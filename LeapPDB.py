@@ -1,5 +1,6 @@
 import sys
 import random
+from AmberMaps import *
 
 __doc__='''
 This module utilize tLEaP to build random mutated structures
@@ -34,8 +35,20 @@ def PDB2Leap(init_PDB_path, MutaFlag):
             for line in f:
                 try:
                     if line.split()[4] == resi_Index:
-                        if 
-                        print(line)
+                        #keep if match the OldAtom list
+                        for i in OldAtoms:
+                            if i == line.split()[2]:
+                                #change the traget residue name !!WARNING!! format limitation here!
+                                #Another method but still depend on format
+                                #Ele=line.split()                            
+                                #new_line='{:<8}'.format(Ele[0])+
+                                new_line=line[:17]+Resi_map[Muta_resi]+line[20:]
+
+                                of.write(new_line)
+                                break
+                        #Do not keep if not match & in the target residue.
+                        
+                        
 
                     else:
                         of.write(line)
