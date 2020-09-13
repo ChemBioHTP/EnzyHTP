@@ -26,7 +26,7 @@ def PDB2Leap(init_PDB_path, MutaFlag):
     resi_Index=MutaFlag[1:3]
     Muta_resi=MutaFlag[3]
 
-    #Operate the PDB
+    # Operate the PDB
     out_PDB_path=init_PDB_path[:-4]+'_'+MutaFlag+'.pdb'
 
     with open(init_PDB_path,'r') as f:
@@ -48,18 +48,16 @@ def PDB2Leap(init_PDB_path, MutaFlag):
                                 of.write(new_line)
                                 break
                         #Do not keep if not match & in the target residue.
-                        
-                        
-
                     else:
                         of.write(line)
-
-
+                
                 except IndexError:
                     of.write(line)
                     print('Warning: Not a data line -> '+line+'---'+str(line_index))
 
                 line_index=line_index+1
+    
+    # Run tLeap
 
 
 def FlagGen(init_PDB_path):
