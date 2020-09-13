@@ -42,6 +42,7 @@ def PDB2Leap(init_PDB_path, MutaFlag):
                                 #Another method but still depend on format
                                 #Ele=line.split()                            
                                 #new_line='{:<8}'.format(Ele[0])+
+                                
                                 new_line=line[:17]+Resi_map[Muta_resi]+line[20:]
 
                                 of.write(new_line)
