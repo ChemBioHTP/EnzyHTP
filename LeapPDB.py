@@ -6,12 +6,15 @@ This module utilize tLEaP to build random mutated structures
 ------------------------------------------------------------
 PDB2Leap()
 Input:  PDB file    (The original PDB file // standard Amber format)
-        MutaFlag    (The flag of mutation. e.g. E92K)
+        MutaFlag    (The flag of mutation in Amber PDB index e.g. E92K -> E37K)
 Output: PDB file    (The structure after mutation // standard Amber format)
 ------------------------------------------------------------
 FlagGen()
 Input:  PDB file    (The original PDB file // standard Amber format)
 Output: A Random MutaFlag
+------------------------------------------------------------
+(List)OldAtoms
+A list of atoms kept from the initial residue.
 ------------------------------------------------------------
 '''
 
@@ -23,16 +26,37 @@ def PDB2Leap(init_PDB_path, MutaFlag):
     Muta_resi=MutaFlag[3]
 
     #Operate the PDB
+    out_PDB_path=init_PDB_path[:-4]+'_'+MutaFlag+'.pdb'
+
     with open(init_PDB_path,'r') as f:
-        for line in f:
-            if line[25] == resi_Index:
-                pass
+        with open(out_PDB_path,'w') as of:
+            line_index=1
+            for line in f:
+                try:
+                    if line.split()[4] == resi_Index:
+                        if 
+                        print(line)
+
+                    else:
+                        of.write(line)
+
+
+                except IndexError:
+                    of.write(line)
+                    print('Warning: Not a data line -> '+line+'---'+str(line_index))
+
+                line_index=line_index+1
 
 
 def FlagGen(init_PDB_path):
     pass
 
+OldAtoms=['N','H','CA','HA','CB','C','O']
+
+
+
+
 # This part is for test only
 PDB1_path=r'C:\Users\shaoqz\OneDrive\Zhongyue\wkFlow\tleap_test\random\2kz2init_amb.pdb'
-PDB2Leap(PDB1_path, 'E92K')
+PDB2Leap(PDB1_path, 'E37K')
 # This part is for test only
