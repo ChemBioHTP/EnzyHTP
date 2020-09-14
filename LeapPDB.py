@@ -1,6 +1,7 @@
-import sys
+import os
 import random
 from AmberMaps import *
+from TestTools import *
 
 __doc__='''
 This module utilize tLEaP to build random mutated structures
@@ -27,7 +28,8 @@ def PDB2Leap(init_PDB_path, MutaFlag):
     Muta_resi=MutaFlag[3]
 
     # Operate the PDB
-    out_PDB_path=init_PDB_path[:-4]+'_'+MutaFlag+'.pdb'
+    out_PDB_path=init_PDB_path[:-4]+'_'+MutaFlag+'_p.pdb'
+    out_PDB_path2=init_PDB_path[:-4]+'_'+MutaFlag+'.pdb'
 
     with open(init_PDB_path,'r') as f:
         with open(out_PDB_path,'w') as of:
@@ -58,6 +60,20 @@ def PDB2Leap(init_PDB_path, MutaFlag):
                 line_index=line_index+1
     
     # Run tLeap
+    #make input
+    os.system('mkdir tleap_cache')
+    leap_input=open('tleap.in','w')
+    leap_input.write('source leaprc.protein.ff14SB\n')
+    leap_input.write('a = loadpdb '+out_PDB_path+'\n')
+    leap_input.write('savepdb a '+out_PDB_path2+'\n')
+    leap_input.write('quit\n')
+    leap_input.close()
+    #run
+    os.system('tleap -s -f tleap.in > tleap.out')
+    os.system('mv *leap.* tleap_cache')
+
+    return out_PDB_path2
+
 
 
 def FlagGen(init_PDB_path):
@@ -69,6 +85,7 @@ OldAtoms=['N','H','CA','HA','CB','C','O']
 
 
 # This part is for test only
-PDB1_path=r'C:\Users\shaoqz\OneDrive\Zhongyue\wkFlow\tleap_test\random\2kz2init_amb.pdb'
-PDB2Leap(PDB1_path, 'E37K')
+PDB1_path='2kz2init_amb.pdb'
+PDB2_path=PDB2Leap(PDB1_path, 'E37K')
+PDBMin(PDB2_path)
 # This part is for test only
