@@ -6,8 +6,10 @@ from TestTools import *
 
 #initial PDB
 PDB1_path='2kz2init_amb.pdb'
-#use tleap to mutate the PDB
-PDB2_path=PDB2Leap(PDB1_path, 'E37K')
-#use minimization to relax the mutated PDB
-PDB3_path=PDBMin(PDB2_path)
+#use tleap to randomly mutate the PDB
+for i in range(10):
+    Flag=FlagGen(PDB1_path)
+    PDB2_path=PDB2Leap(PDB1_path, Flag)
+#use minimization to relax each mutated PDB
+    PDB3_path=PDBMin(PDB2_path)
 

@@ -37,13 +37,11 @@ def PDB2Leap(init_PDB_path, MutaFlag):
             for line in f:
                 try:
                     if line.split()[4] == resi_Index:
+                        #This match method may only work with monomer. Ploymer may need break after first found? (mark:enzyme)
                         #keep if match the OldAtom list
                         for i in OldAtoms:
                             if i == line.split()[2]:
-                                #change the traget residue name !!WARNING!! format limitation here!
-                                #Another method but still depend on format
-                                #Ele=line.split()                            
-                                #new_line='{:<8}'.format(Ele[0])+
+                                #change the traget residue name !!WARNING!! strong format limitation here!
                                 
                                 new_line=line[:17]+Resi_map[Muta_resi]+line[20:]
 
@@ -77,7 +75,31 @@ def PDB2Leap(init_PDB_path, MutaFlag):
 
 
 def FlagGen(init_PDB_path):
-    pass
+    out_flag=''
+    tot_resi=0
+    resi_1=''
+    resi_2=''
+    Muta_idx=''
+
+    #This method to count the totle residue in a chain is order depending. The target chain has to be the first.(mark:enzyme)
+    with open(init_PDB_path,'r') as f:
+        lines=f.readlines()
+        for i in range(len(lines)):
+            if lines[i].strip() == 'TER':
+                tot_resi=int(lines[i-1].split()[4])
+                break
+        #Generate the mutation index and resi_2
+        Muta_idx=str(random.randint(1,tot_resi))
+        resi_2=Resi_list[random.randint(0,len(Resi_list)-1)]
+        #obtain resi_1
+        for line in lines:
+            if line.split()[4] == Muta_idx:
+                resi_1_p=line.split()[3]
+                resi_1=Resi_map2[resi_1_p]
+                break
+
+    out_flag=resi_1+Muta_idx+resi_2
+    return out_flag
 
 OldAtoms=['N','H','CA','HA','CB','C','O']
 
@@ -85,8 +107,9 @@ OldAtoms=['N','H','CA','HA','CB','C','O']
 
 
 # This part is for test only
-PDB1_path='2kz2init_amb.pdb'
-PDB2_path=PDB2Leap(PDB1_path, 'E37K')
-PDBMin(PDB2_path)
+#PDB1_path='2kz2init_amb.pdb'
+#print(FlagGen(PDB1_path))
+#PDB2_path=PDB2Leap(PDB1_path, 'E37K')
+#PDBMin(PDB2_path)
 # This part is for test only
 #TestOnly

@@ -38,6 +38,9 @@ def PDB2FF(PDB_path):
 
 
 def PDBMin(PDB_path):
+    
+    min_cycle='2000'
+
     PDB_name=PDB_path[:-4]
     out4_PDB_path=PDB_name+'_min.pdb'
 
@@ -52,7 +55,7 @@ def PDBMin(PDB_path):
     min_input.write('  imin=1,\n')
     min_input.write('  ntx=1,\n')
     min_input.write('  irest=0,\n')
-    min_input.write('  maxcyc=20000,\n')
+    min_input.write('  maxcyc='+min_cycle+',\n')
     min_input.write('  ncyc=10000,\n')
     min_input.write('  ntpr=1000,\n')
     min_input.write('  ntwx=0,\n')
