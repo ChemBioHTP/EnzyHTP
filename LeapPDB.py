@@ -1,7 +1,7 @@
 import os
 import random
 from AmberMaps import *
-from TestTools import *
+from TestTools import *#TestOnly
 
 __doc__='''
 This module utilize tLEaP to build random mutated structures
@@ -89,3 +89,4 @@ PDB1_path='2kz2init_amb.pdb'
 PDB2_path=PDB2Leap(PDB1_path, 'E37K')
 PDBMin(PDB2_path)
 # This part is for test only
+#TestOnly
