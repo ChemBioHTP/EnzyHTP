@@ -1,5 +1,6 @@
 import os
 import random
+import re
 from AmberMaps import *
 from TestTools import *#TestOnly
 
@@ -24,8 +25,8 @@ def PDB2Leap(init_PDB_path, MutaFlag):
     
     # Decode the Flag
     Init_resi=MutaFlag[0]
-    resi_Index=MutaFlag[1:3]
-    Muta_resi=MutaFlag[3]
+    resi_Index=re.search('[0-9]+',MutaFlag).group()
+    Muta_resi=MutaFlag[-1]
 
     # Operate the PDB
     out_PDB_path=init_PDB_path[:-4]+'_'+MutaFlag+'_p.pdb'
@@ -109,7 +110,7 @@ OldAtoms=['N','H','CA','HA','CB','C','O']
 # This part is for test only
 #PDB1_path='2kz2init_amb.pdb'
 #print(FlagGen(PDB1_path))
-#PDB2_path=PDB2Leap(PDB1_path, 'E37K')
+#PDB2_path=PDB2Leap(PDB1_path, 'E3K')
 #PDBMin(PDB2_path)
 # This part is for test only
 #TestOnly
