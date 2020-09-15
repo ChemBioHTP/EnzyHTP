@@ -30,8 +30,8 @@ def PDB2FF(PDB_path):
     tleap_input.close()
 
     #run
-    os.system('tleap -s -f tleap_ff.in > tleap_ff.out')
-    os.system('mv *leap_ff.* leap.log tleap_cache')
+    os.system('tleap -s -f tleap_ff.in > tleap_ff_'+PDB_name+'.out')
+    os.system('mv *leap_ff* leap.log tleap_cache')
 
     return (PDB_name+'.prmtop',PDB_name+'.inpcrd',out3_PDB_path)
 
@@ -68,10 +68,11 @@ def PDBMin(PDB_path):
 
     #run
     os.system('$AMBERHOME/bin/sander -O -i min.in -o min.out -p '+ff_files[0]+' -c '+ff_files[1]+' -r min.rst')
-    os.system('mv *min.* min_cache')
 
     #rst2pdb
     os.system('ambpdb -p '+ff_files[0]+' -c min.rst > '+out4_PDB_path)
+    os.system('mv min.rst min_cache/min_'+PDB_name+'.rst')
+    os.system('mv min.out min.in '+ff_files[0]+' '+ff_files[1]+' min_cache')
 
     return out4_PDB_path
 
