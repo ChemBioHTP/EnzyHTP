@@ -2,7 +2,7 @@ import os
 import random
 import re
 from AmberMaps import *
-from TestTools import *#TestOnly
+from TestTools import *
 
 __doc__='''
 This module utilize tLEaP to build random mutated structures
@@ -89,15 +89,21 @@ def FlagGen(init_PDB_path):
             if lines[i].strip() == 'TER':
                 tot_resi=int(lines[i-1].split()[4])
                 break
-        #Generate the mutation index and resi_2
+        #Generate the mutation index
         Muta_idx=str(random.randint(1,tot_resi))
-        resi_2=Resi_list[random.randint(0,len(Resi_list)-1)]
         #obtain resi_1
         for line in lines:
             if line.split()[4] == Muta_idx:
                 resi_1_p=line.split()[3]
                 resi_1=Resi_map2[resi_1_p]
                 break
+        #Generate resi_2
+        resi_2=Resi_list[random.randint(0,len(Resi_list)-1)]
+        # Check if the same resi
+        while resi_2 == resi_1:
+            resi_2=Resi_list[random.randint(0,len(Resi_list)-1)]
+            
+
 
     out_flag=resi_1+Muta_idx+resi_2
     return out_flag
