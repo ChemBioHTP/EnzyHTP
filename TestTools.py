@@ -60,8 +60,6 @@ def PDBMin(PDB_path):
     min_input.write('  ntpr=1000,\n')
     min_input.write('  ntwx=0,\n')
     min_input.write('  cut=8.0,\n')
-    min_input.write('  ibelly=1,\n')
-    min_input.write('  bellymask=\'!:1\',\n')
     min_input.write(' /\n')
     min_input.close()
    
