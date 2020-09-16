@@ -7,7 +7,7 @@ from TestTools import *#TestOnly
 __doc__='''
 This module utilize tLEaP to build random mutated structures
 ------------------------------------------------------------
-PDB2Leap()
+PDB2PDBwLeap()
 Input:  PDB file    (The original PDB file // standard Amber format)
         MutaFlag    (The flag of mutation in Amber PDB index e.g. E92K -> E37K)
 Output: PDB file    (The structure after mutation // standard Amber format)
@@ -21,7 +21,7 @@ A list of atoms kept from the initial residue.
 ------------------------------------------------------------
 '''
 
-def PDB2Leap(init_PDB_path, MutaFlag):
+def PDB2PDBwLeap(init_PDB_path, MutaFlag):
     
     # Decode the Flag
     Init_resi=MutaFlag[0]
@@ -110,7 +110,7 @@ OldAtoms=['N','H','CA','HA','CB','C','O']
 # This part is for test only
 #PDB1_path='2kz2init_amb.pdb'
 #print(FlagGen(PDB1_path))
-#PDB2_path=PDB2Leap(PDB1_path, 'E3K')
+#PDB2_path=PDB2PDBwLeap(PDB1_path, 'E3K')
 #PDBMin(PDB2_path)
 # This part is for test only
 #TestOnly
