@@ -12,4 +12,5 @@ for i in range(100):
     PDB2_path=PDB2PDBwLeap(PDB1_path, Flag)
 #use minimization to relax each mutated PDB
     PDB3_path=PDBMin(PDB2_path)
+    print(Check_PDB(PDB3_path,Flag), file='min_cache/Check'+Flag+'.log')
 

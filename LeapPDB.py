@@ -29,11 +29,11 @@ def PDB2PDBwLeap(init_PDB_path, MutaFlag):
     Muta_resi=MutaFlag[-1]
 
     # Operate the PDB
-    out_PDB_path=init_PDB_path[:-4]+'_'+MutaFlag+'_p.pdb'
+    out_PDB_path1=init_PDB_path[:-4]+'_'+MutaFlag+'_p.pdb'
     out_PDB_path2=init_PDB_path[:-4]+'_'+MutaFlag+'.pdb'
 
     with open(init_PDB_path,'r') as f:
-        with open(out_PDB_path,'w') as of:
+        with open(out_PDB_path1,'w') as of:
             line_index=1
             for line in f:
                 try:
@@ -63,7 +63,7 @@ def PDB2PDBwLeap(init_PDB_path, MutaFlag):
     os.system('mkdir tleap_cache')
     leap_input=open('tleap.in','w')
     leap_input.write('source leaprc.protein.ff14SB\n')
-    leap_input.write('a = loadpdb '+out_PDB_path+'\n')
+    leap_input.write('a = loadpdb '+out_PDB_path1+'\n')
     leap_input.write('savepdb a '+out_PDB_path2+'\n')
     leap_input.write('quit\n')
     leap_input.close()

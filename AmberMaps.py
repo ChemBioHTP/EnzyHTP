@@ -13,6 +13,10 @@ Map 3 letter name with residue key.
 Map residue key with index number
 [resi_key,...]
 ------------------------------------------------------------
+(???) Atom_topology
+
+
+------------------------------------------------------------
 '''
 
 Resi_map={'R':'ARG',
