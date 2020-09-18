@@ -11,6 +11,10 @@ PDB2FF()
 Input:  PDB file (standard Amber format)
 Output: prmtop & inpcrd 
 ------------------------------------------------------------
+Check_PDB()
+Input:  PDB file (after mutation // standard Amber format)
+Output: A message of bad contact 
+------------------------------------------------------------
 '''
 
 def PDB2FF(PDB_path):
@@ -74,3 +78,5 @@ def PDBMin(PDB_path):
 
     return out4_PDB_path
 
+def Check_PDB(PDB_path):
+    
