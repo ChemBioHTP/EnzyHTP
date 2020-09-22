@@ -91,6 +91,7 @@ def Check_PDB(PDB_path,MutaFlag):
     resi_Index=re.search('[0-9]+',MutaFlag).group()
     Muta_resi=MutaFlag[-1]
 
+    # Read coordinate and the target section // super format dependent // Only for minization or 2FF
     with open(PDB_path) as f:
         line_index=1
         Coord_index=0
@@ -132,7 +133,7 @@ def Check_PDB(PDB_path,MutaFlag):
             Coord_index = Coord_index+1 #index of next element
             line_index=line_index+1 
 
-    # Check each atom in the list
+    # Check each atom in the list by distance
     for atom in Target_list:
 
         P_A = np.array(Coord[atom[1]])
@@ -158,10 +159,17 @@ def Check_PDB(PDB_path,MutaFlag):
 
                 error_card=error_card+error_sec
 
+    # Check for ring containing Residue
+    # How?
+
     return error_card
     
 
     
 
 #TestOnly
-# print(Check_PDB('2kz2init_amb_E37K_water.pdb','E37K'))
+#print(Check_PDB('2kz2_E92W.rst.pdb','E92W'))
+# for i in glob.glob('*min.pdb'):
+#     Flag = i.split('.')[0].split('_')[2]
+#     print('-------'+Flag+'----------')
+#     print(Check_PDB(i,Flag))
