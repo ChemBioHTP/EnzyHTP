@@ -8,12 +8,13 @@ This module defines the potential object to operate. Included some common I/O an
 -------------------------------------------------------------------------------------
 Class PDB
 -------------------------------------------------------------------------------------
-__init__()
+__init__(self,path,Flag)
     Input:  PDB path (any format), MutaFlag
     Output: self.path 
             self.name 
             self.ifformat (Judge by the first line)
             self.MutaFlag
+          # Connect with the database // add a flow for database?
 -------------------------------------------------------------------------------------
 Information collecting methods:
 -------------------------------------------------------------------------------------
@@ -89,7 +90,7 @@ class PDB(object):
 
 
     def get_tot_resi(self):
-        #This method of counting the totle residue in a chain is order depending. The target chain has to be the first.(mark:enzyme)
+        #This method takes the first chain of a PDB file to count the total number of residues. (mark:enzyme)
         with open(self.path,'r') as f:
             lines=f.readlines()
             for i in range(len(lines)):
@@ -114,7 +115,7 @@ class PDB(object):
                     i=i+1
     
     def get_coord(self):
-        # Read coordinate and the target section // super format dependent // Only for minization or 2FF
+        # The method to extract coordinate depends critically on the file format. (Only takes PDB after minimization and '2FF')
         self.Coord=[]
         with open(self.path) as f:
             line_index=1
@@ -145,7 +146,7 @@ class PDB(object):
                     line_index=line_index+1
                     continue
 
-                #Get coordinate form PDB file. The list index is correspond to the (atom index - 1) may be there will be some inconsistancy?
+                #Get coordinate form PDB file. The list index is correspond to the (atom index - 1) // may be there will be some inconsistancy? (code:enzyme)
                 self.Coord = self.Coord + [[float(line.split()[5]),float(line.split()[6]),float(line.split()[7])],]
                 
                 line_index=line_index+1 
@@ -156,7 +157,7 @@ class PDB(object):
 
     def PDB2PDBwLeap(self):
         '''
-        Use self.MutaFlag and tLeap to build matuted structure.
+        Use self.MutaFlag and tLeap to build mutated structure.
         Save changes to self.path and self.name
         self.stage=1
         '''
@@ -229,7 +230,7 @@ class PDB(object):
         resi_2=''
         Muta_idx=''
 
-        #This method to count the totle residue in a chain is order depending. The target chain has to be the first.(mark:enzyme)
+        #This method takes the first chain of a PDB file to count the total number of residues. (mark:enzyme)
         with open(self.path,'r') as f:
             lines=f.readlines()
             for i in range(len(lines)):
@@ -260,8 +261,9 @@ class PDB(object):
         tleap_input.write('source leaprc.protein.ff14SB\n')
         tleap_input.write('source leaprc.water.tip3p\n')
         tleap_input.write('a = loadpdb '+self.path+'\n')
-        tleap_input.write('solvatebox a TIP3PBOX 8\n')
-        tleap_input.write('addions a Na+ 0\n') #note here charge should be determined when dealing with more enzyme (mark:enzyme)
+        tleap_input.write('solvatebox a TIP3PBOX 10\n')
+        tleap_input.write('addions a Na+ 0\n')
+        tleap_input.write('addions a Cl- 0\n')
         tleap_input.write('saveamberparm a '+self.name+'.prmtop '+self.name+'.inpcrd\n')
         #tleap_input.write('savepdb a '+out3_PDB_path+'\n')
         tleap_input.write('quit\n')
