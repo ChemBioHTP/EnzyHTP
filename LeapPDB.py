@@ -2,12 +2,12 @@ import os
 import random
 import re
 from AmberMaps import *
-from TestTools import *#TestOnly
+from TestTools import *
 
 __doc__='''
 This module utilize tLEaP to build random mutated structures
 ------------------------------------------------------------
-PDB2Leap()
+PDB2PDBwLeap()
 Input:  PDB file    (The original PDB file // standard Amber format)
         MutaFlag    (The flag of mutation in Amber PDB index e.g. E92K -> E37K)
 Output: PDB file    (The structure after mutation // standard Amber format)
@@ -21,7 +21,7 @@ A list of atoms kept from the initial residue.
 ------------------------------------------------------------
 '''
 
-def PDB2Leap(init_PDB_path, MutaFlag):
+def PDB2PDBwLeap(init_PDB_path, MutaFlag):
     
     # Decode the Flag
     Init_resi=MutaFlag[0]
@@ -29,11 +29,11 @@ def PDB2Leap(init_PDB_path, MutaFlag):
     Muta_resi=MutaFlag[-1]
 
     # Operate the PDB
-    out_PDB_path=init_PDB_path[:-4]+'_'+MutaFlag+'_p.pdb'
+    out_PDB_path1=init_PDB_path[:-4]+'_'+MutaFlag+'_p.pdb'
     out_PDB_path2=init_PDB_path[:-4]+'_'+MutaFlag+'.pdb'
 
     with open(init_PDB_path,'r') as f:
-        with open(out_PDB_path,'w') as of:
+        with open(out_PDB_path1,'w') as of:
             line_index=1
             for line in f:
                 try:
@@ -63,7 +63,7 @@ def PDB2Leap(init_PDB_path, MutaFlag):
     os.system('mkdir tleap_cache')
     leap_input=open('tleap.in','w')
     leap_input.write('source leaprc.protein.ff14SB\n')
-    leap_input.write('a = loadpdb '+out_PDB_path+'\n')
+    leap_input.write('a = loadpdb '+out_PDB_path1+'\n')
     leap_input.write('savepdb a '+out_PDB_path2+'\n')
     leap_input.write('quit\n')
     leap_input.close()
@@ -89,15 +89,21 @@ def FlagGen(init_PDB_path):
             if lines[i].strip() == 'TER':
                 tot_resi=int(lines[i-1].split()[4])
                 break
-        #Generate the mutation index and resi_2
+        #Generate the mutation index
         Muta_idx=str(random.randint(1,tot_resi))
-        resi_2=Resi_list[random.randint(0,len(Resi_list)-1)]
         #obtain resi_1
         for line in lines:
             if line.split()[4] == Muta_idx:
                 resi_1_p=line.split()[3]
                 resi_1=Resi_map2[resi_1_p]
                 break
+        #Generate resi_2
+        resi_2=Resi_list[random.randint(0,len(Resi_list)-1)]
+        # Check if the same resi
+        while resi_2 == resi_1:
+            resi_2=Resi_list[random.randint(0,len(Resi_list)-1)]
+            
+
 
     out_flag=resi_1+Muta_idx+resi_2
     return out_flag
@@ -110,7 +116,7 @@ OldAtoms=['N','H','CA','HA','CB','C','O']
 # This part is for test only
 #PDB1_path='2kz2init_amb.pdb'
 #print(FlagGen(PDB1_path))
-#PDB2_path=PDB2Leap(PDB1_path, 'E3K')
+#PDB2_path=PDB2PDBwLeap(PDB1_path, 'E3K')
 #PDBMin(PDB2_path)
 # This part is for test only
 #TestOnly

@@ -1,4 +1,6 @@
-import os
+import os,re
+import numpy as np
+from AmberMaps import *
 
 __doc__='''
 This module provides tools to test the whole workflow
@@ -10,6 +12,10 @@ Output: PDB file (after minimization // standard Amber format)
 PDB2FF()
 Input:  PDB file (standard Amber format)
 Output: prmtop & inpcrd 
+------------------------------------------------------------
+Check_PDB()
+Input:  PDB file (after 2FF or minimization // standard Amber format)
+Output: A message card of bad contact 
 ------------------------------------------------------------
 '''
 
@@ -60,8 +66,6 @@ def PDBMin(PDB_path):
     min_input.write('  ntpr=1000,\n')
     min_input.write('  ntwx=0,\n')
     min_input.write('  cut=8.0,\n')
-    min_input.write('  ibelly=1,\n')
-    min_input.write('  bellymask=\'!:1\',\n')
     min_input.write(' /\n')
     min_input.close()
    
@@ -76,3 +80,96 @@ def PDBMin(PDB_path):
 
     return out4_PDB_path
 
+def Check_PDB(PDB_path,MutaFlag):
+
+    Coord=[]
+    Target_list=[]
+    error_card='Fine\n'
+
+    #decode the Flag
+    Init_resi=MutaFlag[0]
+    resi_Index=re.search('[0-9]+',MutaFlag).group()
+    Muta_resi=MutaFlag[-1]
+
+    # Read coordinate and the target section // super format dependent // Only for minization or 2FF
+    with open(PDB_path) as f:
+        line_index=1
+        Coord_index=0
+        for line in f:
+            #Skip some line
+            skip_flag=0
+            #skip the CRYST1 line
+            if line_index==1:
+                line_index=line_index+1
+                continue
+            #skip the TER
+            if line[:3] == 'TER':
+                line_index=line_index+1
+                continue
+            #skip the END
+            if line[:3] == 'END':
+                line_index=line_index+1
+                continue
+
+            #skip the water and ion(Append in the future)
+            skip_list=['Na+','CA','WAT']
+            for i in skip_list:
+                if line.split()[3] == i:
+                    line_index=line_index+1
+                    skip_flag=1
+                    break
+            if skip_flag:
+                line_index=line_index+1
+                continue
+
+            #Get coordinate form PDB file. The list index is correspond to the (atom index - 1)
+            Coord = Coord + [[float(line.split()[5]),float(line.split()[6]),float(line.split()[7])],]
+
+            #Get the target atom list by resi_index
+            if line.split()[4] == resi_Index:
+                Atom_type=line.split()[2]
+                Target_list=Target_list+[(Atom_type,Coord_index),]
+            
+            Coord_index = Coord_index+1 #index of next element
+            line_index=line_index+1 
+
+    # Check each atom in the list by distance
+    for atom in Target_list:
+
+        P_A = np.array(Coord[atom[1]])
+
+        #Check each atom expect what is connected
+        for i in range(len(Coord)):
+            P_B = np.array(Coord[i])
+            D_AB = np.linalg.norm(P_B-P_A)
+            error_sec=''
+            skip_flag=0
+            
+            #atoms connected (Update to topology version in the future)
+            for j in Target_list:                 
+                if i == j[1]:
+                    # Do not check bond in this version
+                    skip_flag=1
+            if skip_flag:
+                continue
+            
+            #atoms not connected
+            if D_AB <= 0.8:
+                error_sec='Bad contact between: atom '+str(i+1)+' and '+str(atom[1]+1)+'\n'
+
+                error_card=error_card+error_sec
+
+    # Check for ring containing Residue
+    # How?
+
+    return error_card
+    
+
+    
+
+#TestOnly
+#print(Check_PDB('2kz2_E92W.rst.pdb','E92W'))
+# for i in glob.glob('*min.pdb'):
+#     Flag = i.split('.')[0].split('_')[2]
+#     print('-------'+Flag+'----------')
+#     print(Check_PDB(i,Flag))
