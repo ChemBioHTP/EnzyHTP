@@ -1,0 +1,27 @@
+Heat
+ &cntrl
+  imin  = 0,  ntx = 1, irest = 0,
+  ntc   = 1, ntf = 1,
+  cut   = 10.0,
+  nstlim= 20000, dt= 0.001,
+  tempi = 0.0,  temp0=300.0,  
+  ntpr  = 100,  ntwx=20000,
+  ntt   = 2,
+  ntb   = 1,  ntp = 0,
+  iwrap = 1,
+  nmropt= 1,
+  ig    = -1,
+ /
+ &wt
+  type  = 'TEMP0',
+  istep1= 0, istep2=18000,
+  value1= 0.0, value2=300.0,
+ /
+ &wt
+  type  = 'TEMP0',
+  istep1= 18001, istep2=20000,
+  value1= 300.0, value2=300.0,
+ /
+ &wt
+  type  = 'END',
+ /
