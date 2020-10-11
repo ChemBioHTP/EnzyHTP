@@ -5,7 +5,7 @@ from Class_Conf import *
 
 #initial PDB
 #use tleap to randomly mutate the PDB
-for i in range(2):
+for i in range(1):
     PDB1=PDB('2kz2init_amb.pdb')
     PDB1.Random_MutaFlag()
     PDB1.PDB2PDBwLeap()
@@ -22,7 +22,7 @@ for i in range(2):
     MD.set_equi()
     MD.set_prod()
     MD.deploy(path='./MD')
-    PDB1.PDBMD(MD.deploy_path)
+    PDB1.PDBMD(conf_path=MD.deploy_path)
 
     #print(Check_PDB(PDB3_path,Flag), file='min_cache/Check'+Flag+'.log')
 

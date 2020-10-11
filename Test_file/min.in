@@ -1,8 +1,0 @@
-Minimize
- &cntrl
-  imin  = 1,  ntx   = 1,  irest = 0,
-  ntc   = 1,    ntf = 1,
-  cut   = 10.0,
-  maxcyc= 20000, ncyc  = 10000,
-  ntpr  = 1000,   ntwx  = 0,
- /

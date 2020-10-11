@@ -67,7 +67,8 @@ class Conf(object):
   cut   = '''+cut+''',
   maxcyc= '''+maxcyc+''', ncyc  = '''+ncyc+''',
   ntpr  = '''+ntpr+''',   ntwx  = 0,
- /'''
+ /
+ '''
 
         self.min_fn='min'+self.tag+'.in'
         self.deploy_list=self.deploy_list+[(self.min_fn,self.min_conf),]
@@ -109,7 +110,8 @@ class Conf(object):
  /
  &wt
   type  = 'END',
- /'''
+ /
+ '''
 
         self.heat_fn='heat'+self.tag+'.in'
         self.deploy_list=self.deploy_list+[(self.heat_fn,self.heat_conf),]
@@ -133,7 +135,8 @@ class Conf(object):
   ntb   = 2,  ntp = 1,
   iwrap = 1,
   ig    = -1,
- /'''
+ /
+ '''
 
         self.equi_fn='equi'+self.tag+'.in'
         self.deploy_list=self.deploy_list+[(self.equi_fn,self.equi_conf),]
@@ -156,7 +159,8 @@ class Conf(object):
   ntb   = 2,  ntp = 1,
   iwrap = 1,
   ig    = -1,
- /'''
+ /
+ '''
         
         self.prod_fn='prod'+self.tag+'.in'
         self.deploy_list=self.deploy_list+[(self.prod_fn,self.prod_conf),]
@@ -172,14 +176,13 @@ class Conf(object):
         
         if clean:
             self.deploy_list=[]
-            self.deploy_path=''
 
 #TestOnly
-a=Conf()
-a.set_min()
-a.set_heat()
-a.set_equi()
-a.set_prod()
-a.deploy()
+# a=Conf()
+# a.set_min()
+# a.set_heat()
+# a.set_equi()
+# a.set_prod()
+# a.deploy()
 
 

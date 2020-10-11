@@ -378,7 +378,7 @@ class PDB(object):
         os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+conf_path+'/min'+tag+'.in -o ' +out_path+'/min_' +Flag_name+'.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+out_path+'/min_'+Flag_name+'.rst')
         os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+conf_path+'/heat'+tag+'.in -o '+out_path+'/heat_'+Flag_name+'.out -p '+self.prmtop_path+' -c '+out_path+'/min_'+Flag_name+'.rst -ref ' +out_path+'/min_'+Flag_name+'.rst -r ' +out_path+'/heat_'+Flag_name+'.rst')
         os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+conf_path+'/equi'+tag+'.in -o '+out_path+'/equi_'+Flag_name+'.out -p '+self.prmtop_path+' -c '+out_path+'/heat_'+Flag_name+'.rst -ref '+out_path+'/heat_'+Flag_name+'.rst -r '+out_path+'/equi_'+Flag_name+'.rst')
-        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+conf_path+'/prod'+tag+'.in -o '+out_path+'/prod_'+Flag_name+'.out -p '+self.prmtop_path+' -c '+out_path+'/equi_'+Flag_name+'.rst -ref '+out_path+'/equi_'+Flag_name+'.rst -r '+out_path+'/prod_'+Flag_name+'.rst -x '+out_path+'/prod'+Flag_name+'.nc')
+        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+conf_path+'/prod'+tag+'.in -o '+out_path+'/prod_'+Flag_name+'.out -p '+self.prmtop_path+' -c '+out_path+'/equi_'+Flag_name+'.rst -ref '+out_path+'/equi_'+Flag_name+'.rst -r '+out_path+'/prod_'+Flag_name+'.rst -x '+out_path+'/prod_'+Flag_name+'.nc')
 
         #Or add a class constant?
         return 'MD/prod_'+Flag_name+'.rst'
