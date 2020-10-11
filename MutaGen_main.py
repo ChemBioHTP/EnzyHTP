@@ -1,4 +1,5 @@
 from Class_PDB import *
+from Class_Conf import *
 
 #This is the main file
 
@@ -11,5 +12,17 @@ for i in range(2):
 #use minimization to relax each mutated PDB
     PDB1.PDB2FF()
     PDB1.PDBMin()
+#run MD
+    os.system('mkdir MD')
+    PDB1.rm_wat()
+    PDB1.PDB2FF()
+    MD=Conf()
+    MD.set_min()
+    MD.set_heat()
+    MD.set_equi()
+    MD.set_prod()
+    MD.deploy(path='./MD')
+    PDB1.PDBMD(MD.deploy_path)
+
     #print(Check_PDB(PDB3_path,Flag), file='min_cache/Check'+Flag+'.log')
 

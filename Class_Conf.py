@@ -30,6 +30,7 @@ class Conf(object):
 
     # a list for deployment
     deploy_list=[]
+    deploy_path=''
 
     #Amber simulation
     min_conf=''
@@ -161,17 +162,19 @@ class Conf(object):
         self.deploy_list=self.deploy_list+[(self.prod_fn,self.prod_conf),]
 
 
-    def deploy(self,path='./',clean=True):
+    def deploy(self,path='.',clean=True):
 
+        self.deploy_path=path
         for filename,fileStr in self.deploy_list:
-            conf_file=open(path+filename,'w')
+            conf_file=open(self.deploy_path+'/'+filename,'w')
             conf_file.write(fileStr)
             conf_file.close()
         
         if clean:
             self.deploy_list=[]
+            self.deploy_path=''
 
-
+#TestOnly
 a=Conf()
 a.set_min()
 a.set_heat()

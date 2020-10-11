@@ -365,110 +365,20 @@ class PDB(object):
 
         return self.path
 
-    def PDBMD(self):
+    def PDBMD(self,conf_path,tag=''):
         '''
         Use self.prmtop_path and self.inpcrd_path to initilize a MD simulation.
+        The MD configuration files are assigned by the conf_path. Be sure to use the same tag when files are taged.
         Return the rst path of the prod step.
         '''
-        min_cycle='20000'
         Flag_name=self.MutaFlag[0]+self.MutaFlag[1]+self.MutaFlag[2]
-
-
-        # make input protocol files
-        # min
-        os.system('mkdir MD')
-        min_input=open('MD/min.in','w')
-        min_input.write('Minimize\n') 
-        min_input.write(' &cntrl\n') 
-        min_input.write('  imin=1,\n') 
-        min_input.write('  ntx=1,\n') 
-        min_input.write('  irest=0,\n') 
-        min_input.write('  maxcyc='+min_cycle+',\n') 
-        min_input.write('  ncyc=10000,\n') 
-        min_input.write('  ntpr=1000,\n') 
-        min_input.write('  ntwx=0,\n') 
-        min_input.write('  cut=10.0,\n') 
-        min_input.write(' /\n') 
-        min_input.close()
-
-        # heat
-        heat_input=open('MD/heat.in','w')
-        heat_input.write('Equilibration1: constant volume\n') 
-        heat_input.write('&cntrl\n') 
-        heat_input.write('  imin=0,\n') 
-        heat_input.write('  ntx=1,\n') 
-        heat_input.write('  irest=0,\n') 
-        heat_input.write('  iwrap=1,\n') 
-        heat_input.write('  nstlim=20000,\n') 
-        heat_input.write('  dt=0.001,\n') 
-        heat_input.write('  ntf=1,\n') 
-        heat_input.write('  ntc=1,\n') 
-        heat_input.write('  tempi=0.0,\n') 
-        heat_input.write('  temp0=300.0,\n') 
-        heat_input.write('  ntpr=100,\n') 
-        heat_input.write('  ntwx=100,\n') 
-        heat_input.write('  cut=10.0,\n') 
-        heat_input.write('  ntb=1,\n') 
-        heat_input.write('  ntp=0,\n') 
-        heat_input.write('  ntt=2,\n') 
-        heat_input.write('  nmropt=1,\n') 
-        heat_input.write('  ig=-1,\n') 
-        heat_input.write('&end\n') 
-        heat_input.write('&wt type=\'TEMP0\', istep1=0, istep2=18000, value1=0.0, value2=300.0 /\n') 
-        heat_input.write('&wt type=\'TEMP0\', istep1=18001, istep2=20000, value1=300.0,\n') 
-        heat_input.write('value2=300.0 /\n') 
-        heat_input.write('&wt type=\'END\' /\n') 
-        heat_input.close()
-
-        #equi
-        eq_input=open('MD/equi.in','w')
-        eq_input.write('Equilibration2:constant pressure\n')
-        eq_input.write('&cntrl\n')
-        eq_input.write('  imin=0,\n')
-        eq_input.write('  ntx=5,\n')
-        eq_input.write('  irest=0,\n')
-        eq_input.write('  nstlim=5000,\n')
-        eq_input.write('  dt=0.001,\n')
-        eq_input.write('  iwrap=1,\n')
-        eq_input.write('  ntf=1,\n')
-        eq_input.write('  ntc=1,\n')
-        eq_input.write('  temp0=300.0,\n')
-        eq_input.write('  ntpr=5000,\n')
-        eq_input.write('  cut=10.0,\n')
-        eq_input.write('  ntb=2,\n')
-        eq_input.write('  ntp=1,\n')
-        eq_input.write('  ntt=2,\n')
-        eq_input.write('  ig=-1,\n')
-        eq_input.write(' /')
-        eq_input.close()
-
-        #prod
-        prod_input=open('MD/prod.in','w')
-        prod_input.write('Equilibration:constant pressure\n')
-        prod_input.write('&cntrl\n')
-        prod_input.write('  imin=0,\n')
-        prod_input.write('  ntx=1,\n')
-        prod_input.write('  irest=0,\n')
-        prod_input.write('  nstlim=100000,\n')
-        prod_input.write('  dt=0.001,\n')
-        prod_input.write('  iwrap=1,\n')
-        prod_input.write('  ntf=1,\n')
-        prod_input.write('  ntc=1,\n')
-        prod_input.write('  temp0=300.0,\n')
-        prod_input.write('  ntpr=5000,\n')
-        prod_input.write('  cut=10.0,\n')
-        prod_input.write('  ntb=2,\n')
-        prod_input.write('  ntp=1,\n')
-        prod_input.write('  ntt=2,\n')
-        prod_input.write('  ig=-1,\n')
-        prod_input.write(' /\n')   
-        prod_input.close()
+        out_path=conf_path
 
         #run sander
-        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i MD/min.in -o MD/min_'+Flag_name+'.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r MD/min_'+Flag_name+'.rst')
-        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i MD/heat.in -o MD/heat_'+Flag_name+'.out -p '+self.prmtop_path+' -c MD/min_'+Flag_name+'.rst -ref MD/min_'+Flag_name+'.rst -r MD/heat_'+Flag_name+'.rst')
-        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i MD/equi.in -o MD/equi_'+Flag_name+'.out -p '+self.prmtop_path+' -c MD/heat_'+Flag_name+'.rst -ref MD/heat_'+Flag_name+'.rst -r MD/equi_'+Flag_name+'.rst')
-        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i MD/prod.in -o MD/prod_'+Flag_name+'.out -p '+self.prmtop_path+' -c MD/equi_'+Flag_name+'.rst -ref MD/equi_'+Flag_name+'.rst -r MD/prod_'+Flag_name+'.rst')
+        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+conf_path+'/min'+tag+'.in -o ' +out_path+'/min_' +Flag_name+'.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+out_path+'/min_'+Flag_name+'.rst')
+        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+conf_path+'/heat'+tag+'.in -o '+out_path+'/heat_'+Flag_name+'.out -p '+self.prmtop_path+' -c '+out_path+'/min_'+Flag_name+'.rst -ref ' +out_path+'/min_'+Flag_name+'.rst -r ' +out_path+'/heat_'+Flag_name+'.rst')
+        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+conf_path+'/equi'+tag+'.in -o '+out_path+'/equi_'+Flag_name+'.out -p '+self.prmtop_path+' -c '+out_path+'/heat_'+Flag_name+'.rst -ref '+out_path+'/heat_'+Flag_name+'.rst -r '+out_path+'/equi_'+Flag_name+'.rst')
+        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+conf_path+'/prod'+tag+'.in -o '+out_path+'/prod_'+Flag_name+'.out -p '+self.prmtop_path+' -c '+out_path+'/equi_'+Flag_name+'.rst -ref '+out_path+'/equi_'+Flag_name+'.rst -r '+out_path+'/prod_'+Flag_name+'.rst -x '+out_path+'/prod'+Flag_name+'.nc')
 
         #Or add a class constant?
         return 'MD/prod_'+Flag_name+'.rst'
@@ -478,10 +388,10 @@ class PDB(object):
 
 
 #TestOnly
-a=PDB(r'2kz2init_amb.pdb','E37K')
-a.PDB2PDBwLeap()
-a.PDB2FF()
-a.PDBMin()
-a.rm_wat()
-a.PDB2FF()
-a.PDBMD()
+# a=PDB(r'2kz2init_amb.pdb','E37K')
+# a.PDB2PDBwLeap()
+# a.PDB2FF()
+# a.PDBMin()
+# a.rm_wat()
+# a.PDB2FF()
+# a.PDBMD()
