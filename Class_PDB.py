@@ -173,9 +173,6 @@ class PDB(object):
         Flag_name=self.MutaFlag[0]+self.MutaFlag[1]+self.MutaFlag[2]
         OldAtoms=['N','H','CA','HA','CB','C','O']
 
-        #fix for start with Gly
-        if Init_resi == 'G':
-            OldAtoms=['N','H','CA','HA2','C','O'] #keep HA2 or HA3 determine the chirality
         #fix for mutate to Gly & Pro
         if Muta_resi == 'G':
             OldAtoms=['N','H','CA','C','O']
