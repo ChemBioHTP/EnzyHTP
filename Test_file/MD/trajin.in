@@ -1,8 +1,0 @@
-parm   ../2kz2init_amb_D38R_min_rmW.prmtop
-trajin ./*.nc
-strip :WAT                                             
-strip :Na+                                               
-strip :Cl- 
-autoimage anchor :1-93
-rmsd first mass 
-trajout ./r1.dcd
