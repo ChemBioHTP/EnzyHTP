@@ -169,7 +169,6 @@ class PDB(object):
     
         resi_Index=self.MutaFlag[1]
         Muta_resi=self.MutaFlag[2]
-        Init_resi=self.MutaFlag[0]
         Flag_name=self.MutaFlag[0]+self.MutaFlag[1]+self.MutaFlag[2]
         OldAtoms=['N','H','CA','HA','CB','C','O']
 
