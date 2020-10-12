@@ -391,8 +391,8 @@ class PDB(object):
 
 
 #TestOnly
-a=PDB(r'2kz2init_amb.pdb','G41R')
-a.PDB2PDBwLeap()
+# a=PDB(r'2kz2init_amb.pdb','G41R')
+# a.PDB2PDBwLeap()
 # a.PDB2FF()
 # a.PDBMin()
 # a.rm_wat()
