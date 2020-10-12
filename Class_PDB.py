@@ -169,11 +169,18 @@ class PDB(object):
     
         resi_Index=self.MutaFlag[1]
         Muta_resi=self.MutaFlag[2]
+        Init_resi=self.MutaFlag[0]
         Flag_name=self.MutaFlag[0]+self.MutaFlag[1]+self.MutaFlag[2]
         OldAtoms=['N','H','CA','HA','CB','C','O']
-        #fix for Gly
+
+        #fix for start with Gly
+        if Init_resi == 'G':
+            OldAtoms=['N','H','CA','HA2','C','O'] #keep HA2 or HA3 determine the chirality
+        #fix for mutate to Gly & Pro
         if Muta_resi == 'G':
             OldAtoms=['N','H','CA','C','O']
+        if Muta_resi == 'P':
+            OldAtoms=['N','CA','HA','CB','C','O']
 
         # Operate the PDB
         out_PDB_path1=self.path[:-4]+'_'+Flag_name+'_tmp.pdb'
@@ -388,8 +395,8 @@ class PDB(object):
 
 
 #TestOnly
-# a=PDB(r'2kz2init_amb.pdb','E37K')
-# a.PDB2PDBwLeap()
+a=PDB(r'2kz2init_amb.pdb','G41R')
+a.PDB2PDBwLeap()
 # a.PDB2FF()
 # a.PDBMin()
 # a.rm_wat()

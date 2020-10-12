@@ -11,10 +11,14 @@ add_tag(self,job_tag='')
 -------------------------------------------------------------------------------------
 Amber Classical MD Simulation
 -------------------------------------------------------------------------------------
-set_min(self,maxcyc='20000',ncyc='10000',ntpr='1000',cut='10.0',ntc='1')
-set_heat(self,nstlim='20000',dt='0.001',tempi='0.0',temp0='300.0',A_istep2=nstlim*0.9,ntpr='100',ntwx='20000',cut='10.0',ntc='1',ntf='1')
-set_equi(self,nstlim='5000',dt='0.001',cut='10.0',temp0='300.0',ntpr='5000',ntwx='5000',ntc='1',ntf='1')
-set_prod(self,nstlim='100000',dt='0.001',cut='10.0',temp0='300.0',ntpr='5000',ntwx='5000',ntc='1',ntf='1')
+set_MD_min(self,maxcyc='20000',ncyc='10000',ntpr='1000',cut='10.0',ntc='1')
+set_MD_heat(self,nstlim='20000',dt='0.001',tempi='0.0',temp0='300.0',A_istep2=nstlim*0.9,ntpr='100',ntwx='20000',cut='10.0',ntc='1',ntf='1')
+set_MD_equi(self,nstlim='5000',dt='0.001',cut='10.0',temp0='300.0',ntpr='5000',ntwx='5000',ntc='1',ntf='1')
+set_MD_prod(self,nstlim='100000',dt='0.001',cut='10.0',temp0='300.0',ntpr='5000',ntwx='5000',ntc='1',ntf='1')
+-------------------------------------------------------------------------------------
+Gaussian ONIOM calculation
+-------------------------------------------------------------------------------------
+
 -------------------------------------------------------------------------------------
 File Deployment
 -------------------------------------------------------------------------------------
@@ -53,7 +57,7 @@ class Conf(object):
 
 
 
-    def set_min(self,maxcyc='20000',ncyc='10000',ntpr='1000',cut='10.0',ntc='1',ntf='1'):
+    def set_MD_min(self,maxcyc='20000',ncyc='10000',ntpr='1000',cut='10.0',ntc='1',ntf='1'):
         '''
         Set configuration for a minimization job
         default value: (self,maxcyc='20000',ncyc='10000',ntpr='1000',cut='10.0',ntc='1')
@@ -74,7 +78,7 @@ class Conf(object):
         self.deploy_list=self.deploy_list+[(self.min_fn,self.min_conf),]
 
 
-    def set_heat(self,nstlim='20000',dt='0.001',tempi='0.0',temp0='300.0',A_istep2='',ntpr='100',ntwx='20000',cut='10.0',ntc='1',ntf='1'):
+    def set_MD_heat(self,nstlim='20000',dt='0.001',tempi='0.0',temp0='300.0',A_istep2='',ntpr='100',ntwx='20000',cut='10.0',ntc='1',ntf='1'):
         '''
         Set configuration for a heat job
         default value: (self,nstlim='20000',dt='0.001',tempi='0.0',temp0='300.0',A_istep2=nstlim*0.9,ntpr='100',ntwx='20000',cut='10.0',ntc='1',ntf='1')
@@ -117,7 +121,7 @@ class Conf(object):
         self.deploy_list=self.deploy_list+[(self.heat_fn,self.heat_conf),]
 
 
-    def set_equi(self,nstlim='5000',dt='0.001',cut='10.0',temp0='300.0',ntpr='5000',ntwx='5000',ntc='1',ntf='1'):
+    def set_MD_equi(self,nstlim='5000',dt='0.001',cut='10.0',temp0='300.0',ntpr='5000',ntwx='5000',ntc='1',ntf='1'):
         '''
         Set configuration for a equilibration job
         default value: (self,nstlim='5000',dt='0.001',cut='10.0',temp0='300.0',ntpr='5000',ntwx='5000',ntc='1',ntf='1')
@@ -141,7 +145,7 @@ class Conf(object):
         self.equi_fn='equi'+self.tag+'.in'
         self.deploy_list=self.deploy_list+[(self.equi_fn,self.equi_conf),]
 
-    def set_prod(self,nstlim='100000',dt='0.001',cut='10.0',temp0='300.0',ntpr='5000',ntwx='5000',ntc='1',ntf='1'):
+    def set_MD_prod(self,nstlim='100000',dt='0.001',cut='10.0',temp0='300.0',ntpr='5000',ntwx='5000',ntc='1',ntf='1'):
         '''
         Set configuration for a production job
         default value: (self,nstlim='100000',dt='0.001',cut='10.0',temp0='300.0',ntpr='5000',ntwx='5000',ntc='1',ntf='1')
@@ -179,10 +183,10 @@ class Conf(object):
 
 #TestOnly
 # a=Conf()
-# a.set_min()
-# a.set_heat()
-# a.set_equi()
-# a.set_prod()
+# a.set_MD_min()
+# a.set_MD_heat()
+# a.set_MD_equi()
+# a.set_MD_prod()
 # a.deploy()
 
 
