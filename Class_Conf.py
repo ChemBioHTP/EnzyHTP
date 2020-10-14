@@ -71,6 +71,8 @@ class Conf(object):
   cut   = '''+cut+''',
   maxcyc= '''+maxcyc+''', ncyc  = '''+ncyc+''',
   ntpr  = '''+ntpr+''',   ntwx  = 0,
+  ntr   = 1,	restraint_wt = 2.0,
+  restraintmask = '@C,CA,N',
  /
  '''
 
@@ -101,6 +103,8 @@ class Conf(object):
   iwrap = 1,
   nmropt= 1,
   ig    = -1,
+  ntr   = 1,	restraint_wt = 2.0,
+  restraintmask = '@C,CA,N',
  /
  &wt
   type  = 'TEMP0',
@@ -139,6 +143,8 @@ class Conf(object):
   ntb   = 2,  ntp = 1,
   iwrap = 1,
   ig    = -1,
+  ntr   = 1,	restraint_wt = 2.0,
+  restraintmask = '@C,CA,N',
  /
  '''
 
