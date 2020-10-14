@@ -12,9 +12,9 @@ add_tag(self,job_tag='')
 Amber Classical MD Simulation
 -------------------------------------------------------------------------------------
 set_MD_min(self,maxcyc='20000',ncyc='10000',ntpr='1000',cut='10.0',ntc='1')
-set_MD_heat(self,nstlim='20000',dt='0.001',tempi='0.0',temp0='300.0',A_istep2=nstlim*0.9,ntpr='100',ntwx='20000',cut='10.0',ntc='1',ntf='1')
-set_MD_equi(self,nstlim='5000',dt='0.001',cut='10.0',temp0='300.0',ntpr='5000',ntwx='5000',ntc='1',ntf='1')
-set_MD_prod(self,nstlim='100000',dt='0.001',cut='10.0',temp0='300.0',ntpr='5000',ntwx='5000',ntc='1',ntf='1')
+set_MD_heat(self,nstlim='20000',dt='0.001',tempi='0.0',temp0='300.0',A_istep2=nstlim*0.9,ntpr='100',ntwx='20000',cut='10.0',ntc='2',ntf='2')
+set_MD_equi(self,nstlim='5000',dt='0.001',cut='10.0',temp0='300.0',ntpr='5000',ntwx='5000',ntc='2',ntf='2')
+set_MD_prod(self,nstlim='100000',dt='0.001',cut='10.0',temp0='300.0',ntpr='5000',ntwx=nstlim/10000,ntc='2',ntf='2')
 -------------------------------------------------------------------------------------
 Gaussian ONIOM calculation
 -------------------------------------------------------------------------------------
@@ -60,7 +60,7 @@ class Conf(object):
     def set_MD_min(self,maxcyc='20000',ncyc='10000',ntpr='1000',cut='10.0',ntc='2',ntf='2'):
         '''
         Set configuration for a minimization job
-        default value: (self,maxcyc='20000',ncyc='10000',ntpr='1000',cut='10.0',ntc='1')
+        default value: (self,maxcyc='20000',ncyc='10000',ntpr='1000',cut='10.0',ntc='2',ntf='2')
         '''
 
         # WARNING: support SHAKE or ntr restrain in the future
@@ -81,7 +81,7 @@ class Conf(object):
     def set_MD_heat(self,nstlim='20000',dt='0.001',tempi='0.0',temp0='300.0',A_istep2='',ntpr='100',ntwx='20000',cut='10.0',ntc='2',ntf='2'):
         '''
         Set configuration for a heat job
-        default value: (self,nstlim='20000',dt='0.001',tempi='0.0',temp0='300.0',A_istep2=nstlim*0.9,ntpr='100',ntwx='20000',cut='10.0',ntc='1',ntf='1')
+        default value: (self,nstlim='20000',dt='0.001',tempi='0.0',temp0='300.0',A_istep2=nstlim*0.9,ntpr='100',ntwx='20000',cut='10.0',ntc='2',ntf='2')
         '''
 
         if A_istep2 == '':
@@ -96,7 +96,7 @@ class Conf(object):
   nstlim= '''+nstlim+''', dt= '''+dt+''',
   tempi = '''+tempi+''',  temp0='''+temp0+''',  
   ntpr  = '''+ntpr+''',  ntwx='''+ntwx+''',
-  ntt   = 2,
+  ntt   = 3, gamma_ln = 5.0,
   ntb   = 1,  ntp = 0,
   iwrap = 1,
   nmropt= 1,
@@ -124,7 +124,7 @@ class Conf(object):
     def set_MD_equi(self,nstlim='5000',dt='0.001',cut='10.0',temp0='300.0',ntpr='5000',ntwx='5000',ntc='2',ntf='2'):
         '''
         Set configuration for a equilibration job
-        default value: (self,nstlim='5000',dt='0.001',cut='10.0',temp0='300.0',ntpr='5000',ntwx='5000',ntc='1',ntf='1')
+        default value: (self,nstlim='5000',dt='0.001',cut='10.0',temp0='300.0',ntpr='5000',ntwx='5000',ntc='2',ntf='2')
         '''
 
         self.equi_conf='''Equilibration:constant pressure
@@ -135,7 +135,7 @@ class Conf(object):
   cut   = '''+cut+''',
   temp0 = '''+temp0+''',
   ntpr  = '''+ntpr+''', ntwx = '''+ntwx+''',
-  ntt   = 2,
+  ntt   = 3, gamma_ln = 5.0,
   ntb   = 2,  ntp = 1,
   iwrap = 1,
   ig    = -1,
@@ -145,11 +145,15 @@ class Conf(object):
         self.equi_fn='equi'+self.tag+'.in'
         self.deploy_list=self.deploy_list+[(self.equi_fn,self.equi_conf),]
 
-    def set_MD_prod(self,nstlim='100000',dt='0.001',cut='10.0',temp0='300.0',ntpr='5000',ntwx='5000',ntc='2',ntf='2'):
+    def set_MD_prod(self,nstlim='100000',dt='0.001',cut='10.0',temp0='300.0',ntpr='5000',ntwx='',ntc='2',ntf='2'):
         '''
         Set configuration for a production job
-        default value: (self,nstlim='100000',dt='0.001',cut='10.0',temp0='300.0',ntpr='5000',ntwx='5000',ntc='1',ntf='1')
+        default value: (self,nstlim='100000',dt='0.001',cut='10.0',temp0='300.0',ntpr='5000',ntwx=nstlim/10000,ntc='2',ntf='2')
         '''
+
+        #default 10k frames
+        if ntwx == '':
+            ntwx=str(int(float(nstlim)/10000))
 
         self.prod_conf='''Equilibration:constant pressure
  &cntrl
@@ -159,7 +163,7 @@ class Conf(object):
   cut   = '''+cut+''',
   temp0 = '''+temp0+''',
   ntpr  = '''+ntpr+''', ntwx = '''+ntwx+''',
-  ntt   = 2,
+  ntt   = 3, gamma_ln = 5.0,
   ntb   = 2,  ntp = 1,
   iwrap = 1,
   ig    = -1,
