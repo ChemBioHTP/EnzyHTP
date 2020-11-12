@@ -8,12 +8,11 @@ This module defines the potential object to operate. Included some common I/O an
 -------------------------------------------------------------------------------------
 Class PDB
 -------------------------------------------------------------------------------------
-__init__(self,path,Flag)
-    Input:  PDB path (any format), MutaFlag
+__init__(self,path)
+    Input:  PDB path (any format), MutaFlags
     Output: self.path 
             self.name 
             self.ifformat (Judge by the first line)
-            self.MutaFlag
           # Connect with the database // add a flow for database?
 -------------------------------------------------------------------------------------
 Information collecting methods:
@@ -26,13 +25,14 @@ get_coord(self, index)
 -------------------------------------------------------------------------------------
 PDB operating methods: (changes the self.path to indicated new pdb)
 -------------------------------------------------------------------------------------
-PDB2PDBwLeap(self):
+PDB2PDBwLeap(self, Flag):
 PDBMin(self,cycle):
 rm_wat(self): remove water and ion for current pdb. (For potential docking)
 -------------------------------------------------------------------------------------
 Other Mutation Tools:
 -------------------------------------------------------------------------------------
-FlagGen(self):
+Set_MutaFlag(self,Flag):
+Random_MutaFlag(self):
 PDB_check(self):
 -------------------------------------------------------------------------------------
 Input file generating methods:
@@ -50,7 +50,7 @@ class PDB(object):
     stage=0 #For debug indicate which stage is the program in
     ifformat=0
 
-    MutaFlag=[]
+    MutaFlags=[]
     tot_resi=0
     Coord=[]
 
@@ -68,12 +68,10 @@ class PDB(object):
     HETATM_pattern=r'HETATM[ ,0-9][ ,0-9][ ,0-9][ ,0-9][0-9]  [A-Z][ ,0-9,A-Z][ ,0-9,A-Z] [A-Z][A-Z][A-Z]  [ ,0-9][ ,0-9][ ,0-9][0-9]    [ ,\-,0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][0-9][ ,\-,0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][0-9][ ,\-,0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9](?:         [ ,A-Z][ ,A-Z][A-Z])?'
 
 
-    def __init__(self,PDB_PATH,Flag=''):
+    def __init__(self,PDB_PATH):
 
         self.path=PDB_PATH
         self.name=self.path.split(os.sep)[-1][:-4]
-        if len(Flag) != 0:
-            self.MutaFlag = [Flag[0],re.search('[0-9]+',Flag).group(),Flag[-1]]
 
         #self.ifformat
         #Judge if this is the standard Amber format by just read two line.
@@ -162,44 +160,75 @@ class PDB(object):
 
     def PDB2PDBwLeap(self):
         '''
-        Use self.MutaFlag and tLeap to build mutated structure.
+        (The index is correspond to the new index from Standard Amber format for Polymer.)
+        Use every Flag in self.MutaFlags and tLeap to build mutated structure. 
+        **WARNING** if there are multiple mutations in the same index, only the first one will be used.
         Save changes to self.path and self.name
         self.stage=1
         '''
-    
-        resi_Index=self.MutaFlag[1]
-        Muta_resi=self.MutaFlag[2]
-        Flag_name=self.MutaFlag[0]+self.MutaFlag[1]+self.MutaFlag[2]
-        OldAtoms=['N','H','CA','HA','CB','C','O']
 
-        #fix for mutate to Gly & Pro
-        if Muta_resi == 'G':
-            OldAtoms=['N','H','CA','C','O']
-        if Muta_resi == 'P':
-            OldAtoms=['N','CA','HA','CB','C','O']
+        #Judge if theres same MutaIndex
+        for i in range(len(self.MutaFlags)):
+            for j in range(len(self.MutaFlags)):
+                if i >= j:
+                    pass
+                else:
+                    if self.MutaFlags[i][1] == self.MutaFlags[j][1]:
+                        print("**WARNING**")
+                        print("There are multiple mutations in the same index, only the first one will be used: "+self.MutaFlags[i][0]+self.MutaFlags[i][1]+self.MutaFlags[i][2])
+
+        # Prepare a label for the filename
+        tot_Flag_name=''
+        for Flag in self.MutaFlags:
+            Flag_name=Flag[0]+Flag[1]+Flag[2]
+            tot_Flag_name=tot_Flag_name+'_'+Flag_name
 
         # Operate the PDB
-        out_PDB_path1=self.path[:-4]+'_'+Flag_name+'_tmp.pdb'
-        out_PDB_path2=self.path[:-4]+'_'+Flag_name+'.pdb'
+        out_PDB_path1=self.path[:-4]+tot_Flag_name+'_tmp.pdb'
+        out_PDB_path2=self.path[:-4]+tot_Flag_name+'.pdb'
 
         with open(self.path,'r') as f:
             with open(out_PDB_path1,'w') as of:
                 line_index=1
                 for line in f:
-                    try:
-                        if line.split()[4] == resi_Index:
-                            #This match method may only work with monomer. Ploymer may need break after first found? (mark:enzyme)
-                            #keep if match the OldAtom list
-                            for i in OldAtoms:
-                                if i == line.split()[2]:
-                                    #change the traget residue name !!WARNING!! strong format limitation here!
-                                    
-                                    new_line=line[:17]+Resi_map[Muta_resi]+line[20:]
 
-                                    of.write(new_line)
-                                    break
-                            #Do not keep if not match & in the target residue.
-                        else:
+                    try:
+                        match=0
+                        
+                        for Flag in self.MutaFlags:
+                            # Test for every Flag for every lines
+                            resi_Index=Flag[1]
+
+                            if line.split()[4] == resi_Index:
+                                #This matching method work with ploymer because the standard amber format merge different chains into a same index map
+                                #keep if match the OldAtom list
+
+                                match=1
+                                
+                                #Initialize mutation when match
+                                Muta_resi=Flag[2]
+                                OldAtoms=['N','H','CA','HA','CB','C','O']
+                                #fix for mutate to Gly & Pro
+                                if Muta_resi == 'G':
+                                    OldAtoms=['N','H','CA','C','O']
+                                if Muta_resi == 'P':
+                                    OldAtoms=['N','CA','HA','CB','C','O']
+
+
+                                for i in OldAtoms:
+                                    if i == line.split()[2]:
+                                        #change the traget residue name !!WARNING!! strong format limitation here!
+                                        
+                                        new_line=line[:17]+Resi_map[Muta_resi]+line[20:]
+                                        
+                                        of.write(new_line)
+                                        break
+                                #Do not keep if not match & in the target residue.       
+                                
+                                #Dont run for other Flags after first Flag matches. (code: SameSite)
+                                break
+
+                        if not match:               
                             of.write(line)
                     
                     except IndexError:
@@ -219,7 +248,7 @@ class PDB(object):
         leap_input.close()
         #run
         os.system('tleap -s -f tleap.in > tleap.out')
-        os.system('mv *leap.* tleap_cache')
+        os.system('mv *leap.* *tmp.pdb tleap_cache')
 
         #Update the file
         self.path = out_PDB_path2
@@ -228,11 +257,26 @@ class PDB(object):
 
         return out_PDB_path2
 
+    def Set_MutaFlag(self,Flag):
+        '''
+        Input Flag.(e.g. A11B) Can be a str or a list of str.
+        Append self.MutaFlags with the Flag.
+        (The index is correspond to the new merged index from Standard Amber format for Polymer.)
+        '''
+
+        if type(Flag) == str:
+            self.MutaFlags.append((Flag[0],re.search('[0-9]+',Flag).group(),Flag[-1]))
+
+        if type(Flag) == list:
+            for i in Flag:
+                self.MutaFlags.append((i[0],re.search('[0-9]+',i).group(),i[-1]))
+
+        print('Current MutaFlags: ',self.MutaFlags)
 
     def Random_MutaFlag(self):
         '''
         Use self.path & self.tot_resi
-        Save changes to self.MutaFlag 
+        Save changes appending to self.MutaFlags 
         '''
         resi_1=''
         resi_2=''
@@ -259,7 +303,7 @@ class PDB(object):
         while resi_2 == resi_1:
             resi_2=Resi_list[randint(0,len(Resi_list)-1)]
                 
-        self.MutaFlag=[resi_1,Muta_idx,resi_2]
+        self.MutaFlags.append((resi_1,Muta_idx,resi_2))
 
     def PDB2FF(self):
         #out3_PDB_path=self.name+'_water.pdb'
@@ -374,24 +418,30 @@ class PDB(object):
         The MD configuration files are assigned by the conf_path. Be sure to use the same tag when files are taged.
         Return the rst path of the prod step.
         '''
-        Flag_name=self.MutaFlag[0]+self.MutaFlag[1]+self.MutaFlag[2]
+        Flag_name=''
+        for Flag in self.MutaFlags:
+            sep_Flag_name=Flag[0]+Flag[1]+Flag[2]
+            Flag_name=Flag_name+'_'+sep_Flag_name
+
         out_path=conf_path
 
         #run sander
-        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+conf_path+'/min'+tag+'.in -o ' +out_path+'/min_' +Flag_name+'.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+out_path+'/min_'+Flag_name+'.rst')
-        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+conf_path+'/heat'+tag+'.in -o '+out_path+'/heat_'+Flag_name+'.out -p '+self.prmtop_path+' -c '+out_path+'/min_'+Flag_name+'.rst -ref ' +out_path+'/min_'+Flag_name+'.rst -r ' +out_path+'/heat_'+Flag_name+'.rst')
-        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+conf_path+'/equi'+tag+'.in -o '+out_path+'/equi_'+Flag_name+'.out -p '+self.prmtop_path+' -c '+out_path+'/heat_'+Flag_name+'.rst -ref '+out_path+'/heat_'+Flag_name+'.rst -r '+out_path+'/equi_'+Flag_name+'.rst')
-        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+conf_path+'/prod'+tag+'.in -o '+out_path+'/prod_'+Flag_name+'.out -p '+self.prmtop_path+' -c '+out_path+'/equi_'+Flag_name+'.rst -ref '+out_path+'/equi_'+Flag_name+'.rst -r '+out_path+'/prod_'+Flag_name+'.rst -x '+out_path+'/prod_'+Flag_name+'.nc')
+        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+conf_path+'/min'+tag+'.in -o ' +out_path+'/min' +Flag_name+'.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+out_path+'/min'+Flag_name+'.rst -ref '+self.inpcrd_path)
+        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+conf_path+'/heat'+tag+'.in -o '+out_path+'/heat'+Flag_name+'.out -p '+self.prmtop_path+' -c '+out_path+'/min'+Flag_name+'.rst -ref ' +out_path+'/min'+Flag_name+'.rst -r ' +out_path+'/heat'+Flag_name+'.rst')
+        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+conf_path+'/equi'+tag+'.in -o '+out_path+'/equi'+Flag_name+'.out -p '+self.prmtop_path+' -c '+out_path+'/heat'+Flag_name+'.rst -ref '+out_path+'/heat'+Flag_name+'.rst -r '+out_path+'/equi'+Flag_name+'.rst')
+        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+conf_path+'/prod'+tag+'.in -o '+out_path+'/prod'+Flag_name+'.out -p '+self.prmtop_path+' -c '+out_path+'/equi'+Flag_name+'.rst -ref '+out_path+'/equi'+Flag_name+'.rst -r '+out_path+'/prod'+Flag_name+'.rst -x '+out_path+'/prod'+Flag_name+'.nc')
 
         #Or add a class constant?
-        return 'MD/prod_'+Flag_name+'.rst'
+        return 'MD/prod'+Flag_name+'.rst'
 
     
 
 
 
 #TestOnly
-# a=PDB(r'2kz2init_amb.pdb','G41R')
+# a=PDB(r'2kz2init_amb.pdb')
+# a.Set_MutaFlag(['A33T','A33D'])
+# a.Random_MutaFlag()
 # a.PDB2PDBwLeap()
 # a.PDB2FF()
 # a.PDBMin()

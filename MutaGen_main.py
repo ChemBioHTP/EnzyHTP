@@ -16,6 +16,8 @@ def main():
         os.system('mkdir MD')
         PDB1.rm_wat()
         PDB1.PDB2FF()
+
+        #Maybe these should go into the PDBMD func?
         MD=Conf()
         MD.set_MD_min()
         MD.set_MD_heat()
