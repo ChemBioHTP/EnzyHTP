@@ -7,7 +7,7 @@ def main():
     #use tleap to randomly mutate the PDB
     for i in range(1):
         PDB1=PDB('2kz2init_amb.pdb')
-        PDB1.Random_MutaFlag()
+        PDB1.Add_MutaFlag('random')
         PDB1.PDB2PDBwLeap()
     #use minimization to relax each mutated PDB
         PDB1.PDB2FF()

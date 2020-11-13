@@ -31,8 +31,7 @@ rm_wat(self): remove water and ion for current pdb. (For potential docking)
 -------------------------------------------------------------------------------------
 Other Mutation Tools:
 -------------------------------------------------------------------------------------
-Set_MutaFlag(self,Flag):
-Random_MutaFlag(self):
+Add_MutaFlag(self,Flag):
 PDB_check(self):
 -------------------------------------------------------------------------------------
 Input file generating methods:
@@ -257,53 +256,62 @@ class PDB(object):
 
         return out_PDB_path2
 
-    def Set_MutaFlag(self,Flag):
+    def Add_MutaFlag(self,Flag):
         '''
-        Input Flag.(e.g. A11B) Can be a str or a list of str.
+        Input: 
+        Flags or "random"
+        ----------------------------------------------------
+        Flag    (e.g. A11B) Can be a str or a list of str.
+        ----------------------------------------------------
         Append self.MutaFlags with the Flag.
         (The index is correspond to the new merged index from Standard Amber format for Polymer.)
+        ----------------------------------------------------
+        'random' or 'r' (default)
+        ----------------------------------------------------
+        Use self.path & self.tot_resi
+        Save changes appending to self.MutaFlags 
         '''
 
         if type(Flag) == str:
-            self.MutaFlags.append((Flag[0],re.search('[0-9]+',Flag).group(),Flag[-1]))
+
+            if Flag == 'r' or Flag == 'random':
+                resi_1=''
+                resi_2=''
+                Muta_idx=''
+
+                #This method takes the first chain of a PDB file to count the total number of residues. (mark:enzyme)
+                with open(self.path,'r') as f:
+                    lines=f.readlines()
+                    for i in range(len(lines)):
+                        if lines[i].strip() == 'TER':
+                            self.tot_resi=int(lines[i-1].split()[4])
+                            break
+                    #Generate the mutation index
+                    Muta_idx=str(randint(1,self.tot_resi))
+                    #obtain resi_1
+                    for line in lines:
+                        if line.split()[4] == Muta_idx:
+                            resi_1_p=line.split()[3]
+                            resi_1=Resi_map2[resi_1_p]
+                            break
+                #Generate resi_2
+                resi_2=Resi_list[randint(0,len(Resi_list)-1)]
+                # Check if the same resi
+                while resi_2 == resi_1:
+                    resi_2=Resi_list[randint(0,len(Resi_list)-1)]
+                        
+                self.MutaFlags.append((resi_1,Muta_idx,resi_2))
+
+
+
+            else:
+                self.MutaFlags.append((Flag[0],re.search('[0-9]+',Flag).group(),Flag[-1]))
 
         if type(Flag) == list:
             for i in Flag:
                 self.MutaFlags.append((i[0],re.search('[0-9]+',i).group(),i[-1]))
 
         print('Current MutaFlags: ',self.MutaFlags)
-
-    def Random_MutaFlag(self):
-        '''
-        Use self.path & self.tot_resi
-        Save changes appending to self.MutaFlags 
-        '''
-        resi_1=''
-        resi_2=''
-        Muta_idx=''
-
-        #This method takes the first chain of a PDB file to count the total number of residues. (mark:enzyme)
-        with open(self.path,'r') as f:
-            lines=f.readlines()
-            for i in range(len(lines)):
-                if lines[i].strip() == 'TER':
-                    self.tot_resi=int(lines[i-1].split()[4])
-                    break
-            #Generate the mutation index
-            Muta_idx=str(randint(1,self.tot_resi))
-            #obtain resi_1
-            for line in lines:
-                if line.split()[4] == Muta_idx:
-                    resi_1_p=line.split()[3]
-                    resi_1=Resi_map2[resi_1_p]
-                    break
-        #Generate resi_2
-        resi_2=Resi_list[randint(0,len(Resi_list)-1)]
-        # Check if the same resi
-        while resi_2 == resi_1:
-            resi_2=Resi_list[randint(0,len(Resi_list)-1)]
-                
-        self.MutaFlags.append((resi_1,Muta_idx,resi_2))
 
     def PDB2FF(self):
         #out3_PDB_path=self.name+'_water.pdb'
@@ -440,8 +448,8 @@ class PDB(object):
 
 #TestOnly
 # a=PDB(r'2kz2init_amb.pdb')
-# a.Set_MutaFlag(['A33T','A33D'])
-# a.Random_MutaFlag()
+# a.Add_MutaFlag(['A33T','A33D'])
+# a.Add_MutaFlag('random')
 # a.PDB2PDBwLeap()
 # a.PDB2FF()
 # a.PDBMin()
