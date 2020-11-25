@@ -125,15 +125,15 @@ class Conf(object):
         self.deploy_list=self.deploy_list+[(self.heat_fn,self.heat_conf),]
 
 
-    def set_MD_equi(self,nstlim='5000',dt='0.001',cut='10.0',temp0='300.0',ntpr='5000',ntwx='5000',ntc='2',ntf='2'):
+    def set_MD_equi(self,nstlim='500000',dt='0.002',cut='10.0',temp0='300.0',ntpr='10000',ntwx='10000',ntc='2',ntf='2'):
         '''
         Set configuration for a equilibration job
-        default value: (self,nstlim='5000',dt='0.001',cut='10.0',temp0='300.0',ntpr='5000',ntwx='5000',ntc='2',ntf='2')
+        default value: (self,nstlim='50000000',dt='0.002',cut='10.0',temp0='300.0',ntpr='5000',ntwx='5000',ntc='2',ntf='2')
         '''
 
         self.equi_conf='''Equilibration:constant pressure
  &cntrl
-  imin  = 0,  ntx = 5,  irest = 0,
+  imin  = 0,  ntx = 1,  irest = 0,
   ntf   = '''+ntf+''',  ntc = '''+ntc+''',
   nstlim= '''+nstlim+''', dt= '''+dt+''',
   cut   = '''+cut+''',
@@ -151,10 +151,10 @@ class Conf(object):
         self.equi_fn='equi'+self.tag+'.in'
         self.deploy_list=self.deploy_list+[(self.equi_fn,self.equi_conf),]
 
-    def set_MD_prod(self,nstlim='100000',dt='0.001',cut='10.0',temp0='300.0',ntpr='5000',ntwx='',ntc='2',ntf='2'):
+    def set_MD_prod(self,nstlim='50000000',dt='0.002',cut='10.0',temp0='300.0',ntpr='25000',ntwx='',ntc='2',ntf='2'):
         '''
         Set configuration for a production job
-        default value: (self,nstlim='100000',dt='0.001',cut='10.0',temp0='300.0',ntpr='5000',ntwx=nstlim/10000,ntc='2',ntf='2')
+        default value: (self,nstlim='50000000',dt='0.002',cut='10.0',temp0='300.0',ntpr='5000',ntwx=nstlim/10000,ntc='2',ntf='2')
         '''
 
         #default 10k frames
