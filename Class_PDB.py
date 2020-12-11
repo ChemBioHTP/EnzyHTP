@@ -55,14 +55,19 @@ class PDB(object):
     prmtop_path=''
     inpcrd_path=''
     stage=0 #For debug indicate which stage is the program in
+    
     ifformat=0
     ifcomplete=1
+
+    if_art_resi=0
+    if_ligand=0
 
     MutaFlags=[]
     tot_resi=0
     Coord=[]
     raw_sequence={}
     sequence={}
+    sequence_one={}
 
     #current operating residue
     current_index=0
@@ -186,22 +191,40 @@ class PDB(object):
 
 
 
-    def get_seq(self):
+    def get_seq(self, Oneletter=0):
         '''
+        get_seq(self, Oneletter=0)
+        Support most PDB types
+        ----------------------------
+        Oneletter
+        = 0 // use 3-letter format to represet each residue
+        = 1 // use 1-letter format to represet each residue
+        ----------------------------
         Get sequence for current PDB (self.path) // A general function to obtain the missing residue
-        + Re-assign the chain_index base on the order in the file
-        + Use "NAN" as a filler to store missing residues (detect internal missing)
-        + Check if contain non-standard residue with the Resi_map 
+        + Use "NAN"/"-" as a filler to store missing residues (detect internal missing)
+        + Check if contain non-standard residue with the Resi_map --> self.if_art_resi
+        + Check if contain ligand with the Resi_map and TIP3P_map --> self.if_ligand
+        - (WARNING) Require the ligand in seperate chains
+        - Re-assign the chain_index base on the order in the file
         - Do not include the original residue index
         - Do not include any HETATM (ligand/solvent)
+        ----------------------------
+        save the info to self.sequence/self.sequence_one and return it
+        ----------------------------
         self.sequence:
         Format: {'Chain_index':['res','res',...]
                  'Chain_index':['res','res',...]
                  ...
                 }
-        save the info to self.sequence and return it
 
-        self.raw_sequence contain HETATM
+        self.raw_sequence:
+            Internal used, containing HETATM
+
+        self.sequence_one: (when Oneletter=1)
+        Format: {'Chain_index':'seq'
+                 'Chain_index':'seq'
+                 ...
+                }
 
         !!NOTE!! the self.sequence needs to be updated after mutation
         '''
@@ -248,10 +271,15 @@ class PDB(object):
                     last_resi_index = pdb_l.resi_index
             
             self.raw_sequence[Chain_index] = Chain_sequence
-        
-            self.strip_raw_seq() # strip the raw_sequence and save to sequence
+            
+        self.strip_raw_seq() # strip the raw_sequence and save to sequence
 
-        return self.sequence
+        if Oneletter == 1:
+            self.get_Oneletter()
+            return self.sequence_one
+        else:
+            return self.sequence
+
 
     def strip_raw_seq(self):
         '''
@@ -260,14 +288,77 @@ class PDB(object):
         - Delete chains without residue
 
         save changes to self.sequence
+
+        Judge if containing any ligand or artificial residue
+
+        save to self.if_ligand and self.if_art_resi
         '''
+        new_index=0
 
         if len(self.raw_sequence) == 0:
             print("The self.raw_sequence should be obtained first")
             raise IndexError
 
         for chain in self.raw_sequence:
-            for resi in self.raw_sequence[chain]:
+            
+            chain_seq=[]
+            if_realchain = 0
+
+            # Judge if real chain
+            for name in self.raw_sequence[chain]:
+                clean_name = name.strip(' ')
+                if clean_name in Resi_map2.keys():
+                    if_realchain = 1
+            
+            if if_realchain:
+                for name in self.raw_sequence[chain]:
+                    clean_name = name.strip(' ')                               
+                    chain_seq.append(clean_name)
+
+                    # An artificial residue will be a residue in a realchain but not included in force field map
+                    if clean_name not in Resi_map2 and clean_name != 'NAN':
+                        self.if_art_resi = 1                        
+                        ## PLACE HOLDER for further operation on artificial residue ##
+
+            else:
+                # Judge if containing any ligand
+                for name in self.raw_sequence[chain]:
+                    clean_name = name.strip(' ') 
+                    if clean_name not in TIP3P_map and clean_name != 'NAN':
+                        self.if_ligand = 1
+                        ## PLACE HOLDER for further operation on artificial residue ##
+            
+            # only add realchain to the self.sequence
+            if len(chain_seq) != 0:
+                chain_Index=chr(new_index+65)
+                self.sequence[chain_Index]=chain_seq
+                new_index=new_index+1
+
+
+    def get_Oneletter(self):
+        '''
+        (Used internally) convert sequences in self.sequence to oneletter-based str
+        - The 'NAN' is convert to '-'
+
+        save to self.sequence_one
+        '''
+        if len(self.sequence) == 0:
+            print("The self.sequence should be obtained first")
+            raise IndexError
+
+        for chain in self.sequence:
+            chain_Seq=''
+            for name in self.sequence[chain]:
+                if name == 'NAN':
+                    chain_Seq=chain_Seq+'-'
+                else:
+                    chain_Seq=chain_Seq+Resi_map2[name.strip(' ')]
+                
+            self.sequence_one[chain]=chain_Seq
+        
+
+
+
 
 
 
