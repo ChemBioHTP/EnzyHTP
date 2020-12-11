@@ -22,19 +22,26 @@ get_tot_resi(self)
     Output: self.tot_resi
 get_index_resi(self, index)
 get_coord(self, index)
+get_seq(self)
+get_missing(self, seq)
+
 -------------------------------------------------------------------------------------
 PDB operating methods: (changes the self.path to indicated new pdb)
 -------------------------------------------------------------------------------------
 PDB2PDBwLeap(self, Flag):
 PDBMin(self,cycle):
 rm_wat(self): remove water and ion for current pdb. (For potential docking)
+loopmodel_refine(self): Use different method to model the missing sequence
+
 -------------------------------------------------------------------------------------
-Other Mutation Tools:
+Mutation Tools:
 -------------------------------------------------------------------------------------
 Add_MutaFlag(self,Flag): User assigned Flag or Random Flag using "random"
 PDB_check(self):
+
 -------------------------------------------------------------------------------------
 Input file generating methods:
+-------------------------------------------------------------------------------------
 PDB2FF(self):
 PDBMD(self):
 -------------------------------------------------------------------------------------
@@ -44,14 +51,17 @@ class PDB(object):
 
     path=''
     name=''
+    File_str=''
     prmtop_path=''
     inpcrd_path=''
     stage=0 #For debug indicate which stage is the program in
     ifformat=0
+    ifcomplete=1
 
     MutaFlags=[]
     tot_resi=0
     Coord=[]
+    sequence=''
 
     #current operating residue
     current_index=0
@@ -88,7 +98,8 @@ class PDB(object):
                 break
         
         if not self.ifformat:
-            print('WARNING: This file is not in standard Amber format')
+            print('WARNING: This file is not in standard Amber format.')
+            print('WARNING: This is normal when refinement/protonation is one of the target steps.\n')
 
 
     def get_tot_resi(self):
@@ -153,15 +164,83 @@ class PDB(object):
                 
                 line_index=line_index+1 
 
+    def get_file(self):
+        '''
+        Get the PDB file and store it in the self.file
+        return the self.file
+        '''
+        self.file = open(self.path)
+
+        return self.file
+    
+    def get_file_str(self):
+        '''
+        Get the str of the PDB file and store it in self.File_str
+        return the str
+        '''
+        self.get_file()
+        self.File_str =self.file.read()
+
+        return self.File_str
+
+
+
+    def get_seq(self):
+        '''
+        Get sequence for current PDB (self.path) // A general function to obtain the missing residue
+        + Re-assign the chain_index base on the order in the file
+        + Use "-" as a filler to store missing residues
+        + Check if contain non-standard residue with the Resi_map 
+        - Do not include the original residue index
+        - Do not include any HETATM (ligand/solvent)
+        self.sequence:
+        Format: {'Chain_index':['res','res',...]
+                 'Chain_index':['res','res',...]
+                 ...
+                }
+        save the info to self.sequence and return it
+
+        !!NOTE!! the self.sequence needs to be updated after mutation
+        '''
+
+        sequence={}
+
+        
+        PDB_str = self.get_file_str()
+
+        Chain_str = PDB_str.split('TER')
+        for chain,i in enumerate(Chain_str):
+            lines=i.split('\n')
+            # pdbline=PDB_line(lines[1])
+            # print(pdbline.get_resi_index())
+
+            for line in enumerate(lines):
+                pass
+
+
+
+
+
+
+
+            
+
+
+
+
+
+
 
 
 
 
     def PDB2PDBwLeap(self):
         '''
-        (The index is correspond to the new index from Standard Amber format for Polymer.)
+        (The index is correspond to the new index starting from 1 for each chain.)
+        Take the 'XA111Y' format for polymer. Re-local the mutation position based on the index of the first residue in the chain (mark: update)
+
         Use every Flag in self.MutaFlags and tLeap to build mutated structure. 
-        **WARNING** if there are multiple mutations in the same index, only the first one will be used.
+        **WARNING** if there are multiple mutations on the same index, only the first one will be used.
         Save changes to self.path and self.name
         self.stage=1
         '''
@@ -269,8 +348,10 @@ class PDB(object):
         ----------------------------------------------------
         'random' or 'r' (default)
         ----------------------------------------------------
-        Use self.path & self.tot_resi
+        Use self.path & self.sequence // only when ifcomplete
         Save changes appending to self.MutaFlags 
+        
+        Need to add the chain_index info (mark: update)
         '''
 
         if type(Flag) == str:
@@ -280,7 +361,8 @@ class PDB(object):
                 resi_2=''
                 Muta_idx=''
 
-                #This method takes the first chain of a PDB file to count the total number of residues. (mark:enzyme)
+                # This method takes the first chain of a PDB file to count the total number of residues. Will encounter problem when resi_index of the ligand was inserted between the chain. (mark:enzyme)
+                # This method use get_seq and self.sequence. Randomize over the chain and use the 'XA123Y' mutaflag format.  (mark: update)
                 with open(self.path,'r') as f:
                     lines=f.readlines()
                     for i in range(len(lines)):
@@ -442,8 +524,99 @@ class PDB(object):
         #Or add a class constant?
         return 'MD/prod'+Flag_name+'.rst'
 
-    
 
+
+
+
+class PDB_line(object):
+    '''
+    Class for decoding the line in the PDB file. Functions used internally. 
+    '''
+
+    line=''
+    line_type=''
+
+    resi_name=''
+    resi_index=''
+
+
+    def __init__(self,line):
+        '''
+        initilize with a specific line in the PDB file.
+        Get self.line_type
+        '''
+        self.line=line
+        self.line_type = self.line[0:6]
+
+    '''
+    =====
+    Residue
+    =====
+    '''
+
+    def get_resi_name(self):
+        '''
+        Get the residue name from self.line
+        save the result in self.resi_name
+        '''
+        self.resi_name=self.line[17:20]
+
+        return self.resi_name
+    
+    def get_resi_index(self):
+        '''
+        Get the residue index from self.line
+        save the result in self.resi_index
+        '''
+        self.resi_index=self.line[22:26]
+
+        return self.resi_index
+
+
+
+
+
+
+
+# Pre-refinement functions
+    def get_missing(self, seq):
+        '''
+        get_missing(self, seq)
+        Compare self.sequence (from the get_seq) with the seq (str from the uniport)
+        1. No missing
+        2. Terminal missing
+        3. Internal missing
+        '''
+        pass
+
+    def PDB_loopmodel_refine(self, method='Rosetta'):
+        '''
+        Use different methods to model the missing sequence
+        Methods:
+        - pyRosetta
+        - trRosetta
+        '''
+        pass
+
+# 在残缺时使用某种占位字母记录？读取时对相邻的序号做差，大于一的添加N-1个空缺符（不能用字符串对比方法重现残缺位置因为确实了链接关系不知道在哪插入）用seq重写随机突变的方法（flag的存储，随机的方式，突变的实施）
+# 结合class PDB_line的思路完成序列的提取, 用chr(65-1+i)完成ABC转化
+
+# func outside of the class
+def get_PDB(name):
+    '''
+    connect to the database
+    '''
+    pass
+
+
+def PDB_to_AMBER_PDB(path):
+    '''
+    Make the file convertable with tleap without error
+    - Test result: The header part cause duplication of the residues. Deleting that part may give normal tleap output
+    - Test result: For some reason, some ligand will miss if directly covert after simple header cutting
+    - WARNINGs
+    '''
+    pass
 
 
 #TestOnly

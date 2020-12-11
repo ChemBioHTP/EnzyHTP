@@ -18,6 +18,7 @@ def main():
         PDB1.PDB2FF()
 
         #Maybe these should go into the PDBMD func?
+        # change the structure of conf to ade-like
         MD=Conf()
         MD.set_MD_min()
         MD.set_MD_heat()

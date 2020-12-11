@@ -128,7 +128,7 @@ class Conf(object):
     def set_MD_equi(self,nstlim='500000',dt='0.002',cut='10.0',temp0='300.0',ntpr='10000',ntwx='10000',ntc='2',ntf='2'):
         '''
         Set configuration for a equilibration job
-        default value: (self,nstlim='50000000',dt='0.002',cut='10.0',temp0='300.0',ntpr='5000',ntwx='5000',ntc='2',ntf='2')
+        default value: (self,nstlim='500000',dt='0.002',cut='10.0',temp0='300.0',ntpr='5000',ntwx='5000',ntc='2',ntf='2')
         '''
 
         self.equi_conf='''Equilibration:constant pressure
