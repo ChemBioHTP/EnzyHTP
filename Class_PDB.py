@@ -61,7 +61,8 @@ class PDB(object):
     MutaFlags=[]
     tot_resi=0
     Coord=[]
-    sequence=''
+    raw_sequence={}
+    sequence={}
 
     #current operating residue
     current_index=0
@@ -189,7 +190,7 @@ class PDB(object):
         '''
         Get sequence for current PDB (self.path) // A general function to obtain the missing residue
         + Re-assign the chain_index base on the order in the file
-        + Use "-" as a filler to store missing residues
+        + Use "NAN" as a filler to store missing residues (detect internal missing)
         + Check if contain non-standard residue with the Resi_map 
         - Do not include the original residue index
         - Do not include any HETATM (ligand/solvent)
@@ -200,22 +201,74 @@ class PDB(object):
                 }
         save the info to self.sequence and return it
 
+        self.raw_sequence contain HETATM
+
         !!NOTE!! the self.sequence needs to be updated after mutation
         '''
 
-        sequence={}
-
-        
         PDB_str = self.get_file_str()
 
         Chain_str = PDB_str.split('TER')
+        
         for chain,i in enumerate(Chain_str):
-            lines=i.split('\n')
-            # pdbline=PDB_line(lines[1])
-            # print(pdbline.get_resi_index())
 
-            for line in enumerate(lines):
-                pass
+            Chain_index = chr(65+chain) # Covert to ABC using ACSII mapping
+            Chain_sequence=[]
+            
+            # Get the Chain_sequence
+            lines=i.split('\n')
+
+            for line_index, line in enumerate(lines):
+
+                pdb_l = PDB_line(line)
+
+                if pdb_l.line_type == 'ATOM  ' or pdb_l.line_type == 'HETATM':
+                    
+                    pdb_l.get_resi_index()
+                    pdb_l.get_resi_name()
+                    
+                    # Deal with the first residue
+                    if len(Chain_sequence) == 0:
+                        Chain_sequence.append(pdb_l.resi_name)
+                        last_resi_index = pdb_l.resi_index
+                        continue
+
+                    # find next new residue
+                    if pdb_l.resi_index != last_resi_index:
+
+                        # Deal with missing residue, fill with "NAN"
+                        missing_length = pdb_l.resi_index - last_resi_index - 1 
+                        if missing_length > 0:
+                            Chain_sequence = Chain_sequence + ['NAN',] * missing_length 
+                        
+                        # Store the new resi
+                        Chain_sequence.append(pdb_l.resi_name)
+
+                    # Update for next loop                
+                    last_resi_index = pdb_l.resi_index
+            
+            self.raw_sequence[Chain_index] = Chain_sequence
+        
+            self.strip_raw_seq() # strip the raw_sequence and save to sequence
+
+        return self.sequence
+
+    def strip_raw_seq(self):
+        '''
+        (Used internally) strip the raw_sequence.
+        - Delete ligand and solvent
+        - Delete chains without residue
+
+        save changes to self.sequence
+        '''
+
+        if len(self.raw_sequence) == 0:
+            print("The self.raw_sequence should be obtained first")
+            raise IndexError
+
+        for chain in self.raw_sequence:
+            for resi in self.raw_sequence[chain]:
+
 
 
 
@@ -559,7 +612,7 @@ class PDB_line(object):
         Get the residue name from self.line
         save the result in self.resi_name
         '''
-        self.resi_name=self.line[17:20]
+        self.resi_name = self.line[17:20]
 
         return self.resi_name
     
@@ -568,7 +621,7 @@ class PDB_line(object):
         Get the residue index from self.line
         save the result in self.resi_index
         '''
-        self.resi_index=self.line[22:26]
+        self.resi_index = int(self.line[22:26])
 
         return self.resi_index
 
