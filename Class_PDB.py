@@ -1,7 +1,19 @@
 import os
 import re
+import argparse
 from random import randint
 from AmberMaps import *
+try:
+    from pdb2pqr.main import main as run_pdb2pqr
+    from pdb2pqr.main import build_parser as build_pdb2pqr_parser
+except ImportError:
+    raise ImportError('PDB2PQR not installed.')
+
+try:
+    import propka.lib
+except ImportError:
+    raise ImportError('PropKa not installed.')
+
 
 __doc__='''
 This module defines the potential object to operate. Included some common I/O and methods.
@@ -23,6 +35,8 @@ get_tot_resi(self)
 get_index_resi(self, index)
 get_coord(self, index)
 get_seq(self)
+get_if_ligand = get_seq # alias
+get_if_art_resi = get_seq # alias
 get_missing(self, seq)
 
 -------------------------------------------------------------------------------------
@@ -57,10 +71,11 @@ class PDB(object):
     stage=0 #For debug indicate which stage is the program in
     
     ifformat=0
-    ifcomplete=1
-
-    if_art_resi=0
-    if_ligand=0
+    
+    if_complete=None
+    if_complete_chain={} 
+    if_art_resi=None
+    if_ligand=None
 
     MutaFlags=[]
     tot_resi=0
@@ -83,29 +98,37 @@ class PDB(object):
     HETATM_pattern=r'HETATM[ ,0-9][ ,0-9][ ,0-9][ ,0-9][0-9]  [A-Z][ ,0-9,A-Z][ ,0-9,A-Z] [A-Z][A-Z][A-Z]  [ ,0-9][ ,0-9][ ,0-9][0-9]    [ ,\-,0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][0-9][ ,\-,0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][0-9][ ,\-,0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9](?:         [ ,A-Z][ ,A-Z][A-Z])?'
 
 
-    def __init__(self,PDB_PATH):
+    def __init__(self,PDB_PATH='',PDB_File_str=''):
+        '''
+        Waiting for reform
+        '''
 
-        self.path=PDB_PATH
-        self.name=self.path.split(os.sep)[-1][:-4]
+        if len(PDB_PATH) == 0:
+            self.File_str=PDB_File_str
+            # 存一个文件和path？
+        else:
+            self.path=PDB_PATH
+            self.name=self.path.split(os.sep)[-1][:-4]
 
-        #self.ifformat
-        #Judge if this is the standard Amber format by just read two line.
-        with open(self.path) as f:
-            line_index=1
-            for line in f:
-                if line_index==1:
-                    line_index=line_index+1
-                    continue
-                # check by different length. Need improvement in the future for other target type.                 
-                ATOM_if = re.match(self.ATOM_pattern,line) != None
-                HATATM_if = re.match(self.HETATM_pattern,line) != None
+            #self.ifformat
+            #Judge if this is the standard Amber format by just read two line.
+            with open(self.path) as f:
+                line_index=1
+                for line in f:
+                    if line_index==1:
+                        line_index=line_index+1
+                        continue
+                    # check by different length. Need improvement in the future for other target type.                 
+                    ATOM_if = re.match(self.ATOM_pattern,line) != None
+                    HATATM_if = re.match(self.HETATM_pattern,line) != None
 
-                self.ifformat = ATOM_if or HATATM_if
-                break
-        
-        if not self.ifformat:
-            print('WARNING: This file is not in standard Amber format.')
-            print('WARNING: This is normal when refinement/protonation is one of the target steps.\n')
+                    self.ifformat = ATOM_if or HATATM_if
+                    break
+            
+            if not self.ifformat:
+                pass
+                #print('WARNING: This file is not in standard Amber format.')
+                #print('WARNING: This is normal when refinement/protonation is one of the target steps.\n')
 
 
     def get_tot_resi(self):
@@ -172,24 +195,30 @@ class PDB(object):
 
     def get_file(self):
         '''
-        Get the PDB file and store it in the self.file
-        return the self.file
+        Get the PDB file and store it in the self.File
+        return the self.File
         '''
-        self.file = open(self.path)
+        self.File = open(self.path)
 
-        return self.file
+        return self.File
     
     def get_file_str(self):
         '''
         Get the str of the PDB file and store it in self.File_str
         return the str
         '''
-        self.get_file()
-        self.File_str =self.file.read()
+        if self.File_str == '':
+            self.get_file()
+            self.File_str =self.File.read()
 
         return self.File_str
 
 
+    '''
+    =========
+    Sequence (not require Amber format)
+    =========
+    '''
 
     def get_seq(self, Oneletter=0):
         '''
@@ -241,7 +270,7 @@ class PDB(object):
             # Get the Chain_sequence
             lines=i.split('\n')
 
-            for line_index, line in enumerate(lines):
+            for line in lines:
 
                 pdb_l = PDB_line(line)
 
@@ -272,16 +301,20 @@ class PDB(object):
             
             self.raw_sequence[Chain_index] = Chain_sequence
             
-        self.strip_raw_seq() # strip the raw_sequence and save to sequence
+        self._strip_raw_seq() # strip the raw_sequence and save to sequence
+        
+        self.get_if_complete()
 
         if Oneletter == 1:
-            self.get_Oneletter()
+            self._get_Oneletter()
             return self.sequence_one
         else:
             return self.sequence
 
+    get_if_ligand = get_seq # alias
+    get_if_art_resi = get_seq
 
-    def strip_raw_seq(self):
+    def _strip_raw_seq(self):
         '''
         (Used internally) strip the raw_sequence.
         - Delete ligand and solvent
@@ -294,6 +327,10 @@ class PDB(object):
         save to self.if_ligand and self.if_art_resi
         '''
         new_index=0
+
+        #if the value is not changed to 1 then it's 0
+        self.if_art_resi = 0
+        self.if_ligand = 0
 
         if len(self.raw_sequence) == 0:
             print("The self.raw_sequence should be obtained first")
@@ -335,10 +372,11 @@ class PDB(object):
                 new_index=new_index+1
 
 
-    def get_Oneletter(self):
+    def _get_Oneletter(self):
         '''
         (Used internally) convert sequences in self.sequence to oneletter-based str
         - The 'NAN' is convert to '-'
+        - Present unnature residue as full 3-letter name
 
         save to self.sequence_one
         '''
@@ -349,33 +387,82 @@ class PDB(object):
         for chain in self.sequence:
             chain_Seq=''
             for name in self.sequence[chain]:
-                if name == 'NAN':
+                c_name=name.strip(' ')
+                if c_name == 'NAN':
                     chain_Seq=chain_Seq+'-'
                 else:
-                    chain_Seq=chain_Seq+Resi_map2[name.strip(' ')]
+                    if c_name in Resi_map2:
+                        chain_Seq=chain_Seq+Resi_map2[c_name]
+                    else:
+                        chain_Seq=chain_Seq+' '+c_name+' '
                 
             self.sequence_one[chain]=chain_Seq
+
+
+    def get_if_complete(self):
+        '''
+        Judge if the self.sequence (from the get_seq) has internal missing parts
+        Save the result to:
+            self.if_complete ------- for intire PDB
+            self.if_complete_chain - for each chain
+        '''
+        if len(self.sequence.keys()) == 0:
+            print('Please get the sequence first')
+            raise IndexError
         
+        self.if_complete=1 # not flow in if then 1
+        
+        for chain in self.sequence:
+            self.if_complete_chain[chain]=1 # not flow in if then 1
+            for resi in self.sequence[chain]:
+                if resi == 'NAN':
+                    self.if_complete=0
+                    self.if_complete_chain[chain]=0
+                    break
+        return self.if_complete, self.if_complete_chain
 
 
+    def get_missing(self, seq):
+        '''
+        get_missing(self, seq)
+        Compare self.sequence (from the get_seq) with the seq (str from the uniport)
+        1. No missing
+        2. Terminal missing
+        3. Internal missing
+        '''
+        pass
+
+    def PDB_loopmodel_refine(self, method='Rosetta'):
+        '''
+        Use different methods to model the missing sequence
+        Methods:
+        - pyRosetta
+        - trRosetta
+        '''
+        pass
+
+    '''
+    ========
+    Protonation
+    ========
+    '''
+    def get_protonation(self):
+        '''
+        Use PDB2PQR to get the protonation state for current PDB. (self.path)
+
+        '''
+
+        # input of PDB2PQR
+        pdb2pqr_parser = build_pdb2pqr_parser()
+        args = pdb2pqr_parser.parse_args(['--ff=PARSE','--ffout=AMBER','--with-ph=7.0',self.path,self.name+'_pqr.pdb'])
+        run_pdb2pqr(args)
 
 
-
-
-
-
-
-
-
-            
-
-
-
-
-
-
-
-
+    '''
+    ========
+    Mutation
+    ========
+    '''
 
 
     def PDB2PDBwLeap(self):
@@ -492,7 +579,7 @@ class PDB(object):
         ----------------------------------------------------
         'random' or 'r' (default)
         ----------------------------------------------------
-        Use self.path & self.sequence // only when ifcomplete
+        Use self.path & self.sequence // only when if_complete
         Save changes appending to self.MutaFlags 
         
         Need to add the chain_index info (mark: update)
@@ -539,6 +626,12 @@ class PDB(object):
         print('Current MutaFlags: ',self.MutaFlags)
 
 
+    '''
+    ========
+    Gerneral MD
+    ========
+    '''
+
     def PDB2FF(self):
         #out3_PDB_path=self.name+'_water.pdb'
         #make tleap input
@@ -566,8 +659,11 @@ class PDB(object):
         return (self.prmtop_path,self.inpcrd_path)
 
 
-
     def PDBMin(self,cycle='2000'):
+        '''
+        Run a minization use self.prmtop and self.inpcrd
+        Save changed PDB to self.path (containing water and ions)
+        '''
         
         out4_PDB_path=self.path[:-4]+'_min.pdb'
 
@@ -604,17 +700,18 @@ class PDB(object):
 
         return out4_PDB_path
 
+
     def rm_wat(self):
         '''
         Remove water and ion for the pdb. Remians the same if there's no water or ion.
-        Now only skip [Na+,Cl-,WAT] // Append more in the future.
+        Now only skip [Na+,Cl-,WAT,HOH] // Append more in the future.
         Save changed files into self.path.
         '''
         out_path = self.path[:-4]+'_rmW.pdb'
 
         with open(self.path) as f:
             with open(out_path,'w') as of:
-                skip_list=['Na+','Cl-','WAT']
+                skip_list=['Na+','Cl-','WAT','HOH']
                 change_flag=0
                 for line in f:
                     #Skip some lines
@@ -645,6 +742,7 @@ class PDB(object):
         self.name=self.name+'_rmW'
 
         return self.path
+
 
     def PDBMD(self,conf_path,tag=''):
         '''
@@ -722,28 +820,25 @@ class PDB_line(object):
 
 
 
-# Pre-refinement functions
-    def get_missing(self, seq):
-        '''
-        get_missing(self, seq)
-        Compare self.sequence (from the get_seq) with the seq (str from the uniport)
-        1. No missing
-        2. Terminal missing
-        3. Internal missing
-        '''
-        pass
 
-    def PDB_loopmodel_refine(self, method='Rosetta'):
-        '''
-        Use different methods to model the missing sequence
-        Methods:
-        - pyRosetta
-        - trRosetta
-        '''
-        pass
+# 了解并解决加氢的问题
+# 现在用pdb2pqr解决了一部分问题：
+# - 改了其中的两个bug
+# - 但是金属中心相关的问题还没有完成
 
-# 在残缺时使用某种占位字母记录？读取时对相邻的序号做差，大于一的添加N-1个空缺符（不能用字符串对比方法重现残缺位置因为确实了链接关系不知道在哪插入）用seq重写随机突变的方法（flag的存储，随机的方式，突变的实施）
-# 结合class PDB_line的思路完成序列的提取, 用chr(65-1+i)完成ABC转化
+# 判断库里有多少可以直接跑, 遗留问题：无法区分共结晶用的一些小分子和配体。
+# 写pdb转化函数：
+# - 配体存储于独立的链 (貌似都是，也可以判断一下，对于所有判断为人工残基的)
+# - 可以被leap正常读取
+
+# 跑这部分的MD，重写conf类
+# 
+# 基于seq完成get_missing的判断，
+# 写修复的方法Rosetta优先 // 与uniport的对比
+#
+# 用seq重写随机突变的方法（flag的存储，随机的方式，突变的实施）
+#
+# 尝试适配直接传入字符串？或许可以写一个保存文件的函数? （待定）还是要以外部文件为主，因为要和别的程序交互
 
 # func outside of the class
 def get_PDB(name):
