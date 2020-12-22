@@ -3,9 +3,11 @@ import re
 import argparse
 from random import randint
 from AmberMaps import *
+from wrapper import *
+from Class_Structure import *
 try:
-    from pdb2pqr.main import main as run_pdb2pqr
-    from pdb2pqr.main import build_parser as build_pdb2pqr_parser
+    from pdb2pqr.main import main_driver as run_pdb2pqr
+    from pdb2pqr.main import build_main_parser as build_pdb2pqr_parser
 except ImportError:
     raise ImportError('PDB2PQR not installed.')
 
@@ -68,6 +70,7 @@ class PDB(object):
     File_str=''
     prmtop_path=''
     inpcrd_path=''
+    pqr_path=''
     stage=0 #For debug indicate which stage is the program in
     
     ifformat=0
@@ -102,6 +105,31 @@ class PDB(object):
         '''
         Waiting for reform
         '''
+        #initilize
+        self.path=''
+        self.name=''
+        self.File_str=''
+        self.prmtop_path=''
+        self.inpcrd_path=''
+        self.pqr_path=''
+        self.stage=0         
+        self.ifformat=0        
+        self.if_complete=None
+        self.if_complete_chain={} 
+        self.if_art_resi=None
+        self.if_ligand=None
+        self.MutaFlags=[]
+        self.tot_resi=0
+        self.Coord=[]
+        self.raw_sequence={}
+        self.sequence={}
+        self.sequence_one={}
+        self.current_index=0
+        self.current_resi_name_3=''
+        self.current_resi_name=''
+        self.current_resi_atom_list=[]
+        #initilize
+
 
         if len(PDB_PATH) == 0:
             self.File_str=PDB_File_str
@@ -260,7 +288,7 @@ class PDB(object):
 
         PDB_str = self.get_file_str()
 
-        Chain_str = PDB_str.split('TER')
+        Chain_str = PDB_str.split('\nTER') # Note LF is required
         
         for chain,i in enumerate(Chain_str):
 
@@ -446,16 +474,91 @@ class PDB(object):
     Protonation
     ========
     '''
-    def get_protonation(self):
+    def get_protonation(self, ph=7.0):
+        '''
+        Get protonation state based on PDB2PQR:
+        1. Use PDB2PQR, save output to self.pqr_path
+        2. Fix problems:
+            - Metal center: 
+            (detect donor(base on atom type) in a metal type based radiis) --> open for customize
+                - Fix1: deprotonate all. 
+                - Fix2: rotate if there're still lone pair left 
+                - Fix3: run pka calculate containing ion (maybe pypka) and run Fix2 based on the result
+                # switch HIE HID when dealing with HIS
+        save to self.path
+        '''
+        out_path=self.name+'_aH.pdb'
+        self._get_protonation_pdb2pqr(ph=ph)
+        self._protonation_Fix(out_path)
+
+ 
+    def _get_protonation_pdb2pqr(self,ffout='AMBER',ph=7.0,out_path=''):
         '''
         Use PDB2PQR to get the protonation state for current PDB. (self.path)
-
+        current implementation just use the outer layer of PDB2PQR. Update to inner one and get more infomation in the furture.
+        
+        save the result to self.pqr_path
         '''
-
+        # set default value for output pqr path
+        if len(out_path) == 0:
+            self.pqr_path = self.name+'.pqr'
+        else:
+            self.pqr_path = out_path
+        
         # input of PDB2PQR
         pdb2pqr_parser = build_pdb2pqr_parser()
-        args = pdb2pqr_parser.parse_args(['--ff=PARSE','--ffout=AMBER','--with-ph=7.0',self.path,self.name+'_pqr.pdb'])
-        run_pdb2pqr(args)
+        args = pdb2pqr_parser.parse_args(['--ff=PARSE','--ffout='+ffout,'--with-ph='+str(ph),self.path,self.pqr_path])
+        # use context manager to hide output
+        with HiddenPrints('./._get_protonation_pdb2pqr.log'):
+            run_pdb2pqr(args)
+
+
+    def _protonation_Fix(self, out_path, Metal_Fix='1'):
+        '''
+        Add in the missing atoms and run detailed fixing
+        save to self.path
+        '''
+
+        # Add missing atom (from the PDB2PQR step. Update to func result after update the _get_protonation_pdb2pqr func)       
+        # Now metal only
+        stru = structure(self)
+        # find Metal center and combine with the pqr file
+        metal_list = stru.find_metal()
+        with open(self.pqr_path) as f:
+            lines=f.readlines()
+            new_lines=[]
+            for metal in metal_list:
+                new_lines.append(metal.get_line(ff='AMBER'))
+            new_lines.append('TER\n')
+            lines = lines[:-2] + new_lines + lines[-1]
+            with open(out_path,'w') as of:
+                for line in lines:
+                    of.write(line)
+        self.path = out_path
+
+        # fix metal donor
+        self._protonation_Metal_Fix(Fix=Metal_Fix)        
+
+    def _protonation_Metal_Fix(self, Fix):
+        '''
+        fix the protonation state of donor residue of the metal center.
+        overwrite the self.path
+        '''
+        stru = structure(self)
+        metal_list=stru.find_metal()
+
+        if Fix == '1':
+            for metal in metal_list:
+                d_resi_list = metal.get_donor_residue()
+                for d_resi in d_resi_list:
+                    d_resi.deprotonate()
+            stru.build(ff='AMBER')
+
+        if Fix == '2':
+            pass
+
+        if Fix == '3':
+            pass
 
 
     '''
@@ -818,15 +921,19 @@ class PDB_line(object):
 
 
 
+# 主函数的metal处理已经写好
+# 之后再structure类对应主函数的使用写具体的函数
 
-
-
+# 1B8Q这个文件有问题，待处理此类
 # 了解并解决加氢的问题
 # 现在用pdb2pqr解决了一部分问题：
 # - 改了其中的两个bug
-# - 但是金属中心相关的问题还没有完成
+# - 但是金属中心相关的问题还没有完成 (写一个单独的函数删去加多余的H) # htmd保留了离子但没有很好的处理周围的残基的质子态 # pypka貌似可以带离子计算
 
-# 判断库里有多少可以直接跑, 遗留问题：无法区分共结晶用的一些小分子和配体。
+#pypka
+#貌似必须要amber处理之前的结构，如果变成HIE等名称将无法识别
+
+# 判断库里有多少可以直接跑, 遗留问题：无法区分共结晶用的一些小分子和配体。处理酶的时候一概删去
 # 写pdb转化函数：
 # - 配体存储于独立的链 (貌似都是，也可以判断一下，对于所有判断为人工残基的)
 # - 可以被leap正常读取
@@ -839,6 +946,10 @@ class PDB_line(object):
 # 用seq重写随机突变的方法（flag的存储，随机的方式，突变的实施）
 #
 # 尝试适配直接传入字符串？或许可以写一个保存文件的函数? （待定）还是要以外部文件为主，因为要和别的程序交互
+
+#htmd的不足
+#1.结构修复 （只做到保留残基序号从而保留缺失片段的位置）
+#2.金属中心附近的质子态 （可以保留金属离子，但是质子态处理的很差） 
 
 # func outside of the class
 def get_PDB(name):
@@ -853,6 +964,7 @@ def PDB_to_AMBER_PDB(path):
     Make the file convertable with tleap without error
     - Test result: The header part cause duplication of the residues. Deleting that part may give normal tleap output
     - Test result: For some reason, some ligand will miss if directly covert after simple header cutting
+    - Test result: `cat 1NVG.pdb |grep "^ATOM\|^HETATM\|^TER|^END" > 1NVG-grep.pdb` will be fine
     - WARNINGs
     '''
     pass
