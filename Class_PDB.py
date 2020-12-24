@@ -5,6 +5,7 @@ from random import randint
 from AmberMaps import *
 from wrapper import *
 from Class_Structure import *
+from Class_line import *
 try:
     from pdb2pqr.main import main_driver as run_pdb2pqr
     from pdb2pqr.main import build_main_parser as build_pdb2pqr_parser
@@ -63,7 +64,7 @@ PDBMD(self):
 -------------------------------------------------------------------------------------
 '''
 
-class PDB(object):
+class PDB():
 
     path=''
     name=''
@@ -302,22 +303,19 @@ class PDB(object):
 
                 pdb_l = PDB_line(line)
 
-                if pdb_l.line_type == 'ATOM  ' or pdb_l.line_type == 'HETATM':
-                    
-                    pdb_l.get_resi_index()
-                    pdb_l.get_resi_name()
+                if pdb_l.line_type == 'ATOM' or pdb_l.line_type == 'HETATM':
                     
                     # Deal with the first residue
                     if len(Chain_sequence) == 0:
                         Chain_sequence.append(pdb_l.resi_name)
-                        last_resi_index = pdb_l.resi_index
+                        last_resi_index = pdb_l.resi_id
                         continue
 
                     # find next new residue
-                    if pdb_l.resi_index != last_resi_index:
+                    if pdb_l.resi_id != last_resi_index:
 
                         # Deal with missing residue, fill with "NAN"
-                        missing_length = pdb_l.resi_index - last_resi_index - 1 
+                        missing_length = pdb_l.resi_id - last_resi_index - 1 
                         if missing_length > 0:
                             Chain_sequence = Chain_sequence + ['NAN',] * missing_length 
                         
@@ -325,7 +323,7 @@ class PDB(object):
                         Chain_sequence.append(pdb_l.resi_name)
 
                     # Update for next loop                
-                    last_resi_index = pdb_l.resi_index
+                    last_resi_index = pdb_l.resi_id
             
             self.raw_sequence[Chain_index] = Chain_sequence
             
@@ -523,7 +521,7 @@ class PDB(object):
         # Now metal only
         stru = structure(self)
         # find Metal center and combine with the pqr file
-        metal_list = stru.find_metal()
+        metal_list = stru.metalatoms
         with open(self.pqr_path) as f:
             lines=f.readlines()
             new_lines=[]
@@ -872,50 +870,6 @@ class PDB(object):
 
 
 
-
-class PDB_line(object):
-    '''
-    Class for decoding the line in the PDB file. Functions used internally. 
-    '''
-
-    line=''
-    line_type=''
-
-    resi_name=''
-    resi_index=''
-
-
-    def __init__(self,line):
-        '''
-        initilize with a specific line in the PDB file.
-        Get self.line_type
-        '''
-        self.line=line
-        self.line_type = self.line[0:6]
-
-    '''
-    =====
-    Residue
-    =====
-    '''
-
-    def get_resi_name(self):
-        '''
-        Get the residue name from self.line
-        save the result in self.resi_name
-        '''
-        self.resi_name = self.line[17:20]
-
-        return self.resi_name
-    
-    def get_resi_index(self):
-        '''
-        Get the residue index from self.line
-        save the result in self.resi_index
-        '''
-        self.resi_index = int(self.line[22:26])
-
-        return self.resi_index
 
 
 
