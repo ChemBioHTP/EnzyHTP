@@ -1,5 +1,6 @@
 from Class_line import PDB_line
-from helper import Child
+from helper import Child, line_feed
+from AmberMaps import *
 __doc__='''
 This module extract and operate structural infomation from PDB
 # will replace some local function in PDB class in the future.
@@ -36,6 +37,7 @@ class Structure():
     init
     ====
     '''
+    ifsort = 0
 
     def __init__(self, chains=None, metalatoms=None, ligands=None):
         '''
@@ -50,11 +52,14 @@ class Structure():
 
         # Add parent pointer and combine into a whole
         for chain in chains:
-            self.chains.append(chain.add_parent(self))
+            chain.set_parent(self)
+            self.chains.append(chain)
         for metalatom in metalatoms:
-            self.metalatoms.append(metalatom.add_parent(self))
+            metalatom.set_parent(self)
+            self.metalatoms.append(metalatom)
         for ligand in ligands:
-            self.ligands.append(ligand.add_parent(self))
+            ligand.set_parent(self)
+            self.ligands.append(ligand)
     
     @classmethod
     def fromPDB(cls, input_obj, input_type='path'):
@@ -68,6 +73,11 @@ class Structure():
                    |- metalatom(atom)
                    |- ligand(residue)
         - ... (add upon usage)
+        ---------
+        Special Method
+        ---------
+        __len__
+            len(obj) = len(obj.child_list)
         ''' 
 
         # adapt general input // converge to file_str
@@ -82,7 +92,7 @@ class Structure():
         
         raw_chains = []
         # get raw chains
-        chains_str = file_str.split('\nTER') # Note LF is required
+        chains_str = file_str.split(line_feed+'TER') # Note LF is required
         for index, chain_str in enumerate(chains_str):
             if chain_str.strip() != 'END':
                 Chain_index = chr(65+index) # Covert to ABC using ACSII mapping
@@ -103,26 +113,41 @@ class Structure():
         '''
         get metal from raw chains and clean chains by deleting the metal part
         -----
-        Method 1: Assume metal/ligand/solvent can be in any chain
+        Method 1:   Assume metal/ligand/solvent can be in any chain
+                    Assume all resiude have unique index. 
         (Slow but general)
         
         Method 2: Assume metal/ligand/solvent can only be in a seperate chain
         (fast but limited)
         '''
+        metalatoms = []
         if method == '1':
             for chain in raw_chains:
-                for residue in chain:
-                    for atom in residues:
-                        pass #写完getitem之后完成这部分 定义delitem通过索引删除元素
-                    
+                for i in range(len(chain)-1,-1,-1):
+                    # operate in residue level
+                    residue = chain[i]
+                    if residue.name in Metal_map.keys():
+                        # add a logger in the future
+                        print('\033[1;34;40mStructure: found metal in raw: '+chain.id+' '+residue.name+' '+str(residue.id)+' \033[0m')
+                        metalatoms.append(residue)
+                        del chain[residue]
         if method == '2':
+            # Not finished yet
             pass
 
-        return raw_chains, metalatoms
-        # 做这部分！！
-        ###############################################
-        
+        # Break pseudo residues into atoms and convert to Metalatom object 
+        holders = []
+        for pseudo_resi in metalatoms:
+            for metal in pseudo_resi:
+                holders.append(Metalatom.fromAtom(metal))
+        metalatoms = holders
+                
+        # clean empty chains
+        for i in range(len(raw_chains)-1,-1,-1):
+            if len(raw_chains[i]) == 0:
+                del raw_chains[i]
 
+        return raw_chains, metalatoms
 
     @classmethod
     def _get_ligand(cls, raw_chains):
@@ -131,13 +156,29 @@ class Structure():
         -----
         (TO BE DONE)
         '''
-        return raw_chains, []
+        ligands = []
+        # get ligand list
+        # convert to ligand obj
+        # clean empty chains
+        return raw_chains, ligands
 
     '''
     ====
     Methods
     ====
     '''
+    def get_metal_center(self):
+        '''
+        Extract metal centers from metalatoms. Judged by the MetalCenter_map
+        save to self.metal_centers
+        return a bool: if there's metal_center
+        '''
+        self.metal_centers = []
+        for metal in self.metalatoms:
+            if metal.resi_name in MetalCenter_map:
+                self.metal_centers.append(metal)
+        return self.metal_centers
+
 
     def get_art_resi(self):
         '''
@@ -145,11 +186,22 @@ class Structure():
         '''
         pass
     
-    def add_chain(self, chain_obj):
+    def add(self, obj, id=None):
         '''
-        1. set parent
-        2. add chain
+        1. judge obj type
+        2. clean original id
+        3. add to corresponding list
         '''
+        pass
+
+    def sort(self):
+        '''
+        assign index according to current items
+        chain.id
+        resi.id
+        atom.id
+        '''
+        self.ifsort = 1
         pass
 
     def build(self, ff='AMBER'):
@@ -158,6 +210,19 @@ class Structure():
         based on atom and resinames
         '''
         pass
+
+    '''
+    ====
+    Special Method
+    ====
+    '''
+
+    def __len__(self):
+        '''
+        len(obj) = len(obj.child_list)
+        '''
+        return len(self.chains)+len(self.metalatoms)+len(self.ligands)
+
 
 
 
@@ -187,25 +252,34 @@ class Chain(Child):
     __getattr__
         Chain_obj.123 = Chain_obj.residues[123-1] // index mimic (start from 1)
         Chain_obj.HIS = Chain_obj.find_resi_name('HIS') // search mimic
-    
+    __delitem__
+        del obj[int] --> obj.child[int].remove() // delete by index (start from 0)
+        del obj[str] --> obj._del_child_name() // delete by value
+        del obj[child] --> obj.child_list.remove(child) // delete by value
+    __len__
+        len(obj) = len(obj.child_list)
     '''
-
+    self.ifsort = 0
     '''
     ====
     init
     ====
     '''
-    def __init__(self, residues, chain_id: str):
+    def __init__(self, residues, chain_id: str, parent=None):
         '''
         Common part of init methods: direct from data objects
         No parent by default. Add parent by action
         '''
         #set parent to None
-        Child.__init__(self) 
+        Child.__init__(self)
+        # add parent if provided
+        if parent != None:
+            self.set_parent(parent)
         #adapt some children
         self.residues = []
         for i in residues:
-            self.residues.append(i.add_parent(self))
+            i.set_parent(self)
+            self.residues.append(i)
         #set id
         self.id = chain_id
         
@@ -235,7 +309,7 @@ class Chain(Child):
         residues = []
         resi_lines = [] # data holder
         lines = PDB_line.fromlines(chain_str) # Note LF is required
-        for pdb_l in lines:
+        for i, pdb_l in enumerate(lines):
             if pdb_l.line_type == 'ATOM' or pdb_l.line_type == 'HETATM':
 
                 # Deal with the first residue
@@ -247,11 +321,18 @@ class Chain(Child):
                 # find the beginning of a new residue
                 if pdb_l.resi_id != last_resi_index:
                     # Store last resi
-                    residues.append(Residue.fromPDB(resi_lines, last_resi_index))
+                    last_resi = Residue.fromPDB(resi_lines, last_resi_index)
+                    residues.append(last_resi)
                     # empty the holder for current resi
                     resi_lines = []
 
                 resi_lines.append(pdb_l)
+                
+                # Deal with the last residue
+                if i == len(lines)-1:
+                    last_resi = Residue.fromPDB(resi_lines, pdb_l.resi_id)
+                    residues.append(last_resi)
+                
                 # Update for next loop                
                 last_resi_index = pdb_l.resi_id
 
@@ -262,6 +343,25 @@ class Chain(Child):
     Method
     ====
     '''
+    def add(self, obj, id=None):
+        '''
+        1. judge obj type
+        2. clean original id
+        3. add to corresponding list
+        '''
+        pass
+
+    def sort(self):
+        '''
+        maybe useful with other format
+        ----
+        assign index according to current items
+        resi.id
+        atom.id
+        '''
+        self.ifsort = 1
+        pass
+
 
     def get_chain_seq(self):
         pass
@@ -276,6 +376,15 @@ class Chain(Child):
             if resi.name == name:
                 out_list.append(resi)
         return out_list
+    
+    def _del_resi_name(self, name: str):
+        '''
+        find residues according to the name
+        delete found residues
+        ''' 
+        for i in range(len(self.residues)-1,-1,-1):
+            if self.residues[i].name == name:
+                del self.residues[i]
 
     '''
     ====
@@ -299,7 +408,31 @@ class Chain(Child):
         if type(key) == int:
             return self.residues[key-1]
         if type(key) == str:
-            return self.find_resi_name(key)
+            return self._find_resi_name(key)
+        if key == 'stru':
+            return self.parent
+        Exception('bad key: getattr error')
+
+
+    def __delitem__(self, key):
+        '''
+        del obj[int] --> obj.child[int].remove() // delete by index (start from 0)
+        del obj[str] --> obj._del_child_name() // delete by value
+        del obj[child] --> obj.child_list.remove(child) // delete by value
+        '''
+        if type(key) == int:
+            del self.residues[key]
+        if type(key) == str:
+            self._del_resi_name(key)
+        if type(key) == Residue:
+            self.residues.remove(key)
+
+    def __len__(self):
+        '''
+        len(obj) = len(obj.child_list)
+        '''
+        return len(self.residues)
+        
 
 
 
@@ -331,6 +464,12 @@ class Residue(Child):
     __getattr__
         Residue_obj.123 = Residue_obj.atoms[123-1] // index mimic (start from 1)
         Residue_obj.CA = Residue_obj.find_atom_name('CA') // search mimic
+    __delitem__
+        del obj[int] --> obj.child[int].remove() // delete by index (start from 0)
+        del obj[str] --> obj._del_child_name(str) // delete by value
+        del obj[child] --> obj.child_list.remove(child) // delete by value
+    __len__
+        len(obj) = len(obj.child_list)
     '''
 
     '''
@@ -338,17 +477,21 @@ class Residue(Child):
     init
     ====
     '''
-    def __init__(self, atoms, resi_id, resi_name):
+    def __init__(self, atoms, resi_id, resi_name, parent=None):
         '''
         Common part of init methods: direct from data objects
         No parent by default. Add parent by action
         '''
         #set parent to None
         Child.__init__(self) 
+        # add parent if provided
+        if parent != None:
+            self.set_parent(parent)
         #adapt some children
         self.atoms = []
         for i in atoms:
-            self.atoms.append(i.add_parent(self))
+            i.set_parent(self)
+            self.atoms.append(i)
         #set id
         self.id = resi_id
         self.name = resi_name
@@ -413,6 +556,31 @@ class Residue(Child):
         else:
             return out_list[0]
 
+    def _del_atom_name(self, name: str):
+        '''
+        find atoms according to the name
+        delete found atoms
+        ''' 
+        for i in range(len(self.atoms)-1,-1,-1):
+            if self.atoms[i].name == name:
+                del self.atoms[i]
+
+    def add(self, obj, id=None):
+        '''
+        1. judge obj type
+        2. clean original id
+        3. add to corresponding list
+        '''
+        pass
+
+    def sort(self):
+        '''
+        None
+        '''
+        pass
+
+
+
     '''
     ====
     Special Method
@@ -435,7 +603,31 @@ class Residue(Child):
         if type(key) == int:
             return self.atoms[key-1]
         if type(key) == str:
-            return self.find_atom_name(key)
+            return self._find_atom_name(key)
+        if key == 'chain':
+            return self.parent
+        Exception('bad key: getattr error')
+
+    
+    def __delitem__(self, key):
+        '''
+        del obj[int] --> obj.child[int].remove() // delete by index (start from 0)
+        del obj[str] --> obj._del_child_name(str) // delete by value
+        del obj[child] --> obj.child_list.remove(child) // delete by value
+        '''
+        if type(key) == int:
+            del self.atoms[key]
+        if type(key) == str:
+            return self._del_atom_name(key)
+        if type(key) == Atom:
+            self.atoms.remove(key)
+
+    def __len__(self):
+        '''
+        len(obj) = len(obj.child_list)
+        '''
+        return len(self.atoms)
+
 
 
 class Atom(Child):
@@ -458,17 +650,20 @@ class Atom(Child):
     -------------
     '''
 
-    def __init__(self, atom_name: str, coord: list, atom_id = None):
+    def __init__(self, atom_name: str, coord: list, atom_id = None, parent = None):
         '''
         Common part of init methods: direct from data objects
         No parent by default. Add parent by action
         '''
         #set parent to None
         Child.__init__(self)
+        # add parent if provided
+        if parent != None:
+            self.set_parent(parent)
         # get data
         self.name = atom_name
         self.coord = coord
-        # self.atom_id = atom_id
+        self.atom_id = atom_id
     
     @classmethod
     def fromPDB(cls, atom_input, input_type='PDB_line'):
@@ -504,22 +699,49 @@ class Atom(Child):
 
     def gen_line(self, ff='AMBER'):
         '''
-        generate an output line
+        generate an output line. End with LF
+        -------
+        must use after sort!
         '''
-        pass
+        a_index = '{:>5d}'.format(self.id)
+        a_name = '{:<4}'.format(self.name)
+        r_name = '{:>3}'.format(self.parent.name) # fix for metal
+        line = 'ATOM  '+ a_index +' '+a_name+r_name'    348      21.367   9.559  -3.548  1.00  0.00'+line_feed
+        待办
+        return line
 
     def get_around(self, rad):
         pass
+
+
+    '''
+    ====
+    Special Method
+    ====
+    '''
+
+    def __getattr__(self, key):
+        if key == 'residue' or key == 'resi':
+            return self.parent
+        else:
+            Exception('bad key: getattr error')
     
 
 class Metalatom(Atom):
 
+    def __init__(self, name, resi_name, coord, id=None, parent=None):
+        '''
+        Have both atom_name and resi_name
+        '''
+        self.resi_name = resi_name
+        Atom.__init__(self, name, coord, id, parent)
+
     @classmethod
     def fromAtom(cls, atom_obj):
         '''
-        generate from Atom object. cope data
+        generate from Atom object. copy data.
         '''
-        return cls(atom_obj.atom_name, atom_obj.coord)
+        return cls(atom_obj.atom_name, atom_obj.parent.name, atom_obj.coord, parent=atom_obj.parent)
 
     def get_valance(self):
         pass
@@ -527,5 +749,8 @@ class Metalatom(Atom):
         pass
     def get_donor_residue(self):
         return []
+
+class Ligand(Residue):
+    pass
     
 

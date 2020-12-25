@@ -6,6 +6,7 @@ from AmberMaps import *
 from wrapper import *
 from Class_Structure import *
 from Class_line import *
+from helper import line_feed
 try:
     from pdb2pqr.main import main_driver as run_pdb2pqr
     from pdb2pqr.main import build_main_parser as build_pdb2pqr_parser
@@ -289,7 +290,7 @@ class PDB():
 
         PDB_str = self.get_file_str()
 
-        Chain_str = PDB_str.split('\nTER') # Note LF is required
+        Chain_str = PDB_str.split(line_feed+'TER') # Note LF is required
         
         for chain,i in enumerate(Chain_str):
 
@@ -297,7 +298,7 @@ class PDB():
             Chain_sequence=[]
             
             # Get the Chain_sequence
-            lines=i.split('\n')
+            lines=i.split(line_feed)
 
             for line in lines:
 
@@ -519,15 +520,16 @@ class PDB():
 
         # Add missing atom (from the PDB2PQR step. Update to func result after update the _get_protonation_pdb2pqr func)       
         # Now metal only
-        stru = structure(self)
+        # 以纯结构操作的方式重写 ，利用build来生成文件
+        stru = Structure(self.path)
         # find Metal center and combine with the pqr file
-        metal_list = stru.metalatoms
+        metal_list = stru.get_metal_center()
         with open(self.pqr_path) as f:
             lines=f.readlines()
             new_lines=[]
             for metal in metal_list:
-                new_lines.append(metal.get_line(ff='AMBER'))
-            new_lines.append('TER\n')
+                new_lines.append(metal.gen_line(ff='AMBER'))
+            new_lines.append('TER'+line_feed)
             lines = lines[:-2] + new_lines + lines[-1]
             with open(out_path,'w') as of:
                 for line in lines:
@@ -542,7 +544,8 @@ class PDB():
         fix the protonation state of donor residue of the metal center.
         overwrite the self.path
         '''
-        stru = structure(self)
+        # 以纯结构操作的方式重写 ，利用build来生成文件
+        stru = Structure(self.path)
         metal_list=stru.find_metal()
 
         if Fix == '1':

@@ -10,5 +10,12 @@ Tree
 class Child():
     def __init__(self):
         self.parent = None
-    def add_parent(self, parent_obj):
+    def set_parent(self, parent_obj):
         self.parent = parent_obj
+
+        return self
+
+'''
+Text
+'''
+line_feed = '\n'
