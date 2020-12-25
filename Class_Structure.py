@@ -91,7 +91,7 @@ class Structure():
         
         # clean chains
         # clean metals
-        raw_chains_woM, metalatoms = cls._get_metalatoms(raw_chains)
+        raw_chains_woM, metalatoms = cls._get_metalatoms(raw_chains, method='1')
         # clean ligands
         raw_chains_woM_woL, ligands = cls._get_ligand(raw_chains_woM)
 
@@ -99,16 +99,28 @@ class Structure():
 
 
     @classmethod
-    def _get_metalatoms(cls, raw_chains):
+    def _get_metalatoms(cls, raw_chains, method='1'):
         '''
         get metal from raw chains and clean chains by deleting the metal part
+        -----
+        Method 1: Assume metal/ligand/solvent can be in any chain
+        (Slow but general)
+        
+        Method 2: Assume metal/ligand/solvent can only be in a seperate chain
+        (fast but limited)
         '''
-        chains_cleaned = []
-        for chain in raw_chains:
+        if method == '1':
+            for chain in raw_chains:
+                for residue in chain:
+                    for atom in residues:
+                        pass #写完getitem之后完成这部分 定义delitem通过索引删除元素
+                    
+        if method == '2':
             pass
 
-        return chains_cleaned, []
-        做这部分！！
+        return raw_chains, metalatoms
+        # 做这部分！！
+        ###############################################
         
 
 
@@ -157,7 +169,7 @@ class Chain(Child):
     PDB:        Chain.fromPDB(chain_input, chain_id, input_type='file_str' or 'file' or 'path')
     raw data:   Chain(residues, chain_id)
     -------------
-    chain_id
+    id
     parent # the whole structure
     residues = [resi_obj, ...]
     chain_seq = ['resi_name', ..., 'NAN', ..., 'resi_name']
@@ -166,6 +178,16 @@ class Chain(Child):
     -------------
     Add_parent
     get_chain_seq(self)
+    _find_resi_name
+    -------------
+    Special method
+    -------------
+    __getitem__
+        Chain_obj[int]: Chain_obj.residues[int] // (start from 0)
+    __getattr__
+        Chain_obj.123 = Chain_obj.residues[123-1] // index mimic (start from 1)
+        Chain_obj.HIS = Chain_obj.find_resi_name('HIS') // search mimic
+    
     '''
 
     '''
@@ -185,7 +207,7 @@ class Chain(Child):
         for i in residues:
             self.residues.append(i.add_parent(self))
         #set id
-        self.chain_id = chain_id
+        self.id = chain_id
         
     
     @classmethod
@@ -244,6 +266,41 @@ class Chain(Child):
     def get_chain_seq(self):
         pass
 
+    def _find_resi_name(self, name: str):
+        '''
+        find residues according to the name
+        return a list of found residues
+        ''' 
+        out_list = []
+        for resi in self.residues:
+            if resi.name == name:
+                out_list.append(resi)
+        return out_list
+
+    '''
+    ====
+    Special Method
+    ====
+    '''
+    
+    def __getitem__(self, key: int):
+        '''
+        Chain_obj[int]: Chain_obj.residues[int]
+        -----
+        use residue index within the chain, start from 0
+        '''
+        return self.residues[key]
+    
+    def __getattr__(self, key):
+        '''
+        Chain_obj.123 = Chain_obj.residues[123-1] // index mimic (start from 1)
+        Chain_obj.HIS = Chain_obj.find_resi_name('HIS') // search mimic
+        '''
+        if type(key) == int:
+            return self.residues[key-1]
+        if type(key) == str:
+            return self.find_resi_name(key)
+
 
 
 class Residue(Child):
@@ -253,8 +310,8 @@ class Residue(Child):
     PDB:        Residue.fromPDB(resi_input, resi_id=pdb_l.resi_id, input_type='PDB_line' or 'line_str' or 'file' or 'path')
     raw data:   Residue(atoms, resi_id, resi_name)
     -------------
-    resi_id
-    resi_name
+    id
+    name
     parent # the whole chain
 
     atoms = [atom_obj, ...]
@@ -267,7 +324,13 @@ class Residue(Child):
     Add_parent
     if_art_resi
     deprotonate
+    _find_atom_name
     -------------
+    __getitem__
+        Residue_obj[int]: Residue_obj.residues[int]    
+    __getattr__
+        Residue_obj.123 = Residue_obj.atoms[123-1] // index mimic (start from 1)
+        Residue_obj.CA = Residue_obj.find_atom_name('CA') // search mimic
     '''
 
     '''
@@ -287,7 +350,8 @@ class Residue(Child):
         for i in atoms:
             self.atoms.append(i.add_parent(self))
         #set id
-        self.resi_id = resi_id
+        self.id = resi_id
+        self.name = resi_name
     
     @classmethod
     def fromPDB(cls, resi_input, resi_id=None, input_type='PDB_line'):
@@ -334,6 +398,46 @@ class Residue(Child):
     def deprotonate(self):
         pass
 
+    def _find_atom_name(self, name: str):
+        '''
+        find atom according to the name (should find only one atom)
+        return the atom (! assume the uniqueness of name)
+        ''' 
+        out_list = []
+        for atom in self.atoms:
+            if atom.name == name:
+                out_list.append(atom)
+        if len(out_list) > 1:
+            print('\033[32;0mShould there be same atom name in residue +'+self.name+str(self.id)+'?+\033[0m')
+            raise Exception
+        else:
+            return out_list[0]
+
+    '''
+    ====
+    Special Method
+    ====
+    '''
+
+    def __getitem__(self, key: int):
+        '''
+        Residue_obj[int]: Residue_obj.residues[int]
+        -----
+        use residue index within the chain, start from 0
+        '''
+        return self.atoms[key]
+    
+    def __getattr__(self, key):
+        '''
+        Residue_obj.123 = Residue_obj.atoms[123-1] // index mimic (start from 1)
+        Residue_obj.CA = Residue_obj.find_atom_name('CA') // search mimic
+        '''
+        if type(key) == int:
+            return self.atoms[key-1]
+        if type(key) == str:
+            return self.find_atom_name(key)
+
+
 class Atom(Child):
     '''
     -------------
@@ -341,8 +445,8 @@ class Atom(Child):
     PDB:        Atom.fromPDB(atom_input, input_type='PDB_line' or 'line_str' or 'file' or 'path')
     raw data:   Atom(atom_name, coord)
     -------------
-    atom_id
-    atom_name
+    id
+    name
     coord = [x, y, z]
 
     parent # the whole chain
@@ -362,7 +466,7 @@ class Atom(Child):
         #set parent to None
         Child.__init__(self)
         # get data
-        self.atom_name = atom_name
+        self.name = atom_name
         self.coord = coord
         # self.atom_id = atom_id
     
@@ -392,6 +496,12 @@ class Atom(Child):
         return cls(atom_name, coord)
 
 
+    '''
+    ====
+    Method
+    ====
+    '''
+
     def gen_line(self, ff='AMBER'):
         '''
         generate an output line
@@ -400,8 +510,17 @@ class Atom(Child):
 
     def get_around(self, rad):
         pass
+    
 
 class Metalatom(Atom):
+
+    @classmethod
+    def fromAtom(cls, atom_obj):
+        '''
+        generate from Atom object. cope data
+        '''
+        return cls(atom_obj.atom_name, atom_obj.coord)
+
     def get_valance(self):
         pass
     def get_donor_atom(self):
