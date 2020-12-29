@@ -186,13 +186,73 @@ class Structure():
         '''
         pass
     
-    def add(self, obj, id=None):
+    def add(self, obj, id=None, sort=0):
         '''
-        1. judge obj type
-        2. clean original id
-        3. add to corresponding list
+        1. judge obj type (go into the list)
+        2. assign parent
+        3. id
+        if sort:
+            clean original id (use a place holder to represent last)
+        if not None:
+            assign id
+        if sort and not None:
+            mark as id+i
+        4. add to corresponding list
         '''
-        pass
+        # list
+        if type(obj) == list:
+            
+            obj_ele=obj[0]
+
+            if type(obj_ele) != Chain and type(obj_ele) != Metalatom and type(obj_ele) != Ligand:
+                raise TypeError('Add() method only take Chain / Metalatom / Ligand')
+
+            # add parent and clear id (if sort) assign id (if assigned) leave mark if sort and assigned
+            for i in obj:               
+                i.Add_parent(self)
+                if sort:
+                    if id != None:
+                        i.id = str(id)+'i' #str mark
+                    else:
+                        i.id = id #None 
+                else:
+                    if id != None:
+                        i.id=id
+            
+            if type(obj_ele) == Chain:
+                self.chains.extend(obj)
+            if type(obj_ele) == Metalatom:
+                self.metalatoms.extend(obj)
+            if type(obj_ele) == Ligand:
+                self.ligands.extend(obj)
+
+        # single building block
+        else:
+            if type(obj) != Chain and type(obj) != Metalatom and type(obj) != Ligand:
+                raise TypeError('Add() method only take Chain / Metalatom / Ligand')
+            
+            obj.Add_parent(self)
+            if sort:
+                if id != None:
+                    obj.id = str(id)+'i' #str mark
+                else:
+                    obj.id = id #None 
+            else:
+                if id != None:
+                    obj.id=id
+
+            if type(obj) == Chain:
+                self.chains.append(obj)
+            if type(obj) == Metalatom:
+                self.metalatoms.append(obj)   
+            if type(obj) == Ligand:
+                self.ligands.append(obj)
+            
+        if sort:
+            self.sort()
+            
+
+        
 
     def sort(self):
         '''
@@ -204,11 +264,14 @@ class Structure():
         self.ifsort = 1
         pass
 
-    def build(self, ff='AMBER'):
+    def build(self, path, ff='AMBER'):
         '''
         build PDB after the change
         based on atom and resinames
         '''
+        pass
+
+    def protonation_metal_fix(self, Fix):
         pass
 
     '''

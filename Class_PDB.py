@@ -520,46 +520,20 @@ class PDB():
 
         # Add missing atom (from the PDB2PQR step. Update to func result after update the _get_protonation_pdb2pqr func)       
         # Now metal only
-        # 以纯结构操作的方式重写 ，利用build来生成文件
-        stru = Structure(self.path)
+
+        old_stru = Structure(self.path)
+        new_stru = Structure(self.pqr_path)
+
         # find Metal center and combine with the pqr file
-        metal_list = stru.get_metal_center()
-        with open(self.pqr_path) as f:
-            lines=f.readlines()
-            new_lines=[]
-            for metal in metal_list:
-                new_lines.append(metal.gen_line(ff='AMBER'))
-            new_lines.append('TER'+line_feed)
-            lines = lines[:-2] + new_lines + lines[-1]
-            with open(out_path,'w') as of:
-                for line in lines:
-                    of.write(line)
-        self.path = out_path
+        metal_list = old_stru.get_metal_center()
+        new_stru.add(metal_list, sort = 0)
+        # fix metal environment
+        new_stru.protonation_metal_fix(Fix = 1)
 
-        # fix metal donor
-        self._protonation_Metal_Fix(Fix=Metal_Fix)        
+        # PLACE HOLDER for other fix
 
-    def _protonation_Metal_Fix(self, Fix):
-        '''
-        fix the protonation state of donor residue of the metal center.
-        overwrite the self.path
-        '''
-        # 以纯结构操作的方式重写 ，利用build来生成文件
-        stru = Structure(self.path)
-        metal_list=stru.find_metal()
-
-        if Fix == '1':
-            for metal in metal_list:
-                d_resi_list = metal.get_donor_residue()
-                for d_resi in d_resi_list:
-                    d_resi.deprotonate()
-            stru.build(ff='AMBER')
-
-        if Fix == '2':
-            pass
-
-        if Fix == '3':
-            pass
+        # build file
+        new_stru.build(self.path)
 
 
     '''
