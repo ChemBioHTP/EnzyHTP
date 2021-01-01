@@ -37,7 +37,6 @@ class Structure():
     init
     ====
     '''
-    ifsort = 0
 
     def __init__(self, chains=None, metalatoms=None, ligands=None):
         '''
@@ -49,6 +48,7 @@ class Structure():
         self.chains = []
         self.metalatoms = []
         self.ligands = []
+        self.metal_centers = []
 
         # Add parent pointer and combine into a whole
         for chain in chains:
@@ -171,7 +171,7 @@ class Structure():
         '''
         Extract metal centers from metalatoms. Judged by the MetalCenter_map
         save to self.metal_centers
-        return a bool: if there's metal_center
+        return self.metal_centers
         '''
         self.metal_centers = []
         for metal in self.metalatoms:
@@ -205,9 +205,13 @@ class Structure():
             obj_ele=obj[0]
 
             if type(obj_ele) != Chain and type(obj_ele) != Metalatom and type(obj_ele) != Ligand:
-                raise TypeError('Add() method only take Chain / Metalatom / Ligand')
+                raise TypeError('Structure.Add() method only take Chain / Metalatom / Ligand')
 
-            # add parent and clear id (if sort) assign id (if assigned) leave mark if sort and assigned
+            # add parent and clean id (if sort) assign id (if assigned) leave mark if sort and assigned
+            #                         sort
+            #          |     |    0     |   1   |
+            # assigned |  0  |   keep   | clean |
+            #          |  1  |  assign  | mark  |
             for i in obj:               
                 i.Add_parent(self)
                 if sort:
@@ -229,7 +233,7 @@ class Structure():
         # single building block
         else:
             if type(obj) != Chain and type(obj) != Metalatom and type(obj) != Ligand:
-                raise TypeError('Add() method only take Chain / Metalatom / Ligand')
+                raise TypeError('Structure.Add() method only take Chain / Metalatom / Ligand')
             
             obj.Add_parent(self)
             if sort:
@@ -260,6 +264,14 @@ class Structure():
         chain.id
         resi.id
         atom.id
+        -----------
+        Chain/Residue level: 
+            Base on the order of the old obj.id and potential insert mark from add (higher than same number without the mark)
+        Atom level:
+            base on the parent order:
+            chains -> metalatoms -> ligands
+            residue.id within each above.
+            list order within each residues.
         '''
         self.ifsort = 1
         pass
@@ -272,8 +284,32 @@ class Structure():
         pass
 
     def protonation_metal_fix(self, Fix):
-        pass
+        '''
+        return a bool: if there's any metal center
+        '''
+        # try once if not exist
+        if self.metal_centers == []:
+            self.get_metal_center()
+        if self.metal_centers == []:
+            print('No metal center is found. Exit Fix.')
+            return False
 
+        # start fix
+        # get donor atoms and residues
+        for metal in self.metal_centers:
+            metal.get_donor_residue(method = 'INC')
+
+            if Fix == '1':
+                metal._metal_fix_1()
+            
+            if Fix == '2':
+                metal._metal_fix_2()
+
+            if Fix == '3':
+                metal._metal_fix_3()
+        return True
+
+        
     '''
     ====
     Special Method
@@ -322,7 +358,7 @@ class Chain(Child):
     __len__
         len(obj) = len(obj.child_list)
     '''
-    self.ifsort = 0
+
     '''
     ====
     init
@@ -406,13 +442,54 @@ class Chain(Child):
     Method
     ====
     '''
-    def add(self, obj, id=None):
+    def add(self, obj, id=None, sort=0):
         '''
         1. judge obj type
         2. clean original id
         3. add to corresponding list
         '''
-        pass
+        # list
+        if type(obj) == list:
+            
+            obj_ele=obj[0]
+
+            if type(obj_ele) != Residue:
+                raise TypeError('Chain.Add() method only take Residue')
+
+            # add parent and clean id (if sort) assign id (if assigned) leave mark if sort and assigned
+            for i in obj:               
+                i.Add_parent(self)
+                if sort:
+                    if id != None:
+                        i.id = str(id)+'i' #str mark
+                    else:
+                        i.id = id #None 
+                else:
+                    if id != None:
+                        i.id=id
+            self.residues.extend(obj)
+            
+
+        # single building block
+        else:
+            if type(obj) != Residue:
+                raise TypeError('Chain.Add() method only take Residue')
+            
+            obj.Add_parent(self)
+            if sort:
+                if id != None:
+                    obj.id = str(id)+'i' #str mark
+                else:
+                    obj.id = id #None 
+            else:
+                if id != None:
+                    obj.id=id
+            self.residues.append(obj)
+
+        if sort:
+            self.sort()
+
+        
 
     def sort(self):
         '''
@@ -603,6 +680,8 @@ class Residue(Child):
         pass
     def deprotonate(self):
         pass
+    def rot_proton(self, T_atom):
+        pass
 
     def _find_atom_name(self, name: str):
         '''
@@ -769,8 +848,8 @@ class Atom(Child):
         a_index = '{:>5d}'.format(self.id)
         a_name = '{:<4}'.format(self.name)
         r_name = '{:>3}'.format(self.parent.name) # fix for metal
-        line = 'ATOM  '+ a_index +' '+a_name+r_name'    348      21.367   9.559  -3.548  1.00  0.00'+line_feed
-        待办
+        line = 'ATOM  '+ a_index +' '+a_name+r_name+'    348      21.367   9.559  -3.548  1.00  0.00'+line_feed
+        #待办
         return line
 
     def get_around(self, rad):
@@ -808,10 +887,50 @@ class Metalatom(Atom):
 
     def get_valance(self):
         pass
-    def get_donor_atom(self):
+
+    # fix related
+    def get_donor_atom(self, method='INC'):
+        '''
+        Get coordinated donor atom for a metal center.
+        Base on a certain type of radius of this metal:
+        method = INC ------ {ionic radius} for both metal and donor atom
+               = VDW ------ {Van Der Waals radius} for both metal and donor atom
+        -----------------------
+        save found atom list to self.donor_atom
+        '''
+        这里
         pass
-    def get_donor_residue(self):
-        return []
+    def get_donor_residue(self, method='INC'):
+        '''
+        get donor residue based on donor atoms
+        '''
+        self.donor_resi =  []
+        self.get_donor_atom(method=method)
+        for atom in self.donor_atom:
+            self.donor_resi.append(atom.resi)
+
+    def _metal_fix_1(self):
+        '''
+        Fix1: deprotonate all donor
+        '''
+        for resi in self.donor_resi:
+            resi.deprotonate()
+
+
+    def _metal_fix_2(self):
+        '''
+        Fix2: rotate if there're still lone pair left 
+        '''
+        for atom in self.donor_atom:
+            atom.resi.rot_proton(atom)
+
+    def _metal_fix_3(self):
+        '''
+        Fix3: run pka calculate containing ion (maybe pypka) and run Fix2 based on the result
+        waiting for response
+        '''
+        pass
+    
 
 class Ligand(Residue):
     pass

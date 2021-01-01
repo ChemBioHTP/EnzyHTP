@@ -533,6 +533,7 @@ class PDB():
         # PLACE HOLDER for other fix
 
         # build file
+        new_stru.sort()
         new_stru.build(self.path)
 
 
@@ -850,10 +851,9 @@ class PDB():
 
 
 
-
-
-# 主函数的metal处理已经写好
-# 之后再structure类对应主函数的使用写具体的函数
+# Metalatom.get_donor_residue
+# Residue.deprotonate Residue.rot_proton
+# sort, build
 
 # 1B8Q这个文件有问题，待处理此类
 # 了解并解决加氢的问题
