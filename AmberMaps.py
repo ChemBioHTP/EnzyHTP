@@ -217,7 +217,17 @@ MetalCenter_map = { "MG" : "Mg",
                     "PU" : "Pu",
                     "TH" : "Th" }
 
-# Potential coordination donor: add upon discover. (atom_name:element)
+
+Ele_map = {'Amber': { 'CA' : 'C',
+                      'C'  : 'C',
+                      来自amber atom type
+
+}}
+
+# Potential coordination donor: add upon discover. (element_name)
+
+Donor_atom_list={'Amber': [杂原子但不是骨架原子] } 
+
 Donor_atom_map={"SG" : "S",
                 "TL" : "Tl",
                 "CU" : "Cu",

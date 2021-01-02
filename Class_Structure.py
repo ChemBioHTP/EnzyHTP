@@ -1,6 +1,7 @@
 from Class_line import PDB_line
 from helper import Child, line_feed
 from AmberMaps import *
+import numpy as np
 __doc__='''
 This module extract and operate structural infomation from PDB
 # will replace some local function in PDB class in the future.
@@ -308,6 +309,19 @@ class Structure():
             if Fix == '3':
                 metal._metal_fix_3()
         return True
+    
+    def get_all_protein_atom(self):
+        '''
+        get a list of all protein atoms
+        return all_P_atoms 
+        '''
+        all_P_atoms = []
+        for chain in self.chains:
+            for residue in chain:
+                all_P_atoms.extend(residue.atoms)
+        return all_P_atoms
+
+
 
         
     '''
@@ -782,8 +796,9 @@ class Atom(Child):
     id
     name
     coord = [x, y, z]
+    ele (obtain by method)
 
-    parent # the whole chain
+    parent # resi
     -------------
     Method
     -------------
@@ -792,7 +807,7 @@ class Atom(Child):
     -------------
     '''
 
-    def __init__(self, atom_name: str, coord: list, atom_id = None, parent = None):
+    def __init__(self, atom_name: str, coord: list, ff: str, atom_id = None, parent = None):
         '''
         Common part of init methods: direct from data objects
         No parent by default. Add parent by action
@@ -806,9 +821,10 @@ class Atom(Child):
         self.name = atom_name
         self.coord = coord
         self.atom_id = atom_id
-    
+        self.ff = ff
+
     @classmethod
-    def fromPDB(cls, atom_input, input_type='PDB_line'):
+    def fromPDB(cls, atom_input, input_type='PDB_line', ff = 'Amber'):
         '''
         generate atom from PDB. Require 'ATOM' and 'HETATM' lines.
         ---------
@@ -830,7 +846,7 @@ class Atom(Child):
         atom_name = atom_line.atom_name
         coord = [atom_line.atom_x,atom_line.atom_y,atom_line.atom_z]
 
-        return cls(atom_name, coord)
+        return cls(atom_name, coord, ff)
 
 
     '''
@@ -854,7 +870,12 @@ class Atom(Child):
 
     def get_around(self, rad):
         pass
-
+    
+    def get_ele(self):
+        '''
+        get self.ele from a certain map according to the ff type
+        '''
+        self.ele = Ele_map[self.ff][self.name]
 
     '''
     ====
@@ -870,36 +891,93 @@ class Atom(Child):
     
 
 class Metalatom(Atom):
+    '''
+    -------------
+    initilize from
+    PDB:        Atom.fromPDB(atom_input, input_type='PDB_line' or 'line_str' or 'file' or 'path')
+    raw data:   Atom(atom_name, coord)
+    Atom:       MetalAtom.fromAtom(atom_obj)
+    -------------
+    id
+    name
+    coord = [x, y, z]
+    ele
+    resi_name
 
-    def __init__(self, name, resi_name, coord, id=None, parent=None):
+    parent # the whole stru
+    -------------
+    Method
+    -------------
+    Add_parent
+    get_donor_atom(self, method='INC', check_radius=4.0)
+    get_donor_residue(self, method='INC')
+    -------------
+    '''
+
+
+    def __init__(self, name, resi_name, coord, ff, id=None, parent=None):
         '''
-        Have both atom_name and resi_name
+        Have both atom_name, ele and resi_name 
         '''
         self.resi_name = resi_name
-        Atom.__init__(self, name, coord, id, parent)
+        self.ele = Metal_map[resi_name] 
+        Atom.__init__(name, coord, ff, id, parent)
+
+        self.donor_atoms = []
 
     @classmethod
     def fromAtom(cls, atom_obj):
         '''
         generate from Atom object. copy data.
         '''
-        return cls(atom_obj.atom_name, atom_obj.parent.name, atom_obj.coord, parent=atom_obj.parent)
+        return cls(atom_obj.atom_name, atom_obj.parent.name, atom_obj.coord, atom_obj.ff, parent=atom_obj.parent)
 
     def get_valance(self):
         pass
 
     # fix related
-    def get_donor_atom(self, method='INC'):
+    def get_donor_atom(self, method='INC', check_radius=4.0):
         '''
         Get coordinated donor atom for a metal center.
+        1. check all atoms by type within the check_radius, consider those in the "donor_map"
+        2. check distance for every considered atoms.
+        -----------------------
         Base on a certain type of radius of this metal:
         method = INC ------ {ionic radius} for both metal and donor atom
                = VDW ------ {Van Der Waals radius} for both metal and donor atom
+        check_radius ------ the radius that contains all considered potential donor atoms. set for reducing the complexity.
         -----------------------
-        save found atom list to self.donor_atom
+        save found atom list to self.donor_atoms
         '''
-        这里
-        pass
+
+        # find radius for matal
+        if method == 'INC':
+            R_m = Ionic_radious_map[self.ele]
+        if method == 'VDW':
+            R_m = VDW_radious_map[self.ele]
+        
+        # get target with in check_radius (default: 4A)
+        coord_m = np.array(self.coord)
+        protein_atoms = self.parent.get_all_protein_atom()
+        for atom in protein_atoms:
+            
+            #only check donor atom (by atom name)
+            if atom.name in Donor_atom_list[atom.ff]:
+                
+                # cut by check_radius
+                dist = np.linalg.norm(np.array(atom.coord) - coord_m)
+                if dist <= check_radius:
+                    # determine coordination
+                    atom.get_ele()
+                    if method == 'INC':
+                        R_d = Ionic_radious_map[atom.ele]
+                    if method == 'VDW':
+                        R_d = VDW_radious_map[atom.ele]
+                    
+                    if dist <= (R_d + R_m):
+                        self.donor_atoms.append(atom)   
+        
+
     def get_donor_residue(self, method='INC'):
         '''
         get donor residue based on donor atoms
@@ -907,6 +985,7 @@ class Metalatom(Atom):
         self.donor_resi =  []
         self.get_donor_atom(method=method)
         for atom in self.donor_atom:
+            #增加一个判断有没有同一个残基的两个原子被考虑，有的话提出warning 为debug
             self.donor_resi.append(atom.resi)
 
     def _metal_fix_1(self):
