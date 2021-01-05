@@ -224,53 +224,33 @@ Ele_map = {'Amber': { 'CA' : 'C',
 
 }}
 
-# Potential coordination donor: add upon discover. (element_name)
+# Potential coordination donor: add upon discover. (atom name - base on the atom type definition in the force field)
+# ========= Side chain Heteroatoms (O,N,S) ==============
+# Amber: base on a Amber18 LEaP ff14SB output
 
-Donor_atom_list={'Amber': [杂原子但不是骨架原子] } 
+Donor_atom_list={'Amber': [   'NH2', 'NE', 'NH1',
+                              'ND1', 'NE2',
+                              'NZ',
+                              'OD1', 'OD2',
+                              'OE1', 'OE2',
+                              'OG',
+                              'OG1',
+                              'ND2', 'OD1',
+                              'OE1', 'NE2',
+                              'SD',
+                              'OH',
+                              'NE1'             ] } 
 
-Donor_atom_map={"SG" : "S",
-                "TL" : "Tl",
-                "CU" : "Cu",
-                "AG" : "Ag",
-                "BE" : "Be",
-                "NI" : "Ni",
-                "PT" : "Pt",
-                "ZN" : "Zn",
-                "CO" : "Co",
-                "PD" : "Pd",
-                "CR" : "Cr",
-                "FE" : "Fe",
-                "V"  : "V" ,
-                "MN" : "Mn",
-                "HG" : "Hg",
-                "CD" : "Cd",
-                "YB" : "Yb",
-                "CA" : "Ca",
-                "SN" : "Sn",
-                "PB" : "Pb",
-                "EU" : "Eu",
-                "SR" : "Sr",
-                "SM" : "Sm",
-                "BA" : "Ba",
-                "RA" : "Ra",
-                "AL" : "Al",
-                "IN" : "In",
-                "Y"  : "Y" ,
-                "LA" : "La",
-                "CE" : "Ce",
-                "PR" : "Pr",
-                "ND" : "Nd",
-                "GD" : "Gd",
-                "TB" : "Tb",
-                "DY" : "Dy",
-                "ER" : "Er",
-                "TM" : "Tm",
-                "LU" : "Lu",
-                "HF" : "Hf",
-                "ZR" : "Zr",
-                "U"  : "U" ,
-                "PU" : "Pu",
-                "TH" : "Th" }
+
+# A list for residues with ambiguous protonation state that have potential deprotonation
+AmbProton_list = [  'ASH','ASP',
+                    'CYS','CYM',
+                    'GLH','GLU',
+              'HIP','HIE',
+                    'HID',
+              'LYS','LYN',
+                    'TYR','TYM',
+              'ARG','AR0']
 
 
 # reference: doi:10.1107/S0567739476001551 (element : radius)

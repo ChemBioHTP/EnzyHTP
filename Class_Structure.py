@@ -602,6 +602,8 @@ class Residue(Child):
     parent # the whole chain
 
     atoms = [atom_obj, ...]
+
+    d_atom (donor atom when work as a ligand)
     
     #TODO
     if_art_resi
@@ -649,6 +651,9 @@ class Residue(Child):
         #set id
         self.id = resi_id
         self.name = resi_name
+
+        #clean
+        self.d_atom = None
     
     @classmethod
     def fromPDB(cls, resi_input, resi_id=None, input_type='PDB_line'):
@@ -692,10 +697,24 @@ class Residue(Child):
     '''
     def if_art_resi(self):
         pass
-    def deprotonate(self):
+    def deprotonate(self, T_atom = None):
+        '''
+        check current protonation state.
+        deprotonate if applicable
+        ---------
+        base on T_atom if provided.
+        '''
         pass
     def rot_proton(self, T_atom):
         pass
+    def ifAmbProton(self):
+        '''
+        check if this residue add or minus proton in a pH range of 1-14. (ambiguous protonation state, potential deprotonation)
+        -------
+        base on self.name. return a bool
+        '''
+        return self.name in AmbProton_list
+    
 
     def _find_atom_name(self, name: str):
         '''
@@ -984,24 +1003,37 @@ class Metalatom(Atom):
         '''
         self.donor_resi =  []
         self.get_donor_atom(method=method)
+        # add d_atom and save donor_resi
         for atom in self.donor_atom:
-            #增加一个判断有没有同一个残基的两个原子被考虑，有的话提出warning 为debug
-            self.donor_resi.append(atom.resi)
+            resi = atom.resi
+            resi.d_atom = atom
+            self.donor_resi.append(resi)
+
+        # warn if more than one atom are from a same residue
+        for index in range(len(self.donor_resi)):
+            for index2 in range(len(self.donor_resi)):
+                if index2 > index:
+                    if self.donor_resi[index2].id == self.donor_resi[index].id:
+                        print('\033[1;31;40m!WARNING! found more than 1 donor atom from residue: '+ self.donor_resi[index].name + self.donor_resi[index].id +'\033[m')
+
 
     def _metal_fix_1(self):
         '''
-        Fix1: deprotonate all donor
+        Fix1: deprotonate all donor (rotate those with tight H, like Ser)
         '''
         for resi in self.donor_resi:
-            resi.deprotonate()
+            if resi.ifAmbProton():
+                resi.deprotonate()
+            else:
+                resi.rot_proton(resi.d_atom)
 
 
     def _metal_fix_2(self):
         '''
         Fix2: rotate if there're still lone pair left 
         '''
-        for atom in self.donor_atom:
-            atom.resi.rot_proton(atom)
+        for resi in self.donor_resi:
+            resi.rot_proton(resi.d_atom)
 
     def _metal_fix_3(self):
         '''

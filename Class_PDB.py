@@ -67,6 +67,7 @@ PDBMD(self):
 
 class PDB():
 
+    # 待清理 只有和对象的具体化无关的才能作为类变量 不然会引起变量作用域的问题
     path=''
     name=''
     File_str=''
@@ -107,7 +108,7 @@ class PDB():
         '''
         Waiting for reform
         '''
-        #initilize
+        #initilize 不需要 由于对象的创建赋值到变量是**引用赋值**
         self.path=''
         self.name=''
         self.File_str=''
