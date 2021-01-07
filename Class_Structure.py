@@ -697,23 +697,116 @@ class Residue(Child):
     '''
     def if_art_resi(self):
         pass
-    def deprotonate(self, T_atom = None):
+    def deprotonate(self, T_atom = None, HIP = 'HIE'):
         '''
         check current protonation state.
-        deprotonate if applicable
+        deprotonate if applicable (HIP -> HIE by default)
         ---------
-        base on T_atom if provided.
+        base on T_atom if provided. (refine in the future)
+        '''
+        if T_atom == None:
+            if self.name != 'HIP':
+                depro_info = DeProton_map[self.name]
+            else:
+                if HIP == 'HIE':
+                    depro_info = DeProton_map[self.name][0]
+                if HIP == 'HID':
+                    depro_info = DeProton_map[self.name][1]
+
+            depro_resi = depro_info[0]
+            depro_atom = depro_info[1]
+
+            #delete the proton
+            del self[depro_atom]
+
+            #change the name
+            self.name = depro_resi
+
+        else:
+            # assign target atom
+            # only affect operations on residues with differences between donor atom and potential deprotonation atom (HIP HIE HID and ARG)
+            if self.name == 'HIP':
+                if T_atom.name == 'ND1':
+                    del self['HD1']
+                    self.name = 'HIE'
+                    return
+                if T_atom.name == 'NE2':
+                    del self['HE2']
+                    self.name = 'HID'
+                    return
+                    
+            if self.name == 'HIE':
+                if T_atom.name == 'ND1':
+                    return
+                if T_atom.name == 'NE2':
+                    del self['HE2']
+                    self.name = 'HID'
+                    # self.add_H('ND1')
+                    #let leap auto complete by now
+                    return
+
+            if self.name == 'HID':
+                if T_atom.name == 'ND1':
+                    del self['HD1']
+                    self.name = 'HIE'
+                    # self.add_H('NE2')
+                    #let leap auto complete by now
+                    return
+                if T_atom.name == 'NE2':
+                    return
+                
+            if self.name == 'ARG':
+                if T_atom.name == 'NH1':
+                    del self['HH12']
+                    self.name = 'AR0'
+                    return
+                if T_atom.name == 'NH2':
+                    del self['HH22']
+                    self.name = 'AR0'
+                    return
+            
+            depro_info = DeProton_map[self.name]
+            depro_resi = depro_info[0]
+            depro_atom = depro_info[1]
+            #delete the proton
+            del self[depro_atom]
+            #change the name
+            self.name = depro_resi
+
+            
+    def add_H(self, T_atom):
+        '''
+        add H on the corresponding T_atom.
+        1. make the H
+            find H name
+            find H coordinate
+        2. add H to the residue
+            use self.add()
         '''
         pass
+
     def rot_proton(self, T_atom):
-        pass
-    def ifAmbProton(self):
+        
+        if self.name == 'TRP':
+            raise Exception('Error: TRP detected as donor!!!')
+
+        protons = T_atom.get_protons()
+        lp_infos = T_atom.get_lp_infos()
+        # rotate to lp direction if proton on T_atom
+        if len(protons) != 0:
+            for proton in protons:
+                bond_end1 =  T_atom.get_bond_end_atom()
+                bond_end2 =  bond_end1.get_bond_end_atom()
+                proton.set_byDihedral(T_atom, bond_end1, bond_end2, value = lp_infos[0]['D'])
+
+
+    def ifDeProton(self):
         '''
         check if this residue add or minus proton in a pH range of 1-14. (ambiguous protonation state, potential deprotonation)
         -------
         base on self.name. return a bool
         '''
-        return self.name in AmbProton_list
+        return self.name in DeProton_map.keys()
     
 
     def _find_atom_name(self, name: str):
@@ -874,6 +967,38 @@ class Atom(Child):
     ====
     '''
 
+    def get_connect(self):
+        '''
+        find connect atom base on:
+        1. topology template
+        2. parent residue name
+        ------------
+        save found atom object to self.connect 
+        '''
+        pass
+
+    def get_protons(self):
+        '''
+        check if connectivity is obtained. get if not.
+        '''
+        return []
+
+    def get_lp_infos(self):
+        return []
+
+    def get_bond_end_atom(self):
+        pass
+
+    def set_byDihedral(self, A2, A3, A4, value):
+        pass
+
+    def set_byAngle(self, A2, A3, value):
+        pass
+
+    def set_byBond(self, A2, value):
+        pass
+
+
     def gen_line(self, ff='AMBER'):
         '''
         generate an output line. End with LF
@@ -894,7 +1019,7 @@ class Atom(Child):
         '''
         get self.ele from a certain map according to the ff type
         '''
-        self.ele = Ele_map[self.ff][self.name]
+        self.ele = Resi_Ele_map[self.ff][self.name]
 
     '''
     ====
@@ -958,8 +1083,10 @@ class Metalatom(Atom):
     def get_donor_atom(self, method='INC', check_radius=4.0):
         '''
         Get coordinated donor atom for a metal center.
-        1. check all atoms by type within the check_radius, consider those in the "donor_map"
-        2. check distance for every considered atoms.
+        1. check all atoms by type, consider those in the "donor_map"
+        (only those atoms from residues are considered. So atoms from ligand and ion will be ignored)
+        2. check if atoms are within the check_radius
+        3. check distance for every atoms left.
         -----------------------
         Base on a certain type of radius of this metal:
         method = INC ------ {ionic radius} for both metal and donor atom
@@ -1022,8 +1149,8 @@ class Metalatom(Atom):
         Fix1: deprotonate all donor (rotate those with tight H, like Ser)
         '''
         for resi in self.donor_resi:
-            if resi.ifAmbProton():
-                resi.deprotonate()
+            if resi.ifDeProton():
+                resi.deprotonate(resi.d_atom)
             else:
                 resi.rot_proton(resi.d_atom)
 
