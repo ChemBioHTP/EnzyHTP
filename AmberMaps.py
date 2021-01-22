@@ -337,7 +337,7 @@ DeProton_map = {    'ASH' : ('ASP','HD2'),
                     'CYS' : ('CYM','HG' ),
                     'GLH' : ('GLU','HE2'),
               'HIP' : (('HIE', 'HD1'), ('HID', 'HE2')),
-              'LYS' : ('LYN','HZ3'),
+              'LYS' : ('LYN','HZ1'),
                     'TYR' : ('TYM','HH'),
               'ARG' : ('AR0','HH22')}
 

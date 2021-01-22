@@ -186,7 +186,8 @@ class Structure():
         find art_resi
         '''
         pass
-    
+
+
     def add(self, obj, id=None, sort=0):
         '''
         1. judge obj type (go into the list)
@@ -199,6 +200,10 @@ class Structure():
         if sort and not None:
             mark as id+i
         4. add to corresponding list
+                                                    sort
+                  |     |               0             |                     1               |
+         assigned |  0  |   keep (for direct output)  | clean (for sort)                    |
+                  |  1  |  assign (for direct output) | mark  (for relative order in sort ) |
         '''
         # list
         if type(obj) == list:
@@ -214,7 +219,7 @@ class Structure():
             # assigned |  0  |   keep   | clean |
             #          |  1  |  assign  | mark  |
             for i in obj:               
-                i.Add_parent(self)
+                i.set_parent(self)
                 if sort:
                     if id != None:
                         i.id = str(id)+'i' #str mark
@@ -236,7 +241,7 @@ class Structure():
             if type(obj) != Chain and type(obj) != Metalatom and type(obj) != Ligand:
                 raise TypeError('Structure.Add() method only take Chain / Metalatom / Ligand')
             
-            obj.Add_parent(self)
+            obj.set_parent(self)
             if sort:
                 if id != None:
                     obj.id = str(id)+'i' #str mark
@@ -256,8 +261,6 @@ class Structure():
         if sort:
             self.sort()
             
-
-        
 
     def sort(self):
         '''
@@ -354,7 +357,7 @@ class Chain(Child):
     -------------
     method
     -------------
-    Add_parent
+    set_parent
     get_chain_seq(self)
     _find_resi_name
     -------------
@@ -472,7 +475,7 @@ class Chain(Child):
 
             # add parent and clean id (if sort) assign id (if assigned) leave mark if sort and assigned
             for i in obj:               
-                i.Add_parent(self)
+                i.set_parent(self)
                 if sort:
                     if id != None:
                         i.id = str(id)+'i' #str mark
@@ -489,7 +492,7 @@ class Chain(Child):
             if type(obj) != Residue:
                 raise TypeError('Chain.Add() method only take Residue')
             
-            obj.Add_parent(self)
+            obj.set_parent(self)
             if sort:
                 if id != None:
                     obj.id = str(id)+'i' #str mark
@@ -603,14 +606,16 @@ class Residue(Child):
 
     atoms = [atom_obj, ...]
 
+    # --after metalatom.get_donor_resi--
     d_atom (donor atom when work as a ligand)
+    a_metal (acceptor metal)
     
     #TODO
     if_art_resi
     -------------
     Method
     -------------
-    Add_parent
+    set_parent
     if_art_resi
     deprotonate
     _find_atom_name
@@ -697,6 +702,8 @@ class Residue(Child):
     '''
     def if_art_resi(self):
         pass
+
+    
     def deprotonate(self, T_atom = None, HIP = 'HIE'):
         '''
         check current protonation state.
@@ -754,17 +761,33 @@ class Residue(Child):
                     return
                 if T_atom.name == 'NE2':
                     return
-                
+
+            # find the right H to delete for ARG and LYS
             if self.name == 'ARG':
-                if T_atom.name == 'NH1':
-                    del self['HH12']
-                    self.name = 'AR0'
+                raise Exception('ARG detected as donor: '+self.chain.id+str(self.id))
+
+            if self.name == 'LYS':
+                # the deleted H has to be HZ1 in name
+                D1 = np.linalg.norm(np.array(self.HZ1.coord) - np.array(self.a_metal.coord))
+                D2 = np.linalg.norm(np.array(self.HZ2.coord) - np.array(self.a_metal.coord))
+                D3 = np.linalg.norm(np.array(self.HZ3.coord) - np.array(self.a_metal.coord))
+                x = min(D1,D2,D3)
+                if x == D1:
+                    del self['HZ1']
+                    self.name = 'LYN'
                     return
-                if T_atom.name == 'NH2':
-                    del self['HH22']
-                    self.name = 'AR0'
+                if x == D2:
+                    del self['HZ2']
+                    self.HZ1.name = 'HZ2'
+                    self.name = 'LYN'
                     return
-            
+                if x == D3:
+                    del self['HZ3']
+                    self.HZ1.name = 'HZ3'
+                    self.name = 'LYN'
+                    return
+                raise Exception
+
             depro_info = DeProton_map[self.name]
             depro_resi = depro_info[0]
             depro_atom = depro_info[1]
@@ -786,6 +809,11 @@ class Residue(Child):
         pass
 
     def rot_proton(self, T_atom):
+        '''
+        rotate the dihedral relate to the target H-atom bond
+        -----
+        TODO  
+        '''
         
         if self.name == 'TRP':
             raise Exception('Error: TRP detected as donor!!!')
@@ -914,8 +942,21 @@ class Atom(Child):
     -------------
     Method
     -------------
-    Add_parent
+    set_parent
     Add_id # use only after the whole structure is constructed
+
+    get_connect
+    get_protons
+    get_lp_infos
+    get_bond_end_atom
+    set_byDihedral
+    set_byAngle
+    set_byBond
+
+    gen_line
+
+    get_around
+    get_ele
     -------------
     '''
 
@@ -973,29 +1014,53 @@ class Atom(Child):
         1. topology template
         2. parent residue name
         ------------
+        1. template[self.resi]
+        2. search which template atoms are contained in current residue
+        ??? how do I get the template ???
         save found atom object to self.connect 
         '''
         pass
 
     def get_protons(self):
         '''
+        get connected proton based on the connectivity map
+        ---------
         check if connectivity is obtained. get if not.
         '''
         return []
 
     def get_lp_infos(self):
+        '''
+        get lone pair based on the connectivity map
+        ---------
+        check if connectivity is obtained. get if not.
+        '''
         return []
 
     def get_bond_end_atom(self):
-        pass
+        '''
+        get the connected atom that closer to CA in the *network*
+        -------
+        check if connectivity is obtained. get if not.        
+        '''
+        return None
 
     def set_byDihedral(self, A2, A3, A4, value):
+        '''
+        change the atom (self) coordinate by dihedral.
+        '''
         pass
 
     def set_byAngle(self, A2, A3, value):
+        '''
+        change the atom (self) coordinate by angle.
+        '''
         pass
 
     def set_byBond(self, A2, value):
+        '''
+        change the atom (self) coordinate by distance.
+        '''
         pass
 
 
@@ -1052,7 +1117,7 @@ class Metalatom(Atom):
     -------------
     Method
     -------------
-    Add_parent
+    set_parent
     get_donor_atom(self, method='INC', check_radius=4.0)
     get_donor_residue(self, method='INC')
     -------------
@@ -1134,6 +1199,7 @@ class Metalatom(Atom):
         for atom in self.donor_atom:
             resi = atom.resi
             resi.d_atom = atom
+            resi.a_metal = self
             self.donor_resi.append(resi)
 
         # warn if more than one atom are from a same residue
@@ -1147,12 +1213,14 @@ class Metalatom(Atom):
     def _metal_fix_1(self):
         '''
         Fix1: deprotonate all donor (rotate those with tight H, like Ser)
+            - warn if uncommon donor residue shows up (like Ser)
         '''
         for resi in self.donor_resi:
             if resi.ifDeProton():
                 resi.deprotonate(resi.d_atom)
             else:
-                resi.rot_proton(resi.d_atom)
+                print('!WARNING!: uncommon donor residue -- '+resi.chain.id+' '+resi.name+str(resi.id))
+                #resi.rot_proton(resi.d_atom)
 
 
     def _metal_fix_2(self):
