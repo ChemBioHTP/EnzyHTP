@@ -107,6 +107,8 @@ class PDB():
     def __init__(self,PDB_PATH='',PDB_File_str=''):
         '''
         Waiting for reform
+        把类变量和对象变量的差别处理了
+        用类方法的方式处理不同的初始化方式fromXXX
         '''
         #initilize 不需要 由于对象的创建赋值到变量是**引用赋值**
         self.path=''

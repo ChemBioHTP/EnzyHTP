@@ -1,7 +1,7 @@
+import numpy as np
 from Class_line import PDB_line
 from helper import Child, line_feed
 from AmberMaps import *
-import numpy as np
 __doc__='''
 This module extract and operate structural infomation from PDB
 # will replace some local function in PDB class in the future.
@@ -211,7 +211,7 @@ class Structure():
             obj_ele=obj[0]
 
             if type(obj_ele) != Chain and type(obj_ele) != Metalatom and type(obj_ele) != Ligand:
-                raise TypeError('Structure.Add() method only take Chain / Metalatom / Ligand')
+                raise TypeError('structure.Add() method only take Chain / Metalatom / Ligand')
 
             # add parent and clean id (if sort) assign id (if assigned) leave mark if sort and assigned
             #                         sort
@@ -239,7 +239,7 @@ class Structure():
         # single building block
         else:
             if type(obj) != Chain and type(obj) != Metalatom and type(obj) != Ligand:
-                raise TypeError('Structure.Add() method only take Chain / Metalatom / Ligand')
+                raise TypeError('structure.Add() method only take Chain / Metalatom / Ligand')
             
             obj.set_parent(self)
             if sort:
@@ -270,15 +270,28 @@ class Structure():
         atom.id
         -----------
         Chain/Residue level: 
-            Base on the order of the old obj.id and potential insert mark from add (higher than same number without the mark)
+            Base on the order of the old obj.id 
+            and potential insert mark from add (higher than same number without the mark)
+            *if added object has same id and is not assigned with a insert mark -- place after a original one.
         Atom level:
-            base on the parent order:
+            base on the parent order (parent.id):
             chains -> metalatoms -> ligands
             residue.id within each above.
             list order within each residues.
         '''
-        self.ifsort = 1
-        pass
+        # sort chain order
+        self.chains.sort(key=lambda chain: chain.id)
+        # rename each chain
+        for index, chain in enumerate(self.chains):
+            chain.id = chr(65+index) # Covert to ABC using ACSII mapping
+            # sort each chain
+            chain.sort()
+
+        # sort ligand
+        for ligand in self.ligands:
+            ligand.sort()
+
+
 
     def build(self, path, ff='AMBER'):
         '''
@@ -471,7 +484,7 @@ class Chain(Child):
             obj_ele=obj[0]
 
             if type(obj_ele) != Residue:
-                raise TypeError('Chain.Add() method only take Residue')
+                raise TypeError('chain.Add() method only take Residue')
 
             # add parent and clean id (if sort) assign id (if assigned) leave mark if sort and assigned
             for i in obj:               
@@ -510,14 +523,22 @@ class Chain(Child):
 
     def sort(self):
         '''
-        maybe useful with other format
+        turn residue index into str and sort with list.sort() -- cope with the insert mark
+        * start form 1 in each chain
+        * if added object has same id and is not assigned with a insert mark -- place after a original one.
         ----
         assign index according to current items
         resi.id
         atom.id
         '''
-        self.ifsort = 1
-        pass
+        # sort residue order
+        self.residues.sort(key=lambda i: str(i.id))
+        # re-id each residue
+        for index, resi in enumerate(self.residues):
+            resi.id = index+1
+            # sort each residue
+            resi.sort()
+      
 
 
     def get_chain_seq(self):
@@ -861,19 +882,41 @@ class Residue(Child):
             if self.atoms[i].name == name:
                 del self.atoms[i]
 
-    def add(self, obj, id=None):
+    def add(self, obj):
         '''
         1. judge obj type
-        2. clean original id
-        3. add to corresponding list
+        2. set parent, add to corresponding list
+        --------
+        Do not take any id: add to the end of the residue atom list by default
+        Do not sort: the order of atom is pointless by far.
         '''
-        pass
+        # list
+        if type(obj) == list:
+            
+            obj_ele=obj[0]
+
+            if type(obj_ele) != Atom:
+                raise TypeError('residue.Add() method only take Atom')
+
+            obj.set_parent(self)
+            self.atoms.extend(obj)
+            
+
+        # single building block
+        else:
+            if type(obj) != Atom:
+                raise TypeError('residue.Add() method only take Atom')
+            
+            obj.set_parent(self)
+            self.atoms.append(obj)
 
     def sort(self):
         '''
-        None
+        assign atom id based on current order in the list
+        * start from 1 in a residue
         '''
-        pass
+        for index, atom in enumerate(self.atoms):
+            atom.id = index+1
 
 
 
@@ -1239,6 +1282,9 @@ class Metalatom(Atom):
     
 
 class Ligand(Residue):
-    pass
+    def __init__(self):
+        pass
+    def sort(self):
+        pass
     
 
