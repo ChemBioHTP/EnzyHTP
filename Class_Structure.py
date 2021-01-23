@@ -22,8 +22,10 @@ class Structure():
     chains = [chain_obj, ...]
     metalatoms = [metalatom_obj, ...]
     ligands = [ligand, ...]
+    # maybe add solvent in the future. mimic the metal treatment
     ------------
-
+    METHOD
+    ------------
     if_metalatom
 
     # Move in in the future
@@ -31,6 +33,16 @@ class Structure():
     if_ligand
     if_complete
     ligand
+
+    get_metal_center
+    get_art_resi
+    add
+    sort
+    build
+
+    protonation_metal_fix
+
+    get_all_protein_atom
     '''
 
     '''
@@ -292,13 +304,56 @@ class Structure():
             ligand.sort()
 
 
+    def build(self, path, ff='AMBER', forcefield='ff14SB'):
+        '''
+        build PDB after the change based on the chosen format and forcefield
+        - line based on atom and contain chain index and residue index
+        ----------------------------
+        ff = 
+        AMBER (standard amber format: from tleap examples)
+            - resi and atom indexes start from 1 and DO NOT reset reaching a new chain. 
+            - use atom and residue names from amber force field.
+            - place metal, ligand, solvent in seperate chains (seperate with TER)
+            - metal -> ligand -> solvent order
+            * do not sort atomic order in a residue like tleap does.
+        '''
+        with open(path) as of:
+            if ff == 'AMBER':
+                a_id = 0
+                r_id = 0
+                for chain in self.chains:
+                    #write chain
+                    for resi in chain:
+                        r_id = r_id+1
+                        for atom in resi:
+                            a_id = a_id + 1 #current line index
+                            line = atom.build(a_id= a_id, r_id = r_id, ff=ff, forcefield=forcefield)
+                            of.write(line)
+                    #write TER after each chain
+                    of.write('TER'+line_feed)
 
-    def build(self, path, ff='AMBER'):
-        '''
-        build PDB after the change
-        based on atom and resinames
-        '''
-        pass
+                for metal in self.metalatoms:
+                    a_id = a_id + 1
+                    r_id = r_id + 1
+                    line = metal.build(a_id= a_id, r_id = r_id, ff=ff, forcefield=forcefield)
+                    of.write(line)
+                    of.write('TER'+line_feed)
+
+                # for ligand in self.ligands:
+                #     r_id = r_id + 1
+                #     for atom in ligand:
+                #         a_id = a_id + 1
+                #         line = atom.build(a_id= a_id, r_id = r_id, ff=ff, forcefield=forcefield)
+                #         of.write(line)
+                #     of.write('TER'+line_feed)
+
+            if ff == 'XXX':
+                #place holder
+                pass
+                
+            of.write('END'+line_feed)
+
+
 
     def protonation_metal_fix(self, Fix):
         '''
@@ -325,7 +380,8 @@ class Structure():
             if Fix == '3':
                 metal._metal_fix_3()
         return True
-    
+
+
     def get_all_protein_atom(self):
         '''
         get a list of all protein atoms
@@ -1107,12 +1163,20 @@ class Atom(Child):
         pass
 
 
-    def gen_line(self, ff='AMBER'):
+    def build(self, a_id=None, r_id=None, c_id=None,  ff='AMBER', forcefield = 'ff14SB'):
         '''
         generate an output line. End with LF
+        return a line str
+        use self.id and parent id if not assigned
         -------
         must use after sort!
         '''
+        if a_id != None:
+            pass
+        else:
+            pass
+        #TODO
+
         a_index = '{:>5d}'.format(self.id)
         a_name = '{:<4}'.format(self.name)
         r_name = '{:>3}'.format(self.parent.name) # fix for metal
