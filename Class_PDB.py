@@ -492,6 +492,7 @@ class PDB():
         out_path=self.name+'_aH.pdb'
         self._get_protonation_pdb2pqr(ph=ph)
         self._protonation_Fix(out_path)
+        self.path = out_path
 
  
     def _get_protonation_pdb2pqr(self,ffout='AMBER',ph=7.0,out_path=''):
@@ -524,8 +525,8 @@ class PDB():
         # Add missing atom (from the PDB2PQR step. Update to func result after update the _get_protonation_pdb2pqr func)       
         # Now metal only
 
-        old_stru = Structure(self.path)
-        new_stru = Structure(self.pqr_path)
+        old_stru = Structure.fromPDB(self.path)
+        new_stru = Structure.fromPDB(self.pqr_path)
 
         # find Metal center and combine with the pqr file
         metal_list = old_stru.get_metal_center()
@@ -537,7 +538,7 @@ class PDB():
 
         # build file
         new_stru.sort()
-        new_stru.build(self.path)
+        new_stru.build(out_path)   
 
 
     '''

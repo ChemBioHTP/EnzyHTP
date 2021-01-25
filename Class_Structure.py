@@ -111,7 +111,6 @@ class Structure():
                 Chain_index = chr(65+index) # Covert to ABC using ACSII mapping
                 # Generate chains
                 raw_chains.append(Chain.fromPDB(chain_str, Chain_index))
-        
         # clean chains
         # clean metals
         raw_chains_woM, metalatoms = cls._get_metalatoms(raw_chains, method='1')
@@ -317,7 +316,7 @@ class Structure():
             - metal -> ligand -> solvent order
             * do not sort atomic order in a residue like tleap does.
         '''
-        with open(path) as of:
+        with open(path, 'w') as of:
             if ff == 'AMBER':
                 a_id = 0
                 r_id = 0
@@ -332,10 +331,13 @@ class Structure():
                     #write TER after each chain
                     of.write('TER'+line_feed)
 
+                c_id = chr(len(self.chains)+64)
                 for metal in self.metalatoms:
                     a_id = a_id + 1
                     r_id = r_id + 1
-                    line = metal.build(a_id= a_id, r_id = r_id, ff=ff, forcefield=forcefield)
+                    c_id = chr(ord(c_id)+1)
+
+                    line = metal.build(a_id= a_id, r_id = r_id, c_id = c_id, ff=ff, forcefield=forcefield)
                     of.write(line)
                     of.write('TER'+line_feed)
 
@@ -371,13 +373,13 @@ class Structure():
         for metal in self.metal_centers:
             metal.get_donor_residue(method = 'INC')
 
-            if Fix == '1':
+            if Fix == 1:
                 metal._metal_fix_1()
             
-            if Fix == '2':
+            if Fix == 2:
                 metal._metal_fix_2()
 
-            if Fix == '3':
+            if Fix == 3:
                 metal._metal_fix_3()
         return True
 
@@ -588,7 +590,12 @@ class Chain(Child):
         atom.id
         '''
         # sort residue order
-        self.residues.sort(key=lambda i: str(i.id))
+        for i in self.residues:
+            if type(i.id) == str:
+                raise Exception('Does not support added residue now: update in the future')
+            # TODO
+        
+        self.residues.sort(key=lambda i: i.id)
         # re-id each residue
         for index, resi in enumerate(self.residues):
             resi.id = index+1
@@ -641,10 +648,10 @@ class Chain(Child):
         '''
         if type(key) == int:
             return self.residues[key-1]
-        if type(key) == str:
-            return self._find_resi_name(key)
         if key == 'stru':
             return self.parent
+        if type(key) == str:
+            return self._find_resi_name(key)
         Exception('bad key: getattr error')
 
 
@@ -997,10 +1004,10 @@ class Residue(Child):
         '''
         if type(key) == int:
             return self.atoms[key-1]
-        if type(key) == str:
-            return self._find_atom_name(key)
         if key == 'chain':
             return self.parent
+        if type(key) == str:
+            return self._find_atom_name(key)
         Exception('bad key: getattr error')
 
     
@@ -1072,7 +1079,7 @@ class Atom(Child):
         # get data
         self.name = atom_name
         self.coord = coord
-        self.atom_id = atom_id
+        self.id = atom_id
         self.ff = ff
 
     @classmethod
@@ -1171,17 +1178,40 @@ class Atom(Child):
         -------
         must use after sort!
         '''
-        if a_id != None:
-            pass
-        else:
-            pass
-        #TODO
+        #default
+        if a_id == None:
+            a_id = self.id
+        if r_id == None:
+            r_id = self.resi.id
+        if c_id == None:
+            c_id = self.resi.chain.id
+        
+        if ff == 'AMBER':
+            #build an amber style line here
+            l_type = '{:<6}'.format('ATOM')
+            a_index = '{:>5d}'.format(a_id)
 
-        a_index = '{:>5d}'.format(self.id)
-        a_name = '{:<4}'.format(self.name)
-        r_name = '{:>3}'.format(self.parent.name) # fix for metal
-        line = 'ATOM  '+ a_index +' '+a_name+r_name+'    348      21.367   9.559  -3.548  1.00  0.00'+line_feed
-        #待办
+            if forcefield == 'ff14SB':
+                # ff14SB by default
+                #atom name TODO when deal with 2-letter element in artifical residue and ligand
+                if len(self.name) > 3:
+                    a_name = '{:<4}'.format(self.name)
+                else:
+                    a_name = '{:<3}'.format(self.name)
+                    a_name = ' '+a_name
+                r_name = '{:>3}'.format(self.resi.name)
+            else:
+                raise Exception('Only support ff14SB atom/resiude name now')
+
+            c_index = c_id
+            r_index = '{:>4d}'.format(r_id)
+            x = '{:>8.3f}'.format(self.coord[0])
+            y = '{:>8.3f}'.format(self.coord[1])
+            z = '{:>8.3f}'.format(self.coord[2])
+        
+        #example: ATOM   5350  HB2 PRO   347      32.611  15.301  24.034  1.00  0.00
+        line = l_type + a_index +' '+a_name + ' ' + r_name+' '+ c_index + r_index + '    ' + x + y + z + '  1.00  0.00'+line_feed
+
         return line
 
     def get_around(self, rad):
@@ -1237,7 +1267,7 @@ class Metalatom(Atom):
         '''
         self.resi_name = resi_name
         self.ele = Metal_map[resi_name] 
-        Atom.__init__(name, coord, ff, id, parent)
+        Atom.__init__(self, name, coord, ff, id, parent)
 
         self.donor_atoms = []
 
@@ -1246,7 +1276,7 @@ class Metalatom(Atom):
         '''
         generate from Atom object. copy data.
         '''
-        return cls(atom_obj.atom_name, atom_obj.parent.name, atom_obj.coord, atom_obj.ff, parent=atom_obj.parent)
+        return cls(atom_obj.name, atom_obj.parent.name, atom_obj.coord, atom_obj.ff, parent=atom_obj.parent)
 
     def get_valance(self):
         pass
@@ -1285,6 +1315,7 @@ class Metalatom(Atom):
                 # cut by check_radius
                 dist = np.linalg.norm(np.array(atom.coord) - coord_m)
                 if dist <= check_radius:
+                    # debug: print(atom.resi.id, atom.name) #debug
                     # determine coordination
                     atom.get_ele()
                     if method == 'INC':
@@ -1293,7 +1324,8 @@ class Metalatom(Atom):
                         R_d = VDW_radious_map[atom.ele]
                     
                     if dist <= (R_d + R_m):
-                        self.donor_atoms.append(atom)   
+                        self.donor_atoms.append(atom)                     
+        # debug: print(self.coord, self.donor_atoms) #debug
         
 
     def get_donor_residue(self, method='INC'):
@@ -1303,7 +1335,7 @@ class Metalatom(Atom):
         self.donor_resi =  []
         self.get_donor_atom(method=method)
         # add d_atom and save donor_resi
-        for atom in self.donor_atom:
+        for atom in self.donor_atoms:
             resi = atom.resi
             resi.d_atom = atom
             resi.a_metal = self
@@ -1326,8 +1358,9 @@ class Metalatom(Atom):
             if resi.ifDeProton():
                 resi.deprotonate(resi.d_atom)
             else:
-                print('!WARNING!: uncommon donor residue -- '+resi.chain.id+' '+resi.name+str(resi.id))
-                #resi.rot_proton(resi.d_atom)
+                if resi.name not in NoProton_list:
+                    print('!WARNING!: uncommon donor residue -- '+resi.chain.id+' '+resi.name+str(resi.id))
+                    #resi.rot_proton(resi.d_atom)
 
 
     def _metal_fix_2(self):
@@ -1343,6 +1376,47 @@ class Metalatom(Atom):
         waiting for response
         '''
         pass
+
+    def build(self, a_id=None, r_id=None, c_id=None,  ff='AMBER', forcefield = 'ff14SB'):
+        '''
+        generate an metal atom output line. End with LF
+        return a line str
+        --------
+        use self.id if not assigned
+        
+        '''
+        #default
+        if a_id == None:
+            a_id = self.id
+        if r_id == None:
+            r_id = self.resi.id
+        if c_id == None:
+            print('WARNING: the metal atom may need a chain id in build()!')
+            c_id = ' '
+        
+        if ff == 'AMBER':
+            #build an amber style line here
+            l_type = '{:<6}'.format('ATOM')
+            a_index = '{:>5d}'.format(a_id)
+
+            if forcefield == 'ff14SB':
+                # ff14SB by default
+                a_name = '{:>2}'.format(self.name)
+                r_name = '{:<3}'.format(self.resi_name)
+            else:
+                raise Exception('Only support ff14SB atom/resiude name now')
+
+            c_index = c_id
+            r_index = '{:>4d}'.format(r_id)
+            x = '{:>8.3f}'.format(self.coord[0])
+            y = '{:>8.3f}'.format(self.coord[1])
+            z = '{:>8.3f}'.format(self.coord[2])
+        
+        #example: ATOM   5350  HB2 PRO   347      32.611  15.301  24.034  1.00  0.00
+        line = l_type + a_index +' '+a_name +'   '+ r_name+' '+ c_index + r_index + '    ' + x + y + z + '  1.00  0.00'+line_feed
+
+        return line
+
     
 
 class Ligand(Residue):
