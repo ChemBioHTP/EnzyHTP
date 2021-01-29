@@ -109,6 +109,7 @@ class PDB():
         Waiting for reform
         把类变量和对象变量的差别处理了
         用类方法的方式处理不同的初始化方式fromXXX
+        注意对self.dir的处理
         '''
         #initilize 不需要 由于对象的创建赋值到变量是**引用赋值**
         self.path=''
@@ -141,6 +142,8 @@ class PDB():
             # 存一个文件和path？
         else:
             self.path=PDB_PATH
+            self.dir = self.path[:-len(self.path.split(os.sep)[-1])]
+            self.path_name = self.path[:-4]
             self.name=self.path.split(os.sep)[-1][:-4]
 
             #self.ifformat
@@ -246,6 +249,10 @@ class PDB():
 
         return self.File_str
 
+    def update_path(self):
+        self.dir = self.path[:-len(self.path.split(os.sep)[-1])]
+        self.path_name = self.path[:-4]
+        self.name=self.path.split(os.sep)[-1][:-4]
 
     '''
     =========
@@ -489,10 +496,11 @@ class PDB():
                 # switch HIE HID when dealing with HIS
         save to self.path
         '''
-        out_path=self.name+'_aH.pdb'
+        out_path=self.path_name+'_aH.pdb'
         self._get_protonation_pdb2pqr(ph=ph)
         self._protonation_Fix(out_path)
         self.path = out_path
+        self.update_path()
 
  
     def _get_protonation_pdb2pqr(self,ffout='AMBER',ph=7.0,out_path=''):
@@ -504,7 +512,7 @@ class PDB():
         '''
         # set default value for output pqr path
         if len(out_path) == 0:
-            self.pqr_path = self.name+'.pqr'
+            self.pqr_path = self.path_name+'.pqr'
         else:
             self.pqr_path = out_path
         
@@ -530,9 +538,10 @@ class PDB():
 
         # find Metal center and combine with the pqr file
         metal_list = old_stru.get_metal_center()
-        new_stru.add(metal_list, sort = 0)
-        # fix metal environment
-        new_stru.protonation_metal_fix(Fix = 1)
+        if len(metal_list) > 0:
+            new_stru.add(metal_list, sort = 0)
+            # fix metal environment
+            new_stru.protonation_metal_fix(Fix = 1)
 
         # PLACE HOLDER for other fix
 
@@ -715,28 +724,39 @@ class PDB():
     ========
     '''
 
-    def PDB2FF(self):
+    def PDB2FF(self, o_path=''):
+        '''
+        PDB2FF(self, o_path='')
+        --------------------
+        o_path contral where the leap.in and leap.log go: has to contain a / at the end (e.g.: ./dir/)
+        '''
         #out3_PDB_path=self.name+'_water.pdb'
         #make tleap input
-        os.system('mkdir tleap_cache')
-        tleap_input=open('tleap_ff.in','w')
+        os.popen('mkdir '+o_path+'tleap_cache')
+        tleap_input=open(o_path+'tleap_ff.in','w')
         tleap_input.write('source leaprc.protein.ff14SB\n')
         tleap_input.write('source leaprc.water.tip3p\n')
         tleap_input.write('a = loadpdb '+self.path+'\n')
         tleap_input.write('solvatebox a TIP3PBOX 10\n')
         tleap_input.write('addions a Na+ 0\n')
         tleap_input.write('addions a Cl- 0\n')
-        tleap_input.write('saveamberparm a '+self.name+'.prmtop '+self.name+'.inpcrd\n')
+        if o_path == '':
+            tleap_input.write('saveamberparm a '+self.path_name+'.prmtop '+self.path_name+'.inpcrd\n')
+            self.prmtop_path=self.path_name+'.prmtop'
+            self.inpcrd_path=self.path_name+'.inpcrd'
+        else:
+            tleap_input.write('saveamberparm a '+o_path+self.name+'.prmtop '+o_path+self.name+'.inpcrd\n')
+            self.prmtop_path=o_path+self.name+'.prmtop'
+            self.inpcrd_path=o_path+self.name+'.inpcrd'
+
         #tleap_input.write('savepdb a '+out3_PDB_path+'\n')
         tleap_input.write('quit\n')
         tleap_input.close()
 
         #run
-        os.system('tleap -s -f tleap_ff.in > tleap_ff_'+self.name+'.out')
-        os.system('mv *leap_ff* leap.log tleap_cache')
+        os.system('tleap -s -f '+o_path+'tleap_ff.in > '+o_path+'tleap_ff_'+self.name+'.out')
+        os.system('mv '+o_path+'*leap_ff* leap.log '+o_path+'tleap_cache')
 
-        self.prmtop_path=self.name+'.prmtop'
-        self.inpcrd_path=self.name+'.inpcrd'
         self.stage = 2
 
         return (self.prmtop_path,self.inpcrd_path)
@@ -822,7 +842,7 @@ class PDB():
                     print('No change.')
 
         self.path=out_path
-        self.name=self.name+'_rmW'
+        self.update_path()
 
         return self.path
 

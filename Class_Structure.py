@@ -8,8 +8,13 @@ This module extract and operate structural infomation from PDB
 -------------------------------------------------------------------------------------
 Class Structure
 -------------------------------------------------------------------------------------
-__init__(self,path)
-
+Class Chain
+-------------------------------------------------------------------------------------
+Class Residue
+-------------------------------------------------------------------------------------
+Class Atom
+-------------------------------------------------------------------------------------
+Class Metalatom
 ===============
 '''
 
@@ -412,8 +417,6 @@ class Structure():
 
 
 
-
-
 class Chain(Child):
     '''
     -------------
@@ -674,7 +677,6 @@ class Chain(Child):
         '''
         return len(self.residues)
         
-
 
 
 class Residue(Child):
@@ -1235,6 +1237,7 @@ class Atom(Child):
         else:
             Exception('bad key: getattr error')
     
+
 
 class Metalatom(Atom):
     '''
