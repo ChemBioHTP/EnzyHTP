@@ -67,38 +67,6 @@ PDBMD(self):
 
 class PDB():
 
-    # 待清理 只有和对象的具体化无关的才能作为类变量 不然会引起变量作用域的问题
-    path=''
-    name=''
-    File_str=''
-    prmtop_path=''
-    inpcrd_path=''
-    pqr_path=''
-    stage=0 #For debug indicate which stage is the program in
-    
-    ifformat=0
-    
-    if_complete=None
-    if_complete_chain={} 
-    if_art_resi=None
-    if_ligand=None
-
-    MutaFlags=[]
-    tot_resi=0
-    Coord=[]
-    raw_sequence={}
-    sequence={}
-    sequence_one={}
-
-    #current operating residue
-    current_index=0
-    current_resi_name_3=''
-    current_resi_name=''
-    current_resi_atom_list=[]
-    
-    
-
-
     #regex pattern of standard Amber format line
     ATOM_pattern=r'ATOM  [ ,0-9][ ,0-9][ ,0-9][ ,0-9][0-9]  [A-Z][ ,0-9,A-Z][ ,0-9,A-Z] [A-Z][A-Z][A-Z]  [ ,0-9][ ,0-9][ ,0-9][0-9]    [ ,\-,0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][0-9][ ,\-,0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][0-9][ ,\-,0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9](?:         [ ,A-Z][ ,A-Z][A-Z])?'
     HETATM_pattern=r'HETATM[ ,0-9][ ,0-9][ ,0-9][ ,0-9][0-9]  [A-Z][ ,0-9,A-Z][ ,0-9,A-Z] [A-Z][A-Z][A-Z]  [ ,0-9][ ,0-9][ ,0-9][0-9]    [ ,\-,0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][0-9][ ,\-,0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][0-9][ ,\-,0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9](?:         [ ,A-Z][ ,A-Z][A-Z])?'
@@ -817,6 +785,7 @@ class PDB():
                 skip_list=['Na+','Cl-','WAT','HOH']
                 change_flag=0
                 for line in f:
+                    PDB_l = PDB_line(line)
                     #Skip some lines
                     skip_flag=0
                     #skip the CRYST1 line
@@ -830,7 +799,7 @@ class PDB():
 
                     #skip the water and ion(Append in the future)
                     for i in skip_list:
-                        if line.split()[3] == i:
+                        if PDB_l.resi_name == i:
                             skip_flag=1
                             break
                     if skip_flag:
@@ -839,7 +808,7 @@ class PDB():
 
                     of.write(line)
                 if not change_flag:
-                    print('No change.')
+                    print('rm_wat(): No change.')
 
         self.path=out_path
         self.update_path()
@@ -875,36 +844,14 @@ class PDB():
 
 
 
-# Metalatom.get_donor_residue
-# Residue.deprotonate Residue.rot_proton
-# sort, build
-
-# 1B8Q这个文件有问题，待处理此类
-# 了解并解决加氢的问题
-# 现在用pdb2pqr解决了一部分问题：
-# - 改了其中的两个bug
-# - 但是金属中心相关的问题还没有完成 (写一个单独的函数删去加多余的H) # htmd保留了离子但没有很好的处理周围的残基的质子态 # pypka貌似可以带离子计算
-
-#pypka
-#貌似必须要amber处理之前的结构，如果变成HIE等名称将无法识别
-
-# 判断库里有多少可以直接跑, 遗留问题：无法区分共结晶用的一些小分子和配体。处理酶的时候一概删去
-# 写pdb转化函数：
-# - 配体存储于独立的链 (貌似都是，也可以判断一下，对于所有判断为人工残基的)
-# - 可以被leap正常读取
-
-# 跑这部分的MD，重写conf类
+# 重写conf类
 # 
-# 基于seq完成get_missing的判断，
 # 写修复的方法Rosetta优先 // 与uniport的对比
-#
 # 用seq重写随机突变的方法（flag的存储，随机的方式，突变的实施）
-#
-# 尝试适配直接传入字符串？或许可以写一个保存文件的函数? （待定）还是要以外部文件为主，因为要和别的程序交互
 
 #htmd的不足
 #1.结构修复 （只做到保留残基序号从而保留缺失片段的位置）
-#2.金属中心附近的质子态 （可以保留金属离子，但是质子态处理的很差） 
+#2.金属中心附近的质子态 （可以保留金属离子，但是质子态没有处理） 
 
 # func outside of the class
 def get_PDB(name):

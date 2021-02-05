@@ -6,12 +6,6 @@ class PDB_line(object):
     lines: PDB_line.fromlines(lines) --> [PDB_line, ...]
     '''
 
-    line=''
-    line_type=''
-
-    resi_name=''
-    resi_index=''
-
 
     def __init__(self,line):
         '''

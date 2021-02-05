@@ -18,6 +18,8 @@ Class Metalatom
 ===============
 '''
 
+debug = 1
+
 class Structure():
     '''
     initilize from
@@ -361,6 +363,21 @@ class Structure():
             of.write('END'+line_feed)
 
 
+    def get_connectivty_table(self, ff='GAUSSIAN', metal_fix = 1, ligand_fix = 1):
+        '''
+        get connectivity table with atom index based on 'ff' settings:
+        ff = GAUSSIAN  -- continuous atom index start from 1, do not seperate by chain
+        -------------------
+        TREATMENT
+        chain: based on connectivity map of each atom in each residue
+        metalatom:  fix1: treat as isolated atom
+                    fix2: connect to donor atom (MCPB?)
+        ligand: fix1: use openboble to generate a mol2 file and read connectivity in it.
+        '''
+        connectivty_table = ''
+        #TODO
+
+        return connectivty_table
 
     def protonation_metal_fix(self, Fix):
         '''
@@ -582,8 +599,10 @@ class Chain(Child):
 
         
 
-    def sort(self):
+    def sort(self, sort_resi = 1):
         '''
+        sort_resi: 1/0 -- if or not sort atoms in each residue. (start from 1 for each residue)
+
         turn residue index into str and sort with list.sort() -- cope with the insert mark
         * start form 1 in each chain
         * if added object has same id and is not assigned with a insert mark -- place after a original one.
@@ -603,7 +622,8 @@ class Chain(Child):
         for index, resi in enumerate(self.residues):
             resi.id = index+1
             # sort each residue
-            resi.sort()
+            if sort_resi:
+                resi.sort()
       
 
 
@@ -649,13 +669,15 @@ class Chain(Child):
         Chain_obj.123 = Chain_obj.residues[123-1] // index mimic (start from 1)
         Chain_obj.HIS = Chain_obj.find_resi_name('HIS') // search mimic
         '''
-        if type(key) == int:
-            return self.residues[key-1]
         if key == 'stru':
             return self.parent
-        if type(key) == str:
+        try:
+            # digit
+            key = int(key)
+            return self.residues[key-1]
+        except ValueError:
+            # text
             return self._find_resi_name(key)
-        Exception('bad key: getattr error')
 
 
     def __delitem__(self, key):
@@ -1004,13 +1026,14 @@ class Residue(Child):
         Residue_obj.123 = Residue_obj.atoms[123-1] // index mimic (start from 1)
         Residue_obj.CA = Residue_obj.find_atom_name('CA') // search mimic
         '''
-        if type(key) == int:
-            return self.atoms[key-1]
         if key == 'chain':
             return self.parent
-        if type(key) == str:
+        # judge if a digit str, since a str will always be passed
+        try:
+            key = int(key)
+            return self.atoms[key-1]
+        except ValueError:
             return self._find_atom_name(key)
-        Exception('bad key: getattr error')
 
     
     def __delitem__(self, key):
@@ -1119,15 +1142,33 @@ class Atom(Child):
     def get_connect(self):
         '''
         find connect atom base on:
-        1. topology template
+        1. AmberMaps.resi_cnt_map
         2. parent residue name
         ------------
-        1. template[self.resi]
-        2. search which template atoms are contained in current residue
-        ??? how do I get the template ???
-        save found atom object to self.connect 
+        * require standard Amber format (atom name and C/N terminal name)
+        save found list of Atom object to self.connect 
         '''
-        pass
+        self.connect = []
+        r_id = self.resi.id
+
+        if r_id == 1:
+            # N terminal
+            name_list = resi_nt_cnt_map[self.resi.name][self.name]
+        if r_id == len(self.resi.chain):
+            # C terminal
+            name_list = resi_ct_cnt_map[self.resi.name][self.name]
+        if r_id != 1 and r_id != len(self.resi.chain):
+            name_list = resi_cnt_map[self.resi.name][self.name]
+
+        for name in name_list:
+            try:
+                self.connect.append(self.resi._find_atom_name(name))
+            except IndexError:
+                if debug == 1:
+                    print('WARNING: '+self.resi.name+str(self.resi.id)+' should have atom: '+name)
+                else:
+                    pass
+
 
     def get_protons(self):
         '''
@@ -1303,9 +1344,9 @@ class Metalatom(Atom):
 
         # find radius for matal
         if method == 'INC':
-            R_m = Ionic_radious_map[self.ele]
+            R_m = Ionic_radius_map[self.ele]
         if method == 'VDW':
-            R_m = VDW_radious_map[self.ele]
+            R_m = VDW_radius_map[self.ele]
         
         # get target with in check_radius (default: 4A)
         coord_m = np.array(self.coord)
@@ -1322,9 +1363,9 @@ class Metalatom(Atom):
                     # determine coordination
                     atom.get_ele()
                     if method == 'INC':
-                        R_d = Ionic_radious_map[atom.ele]
+                        R_d = Ionic_radius_map[atom.ele]
                     if method == 'VDW':
-                        R_d = VDW_radious_map[atom.ele]
+                        R_d = VDW_radius_map[atom.ele]
                     
                     if dist <= (R_d + R_m):
                         self.donor_atoms.append(atom)                     
@@ -1349,7 +1390,7 @@ class Metalatom(Atom):
             for index2 in range(len(self.donor_resi)):
                 if index2 > index:
                     if self.donor_resi[index2].id == self.donor_resi[index].id:
-                        print('\033[1;31;40m!WARNING! found more than 1 donor atom from residue: '+ self.donor_resi[index].name + self.donor_resi[index].id +'\033[m')
+                        print('\033[1;31;40m!WARNING! found more than 1 donor atom from residue: '+ self.donor_resi[index].name + str(self.donor_resi[index].id) +'\033[m')
 
 
     def _metal_fix_1(self):
