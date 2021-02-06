@@ -627,8 +627,75 @@ class Chain(Child):
       
 
 
-    def get_chain_seq(self):
+    def get_chain_seq(self, Oneletter = 0):
+        '''
+        get chain sequence from the "residues" list. Store in self.seq
+        ----------------------------
+        Oneletter
+        = 0 // use 3-letter format to represet each residue
+        = 1 // use 1-letter format to represet each residue
+        ----------------------------
+        + Use "NAN"/"-" as a filler to store missing residues (detect internal missing)
+        - (WARNING) Require the ligand in seperate chains
+        - (WARNING) Only support normal chain! (not ligand or solvent)
+        ---------------------
+        * Note that the missing sequence infomation will be missing after sort(). So get seq before sort to obtain such info.
+        * Need to be update after mutation
+        '''
+        chain_seq = []
+        for resi in self.residues:
+            # first resi
+            if len(chain_seq) == 0:
+                last_id = resi.id
+                chain_seq.append(resi.name)
+                continue
+            # missing sequence
+            missing_length = resi.id - last_id - 1
+            if missing_length > 0:
+                chain_seq = chain_seq + ['NAN',] * missing_length
+
+            chain_seq.append(resi.name)
+            last_id = resi.id
+
+        self.seq = chain_seq
+        if Oneletter == 1:
+            self._get_Oneletter()
+            return self.seq_one
+        else:
+            return self.seq
+    
+    def if_art_resi(self):
+        '''
+        TODO
+        '''
         pass
+
+    def _get_Oneletter(self):
+        '''
+        (Used internally) convert sequences in self.sequence to oneletter-based str
+        - The 'NAN' is convert to '-'
+        - Present unnature residue as full 3-letter name
+        save to self.seq_one
+        '''
+        if len(self.seq) == 0:
+            raise IndexError("The self.sequence should be obtained first")
+        
+        seq_one = ''
+        for name in self.seq:
+            if name == 'NAN':
+                seq_one=seq_one+'-'
+            else:
+                if name in Resi_map2:
+                    seq_one = seq_one + Resi_map2[name]
+                else:
+                    seq_one = seq_one + ' '+name+' '
+
+        self.seq_one = seq_one
+                
+            
+
+        
+
 
     def _find_resi_name(self, name: str):
         '''
