@@ -29,6 +29,7 @@ class Structure():
     chains = [chain_obj, ...]
     metalatoms = [metalatom_obj, ...]
     ligands = [ligand, ...]
+    solvents = [solvent, ...]
     # maybe add solvent in the future. mimic the metal treatment
     ------------
     METHOD
@@ -50,7 +51,16 @@ class Structure():
     protonation_metal_fix
 
     get_all_protein_atom
+
+    ---------
+    Special Method
+    ---------
+    __len__
+        len(obj) = len(obj.child_list)
     '''
+    # a list of meaningless ligands. Do not read in from PDB.
+    non_ligand_list = ['CL', 'EDO']
+    solvent_list = ['HOH', 'WAT']
 
     '''
     ====
@@ -58,17 +68,18 @@ class Structure():
     ====
     '''
 
-    def __init__(self, chains=None, metalatoms=None, ligands=None):
+    def __init__(self, chains=[], metalatoms=[], ligands=[], solvents=[]):
         '''
         Common part of init methods: direct from data objects
         '''
-        if chains is None and metalatoms is None and ligands is None:
+        if len(chains) == 0 and len(metalatoms) == 0 and len(ligands) == 0 and len(solvents) == 0:
             raise ValueError('need at least one input')
             
         self.chains = []
         self.metalatoms = []
         self.ligands = []
         self.metal_centers = []
+        self.solvents = []
 
         # Add parent pointer and combine into a whole
         for chain in chains:
@@ -80,24 +91,26 @@ class Structure():
         for ligand in ligands:
             ligand.set_parent(self)
             self.ligands.append(ligand)
-    
+        for solvent in solvents:
+            solvent.set_parent(self)
+            self.solvents.append(solvent)
+
     @classmethod
-    def fromPDB(cls, input_obj, input_type='path'):
+    def fromPDB(cls, input_obj, input_type='path', ligand_list = None):
         '''
         extract the structure from PDB path. Capable with raw experimental and Amber format
         ---------
         input = path (or file or file_str)
-        split the file_str to chain and init each chain
+            split the file_str to chain and init each chain
+        ligand_list: ['NAME',...]
+            User specific ligand names. Only extract these if provided. 
+        ---------
         Target:
         - structure - chain - residue - atom
                    |- metalatom(atom)
                    |- ligand(residue)
+                   |- solvent(residue)
         - ... (add upon usage)
-        ---------
-        Special Method
-        ---------
-        __len__
-            len(obj) = len(obj.child_list)
         ''' 
 
         # adapt general input // converge to file_str
@@ -122,9 +135,20 @@ class Structure():
         # clean metals
         raw_chains_woM, metalatoms = cls._get_metalatoms(raw_chains, method='1')
         # clean ligands
-        raw_chains_woM_woL, ligands = cls._get_ligand(raw_chains_woM)
+        raw_chains_woM_woL, ligands = cls._get_ligands(raw_chains_woM, ligand_list=ligand_list)
+        # clean solvent
+        raw_chains_woM_woL_woS, solvents = cls._get_solvents(raw_chains_woM_woL)
 
-        return cls(raw_chains_woM_woL, metalatoms, ligands)
+        ####### debug ##########
+        if debug > 1:
+            for chain in raw_chains_woM_woL_woS:
+                print(chain.id, chain.get_chain_seq(Oneletter=1))
+            for metal in metalatoms:
+                print(metal.name)
+            for ligand in ligands:
+                print(ligand.name)
+
+        return cls(raw_chains_woM_woL_woS, metalatoms, ligands, solvents)
 
 
     @classmethod
@@ -132,11 +156,11 @@ class Structure():
         '''
         get metal from raw chains and clean chains by deleting the metal part
         -----
-        Method 1:   Assume metal/ligand/solvent can be in any chain
+        Method 1:   Assume metal can be in any chain
                     Assume all resiude have unique index. 
         (Slow but general)
         
-        Method 2: Assume metal/ligand/solvent can only be in a seperate chain
+        Method 2: Assume metal can only be in a seperate chain
         (fast but limited)
         '''
         metalatoms = []
@@ -169,17 +193,85 @@ class Structure():
         return raw_chains, metalatoms
 
     @classmethod
-    def _get_ligand(cls, raw_chains):
+    def _get_ligands(cls, raw_chains, ligand_list = None):
         '''
-        get ligand from self.chains and clean chains by deleting the ligand part
+        get ligand from raw chains and clean chains by deleting the ligand part
         -----
-        (TO BE DONE)
+        Method: Assume metal/ligand/solvent can only be in a seperate chain (or it can not be distinguish from artificial residues.)
+                - delete names from non_ligand_list
+                + get names from ligand_list only if provided.
         '''
         ligands = []
-        # get ligand list
-        # convert to ligand obj
+        for chain in raw_chains:
+            #determine if a metal/ligand/solvent chain
+            if_HET_chain = 1
+            for resi in chain:
+                if resi.name in Resi_map2:
+                   if_HET_chain = 0
+                   break
+            if if_HET_chain:
+                for i in range(len(chain)-1,-1,-1):
+                    # operate in residue level
+                    residue = chain[i]
+
+                    # User defined ligand
+                    if ligand_list is not None:
+                        if residue.name in ligand_list:
+                            # add a logger in the future
+                            print('\033[1;34;40mStructure: found user assigned ligand in raw: '+chain.id+' '+residue.name+' '+str(residue.id)+' \033[0m')
+                            ligands.append(residue)
+                            del chain[residue]
+                    else:
+                        if residue.name not in cls.solvent_list:
+                            if residue.name not in cls.non_ligand_list:
+                                print('\033[1;34;40mStructure: found ligand in raw: '+chain.id+' '+residue.name+' '+str(residue.id)+' \033[0m')
+                                ligands.append(residue)
+                            del chain[residue]
+
+
+        # Convert pseudo residues to Ligand object 
+        holders = []
+        for pseudo_resi in ligands:
+            holders.append(Ligand.fromResidue(pseudo_resi))
+        ligands = holders
+                
         # clean empty chains
+        for i in range(len(raw_chains)-1,-1,-1):
+            if len(raw_chains[i]) == 0:
+                del raw_chains[i]
+
         return raw_chains, ligands
+
+    @classmethod
+    def _get_solvents(cls, raw_chains):
+        '''
+        get solvent from raw chains and clean chains by deleting the solvent part
+        -----
+        Method: Assume metal/ligand/solvent can anywhere. Base on self.solvent_list
+        '''
+        solvents = []
+        for chain in raw_chains:
+            for i in range(len(chain)-1,-1,-1):
+                # operate in residue level
+                residue = chain[i]
+                if residue.name in cls.solvent_list:
+                    if debug > 1:
+                        print('\033[1;34;40mStructure: found solvent in raw: '+chain.id+' '+residue.name+' '+str(residue.id)+' \033[0m')
+                    solvents.append(residue)
+                    del chain[residue]
+
+        # Convert pseudo residues to Ligand object 
+        holders = []
+        for pseudo_resi in solvents:
+            holders.append(Solvent.fromResidue(pseudo_resi))
+        ligands = holders
+                
+        # clean empty chains
+        for i in range(len(raw_chains)-1,-1,-1):
+            if len(raw_chains[i]) == 0:
+                del raw_chains[i]
+
+        return raw_chains, solvents
 
     '''
     ====
@@ -228,8 +320,8 @@ class Structure():
             
             obj_ele=obj[0]
 
-            if type(obj_ele) != Chain and type(obj_ele) != Metalatom and type(obj_ele) != Ligand:
-                raise TypeError('structure.Add() method only take Chain / Metalatom / Ligand')
+            if type(obj_ele) != Chain and type(obj_ele) != Metalatom and type(obj_ele) != Ligand and type(obj_ele) != Solvent:
+                raise TypeError('structure.Add() method only take Chain / Metalatom / Ligand / Solvent')
 
             # add parent and clean id (if sort) assign id (if assigned) leave mark if sort and assigned
             #                         sort
@@ -253,11 +345,13 @@ class Structure():
                 self.metalatoms.extend(obj)
             if type(obj_ele) == Ligand:
                 self.ligands.extend(obj)
+            if type(obj_ele) == Solvent:
+                self.solvents.extend(obj)
 
         # single building block
         else:
-            if type(obj) != Chain and type(obj) != Metalatom and type(obj) != Ligand:
-                raise TypeError('structure.Add() method only take Chain / Metalatom / Ligand')
+            if type(obj) != Chain and type(obj) != Metalatom and type(obj) != Ligand and type(obj) != Solvent:
+                raise TypeError('structure.Add() method only take Chain / Metalatom / Ligand / Solvent')
             
             obj.set_parent(self)
             if sort:
@@ -275,6 +369,8 @@ class Structure():
                 self.metalatoms.append(obj)   
             if type(obj) == Ligand:
                 self.ligands.append(obj)
+            if type(obj) == Solvent:
+                self.solvents.append(obj)
             
         if sort:
             self.sort()
@@ -305,9 +401,9 @@ class Structure():
             # sort each chain
             chain.sort()
 
-        # sort ligand
+        # sort ligand // Do I really need?
         for ligand in self.ligands:
-            ligand.sort()
+            ligand.sort() #Do nothing
 
 
     def build(self, path, ff='AMBER', forcefield='ff14SB'):
@@ -348,13 +444,25 @@ class Structure():
                     of.write(line)
                     of.write('TER'+line_feed)
 
-                # for ligand in self.ligands:
-                #     r_id = r_id + 1
-                #     for atom in ligand:
-                #         a_id = a_id + 1
-                #         line = atom.build(a_id= a_id, r_id = r_id, ff=ff, forcefield=forcefield)
-                #         of.write(line)
-                #     of.write('TER'+line_feed)
+                for ligand in self.ligands:
+                    r_id = r_id + 1
+                    c_id = chr(ord(c_id)+1)
+
+                    for atom in ligand:
+                        a_id = a_id + 1
+                        line = atom.build(a_id= a_id, r_id = r_id, c_id = c_id, ff=ff, forcefield=forcefield)
+                        of.write(line)
+                    of.write('TER'+line_feed)
+
+                c_id = chr(ord(c_id)+1) # chain_id for all solvent
+                for solvent in self.solvents:
+                    r_id = r_id + 1
+                    for atom in solvent:
+                        a_id = a_id + 1
+                        line = atom.build(a_id= a_id, r_id = r_id, c_id = c_id, ff=ff, forcefield=forcefield)
+                        of.write(line)
+                of.write('TER'+line_feed)
+
 
             if ff == 'XXX':
                 #place holder
@@ -378,6 +486,7 @@ class Structure():
         #TODO
 
         return connectivty_table
+
 
     def protonation_metal_fix(self, Fix):
         '''
@@ -1531,9 +1640,68 @@ class Metalatom(Atom):
     
 
 class Ligand(Residue):
-    def __init__(self):
-        pass
+    '''
+    -------------
+    initilize from
+    PDB:        Residue.fromPDB(atom_input, input_type='PDB_line' or 'line_str' or 'file' or 'path')
+    raw data:   Residue(atom_name, coord)
+    Residue:    Ligand.fromResidue(atom_obj)
+    -------------
+    id
+    name
+    atoms = [atom, ...]
+    parent # the whole stru
+    -------------
+    Method
+    -------------
+    set_parent
+    -------------
+    '''
+    def __init__(self, atoms, id, name, parent=None):
+        Residue.__init__(self, atoms, id, name, parent)
+
+    @classmethod
+    def fromResidue(cls, Resi_obj):
+        '''
+        generate from a Residue object. copy data
+        '''
+        return cls(Resi_obj.atoms, Resi_obj.id, Resi_obj.name, parent=Resi_obj.parent)
+
+    
     def sort(self):
         pass
+
+
+
+class Solvent(Residue):
+    '''
+    -------------
+    initilize from
+    PDB:        Residue.fromPDB(atom_input, input_type='PDB_line' or 'line_str' or 'file' or 'path')
+    raw data:   Residue(atom_name, coord)
+    Residue:    Ligand.fromResidue(atom_obj)
+    -------------
+    id
+    name
+    atoms = [atom, ...]
+    parent # the whole stru
+    -------------
+    Method
+    -------------
+    set_parent
+    -------------
+    '''
+    def __init__(self, atoms, id, name, parent=None):
+        Residue.__init__(self, atoms, id, name, parent)
+
+    @classmethod
+    def fromResidue(cls, Resi_obj):
+        '''
+        generate from a Residue object. copy data
+        '''
+        return cls(Resi_obj.atoms, Resi_obj.id, Resi_obj.name, parent=Resi_obj.parent)
+
     
+    def sort(self):
+        pass
 
