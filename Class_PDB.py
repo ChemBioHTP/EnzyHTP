@@ -17,6 +17,12 @@ try:
     import propka.lib
 except ImportError:
     raise ImportError('PropKa not installed.')
+try:
+    import openbabel
+    import openbabel.pybel as pybel
+except ImportError:
+    raise ImportError('OpenBabel not installed.')
+
 
 
 __doc__='''
@@ -219,12 +225,14 @@ class PDB():
 
     def update_path(self):
         self.dir = self.path[:-len(self.path.split(os.sep)[-1])]
+        if self.dir == '':
+            self.dir = './'
         self.path_name = self.path[:-4]
         self.name=self.path.split(os.sep)[-1][:-4]
 
     '''
     =========
-    Sequence (not require Amber format)
+    Sequence (not require Amber format) (已部分迁移，剩判断配体和人工残基的部分)
     =========
     '''
 
@@ -437,6 +445,7 @@ class PDB():
         '''
         pass
 
+
     def PDB_loopmodel_refine(self, method='Rosetta'):
         '''
         Use different methods to model the missing sequence
@@ -466,7 +475,7 @@ class PDB():
         '''
         out_path=self.path_name+'_aH.pdb'
         self._get_protonation_pdb2pqr(ph=ph)
-        self._protonation_Fix(out_path)
+        self._protonation_Fix(out_path, ph=ph)
         self.path = out_path
         self.update_path()
 
@@ -474,7 +483,8 @@ class PDB():
     def _get_protonation_pdb2pqr(self,ffout='AMBER',ph=7.0,out_path=''):
         '''
         Use PDB2PQR to get the protonation state for current PDB. (self.path)
-        current implementation just use the outer layer of PDB2PQR. Update to inner one and get more infomation in the furture.
+        current implementation just use the outer layer of PDB2PQR. Update to inner one and get more infomation in the furture. 
+            (TARGET: 1. what is deleted from the structure // metal, ligand)
         
         save the result to self.pqr_path
         '''
@@ -492,14 +502,14 @@ class PDB():
             run_pdb2pqr(args)
 
 
-    def _protonation_Fix(self, out_path, Metal_Fix='1'):
+    def _protonation_Fix(self, out_path, Metal_Fix='1', ph = 7.0):
         '''
         Add in the missing atoms and run detailed fixing
         save to self.path
         '''
 
         # Add missing atom (from the PDB2PQR step. Update to func result after update the _get_protonation_pdb2pqr func)       
-        # Now metal only
+        # Now metal and ligand
 
         old_stru = Structure.fromPDB(self.path)
         new_stru = Structure.fromPDB(self.pqr_path)
@@ -511,11 +521,53 @@ class PDB():
             # fix metal environment
             new_stru.protonation_metal_fix(Fix = 1)
 
+        # protonate ligands and combine with the pqr file
+        if len(old_stru.ligands) > 0:
+            lig_dir = self.dir+'ligands/'
+            if os.path.exists(lig_dir):
+                pass
+            else:
+                os.mkdir(lig_dir)
+            lig_paths = old_stru.build_ligands(lig_dir)
+
+            new_ligs = []
+            for lig_path in lig_paths:
+                new_lig_path = self.protonate_ligand(lig_path, ph=ph)
+                new_ligs.append(Ligand.fromPDB(new_lig_path, input_type='path'))
+            new_stru.add(new_ligs, sort = 0)
+
         # PLACE HOLDER for other fix
 
         # build file
         new_stru.sort()
         new_stru.build(out_path)   
+
+    @classmethod
+    def protonate_ligand(cls, path, method='PYBEL', ph = 7.0):
+        '''
+        Protonate the ligand from 'path' with 'method'
+        ---------------
+        method: PYBEL (default)
+                OPENBABEL (not working if block warning output)
+        ph: 7.0 by default
+        '''
+        out_path = path[:-4]+'_aH.pdb'
+
+        if method == 'OPENBABEL':
+            # not working if block warning output for some reason
+            # openbabel.obErrorLog.SetOutputLevel(0)
+            obConversion = openbabel.OBConversion()
+            obConversion.SetInAndOutFormats("pdb", "pdb")
+            mol = openbabel.OBMol()
+            obConversion.ReadFile(mol, path)
+            mol.AddHydrogens(False, True, ph)
+            obConversion.WriteFile(mol, out_path)
+        if method == 'PYBEL':
+            pybel.ob.obErrorLog.SetOutputLevel(0)
+            mol = next(pybel.readfile('pdb', path))
+            mol.OBMol.AddHydrogens(False, True, ph)
+            mol.write('pdb', out_path, overwrite=True)
+        return out_path
 
 
     '''

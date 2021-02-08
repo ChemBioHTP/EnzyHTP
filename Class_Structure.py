@@ -15,6 +15,10 @@ Class Residue
 Class Atom
 -------------------------------------------------------------------------------------
 Class Metalatom
+-------------------------------------------------------------------------------------
+Class Ligand
+-------------------------------------------------------------------------------------
+Class Solvent
 ===============
 '''
 
@@ -264,7 +268,7 @@ class Structure():
         holders = []
         for pseudo_resi in solvents:
             holders.append(Solvent.fromResidue(pseudo_resi))
-        ligands = holders
+        solvents = holders
                 
         # clean empty chains
         for i in range(len(raw_chains)-1,-1,-1):
@@ -469,6 +473,36 @@ class Structure():
                 pass
                 
             of.write('END'+line_feed)
+
+
+    def build_ligands(self, dir, ft='PDB'):
+        '''
+        build files for every ligand in self.ligands
+        -------
+        dir: output dir. (e.g. File path for ligand i is $dir/ligand_i.pdb)
+        ft : file type / support: PDB(default)
+        '''
+        out_paths = []
+
+        if ft == 'PDB':
+            l_id = 0
+            for lig in self.ligands:
+                l_id = l_id + 1 # current ligand id
+                # make output path
+                if dir[-1] == '/':
+                    dir = dir[:-1]
+                out_path = dir+'/ligand_'+str(l_id)+'.pdb'
+                # write
+                with open(out_path,'w') as of:
+                    a_id = 0
+                    for atom in lig:
+                        a_id = a_id + 1
+                        line = atom.build(a_id = a_id, c_id=' ')
+                        of.write(line)
+                    of.write('TER'+line_feed+'END'+line_feed)
+                # record
+                out_paths.append(out_path)
+        return out_paths
 
 
     def get_connectivty_table(self, ff='GAUSSIAN', metal_fix = 1, ligand_fix = 1):
@@ -966,6 +1000,13 @@ class Residue(Child):
         if input_type == 'PDB_line':
             resi_lines = resi_input
         
+        #clean lines
+        for i in range(len(resi_lines)-1,-1,-1):
+            if resi_lines[i].line_type != 'ATOM' and resi_lines[i].line_type != 'HETATM':
+                if debug > 1:
+                    print('Residue.fromPDB: delete error line in input.')
+                del resi_lines[i]
+    
         # Default resi_id
         if resi_id is None:
             resi_id = resi_lines[0].resi_id
@@ -1340,7 +1381,7 @@ class Atom(Child):
             try:
                 self.connect.append(self.resi._find_atom_name(name))
             except IndexError:
-                if debug == 1:
+                if debug >= 1:
                     print('WARNING: '+self.resi.name+str(self.resi.id)+' should have atom: '+name)
                 else:
                     pass

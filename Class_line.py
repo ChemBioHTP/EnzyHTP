@@ -38,7 +38,7 @@ class PDB_line(object):
         '''
         line_feed='\n' # potential update
 
-        line_list = lines.split(line_feed)
+        line_list = lines.strip().split(line_feed)
         pdb_l_list = []
         for line in line_list:
             pdb_l_list.append(cls(line))
