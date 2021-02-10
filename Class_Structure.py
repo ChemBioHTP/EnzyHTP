@@ -72,7 +72,7 @@ class Structure():
     ====
     '''
 
-    def __init__(self, chains=[], metalatoms=[], ligands=[], solvents=[]):
+    def __init__(self, chains=[], metalatoms=[], ligands=[], solvents=[], name):
         '''
         Common part of init methods: direct from data objects
         '''
@@ -98,9 +98,10 @@ class Structure():
         for solvent in solvents:
             solvent.set_parent(self)
             self.solvents.append(solvent)
+        self.name = name
 
     @classmethod
-    def fromPDB(cls, input_obj, input_type='path', ligand_list = None):
+    def fromPDB(cls, input_obj, input_type='path', input_name = None ligand_list = None):
         '''
         extract the structure from PDB path. Capable with raw experimental and Amber format
         ---------
@@ -110,10 +111,10 @@ class Structure():
             User specific ligand names. Only extract these if provided. 
         ---------
         Target:
-        - structure - chain - residue - atom
-                   |- metalatom(atom)
-                   |- ligand(residue)
-                   |- solvent(residue)
+        - structure(w/name)   - chain - residue - atom
+                            |- metalatom(atom)
+                            |- ligand(residue)
+                            |- solvent(residue)
         - ... (add upon usage)
         ''' 
 
@@ -152,7 +153,7 @@ class Structure():
             for ligand in ligands:
                 print(ligand.name)
 
-        return cls(raw_chains_woM_woL_woS, metalatoms, ligands, solvents)
+        return cls(raw_chains_woM_woL_woS, metalatoms, ligands, solvents, input_name)
 
 
     @classmethod

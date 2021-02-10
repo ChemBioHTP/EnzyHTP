@@ -549,7 +549,7 @@ class PDB():
         ---------------
         method: PYBEL (default)
                 OPENBABEL (not working if block warning output)
-        ph: 7.0 by default
+        ph: 7.0 by default #TODO
         '''
         out_path = path[:-4]+'_aH.pdb'
 
@@ -744,40 +744,53 @@ class PDB():
     ========
     '''
 
-    def PDB2FF(self, o_path=''):
+    def PDB2FF(self, o_path='', AminoOnly=0):
         '''
         PDB2FF(self, o_path='')
         --------------------
         o_path contral where the leap.in and leap.log go: has to contain a / at the end (e.g.: ./dir/)
+        --------------------
+        chains:
+        ligand: 
+        metal:
         '''
-        #out3_PDB_path=self.name+'_water.pdb'
-        #make tleap input
-        os.popen('mkdir '+o_path+'tleap_cache')
-        tleap_input=open(o_path+'tleap_ff.in','w')
-        tleap_input.write('source leaprc.protein.ff14SB\n')
-        tleap_input.write('source leaprc.water.tip3p\n')
-        tleap_input.write('a = loadpdb '+self.path+'\n')
-        tleap_input.write('solvatebox a TIP3PBOX 10\n')
-        tleap_input.write('addions a Na+ 0\n')
-        tleap_input.write('addions a Cl- 0\n')
-        if o_path == '':
-            tleap_input.write('saveamberparm a '+self.path_name+'.prmtop '+self.path_name+'.inpcrd\n')
-            self.prmtop_path=self.path_name+'.prmtop'
-            self.inpcrd_path=self.path_name+'.inpcrd'
+        if not AminoOnly:
+            # check self.stru
+            # build things seperately
+            # parm
+            # combine
+            pass
+        
         else:
-            tleap_input.write('saveamberparm a '+o_path+self.name+'.prmtop '+o_path+self.name+'.inpcrd\n')
-            self.prmtop_path=o_path+self.name+'.prmtop'
-            self.inpcrd_path=o_path+self.name+'.inpcrd'
+            # place to hold the **old** realization
+            #make tleap input
+            os.popen('mkdir '+o_path+'tleap_cache')
+            tleap_input=open(o_path+'tleap_ff.in','w')
+            tleap_input.write('source leaprc.protein.ff14SB\n')
+            tleap_input.write('source leaprc.water.tip3p\n')
+            tleap_input.write('a = loadpdb '+self.path+'\n')
+            tleap_input.write('solvatebox a TIP3PBOX 10\n')
+            tleap_input.write('addions a Na+ 0\n')
+            tleap_input.write('addions a Cl- 0\n')
+            if o_path == '':
+                tleap_input.write('saveamberparm a '+self.path_name+'.prmtop '+self.path_name+'.inpcrd\n')
+                self.prmtop_path=self.path_name+'.prmtop'
+                self.inpcrd_path=self.path_name+'.inpcrd'
+            else:
+                tleap_input.write('saveamberparm a '+o_path+self.name+'.prmtop '+o_path+self.name+'.inpcrd\n')
+                self.prmtop_path=o_path+self.name+'.prmtop'
+                self.inpcrd_path=o_path+self.name+'.inpcrd'
 
-        #tleap_input.write('savepdb a '+out3_PDB_path+'\n')
-        tleap_input.write('quit\n')
-        tleap_input.close()
+            #tleap_input.write('savepdb a '+out3_PDB_path+'\n')
+            tleap_input.write('quit\n')
+            tleap_input.close()
 
-        #run
-        os.system('tleap -s -f '+o_path+'tleap_ff.in > '+o_path+'tleap_ff_'+self.name+'.out')
-        os.system('mv '+o_path+'*leap_ff* leap.log '+o_path+'tleap_cache')
+            #run
+            os.system('tleap -s -f '+o_path+'tleap_ff.in > '+o_path+'tleap_ff_'+self.name+'.out')
+            os.system('mv '+o_path+'*leap_ff* leap.log '+o_path+'tleap_cache')
 
-        self.stage = 2
+
+
 
         return (self.prmtop_path,self.inpcrd_path)
 

@@ -133,7 +133,7 @@ class Conf():
 
         self.equi_conf='''Equilibration:constant pressure
  &cntrl
-  imin  = 0,  ntx = 1,  irest = 0,
+  imin  = 0,  ntx = 1,  irest = 1,
   ntf   = '''+ntf+''',  ntc = '''+ntc+''',
   nstlim= '''+nstlim+''', dt= '''+dt+''',
   cut   = '''+cut+''',
@@ -151,7 +151,7 @@ class Conf():
         self.equi_fn='equi'+self.tag+'.in'
         self.deploy_list=self.deploy_list+[(self.equi_fn,self.equi_conf),]
 
-    def set_MD_prod(self,nstlim='50000000',dt='0.002',cut='10.0',temp0='300.0',ntpr='25000',ntwx='',ntc='2',ntf='2'):
+    def set_MD_prod(self,nstlim='50000000',dt='0.002',cut='10.0',temp0='300.0',ntpr='25000',ntwx='',ntc='2',ntf='2',irest='1'):
         '''
         Set configuration for a production job
         default value: (self,nstlim='50000000',dt='0.002',cut='10.0',temp0='300.0',ntpr='5000',ntwx=nstlim/10000,ntc='2',ntf='2')
@@ -163,7 +163,7 @@ class Conf():
 
         self.prod_conf='''Equilibration:constant pressure
  &cntrl
-  imin  = 0, ntx = 1, irest = 0,
+  imin  = 0, ntx = 1, irest = '''+irest+''',
   ntf   = '''+ntf+''',  ntc = '''+ntc+''',
   nstlim= '''+nstlim+''', dt= '''+dt+''',
   cut   = '''+cut+''',
