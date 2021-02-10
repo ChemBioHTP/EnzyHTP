@@ -72,7 +72,7 @@ class Structure():
     ====
     '''
 
-    def __init__(self, chains=[], metalatoms=[], ligands=[], solvents=[], name):
+    def __init__(self, chains=[], metalatoms=[], ligands=[], solvents=[], name = None):
         '''
         Common part of init methods: direct from data objects
         '''
