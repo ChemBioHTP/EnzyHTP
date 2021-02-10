@@ -101,7 +101,7 @@ class Structure():
         self.name = name
 
     @classmethod
-    def fromPDB(cls, input_obj, input_type='path', input_name = None ligand_list = None):
+    def fromPDB(cls, input_obj, input_type='path', input_name = None, ligand_list = None):
         '''
         extract the structure from PDB path. Capable with raw experimental and Amber format
         ---------
