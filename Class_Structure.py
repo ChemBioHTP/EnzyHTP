@@ -111,7 +111,7 @@ class Structure():
             User specific ligand names. Only extract these if provided. 
         ---------
         Target:
-        - structure(w/name)   - chain - residue - atom
+        - structure(w/name)  - chain - residue - atom
                             |- metalatom(atom)
                             |- ligand(residue)
                             |- solvent(residue)

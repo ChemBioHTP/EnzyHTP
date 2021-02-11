@@ -1,7 +1,7 @@
 '''
 Misc helper func and class
 '''
-
+import os
 '''
 ====
 Tree
@@ -19,3 +19,12 @@ class Child():
 Text
 '''
 line_feed = '\n'
+
+'''
+func
+'''
+def mkdir(dir):
+    if os.path.exists(dir):
+        pass
+    else:
+        os.mkdir(dir)

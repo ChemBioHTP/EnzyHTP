@@ -6,7 +6,7 @@ from AmberMaps import *
 from wrapper import *
 from Class_Structure import *
 from Class_line import *
-from helper import line_feed
+from helper import line_feed, mkdir
 try:
     from pdb2pqr.main import main_driver as run_pdb2pqr
     from pdb2pqr.main import build_main_parser as build_pdb2pqr_parser
@@ -108,8 +108,9 @@ class PDB():
         self.current_resi_name_3=''
         self.current_resi_name=''
         self.current_resi_atom_list=[]
+        # Nessessary for judging
+        self.stru = None
         #initilize
-
 
         if len(PDB_PATH) == 0:
             self.File_str=PDB_File_str
@@ -229,6 +230,18 @@ class PDB():
             self.dir = './'
         self.path_name = self.path[:-4]
         self.name=self.path.split(os.sep)[-1][:-4]
+
+    def get_stru(self, input_name=None, ligand_list=None):
+        '''
+        Convert current PDB file (self.path) to a Struture object (self.stru).
+        ------
+        input_name: a name tag for the object (self.name by default)
+        ligand_list: a list of user assigned ligand residue names.
+        '''
+        if input_name == None:
+            input_name = self.name
+        self.stru = Structure.fromPDB(self.path, input_name=input_name, ligand_list=ligand_list)
+
 
     '''
     =========
@@ -755,11 +768,35 @@ class PDB():
         metal:
         '''
         if not AminoOnly:
-            # check self.stru
+            # check and generate self.stru
+            if self.stru == None:
+                self.get_stru()
+            else:
+                if self.stru.name != self.name:
+                    # warn if possible wrong self.stru
+                    if debug > 1:
+                        print('PDB.PDB2FF: WARNING: the self.stru has a different name')
+                        print('     -self.name: '+self.name)
+                        print('     -self.stru.name: '+self.stru.name)
+
             # build things seperately
+            lig_dir = self.dir+'ligands/'
+            pro_dir = self.dir+'protein/'
+            met_dir = self.dir+'metalcenters/'
+            mkdir(lig_dir)
+            mkdir(pro_dir)
+            mkdir(met_dir)
+
+            protein_path = self.stru.build_protein(pro_dir)
+            ligands_path = self.stru.build_ligands(lig_dir)
+            metalcenters_path = self.stru.build_metalcenters(met_dir)
             # parm
+            self._protein_parm(protein_path)
+            self._ligand_parm(path)
+            self._metal_parm(path)
             # combine
-            pass
+            self._combine_parm()
+            # TODO
         
         else:
             # place to hold the **old** realization
