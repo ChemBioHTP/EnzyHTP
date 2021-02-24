@@ -6,6 +6,7 @@ from AmberMaps import *
 from wrapper import *
 from Class_Structure import *
 from Class_line import *
+from Class_Conf import AmberHome
 from helper import line_feed, mkdir
 try:
     from pdb2pqr.main import main_driver as run_pdb2pqr
@@ -118,8 +119,13 @@ class PDB():
         else:
             self.path=PDB_PATH
             self.dir = self.path[:-len(self.path.split(os.sep)[-1])]
+            if self.dir == '':
+                self.dir = '.'
             self.path_name = self.path[:-4]
             self.name=self.path.split(os.sep)[-1][:-4]
+            # make cache
+            self.cache_path=self.dir+'/cache'
+            mkdir(self.cache_path)
 
             #self.ifformat
             #Judge if this is the standard Amber format by just read two line.
@@ -227,7 +233,7 @@ class PDB():
     def update_path(self):
         self.dir = self.path[:-len(self.path.split(os.sep)[-1])]
         if self.dir == '':
-            self.dir = './'
+            self.dir = '.'
         self.path_name = self.path[:-4]
         self.name=self.path.split(os.sep)[-1][:-4]
 
@@ -536,17 +542,14 @@ class PDB():
 
         # protonate ligands and combine with the pqr file
         if len(old_stru.ligands) > 0:
-            lig_dir = self.dir+'ligands/'
-            if os.path.exists(lig_dir):
-                pass
-            else:
-                os.mkdir(lig_dir)
-            lig_paths = old_stru.build_ligands(lig_dir)
+            lig_dir = self.dir+'/ligands/'
+            mkdir(lig_dir)
+            lig_paths = [i for i,j in old_stru.build_ligands(lig_dir)]
 
             new_ligs = []
             for lig_path in lig_paths:
-                new_lig_path = self.protonate_ligand(lig_path, ph=ph)
-                new_ligs.append(Ligand.fromPDB(new_lig_path, input_type='path'))
+                new_lig_path, net_charge = self.protonate_ligand(lig_path, ph=ph)
+                new_ligs.append(Ligand.fromPDB(new_lig_path, net_charge=net_charge, input_type='path'))
             new_stru.add(new_ligs, sort = 0)
 
         # PLACE HOLDER for other fix
@@ -565,6 +568,7 @@ class PDB():
         ph: 7.0 by default #TODO
         '''
         out_path = path[:-4]+'_aH.pdb'
+        outm2_path = path[:-4]+'_aH.mol2'
 
         if method == 'OPENBABEL':
             # not working if block warning output for some reason
@@ -580,7 +584,13 @@ class PDB():
             mol = next(pybel.readfile('pdb', path))
             mol.OBMol.AddHydrogens(False, True, ph)
             mol.write('pdb', out_path, overwrite=True)
-        return out_path
+            # determine partial charge
+            mol.write('mol2', outm2_path, overwrite=True)
+            mol = next(pybel.readfile('mol2', outm2_path))
+            net_charge=0
+            for atom in mol:
+                net_charge=net_charge+atom.formalcharge
+        return out_path, net_charge
 
 
     '''
@@ -757,7 +767,7 @@ class PDB():
     ========
     '''
 
-    def PDB2FF(self, o_path='', AminoOnly=0):
+    def PDB2FF(self, o_path='', AminoOnly=0, lig_method='AM1BCC'):
         '''
         PDB2FF(self, o_path='')
         --------------------
@@ -780,23 +790,18 @@ class PDB():
                         print('     -self.stru.name: '+self.stru.name)
 
             # build things seperately
-            lig_dir = self.dir+'ligands/'
-            pro_dir = self.dir+'protein/'
-            met_dir = self.dir+'metalcenters/'
+            lig_dir = self.dir+'/ligands/'
+            met_dir = self.dir+'/metalcenters/'
             mkdir(lig_dir)
-            mkdir(pro_dir)
             mkdir(met_dir)
 
-            protein_path = self.stru.build_protein(pro_dir)
-            ligands_path = self.stru.build_ligands(lig_dir)
-            metalcenters_path = self.stru.build_metalcenters(met_dir)
+            ligands_pathNchrg = self.stru.build_ligands(lig_dir, ifcharge=1) #同名ligand一定要在同一个文件？？
+            # metalcenters_path = self.stru.build_metalcenters(met_dir)
             # parm
-            self._protein_parm(protein_path)
-            self._ligand_parm(path)
-            self._metal_parm(path)
+            ligand_parm_paths = self._ligand_parm(ligands_pathNchrg, method=lig_method)
+            # self._metal_parm(metalcenters_path)
             # combine
-            self._combine_parm()
-            # TODO
+            self._combine_parm(ligand_parm_paths, o_path=o_path)
         
         else:
             # place to hold the **old** realization
@@ -826,10 +831,75 @@ class PDB():
             os.system('tleap -s -f '+o_path+'tleap_ff.in > '+o_path+'tleap_ff_'+self.name+'.out')
             os.system('mv '+o_path+'*leap_ff* leap.log '+o_path+'tleap_cache')
 
-
-
-
         return (self.prmtop_path,self.inpcrd_path)
+
+    
+    def _ligand_parm(self, paths, method='AM1BCC'):
+        '''
+        Turn ligands to prepi (w/net charge), parameterize with parmchk
+        -----------
+        return [(perpi_1, frcmod_1), ...]
+        - less junk files if your workflow contains a protonation step in advance. 
+        '''
+        parm_paths = []
+
+        for lig_pdb, net_charge in paths:
+            if method == 'AM1BCC':
+                out_prepi = lig_pdb[:-3]+'prepin'
+                out_frcmod = lig_pdb[:-3]+'frcmod'
+
+                #gen prepi (net charge and correct protonation state is important)
+                os.system(AmberHome+'/bin/antechamber -i '+lig_pdb+' -fi pdb -o '+out_prepi+' -fo prepi -c bcc -s 0 -nc '+str(net_charge))
+                #gen frcmod
+                os.system(AmberHome+'/bin/parmchk2 -i '+out_prepi+' -f prepi -o '+out_frcmod)                
+                #record
+                parm_paths.append((out_prepi, out_frcmod))
+
+        return parm_paths
+
+
+    def _combine_parm(self, lig_parms, o_path='', ifsolve=1, box_type='box', box_size='10'):
+        '''
+        combine different parmeter files and make finally inpcrd and prmtop
+        -------
+        structure: pdb
+        ligands: prepi, frcmod
+        metalcenters, artificial residues: TODO
+        '''
+        leap_path= self.cache_path+'/leap.in'
+        with open(leap_path, 'w') as of:
+            of.write('source leaprc.protein.ff14SB'+line_feed)
+            of.write('source leaprc.gaff'+line_feed)
+            of.write('source leaprc.water.tip3p'+line_feed)
+            # ligands
+            for prepi, frcmod in lig_parms:
+                of.write('loadAmberParams '+frcmod+line_feed)
+                of.write('loadAmberPrep '+prepi+line_feed)
+            of.write('a = loadpdb '+self.path+line_feed)
+            of.write('center a'+line_feed)
+            # solvation
+            if ifsolve:
+                of.write('addions a Na+ 0'+line_feed)
+                of.write('addions a Cl- 0'+line_feed)
+                if box_type == 'box':
+                    of.write('solvatebox a TIP3PBOX '+box_size+line_feed)
+                if box_type == 'oct':
+                    of.write('solvateOct a TIP3PBOX '+box_size+line_feed)
+                if box_type != 'box' and box_type != 'oct':
+                    raise Exception('PDB._combine_parm().box_type: Only support box and oct now!')
+            # save
+            if o_path == '':
+                of.write('saveamberparm a '+self.path_name+'.prmtop '+self.path_name+'.inpcrd\n')
+                self.prmtop_path=self.path_name+'.prmtop'
+                self.inpcrd_path=self.path_name+'.inpcrd'
+            else:
+                of.write('saveamberparm a '+o_path+self.name+'.prmtop '+o_path+self.name+'.inpcrd\n')
+                self.prmtop_path=o_path+self.name+'.prmtop'
+                self.inpcrd_path=o_path+self.name+'.inpcrd'
+            
+            os.system('tleap -s -f '+leap_path+' > '+leap_path[:-2]+'.out')
+
+            return self.prmtop_path, self.inpcrd_path
 
 
     def PDBMin(self,cycle='2000'):

@@ -1,7 +1,13 @@
 import numpy as np
+import os
 from Class_line import PDB_line
-from helper import Child, line_feed
+from helper import Child, line_feed, mkdir
 from AmberMaps import *
+try:
+    import openbabel
+    import openbabel.pybel as pybel
+except ImportError:
+    raise ImportError('OpenBabel not installed.')
 __doc__='''
 This module extract and operate structural infomation from PDB
 # will replace some local function in PDB class in the future.
@@ -476,33 +482,81 @@ class Structure():
             of.write('END'+line_feed)
 
 
-    def build_ligands(self, dir, ft='PDB'):
+    def build_ligands(self, dir, ft='PDB', ifcharge=0 ,c_method='PYBEL', ph=7.0):
         '''
         build files for every ligand in self.ligands
         -------
-        dir: output dir. (e.g. File path for ligand i is $dir/ligand_i.pdb)
-        ft : file type / support: PDB(default)
+        dir      : output dir. (e.g. File path for ligand i is $dir/ligand_i.pdb)
+        ft       : file type / now support: PDB(default)
+        ifcharge : if calculate net charge info. (do not before add H)
+        c_method : method determining the net charge (default: PYBEL)
+        ph       : pH value used for determine the net charge
+        '''
+        out_ligs = []
+
+        l_id = 0
+        for lig in self.ligands:
+            l_id = l_id + 1 # current ligand id
+            # make output path
+            if dir[-1] == '/':
+                dir = dir[:-1]
+            out_path = dir+'/ligand_'+str(l_id)+'.pdb'
+            # write
+            lig.build(out_path, ft=ft)
+            # net charge
+            net_charge=None
+            if ifcharge:
+                if lig.net_charge != None:
+                    net_charge = lig.net_charge
+                else:
+                    net_charge = lig.get_net_charge(method=c_method, ph=ph)
+
+            # record
+            out_ligs.append((out_path, net_charge))
+
+        return out_ligs
+
+
+    def build_protein(self, dir, ft='PDB'):
+        '''
+        build only protein and output under the dir
+        -------
+        dir: out put dir ($dir/protein.pdb)
+        ft : file type / now support: PDB(default) 
+        '''
+        # make path
+        if dir[-1] == '/':
+            dir = dir[:-1]
+        out_path = dir+'/protein.pdb'
+
+        #write
+        if ft == 'PDB':
+            with open(out_path,'w') as of:
+                a_id = 0
+                r_id = 0
+                for chain in self.chains:
+                    #write chain
+                    for resi in chain:
+                        r_id = r_id+1
+                        for atom in resi:
+                            a_id = a_id + 1 #current line index
+                            line = atom.build(a_id= a_id, r_id = r_id)
+                            of.write(line)
+                    #write TER after each chain
+                    of.write('TER'+line_feed)
+                of.write('END'+line_feed)
+        else:
+            raise Exception('Support only PDB output now.')
+
+        return out_path
+    
+    
+    def build_metalcenters(self, dir, ft='PDB'):
+        '''
+        build metalcenters only. Use for MCPB parameterization. Deal with donor residue with different protonation states.        ----------
+        TODO
         '''
         out_paths = []
-
-        if ft == 'PDB':
-            l_id = 0
-            for lig in self.ligands:
-                l_id = l_id + 1 # current ligand id
-                # make output path
-                if dir[-1] == '/':
-                    dir = dir[:-1]
-                out_path = dir+'/ligand_'+str(l_id)+'.pdb'
-                # write
-                with open(out_path,'w') as of:
-                    a_id = 0
-                    for atom in lig:
-                        a_id = a_id + 1
-                        line = atom.build(a_id = a_id, c_id=' ')
-                        of.write(line)
-                    of.write('TER'+line_feed+'END'+line_feed)
-                # record
-                out_paths.append(out_path)
         return out_paths
 
 
@@ -1540,7 +1594,7 @@ class Metalatom(Atom):
         '''
         return cls(atom_obj.name, atom_obj.parent.name, atom_obj.coord, atom_obj.ff, parent=atom_obj.parent)
 
-    def get_valance(self):
+    def get_valence(self):
         pass
 
     # fix related
@@ -1699,7 +1753,8 @@ class Ligand(Residue):
     set_parent
     -------------
     '''
-    def __init__(self, atoms, id, name, parent=None):
+    def __init__(self, atoms, id, name, net_charge=None, parent=None):
+        self.net_charge = net_charge
         Residue.__init__(self, atoms, id, name, parent)
 
     @classmethod
@@ -1709,11 +1764,103 @@ class Ligand(Residue):
         '''
         return cls(Resi_obj.atoms, Resi_obj.id, Resi_obj.name, parent=Resi_obj.parent)
 
+    @classmethod
+    def fromPDB(cls, resi_input, resi_id=None, net_charge=None, input_type='PDB_line'):
+        '''
+        generate resi from PDB. Require 'ATOM' and 'HETATM' lines.
+        ---------
+        resi_input = PDB_line (or line_str or file or path)
+        resi_id : int (use the number in the line by default // support customize)
+        net_charge : user assigned net charge for further use
+        Use PDB_line in the list to init each atom
+        '''
+
+        # adapt general input // converge to a list of PDB_line (resi_lines)
+        if input_type == 'path':
+            f = open(resi_input)
+            resi_lines = PDB_line.fromlines(f.read())
+            f.close()
+        if input_type == 'file':
+            resi_lines = PDB_line.fromlines(resi_input.read())
+        if input_type == 'line_str':
+            resi_lines = PDB_line.fromlines(resi_input)
+        if input_type == 'PDB_line':
+            resi_lines = resi_input
+        
+        #clean lines
+        for i in range(len(resi_lines)-1,-1,-1):
+            if resi_lines[i].line_type != 'ATOM' and resi_lines[i].line_type != 'HETATM':
+                if debug > 1:
+                    print('Residue.fromPDB: delete error line in input.')
+                del resi_lines[i]
     
+        # Default resi_id
+        if resi_id is None:
+            resi_id = resi_lines[0].resi_id
+        # get name from first line
+        resi_name = resi_lines[0].resi_name
+        # get child atoms
+        atoms = []
+        for pdb_l in resi_lines:
+            atoms.append(Atom.fromPDB(pdb_l))
+        
+        return cls(atoms, resi_id, resi_name, net_charge=net_charge)
+    
+ 
     def sort(self):
         pass
 
 
+    def build(self, out_path, ft='PDB'):
+        '''
+        build ligand file(out_path) with ft format
+        '''
+        if ft == 'PDB':
+            with open(out_path,'w') as of:
+                a_id = 0
+                for atom in self:
+                    a_id = a_id + 1
+                    line = atom.build(a_id = a_id, c_id=' ')
+                    of.write(line)
+                of.write('TER'+line_feed+'END'+line_feed)
+        else:
+            raise Exception('Support only PDB output now.')
+
+
+    def get_net_charge(self, method='PYBEL', ph=7.0):
+        '''
+        get net charge for the ligand
+        -------
+        method   : PYBEL (default) use UNITY_ATOM_ATTR info from openbabel mol2
+        '''
+        # build file
+        mkdir('./cache')
+        temp_path='./cache/ligand_temp.pdb'
+        temp_pdb2_path='./cache/ligand_temp2.pdb'
+        temp_pdb3_path='./cache/ligand_temp3.pdb'
+        temp_m2_path='./cache/ligand_temp.mol2'
+        self.build(temp_path)
+        # charge
+        if method == 'PYBEL':
+            pybel.ob.obErrorLog.SetOutputLevel(0)
+            # remove H (or the )
+            mol = next(pybel.readfile('pdb', temp_path))
+            mol.removeh()
+            mol.write('pdb', temp_pdb2_path, overwrite=True)
+            # clean connectivity
+            os.popen('cat '+temp_pdb2_path+' |grep \'ATOM\' > '+temp_pdb3_path)
+            # add H and result net charge
+            mol = next(pybel.readfile('pdb', temp_pdb3_path))
+            mol.OBMol.AddHydrogens(False, True, ph)
+            mol.write('mol2', temp_m2_path, overwrite=True)
+            mol = next(pybel.readfile('mol2', temp_m2_path))
+            net_charge=0
+            for atom in mol:
+                net_charge=net_charge+atom.formalcharge
+        self.net_charge=net_charge
+        return net_charge
+
+        
 
 class Solvent(Residue):
     '''

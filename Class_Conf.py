@@ -27,6 +27,8 @@ deploy(path='./',clean=True)       #deploy all files set in the deploy_list
 -------------------------------------------------------------------------------------
 '''
 
+AmberHome = '$AMBERHOME'
+
 class Conf():
 
     # A custom tag for filenames including: all .in files; 
