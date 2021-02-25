@@ -583,7 +583,7 @@ class PDB():
             pybel.ob.obErrorLog.SetOutputLevel(0)
             mol = next(pybel.readfile('pdb', path))
             mol.OBMol.AddHydrogens(False, True, ph)
-            mol.write('pdb', out_path, overwrite=True)
+            mol.write('pdb', out_path, overwrite=True) #这里需要保留atom label和residue name 最下策就是自己按照原子序号添加 并调查一下名称的规则from leap
             # determine partial charge
             mol.write('mol2', outm2_path, overwrite=True)
             mol = next(pybel.readfile('mol2', outm2_path))
@@ -795,7 +795,7 @@ class PDB():
             mkdir(lig_dir)
             mkdir(met_dir)
 
-            ligands_pathNchrg = self.stru.build_ligands(lig_dir, ifcharge=1) #同名ligand一定要在同一个文件？？
+            ligands_pathNchrg = self.stru.build_ligands(lig_dir, ifcharge=1)
             # metalcenters_path = self.stru.build_metalcenters(met_dir)
             # parm
             ligand_parm_paths = self._ligand_parm(ligands_pathNchrg, method=lig_method)
@@ -1011,10 +1011,89 @@ class PDB():
         return 'MD/prod'+Flag_name+'.rst'
 
 
+    '''
+    ========
+    QM/MM
+    ========
+    '''
+
+    def PDB2QMMM(self, out_dir='.', work_type='spe', qm='g16'):
+        '''
+        generate QMMM input for the QM program. (default: g16)
+        --------
+        qm          : QM program (default: g16 / Gaussian16)
+        work_type   : QMMM calculation type (default: spe)
+        out_dir     : out put directory of the input file (default: '.' current dir )
+        ========
+        Gaussian
+        ========
+        # route section (from config module / leave work type as an inp arg)
+        # charge and spin
+        # coordinate 
+        	- atom label (from .lib)
+        	- atom charge
+        	- freeze part (general option / some presupposition) 
+        	- layer (same as above)
+        	- xyz (1. new system 2. existing template (do we still need?) -- from pdb / mdcrd / gout) ref: ONIOM_template_tool
+        # connectivity
+        # missing parameters (ligand related?)
+        '''
+        if qm == 'g16':
+            route = self._get_oniom_g16_route(work_type)
+            chrgspin = self._get_oniom_chrgspin()
+            coord = self._get_oniom_g16_coord()
+            cnt_table = self._get_oniom_cnt()
+            add_prm = self._get_oniom_g16_add_prm() # test for rules of missing parameters
+
+            #combine and write 
+        
+
+    def _get_oniom_g16_route(self, work_type):
+        '''
+        generate gaussian 16 ONIOM route section. Base on settings in the config module.
+        -------
+        work_type   : ONIOM calculation type (support: spe, ...)
+        '''
+        route = ''
+        
+        if work_type == 'spe':
+            pass
+        
+        return route
 
 
+    def _get_oniom_chrgspin(self):
+        '''
+        determing charge and spin for all ONIOM layers. Base on *structure* and layer settings in the *config* module.
+        '''
+        chrgspin=''
+        # get layer form config
+        return chrgspin
 
 
+    def _get_oniom_g16_coord(self):
+        '''
+        generate coordinate line. Base on *structure* and layer settings in the *config* module.
+        ---------------
+        for a coord line:
+            - element name
+        	- atom name (from .lib)
+        	- atom charge
+        	- freeze part (general option / some presupposition) 
+        	- xyz (from self.stru)
+        	- layer (general option / some presupposition) 
+        '''
+        pass
+    
+    
+    def _get_oniom_cnt(self):
+        pass
+
+
+    def _get_oniom_g16_add_prm(self):
+        pass
+
+    
 
 # 重写conf类
 # 
