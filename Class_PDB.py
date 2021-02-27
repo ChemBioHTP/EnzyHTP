@@ -937,13 +937,14 @@ class PDB():
                     raise Exception('PDB._combine_parm().box_type: Only support box and oct now!')
             # save
             if o_path == '':
-                of.write('saveamberparm a '+self.path_name+'.prmtop '+self.path_name+'.inpcrd\n')
+                of.write('saveamberparm a '+self.path_name+'.prmtop '+self.path_name+'.inpcrd'+line_feed)
                 self.prmtop_path=self.path_name+'.prmtop'
                 self.inpcrd_path=self.path_name+'.inpcrd'
             else:
-                of.write('saveamberparm a '+o_path+self.name+'.prmtop '+o_path+self.name+'.inpcrd\n')
+                of.write('saveamberparm a '+o_path+self.name+'.prmtop '+o_path+self.name+'.inpcrd'+line_feed)
                 self.prmtop_path=o_path+self.name+'.prmtop'
                 self.inpcrd_path=o_path+self.name+'.inpcrd'
+            of.write('quit'+line_feed)
             
             os.system('tleap -s -f '+leap_path+' > '+leap_path[:-2]+'.out')
 
