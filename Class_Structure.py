@@ -482,7 +482,7 @@ class Structure():
             of.write('END'+line_feed)
 
 
-    def build_ligands(self, dir, ft='PDB', ifcharge=0 ,c_method='PYBEL', ph=7.0):
+    def build_ligands(self, dir, ft='PDB', ifcharge=0 ,c_method='PYBEL', ph=7.0, ifname=0):
         '''
         build files for every ligand in self.ligands
         -------
@@ -491,6 +491,7 @@ class Structure():
         ifcharge : if calculate net charge info. (do not before add H)
         c_method : method determining the net charge (default: PYBEL)
         ph       : pH value used for determine the net charge
+        ifname   : export residue name if 1 (default: 0)
         '''
         out_ligs = []
 
@@ -512,7 +513,10 @@ class Structure():
                     net_charge = lig.get_net_charge(method=c_method, ph=ph)
 
             # record
-            out_ligs.append((out_path, net_charge))
+            if ifname:
+                out_ligs.append((out_path, net_charge, lig.name))
+            else:
+                out_ligs.append((out_path, net_charge))
 
         return out_ligs
 
@@ -1765,7 +1769,7 @@ class Ligand(Residue):
         return cls(Resi_obj.atoms, Resi_obj.id, Resi_obj.name, parent=Resi_obj.parent)
 
     @classmethod
-    def fromPDB(cls, resi_input, resi_id=None, net_charge=None, input_type='PDB_line'):
+    def fromPDB(cls, resi_input, resi_id=None, resi_name=None, net_charge=None, input_type='PDB_line'):
         '''
         generate resi from PDB. Require 'ATOM' and 'HETATM' lines.
         ---------
@@ -1798,7 +1802,8 @@ class Ligand(Residue):
         if resi_id is None:
             resi_id = resi_lines[0].resi_id
         # get name from first line
-        resi_name = resi_lines[0].resi_name
+        if resi_name is None:
+            resi_name = resi_lines[0].resi_name
         # get child atoms
         atoms = []
         for pdb_l in resi_lines:

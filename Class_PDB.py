@@ -544,12 +544,12 @@ class PDB():
         if len(old_stru.ligands) > 0:
             lig_dir = self.dir+'/ligands/'
             mkdir(lig_dir)
-            lig_paths = [i for i,j in old_stru.build_ligands(lig_dir)]
+            lig_paths = [(i,k) for i,j,k in old_stru.build_ligands(lig_dir, ifname=1)]
 
             new_ligs = []
-            for lig_path in lig_paths:
+            for lig_path, lig_name in lig_paths:
                 new_lig_path, net_charge = self.protonate_ligand(lig_path, ph=ph)
-                new_ligs.append(Ligand.fromPDB(new_lig_path, net_charge=net_charge, input_type='path'))
+                new_ligs.append(Ligand.fromPDB(new_lig_path, resi_name=lig_name, net_charge=net_charge, input_type='path'))
             new_stru.add(new_ligs, sort = 0)
 
         # PLACE HOLDER for other fix
@@ -567,6 +567,7 @@ class PDB():
                 OPENBABEL (not working if block warning output)
         ph: 7.0 by default #TODO
         '''
+        outp1_path = path[:-4]+'_badname_aH.pdb'
         out_path = path[:-4]+'_aH.pdb'
         outm2_path = path[:-4]+'_aH.mol2'
 
@@ -583,14 +584,61 @@ class PDB():
             pybel.ob.obErrorLog.SetOutputLevel(0)
             mol = next(pybel.readfile('pdb', path))
             mol.OBMol.AddHydrogens(False, True, ph)
-            mol.write('pdb', out_path, overwrite=True) #这里需要保留atom label和residue name 最下策就是自己按照原子序号添加 并调查一下名称的规则from leap
+            mol.write('pdb', outp1_path, overwrite=True)
+            # fix atom label abd determing net charge
+            cls._fix_ob_output(outp1_path, out_path)
             # determine partial charge
-            mol.write('mol2', outm2_path, overwrite=True)
-            mol = next(pybel.readfile('mol2', outm2_path))
-            net_charge=0
-            for atom in mol:
-                net_charge=net_charge+atom.formalcharge
+            # > METHOD 1<
+            net_charge = cls._ob_pdb_charge(outp1_path)
+            # > METHOD 2 <
+            # mol.write('mol2', outm2_path, overwrite=True)
+            # mol = next(pybel.readfile('mol2', outm2_path))
+            # net_charge=0
+            # for atom in mol:
+            #     net_charge=net_charge+atom.formalcharge
         return out_path, net_charge
+
+    @classmethod
+    def _fix_ob_output(cls, pdb_path, out_path):
+        '''
+        fix atom label in pdb_pat write to out_path
+        ---------
+        according to tleap output, the name could be just *counting* the element start from ' ' to number
+        '''
+        with open(pdb_path) as f:
+            with open(out_path, 'w') as of:
+                # count element in a dict
+                ele_count={}
+                pdb_ls = PDB_line.fromlines(f.read())
+                for pdb_l in pdb_ls:
+                    if pdb_l.line_type == 'HETATM' or pdb_l.line_type == 'ATOM':
+                        ele = pdb_l.get_element()
+                        # determine the element count
+                        try:
+                            # rename if more than one (add count)
+                            ele_count[ele] += 1
+                            pdb_l.atom_name = ele+str(ele_count[ele])
+                        except KeyError:
+                            ele_count[ele] = 0
+                        of.write(pdb_l.build())
+               
+
+    @classmethod
+    def _ob_pdb_charge(cls, pdb_path):
+        '''
+        extract net charge from openbabel exported pdb file
+        '''
+        with open(pdb_path) as f:
+            net_charge=0
+            pdb_ls = PDB_line.fromlines(f.read())
+            for pdb_l in pdb_ls:
+                if pdb_l.line_type == 'HETATM' or pdb_l.line_type == 'ATOM':
+                    if len(pdb_l.get_charge()) != 0:
+                        charge = pdb_l.charge[::-1]
+                        if debug > 1:
+                            print('Found formal charge: '+pdb_l.atom_name+' '+charge)
+                        net_charge = net_charge + int(charge)
+            return net_charge
 
 
     '''
