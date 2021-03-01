@@ -1,6 +1,7 @@
 import numpy as np
 import os
 from Class_line import PDB_line
+from Class_Conf import Config
 from helper import Child, line_feed, mkdir
 from AmberMaps import *
 try:
@@ -27,8 +28,6 @@ Class Ligand
 Class Solvent
 ===============
 '''
-
-debug = 1
 
 class Structure():
     '''
@@ -151,7 +150,7 @@ class Structure():
         raw_chains_woM_woL_woS, solvents = cls._get_solvents(raw_chains_woM_woL)
 
         ####### debug ##########
-        if debug > 1:
+        if Config.debug > 1:
             for chain in raw_chains_woM_woL_woS:
                 print(chain.id, chain.get_chain_seq(Oneletter=1))
             for metal in metalatoms:
@@ -266,7 +265,7 @@ class Structure():
                 # operate in residue level
                 residue = chain[i]
                 if residue.name in cls.solvent_list:
-                    if debug > 1:
+                    if Config.debug > 1:
                         print('\033[1;34;40mStructure: found solvent in raw: '+chain.id+' '+residue.name+' '+str(residue.id)+' \033[0m')
                     solvents.append(residue)
                     del chain[residue]
@@ -1062,7 +1061,7 @@ class Residue(Child):
         #clean lines
         for i in range(len(resi_lines)-1,-1,-1):
             if resi_lines[i].line_type != 'ATOM' and resi_lines[i].line_type != 'HETATM':
-                if debug > 1:
+                if Config.debug > 1:
                     print('Residue.fromPDB: delete error line in input.')
                 del resi_lines[i]
     
@@ -1440,7 +1439,7 @@ class Atom(Child):
             try:
                 self.connect.append(self.resi._find_atom_name(name))
             except IndexError:
-                if debug >= 1:
+                if Config.debug >= 1:
                     print('WARNING: '+self.resi.name+str(self.resi.id)+' should have atom: '+name)
                 else:
                     pass
@@ -1635,7 +1634,6 @@ class Metalatom(Atom):
                 # cut by check_radius
                 dist = np.linalg.norm(np.array(atom.coord) - coord_m)
                 if dist <= check_radius:
-                    # debug: print(atom.resi.id, atom.name) #debug
                     # determine coordination
                     atom.get_ele()
                     if method == 'INC':
@@ -1645,7 +1643,6 @@ class Metalatom(Atom):
                     
                     if dist <= (R_d + R_m):
                         self.donor_atoms.append(atom)                     
-        # debug: print(self.coord, self.donor_atoms) #debug
         
 
     def get_donor_residue(self, method='INC'):
@@ -1794,7 +1791,7 @@ class Ligand(Residue):
         #clean lines
         for i in range(len(resi_lines)-1,-1,-1):
             if resi_lines[i].line_type != 'ATOM' and resi_lines[i].line_type != 'HETATM':
-                if debug > 1:
+                if Config.debug > 1:
                     print('Residue.fromPDB: delete error line in input.')
                 del resi_lines[i]
     

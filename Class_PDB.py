@@ -6,7 +6,7 @@ from AmberMaps import *
 from wrapper import *
 from Class_Structure import *
 from Class_line import *
-from Class_Conf import AmberHome
+from Class_Conf import Config
 from helper import line_feed, mkdir
 try:
     from pdb2pqr.main import main_driver as run_pdb2pqr
@@ -635,7 +635,7 @@ class PDB():
                 if pdb_l.line_type == 'HETATM' or pdb_l.line_type == 'ATOM':
                     if len(pdb_l.get_charge()) != 0:
                         charge = pdb_l.charge[::-1]
-                        if debug > 1:
+                        if Config.debug > 1:
                             print('Found formal charge: '+pdb_l.atom_name+' '+charge)
                         net_charge = net_charge + int(charge)
             return net_charge
@@ -832,7 +832,7 @@ class PDB():
             else:
                 if self.stru.name != self.name:
                     # warn if possible wrong self.stru
-                    if debug > 1:
+                    if Config.debug > 1:
                         print('PDB.PDB2FF: WARNING: the self.stru has a different name')
                         print('     -self.name: '+self.name)
                         print('     -self.stru.name: '+self.stru.name)
@@ -897,9 +897,9 @@ class PDB():
                 out_frcmod = lig_pdb[:-3]+'frcmod'
 
                 #gen prepi (net charge and correct protonation state is important)
-                os.system(AmberHome+'/bin/antechamber -i '+lig_pdb+' -fi pdb -o '+out_prepi+' -fo prepi -c bcc -s 0 -nc '+str(net_charge))
+                os.system(Config.Amber.AmberHome+'/bin/antechamber -i '+lig_pdb+' -fi pdb -o '+out_prepi+' -fo prepi -c bcc -s 0 -nc '+str(net_charge))
                 #gen frcmod
-                os.system(AmberHome+'/bin/parmchk2 -i '+out_prepi+' -f prepi -o '+out_frcmod)                
+                os.system(Config.Amber.AmberHome+'/bin/parmchk2 -i '+out_prepi+' -f prepi -o '+out_frcmod)                
                 #record
                 parm_paths.append((out_prepi, out_frcmod))
 

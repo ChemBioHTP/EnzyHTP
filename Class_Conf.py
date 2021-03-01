@@ -27,7 +27,29 @@ deploy(path='./',clean=True)       #deploy all files set in the deploy_list
 -------------------------------------------------------------------------------------
 '''
 
-AmberHome = '$AMBERHOME'
+class Config:
+    # >>>>>> Resource <<<<<<
+    # -----------------------------
+    # Cores available (used in MD(Amber) and QM(Gaussian) calculations)
+    #
+    n_cores = 8
+    # -----------------------------
+    # Per core memory in MB
+    #
+    max_core = 2000
+    # -----------------------------
+    # debug info level
+    # 0: No info. 1: normal debug 2: verbose debug
+    debug = 1
+
+    
+    # >>>>>> Software <<<<<<
+    class Amber:
+        # -----------------------------
+        # Amber Home dir
+        #
+        AmberHome = '$AMBERHOME'
+
 
 class Conf():
 
