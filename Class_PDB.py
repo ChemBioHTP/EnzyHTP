@@ -815,7 +815,7 @@ class PDB():
     ========
     '''
 
-    def PDB2FF(self, o_path='', AminoOnly=0, lig_method='AM1BCC'):
+    def PDB2FF(self, o_path='', lig_method='AM1BCC'):
         '''
         PDB2FF(self, o_path='')
         --------------------
@@ -825,60 +825,31 @@ class PDB():
         ligand: 
         metal:
         '''
-        if not AminoOnly:
-            # check and generate self.stru
-            if self.stru == None:
-                self.get_stru()
-            else:
-                if self.stru.name != self.name:
-                    # warn if possible wrong self.stru
-                    if Config.debug > 1:
-                        print('PDB.PDB2FF: WARNING: the self.stru has a different name')
-                        print('     -self.name: '+self.name)
-                        print('     -self.stru.name: '+self.stru.name)
-
-            # build things seperately
-            lig_dir = self.dir+'/ligands/'
-            met_dir = self.dir+'/metalcenters/'
-            mkdir(lig_dir)
-            mkdir(met_dir)
-
-            ligands_pathNchrg = self.stru.build_ligands(lig_dir, ifcharge=1)
-            # metalcenters_path = self.stru.build_metalcenters(met_dir)
-            # parm
-            ligand_parm_paths = self._ligand_parm(ligands_pathNchrg, method=lig_method)
-            # self._metal_parm(metalcenters_path)
-            # combine
-            self._combine_parm(ligand_parm_paths, o_path=o_path)
-        
+        # check and generate self.stru
+        if self.stru == None:
+            self.get_stru()
         else:
-            # place to hold the **old** realization
-            #make tleap input
-            os.popen('mkdir '+o_path+'tleap_cache')
-            tleap_input=open(o_path+'tleap_ff.in','w')
-            tleap_input.write('source leaprc.protein.ff14SB\n')
-            tleap_input.write('source leaprc.water.tip3p\n')
-            tleap_input.write('a = loadpdb '+self.path+'\n')
-            tleap_input.write('solvatebox a TIP3PBOX 10\n')
-            tleap_input.write('addions a Na+ 0\n')
-            tleap_input.write('addions a Cl- 0\n')
-            if o_path == '':
-                tleap_input.write('saveamberparm a '+self.path_name+'.prmtop '+self.path_name+'.inpcrd\n')
-                self.prmtop_path=self.path_name+'.prmtop'
-                self.inpcrd_path=self.path_name+'.inpcrd'
-            else:
-                tleap_input.write('saveamberparm a '+o_path+self.name+'.prmtop '+o_path+self.name+'.inpcrd\n')
-                self.prmtop_path=o_path+self.name+'.prmtop'
-                self.inpcrd_path=o_path+self.name+'.inpcrd'
+            if self.stru.name != self.name:
+                # warn if possible wrong self.stru
+                if Config.debug > 1:
+                    print('PDB.PDB2FF: WARNING: the self.stru has a different name')
+                    print('     -self.name: '+self.name)
+                    print('     -self.stru.name: '+self.stru.name)
 
-            #tleap_input.write('savepdb a '+out3_PDB_path+'\n')
-            tleap_input.write('quit\n')
-            tleap_input.close()
+        # build things seperately
+        lig_dir = self.dir+'/ligands/'
+        met_dir = self.dir+'/metalcenters/'
+        mkdir(lig_dir)
+        mkdir(met_dir)
 
-            #run
-            os.system('tleap -s -f '+o_path+'tleap_ff.in > '+o_path+'tleap_ff_'+self.name+'.out')
-            os.system('mv '+o_path+'*leap_ff* leap.log '+o_path+'tleap_cache')
-
+        ligands_pathNchrg = self.stru.build_ligands(lig_dir, ifcharge=1)
+        # metalcenters_path = self.stru.build_metalcenters(met_dir)
+        # parm
+        ligand_parm_paths = self._ligand_parm(ligands_pathNchrg, method=lig_method)
+        # self._metal_parm(metalcenters_path)
+        # combine
+        self._combine_parm(ligand_parm_paths, o_path=o_path)
+        
         return (self.prmtop_path,self.inpcrd_path)
 
     
