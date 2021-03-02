@@ -67,9 +67,6 @@ class Structure():
     __len__
         len(obj) = len(obj.child_list)
     '''
-    # a list of meaningless ligands. Do not read in from PDB.
-    non_ligand_list = ['CL', 'EDO']
-    solvent_list = ['HOH', 'WAT']
 
     '''
     ====
@@ -208,7 +205,7 @@ class Structure():
         get ligand from raw chains and clean chains by deleting the ligand part
         -----
         Method: Assume metal/ligand/solvent can only be in a seperate chain (or it can not be distinguish from artificial residues.)
-                - delete names from non_ligand_list
+                - delete names from rd_non_ligand_list
                 + get names from ligand_list only if provided.
         '''
         ligands = []
@@ -232,8 +229,8 @@ class Structure():
                             ligands.append(residue)
                             del chain[residue]
                     else:
-                        if residue.name not in cls.solvent_list:
-                            if residue.name not in cls.non_ligand_list:
+                        if residue.name not in rd_solvent_list:
+                            if residue.name not in rd_non_ligand_list:
                                 print('\033[1;34;40mStructure: found ligand in raw: '+chain.id+' '+residue.name+' '+str(residue.id)+' \033[0m')
                                 ligands.append(residue)
                             del chain[residue]
@@ -257,14 +254,14 @@ class Structure():
         '''
         get solvent from raw chains and clean chains by deleting the solvent part
         -----
-        Method: Assume metal/ligand/solvent can anywhere. Base on self.solvent_list
+        Method: Assume metal/ligand/solvent can anywhere. Base on rd_solvent_list
         '''
         solvents = []
         for chain in raw_chains:
             for i in range(len(chain)-1,-1,-1):
                 # operate in residue level
                 residue = chain[i]
-                if residue.name in cls.solvent_list:
+                if residue.name in rd_solvent_list:
                     if Config.debug > 1:
                         print('\033[1;34;40mStructure: found solvent in raw: '+chain.id+' '+residue.name+' '+str(residue.id)+' \033[0m')
                     solvents.append(residue)

@@ -3,27 +3,8 @@ __doc__='''
 This module make configuration file and deploy input file for different next-stage software. (Amber, Gaussian(QM/ONIOM))
 Take all job set up that not relate to the PDB itself
 -------------------------------------------------------------------------------------
-Class Conf
--------------------------------------------------------------------------------------
-add_tag(self,job_tag='')
-    Add a custom tag for filenames including: 
-        all .in files;
--------------------------------------------------------------------------------------
-Amber Classical MD Simulation
--------------------------------------------------------------------------------------
-set_MD_min(self,maxcyc='20000',ncyc='10000',ntpr='1000',cut='10.0',ntc='1')
-set_MD_heat(self,nstlim='20000',dt='0.001',tempi='0.0',temp0='300.0',A_istep2=nstlim*0.9,ntpr='100',ntwx='20000',cut='10.0',ntc='2',ntf='2')
-set_MD_equi(self,nstlim='5000',dt='0.001',cut='10.0',temp0='300.0',ntpr='5000',ntwx='5000',ntc='2',ntf='2')
-set_MD_prod(self,nstlim='100000',dt='0.001',cut='10.0',temp0='300.0',ntpr='5000',ntwx=nstlim/10000,ntc='2',ntf='2')
--------------------------------------------------------------------------------------
-Gaussian ONIOM calculation
--------------------------------------------------------------------------------------
-
--------------------------------------------------------------------------------------
-File Deployment
--------------------------------------------------------------------------------------
-deploy(path='./',clean=True)       #deploy all files set in the deploy_list
-                                   #clean the deploy_list after deployment
+Config --- Amber
+        |- Gaussian
 -------------------------------------------------------------------------------------
 '''
 
