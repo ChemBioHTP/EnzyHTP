@@ -687,7 +687,9 @@ class Chain(Child):
             self.residues.append(i)
         #set id
         self.id = chain_id
-        
+
+        # init
+        self.ifsorted = 0
     
     @classmethod
     def fromPDB(cls, chain_input, chain_id, input_type='file_str'):
@@ -822,6 +824,8 @@ class Chain(Child):
             # sort each residue
             if sort_resi:
                 resi.sort()
+        
+        self.ifsorted = 1
       
 
 
@@ -840,6 +844,10 @@ class Chain(Child):
         * Note that the missing sequence infomation will be missing after sort(). So get seq before sort to obtain such info.
         * Need to be update after mutation
         '''
+        if self.ifsorted:
+            if Config.debug >= 1:
+                print('Chain.get_chain_seq: WARNING: missing sequence infomation is missing after sort().')
+
         chain_seq = []
         for resi in self.residues:
             # first resi
@@ -861,12 +869,14 @@ class Chain(Child):
             return self.seq_one
         else:
             return self.seq
-    
+
+
     def if_art_resi(self):
         '''
         TODO
         '''
         pass
+
 
     def _get_Oneletter(self):
         '''

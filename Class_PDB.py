@@ -27,29 +27,19 @@ except ImportError:
 
 
 __doc__='''
-This module defines the potential object to operate. Included some common I/O and methods.
+This module handles file I/O and external programs.
 -------------------------------------------------------------------------------------
 Class PDB
 -------------------------------------------------------------------------------------
-__init__(self,path)
-    Input:  PDB path (any format), MutaFlags
-    Output: self.path 
-            self.name 
-            self.ifformat (Judge by the first line)
-          # Connect with the database // add a flow for database?
+__init__(self, PDB_input, wk_dir = '', name = '', input_type='path')
 -------------------------------------------------------------------------------------
 Information collecting methods:
 -------------------------------------------------------------------------------------
-get_tot_resi(self)
-    Input:  self (standard Amber format)
-    Output: self.tot_resi
-get_index_resi(self, index)
-get_coord(self, index)
+get_stru(self, ligand_list=None)
 get_seq(self)
 get_if_ligand = get_seq # alias
 get_if_art_resi = get_seq # alias
 get_missing(self, seq)
-
 -------------------------------------------------------------------------------------
 PDB operating methods: (changes the self.path to indicated new pdb)
 -------------------------------------------------------------------------------------
@@ -73,185 +63,113 @@ PDBMD(self):
 '''
 
 class PDB():
-
-    #regex pattern of standard Amber format line
-    ATOM_pattern=r'ATOM  [ ,0-9][ ,0-9][ ,0-9][ ,0-9][0-9]  [A-Z][ ,0-9,A-Z][ ,0-9,A-Z] [A-Z][A-Z][A-Z]  [ ,0-9][ ,0-9][ ,0-9][0-9]    [ ,\-,0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][0-9][ ,\-,0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][0-9][ ,\-,0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9](?:         [ ,A-Z][ ,A-Z][A-Z])?'
-    HETATM_pattern=r'HETATM[ ,0-9][ ,0-9][ ,0-9][ ,0-9][0-9]  [A-Z][ ,0-9,A-Z][ ,0-9,A-Z] [A-Z][A-Z][A-Z]  [ ,0-9][ ,0-9][ ,0-9][0-9]    [ ,\-,0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][0-9][ ,\-,0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][0-9][ ,\-,0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9](?:         [ ,A-Z][ ,A-Z][A-Z])?'
-
-
-    def __init__(self,PDB_PATH='',PDB_File_str=''):
+    def __init__(self, PDB_input, wk_dir = '', name = '', input_type='path'):
         '''
-        Waiting for reform
-        把类变量和对象变量的差别处理了
-        用类方法的方式处理不同的初始化方式fromXXX
-        注意对self.dir的处理
+        initiate PDB object
+        -------------------
+        PDB_input
+        wk_dir      : working directory (default: current dir ) **all file in the workflow are constructed base on this.**
+        name        : self assigned filename (default: from path or UNKNOW if no path)
+        input_type  : path (default) / file_str / file
+        -------------------
         '''
-        #initilize 不需要 由于对象的创建赋值到变量是**引用赋值**
-        self.path=''
-        self.name=''
-        self.File_str=''
-        self.prmtop_path=''
-        self.inpcrd_path=''
-        self.pqr_path=''
-        self.stage=0         
-        self.ifformat=0        
-        self.if_complete=None
-        self.if_complete_chain={} 
-        self.if_art_resi=None
-        self.if_ligand=None
-        self.MutaFlags=[]
-        self.tot_resi=0
-        self.Coord=[]
-        self.raw_sequence={}
-        self.sequence={}
-        self.sequence_one={}
-        self.current_index=0
-        self.current_resi_name_3=''
-        self.current_resi_name=''
-        self.current_resi_atom_list=[]
-        # Nessessary for judging
+        # Nessessary initilize for empty judging
         self.stru = None
-        #initilize
+        self.path = None
 
-        if len(PDB_PATH) == 0:
-            self.File_str=PDB_File_str
-            # 存一个文件和path？
-        else:
-            self.path=PDB_PATH
-            self.dir = self.path[:-len(self.path.split(os.sep)[-1])]
-            if self.dir == '':
-                self.dir = '.'
-            self.path_name = self.path[:-4]
-            self.name=self.path.split(os.sep)[-1][:-4]
-            # make cache
-            self.cache_path=self.dir+'/cache'
-            mkdir(self.cache_path)
-
-            #self.ifformat
-            #Judge if this is the standard Amber format by just read two line.
-            with open(self.path) as f:
-                line_index=1
-                for line in f:
-                    if line_index==1:
-                        line_index=line_index+1
-                        continue
-                    # check by different length. Need improvement in the future for other target type.                 
-                    ATOM_if = re.match(self.ATOM_pattern,line) != None
-                    HATATM_if = re.match(self.HETATM_pattern,line) != None
-
-                    self.ifformat = ATOM_if or HATATM_if
-                    break
-            
-            if not self.ifformat:
-                pass
-                #print('WARNING: This file is not in standard Amber format.')
-                #print('WARNING: This is normal when refinement/protonation is one of the target steps.\n')
-
-
-    def get_tot_resi(self):
-        #This method takes the first chain of a PDB file to count the total number of residues. (mark:enzyme)
-        with open(self.path,'r') as f:
-            lines=f.readlines()
-            for i in range(len(lines)):
-                if lines[i].strip() == 'TER':
-                    self.tot_resi=int(lines[i-1].split()[4])
-                    break
-
-    def get_index_resi(self,index):
-
-        self.current_index = index
-
-        with open(self.path) as f:
-            i=0
-            for line in f:
-                if line.split()[4] == self.current_index:
-                    if i==0:
-                        self.current_resi_name_3=line.split()[3]
-                        self.current_resi_name=Resi_map2[self.current_resi_name_3]
-                    Atom_type=line.split()[2]
-                    Atom_index=line.split()[1]
-                    self.current_resi_atom_list=self.current_resi_atom_list+[(Atom_type,Atom_index),]
-                    i=i+1
-    
-    def get_coord(self):
-        # The method to extract coordinate depends critically on the file format. (Only takes PDB after minimization and '2FF')
-        self.Coord=[]
-        with open(self.path) as f:
-            line_index=1
-            for line in f:
-                #Skip some lines
-                skip_flag=0
-                #skip the CRYST1 line
-                if line_index==1:
-                    line_index=line_index+1
-                    continue
-                #skip the TER
-                if line[:3] == 'TER':
-                    line_index=line_index+1
-                    continue
-                #skip the END
-                if line[:3] == 'END':
-                    line_index=line_index+1
-                    continue
-
-                #skip the water and ion(Append in the future)
-                skip_list=['Na+','CA','WAT']
-                for i in skip_list:
-                    if line.split()[3] == i:
-                        line_index=line_index+1
-                        skip_flag=1
-                        break
-                if skip_flag:
-                    line_index=line_index+1
-                    continue
-
-                #Get coordinate form PDB file. The list index is correspond to the (atom index - 1) // may be there will be some inconsistancy? (code:enzyme)
-                self.Coord = self.Coord + [[float(line.split()[5]),float(line.split()[6]),float(line.split()[7])],]
-                
-                line_index=line_index+1 
-
-    def get_file(self):
-        '''
-        Get the PDB file and store it in the self.File
-        return the self.File
-        '''
-        self.File = open(self.path)
-
-        return self.File
-    
-    def get_file_str(self):
-        '''
-        Get the str of the PDB file and store it in self.File_str
-        return the str
-        '''
-        if self.File_str == '':
-            self.get_file()
-            self.File_str =self.File.read()
-
-        return self.File_str
-
-    def update_path(self):
-        self.dir = self.path[:-len(self.path.split(os.sep)[-1])]
-        if self.dir == '':
+        if wk_dir == '':
+            #current dir by default
             self.dir = '.'
-        self.path_name = self.path[:-4]
-        self.name=self.path.split(os.sep)[-1][:-4]
+        else:
+            if wk_dir[-1] == '/':
+                self.dir = wk_dir[:-1]
+            else:
+                self.dir = wk_dir
 
-    def get_stru(self, input_name=None, ligand_list=None):
+        if input_type == 'path':
+            self.path = PDB_input
+            self._update_name()
+        if input_type == 'file_str':
+            self.file_str = PDB_input
+            if name == '':
+                # default name
+                name = 'UNKNOW'
+            self.name = name
+            self.path_name = self.dir+'/'+self.name
+        if input_type == 'file':
+            self.file_str = PDB_input.read()
+            if name == '':
+                # default name
+                name = 'UNKNOW'
+            self.name = name
+            self.path_name = self.dir+'/'+self.name
+        if input_type not in ['path', 'file_str', 'file']:
+            raise Exception('PDB.__init__: only take path or file_str or file.')
+
+        # make cache
+        self.cache_path = self.dir+'/cache'
+        mkdir(self.cache_path)
+        
+
+    def _update_name(self):
+        '''
+        update name
+        '''
+        suffix_len = len(self.path.split('.')[-1]) + 1
+        self.name=self.path.split(os.sep)[-1][:-suffix_len]
+        self.path_name = self.dir+'/'+self.name
+        
+
+    def get_stru(self, ligand_list=None):
         '''
         Convert current PDB file (self.path) to a Struture object (self.stru).
         ------
         input_name: a name tag for the object (self.name by default)
         ligand_list: a list of user assigned ligand residue names.
         '''
-        if input_name == None:
-            input_name = self.name
-        self.stru = Structure.fromPDB(self.path, input_name=input_name, ligand_list=ligand_list)
+        # indicated by self.name
+        input_name = self.name
+        # if get new stru
+        get_flag = 0
+        if self.stru is not None:
+            if self.stru.name != self.name:
+                get_flag = 1
+                # warn if possible wrong self.stru
+                if Config.debug > 1:
+                    print('PDB.get_stru: WARNING: self.stru has a different name')
+                    print('     -self.name: '+self.name)
+                    print('     -self.stru.name: '+self.stru.name)
+                    print('Getting new stru')
+        else:
+            get_flag = 1
 
+        if get_flag:
+            if self.path is not None:
+                self.stru = Structure.fromPDB(self.path, input_name=input_name, ligand_list=ligand_list)
+            else:
+                self.stru = Structure.fromPDB(self.file_str, input_type='file_str', input_name=input_name, ligand_list=ligand_list)
+
+
+    def _get_file_str(self):
+        if self.path is None:
+            return self.file_str
+        else:
+            return open(self.path).read()
+
+
+    def _get_file_path(self):
+        '''
+        save a file and get path is self.path is None
+        '''
+        if self.path is None:
+            self.path = self.path_name+'.pdb'
+            with open(self.path,'w') as of:
+                of.write(self.file_str)
+        return self.path
 
     '''
     =========
-    Sequence (not require Amber format) (已部分迁移，剩判断配体和人工残基的部分)
+    Sequence TODO: reform(已部分迁移至Chain类，剩人工残基的部分和整个stru的判断)
     =========
     '''
 
@@ -293,7 +211,10 @@ class PDB():
         !!NOTE!! the self.sequence needs to be updated after mutation
         '''
 
-        PDB_str = self.get_file_str()
+        PDB_str = self._get_file_str()
+        self.raw_sequence = {}
+        self.sequence = {}
+        self.sequence_one = {}
 
         Chain_str = PDB_str.split(line_feed+'TER') # Note LF is required
         
@@ -442,10 +363,11 @@ class PDB():
             print('Please get the sequence first')
             raise IndexError
         
-        self.if_complete=1 # not flow in if then 1
+        self.if_complete=1 # if not flow in then 1
+        self.if_complete_chain = {}
         
         for chain in self.sequence:
-            self.if_complete_chain[chain]=1 # not flow in if then 1
+            self.if_complete_chain[chain]=1 # if not flow in then 1
             for resi in self.sequence[chain]:
                 if resi == 'NAN':
                     self.if_complete=0
@@ -493,10 +415,12 @@ class PDB():
         save to self.path
         '''
         out_path=self.path_name+'_aH.pdb'
+        self._get_file_path()
         self._get_protonation_pdb2pqr(ph=ph)
         self._protonation_Fix(out_path, ph=ph)
         self.path = out_path
-        self.update_path()
+        self._update_name()
+        self.stru.name=self.name
 
  
     def _get_protonation_pdb2pqr(self,ffout='AMBER',ph=7.0,out_path=''):
@@ -556,7 +480,9 @@ class PDB():
 
         # build file
         new_stru.sort()
-        new_stru.build(out_path)   
+        new_stru.build(out_path)
+        self.stru = new_stru
+
 
     @classmethod
     def protonate_ligand(cls, path, method='PYBEL', ph = 7.0):
@@ -597,6 +523,7 @@ class PDB():
             # for atom in mol:
             #     net_charge=net_charge+atom.formalcharge
         return out_path, net_charge
+
 
     @classmethod
     def _fix_ob_output(cls, pdb_path, out_path):
@@ -647,7 +574,7 @@ class PDB():
     ========
     '''
 
-
+###########待修改##########尝试结合stru类重写
     def PDB2PDBwLeap(self):
         '''
         (The index is correspond to the new index starting from 1 for each chain.)
@@ -822,19 +749,11 @@ class PDB():
         o_path contral where the leap.in and leap.log go: has to contain a / at the end (e.g.: ./dir/)
         --------------------
         chains:
-        ligand: 
+        ligand: - less junk files if your workflow contains a protonation step in advance.  
         metal:
         '''
         # check and generate self.stru
-        if self.stru == None:
-            self.get_stru()
-        else:
-            if self.stru.name != self.name:
-                # warn if possible wrong self.stru
-                if Config.debug > 1:
-                    print('PDB.PDB2FF: WARNING: the self.stru has a different name')
-                    print('     -self.name: '+self.name)
-                    print('     -self.stru.name: '+self.stru.name)
+        self.get_stru()
 
         # build things seperately
         lig_dir = self.dir+'/ligands/'
@@ -858,7 +777,7 @@ class PDB():
         Turn ligands to prepi (w/net charge), parameterize with parmchk
         -----------
         return [(perpi_1, frcmod_1), ...]
-        - less junk files if your workflow contains a protonation step in advance. 
+        * BUG: Antechamber has a bug that if current dir has temp files from previous antechamber run (ANTECHAMBER_AC.AC, etc.) sqm will fail. 
         '''
         parm_paths = []
 
@@ -866,9 +785,9 @@ class PDB():
             if method == 'AM1BCC':
                 out_prepi = lig_pdb[:-3]+'prepin'
                 out_frcmod = lig_pdb[:-3]+'frcmod'
-
                 #gen prepi (net charge and correct protonation state is important)
                 os.system(Config.Amber.AmberHome+'/bin/antechamber -i '+lig_pdb+' -fi pdb -o '+out_prepi+' -fo prepi -c bcc -s 0 -nc '+str(net_charge))
+                os.system('rm ANTECHAMBER* ATOMTYPE.INF NEWPDB.PDB PREP.INF sqm.pdb')
                 #gen frcmod
                 os.system(Config.Amber.AmberHome+'/bin/parmchk2 -i '+out_prepi+' -f prepi -o '+out_frcmod)                
                 #record
@@ -916,10 +835,79 @@ class PDB():
                 self.prmtop_path=o_path+self.name+'.prmtop'
                 self.inpcrd_path=o_path+self.name+'.inpcrd'
             of.write('quit'+line_feed)
-            
-            os.system('tleap -s -f '+leap_path+' > '+leap_path[:-2]+'.out')
 
-            return self.prmtop_path, self.inpcrd_path
+        os.system('tleap -s -f '+leap_path+' > '+leap_path[:-2]+'out')
+
+        return self.prmtop_path, self.inpcrd_path
+
+
+    def rm_wat(self):
+        '''
+        Remove water and ion for the pdb. Remians the same if there's no water or ion.
+        Now only skip [Na+,Cl-,WAT,HOH] // Append more in the future.
+        Save changed files into self.path.
+        '''
+        out_path = self.path_name+'_rmW.pdb'
+        self._get_file_path()
+        with open(self.path) as f:
+            with open(out_path,'w') as of:
+                skip_list=['Na+','Cl-','WAT','HOH']
+                change_flag=0
+                for line in f:
+                    PDB_l = PDB_line(line)
+                    #Skip some lines
+                    skip_flag=0
+                    #skip the CRYST1 line
+                    if line[:6] == 'CRYST1':
+                        change_flag=1
+                        continue
+                    #keep TER and END
+                    if line[:3] == 'TER' or line[:3] == 'END':
+                        of.write(line)
+                        continue
+
+                    #skip the water and ion(Append in the future)
+                    for i in skip_list:
+                        if PDB_l.resi_name == i:
+                            skip_flag=1
+                            break
+                    if skip_flag:
+                        change_flag=1
+                        continue
+
+                    of.write(line)
+                if not change_flag:
+                    print('rm_wat(): No change.')
+
+        self.path=out_path
+        self._update_name()
+
+        return self.path
+
+
+###########待修改##########
+    def PDBMD(self,conf_path,tag=''):
+        '''
+        Use self.prmtop_path and self.inpcrd_path to initilize a MD simulation.
+        The MD configuration files are assigned by the conf_path. Be sure to use the same tag when files are taged.
+        Return the rst path of the prod step.
+        '''
+        #TODO 改入config中
+        Flag_name=''
+        for Flag in self.MutaFlags:
+            sep_Flag_name=Flag[0]+Flag[1]+Flag[2]
+            Flag_name=Flag_name+'_'+sep_Flag_name
+
+        out_path=conf_path
+
+        #run sander
+        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+conf_path+'/min'+tag+'.in -o ' +out_path+'/min' +Flag_name+'.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+out_path+'/min'+Flag_name+'.rst -ref '+self.inpcrd_path)
+        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+conf_path+'/heat'+tag+'.in -o '+out_path+'/heat'+Flag_name+'.out -p '+self.prmtop_path+' -c '+out_path+'/min'+Flag_name+'.rst -ref ' +out_path+'/min'+Flag_name+'.rst -r ' +out_path+'/heat'+Flag_name+'.rst')
+        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+conf_path+'/equi'+tag+'.in -o '+out_path+'/equi'+Flag_name+'.out -p '+self.prmtop_path+' -c '+out_path+'/heat'+Flag_name+'.rst -ref '+out_path+'/heat'+Flag_name+'.rst -r '+out_path+'/equi'+Flag_name+'.rst')
+        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+conf_path+'/prod'+tag+'.in -o '+out_path+'/prod'+Flag_name+'.out -p '+self.prmtop_path+' -c '+out_path+'/equi'+Flag_name+'.rst -ref '+out_path+'/equi'+Flag_name+'.rst -r '+out_path+'/prod'+Flag_name+'.rst -x '+out_path+'/prod'+Flag_name+'.nc')
+
+        #Or add a class constant?
+        return 'MD/prod'+Flag_name+'.rst'
 
 
     def PDBMin(self,cycle='2000'):
@@ -928,7 +916,8 @@ class PDB():
         Save changed PDB to self.path (containing water and ions)
         '''
         
-        out4_PDB_path=self.path[:-4]+'_min.pdb'
+        out4_PDB_path=self.path_name+'_min.pdb'
+        #TODO 改入config中
 
         #make sander input
         os.system('mkdir min_cache')
@@ -963,72 +952,6 @@ class PDB():
 
         return out4_PDB_path
 
-
-    def rm_wat(self):
-        '''
-        Remove water and ion for the pdb. Remians the same if there's no water or ion.
-        Now only skip [Na+,Cl-,WAT,HOH] // Append more in the future.
-        Save changed files into self.path.
-        '''
-        out_path = self.path[:-4]+'_rmW.pdb'
-
-        with open(self.path) as f:
-            with open(out_path,'w') as of:
-                skip_list=['Na+','Cl-','WAT','HOH']
-                change_flag=0
-                for line in f:
-                    PDB_l = PDB_line(line)
-                    #Skip some lines
-                    skip_flag=0
-                    #skip the CRYST1 line
-                    if line[:6] == 'CRYST1':
-                        change_flag=1
-                        continue
-                    #keep TER and END
-                    if line[:3] == 'TER' or line[:3] == 'END':
-                        of.write(line)
-                        continue
-
-                    #skip the water and ion(Append in the future)
-                    for i in skip_list:
-                        if PDB_l.resi_name == i:
-                            skip_flag=1
-                            break
-                    if skip_flag:
-                        change_flag=1
-                        continue
-
-                    of.write(line)
-                if not change_flag:
-                    print('rm_wat(): No change.')
-
-        self.path=out_path
-        self.update_path()
-
-        return self.path
-
-
-    def PDBMD(self,conf_path,tag=''):
-        '''
-        Use self.prmtop_path and self.inpcrd_path to initilize a MD simulation.
-        The MD configuration files are assigned by the conf_path. Be sure to use the same tag when files are taged.
-        Return the rst path of the prod step.
-        '''
-        Flag_name=''
-        for Flag in self.MutaFlags:
-            sep_Flag_name=Flag[0]+Flag[1]+Flag[2]
-            Flag_name=Flag_name+'_'+sep_Flag_name
-
-        out_path=conf_path
-
-        #run sander
-        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+conf_path+'/min'+tag+'.in -o ' +out_path+'/min' +Flag_name+'.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+out_path+'/min'+Flag_name+'.rst -ref '+self.inpcrd_path)
-        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+conf_path+'/heat'+tag+'.in -o '+out_path+'/heat'+Flag_name+'.out -p '+self.prmtop_path+' -c '+out_path+'/min'+Flag_name+'.rst -ref ' +out_path+'/min'+Flag_name+'.rst -r ' +out_path+'/heat'+Flag_name+'.rst')
-        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+conf_path+'/equi'+tag+'.in -o '+out_path+'/equi'+Flag_name+'.out -p '+self.prmtop_path+' -c '+out_path+'/heat'+Flag_name+'.rst -ref '+out_path+'/heat'+Flag_name+'.rst -r '+out_path+'/equi'+Flag_name+'.rst')
-        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+conf_path+'/prod'+tag+'.in -o '+out_path+'/prod'+Flag_name+'.out -p '+self.prmtop_path+' -c '+out_path+'/equi'+Flag_name+'.rst -ref '+out_path+'/equi'+Flag_name+'.rst -r '+out_path+'/prod'+Flag_name+'.rst -x '+out_path+'/prod'+Flag_name+'.nc')
-
-        #Or add a class constant?
-        return 'MD/prod'+Flag_name+'.rst'
 
 
     '''
