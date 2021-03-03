@@ -704,12 +704,12 @@ class Chain(Child):
         # adapt general input // converge to file_str
         if input_type == 'path':
             f = open(chain_input)
-            chain_str = f.read()
+            chain_str = f.read().strip()
             f.close()
         if input_type == 'file':
-            chain_str = chain_input.read()
+            chain_str = chain_input.read().strip()
         if input_type == 'file_str':
-            chain_str = chain_input
+            chain_str = chain_input.strip()
 
 
         # chain residues
@@ -718,7 +718,6 @@ class Chain(Child):
         lines = PDB_line.fromlines(chain_str) # Note LF is required
         for i, pdb_l in enumerate(lines):
             if pdb_l.line_type == 'ATOM' or pdb_l.line_type == 'HETATM':
-
                 # Deal with the first residue
                 if len(residues) == 0 and len(resi_lines) == 0:
                     resi_lines.append(pdb_l)
@@ -734,14 +733,14 @@ class Chain(Child):
                     resi_lines = []
 
                 resi_lines.append(pdb_l)
-                
-                # Deal with the last residue
-                if i == len(lines)-1:
-                    last_resi = Residue.fromPDB(resi_lines, pdb_l.resi_id)
-                    residues.append(last_resi)
-                
+                                
                 # Update for next loop                
                 last_resi_index = pdb_l.resi_id
+
+            # Deal with the last residue
+            if i == len(lines)-1:
+                last_resi = Residue.fromPDB(resi_lines, resi_lines[-1].resi_id)
+                residues.append(last_resi)
 
         return cls(residues, chain_id)
 

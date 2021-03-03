@@ -767,6 +767,8 @@ class PDB():
         ligand_parm_paths = self._ligand_parm(ligands_pathNchrg, method=lig_method)
         # self._metal_parm(metalcenters_path)
         # combine
+        if o_path != '':
+            mkdir(o_path)
         self._combine_parm(ligand_parm_paths, o_path=o_path)
         
         return (self.prmtop_path,self.inpcrd_path)
@@ -846,6 +848,7 @@ class PDB():
         Remove water and ion for the pdb. Remians the same if there's no water or ion.
         Now only skip [Na+,Cl-,WAT,HOH] // Append more in the future.
         Save changed files into self.path.
+        TODO: need to support key water.
         '''
         out_path = self.path_name+'_rmW.pdb'
         self._get_file_path()
