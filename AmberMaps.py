@@ -407,12 +407,12 @@ Ionic_radius_map= { "N"  : 1.32,
                     "Ni" : None, 
                     "Pt" : None, 
                     "Zn" : 0.88, 
-                    "Co" : None, 
+                    "Co" : 0.68,    # +3 ls 
                     "Pd" : None, 
                     "Cr" : None, 
-                    "Fe" : None, 
+                    "Fe" : 0.92,    # +2 hs / PDB disctance based (5HIO) / can not handel really well
                     "V"  : None, 
-                    "Mn" : None, 
+                    "Mn" : 0.81,    # +2
                     "Hg" : None, 
                     "Cd" : None, 
                     "Yb" : None, 

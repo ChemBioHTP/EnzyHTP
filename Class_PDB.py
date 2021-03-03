@@ -490,8 +490,9 @@ class PDB():
         Protonate the ligand from 'path' with 'method'
         ---------------
         method: PYBEL (default)
+                Dimorphite (from https://durrantlab.pitt.edu/dimorphite-dl/) TODO seems better and with better python API.
                 OPENBABEL (not working if block warning output)
-        ph: 7.0 by default #TODO
+        ph: 7.0 by default 
         '''
         outp1_path = path[:-4]+'_badname_aH.pdb'
         out_path = path[:-4]+'_aH.pdb'
@@ -789,7 +790,8 @@ class PDB():
                 out_frcmod = lig_pdb[:-3]+'frcmod'
                 #gen prepi (net charge and correct protonation state is important)
                 os.system(Config.Amber.AmberHome+'/bin/antechamber -i '+lig_pdb+' -fi pdb -o '+out_prepi+' -fo prepi -c bcc -s 0 -nc '+str(net_charge))
-                os.system('rm ANTECHAMBER* ATOMTYPE.INF NEWPDB.PDB PREP.INF sqm.pdb')
+                if Config.debug <= 1:
+                    os.system('rm ANTECHAMBER* ATOMTYPE.INF NEWPDB.PDB PREP.INF sqm.pdb sqm.in sqm.out leap.log')
                 #gen frcmod
                 os.system(Config.Amber.AmberHome+'/bin/parmchk2 -i '+out_prepi+' -f prepi -o '+out_frcmod)                
                 #record
