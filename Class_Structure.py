@@ -134,7 +134,7 @@ class Structure():
         # get raw chains
         chains_str = file_str.split(line_feed+'TER') # Note LF is required
         for index, chain_str in enumerate(chains_str):
-            if chain_str.strip() != 'END':
+            if chain_str.strip() != 'END' and chain_str.strip() != '':
                 Chain_index = chr(65+index) # Covert to ABC using ACSII mapping
                 # Generate chains
                 raw_chains.append(Chain.fromPDB(chain_str, Chain_index))
