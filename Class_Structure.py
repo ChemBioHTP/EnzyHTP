@@ -149,11 +149,11 @@ class Structure():
         ####### debug ##########
         if Config.debug > 1:
             for chain in raw_chains_woM_woL_woS:
-                print(chain.id, chain.get_chain_seq(Oneletter=1))
+                print('Structure.fromPDB: final chain sequence: '+chain.id, chain.get_chain_seq(Oneletter=1))
             for metal in metalatoms:
-                print(metal.name)
+                print('Structure.fromPDB: final metal recorded '+metal.name)
             for ligand in ligands:
-                print(ligand.name)
+                print('Structure.fromPDB: final ligand recorded ' + ligand.name)
 
         return cls(raw_chains_woM_woL_woS, metalatoms, ligands, solvents, input_name)
 
@@ -1651,7 +1651,9 @@ class Metalatom(Atom):
                         R_d = VDW_radius_map[atom.ele]
                     
                     if dist <= (R_d + R_m):
-                        self.donor_atoms.append(atom)                     
+                        self.donor_atoms.append(atom)
+                        if Config.debug > 1:
+                            print('Metalatom.get_donor_atom: '+self.name+' find donor atom:' + atom.resi.name +' '+ str(atom.resi.id) + ' ' + atom.name)                     
         
 
     def get_donor_residue(self, method='INC'):
