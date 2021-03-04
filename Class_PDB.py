@@ -2,6 +2,7 @@ import os
 import re
 import argparse
 from random import randint
+from sys import flags
 from AmberMaps import *
 from wrapper import *
 from Class_Structure import *
@@ -60,6 +61,12 @@ Input file generating methods:
 PDB2FF(self):
 PDBMD(self):
 -------------------------------------------------------------------------------------
+>>>>>>> Develop Note <<<<<<<<<
+For every potential first use of self.file_str or self.path or self.stru
+Will do nothing if the correct var is already exist.
+ - use _get_file_str
+ - use _get_file_path
+ - use get_stru 
 '''
 
 class PDB():
@@ -76,6 +83,7 @@ class PDB():
         # Nessessary initilize for empty judging
         self.stru = None
         self.path = None
+        self.MutaFlags = []
 
         if wk_dir == '':
             #current dir by default
@@ -151,6 +159,11 @@ class PDB():
 
 
     def _get_file_str(self):
+        '''
+        read file_str from path is not pre-exist.
+        -------------
+        recommend before every potential first use of self.file_str
+        '''
         if self.path is None:
             return self.file_str
         else:
@@ -159,7 +172,9 @@ class PDB():
 
     def _get_file_path(self):
         '''
-        save a file and get path is self.path is None
+        save a file and get path if self.path is None
+        -------------
+        recommend before every potential first use of self.path
         '''
         if self.path is None:
             self.path = self.path_name+'.pdb'
@@ -548,6 +563,7 @@ class PDB():
                             pdb_l.atom_name = ele+str(ele_count[ele])
                         except KeyError:
                             ele_count[ele] = 0
+                            pdb_l.atom_name = ele
                         of.write(pdb_l.build())
                
 
@@ -575,7 +591,7 @@ class PDB():
     ========
     '''
 
-###########待修改##########尝试结合stru类重写
+###########待修改##########需要先修改MutaFlag的规则 之后再修改P2PwL中的判断方式 直接修改文件是可行的 但是需要与 链id-残基id 严格对应 也就是说决定了MutaFlag之后不能又类似sort的改变残基id的行为
     def PDB2PDBwLeap(self):
         '''
         (The index is correspond to the new index starting from 1 for each chain.)
@@ -594,8 +610,7 @@ class PDB():
                     pass
                 else:
                     if self.MutaFlags[i][1] == self.MutaFlags[j][1]:
-                        print("**WARNING**")
-                        print("There are multiple mutations in the same index, only the first one will be used: "+self.MutaFlags[i][0]+self.MutaFlags[i][1]+self.MutaFlags[i][2])
+                        print(">>WARNING<< PDB2PDBwLeap: There are multiple mutations in the same index, only the first one will be used: "+self.MutaFlags[i][0]+self.MutaFlags[i][1]+self.MutaFlags[i][2])
 
         # Prepare a label for the filename
         tot_Flag_name=''
@@ -604,22 +619,21 @@ class PDB():
             tot_Flag_name=tot_Flag_name+'_'+Flag_name
 
         # Operate the PDB
-        out_PDB_path1=self.path[:-4]+tot_Flag_name+'_tmp.pdb'
-        out_PDB_path2=self.path[:-4]+tot_Flag_name+'.pdb'
+        out_PDB_path1=self.path_name+tot_Flag_name+'_tmp.pdb'
+        out_PDB_path2=self.path_name+tot_Flag_name+'.pdb'
 
+        self._get_file_path()
         with open(self.path,'r') as f:
             with open(out_PDB_path1,'w') as of:
-                line_index=1
-                for line in f:
-
+                for line_index, line in enumerate(f):
+                    line_index = line_index + 1 
                     try:
-                        match=0
-                        
+                        match=0                        
                         for Flag in self.MutaFlags:
                             # Test for every Flag for every lines
                             resi_Index=Flag[1]
 
-                            if line.split()[4] == resi_Index:
+                            if line.split()[4] == resi_Index: 
                                 #This matching method work with ploymer because the standard amber format merge different chains into a same index map
                                 #keep if match the OldAtom list
 
@@ -654,8 +668,6 @@ class PDB():
                     except IndexError:
                         of.write(line)
                         print('Warning: Not a data line -> '+line+'---'+str(line_index))
-
-                    line_index=line_index+1
         
         # Run tLeap
         #make input
@@ -705,6 +717,12 @@ class PDB():
 
                 # This method takes the first chain of a PDB file to count the total number of residues. Will encounter problem when resi_index of the ligand was inserted between the chain. (mark:enzyme)
                 # This method use get_seq and self.sequence. Randomize over the chain and use the 'XA123Y' mutaflag format.  (mark: update)
+                # IO的方式不变
+                # 指定如果没有链id则默认第一条链 每条链从1开始
+                # 随机则直接根据self.stru整理信息随机
+                # ---
+                # 生成flag：
+                # 之后写入的方式在实际的文件中用TER重新计数（有无链id 序号是否在链重启）
                 with open(self.path,'r') as f:
                     lines=f.readlines()
                     for i in range(len(lines)):
@@ -762,7 +780,7 @@ class PDB():
         mkdir(lig_dir)
         mkdir(met_dir)
 
-        ligands_pathNchrg = self.stru.build_ligands(lig_dir, ifcharge=1)
+        ligands_pathNchrg = self.stru.build_ligands(lig_dir, ifcharge=1, ifunique=1)
         # metalcenters_path = self.stru.build_metalcenters(met_dir)
         # parm
         ligand_parm_paths = self._ligand_parm(ligands_pathNchrg, method=lig_method)

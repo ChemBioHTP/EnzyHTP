@@ -20,7 +20,7 @@ class Config:
     max_core = 2000
     # -----------------------------
     # debug info level
-    # 0: No info. 1: normal debug 2: verbose debug
+    # 0: No info. 1: normal debug (warning) 2: verbose debug (running log)
     debug = 1
 
     

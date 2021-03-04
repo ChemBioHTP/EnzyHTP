@@ -478,7 +478,7 @@ class Structure():
             of.write('END'+line_feed)
 
 
-    def build_ligands(self, dir, ft='PDB', ifcharge=0 ,c_method='PYBEL', ph=7.0, ifname=0):
+    def build_ligands(self, dir, ft='PDB', ifcharge=0 ,c_method='PYBEL', ph=7.0, ifname=0, ifunique=0):
         '''
         build files for every ligand in self.ligands
         -------
@@ -488,11 +488,20 @@ class Structure():
         c_method : method determining the net charge (default: PYBEL)
         ph       : pH value used for determine the net charge
         ifname   : export residue name if 1 (default: 0)
+        ifunique : 1: only build one ligand if there's multiple same ones. 0: build every ligand
         '''
         out_ligs = []
 
         l_id = 0
-        for lig in self.ligands:
+        lig_list = self.ligands
+        # Only build ligand with same name once
+        if ifunique:
+            lig_list_uni = {}
+            for lig in lig_list:
+                lig_list_uni[lig.name] = lig
+            lig_list = lig_list_uni.values()
+
+        for lig in lig_list:
             l_id = l_id + 1 # current ligand id
             # make output path
             if dir[-1] == '/':
