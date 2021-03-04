@@ -738,8 +738,12 @@ class Chain(Child):
 
         # Deal with the last residue (Now add the last one after the loop.)
             # if i == len(lines)-1:
-        last_resi = Residue.fromPDB(resi_lines, resi_lines[-1].resi_id)
-        residues.append(last_resi)
+        if resi_lines != []:    # deal with blank chain
+            last_resi = Residue.fromPDB(resi_lines, resi_lines[-1].resi_id)
+            residues.append(last_resi)
+        else:
+            if Config.debug >= 1:
+                print('Chain.fromPDB: find a empty chain: ' + chain_id)
 
         return cls(residues, chain_id)
 
