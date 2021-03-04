@@ -711,12 +711,11 @@ class Chain(Child):
         if input_type == 'file_str':
             chain_str = chain_input.strip()
 
-
         # chain residues
         residues = []
         resi_lines = [] # data holder
         lines = PDB_line.fromlines(chain_str) # Note LF is required
-        for i, pdb_l in enumerate(lines):
+        for pdb_l in lines:
             if pdb_l.line_type == 'ATOM' or pdb_l.line_type == 'HETATM':
                 # Deal with the first residue
                 if len(residues) == 0 and len(resi_lines) == 0:
@@ -737,10 +736,10 @@ class Chain(Child):
                 # Update for next loop                
                 last_resi_index = pdb_l.resi_id
 
-            # Deal with the last residue
-            if i == len(lines)-1:
-                last_resi = Residue.fromPDB(resi_lines, resi_lines[-1].resi_id)
-                residues.append(last_resi)
+        # Deal with the last residue (Now add the last one after the loop.)
+            # if i == len(lines)-1:
+        last_resi = Residue.fromPDB(resi_lines, resi_lines[-1].resi_id)
+        residues.append(last_resi)
 
         return cls(residues, chain_id)
 
