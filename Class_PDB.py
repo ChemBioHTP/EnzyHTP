@@ -1,8 +1,7 @@
+from math import exp
 import os
 import re
-import argparse
-from random import randint
-from sys import flags
+from random import choice
 from AmberMaps import *
 from wrapper import *
 from Class_Structure import *
@@ -128,12 +127,13 @@ class PDB():
         self.path_name = self.dir+'/'+self.name
         
 
-    def get_stru(self, ligand_list=None):
+    def get_stru(self, ligand_list=None, renew = 0):
         '''
         Convert current PDB file (self.path) to a Struture object (self.stru).
         ------
-        input_name: a name tag for the object (self.name by default)
-        ligand_list: a list of user assigned ligand residue names.
+        input_name  : a name tag for the object (self.name by default)
+        ligand_list : a list of user assigned ligand residue names.
+        renew       : 1: force generate a new stru_obj
         '''
         # indicated by self.name
         input_name = self.name
@@ -151,7 +151,7 @@ class PDB():
         else:
             get_flag = 1
 
-        if get_flag:
+        if get_flag or renew:
             if self.path is not None:
                 self.stru = Structure.fromPDB(self.path, input_name=input_name, ligand_list=ligand_list)
             else:
@@ -408,6 +408,7 @@ class PDB():
         Methods:
         - pyRosetta
         - trRosetta
+        remember to update the name.
         '''
         pass
 
@@ -502,7 +503,7 @@ class PDB():
     @classmethod
     def protonate_ligand(cls, path, method='PYBEL', ph = 7.0):
         '''
-        Protonate the ligand from 'path' with 'method'
+        Protonate the ligand from 'path' with 'method', provide out_path and net charge.
         ---------------
         method: PYBEL (default)
                 Dimorphite (from https://durrantlab.pitt.edu/dimorphite-dl/) TODO seems better and with better python API.
@@ -538,6 +539,8 @@ class PDB():
             # net_charge=0
             # for atom in mol:
             #     net_charge=net_charge+atom.formalcharge
+        if method == 'Dimorphite':
+            pass
         return out_path, net_charge
 
 
@@ -591,31 +594,35 @@ class PDB():
     ========
     '''
 
-###########待修改##########需要先修改MutaFlag的规则 之后再修改P2PwL中的判断方式 直接修改文件是可行的 但是需要与 链id-残基id 严格对应 也就是说决定了MutaFlag之后不能又类似sort的改变残基id的行为
     def PDB2PDBwLeap(self):
         '''
-        (The index is correspond to the new index starting from 1 for each chain.)
-        Take the 'XA111Y' format for polymer. Re-local the mutation position based on the index of the first residue in the chain (mark: update)
+        Apply mutations using tleap. Save mutated structure PDB in self.path
+        ------------------------------
+        Use MutaFlag in self.MutaFlags
+        Grammer (from Add_MutaFlag):
+        X : Original residue name. Leave X if unknow. 
+            Only used for build filenames. **Do not affect any calculation.**
+        A : Chain index. Determine by 'TER' marks in the PDB file. (Do not consider chain_indexs in the original file.)
+        11: Residue index. Strictly correponding residue indexes in the original file. (NO sort applied)
+        Y : Target residue name.  
 
-        Use every Flag in self.MutaFlags and tLeap to build mutated structure. 
         **WARNING** if there are multiple mutations on the same index, only the first one will be used.
-        Save changes to self.path and self.name
-        self.stage=1
         '''
 
-        #Judge if theres same MutaIndex
+        #Judge if there are same MutaIndex (c_id + r_id)
         for i in range(len(self.MutaFlags)):
             for j in range(len(self.MutaFlags)):
                 if i >= j:
                     pass
                 else:
-                    if self.MutaFlags[i][1] == self.MutaFlags[j][1]:
-                        print(">>WARNING<< PDB2PDBwLeap: There are multiple mutations in the same index, only the first one will be used: "+self.MutaFlags[i][0]+self.MutaFlags[i][1]+self.MutaFlags[i][2])
+                    if (self.MutaFlags[i][1], self.MutaFlags[i][2]) == (self.MutaFlags[j][1], self.MutaFlags[j][2]):
+                        if Config.debug >= 1:
+                            print("PDB2PDBwLeap: There are multiple mutations at the same index, only the first one will be used: "+self.MutaFlags[i][0]+self.MutaFlags[i][1]+self.MutaFlags[i][2])
 
         # Prepare a label for the filename
         tot_Flag_name=''
         for Flag in self.MutaFlags:
-            Flag_name=Flag[0]+Flag[1]+Flag[2]
+            Flag_name=self._build_MutaName(Flag)
             tot_Flag_name=tot_Flag_name+'_'+Flag_name
 
         # Operate the PDB
@@ -625,51 +632,51 @@ class PDB():
         self._get_file_path()
         with open(self.path,'r') as f:
             with open(out_PDB_path1,'w') as of:
-                for line_index, line in enumerate(f):
-                    line_index = line_index + 1 
-                    try:
-                        match=0                        
+                for line in f:
+                    pdb_l = PDB_line(line)
+                    
+                    chain_count = 1
+                    TER_flag = 0
+                    if pdb_l.line_type == 'TER':
+                        TER_flag = 1
+                    # add chain count in next loop for next line
+                    if TER_flag:
+                        chain_count += 1
+                    match=0
+                    # only match in the dataline and keep all non data lines
+                    if pdb_l.line_type == 'ATOM':
                         for Flag in self.MutaFlags:
                             # Test for every Flag for every lines
-                            resi_Index=Flag[1]
+                            t_chain_id=Flag[1]
+                            t_resi_id =Flag[2]
 
-                            if line.split()[4] == resi_Index: 
-                                #This matching method work with ploymer because the standard amber format merge different chains into a same index map
-                                #keep if match the OldAtom list
+                            if chr(65+chain_count) == t_chain_id:
+                                if pdb_l.resi_id == int(t_resi_id):
+                                    
+                                    # do not write old line if match a MutaFlag
+                                    match=1
+                                    # Keep OldAtoms of targeted old residue
+                                    resi_2 = Flag[3]
+                                    OldAtoms=['N','H','CA','HA','CB','C','O']
+                                    #fix for mutations of Gly & Pro
+                                    if resi_2 == 'G':
+                                        OldAtoms=['N','H','CA','C','O']
+                                    if resi_2 == 'P':
+                                        OldAtoms=['N','CA','HA','CB','C','O']
 
-                                match=1
-                                
-                                #Initialize mutation when match
-                                Muta_resi=Flag[2]
-                                OldAtoms=['N','H','CA','HA','CB','C','O']
-                                #fix for mutate to Gly & Pro
-                                if Muta_resi == 'G':
-                                    OldAtoms=['N','H','CA','C','O']
-                                if Muta_resi == 'P':
-                                    OldAtoms=['N','CA','HA','CB','C','O']
+                                    for i in OldAtoms:
+                                        if i == pdb_l.atom_name:
+                                            new_line=line[:17]+Resi_map[resi_2]+line[20:]                                        
+                                            of.write(new_line)
+                                            break                                
+                                    #Dont run for other Flags after first Flag matches.
+                                    break
 
-
-                                for i in OldAtoms:
-                                    if i == line.split()[2]:
-                                        #change the traget residue name !!WARNING!! strong format limitation here!
-                                        
-                                        new_line=line[:17]+Resi_map[Muta_resi]+line[20:]
-                                        
-                                        of.write(new_line)
-                                        break
-                                #Do not keep if not match & in the target residue.       
-                                
-                                #Dont run for other Flags after first Flag matches. (code: SameSite)
-                                break
-
-                        if not match:               
-                            of.write(line)
-                    
-                    except IndexError:
+                    if not match:               
                         of.write(line)
-                        print('Warning: Not a data line -> '+line+'---'+str(line_index))
-        
-        # Run tLeap
+
+
+        # Run tLeap 待修改 结合self.dir设置文件位置
         #make input
         os.system('mkdir tleap_cache')
         leap_input=open('tleap.in','w')
@@ -690,69 +697,118 @@ class PDB():
         return out_PDB_path2
 
 
-    def Add_MutaFlag(self,Flag):
+    def Add_MutaFlag(self,Flag = 'r'):
         '''
         Input: 
         Flags or "random"
         ----------------------------------------------------
-        Flag    (e.g. A11B) Can be a str or a list of str.
+        Flag    (e.g. XA11Y) Can be a str or a list of str (a list of flags).
         ----------------------------------------------------
         Append self.MutaFlags with the Flag.
-        (The index is correspond to the new merged index from Standard Amber format for Polymer.)
+        Grammer:
+        X : Original residue name. Leave X if unknow. 
+            Only used for build filenames. **Do not affect any calculation.**
+        A : Chain index. Determine by 'TER' marks in the PDB file. (Do not consider chain_indexs in the original file.)
+        11: Residue index. Strictly correponding residue indexes in the original file. (NO sort applied)
+        Y : Target residue name.  
         ----------------------------------------------------
         'random' or 'r' (default)
         ----------------------------------------------------
-        Use self.path & self.sequence // only when if_complete
-        Save changes appending to self.MutaFlags 
-        
-        Need to add the chain_index info (mark: update)
         '''
 
         if type(Flag) == str:
 
             if Flag == 'r' or Flag == 'random':
-                resi_1=''
-                resi_2=''
-                Muta_idx=''
+                resi_1 = ''
+                resi_2 = ''
+                Muta_c_id = ''
+                Muta_r_id = ''
 
-                # This method takes the first chain of a PDB file to count the total number of residues. Will encounter problem when resi_index of the ligand was inserted between the chain. (mark:enzyme)
-                # This method use get_seq and self.sequence. Randomize over the chain and use the 'XA123Y' mutaflag format.  (mark: update)
-                # IO的方式不变
-                # 指定如果没有链id则默认第一条链 每条链从1开始
-                # 随机则直接根据self.stru整理信息随机
-                # ---
-                # 生成flag：
-                # 之后写入的方式在实际的文件中用TER重新计数（有无链id 序号是否在链重启）
-                with open(self.path,'r') as f:
-                    lines=f.readlines()
-                    for i in range(len(lines)):
-                        if lines[i].strip() == 'TER':
-                            self.tot_resi=int(lines[i-1].split()[4])
-                            break
-                    #Generate the mutation index
-                    Muta_idx=str(randint(1,self.tot_resi))
-                    #obtain resi_1
-                    for line in lines:
-                        if line.split()[4] == Muta_idx:
-                            resi_1_p=line.split()[3]
-                            resi_1=Resi_map2[resi_1_p]
-                            break
-                #Generate resi_2
-                resi_2=Resi_list[randint(0,len(Resi_list)-1)]
-                # Check if the same resi
-                while resi_2 == resi_1:
-                    resi_2=Resi_list[randint(0,len(Resi_list)-1)]
-                        
-                self.MutaFlags.append((resi_1,Muta_idx,resi_2))
+                # Flag Generation：
+                # Random over the self.stru. Strictly correponding residue indexes in the original file. (no sort applied)
+                self.get_stru()
+                # random over the structure "protein" part.
+                chain = choice(self.stru.chains)
+                resi = choice(chain.residues)
+                Muta_c_id = chain.id
+                Muta_r_id = str(resi.id)
+                if resi.name in Resi_map2:
+                    resi_1 = Resi_map2[resi.name]
+                else:
+                    resi_1 = resi.name
+                # random over the residue list
+                resi_2 = choice(Resi_list)
+
+                MutaFlag = (resi_1, Muta_c_id, Muta_r_id ,resi_2)
+                self.MutaFlags.append(MutaFlag)
 
             else:
-                self.MutaFlags.append((Flag[0],re.search('[0-9]+',Flag).group(),Flag[-1]))
+                MutaFlag = self._read_MutaFlag(Flag)
+                self.MutaFlags.append(MutaFlag)
 
         if type(Flag) == list:
             for i in Flag:
-                self.MutaFlags.append((i[0],re.search('[0-9]+',i).group(),i[-1]))
+                MutaFlag = self._read_MutaFlag(i)
+                self.MutaFlags.append(MutaFlag)
 
-        print('Current MutaFlags: ',self.MutaFlags)
+        if Config.debug >= 1:
+            print('Current MutaFlags:')
+            for flag in self.MutaFlags:
+                print(self._build_MutaName(flag))
+                
+
+    def _read_MutaFlag(self, Flag):
+        '''
+        decode the manually input MutaFlag. Return (resi_1, chain_id, resi_id, resi_2)
+        --------------
+        Grammer(XA11Y):
+        X : Original residue name. Leave X if unknow. 
+            Only used for build filenames. **Do not affect any calculation.**
+        A : Chain index. Determine by 'TER' marks in the PDB file. (Do not consider chain_indexs in the original file.)
+        11: Residue index. Strictly correponding residue indexes in the original file. (NO sort applied)
+        Y : Target residue name.
+
+        the later 3 will go through a san check to make sure they are within the range:
+        A : chain.id range in self.stru.chains
+        11: resi.id range in self.stru.chain[int].residues
+        Y : Resi_list
+        '''
+        pattern = r'([A-Z])([A-Z])?([0-9]+)([A-Z])'
+        F_match = re.match(pattern, Flag)
+        if F_match is None:
+            raise Exception('_read_MutaFlag: Required format: XA123Y (or X123Y indicating the first chain)')
+        
+        resi_1 = F_match.group(1)
+        chain_id = F_match.group(2)
+        resi_id = str(F_match.group(3))
+        resi_2 = F_match.group(4)
+
+        # san check of the manual input
+        self.get_stru()
+        chain_id_list = [i.id for i in self.stru.chains]
+        if not chain_id in chain_id_list:
+            raise Exception('_read_MutaFlag: San check failed. Input chain id in not in range.'+line_feed+' range: '+ repr(chain_id_list))
+        chain_int = ord(chain_id)-65
+        resi_id_list = [str(i.id) for i in self.stru.chains[chain_int].residues]
+        if not resi_id in resi_id_list:
+            raise Exception('_read_MutaFlag: San check failed. Input resi id in not in range.'+line_feed+' range: '+ repr(resi_id_list))
+        if not resi_2 in Resi_list:
+            raise Exception('_read_MutaFlag: Only support mutate to the known 21 residues. (Check in the AmberMap.Resi_list)')
+
+        # default
+        if F_match.group(2) is None:
+            chain_id = 'A'
+            if Config.debug >= 1:
+                print('_read_MutaFlag: No chain_id is provided! Mutate in the first chain by default. Input: ' + Flag)   
+
+        return (resi_1, chain_id, resi_id, resi_2)
+    
+
+    def _build_MutaName(self, Flag):
+        '''
+        Take a MutaFlag Tuple and return a str of name
+        '''
+        return Flag[0]+Flag[1]+Flag[2]+Flag[3]
 
 
     '''
