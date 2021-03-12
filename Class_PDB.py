@@ -626,7 +626,7 @@ class PDB():
             tot_Flag_name=tot_Flag_name+'_'+Flag_name
 
         # Operate the PDB
-        out_PDB_path1=self.path_name+tot_Flag_name+'_tmp.pdb'
+        out_PDB_path1=self.cache_path+'/'+self.name+tot_Flag_name+'_tmp.pdb'
         out_PDB_path2=self.path_name+tot_Flag_name+'.pdb'
 
         self._get_file_path()
@@ -676,25 +676,25 @@ class PDB():
                         of.write(line)
 
 
-        # Run tLeap 待修改 结合self.dir设置文件位置
+        # Run tLeap 
         #make input
-        os.system('mkdir tleap_cache')
-        leap_input=open('tleap.in','w')
+        leapin_path = self.cache_path+'/leap_P2PwL.in'
+        leap_input=open(leapin_path,'w')
         leap_input.write('source leaprc.protein.ff14SB\n')
         leap_input.write('a = loadpdb '+out_PDB_path1+'\n')
         leap_input.write('savepdb a '+out_PDB_path2+'\n')
         leap_input.write('quit\n')
         leap_input.close()
         #run
-        os.system('tleap -s -f tleap.in > tleap.out')
-        os.system('mv *leap.* *tmp.pdb tleap_cache')
+        os.system('tleap -s -f '+leapin_path+' > '+self.cache_path+'/leap_P2PwL.out')
+        if Config.debug <= 1:
+            os.system('rm leap.log')
 
         #Update the file
         self.path = out_PDB_path2
-        self.name = self.path.split(os.sep)[-1][:-4]
-        self.stage = 1
+        self._update_name()
 
-        return out_PDB_path2
+        return self.path
 
 
     def Add_MutaFlag(self,Flag = 'r'):
@@ -968,10 +968,10 @@ class PDB():
     def PDBMD(self,conf_path,tag=''):
         '''
         Use self.prmtop_path and self.inpcrd_path to initilize a MD simulation.
-        The MD configuration files are assigned by the conf_path. Be sure to use the same tag when files are taged.
+        The MD configuration files are assigned by class Config.Amber.
         Return the rst path of the prod step.
         '''
-        #TODO 改入config中
+
         Flag_name=''
         for Flag in self.MutaFlags:
             sep_Flag_name=Flag[0]+Flag[1]+Flag[2]
@@ -989,47 +989,51 @@ class PDB():
         return 'MD/prod'+Flag_name+'.rst'
 
 
-    def PDBMin(self,cycle='2000'):
+    def PDBMin(self,cycle=2000):
         '''
-        Run a minization use self.prmtop and self.inpcrd
+        Run a minization use self.prmtop and self.inpcrd and setting form class Config.
+        --------------------------------------------------
         Save changed PDB to self.path (containing water and ions)
+        Mainly used for remove bad contact from PDB2PDBwLeap.
         '''
         
         out4_PDB_path=self.path_name+'_min.pdb'
-        #TODO 改入config中
 
         #make sander input
-        os.system('mkdir min_cache')
-        min_input=open('min.in','w')
-        min_input.write('Minimize\n')
-        min_input.write(' &cntrl\n')
-        min_input.write('  imin=1,\n')
-        min_input.write('  ntx=1,\n')
-        min_input.write('  irest=0,\n')
-        min_input.write('  maxcyc='+cycle+',\n')
-        min_input.write('  ncyc=10000,\n')
-        min_input.write('  ntpr=1000,\n')
-        min_input.write('  ntwx=0,\n')
-        min_input.write('  cut=8.0,\n')
-        min_input.write(' /\n')
+        min_dir = self.cache_path+'/PDBMin'
+        minin_path = min_dir + '/min.in'
+        minout_path = min_dir + '/min.out'
+        minrst_path = min_dir + '/min.rst'
+        mkdir(min_dir)
+        min_input=open(minin_path,'w')
+        min_input.write('Minimize'+line_feed)
+        min_input.write(' &cntrl'+line_feed)
+        min_input.write('  imin=1,'+line_feed)
+        min_input.write('  ntx=1,'+line_feed)
+        min_input.write('  irest=0,'+line_feed)
+        min_input.write('  maxcyc='+str(cycle)+','+line_feed)
+        min_input.write('  ncyc='+str(int(0.5*cycle))+','+line_feed)
+        min_input.write('  ntpr='+str(int(0.2*cycle))+','+line_feed)
+        min_input.write('  ntwx=0,'+line_feed)
+        min_input.write('  cut=8.0,'+line_feed)
+        min_input.write(' /'+line_feed)
         min_input.close()
     
 
         #run
-        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i min.in -o min.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r min.rst')
-
+        if Config.debug >= 1:
+            print('running: '+Config.PC_cmd +' '+ Config.Amber.AmberHome + '/bin/sander.MPI -O -i '+minin_path+' -o '+minout_path+' -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+minrst_path)
+        os.system(Config.PC_cmd +' '+ Config.Amber.AmberHome + '/bin/sander.MPI -O -i '+minin_path+' -o '+minout_path+' -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+minrst_path)
         #rst2pdb
-        os.system('ambpdb -p '+self.prmtop_path+' -c min.rst > '+out4_PDB_path)
-        os.system('mv min.rst min_cache/min_'+self.name+'.rst')
-        os.system('mv min.out min.in '+self.prmtop_path+' '+self.inpcrd_path+' min_cache')
+        os.system('ambpdb -p '+self.prmtop_path+' -c '+minrst_path+' > '+out4_PDB_path)
+        os.system('mv '+self.prmtop_path+' '+self.inpcrd_path+' '+min_dir)
 
         self.path = out4_PDB_path
-        self.name = self.name+'_min'
-        self.prmtop_path='min_cache/'+self.prmtop_path
-        self.inpcrd_path='min_cache/'+self.inpcrd_path
-        self.stage = 3
+        self._update_name()
+        self.prmtop_path=min_dir+'/'+self.prmtop_path
+        self.inpcrd_path=min_dir+'/'+self.inpcrd_path
 
-        return out4_PDB_path
+        return self.path
 
 
 
@@ -1087,6 +1091,7 @@ class PDB():
     def _get_oniom_chrgspin(self):
         '''
         determing charge and spin for all ONIOM layers. Base on *structure* and layer settings in the *config* module.
+        generate prmtop and use PDB2FF ?
         '''
         chrgspin=''
         # get layer form config
@@ -1103,7 +1108,7 @@ class PDB():
         	- atom charge
         	- freeze part (general option / some presupposition) 
         	- xyz (from self.stru)
-        	- layer (general option / some presupposition) 
+        	- layer (general option / some presupposition) 需要label一个对接氢原子
         '''
         pass
     

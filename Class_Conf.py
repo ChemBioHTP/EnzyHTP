@@ -22,6 +22,10 @@ class Config:
     # debug info level
     # 0: No info. 1: normal debug (warning) 2: verbose debug (running log)
     debug = 1
+    # -----------------------------
+    # command line name for parallel computing
+    # 
+    PC_cmd = 'mpirun -np '+str(n_cores) 
 
     
     # >>>>>> Software <<<<<<

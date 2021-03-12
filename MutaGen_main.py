@@ -6,12 +6,12 @@ def main():
     #initial PDB
     #use tleap to randomly mutate the PDB
     for i in range(1):
-        PDB1=PDB('1Q4T_grep.pdb')
-        PDB1.Add_MutaFlag('XC1G')
+        PDB1=PDB('2kz2init_amb.pdb',wk_dir='./2kz2')
+        PDB1.Add_MutaFlag('XA12G')
         PDB1.PDB2PDBwLeap()
     #use minimization to relax each mutated PDB
-        # PDB1.PDB2FF()
-        # PDB1.PDBMin()
+        PDB1.PDB2FF()
+        PDB1.PDBMin()
     #run MD
         # os.system('mkdir MD')
         # PDB1.rm_wat()

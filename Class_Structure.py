@@ -1870,7 +1870,7 @@ class Ligand(Residue):
             mol.removeh()
             mol.write('pdb', temp_pdb2_path, overwrite=True)
             # clean connectivity
-            os.popen('cat '+temp_pdb2_path+' |grep \'ATOM\' > '+temp_pdb3_path)
+            os.system('cat '+temp_pdb2_path+' |grep \'ATOM\' > '+temp_pdb3_path)
             # add H and result net charge
             mol = next(pybel.readfile('pdb', temp_pdb3_path))
             mol.OBMol.AddHydrogens(False, True, ph)
