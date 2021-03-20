@@ -83,6 +83,8 @@ class PDB():
         self.stru = None
         self.path = None
         self.MutaFlags = []
+        # local MD conf.
+        self.MD_conf_xxxx = xxxx
 
         if wk_dir == '':
             #current dir by default
@@ -811,6 +813,59 @@ class PDB():
         return Flag[0]+Flag[1]+Flag[2]+Flag[3]
 
 
+    def PDBMin(self,cycle=2000):
+        '''
+        Run a minization use self.prmtop and self.inpcrd and setting form class Config.
+        --------------------------------------------------
+        Save changed PDB to self.path (containing water and ions)
+        Mainly used for remove bad contact from PDB2PDBwLeap.
+        '''
+        
+        out4_PDB_path=self.path_name+'_min.pdb'
+
+        #make sander input
+        min_dir = self.cache_path+'/PDBMin'
+        minin_path = min_dir + '/min.in'
+        minout_path = min_dir + '/min.out'
+        minrst_path = min_dir + '/min.rst'
+        mkdir(min_dir)
+        min_input=open(minin_path,'w')
+        min_input.write('Minimize'+line_feed)
+        min_input.write(' &cntrl'+line_feed)
+        min_input.write('  imin=1,'+line_feed)
+        min_input.write('  ntx=1,'+line_feed)
+        min_input.write('  irest=0,'+line_feed)
+        min_input.write('  maxcyc='+str(cycle)+','+line_feed)
+        min_input.write('  ncyc='+str(int(0.5*cycle))+','+line_feed)
+        min_input.write('  ntpr='+str(int(0.2*cycle))+','+line_feed)
+        min_input.write('  ntwx=0,'+line_feed)
+        min_input.write('  cut=8.0,'+line_feed)
+        min_input.write(' /'+line_feed)
+        min_input.close()
+    
+
+        #run
+        if Config.debug >= 1:
+            print('running: '+Config.PC_cmd +' '+ Config.Amber.AmberHome + '/bin/sander.MPI -O -i '+minin_path+' -o '+minout_path+' -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+minrst_path)
+        os.system(Config.PC_cmd +' '+ Config.Amber.AmberHome + '/bin/sander.MPI -O -i '+minin_path+' -o '+minout_path+' -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+minrst_path)
+        #rst2pdb
+        os.system('ambpdb -p '+self.prmtop_path+' -c '+minrst_path+' > '+out4_PDB_path)
+        os.system('mv '+self.prmtop_path+' '+self.inpcrd_path+' '+min_dir)
+
+        self.path = out4_PDB_path
+        self._update_name()
+        self.prmtop_path=min_dir+'/'+self.prmtop_path
+        self.inpcrd_path=min_dir+'/'+self.inpcrd_path
+
+        return self.path
+
+
+    def rm_allH(self):
+        '''
+        remove wrong hydrogens added by leap after mutation (In the case that the input file was a H-less one from crystal.)
+        '''
+        
+
     '''
     ========
     Gerneral MD
@@ -964,76 +1019,55 @@ class PDB():
         return self.path
 
 
-###########待修改##########
-    def PDBMD(self,conf_path,tag=''):
+    def PDBMD(self, tag='', o_dir=''):
         '''
         Use self.prmtop_path and self.inpcrd_path to initilize a MD simulation.
-        The MD configuration files are assigned by class Config.Amber.
-        Return the rst path of the prod step.
+        The default MD configuration settings are assigned by class Config.Amber.
+        User can also set configuration for the current object by assigning self.MD_conf_xxxx.
+        --------------
+        o_dir   : Write files in o_dir (current self.dir/MD by default).
+        tag     : tag the name of the MD folder
+        Return the nc path of the prod step.
         '''
+        # make folder
+        if o_dir == '':
+            o_dir = self.dir+'/MD'+tag
+        mkdir(o_dir)
 
-        Flag_name=''
-        for Flag in self.MutaFlags:
-            sep_Flag_name=Flag[0]+Flag[1]+Flag[2]
-            Flag_name=Flag_name+'_'+sep_Flag_name
+        # default settings (set default self.MD_conf_xxxx)
+        self._set_MD_conf()
 
-        out_path=conf_path
+        # build input file (use self.MD_conf_xxxx)
+        self._build_MD_min(o_dir)
+        self._build_MD_heat(o_dir)
+        self._build_MD_equi(o_dir)
+        self._build_MD_prod(o_dir)
 
-        #run sander
-        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+conf_path+'/min'+tag+'.in -o ' +out_path+'/min' +Flag_name+'.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+out_path+'/min'+Flag_name+'.rst -ref '+self.inpcrd_path)
-        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+conf_path+'/heat'+tag+'.in -o '+out_path+'/heat'+Flag_name+'.out -p '+self.prmtop_path+' -c '+out_path+'/min'+Flag_name+'.rst -ref ' +out_path+'/min'+Flag_name+'.rst -r ' +out_path+'/heat'+Flag_name+'.rst')
-        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+conf_path+'/equi'+tag+'.in -o '+out_path+'/equi'+Flag_name+'.out -p '+self.prmtop_path+' -c '+out_path+'/heat'+Flag_name+'.rst -ref '+out_path+'/heat'+Flag_name+'.rst -r '+out_path+'/equi'+Flag_name+'.rst')
-        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+conf_path+'/prod'+tag+'.in -o '+out_path+'/prod'+Flag_name+'.out -p '+self.prmtop_path+' -c '+out_path+'/equi'+Flag_name+'.rst -ref '+out_path+'/equi'+Flag_name+'.rst -r '+out_path+'/prod'+Flag_name+'.rst -x '+out_path+'/prod'+Flag_name+'.nc')
+        # run sander
+        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+o_dir+'/min.in -o ' +o_dir+'/min.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+o_dir+'/min.rst -ref '+self.inpcrd_path)
+        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+o_dir+'/heat.in -o '+o_dir+'/heat.out -p '+self.prmtop_path+' -c '+o_dir+'/min.rst -ref ' +o_dir+'/min.rst -r ' +o_dir+'/heat.rst')
+        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+o_dir+'/equi.in -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst')
+        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+o_dir+'/prod.in -o '+o_dir+'/prod.out -p '+self.prmtop_path+' -c '+o_dir+'/equi.rst -ref '+o_dir+'/equi.rst -r '+o_dir+'/prod.rst -x '+o_dir+'/prod.nc')
 
-        #Or add a class constant?
-        return 'MD/prod'+Flag_name+'.rst'
+        return o_dir+'/prod.nc'
 
-
-    def PDBMin(self,cycle=2000):
+    def _set_MD_conf(self):
         '''
-        Run a minization use self.prmtop and self.inpcrd and setting form class Config.
-        --------------------------------------------------
-        Save changed PDB to self.path (containing water and ions)
-        Mainly used for remove bad contact from PDB2PDBwLeap.
+        set MD configuration for current PDB object. If a "local" self.MD_conf_xxx is already assigned than it will not be replaced(higher pirority)
         '''
-        
-        out4_PDB_path=self.path_name+'_min.pdb'
+        # judge local
 
-        #make sander input
-        min_dir = self.cache_path+'/PDBMin'
-        minin_path = min_dir + '/min.in'
-        minout_path = min_dir + '/min.out'
-        minrst_path = min_dir + '/min.rst'
-        mkdir(min_dir)
-        min_input=open(minin_path,'w')
-        min_input.write('Minimize'+line_feed)
-        min_input.write(' &cntrl'+line_feed)
-        min_input.write('  imin=1,'+line_feed)
-        min_input.write('  ntx=1,'+line_feed)
-        min_input.write('  irest=0,'+line_feed)
-        min_input.write('  maxcyc='+str(cycle)+','+line_feed)
-        min_input.write('  ncyc='+str(int(0.5*cycle))+','+line_feed)
-        min_input.write('  ntpr='+str(int(0.2*cycle))+','+line_feed)
-        min_input.write('  ntwx=0,'+line_feed)
-        min_input.write('  cut=8.0,'+line_feed)
-        min_input.write(' /'+line_feed)
-        min_input.close()
-    
+        # assign default
 
-        #run
-        if Config.debug >= 1:
-            print('running: '+Config.PC_cmd +' '+ Config.Amber.AmberHome + '/bin/sander.MPI -O -i '+minin_path+' -o '+minout_path+' -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+minrst_path)
-        os.system(Config.PC_cmd +' '+ Config.Amber.AmberHome + '/bin/sander.MPI -O -i '+minin_path+' -o '+minout_path+' -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+minrst_path)
-        #rst2pdb
-        os.system('ambpdb -p '+self.prmtop_path+' -c '+minrst_path+' > '+out4_PDB_path)
-        os.system('mv '+self.prmtop_path+' '+self.inpcrd_path+' '+min_dir)
 
-        self.path = out4_PDB_path
-        self._update_name()
-        self.prmtop_path=min_dir+'/'+self.prmtop_path
-        self.inpcrd_path=min_dir+'/'+self.inpcrd_path
-
-        return self.path
+    def _build_MD_min(self, o_dir):
+        pass
+    def _build_MD_heat(self, o_dir):
+        pass
+    def _build_MD_equi(self, o_dir):
+        pass
+    def _build_MD_prod(self, o_dir):
+        pass
 
 
 

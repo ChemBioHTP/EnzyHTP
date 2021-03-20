@@ -34,6 +34,22 @@ class Config:
         # Amber Home dir
         #
         AmberHome = '$AMBERHOME'
+        # -----------------------------
+        # Default configuration for MD
+        #
+        # -----------------------------
+        #            min
+        # Minimize
+        # &cntrl
+        # imin  = 1,  ntx   = 1,  irest = 0,
+        # ntc   = 2,    ntf = 2,
+        # cut   = 10.0,
+        # maxcyc= 20000, ncyc  = 10000,
+        # ntpr  = 1000,   ntwx  = 0,
+        # ntr   = 1,	restraint_wt = 2.0,
+        # restraintmask = '@C,CA,N',
+        # /        
+        conf_min={}
 
 
 class Conf():
