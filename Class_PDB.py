@@ -83,8 +83,8 @@ class PDB():
         self.stru = None
         self.path = None
         self.MutaFlags = []
-        # local MD conf.
-        self.MD_conf_xxxx = xxxx
+        # default MD conf.
+        self._init_MD_conf()
 
         if wk_dir == '':
             #current dir by default
@@ -183,6 +183,17 @@ class PDB():
             with open(self.path,'w') as of:
                 of.write(self.file_str)
         return self.path
+
+
+    def _init_MD_conf(self):
+        '''
+        initialize default MD configuration. Replaced by manual setting if assigned later.
+        '''
+        self.conf_min = Config.Amber.conf_min
+        self.conf_heat = Config.Amber.conf_heat
+        self.conf_equi = Config.Amber.conf_equi
+        self.conf_prod = Config.Amber.conf_prod
+
 
     '''
     =========
@@ -1023,7 +1034,8 @@ class PDB():
         '''
         Use self.prmtop_path and self.inpcrd_path to initilize a MD simulation.
         The default MD configuration settings are assigned by class Config.Amber.
-        User can also set configuration for the current object by assigning self.MD_conf_xxxx.
+        * User can also set MD configuration for the current object by assigning values in self.conf_xxxx.
+        * e.g.: self.conf_heat['nstlim'] = 50000
         --------------
         o_dir   : Write files in o_dir (current self.dir/MD by default).
         tag     : tag the name of the MD folder
@@ -1034,40 +1046,207 @@ class PDB():
             o_dir = self.dir+'/MD'+tag
         mkdir(o_dir)
 
-        # default settings (set default self.MD_conf_xxxx)
-        self._set_MD_conf()
-
         # build input file (use self.MD_conf_xxxx)
-        self._build_MD_min(o_dir)
-        self._build_MD_heat(o_dir)
-        self._build_MD_equi(o_dir)
-        self._build_MD_prod(o_dir)
+        min_path = self._build_MD_min(o_dir)
+        heat_path = self._build_MD_heat(o_dir)
+        equi_path = self._build_MD_equi(o_dir)
+        prod_path = self._build_MD_prod(o_dir)
 
         # run sander
-        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+o_dir+'/min.in -o ' +o_dir+'/min.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+o_dir+'/min.rst -ref '+self.inpcrd_path)
-        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+o_dir+'/heat.in -o '+o_dir+'/heat.out -p '+self.prmtop_path+' -c '+o_dir+'/min.rst -ref ' +o_dir+'/min.rst -r ' +o_dir+'/heat.rst')
-        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+o_dir+'/equi.in -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst')
-        os.system('mpirun -np 8 $AMBERHOME/bin/sander.MPI -O -i '+o_dir+'/prod.in -o '+o_dir+'/prod.out -p '+self.prmtop_path+' -c '+o_dir+'/equi.rst -ref '+o_dir+'/equi.rst -r '+o_dir+'/prod.rst -x '+o_dir+'/prod.nc')
+        if Config.debug >= 1:
+            print('running: '+Config.PC_cmd +' '+ Config.Amber.AmberHome +'/bin/sander.MPI -O -i '+min_path +' -o '+o_dir+'/min.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+o_dir+'/min.rst -ref '+self.inpcrd_path)
+        os.system(Config.PC_cmd +' '+ Config.Amber.AmberHome +'/bin/sander.MPI -O -i '+min_path +' -o '+o_dir+'/min.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+o_dir+'/min.rst -ref '+self.inpcrd_path)
+        if Config.debug >= 1:
+            print('running: '+Config.PC_cmd +' '+ Config.Amber.AmberHome +'/bin/sander.MPI -O -i '+heat_path+' -o '+o_dir+'/heat.out -p '+self.prmtop_path+' -c '+o_dir+'/min.rst -ref ' +o_dir+'/min.rst -r ' +o_dir+'/heat.rst')
+        os.system(Config.PC_cmd +' '+ Config.Amber.AmberHome +'/bin/sander.MPI -O -i '+heat_path+' -o '+o_dir+'/heat.out -p '+self.prmtop_path+' -c '+o_dir+'/min.rst -ref ' +o_dir+'/min.rst -r ' +o_dir+'/heat.rst')
+        if Config.debug >= 1:
+            print('running: '+Config.PC_cmd +' '+ Config.Amber.AmberHome +'/bin/sander.MPI -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
+        os.system(Config.PC_cmd +' '+ Config.Amber.AmberHome +'/bin/sander.MPI -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
+        if Config.debug >= 1:
+            print('running: '+Config.PC_cmd +' '+ Config.Amber.AmberHome +'/bin/sander.MPI -O -i '+prod_path+' -o '+o_dir+'/prod.out -p '+self.prmtop_path+' -c '+o_dir+'/equi.rst -ref '+o_dir+'/equi.rst -r '+o_dir+'/prod.rst -x '+o_dir+'/prod.nc')
+        os.system(Config.PC_cmd +' '+ Config.Amber.AmberHome +'/bin/sander.MPI -O -i '+prod_path+' -o '+o_dir+'/prod.out -p '+self.prmtop_path+' -c '+o_dir+'/equi.rst -ref '+o_dir+'/equi.rst -r '+o_dir+'/prod.rst -x '+o_dir+'/prod.nc')
 
         return o_dir+'/prod.nc'
 
-    def _set_MD_conf(self):
-        '''
-        set MD configuration for current PDB object. If a "local" self.MD_conf_xxx is already assigned than it will not be replaced(higher pirority)
-        '''
-        # judge local
-
-        # assign default
-
 
     def _build_MD_min(self, o_dir):
-        pass
+        '''
+        Build configuration file for a minimization job
+        See default value Config.Amber.conf_min
+        '''
+        #path
+        o_path=o_dir+'/min.in'
+        #maxcyc related
+        maxcyc = self.conf_min['maxcyc']
+        if self.conf_min['ncyc'] == '0.5maxcyc':
+            ncyc = str(int(0.5 * maxcyc))
+        if self.conf_min['ntpr'] == '0.01maxcyc':
+            ntpr = str(int(0.01 * maxcyc))
+        maxcyc = str(maxcyc)
+        #restrain related
+        if self.conf_min['ntr'] == '1':
+            ntr_line = '  ntr   = '+self.conf_min['ntr']+',	 restraint_wt = '+self.conf_min['restraint_wt']+', restraintmask = '+self.conf_min['restraintmask']+','+line_feed
+        else:
+            ntr_line = ''
+
+        #text        
+        conf_str='''Minimize
+ &cntrl
+  imin  = 1,  ntx   = 1,  irest = 0,
+  ntc   = '''+self.conf_min['ntc']+''',    ntf = '''+self.conf_min['ntf']+''',
+  cut   = '''+self.conf_min['cut']+''',
+  maxcyc= '''+maxcyc+''', ncyc  = '''+ncyc+''',
+  ntpr  = '''+ntpr+''', ntwx  = 0,
+'''+ntr_line+''' /
+'''
+
+        #write
+        with open(o_path,'w') as of:
+            of.write(conf_str)
+        return o_path
+
+
     def _build_MD_heat(self, o_dir):
-        pass
+        '''
+        Build configuration file for a heat job
+        See default value Config.Amber.conf_heat
+        '''
+        #path
+        o_path=o_dir+'/heat.in'
+
+        # nstlim related
+        nstlim=self.conf_heat['nstlim']
+        if self.conf_heat['A_istep2'] == '0.9nstlim':
+            A_istep2=str(int(nstlim*0.9))
+        if self.conf_heat['B_istep1'] == 'A_istep2+1':
+            B_istep1=str(int(A_istep2)+1)
+        if self.conf_heat['ntpr'] == '0.01nstlim':
+            ntpr = str(int(nstlim*0.01))
+        if self.conf_heat['ntwx'] == 'nstlim':
+            ntwx = str(nstlim)
+        nstlim = str(nstlim)
+        #restrain related
+        if self.conf_heat['ntr'] == '1':
+            ntr_line = '  ntr   = '+self.conf_heat['ntr']+', restraint_wt = '+self.conf_heat['restraint_wt']+', restraintmask = '+self.conf_heat['restraintmask']+','+line_feed
+        else:
+            ntr_line = ''
+
+        conf_str='''Heat
+ &cntrl
+  imin  = 0,  ntx = 1, irest = 0,
+  ntc   = '''+self.conf_heat['ntc']+''', ntf = '''+self.conf_heat['ntf']+''',
+  cut   = '''+self.conf_heat['cut']+''',
+  nstlim= '''+nstlim+''', dt= '''+self.conf_heat['dt']+''',
+  tempi = '''+self.conf_heat['tempi']+''',  temp0='''+self.conf_heat['temp0']+''',  
+  ntpr  = '''+ntpr+''',  ntwx='''+ntwx+''',
+  ntt   = '''+self.conf_heat['ntt']+''', gamma_ln = '''+self.conf_heat['gamma_ln']+''',
+  ntb   = 1,  ntp = 0,
+  iwrap = '''+self.conf_heat['iwarp']+''',
+  nmropt= 1,
+  ig    = -1,
+'''+ntr_line+''' /
+ &wt
+  type  = 'TEMP0',
+  istep1= 0, istep2='''+A_istep2+''',
+  value1= '''+self.conf_heat['tempi']+''', value2='''+self.conf_heat['temp0']+''',
+ /
+ &wt
+  type  = 'TEMP0',
+  istep1= '''+B_istep1+''', istep2='''+nstlim+''',
+  value1= '''+self.conf_heat['temp0']+''', value2='''+self.conf_heat['temp0']+''',
+ /
+ &wt
+  type  = 'END',
+ /
+'''
+        #write
+        with open(o_path,'w') as of:
+            of.write(conf_str)
+        return o_path
+
+
     def _build_MD_equi(self, o_dir):
-        pass
+        '''
+        Build configuration file for the equilibration step
+        See default value Config.Amber.conf_equi
+        default ntwx -> 10ps
+        '''
+        #path
+        o_path=o_dir+'/equi.in'
+
+        # nstlim related
+        nstlim=self.conf_equi['nstlim']
+        if self.conf_equi['ntpr'] == '0.002nstlim':
+            ntpr = str(int(nstlim*0.002))
+        nstlim = str(nstlim)
+        #restrain related
+        if self.conf_equi['ntr'] == '1':
+            ntr_line = '  ntr   = '+self.conf_equi['ntr']+', restraint_wt = '+self.conf_equi['restraint_wt']+', restraintmask = '+self.conf_equi['restraintmask']+','+line_feed
+        else:
+            ntr_line = ''
+
+
+        conf_str='''Equilibration:constant pressure
+ &cntrl
+  imin  = 0,  ntx = '''+self.conf_equi['ntx']+''',  irest = '''+self.conf_equi['irest']+''',
+  ntf   = '''+self.conf_equi['ntf']+''',  ntc = '''+self.conf_equi['ntc']+''',
+  nstlim= '''+nstlim+''', dt= '''+self.conf_equi['dt']+''',
+  cut   = '''+self.conf_equi['cut']+''',
+  temp0 = '''+self.conf_equi['temp0']+''',
+  ntpr  = '''+ntpr+''', ntwx = '''+self.conf_equi['ntwx']+''',
+  ntt   = '''+self.conf_equi['ntt']+''', gamma_ln = '''+self.conf_equi['gamma_ln']+''',
+  ntb   = 2,  ntp = 1,
+  iwrap = '''+self.conf_equi['iwarp']+''',
+  ig    = -1,
+'''+ntr_line+''' /
+'''
+
+        #write
+        with open(o_path,'w') as of:
+            of.write(conf_str)
+        return o_path
+
+
+
     def _build_MD_prod(self, o_dir):
-        pass
+        '''
+        Build configuration file for the production step
+        See default value Config.Amber.conf_prod
+        default ntwx -> 10ps
+        '''
+        #path
+        o_path=o_dir+'/prod.in'
+
+        # nstlim related
+        nstlim=self.conf_prod['nstlim']
+        if self.conf_prod['ntpr'] == '0.001nstlim':
+            ntpr = str(int(nstlim*0.001))
+        nstlim = str(nstlim)
+        #restrain related
+        if self.conf_prod['ntr'] == '1':
+            ntr_line = '  ntr   = '+self.conf_prod['ntr']+', restraint_wt = '+self.conf_prod['restraint_wt']+', restraintmask = '+self.conf_prod['restraintmask']+','+line_feed
+        else:
+            ntr_line = ''        
+
+        conf_str='''Production: constant pressure
+ &cntrl
+  imin  = 0, ntx = '''+self.conf_prod['ntx']+''', irest = '''+self.conf_prod['irest']+''',
+  ntf   = '''+self.conf_prod['ntf']+''',  ntc = '''+self.conf_prod['ntc']+''',
+  nstlim= '''+nstlim+''', dt= '''+self.conf_prod['dt']+''',
+  cut   = '''+self.conf_prod['cut']+''',
+  temp0 = '''+self.conf_prod['temp0']+''',
+  ntpr  = '''+ntpr+''', ntwx = '''+self.conf_prod['ntwx']+''',
+  ntt   = '''+self.conf_prod['ntt']+''', gamma_ln = '''+self.conf_prod['gamma_ln']+''',
+  ntb   = 2,  ntp = 1,
+  iwrap = '''+self.conf_prod['iwarp']+''',
+  ig    = -1,
+'''+ntr_line+''' /
+'''
+        
+        #write
+        with open(o_path,'w') as of:
+            of.write(conf_str)
+        return o_path
 
 
 
