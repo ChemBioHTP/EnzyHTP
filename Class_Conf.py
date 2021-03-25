@@ -38,6 +38,11 @@ class Config:
         # Default configuration for MD
         #
         # -----------------------------
+        # Water box type and size
+        # availible type: box/oct
+        box_type = 'box'
+        box_size = '10'
+        # -----------------------------
         #            min
         # Minimize
         #  &cntrl

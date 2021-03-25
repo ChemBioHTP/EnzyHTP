@@ -920,7 +920,8 @@ class PDB():
         Turn ligands to prepi (w/net charge), parameterize with parmchk
         -----------
         return [(perpi_1, frcmod_1), ...]
-        * BUG: Antechamber has a bug that if current dir has temp files from previous antechamber run (ANTECHAMBER_AC.AC, etc.) sqm will fail. 
+        * BUG: Antechamber has a bug that if current dir has temp files from previous antechamber run (ANTECHAMBER_AC.AC, etc.) sqm will fail. Now remove them everytime.
+        TODO: 增加一个选项支持检测是否已有参数文件
         '''
         parm_paths = []
 
@@ -940,7 +941,7 @@ class PDB():
         return parm_paths
 
 
-    def _combine_parm(self, lig_parms, o_path='', ifsolve=1, box_type='box', box_size='10'):
+    def _combine_parm(self, lig_parms, o_path='', ifsolve=1, box_type=Config.Amber.box_type, box_size=Config.Amber.box_size):
         '''
         combine different parmeter files and make finally inpcrd and prmtop
         -------

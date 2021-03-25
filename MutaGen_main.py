@@ -7,26 +7,17 @@ def main():
     #use tleap to randomly mutate the PDB
     for i in range(1):
         PDB1=PDB('2kz2init_amb.pdb',wk_dir='./2kz2')
-        #PDB1.Add_MutaFlag('XA12G')
-        #PDB1.PDB2PDBwLeap()
+        PDB1.Add_MutaFlag('XA12G')
+        PDB1.PDB2PDBwLeap()
     #use minimization to relax each mutated PDB
         PDB1.PDB2FF()
-        PDB1.PDBMD()
-        #PDB1.PDBMin()
+        PDB1.PDBMin()
     #run MD
-        # os.system('mkdir MD')
-        # PDB1.rm_wat()
-        # PDB1.PDB2FF()
+        PDB1.rm_wat()
+        PDB1.PDB2FF()
 
-        #Maybe these should go into the PDBMD func?
-        # change the structure of conf to ade-like
-        # MD=Conf()
-        # MD.set_MD_min()
-        # MD.set_MD_heat()
-        # MD.set_MD_equi()
-        # MD.set_MD_prod()
-        # MD.deploy(path='./MD')
-        # PDB1.PDBMD(conf_path=MD.deploy_path)
+        PDB1.conf_prod['nstlim'] = 100000000 # Edit MD configuration (see default in Class_Conf.py - Config.Amber)
+        PDB1.PDBMD(tag='XA12G')
 
         #print(Check_PDB(PDB3_path,Flag), file='min_cache/Check'+Flag+'.log')
 
