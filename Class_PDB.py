@@ -440,6 +440,8 @@ class PDB():
                 - Fix1: deprotonate all. 
                 - Fix2: rotate if there're still lone pair left 
                 - Fix3: run pka calculate containing ion (maybe pypka) and run Fix2 based on the result
+            - Ligand:
+                - Use OpenBable to protonate ligand by default
                 # switch HIE HID when dealing with HIS
         save to self.path
         '''
@@ -877,12 +879,26 @@ class PDB():
         return self.path
 
 
-    def rm_allH(self):
+    def rm_allH(self, ff='Amber'):
         '''
         remove wrong hydrogens added by leap after mutation (In the case that the input file was a H-less one from crystal.)
         '''
-        
+        # out path
+        o_path=self.path_name+'_rmH.pdb'
+        # H list
+        H_namelist=[]
+        for name in Resi_Ele_map[ff]:
+            if Resi_Ele_map[ff][name] == 'H':
+                H_namelist.append(name)
 
+        with open(self.path) as f:
+            with open(o_path,'w') as of:
+                for line in f:
+                    if line[12:16].strip() in H_namelist:
+                        continue
+                    of.write(line)
+
+        
     '''
     ========
     Gerneral MD
@@ -921,13 +937,15 @@ class PDB():
         return (self.prmtop_path,self.inpcrd_path)
 
     
-    def _ligand_parm(self, paths, method='AM1BCC'):
+    def _ligand_parm(self, paths, method='AM1BCC', renew=0):
         '''
         Turn ligands to prepi (w/net charge), parameterize with parmchk
-        -----------
         return [(perpi_1, frcmod_1), ...]
+        -----------
+        method  : method use for ligand charge. Only support AM1BCC now.
+        renew   : 0:(default) use old parm files if exist. 1: renew parm files everytime
+        * WARN: The parm file for ligand will always be like xxx/ligand_1.frcmod. Remember to enable renew when different object is sharing a same path.
         * BUG: Antechamber has a bug that if current dir has temp files from previous antechamber run (ANTECHAMBER_AC.AC, etc.) sqm will fail. Now remove them everytime.
-        TODO: 增加一个选项支持检测是否已有参数文件
         '''
         parm_paths = []
 
@@ -935,12 +953,17 @@ class PDB():
             if method == 'AM1BCC':
                 out_prepi = lig_pdb[:-3]+'prepin'
                 out_frcmod = lig_pdb[:-3]+'frcmod'
-                #gen prepi (net charge and correct protonation state is important)
-                os.system(Config.Amber.AmberHome+'/bin/antechamber -i '+lig_pdb+' -fi pdb -o '+out_prepi+' -fo prepi -c bcc -s 0 -nc '+str(net_charge))
-                if Config.debug <= 1:
-                    os.system('rm ANTECHAMBER* ATOMTYPE.INF NEWPDB.PDB PREP.INF sqm.pdb sqm.in sqm.out')
-                #gen frcmod
-                os.system(Config.Amber.AmberHome+'/bin/parmchk2 -i '+out_prepi+' -f prepi -o '+out_frcmod)                
+                if os.path.isfile(out_prepi) and os.path.isfile(out_frcmod) and not renew:
+                    if Config.debug >= 1:
+                        print('Parm files exist: ' + out_prepi + ' ' + out_frcmod)
+                        print('Using old parm files.')
+                else:
+                    #gen prepi (net charge and correct protonation state is important)
+                    os.system(Config.Amber.AmberHome+'/bin/antechamber -i '+lig_pdb+' -fi pdb -o '+out_prepi+' -fo prepi -c bcc -s 0 -nc '+str(net_charge))
+                    if Config.debug <= 1:
+                        os.system('rm ANTECHAMBER* ATOMTYPE.INF NEWPDB.PDB PREP.INF sqm.pdb sqm.in sqm.out')
+                    #gen frcmod
+                    os.system(Config.Amber.AmberHome+'/bin/parmchk2 -i '+out_prepi+' -f prepi -o '+out_frcmod)                
                 #record
                 parm_paths.append((out_prepi, out_frcmod))
 
@@ -1263,6 +1286,14 @@ class PDB():
         self.conf_prod = Config.Amber.conf_prod
 
 
+    def show_MD_conf(self):
+        '''
+        Show MD configuration of current object. 
+        '''
+        print('Min :     '+repr(self.conf_min))
+        print('Heat:     '+repr(self.conf_heat))
+        print('Equi:     '+repr(self.conf_equi))
+        print('Prod:     '+repr(self.conf_prod))
 
     '''
     ========

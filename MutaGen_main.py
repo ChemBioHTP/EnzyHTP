@@ -9,13 +9,15 @@ def main():
         PDB1=PDB('2kz2init_amb.pdb',wk_dir='./2kz2')
         print(PDB1.Add_MutaFlag('r'))
         PDB1.PDB2PDBwLeap()
+    # remove causal protonation from leap (Not sure if it's better to be before Min or not)
+        PDB1.rm_allH()
+        PDB1.get_protonation()
     #use minimization to relax each mutated PDB
         PDB1.PDB2FF()
         PDB1.PDBMin()
     #run MD
         PDB1.rm_wat()
         PDB1.PDB2FF()
-
         PDB1.conf_prod['nstlim'] = 100000000 # Edit MD configuration (see default in Class_Conf.py - Config.Amber)
         PDB1.PDBMD(tag='XA12G')
     

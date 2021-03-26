@@ -1,4 +1,5 @@
 from helper import line_feed
+from AmberMaps import Resi_Ele_map
 
 class PDB_line(object):
     '''
@@ -117,6 +118,10 @@ class PDB_line(object):
         return self.seg_id
     def get_element(self):
         self.element = self.line[76:78].strip()
+        # try to get if not exist
+        # if self.element == '':
+        #     if self.atom_name in Resi_Ele_map['Amber']:
+        #         self.element = Resi_Ele_map['Amber'][self.atom_name]
         return self.element
     def get_charge(self):
         self.charge = self.line[78:80].strip()
