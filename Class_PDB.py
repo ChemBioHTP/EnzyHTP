@@ -645,10 +645,10 @@ class PDB():
         self._get_file_path()
         with open(self.path,'r') as f:
             with open(out_PDB_path1,'w') as of:
+                chain_count = 1
                 for line in f:
                     pdb_l = PDB_line(line)
-                    
-                    chain_count = 1
+                                        
                     TER_flag = 0
                     if pdb_l.line_type == 'TER':
                         TER_flag = 1
@@ -663,7 +663,7 @@ class PDB():
                             t_chain_id=Flag[1]
                             t_resi_id =Flag[2]
 
-                            if chr(65+chain_count) == t_chain_id:
+                            if chr(64+chain_count) == t_chain_id:
                                 if pdb_l.resi_id == int(t_resi_id):
                                     
                                     # do not write old line if match a MutaFlag
@@ -727,6 +727,7 @@ class PDB():
         ----------------------------------------------------
         'random' or 'r' (default)
         ----------------------------------------------------
+        return a label of mutations
         '''
 
         if type(Flag) == str:
@@ -768,6 +769,11 @@ class PDB():
             print('Current MutaFlags:')
             for flag in self.MutaFlags:
                 print(self._build_MutaName(flag))
+
+        label=''
+        for flag in self.MutaFlags:
+            label=label+'_'+self._build_MutaName(flag) 
+        return label
                 
 
     def _read_MutaFlag(self, Flag):
@@ -806,7 +812,7 @@ class PDB():
         if not resi_id in resi_id_list:
             raise Exception('_read_MutaFlag: San check failed. Input resi id in not in range.'+line_feed+' range: '+ repr(resi_id_list))
         if not resi_2 in Resi_list:
-            raise Exception('_read_MutaFlag: Only support mutate to the known 21 residues. (Check in the AmberMap.Resi_list)')
+            raise Exception('_read_MutaFlag: Only support mutate to the known 21 residues. AmberMaps.Resi_list: '+ repr(Resi_list))
 
         # default
         if F_match.group(2) is None:
@@ -1100,7 +1106,6 @@ class PDB():
   ntpr  = '''+ntpr+''', ntwx  = 0,
 '''+ntr_line+''' /
 '''
-
         #write
         with open(o_path,'w') as of:
             of.write(conf_str)
@@ -1201,7 +1206,6 @@ class PDB():
   ig    = -1,
 '''+ntr_line+''' /
 '''
-
         #write
         with open(o_path,'w') as of:
             of.write(conf_str)
@@ -1242,12 +1246,21 @@ class PDB():
   iwrap = '''+self.conf_prod['iwarp']+''',
   ig    = -1,
 '''+ntr_line+''' /
-'''
-        
+'''        
         #write
         with open(o_path,'w') as of:
             of.write(conf_str)
         return o_path
+    
+
+    def reset_MD_conf(self):
+        '''
+        reset MD configuration of current object to default. 
+        '''
+        self.conf_min = Config.Amber.conf_min
+        self.conf_heat = Config.Amber.conf_heat
+        self.conf_equi = Config.Amber.conf_equi
+        self.conf_prod = Config.Amber.conf_prod
 
 
 
