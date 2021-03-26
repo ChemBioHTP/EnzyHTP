@@ -905,7 +905,7 @@ class PDB():
     ========
     '''
 
-    def PDB2FF(self, o_path='', lig_method='AM1BCC'):
+    def PDB2FF(self, o_path='', lig_method='AM1BCC', renew_lig=0):
         '''
         PDB2FF(self, o_path='')
         --------------------
@@ -932,7 +932,7 @@ class PDB():
         # combine
         if o_path != '':
             mkdir(o_path)
-        self._combine_parm(ligand_parm_paths, o_path=o_path)
+        self._combine_parm(ligand_parm_paths, o_path=o_path, renew=renew_lig)
         
         return (self.prmtop_path,self.inpcrd_path)
 

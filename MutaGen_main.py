@@ -24,7 +24,7 @@ def main():
     # demo: reset_MD_conf
         label = PDB1.Add_MutaFlag('r')
         PDB1.PDB2PDBwLeap()
-        PDB1.PDB2FF()
+        PDB1.PDB2FF(renew_lig=1) # not nessessary but available
         PDB1.PDBMin()
         PDB1.rm_wat()
         PDB1.PDB2FF()
