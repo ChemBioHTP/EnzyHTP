@@ -927,12 +927,12 @@ class PDB():
         ligands_pathNchrg = self.stru.build_ligands(lig_dir, ifcharge=1, ifunique=1)
         # metalcenters_path = self.stru.build_metalcenters(met_dir)
         # parm
-        ligand_parm_paths = self._ligand_parm(ligands_pathNchrg, method=lig_method)
+        ligand_parm_paths = self._ligand_parm(ligands_pathNchrg, method=lig_method, renew=renew_lig)
         # self._metal_parm(metalcenters_path)
         # combine
         if o_path != '':
             mkdir(o_path)
-        self._combine_parm(ligand_parm_paths, o_path=o_path, renew=renew_lig)
+        self._combine_parm(ligand_parm_paths, o_path=o_path)
         
         return (self.prmtop_path,self.inpcrd_path)
 
