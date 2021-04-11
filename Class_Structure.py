@@ -204,6 +204,7 @@ class Structure():
         '''
         get ligand from raw chains and clean chains by deleting the ligand part
         -----
+        ligand_list: only record user specified ligand if provided
         Method: Assume metal/ligand/solvent can only be in a seperate chain (or it can not be distinguish from artificial residues.)
                 - delete names from rd_non_ligand_list
                 + get names from ligand_list only if provided.
@@ -413,7 +414,7 @@ class Structure():
             ligand.sort() #Do nothing
 
 
-    def build(self, path, ff='AMBER', forcefield='ff14SB'):
+    def build(self, path, ff='AMBER', forcefield='ff14SB', keep_id = 0):
         '''
         build PDB after the change based on the chosen format and forcefield
         - line based on atom and contain chain index and residue index
@@ -428,47 +429,79 @@ class Structure():
         '''
         with open(path, 'w') as of:
             if ff == 'AMBER':
-                a_id = 0
-                r_id = 0
-                for chain in self.chains:
-                    #write chain
-                    for resi in chain:
-                        r_id = r_id+1
-                        for atom in resi:
-                            a_id = a_id + 1 #current line index
-                            line = atom.build(a_id= a_id, r_id = r_id, ff=ff, forcefield=forcefield)
+                if not keep_id:
+                    a_id = 0
+                    r_id = 0
+                    for chain in self.chains:
+                        #write chain
+                        for resi in chain:
+                            r_id = r_id+1
+                            for atom in resi:
+                                a_id = a_id + 1 #current line index
+                                line = atom.build(a_id= a_id, r_id = r_id, ff=ff, forcefield=forcefield)
+                                of.write(line)
+                        #write TER after each chain
+                        of.write('TER'+line_feed)
+
+                    c_id = chr(len(self.chains)+64)
+                    for metal in self.metalatoms:
+                        a_id = a_id + 1
+                        r_id = r_id + 1
+                        c_id = chr(ord(c_id)+1)
+
+                        line = metal.build(a_id= a_id, r_id = r_id, c_id = c_id, ff=ff, forcefield=forcefield)
+                        of.write(line)
+                        of.write('TER'+line_feed)
+
+                    for ligand in self.ligands:
+                        r_id = r_id + 1
+                        c_id = chr(ord(c_id)+1)
+
+                        for atom in ligand:
+                            a_id = a_id + 1
+                            line = atom.build(a_id= a_id, r_id = r_id, c_id = c_id, ff=ff, forcefield=forcefield)
                             of.write(line)
-                    #write TER after each chain
+                        of.write('TER'+line_feed)
+
+                    c_id = chr(ord(c_id)+1) # chain_id for all solvent
+                    for solvent in self.solvents:
+                        r_id = r_id + 1
+                        for atom in solvent:
+                            a_id = a_id + 1
+                            line = atom.build(a_id= a_id, r_id = r_id, c_id = c_id, ff=ff, forcefield=forcefield)
+                            of.write(line)
                     of.write('TER'+line_feed)
 
-                c_id = chr(len(self.chains)+64)
-                for metal in self.metalatoms:
-                    a_id = a_id + 1
-                    r_id = r_id + 1
-                    c_id = chr(ord(c_id)+1)
+                else:
+                    for chain in self.chains:
+                        #write chain
+                        for resi in chain:
+                            for atom in resi:
+                                line = atom.build(ff=ff, forcefield=forcefield)
+                                of.write(line)
+                        #write TER after each chain
+                        of.write('TER'+line_feed)
 
-                    line = metal.build(a_id= a_id, r_id = r_id, c_id = c_id, ff=ff, forcefield=forcefield)
-                    of.write(line)
-                    of.write('TER'+line_feed)
-
-                for ligand in self.ligands:
-                    r_id = r_id + 1
-                    c_id = chr(ord(c_id)+1)
-
-                    for atom in ligand:
-                        a_id = a_id + 1
-                        line = atom.build(a_id= a_id, r_id = r_id, c_id = c_id, ff=ff, forcefield=forcefield)
+                    c_id = chr(len(self.chains)+64)
+                    for metal in self.metalatoms:
+                        c_id = chr(ord(c_id)+1)
+                        line = metal.build(c_id = c_id, ff=ff, forcefield=forcefield)
                         of.write(line)
-                    of.write('TER'+line_feed)
+                        of.write('TER'+line_feed)
 
-                c_id = chr(ord(c_id)+1) # chain_id for all solvent
-                for solvent in self.solvents:
-                    r_id = r_id + 1
-                    for atom in solvent:
-                        a_id = a_id + 1
-                        line = atom.build(a_id= a_id, r_id = r_id, c_id = c_id, ff=ff, forcefield=forcefield)
-                        of.write(line)
-                of.write('TER'+line_feed)
+                    for ligand in self.ligands:
+                        c_id = chr(ord(c_id)+1)
+                        for atom in ligand:
+                            line = atom.build(c_id = c_id, ff=ff, forcefield=forcefield)
+                            of.write(line)
+                        of.write('TER'+line_feed)
+
+                    c_id = chr(ord(c_id)+1) # chain_id for all solvent
+                    for solvent in self.solvents:
+                        for atom in solvent:
+                            line = atom.build(c_id = c_id, ff=ff, forcefield=forcefield)
+                            of.write(line)
+                    of.write('TER'+line_feed)
 
 
             if ff == 'XXX':
@@ -625,6 +658,28 @@ class Structure():
         return all_P_atoms
 
 
+    def get_atom_id(self):
+        '''
+        return a list of id of all atoms in the structure
+        '''
+        atom_id_list = []
+        for chain in self.chains:
+            for res in chain:
+                for atom in res:
+                    atom_id_list.append(atom.id)
+        
+        for metal in self.metalatoms:
+            atom_id_list.append(metal.id)
+        
+        for lig in self.ligands:
+            for atom in lig:
+                atom_id_list.append(atom.id)
+
+        for sol in self.solvents:
+            for atom in sol:
+                atom_id_list.append(atom.id)
+
+        return atom_id_list
 
         
     '''
@@ -637,8 +692,7 @@ class Structure():
         '''
         len(obj) = len(obj.child_list)
         '''
-        return len(self.chains)+len(self.metalatoms)+len(self.ligands)
-
+        return len(self.chains)+len(self.metalatoms)+len(self.ligands)+len(self.solvents)
 
 
 class Chain(Child):
@@ -1422,8 +1476,9 @@ class Atom(Child):
         # get data
         atom_name = atom_line.atom_name
         coord = [atom_line.atom_x,atom_line.atom_y,atom_line.atom_z]
+        atom_id = atom_line.atom_id
 
-        return cls(atom_name, coord, ff)
+        return cls(atom_name, coord, ff, atom_id=atom_id)
 
 
     '''

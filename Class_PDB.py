@@ -450,7 +450,7 @@ class PDB():
     Protonation
     ========
     '''
-    def get_protonation(self, ph=7.0):
+    def get_protonation(self, ph=7.0, keep_id=0):
         '''
         Get protonation state based on PDB2PQR:
         1. Use PDB2PQR, save output to self.pqr_path
@@ -468,7 +468,7 @@ class PDB():
         out_path=self.path_name+'_aH.pdb'
         self._get_file_path()
         self._get_protonation_pdb2pqr(ph=ph)
-        self._protonation_Fix(out_path, ph=ph)
+        self._protonation_Fix(out_path, ph=ph, keep_id=keep_id)
         self.path = out_path
         self._update_name()
         self.stru.name=self.name
@@ -496,7 +496,7 @@ class PDB():
             run_pdb2pqr(args)
 
 
-    def _protonation_Fix(self, out_path, Metal_Fix='1', ph = 7.0):
+    def _protonation_Fix(self, out_path, Metal_Fix='1', ph = 7.0, keep_id=0):
         '''
         Add in the missing atoms and run detailed fixing
         save to self.path
@@ -530,8 +530,9 @@ class PDB():
         # PLACE HOLDER for other fix
 
         # build file
-        new_stru.sort()
-        new_stru.build(out_path)
+        if not keep_id:
+            new_stru.sort()
+        new_stru.build(out_path, keep_id=keep_id)
         self.stru = new_stru
 
 
@@ -1320,7 +1321,7 @@ class PDB():
     QM/MM
     ========
     '''
-
+    # 需要确保MD的结构和模板结构完全一致（溶剂、 配体）
     def PDB2QMMM(self, o_dir='',tag='', work_type='spe', qm='g16', keywords=''):
         '''
         generate QMMM input template based on [connectivity, atom order, work type, layer/freeze settings, charge settings]
@@ -1340,7 +1341,7 @@ class PDB():
         # coordinate 
         	- atom label (from .lib)
         	- atom charge
-        	- freeze part (general option / some presupposition) 
+        	- freeze part (general option / some presupposition / freeze MM) 
         	- layer (same as above)
         	- xyz (1. new system 2. existing template (do we still need?) -- from pdb / mdcrd / gout) ref: ONIOM_template_tool
         # connectivity
@@ -1503,6 +1504,7 @@ def PDB_to_AMBER_PDB(path):
 
 
 #TestOnly
-a = PDB('2kz2init_amb.pdb')
+# a = PDB('1Q4T_grep.pdb')
+# a.get_protonation()
 # a.PDB2QMMM(keywords='test')
-b = Layer(a, ['1-3,10-14,16', '100-110'])
+# b = Layer.preset(a, set_id=2)
