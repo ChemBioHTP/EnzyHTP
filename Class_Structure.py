@@ -384,7 +384,7 @@ class Structure():
             self.sort()
             
 
-    def sort(self):
+    def sort(self, if_local = 0):
         '''
         assign index according to current items
         chain.id
@@ -401,17 +401,43 @@ class Structure():
             residue.id within each above.
             list order within each residues.
         '''
-        # sort chain order
-        self.chains.sort(key=lambda chain: chain.id)
-        # rename each chain
-        for index, chain in enumerate(self.chains):
-            chain.id = chr(65+index) # Covert to ABC using ACSII mapping
-            # sort each chain
-            chain.sort()
+        if if_local:
+            # sort chain order
+            self.chains.sort(key=lambda chain: chain.id)
+            # rename each chain
+            for index, chain in enumerate(self.chains):
+                chain.id = chr(65+index) # Covert to ABC using ACSII mapping
+                # sort each chain
+                chain.sort()
 
-        # sort ligand // Do I really need?
-        for ligand in self.ligands:
-            ligand.sort() #Do nothing
+            # sort ligand // Do I really need?
+            for ligand in self.ligands:
+                ligand.sort() #Do nothing
+        else:
+            r_id = 0
+            a_id = 0
+            for chain in self.chains:
+                for res in chain:
+                    r_id +=1
+                    res.id = r_id
+                    for atom in res:
+                        a_id +=1
+                        atom.id = a_id
+            for metal in self.metalatoms:
+                a_id +=1
+                metal.id = a_id
+            for lig in self.ligands:
+                r_id +=1
+                lig.id = r_id
+                for atom in lig:
+                    a_id +=1
+                    atom.id = a_id
+            for sol in self.solvents:
+                r_id += 1
+                sol.id = r_id
+                for atom in sol:
+                    a_id += 1
+                    atom.id = a_id
 
 
     def build(self, path, ff='AMBER', forcefield='ff14SB', keep_id = 0):
@@ -693,6 +719,7 @@ class Structure():
         len(obj) = len(obj.child_list)
         '''
         return len(self.chains)+len(self.metalatoms)+len(self.ligands)+len(self.solvents)
+
 
 
 class Chain(Child):
