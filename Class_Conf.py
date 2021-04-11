@@ -7,6 +7,7 @@ Config --- Amber
         |- Gaussian
 -------------------------------------------------------------------------------------
 '''
+from math import exp
 import re
 
 # >>>>>> Resource <<<<<<
@@ -204,12 +205,14 @@ class Config:
         layer_preset = 0
         layer_atoms = []
 
+
+
 class Layer:
 	'''
 	set / use preset of oniom layer
 	------------
 	PDB: related PDB object
-	layer_atoms: list of layer's list of atom indexes 
+	layer: list of layer's list of atom indexes 
 	'''
 	def __init__(self, PDB_obj, atom_lists, if_set=0):
 		'''
@@ -217,7 +220,11 @@ class Layer:
 		'''
 		self.PDB = PDB_obj
 		if not if_set:
-			self.layer_atoms = []
+			self.layer = []
+
+			if len(atom_lists) not in [2,3]:
+				raise Exception('Layer.__init__: only support 2 or 3 layers. Input layers: '+str(len(atom_lists)))
+				
 			for layer in atom_lists:
 				atoms = []
 				for atom_str in layer.split(','):
@@ -228,27 +235,91 @@ class Layer:
 						atoms.extend(range(int(ID[0]),int(ID[1])+1))
 					else:
 						atoms.append(int(atom_str))
-				self.layer_atoms.append(atoms)
+				self.layer.append(atoms)
 		else:
 			#for preset
-			self.layer_atoms = atom_lists
+			self.layer = atom_lists
 
+		if Config.debug >= 1:
+			print('current layer atoms: ')
+			for i,atoms in enumerate(self.layer):
+				print(str(i)+':',len(atoms))
 		if Config.debug >= 2:
-			print('current layer atoms: ' + repr(self.layer_atoms))
+			print('current layer atoms: ' + repr(self.layer))
 									
 	
 	@classmethod
-	def preset(cls, PDB_obj, set_id):
+	def preset(cls, PDB_obj, set_id, lig_list=[]):
 		'''
 		preset layer settings for ONIOM
+                ------------
 		set_id = 
-		1: 只包含底物
-		2: 包含底物和“关键残基”
-		3: 包含一定半径内的所有残基、配体
-		4: 根据某种参数选择QM区域
+			(two layers)
+			1: Substrate only
+			2: Key ligands (specify ligand index or name; all ligand by default)
+			3: Substrate and key residues (manually assigned)
+			4: Substrate and all residues/ligands within a assigned radius
+			5: Based on some parameters to select the QM region
+		lig_list: (set_id = 2) key ligand index
 		'''
 		layer_atoms = []
+		PDB_obj.get_stru()
+		stru = PDB_obj.stru
+
+		if set_id not in [1,2,3,4,5]:
+			raise Exception('Only support 1-5 set_id now. You are entering: ' +str(set_id))
+
 		if set_id == 1:
-			想想怎么设置预设
+			# TODO: connect with the database and recognize the substrate in the future
+			pass
+
+		if set_id == 2:
+			if lig_list == []:
+				h_atoms=[]
+				lig_names = []
+				for lig in stru.ligands:
+					for atom in lig:
+						h_atoms.append(atom.id)
+					lig_names.append(repr((lig.name, lig.id)))
+				layer_atoms.append(h_atoms)
+				# log
+				if Config.debug >= 1:
+					print('Layer.preset(set_id=2): No id in lig_list, set all ligands to high layer by default')
+					print(' '.join(lig_names))
+			else:
+				h_atoms=[]
+				for lig_inp in lig_list:
+					if type(lig_inp) == int:
+						for lig in stru.ligands:
+							if lig.id == lig_inp:
+								for atom in lig:
+									h_atoms.append(atom.id)
+					if type(lig_inp) == str:
+						for lig in stru.ligands:
+							if lig.name == lig_inp:
+								for atom in lig:
+									h_atoms.append(atom.id)
+
+			l_atoms = list(set(stru.get_atom_id()).difference(set(h_atoms)))
+
+			layer_atoms = [h_atoms,l_atoms]
 		
-		return cls(PDB_obj, layer_atoms)
+		if set_id == 3:
+			pass
+		
+		return cls(PDB_obj, layer_atoms, if_set=1)
+
+
+	'''
+	====
+	Special Method
+	====
+	'''
+
+	def __getitem__(self, key: int):
+		'''
+		Chain_obj[int]: Chain_obj.residues[int]
+		-----
+		use residue index within the chain, start from 0
+		'''
+		return self.layer[key]

@@ -926,7 +926,7 @@ class PDB():
     ========
     '''
 
-    def PDB2FF(self, o_path='', lig_method='AM1BCC', renew_lig=0):
+    def PDB2FF(self, o_path='', lig_method='AM1BCC', renew_lig=0, ifsavepdb=0):
         '''
         PDB2FF(self, o_path='')
         --------------------
@@ -953,7 +953,7 @@ class PDB():
         # combine
         if o_path != '':
             mkdir(o_path)
-        self._combine_parm(ligand_parm_paths, o_path=o_path)
+        self._combine_parm(ligand_parm_paths, o_path=o_path, ifsavepdb=ifsavepdb)
         
         return (self.prmtop_path,self.inpcrd_path)
 
@@ -991,7 +991,7 @@ class PDB():
         return parm_paths
 
 
-    def _combine_parm(self, lig_parms, o_path='', ifsolve=1, box_type=Config.Amber.box_type, box_size=Config.Amber.box_size):
+    def _combine_parm(self, lig_parms, o_path='', ifsavepdb=0, ifsolve=1, box_type=Config.Amber.box_type, box_size=Config.Amber.box_size):
         '''
         combine different parmeter files and make finally inpcrd and prmtop
         -------
@@ -1000,6 +1000,7 @@ class PDB():
         metalcenters, artificial residues: TODO
         '''
         leap_path= self.cache_path+'/leap.in'
+        sol_path= self.path_name+'_ffsol.pdb'
         with open(leap_path, 'w') as of:
             of.write('source leaprc.protein.ff14SB'+line_feed)
             of.write('source leaprc.gaff'+line_feed)
@@ -1029,6 +1030,8 @@ class PDB():
                 of.write('saveamberparm a '+o_path+self.name+'.prmtop '+o_path+self.name+'.inpcrd'+line_feed)
                 self.prmtop_path=o_path+self.name+'.prmtop'
                 self.inpcrd_path=o_path+self.name+'.inpcrd'
+            if ifsavepdb:
+                of.write('savepdb a '+sol_path+line_feed)
             of.write('quit'+line_feed)
 
         os.system('tleap -s -f '+leap_path+' > '+leap_path[:-2]+'out')
@@ -1443,7 +1446,8 @@ class PDB():
         generate prmtop and use PDB2FF ?
         '''
         chrgspin='TODO'
-        # get layer form config
+        # get charge for high
+        
         return chrgspin
 
 
@@ -1504,7 +1508,7 @@ def PDB_to_AMBER_PDB(path):
 
 
 #TestOnly
-# a = PDB('1Q4T_grep.pdb')
-# a.get_protonation()
-# a.PDB2QMMM(keywords='test')
-# b = Layer.preset(a, set_id=2)
+a = PDB('1Q4T_grep_rmW_aH_ffsol.pdb')
+a.layer_preset=2
+a.PDB2QMMM(keywords='test')
+# a._get_oniom_layer()
