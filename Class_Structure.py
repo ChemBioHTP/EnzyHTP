@@ -264,7 +264,7 @@ class Structure():
                 residue = chain[i]
                 if residue.name in rd_solvent_list:
                     if Config.debug > 1:
-                        print('\033[1;34;40mStructure: found solvent in raw: '+chain.id+' '+residue.name+' '+str(residue.id)+' \033[0m')
+                        print('\033[1;34;40mStructure: found solvent in raw: '+residue.name+' '+str(residue.id)+' \033[0m')
                     solvents.append(residue)
                     del chain[i]
 
@@ -489,7 +489,7 @@ class Structure():
                             of.write(line)
                         of.write('TER'+line_feed)
 
-                    c_id = chr(ord(c_id)+1) # chain_id for all solvent
+                    c_id = chr(ord(c_id)+1) # same chain_id for all solvent
                     for solvent in self.solvents:
                         r_id = r_id + 1
                         for atom in solvent:
@@ -692,17 +692,25 @@ class Structure():
         for chain in self.chains:
             for res in chain:
                 for atom in res:
+                    if atom.id == None:
+                        raise Exception('Detected None in chain '+str(chain.id)+str(res.id)+' '+atom.name)
                     atom_id_list.append(atom.id)
         
         for metal in self.metalatoms:
+            if metal.id == None:
+                raise Exception('Detected None in metal '+ metal.name)
             atom_id_list.append(metal.id)
         
         for lig in self.ligands:
             for atom in lig:
+                if atom.id == None:
+                    raise Exception('Detected None in ligands', res.id, atom.name)
                 atom_id_list.append(atom.id)
 
         for sol in self.solvents:
             for atom in sol:
+                if atom.id == None:
+                    raise Exception('Detected None in solvent', res.id, atom.name)
                 atom_id_list.append(atom.id)
 
         return atom_id_list
@@ -1695,7 +1703,7 @@ class Metalatom(Atom):
         '''
         generate from Atom object. copy data.
         '''
-        return cls(atom_obj.name, atom_obj.parent.name, atom_obj.coord, atom_obj.ff, parent=atom_obj.parent)
+        return cls(atom_obj.name, atom_obj.parent.name, atom_obj.coord, atom_obj.ff, id=atom_obj.id, parent=atom_obj.parent)
 
     def get_valence(self):
         pass
