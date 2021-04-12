@@ -180,7 +180,7 @@ class Structure():
                         # add a logger in the future
                         print('\033[1;34;40mStructure: found metal in raw: '+chain.id+' '+residue.name+' '+str(residue.id)+' \033[0m')
                         metalatoms.append(residue)
-                        del chain[residue]
+                        del chain[i]
         if method == '2':
             # Not finished yet
             pass
@@ -228,13 +228,13 @@ class Structure():
                             # add a logger in the future
                             print('\033[1;34;40mStructure: found user assigned ligand in raw: '+chain.id+' '+residue.name+' '+str(residue.id)+' \033[0m')
                             ligands.append(residue)
-                            del chain[residue]
+                            del chain[i]
                     else:
                         if residue.name not in rd_solvent_list:
                             if residue.name not in rd_non_ligand_list:
                                 print('\033[1;34;40mStructure: found ligand in raw: '+chain.id+' '+residue.name+' '+str(residue.id)+' \033[0m')
                                 ligands.append(residue)
-                            del chain[residue]
+                            del chain[i]
 
 
         # Convert pseudo residues to Ligand object 
@@ -266,7 +266,7 @@ class Structure():
                     if Config.debug > 1:
                         print('\033[1;34;40mStructure: found solvent in raw: '+chain.id+' '+residue.name+' '+str(residue.id)+' \033[0m')
                     solvents.append(residue)
-                    del chain[residue]
+                    del chain[i]
 
         # Convert pseudo residues to Ligand object 
         holders = []
