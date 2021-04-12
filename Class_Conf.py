@@ -258,7 +258,7 @@ class Layer:
 			1: Substrate only
 			2: Key ligands (specify ligand index or name; all ligand by default)
 			3: Substrate and key residues (manually assigned)
-			4: Substrate and all residues/ligands within a assigned radius
+			4: Substrate and all residues/ligands within a assigned radius (Need to keep consistant molecular number)
 			5: Based on some parameters to select the QM region
 		lig_list: (set_id = 2) key ligand index
 		'''
@@ -302,6 +302,17 @@ class Layer:
 
 			l_atoms = list(set(stru.get_atom_id()).difference(set(h_atoms)))
 
+			#debug
+			# a = stru.get_atom_id()
+			# b = set(a)
+			# for i in b:
+			# 	count = 0
+			# 	for j in a:
+			# 		if j == i:
+			# 			count +=1
+			# 	if count > 1:
+			# 		print(i, ':', count)
+			
 			layer_atoms = [h_atoms,l_atoms]
 		
 		if set_id == 3:
@@ -323,3 +334,7 @@ class Layer:
 		use residue index within the chain, start from 0
 		'''
 		return self.layer[key]
+
+
+	def __len__(self):
+		return len(self.layer)
