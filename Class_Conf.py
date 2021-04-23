@@ -229,9 +229,12 @@ class Layer:
 				atoms = []
 				for atom_str in layer.split(','):
 					if '-' in atom_str:
-						if re.match(r'[0-9]+-[0-9]+',atom_str) == None:
+						if re.match(r'[0-9]+-(?:[0-9]+|L)',atom_str) == None:
 							raise Exception('Wrong layer syntax of atom indexes. e.g.: 1,2,3-5')
 						ID = atom_str.split('-')
+						for i, j in enumerate(ID):
+							if j == 'L':
+								ID[i] = PDB_obj.get_last_A_id()
 						atoms.extend(range(int(ID[0]),int(ID[1])+1))
 					else:
 						atoms.append(int(atom_str))

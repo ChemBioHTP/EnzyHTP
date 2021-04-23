@@ -1,5 +1,6 @@
 import numpy as np
-import os
+import os, re
+from math import ceil
 from Class_line import PDB_line
 from Class_Conf import Config
 from helper import Child, line_feed, mkdir
@@ -12,6 +13,7 @@ except ImportError:
 __doc__='''
 This module extract and operate structural infomation from PDB
 # will replace some local function in PDB class in the future.
+问题：缺少一个迭代所有原子的方法 可以返回一个按a_id排序的列表 但是由于数据量太大真的合适吗
 -------------------------------------------------------------------------------------
 Class Structure
 -------------------------------------------------------------------------------------
@@ -450,7 +452,7 @@ class Structure():
             - resi and atom indexes start from 1 and DO NOT reset reaching a new chain. 
             - use atom and residue names from amber force field.
             - place metal, ligand, solvent in seperate chains (seperate with TER)
-            - metal -> ligand -> solvent order
+            - ligand -> metal -> solvent order
             * do not sort atomic order in a residue like tleap does.
         '''
         with open(path, 'w') as of:
@@ -470,14 +472,6 @@ class Structure():
                         of.write('TER'+line_feed)
 
                     c_id = chr(len(self.chains)+64)
-                    for metal in self.metalatoms:
-                        a_id = a_id + 1
-                        r_id = r_id + 1
-                        c_id = chr(ord(c_id)+1)
-
-                        line = metal.build(a_id= a_id, r_id = r_id, c_id = c_id, ff=ff, forcefield=forcefield)
-                        of.write(line)
-                        of.write('TER'+line_feed)
 
                     for ligand in self.ligands:
                         r_id = r_id + 1
@@ -487,6 +481,15 @@ class Structure():
                             a_id = a_id + 1
                             line = atom.build(a_id= a_id, r_id = r_id, c_id = c_id, ff=ff, forcefield=forcefield)
                             of.write(line)
+                        of.write('TER'+line_feed)
+
+                    for metal in self.metalatoms:
+                        a_id = a_id + 1
+                        r_id = r_id + 1
+                        c_id = chr(ord(c_id)+1)
+
+                        line = metal.build(a_id= a_id, r_id = r_id, c_id = c_id, ff=ff, forcefield=forcefield)
+                        of.write(line)
                         of.write('TER'+line_feed)
 
                     c_id = chr(ord(c_id)+1) # same chain_id for all solvent
@@ -509,17 +512,18 @@ class Structure():
                         of.write('TER'+line_feed)
 
                     c_id = chr(len(self.chains)+64)
-                    for metal in self.metalatoms:
-                        c_id = chr(ord(c_id)+1)
-                        line = metal.build(c_id = c_id, ff=ff, forcefield=forcefield)
-                        of.write(line)
-                        of.write('TER'+line_feed)
 
                     for ligand in self.ligands:
                         c_id = chr(ord(c_id)+1)
                         for atom in ligand:
                             line = atom.build(c_id = c_id, ff=ff, forcefield=forcefield)
                             of.write(line)
+                        of.write('TER'+line_feed)
+
+                    for metal in self.metalatoms:
+                        c_id = chr(ord(c_id)+1)
+                        line = metal.build(c_id = c_id, ff=ff, forcefield=forcefield)
+                        of.write(line)
                         of.write('TER'+line_feed)
 
                     c_id = chr(ord(c_id)+1) # chain_id for all solvent
@@ -715,7 +719,63 @@ class Structure():
 
         return atom_id_list
 
+
+    def get_atom_charge(self, prmtop_path):
+        '''
+        requires generate the stru using !SAME! PDB as one that generate the prmtop. 
+        '''
+        pass   
+
+
+    def get_atom_type(self, prmtop_path):
+        '''
+        requires generate the stru using !SAME! PDB as one that generate the prmtop. 
+        '''
+        # get type list
+        with open(prmtop_path) as f:
+            type_list=[]
+            line_index=0
+
+            for line in f:
+                
+                line_index=line_index+1 #current line
+                
+                if line.strip() == r'%FLAG POINTERS':
+                    format_flag=line_index
+                if line.strip() == r'%FLAG AMBER_ATOM_TYPE':
+                    type_flag=line_index
+
+                if 'format_flag' in dir():
+                    if line_index == format_flag+2:
+                        N_atom=int(line.split()[0])
+                        del format_flag
+                        
+                if 'type_flag' in dir():
+                    if line_index >= type_flag+2 and line_index <= type_flag+1+ceil(N_atom/5):
+                        for i in line.strip().split():
+                            type_list.append(i)
+        # assign type to atom
+        for chain in self.chains:
+            for res in chain:
+                for atom in res:
+                    atom.type = type_list[atom.id-1]
+        for atom in self.metalatoms:
+            if atom.id == None:
+                raise Exception('Detected None in metal '+ atom.name)
+            atom.type = type_list[atom.id-1]
+        for lig in self.ligands:
+            for atom in lig:
+                if atom.id == None:
+                    raise Exception('Detected None in ligands', res.id, atom.name)
+                atom.type = type_list[atom.id-1]
+        for sol in self.solvents:
+            for atom in sol:
+                if atom.id == None:
+                    raise Exception('Detected None in solvent', res.id, atom.name)
+                atom.type = type_list[atom.id-1]
         
+        
+
     '''
     ====
     Special Method
@@ -727,6 +787,25 @@ class Structure():
         len(obj) = len(obj.child_list)
         '''
         return len(self.chains)+len(self.metalatoms)+len(self.ligands)+len(self.solvents)
+
+
+    def __getitem__(self, i):
+        '''
+        pop four elements with fixed order
+        -----------------
+        capable with future update
+        '''
+
+        if i == 1:
+            return self.chains
+        if i == 2:
+            return self.metalatoms
+        if i == 3:
+            return self.ligands
+        if i == 4:
+            return self.solvents
+        if i > 4:
+            raise StopIteration
 
 
 
@@ -1001,9 +1080,6 @@ class Chain(Child):
         self.seq_one = seq_one
                 
             
-
-        
-
 
     def _find_resi_name(self, name: str):
         '''
@@ -1532,16 +1608,19 @@ class Atom(Child):
         save found list of Atom object to self.connect 
         '''
         self.connect = []
-        r_id = self.resi.id
+        r = self.resi
+        r1 = self.resi.chain.residues[0]
+        rm1 = self.resi.chain.residues[-1]
 
-        if r_id == 1:
+        if r == r1:
             # N terminal
             name_list = resi_nt_cnt_map[self.resi.name][self.name]
-        if r_id == len(self.resi.chain):
-            # C terminal
-            name_list = resi_ct_cnt_map[self.resi.name][self.name]
-        if r_id != 1 and r_id != len(self.resi.chain):
-            name_list = resi_cnt_map[self.resi.name][self.name]
+        else:
+            if r == rm1:
+                # C terminal
+                name_list = resi_ct_cnt_map[self.resi.name][self.name]
+            else:
+                name_list = resi_cnt_map[self.resi.name][self.name]
 
         for name in name_list:
             try:
@@ -1640,14 +1719,76 @@ class Atom(Child):
 
         return line
 
+
+    def build_oniom(self, layer, chrg=None, cnt_info:list=None, if_lig=0 , if_sol=0):
+        '''
+        build line for oniom. Use element name for ligand atoms since they are mostly in QM regions.
+        Gaussian use *ff96* which the atom type is corresponding to all_amino94.lib and ion94.lib in Amber distribution
+        ---------
+        chrg    : charge of current atom
+        layer   : layer where atom in
+        cnt_info: (low atom only) when current atom was a boundary atom. Provide [cnt_atom_ele, cnt_atom_label, cnt_atom_id]
+        '''
+        cnt_flag = ''
+        self.get_ele()
+        if layer not in ['h','l']:
+            raise Exception('build_oniom: please use: "h" or "l" for layer')
+        if layer == 'h':
+            fz_flag = '0'
+            ly_flag = 'H'
+        if layer == 'l':
+            fz_flag = '-1'
+            ly_flag = 'L'       
+            if cnt_info != None:
+                cnt_flag = ' '+ cnt_info[0] + '-'+cnt_info[1]+' '+str(cnt_info[2])
+
+        # label: deal with N/C terminal and ligand            
+        if if_lig:
+            G16_label = self.ele
+        if if_sol:
+            G16_label = G16_label_map[self.parent.name][self.name]
+        if not if_sol and not if_lig:
+            r = self.resi
+            r1 = self.resi.chain.residues[0]
+            rm1 = self.resi.chain.residues[-1]
+            if r == r1 and self.name in ['H1','H2','H3']:
+                G16_label = 'H'
+            else:
+                if r == rm1 and self.name == 'OXT':
+                    G16_label = 'O2'
+                else:
+                    G16_label = G16_label_map[self.parent.name][self.name]
+
+        # chrg
+        if chrg == None:
+            try:
+                chrg = self.charge # from prmtop
+            except NameError:
+                raise Exception('You need to at least provide a charge or use get_atom_charge to get one from prmtop file.')
+
+        atom_label = '{:<16}'.format(' '+self.ele+'-'+G16_label+'-'+str(round(chrg,6)))
+        fz_flag = '{:>2}'.format(fz_flag)
+        x = '{:<14.8f}'.format(self.coord[0])
+        y = '{:<14.8f}'.format(self.coord[1])
+        z = '{:<14.8f}'.format(self.coord[2])
+
+        line = atom_label+' '+ fz_flag + '   ' + x +' '+ y +' '+ z + ' ' + ly_flag + cnt_flag +line_feed
+
+        return line
+
+
     def get_around(self, rad):
         pass
+
     
     def get_ele(self):
         '''
         get self.ele from a certain map according to the ff type
         '''
-        self.ele = Resi_Ele_map[self.ff][self.name]
+        if self.name in Resi_Ele_map[self.ff].keys():
+            self.ele = Resi_Ele_map[self.ff][self.name]
+        else:
+            self.ele = re.match('^[A-Z][a-z]?',self.name).group()
 
     '''
     ====
@@ -1697,6 +1838,7 @@ class Metalatom(Atom):
         Atom.__init__(self, name, coord, ff, id, parent)
 
         self.donor_atoms = []
+        self.parm=None
 
     @classmethod
     def fromAtom(cls, atom_obj):
@@ -1804,6 +1946,7 @@ class Metalatom(Atom):
         '''
         pass
 
+
     def build(self, a_id=None, r_id=None, c_id=None,  ff='AMBER', forcefield = 'ff14SB'):
         '''
         generate an metal atom output line. End with LF
@@ -1844,7 +1987,58 @@ class Metalatom(Atom):
 
         return line
 
-    
+
+    def build_oniom(self, layer, chrg=None, cnt_info:list=None):
+        '''
+        build a metal line for oniom. 
+        Gaussian use *ff96* which the atom type is corresponding to all_amino94.lib and ion94.lib in Amber distribution
+        For metals that do not exist in ion94.lib. Custom a type and get parms from TIP3P lib.
+        ---------
+        chrg    : charge of current metal atom
+        layer   : layer where atom in
+        cnt_info: (low atom only) when current atom was a boundary atom. Provide [cnt_atom_ele, cnt_atom_label, cnt_atom_id]
+        '''
+        cnt_flag = ''
+        if layer not in ['h','l']:
+            raise Exception('build_oniom: please use: "h" or "l" for layer')
+        if layer == 'h':
+            fz_flag = '0'
+            ly_flag = 'H'
+        if layer == 'l':
+            fz_flag = '-1'
+            ly_flag = 'L'       
+            if cnt_info != None:
+                cnt_flag = ' '+ cnt_info[0] + '-'+cnt_info[1]+' '+str(cnt_info[2])
+
+        # label
+        if self.resi_name in G16_label_map.keys():
+            G16_label = G16_label_map[self.resi_name][self.name]
+        else:
+            if Config.debug >= 1:
+                print('Metal: '+self.name+ ' not in build-in atom type of ff96.')
+                print('Use parameters and atom types from TIP3P (frcmod.ionsjc_tip3p & frcmod.ions234lm_126_tip3p)')
+            G16_label = self.resi_name.strip('+-')+'0'
+            self.parm = tip3p_metal_map[self.resi_name][self.name]
+            self.parm[0] = G16_label
+
+        # chrg
+        if chrg == None:
+            try:
+                chrg = self.charge # from prmtop
+            except NameError:
+                raise Exception('You need to at least provide a charge or use get_atom_charge to get one from prmtop file.')
+
+        atom_label = '{:<16}'.format(' '+self.ele+'-'+G16_label+'-'+str(round(chrg,6)))
+        fz_flag = '{:>2}'.format(fz_flag)
+        x = '{:<14.8f}'.format(self.coord[0])
+        y = '{:<14.8f}'.format(self.coord[1])
+        z = '{:<14.8f}'.format(self.coord[2])
+
+        line = atom_label+' '+ fz_flag + '   ' + x +' '+ y +' '+ z + ' ' + ly_flag + cnt_flag +line_feed
+
+        return line
+
+
 
 class Ligand(Residue):
     '''
