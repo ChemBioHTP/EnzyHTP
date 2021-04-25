@@ -632,19 +632,143 @@ class Structure():
         return out_paths
 
 
-    def get_connectivty_table(self, ff='GAUSSIAN', metal_fix = 1, ligand_fix = 1):
+    def get_connect(self, metal_fix = 1, ligand_fix = 1, prepi_path=None):
+        '''
+        get connectivity
+        -----------------
+        TREATMENT
+        chain: based on connectivity map of each atom in each residue
+        metalatom:  fix1: treat as isolated atom
+                    fix2: connect to donor atom (MCPB?)
+        ligand: fix1: use antechamber generated prepin file to get connectivity.
+                      according to https://ambermd.org/doc/prep.html the coordniate line will always start at the 11th line after 3 DUMM.
+        '''
+        # san check
+        if ligand_fix == 1 and prepi_path == None:
+            raise Exception('Ligand fix 1 requires prepin_path.')
+        # chain part
+        for chain in self.chains:
+            for res in chain:
+                for atom in res:
+                    atom.get_connect()
+        for sol in self.solvents:
+            for atom in sol:
+                atom.get_connect()
+        # metal
+        for metal in self.metalatoms:
+            metal.connect = []
+        if metal_fix == 1:
+            pass
+        if metal_fix == 2:
+            raise Exception('TODO: Still working on 2 right now')
+        
+        # ligand
+        # init
+        for lig in self.ligands:
+            for atom in lig:
+                atom.connect = []
+        # fix 1
+        if ligand_fix == 1:
+            for lig in self.ligands:
+                # read prepin for each ligand
+                with open(prepi_path[lig.name]) as f:
+                    line_id = 0
+                    if_loop = 0
+                    for line in f:
+                        line_id += 1
+                        if line.strip() == '':
+                            if if_loop == 1:
+                                # switch off loop and break if first blank after LOOP encountered
+                                if_loop = 0
+                                break
+                            continue
+                        if if_loop:
+                            lp = line.strip().split()
+                            lig._find_atom_name(lp[0]).connect.append(lig._find_atom_name(lp[1]))
+                            continue
+                        # loop connect starts at LOOP
+                        if line.strip() == 'LOOP':
+                            if_loop = 1
+                            continue
+                        # coord starts at 11th
+                        if line_id >= 11:
+                            lp = line.strip().split()
+                            atom_id = int(lp[0])-3
+                            atom_cnt = int(lp[4])-3
+                            if atom_cnt != 0:
+                                lig[atom_id-1].connect.append(lig[atom_cnt-1])
+                                lig[atom_cnt-1].connect.append(lig[atom_id-1])
+                            
+
+    def get_connectivty_table(self, ff='GAUSSIAN', metal_fix = 1, ligand_fix = 1, prepi_path=None):
         '''
         get connectivity table with atom index based on 'ff' settings:
         ff = GAUSSIAN  -- continuous atom index start from 1, do not seperate by chain
         -------------------
         TREATMENT
-        chain: based on connectivity map of each atom in each residue
-        metalatom:  fix1: treat as isolated atom
-                    fix2: connect to donor atom (MCPB?)
-        ligand: fix1: use openboble to generate a mol2 file and read connectivity in it.
+        Use original atom.id.
+            chain: based on connectivity map of each atom in each residue
+            metalatom:  fix1: treat as isolated atom
+                        fix2: connect to donor atom (MCPB?)
+            ligand: fix1: use antechamber generated prepin file to get connectivity.
+        Use 1.0 for all connection.
+            Amber force field in gaussian do not account in bond order. (Only UFF does.)
+            Note that bond order less than 0.1 do not count in MM but only in opt redundant coordinate.
         '''
         connectivty_table = ''
-        #TODO
+        # get connect for every atom in stru
+        self.get_connect(metal_fix, ligand_fix, prepi_path)
+
+        # write str in order
+        # Note: Only write the connected atom with larger id
+        a_id = 0
+        for chain in self.chains:
+            for res in chain:
+                for atom in res:
+                    a_id += 1
+                    cnt_line = ' '+str(atom.id)
+                    # san check
+                    if atom.id != a_id:
+                        raise Exception('atom id error.')
+                    for cnt_atom in atom.connect:
+                        if cnt_atom.id > atom.id:
+                            cnt_line += ' '+str(cnt_atom.id)+' '+'1.0'
+                    connectivty_table += cnt_line+line_feed
+                        
+        for lig in self.ligands:
+            for atom in lig:
+                a_id += 1
+                cnt_line = ' '+str(atom.id)
+                # san check
+                if atom.id != a_id:
+                    raise Exception('atom id error.')
+                for cnt_atom in atom.connect:
+                    if cnt_atom.id > atom.id:
+                        cnt_line += ' '+str(cnt_atom.id)+' '+'1.0'
+                connectivty_table += cnt_line+line_feed
+
+        for atom in self.metalatoms:
+            a_id += 1
+            cnt_line = ' '+str(atom.id)
+            # san check
+            if atom.id != a_id:
+                raise Exception('atom id error.')
+            for cnt_atom in atom.connect:
+                if cnt_atom.id > atom.id:
+                    cnt_line += ' '+str(cnt_atom.id)+' '+'1.0'
+            connectivty_table += cnt_line+line_feed
+
+        for sol in self.solvents:
+            for atom in sol:
+                a_id += 1
+                cnt_line = ' '+str(atom.id)
+                # san check
+                if atom.id != a_id:
+                    raise Exception('atom id error.')
+                for cnt_atom in atom.connect:
+                    if cnt_atom.id > atom.id:
+                        cnt_line += ' '+str(cnt_atom.id)+' '+'1.0'
+                connectivty_table += cnt_line+line_feed
 
         return connectivty_table
 
@@ -1374,6 +1498,7 @@ class Residue(Child):
         '''
         pass
 
+
     def rot_proton(self, T_atom):
         '''
         rotate the dihedral relate to the target H-atom bond
@@ -1608,19 +1733,23 @@ class Atom(Child):
         save found list of Atom object to self.connect 
         '''
         self.connect = []
-        r = self.resi
-        r1 = self.resi.chain.residues[0]
-        rm1 = self.resi.chain.residues[-1]
 
-        if r == r1:
-            # N terminal
-            name_list = resi_nt_cnt_map[self.resi.name][self.name]
+        if self.resi.name in rd_solvent_list:
+            name_list = resi_cnt_map[self.resi.name][self.name]
         else:
-            if r == rm1:
-                # C terminal
-                name_list = resi_ct_cnt_map[self.resi.name][self.name]
+            r = self.resi
+            r1 = self.resi.chain.residues[0]
+            rm1 = self.resi.chain.residues[-1]
+
+            if r == r1:
+                # N terminal
+                name_list = resi_nt_cnt_map[self.resi.name][self.name]
             else:
-                name_list = resi_cnt_map[self.resi.name][self.name]
+                if r == rm1:
+                    # C terminal
+                    name_list = resi_ct_cnt_map[self.resi.name][self.name]
+                else:
+                    name_list = resi_cnt_map[self.resi.name][self.name]
 
         for name in name_list:
             try:
