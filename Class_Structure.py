@@ -1215,6 +1215,20 @@ class Chain(Child):
             if resi.name == name:
                 out_list.append(resi)
         return out_list
+
+    def _find_resi_id(self, id: int):
+        '''
+        find residues according to the id
+        return a found residue
+        ''' 
+        out_list = []
+        for resi in self.residues:
+            if resi.id == id:
+                out_list.append(resi)
+        if len(out_list) > 1:
+            print('\033[32;0mShould there be same residue id in chain +'+self.name+str(self.id)+'?+\033[0m')
+            raise Exception
+        return out_list[0]
     
     def _del_resi_name(self, name: str):
         '''
@@ -1224,6 +1238,7 @@ class Chain(Child):
         for i in range(len(self.residues)-1,-1,-1):
             if self.residues[i].name == name:
                 del self.residues[i]
+
 
     '''
     ====
@@ -1753,12 +1768,38 @@ class Atom(Child):
 
         for name in name_list:
             try:
-                self.connect.append(self.resi._find_atom_name(name))
+                if name not in ['-1C', '+1N']:
+                    cnt_atom = self.resi._find_atom_name(name)
+                if name == '-1C':
+                    cnt_resi = self.resi.chain._find_resi_id(self.resi.id-1)
+                    cnt_atom = cnt_resi._find_atom_name('C')
+                if name == '+1N':
+                    cnt_resi = self.resi.chain._find_resi_id(self.resi.id+1)
+                    cnt_atom = cnt_resi._find_atom_name('N')                
+                self.connect.append(cnt_atom)
             except IndexError:
                 if Config.debug >= 1:
                     print('WARNING: '+self.resi.name+str(self.resi.id)+' should have atom: '+name)
                 else:
                     pass
+
+    def get_type(self):
+        if self.resi.name in rd_solvent_list:
+            self.type = G16_label_map[self.parent.name][self.name]
+        else:
+            r = self.resi
+            r1 = self.resi.chain.residues[0]
+            rm1 = self.resi.chain.residues[-1]
+            if r == r1 and self.name in ['H1','H2','H3']:
+                self.type = 'H'
+            else:
+                if r == rm1 and self.name == 'OXT':
+                    self.type = 'O2'
+                else:
+                    self.type = G16_label_map[self.parent.name][self.name]
+        return self.type
+        
+
 
 
     def get_protons(self):
