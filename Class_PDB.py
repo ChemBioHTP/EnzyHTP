@@ -559,7 +559,7 @@ class PDB():
         '''
         outp1_path = path[:-4]+'_badname_aH.pdb'
         out_path = path[:-4]+'_aH.pdb'
-        outm2_path = path[:-4]+'_aH.mol2'
+        # outm2_path = path[:-4]+'_aH.mol2'
 
         if method == 'OPENBABEL':
             # not working if block warning output for some reason
@@ -1083,8 +1083,16 @@ class PDB():
                         change_flag=1
                         continue
                     #keep TER and END
-                    if line[:3] == 'TER' or line[:3] == 'END':
+                    if line[:3] == 'END':
                         of.write(line)
+                        continue
+                    if line[:3] == 'TER':
+                        # if ter_flag is still 1. It means this first line kept after last TER is still a TER
+                        # skip TER in this case
+                        if ter_flag == 1:
+                            continue
+                        of.write(line)
+                        ter_flag = 1
                         continue
 
                     #skip the water and ion(Append in the future)
@@ -1097,6 +1105,9 @@ class PDB():
                         continue
 
                     of.write(line)
+                    # set to 0 until first following line after TER is kept (not TER or skip_list)
+                    ter_flag=0
+
                 if not change_flag:
                     print('rm_wat(): No change.')
 
@@ -1518,7 +1529,7 @@ class PDB():
         return chrgspin
 
 
-    def _get_oniom_g16_coord(self, prmtop_path):
+    def _get_oniom_g16_coord(self):
         '''
         generate coordinate line. Base on *structure* and layer settings in the *config* module.
         Use element name as atom type for ligand atoms since they are mostly in QM regions.
@@ -1552,11 +1563,7 @@ class PDB():
                             if cnt_atom.id in self.layer[0]:
                                 if repeat_flag:
                                     raise Exception('A low layer atom is connecting 2 higher layer atoms')
-                                #####determine pseudo H type#####TODO
-                                cnt_atom.get_ele()
-                                H_type = 'H'+cnt_atom.ele
-                                #################################             
-                                cnt_info = ['H', H_type, cnt_atom.id] 
+                                cnt_info = ['H', cnt_atom.get_pseudo_H_type(atom), cnt_atom.id] 
                                 repeat_flag = 1
                         # general low layer
                         coord += atom.build_oniom('l', self.chrg_list_all[atom.id-1], cnt_info=cnt_info)
@@ -1571,11 +1578,16 @@ class PDB():
                     if Config.debug >= 1:
                         print('\033[1;31;0m In PDB2QMMM in _get_oniom_g16_coord: WARNING: Found ligand atom in low layer \033[0m')
                     # consider connection
-                    cnt_info = None 
+                    cnt_info = None
+                    repeat_flag = 0 
                     for cnt_atom in atom.connect:
+                        if repeat_flag:
+                            raise Exception('A low layer atom is connecting 2 higher layer atoms')
                         if cnt_atom.id in self.layer[0]:
-                            print('\033[1;31;0m In PDB2QMMM in _get_oniom_g16_coord: WARNING: Found ligand atom'+str(atom.id)+' in seperate layers \033[0m')
-                        cnt_info = ['H', 'H', cnt_atom.id] # for future update
+                            if Config.debug >= 1:
+                                print('\033[1;31;0m In PDB2QMMM in _get_oniom_g16_coord: WARNING: Found ligand atom'+str(atom.id)+' in seperate layers \033[0m')
+                            cnt_info = ['H', cnt_atom.get_pseudo_H_type(atom), cnt_atom.id]
+                            repeat_flag = 1
                     coord += atom.build_oniom('l', self.chrg_list_all[atom.id-1], cnt_info=cnt_info, if_lig=1)
         for atom in self.stru.metalatoms:
             a_id += 1
@@ -1602,7 +1614,7 @@ class PDB():
                                 print('\033[1;31;0m In PDB2QMMM in _get_oniom_g16_coord: WARNING: Found solvent atom'+str(atom.id)+' in seperate layers \033[0m')
                             if repeat_flag:
                                 raise Exception('A low layer atom is connecting 2 higher layer atoms')
-                            cnt_info = ['H', 'H', cnt_atom.id] 
+                            cnt_info = ['H', cnt_atom.get_pseudo_H_type(atom), cnt_atom.id] 
                             repeat_flag = 1
                     coord += atom.build_oniom('l', self.chrg_list_all[atom.id-1], cnt_info=cnt_info, if_sol=1)
 
@@ -1614,14 +1626,22 @@ class PDB():
         Add missing parameters for protein and custom atom types
         1. addition parameters for metal element that not exist in ff96
         2. Commonly missing line for no reason: 'HrmBnd1    N   CT   HC     35.0000     109.5000'
+        3. What if ligand or artificial residue appears in the low layer TODO
+        4. missing parameters brought by the pseudo boundary H
         '''
+        #1
         add_prm='HrmBnd1    N   CT   HC     35.0000     109.5000'+line_feed
+        #2
         atom_rec=[]
         for atom in self.stru.metalatoms:
             if atom.parm != None:
                 if atom.parm[0] not in atom_rec:
                     add_prm += 'VDW   '+ '   '.join(atom.parm)+line_feed
                     atom_rec.append(atom.parm[0])
+        #3
+        #TODO
+        #4
+
         return add_prm
 
     @classmethod
@@ -1667,6 +1687,17 @@ class PDB():
 #2.金属中心附近的质子态 （可以保留金属离子，但是质子态没有处理） 
 
 # func outside of the class
+def Run_QMMM(inps, prog='g16'):
+    '''
+    run QMMM with 'prog' 
+    '''
+    if prog == 'g16':
+        outs = []
+        for gjf in inps:
+            pass 
+            #找一种高效的运行高斯的方式 收集输出文件的路径
+        return outs
+
 def get_PDB(name):
     '''
     connect to the database
@@ -1691,9 +1722,7 @@ def PDB_to_AMBER_PDB(path):
 # a.get_stru()
 # a.PDB2QMMM(keywords='test', prmtop_path='./1Q4T_grep_rmW_aH.prmtop', prepi_path={'4CO':'./ligands/ligand_1.prepin'})
 
-a = PDB('2kz2init_amb.pdb')
-a.rm_allH()
-a.get_protonation()
-a.PDB2FF(ifsavepdb=1)
-a.layer_atoms=['1-9','10-L']
-a.PDB2QMMM(keywords='test')
+# a = PDB('2kz2init_amb.pdb')
+# a.PDB2FF(ifsavepdb=1)
+# a.layer_atoms=['1-9','10-L']
+# a.PDB2QMMM(keywords='test')
