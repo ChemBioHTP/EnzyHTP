@@ -84,6 +84,7 @@ class PDB():
         self.path = None
         self.prmtop_path = None
         self.MutaFlags = []
+        self.nc=None
         # default MD conf.
         self._init_MD_conf()
         # default ONIOM layer setting
@@ -1126,7 +1127,7 @@ class PDB():
         --------------
         o_dir   : Write files in o_dir (current self.dir/MD by default).
         tag     : tag the name of the MD folder
-        Return the nc path of the prod step.
+        Return the nc path of the prod step and store in self.nc
         '''
         # make folder
         if o_dir == '':
@@ -1153,6 +1154,7 @@ class PDB():
             print('running: '+Config.PC_cmd +' '+ Config.Amber.AmberHome +'/bin/sander.MPI -O -i '+prod_path+' -o '+o_dir+'/prod.out -p '+self.prmtop_path+' -c '+o_dir+'/equi.rst -ref '+o_dir+'/equi.rst -r '+o_dir+'/prod.rst -x '+o_dir+'/prod.nc')
         os.system(Config.PC_cmd +' '+ Config.Amber.AmberHome +'/bin/sander.MPI -O -i '+prod_path+' -o '+o_dir+'/prod.out -p '+self.prmtop_path+' -c '+o_dir+'/equi.rst -ref '+o_dir+'/equi.rst -r '+o_dir+'/prod.rst -x '+o_dir+'/prod.nc')
 
+        self.nc = o_dir+'/prod.nc'
         return o_dir+'/prod.nc'
 
 
@@ -1675,7 +1677,52 @@ class PDB():
                             charge_list.append(float(i)/18.2223)
         return charge_list
 
+    '''
+    ========
+    MD Analysis
+    ========
+    '''
+    def nc2mdcrd(self, o_path='', point=None, start=1, end=-1, step=1, engine='cpptraj'):
+        '''
+        convert self.nc to a mdcrd file to read and operate.(self.dir/cache/prod.mdcrd by default)
+        a easier way is to use pytraj directly.
+        ---------------
+        o_path: user assigned out path 
+        point:  sample point. use value from self.conf_prod['nstlim'] and self.conf_prod['ntwx'] to determine step size.
+        start:  start point
+        end:    end point
+        step:   step size
+        engine: pytraj or cpptraj (some package conflict may cause pytraj not available)
+        '''
+        if self.nc == None:
+            raise Exception('No nc file found. Please assign self.nc or run PDBMD first')
+        else:
+            if o_path == '':
+                o_path= self.cache_path+'/prod.mdcrd'
+            if end == -1:
+                end = 'last'
+            if point != None:
+                all_p = int(self.conf_prod['nstlim'])/int(self.conf_prod['ntwx'])
+                step = int(all_p/point)
 
+            if engine not in ['pytraj', 'cpptraj']:
+                raise Exception('engine: pytraj or cpptraj')
+            
+            if engine == 'pytraj':
+                pass
+
+            if engine == 'cpptraj':
+                cpp_in_path = self.cache_path+'/cpptraj_nc2mdcrd.in'
+                cpp_out_path = self.cache_path+'/cpptraj_nc2mdcrd.out'
+                with open(cpp_in_path,'w') as of:
+                    of.write('parm '+self.prmtop_path+line_feed)
+                    of.write('trajin '+self.nc+' '+str(start)+' '+end+' '+str(step)+line_feed)
+                    of.write('trajout '+o_path+line_feed)
+                    of.write('run'+line_feed)
+                    of.write('quit'+line_feed)
+                os.system('cpptraj -i '+cpp_in_path+' > '+cpp_out_path)
+        return o_path
+            
 
 # 重写conf类
 # 
