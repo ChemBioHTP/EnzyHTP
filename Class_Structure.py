@@ -126,7 +126,7 @@ class Structure():
         if input_type == 'path':
             f = open(input_obj)
             file_str = f.read()
-            f.close
+            f.close()
         if input_type == 'file':
             file_str = input_obj.read()
         if input_type == 'file_str':
@@ -812,6 +812,18 @@ class Structure():
         return all_P_atoms
 
 
+    def get_all_residue_unit(self):
+        all_r_list = []
+        for chain in self.chains:
+            for resi in chain:
+                all_r_list.append(resi)
+        for resi in self.ligands:
+            all_r_list.append(resi)
+        for resi in self.metalatoms:
+            all_r_list.append(resi)
+        return all_r_list
+
+
     def get_atom_id(self):
         '''
         return a list of id of all atoms in the structure
@@ -899,6 +911,33 @@ class Structure():
                 atom.type = type_list[atom.id-1]
         
         
+    def get_sele_list(self, atom_mask):
+        '''
+        interface with class ONIOM_Frame. Generate a list for sele build. Make sure use same pdb as the one generate the frame.
+        ------------
+        resi_list: selected residue list
+        #atom_mask: atom selection with the standard grammer of Amber (incomplete)
+        '''
+        sele_lines = {}
+        #decode atom_mask (maybe in helper later) TODO
+        resi_list = atom_mask[1:].strip().split(',')
+        all_resi_list = self.get_all_residue_unit()
+        for resi in resi_list:
+            chain_id = re.match('[A-Z]',resi)
+            resi_id = int(re.match('[0-9]+',resi).group(0))
+            if chain_id == None:
+                for resi in all_resi_list:
+                    if resi_id == resi.id:
+                        resi_obj = resi
+            else:
+                chain_id = chain_id.group(0)
+                resi_obj = self.chains[int(chain_id)-65]._find_resi_id(resi_id)
+            for atom in resi_obj:
+                atom.get_ele()
+                sele_lines[str(atom.id)] = atom.ele
+        print(sele_lines)
+        return sele_lines
+
 
     '''
     ====
@@ -923,9 +962,9 @@ class Structure():
         if i == 1:
             return self.chains
         if i == 2:
-            return self.metalatoms
-        if i == 3:
             return self.ligands
+        if i == 3:
+            return self.metalatoms
         if i == 4:
             return self.solvents
         if i > 4:
@@ -1799,7 +1838,34 @@ class Atom(Child):
                     self.type = G16_label_map[self.parent.name][self.name]
         return self.type
         
+    def get_pseudo_H_type(self, old_atom, method=1):
+        '''
+        determine the connecting pseudo H atom type base on the environment for ONIOM input
+        A low layer atom will be replaced to a pesudo H for "model-low" layer modeling
+        self    : the atom in the "model" layer
+        old_atom: the original connecting atom replacing by H. 
+        method  : 
+        1 ----- : Only consider some main cases:
+                    - truncating CA-CB
+                    - truncating C-N
+                    (abort for other cases)
+        -----------
+        TARGET
+        -----------
+        1. provide reasonable parameters according to the atom type
+        2. avoid missing parameters (search ff96)
+        3. append missing parameters
+        '''
+        p_H_type = ''
+        if (self.name, old_atom.name) not in [('CA','CB'),('C','N'),('CB','CA'),('N','C')]:
+            raise Exception('method 1 only support truncations of CA-CB and C-N')
+        else:
+            if self.name == 'CA':
+                #p_H_type = XXX
+                pass
 
+
+        return p_H_type
 
 
     def get_protons(self):
