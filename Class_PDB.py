@@ -7,6 +7,7 @@ from wrapper import *
 from Class_Structure import *
 from Class_line import *
 from Class_Conf import Config, Layer
+from Class_ONIOM_Frame import *
 from helper import line_feed, mkdir
 try:
     from pdb2pqr.main import main_driver as run_pdb2pqr
@@ -865,7 +866,7 @@ class PDB():
         return Flag[0]+Flag[1]+Flag[2]+Flag[3]
 
 
-    def PDBMin(self,cycle=2000):
+    def PDBMin(self,cycle=2000,engine='Amber_sander'):
         '''
         Run a minization use self.prmtop and self.inpcrd and setting form class Config.
         --------------------------------------------------
@@ -895,11 +896,21 @@ class PDB():
         min_input.write(' /'+line_feed)
         min_input.close()
     
+        # express engine
+        if engine == 'Amber_sander':
+            engine_path = Config.Amber.AmberHome+'/bin/sander.MPI'
+        if engine == 'Amber_pmemd_cpu':
+            engine_path = Config.Amber.AmberHome+'/bin/pmemd.MPI'
+        if engine == 'Amber_pmemd_gpu':
+            engine_path = Config.Amber.AmberHome+'/bin/pmemd.cuda'
+        if Config.Amber.AmberEXE != None:
+            engine_path = Config.Amber.AmberEXE
+
 
         #run
         if Config.debug >= 1:
-            print('running: '+Config.PC_cmd +' '+ Config.Amber.AmberHome + '/bin/sander.MPI -O -i '+minin_path+' -o '+minout_path+' -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+minrst_path)
-        os.system(Config.PC_cmd +' '+ Config.Amber.AmberHome + '/bin/sander.MPI -O -i '+minin_path+' -o '+minout_path+' -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+minrst_path)
+            print('running: '+Config.PC_cmd +' '+ engine_path +' -O -i '+minin_path+' -o '+minout_path+' -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+minrst_path)
+        os.system(Config.PC_cmd +' '+ engine_path +' -O -i '+minin_path+' -o '+minout_path+' -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+minrst_path)
         #rst2pdb
         os.system('ambpdb -p '+self.prmtop_path+' -c '+minrst_path+' > '+out4_PDB_path)
         os.system('mv '+self.prmtop_path+' '+self.inpcrd_path+' '+min_dir)
@@ -930,8 +941,10 @@ class PDB():
                     if line[12:16].strip() in H_namelist:
                         continue
                     of.write(line)
-
+        self.path=o_path
+        self._update_name()       
         
+         
     '''
     ========
     Gerneral MD
@@ -1002,10 +1015,14 @@ class PDB():
                         print('Using old parm files.')
                 else:
                     #gen prepi (net charge and correct protonation state is important)
+                    if Config.debug >= 1:
+                        print('running: '+Config.Amber.AmberHome+'/bin/antechamber -i '+lig_pdb+' -fi pdb -o '+out_prepi+' -fo prepi -c bcc -s 0 -nc '+str(net_charge))
                     os.system(Config.Amber.AmberHome+'/bin/antechamber -i '+lig_pdb+' -fi pdb -o '+out_prepi+' -fo prepi -c bcc -s 0 -nc '+str(net_charge))
                     if Config.debug <= 1:
                         os.system('rm ANTECHAMBER* ATOMTYPE.INF NEWPDB.PDB PREP.INF sqm.pdb sqm.in sqm.out')
                     #gen frcmod
+                    if Config.debug >= 1:
+                        print('running: '+Config.Amber.AmberHome+'/bin/parmchk2 -i '+out_prepi+' -f prepi -o '+out_frcmod)
                     os.system(Config.Amber.AmberHome+'/bin/parmchk2 -i '+out_prepi+' -f prepi -o '+out_frcmod)                
                 #record
                 parm_paths.append((out_prepi, out_frcmod))
@@ -1118,7 +1135,7 @@ class PDB():
         return self.path
 
 
-    def PDBMD(self, tag='', o_dir=''):
+    def PDBMD(self, tag='', o_dir='', engine='Amber_sander'):
         '''
         Use self.prmtop_path and self.inpcrd_path to initilize a MD simulation.
         The default MD configuration settings are assigned by class Config.Amber.
@@ -1134,6 +1151,16 @@ class PDB():
             o_dir = self.dir+'/MD'+tag
         mkdir(o_dir)
 
+        # express engine
+        if engine == 'Amber_sander':
+            engine_path = Config.Amber.AmberHome+'/bin/sander.MPI'
+        if engine == 'Amber_pmemd_cpu':
+            engine_path = Config.Amber.AmberHome+'/bin/pmemd.MPI'
+        if engine == 'Amber_pmemd_gpu':
+            engine_path = Config.Amber.AmberHome+'/bin/pmemd.cuda'
+        if Config.Amber.AmberEXE != None:
+            engine_path = Config.Amber.AmberEXE
+
         # build input file (use self.MD_conf_xxxx)
         min_path = self._build_MD_min(o_dir)
         heat_path = self._build_MD_heat(o_dir)
@@ -1142,17 +1169,17 @@ class PDB():
 
         # run sander
         if Config.debug >= 1:
-            print('running: '+Config.PC_cmd +' '+ Config.Amber.AmberHome +'/bin/sander.MPI -O -i '+min_path +' -o '+o_dir+'/min.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+o_dir+'/min.rst -ref '+self.inpcrd_path)
-        os.system(Config.PC_cmd +' '+ Config.Amber.AmberHome +'/bin/sander.MPI -O -i '+min_path +' -o '+o_dir+'/min.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+o_dir+'/min.rst -ref '+self.inpcrd_path)
+            print('running: '+Config.PC_cmd +' '+ engine_path +' -O -i '+min_path +' -o '+o_dir+'/min.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+o_dir+'/min.rst -ref '+self.inpcrd_path)
+        os.system(Config.PC_cmd +' '+ engine_path +' -O -i '+min_path +' -o '+o_dir+'/min.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+o_dir+'/min.rst -ref '+self.inpcrd_path)
         if Config.debug >= 1:
-            print('running: '+Config.PC_cmd +' '+ Config.Amber.AmberHome +'/bin/sander.MPI -O -i '+heat_path+' -o '+o_dir+'/heat.out -p '+self.prmtop_path+' -c '+o_dir+'/min.rst -ref ' +o_dir+'/min.rst -r ' +o_dir+'/heat.rst')
-        os.system(Config.PC_cmd +' '+ Config.Amber.AmberHome +'/bin/sander.MPI -O -i '+heat_path+' -o '+o_dir+'/heat.out -p '+self.prmtop_path+' -c '+o_dir+'/min.rst -ref ' +o_dir+'/min.rst -r ' +o_dir+'/heat.rst')
+            print('running: '+Config.PC_cmd +' '+ engine_path +' -O -i '+heat_path+' -o '+o_dir+'/heat.out -p '+self.prmtop_path+' -c '+o_dir+'/min.rst -ref ' +o_dir+'/min.rst -r ' +o_dir+'/heat.rst')
+        os.system(Config.PC_cmd +' '+ engine_path +' -O -i '+heat_path+' -o '+o_dir+'/heat.out -p '+self.prmtop_path+' -c '+o_dir+'/min.rst -ref ' +o_dir+'/min.rst -r ' +o_dir+'/heat.rst')
         if Config.debug >= 1:
-            print('running: '+Config.PC_cmd +' '+ Config.Amber.AmberHome +'/bin/sander.MPI -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
-        os.system(Config.PC_cmd +' '+ Config.Amber.AmberHome +'/bin/sander.MPI -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
+            print('running: '+Config.PC_cmd +' '+ engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
+        os.system(Config.PC_cmd +' '+ engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
         if Config.debug >= 1:
-            print('running: '+Config.PC_cmd +' '+ Config.Amber.AmberHome +'/bin/sander.MPI -O -i '+prod_path+' -o '+o_dir+'/prod.out -p '+self.prmtop_path+' -c '+o_dir+'/equi.rst -ref '+o_dir+'/equi.rst -r '+o_dir+'/prod.rst -x '+o_dir+'/prod.nc')
-        os.system(Config.PC_cmd +' '+ Config.Amber.AmberHome +'/bin/sander.MPI -O -i '+prod_path+' -o '+o_dir+'/prod.out -p '+self.prmtop_path+' -c '+o_dir+'/equi.rst -ref '+o_dir+'/equi.rst -r '+o_dir+'/prod.rst -x '+o_dir+'/prod.nc')
+            print('running: '+Config.PC_cmd +' '+ engine_path +' -O -i '+prod_path+' -o '+o_dir+'/prod.out -p '+self.prmtop_path+' -c '+o_dir+'/equi.rst -ref '+o_dir+'/equi.rst -r '+o_dir+'/prod.rst -x '+o_dir+'/prod.nc')
+        os.system(Config.PC_cmd +' '+ engine_path +' -O -i '+prod_path+' -o '+o_dir+'/prod.out -p '+self.prmtop_path+' -c '+o_dir+'/equi.rst -ref '+o_dir+'/equi.rst -r '+o_dir+'/prod.rst -x '+o_dir+'/prod.nc')
 
         self.nc = o_dir+'/prod.nc'
         return o_dir+'/prod.nc'
@@ -1679,15 +1706,15 @@ class PDB():
 
     '''
     ========
-    MD Analysis
+    MD Analysis 
     ========
     '''
     def nc2mdcrd(self, o_path='', point=None, start=1, end=-1, step=1, engine='cpptraj'):
         '''
-        convert self.nc to a mdcrd file to read and operate.(self.dir/cache/prod.mdcrd by default)
+        convert self.nc to a mdcrd file to read and operate.(self.nc[:-2]+'.mdcrd' by default)
         a easier way is to use pytraj directly.
         ---------------
-        o_path: user assigned out path 
+        o_path: user assigned out path (self.nc[:-2]+'mdcrd' by default)
         point:  sample point. use value from self.conf_prod['nstlim'] and self.conf_prod['ntwx'] to determine step size.
         start:  start point
         end:    end point
@@ -1698,7 +1725,7 @@ class PDB():
             raise Exception('No nc file found. Please assign self.nc or run PDBMD first')
         else:
             if o_path == '':
-                o_path= self.cache_path+'/prod.mdcrd'
+                o_path= self.nc[:-2]+'mdcrd'
             if end == -1:
                 end = 'last'
             if point != None:
@@ -1721,8 +1748,102 @@ class PDB():
                     of.write('run'+line_feed)
                     of.write('quit'+line_feed)
                 os.system('cpptraj -i '+cpp_in_path+' > '+cpp_out_path)
+
+        self.mdcrd=o_path
         return o_path
             
+
+    '''
+    ========
+    QM Cluster
+    ========    
+    '''
+    def PDB2QMCluster(self, atom_mask, spin=1, o_dir='', tag='', QM='gaussian',g_route=None):
+        '''
+        Build & Run QM cluster input from self.mdcrd with selected atoms according to atom_mask
+        ---------
+        spin: specific spin state for the qm cluster. (default: 1)
+        QM: QM engine (default: Gaussian)
+        g_route: Gaussian route line
+        '''
+        # make folder
+        if o_dir == '':
+            o_dir = self.dir+'/QM_cluster'+tag
+        mkdir(o_dir)
+        # update stru
+        self.get_stru()
+        # get sele
+        sele_lines = self.stru.get_sele_list(atom_mask)
+        # get chrgspin
+        chrgspin = self._get_qmcluster_chrgspin(sele_lines, spin=spin)
+
+        #make inp files
+        frames = Frame.fromMDCrd(self.mdcrd)
+        gjf_paths = []
+        for i, frame in enumerate(frames):
+            gjf_path = o_dir+'/qm_cluster_'+str(i)+'.gjf'
+            frame.write_sele_lines(sele_lines, out_path=gjf_path, g_route=g_route, chrgspin=chrgspin)
+            gjf_paths.append(gjf_path)
+        # Run inp files
+        qm_cluster_out_paths = self.Run_QM(gjf_paths)
+
+        self.qm_cluster_out = qm_cluster_out_paths
+        return self.qm_cluster_out
+    
+
+    def _get_qmcluster_chrgspin(self, sele, spin=1):
+        '''
+        get charge for qmcluster of sele from self.prmtop
+        '''
+        # get chrg list
+        chrg_list_all = PDB.get_charge_list(self.prmtop_path)
+        # sum with sele
+        sele_chrg = 0
+        for i, chrg in enumerate(chrg_list_all):
+            for j in sele.keys():
+                if int(j) == i:
+                    sele_chrg += chrg
+        return (round(sele_chrg), spin)
+
+
+    def Run_QM(inp, prog='g16'):
+        '''
+        Run QM with prog
+        '''
+        if prog == 'g16':
+            outs = []
+            for gjf in inp:
+                out = gjf[:-3]+'out'
+                print('running: '+Config.Gaussian.g16_exe+' '+gjf+' > '+out)
+                os.system(Config.Gaussian.g16_exe+' '+gjf+' > '+out)
+                outs.append(out)
+            return outs
+
+        if prog == 'g09':
+            outs = []
+            for gjf in inp:
+                out = gjf[:-3]+'out'
+                print('running: '+Config.Gaussian.g16_exe+' '+gjf+' > '+out)
+                os.system(Config.Gaussian.g09_exe+' '+gjf+' > '+out)
+                outs.append(out)
+            return outs
+
+
+    '''
+    ========
+    QM Analysis 
+    ========
+    '''
+    @classmethod
+    def get_field_strength(cls, qm_out_paths):
+        '''
+        use qm_out_paths and return field strength
+        '''
+        E = None
+
+        return E
+
+
 
 # 重写conf类
 # 
@@ -1734,16 +1855,28 @@ class PDB():
 #2.金属中心附近的质子态 （可以保留金属离子，但是质子态没有处理） 
 
 # func outside of the class
-def Run_QMMM(inps, prog='g16'):
-    '''
-    run QMMM with 'prog' 
-    '''
-    if prog == 'g16':
-        outs = []
-        for gjf in inps:
-            pass 
-            #找一种高效的运行高斯的方式 收集输出文件的路径
-        return outs
+# def Run_QMMM(inps, prog='g16'):
+#     '''
+#     run QMMM with 'prog' 
+#     '''
+#     if prog == 'g16':
+#         outs = []
+#         for gjf in inps:
+#             pass 
+#             #TODO 找一种高效的运行高斯的方式 收集输出文件的路径
+#         return outs
+
+# def Run_QM(inps, prog='g16'):
+#     '''
+#     run QM with 'prog' 
+#     '''
+#     if prog == 'g16':
+#         outs = []
+#         for gjf in inps:
+#             pass 
+#             #找一种高效的运行高斯的方式 收集输出文件的路径
+#         return outs
+    
 
 def get_PDB(name):
     '''
