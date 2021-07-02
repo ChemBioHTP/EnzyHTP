@@ -23,7 +23,6 @@ Usage:
 '''
 import numpy as np
 from Class_Conf import Config
-from Class_PDB import PDB
 from helper import line_feed
 import re
 import os
@@ -283,8 +282,8 @@ class Frame:
             if ff == 'xyz':
                 of.write(str(len(sele_list.keys()))+line_feed)
             if ff == 'gjf':
-                of.write('%mem='+Config.Gaussian.max_core*Config.Gaussian.n_cores+'MB'+line_feed)
-                of.write('%nprocshared='+Config.Gaussian.n_cores+line_feed)
+                of.write('%mem='+str(Config.Gaussian.max_core*Config.Gaussian.n_cores)+'MB'+line_feed)
+                of.write('%nprocshared='+str(Config.Gaussian.n_cores)+line_feed)
                 if g_route == None:
                     of.write('# hf/3-21g'+line_feed)
                 else:
@@ -306,6 +305,8 @@ class Frame:
                 z = '{:>15.8f}'.format(line_coord[2])
 
                 of.write(label+x+y+z+line_feed)
+            # write a blank line to support "g16 < .gjf > .out" mode of gaussian
+            of.write(line_feed)
 
     @classmethod
     def sele_unfreeze(cls, g_file, ff='gjf'):

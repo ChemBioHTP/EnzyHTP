@@ -943,8 +943,8 @@ class PDB():
                     of.write(line)
         self.path=o_path
         self._update_name()       
-        
-         
+
+
     '''
     ========
     Gerneral MD
@@ -1758,7 +1758,7 @@ class PDB():
     QM Cluster
     ========    
     '''
-    def PDB2QMCluster(self, atom_mask, spin=1, o_dir='', tag='', QM='gaussian',g_route=None):
+    def PDB2QMCluster(self, atom_mask, spin=1, o_dir='', tag='', QM='g16',g_route=None):
         '''
         Build & Run QM cluster input from self.mdcrd with selected atoms according to atom_mask
         ---------
@@ -1779,13 +1779,17 @@ class PDB():
 
         #make inp files
         frames = Frame.fromMDCrd(self.mdcrd)
-        gjf_paths = []
-        for i, frame in enumerate(frames):
-            gjf_path = o_dir+'/qm_cluster_'+str(i)+'.gjf'
-            frame.write_sele_lines(sele_lines, out_path=gjf_path, g_route=g_route, chrgspin=chrgspin)
-            gjf_paths.append(gjf_path)
-        # Run inp files
-        qm_cluster_out_paths = self.Run_QM(gjf_paths)
+
+        if QM in ['g16','g09']:
+            gjf_paths = []
+            for i, frame in enumerate(frames):
+                gjf_path = o_dir+'/qm_cluster_'+str(i)+'.gjf'
+                frame.write_sele_lines(sele_lines, out_path=gjf_path, g_route=g_route, chrgspin=chrgspin)
+                gjf_paths.append(gjf_path)
+            # Run inp files
+            qm_cluster_out_paths = PDB.Run_QM(gjf_paths, prog=QM)
+        if QM=='ORCA':
+            pass
 
         self.qm_cluster_out = qm_cluster_out_paths
         return self.qm_cluster_out
@@ -1805,8 +1809,8 @@ class PDB():
                     sele_chrg += chrg
         return (round(sele_chrg), spin)
 
-
-    def Run_QM(inp, prog='g16'):
+    @classmethod
+    def Run_QM(cls, inp, prog='g16'):
         '''
         Run QM with prog
         '''
@@ -1814,8 +1818,8 @@ class PDB():
             outs = []
             for gjf in inp:
                 out = gjf[:-3]+'out'
-                print('running: '+Config.Gaussian.g16_exe+' '+gjf+' > '+out)
-                os.system(Config.Gaussian.g16_exe+' '+gjf+' > '+out)
+                print('running: '+Config.Gaussian.g16_exe+' < '+gjf+' > '+out)
+                os.system(Config.Gaussian.g16_exe+' < '+gjf+' > '+out)
                 outs.append(out)
             return outs
 
@@ -1823,8 +1827,8 @@ class PDB():
             outs = []
             for gjf in inp:
                 out = gjf[:-3]+'out'
-                print('running: '+Config.Gaussian.g16_exe+' '+gjf+' > '+out)
-                os.system(Config.Gaussian.g09_exe+' '+gjf+' > '+out)
+                print('running: '+Config.Gaussian.g16_exe+' < '+gjf+' > '+out)
+                os.system(Config.Gaussian.g09_exe+' < '+gjf+' > '+out)
                 outs.append(out)
             return outs
 
