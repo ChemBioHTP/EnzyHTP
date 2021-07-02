@@ -569,7 +569,7 @@ class Structure():
             # make output path
             if dir[-1] == '/':
                 dir = dir[:-1]
-            out_path = dir+'/ligand_'+str(l_id)+'.pdb'
+            out_path = dir+'/ligand_'+str(l_id)+'_'+lig.name+'.pdb'
             # write
             lig.build(out_path, ft=ft)
             # net charge
@@ -578,7 +578,7 @@ class Structure():
                 if lig.net_charge != None:
                     net_charge = lig.net_charge
                 else:
-                    net_charge = lig.get_net_charge(method=c_method, ph=ph)
+                    net_charge = lig.get_net_charge(method=c_method, ph=ph, o_dir=dir)
 
             # record
             if ifname:
@@ -2369,18 +2369,18 @@ class Ligand(Residue):
             raise Exception('Support only PDB output now.')
 
 
-    def get_net_charge(self, method='PYBEL', ph=7.0):
+    def get_net_charge(self, method='PYBEL', ph=7.0, o_dir='.'):
         '''
         get net charge for the ligand
         -------
         method   : PYBEL (default) use UNITY_ATOM_ATTR info from openbabel mol2
         '''
         # build file
-        mkdir('./cache')
-        temp_path='./cache/ligand_temp.pdb'
-        temp_pdb2_path='./cache/ligand_temp2.pdb'
-        temp_pdb3_path='./cache/ligand_temp3.pdb'
-        temp_m2_path='./cache/ligand_temp.mol2'
+        mkdir(o_dir+'/cache')
+        temp_path=o_dir+'/cache/ligand_temp.pdb'
+        temp_pdb2_path=o_dir+'/cache/ligand_temp2.pdb'
+        temp_pdb3_path=o_dir+'/cache/ligand_temp3.pdb'
+        temp_m2_path=o_dir+'/cache/ligand_temp.mol2'
         self.build(temp_path)
         # charge
         if method == 'PYBEL':
