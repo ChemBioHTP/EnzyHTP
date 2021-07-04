@@ -23,7 +23,7 @@ Usage:
 '''
 import numpy as np
 from Class_Conf import Config
-from helper import line_feed
+from helper import line_feed, set_distance
 import re
 import os
 
@@ -260,7 +260,7 @@ class Frame:
                     of.write(line)
         return out_path
 
-    def write_sele_lines(self, sele_list, out_path = None, ff='gjf', g_route=None, chrgspin=None):
+    def write_sele_lines(self, sele_list, out_path = None, ff='gjf', g_route=None, chrgspin=None, ifchk=0):
         '''
         the sele list should be a map like: {'int':'atom_name', '1':'H', ....}
         --------
@@ -269,12 +269,29 @@ class Frame:
         '''
         if out_path == None:
             out_path ='sele_coord.'+ff
+        if ifchk:
+            chk_path = out_path[:-len(ff)]+'.chk'
 
         sele_lines = []
-        for index, line in enumerate(self.coord):
-            for sele in sele_list.keys():
-                if int(sele) == index + 1:
+        for sele in sele_list.keys():
+            # decode val fix atoms
+            if '-' in sele:
+                ele_name = sele_list[sele]
+                fix_info = sele.split('-')
+                fix_val_coord = self._get_fix_val_coord(fix_info[0], fix_info[1], fix_info[2])
+                sele_lines.append((ele_name, fix_val_coord))
+                continue            
+            # get coord for normal atoms
+            # clean up
+            if sele[-1] not in '1234567890':
+                sele_id = sele[:-1]
+            else:
+                sele_id = sele 
+            # search coord
+            for index, line in enumerate(self.coord):            
+                if int(sele_id) == index + 1:
                     sele_lines.append((sele_list[sele], line))
+                    break
         
         with open(out_path, 'w') as of:
             if ff != 'xyz' and ff != 'gjf':
@@ -282,6 +299,8 @@ class Frame:
             if ff == 'xyz':
                 of.write(str(len(sele_list.keys()))+line_feed)
             if ff == 'gjf':
+                if ifchk:
+                    of.write(r'%chk='+chk_path+line_feed)
                 of.write('%mem='+str(Config.Gaussian.max_core*Config.Gaussian.n_cores)+'MB'+line_feed)
                 of.write('%nprocshared='+str(Config.Gaussian.n_cores)+line_feed)
                 if g_route == None:
@@ -361,7 +380,24 @@ class Frame:
         raise Exception('only support gjf now')
                 
 
+    def _get_fix_val_coord(self, id1, id2, d):
+        '''
+        search for coord of id1 and id2 and generate a new coord using d for center atom of the fix
+        '''
+        # search for p1
+        for index, line in enumerate(self.coord):            
+            if int(id1) == index + 1:
+                p1 = line
+                break
+        for index, line in enumerate(self.coord):            
+            if int(id2) == index + 1:
+                p2 = line
+                break
+        d = float(d)
+        fix_val_coord = set_distance(p1,p2,d)
 
+        return fix_val_coord
+                
     '''
     special method
     '''

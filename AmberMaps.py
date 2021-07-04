@@ -392,6 +392,8 @@ DeProton_map = {    'ASH' : ('ASP','HD2'),
 
 NoProton_list = ['ASP', 'GLU', 'MET'] 
 
+# Radius and distance
+# ===============================================
 # reference: doi:10.1107/S0567739476001551 (element : radius)
 Ionic_radius_map= { "N"  : 1.32, 
                     "O"  : 1.26, 
@@ -490,7 +492,13 @@ VDW_radius_map = {  "N"  : 1.55,
                     "Pu" : None, 
                     "Th" : None }
 
+# mimic the way GaussView/PyMol add H using PDB atom names (append in the future as needed)
+X_H_bond_length = { "N" : 1.00,
+                    "C" : 1.07}
+# ===============================================
+
 # from amino12.lib about residue and connectivity
+# ===============================================
 
 resi_atom_list = {'ALA' : ['N', 'H', 'CA', 'HA', 'CB', 'HB1', 'HB2', 'HB3', 'C', 'O'],
                   'ARG' : ['N', 'H', 'CA', 'HA', 'CB', 'HB2', 'HB3', 'CG', 'HG2', 'HG3', 'CD', 'HD2', 'HD3', 'NE', 'HE', 'CZ', 'NH1', 'HH11', 'HH12', 'NH2', 'HH21', 'HH22', 'C', 'O'],
@@ -655,6 +663,8 @@ resi_nt_cnt_map = {     'ACE': {'H1': ['CH3'], 'CH3': ['H1', 'H2', 'H3', 'C'], '
                         'TRP': {'N': ['H1', 'H2', 'H3', 'CA'], 'H1': ['N'], 'H2': ['N'], 'H3': ['N'], 'CA': ['N', 'HA', 'CB', 'C'], 'HA': ['CA'], 'CB': ['CA', 'HB2', 'HB3', 'CG'], 'HB2': ['CB'], 'HB3': ['CB'], 'CG': ['CB', 'CD1', 'CD2'], 'CD1': ['CG', 'HD1', 'NE1'], 'HD1': ['CD1'], 'NE1': ['CD1', 'HE1', 'CE2'], 'HE1': ['NE1'], 'CE2': ['NE1', 'CZ2', 'CD2'], 'CZ2': ['CE2', 'HZ2', 'CH2'], 'HZ2': ['CZ2'], 'CH2': ['CZ2', 'HH2', 'CZ3'], 'HH2': ['CH2'], 'CZ3': ['CH2', 'HZ3', 'CE3'], 'HZ3': ['CZ3'], 'CE3': ['CZ3', 'HE3', 'CD2'], 'HE3': ['CE3'], 'CD2': ['CG', 'CE2', 'CE3'], 'C': ['CA', 'O', '+1N'], 'O': ['C']},
                         'TYR': {'N': ['H1', 'H2', 'H3', 'CA'], 'H1': ['N'], 'H2': ['N'], 'H3': ['N'], 'CA': ['N', 'HA', 'CB', 'C'], 'HA': ['CA'], 'CB': ['CA', 'HB2', 'HB3', 'CG'], 'HB2': ['CB'], 'HB3': ['CB'], 'CG': ['CB', 'CD1', 'CD2'], 'CD1': ['CG', 'HD1', 'CE1'], 'HD1': ['CD1'], 'CE1': ['CD1', 'HE1', 'CZ'], 'HE1': ['CE1'], 'CZ': ['CE1', 'OH', 'CE2'], 'OH': ['CZ', 'HH'], 'HH': ['OH'], 'CE2': ['CZ', 'HE2', 'CD2'], 'HE2': ['CE2'], 'CD2': ['CG', 'CE2', 'HD2'], 'HD2': ['CD2'], 'C': ['CA', 'O', '+1N'], 'O': ['C']},
                         'VAL': {'N': ['H1', 'H2', 'H3', 'CA'], 'H1': ['N'], 'H2': ['N'], 'H3': ['N'], 'CA': ['N', 'HA', 'CB', 'C'], 'HA': ['CA'], 'CB': ['CA', 'HB', 'CG1', 'CG2'], 'HB': ['CB'], 'CG1': ['CB', 'HG11', 'HG12', 'HG13'], 'HG11': ['CG1'], 'HG12': ['CG1'], 'HG13': ['CG1'], 'CG2': ['CB', 'HG21', 'HG22', 'HG23'], 'HG21': ['CG2'], 'HG22': ['CG2'], 'HG23': ['CG2'], 'C': ['CA', 'O', '+1N'], 'O': ['C']} }
+
+# ===============================================
 
 # ONIOM label G16 (Need to provide missing parms for non-pre-existed metal)
 G16_label_map = { 'ILE': {'C': 'C', 'CG2': 'CT', 'HG22': 'HC', 'H': 'H', 'CA': 'CT', 'O': 'O', 'N': 'N', 'CG1': 'CT', 'HG21': 'HC', 'HG12': 'HC', 'HG13': 'HC', 'HD13': 'HC', 'CD1': 'CT', 'CB': 'CT', 'HB': 'HC', 'HD12': 'HC', 'HG23': 'HC', 'HA': 'H1', 'HD11': 'HC'},

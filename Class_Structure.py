@@ -911,17 +911,31 @@ class Structure():
                 atom.type = type_list[atom.id-1]
         
         
-    def get_sele_list(self, atom_mask):
+    def get_sele_list(self, atom_mask, fix_end='H', prepi_path=None):
         '''
         interface with class ONIOM_Frame. Generate a list for sele build. Make sure use same pdb as the one generate the frame.
         ------------
         resi_list: selected residue list
-        #atom_mask: atom selection with the standard grammer of Amber (incomplete)
+        atom_mask: atom selection with the standard grammer of Amber (incomplete)
+        fix_end: fix valance of the cut bond. (default: H)
+                - H: add H to where the original connecting atom is.
+                    special fix for classical case:
+                    "sele by residue" (cut N-C) -- adjust dihedral for added H on N.
+                = Interface with write_sele_lines:
+                    add {fix_flag+element_mark: coord} in sele_lines 
+        ------------
+        return a sele list:
+        - Fixing atoms are labeled as qm_atom_id-qm_atom_cnt_id-distance
+        - backbone atoms are marked as b at the end (for qmcluster charge calculation)
+        - other atoms use _ as place holder
         '''
         sele_lines = {}
         #decode atom_mask (maybe in helper later) TODO
         resi_list = atom_mask[1:].strip().split(',')
         all_resi_list = self.get_all_residue_unit()
+
+        # decode and get obj
+        sele_stru_objs=[]
         for resi in resi_list:
             chain_id = re.match('[A-Z]',resi)
             resi_id = int(re.match('[0-9]+',resi).group(0))
@@ -932,10 +946,48 @@ class Structure():
             else:
                 chain_id = chain_id.group(0)
                 resi_obj = self.chains[int(chain_id)-65]._find_resi_id(resi_id)
-            for atom in resi_obj:
-                atom.get_ele()
-                sele_lines[str(atom.id)] = atom.ele
-        print(sele_lines)
+
+            sele_stru_objs.append(resi_obj)
+
+        # combine the sele
+        sele_atoms = []
+        for obj in sele_stru_objs:
+            for atom in obj:
+                sele_atoms.append(atom)
+
+        if fix_end != None:
+            self.get_connect(prepi_path=prepi_path)
+
+        # operate on the sele objs
+        for atom in sele_atoms:
+            # add current atom
+            atom.get_ele()
+            if type(atom.parent) != Ligand:
+                if atom.name in ['C','CA','O','N','H','HA']:
+                    sele_lines[str(atom.id)+'b'] = atom.ele
+                else:
+                    sele_lines[str(atom.id)+'_'] = atom.ele
+            else:
+                sele_lines[str(atom.id)+'_'] = atom.ele
+            
+            if fix_end != None:
+                # search for cut bond
+                for cnt_atom in atom.connect:
+                    if not cnt_atom in sele_atoms:
+                        if fix_end == 'H':
+                            d_XH = X_H_bond_length[atom.name]
+                            label = '-'.join((str(atom.id),str(cnt_atom.id),str(d_XH)))
+                            fix_atom = 'H'
+                        if fix_end == 'Me':
+                            #TODO
+                            pass
+                        # write to sele_lines
+                        sele_lines[label] = fix_atom
+
+        if Config.debug >= 1:
+            print('Selected QM cluster atoms: ')
+            print(sele_lines)
+
         return sele_lines
 
 
@@ -959,15 +1011,15 @@ class Structure():
         capable with future update
         '''
 
-        if i == 1:
+        if i == 0:
             return self.chains
-        if i == 2:
+        if i == 1:
             return self.ligands
-        if i == 3:
+        if i == 2:
             return self.metalatoms
-        if i == 4:
+        if i == 3:
             return self.solvents
-        if i > 4:
+        if i > 3:
             raise StopIteration
 
 
@@ -2274,6 +2326,23 @@ class Metalatom(Atom):
 
         return line
 
+
+    '''
+    ====
+    Special Method
+    ====
+    '''
+
+    def __getitem__(self, key: int):
+        '''
+        Metalatom_obj[0]: self
+        -----
+        return self when iter. Allow metalatom to be iterate like a residue that return a atom level obj.
+        '''
+        if i == 0:
+            return self
+        if i > 0:
+            raise StopIteration
 
 
 class Ligand(Residue):

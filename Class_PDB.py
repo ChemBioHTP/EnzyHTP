@@ -1758,13 +1758,19 @@ class PDB():
     QM Cluster
     ========    
     '''
-    def PDB2QMCluster(self, atom_mask, spin=1, o_dir='', tag='', QM='g16',g_route=None):
+    def PDB2QMCluster(self, atom_mask, spin=1, o_dir='', tag='', QM='g16',g_route=None, ifchk=0, val_fix = 'internal'):
         '''
         Build & Run QM cluster input from self.mdcrd with selected atoms according to atom_mask
         ---------
         spin: specific spin state for the qm cluster. (default: 1)
         QM: QM engine (default: Gaussian)
-        g_route: Gaussian route line
+            g_route: Gaussian route line
+            ifchk: if save chk file of a gaussian job. (default: 0)
+        val_fix: fix free valance of truncated strutures
+            = internal: add H to where the original connecting atom is. 
+                        special fix for classical case:
+                        "sele by residue" (cut N-C) -- adjust dihedral for added H on N.
+            = openbabel TODO
         '''
         # make folder
         if o_dir == '':
@@ -1773,25 +1779,37 @@ class PDB():
         # update stru
         self.get_stru()
         # get sele
-        sele_lines = self.stru.get_sele_list(atom_mask)
+        if val_fix == 'internal':
+            sele_lines = self.stru.get_sele_list(atom_mask, fix_end='H', prepi_path=self.prepi_path)
+        else:
+            sele_lines = self.stru.get_sele_list(atom_mask, fix_end=None)
         # get chrgspin
         chrgspin = self._get_qmcluster_chrgspin(sele_lines, spin=spin)
 
         #make inp files
         frames = Frame.fromMDCrd(self.mdcrd)
-
         if QM in ['g16','g09']:
             gjf_paths = []
             for i, frame in enumerate(frames):
                 gjf_path = o_dir+'/qm_cluster_'+str(i)+'.gjf'
-                frame.write_sele_lines(sele_lines, out_path=gjf_path, g_route=g_route, chrgspin=chrgspin)
+                frame.write_sele_lines(sele_lines, out_path=gjf_path, g_route=g_route, chrgspin=chrgspin, ifchk=ifchk)
                 gjf_paths.append(gjf_path)
             # Run inp files
             qm_cluster_out_paths = PDB.Run_QM(gjf_paths, prog=QM)
+            # get chk files if ifchk
+            if ifchk:
+                qm_cluster_chk_paths = []
+                for gjf in gjf_paths:
+                    chk_path = gjf[:-3]+'.chk'
+                    qm_cluster_chk_paths.append(chk_path)
         if QM=='ORCA':
             pass
 
         self.qm_cluster_out = qm_cluster_out_paths
+        if ifchk:
+            self.qm_cluster_chk = qm_cluster_chk_paths
+            return self.qm_cluster_out, self.qm_cluster_chk
+        
         return self.qm_cluster_out
     
 
@@ -1803,9 +1821,14 @@ class PDB():
         chrg_list_all = PDB.get_charge_list(self.prmtop_path)
         # sum with sele
         sele_chrg = 0
-        for i, chrg in enumerate(chrg_list_all):
-            for j in sele.keys():
-                if int(j) == i:
+        for sele_atom in sele.keys():
+            if '-' in sele_atom:
+                continue
+            # skip backbone atoms (cut CA-CB when calculate charge)
+            if sele_atom[-1] == 'b':
+                continue
+            for i, chrg in enumerate(chrg_list_all):
+                if int(sele_atom[:-1]) == i+1:
                     sele_chrg += chrg
         return (round(sele_chrg), spin)
 
@@ -1832,6 +1855,13 @@ class PDB():
                 outs.append(out)
             return outs
 
+    def get_fchk(self, keep_chk=0):
+        '''
+        transfer chk files to fchk files using formchk
+        ----------
+        keep_chk: if not delete original chk file (default: 0)
+        '''
+        pass
 
     '''
     ========
@@ -1843,43 +1873,26 @@ class PDB():
         '''
         use qm_out_paths and return field strength
         '''
-        E = None
+        Es = []
 
-        return E
+        return Es
 
+    @classmethod
+    def get_bond_dipole(cls, qm_fch_paths, prog='Multiwfn'):
+        '''
+        get bond dipole using wfn analysis with fchk files.
+        -----------
+        Multiwfn workflow:
+        1. Multiwfn xxx.fchk < parameter_file > output
+           the result will be in ./LMOdip.txt 
+        2. extract value and project to the bond accordingly
+        -----------
+        prog: program for wfn analysis (default: multiwfn)
+        '''
+        Dipoles = []
 
+        return Dipoles
 
-# 重写conf类
-# 
-# 写修复的方法Rosetta优先 // 与uniport的对比
-# 用seq重写随机突变的方法（flag的存储，随机的方式，突变的实施）
-
-#htmd的不足
-#1.结构修复 （只做到保留残基序号从而保留缺失片段的位置）
-#2.金属中心附近的质子态 （可以保留金属离子，但是质子态没有处理） 
-
-# func outside of the class
-# def Run_QMMM(inps, prog='g16'):
-#     '''
-#     run QMMM with 'prog' 
-#     '''
-#     if prog == 'g16':
-#         outs = []
-#         for gjf in inps:
-#             pass 
-#             #TODO 找一种高效的运行高斯的方式 收集输出文件的路径
-#         return outs
-
-# def Run_QM(inps, prog='g16'):
-#     '''
-#     run QM with 'prog' 
-#     '''
-#     if prog == 'g16':
-#         outs = []
-#         for gjf in inps:
-#             pass 
-#             #找一种高效的运行高斯的方式 收集输出文件的路径
-#         return outs
     
 
 def get_PDB(name):
@@ -1899,14 +1912,3 @@ def PDB_to_AMBER_PDB(path):
     '''
     pass
 
-
-#TestOnly 写一个完整的workflow整合模板工具 做按范围取QM区间
-# a = PDB('1Q4T_grep_rmW_aH_ffsol.pdb')
-# a.layer_preset=2
-# a.get_stru()
-# a.PDB2QMMM(keywords='test', prmtop_path='./1Q4T_grep_rmW_aH.prmtop', prepi_path={'4CO':'./ligands/ligand_1.prepin'})
-
-# a = PDB('2kz2init_amb.pdb')
-# a.PDB2FF(ifsavepdb=1)
-# a.layer_atoms=['1-9','10-L']
-# a.PDB2QMMM(keywords='test')
