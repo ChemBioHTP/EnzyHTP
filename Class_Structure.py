@@ -917,7 +917,7 @@ class Structure():
         ------------
         resi_list: selected residue list
         atom_mask: atom selection with the standard grammer of Amber (incomplete)
-        fix_end: fix valance of the cut bond. (default: H)
+        fix_end: fix valence of the cut bond. (default: H)
                 - H: add H to where the original connecting atom is.
                     special fix for classical case:
                     "sele by residue" (cut N-C) -- adjust dihedral for added H on N.

@@ -1800,7 +1800,7 @@ class PDB():
             if ifchk:
                 qm_cluster_chk_paths = []
                 for gjf in gjf_paths:
-                    chk_path = gjf[:-3]+'.chk'
+                    chk_path = gjf[:-3]+'chk'
                     qm_cluster_chk_paths.append(chk_path)
         if QM=='ORCA':
             pass
