@@ -270,7 +270,7 @@ class Frame:
         if out_path == None:
             out_path ='sele_coord.'+ff
         if ifchk:
-            chk_path = out_path[:-len(ff)]+'.chk'
+            chk_path = out_path[:-len(ff)]+'chk'
 
         sele_lines = []
         for sele in sele_list.keys():
