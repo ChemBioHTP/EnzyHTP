@@ -812,15 +812,22 @@ class Structure():
         return all_P_atoms
 
 
-    def get_all_residue_unit(self):
+    def get_all_residue_unit(self, ifsolvent=0):
         all_r_list = []
         for chain in self.chains:
             for resi in chain:
                 all_r_list.append(resi)
+
         for resi in self.ligands:
             all_r_list.append(resi)
+
         for resi in self.metalatoms:
             all_r_list.append(resi)
+
+        if ifsolvent:
+            for resi in self.solvents:
+                all_r_list.append(resi)
+
         return all_r_list
 
 
@@ -2090,6 +2097,9 @@ class Atom(Child):
         else:
             Exception('bad key: getattr error')
     
+    def __int__(self):
+        return self.id
+
 
 
 class Metalatom(Atom):
@@ -2343,6 +2353,7 @@ class Metalatom(Atom):
             return self
         if i > 0:
             raise StopIteration
+
 
 
 class Ligand(Residue):

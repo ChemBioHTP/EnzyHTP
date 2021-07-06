@@ -9,7 +9,7 @@ from Class_Structure import *
 from Class_line import *
 from Class_Conf import Config, Layer
 from Class_ONIOM_Frame import *
-from helper import line_feed, mkdir
+from helper import decode_atom_mask, get_center, get_field_strength, line_feed, mkdir
 try:
     from pdb2pqr.main import main_driver as run_pdb2pqr
     from pdb2pqr.main import build_main_parser as build_pdb2pqr_parser
@@ -87,6 +87,7 @@ class PDB():
         self.prmtop_path = None
         self.MutaFlags = []
         self.nc=None
+        self.frames=None
         # default MD conf.
         self._init_MD_conf()
         # default ONIOM layer setting
@@ -1679,6 +1680,8 @@ class PDB():
         '''
         Get charge from the .prmtop file
         Take the (path) of .prmtop file and return a [list of charges] with corresponding to the atom sequence
+        -----------------
+        * Unit transfer in prmtop: http://ambermd.org/Questions/units.html
         '''
         with open(prmtop_path) as f:
             
@@ -1786,9 +1789,12 @@ class PDB():
             sele_lines = self.stru.get_sele_list(atom_mask, fix_end=None)
         # get chrgspin
         chrgspin = self._get_qmcluster_chrgspin(sele_lines, spin=spin)
+        if Config.debug >= 1:
+            print('Charge: '+str(chrgspin[0])+' Spin: '+str(chrgspin[1]))
 
         #make inp files
         frames = Frame.fromMDCrd(self.mdcrd)
+        self.frames = frames
         if QM in ['g16','g09']:
             gjf_paths = []
             for i, frame in enumerate(frames):
@@ -1828,9 +1834,14 @@ class PDB():
             # skip backbone atoms (cut CA-CB when calculate charge)
             if sele_atom[-1] == 'b':
                 continue
-            for i, chrg in enumerate(chrg_list_all):
-                if int(sele_atom[:-1]) == i+1:
-                    sele_chrg += chrg
+
+            # clean up
+            if sele_atom[-1] not in '1234567890':
+                sele_id = sele_atom[:-1]
+            else:
+                sele_id = sele_atom
+            sele_chrg += chrg_list_all[int(sele_id)-1]
+
         return (round(sele_chrg), spin)
 
     @classmethod
@@ -1855,6 +1866,7 @@ class PDB():
                 os.system(Config.Gaussian.g09_exe+' < '+gjf+' > '+out)
                 outs.append(out)
             return outs
+
 
     def get_fchk(self, keep_chk=0):
         '''
@@ -1889,14 +1901,63 @@ class PDB():
     QM Analysis 
     ========
     '''
-    @classmethod
-    def get_field_strength(cls, qm_out_paths):
+    def get_field_strength(self, atom_mask, a1=None, a2=None, bond_p1='center', p1=None, p2=None, d1=None):
         '''
-        use qm_out_paths and return field strength
+        use frame coordinate from *mdcrd* and MM charge from *prmtop* to calculate the field strength of *p1* along *p2-p1* or *d1*
+        atoms in *atom_mask* is included. (TODO: or an exclude one?)
+        -------------------------------------
+        a1 a2:  id of atoms compose the bond
+        bond_p1:method to generate p1
+                - center
+                - a1
+                - ...
+        p1:     the point where E is calculated
+        p2:     a point to fix d1
+        d1:     the direction E is projected
+        return an ensemble field strengths
         '''
         Es = []
+        chrg_list = PDB.get_charge_list(self.prmtop_path)
+
+        # san check
+        if a1 == None and p1 == None:
+            raise Exception('Please provide a 1nd atom (a1=...) or point (p1=...) where E is calculated ')
+        if a2 == None and p2 == None and d1 == None:
+            raise Exception('Please provide a 2nd atom (a2=...) or point (p2=...) or a direction (d1=...)')
+        if a1 == None and a2 == None and bond_p1 == 'center':
+            raise Exception('Please provide a both atom (a1=... a2=...) when bond_p1 = center; Or change bond_p1 to a1 to calculate E at a1')
+        if a1 != None and a2 != None and bond_p1 not in ['center', 'a1']:
+            raise Exception('Only support p1 selection in center or a1 now')
+
+        if self.frames == None:
+            self.frames = Frame.fromMDCrd(self.mdcrd)
+
+        # decode atom mask (stru corresponding to mdcrd structures)
+        atom_list = decode_atom_mask(self.stru, atom_mask)
+
+        for frame in self.frames:
+            #get p2
+            if a2 != None:
+                p2 = frame.coord[a2-1]
+            #get p1
+            if a1 != None:
+                if bond_p1 == 'a1':
+                    p1 = frame.coord[a1-1]
+                if bond_p1 == 'center':
+                    p1 = get_center(frame.coord[a1-1], p2)
+                if bond_p1 == 'xxx':
+                    pass
+            # sum up field strength
+            E = 0
+            for atom_id in atom_list:
+                # search for coord and chrg
+                coord = frame.coord[atom_id-1]
+                chrg = chrg_list[atom_id-1]
+                E += get_field_strength(coord, chrg, p1, p2=p2, d1=d1)
+            Es.append(E)
 
         return Es
+
 
     @classmethod
     def get_bond_dipole(cls, qm_fch_paths, prog='Multiwfn'):

@@ -280,18 +280,16 @@ class Frame:
                 fix_info = sele.split('-')
                 fix_val_coord = self._get_fix_val_coord(fix_info[0], fix_info[1], fix_info[2])
                 sele_lines.append((ele_name, fix_val_coord))
-                continue            
+                continue
+
             # get coord for normal atoms
             # clean up
             if sele[-1] not in '1234567890':
                 sele_id = sele[:-1]
             else:
                 sele_id = sele 
-            # search coord
-            for index, line in enumerate(self.coord):            
-                if int(sele_id) == index + 1:
-                    sele_lines.append((sele_list[sele], line))
-                    break
+            # get coord
+            sele_lines.append((sele_list[sele], self.coord[int(sele_id)-1]))
         
         with open(out_path, 'w') as of:
             if ff != 'xyz' and ff != 'gjf':
