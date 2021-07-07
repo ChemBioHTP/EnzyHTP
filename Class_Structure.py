@@ -935,6 +935,8 @@ class Structure():
         - Fixing atoms are labeled as qm_atom_id-qm_atom_cnt_id-distance
         - backbone atoms are marked as b at the end (for qmcluster charge calculation)
         - other atoms use _ as place holder
+        return a sele map:
+        (PDB atom id -> QM atom id)
         '''
         sele_lines = {}
         #decode atom_mask (maybe in helper later) TODO
@@ -990,12 +992,18 @@ class Structure():
                             pass
                         # write to sele_lines
                         sele_lines[label] = fix_atom
+        # make sele_map (PDB atom id -> QM atom id)
+        sele_map = {}
+        for i, key in enumerate(sele_lines.keys()):
+            if key[-1] not in '1234567890':
+                key = key[:-1]
+            sele_map[key] = i+1
 
         if Config.debug >= 1:
             print('Selected QM cluster atoms: ')
             print(sele_lines)
 
-        return sele_lines
+        return sele_lines, sele_map
 
 
     '''

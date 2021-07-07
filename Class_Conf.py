@@ -5,6 +5,7 @@ Take all job set up that not relate to the PDB itself
 -------------------------------------------------------------------------------------
 Config --- Amber
         |- Gaussian
+        |- Multiwfn
 -------------------------------------------------------------------------------------
 '''
 from math import exp
@@ -217,6 +218,25 @@ class Config:
         layer_preset = 0
         layer_atoms = []
 
+
+    class Multiwfn:
+        # -----------------------------
+        # Cores for Multiwfn job (higher pirority)
+        # 
+        n_cores = n_cores
+        # -----------------------------
+        # Per core memory in MB for Multiwfn job (higher pirority)
+        # 
+        max_core = max_core
+        # -----------------------------
+        # Executable Multiwfn command for current environment
+        # 
+        exe = 'Multiwfn'
+        # -----------------------------
+        # Path of Multiwfn folder
+        # 
+        DIR = '$Multiwfnpath'
+        
 
 
 class Layer:

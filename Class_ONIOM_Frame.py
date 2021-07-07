@@ -260,6 +260,7 @@ class Frame:
                     of.write(line)
         return out_path
 
+
     def write_sele_lines(self, sele_list, out_path = None, ff='gjf', g_route=None, chrgspin=None, ifchk=0):
         '''
         the sele list should be a map like: {'int':'atom_name', '1':'H', ....}
