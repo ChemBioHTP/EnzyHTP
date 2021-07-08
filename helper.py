@@ -122,3 +122,21 @@ def decode_atom_mask(stru, mask, ifsolvent=0):
                     atom_ids.append(atom.id)
 
     return atom_ids
+
+
+def write_data(tag, data, out_path):
+    '''
+    use repr() to store data
+    expect a eval() to decode the stored file
+    '''
+    tag = repr(tag)
+    
+    with open(out_path, 'a') as of:
+        of.write('===TAG==='+line_feed)
+        of.write(tag+line_feed)
+        for item in data.keys():
+            of.write('---'+item+'---'+line_feed)
+            of.write(repr(data[item])+line_feed)
+
+    return out_path
+        
