@@ -552,14 +552,17 @@ class PDB():
 
 
     @classmethod
-    def protonate_ligand(cls, path, method='PYBEL', ph = 7.0):
+    def protonate_ligand(cls, path, method='PYBEL', ph = 7.0, keep_name=1):
         '''
         Protonate the ligand from 'path' with 'method', provide out_path and net charge.
+        TODO "obabel -ipdb ligand_1.pdb -opdb pdb -O ligand_1_aHt.pdb -h" can keep names, but how is it accessed by pybel
         ---------------
-        method: PYBEL (default)
-                Dimorphite (from https://durrantlab.pitt.edu/dimorphite-dl/) TODO seems better and with better python API.
-                OPENBABEL (not working if block warning output)
-        ph: 7.0 by default 
+        method      : PYBEL (default)
+                      Dimorphite (from https://durrantlab.pitt.edu/dimorphite-dl/) TODO seems better and with better python API.
+                      OPENBABEL (not working if block warning output)
+        ph          : 7.0 by default 
+        keep_name   : if keep original atom names of ligands (default: 1)
+                        - check if there're duplicated names, add suffix if are.
         '''
         outp1_path = path[:-4]+'_badname_aH.pdb'
         out_path = path[:-4]+'_aH.pdb'
@@ -580,7 +583,10 @@ class PDB():
             mol.OBMol.AddHydrogens(False, True, ph)
             mol.write('pdb', outp1_path, overwrite=True)
             # fix atom label abd determing net charge
-            cls._fix_ob_output(outp1_path, out_path)
+            if keep_name:
+                cls._fix_ob_output(outp1_path, out_path, ref_name_path=path)
+            else:
+                cls._fix_ob_output(outp1_path, out_path)
             # determine partial charge
             # > METHOD 1<
             net_charge = cls._ob_pdb_charge(outp1_path)
@@ -596,20 +602,40 @@ class PDB():
 
 
     @classmethod
-    def _fix_ob_output(cls, pdb_path, out_path):
+    def _fix_ob_output(cls, pdb_path, out_path, ref_name_path=None):
         '''
         fix atom label in pdb_pat write to out_path
         ---------
-        according to tleap output, the name could be just *counting* the element start from ' ' to number
+        ref_name_path: if use original atom names from pdb
+        - default: None
+            according to tleap output, the name could be just *counting* the element start from ' ' to number
+        - : not None
+            check if there're duplicated names originally, add suffix if there are.
         '''
+        if ref_name_path != None:
+            ref_a_names = []
+            with open(ref_name_path) as rf:
+                pdb_ls = PDB_line.fromlines(rf.read())
+                ref_resi_name = pdb_ls[0].resi_name
+                for pdb_l in pdb_ls:
+                    if pdb_l.line_type == 'HETATM' or pdb_l.line_type == 'ATOM':
+                        # pybel use line order (not atom id) to assign new atom id
+                        ref_a_names.append(pdb_l.atom_name)
+
         with open(pdb_path) as f:
             with open(out_path, 'w') as of:
                 # count element in a dict
                 ele_count={}
                 pdb_ls = PDB_line.fromlines(f.read())
+                line_count = 0
                 for pdb_l in pdb_ls:
                     if pdb_l.line_type == 'HETATM' or pdb_l.line_type == 'ATOM':
-                        ele = pdb_l.get_element()
+                        if ref_name_path == None:
+                            ele = pdb_l.get_element()
+                        else:
+                            ele = ref_a_names[line_count]
+                            pdb_l.resi_name = ref_resi_name
+                            line_count += 1
                         # determine the element count
                         try:
                             # rename if more than one (add count)
@@ -619,7 +645,7 @@ class PDB():
                             ele_count[ele] = 0
                             pdb_l.atom_name = ele
                         of.write(pdb_l.build())
-               
+            
 
     @classmethod
     def _ob_pdb_charge(cls, pdb_path):
@@ -927,11 +953,13 @@ class PDB():
 
     def rm_allH(self, ff='Amber'):
         '''
-        remove wrong hydrogens added by leap after mutation (In the case that the input file was a H-less one from crystal.)
+        remove wrong hydrogens added by leap after mutation. (In the case that the input file was a H-less one from crystal.)
+        ----------
+        remove Hs of standard protein residues only.
         '''
         # out path
         o_path=self.path_name+'_rmH.pdb'
-        # H list
+        # H list (residue only)
         H_namelist=[]
         for name in Resi_Ele_map[ff]:
             if Resi_Ele_map[ff][name] == 'H':
