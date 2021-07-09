@@ -1,0 +1,8 @@
+#Substrate 116
+Phosphate(P=O) P 2 O 1
+Phosphate(P=O) P 2 O 3
+Phosphate(P=O) P 2 O 4
+Phosphate(P=O) P 6 O 7
+Phosphate(P=O) P 6 O 8
+Phosphate(P=O) P 6 O 9
+Phosphate(P-O-P) P 2 O 5 P 6

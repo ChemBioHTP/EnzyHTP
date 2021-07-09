@@ -1,0 +1,32 @@
+Substrate 17 Aldehyde/ketone
+ 5O 4C 0.506115
+ 10O 9C 0.441315
+
+Substrate 35 Ester(C=O)
+ 5O 4C 0.514635
+ 15O 14C 0.478855
+
+Substrate 188 Nitrile
+ 1N 2C 0.10169333333333334
+ 5N 4C 0.10168333333333335
+
+Substrate 116 Phosphate(P=O)
+ 1O 2P 0.36394
+ 3O 2P 0.3575
+ 4O 2P 0.36805
+ 7O 6P 0.36332
+ 8O 6P 0.36781
+ 9O 6P 0.35793
+
+Substrate 10 Epoxide
+ 7O 8C 0.58343
+ 7O 6C 0.58486
+
+Substrate 8 C-Cl
+ 4Cl 3C 0.8347
+ 6Cl 5C 0.83454
+
+Substrate 235 Possible_glycosidic(O-C-N)
+ 3N 9C 0.37796
+ 13O 9C 0.53354
+

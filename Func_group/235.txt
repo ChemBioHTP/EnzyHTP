@@ -1,0 +1,8 @@
+#Substrate 235
+Amide(C=O) C 4 O 5
+Amide(C-N) C 4 N 3
+Amide(C=O) C 4 O 5
+Amide(C-N) C 4 N 6
+Amide(C=O) C 7 O 8
+Amide(C-N) C 7 N 6
+Possible_glycosidic(O-C-N) O 13 C 9 N 3

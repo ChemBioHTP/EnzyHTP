@@ -1,0 +1,3 @@
+#Substrate 17
+Aldehyde/ketone C 4 O 5
+Aldehyde/ketone C 9 O 10

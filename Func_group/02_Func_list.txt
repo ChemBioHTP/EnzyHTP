@@ -1,0 +1,7 @@
+17      Aldehyde/ketone
+35	Ester(C=O)
+188     Nitrile
+116     Phosphate(P=O)
+10      Epoxide
+8       C-Cl
+235     Possible_glycosidic(O-C-N)

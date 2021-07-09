@@ -1,0 +1,5 @@
+#Substrate 35
+Ester(C=O) C 4 O 5
+Ester(C-O) C 4 O 6
+Ester(C=O) C 14 O 15
+Ester(C-O) C 14 O 16
