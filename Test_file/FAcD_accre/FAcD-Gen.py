@@ -8,9 +8,10 @@ from Class_ONIOM_Frame import *
 from helper import write_data
 
 # settings
-Config.n_cores = 24
+Config.n_cores = 8
 Config.max_core = 2000
 Config.PC_cmd = 'srun'
+Config.Amber.AmberHome='$AMBERHOME2'
 Config.Amber.conf_prod['nstlim'] = 500000
 Config.debug = 1
 data_output_path = './Mutation-E-BD.dat'
@@ -18,11 +19,11 @@ data_output_path = './Mutation-E-BD.dat'
 def main():
 	starttime = datetime.datetime.now()
 
-	for i in range(20):
+	for i in range(1):
 		# --- Preparation ---
-		pdb_obj = PDB('./FAcD-FA-ASP.pdb', wk_dir='./FAcD_test'+str(i))		# Initiate with file from protein data bank 												(self.path) 
+		pdb_obj = PDB('./FAcD-FA-ASP.pdb', wk_dir='./FAcD_test'+str(i))		# Initiate with the file from protein data bank 											(self.path) 
 		pdb_obj.rm_wat()													# Remove water and ion in original crystal file 											(self.path) 
-		pdb_obj.get_protonation()											# For most crystal files, hydrogens is needed to be add 									(self.path) 
+		pdb_obj.get_protonation()											# For most crystal files, add hydrogens														(self.path) 
 
 		# --- Operation ---
 		# Mutation
@@ -61,9 +62,13 @@ def main():
 		Es = pdb_obj.get_field_strength(E_atom_mask, a1=a1 ,a2=a2 ,bond_p1='center') # Run Field Strength analysis
 		# Bond Dipole Moment (QM)
 		Dipoles = PDB.get_bond_dipole(pdb_obj.qm_cluster_fchk, a1qm, a2qm)	# Run Bond Dipole Moment analysis
+		# Mutation distance
+		r1 = pdb_obj.stru.ligands[0]
+		r2 = pdb_obj.stru.chains[ord(pdb_obj.MutaFlags[0][1])-65][int(pdb_obj.MutaFlags[0][2])-1]
+		Dist = pdb_obj.stru.get_resi_dist(r1, r2)
 
 		# write to csv or plot												
-		write_data(pdb_obj.MutaFlags, {'E': Es, 'Bond Dipole': Dipoles}, data_output_path)		# Current data: Mutation - MD geometry - QM cluster wavefunction = Field strength at bond - Bond dipole moment
+		write_data(pdb_obj.MutaFlags, {'E': Es, 'Bond Dipole': Dipoles, 'Distance': Dist}, data_output_path)		# Current data: Mutation - MD geometry - QM cluster wavefunction = Field strength at bond - Bond dipole moment
 	
 	endtime = datetime.datetime.now()
 	print(endtime - starttime)

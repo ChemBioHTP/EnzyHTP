@@ -3,7 +3,7 @@ import os, re
 from math import ceil
 from Class_line import PDB_line
 from Class_Conf import Config
-from helper import Child, line_feed, mkdir
+from helper import Child, get_center, get_distance, line_feed, mkdir
 from AmberMaps import *
 try:
     import openbabel
@@ -13,7 +13,6 @@ except ImportError:
 __doc__='''
 This module extract and operate structural infomation from PDB
 # will replace some local function in PDB class in the future.
-问题：缺少一个迭代所有原子的方法 可以返回一个按a_id排序的列表 但是由于数据量太大真的合适吗
 -------------------------------------------------------------------------------------
 Class Structure
 -------------------------------------------------------------------------------------
@@ -831,6 +830,18 @@ class Structure():
         return all_r_list
 
 
+    def get_residue(self, id):
+        '''
+        research residue id with all residues count togethor from 1.
+        ----------
+        return a residue object
+        '''
+        all_resi = self.get_all_residue_unit
+        for resi in all_resi:
+            if resi.id == int(id):
+                return resi
+
+
     def get_atom_id(self):
         '''
         return a list of id of all atoms in the structure
@@ -1004,6 +1015,24 @@ class Structure():
             print(sele_lines)
 
         return sele_lines, sele_map
+
+
+    def get_resi_dist(self, r1, r2, method='mass_center'):
+        '''
+        r1: residue 1. (residue_obj)
+        r2: residue 2. (residue_obj)
+        method: The method to narrow the residue down to a point.
+                - mass_center
+                - ...
+        '''
+        if method == 'mass_center':
+            p1 = r1.get_mass_center()
+            p2 = r2.get_mass_center()
+
+        D = get_distance(p1, p2)
+
+        return D
+
 
 
     '''
@@ -1709,7 +1738,21 @@ class Residue(Child):
         for index, atom in enumerate(self.atoms):
             atom.id = index+1
 
+    def get_mass_center(self):
+        '''
+        get mass center of current residue
+        '''
+        M_t = 0
+        M_cw = np.array((0.0,0.0,0.0))
+        for atom in self:
+            atom.get_ele()
+            a_mass = Ele_mass_map[atom.ele]
+            M_t += a_mass
+            M_cw += a_mass * np.array(atom.coord)
+        
+        M_center = tuple(M_cw/M_t)
 
+        return M_center
 
     '''
     ====

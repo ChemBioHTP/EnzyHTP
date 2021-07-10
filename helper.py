@@ -51,6 +51,14 @@ def set_distance(p1,p2,d):
 
     return tuple(p3)
 
+
+def get_distance(p1,p2):
+    d1 = np.array(p2) - np.array(p1)
+    D = np.linalg.norm(d1)
+
+    return D
+
+
 def get_field_strength(p0, c0, p1, p2=None, d1=None):
     '''
     return field strength E of *p0(c0)* at *p1* in direction of *p2-p1* or *d1*

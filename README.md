@@ -4,6 +4,8 @@ Using AlleyCat as a model enzyme, we will develop Python 3 libraries that facili
 # Requirement
 ## External Program
 - AmberTool/Amber
+- Gaussian
+- Multiwfn (for wavefunction analysis)
 ## Python Package
 - numpy
 - pdb2pqr

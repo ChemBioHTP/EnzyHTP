@@ -349,6 +349,12 @@ Resi_Ele_map = {'Amber': {    'C' : 'C',
                               "PU" : "Pu",
                               "TH" : "Th" }       }
 
+# relative mass of elements. Append as need.
+Ele_mass_map = {  'H': 1.008, 'He': 4.003,
+                  'Li': 6.941, 'Be': 9.012, 'B': 10.811, 'C': 12.011, 'N': 14.007, 'O': 15.999, 'F': 18.998, 'Ne': 20.17, 
+                  'Na': 22.99, 'Mg': 24.305, 'Al': 26.982, 'Si': 28.085, 'P': 30.974, 'S': 32.06, 'Cl': 35.453, 'Ar': 39.94,
+                  'K': 39.098, 'Ca': 40.08}
+
 # Potential coordination donor: add upon discover. (atom name - base on the atom type definition in the force field)
 # ========= Side chain Heteroatoms (O,N,S) ==============
 # Amber: base on a Amber18 LEaP ff14SB output
