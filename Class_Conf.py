@@ -36,7 +36,7 @@ class Config:
     # 0: No info. 1: normal debug (warning) 2: verbose debug (running log)
     debug = 1
     # -----------------------------
-    # command line name for parallel computing
+    # command line name for cpu parallel computing
     # 
     PC_cmd = 'mpirun -np '+str(n_cores) 
 
@@ -47,6 +47,14 @@ class Config:
         # Amber Home dir
         #
         AmberHome = '$AMBERHOME'
+        # -----------------------------
+        # User defined Amber sander path
+        #
+        Amber_sander_CPU = None
+        # -----------------------------
+        # User defined Amber pmemd path
+        #
+        Amber_pmemd_GPU = None
         # -----------------------------
         # User defined Amber MD exe dir other than normal sander.MPI or pmemd.cuda 
         #

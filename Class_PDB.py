@@ -1165,7 +1165,7 @@ class PDB():
         return self.path
 
 
-    def PDBMD(self, tag='', o_dir='', engine='Amber_sander'):
+    def PDBMD(self, tag='', o_dir='', engine='Amber_sander', equi_cpu=0, ifcmd=1):
         '''
         Use self.prmtop_path and self.inpcrd_path to initilize a MD simulation.
         The default MD configuration settings are assigned by class Config.Amber.
@@ -1174,6 +1174,9 @@ class PDB():
         --------------
         o_dir   : Write files in o_dir (current self.dir/MD by default).
         tag     : tag the name of the MD folder
+        engine  : MD engine
+        equi_cpu: if use cpu for equi step
+        ifcmd   : if use custom AmberEXE, notice if default cmd is needed
         Return the nc path of the prod step and store in self.nc
         '''
         # make folder
@@ -1181,15 +1184,26 @@ class PDB():
             o_dir = self.dir+'/MD'+tag
         mkdir(o_dir)
 
-        # express engine
+        # express engine (pirority: AmberEXE - Amber_pmemd_GPU/Amber_sander_CPU - AmberHome)
+        cpu_sander_path = Config.Amber.Amber_sander_CPU
+        if Config.Amber.Amber_sander_CPU == None:
+            cpu_sander_path = Config.Amber.AmberHome+'/bin/sander.MPI'
+        gpu_pmemd_path = Config.Amber.Amber_pmemd_GPU
+        if Config.Amber.Amber_pmemd_GPU == None:
+            gpu_pmemd_path = Config.Amber.AmberHome+'/bin/pmemd.cuda'
+        # -----
         if engine == 'Amber_sander':
-            engine_path = Config.Amber.AmberHome+'/bin/sander.MPI'
-        if engine == 'Amber_pmemd_cpu':
-            engine_path = Config.Amber.AmberHome+'/bin/pmemd.MPI'
+            engine_path = cpu_sander_path
+            PC_cmd = Config.PC_cmd
         if engine == 'Amber_pmemd_gpu':
-            engine_path = Config.Amber.AmberHome+'/bin/pmemd.cuda'
+            engine_path = gpu_pmemd_path
+            PC_cmd = ''
         if Config.Amber.AmberEXE != None:
             engine_path = Config.Amber.AmberEXE
+            if ifcmd:
+                PC_cmd = Config.PC_cmd
+            else:
+                PC_cmd = ''
 
         # build input file (use self.MD_conf_xxxx)
         min_path = self._build_MD_min(o_dir)
@@ -1199,17 +1213,26 @@ class PDB():
 
         # run sander
         if Config.debug >= 1:
-            print('running: '+Config.PC_cmd +' '+ engine_path +' -O -i '+min_path +' -o '+o_dir+'/min.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+o_dir+'/min.rst -ref '+self.inpcrd_path)
-        os.system(Config.PC_cmd +' '+ engine_path +' -O -i '+min_path +' -o '+o_dir+'/min.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+o_dir+'/min.rst -ref '+self.inpcrd_path)
+            print('running: '+PC_cmd +' '+ engine_path +' -O -i '+min_path +' -o '+o_dir+'/min.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+o_dir+'/min.rst -ref '+self.inpcrd_path)
+        os.system(PC_cmd +' '+ engine_path +' -O -i '+min_path +' -o '+o_dir+'/min.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+o_dir+'/min.rst -ref '+self.inpcrd_path)
         if Config.debug >= 1:
-            print('running: '+Config.PC_cmd +' '+ engine_path +' -O -i '+heat_path+' -o '+o_dir+'/heat.out -p '+self.prmtop_path+' -c '+o_dir+'/min.rst -ref ' +o_dir+'/min.rst -r ' +o_dir+'/heat.rst')
-        os.system(Config.PC_cmd +' '+ engine_path +' -O -i '+heat_path+' -o '+o_dir+'/heat.out -p '+self.prmtop_path+' -c '+o_dir+'/min.rst -ref ' +o_dir+'/min.rst -r ' +o_dir+'/heat.rst')
+            print('running: '+PC_cmd +' '+ engine_path +' -O -i '+heat_path+' -o '+o_dir+'/heat.out -p '+self.prmtop_path+' -c '+o_dir+'/min.rst -ref ' +o_dir+'/min.rst -r ' +o_dir+'/heat.rst')
+        os.system(PC_cmd +' '+ engine_path +' -O -i '+heat_path+' -o '+o_dir+'/heat.out -p '+self.prmtop_path+' -c '+o_dir+'/min.rst -ref ' +o_dir+'/min.rst -r ' +o_dir+'/heat.rst')
+        
+        # gpu debug for equi
+        if equi_cpu: 
+            # use Config.PC_cmd and cpu_sander_path
+            if Config.debug >= 1:
+                print('running: '+Config.PC_cmd +' '+ cpu_sander_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
+            os.system(Config.PC_cmd +' '+ cpu_sander_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
+        else:
+            if Config.debug >= 1:
+                print('running: '+PC_cmd +' '+ engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
+            os.system(PC_cmd +' '+ engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
+        
         if Config.debug >= 1:
-            print('running: '+Config.PC_cmd +' '+ engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
-        os.system(Config.PC_cmd +' '+ engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
-        if Config.debug >= 1:
-            print('running: '+Config.PC_cmd +' '+ engine_path +' -O -i '+prod_path+' -o '+o_dir+'/prod.out -p '+self.prmtop_path+' -c '+o_dir+'/equi.rst -ref '+o_dir+'/equi.rst -r '+o_dir+'/prod.rst -x '+o_dir+'/prod.nc')
-        os.system(Config.PC_cmd +' '+ engine_path +' -O -i '+prod_path+' -o '+o_dir+'/prod.out -p '+self.prmtop_path+' -c '+o_dir+'/equi.rst -ref '+o_dir+'/equi.rst -r '+o_dir+'/prod.rst -x '+o_dir+'/prod.nc')
+            print('running: '+PC_cmd +' '+ engine_path +' -O -i '+prod_path+' -o '+o_dir+'/prod.out -p '+self.prmtop_path+' -c '+o_dir+'/equi.rst -ref '+o_dir+'/equi.rst -r '+o_dir+'/prod.rst -x '+o_dir+'/prod.nc')
+        os.system(PC_cmd +' '+ engine_path +' -O -i '+prod_path+' -o '+o_dir+'/prod.out -p '+self.prmtop_path+' -c '+o_dir+'/equi.rst -ref '+o_dir+'/equi.rst -r '+o_dir+'/prod.rst -x '+o_dir+'/prod.nc')
 
         self.nc = o_dir+'/prod.nc'
         return o_dir+'/prod.nc'

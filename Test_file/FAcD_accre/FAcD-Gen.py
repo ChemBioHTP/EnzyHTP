@@ -12,6 +12,7 @@ Config.n_cores = 8
 Config.max_core = 2000
 Config.PC_cmd = 'srun'
 Config.Amber.AmberHome='$AMBERHOME2'
+Config.Amber.Amber_sander_CPU = '$AMBERHOME/bin/sander.MPI'
 Config.Amber.conf_prod['nstlim'] = 500000
 Config.debug = 1
 data_output_path = './Mutation-E-BD.dat'
@@ -41,7 +42,7 @@ def main():
 		# --- Sample with MD ---
 		pdb_obj.rm_wat()													# Remove water from the minimization 														(self.path) 												
 		pdb_obj.PDB2FF(ifsavepdb=1) 										# Generate parameter files *savepdb save the exact structure use in MD for future analysis 	(self.path) 
-		pdb_obj.PDBMD(tag=Muta_tag, engine='Amber_pmemd_gpu')				# Run MD 																					(self.nc) 
+		pdb_obj.PDBMD(tag=Muta_tag, engine='Amber_pmemd_gpu', equi_cpu=1)				# Run MD 																					(self.nc) 
 		# sample
 		pdb_obj.nc2mdcrd(point=100)											# Sample from trajactory 																	(self.mdcrd) 
 
