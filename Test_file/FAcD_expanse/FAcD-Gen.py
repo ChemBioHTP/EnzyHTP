@@ -11,6 +11,7 @@ from helper import write_data
 Config.n_cores = 8
 Config.max_core = 2000
 Config.PC_cmd = 'srun'
+Config.Amber.conf_equi['nstlim'] = 50000
 Config.Amber.conf_prod['nstlim'] = 500000
 Config.debug = 1
 data_output_path = './Mutation-E-BD.dat'

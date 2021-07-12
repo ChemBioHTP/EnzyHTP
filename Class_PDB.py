@@ -1554,8 +1554,8 @@ class PDB():
         support edit keywords directly in module Config
         '''
         chk = r'%chk='+chk_name+'.chk' + line_feed
-        proc = '%nprocshared='+str(Config.Gaussian.n_cores) + line_feed
-        mem = '%mem=' + str(Config.Gaussian.n_cores * Config.Gaussian.max_core) + 'MB' + line_feed
+        proc = '%nprocshared='+str(Config.n_cores) + line_feed
+        mem = '%mem=' + str(Config.n_cores * Config.max_core) + 'MB' + line_feed
         if type(key_words) == str and key_words != '':
             keyword_line = '# '+' '.join(Config.Gaussian.keywords[work_type]+[key_words,]) + line_feed
         if type(key_words) == list:
@@ -2083,7 +2083,7 @@ class PDB():
         '''
         # set nthreads
         if n_cores == None:
-            n_cores = str(Config.Multiwfn.n_cores)
+            n_cores = str(Config.n_cores)
         if Config.debug >= 1:
             print("Running: "+"sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  "+n_cores+"/' "+Config.Multiwfn.DIR+"/settings.ini")
         run("sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  "+n_cores+"/' "+Config.Multiwfn.DIR+"/settings.ini", check=True, text=True, shell=True, capture_output=True)

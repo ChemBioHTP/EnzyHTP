@@ -11,26 +11,17 @@ Config --- Amber
 from math import exp
 import re
 
-# >>>>>> Resource <<<<<<
-# -----------------------------
-# Cores available (used in MD(Amber) and QM(Gaussian) calculations)
-#
-n_cores = 24
-# -----------------------------
-# Per core memory in MB
-#
-max_core = 2000
 
 class Config:
     # >>>>>> Resource <<<<<<
-    # -----------------------------
+	# -----------------------------
     # Cores available (used in MD(Amber) and QM(Gaussian) calculations)
     #
-    n_cores = n_cores
+    n_cores = 24
     # -----------------------------
     # Per core memory in MB
     #
-    max_core = max_core
+    max_core = 2000
     # -----------------------------
     # debug info level
     # 0: No info. 1: normal debug (warning) 2: verbose debug (running log)
@@ -186,11 +177,11 @@ class Config:
         # -----------------------------
         # Cores for gaussian job (higher pirority)
         # 
-        n_cores = n_cores
+        # n_cores = n_cores
         # -----------------------------
         # Per core memory in MB for gaussian job (higher pirority)
         # 
-        max_core = max_core
+        # max_core = max_core
         # -----------------------------
         # Executable g16 command for current environment
         # 
@@ -231,11 +222,11 @@ class Config:
         # -----------------------------
         # Cores for Multiwfn job (higher pirority)
         # 
-        n_cores = n_cores
+        # n_cores = n_cores
         # -----------------------------
         # Per core memory in MB for Multiwfn job (higher pirority)
         # 
-        max_core = max_core
+        # max_core = max_core
         # -----------------------------
         # Executable Multiwfn command for current environment
         # 
@@ -245,7 +236,6 @@ class Config:
         # 
         DIR = '$Multiwfnpath'
         
-
 
 class Layer:
 	'''

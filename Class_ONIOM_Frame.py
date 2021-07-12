@@ -300,8 +300,8 @@ class Frame:
             if ff == 'gjf':
                 if ifchk:
                     of.write(r'%chk='+chk_path+line_feed)
-                of.write('%mem='+str(Config.Gaussian.max_core*Config.Gaussian.n_cores)+'MB'+line_feed)
-                of.write('%nprocshared='+str(Config.Gaussian.n_cores)+line_feed)
+                of.write('%mem='+str(Config.max_core*Config.n_cores)+'MB'+line_feed)
+                of.write('%nprocshared='+str(Config.n_cores)+line_feed)
                 if g_route == None:
                     of.write('# hf/3-21g'+line_feed)
                 else:
