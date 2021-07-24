@@ -3,11 +3,11 @@
 #SBATCH --account=cla296
 #SBATCH --partition=gpu-shared
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=8
-#SBATCH --gpus=2
+#SBATCH --ntasks-per-node=16
+#SBATCH --gpus=1
 #SBATCH --mem=50G
 #SBATCH --no-requeue
-#SBATCH --time=1:00:00         # Total run time limit (HH:MM:SS)
+#SBATCH --time=12:00:00         # Total run time limit (HH:MM:SS)
 
 
 module purge
@@ -25,4 +25,4 @@ conda activate MutaGen
 
 export PYTHONPATH=$PYTHONPATH:~/enzyme_workflow
 
-python FAcD-Gen.py > FAcD-Gen.py.out
+python FAcD-Gen-fixlog.py >> FAcD-Gen-fixlog.py.out

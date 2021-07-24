@@ -1,7 +1,7 @@
 from math import exp, ceil
 import os
 import re
-from subprocess import run
+from subprocess import run, CalledProcessError
 from random import choice
 from AmberMaps import *
 from wrapper import *
@@ -940,7 +940,13 @@ class PDB():
             print('running: '+Config.PC_cmd +' '+ engine_path +' -O -i '+minin_path+' -o '+minout_path+' -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+minrst_path)
         os.system(Config.PC_cmd +' '+ engine_path +' -O -i '+minin_path+' -o '+minout_path+' -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+minrst_path)
         #rst2pdb
-        os.system('ambpdb -p '+self.prmtop_path+' -c '+minrst_path+' > '+out4_PDB_path)
+        try:
+            run('ambpdb -p '+self.prmtop_path+' -c '+minrst_path+' > '+out4_PDB_path, check=True, text=True, shell=True, capture_output=True)
+        except CalledProcessError:
+            if Config.debug >= 1:
+                print('Error: ambpdb cannot read PDBMin result .rst')
+                return 1
+        
         os.system('mv '+self.prmtop_path+' '+self.inpcrd_path+' '+min_dir)
 
         self.path = out4_PDB_path
