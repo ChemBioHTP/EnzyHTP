@@ -568,7 +568,10 @@ class Structure():
             # make output path
             if dir[-1] == '/':
                 dir = dir[:-1]
-            out_path = dir+'/ligand_'+str(l_id)+'_'+lig.name+'.pdb'
+            if ifunique:
+                out_path = dir+'/ligand_'+lig.name+'.pdb'
+            else:
+                out_path = dir+'/ligand_'+str(l_id)+'_'+lig.name+'.pdb'
             # write
             lig.build(out_path, ft=ft)
             # net charge

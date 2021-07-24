@@ -911,7 +911,7 @@ class PDB():
         min_dir = self.cache_path+'/PDBMin'
         minin_path = min_dir + '/min.in'
         minout_path = min_dir + '/min.out'
-        minrst_path = min_dir + '/min.rst'
+        minrst_path = min_dir + '/min.ncrst' # change to ncrst seeking for solution of rst error
         mkdir(min_dir)
         min_input=open(minin_path,'w')
         min_input.write('Minimize'+line_feed)
@@ -990,11 +990,15 @@ class PDB():
     ========
     '''
 
-    def PDB2FF(self, o_path='', lig_method='AM1BCC', renew_lig=0, ifsavepdb=0):
+    def PDB2FF(self, o_path='', lig_method='AM1BCC', renew_lig=0, local_lig=1, ifsavepdb=0):
         '''
         PDB2FF(self, o_path='')
         --------------------
         o_path contral where the leap.in and leap.log go: has to contain a / at the end (e.g.: ./dir/)
+        renew_lig: 0 use old ligand parm files if detected.
+                   1 generate new ones. 
+        local_lig: 0 export lig files to the workdir level in HTP jobs.
+                   1 keep local 
         --------------------
         chains:
         ligand: - less junk files if your workflow contains a protonation step in advance.  
@@ -1004,8 +1008,12 @@ class PDB():
         self.get_stru()
 
         # build things seperately
-        lig_dir = self.dir+'/ligands/'
-        met_dir = self.dir+'/metalcenters/'
+        if local_lig:
+            lig_dir = self.dir+'/ligands/'
+            met_dir = self.dir+'/metalcenters/'
+        else:
+            lig_dir = self.dir+'/../ligands/'
+            met_dir = self.dir+'/../metalcenters/'
         mkdir(lig_dir)
         mkdir(met_dir)
 
@@ -1056,13 +1064,13 @@ class PDB():
                     #gen prepi (net charge and correct protonation state is important)
                     if Config.debug >= 1:
                         print('running: '+Config.Amber.AmberHome+'/bin/antechamber -i '+lig_pdb+' -fi pdb -o '+out_prepi+' -fo prepi -c bcc -s 0 -nc '+str(net_charge))
-                    os.system(Config.Amber.AmberHome+'/bin/antechamber -i '+lig_pdb+' -fi pdb -o '+out_prepi+' -fo prepi -c bcc -s 0 -nc '+str(net_charge))
+                    run(Config.Amber.AmberHome+'/bin/antechamber -i '+lig_pdb+' -fi pdb -o '+out_prepi+' -fo prepi -c bcc -s 0 -nc '+str(net_charge), check=True, text=True, shell=True, capture_output=True)
                     if Config.debug <= 1:
                         os.system('rm ANTECHAMBER* ATOMTYPE.INF NEWPDB.PDB PREP.INF sqm.pdb sqm.in sqm.out')
                     #gen frcmod
                     if Config.debug >= 1:
                         print('running: '+Config.Amber.AmberHome+'/bin/parmchk2 -i '+out_prepi+' -f prepi -o '+out_frcmod)
-                    os.system(Config.Amber.AmberHome+'/bin/parmchk2 -i '+out_prepi+' -f prepi -o '+out_frcmod)                
+                    run(Config.Amber.AmberHome+'/bin/parmchk2 -i '+out_prepi+' -f prepi -o '+out_frcmod, check=True, text=True, shell=True, capture_output=True)                
                 #record
                 parm_paths.append((out_prepi, out_frcmod))
                 self.prepi_path[lig_name] = out_prepi
@@ -1861,6 +1869,8 @@ class PDB():
         self.frames = frames
         if QM in ['g16','g09']:
             gjf_paths = []
+            if Config.debug >= 1:
+                print('Writing gjfs.')
             for i, frame in enumerate(frames):
                 gjf_path = o_dir+'/qm_cluster_'+str(i)+'.gjf'
                 frame.write_sele_lines(sele_lines, out_path=gjf_path, g_route=g_route, chrgspin=chrgspin, ifchk=ifchk)

@@ -20,7 +20,7 @@ wkflow_log_path = './FAcD-Gen.py.log'
 def main():
 	starttime = datetime.datetime.now()
 
-	for i in range(4):
+	for i in range(20):
 		of = open(wkflow_log_path, 'a')
 		of.write('Round: '+str(i)+line_feed)												# Remove water and ion in original crystal file 											(self.path) 
 		# --- Preparation ---
@@ -42,7 +42,7 @@ def main():
 		pdb_obj.rm_allH()													# Remove all hydrogens after mutation (residues only) 										(self.path) 
 		pdb_obj.get_protonation()											# Determine protonation state again 														(self.path) 
 		# use minimization to relax each mutated PDB
-		pdb_obj.PDB2FF()													# Generate parameter files for MD simulation 
+		pdb_obj.PDB2FF(local_lig=0)													# Generate parameter files for MD simulation 
 		exit_code = pdb_obj.PDBMin(engine='Amber_pmemd_gpu')				# Minimization 																				(self.path) 
 		if exit_code == 1:
 			continue
@@ -50,7 +50,7 @@ def main():
 
 		# --- Sample with MD ---
 		pdb_obj.rm_wat()													# Remove water from the minimization 														(self.path) 												
-		pdb_obj.PDB2FF(ifsavepdb=1) 										# Generate parameter files *savepdb save the exact structure use in MD for future analysis 	(self.path) 
+		pdb_obj.PDB2FF(local_lig=0, ifsavepdb=1) 										# Generate parameter files *savepdb save the exact structure use in MD for future analysis 	(self.path) 
 		pdb_obj.PDBMD(tag=Muta_tag, engine='Amber_pmemd_gpu', equi_cpu=1)				# Run MD 																					(self.nc) 
 		of.write('MD: '+str(datetime.datetime.now()- starttime)+line_feed)													# Remove water and ion in original crystal file 											(self.path) 
 		# sample
