@@ -774,7 +774,7 @@ class PDB():
         return self.path
 
 
-    def Add_MutaFlag(self,Flag = 'r'):
+    def Add_MutaFlag(self,Flag = 'r', if_U = 0):
         '''
         Input: 
         Flags or "random"
@@ -815,7 +815,10 @@ class PDB():
                 else:
                     resi_1 = resi.name
                 # random over the residue list
-                resi_2 = choice(Resi_list)
+                if if_U:
+                    resi_2 = choice(Resi_list)
+                else:
+                    resi_2 = choice(Resi_list[:-1])
 
                 MutaFlag = (resi_1, Muta_c_id, Muta_r_id ,resi_2)
                 self.MutaFlags.append(MutaFlag)

@@ -66,7 +66,7 @@ Resi_map2={'ARG':'R',
            'TYR':'Y',
            'TRP':'W'}
 
-Resi_list=['R','H','K','D','E','S','T','N','Q','C','U','G','P','A','V','I','L','M','F','Y','W']
+Resi_list=['R','H','K','D','E','S','T','N','Q','C','G','P','A','V','I','L','M','F','Y','W','U']
 
 TIP3P_map=[ "O" , "H" , "OW", "HW","HOH","WAT",
             "F" , 

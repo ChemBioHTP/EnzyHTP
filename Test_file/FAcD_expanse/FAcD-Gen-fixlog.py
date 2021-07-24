@@ -32,7 +32,7 @@ def main():
 		# --- Operation ---
 		# Mutation
 		Muta_tag = pdb_obj.Add_MutaFlag('r')								# Generate a target "Flag" for mutation 													
-		if pdb_obj.MutaFlags[0][2] == '108' or pdb_obj.MutaFlags[0][3] == 'U': 								# Keep the key residue 
+		if pdb_obj.MutaFlags[0][2] == '108': 								# Keep the key residue 
 			continue
 		if pdb_obj.MutaFlags[0][0] == pdb_obj.MutaFlags[0][3]:
 			continue
