@@ -7,7 +7,7 @@
 #SBATCH --gpus=1
 #SBATCH --mem=50G
 #SBATCH --no-requeue
-#SBATCH --time=12:00:00         # Total run time limit (HH:MM:SS)
+#SBATCH --time=10:00:00         # Total run time limit (HH:MM:SS)
 
 
 module purge
@@ -25,4 +25,4 @@ conda activate MutaGen
 
 export PYTHONPATH=$PYTHONPATH:~/enzyme_workflow
 
-python FAcD-Gen-fixlog.py >> FAcD-Gen-fixlog.py.out
+python -u FAcD-Gen-fixlog.py >> FAcD-Gen-fixlog.py.out
