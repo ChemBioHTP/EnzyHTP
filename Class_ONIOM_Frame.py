@@ -71,7 +71,9 @@ class Frame:
         atom_coord = []
         counter = 1
         end_flag_1 = 0
+        fake_end_flag = 0
         #os.system('echo >> '+mdcrd_file)
+        debug_counter = 0
 
         with open(mdcrd_file) as f:
             while True:
@@ -80,10 +82,16 @@ class Frame:
 
                 if re.match(digit_pattern, line) == None:
                     # not data line // could be faster here
-                    if not end_flag_1:
+                    if not end_flag_1 and not fake_end_flag:
                         continue
+                
+                if fake_end_flag:
+                    # if next line of fake end is the file end 
+                    if line == '':
+                        break
 
                 if end_flag_1:
+                    debug_counter += 1
                     if re.match(frame_sep_pattern, line) != None:
                         # last line is a fake end line
                         coord.append(holder)
@@ -91,6 +99,7 @@ class Frame:
                         # empty for next loop
                         coord = []
                         end_flag_1 = 0
+                        fake_end_flag = 1
                         continue
                     else:                        
                         # last line is a real end line
@@ -102,7 +111,8 @@ class Frame:
                             #the last line
                             break
                         if line == line_feed:
-                            print("WARNING: unexpected empty line detected. Treat as EOF. exit reading")
+                            if Config.debug >= 1:
+                                print("Frame.fromMDCrd: WARNING: unexpected empty line detected. Treat as EOF. exit reading")
                             break
                         # do not skip if normal next line
 
