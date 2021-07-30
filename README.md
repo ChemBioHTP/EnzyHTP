@@ -22,4 +22,4 @@ git clone https://github.com/Electrostatics/pdb2pqr.git
 cd pdb2pqr
 pip install .
 ```
-3. Install Multiwfn (install demo in author's blog: http://sobereva.com/454)
+3. Install Multiwfn (install demo in author's blog: http://sobereva.com/454) (The LMO func seems not working for WSL)

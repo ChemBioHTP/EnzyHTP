@@ -488,7 +488,7 @@ class PDB():
         self._update_name()
         self.stru.name=self.name
 
- 
+
     def _get_protonation_pdb2pqr(self,ffout='AMBER',ph=7.0,out_path=''):
         '''
         Use PDB2PQR to get the protonation state for current PDB. (self.path)
@@ -1927,7 +1927,8 @@ class PDB():
             outs = []
             for gjf in inp:
                 out = gjf[:-3]+'out'
-                print('running: '+Config.Gaussian.g16_exe+' < '+gjf+' > '+out)
+                if Config.debug > 1:
+                    print('running: '+Config.Gaussian.g16_exe+' < '+gjf+' > '+out)
                 os.system(Config.Gaussian.g16_exe+' < '+gjf+' > '+out)
                 outs.append(out)
             return outs
@@ -1936,7 +1937,8 @@ class PDB():
             outs = []
             for gjf in inp:
                 out = gjf[:-3]+'out'
-                print('running: '+Config.Gaussian.g16_exe+' < '+gjf+' > '+out)
+                if Config.debug > 1:
+                    print('running: '+Config.Gaussian.g16_exe+' < '+gjf+' > '+out)
                 os.system(Config.Gaussian.g09_exe+' < '+gjf+' > '+out)
                 outs.append(out)
             return outs
@@ -1956,13 +1958,13 @@ class PDB():
         fchk_paths = []
         for chk in self.qm_cluster_chk:
             fchk = chk[:-3]+'fchk'
-            if Config.debug >= 1:
+            if Config.debug > 1:
                 print('running: '+'formchk '+chk+' '+fchk)
             run('formchk '+chk+' '+fchk, check=True, text=True, shell=True, capture_output=True)
             fchk_paths.append(fchk)
             # keep chk
             if not keep_chk:
-                if Config.debug >= 1:
+                if Config.debug > 1:
                     print('removing: '+chk)
                 os.remove(chk)
 
@@ -2036,6 +2038,8 @@ class PDB():
     def get_bond_dipole(cls, qm_fch_paths, a1, a2, prog='Multiwfn'):
         '''
         get bond dipole using wfn analysis with fchk files.
+        * NEED nosymm in gaussian input if want to compare resulting coord and original mdcrd/gjf stru.
+        * requires a out file with only tail difference. 
         -----------
         qm_fch_paths: paths of fchk files
         a1          : QM I/O id of atom 1 of the target bond
@@ -2049,6 +2053,7 @@ class PDB():
         -----------
         LMO bond dipole: (Multiwfn manual 3.22/4.19.4)
         2-center LMO dipole is defined by the deviation of the eletronic mass center relative to the bond center.
+        Direction: negative(-) to positive(+).
         '''
         Dipoles = []
 
@@ -2068,6 +2073,29 @@ class PDB():
             bond_data_pattern = r'X\/Y\/Z: *([0-9\.\-]+) *([0-9\.\-]+) *([0-9\.\-]+) *Norm: *([0-9\.]+)'
             
             for fchk in qm_fch_paths:
+                # get a1->a2 vector from .out (update to using fchk TODO)
+                G_out_path = fchk[:-len(fchk.split('.')[-1])]+'out'
+                with open(G_out_path) as f0:
+                    coord_flag = 0
+                    skip_flag = 0
+                    for line0 in f0:
+                        if 'Standard orientation' in line0:
+                            coord_flag = 1
+                            continue
+                        if coord_flag:
+                            # skip first 4 lines
+                            if skip_flag <= 3:
+                                skip_flag += 1
+                                continue
+                            if '-------------------------' in line0:
+                                break
+                            l_p = line0.strip().split()
+                            if str(a1) == l_p[0]:
+                                coord_a1 = np.array((float(l_p[3]), float(l_p[4]), float(l_p[5])))
+                            if str(a2) == l_p[0]:
+                                coord_a2 = np.array((float(l_p[3]), float(l_p[4]), float(l_p[5])))
+                Bond_vec = (coord_a2 - coord_a1)
+                
                 # Run Multiwfn
                 mltwfn_out_path = fchk[:-len(fchk.split('.')[-1])]+'dip'
                 if Config.debug >= 2:
@@ -2075,6 +2103,7 @@ class PDB():
                 run(Config.Multiwfn.exe+' '+fchk+' < '+mltwfn_in_path, check=True, text=True, shell=True, capture_output=True)
                 run('mv LMOdip.txt '+mltwfn_out_path, check=True, text=True, shell=True, capture_output=True)
                 run('rm LMOcen.txt new.fch', check=True, text=True, shell=True, capture_output=True)
+                
                 # get dipole
                 with open(mltwfn_out_path) as f:
                     read_flag = 0
@@ -2083,15 +2112,20 @@ class PDB():
                             read_flag = 1
                             continue
                         if read_flag:
+                            if 'Sum' in line:
+                                raise Exception('Cannot find bond:'+str(a1)+'-'+str(a2)+line_feed)
                             Bond_id = re.search(bond_id_pattern, line).groups()
                             # find target bond
                             if str(a1) in Bond_id and str(a2) in Bond_id:
                                 Bond_data = re.search(bond_data_pattern, line).groups()
                                 dipole_vec = (float(Bond_data[0]) ,float(Bond_data[1]) ,float(Bond_data[2]))
-                                dipole_norm = float(Bond_data[3])
+                                # determine sign
+                                if np.dot(np.array(dipole_vec), Bond_vec) > 0:
+                                    dipole_norm_signed = float(Bond_data[3])
+                                else:
+                                    dipole_norm_signed = -float(Bond_data[3])
                                 break
-            
-                Dipoles.append((dipole_norm, dipole_vec))
+                Dipoles.append((dipole_norm_signed, dipole_vec))
 
         return Dipoles
 
