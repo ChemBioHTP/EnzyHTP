@@ -774,12 +774,14 @@ class PDB():
         return self.path
 
 
-    def Add_MutaFlag(self,Flag = 'r', if_U = 0):
+    def Add_MutaFlag(self,Flag = 'r', if_U = 0, if_self=0):
         '''
         Input: 
         Flags or "random"
         ----------------------------------------------------
-        Flag    (e.g. XA11Y) Can be a str or a list of str (a list of flags).
+        Flag   :(e.g. XA11Y) Can be a str or a list of str (a list of flags).
+        if_U   :if consider mutation to U in random generation (Selenocysteine)
+        if_self:if consider mutation to the residue itself in random generation(wt)
         ----------------------------------------------------
         Append self.MutaFlags with the Flag.
         Grammer:
@@ -816,9 +818,14 @@ class PDB():
                     resi_1 = resi.name
                 # random over the residue list
                 if if_U:
-                    resi_2 = choice(Resi_list)
+                    m_Resi_list = Resi_list
                 else:
-                    resi_2 = choice(Resi_list[:-1])
+                    m_Resi_list = Resi_list[:-1]
+                resi_2 = choice(m_Resi_list)
+                # avoid or not mutation to self
+                if not if_self:
+                    while resi_2 == resi_1:
+                        resi_2 = choice(m_Resi_list)
 
                 MutaFlag = (resi_1, Muta_c_id, Muta_r_id ,resi_2)
                 self.MutaFlags.append(MutaFlag)
@@ -2053,7 +2060,8 @@ class PDB():
         -----------
         LMO bond dipole: (Multiwfn manual 3.22/4.19.4)
         2-center LMO dipole is defined by the deviation of the eletronic mass center relative to the bond center.
-        Direction: negative(-) to positive(+).
+        Dipole positive Direction: negative(-) to positive(+).
+        Result direction: a1 -> a2
         '''
         Dipoles = []
 
