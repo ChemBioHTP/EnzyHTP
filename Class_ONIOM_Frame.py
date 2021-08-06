@@ -214,7 +214,7 @@ class Frame:
                     self.coord.append(l1_coord)
 
 
-    def write_to_template(self, t_file_path, out_path=None, index : str = None):
+    def write_to_template(self, t_file_path, out_path=None, index : str = None, ifchk=1):
         '''
         1. find the beginning and ending of the coordinate section.
         2. replace coordinate based on the same atom sequence.
@@ -225,7 +225,7 @@ class Frame:
             out_path = t_file_path[:-4]+'_newcoord.gjf'
         if index != None:
             out_path = out_path[:-4]+'_'+index+'.gjf'
-            
+        chk_path = out_path[:-3]+'chk'
         
         with open(t_file_path) as f:
             with open(out_path,'w') as of:
@@ -234,6 +234,13 @@ class Frame:
                 coord_index = 0
                 for line in f:
                     
+                    if re.search('chk_place_holder', line.strip()) != None:
+                        if ifchk:
+                            of.write(r'%chk='+chk_path + line_feed)
+                            continue
+                        else:
+                            continue
+
                     if re.match(ChrgSpin_pattern, line.strip()) != None:
                         coord_b_flag = 1
                         of.write(line)
@@ -268,6 +275,10 @@ class Frame:
                         continue
                     
                     of.write(line)
+                    
+        if ifchk:
+            return out_path, chk_path
+
         return out_path
 
 

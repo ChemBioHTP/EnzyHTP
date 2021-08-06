@@ -1463,10 +1463,11 @@ class PDB():
     QM/MM
     ========
     '''
-    def PDB2QMMM(self, o_dir='',tag='', work_type='spe', qm='g16', keywords='', prmtop_path=None, prepi_path:dict=None, spin_list=[1,1]):
+    def PDB2QMMM(self, o_dir='',tag='', work_type='spe', qm='g16', keywords='', prmtop_path=None, prepi_path:dict=None, spin_list=[1,1], ifchk=1):
         '''
         generate QMMM input template based on [connectivity, atom order, work type, layer/freeze settings, charge settings]
         * NEED TO SET LAYER BY ATOM INDEX OR SELECT A LAYER PRESET (use Config.Gaussian.layer_preset and Config.Gaussian.layer_atoms)
+        * define self.frames in the func
         --------
         qm          : QM program (default: g16 / Gaussian16)
         work_type   : QMMM calculation type (default: spe)
@@ -1476,6 +1477,7 @@ class PDB():
         prmtop_path : provide prmtop file for determining charge and spin. use self.prmtop by default
         prepi_path  : a diction of prepin file path with each ligand name as key. (e.g.: {'4CO':'./ligand/xxx.prepin'})
         spin_list   : a list of spin for each layers. (Do not support auto judge of the spin now)
+        ifchk       : if save chk and return chk paths
         <see more options in Config.Gaussian>
         ========
         Gaussian
@@ -1517,7 +1519,7 @@ class PDB():
         mkdir(o_dir)
         # file path and name
         o_name = self.name+'_QMMM'
-        o_path = o_dir+'/'+o_name+'.gjf'
+        g_temp_path = o_dir+'/'+o_name+'.gjf'
         #get stru
         self.get_stru()
         #get layer
@@ -1536,7 +1538,7 @@ class PDB():
             add_prm = self._get_oniom_g16_add_prm() # test for rules of missing parameters
             
             #combine and write 
-            with open(o_path,'w') as of:
+            with open(g_temp_path,'w') as of:
                 of.write(self.route) 
                 of.write(line_feed) 
                 of.write(title)
@@ -1548,8 +1550,29 @@ class PDB():
                 of.write(cnt_table)
                 of.write(line_feed)
                 of.write(add_prm)
+        
+        # deploy to inp files
+        frames = Frame.fromMDCrd(self.mdcrd)
+        self.frames = frames
+        gjf_paths = []
+        chk_paths = []
+        if Config.debug >= 1:
+            print('Writing QMMM gjfs.')
+        for i, frame in enumerate(frames):
+            if ifchk:
+                frame_path = frame.write_to_template(g_temp_path, index = str(i), ifchk=1)
+                gjf_paths.append(frame_path[0])
+                chk_paths.append(frame_path[1])
+            else:
+                gjf_paths.append(frame.write_to_template(g_temp_path, index = str(i), ifchk=0))
+        # run Gaussian job
+        self.qmmm_out = PDB.Run_QM(gjf_paths)
 
-        return o_path
+        if ifchk:
+            self.qmmm_chk = chk_paths
+            return self.qmmm_out, self.qmmm_chk
+
+        return self.qmmm_out
 
 
     def _get_oniom_layer(self):
@@ -1567,7 +1590,7 @@ class PDB():
             self.layer = Layer.preset(self, self.layer_preset)
 
 
-    def _get_oniom_g16_route(self, work_type, chk_name='QMMM', key_words=''):
+    def _get_oniom_g16_route(self, work_type, chk_name='chk_place_holder', key_words=''):
         '''
         generate gaussian 16 ONIOM route section. Base on settings in the config module.
         -------
@@ -1877,7 +1900,7 @@ class PDB():
         if QM in ['g16','g09']:
             gjf_paths = []
             if Config.debug >= 1:
-                print('Writing gjfs.')
+                print('Writing QMcluster gjfs.')
             for i, frame in enumerate(frames):
                 gjf_path = o_dir+'/qm_cluster_'+str(i)+'.gjf'
                 frame.write_sele_lines(sele_lines, out_path=gjf_path, g_route=g_route, chrgspin=chrgspin, ifchk=ifchk)
