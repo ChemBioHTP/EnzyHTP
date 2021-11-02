@@ -2,6 +2,7 @@ import sys
 import os
 import glob
 import datetime
+import numpy as np
 from Class_PDB import *
 from Class_Conf import *
 from Class_ONIOM_Frame import *
@@ -21,7 +22,7 @@ def main():
 	starttime = datetime.datetime.now()
 
 	of = open(wkflow_log_path, 'wb', buffering=0)
-	for i in range(20):
+	for i in range(25):
 		of.write(('Round: '+str(i)+line_feed).encode('utf-8'))												# Remove water and ion in original crystal file 											(self.path) 
 		# --- Preparation ---
 		pdb_obj = PDB('./FAcD-FA-ASP.pdb', wk_dir='./FAcD_test'+str(i))		# Initiate with the file from protein data bank 											(self.path) 
@@ -33,8 +34,6 @@ def main():
 		# Mutation
 		Muta_tag = pdb_obj.Add_MutaFlag('r')								# Generate a target "Flag" for mutation 													
 		if pdb_obj.MutaFlags[0][2] == '108': 								# Keep the key residue 
-			continue
-		if pdb_obj.MutaFlags[0][0] == pdb_obj.MutaFlags[0][3]:
 			continue
 		pdb_obj.PDB2PDBwLeap()												# Deploy mutation 																			(self.path) 
 		of.write(('Mutation: p2pwl: '+str(datetime.datetime.now()- starttime)+line_feed).encode('utf-8'))													# Remove water and ion in original crystal file 											(self.path) 
@@ -58,7 +57,7 @@ def main():
 
 		# --- QM cluster ---
 		atom_mask = ':108,298'												# Define QM cluster / can also use some presets: ligand; residues within a distance using a Layer object
-		g_route = '# hf/6-31G(d) pop=cm5'									# QM keywords
+		g_route = '# hf/6-31G(d) pop=cm5 nosymm'							# QM keywords
 		pdb_obj.PDB2QMCluster(atom_mask, g_route=g_route, ifchk=1)			# Run QM cluster calculation																(self.qm_cluster_out, self.qm_cluster_chk) 
 		of.write(('QM Cluster: '+str(datetime.datetime.now()- starttime)+line_feed).encode('utf-8'))													# Remove water and ion in original crystal file 											(self.path) 
 		pdb_obj.get_fchk(keep_chk=0)										# Save fchk files for analysis																(self.qm_cluster_fchk) 

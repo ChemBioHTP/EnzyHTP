@@ -5,7 +5,6 @@
 #SBATCH --tasks-per-node=24                # Number of tasks (usually = cores) on each node
 #SBATCH --mem-per-cpu=4G   # Minimum memory (in MB) required per allocated CPU
 #SBATCH --time=24:00:00         # Total run time limit (HH:MM:SS)
-#SBATCH --export=ALL              # Export you current env to the job env
 #SBATCH --account=yang_lab_csb
 
 module load GCC/6.4.0-2.28  OpenMPI/2.1.1

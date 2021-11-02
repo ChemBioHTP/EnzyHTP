@@ -7,7 +7,7 @@
 #SBATCH --gpus=1
 #SBATCH --mem=50G
 #SBATCH --no-requeue
-#SBATCH --time=10:00:00         # Total run time limit (HH:MM:SS)
+#SBATCH --time=18:00:00         # Total run time limit (HH:MM:SS)
 
 
 module purge
