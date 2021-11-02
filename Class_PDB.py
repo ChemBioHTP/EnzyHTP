@@ -1085,7 +1085,7 @@ class PDB():
         return parm_paths
 
 
-    def _combine_parm(self, lig_parms, o_path='', ifsavepdb=0, ifsolve=1, box_type=Config.Amber.box_type, box_size=Config.Amber.box_size):
+    def _combine_parm(self, lig_parms, o_path='', ifsavepdb=0, ifsolve=1, box_type=None, box_size=Config.Amber.box_size):
         '''
         combine different parmeter files and make finally inpcrd and prmtop
         -------
@@ -1093,6 +1093,9 @@ class PDB():
         ligands: prepi, frcmod
         metalcenters, artificial residues: TODO
         '''
+        if box_type == None:
+            box_type = Config.Amber.box_type
+            
         leap_path= self.cache_path+'/leap.in'
         sol_path= self.path_name+'_ff.pdb'
         with open(leap_path, 'w') as of:
