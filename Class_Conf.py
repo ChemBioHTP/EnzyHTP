@@ -56,7 +56,7 @@ class Config:
         # -----------------------------
         # Water box type and size
         # availible type: box/oct
-        box_type = 'box'
+        box_type = 'oct'
         box_size = '10'
         # -----------------------------
         #            min
