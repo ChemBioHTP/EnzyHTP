@@ -491,14 +491,15 @@ class Structure():
                         of.write(line)
                         of.write('TER'+line_feed)
 
-                    c_id = chr(ord(c_id)+1) # same chain_id for all solvent
-                    for solvent in self.solvents:
-                        r_id = r_id + 1
-                        for atom in solvent:
-                            a_id = a_id + 1
-                            line = atom.build(a_id= a_id, r_id = r_id, c_id = c_id, ff=ff, forcefield=forcefield)
-                            of.write(line)
-                    of.write('TER'+line_feed)
+                    if len(self.solvents) != 0:
+                        c_id = chr(ord(c_id)+1) # same chain_id for all solvent
+                        for solvent in self.solvents:
+                            r_id = r_id + 1
+                            for atom in solvent:
+                                a_id = a_id + 1
+                                line = atom.build(a_id= a_id, r_id = r_id, c_id = c_id, ff=ff, forcefield=forcefield)
+                                of.write(line)
+                        of.write('TER'+line_feed)
 
                 else:
                     for chain in self.chains:
@@ -525,12 +526,13 @@ class Structure():
                         of.write(line)
                         of.write('TER'+line_feed)
 
-                    c_id = chr(ord(c_id)+1) # chain_id for all solvent
-                    for solvent in self.solvents:
-                        for atom in solvent:
-                            line = atom.build(c_id = c_id, ff=ff, forcefield=forcefield)
-                            of.write(line)
-                    of.write('TER'+line_feed)
+                    if len(self.solvents) != 0:
+                        c_id = chr(ord(c_id)+1) # chain_id for all solvent
+                        for solvent in self.solvents:
+                            for atom in solvent:
+                                line = atom.build(c_id = c_id, ff=ff, forcefield=forcefield)
+                                of.write(line)
+                        of.write('TER'+line_feed)
 
 
             if ff == 'XXX':
