@@ -837,11 +837,11 @@ class Structure():
 
     def get_residue(self, id):
         '''
-        research residue id with all residues count togethor from 1.
+        re-search residue id with all residues count togethor from 1.
         ----------
         return a residue object
         '''
-        all_resi = self.get_all_residue_unit
+        all_resi = self.get_all_residue_unit()
         for resi in all_resi:
             if resi.id == int(id):
                 return resi
@@ -2405,9 +2405,9 @@ class Metalatom(Atom):
         -----
         return self when iter. Allow metalatom to be iterate like a residue that return a atom level obj.
         '''
-        if i == 0:
+        if key == 0:
             return self
-        if i > 0:
+        if key > 0:
             raise StopIteration
 
 
