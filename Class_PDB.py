@@ -637,7 +637,7 @@ class PDB():
                             if line_count < len(ref_a_names):    
                                 ele = ref_a_names[line_count]
                             else:
-                                ele = pdb_l.get_element()
+                                ele = pdb_l.get_element() # New atoms
                             pdb_l.resi_name = ref_resi_name
                             line_count += 1
                         # determine the element count
@@ -971,33 +971,47 @@ class PDB():
         return self.path
 
 
-    def rm_allH(self, ff='Amber'):
+    def rm_allH(self, ff='Amber', if_ligand=0):
         '''
         remove wrong hydrogens added by leap after mutation. (In the case that the input file was a H-less one from crystal.)
         ----------
-        remove Hs of standard protein residues only.
+        if_ligand:
+        0 - remove Hs of standard protein residues only.
+        1 - remove all Hs base on the nomenclature. (start with H and not in the non_H_list)
         '''
         # out path
         o_path=self.path_name+'_rmH.pdb'
-        # H list (residue only)
-        H_namelist=[]
-        for name in Resi_Ele_map[ff]:
-            if Resi_Ele_map[ff][name] == 'H':
-                H_namelist.append(name)
 
-        with open(self.path) as f:
-            with open(o_path,'w') as of:
-                for line in f:
-                    if line[12:16].strip() in H_namelist:
-                        continue
-                    of.write(line)
+        # crude judgement of H including customized H
+        if if_ligand:
+            not_H_list = ['HG', 'HF', 'HS'] # non-H elements that start with "H"
+            with open(self.path) as f:
+                with open(o_path,'w') as of:
+                    for line in f:
+                        atom_name = line[12:16].strip()
+                        if atom_name[0] == 'H' and (atom_name[:2] not in not_H_list):
+                            continue
+                        of.write(line)
+        else:
+            # H list (residue only)
+            H_namelist=[]
+            for name in Resi_Ele_map[ff]:
+                if Resi_Ele_map[ff][name] == 'H':
+                    H_namelist.append(name)
+
+            with open(self.path) as f:
+                with open(o_path,'w') as of:
+                    for line in f:
+                        if line[12:16].strip() in H_namelist:
+                            continue
+                        of.write(line)
         self.path=o_path
         self._update_name()       
 
 
     '''
     ========
-    Gerneral MD
+    General MD
     ========
     '''
 
