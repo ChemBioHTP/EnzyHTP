@@ -1,5 +1,5 @@
-# enzyme_workflow
-Using AlleyCat as a model enzyme, we will develop Python 3 libraries that facilitate the enzyme mutant model construction, input file creation, job monitor, output data collection, and analysis.
+# EnzyHTP
+we built a holistic platform EnzyHTP that allows the collection of both dynamics from MD and electronic structure data from QM or QM/MM in a high-throughput manner.
 
 # Requirement
 ## External Program
@@ -15,8 +15,9 @@ Using AlleyCat as a model enzyme, we will develop Python 3 libraries that facili
 # Installation 
 ## dependence
 0. Install conda & create an environment
-1. Install openbabel `conda install openbabel -c conda-forge`
-2. Install pdb2pqr 
+1. install numpy `conda install numpy`
+2. Install openbabel `conda install openbabel -c conda-forge`
+3. Install pdb2pqr 
 ```
 git clone https://github.com/Electrostatics/pdb2pqr.git
 cd pdb2pqr
