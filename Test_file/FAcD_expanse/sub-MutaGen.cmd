@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=FAcD_gpu_Test          # Assign an 8-character name to your job
-#SBATCH --account=cla296
+#SBATCH --account=xxx
 #SBATCH --partition=gpu-shared
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=16
