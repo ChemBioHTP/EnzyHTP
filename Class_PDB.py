@@ -2037,6 +2037,7 @@ class PDB():
         bond_p1:method to generate p1
                 - center
                 - a1
+                - TODO exact dipole center of the current structure
                 - ...
         p1:     the point where E is calculated
         p2:     a point to fix d1
