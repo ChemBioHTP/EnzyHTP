@@ -776,7 +776,7 @@ resi_subgrp = {
       'negative' :      ['D','E'],
       'polarNcharge' :  ['S','T','N','Q','C','Y'],
       'nonpolar' :      ['A','V','I','L','P','M','F','W','G'],
-      'netural' :       ['S','T','N','Q','C','Y','A','V','I','L','P','M','F','W','G']
+      'neutral' :       ['S','T','N','Q','C','Y','A','V','I','L','P','M','F','W','G']
 }
 # Residue Volume Rank (From http://www.imgt.org/IMGTeducation/Aide-memoire/_UK/aminoacids/abbreviation.html)
 resi_vol_rank = ['G','A','S','C','D','P','N','T','E','V','Q','H','M','I','L','K','R','F','Y','W']
