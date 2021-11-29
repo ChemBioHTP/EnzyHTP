@@ -1,0 +1,11 @@
+source leaprc.protein.ff14SB
+source leaprc.gaff
+source leaprc.water.tip3p
+a = loadpdb 2kz2init_amb.pdb
+center a
+addions a Na+ 0
+addions a Cl- 0
+solvatebox a TIP3PBOX 10
+saveamberparm a ./2kz2init_amb.prmtop ./2kz2init_amb.inpcrd
+savepdb a ./2kz2init_amb_ff.pdb
+quit

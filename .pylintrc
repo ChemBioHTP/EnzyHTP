@@ -1,0 +1,8 @@
+[MASTER]
+init-hook='import sys; sys.path.append("C:/Users/shaoqz/OneDrive/Zhongyue/enzyme_workflow/")'
+
+[MESSAGES CONTROL]
+# Find available symbolic names in:
+# https://docs.pylint.org/features.html
+disable=W,wildcard-import,unused-wildcard-import,raise-missing-from,pointless-string,consider-using-enumerate,singleton-comparison,unidiomatic-typecheck,too-many-lines,trailing-newlines,locally-disabled,trailing-whitespace,fixme,missing-docstring,protected-access,invalid-name,super-init-not-called,star-args,no-self-argument,inherit-non-class,no-method-argument,no-self-use,unused-argument,too-many-return-statements,too-many-branches,too-many-function-args,too-many-instance-attributes,too-many-locals,bad-continuation,unnecessary-lambda,redefined-variable-type,global-statement,line-too-long,mixed-indentation,bad-whitespace,missing-final-newline
+enable=unreachable,duplicate-key,unnecessary-semicolon,global-variable-not-assigned,unused-variable,binary-op-exception,bad-format-string,bad-open-mode
