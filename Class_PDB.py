@@ -908,7 +908,7 @@ class PDB():
         return Flag[0]+Flag[1]+Flag[2]+Flag[3]
 
 
-    def PDBMin(self,cycle=2000,engine='Amber_sander'):
+    def PDBMin(self,cycle=2000,engine='Amber_GPU'):
         '''
         Run a minization use self.prmtop and self.inpcrd and setting form class Config.
         --------------------------------------------------
@@ -939,20 +939,12 @@ class PDB():
         min_input.close()
     
         # express engine
-        if engine == 'Amber_sander':
-            engine_path = Config.Amber.AmberHome+'/bin/sander.MPI'
-        if engine == 'Amber_pmemd_cpu':
-            engine_path = Config.Amber.AmberHome+'/bin/pmemd.MPI'
-        if engine == 'Amber_pmemd_gpu':
-            engine_path = Config.Amber.AmberHome+'/bin/pmemd.cuda'
-        if Config.Amber.AmberEXE != None:
-            engine_path = Config.Amber.AmberEXE
-
+        PC_cmd, engine_path = Config.Amber.get_Amber_engine(engine=engine)
 
         #run
         if Config.debug >= 1:
-            print('running: '+Config.PC_cmd +' '+ engine_path +' -O -i '+minin_path+' -o '+minout_path+' -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+minrst_path)
-        os.system(Config.PC_cmd +' '+ engine_path +' -O -i '+minin_path+' -o '+minout_path+' -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+minrst_path)
+            print('running: '+PC_cmd +' '+ engine_path +' -O -i '+minin_path+' -o '+minout_path+' -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+minrst_path)
+        os.system(PC_cmd +' '+ engine_path +' -O -i '+minin_path+' -o '+minout_path+' -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+minrst_path)
         #rst2pdb
         try:
             run('ambpdb -p '+self.prmtop_path+' -c '+minrst_path+' > '+out4_PDB_path, check=True, text=True, shell=True, capture_output=True)
@@ -1210,7 +1202,7 @@ class PDB():
         return self.path
 
 
-    def PDBMD(self, tag='', o_dir='', engine='Amber_sander', equi_cpu=0, ifcmd=1):
+    def PDBMD(self, tag='', o_dir='', engine='Amber_GPU', equi_cpu=0):
         '''
         Use self.prmtop_path and self.inpcrd_path to initilize a MD simulation.
         The default MD configuration settings are assigned by class Config.Amber.
@@ -1219,9 +1211,8 @@ class PDB():
         --------------
         o_dir   : Write files in o_dir (current self.dir/MD by default).
         tag     : tag the name of the MD folder
-        engine  : MD engine
+        engine  : MD engine (cpu/gpu)
         equi_cpu: if use cpu for equi step
-        ifcmd   : if use custom AmberEXE, notice if default cmd is needed
         Return the nc path of the prod step and store in self.nc
         '''
         # make folder
@@ -1229,26 +1220,14 @@ class PDB():
             o_dir = self.dir+'/MD'+tag
         mkdir(o_dir)
 
-        # express engine (pirority: AmberEXE - Amber_pmemd_GPU/Amber_sander_CPU - AmberHome)
-        cpu_sander_path = Config.Amber.Amber_sander_CPU
-        if Config.Amber.Amber_sander_CPU == None:
-            cpu_sander_path = Config.Amber.AmberHome+'/bin/sander.MPI'
-        gpu_pmemd_path = Config.Amber.Amber_pmemd_GPU
-        if Config.Amber.Amber_pmemd_GPU == None:
-            gpu_pmemd_path = Config.Amber.AmberHome+'/bin/pmemd.cuda'
-        # -----
-        if engine == 'Amber_sander':
-            engine_path = cpu_sander_path
-            PC_cmd = Config.PC_cmd
-        if engine == 'Amber_pmemd_gpu':
-            engine_path = gpu_pmemd_path
-            PC_cmd = ''
-        if Config.Amber.AmberEXE != None:
-            engine_path = Config.Amber.AmberEXE
-            if ifcmd:
-                PC_cmd = Config.PC_cmd
+        # express engine (pirority: AmberEXE_GPU/AmberEXE_CPU - AmberHome/bin/xxx)
+        PC_cmd, engine_path = Config.Amber.get_Amber_engine(engine=engine)
+        # express cpu engine if equi_cpu
+        if equi_cpu:
+            if Config.Amber.AmberEXE_CPU == None:
+                cpu_engine_path = Config.Amber.AmberHome+'/bin/sander.MPI'
             else:
-                PC_cmd = ''
+                cpu_engine_path = Config.Amber.AmberEXE_CPU
 
         # build input file (use self.MD_conf_xxxx)
         min_path = self._build_MD_min(o_dir)
@@ -1266,10 +1245,10 @@ class PDB():
         
         # gpu debug for equi
         if equi_cpu: 
-            # use Config.PC_cmd and cpu_sander_path
+            # use Config.PC_cmd and cpu_engine_path
             if Config.debug >= 1:
-                print('running: '+Config.PC_cmd +' '+ cpu_sander_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
-            os.system(Config.PC_cmd +' '+ cpu_sander_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
+                print('running: '+Config.PC_cmd +' '+ cpu_engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
+            os.system(Config.PC_cmd +' '+ cpu_engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
         else:
             if Config.debug >= 1:
                 print('running: '+PC_cmd +' '+ engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')

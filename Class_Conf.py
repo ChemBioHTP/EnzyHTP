@@ -39,17 +39,13 @@ class Config:
         #
         AmberHome = '$AMBERHOME'
         # -----------------------------
-        # User defined Amber sander path
+        # User defined Amber CPU path (default: $AMBERHOME/bin/sander.MPI)
         #
-        Amber_sander_CPU = None
+        AmberEXE_CPU = None
         # -----------------------------
-        # User defined Amber pmemd path
+        # User defined Amber GPU path (default: $AMBERHOME/bin/pmemd.cuda)
         #
-        Amber_pmemd_GPU = None
-        # -----------------------------
-        # User defined Amber MD exe dir other than normal sander.MPI or pmemd.cuda 
-        #
-        AmberEXE = None
+        AmberEXE_GPU = None
         # -----------------------------
         # Default configuration for MD
         #
@@ -167,6 +163,43 @@ class Config:
                    'iwarp': '1',
                    'ntr': '0', 'restraintmask': None, 'restraint_wt': '2.0', # the later two are only used when ntr = 1
                   }
+        
+        @classmethod
+        def get_Amber_engine(cls, engine='Amber_GPU'):
+            '''
+            Give default value to Amber cpu/gpu engines
+            engine 
+            ---
+            return (PC_cmd, AmberEXE path)
+            '''
+            #san check
+            if engine not in ['Amber_CPU', 'Amber_GPU']:
+                raise Exception("get_Amber_engin only support ['Amber_CPU', 'Amber_GPU']")
+
+            if engine == 'Amber_CPU':
+                if cls.AmberEXE_CPU == None:
+                    engine_path = cls.AmberHome+'/bin/sander.MPI'
+                else:
+                    engine_path = cls.AmberEXE_CPU
+                PC_cmd = Config.PC_cmd
+
+            if engine == 'Amber_GPU':
+                if cls.AmberEXE_GPU == None:
+                    engine_path = cls.AmberHome+'/bin/pmemd.cuda'
+                else:
+                    engine_path = cls.AmberEXE_GPU
+                PC_cmd = ''
+
+            return PC_cmd, engine_path
+
+
+
+        class MMPBSA:
+            # -----------------------------
+            # User defined MMPBSA.py(.MPI) exe dir other than $AMBERHOME/bin/MMPBSA.py.MPI
+            #
+            MMPBSA_EXE = None
+
 
 
     class Gaussian:
