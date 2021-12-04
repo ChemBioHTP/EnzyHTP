@@ -282,9 +282,6 @@ class Config:
                     print('/' , end=line_feed, file=of)
 
 
-
-
-
     class Gaussian:
         # -----------------------------
         #   >>>>>>>>ONIOM<<<<<<<<
