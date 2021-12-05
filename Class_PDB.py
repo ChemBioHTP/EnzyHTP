@@ -1007,11 +1007,12 @@ class PDB():
     ========
     '''
 
-    def PDB2FF(self, o_path='', lig_method='AM1BCC', renew_lig=0, local_lig=1, ifsavepdb=0):
+    def PDB2FF(self, prm_out_path='', o_dir='', lig_method='AM1BCC', renew_lig=0, local_lig=1, ifsavepdb=0, igb=None, if_prm_only=0):
         '''
-        PDB2FF(self, o_path='')
+        PDB2FF(self, o_dir='')
         --------------------
-        o_path contral where the leap.in and leap.log go: has to contain a / at the end (e.g.: ./dir/)
+        prm_out_path: output path of the prmtop file
+        o_dir contral where the leap.in and leap.log go: has to contain a / at the end (e.g.: ./dir/)
         renew_lig: 0 use old ligand parm files if detected.
                    1 generate new ones. 
         local_lig: 0 export lig files to the workdir level in HTP jobs.
@@ -1040,9 +1041,9 @@ class PDB():
         ligand_parm_paths = self._ligand_parm(ligands_pathNchrg, method=lig_method, renew=renew_lig)
         # self._metal_parm(metalcenters_path)
         # combine
-        if o_path != '':
-            mkdir(o_path)
-        self._combine_parm(ligand_parm_paths, o_path=o_path, ifsavepdb=ifsavepdb)
+        if o_dir != '':
+            mkdir(o_dir)
+        self._combine_parm(ligand_parm_paths, prm_out_path=prm_out_path, o_dir=o_dir, ifsavepdb=ifsavepdb, igb=igb, if_prm_only=if_prm_only)
         if ifsavepdb:
             self.path = self.path_name+'_ff.pdb'
             self._update_name()
@@ -1095,7 +1096,7 @@ class PDB():
         return parm_paths
 
 
-    def _combine_parm(self, lig_parms, o_path='', ifsavepdb=0, ifsolve=1, box_type=None, box_size=Config.Amber.box_size):
+    def _combine_parm(self, lig_parms, prm_out_path='', o_dir='', ifsavepdb=0, ifsolve=1, box_type=None, box_size=Config.Amber.box_size, igb=None, if_prm_only=0):
         '''
         combine different parmeter files and make finally inpcrd and prmtop
         -------
@@ -1117,6 +1118,10 @@ class PDB():
                 of.write('loadAmberParams '+frcmod+line_feed)
                 of.write('loadAmberPrep '+prepi+line_feed)
             of.write('a = loadpdb '+self.path+line_feed)
+            # igb Radii
+            if igb != None:
+                radii = radii_map[str(igb)]
+                of.write('set default PBRadii '+ radii +line_feed)
             of.write('center a'+line_feed)
             # solvation
             if ifsolve:
@@ -1129,14 +1134,37 @@ class PDB():
                 if box_type != 'box' and box_type != 'oct':
                     raise Exception('PDB._combine_parm().box_type: Only support box and oct now!')
             # save
-            if o_path == '':
-                of.write('saveamberparm a '+self.path_name+'.prmtop '+self.path_name+'.inpcrd'+line_feed)
-                self.prmtop_path=self.path_name+'.prmtop'
-                self.inpcrd_path=self.path_name+'.inpcrd'
+            if prm_out_path == '':
+                if o_dir == '':                        
+                    of.write('saveamberparm a '+self.path_name+'.prmtop '+self.path_name+'.inpcrd'+line_feed)
+                    self.prmtop_path=self.path_name+'.prmtop'
+                    self.inpcrd_path=self.path_name+'.inpcrd'
+                else:
+                    of.write('saveamberparm a '+o_dir+self.name+'.prmtop '+o_dir+self.name+'.inpcrd'+line_feed)
+                    self.prmtop_path=o_dir+self.name+'.prmtop'
+                    self.inpcrd_path=o_dir+self.name+'.inpcrd'
             else:
-                of.write('saveamberparm a '+o_path+self.name+'.prmtop '+o_path+self.name+'.inpcrd'+line_feed)
-                self.prmtop_path=o_path+self.name+'.prmtop'
-                self.inpcrd_path=o_path+self.name+'.inpcrd'
+                if o_dir == '':
+                    if if_prm_only:
+                        mkdir('./tmp')
+                        of.write('saveamberparm a '+prm_out_path+' ./tmp/tmp.inpcrd'+line_feed)
+                        self.prmtop_path=prm_out_path
+                        self.inpcrd_path=None
+                    else:
+                        of.write('saveamberparm a '+prm_out_path+' '+self.path_name+'.inpcrd'+line_feed)
+                        self.prmtop_path=prm_out_path
+                        self.inpcrd_path=self.path_name+'.inpcrd'
+                else:
+                    if if_prm_only:
+                        mkdir('./tmp')
+                        of.write('saveamberparm a '+prm_out_path+' ./tmp/tmp.inpcrd'+line_feed)
+                        self.prmtop_path=prm_out_path
+                        self.inpcrd_path=None
+                    else:
+                        of.write('saveamberparm a '+prm_out_path+' '+o_dir+self.name+'.inpcrd'+line_feed)
+                        self.prmtop_path=prm_out_path
+                        self.inpcrd_path=o_dir+self.name+'.inpcrd'
+
             if ifsavepdb:
                 of.write('savepdb a '+sol_path+line_feed)
             of.write('quit'+line_feed)

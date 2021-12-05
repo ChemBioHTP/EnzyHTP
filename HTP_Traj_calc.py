@@ -12,10 +12,14 @@ from subprocess import run, CalledProcessError
 from glob import glob
 import os
 
+from Class_PDB import PDB
 from Class_Structure import *
 from Class_Conf import *
 from AmberMaps import radii_map
 from helper import line_feed, mkdir
+
+class TrajCalcERROR(Exception):
+    pass
 
 
 class Traj_calc:
@@ -65,7 +69,7 @@ class Traj_calc:
             if len(p_prmtop) > 1:
                 print('WARNING: Found more than one prmtop files in:', p_path)
                 print('Please choose between:', p_prmtop)
-                raise Exception
+                raise TrajCalcERROR
             p_prmtop = p_prmtop[0]
             #--pdb--
             # find the pdb with the same name as prmtop. Based on the common procedure in the EnzyHTP
@@ -104,8 +108,10 @@ class Traj_calc:
         with open('./tmp/parmed.in','w') as of:
             of.write('changeRadii '+radii+line_feed)
             of.write('parmout '+new_prmtop_path+line_feed)
-        run('parmed -p '+prmtop_path+' -i ./tmp/parmed.in', check=True, text=True, shell=True, capture_output=True)
-
+        try:
+            run('parmed -p '+prmtop_path+' -i ./tmp/parmed.in', check=True, text=True, shell=True, capture_output=True)
+        except CalledProcessError as err:
+            raise TrajCalcERROR(err.stderr)
         self.prmtop = new_prmtop_path
         # clean
         if Config.debug < 2:
@@ -117,20 +123,21 @@ class Traj_calc:
         return new_prmtop_path
 
 
-    def make_dry_frags(self, frag_str, igb=5):
+    def make_dry_frags(self, frag_str, igb=5, if_sol=0):
         '''
         Define MMPBSA fragments
         Make dry prmtop files for the MMPB(GB)SA calculation
         1. make new pdbs
         2. use tLeap to generate these from pdbs
         ---
-        igb:        gb method used
         frag_str:   A str to define two fragments
                 (Grammer)
                 - same as pymol select grammer (So that you can confirm selection via pymol)
                 - Use ':' to seperate two fragment (In the order of: receptor - ligand . This order only matters in the correspondance in the MMPBSA output)
                 * TODO currently only chain id is accepted
                 * DO NOT use original chain id in the pdb file. Count from A and from 1.
+        igb:        gb method used
+        if_sol:     if use also generate solvent prmtop with tleap. (Because Parmed cannot use in the amber instance on many clusters)
                 
         update self.dc_prmtop, self.dl_prmtop, self.dr_prmtop
         '''
@@ -141,7 +148,7 @@ class Traj_calc:
         frag1_str = frag1_str.strip().split(' ')
         frag2_str = frag2_str.strip().split(' ')
         if frag1_str[0] not in ('c.', 'chain') or frag2_str[0] not in ('c.', 'chain'):
-            raise Exception('ERROR: current version of make_dry_frags parser only take chain indexes. e.g. c. A+B:c. C')
+            raise TrajCalcERROR('ERROR: current version of make_dry_frags parser only take chain indexes. e.g. c. A+B:c. C')
         frag1_chains = frag1_str[1].split('+')
         frag2_chains = frag2_str[1].split('+')
 
@@ -152,17 +159,23 @@ class Traj_calc:
         for i in range(len(stru1.chains)-1,-1,-1):
             if stru1.chains[i].id not in frag1_chains:
                 del stru1.chains[i]
+        # san check
+        if len(stru1.chains) == 0: raise TrajCalcERROR('ERROR: PDB'+ self.pdb+' do not contain chain: '+repr(frag1_chains))
         stru1.build(frag1_path)
         stru2 = Structure.fromPDB(self.pdb)
         for i in range(len(stru2.chains)-1,-1,-1):
             if stru2.chains[i].id not in frag2_chains:
                 del stru2.chains[i]
+        # san check
+        if len(stru2.chains) == 0: raise TrajCalcERROR('ERROR: PDB '+ self.pdb +' do not contain chain: '+repr(frag2_chains))
         stru2.build(frag2_path)
 
         # convert frag pdbs to prmtop files
         self.dr_prmtop = self._pdb2prmtop_mmpbsa(frag1_path, igb=igb)
         self.dl_prmtop = self._pdb2prmtop_mmpbsa(frag2_path, igb=igb)
-        self.dc_prmtop = self._pdb2prmtop_mmpbsa(self.pdb, igb=igb, out_path=self.pdb[:-4]+'_dc.pdb')
+        self.dc_prmtop = self._pdb2prmtop_mmpbsa(self.pdb, igb=igb, out_path=self.pdb[:-4]+'_dc.prmtop')
+        if if_sol:
+            self.prmtop = PDB(self.pdb).PDB2FF(igb=igb, prm_out_path=self.pdb[:-4]+'_sc.prmtop', if_prm_only=1)[0]
 
     @staticmethod
     def _pdb2prmtop_mmpbsa(pdb_path, igb, out_path=None):
@@ -183,15 +196,15 @@ class Traj_calc:
         
         try:
             run('tleap -s -f ./tmp/leap_pdb2prmtop.in', check=True, text=True, shell=True, capture_output=True)
-        except CalledProcessError:
-            print(CalledProcessError.stderr)
-            raise Exception
+        except CalledProcessError as err:
+            raise TrajCalcERROR(err.stderr)
         # clean
         if Config.debug < 2:
             run('rm leap.log', check=0, text=True, shell=True, capture_output=True)
 
         return out_path
 
+    # TODO add method using ante-MMPBSA.py
 
     def run_MMPBSA(self, in_file='', overwrite=0, out_path=''):
         '''
@@ -206,7 +219,7 @@ class Traj_calc:
         '''
         # build in file
         if in_file == '':
-            Config.Amber.MMPBSA.build_MMPBSA_in()
+            in_file = Config.Amber.MMPBSA.build_MMPBSA_in()
         else:
             if os.path.exists(in_file):
                 if overwrite:
@@ -227,7 +240,7 @@ class Traj_calc:
         try:
             run(cmd, check=True, text=True, shell=True, capture_output=True)
         except CalledProcessError as err:
-            raise Exception(err.stderr)
+            raise TrajCalcERROR(err.stderr)
         # clean
         if Config.debug < 2:
             run('rm reference.frc _MMPBSA_info', check=0, text=True, shell=True, capture_output=True)
@@ -235,7 +248,7 @@ class Traj_calc:
         return out_path
 
     @classmethod
-    def calc_MMPBSA(cls, traj_list, frag_str, igb=5, out_dir='', in_file=''):
+    def calc_MMPBSA(cls, traj_list, frag_str, igb=5, out_dir='', in_file='', use_parmed=1, prepare_only=0):
         '''
         1. update_Radii
         2. make_dry_frags
@@ -247,6 +260,11 @@ class Traj_calc:
                 - same as pymol select grammer (So that you can confirm selection via pymol)
                 - Use ':' to seperate two fragment (In the order of: receptor - ligand . This order only matters in the correspondance in the MMPBSA output)
                 * DO NOT use original chain id in the pdb file. Count from A and from 1.
+        igb:        igb method used for MMGBSA (relate to Radii change)
+        out_dir:    output dir of the data file
+        in_file:    MMPBSA.in
+        use_parmed: if use parmed the change the Radii
+        prepare_only: if prepare the prmtop files only. (With accre this is nessessary since the Amber and MMPBSA is install with a lower version of Python and kills everythings use conda.)
         '''
         # clean out path
         if out_dir == '':
@@ -258,12 +276,20 @@ class Traj_calc:
 
         data_files = []
 
-        for traj in traj_list: 
-            traj.update_Radii(igb=igb)
-            traj.make_dry_frags(frag_str, igb=igb)
-            data_file = traj.run_MMPBSA(in_file=in_file, out_path=out_dir+traj.name+'.dat')
-            data_files.append(data_file)
-
+        for traj in traj_list:
+            try:
+                if use_parmed:
+                    traj.update_Radii(igb=igb)
+                    traj.make_dry_frags(frag_str, igb=igb)
+                else:
+                    traj.make_dry_frags(frag_str, igb=igb, if_sol=1)
+                if not prepare_only:
+                    data_file = traj.run_MMPBSA(in_file=in_file, out_path=out_dir+traj.name+'.dat')
+                    data_files.append(data_file)
+                else:
+                    data_files.append((traj.name, traj.nc, traj.prmtop, traj.dl_prmtop, traj.dr_prmtop, traj.dc_prmtop))
+            except TrajCalcERROR as err:
+                print('ERROR:', err)
         return data_files
         
         

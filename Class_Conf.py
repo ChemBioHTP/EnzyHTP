@@ -280,6 +280,8 @@ class Config:
                     print('&pb' , end=line_feed, file=of)
                     print(pb_line  , end=line_feed, file=of)
                     print('/' , end=line_feed, file=of)
+                
+                return out_path
 
 
     class Gaussian:
