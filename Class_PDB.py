@@ -880,6 +880,12 @@ class PDB():
         resi_id = str(F_match.group(3))
         resi_2 = F_match.group(4)
 
+        # default
+        if F_match.group(2) is None:
+            chain_id = 'A'
+            if Config.debug >= 1:
+                print('_read_MutaFlag: No chain_id is provided! Mutate in the first chain by default. Input: ' + Flag)   
+
         # san check of the manual input
         self.get_stru()
         chain_id_list = [i.id for i in self.stru.chains]
@@ -892,11 +898,6 @@ class PDB():
         if not resi_2 in Resi_list:
             raise Exception('_read_MutaFlag: Only support mutate to the known 21 residues. AmberMaps.Resi_list: '+ repr(Resi_list))
 
-        # default
-        if F_match.group(2) is None:
-            chain_id = 'A'
-            if Config.debug >= 1:
-                print('_read_MutaFlag: No chain_id is provided! Mutate in the first chain by default. Input: ' + Flag)   
 
         return (resi_1, chain_id, resi_id, resi_2)
     
