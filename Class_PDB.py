@@ -633,7 +633,6 @@ class PDB():
                         if ref_name_path == None:
                             ele = pdb_l.get_element()
                         else:
-                            print(pdb_l.line)
                             if line_count < len(ref_a_names):    
                                 ele = ref_a_names[line_count]
                             else:
