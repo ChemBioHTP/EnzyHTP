@@ -121,14 +121,14 @@ class Frame:
                         # find line that mark the end of a frame // possible fake line
                         # store the last frame and empty the holder
                         end_flag_1 = 1 
-                        lp = line.strip().split('  ')
+                        lp = re.split(' +', line.strip())
                         # hold the info
                         holder = [float(lp[0]), float(lp[1]), float(lp[2])]
                         continue
                 
 
                 # normal data lines
-                lp = line.strip().split('  ')
+                lp = re.split(' +', line.strip())
                 for i in lp:
                     if counter < 3:
                         atom_coord.append(float(i))
