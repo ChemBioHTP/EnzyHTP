@@ -73,7 +73,10 @@ class Config:
                   'cut': '10.0',
                   'maxcyc': 20000, 'ncyc': '0.5maxcyc',
                   'ntpr': '0.01maxcyc',
-                  'ntr': '1', 'restraintmask': "'@C,CA,N'", 'restraint_wt': '2.0'
+                  'ntr': '1', 'restraintmask': "'@C,CA,N'", 'restraint_wt': '2.0',
+                  'nmropt_rest': '0',
+                  'nmropt': '0',
+                  'DISANG': '0.rs' # Only used when nmropt_rest=1
                   }
         # -----------------------------
         #            heat
@@ -113,7 +116,9 @@ class Config:
                    'ntt': '3', 'gamma_ln': '5.0',
                    'iwarp': '1',
                    'ntr': '1', 'restraintmask': "'@C,CA,N'", 'restraint_wt': '2.0',
-                   'A_istep2':'0.9nstlim', 'B_istep1':'A_istep2+1'
+                   'A_istep2':'0.9nstlim', 'B_istep1':'A_istep2+1',
+                   'nmropt_rest': '0',
+                   'DISANG': '0.rs' # Only used when nmropt_rest=1
                   }
         # -----------------------------
         #            equi
@@ -141,6 +146,9 @@ class Config:
                    'ntt': '3', 'gamma_ln': '5.0',
                    'iwarp': '1',
                    'ntr': '1', 'restraintmask': "'@C,CA,N'", 'restraint_wt': '2.0', # the later two are only used when ntr = 1
+                   'nmropt_rest': '0',
+                   'nmropt': '0',
+                   'DISANG': '0.rs' # Only used when nmropt_rest=1
                   }
         # -----------------------------
         #            prod
@@ -166,6 +174,9 @@ class Config:
                    'ntt': '3', 'gamma_ln': '5.0',
                    'iwarp': '1',
                    'ntr': '0', 'restraintmask': None, 'restraint_wt': '2.0', # the later two are only used when ntr = 1
+                   'nmropt_rest': '0',
+                   'nmropt': '0',
+                   'DISANG': '0.rs' # Only used when nmropt_rest=1
                   }
 
 
