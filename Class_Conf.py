@@ -75,8 +75,16 @@ class Config:
                   'ntpr': '0.01maxcyc',
                   'ntr': '1', 'restraintmask': "'@C,CA,N'", 'restraint_wt': '2.0',
                   'nmropt_rest': '0',
+                  # Only used when nmropt_rest=1
                   'nmropt': '0',
-                  'DISANG': '0.rs' # Only used when nmropt_rest=1
+                  'DISANG': '0.rs',
+                  #Content of DISANG rs file
+                   'rs_constraints': [
+                       {
+                       'iat':['###','###'],'r1': '###','r2': '###','r3': '###','r4': '###',
+                       'rk2':'###','rk3':'###','ir6':'###','ialtd':'###'
+                        },
+                    ]
                   }
         # -----------------------------
         #            heat
@@ -118,7 +126,15 @@ class Config:
                    'ntr': '1', 'restraintmask': "'@C,CA,N'", 'restraint_wt': '2.0',
                    'A_istep2':'0.9nstlim', 'B_istep1':'A_istep2+1',
                    'nmropt_rest': '0',
-                   'DISANG': '0.rs' # Only used when nmropt_rest=1
+                   # Only used when nmropt_rest=1
+                   'DISANG': '0.rs',
+                   #Content of DISANG rs file
+                   'rs_constraints': [
+                       {
+                       'iat':['###','###'],'r1': '###','r2': '###','r3': '###','r4': '###',
+                       'rk2':'###','rk3':'###','ir6':'###','ialtd':'###'
+                        },
+                    ]
                   }
         # -----------------------------
         #            equi
@@ -147,8 +163,16 @@ class Config:
                    'iwarp': '1',
                    'ntr': '1', 'restraintmask': "'@C,CA,N'", 'restraint_wt': '2.0', # the later two are only used when ntr = 1
                    'nmropt_rest': '0',
+                   # Only used when nmropt_rest=1
                    'nmropt': '0',
-                   'DISANG': '0.rs' # Only used when nmropt_rest=1
+                   'DISANG': '0.rs',
+                   #Content of DISANG rs file
+                   'rs_constraints': [
+                       {
+                       'iat':['###','###'],'r1': '###','r2': '###','r3': '###','r4': '###',
+                       'rk2':'###','rk3':'###','ir6':'###','ialtd':'###'
+                        },
+                    ]
                   }
         # -----------------------------
         #            prod
@@ -175,8 +199,16 @@ class Config:
                    'iwarp': '1',
                    'ntr': '0', 'restraintmask': None, 'restraint_wt': '2.0', # the later two are only used when ntr = 1
                    'nmropt_rest': '0',
+                   # Only used when nmropt_rest=1
                    'nmropt': '0',
-                   'DISANG': '0.rs' # Only used when nmropt_rest=1
+                   'DISANG': '0.rs',
+                   #Content of DISANG rs file
+                   'rs_constraints': [
+                       {
+                       'iat':['###','###'],'r1': '###','r2': '###','r3': '###','r4': '###',
+                       'rk2':'###','rk3':'###','ir6':'###','ialtd':'###'
+                        },
+                    ]
                   }
 
 

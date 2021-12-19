@@ -1309,6 +1309,7 @@ class PDB():
   type='END'
  /
   DISANG= '''+self.conf_min['DISANG']+line_feed
+            self._build_MD_rs(step='min',o_path=self.conf_min['DISANG'])
         else:
             nmropt_line = ''
             DISANG_tail = ''
@@ -1354,6 +1355,7 @@ class PDB():
             ntr_line = ''
         if self.conf_heat['nmropt_rest'] == '1':
             DISANG_tail = '''  DISANG='''+self.conf_heat['DISANG']+line_feed
+            self._build_MD_rs(step='heat',o_path=self.conf_heat['DISANG'])
         else:
             DISANG_tail = ''
         conf_str='''Heat
@@ -1416,6 +1418,7 @@ class PDB():
   type='END'
  /
   DISANG= '''+self.conf_equi['DISANG']+line_feed
+            self._build_MD_rs(step='equi',o_path=self.conf_equi['DISANG'])
         else:
             nmropt_line = ''
             DISANG_tail = ''
@@ -1468,6 +1471,7 @@ class PDB():
   type='END'
  /
   DISANG= '''+self.conf_prod['DISANG']+line_feed
+            self._build_MD_rs(step='prod',o_path=self.conf_prod['DISANG'])
         else:
             nmropt_line = ''
             DISANG_tail = ''
@@ -1491,6 +1495,24 @@ class PDB():
             of.write(conf_str)
         return o_path
     
+
+    def _build_MD_rs(self,step,o_path):
+        '''
+        Generate a file for DISANG restraint. Get parameters from self.conf_step.
+        '''
+        rs_str=''
+        rs_data_step=self.__dict__['conf_'+step]['rs_constraints']
+        for rest_data in rs_data_step:
+            rs_str=rs_str+'''  &rst
+   iat=  '''+','.join(rest_data['iat'])+''', r1= '''+rest_data['r1']+''', r2= '''+rest_data['r2']+''', r3= '''+rest_data['r3']+''', r4= '''+rest_data['r4']+''',
+   rk2='''+rest_data['rk2']+''', rk3='''+rest_data['rk3']+''', ir6='''+rest_data['ir6']+''', ialtd='''+rest_data['ialtd']+''',
+  &end
+'''
+        #write
+        with open(o_path,'w') as of:
+            of.write(rs_str)
+        return o_path
+
 
     def reset_MD_conf(self):
         '''
