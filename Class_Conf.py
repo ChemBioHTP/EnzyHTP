@@ -139,7 +139,7 @@ class Config:
                    'cut': '10.0',
                    'nstlim': 500000, 'dt': '0.002',
                    'temp0': '300.0',
-                   'ntpr': '0.002nstlim', 'ntwx': '5000', # default 10ps
+                   'ntpr': '0.002nstlim', 'ntwx': '5000', # default 10ps (TODO support different power numbers)
                    'ntt': '3', 'gamma_ln': '5.0',
                    'iwarp': '1',
                    'ntr': '1', 'restraintmask': "'@C,CA,N'", 'restraint_wt': '2.0', # the later two are only used when ntr = 1

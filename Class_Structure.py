@@ -1396,16 +1396,17 @@ class Chain(Child):
     
     def __getattr__(self, key):
         '''
-        Chain_obj.123 = Chain_obj.residues[123-1] // index mimic (start from 1)
+        Use i to indicate id (! by this, do not support searching any residue name start with i)
+        Chain_obj.i123 = Chain_obj.residues[123-1] // index mimic (start from 1)
         Chain_obj.HIS = Chain_obj.find_resi_name('HIS') // search mimic
         '''
         if key == 'stru':
             return self.parent
-        try:
+        if key[0] == 'i':
             # digit
-            key = int(key)
+            key = int(key[1:])
             return self.residues[key-1]
-        except ValueError:
+        else:
             # text
             return self._find_resi_name(key)
 
@@ -1775,16 +1776,16 @@ class Residue(Child):
     
     def __getattr__(self, key):
         '''
-        Residue_obj.123 = Residue_obj.atoms[123-1] // index mimic (start from 1)
+        Residue_obj.i123 = Residue_obj.atoms[123-1] // index mimic (start from 1)
         Residue_obj.CA = Residue_obj.find_atom_name('CA') // search mimic
         '''
         if key == 'chain':
             return self.parent
         # judge if a digit str, since a str will always be passed
-        try:
-            key = int(key)
+        if key[0] == 'i':
+            key = int(key[1:])
             return self.atoms[key-1]
-        except ValueError:
+        else:
             return self._find_atom_name(key)
 
     
