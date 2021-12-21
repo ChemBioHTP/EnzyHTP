@@ -1114,6 +1114,8 @@ class PDB():
             of.write('source leaprc.gaff'+line_feed)
             of.write('source leaprc.water.tip3p'+line_feed)
             # ligands
+            of.write('loadAmberParams ../ligands/ligand_THN.frcmod'+line_feed)
+            of.write('loadAmberPrep ../ligands/ligand_THN.prepin'+line_feed)            
             for prepi, frcmod in lig_parms:
                 of.write('loadAmberParams '+frcmod+line_feed)
                 of.write('loadAmberPrep '+prepi+line_feed)
