@@ -64,7 +64,8 @@ Resi_map2={'ARG':'R',
            'MET':'M',
            'PHE':'F',
            'TYR':'Y',
-           'TRP':'W'}
+           'TRP':'W',
+	   'THN':'X'}
 
 Resi_list=['R','H','K','D','E','S','T','N','Q','C','G','P','A','V','I','L','M','F','Y','W','U']
 
