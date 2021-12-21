@@ -633,7 +633,6 @@ class PDB():
                         if ref_name_path == None:
                             ele = pdb_l.get_element()
                         else:
-                            print(pdb_l.line)
                             if line_count < len(ref_a_names):    
                                 ele = ref_a_names[line_count]
                             else:
@@ -880,6 +879,12 @@ class PDB():
         resi_id = str(F_match.group(3))
         resi_2 = F_match.group(4)
 
+        # default
+        if F_match.group(2) is None:
+            chain_id = 'A'
+            if Config.debug >= 1:
+                print('_read_MutaFlag: No chain_id is provided! Mutate in the first chain by default. Input: ' + Flag)   
+
         # san check of the manual input
         self.get_stru()
         chain_id_list = [i.id for i in self.stru.chains]
@@ -892,11 +897,6 @@ class PDB():
         if not resi_2 in Resi_list:
             raise Exception('_read_MutaFlag: Only support mutate to the known 21 residues. AmberMaps.Resi_list: '+ repr(Resi_list))
 
-        # default
-        if F_match.group(2) is None:
-            chain_id = 'A'
-            if Config.debug >= 1:
-                print('_read_MutaFlag: No chain_id is provided! Mutate in the first chain by default. Input: ' + Flag)   
 
         return (resi_1, chain_id, resi_id, resi_2)
     
@@ -908,7 +908,7 @@ class PDB():
         return Flag[0]+Flag[1]+Flag[2]+Flag[3]
 
 
-    def PDBMin(self,cycle=2000,engine='Amber_sander'):
+    def PDBMin(self,cycle=2000,engine='Amber_GPU'):
         '''
         Run a minization use self.prmtop and self.inpcrd and setting form class Config.
         --------------------------------------------------
@@ -939,20 +939,12 @@ class PDB():
         min_input.close()
     
         # express engine
-        if engine == 'Amber_sander':
-            engine_path = Config.Amber.AmberHome+'/bin/sander.MPI'
-        if engine == 'Amber_pmemd_cpu':
-            engine_path = Config.Amber.AmberHome+'/bin/pmemd.MPI'
-        if engine == 'Amber_pmemd_gpu':
-            engine_path = Config.Amber.AmberHome+'/bin/pmemd.cuda'
-        if Config.Amber.AmberEXE != None:
-            engine_path = Config.Amber.AmberEXE
-
+        PC_cmd, engine_path = Config.Amber.get_Amber_engine(engine=engine)
 
         #run
         if Config.debug >= 1:
-            print('running: '+Config.PC_cmd +' '+ engine_path +' -O -i '+minin_path+' -o '+minout_path+' -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+minrst_path)
-        os.system(Config.PC_cmd +' '+ engine_path +' -O -i '+minin_path+' -o '+minout_path+' -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+minrst_path)
+            print('running: '+PC_cmd +' '+ engine_path +' -O -i '+minin_path+' -o '+minout_path+' -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+minrst_path)
+        os.system(PC_cmd +' '+ engine_path +' -O -i '+minin_path+' -o '+minout_path+' -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+minrst_path)
         #rst2pdb
         try:
             run('ambpdb -p '+self.prmtop_path+' -c '+minrst_path+' > '+out4_PDB_path, check=True, text=True, shell=True, capture_output=True)
@@ -1015,11 +1007,12 @@ class PDB():
     ========
     '''
 
-    def PDB2FF(self, o_path='', lig_method='AM1BCC', renew_lig=0, local_lig=1, ifsavepdb=0):
+    def PDB2FF(self, prm_out_path='', o_dir='', lig_method='AM1BCC', renew_lig=0, local_lig=1, ifsavepdb=0, igb=None, if_prm_only=0):
         '''
-        PDB2FF(self, o_path='')
+        PDB2FF(self, o_dir='')
         --------------------
-        o_path contral where the leap.in and leap.log go: has to contain a / at the end (e.g.: ./dir/)
+        prm_out_path: output path of the prmtop file
+        o_dir contral where the leap.in and leap.log go: has to contain a / at the end (e.g.: ./dir/)
         renew_lig: 0 use old ligand parm files if detected.
                    1 generate new ones. 
         local_lig: 0 export lig files to the workdir level in HTP jobs.
@@ -1048,9 +1041,9 @@ class PDB():
         ligand_parm_paths = self._ligand_parm(ligands_pathNchrg, method=lig_method, renew=renew_lig)
         # self._metal_parm(metalcenters_path)
         # combine
-        if o_path != '':
-            mkdir(o_path)
-        self._combine_parm(ligand_parm_paths, o_path=o_path, ifsavepdb=ifsavepdb)
+        if o_dir != '':
+            mkdir(o_dir)
+        self._combine_parm(ligand_parm_paths, prm_out_path=prm_out_path, o_dir=o_dir, ifsavepdb=ifsavepdb, igb=igb, if_prm_only=if_prm_only)
         if ifsavepdb:
             self.path = self.path_name+'_ff.pdb'
             self._update_name()
@@ -1103,7 +1096,7 @@ class PDB():
         return parm_paths
 
 
-    def _combine_parm(self, lig_parms, o_path='', ifsavepdb=0, ifsolve=1, box_type=None, box_size=Config.Amber.box_size):
+    def _combine_parm(self, lig_parms, prm_out_path='', o_dir='', ifsavepdb=0, ifsolve=1, box_type=None, box_size=Config.Amber.box_size, igb=None, if_prm_only=0):
         '''
         combine different parmeter files and make finally inpcrd and prmtop
         -------
@@ -1125,6 +1118,10 @@ class PDB():
                 of.write('loadAmberParams '+frcmod+line_feed)
                 of.write('loadAmberPrep '+prepi+line_feed)
             of.write('a = loadpdb '+self.path+line_feed)
+            # igb Radii
+            if igb != None:
+                radii = radii_map[str(igb)]
+                of.write('set default PBRadii '+ radii +line_feed)
             of.write('center a'+line_feed)
             # solvation
             if ifsolve:
@@ -1137,14 +1134,37 @@ class PDB():
                 if box_type != 'box' and box_type != 'oct':
                     raise Exception('PDB._combine_parm().box_type: Only support box and oct now!')
             # save
-            if o_path == '':
-                of.write('saveamberparm a '+self.path_name+'.prmtop '+self.path_name+'.inpcrd'+line_feed)
-                self.prmtop_path=self.path_name+'.prmtop'
-                self.inpcrd_path=self.path_name+'.inpcrd'
+            if prm_out_path == '':
+                if o_dir == '':                        
+                    of.write('saveamberparm a '+self.path_name+'.prmtop '+self.path_name+'.inpcrd'+line_feed)
+                    self.prmtop_path=self.path_name+'.prmtop'
+                    self.inpcrd_path=self.path_name+'.inpcrd'
+                else:
+                    of.write('saveamberparm a '+o_dir+self.name+'.prmtop '+o_dir+self.name+'.inpcrd'+line_feed)
+                    self.prmtop_path=o_dir+self.name+'.prmtop'
+                    self.inpcrd_path=o_dir+self.name+'.inpcrd'
             else:
-                of.write('saveamberparm a '+o_path+self.name+'.prmtop '+o_path+self.name+'.inpcrd'+line_feed)
-                self.prmtop_path=o_path+self.name+'.prmtop'
-                self.inpcrd_path=o_path+self.name+'.inpcrd'
+                if o_dir == '':
+                    if if_prm_only:
+                        mkdir('./tmp')
+                        of.write('saveamberparm a '+prm_out_path+' ./tmp/tmp.inpcrd'+line_feed)
+                        self.prmtop_path=prm_out_path
+                        self.inpcrd_path=None
+                    else:
+                        of.write('saveamberparm a '+prm_out_path+' '+self.path_name+'.inpcrd'+line_feed)
+                        self.prmtop_path=prm_out_path
+                        self.inpcrd_path=self.path_name+'.inpcrd'
+                else:
+                    if if_prm_only:
+                        mkdir('./tmp')
+                        of.write('saveamberparm a '+prm_out_path+' ./tmp/tmp.inpcrd'+line_feed)
+                        self.prmtop_path=prm_out_path
+                        self.inpcrd_path=None
+                    else:
+                        of.write('saveamberparm a '+prm_out_path+' '+o_dir+self.name+'.inpcrd'+line_feed)
+                        self.prmtop_path=prm_out_path
+                        self.inpcrd_path=o_dir+self.name+'.inpcrd'
+
             if ifsavepdb:
                 of.write('savepdb a '+sol_path+line_feed)
             of.write('quit'+line_feed)
@@ -1210,7 +1230,7 @@ class PDB():
         return self.path
 
 
-    def PDBMD(self, tag='', o_dir='', engine='Amber_sander', equi_cpu=0, ifcmd=1):
+    def PDBMD(self, tag='', o_dir='', engine='Amber_GPU', equi_cpu=0):
         '''
         Use self.prmtop_path and self.inpcrd_path to initilize a MD simulation.
         The default MD configuration settings are assigned by class Config.Amber.
@@ -1219,9 +1239,8 @@ class PDB():
         --------------
         o_dir   : Write files in o_dir (current self.dir/MD by default).
         tag     : tag the name of the MD folder
-        engine  : MD engine
+        engine  : MD engine (cpu/gpu)
         equi_cpu: if use cpu for equi step
-        ifcmd   : if use custom AmberEXE, notice if default cmd is needed
         Return the nc path of the prod step and store in self.nc
         '''
         # make folder
@@ -1229,26 +1248,14 @@ class PDB():
             o_dir = self.dir+'/MD'+tag
         mkdir(o_dir)
 
-        # express engine (pirority: AmberEXE - Amber_pmemd_GPU/Amber_sander_CPU - AmberHome)
-        cpu_sander_path = Config.Amber.Amber_sander_CPU
-        if Config.Amber.Amber_sander_CPU == None:
-            cpu_sander_path = Config.Amber.AmberHome+'/bin/sander.MPI'
-        gpu_pmemd_path = Config.Amber.Amber_pmemd_GPU
-        if Config.Amber.Amber_pmemd_GPU == None:
-            gpu_pmemd_path = Config.Amber.AmberHome+'/bin/pmemd.cuda'
-        # -----
-        if engine == 'Amber_sander':
-            engine_path = cpu_sander_path
-            PC_cmd = Config.PC_cmd
-        if engine == 'Amber_pmemd_gpu':
-            engine_path = gpu_pmemd_path
-            PC_cmd = ''
-        if Config.Amber.AmberEXE != None:
-            engine_path = Config.Amber.AmberEXE
-            if ifcmd:
-                PC_cmd = Config.PC_cmd
+        # express engine (pirority: AmberEXE_GPU/AmberEXE_CPU - AmberHome/bin/xxx)
+        PC_cmd, engine_path = Config.Amber.get_Amber_engine(engine=engine)
+        # express cpu engine if equi_cpu
+        if equi_cpu:
+            if Config.Amber.AmberEXE_CPU == None:
+                cpu_engine_path = Config.Amber.AmberHome+'/bin/sander.MPI'
             else:
-                PC_cmd = ''
+                cpu_engine_path = Config.Amber.AmberEXE_CPU
 
         # build input file (use self.MD_conf_xxxx)
         min_path = self._build_MD_min(o_dir)
@@ -1266,10 +1273,10 @@ class PDB():
         
         # gpu debug for equi
         if equi_cpu: 
-            # use Config.PC_cmd and cpu_sander_path
+            # use Config.PC_cmd and cpu_engine_path
             if Config.debug >= 1:
-                print('running: '+Config.PC_cmd +' '+ cpu_sander_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
-            os.system(Config.PC_cmd +' '+ cpu_sander_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
+                print('running: '+Config.PC_cmd +' '+ cpu_engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
+            os.system(Config.PC_cmd +' '+ cpu_engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
         else:
             if Config.debug >= 1:
                 print('running: '+PC_cmd +' '+ engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
