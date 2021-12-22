@@ -761,6 +761,8 @@ class PDB():
         leapin_path = self.cache_path+'/leap_P2PwL.in'
         leap_input=open(leapin_path,'w')
         leap_input.write('source leaprc.protein.ff14SB\n')
+        leap_input.write('loadAmberParams ../ligands/ligand_THN.frcmod\n')
+        leap_input.write('loadAmberPrep ../ligands/ligand_THN.prepin\n')
         leap_input.write('a = loadpdb '+out_PDB_path1+'\n')
         leap_input.write('savepdb a '+out_PDB_path2+'\n')
         leap_input.write('quit\n')
