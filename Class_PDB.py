@@ -1058,6 +1058,7 @@ class PDB():
         -----------
         method  : method use for ligand charge. Only support AM1BCC now.
         renew   : 0:(default) use old parm files if exist. 1: renew parm files everytime
+        TODO check if the ligand is having correct name. (isolate the renaming function and also use in the class structure)
         * WARN: The parm file for ligand will always be like xxx/ligand_1.frcmod. Remember to enable renew when different object is sharing a same path.
         * BUG: Antechamber has a bug that if current dir has temp files from previous antechamber run (ANTECHAMBER_AC.AC, etc.) sqm will fail. Now remove them everytime.
         '''
@@ -1996,7 +1997,7 @@ class PDB():
             for gjf in inp:
                 out = gjf[:-3]+'out'
                 if Config.debug > 1:
-                    print('running: '+Config.Gaussian.g16_exe+' < '+gjf+' > '+out)
+                    print('running: '+Config.Gaussian.g09_exe+' < '+gjf+' > '+out)
                 os.system(Config.Gaussian.g09_exe+' < '+gjf+' > '+out)
                 outs.append(out)
             return outs
