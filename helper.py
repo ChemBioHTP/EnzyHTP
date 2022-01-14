@@ -1,6 +1,7 @@
 '''
 Misc helper func and class
 '''
+from distutils.command.config import config
 from AmberMaps import Resi_list
 import os
 import numpy as np
@@ -98,6 +99,60 @@ def get_center(p1, p2):
     p3 = 0.5 * (np.array(p1) + np.array(p2))
 
     return tuple(p3)
+
+
+'''
+Cheminfo
+'''
+def Conformer_Gen_wRDKit(input_mol, out_path, numConfs=50):
+    '''
+    Generate small molecular conformers using RDKit. (wrote in 2022/1/13 for ReactiveDocking)
+    If input 3D structure, require protonated one. (treat add H in a different function)
+    ---
+    In: SMILES | MOL2 | PDB
+    Out: SDF | PDB
+
+    '''
+    from rdkit import Chem
+    from rdkit.Chem import AllChem
+    from Class_Conf import Config
+
+    # input type support 
+    # [input_mol --> mol]
+    # file or SMILES
+    if not os.path.exists(input_mol):
+        if Config.debug > 1:
+            print('WARNING: Conformer_Gen_wRDKit: input is not a file. Using SMILES mode.')
+        # SMILES
+        mol = Chem.MolFromSmiles(input_mol)
+        mol = Chem.AddHs(mol)
+    else:
+        # file
+        sfx = input_mol.split('.')[-1].strip()
+        if sfx == 'smiles':
+            mol = Chem.MolFromSmiles(input_mol)
+            mol = Chem.AddHs(mol)
+        if sfx == 'mol2':
+            mol = Chem.MolFromMol2File(input_mol, removeHs=0)
+        if sfx == 'pdb':
+            mol = Chem.MolFromPDBFile(input_mol, removeHs=0)
+        
+    # calculate conformers & minimize
+    cids = AllChem.EmbedMultipleConfs(mol, numConfs=50, numThreads=0, pruneRmsThresh=0.1)
+    AllChem.MMFFOptimizeMoleculeConfs(mol, numThreads=0)
+    
+    # output
+    o_sfx = out_path.split('.')[-1].strip()
+    if o_sfx == 'sdf':
+        with Chem.SDWriter(out_path) as of:
+            for i in cids:
+                of.write(mol, confId=i)
+    if o_sfx == 'pdb':
+        with Chem.PDBWriter(out_path) as of:
+            for i in cids:
+                of.write(mol, confId=i)
+        
+    return out_path
 
 
 '''
