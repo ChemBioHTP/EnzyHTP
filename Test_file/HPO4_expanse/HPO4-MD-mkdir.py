@@ -1,19 +1,21 @@
 from helper import mkdir
 import os
 
+
 def main():
-	# get mutant list
-	MutaFlags = []
-	with open('Single_Mut_list.txt') as f:
-		for line in f:
-			MutaFlag = line.strip()
-			if MutaFlag != '':
-				MutaFlags.append(MutaFlag)
-	# deploy mutation
-	for Flag in MutaFlags:
-		mkdir(Flag)
-		with open('./'+Flag+'/HPO4-MD-gen.py','w') as of:
-			of.write('''import datetime
+    # get mutant list
+    MutaFlags = []
+    with open("Single_Mut_list.txt") as f:
+        for line in f:
+            MutaFlag = line.strip()
+            if MutaFlag != "":
+                MutaFlags.append(MutaFlag)
+    # deploy mutation
+    for Flag in MutaFlags:
+        mkdir(Flag)
+        with open("./" + Flag + "/HPO4-MD-gen.py", "w") as of:
+            of.write(
+                """import datetime
 from Class_PDB import *
 from Class_Conf import *
 from helper import line_feed
@@ -44,14 +46,18 @@ def main():
         starttime = datetime.datetime.now()
         of = open(wkflow_log_path, 'wb', buffering=0)
         # deploy mutation
-        of.write(('Working on: '+ '''+repr(Flag)+''' +line_feed).encode('utf-8'))
+        of.write(('Working on: '+ """
+                + repr(Flag)
+                + """ +line_feed).encode('utf-8'))
         # --- Preparation ---
         pdb_obj = PDB('WT-HPO4.pdb')
         of.write(('Preparation: '+str(datetime.datetime.now()- starttime)+line_feed).encode('utf-8'))
 
         # --- Operation ---
         # Mutation
-        pdb_obj.Add_MutaFlag('''+repr(Flag)+''')
+        pdb_obj.Add_MutaFlag("""
+                + repr(Flag)
+                + """)
         pdb_obj.PDB2PDBwLeap()
         of.write(('Mutation: p2pwl: '+str(datetime.datetime.now()- starttime)+line_feed).encode('utf-8'))
 
@@ -70,11 +76,15 @@ def main():
         of.close()
 
 if __name__ == "__main__":
-        main()''')
+        main()"""
+            )
 
-		with open('./'+Flag+'/sub-EnzyHTP.cmd','w') as of:
-			of.write('''#!/bin/bash
-#SBATCH --job-name=MD_'''+Flag+'''          # Assign an 8-character name to your job
+        with open("./" + Flag + "/sub-EnzyHTP.cmd", "w") as of:
+            of.write(
+                """#!/bin/bash
+#SBATCH --job-name=MD_"""
+                + Flag
+                + """          # Assign an 8-character name to your job
 #SBATCH --account=cla296
 #SBATCH --partition=gpu-shared
 #SBATCH --nodes=1
@@ -95,10 +105,10 @@ source ~/bin/miniconda3/bin/activate
 conda activate MutaGen
 export PYTHONPATH=$PYTHONPATH:~/enzyme_workflow
 
-python -u HPO4-MD-gen.py > HPO4-MD-gen.py.out''')
-		os.system('cp ./*pdb '+Flag)
-
+python -u HPO4-MD-gen.py > HPO4-MD-gen.py.out"""
+            )
+        os.system("cp ./*pdb " + Flag)
 
 
 if __name__ == "__main__":
-	main()
+    main()
