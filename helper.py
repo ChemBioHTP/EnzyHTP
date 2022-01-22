@@ -111,7 +111,8 @@ def Conformer_Gen_wRDKit(input_mol, out_path, numConfs=50):
     ---
     In: SMILES | MOL2 | PDB | SDF
     Out: SDF | PDB
-
+    ---
+    numConfs: number of conformers output
     '''
     from rdkit import Chem
     from rdkit.Chem import AllChem
@@ -134,10 +135,13 @@ def Conformer_Gen_wRDKit(input_mol, out_path, numConfs=50):
             mol = Chem.AddHs(mol)
         if sfx == 'mol2':
             mol = Chem.MolFromMol2File(input_mol, removeHs=0)
+            Chem.rdmolops.AssignAtomChiralTagsFromStructure(mol)
         if sfx == 'pdb':
             mol = Chem.MolFromPDBFile(input_mol, removeHs=0)
+            Chem.rdmolops.AssignAtomChiralTagsFromStructure(mol)
         if sfx == 'sdf':
             mol = Chem.SDMolSupplier(input_mol, removeHs=0)[0]
+            Chem.rdmolops.AssignAtomChiralTagsFromStructure(mol)
         
     # calculate conformers & minimize
     cids = AllChem.EmbedMultipleConfs(mol, numConfs=numConfs, numThreads=0, pruneRmsThresh=0.1)
