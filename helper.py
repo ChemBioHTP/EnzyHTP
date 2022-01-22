@@ -140,7 +140,7 @@ def Conformer_Gen_wRDKit(input_mol, out_path, numConfs=50):
             mol = Chem.SDMolSupplier(input_mol, removeHs=0)[0]
         
     # calculate conformers & minimize
-    cids = AllChem.EmbedMultipleConfs(mol, numConfs=50, numThreads=0, pruneRmsThresh=0.1)
+    cids = AllChem.EmbedMultipleConfs(mol, numConfs=numConfs, numThreads=0, pruneRmsThresh=0.1)
     AllChem.MMFFOptimizeMoleculeConfs(mol, numThreads=0)
     
     # output
