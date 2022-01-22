@@ -147,6 +147,7 @@ def Conformer_Gen_wRDKit(input_mol, out_path, numConfs=50):
     o_sfx = out_path.split('.')[-1].strip()
     if o_sfx == 'sdf':
         with Chem.SDWriter(out_path) as of:
+            Chem.rdmolfiles.SDWriter.SetKekulize(of, False)
             for i in cids:
                 of.write(mol, confId=i)
     if o_sfx == 'pdb':
