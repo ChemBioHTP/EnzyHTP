@@ -109,7 +109,7 @@ def Conformer_Gen_wRDKit(input_mol, out_path, numConfs=50):
     Generate small molecular conformers using RDKit. (wrote in 2022/1/13 for ReactiveDocking)
     If input 3D structure, require protonated one. (treat add H in a different function)
     ---
-    In: SMILES | MOL2 | PDB
+    In: SMILES | MOL2 | PDB | SDF
     Out: SDF | PDB
 
     '''
@@ -136,6 +136,8 @@ def Conformer_Gen_wRDKit(input_mol, out_path, numConfs=50):
             mol = Chem.MolFromMol2File(input_mol, removeHs=0)
         if sfx == 'pdb':
             mol = Chem.MolFromPDBFile(input_mol, removeHs=0)
+        if sfx == 'sdf':
+            mol = Chem.SDMolSupplier(input_mol, removeHs=0)[0]
         
     # calculate conformers & minimize
     cids = AllChem.EmbedMultipleConfs(mol, numConfs=50, numThreads=0, pruneRmsThresh=0.1)
