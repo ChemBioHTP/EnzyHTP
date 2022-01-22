@@ -465,7 +465,7 @@ class PDB():
     Protonation
     ========
     '''
-    def get_protonation(self, ph=7.0, keep_id=0):
+    def get_protonation(self, ph=7.0, keep_id=0, if_prt_ligand=1):
         '''
         Get protonation state based on PDB2PQR:
         1. Use PDB2PQR, save output to self.pqr_path
@@ -479,11 +479,15 @@ class PDB():
                 - Use OpenBable to protonate ligand by default
                 # switch HIE HID when dealing with HIS
         save to self.path
+        ----------
+        ph: pH when determine the protonation state
+        keep_id: if keep ids of original pdb file
+        if_prt_ligand: if re-protonate ligand. (since sometime its already protonated)
         '''
         out_path=self.path_name+'_aH.pdb'
         self._get_file_path()
         self._get_protonation_pdb2pqr(ph=ph)
-        self._protonation_Fix(out_path, ph=ph, keep_id=keep_id)
+        self._protonation_Fix(out_path, ph=ph, keep_id=keep_id, if_prt_ligand=if_prt_ligand)
         self.path = out_path
         self._update_name()
         self.stru.name=self.name
@@ -511,7 +515,7 @@ class PDB():
             run_pdb2pqr(args)
 
 
-    def _protonation_Fix(self, out_path, Metal_Fix='1', ph = 7.0, keep_id=0):
+    def _protonation_Fix(self, out_path, Metal_Fix='1', ph = 7.0, keep_id=0, if_prt_ligand=1):
         '''
         Add in the missing atoms and run detailed fixing
         save to self.path
@@ -538,7 +542,11 @@ class PDB():
 
             new_ligs = []
             for lig_path, lig_name in lig_paths:
-                new_lig_path, net_charge = self.protonate_ligand(lig_path, ph=ph)
+                if if_prt_ligand:
+                    new_lig_path, net_charge = self.protonate_ligand(lig_path, ph=ph)
+                else:
+                    # keep original structure
+                    new_lig_path, net_charge = (lig_path, None)
                 new_ligs.append(Ligand.fromPDB(new_lig_path, resi_name=lig_name, net_charge=net_charge, input_type='path'))
             new_stru.add(new_ligs, sort = 0)
 
@@ -666,6 +674,18 @@ class PDB():
                             print('Found formal charge: '+pdb_l.atom_name+' '+charge)
                         net_charge = net_charge + int(charge)
             return net_charge
+
+
+    '''
+    ========
+    Docking
+    ========
+    '''
+    def Dock_Reactive_Substrate(self):
+        '''
+        
+        '''
+
 
 
     '''
