@@ -232,7 +232,7 @@ class PDB():
                     return pdbl.atom_id
     '''
     =========
-    Sequence TODO: reform(已部分迁移至Chain类，剩人工残基的部分和整个stru的判断)
+    Sequence TODO: reform(most of it has been moved to class Chain，only judgement of art residue and overlook of whole structure remains)
     =========
     '''
 
@@ -685,7 +685,7 @@ class PDB():
         '''
         
         '''
-
+        pass
 
 
     '''
@@ -1000,9 +1000,14 @@ class PDB():
             with open(self.path) as f:
                 with open(o_path,'w') as of:
                     for line in f:
-                        atom_name = line[12:16].strip()
-                        if atom_name[0] == 'H' and (atom_name[:2] not in not_H_list):
-                            continue
+                        if line.startswith('ATOM'):
+                            atom_name = line[12:16].strip()
+                            if atom_name[0] == 'H':
+                                if len(atom_name) >= 2:
+                                    if atom_name[:2] not in not_H_list:
+                                        continue
+                                else:
+                                    continue
                         of.write(line)
         else:
             # H list (residue only)
@@ -1014,7 +1019,7 @@ class PDB():
             with open(self.path) as f:
                 with open(o_path,'w') as of:
                     for line in f:
-                        if line[12:16].strip() in H_namelist:
+                        if line[12:16].strip() in H_namelist and line[17:20].strip() in Resi_map2.keys():
                             continue
                         of.write(line)
         self.path=o_path
