@@ -24,4 +24,4 @@ git clone https://github.com/Electrostatics/pdb2pqr.git
 cd pdb2pqr
 pip install .
 ```
-3. Install Multiwfn (install demo in author's blog: http://sobereva.com/454) (The LMO func seems not working for WSL)
+3. Install Multiwfn (install demo in author's blog: http://bbs.keinsci.com/thread-12020-1-1.html) (The LMO func seems not working for WSL) (Note that run Multiwfn on ACCRE requires loading the GCC module) 
