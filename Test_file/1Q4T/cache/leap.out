@@ -1,0 +1,111 @@
+-I: Adding /home/shaoqz/amber18/dat/leap/prep to search path.
+-I: Adding /home/shaoqz/amber18/dat/leap/lib to search path.
+-I: Adding /home/shaoqz/amber18/dat/leap/parm to search path.
+-I: Adding /home/shaoqz/amber18/dat/leap/cmd to search path.
+-s: Ignoring startup file: leaprc
+-f: Source ./cache/leap.in.
+
+Welcome to LEaP!
+Sourcing: ./cache/leap.in
+----- Source: /home/shaoqz/amber18/dat/leap/cmd/leaprc.protein.ff14SB
+----- Source of /home/shaoqz/amber18/dat/leap/cmd/leaprc.protein.ff14SB done
+Log file: ./leap.log
+Loading parameters: /home/shaoqz/amber18/dat/leap/parm/parm10.dat
+Reading title:
+PARM99 + frcmod.ff99SB + frcmod.parmbsc0 + OL3 for RNA
+Loading parameters: /home/shaoqz/amber18/dat/leap/parm/frcmod.ff14SB
+Reading force field modification type file (frcmod)
+Reading title:
+ff14SB protein backbone and sidechain parameters
+Loading library: /home/shaoqz/amber18/dat/leap/lib/amino12.lib
+Loading library: /home/shaoqz/amber18/dat/leap/lib/aminoct12.lib
+Loading library: /home/shaoqz/amber18/dat/leap/lib/aminont12.lib
+----- Source: /home/shaoqz/amber18/dat/leap/cmd/leaprc.gaff
+----- Source of /home/shaoqz/amber18/dat/leap/cmd/leaprc.gaff done
+Log file: ./leap.log
+Loading parameters: /home/shaoqz/amber18/dat/leap/parm/gaff.dat
+Reading title:
+AMBER General Force Field for organic molecules (Version 1.81, May 2017)
+----- Source: /home/shaoqz/amber18/dat/leap/cmd/leaprc.water.tip3p
+----- Source of /home/shaoqz/amber18/dat/leap/cmd/leaprc.water.tip3p done
+Loading library: /home/shaoqz/amber18/dat/leap/lib/atomic_ions.lib
+Loading library: /home/shaoqz/amber18/dat/leap/lib/solvents.lib
+Loading parameters: /home/shaoqz/amber18/dat/leap/parm/frcmod.tip3p
+Reading force field modification type file (frcmod)
+Reading title:
+This is the additional/replacement parameter set for TIP3P water
+Loading parameters: /home/shaoqz/amber18/dat/leap/parm/frcmod.ionsjc_tip3p
+Reading force field modification type file (frcmod)
+Reading title:
+Monovalent ion parameters for Ewald and TIP3P water from Joung & Cheatham JPCB (2008)
+Loading parameters: /home/shaoqz/amber18/dat/leap/parm/frcmod.ions234lm_126_tip3p
+Reading force field modification type file (frcmod)
+Reading title:
+Li/Merz ion parameters of divalent to tetravalent ions for TIP3P water model (12-6 normal usage set)
+Loading PDB file: ./2kz2init_amb.pdb
+  total atoms in file: 1413
+  Leap added 7 missing atoms according to residue templates:
+       7 H / lone pairs
+The center is at: 0.07, -0.10, 0.03
+11 Na+ ions required to neutralize.
+Adding 11 counter ions to "a" using 1A grid
+Grid extends from solute vdw + 3.13  to  9.13
+Resolution:      1.00 Angstrom.
+ (no solvent present)
+Calculating grid charges
+Placed Na+ in a at (6.11, 12.02, 7.76).
+Placed Na+ in a at (4.11, -11.98, 4.76).
+Placed Na+ in a at (-5.89, -20.98, -4.24).
+Placed Na+ in a at (2.11, 15.02, 11.76).
+Placed Na+ in a at (9.11, 4.02, 11.76).
+Placed Na+ in a at (10.11, -8.98, -8.24).
+Placed Na+ in a at (-1.89, -16.98, 1.76).
+Placed Na+ in a at (-3.89, 18.02, 6.76).
+Placed Na+ in a at (-5.89, 10.02, -15.24).
+Placed Na+ in a at (4.11, -19.98, -11.24).
+Placed Na+ in a at (6.11, -5.98, 6.76).
+
+Done adding ions.
+ 0.000000 0 1 0
+0 Cl- ion required to neutralize.
+Adding 0 counter ions to "a" using 1A grid
+  Solute vdw bounding box:              42.227 41.738 42.243
+  Total bounding box for atom centers:  62.227 61.738 62.243
+  Solvent unit box:                     18.774 18.774 18.774
+  Total vdw box size:                   65.419 64.744 65.364 angstroms.
+  Volume: 276847.740 A^3 
+  Total mass 129935.198 amu,  Density 0.779 g/cc
+  Added 6604 residues.
+Checking Unit.
+Building topology.
+Building atom parameters.
+Building bond parameters.
+Building angle parameters.
+Building proper torsion parameters.
+Building improper torsion parameters.
+ total 302 improper torsions applied
+Building H-Bond parameters.
+Incorporating Non-Bonded adjustments.
+Not Marking per-residue atom chain types.
+Marking per-residue atom chain types.
+  (Residues lacking connect0/connect1 - 
+   these don't have chain types marked:
+
+	res	total affected
+
+	CLYS	1
+	NGLY	1
+	WAT	6604
+  )
+ (no restraints)
+Writing pdb file: ./2kz2init_amb_ff.pdb
+   printing CRYST1 record to PDB file with box info
+
+/home/shaoqz/amber18/bin/teLeap: Warning!
+ Converting N-terminal residue name to PDB format: NGLY -> GLY
+
+/home/shaoqz/amber18/bin/teLeap: Warning!
+ Converting C-terminal residue name to PDB format: CLYS -> LYS
+	Quit
+
+Exiting LEaP: Errors = 0; Warnings = 2; Notes = 0.
