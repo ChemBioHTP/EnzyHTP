@@ -73,6 +73,7 @@ Will do nothing if the correct var is already exist.
 
 class PDB:
     def __init__(self, PDB_input, wk_dir="", name="", input_type="path"):
+		# TODO this thing does wayyy too much. jk
         """
         initiate PDB object
         -------------------
