@@ -60,7 +60,7 @@ def get_distance(p1,p2):
     return D
 
 
-def get_field_strength(p0, c0, p1, p2=None, d1=None):
+def get_field_strength_value(p0, c0, p1, p2=None, d1=None):
     '''
     return field strength E of *p0(c0)* at *p1* in direction of *p2-p1* or *d1*
     -- E = kq/r^2 -- (Unit: kcal/mol)
@@ -161,6 +161,24 @@ def Conformer_Gen_wRDKit(input_mol, out_path, numConfs=50):
         
     return out_path
 
+
+'''
+Rosetta
+'''
+def generate_Rosetta_params(input_file, out_dir, resn, out_pdb_name, if_conformer=0, overwrite=0):
+    '''
+    generate rosetta params file using molfile_to_params.py
+    The command will be:
+    [some_path]/molfile_to_params.py -n [resn] -p [out_pdb_name] --keep-names
+    This command will output files under the working directory. The function will move them to out_dir
+    ------
+    resn:           if resn is 'same' then extract the resi name from the input_file
+    out_pdb_name:   if out_pdb_name is 'same' then extract the resi name from the input_file
+    if_conformer:   if add --conformers-in-one-file flag
+    overwrite:      if add --clobber flag
+    '''
+    pass
+    # return params_path, out_pdb_path, conformers_path (can only under the same dir as params)
 
 '''
 misc

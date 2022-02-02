@@ -9,7 +9,7 @@ from Class_Structure import *
 from Class_line import *
 from Class_Conf import Config, Layer
 from Class_ONIOM_Frame import *
-from helper import decode_atom_mask, get_center, get_field_strength, line_feed, mkdir
+from helper import Conformer_Gen_wRDKit, decode_atom_mask, get_center, get_field_strength_value, line_feed, mkdir, generate_Rosetta_params
 try:
     from pdb2pqr.main import main_driver as run_pdb2pqr
     from pdb2pqr.main import build_main_parser as build_pdb2pqr_parser
@@ -681,11 +681,74 @@ class PDB():
     Docking
     ========
     '''
-    def Dock_Reactive_Substrate(self):
+    def Dock_Reactive_Substrate(self, substrate, reactive_define, local_lig = 0):
         '''
-        
+        Dock substrates into the apo enzyme in a reactive conformation
+        Update self.path after docking. Will not update self.path in the middle of the docking
+        -----
+        In:     "apo-enzyme structure" self.path (pdb)
+                "substrate structure" substrate (smile/sdf)
+                "constraint parameters" reactive_define - a set of constraint information that defines *Reactive*
+                    [reacting residue]
+                        id
+                        atom_name_1
+                    [substrate]
+                        atom_name_1
+                    --- Will Generate ---
+                    [reacting residue]
+                        name 
+                        atom_name_2
+                        atom_name_3
+                    [substrate]
+                        id 
+                        name 
+                        atom_name_2 
+                        atom_name_3
+                    [distance]
+                        ideal
+                        allowed deviation
+                        force constant
+                        if_covalent
+                    [angle]
+                        ideal
+                        allowed deviation
+                        force constant
+        Out:    Enzyme-Substrate Reactive Complex
+        -----
         '''
-        pass
+        apo_enzyme = self.path
+        if local_lig:
+            lig_dir = self.dir+'/ligands/'
+            met_dir = self.dir+'/metalcenters/'
+        else:
+            lig_dir = self.dir+'/../ligands/'
+            met_dir = self.dir+'/../metalcenters/'
+        mkdir(lig_dir)
+        mkdir(met_dir)
+
+        # Build ligands 
+        cofactors = self.stru.build_ligands(lig_dir, ifcharge=1, ifunique=1)
+        # cofactor_params, cofactors_pdb = generate_Rosetta_params(cofactors, lig_dir, resn='same', out_pdb_name='same')
+        # # clean enzyme
+        # self.fix_residue_names_for_rosetta()
+        # # prepare substrate
+        # sub_confs = Conformer_Gen(substrate, method='rdkit')
+        # sub_params, sub_pdb, sub_confs_pdb = generate_Rosetta_params(sub_confs, lig_dir, resn='SUB', out_pdb_name='SUB')
+        # # define reactive
+        # -- search for RULE OF INPUT ID and get a map --
+        # self.RDock_generate_cst_file(reactive_define, name_map?)        
+        # # initial placement
+        # self._RDock_initial_placement(sub_pdb)
+        # self._RDock_add_remark_line()
+        # # make config file for Rosetta
+        # score_path = XXX
+        # out_pdb_lib_path = XXX # control the output
+        # option_path = Config.Rosetta.generate_xmlNoption(self.path, [cofactor_params, sub_params], score_path, nstruct=100, task='RDock')
+        # # Run rosetta script
+        # PDB.Run_Rosetta_Script(option_path)
+        # Final_pdbs = self.RDock_get_result(score_path, out_pdb_lib_path)
+        # self.Rosetta_pdb_to_Amber()
+
 
 
     '''
@@ -2114,7 +2177,7 @@ class PDB():
                 # search for coord and chrg
                 coord = frame.coord[atom_id-1]
                 chrg = chrg_list[atom_id-1]
-                E += get_field_strength(coord, chrg, p1, p2=p2, d1=d1)
+                E += get_field_strength_value(coord, chrg, p1, p2=p2, d1=d1)
             Es.append(E)
 
         return Es
@@ -2123,23 +2186,32 @@ class PDB():
     def get_bond_dipole(cls, qm_fch_paths, a1, a2, prog='Multiwfn'):
         '''
         get bond dipole using wfn analysis with fchk files.
-        * NEED nosymm in gaussian input if want to compare resulting coord and original mdcrd/gjf stru.
-        * requires a out file with only tail difference. 
         -----------
-        qm_fch_paths: paths of fchk files
-        a1          : QM I/O id of atom 1 of the target bond
-        a2          : QM I/O id of atom 2 of the target bond
-        prog        : program for wfn analysis (default: multiwfn)
+        Args:
+            qm_fch_paths: paths of fchk files 
+                        * requires correponding out files with only ext difference
+                        * (if want to compare resulting coord to original mdcrd/gjf stru)
+                            requires nosymm in gaussian input that generate the fch file.
+            a1          : QM I/O id of atom 1 of the target bond
+            a2          : QM I/O id of atom 2 of the target bond
+            prog        : program for wfn analysis (default: multiwfn)
+                          **Multiwfn workflow**
+                            1. Multiwfn xxx.fchk < parameter_file > output
+                            the result will be in ./LMOdip.txt 
+                            2. extract value and project to the bond accordingly
+        Returns:
+            Dipoles     : A list of dipole data in a form of [(dipole_norm_signed, dipole_vec), ...]
+                          *dipole_norm_signed* is the signed norm of the dipole according to its projection
+                                               to be bond vector.
+                          *dipole_vec* is the vector of the dipole
         -----------
-        Multiwfn workflow:
-        1. Multiwfn xxx.fchk < parameter_file > output
-           the result will be in ./LMOdip.txt 
-        2. extract value and project to the bond accordingly
-        -----------
-        LMO bond dipole: (Multiwfn manual 3.22/4.19.4)
+        LMO bond dipole: 
+        (Method: Multiwfn manual 3.22/4.19.4)
         2-center LMO dipole is defined by the deviation of the eletronic mass center relative to the bond center.
         Dipole positive Direction: negative(-) to positive(+).
         Result direction: a1 -> a2
+        
+        REF: Lu, T.; Chen, F., Multiwfn: A multifunctional wavefunction analyzer. J. Comput. Chem. 2012, 33 (5), 580-592.
         '''
         Dipoles = []
 
@@ -2165,7 +2237,7 @@ class PDB():
                     coord_flag = 0
                     skip_flag = 0
                     for line0 in f0:
-                        if 'Standard orientation' in line0:
+                        if 'Input orientation' in line0:
                             coord_flag = 1
                             continue
                         if coord_flag:
