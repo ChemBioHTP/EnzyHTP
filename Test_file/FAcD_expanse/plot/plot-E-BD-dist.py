@@ -8,7 +8,7 @@ ProjPath='./'
 Data_file=ProjPath+'Mutation-E-BD-100.dat'
 csv_file = ProjPath+'Mutation-E-BD-100.csv'
 analysis_list = ['mean','SD','max','min','med']
-terms = ['BD_norm', 'E']
+terms = ['BD_norm', 'E', 'G']
 Data=[]
 
 #extract data with eval()
@@ -82,36 +82,39 @@ for m_data in Data:
     #G
     G = -BD_norm * E * A0/A  # G = -BD_norm * E * A0/A # add minus except for the tests before 2021.7.30.
 
-    m_data['G_mean'] = E.mean()
-    m_data['G_SD'] = E.std()
-    m_data['G_pQ'] = np.percentile(E, 75)
-    m_data['G_mQ'] = np.percentile(E, 25)
-    m_data['G_max'] = E.max()
-    m_data['G_min'] = E.min()
-    m_data['G_med'] = np.median(E)
+    m_data['G_mean'] = G.mean()
+    m_data['G_SD'] = G.std()
+    m_data['G_pQ'] = np.percentile(G, 75)
+    m_data['G_mQ'] = np.percentile(G, 25)
+    m_data['G_max'] = G.max()
+    m_data['G_min'] = G.min()
+    m_data['G_med'] = np.median(G)
 
     
 # Output
 #=========
 #---csv---
-    # with open(csv_file,'w') as of:
-    #     if_first = 1
-    #     for m_data in Data:
-    #         if if_first:
-    #             line = ''
-    #             for i in analysis_list:
-    #                 for j in terms:
-    #                     line += j+'_'+i+','
-    #             line+='Distance, TAG\n'
-    #             of.write(line)
-    #             if_first = 0
-    #         line = ''
-    #         for i in analysis_list:
-    #             for j in terms:
-    #                 line += str(m_data[j+'_'+i])+','
-    #         TAG = m_data['TAG'][0] + m_data['TAG'][2] + m_data['TAG'][3]
-    #         line+=str(m_data['Distance'])+','+TAG+'\n'
-    #         of.write(line)
+# with open(csv_file,'w') as of:
+#     if_first = 1
+#     for m_data in Data:
+#         if if_first:
+#             line = ''
+#             for i in terms:
+#                 for j in analysis_list:
+#                     line += i+'_'+j+','
+#             line+='Distance, TAG, R1, ID, R2\n'
+#             of.write(line)
+#             if_first = 0
+#         line = ''
+#         for i in terms:
+#             for j in analysis_list:
+#                 line += str(m_data[i+'_'+j])+','
+#         R1 = m_data['TAG'][0]
+#         ID = m_data['TAG'][2]
+#         R2 = m_data['TAG'][3]
+#         TAG = R1 + ID + R2
+#         line+=(','.join([str(m_data['Distance']),TAG, R1, ID, R2])) +'\n'
+#         of.write(line)
 
 #---plt---E
     # TAG = [i['TAG'][0]+i['TAG'][2]+i['TAG'][3] for i in Data]
@@ -207,24 +210,47 @@ for m_data in Data:
     #     for i, G in enumerate(G_mean):
     #         of.write(str(G)+'\n')
 
-Index = [i['TAG'][2] for i in Data]
-TAG = [i['TAG'] for i in Data]
+#--pymol-plot--G-100-cartoon
+# Index = [i['TAG'][2] for i in Data]
+# TAG = [i['TAG'] for i in Data]
 
-TAG_map={}
+# TAG_map={}
 
-for i in TAG:
-    TAG_map[i[2]] = None
-for i in TAG:
-    if TAG_map[i[2]] == None:
-        TAG_map[i[2]] = [i[3]]
-    else:
-        TAG_map[i[2]].append(i[3])
-        if TAG_map[i[2]] == i[3]:
-            print('found repeat in: '+i[1]+i[2]+i[3])
-for i in sorted(TAG_map, key=lambda j: int(j)):
-    print(i, sep='', end='+')#,':', TAG_map[i])
+# for i in TAG:
+#     TAG_map[i[2]] = None
+# for i in TAG:
+#     if TAG_map[i[2]] == None:
+#         TAG_map[i[2]] = [i[3]]
+#     else:
+#         TAG_map[i[2]].append(i[3])
+#         if TAG_map[i[2]] == i[3]:
+#             print('found repeat in: '+i[1]+i[2]+i[3])
+# for i in sorted(TAG_map, key=lambda j: int(j)):
+#     print(i, sep='', end='+')#,':', TAG_map[i])
 
-# Index.sort(key=lambda i: int(i))
-# for i in Index:
-#     print(i,sep='', end=',')    
+#--G metric csv--
+# with open('./Mutation_G_100.csv','w') as of:
+#     print('TAG', 'G_mean', 'G_SD', 'G_pQ', 'G_mQ', 'G_max', 'G_min', 'G_med', sep=',', file=of)
+#     for m_data in Data:
+#         print(''.join(m_data['TAG']), m_data['G_mean'], m_data['G_SD'], m_data['G_pQ'], m_data['G_mQ'], m_data['G_max'], m_data['G_min'], m_data['G_med'], sep=',', file=of)
 
+#--group by mutation type--
+from AmberMaps import *
+
+with open('Mutant_group.csv','w') as of:
+    type_list = ['netural', 'charged']
+    # init
+    table9={}
+    for i in type_list:
+        for j in type_list:
+            table9[i+'-'+j] = []
+    # classify
+    for m_data in Data:
+        TAG = m_data['TAG']
+        for i in type_list:
+            for j in type_list:
+                if TAG[0] in resi_subgrp[i] and TAG[3] in resi_subgrp[j]:
+                    table9[i+'-'+j].append(''.join((TAG[0],TAG[2],TAG[3])))
+    # write
+    for i in table9:
+        print(i,','.join(table9[i]),sep=',',end='\n',file=of)

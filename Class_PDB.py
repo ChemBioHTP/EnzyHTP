@@ -9,7 +9,7 @@ from Class_Structure import *
 from Class_line import *
 from Class_Conf import Config, Layer
 from Class_ONIOM_Frame import *
-from helper import decode_atom_mask, get_center, get_field_strength, line_feed, mkdir
+from helper import Conformer_Gen_wRDKit, decode_atom_mask, get_center, get_field_strength_value, line_feed, mkdir, generate_Rosetta_params
 try:
     from pdb2pqr.main import main_driver as run_pdb2pqr
     from pdb2pqr.main import build_main_parser as build_pdb2pqr_parser
@@ -232,7 +232,7 @@ class PDB():
                     return pdbl.atom_id
     '''
     =========
-    Sequence TODO: reform(已部分迁移至Chain类，剩人工残基的部分和整个stru的判断)
+    Sequence TODO: reform(most of it has been moved to class Chain，only judgement of art residue and overlook of whole structure remains)
     =========
     '''
 
@@ -465,7 +465,7 @@ class PDB():
     Protonation
     ========
     '''
-    def get_protonation(self, ph=7.0, keep_id=0):
+    def get_protonation(self, ph=7.0, keep_id=0, if_prt_ligand=1):
         '''
         Get protonation state based on PDB2PQR:
         1. Use PDB2PQR, save output to self.pqr_path
@@ -479,11 +479,15 @@ class PDB():
                 - Use OpenBable to protonate ligand by default
                 # switch HIE HID when dealing with HIS
         save to self.path
+        ----------
+        ph: pH when determine the protonation state
+        keep_id: if keep ids of original pdb file
+        if_prt_ligand: if re-protonate ligand. (since sometime its already protonated)
         '''
         out_path=self.path_name+'_aH.pdb'
         self._get_file_path()
         self._get_protonation_pdb2pqr(ph=ph)
-        self._protonation_Fix(out_path, ph=ph, keep_id=keep_id)
+        self._protonation_Fix(out_path, ph=ph, keep_id=keep_id, if_prt_ligand=if_prt_ligand)
         self.path = out_path
         self._update_name()
         self.stru.name=self.name
@@ -511,7 +515,7 @@ class PDB():
             run_pdb2pqr(args)
 
 
-    def _protonation_Fix(self, out_path, Metal_Fix='1', ph = 7.0, keep_id=0):
+    def _protonation_Fix(self, out_path, Metal_Fix='1', ph = 7.0, keep_id=0, if_prt_ligand=1):
         '''
         Add in the missing atoms and run detailed fixing
         save to self.path
@@ -538,7 +542,11 @@ class PDB():
 
             new_ligs = []
             for lig_path, lig_name in lig_paths:
-                new_lig_path, net_charge = self.protonate_ligand(lig_path, ph=ph)
+                if if_prt_ligand:
+                    new_lig_path, net_charge = self.protonate_ligand(lig_path, ph=ph)
+                else:
+                    # keep original structure
+                    new_lig_path, net_charge = (lig_path, None)
                 new_ligs.append(Ligand.fromPDB(new_lig_path, resi_name=lig_name, net_charge=net_charge, input_type='path'))
             new_stru.add(new_ligs, sort = 0)
 
@@ -633,7 +641,6 @@ class PDB():
                         if ref_name_path == None:
                             ele = pdb_l.get_element()
                         else:
-                            print(pdb_l.line)
                             if line_count < len(ref_a_names):    
                                 ele = ref_a_names[line_count]
                             else:
@@ -667,6 +674,81 @@ class PDB():
                             print('Found formal charge: '+pdb_l.atom_name+' '+charge)
                         net_charge = net_charge + int(charge)
             return net_charge
+
+
+    '''
+    ========
+    Docking
+    ========
+    '''
+    def Dock_Reactive_Substrate(self, substrate, reactive_define, local_lig = 0):
+        '''
+        Dock substrates into the apo enzyme in a reactive conformation
+        Update self.path after docking. Will not update self.path in the middle of the docking
+        -----
+        In:     "apo-enzyme structure" self.path (pdb)
+                "substrate structure" substrate (smile/sdf)
+                "constraint parameters" reactive_define - a set of constraint information that defines *Reactive*
+                    [reacting residue]
+                        id
+                        atom_name_1
+                    [substrate]
+                        atom_name_1
+                    --- Will Generate ---
+                    [reacting residue]
+                        name 
+                        atom_name_2
+                        atom_name_3
+                    [substrate]
+                        id 
+                        name 
+                        atom_name_2 
+                        atom_name_3
+                    [distance]
+                        ideal
+                        allowed deviation
+                        force constant
+                        if_covalent
+                    [angle]
+                        ideal
+                        allowed deviation
+                        force constant
+        Out:    Enzyme-Substrate Reactive Complex
+        -----
+        '''
+        apo_enzyme = self.path
+        if local_lig:
+            lig_dir = self.dir+'/ligands/'
+            met_dir = self.dir+'/metalcenters/'
+        else:
+            lig_dir = self.dir+'/../ligands/'
+            met_dir = self.dir+'/../metalcenters/'
+        mkdir(lig_dir)
+        mkdir(met_dir)
+
+        # Build ligands 
+        cofactors = self.stru.build_ligands(lig_dir, ifcharge=1, ifunique=1)
+        # cofactor_params, cofactors_pdb = generate_Rosetta_params(cofactors, lig_dir, resn='same', out_pdb_name='same')
+        # # clean enzyme
+        # self.fix_residue_names_for_rosetta()
+        # # prepare substrate
+        # sub_confs = Conformer_Gen(substrate, method='rdkit')
+        # sub_params, sub_pdb, sub_confs_pdb = generate_Rosetta_params(sub_confs, lig_dir, resn='SUB', out_pdb_name='SUB')
+        # # define reactive
+        # -- search for RULE OF INPUT ID and get a map --
+        # self.RDock_generate_cst_file(reactive_define, name_map?)        
+        # # initial placement
+        # self._RDock_initial_placement(sub_pdb)
+        # self._RDock_add_remark_line()
+        # # make config file for Rosetta
+        # score_path = XXX
+        # out_pdb_lib_path = XXX # control the output
+        # option_path = Config.Rosetta.generate_xmlNoption(self.path, [cofactor_params, sub_params], score_path, nstruct=100, task='RDock')
+        # # Run rosetta script
+        # PDB.Run_Rosetta_Script(option_path)
+        # Final_pdbs = self.RDock_get_result(score_path, out_pdb_lib_path)
+        # self.Rosetta_pdb_to_Amber()
+
 
 
     '''
@@ -880,6 +962,12 @@ class PDB():
         resi_id = str(F_match.group(3))
         resi_2 = F_match.group(4)
 
+        # default
+        if F_match.group(2) is None:
+            chain_id = 'A'
+            if Config.debug >= 1:
+                print('_read_MutaFlag: No chain_id is provided! Mutate in the first chain by default. Input: ' + Flag)   
+
         # san check of the manual input
         self.get_stru()
         chain_id_list = [i.id for i in self.stru.chains]
@@ -892,11 +980,6 @@ class PDB():
         if not resi_2 in Resi_list:
             raise Exception('_read_MutaFlag: Only support mutate to the known 21 residues. AmberMaps.Resi_list: '+ repr(Resi_list))
 
-        # default
-        if F_match.group(2) is None:
-            chain_id = 'A'
-            if Config.debug >= 1:
-                print('_read_MutaFlag: No chain_id is provided! Mutate in the first chain by default. Input: ' + Flag)   
 
         return (resi_1, chain_id, resi_id, resi_2)
     
@@ -908,7 +991,7 @@ class PDB():
         return Flag[0]+Flag[1]+Flag[2]+Flag[3]
 
 
-    def PDBMin(self,cycle=2000,engine='Amber_sander'):
+    def PDBMin(self,cycle=2000,engine='Amber_GPU'):
         '''
         Run a minization use self.prmtop and self.inpcrd and setting form class Config.
         --------------------------------------------------
@@ -939,20 +1022,12 @@ class PDB():
         min_input.close()
     
         # express engine
-        if engine == 'Amber_sander':
-            engine_path = Config.Amber.AmberHome+'/bin/sander.MPI'
-        if engine == 'Amber_pmemd_cpu':
-            engine_path = Config.Amber.AmberHome+'/bin/pmemd.MPI'
-        if engine == 'Amber_pmemd_gpu':
-            engine_path = Config.Amber.AmberHome+'/bin/pmemd.cuda'
-        if Config.Amber.AmberEXE != None:
-            engine_path = Config.Amber.AmberEXE
-
+        PC_cmd, engine_path = Config.Amber.get_Amber_engine(engine=engine)
 
         #run
         if Config.debug >= 1:
-            print('running: '+Config.PC_cmd +' '+ engine_path +' -O -i '+minin_path+' -o '+minout_path+' -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+minrst_path)
-        os.system(Config.PC_cmd +' '+ engine_path +' -O -i '+minin_path+' -o '+minout_path+' -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+minrst_path)
+            print('running: '+PC_cmd +' '+ engine_path +' -O -i '+minin_path+' -o '+minout_path+' -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+minrst_path)
+        os.system(PC_cmd +' '+ engine_path +' -O -i '+minin_path+' -o '+minout_path+' -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+minrst_path)
         #rst2pdb
         try:
             run('ambpdb -p '+self.prmtop_path+' -c '+minrst_path+' > '+out4_PDB_path, check=True, text=True, shell=True, capture_output=True)
@@ -988,9 +1063,14 @@ class PDB():
             with open(self.path) as f:
                 with open(o_path,'w') as of:
                     for line in f:
-                        atom_name = line[12:16].strip()
-                        if atom_name[0] == 'H' and (atom_name[:2] not in not_H_list):
-                            continue
+                        if line.startswith('ATOM'):
+                            atom_name = line[12:16].strip()
+                            if atom_name[0] == 'H':
+                                if len(atom_name) >= 2:
+                                    if atom_name[:2] not in not_H_list:
+                                        continue
+                                else:
+                                    continue
                         of.write(line)
         else:
             # H list (residue only)
@@ -1002,7 +1082,7 @@ class PDB():
             with open(self.path) as f:
                 with open(o_path,'w') as of:
                     for line in f:
-                        if line[12:16].strip() in H_namelist:
+                        if line[12:16].strip() in H_namelist and line[17:20].strip() in Resi_map2.keys():
                             continue
                         of.write(line)
         self.path=o_path
@@ -1015,11 +1095,12 @@ class PDB():
     ========
     '''
 
-    def PDB2FF(self, o_path='', lig_method='AM1BCC', renew_lig=0, local_lig=1, ifsavepdb=0):
+    def PDB2FF(self, prm_out_path='', o_dir='', lig_method='AM1BCC', renew_lig=0, local_lig=1, ifsavepdb=0, igb=None, if_prm_only=0):
         '''
-        PDB2FF(self, o_path='')
+        PDB2FF(self, o_dir='')
         --------------------
-        o_path contral where the leap.in and leap.log go: has to contain a / at the end (e.g.: ./dir/)
+        prm_out_path: output path of the prmtop file
+        o_dir contral where the leap.in and leap.log go: has to contain a / at the end (e.g.: ./dir/)
         renew_lig: 0 use old ligand parm files if detected.
                    1 generate new ones. 
         local_lig: 0 export lig files to the workdir level in HTP jobs.
@@ -1048,9 +1129,9 @@ class PDB():
         ligand_parm_paths = self._ligand_parm(ligands_pathNchrg, method=lig_method, renew=renew_lig)
         # self._metal_parm(metalcenters_path)
         # combine
-        if o_path != '':
-            mkdir(o_path)
-        self._combine_parm(ligand_parm_paths, o_path=o_path, ifsavepdb=ifsavepdb)
+        if o_dir != '':
+            mkdir(o_dir)
+        self._combine_parm(ligand_parm_paths, prm_out_path=prm_out_path, o_dir=o_dir, ifsavepdb=ifsavepdb, igb=igb, if_prm_only=if_prm_only)
         if ifsavepdb:
             self.path = self.path_name+'_ff.pdb'
             self._update_name()
@@ -1065,6 +1146,7 @@ class PDB():
         -----------
         method  : method use for ligand charge. Only support AM1BCC now.
         renew   : 0:(default) use old parm files if exist. 1: renew parm files everytime
+        TODO check if the ligand is having correct name. (isolate the renaming function and also use in the class structure)
         * WARN: The parm file for ligand will always be like xxx/ligand_1.frcmod. Remember to enable renew when different object is sharing a same path.
         * BUG: Antechamber has a bug that if current dir has temp files from previous antechamber run (ANTECHAMBER_AC.AC, etc.) sqm will fail. Now remove them everytime.
         '''
@@ -1103,7 +1185,7 @@ class PDB():
         return parm_paths
 
 
-    def _combine_parm(self, lig_parms, o_path='', ifsavepdb=0, ifsolve=1, box_type=None, box_size=Config.Amber.box_size):
+    def _combine_parm(self, lig_parms, prm_out_path='', o_dir='', ifsavepdb=0, ifsolve=1, box_type=None, box_size=Config.Amber.box_size, igb=None, if_prm_only=0):
         '''
         combine different parmeter files and make finally inpcrd and prmtop
         -------
@@ -1125,6 +1207,10 @@ class PDB():
                 of.write('loadAmberParams '+frcmod+line_feed)
                 of.write('loadAmberPrep '+prepi+line_feed)
             of.write('a = loadpdb '+self.path+line_feed)
+            # igb Radii
+            if igb != None:
+                radii = radii_map[str(igb)]
+                of.write('set default PBRadii '+ radii +line_feed)
             of.write('center a'+line_feed)
             # solvation
             if ifsolve:
@@ -1137,14 +1223,37 @@ class PDB():
                 if box_type != 'box' and box_type != 'oct':
                     raise Exception('PDB._combine_parm().box_type: Only support box and oct now!')
             # save
-            if o_path == '':
-                of.write('saveamberparm a '+self.path_name+'.prmtop '+self.path_name+'.inpcrd'+line_feed)
-                self.prmtop_path=self.path_name+'.prmtop'
-                self.inpcrd_path=self.path_name+'.inpcrd'
+            if prm_out_path == '':
+                if o_dir == '':                        
+                    of.write('saveamberparm a '+self.path_name+'.prmtop '+self.path_name+'.inpcrd'+line_feed)
+                    self.prmtop_path=self.path_name+'.prmtop'
+                    self.inpcrd_path=self.path_name+'.inpcrd'
+                else:
+                    of.write('saveamberparm a '+o_dir+self.name+'.prmtop '+o_dir+self.name+'.inpcrd'+line_feed)
+                    self.prmtop_path=o_dir+self.name+'.prmtop'
+                    self.inpcrd_path=o_dir+self.name+'.inpcrd'
             else:
-                of.write('saveamberparm a '+o_path+self.name+'.prmtop '+o_path+self.name+'.inpcrd'+line_feed)
-                self.prmtop_path=o_path+self.name+'.prmtop'
-                self.inpcrd_path=o_path+self.name+'.inpcrd'
+                if o_dir == '':
+                    if if_prm_only:
+                        mkdir('./tmp')
+                        of.write('saveamberparm a '+prm_out_path+' ./tmp/tmp.inpcrd'+line_feed)
+                        self.prmtop_path=prm_out_path
+                        self.inpcrd_path=None
+                    else:
+                        of.write('saveamberparm a '+prm_out_path+' '+self.path_name+'.inpcrd'+line_feed)
+                        self.prmtop_path=prm_out_path
+                        self.inpcrd_path=self.path_name+'.inpcrd'
+                else:
+                    if if_prm_only:
+                        mkdir('./tmp')
+                        of.write('saveamberparm a '+prm_out_path+' ./tmp/tmp.inpcrd'+line_feed)
+                        self.prmtop_path=prm_out_path
+                        self.inpcrd_path=None
+                    else:
+                        of.write('saveamberparm a '+prm_out_path+' '+o_dir+self.name+'.inpcrd'+line_feed)
+                        self.prmtop_path=prm_out_path
+                        self.inpcrd_path=o_dir+self.name+'.inpcrd'
+
             if ifsavepdb:
                 of.write('savepdb a '+sol_path+line_feed)
             of.write('quit'+line_feed)
@@ -1210,7 +1319,7 @@ class PDB():
         return self.path
 
 
-    def PDBMD(self, tag='', o_dir='', engine='Amber_sander', equi_cpu=0, ifcmd=1):
+    def PDBMD(self, tag='', o_dir='', engine='Amber_GPU', equi_cpu=0):
         '''
         Use self.prmtop_path and self.inpcrd_path to initilize a MD simulation.
         The default MD configuration settings are assigned by class Config.Amber.
@@ -1219,9 +1328,8 @@ class PDB():
         --------------
         o_dir   : Write files in o_dir (current self.dir/MD by default).
         tag     : tag the name of the MD folder
-        engine  : MD engine
+        engine  : MD engine (cpu/gpu)
         equi_cpu: if use cpu for equi step
-        ifcmd   : if use custom AmberEXE, notice if default cmd is needed
         Return the nc path of the prod step and store in self.nc
         '''
         # make folder
@@ -1229,26 +1337,14 @@ class PDB():
             o_dir = self.dir+'/MD'+tag
         mkdir(o_dir)
 
-        # express engine (pirority: AmberEXE - Amber_pmemd_GPU/Amber_sander_CPU - AmberHome)
-        cpu_sander_path = Config.Amber.Amber_sander_CPU
-        if Config.Amber.Amber_sander_CPU == None:
-            cpu_sander_path = Config.Amber.AmberHome+'/bin/sander.MPI'
-        gpu_pmemd_path = Config.Amber.Amber_pmemd_GPU
-        if Config.Amber.Amber_pmemd_GPU == None:
-            gpu_pmemd_path = Config.Amber.AmberHome+'/bin/pmemd.cuda'
-        # -----
-        if engine == 'Amber_sander':
-            engine_path = cpu_sander_path
-            PC_cmd = Config.PC_cmd
-        if engine == 'Amber_pmemd_gpu':
-            engine_path = gpu_pmemd_path
-            PC_cmd = ''
-        if Config.Amber.AmberEXE != None:
-            engine_path = Config.Amber.AmberEXE
-            if ifcmd:
-                PC_cmd = Config.PC_cmd
+        # express engine (pirority: AmberEXE_GPU/AmberEXE_CPU - AmberHome/bin/xxx)
+        PC_cmd, engine_path = Config.Amber.get_Amber_engine(engine=engine)
+        # express cpu engine if equi_cpu
+        if equi_cpu:
+            if Config.Amber.AmberEXE_CPU == None:
+                cpu_engine_path = Config.Amber.AmberHome+'/bin/sander.MPI'
             else:
-                PC_cmd = ''
+                cpu_engine_path = Config.Amber.AmberEXE_CPU
 
         # build input file (use self.MD_conf_xxxx)
         min_path = self._build_MD_min(o_dir)
@@ -1266,10 +1362,10 @@ class PDB():
         
         # gpu debug for equi
         if equi_cpu: 
-            # use Config.PC_cmd and cpu_sander_path
+            # use Config.PC_cmd and cpu_engine_path
             if Config.debug >= 1:
-                print('running: '+Config.PC_cmd +' '+ cpu_sander_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
-            os.system(Config.PC_cmd +' '+ cpu_sander_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
+                print('running: '+Config.PC_cmd +' '+ cpu_engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
+            os.system(Config.PC_cmd +' '+ cpu_engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
         else:
             if Config.debug >= 1:
                 print('running: '+PC_cmd +' '+ engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
@@ -1989,7 +2085,7 @@ class PDB():
             for gjf in inp:
                 out = gjf[:-3]+'out'
                 if Config.debug > 1:
-                    print('running: '+Config.Gaussian.g16_exe+' < '+gjf+' > '+out)
+                    print('running: '+Config.Gaussian.g09_exe+' < '+gjf+' > '+out)
                 os.system(Config.Gaussian.g09_exe+' < '+gjf+' > '+out)
                 outs.append(out)
             return outs
@@ -2081,7 +2177,7 @@ class PDB():
                 # search for coord and chrg
                 coord = frame.coord[atom_id-1]
                 chrg = chrg_list[atom_id-1]
-                E += get_field_strength(coord, chrg, p1, p2=p2, d1=d1)
+                E += get_field_strength_value(coord, chrg, p1, p2=p2, d1=d1)
             Es.append(E)
 
         return Es
@@ -2090,23 +2186,32 @@ class PDB():
     def get_bond_dipole(cls, qm_fch_paths, a1, a2, prog='Multiwfn'):
         '''
         get bond dipole using wfn analysis with fchk files.
-        * NEED nosymm in gaussian input if want to compare resulting coord and original mdcrd/gjf stru.
-        * requires a out file with only tail difference. 
         -----------
-        qm_fch_paths: paths of fchk files
-        a1          : QM I/O id of atom 1 of the target bond
-        a2          : QM I/O id of atom 2 of the target bond
-        prog        : program for wfn analysis (default: multiwfn)
+        Args:
+            qm_fch_paths: paths of fchk files 
+                        * requires correponding out files with only ext difference
+                        * (if want to compare resulting coord to original mdcrd/gjf stru)
+                            requires nosymm in gaussian input that generate the fch file.
+            a1          : QM I/O id of atom 1 of the target bond
+            a2          : QM I/O id of atom 2 of the target bond
+            prog        : program for wfn analysis (default: multiwfn)
+                          **Multiwfn workflow**
+                            1. Multiwfn xxx.fchk < parameter_file > output
+                            the result will be in ./LMOdip.txt 
+                            2. extract value and project to the bond accordingly
+        Returns:
+            Dipoles     : A list of dipole data in a form of [(dipole_norm_signed, dipole_vec), ...]
+                          *dipole_norm_signed* is the signed norm of the dipole according to its projection
+                                               to be bond vector.
+                          *dipole_vec* is the vector of the dipole
         -----------
-        Multiwfn workflow:
-        1. Multiwfn xxx.fchk < parameter_file > output
-           the result will be in ./LMOdip.txt 
-        2. extract value and project to the bond accordingly
-        -----------
-        LMO bond dipole: (Multiwfn manual 3.22/4.19.4)
+        LMO bond dipole: 
+        (Method: Multiwfn manual 3.22/4.19.4)
         2-center LMO dipole is defined by the deviation of the eletronic mass center relative to the bond center.
         Dipole positive Direction: negative(-) to positive(+).
         Result direction: a1 -> a2
+        
+        REF: Lu, T.; Chen, F., Multiwfn: A multifunctional wavefunction analyzer. J. Comput. Chem. 2012, 33 (5), 580-592.
         '''
         Dipoles = []
 
@@ -2132,7 +2237,7 @@ class PDB():
                     coord_flag = 0
                     skip_flag = 0
                     for line0 in f0:
-                        if 'Standard orientation' in line0:
+                        if 'Input orientation' in line0:
                             coord_flag = 1
                             continue
                         if coord_flag:
