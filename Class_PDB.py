@@ -232,7 +232,7 @@ class PDB():
                     return pdbl.atom_id
     '''
     =========
-    Sequence TODO: reform(已部分迁移至Chain类，剩人工残基的部分和整个stru的判断)
+    Sequence TODO: reform(most of it has been moved to class Chain，only judgement of art residue and overlook of whole structure remains)
     =========
     '''
 
@@ -465,7 +465,7 @@ class PDB():
     Protonation
     ========
     '''
-    def get_protonation(self, ph=7.0, keep_id=0):
+    def get_protonation(self, ph=7.0, keep_id=0, if_prt_ligand=1):
         '''
         Get protonation state based on PDB2PQR:
         1. Use PDB2PQR, save output to self.pqr_path
@@ -479,11 +479,15 @@ class PDB():
                 - Use OpenBable to protonate ligand by default
                 # switch HIE HID when dealing with HIS
         save to self.path
+        ----------
+        ph: pH when determine the protonation state
+        keep_id: if keep ids of original pdb file
+        if_prt_ligand: if re-protonate ligand. (since sometime its already protonated)
         '''
         out_path=self.path_name+'_aH.pdb'
         self._get_file_path()
         self._get_protonation_pdb2pqr(ph=ph)
-        self._protonation_Fix(out_path, ph=ph, keep_id=keep_id)
+        self._protonation_Fix(out_path, ph=ph, keep_id=keep_id, if_prt_ligand=if_prt_ligand)
         self.path = out_path
         self._update_name()
         self.stru.name=self.name
@@ -511,7 +515,7 @@ class PDB():
             run_pdb2pqr(args)
 
 
-    def _protonation_Fix(self, out_path, Metal_Fix='1', ph = 7.0, keep_id=0):
+    def _protonation_Fix(self, out_path, Metal_Fix='1', ph = 7.0, keep_id=0, if_prt_ligand=1):
         '''
         Add in the missing atoms and run detailed fixing
         save to self.path
@@ -538,7 +542,11 @@ class PDB():
 
             new_ligs = []
             for lig_path, lig_name in lig_paths:
-                new_lig_path, net_charge = self.protonate_ligand(lig_path, ph=ph)
+                if if_prt_ligand:
+                    new_lig_path, net_charge = self.protonate_ligand(lig_path, ph=ph)
+                else:
+                    # keep original structure
+                    new_lig_path, net_charge = (lig_path, None)
                 new_ligs.append(Ligand.fromPDB(new_lig_path, resi_name=lig_name, net_charge=net_charge, input_type='path'))
             new_stru.add(new_ligs, sort = 0)
 
@@ -666,6 +674,18 @@ class PDB():
                             print('Found formal charge: '+pdb_l.atom_name+' '+charge)
                         net_charge = net_charge + int(charge)
             return net_charge
+
+
+    '''
+    ========
+    Docking
+    ========
+    '''
+    def Dock_Reactive_Substrate(self):
+        '''
+        
+        '''
+        pass
 
 
     '''
@@ -982,9 +1002,14 @@ class PDB():
             with open(self.path) as f:
                 with open(o_path,'w') as of:
                     for line in f:
-                        atom_name = line[12:16].strip()
-                        if atom_name[0] == 'H' and (atom_name[:2] not in not_H_list):
-                            continue
+                        if line.startswith('ATOM'):
+                            atom_name = line[12:16].strip()
+                            if atom_name[0] == 'H':
+                                if len(atom_name) >= 2:
+                                    if atom_name[:2] not in not_H_list:
+                                        continue
+                                else:
+                                    continue
                         of.write(line)
         else:
             # H list (residue only)
@@ -996,7 +1021,7 @@ class PDB():
             with open(self.path) as f:
                 with open(o_path,'w') as of:
                     for line in f:
-                        if line[12:16].strip() in H_namelist:
+                        if line[12:16].strip() in H_namelist and line[17:20].strip() in Resi_map2.keys():
                             continue
                         of.write(line)
         self.path=o_path
@@ -1060,6 +1085,7 @@ class PDB():
         -----------
         method  : method use for ligand charge. Only support AM1BCC now.
         renew   : 0:(default) use old parm files if exist. 1: renew parm files everytime
+        TODO check if the ligand is having correct name. (isolate the renaming function and also use in the class structure)
         * WARN: The parm file for ligand will always be like xxx/ligand_1.frcmod. Remember to enable renew when different object is sharing a same path.
         * BUG: Antechamber has a bug that if current dir has temp files from previous antechamber run (ANTECHAMBER_AC.AC, etc.) sqm will fail. Now remove them everytime.
         '''
@@ -2054,7 +2080,7 @@ class PDB():
             for gjf in inp:
                 out = gjf[:-3]+'out'
                 if Config.debug > 1:
-                    print('running: '+Config.Gaussian.g16_exe+' < '+gjf+' > '+out)
+                    print('running: '+Config.Gaussian.g09_exe+' < '+gjf+' > '+out)
                 os.system(Config.Gaussian.g09_exe+' < '+gjf+' > '+out)
                 outs.append(out)
             return outs

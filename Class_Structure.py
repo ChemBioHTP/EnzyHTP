@@ -67,6 +67,7 @@ class Structure():
     ---------
     __len__
         len(obj) = len(obj.child_list)
+    TODO support better way to operate chains metelatoms ligands (e.g.: search by name, ... instead of just use the list id) (*The list id will have problem since the ligand, metal, and solvent are read in a reversed manner.)
     '''
 
     '''
