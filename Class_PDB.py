@@ -1398,7 +1398,17 @@ class PDB():
             ntr_line = '  ntr   = '+self.conf_min['ntr']+',	 restraint_wt = '+self.conf_min['restraint_wt']+', restraintmask = '+self.conf_min['restraintmask']+','+line_feed
         else:
             ntr_line = ''
-
+        if self.conf_min['nmropt_rest'] == '1':
+            self.conf_min['nmropt'] = '1'
+            nmropt_line = '  nmropt= '+self.conf_min['nmropt']+','+line_feed
+            DISANG_tail = ''' &wt
+  type='END'
+ /
+  DISANG= '''+self.conf_min['DISANG']+line_feed
+            self._build_MD_rs(step='min',o_path=self.conf_min['DISANG'])
+        else:
+            nmropt_line = ''
+            DISANG_tail = ''
         #text        
         conf_str='''Minimize
  &cntrl
@@ -1407,8 +1417,8 @@ class PDB():
   cut   = '''+self.conf_min['cut']+''',
   maxcyc= '''+maxcyc+''', ncyc  = '''+ncyc+''',
   ntpr  = '''+ntpr+''', ntwx  = 0,
-'''+ntr_line+''' /
-'''
+'''+ntr_line+nmropt_line+''' /
+'''+DISANG_tail
         #write
         with open(o_path,'w') as of:
             of.write(conf_str)
@@ -1439,7 +1449,11 @@ class PDB():
             ntr_line = '  ntr   = '+self.conf_heat['ntr']+', restraint_wt = '+self.conf_heat['restraint_wt']+', restraintmask = '+self.conf_heat['restraintmask']+','+line_feed
         else:
             ntr_line = ''
-
+        if self.conf_heat['nmropt_rest'] == '1':
+            DISANG_tail = '''  DISANG='''+self.conf_heat['DISANG']+line_feed
+            self._build_MD_rs(step='heat',o_path=self.conf_heat['DISANG'])
+        else:
+            DISANG_tail = ''
         conf_str='''Heat
  &cntrl
   imin  = 0,  ntx = 1, irest = 0,
@@ -1467,7 +1481,7 @@ class PDB():
  &wt
   type  = 'END',
  /
-'''
+'''+DISANG_tail
         #write
         with open(o_path,'w') as of:
             of.write(conf_str)
@@ -1493,6 +1507,17 @@ class PDB():
             ntr_line = '  ntr   = '+self.conf_equi['ntr']+', restraint_wt = '+self.conf_equi['restraint_wt']+', restraintmask = '+self.conf_equi['restraintmask']+','+line_feed
         else:
             ntr_line = ''
+        if self.conf_equi['nmropt_rest'] == '1':
+            self.conf_equi['nmropt'] = '1'
+            nmropt_line = '  nmropt= '+self.conf_equi['nmropt']+','+line_feed
+            DISANG_tail = ''' &wt
+  type='END'
+ /
+  DISANG= '''+self.conf_equi['DISANG']+line_feed
+            self._build_MD_rs(step='equi',o_path=self.conf_equi['DISANG'])
+        else:
+            nmropt_line = ''
+            DISANG_tail = ''
 
 
         conf_str='''Equilibration:constant pressure
@@ -1507,8 +1532,8 @@ class PDB():
   ntb   = 2,  ntp = 1,
   iwrap = '''+self.conf_equi['iwarp']+''',
   ig    = -1,
-'''+ntr_line+''' /
-'''
+'''+ntr_line+nmropt_line+''' /
+'''+DISANG_tail
         #write
         with open(o_path,'w') as of:
             of.write(conf_str)
@@ -1534,7 +1559,18 @@ class PDB():
         if self.conf_prod['ntr'] == '1':
             ntr_line = '  ntr   = '+self.conf_prod['ntr']+', restraint_wt = '+self.conf_prod['restraint_wt']+', restraintmask = '+self.conf_prod['restraintmask']+','+line_feed
         else:
-            ntr_line = ''        
+            ntr_line = ''
+        if self.conf_prod['nmropt_rest'] == '1':
+            self.conf_prod['nmropt'] = '1'
+            nmropt_line = '  nmropt= '+self.conf_prod['nmropt']+','+line_feed
+            DISANG_tail = ''' &wt
+  type='END'
+ /
+  DISANG= '''+self.conf_prod['DISANG']+line_feed
+            self._build_MD_rs(step='prod',o_path=self.conf_prod['DISANG'])
+        else:
+            nmropt_line = ''
+            DISANG_tail = ''
 
         conf_str='''Production: constant pressure
  &cntrl
@@ -1548,13 +1584,31 @@ class PDB():
   ntb   = 2,  ntp = 1,
   iwrap = '''+self.conf_prod['iwarp']+''',
   ig    = -1,
-'''+ntr_line+''' /
-'''        
+'''+ntr_line+nmropt_line+''' /
+'''+DISANG_tail
         #write
         with open(o_path,'w') as of:
             of.write(conf_str)
         return o_path
     
+
+    def _build_MD_rs(self,step,o_path):
+        '''
+        Generate a file for DISANG restraint. Get parameters from self.conf_step.
+        '''
+        rs_str=''
+        rs_data_step=self.__dict__['conf_'+step]['rs_constraints']
+        for rest_data in rs_data_step:
+            rs_str=rs_str+'''  &rst
+   iat=  '''+','.join(rest_data['iat'])+''', r1= '''+rest_data['r1']+''', r2= '''+rest_data['r2']+''', r3= '''+rest_data['r3']+''', r4= '''+rest_data['r4']+''',
+   rk2='''+rest_data['rk2']+''', rk3='''+rest_data['rk3']+''', ir6='''+rest_data['ir6']+''', ialtd='''+rest_data['ialtd']+''',
+  &end
+'''
+        #write
+        with open(o_path,'w') as of:
+            of.write(rs_str)
+        return o_path
+
 
     def reset_MD_conf(self):
         '''
