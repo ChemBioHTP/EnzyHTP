@@ -81,7 +81,7 @@ class Config:
                   'nmropt': '0',
                   'DISANG': '0.rs',
                   #Content of DISANG rs file
-                   'rs_constraints': [
+                  'rs_constraints': [
                        {
                        'iat':['###','###'],'r1': '###','r2': '###','r3': '###','r4': '###',
                        'rk2':'###','rk3':'###','ir6':'###','ialtd':'###'
