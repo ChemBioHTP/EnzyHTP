@@ -10,6 +10,7 @@ Config --- Amber
 '''
 from math import exp
 import re
+from helper import mkdir, line_feed
 
 
 class Config:
@@ -29,7 +30,12 @@ class Config:
     # -----------------------------
     # command line name for cpu parallel computing
     # 
-    PC_cmd = 'mpirun -np '+str(n_cores) 
+    PC_cmd = 'mpirun'
+    @classmethod
+    def get_PC_cmd(cls):
+        if cls.PC_cmd == 'mpirun':
+            return 'mpirun -np '+str(cls.n_cores) 
+        return cls.PC_cmd
 
     
     # >>>>>> Software <<<<<<
@@ -39,17 +45,13 @@ class Config:
         #
         AmberHome = '$AMBERHOME'
         # -----------------------------
-        # User defined Amber sander path
+        # User defined Amber CPU path (default: $AMBERHOME/bin/sander.MPI)
         #
-        Amber_sander_CPU = None
+        AmberEXE_CPU = None
         # -----------------------------
-        # User defined Amber pmemd path
+        # User defined Amber GPU path (default: $AMBERHOME/bin/pmemd.cuda)
         #
-        Amber_pmemd_GPU = None
-        # -----------------------------
-        # User defined Amber MD exe dir other than normal sander.MPI or pmemd.cuda 
-        #
-        AmberEXE = None
+        AmberEXE_GPU = None
         # -----------------------------
         # Default configuration for MD
         #
@@ -137,7 +139,7 @@ class Config:
                    'cut': '10.0',
                    'nstlim': 500000, 'dt': '0.002',
                    'temp0': '300.0',
-                   'ntpr': '0.002nstlim', 'ntwx': '5000', # default 10ps
+                   'ntpr': '0.002nstlim', 'ntwx': '5000', # default 10ps (TODO support different power numbers)
                    'ntt': '3', 'gamma_ln': '5.0',
                    'iwarp': '1',
                    'ntr': '1', 'restraintmask': "'@C,CA,N'", 'restraint_wt': '2.0', # the later two are only used when ntr = 1
@@ -167,6 +169,119 @@ class Config:
                    'iwarp': '1',
                    'ntr': '0', 'restraintmask': None, 'restraint_wt': '2.0', # the later two are only used when ntr = 1
                   }
+        
+        #==============================
+        # Method to express Amber EXE path and PC_cmd
+        #
+        @classmethod
+        def get_Amber_engine(cls, engine='Amber_GPU'):
+            '''
+            Give default value to Amber cpu/gpu engines
+            engine: ['Amber_CPU', 'Amber_GPU'] 
+            ---
+            return (PC_cmd, AmberEXE path)
+            '''
+            #san check
+            if engine not in ['Amber_CPU', 'Amber_GPU']:
+                raise Exception("get_Amber_engin only support ['Amber_CPU', 'Amber_GPU']")
+
+            if engine == 'Amber_CPU':
+                if cls.AmberEXE_CPU == None:
+                    engine_path = cls.AmberHome+'/bin/sander.MPI'
+                else:
+                    engine_path = cls.AmberEXE_CPU
+                PC_cmd = Config.get_PC_cmd()
+
+            if engine == 'Amber_GPU':
+                if cls.AmberEXE_GPU == None:
+                    engine_path = cls.AmberHome+'/bin/pmemd.cuda'
+                else:
+                    engine_path = cls.AmberEXE_GPU
+                PC_cmd = ''
+
+            return PC_cmd, engine_path
+
+
+
+        class MMPBSA:
+            # -----------------------------
+            # User defined MMPBSA.py(.MPI) exe dir other than $AMBERHOME/bin/MMPBSA.py.MPI
+            #
+            MMPBSA_EXE = None
+
+            #==============================
+            # Method to express MMPBSA EXE path
+            #
+            @classmethod
+            def get_MMPBSA_engine(cls):
+                '''
+                Give default value to MMPBSA engine
+                Only support MPI version now.
+                ---
+                return engine_path
+                '''
+                if cls.MMPBSA_EXE == None:
+                    engine_path = Config.Amber.AmberHome+'/bin/MMPBSA.py.MPI'
+                else:
+                    engine_path = cls.MMPBSA_EXE
+                
+                return engine_path
+            
+            # -----------------------------
+            #           MMPBSA.in
+            #
+            # GB and PB calculation
+            # &general
+            #   startframe=1, interval=100,
+            #   verbose=1, keep_files=0,
+            # /
+            # &gb
+            #   igb=5, saltcon=0.150,
+            # /
+            # &pb
+            #   istrng=0.15, fillratio=4.0
+            # /
+            conf_in = {
+                'startframe': 1, 'endframe': None, 'interval': 1,
+                'verbose': 1, 'keep_files': 0,
+                'if_gb' : 1,
+                'igb' : 5, 'saltcon' : 0.15,
+                'if_pb' : 1,
+                'istrng': 0.15, 'fillratio': 4.0
+            }
+
+            @classmethod
+            def build_MMPBSA_in(cls, out_path=''):
+                '''
+                build MMPBSA.in in out_path
+                '''
+                if out_path == '':
+                    mkdir('./tmp')
+                    out_path = './tmp/MMPBSA.in'
+
+                # make lines
+                frame_line = '  '
+                for i in ('startframe', 'endframe', 'interval'):
+                    if cls.conf_in[i] != None:
+                        frame_line = frame_line + i + '=' + str(cls.conf_in[i]) + ', '
+                output_line = '  verbose='+ str(cls.conf_in['verbose']) +', keep_files='+ str(cls.conf_in['keep_files']) +','
+                gb_line = '  igb='+str(cls.conf_in['igb']) + ', saltcon='+str(cls.conf_in['saltcon'])+','
+                pb_line = '  istrng='+str(cls.conf_in['istrng'])+', fillratio='+str(cls.conf_in['fillratio'])
+
+                with open(out_path, 'w') as of:
+                    print('GB and PB calculation' , end=line_feed, file=of)
+                    print('&general' , end=line_feed, file=of)
+                    print(frame_line  , end=line_feed, file=of)
+                    print(output_line  , end=line_feed, file=of)
+                    print('/' , end=line_feed, file=of)
+                    print('&gb' , end=line_feed, file=of)
+                    print(gb_line  , end=line_feed, file=of)
+                    print('/' , end=line_feed, file=of)
+                    print('&pb' , end=line_feed, file=of)
+                    print(pb_line  , end=line_feed, file=of)
+                    print('/' , end=line_feed, file=of)
+                
+                return out_path
 
 
     class Gaussian:

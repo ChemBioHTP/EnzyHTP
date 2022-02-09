@@ -1,6 +1,7 @@
 '''
 Misc helper func and class
 '''
+from distutils.command.config import config
 from AmberMaps import Resi_list
 import os
 import numpy as np
@@ -59,7 +60,7 @@ def get_distance(p1,p2):
     return D
 
 
-def get_field_strength(p0, c0, p1, p2=None, d1=None):
+def get_field_strength_value(p0, c0, p1, p2=None, d1=None):
     '''
     return field strength E of *p0(c0)* at *p1* in direction of *p2-p1* or *d1*
     -- E = kq/r^2 -- (Unit: kcal/mol)
@@ -99,6 +100,85 @@ def get_center(p1, p2):
 
     return tuple(p3)
 
+
+'''
+Cheminfo
+'''
+def Conformer_Gen_wRDKit(input_mol, out_path, numConfs=50):
+    '''
+    Generate small molecular conformers using RDKit. (wrote in 2022/1/13 for ReactiveDocking)
+    If input 3D structure, require protonated one. (treat add H in a different function)
+    ---
+    In: SMILES | MOL2 | PDB | SDF
+    Out: SDF | PDB
+    ---
+    numConfs: number of conformers output
+    '''
+    from rdkit import Chem
+    from rdkit.Chem import AllChem
+    from Class_Conf import Config
+
+    # input type support 
+    # [input_mol --> mol]
+    # file or SMILES
+    if not os.path.exists(input_mol):
+        if Config.debug > 1:
+            print('WARNING: Conformer_Gen_wRDKit: input is not a file. Using SMILES mode.')
+        # SMILES
+        mol = Chem.MolFromSmiles(input_mol)
+        mol = Chem.AddHs(mol)
+    else:
+        # file
+        sfx = input_mol.split('.')[-1].strip()
+        if sfx == 'smiles':
+            mol = Chem.MolFromSmiles(input_mol)
+            mol = Chem.AddHs(mol)
+        if sfx == 'mol2':
+            mol = Chem.MolFromMol2File(input_mol, removeHs=0)
+            Chem.rdmolops.AssignAtomChiralTagsFromStructure(mol)
+        if sfx == 'pdb':
+            mol = Chem.MolFromPDBFile(input_mol, removeHs=0)
+            Chem.rdmolops.AssignAtomChiralTagsFromStructure(mol)
+        if sfx == 'sdf':
+            mol = Chem.SDMolSupplier(input_mol, removeHs=0)[0]
+            Chem.rdmolops.AssignAtomChiralTagsFromStructure(mol)
+        
+    # calculate conformers & minimize
+    cids = AllChem.EmbedMultipleConfs(mol, numConfs=numConfs, numThreads=0, pruneRmsThresh=0.1)
+    AllChem.MMFFOptimizeMoleculeConfs(mol, numThreads=0)
+    
+    # output
+    o_sfx = out_path.split('.')[-1].strip()
+    if o_sfx == 'sdf':
+        with Chem.SDWriter(out_path) as of:
+            Chem.rdmolfiles.SDWriter.SetKekulize(of, False)
+            for i in cids:
+                of.write(mol, confId=i)
+    if o_sfx == 'pdb':
+        with Chem.PDBWriter(out_path) as of:
+            for i in cids:
+                of.write(mol, confId=i)
+        
+    return out_path
+
+
+'''
+Rosetta
+'''
+def generate_Rosetta_params(input_file, out_dir, resn, out_pdb_name, if_conformer=0, overwrite=0):
+    '''
+    generate rosetta params file using molfile_to_params.py
+    The command will be:
+    [some_path]/molfile_to_params.py -n [resn] -p [out_pdb_name] --keep-names
+    This command will output files under the working directory. The function will move them to out_dir
+    ------
+    resn:           if resn is 'same' then extract the resi name from the input_file
+    out_pdb_name:   if out_pdb_name is 'same' then extract the resi name from the input_file
+    if_conformer:   if add --conformers-in-one-file flag
+    overwrite:      if add --clobber flag
+    '''
+    pass
+    # return params_path, out_pdb_path, conformers_path (can only under the same dir as params)
 
 '''
 misc

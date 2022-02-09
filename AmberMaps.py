@@ -781,6 +781,16 @@ resi_subgrp = {
 # Residue Volume Rank (From http://www.imgt.org/IMGTeducation/Aide-memoire/_UK/aminoacids/abbreviation.html)
 resi_vol_rank = ['G','A','S','C','D','P','N','T','E','V','Q','H','M','I','L','K','R','F','Y','W']
 
+# MMPB(GB)SA related
+# Radii mapping with igb methods
+radii_map={
+      '1':'mbondi',
+      '2':'mbondi2',
+      '5':'mbondi2',
+      '7':'bondi',
+      '8':'mbondi3'
+      }
+
 # {connecting_atom : H type} Base on http://www.uoxray.uoregon.edu/local/manuals/biosym/discovery/General/Forcefields/AMBER.html 
 # ff96_H_map = {'N2':'H', 'N':'H', 'CT':'HC', 'CA':'HA', 'OH':'HO', 'SH':'HS', 'OW':'HW', 'CR':'H5', 'CV':'H4', 'CR':'H5'}
 # a list of meaningless co-crystaled "ligands". Do not read in Structure.fromPDB. 
