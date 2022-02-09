@@ -1,0 +1,4 @@
+# Thanks to all of the EnzyHTP Authors for their 
+# contributions!
+
++ Chris Jurich <chris.jurich@vanderbilt.edu>
