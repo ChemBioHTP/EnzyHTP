@@ -217,8 +217,8 @@ class Structure():
             if_HET_chain = 1
             for resi in chain:
                 if resi.name in Resi_map2:
-                   if_HET_chain = 0
-                   break
+                    if_HET_chain = 0
+                    break
             if if_HET_chain:
                 for i in range(len(chain)-1,-1,-1):
                     # operate in residue level
