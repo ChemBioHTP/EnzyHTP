@@ -697,13 +697,13 @@ class PDB():
                         atom_name_1
                     --- Will Generate ---
                     [reacting residue]
-                        name 
+                        name
                         atom_name_2
                         atom_name_3
                     [substrate]
                         id
-                        name 
-                        atom_name_2 
+                        name
+                        atom_name_2
                         atom_name_3
                     [distance]
                         ideal
