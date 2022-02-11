@@ -71,23 +71,23 @@ class Structure:
         len(obj) = len(obj.child_list)
     TODO support better way to operate chains metelatoms ligands (e.g.: search by name, ... instead of just use the list id) (*The list id will have problem since the ligand, metal, and solvent are read in a reversed manner.)
     """
-
     """
     ====
     init
     ====
     """
 
-    def __init__(self, chains=[], metalatoms=[], ligands=[], solvents=[], name=None):
+    def __init__(self,
+                 chains=[],
+                 metalatoms=[],
+                 ligands=[],
+                 solvents=[],
+                 name=None):
         """
         Common part of init methods: direct from data objects
         """
-        if (
-            len(chains) == 0
-            and len(metalatoms) == 0
-            and len(ligands) == 0
-            and len(solvents) == 0
-        ):
+        if (len(chains) == 0 and len(metalatoms) == 0 and len(ligands) == 0 and
+                len(solvents) == 0):
             raise ValueError("need at least one input")
 
         self.chains = []
@@ -112,7 +112,11 @@ class Structure:
         self.name = name
 
     @classmethod
-    def fromPDB(cls, input_obj, input_type="path", input_name=None, ligand_list=None):
+    def fromPDB(cls,
+                input_obj,
+                input_type="path",
+                input_name=None,
+                ligand_list=None):
         """
         extract the structure from PDB path. Capable with raw experimental and Amber format
         ---------
@@ -144,16 +148,16 @@ class Structure:
         chains_str = file_str.split(line_feed + "TER")  # Note LF is required
         for index, chain_str in enumerate(chains_str):
             if chain_str.strip() != "END" and chain_str.strip() != "":
-                Chain_index = chr(65 + index)  # Covert to ABC using ACSII mapping
+                Chain_index = chr(65 +
+                                  index)  # Covert to ABC using ACSII mapping
                 # Generate chains
                 raw_chains.append(Chain.fromPDB(chain_str, Chain_index))
         # clean chains
         # clean metals
         raw_chains_woM, metalatoms = cls._get_metalatoms(raw_chains, method="1")
         # clean ligands
-        raw_chains_woM_woL, ligands = cls._get_ligands(
-            raw_chains_woM, ligand_list=ligand_list
-        )
+        raw_chains_woM_woL, ligands = cls._get_ligands(raw_chains_woM,
+                                                       ligand_list=ligand_list)
         # clean solvent
         raw_chains_woM_woL_woS, solvents = cls._get_solvents(raw_chains_woM_woL)
 
@@ -169,7 +173,8 @@ class Structure:
             for ligand in ligands:
                 print("Structure.fromPDB: final ligand recorded " + ligand.name)
 
-        return cls(raw_chains_woM_woL_woS, metalatoms, ligands, solvents, input_name)
+        return cls(raw_chains_woM_woL_woS, metalatoms, ligands, solvents,
+                   input_name)
 
     @classmethod
     def _get_metalatoms(cls, raw_chains, method="1"):
@@ -191,15 +196,9 @@ class Structure:
                     residue = chain[i]
                     if residue.name in Metal_map.keys():
                         # add a logger in the future
-                        print(
-                            "\033[1;34;40mStructure: found metal in raw: "
-                            + chain.id
-                            + " "
-                            + residue.name
-                            + " "
-                            + str(residue.id)
-                            + " \033[0m"
-                        )
+                        print("\033[1;34;40mStructure: found metal in raw: " +
+                              chain.id + " " + residue.name + " " +
+                              str(residue.id) + " \033[0m")
                         metalatoms.append(residue)
                         del chain[i]
         if method == "2":
@@ -249,13 +248,8 @@ class Structure:
                             # add a logger in the future
                             print(
                                 "\033[1;34;40mStructure: found user assigned ligand in raw: "
-                                + chain.id
-                                + " "
-                                + residue.name
-                                + " "
-                                + str(residue.id)
-                                + " \033[0m"
-                            )
+                                + chain.id + " " + residue.name + " " +
+                                str(residue.id) + " \033[0m")
                             ligands.append(residue)
                             del chain[i]
                     else:
@@ -263,13 +257,8 @@ class Structure:
                             if residue.name not in rd_non_ligand_list:
                                 print(
                                     "\033[1;34;40mStructure: found ligand in raw: "
-                                    + chain.id
-                                    + " "
-                                    + residue.name
-                                    + " "
-                                    + str(residue.id)
-                                    + " \033[0m"
-                                )
+                                    + chain.id + " " + residue.name + " " +
+                                    str(residue.id) + " \033[0m")
                                 ligands.append(residue)
                             del chain[i]
 
@@ -300,13 +289,8 @@ class Structure:
                 residue = chain[i]
                 if residue.name in rd_solvent_list:
                     if Config.debug > 1:
-                        print(
-                            "\033[1;34;40mStructure: found solvent in raw: "
-                            + residue.name
-                            + " "
-                            + str(residue.id)
-                            + " \033[0m"
-                        )
+                        print("\033[1;34;40mStructure: found solvent in raw: " +
+                              residue.name + " " + str(residue.id) + " \033[0m")
                     solvents.append(residue)
                     del chain[i]
 
@@ -369,12 +353,8 @@ class Structure:
 
             obj_ele = obj[0]
 
-            if (
-                type(obj_ele) != Chain
-                and type(obj_ele) != Metalatom
-                and type(obj_ele) != Ligand
-                and type(obj_ele) != Solvent
-            ):
+            if (type(obj_ele) != Chain and type(obj_ele) != Metalatom and
+                    type(obj_ele) != Ligand and type(obj_ele) != Solvent):
                 raise TypeError(
                     "structure.Add() method only take Chain / Metalatom / Ligand / Solvent"
                 )
@@ -406,12 +386,8 @@ class Structure:
 
         # single building block
         else:
-            if (
-                type(obj) != Chain
-                and type(obj) != Metalatom
-                and type(obj) != Ligand
-                and type(obj) != Solvent
-            ):
+            if (type(obj) != Chain and type(obj) != Metalatom and
+                    type(obj) != Ligand and type(obj) != Solvent):
                 raise TypeError(
                     "structure.Add() method only take Chain / Metalatom / Ligand / Solvent"
                 )
@@ -517,9 +493,10 @@ class Structure:
                             r_id = r_id + 1
                             for atom in resi:
                                 a_id = a_id + 1  # current line index
-                                line = atom.build(
-                                    a_id=a_id, r_id=r_id, ff=ff, forcefield=forcefield
-                                )
+                                line = atom.build(a_id=a_id,
+                                                  r_id=r_id,
+                                                  ff=ff,
+                                                  forcefield=forcefield)
                                 of.write(line)
                         # write TER after each chain
                         of.write("TER" + line_feed)
@@ -558,7 +535,8 @@ class Structure:
                         of.write("TER" + line_feed)
 
                     if len(self.solvents) != 0:
-                        c_id = chr(ord(c_id) + 1)  # same chain_id for all solvent
+                        c_id = chr(ord(c_id) +
+                                   1)  # same chain_id for all solvent
                         for solvent in self.solvents:
                             r_id = r_id + 1
                             for atom in solvent:
@@ -588,13 +566,17 @@ class Structure:
                     for ligand in self.ligands:
                         c_id = chr(ord(c_id) + 1)
                         for atom in ligand:
-                            line = atom.build(c_id=c_id, ff=ff, forcefield=forcefield)
+                            line = atom.build(c_id=c_id,
+                                              ff=ff,
+                                              forcefield=forcefield)
                             of.write(line)
                         of.write("TER" + line_feed)
 
                     for metal in self.metalatoms:
                         c_id = chr(ord(c_id) + 1)
-                        line = metal.build(c_id=c_id, ff=ff, forcefield=forcefield)
+                        line = metal.build(c_id=c_id,
+                                           ff=ff,
+                                           forcefield=forcefield)
                         of.write(line)
                         of.write("TER" + line_feed)
 
@@ -602,9 +584,9 @@ class Structure:
                         c_id = chr(ord(c_id) + 1)  # chain_id for all solvent
                         for solvent in self.solvents:
                             for atom in solvent:
-                                line = atom.build(
-                                    c_id=c_id, ff=ff, forcefield=forcefield
-                                )
+                                line = atom.build(c_id=c_id,
+                                                  ff=ff,
+                                                  forcefield=forcefield)
                                 of.write(line)
                         of.write("TER" + line_feed)
 
@@ -614,9 +596,14 @@ class Structure:
 
             of.write("END" + line_feed)
 
-    def build_ligands(
-        self, dir, ft="PDB", ifcharge=0, c_method="PYBEL", ph=7.0, ifname=0, ifunique=0
-    ):
+    def build_ligands(self,
+                      dir,
+                      ft="PDB",
+                      ifcharge=0,
+                      c_method="PYBEL",
+                      ph=7.0,
+                      ifname=0,
+                      ifunique=0):
         """
         build files for every ligand in self.ligands
         -------
@@ -647,7 +634,8 @@ class Structure:
             if ifunique:
                 out_path = dir + "/ligand_" + lig.name + ".pdb"
             else:
-                out_path = dir + "/ligand_" + str(l_id) + "_" + lig.name + ".pdb"
+                out_path = dir + "/ligand_" + str(
+                    l_id) + "_" + lig.name + ".pdb"
             # write
             lig.build(out_path, ft=ft)
             # net charge
@@ -656,7 +644,9 @@ class Structure:
                 if lig.net_charge != None:
                     net_charge = lig.net_charge
                 else:
-                    net_charge = lig.get_net_charge(method=c_method, ph=ph, o_dir=dir)
+                    net_charge = lig.get_net_charge(method=c_method,
+                                                    ph=ph,
+                                                    o_dir=dir)
 
             # record
             if ifname:
@@ -760,8 +750,7 @@ class Structure:
                         if if_loop:
                             lp = line.strip().split()
                             lig._find_atom_name(lp[0]).connect.append(
-                                lig._find_atom_name(lp[1])
-                            )
+                                lig._find_atom_name(lp[1]))
                             continue
                         # loop connect starts at LOOP
                         if line.strip() == "LOOP":
@@ -773,12 +762,16 @@ class Structure:
                             atom_id = int(lp[0]) - 3
                             atom_cnt = int(lp[4]) - 3
                             if atom_cnt != 0:
-                                lig[atom_id - 1].connect.append(lig[atom_cnt - 1])
-                                lig[atom_cnt - 1].connect.append(lig[atom_id - 1])
+                                lig[atom_id - 1].connect.append(lig[atom_cnt -
+                                                                    1])
+                                lig[atom_cnt - 1].connect.append(lig[atom_id -
+                                                                     1])
 
-    def get_connectivty_table(
-        self, ff="GAUSSIAN", metal_fix=1, ligand_fix=1, prepi_path=None
-    ):
+    def get_connectivty_table(self,
+                              ff="GAUSSIAN",
+                              metal_fix=1,
+                              ligand_fix=1,
+                              prepi_path=None):
         """
         get connectivity table with atom index based on 'ff' settings:
         ff = GAUSSIAN  -- continuous atom index start from 1, do not seperate by chain
@@ -925,13 +918,9 @@ class Structure:
             for res in chain:
                 for atom in res:
                     if atom.id == None:
-                        raise Exception(
-                            "Detected None in chain "
-                            + str(chain.id)
-                            + str(res.id)
-                            + " "
-                            + atom.name
-                        )
+                        raise Exception("Detected None in chain " +
+                                        str(chain.id) + str(res.id) + " " +
+                                        atom.name)
                     atom_id_list.append(atom.id)
 
         for metal in self.metalatoms:
@@ -942,13 +931,15 @@ class Structure:
         for lig in self.ligands:
             for atom in lig:
                 if atom.id == None:
-                    raise Exception("Detected None in ligands", res.id, atom.name)
+                    raise Exception("Detected None in ligands", res.id,
+                                    atom.name)
                 atom_id_list.append(atom.id)
 
         for sol in self.solvents:
             for atom in sol:
                 if atom.id == None:
-                    raise Exception("Detected None in solvent", res.id, atom.name)
+                    raise Exception("Detected None in solvent", res.id,
+                                    atom.name)
                 atom_id_list.append(atom.id)
 
         return atom_id_list
@@ -983,10 +974,8 @@ class Structure:
                         del format_flag
 
                 if "type_flag" in dir():
-                    if (
-                        line_index >= type_flag + 2
-                        and line_index <= type_flag + 1 + ceil(N_atom / 5)
-                    ):
+                    if (line_index >= type_flag + 2 and
+                            line_index <= type_flag + 1 + ceil(N_atom / 5)):
                         for i in line.strip().split():
                             type_list.append(i)
         # assign type to atom
@@ -1001,12 +990,14 @@ class Structure:
         for lig in self.ligands:
             for atom in lig:
                 if atom.id == None:
-                    raise Exception("Detected None in ligands", res.id, atom.name)
+                    raise Exception("Detected None in ligands", res.id,
+                                    atom.name)
                 atom.type = type_list[atom.id - 1]
         for sol in self.solvents:
             for atom in sol:
                 if atom.id == None:
-                    raise Exception("Detected None in solvent", res.id, atom.name)
+                    raise Exception("Detected None in solvent", res.id,
+                                    atom.name)
                 atom.type = type_list[atom.id - 1]
 
     def get_sele_list(self, atom_mask, fix_end="H", prepi_path=None):
@@ -1045,7 +1036,8 @@ class Structure:
                         resi_obj = resi
             else:
                 chain_id = chain_id.group(0)
-                resi_obj = self.chains[int(chain_id) - 65]._find_resi_id(resi_id)
+                resi_obj = self.chains[int(chain_id) -
+                                       65]._find_resi_id(resi_id)
 
             sele_stru_objs.append(resi_obj)
 
@@ -1077,8 +1069,7 @@ class Structure:
                         if fix_end == "H":
                             d_XH = X_H_bond_length[atom.name]
                             label = "-".join(
-                                (str(atom.id), str(cnt_atom.id), str(d_XH))
-                            )
+                                (str(atom.id), str(cnt_atom.id), str(d_XH)))
                             fix_atom = "H"
                         if fix_end == "Me":
                             # TODO
@@ -1124,12 +1115,8 @@ class Structure:
         """
         len(obj) = len(obj.child_list)
         """
-        return (
-            len(self.chains)
-            + len(self.metalatoms)
-            + len(self.ligands)
-            + len(self.solvents)
-        )
+        return (len(self.chains) + len(self.metalatoms) + len(self.ligands) +
+                len(self.solvents))
 
     def __getitem__(self, i):
         """
@@ -1182,7 +1169,6 @@ class Chain(Child):
     __len__
         len(obj) = len(obj.child_list)
     """
-
     """
     ====
     init
@@ -1334,8 +1320,7 @@ class Chain(Child):
         for i in self.residues:
             if type(i.id) == str:
                 raise Exception(
-                    "Does not support added residue now: update in the future"
-                )
+                    "Does not support added residue now: update in the future")
             # TODO
 
         self.residues.sort(key=lambda i: i.id)
@@ -1379,7 +1364,9 @@ class Chain(Child):
             # missing sequence
             missing_length = resi.id - last_id - 1
             if missing_length > 0:
-                chain_seq = chain_seq + ["NAN",] * missing_length
+                chain_seq = chain_seq + [
+                    "NAN",
+                ] * missing_length
 
             chain_seq.append(resi.name)
             last_id = resi.id
@@ -1440,12 +1427,8 @@ class Chain(Child):
             if resi.id == id:
                 out_list.append(resi)
         if len(out_list) > 1:
-            print(
-                "\033[32;0mShould there be same residue id in chain +"
-                + self.name
-                + str(self.id)
-                + "?+\033[0m"
-            )
+            print("\033[32;0mShould there be same residue id in chain +" +
+                  self.name + str(self.id) + "?+\033[0m")
             raise Exception
         return out_list[0]
 
@@ -1547,7 +1530,6 @@ class Residue(Child):
     __len__
         len(obj) = len(obj.child_list)
     """
-
     """
     ====
     init
@@ -1600,10 +1582,8 @@ class Residue(Child):
 
         # clean lines
         for i in range(len(resi_lines) - 1, -1, -1):
-            if (
-                resi_lines[i].line_type != "ATOM"
-                and resi_lines[i].line_type != "HETATM"
-            ):
+            if (resi_lines[i].line_type != "ATOM" and
+                    resi_lines[i].line_type != "HETATM"):
                 if Config.debug > 1:
                     print("Residue.fromPDB: delete error line in input.")
                 del resi_lines[i]
@@ -1689,21 +1669,17 @@ class Residue(Child):
 
             # find the right H to delete for ARG and LYS
             if self.name == "ARG":
-                raise Exception(
-                    "ARG detected as donor: " + self.chain.id + str(self.id)
-                )
+                raise Exception("ARG detected as donor: " + self.chain.id +
+                                str(self.id))
 
             if self.name == "LYS":
                 # the deleted H has to be HZ1 in name
                 D1 = np.linalg.norm(
-                    np.array(self.HZ1.coord) - np.array(self.a_metal.coord)
-                )
+                    np.array(self.HZ1.coord) - np.array(self.a_metal.coord))
                 D2 = np.linalg.norm(
-                    np.array(self.HZ2.coord) - np.array(self.a_metal.coord)
-                )
+                    np.array(self.HZ2.coord) - np.array(self.a_metal.coord))
                 D3 = np.linalg.norm(
-                    np.array(self.HZ3.coord) - np.array(self.a_metal.coord)
-                )
+                    np.array(self.HZ3.coord) - np.array(self.a_metal.coord))
                 x = min(D1, D2, D3)
                 if x == D1:
                     del self["HZ1"]
@@ -1757,9 +1733,10 @@ class Residue(Child):
             for proton in protons:
                 bond_end1 = T_atom.get_bond_end_atom()
                 bond_end2 = bond_end1.get_bond_end_atom()
-                proton.set_byDihedral(
-                    T_atom, bond_end1, bond_end2, value=lp_infos[0]["D"]
-                )
+                proton.set_byDihedral(T_atom,
+                                      bond_end1,
+                                      bond_end2,
+                                      value=lp_infos[0]["D"])
 
     def ifDeProton(self):
         """
@@ -1779,12 +1756,8 @@ class Residue(Child):
             if atom.name == name:
                 out_list.append(atom)
         if len(out_list) > 1:
-            print(
-                "\033[32;0mShould there be same atom name in residue +"
-                + self.name
-                + str(self.id)
-                + "?+\033[0m"
-            )
+            print("\033[32;0mShould there be same atom name in residue +" +
+                  self.name + str(self.id) + "?+\033[0m")
             raise Exception
         else:
             return out_list[0]
@@ -1931,7 +1904,12 @@ class Atom(Child):
     -------------
     """
 
-    def __init__(self, atom_name: str, coord: list, ff: str, atom_id=None, parent=None):
+    def __init__(self,
+                 atom_name: str,
+                 coord: list,
+                 ff: str,
+                 atom_id=None,
+                 parent=None):
         """
         Common part of init methods: direct from data objects
         No parent by default. Add parent by action
@@ -2020,13 +1998,8 @@ class Atom(Child):
                 self.connect.append(cnt_atom)
             except IndexError:
                 if Config.debug >= 1:
-                    print(
-                        "WARNING: "
-                        + self.resi.name
-                        + str(self.resi.id)
-                        + " should have atom: "
-                        + name
-                    )
+                    print("WARNING: " + self.resi.name + str(self.resi.id) +
+                          " should have atom: " + name)
                 else:
                     pass
 
@@ -2071,7 +2044,8 @@ class Atom(Child):
             ("CB", "CA"),
             ("N", "C"),
         ]:
-            raise Exception("method 1 only support truncations of CA-CB and C-N")
+            raise Exception(
+                "method 1 only support truncations of CA-CB and C-N")
         else:
             if self.name == "CA":
                 # p_H_type = XXX
@@ -2121,7 +2095,12 @@ class Atom(Child):
         """
         pass
 
-    def build(self, a_id=None, r_id=None, c_id=None, ff="AMBER", forcefield="ff14SB"):
+    def build(self,
+              a_id=None,
+              r_id=None,
+              c_id=None,
+              ff="AMBER",
+              forcefield="ff14SB"):
         """
         generate an output line. End with LF
         return a line str
@@ -2161,27 +2140,17 @@ class Atom(Child):
             z = "{:>8.3f}".format(self.coord[2])
 
         # example: ATOM   5350  HB2 PRO   347      32.611  15.301  24.034  1.00  0.00
-        line = (
-            l_type
-            + a_index
-            + " "
-            + a_name
-            + " "
-            + r_name
-            + " "
-            + c_index
-            + r_index
-            + "    "
-            + x
-            + y
-            + z
-            + "  1.00  0.00"
-            + line_feed
-        )
+        line = (l_type + a_index + " " + a_name + " " + r_name + " " + c_index +
+                r_index + "    " + x + y + z + "  1.00  0.00" + line_feed)
 
         return line
 
-    def build_oniom(self, layer, chrg=None, cnt_info: list = None, if_lig=0, if_sol=0):
+    def build_oniom(self,
+                    layer,
+                    chrg=None,
+                    cnt_info: list = None,
+                    if_lig=0,
+                    if_sol=0):
         """
         build line for oniom. Use element name for ligand atoms since they are mostly in QM regions.
         Gaussian use *ff96* which the atom type is corresponding to all_amino94.lib and ion94.lib in Amber distribution
@@ -2201,9 +2170,8 @@ class Atom(Child):
             fz_flag = "-1"
             ly_flag = "L"
             if cnt_info != None:
-                cnt_flag = (
-                    " " + cnt_info[0] + "-" + cnt_info[1] + " " + str(cnt_info[2])
-                )
+                cnt_flag = (" " + cnt_info[0] + "-" + cnt_info[1] + " " +
+                            str(cnt_info[2]))
 
         # label: deal with N/C terminal and ligand
         if if_lig:
@@ -2231,29 +2199,15 @@ class Atom(Child):
                     "You need to at least provide a charge or use get_atom_charge to get one from prmtop file."
                 )
 
-        atom_label = "{:<16}".format(
-            " " + self.ele + "-" + G16_label + "-" + str(round(chrg, 6))
-        )
+        atom_label = "{:<16}".format(" " + self.ele + "-" + G16_label + "-" +
+                                     str(round(chrg, 6)))
         fz_flag = "{:>2}".format(fz_flag)
         x = "{:<14.8f}".format(self.coord[0])
         y = "{:<14.8f}".format(self.coord[1])
         z = "{:<14.8f}".format(self.coord[2])
 
-        line = (
-            atom_label
-            + " "
-            + fz_flag
-            + "   "
-            + x
-            + " "
-            + y
-            + " "
-            + z
-            + " "
-            + ly_flag
-            + cnt_flag
-            + line_feed
-        )
+        line = (atom_label + " " + fz_flag + "   " + x + " " + y + " " + z +
+                " " + ly_flag + cnt_flag + line_feed)
 
         return line
 
@@ -2381,16 +2335,9 @@ class Metalatom(Atom):
                     if dist <= (R_d + R_m):
                         self.donor_atoms.append(atom)
                         if Config.debug > 1:
-                            print(
-                                "Metalatom.get_donor_atom: "
-                                + self.name
-                                + " find donor atom:"
-                                + atom.resi.name
-                                + " "
-                                + str(atom.resi.id)
-                                + " "
-                                + atom.name
-                            )
+                            print("Metalatom.get_donor_atom: " + self.name +
+                                  " find donor atom:" + atom.resi.name + " " +
+                                  str(atom.resi.id) + " " + atom.name)
 
     def get_donor_residue(self, method="INC"):
         """
@@ -2412,10 +2359,8 @@ class Metalatom(Atom):
                     if self.donor_resi[index2].id == self.donor_resi[index].id:
                         print(
                             "\033[1;31;40m!WARNING! found more than 1 donor atom from residue: "
-                            + self.donor_resi[index].name
-                            + str(self.donor_resi[index].id)
-                            + "\033[m"
-                        )
+                            + self.donor_resi[index].name +
+                            str(self.donor_resi[index].id) + "\033[m")
 
     def _metal_fix_1(self):
         """
@@ -2427,13 +2372,8 @@ class Metalatom(Atom):
                 resi.deprotonate(resi.d_atom)
             else:
                 if resi.name not in NoProton_list:
-                    print(
-                        "!WARNING!: uncommon donor residue -- "
-                        + resi.chain.id
-                        + " "
-                        + resi.name
-                        + str(resi.id)
-                    )
+                    print("!WARNING!: uncommon donor residue -- " +
+                          resi.chain.id + " " + resi.name + str(resi.id))
                     # resi.rot_proton(resi.d_atom)
 
     def _metal_fix_2(self):
@@ -2450,7 +2390,12 @@ class Metalatom(Atom):
         """
         pass
 
-    def build(self, a_id=None, r_id=None, c_id=None, ff="AMBER", forcefield="ff14SB"):
+    def build(self,
+              a_id=None,
+              r_id=None,
+              c_id=None,
+              ff="AMBER",
+              forcefield="ff14SB"):
         """
         generate an metal atom output line. End with LF
         return a line str
@@ -2486,23 +2431,9 @@ class Metalatom(Atom):
             z = "{:>8.3f}".format(self.coord[2])
 
         # example: ATOM   5350  HB2 PRO   347      32.611  15.301  24.034  1.00  0.00
-        line = (
-            l_type
-            + a_index
-            + " "
-            + a_name
-            + "   "
-            + r_name
-            + " "
-            + c_index
-            + r_index
-            + "    "
-            + x
-            + y
-            + z
-            + "  1.00  0.00"
-            + line_feed
-        )
+        line = (l_type + a_index + " " + a_name + "   " + r_name + " " +
+                c_index + r_index + "    " + x + y + z + "  1.00  0.00" +
+                line_feed)
 
         return line
 
@@ -2526,16 +2457,16 @@ class Metalatom(Atom):
             fz_flag = "-1"
             ly_flag = "L"
             if cnt_info != None:
-                cnt_flag = (
-                    " " + cnt_info[0] + "-" + cnt_info[1] + " " + str(cnt_info[2])
-                )
+                cnt_flag = (" " + cnt_info[0] + "-" + cnt_info[1] + " " +
+                            str(cnt_info[2]))
 
         # label
         if self.resi_name in G16_label_map.keys():
             G16_label = G16_label_map[self.resi_name][self.name]
         else:
             if Config.debug >= 1:
-                print("Metal: " + self.name + " not in build-in atom type of ff96.")
+                print("Metal: " + self.name +
+                      " not in build-in atom type of ff96.")
                 print(
                     "Use parameters and atom types from TIP3P (frcmod.ionsjc_tip3p & frcmod.ions234lm_126_tip3p)"
                 )
@@ -2552,29 +2483,15 @@ class Metalatom(Atom):
                     "You need to at least provide a charge or use get_atom_charge to get one from prmtop file."
                 )
 
-        atom_label = "{:<16}".format(
-            " " + self.ele + "-" + G16_label + "-" + str(round(chrg, 6))
-        )
+        atom_label = "{:<16}".format(" " + self.ele + "-" + G16_label + "-" +
+                                     str(round(chrg, 6)))
         fz_flag = "{:>2}".format(fz_flag)
         x = "{:<14.8f}".format(self.coord[0])
         y = "{:<14.8f}".format(self.coord[1])
         z = "{:<14.8f}".format(self.coord[2])
 
-        line = (
-            atom_label
-            + " "
-            + fz_flag
-            + "   "
-            + x
-            + " "
-            + y
-            + " "
-            + z
-            + " "
-            + ly_flag
-            + cnt_flag
-            + line_feed
-        )
+        line = (atom_label + " " + fz_flag + "   " + x + " " + y + " " + z +
+                " " + ly_flag + cnt_flag + line_feed)
 
         return line
 
@@ -2624,7 +2541,10 @@ class Ligand(Residue):
         """
         generate from a Residue object. copy data
         """
-        return cls(Resi_obj.atoms, Resi_obj.id, Resi_obj.name, parent=Resi_obj.parent)
+        return cls(Resi_obj.atoms,
+                   Resi_obj.id,
+                   Resi_obj.name,
+                   parent=Resi_obj.parent)
 
     @classmethod
     def fromPDB(
@@ -2658,10 +2578,8 @@ class Ligand(Residue):
 
         # clean lines
         for i in range(len(resi_lines) - 1, -1, -1):
-            if (
-                resi_lines[i].line_type != "ATOM"
-                and resi_lines[i].line_type != "HETATM"
-            ):
+            if (resi_lines[i].line_type != "ATOM" and
+                    resi_lines[i].line_type != "HETATM"):
                 if Config.debug > 1:
                     print("Residue.fromPDB: delete error line in input.")
                 del resi_lines[i]
@@ -2718,7 +2636,8 @@ class Ligand(Residue):
             mol.removeh()
             mol.write("pdb", temp_pdb2_path, overwrite=True)
             # clean connectivity
-            os.system("cat " + temp_pdb2_path + " |grep 'ATOM' > " + temp_pdb3_path)
+            os.system("cat " + temp_pdb2_path + " |grep 'ATOM' > " +
+                      temp_pdb3_path)
             # add H and result net charge
             mol = next(pybel.readfile("pdb", temp_pdb3_path))
             mol.OBMol.AddHydrogens(False, True, ph)
@@ -2758,7 +2677,10 @@ class Solvent(Residue):
         """
         generate from a Residue object. copy data
         """
-        return cls(Resi_obj.atoms, Resi_obj.id, Resi_obj.name, parent=Resi_obj.parent)
+        return cls(Resi_obj.atoms,
+                   Resi_obj.id,
+                   Resi_obj.name,
+                   parent=Resi_obj.parent)
 
     def sort(self):
         pass

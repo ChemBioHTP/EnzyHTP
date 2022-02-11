@@ -3,7 +3,6 @@ wappers and context manager defined for the program
 """
 import os, sys
 
-
 # def blockprint(redirect=os.devnull):
 #     '''
 #     blockprint(redirect=os.devnull)

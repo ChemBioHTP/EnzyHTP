@@ -5,6 +5,5 @@ Date: 2022-02-01
 """
 
 
-
-def read_PDB( fname ):
-	pass
+def read_PDB(fname):
+    pass

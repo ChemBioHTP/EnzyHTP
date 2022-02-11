@@ -5,7 +5,6 @@ from distutils.command.config import config
 from AmberMaps import Resi_list
 import os
 import numpy as np
-
 """
 ====
 Tree
@@ -14,6 +13,7 @@ Tree
 
 
 class Child:
+
     def __init__(self):
         self.parent = None
 
@@ -27,7 +27,6 @@ class Child:
 Text
 """
 line_feed = "\n"
-
 """
 func
 """
@@ -94,7 +93,7 @@ def get_field_strength(p0, c0, p1, p2=None, d1=None):
     r_u = r / r_m
 
     # Get E
-    E = (k * q / (r_m ** 2)) * r_u
+    E = (k * q / (r_m**2)) * r_u
     # Get E in direction
     Ed = np.dot(E, d1)  # kcal/(mol*e*Ang)
 
@@ -151,9 +150,10 @@ def Conformer_Gen_wRDKit(input_mol, out_path, numConfs=50):
             mol = Chem.MolFromPDBFile(input_mol, removeHs=0)
 
     # calculate conformers & minimize
-    cids = AllChem.EmbedMultipleConfs(
-        mol, numConfs=50, numThreads=0, pruneRmsThresh=0.1
-    )
+    cids = AllChem.EmbedMultipleConfs(mol,
+                                      numConfs=50,
+                                      numThreads=0,
+                                      pruneRmsThresh=0.1)
     AllChem.MMFFOptimizeMoleculeConfs(mol, numThreads=0)
 
     # output

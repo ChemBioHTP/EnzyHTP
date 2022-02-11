@@ -27,7 +27,6 @@ try:
 except ImportError:
     raise ImportError("OpenBabel not installed.")
 
-
 __doc__ = """
 This module handles file I/O and external programs.
 -------------------------------------------------------------------------------------
@@ -72,8 +71,9 @@ Will do nothing if the correct var is already exist.
 
 
 class PDB:
+
     def __init__(self, PDB_input, wk_dir="", name="", input_type="path"):
-		# TODO this thing does wayyy too much. jk
+        # TODO this thing does wayyy too much. jk
         """
         initiate PDB object
         -------------------
@@ -154,7 +154,8 @@ class PDB:
                 get_flag = 1
                 # warn if possible wrong self.stru
                 if Config.debug >= 1:
-                    print("PDB.get_stru: WARNING: self.stru has a different name")
+                    print(
+                        "PDB.get_stru: WARNING: self.stru has a different name")
                     print("     -self.name: " + self.name)
                     print("     -self.stru.name: " + self.stru.name)
                     print("Getting new stru")
@@ -163,9 +164,9 @@ class PDB:
 
         if get_flag or renew:
             if self.path is not None:
-                self.stru = Structure.fromPDB(
-                    self.path, input_name=input_name, ligand_list=ligand_list
-                )
+                self.stru = Structure.fromPDB(self.path,
+                                              input_name=input_name,
+                                              ligand_list=ligand_list)
             else:
                 self.stru = Structure.fromPDB(
                     self.file_str,
@@ -314,7 +315,9 @@ class PDB:
                         # Deal with missing residue, fill with "NAN"
                         missing_length = pdb_l.resi_id - last_resi_index - 1
                         if missing_length > 0:
-                            Chain_sequence = Chain_sequence + ["NAN",] * missing_length
+                            Chain_sequence = Chain_sequence + [
+                                "NAN",
+                            ] * missing_length
 
                         # Store the new resi
                         Chain_sequence.append(pdb_l.resi_name)
@@ -508,15 +511,13 @@ class PDB:
 
         # input of PDB2PQR
         pdb2pqr_parser = build_pdb2pqr_parser()
-        args = pdb2pqr_parser.parse_args(
-            [
-                "--ff=PARSE",
-                "--ffout=" + ffout,
-                "--with-ph=" + str(ph),
-                self.path,
-                self.pqr_path,
-            ]
-        )
+        args = pdb2pqr_parser.parse_args([
+            "--ff=PARSE",
+            "--ffout=" + ffout,
+            "--with-ph=" + str(ph),
+            self.path,
+            self.pqr_path,
+        ])
         # use context manager to hide output
         with HiddenPrints("./._get_protonation_pdb2pqr.log"):
             run_pdb2pqr(args)
@@ -550,15 +551,15 @@ class PDB:
 
             new_ligs = []
             for lig_path, lig_name in lig_paths:
-                new_lig_path, net_charge = self.protonate_ligand(lig_path, ph=ph)
+                new_lig_path, net_charge = self.protonate_ligand(lig_path,
+                                                                 ph=ph)
                 new_ligs.append(
                     Ligand.fromPDB(
                         new_lig_path,
                         resi_name=lig_name,
                         net_charge=net_charge,
                         input_type="path",
-                    )
-                )
+                    ))
             new_stru.add(new_ligs, sort=0)
 
         # PLACE HOLDER for other fix
@@ -679,9 +680,8 @@ class PDB:
                     if len(pdb_l.get_charge()) != 0:
                         charge = pdb_l.charge[::-1]
                         if Config.debug > 1:
-                            print(
-                                "Found formal charge: " + pdb_l.atom_name + " " + charge
-                            )
+                            print("Found formal charge: " + pdb_l.atom_name +
+                                  " " + charge)
                         net_charge = net_charge + int(charge)
             return net_charge
 
@@ -713,16 +713,14 @@ class PDB:
                     pass
                 else:
                     if (self.MutaFlags[i][1], self.MutaFlags[i][2]) == (
-                        self.MutaFlags[j][1],
-                        self.MutaFlags[j][2],
+                            self.MutaFlags[j][1],
+                            self.MutaFlags[j][2],
                     ):
                         if Config.debug >= 1:
                             print(
                                 "PDB2PDBwLeap: There are multiple mutations at the same index, only the first one will be used: "
-                                + self.MutaFlags[i][0]
-                                + self.MutaFlags[i][1]
-                                + self.MutaFlags[i][2]
-                            )
+                                + self.MutaFlags[i][0] + self.MutaFlags[i][1] +
+                                self.MutaFlags[i][2])
 
         # Prepare a label for the filename
         tot_Flag_name = ""
@@ -762,18 +760,22 @@ class PDB:
                                     match = 1
                                     # Keep OldAtoms of targeted old residue
                                     resi_2 = Flag[3]
-                                    OldAtoms = ["N", "H", "CA", "HA", "CB", "C", "O"]
+                                    OldAtoms = [
+                                        "N", "H", "CA", "HA", "CB", "C", "O"
+                                    ]
                                     # fix for mutations of Gly & Pro
                                     if resi_2 == "G":
                                         OldAtoms = ["N", "H", "CA", "C", "O"]
                                     if resi_2 == "P":
-                                        OldAtoms = ["N", "CA", "HA", "CB", "C", "O"]
+                                        OldAtoms = [
+                                            "N", "CA", "HA", "CB", "C", "O"
+                                        ]
 
                                     for i in OldAtoms:
                                         if i == pdb_l.atom_name:
-                                            new_line = (
-                                                line[:17] + Resi_map[resi_2] + line[20:]
-                                            )
+                                            new_line = (line[:17] +
+                                                        Resi_map[resi_2] +
+                                                        line[20:])
                                             of.write(new_line)
                                             break
                                     # Dont run for other Flags after first Flag matches.
@@ -792,9 +794,8 @@ class PDB:
         leap_input.write("quit\n")
         leap_input.close()
         # run
-        os.system(
-            "tleap -s -f " + leapin_path + " > " + self.cache_path + "/leap_P2PwL.out"
-        )
+        os.system("tleap -s -f " + leapin_path + " > " + self.cache_path +
+                  "/leap_P2PwL.out")
         if Config.debug <= 1:
             os.system("rm leap.log")
 
@@ -913,8 +914,7 @@ class PDB:
             if Config.debug >= 1:
                 print(
                     "_read_MutaFlag: No chain_id is provided! Mutate in the first chain by default. Input: "
-                    + Flag
-                )
+                    + Flag)
 
         # san check of the manual input
         self.get_stru()
@@ -922,24 +922,17 @@ class PDB:
         if not chain_id in chain_id_list:
             raise Exception(
                 "_read_MutaFlag: San check failed. Input chain id in not in range."
-                + line_feed
-                + " range: "
-                + repr(chain_id_list)
-            )
+                + line_feed + " range: " + repr(chain_id_list))
         chain_int = ord(chain_id) - 65
         resi_id_list = [str(i.id) for i in self.stru.chains[chain_int].residues]
         if not resi_id in resi_id_list:
             raise Exception(
                 "_read_MutaFlag: San check failed. Input resi id in not in range."
-                + line_feed
-                + " range: "
-                + repr(resi_id_list)
-            )
+                + line_feed + " range: " + repr(resi_id_list))
         if not resi_2 in Resi_list:
             raise Exception(
                 "_read_MutaFlag: Only support mutate to the known 21 residues. AmberMaps.Resi_list: "
-                + repr(Resi_list)
-            )
+                + repr(Resi_list))
 
         return (resi_1, chain_id, resi_id, resi_2)
 
@@ -963,9 +956,8 @@ class PDB:
         min_dir = self.cache_path + "/PDBMin"
         minin_path = min_dir + "/min.in"
         minout_path = min_dir + "/min.out"
-        minrst_path = (
-            min_dir + "/min.ncrst"
-        )  # change to ncrst seeking for solution of rst error
+        minrst_path = (min_dir + "/min.ncrst"
+                      )  # change to ncrst seeking for solution of rst error
         mkdir(min_dir)
         min_input = open(minin_path, "w")
         min_input.write("Minimize" + line_feed)
@@ -986,46 +978,18 @@ class PDB:
 
         # run
         if Config.debug >= 1:
-            print(
-                "running: "
-                + PC_cmd
-                + " "
-                + engine_path
-                + " -O -i "
-                + minin_path
-                + " -o "
-                + minout_path
-                + " -p "
-                + self.prmtop_path
-                + " -c "
-                + self.inpcrd_path
-                + " -r "
-                + minrst_path
-            )
-        os.system(
-            PC_cmd
-            + " "
-            + engine_path
-            + " -O -i "
-            + minin_path
-            + " -o "
-            + minout_path
-            + " -p "
-            + self.prmtop_path
-            + " -c "
-            + self.inpcrd_path
-            + " -r "
-            + minrst_path
-        )
+            print("running: " + PC_cmd + " " + engine_path + " -O -i " +
+                  minin_path + " -o " + minout_path + " -p " +
+                  self.prmtop_path + " -c " + self.inpcrd_path + " -r " +
+                  minrst_path)
+        os.system(PC_cmd + " " + engine_path + " -O -i " + minin_path + " -o " +
+                  minout_path + " -p " + self.prmtop_path + " -c " +
+                  self.inpcrd_path + " -r " + minrst_path)
         # rst2pdb
         try:
             run(
-                "ambpdb -p "
-                + self.prmtop_path
-                + " -c "
-                + minrst_path
-                + " > "
-                + out4_PDB_path,
+                "ambpdb -p " + self.prmtop_path + " -c " + minrst_path + " > " +
+                out4_PDB_path,
                 check=True,
                 text=True,
                 shell=True,
@@ -1036,7 +1000,8 @@ class PDB:
                 print("Error: ambpdb cannot read PDBMin result .rst")
                 return 1
 
-        os.system("mv " + self.prmtop_path + " " + self.inpcrd_path + " " + min_dir)
+        os.system("mv " + self.prmtop_path + " " + self.inpcrd_path + " " +
+                  min_dir)
 
         self.path = out4_PDB_path
         self._update_name()
@@ -1058,12 +1023,14 @@ class PDB:
 
         # crude judgement of H including customized H
         if if_ligand:
-            not_H_list = ["HG", "HF", "HS"]  # non-H elements that start with "H"
+            not_H_list = ["HG", "HF",
+                          "HS"]  # non-H elements that start with "H"
             with open(self.path) as f:
                 with open(o_path, "w") as of:
                     for line in f:
                         atom_name = line[12:16].strip()
-                        if atom_name[0] == "H" and (atom_name[:2] not in not_H_list):
+                        if atom_name[0] == "H" and (atom_name[:2]
+                                                    not in not_H_list):
                             continue
                         of.write(line)
         else:
@@ -1126,12 +1093,14 @@ class PDB:
         mkdir(lig_dir)
         mkdir(met_dir)
 
-        ligands_pathNchrg = self.stru.build_ligands(lig_dir, ifcharge=1, ifunique=1)
+        ligands_pathNchrg = self.stru.build_ligands(lig_dir,
+                                                    ifcharge=1,
+                                                    ifunique=1)
         # metalcenters_path = self.stru.build_metalcenters(met_dir)
         # parm
-        ligand_parm_paths = self._ligand_parm(
-            ligands_pathNchrg, method=lig_method, renew=renew_lig
-        )
+        ligand_parm_paths = self._ligand_parm(ligands_pathNchrg,
+                                              method=lig_method,
+                                              renew=renew_lig)
         # self._metal_parm(metalcenters_path)
         # combine
         if o_dir != "":
@@ -1174,35 +1143,23 @@ class PDB:
                         if pdbl.line_type == "ATOM" or pdbl.line_type == "HETATM":
                             lig_name = pdbl.resi_name
                 # if renew
-                if (
-                    os.path.isfile(out_prepi)
-                    and os.path.isfile(out_frcmod)
-                    and not renew
-                ):
+                if (os.path.isfile(out_prepi) and os.path.isfile(out_frcmod) and
+                        not renew):
                     if Config.debug >= 1:
-                        print("Parm files exist: " + out_prepi + " " + out_frcmod)
+                        print("Parm files exist: " + out_prepi + " " +
+                              out_frcmod)
                         print("Using old parm files.")
                 else:
                     # gen prepi (net charge and correct protonation state is important)
                     if Config.debug >= 1:
-                        print(
-                            "running: "
-                            + Config.Amber.AmberHome
-                            + "/bin/antechamber -i "
-                            + lig_pdb
-                            + " -fi pdb -o "
-                            + out_prepi
-                            + " -fo prepi -c bcc -s 0 -nc "
-                            + str(net_charge)
-                        )
+                        print("running: " + Config.Amber.AmberHome +
+                              "/bin/antechamber -i " + lig_pdb +
+                              " -fi pdb -o " + out_prepi +
+                              " -fo prepi -c bcc -s 0 -nc " + str(net_charge))
                     run(
-                        Config.Amber.AmberHome
-                        + "/bin/antechamber -i "
-                        + lig_pdb
-                        + " -fi pdb -o "
-                        + out_prepi
-                        + " -fo prepi -c bcc -s 0 -nc "
-                        + str(net_charge),
+                        Config.Amber.AmberHome + "/bin/antechamber -i " +
+                        lig_pdb + " -fi pdb -o " + out_prepi +
+                        " -fo prepi -c bcc -s 0 -nc " + str(net_charge),
                         check=True,
                         text=True,
                         shell=True,
@@ -1214,20 +1171,12 @@ class PDB:
                         )
                     # gen frcmod
                     if Config.debug >= 1:
-                        print(
-                            "running: "
-                            + Config.Amber.AmberHome
-                            + "/bin/parmchk2 -i "
-                            + out_prepi
-                            + " -f prepi -o "
-                            + out_frcmod
-                        )
+                        print("running: " + Config.Amber.AmberHome +
+                              "/bin/parmchk2 -i " + out_prepi +
+                              " -f prepi -o " + out_frcmod)
                     run(
-                        Config.Amber.AmberHome
-                        + "/bin/parmchk2 -i "
-                        + out_prepi
-                        + " -f prepi -o "
-                        + out_frcmod,
+                        Config.Amber.AmberHome + "/bin/parmchk2 -i " +
+                        out_prepi + " -f prepi -o " + out_frcmod,
                         check=True,
                         text=True,
                         shell=True,
@@ -1292,73 +1241,39 @@ class PDB:
             # save
             if prm_out_path == "":
                 if o_dir == "":
-                    of.write(
-                        "saveamberparm a "
-                        + self.path_name
-                        + ".prmtop "
-                        + self.path_name
-                        + ".inpcrd"
-                        + line_feed
-                    )
+                    of.write("saveamberparm a " + self.path_name + ".prmtop " +
+                             self.path_name + ".inpcrd" + line_feed)
                     self.prmtop_path = self.path_name + ".prmtop"
                     self.inpcrd_path = self.path_name + ".inpcrd"
                 else:
-                    of.write(
-                        "saveamberparm a "
-                        + o_dir
-                        + self.name
-                        + ".prmtop "
-                        + o_dir
-                        + self.name
-                        + ".inpcrd"
-                        + line_feed
-                    )
+                    of.write("saveamberparm a " + o_dir + self.name +
+                             ".prmtop " + o_dir + self.name + ".inpcrd" +
+                             line_feed)
                     self.prmtop_path = o_dir + self.name + ".prmtop"
                     self.inpcrd_path = o_dir + self.name + ".inpcrd"
             else:
                 if o_dir == "":
                     if if_prm_only:
                         mkdir("./tmp")
-                        of.write(
-                            "saveamberparm a "
-                            + prm_out_path
-                            + " ./tmp/tmp.inpcrd"
-                            + line_feed
-                        )
+                        of.write("saveamberparm a " + prm_out_path +
+                                 " ./tmp/tmp.inpcrd" + line_feed)
                         self.prmtop_path = prm_out_path
                         self.inpcrd_path = None
                     else:
-                        of.write(
-                            "saveamberparm a "
-                            + prm_out_path
-                            + " "
-                            + self.path_name
-                            + ".inpcrd"
-                            + line_feed
-                        )
+                        of.write("saveamberparm a " + prm_out_path + " " +
+                                 self.path_name + ".inpcrd" + line_feed)
                         self.prmtop_path = prm_out_path
                         self.inpcrd_path = self.path_name + ".inpcrd"
                 else:
                     if if_prm_only:
                         mkdir("./tmp")
-                        of.write(
-                            "saveamberparm a "
-                            + prm_out_path
-                            + " ./tmp/tmp.inpcrd"
-                            + line_feed
-                        )
+                        of.write("saveamberparm a " + prm_out_path +
+                                 " ./tmp/tmp.inpcrd" + line_feed)
                         self.prmtop_path = prm_out_path
                         self.inpcrd_path = None
                     else:
-                        of.write(
-                            "saveamberparm a "
-                            + prm_out_path
-                            + " "
-                            + o_dir
-                            + self.name
-                            + ".inpcrd"
-                            + line_feed
-                        )
+                        of.write("saveamberparm a " + prm_out_path + " " +
+                                 o_dir + self.name + ".inpcrd" + line_feed)
                         self.prmtop_path = prm_out_path
                         self.inpcrd_path = o_dir + self.name + ".inpcrd"
 
@@ -1460,211 +1375,61 @@ class PDB:
 
         # run sander
         if Config.debug >= 1:
-            print(
-                "running: "
-                + PC_cmd
-                + " "
-                + engine_path
-                + " -O -i "
-                + min_path
-                + " -o "
-                + o_dir
-                + "/min.out -p "
-                + self.prmtop_path
-                + " -c "
-                + self.inpcrd_path
-                + " -r "
-                + o_dir
-                + "/min.rst -ref "
-                + self.inpcrd_path
-            )
-        os.system(
-            PC_cmd
-            + " "
-            + engine_path
-            + " -O -i "
-            + min_path
-            + " -o "
-            + o_dir
-            + "/min.out -p "
-            + self.prmtop_path
-            + " -c "
-            + self.inpcrd_path
-            + " -r "
-            + o_dir
-            + "/min.rst -ref "
-            + self.inpcrd_path
-        )
+            print("running: " + PC_cmd + " " + engine_path + " -O -i " +
+                  min_path + " -o " + o_dir + "/min.out -p " +
+                  self.prmtop_path + " -c " + self.inpcrd_path + " -r " +
+                  o_dir + "/min.rst -ref " + self.inpcrd_path)
+        os.system(PC_cmd + " " + engine_path + " -O -i " + min_path + " -o " +
+                  o_dir + "/min.out -p " + self.prmtop_path + " -c " +
+                  self.inpcrd_path + " -r " + o_dir + "/min.rst -ref " +
+                  self.inpcrd_path)
         if Config.debug >= 1:
-            print(
-                "running: "
-                + PC_cmd
-                + " "
-                + engine_path
-                + " -O -i "
-                + heat_path
-                + " -o "
-                + o_dir
-                + "/heat.out -p "
-                + self.prmtop_path
-                + " -c "
-                + o_dir
-                + "/min.rst -ref "
-                + o_dir
-                + "/min.rst -r "
-                + o_dir
-                + "/heat.rst"
-            )
-        os.system(
-            PC_cmd
-            + " "
-            + engine_path
-            + " -O -i "
-            + heat_path
-            + " -o "
-            + o_dir
-            + "/heat.out -p "
-            + self.prmtop_path
-            + " -c "
-            + o_dir
-            + "/min.rst -ref "
-            + o_dir
-            + "/min.rst -r "
-            + o_dir
-            + "/heat.rst"
-        )
+            print("running: " + PC_cmd + " " + engine_path + " -O -i " +
+                  heat_path + " -o " + o_dir + "/heat.out -p " +
+                  self.prmtop_path + " -c " + o_dir + "/min.rst -ref " + o_dir +
+                  "/min.rst -r " + o_dir + "/heat.rst")
+        os.system(PC_cmd + " " + engine_path + " -O -i " + heat_path + " -o " +
+                  o_dir + "/heat.out -p " + self.prmtop_path + " -c " + o_dir +
+                  "/min.rst -ref " + o_dir + "/min.rst -r " + o_dir +
+                  "/heat.rst")
 
         # gpu debug for equi
         if equi_cpu:
             # use Config.PC_cmd and cpu_engine_path
             if Config.debug >= 1:
-                print(
-                    "running: "
-                    + Config.PC_cmd
-                    + " "
-                    + cpu_engine_path
-                    + " -O -i "
-                    + equi_path
-                    + " -o "
-                    + o_dir
-                    + "/equi.out -p "
-                    + self.prmtop_path
-                    + " -c "
-                    + o_dir
-                    + "/heat.rst -ref "
-                    + o_dir
-                    + "/heat.rst -r "
-                    + o_dir
-                    + "/equi.rst -x "
-                    + o_dir
-                    + "/equi.nc"
-                )
-            os.system(
-                Config.PC_cmd
-                + " "
-                + cpu_engine_path
-                + " -O -i "
-                + equi_path
-                + " -o "
-                + o_dir
-                + "/equi.out -p "
-                + self.prmtop_path
-                + " -c "
-                + o_dir
-                + "/heat.rst -ref "
-                + o_dir
-                + "/heat.rst -r "
-                + o_dir
-                + "/equi.rst -x "
-                + o_dir
-                + "/equi.nc"
-            )
+                print("running: " + Config.PC_cmd + " " + cpu_engine_path +
+                      " -O -i " + equi_path + " -o " + o_dir + "/equi.out -p " +
+                      self.prmtop_path + " -c " + o_dir + "/heat.rst -ref " +
+                      o_dir + "/heat.rst -r " + o_dir + "/equi.rst -x " +
+                      o_dir + "/equi.nc")
+            os.system(Config.PC_cmd + " " + cpu_engine_path + " -O -i " +
+                      equi_path + " -o " + o_dir + "/equi.out -p " +
+                      self.prmtop_path + " -c " + o_dir + "/heat.rst -ref " +
+                      o_dir + "/heat.rst -r " + o_dir + "/equi.rst -x " +
+                      o_dir + "/equi.nc")
         else:
             if Config.debug >= 1:
-                print(
-                    "running: "
-                    + PC_cmd
-                    + " "
-                    + engine_path
-                    + " -O -i "
-                    + equi_path
-                    + " -o "
-                    + o_dir
-                    + "/equi.out -p "
-                    + self.prmtop_path
-                    + " -c "
-                    + o_dir
-                    + "/heat.rst -ref "
-                    + o_dir
-                    + "/heat.rst -r "
-                    + o_dir
-                    + "/equi.rst -x "
-                    + o_dir
-                    + "/equi.nc"
-                )
-            os.system(
-                PC_cmd
-                + " "
-                + engine_path
-                + " -O -i "
-                + equi_path
-                + " -o "
-                + o_dir
-                + "/equi.out -p "
-                + self.prmtop_path
-                + " -c "
-                + o_dir
-                + "/heat.rst -ref "
-                + o_dir
-                + "/heat.rst -r "
-                + o_dir
-                + "/equi.rst -x "
-                + o_dir
-                + "/equi.nc"
-            )
+                print("running: " + PC_cmd + " " + engine_path + " -O -i " +
+                      equi_path + " -o " + o_dir + "/equi.out -p " +
+                      self.prmtop_path + " -c " + o_dir + "/heat.rst -ref " +
+                      o_dir + "/heat.rst -r " + o_dir + "/equi.rst -x " +
+                      o_dir + "/equi.nc")
+            os.system(PC_cmd + " " + engine_path + " -O -i " + equi_path +
+                      " -o " + o_dir + "/equi.out -p " + self.prmtop_path +
+                      " -c " + o_dir + "/heat.rst -ref " + o_dir +
+                      "/heat.rst -r " + o_dir + "/equi.rst -x " + o_dir +
+                      "/equi.nc")
 
         if Config.debug >= 1:
-            print(
-                "running: "
-                + PC_cmd
-                + " "
-                + engine_path
-                + " -O -i "
-                + prod_path
-                + " -o "
-                + o_dir
-                + "/prod.out -p "
-                + self.prmtop_path
-                + " -c "
-                + o_dir
-                + "/equi.rst -ref "
-                + o_dir
-                + "/equi.rst -r "
-                + o_dir
-                + "/prod.rst -x "
-                + o_dir
-                + "/prod.nc"
-            )
-        os.system(
-            PC_cmd
-            + " "
-            + engine_path
-            + " -O -i "
-            + prod_path
-            + " -o "
-            + o_dir
-            + "/prod.out -p "
-            + self.prmtop_path
-            + " -c "
-            + o_dir
-            + "/equi.rst -ref "
-            + o_dir
-            + "/equi.rst -r "
-            + o_dir
-            + "/prod.rst -x "
-            + o_dir
-            + "/prod.nc"
-        )
+            print("running: " + PC_cmd + " " + engine_path + " -O -i " +
+                  prod_path + " -o " + o_dir + "/prod.out -p " +
+                  self.prmtop_path + " -c " + o_dir + "/equi.rst -ref " +
+                  o_dir + "/equi.rst -r " + o_dir + "/prod.rst -x " + o_dir +
+                  "/prod.nc")
+        os.system(PC_cmd + " " + engine_path + " -O -i " + prod_path + " -o " +
+                  o_dir + "/prod.out -p " + self.prmtop_path + " -c " + o_dir +
+                  "/equi.rst -ref " + o_dir + "/equi.rst -r " + o_dir +
+                  "/prod.rst -x " + o_dir + "/prod.nc")
 
         self.nc = o_dir + "/prod.nc"
         return o_dir + "/prod.nc"
@@ -1685,45 +1450,24 @@ class PDB:
         maxcyc = str(maxcyc)
         # restrain related
         if self.conf_min["ntr"] == "1":
-            ntr_line = (
-                "  ntr   = "
-                + self.conf_min["ntr"]
-                + ",	 restraint_wt = "
-                + self.conf_min["restraint_wt"]
-                + ", restraintmask = "
-                + self.conf_min["restraintmask"]
-                + ","
-                + line_feed
-            )
+            ntr_line = ("  ntr   = " + self.conf_min["ntr"] +
+                        ",	 restraint_wt = " + self.conf_min["restraint_wt"] +
+                        ", restraintmask = " + self.conf_min["restraintmask"] +
+                        "," + line_feed)
         else:
             ntr_line = ""
 
         # text
-        conf_str = (
-            """Minimize
+        conf_str = ("""Minimize
  &cntrl
   imin  = 1,  ntx   = 1,  irest = 0,
-  ntc   = """
-            + self.conf_min["ntc"]
-            + """,    ntf = """
-            + self.conf_min["ntf"]
-            + """,
-  cut   = """
-            + self.conf_min["cut"]
-            + """,
-  maxcyc= """
-            + maxcyc
-            + """, ncyc  = """
-            + ncyc
-            + """,
-  ntpr  = """
-            + ntpr
-            + """, ntwx  = 0,
-"""
-            + ntr_line
-            + """ /
-"""
-        )
+  ntc   = """ + self.conf_min["ntc"] + """,    ntf = """ +
+                    self.conf_min["ntf"] + """,
+  cut   = """ + self.conf_min["cut"] + """,
+  maxcyc= """ + maxcyc + """, ncyc  = """ + ncyc + """,
+  ntpr  = """ + ntpr + """, ntwx  = 0,
+""" + ntr_line + """ /
+""")
         # write
         with open(o_path, "w") as of:
             of.write(conf_str)
@@ -1750,89 +1494,46 @@ class PDB:
         nstlim = str(nstlim)
         # restrain related
         if self.conf_heat["ntr"] == "1":
-            ntr_line = (
-                "  ntr   = "
-                + self.conf_heat["ntr"]
-                + ", restraint_wt = "
-                + self.conf_heat["restraint_wt"]
-                + ", restraintmask = "
-                + self.conf_heat["restraintmask"]
-                + ","
-                + line_feed
-            )
+            ntr_line = ("  ntr   = " + self.conf_heat["ntr"] +
+                        ", restraint_wt = " + self.conf_heat["restraint_wt"] +
+                        ", restraintmask = " + self.conf_heat["restraintmask"] +
+                        "," + line_feed)
         else:
             ntr_line = ""
 
-        conf_str = (
-            """Heat
+        conf_str = ("""Heat
  &cntrl
   imin  = 0,  ntx = 1, irest = 0,
-  ntc   = """
-            + self.conf_heat["ntc"]
-            + """, ntf = """
-            + self.conf_heat["ntf"]
-            + """,
-  cut   = """
-            + self.conf_heat["cut"]
-            + """,
-  nstlim= """
-            + nstlim
-            + """, dt= """
-            + self.conf_heat["dt"]
-            + """,
-  tempi = """
-            + self.conf_heat["tempi"]
-            + """,  temp0="""
-            + self.conf_heat["temp0"]
-            + """,  
-  ntpr  = """
-            + ntpr
-            + """,  ntwx="""
-            + ntwx
-            + """,
-  ntt   = """
-            + self.conf_heat["ntt"]
-            + """, gamma_ln = """
-            + self.conf_heat["gamma_ln"]
-            + """,
+  ntc   = """ + self.conf_heat["ntc"] + """, ntf = """ + self.conf_heat["ntf"] +
+                    """,
+  cut   = """ + self.conf_heat["cut"] + """,
+  nstlim= """ + nstlim + """, dt= """ + self.conf_heat["dt"] + """,
+  tempi = """ + self.conf_heat["tempi"] + """,  temp0=""" +
+                    self.conf_heat["temp0"] + """,  
+  ntpr  = """ + ntpr + """,  ntwx=""" + ntwx + """,
+  ntt   = """ + self.conf_heat["ntt"] + """, gamma_ln = """ +
+                    self.conf_heat["gamma_ln"] + """,
   ntb   = 1,  ntp = 0,
-  iwrap = """
-            + self.conf_heat["iwarp"]
-            + """,
+  iwrap = """ + self.conf_heat["iwarp"] + """,
   nmropt= 1,
   ig    = -1,
-"""
-            + ntr_line
-            + """ /
+""" + ntr_line + """ /
  &wt
   type  = 'TEMP0',
-  istep1= 0, istep2="""
-            + A_istep2
-            + """,
-  value1= """
-            + self.conf_heat["tempi"]
-            + """, value2="""
-            + self.conf_heat["temp0"]
-            + """,
+  istep1= 0, istep2=""" + A_istep2 + """,
+  value1= """ + self.conf_heat["tempi"] + """, value2=""" +
+                    self.conf_heat["temp0"] + """,
  /
  &wt
   type  = 'TEMP0',
-  istep1= """
-            + B_istep1
-            + """, istep2="""
-            + nstlim
-            + """,
-  value1= """
-            + self.conf_heat["temp0"]
-            + """, value2="""
-            + self.conf_heat["temp0"]
-            + """,
+  istep1= """ + B_istep1 + """, istep2=""" + nstlim + """,
+  value1= """ + self.conf_heat["temp0"] + """, value2=""" +
+                    self.conf_heat["temp0"] + """,
  /
  &wt
   type  = 'END',
  /
-"""
-        )
+""")
         # write
         with open(o_path, "w") as of:
             of.write(conf_str)
@@ -1854,63 +1555,30 @@ class PDB:
         nstlim = str(nstlim)
         # restrain related
         if self.conf_equi["ntr"] == "1":
-            ntr_line = (
-                "  ntr   = "
-                + self.conf_equi["ntr"]
-                + ", restraint_wt = "
-                + self.conf_equi["restraint_wt"]
-                + ", restraintmask = "
-                + self.conf_equi["restraintmask"]
-                + ","
-                + line_feed
-            )
+            ntr_line = ("  ntr   = " + self.conf_equi["ntr"] +
+                        ", restraint_wt = " + self.conf_equi["restraint_wt"] +
+                        ", restraintmask = " + self.conf_equi["restraintmask"] +
+                        "," + line_feed)
         else:
             ntr_line = ""
 
-        conf_str = (
-            """Equilibration:constant pressure
+        conf_str = ("""Equilibration:constant pressure
  &cntrl
-  imin  = 0,  ntx = """
-            + self.conf_equi["ntx"]
-            + """,  irest = """
-            + self.conf_equi["irest"]
-            + """,
-  ntf   = """
-            + self.conf_equi["ntf"]
-            + """,  ntc = """
-            + self.conf_equi["ntc"]
-            + """,
-  nstlim= """
-            + nstlim
-            + """, dt= """
-            + self.conf_equi["dt"]
-            + """,
-  cut   = """
-            + self.conf_equi["cut"]
-            + """,
-  temp0 = """
-            + self.conf_equi["temp0"]
-            + """,
-  ntpr  = """
-            + ntpr
-            + """, ntwx = """
-            + self.conf_equi["ntwx"]
-            + """,
-  ntt   = """
-            + self.conf_equi["ntt"]
-            + """, gamma_ln = """
-            + self.conf_equi["gamma_ln"]
-            + """,
+  imin  = 0,  ntx = """ + self.conf_equi["ntx"] + """,  irest = """ +
+                    self.conf_equi["irest"] + """,
+  ntf   = """ + self.conf_equi["ntf"] + """,  ntc = """ +
+                    self.conf_equi["ntc"] + """,
+  nstlim= """ + nstlim + """, dt= """ + self.conf_equi["dt"] + """,
+  cut   = """ + self.conf_equi["cut"] + """,
+  temp0 = """ + self.conf_equi["temp0"] + """,
+  ntpr  = """ + ntpr + """, ntwx = """ + self.conf_equi["ntwx"] + """,
+  ntt   = """ + self.conf_equi["ntt"] + """, gamma_ln = """ +
+                    self.conf_equi["gamma_ln"] + """,
   ntb   = 2,  ntp = 1,
-  iwrap = """
-            + self.conf_equi["iwarp"]
-            + """,
+  iwrap = """ + self.conf_equi["iwarp"] + """,
   ig    = -1,
-"""
-            + ntr_line
-            + """ /
-"""
-        )
+""" + ntr_line + """ /
+""")
         # write
         with open(o_path, "w") as of:
             of.write(conf_str)
@@ -1932,63 +1600,30 @@ class PDB:
         nstlim = str(nstlim)
         # restrain related
         if self.conf_prod["ntr"] == "1":
-            ntr_line = (
-                "  ntr   = "
-                + self.conf_prod["ntr"]
-                + ", restraint_wt = "
-                + self.conf_prod["restraint_wt"]
-                + ", restraintmask = "
-                + self.conf_prod["restraintmask"]
-                + ","
-                + line_feed
-            )
+            ntr_line = ("  ntr   = " + self.conf_prod["ntr"] +
+                        ", restraint_wt = " + self.conf_prod["restraint_wt"] +
+                        ", restraintmask = " + self.conf_prod["restraintmask"] +
+                        "," + line_feed)
         else:
             ntr_line = ""
 
-        conf_str = (
-            """Production: constant pressure
+        conf_str = ("""Production: constant pressure
  &cntrl
-  imin  = 0, ntx = """
-            + self.conf_prod["ntx"]
-            + """, irest = """
-            + self.conf_prod["irest"]
-            + """,
-  ntf   = """
-            + self.conf_prod["ntf"]
-            + """,  ntc = """
-            + self.conf_prod["ntc"]
-            + """,
-  nstlim= """
-            + nstlim
-            + """, dt= """
-            + self.conf_prod["dt"]
-            + """,
-  cut   = """
-            + self.conf_prod["cut"]
-            + """,
-  temp0 = """
-            + self.conf_prod["temp0"]
-            + """,
-  ntpr  = """
-            + ntpr
-            + """, ntwx = """
-            + self.conf_prod["ntwx"]
-            + """,
-  ntt   = """
-            + self.conf_prod["ntt"]
-            + """, gamma_ln = """
-            + self.conf_prod["gamma_ln"]
-            + """,
+  imin  = 0, ntx = """ + self.conf_prod["ntx"] + """, irest = """ +
+                    self.conf_prod["irest"] + """,
+  ntf   = """ + self.conf_prod["ntf"] + """,  ntc = """ +
+                    self.conf_prod["ntc"] + """,
+  nstlim= """ + nstlim + """, dt= """ + self.conf_prod["dt"] + """,
+  cut   = """ + self.conf_prod["cut"] + """,
+  temp0 = """ + self.conf_prod["temp0"] + """,
+  ntpr  = """ + ntpr + """, ntwx = """ + self.conf_prod["ntwx"] + """,
+  ntt   = """ + self.conf_prod["ntt"] + """, gamma_ln = """ +
+                    self.conf_prod["gamma_ln"] + """,
   ntb   = 2,  ntp = 1,
-  iwrap = """
-            + self.conf_prod["iwarp"]
-            + """,
+  iwrap = """ + self.conf_prod["iwarp"] + """,
   ig    = -1,
-"""
-            + ntr_line
-            + """ /
-"""
-        )
+""" + ntr_line + """ /
+""")
         # write
         with open(o_path, "w") as of:
             of.write(conf_str)
@@ -2072,9 +1707,8 @@ class PDB:
         # san check
         support_work_type = ["spe", "opt", "tsopt"]
         if work_type not in support_work_type:
-            raise Exception(
-                "PDB2QMMM.work_type : only support: " + repr(support_work_type)
-            )
+            raise Exception("PDB2QMMM.work_type : only support: " +
+                            repr(support_work_type))
         support_qm = ["g16"]
         if qm not in support_qm:
             raise Exception("PDB2QMMM.qm: only support: " + repr(support_qm))
@@ -2098,23 +1732,19 @@ class PDB:
 
         # build template
         if qm == "g16":
-            self.route = self._get_oniom_g16_route(
-                work_type, o_name, key_words=keywords
-            )
+            self.route = self._get_oniom_g16_route(work_type,
+                                                   o_name,
+                                                   key_words=keywords)
             title = (
                 "ONIOM input template generated by PDB2QMMM module of XXX(software name)"
-                + line_feed
-            )
-            chrgspin = self._get_oniom_chrgspin(
-                prmtop_path=prmtop_path, spin_list=spin_list
-            )
+                + line_feed)
+            chrgspin = self._get_oniom_chrgspin(prmtop_path=prmtop_path,
+                                                spin_list=spin_list)
             cnt_table = self.stru.get_connectivty_table(prepi_path=prepi_path)
             coord = self._get_oniom_g16_coord(
-                prmtop_path
-            )  # use connectivity info from the line above.
-            add_prm = (
-                self._get_oniom_g16_add_prm()
-            )  # test for rules of missing parameters
+                prmtop_path)  # use connectivity info from the line above.
+            add_prm = (self._get_oniom_g16_add_prm()
+                      )  # test for rules of missing parameters
 
             # combine and write
             with open(g_temp_path, "w") as of:
@@ -2139,13 +1769,14 @@ class PDB:
             print("Writing QMMM gjfs.")
         for i, frame in enumerate(frames):
             if ifchk:
-                frame_path = frame.write_to_template(g_temp_path, index=str(i), ifchk=1)
+                frame_path = frame.write_to_template(g_temp_path,
+                                                     index=str(i),
+                                                     ifchk=1)
                 gjf_paths.append(frame_path[0])
                 chk_paths.append(frame_path[1])
             else:
                 gjf_paths.append(
-                    frame.write_to_template(g_temp_path, index=str(i), ifchk=0)
-                )
+                    frame.write_to_template(g_temp_path, index=str(i), ifchk=0))
         # run Gaussian job
         self.qmmm_out = PDB.Run_QM(gjf_paths)
 
@@ -2171,9 +1802,10 @@ class PDB:
         else:
             self.layer = Layer.preset(self, self.layer_preset)
 
-    def _get_oniom_g16_route(
-        self, work_type, chk_name="chk_place_holder", key_words=""
-    ):
+    def _get_oniom_g16_route(self,
+                             work_type,
+                             chk_name="chk_place_holder",
+                             key_words=""):
         """
         generate gaussian 16 ONIOM route section. Base on settings in the config module.
         -------
@@ -2187,17 +1819,15 @@ class PDB:
         proc = "%nprocshared=" + str(Config.n_cores) + line_feed
         mem = "%mem=" + str(Config.n_cores * Config.max_core) + "MB" + line_feed
         if type(key_words) == str and key_words != "":
-            keyword_line = (
-                "# "
-                + " ".join(Config.Gaussian.keywords[work_type] + [key_words,])
-                + line_feed
-            )
+            keyword_line = ("# " +
+                            " ".join(Config.Gaussian.keywords[work_type] + [
+                                key_words,
+                            ]) + line_feed)
         if type(key_words) == list:
             keyword_line = (
-                "# "
-                + " ".join(Config.Gaussian.keywords[work_type] + key_words)
-                + line_feed
-            )
+                "# " +
+                " ".join(Config.Gaussian.keywords[work_type] + key_words) +
+                line_feed)
 
         route = chk + proc + mem + keyword_line
         return route
@@ -2278,7 +1908,8 @@ class PDB:
                     if atom.id != a_id:
                         raise Exception("atom id error.")
                     if atom.id in self.layer[0]:
-                        coord += atom.build_oniom("h", self.chrg_list_all[atom.id - 1])
+                        coord += atom.build_oniom(
+                            "h", self.chrg_list_all[atom.id - 1])
                     else:
                         # consider connection
                         cnt_info = None
@@ -2296,18 +1927,19 @@ class PDB:
                                 ]
                                 repeat_flag = 1
                         # general low layer
-                        coord += atom.build_oniom(
-                            "l", self.chrg_list_all[atom.id - 1], cnt_info=cnt_info
-                        )
+                        coord += atom.build_oniom("l",
+                                                  self.chrg_list_all[atom.id -
+                                                                     1],
+                                                  cnt_info=cnt_info)
         for lig in self.stru.ligands:
             for atom in lig:
                 a_id += 1
                 if atom.id != a_id:
                     raise Exception("atom id error.")
                 if atom.id in self.layer[0]:
-                    coord += atom.build_oniom(
-                        "h", self.chrg_list_all[atom.id - 1], if_lig=1
-                    )
+                    coord += atom.build_oniom("h",
+                                              self.chrg_list_all[atom.id - 1],
+                                              if_lig=1)
                 else:
                     if Config.debug >= 1:
                         print(
@@ -2325,9 +1957,8 @@ class PDB:
                             if Config.debug >= 1:
                                 print(
                                     "\033[1;31;0m In PDB2QMMM in _get_oniom_g16_coord: WARNING: Found ligand atom"
-                                    + str(atom.id)
-                                    + " in seperate layers \033[0m"
-                                )
+                                    + str(atom.id) +
+                                    " in seperate layers \033[0m")
                             cnt_info = [
                                 "H",
                                 cnt_atom.get_pseudo_H_type(atom),
@@ -2354,9 +1985,9 @@ class PDB:
                 if atom.id != a_id:
                     raise Exception("atom id error.")
                 if atom.id in self.layer[0]:
-                    coord += atom.build_oniom(
-                        "h", self.chrg_list_all[atom.id - 1], if_sol=1
-                    )
+                    coord += atom.build_oniom("h",
+                                              self.chrg_list_all[atom.id - 1],
+                                              if_sol=1)
                 else:
                     # consider connection
                     cnt_info = None  # for future update
@@ -2366,9 +1997,8 @@ class PDB:
                             if Config.debug >= 1:
                                 print(
                                     "\033[1;31;0m In PDB2QMMM in _get_oniom_g16_coord: WARNING: Found solvent atom"
-                                    + str(atom.id)
-                                    + " in seperate layers \033[0m"
-                                )
+                                    + str(atom.id) +
+                                    " in seperate layers \033[0m")
                             if repeat_flag:
                                 raise Exception(
                                     "A low layer atom is connecting 2 higher layer atoms"
@@ -2439,10 +2069,8 @@ class PDB:
                         del format_flag
 
                 if "charge_flag" in dir():
-                    if (
-                        line_index >= charge_flag + 2
-                        and line_index <= charge_flag + 1 + ceil(N_atom / 5)
-                    ):
+                    if (line_index >= charge_flag + 2 and
+                            line_index <= charge_flag + 1 + ceil(N_atom / 5)):
                         for i in line.strip().split():
                             charge_list.append(float(i) / 18.2223)
         return charge_list
@@ -2453,9 +2081,13 @@ class PDB:
     ========
     """
 
-    def nc2mdcrd(
-        self, o_path="", point=None, start=1, end=-1, step=1, engine="cpptraj"
-    ):
+    def nc2mdcrd(self,
+                 o_path="",
+                 point=None,
+                 start=1,
+                 end=-1,
+                 step=1,
+                 engine="cpptraj"):
         """
         convert self.nc to a mdcrd file to read and operate.(self.nc[:-2]+'.mdcrd' by default)
         a easier way is to use pytraj directly.
@@ -2469,15 +2101,15 @@ class PDB:
         """
         if self.nc == None:
             raise Exception(
-                "No nc file found. Please assign self.nc or run PDBMD first"
-            )
+                "No nc file found. Please assign self.nc or run PDBMD first")
         else:
             if o_path == "":
                 o_path = self.nc[:-2] + "mdcrd"
             if end == -1:
                 end = "last"
             if point != None:
-                all_p = int(self.conf_prod["nstlim"]) / int(self.conf_prod["ntwx"])
+                all_p = int(self.conf_prod["nstlim"]) / int(
+                    self.conf_prod["ntwx"])
                 step = int(all_p / point)
 
             if engine not in ["pytraj", "cpptraj"]:
@@ -2491,17 +2123,8 @@ class PDB:
                 cpp_out_path = self.cache_path + "/cpptraj_nc2mdcrd.out"
                 with open(cpp_in_path, "w") as of:
                     of.write("parm " + self.prmtop_path + line_feed)
-                    of.write(
-                        "trajin "
-                        + self.nc
-                        + " "
-                        + str(start)
-                        + " "
-                        + end
-                        + " "
-                        + str(step)
-                        + line_feed
-                    )
+                    of.write("trajin " + self.nc + " " + str(start) + " " +
+                             end + " " + str(step) + line_feed)
                     of.write("trajout " + o_path + line_feed)
                     of.write("run" + line_feed)
                     of.write("quit" + line_feed)
@@ -2552,10 +2175,10 @@ class PDB:
         # get sele
         if val_fix == "internal":
             sele_lines, sele_map = self.stru.get_sele_list(
-                atom_mask, fix_end="H", prepi_path=self.prepi_path
-            )
+                atom_mask, fix_end="H", prepi_path=self.prepi_path)
         else:
-            sele_lines, sele_map = self.stru.get_sele_list(atom_mask, fix_end=None)
+            sele_lines, sele_map = self.stru.get_sele_list(atom_mask,
+                                                           fix_end=None)
         self.qm_cluster_map = sele_map
         # get chrgspin
         chrgspin = self._get_qmcluster_chrgspin(sele_lines, spin=spin)
@@ -2631,14 +2254,8 @@ class PDB:
             for gjf in inp:
                 out = gjf[:-3] + "out"
                 if Config.debug > 1:
-                    print(
-                        "running: "
-                        + Config.Gaussian.g16_exe
-                        + " < "
-                        + gjf
-                        + " > "
-                        + out
-                    )
+                    print("running: " + Config.Gaussian.g16_exe + " < " + gjf +
+                          " > " + out)
                 os.system(Config.Gaussian.g16_exe + " < " + gjf + " > " + out)
                 outs.append(out)
             return outs
@@ -2648,14 +2265,8 @@ class PDB:
             for gjf in inp:
                 out = gjf[:-3] + "out"
                 if Config.debug > 1:
-                    print(
-                        "running: "
-                        + Config.Gaussian.g09_exe
-                        + " < "
-                        + gjf
-                        + " > "
-                        + out
-                    )
+                    print("running: " + Config.Gaussian.g09_exe + " < " + gjf +
+                          " > " + out)
                 os.system(Config.Gaussian.g09_exe + " < " + gjf + " > " + out)
                 outs.append(out)
             return outs
@@ -2699,9 +2310,14 @@ class PDB:
     ========
     """
 
-    def get_field_strength(
-        self, atom_mask, a1=None, a2=None, bond_p1="center", p1=None, p2=None, d1=None
-    ):
+    def get_field_strength(self,
+                           atom_mask,
+                           a1=None,
+                           a2=None,
+                           bond_p1="center",
+                           p1=None,
+                           p2=None,
+                           d1=None):
         """
         use frame coordinate from *mdcrd* and MM charge from *prmtop* to calculate the field strength of *p1* along *p2-p1* or *d1*
         atoms in *atom_mask* is included. (TODO: or an exclude one?)
@@ -2792,9 +2408,8 @@ class PDB:
         if prog == "Multiwfn":
             # self.init_Multiwfn()
             ref_path = qm_fch_paths[0]
-            mltwfn_in_path = (
-                ref_path[: -(len(ref_path.split(".")[-1]) + 1)] + "_dipole.in"
-            )
+            mltwfn_in_path = (ref_path[:-(len(ref_path.split(".")[-1]) + 1)] +
+                              "_dipole.in")
 
             with open(mltwfn_in_path, "w") as of:
                 of.write("19" + line_feed)
@@ -2810,7 +2425,7 @@ class PDB:
 
             for fchk in qm_fch_paths:
                 # get a1->a2 vector from .out (update to using fchk TODO)
-                G_out_path = fchk[: -len(fchk.split(".")[-1])] + "out"
+                G_out_path = fchk[:-len(fchk.split(".")[-1])] + "out"
                 with open(G_out_path) as f0:
                     coord_flag = 0
                     skip_flag = 0
@@ -2828,25 +2443,19 @@ class PDB:
                             l_p = line0.strip().split()
                             if str(a1) == l_p[0]:
                                 coord_a1 = np.array(
-                                    (float(l_p[3]), float(l_p[4]), float(l_p[5]))
-                                )
+                                    (float(l_p[3]), float(l_p[4]),
+                                     float(l_p[5])))
                             if str(a2) == l_p[0]:
                                 coord_a2 = np.array(
-                                    (float(l_p[3]), float(l_p[4]), float(l_p[5]))
-                                )
+                                    (float(l_p[3]), float(l_p[4]),
+                                     float(l_p[5])))
                 Bond_vec = coord_a2 - coord_a1
 
                 # Run Multiwfn
-                mltwfn_out_path = fchk[: -len(fchk.split(".")[-1])] + "dip"
+                mltwfn_out_path = fchk[:-len(fchk.split(".")[-1])] + "dip"
                 if Config.debug >= 2:
-                    print(
-                        "Running: "
-                        + Config.Multiwfn.exe
-                        + " "
-                        + fchk
-                        + " < "
-                        + mltwfn_in_path
-                    )
+                    print("Running: " + Config.Multiwfn.exe + " " + fchk +
+                          " < " + mltwfn_in_path)
                 run(
                     Config.Multiwfn.exe + " " + fchk + " < " + mltwfn_in_path,
                     check=True,
@@ -2873,22 +2482,19 @@ class PDB:
                 with open(mltwfn_out_path) as f:
                     read_flag = 0
                     for line in f:
-                        if line.strip() == "Two-center bond dipole moments (a.u.):":
+                        if line.strip(
+                        ) == "Two-center bond dipole moments (a.u.):":
                             read_flag = 1
                             continue
                         if read_flag:
                             if "Sum" in line:
-                                raise Exception(
-                                    "Cannot find bond:"
-                                    + str(a1)
-                                    + "-"
-                                    + str(a2)
-                                    + line_feed
-                                )
+                                raise Exception("Cannot find bond:" + str(a1) +
+                                                "-" + str(a2) + line_feed)
                             Bond_id = re.search(bond_id_pattern, line).groups()
                             # find target bond
                             if str(a1) in Bond_id and str(a2) in Bond_id:
-                                Bond_data = re.search(bond_data_pattern, line).groups()
+                                Bond_data = re.search(bond_data_pattern,
+                                                      line).groups()
                                 dipole_vec = (
                                     float(Bond_data[0]),
                                     float(Bond_data[1]),
@@ -2913,20 +2519,11 @@ class PDB:
         if n_cores == None:
             n_cores = str(Config.n_cores)
         if Config.debug >= 1:
-            print(
-                "Running: "
-                + "sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  "
-                + n_cores
-                + "/' "
-                + Config.Multiwfn.DIR
-                + "/settings.ini"
-            )
+            print("Running: " + "sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  " +
+                  n_cores + "/' " + Config.Multiwfn.DIR + "/settings.ini")
         run(
-            "sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  "
-            + n_cores
-            + "/' "
-            + Config.Multiwfn.DIR
-            + "/settings.ini",
+            "sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  " + n_cores + "/' " +
+            Config.Multiwfn.DIR + "/settings.ini",
             check=True,
             text=True,
             shell=True,

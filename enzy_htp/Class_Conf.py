@@ -157,7 +157,8 @@ class Config:
             "dt": "0.002",
             "temp0": "300.0",
             "ntpr": "0.002nstlim",
-            "ntwx": "5000",  # default 10ps (TODO support different power numbers)
+            "ntwx":
+                "5000",  # default 10ps (TODO support different power numbers)
             "ntt": "3",
             "gamma_ln": "5.0",
             "iwarp": "1",
@@ -213,8 +214,7 @@ class Config:
             # san check
             if engine not in ["Amber_CPU", "Amber_GPU"]:
                 raise Exception(
-                    "get_Amber_engin only support ['Amber_CPU', 'Amber_GPU']"
-                )
+                    "get_Amber_engin only support ['Amber_CPU', 'Amber_GPU']")
 
             if engine == "Amber_CPU":
                 if cls.AmberEXE_CPU == None:
@@ -297,27 +297,15 @@ class Config:
                 frame_line = "  "
                 for i in ("startframe", "endframe", "interval"):
                     if cls.conf_in[i] != None:
-                        frame_line = frame_line + i + "=" + str(cls.conf_in[i]) + ", "
-                output_line = (
-                    "  verbose="
-                    + str(cls.conf_in["verbose"])
-                    + ", keep_files="
-                    + str(cls.conf_in["keep_files"])
-                    + ","
-                )
-                gb_line = (
-                    "  igb="
-                    + str(cls.conf_in["igb"])
-                    + ", saltcon="
-                    + str(cls.conf_in["saltcon"])
-                    + ","
-                )
-                pb_line = (
-                    "  istrng="
-                    + str(cls.conf_in["istrng"])
-                    + ", fillratio="
-                    + str(cls.conf_in["fillratio"])
-                )
+                        frame_line = frame_line + i + "=" + str(
+                            cls.conf_in[i]) + ", "
+                output_line = ("  verbose=" + str(cls.conf_in["verbose"]) +
+                               ", keep_files=" +
+                               str(cls.conf_in["keep_files"]) + ",")
+                gb_line = ("  igb=" + str(cls.conf_in["igb"]) + ", saltcon=" +
+                           str(cls.conf_in["saltcon"]) + ",")
+                pb_line = ("  istrng=" + str(cls.conf_in["istrng"]) +
+                           ", fillratio=" + str(cls.conf_in["fillratio"]))
 
                 with open(out_path, "w") as of:
                     print("GB and PB calculation", end=line_feed, file=of)
@@ -437,8 +425,7 @@ class Layer:
             if len(atom_lists) not in [2, 3]:
                 raise Exception(
                     "Layer.__init__: only support 2 or 3 layers. Input layers: "
-                    + str(len(atom_lists))
-                )
+                    + str(len(atom_lists)))
 
             for layer in atom_lists:
                 atoms = []
@@ -486,9 +473,8 @@ class Layer:
         stru = PDB_obj.stru
 
         if set_id not in [1, 2, 3, 4, 5]:
-            raise Exception(
-                "Only support 1-5 set_id now. You are entering: " + str(set_id)
-            )
+            raise Exception("Only support 1-5 set_id now. You are entering: " +
+                            str(set_id))
 
         if set_id == 1:
             # TODO: connect with the database and recognize the substrate in the future
