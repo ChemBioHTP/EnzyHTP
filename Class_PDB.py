@@ -862,6 +862,10 @@ class PDB():
 
     def Add_MutaFlag(self,Flag = 'r', if_U = 0, if_self=0):
         '''
+        This function 
+        - check assigned mutation
+        - generate mutation randomly based on rules
+        - calculate mutation based on rules
         Input: 
         Flags or "random"
         ----------------------------------------------------
@@ -870,7 +874,7 @@ class PDB():
         if_self:if consider mutation to the residue itself in random generation(wt)
         ----------------------------------------------------
         Append self.MutaFlags with the Flag.
-        Grammer:
+        Grammar:
         X : Original residue name. Leave X if unknow. 
             Only used for build filenames. **Do not affect any calculation.**
         A : Chain index. Determine by 'TER' marks in the PDB file. (Do not consider chain_indexs in the original file.)
@@ -901,6 +905,8 @@ class PDB():
                 if resi.name in Resi_map2:
                     resi_1 = Resi_map2[resi.name]
                 else:
+                    if Config.debug >= 1:
+                        print('WARNING: pdb.Add_MutaFlag(): A non-canonical animo acid is being mutated! The MutaFlag will have a 3-letter code for the original residue .')
                     resi_1 = resi.name
                 # random over the residue list
                 if if_U:
@@ -2367,7 +2373,7 @@ def PDB_to_AMBER_PDB(path):
     Make the file convertable with tleap without error
     - Test result: The header part cause duplication of the residues. Deleting that part may give normal tleap output
     - Test result: For some reason, some ligand will miss if directly covert after simple header cutting
-    - Test result: `cat 1NVG.pdb |grep "^ATOM\|^HETATM\|^TER|^END" > 1NVG-grep.pdb` will be fine
+    - Test result: `cat 1NVG.pdb |grep "^ATOM\\|^HETATM\\|^TER|^END" > 1NVG-grep.pdb` will be fine
     - WARNINGs
     '''
     pass
