@@ -227,4 +227,19 @@ def write_data(tag, data, out_path):
             of.write(repr(data[item])+line_feed)
 
     return out_path
-        
+
+def env_chk(cmd):
+    '''
+    Check the existence of commands.
+    '''
+    from shutil import which
+    if isinstance(cmd, str):
+       if which(cmd):
+          print(cmd,'exists.')
+          return 1
+       else:
+          print(cmd,'does not exist.')
+          return 0
+    else:
+       print('The input must be a string.')
+       return -1
