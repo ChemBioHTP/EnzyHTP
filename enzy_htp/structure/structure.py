@@ -3,7 +3,7 @@
 Author: Chris Jurich, <chris.jurich@vanderbilt.edu>
 Date: 2022-02-01
 """
-
+import logging
 from biopandas.pdb import PandasPdb
 
 
