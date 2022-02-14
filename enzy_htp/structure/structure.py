@@ -32,12 +32,13 @@ class Structure(PandasPdb):
             sliced_df = self.df[key_name]
             print(sliced_df)
             self.df[key_name] = sliced_df[(~sliced_df.atom_name.isin(SKIP)) &
-                                          (sliced_df.record_name != 'TER')]
+                                          (sliced_df.record_name != 'TER')&(~sliced_df.residue_name.isin(["WAT"]))]
 
         clean_df('ATOM')
         #clean_df( 'OTHERS' )
-
-        pass
-
+        temp = self.df['OTHERS']
+        keep = temp.record_name != 'CRYST1'
+        self.df['OTHERS'] = temp[keep]
+    
     def get_protonation(self):
         pass
