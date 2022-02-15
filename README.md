@@ -3,8 +3,7 @@
 ![](Four_modules_whitebg.png)
 
 # Documentation
-Currently we are still preparing documentations for EnzyHTP and the code itself is under refactoring. The document is expected to online along with the refactored code. 
-For now, you can check our paper (https://pubs.acs.org/doi/10.1021/acs.jcim.1c01424) and corresponding use cases under /Test_file/FAcD_expanse
+Complete documentation for EnzyHTP is in progress, and its code is under refactoring. Stay tuned for documentation and the refactored code. For an in-depth description of EnzyHTP, please refer to our paper (https://pubs.acs.org/doi/10.1021/acs.jcim.1c01424) and corresponding use cases under /Test_file/FAcD_expanse
 
 # Requirement
 ## External Program
@@ -18,7 +17,7 @@ For now, you can check our paper (https://pubs.acs.org/doi/10.1021/acs.jcim.1c01
 - openbabel
 
 # Installation 
-## dependence
+## Dependence
 1. Install conda & create an environment
 2. install numpy `conda install numpy`
 3. Install openbabel `conda install openbabel -c conda-forge`
