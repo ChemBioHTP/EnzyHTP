@@ -1,5 +1,5 @@
 [MASTER]
-init-hook='import sys; sys.path.append("C:/Users/shaoqz/OneDrive/Zhongyue/enzyme_workflow/")'
+init-hook='import sys; sys.path.append("/Users/alvin.nebula23/Desktop/EnzyHTP/")'
 
 [MESSAGES CONTROL]
 # Find available symbolic names in:
