@@ -1,5 +1,5 @@
 from Class_PDB import *
-obj = PDB('/scratch/jiany37/HMT/ETI/input_prep/HMT_EtI_RDock_aH_amber_newlabel.pdb')
+obj = PDB('EnzyHTP/Test_file/FAcD/FAcD-FA-ASP.pdb')
 
 def test():
     obj.Add_MutaFlag('A30T')
