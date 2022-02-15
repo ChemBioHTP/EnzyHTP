@@ -9,7 +9,7 @@ from Class_Structure import *
 from Class_line import *
 from Class_Conf import Config, Layer
 from Class_ONIOM_Frame import *
-from helper import Conformer_Gen_wRDKit, decode_atom_mask, get_center, get_field_strength_value, line_feed, mkdir, generate_Rosetta_params
+from helper import decode_atom_mask, get_center, get_field_strength, line_feed, mkdir
 try:
     from pdb2pqr.main import main_driver as run_pdb2pqr
     from pdb2pqr.main import build_main_parser as build_pdb2pqr_parser
@@ -232,9 +232,66 @@ class PDB():
                     return pdbl.atom_id
     '''
     =========
-    Sequence TODO: reform(most of it has been moved to class Chain，only judgement of art residue and overlook of whole structure remains)
+    Sequence TODO: reform(已部分迁移至Chain类，剩人工残基的部分和整个stru的判断)
     =========
     '''
+
+    def topology_sort(self):
+        '''
+        sort the sequence of the lasso peptide into sections
+        representative of its topology -Reecan
+        '''
+        self.upperLoop=[]
+        self.tail=[]
+        self.plugs=[]
+        self.ring=[]
+        self.upperPlug=[]
+        self.lowerPlug=[]
+        self.essentialRes=[] #this residue (ASX) connects the ring and tail
+        
+        #these ranges can be changed to accomodate for 
+        #different lasso peptide structures.
+        upperRange=range(7)
+        plugRange=range(7,9)
+        tailRange=range(10,14)
+        ringRange=range(15,21) # 21 = 7mr, 22 = 8mr, 23 = 9mr
+        
+        #pluglocation
+        uPlugRes = 7
+        lPlugRes = 8
+        
+        #sort the PDB
+        with open(self.path) as f:
+            lines = [line.split() for line in f]
+            i = 4 #by residue number
+            for l in lines:
+                if i < len(l): #avoid 'END'
+                    if int(l[i]) in upperRange:
+                        self.upperLoop.append(str(l[i]))
+                    if int(l[i]) in plugRange:
+                        self.plugs.append(str(l[i]))
+                        if int(l[i]) == uPlugRes:
+                            self.upperPlug.append(str(l[i]))
+                        if int(l[i]) == lPlugRes:
+                            self.lowerPlug.append(str(l[i]))
+                    if int(l[i]) in tailRange:
+                        self.tail.append(str(l[i]))
+                    if int(l[i]) in ringRange:
+                        self.ring.append(str(l[i]))
+                    if (l[i-1]) == 'ASX':
+                        self.essentialRes.append(str(l[i]))
+                else:
+                    None
+        
+        self.upperLoop = list(set(self.upperLoop))
+        self.tail = list(set(self.tail))
+        self.plugs = list(set(self.plugs))
+        self.ring = list(set(self.ring))
+        self.upperPlug = list(set(self.upperPlug))
+        self.lowerPlug = list(set(self.lowerPlug))
+        self.essentialRes = list(set(self.essentialRes))
+
+        return self.upperLoop, self.tail, self.plugs, self.ring, self.upperPlug, self.lowerPlug, self.essentialRes
 
     def get_seq(self, Oneletter=0):
         '''
@@ -329,6 +386,7 @@ class PDB():
 
     get_if_ligand = get_seq # alias
     get_if_art_resi = get_seq
+
 
     def _strip_raw_seq(self):
         '''
@@ -465,7 +523,7 @@ class PDB():
     Protonation
     ========
     '''
-    def get_protonation(self, ph=7.0, keep_id=0, if_prt_ligand=1):
+    def get_protonation(self, ph=7.0, keep_id=0):
         '''
         Get protonation state based on PDB2PQR:
         1. Use PDB2PQR, save output to self.pqr_path
@@ -479,15 +537,11 @@ class PDB():
                 - Use OpenBable to protonate ligand by default
                 # switch HIE HID when dealing with HIS
         save to self.path
-        ----------
-        ph: pH when determine the protonation state
-        keep_id: if keep ids of original pdb file
-        if_prt_ligand: if re-protonate ligand. (since sometime its already protonated)
         '''
         out_path=self.path_name+'_aH.pdb'
         self._get_file_path()
         self._get_protonation_pdb2pqr(ph=ph)
-        self._protonation_Fix(out_path, ph=ph, keep_id=keep_id, if_prt_ligand=if_prt_ligand)
+        self._protonation_Fix(out_path, ph=ph, keep_id=keep_id)
         self.path = out_path
         self._update_name()
         self.stru.name=self.name
@@ -515,7 +569,7 @@ class PDB():
             run_pdb2pqr(args)
 
 
-    def _protonation_Fix(self, out_path, Metal_Fix='1', ph = 7.0, keep_id=0, if_prt_ligand=1):
+    def _protonation_Fix(self, out_path, Metal_Fix='1', ph = 7.0, keep_id=0):
         '''
         Add in the missing atoms and run detailed fixing
         save to self.path
@@ -541,12 +595,9 @@ class PDB():
             lig_paths = [(i,k) for i,j,k in old_stru.build_ligands(lig_dir, ifname=1)]
 
             new_ligs = []
+
             for lig_path, lig_name in lig_paths:
-                if if_prt_ligand:
-                    new_lig_path, net_charge = self.protonate_ligand(lig_path, ph=ph)
-                else:
-                    # keep original structure
-                    new_lig_path, net_charge = (lig_path, None)
+                new_lig_path, net_charge = self.protonate_ligand(lig_path, ph=ph)
                 new_ligs.append(Ligand.fromPDB(new_lig_path, resi_name=lig_name, net_charge=net_charge, input_type='path'))
             new_stru.add(new_ligs, sort = 0)
 
@@ -678,81 +729,6 @@ class PDB():
 
     '''
     ========
-    Docking
-    ========
-    '''
-    def Dock_Reactive_Substrate(self, substrate, reactive_define, local_lig = 0):
-        '''
-        Dock substrates into the apo enzyme in a reactive conformation
-        Update self.path after docking. Will not update self.path in the middle of the docking
-        -----
-        In:     "apo-enzyme structure" self.path (pdb)
-                "substrate structure" substrate (smile/sdf)
-                "constraint parameters" reactive_define - a set of constraint information that defines *Reactive*
-                    [reacting residue]
-                        id
-                        atom_name_1
-                    [substrate]
-                        atom_name_1
-                    --- Will Generate ---
-                    [reacting residue]
-                        name 
-                        atom_name_2
-                        atom_name_3
-                    [substrate]
-                        id 
-                        name 
-                        atom_name_2 
-                        atom_name_3
-                    [distance]
-                        ideal
-                        allowed deviation
-                        force constant
-                        if_covalent
-                    [angle]
-                        ideal
-                        allowed deviation
-                        force constant
-        Out:    Enzyme-Substrate Reactive Complex
-        -----
-        '''
-        apo_enzyme = self.path
-        if local_lig:
-            lig_dir = self.dir+'/ligands/'
-            met_dir = self.dir+'/metalcenters/'
-        else:
-            lig_dir = self.dir+'/../ligands/'
-            met_dir = self.dir+'/../metalcenters/'
-        mkdir(lig_dir)
-        mkdir(met_dir)
-
-        # Build ligands 
-        cofactors = self.stru.build_ligands(lig_dir, ifcharge=1, ifunique=1)
-        # cofactor_params, cofactors_pdb = generate_Rosetta_params(cofactors, lig_dir, resn='same', out_pdb_name='same')
-        # # clean enzyme
-        # self.fix_residue_names_for_rosetta()
-        # # prepare substrate
-        # sub_confs = Conformer_Gen(substrate, method='rdkit')
-        # sub_params, sub_pdb, sub_confs_pdb = generate_Rosetta_params(sub_confs, lig_dir, resn='SUB', out_pdb_name='SUB')
-        # # define reactive
-        # -- search for RULE OF INPUT ID and get a map --
-        # self.RDock_generate_cst_file(reactive_define, name_map?)        
-        # # initial placement
-        # self._RDock_initial_placement(sub_pdb)
-        # self._RDock_add_remark_line()
-        # # make config file for Rosetta
-        # score_path = XXX
-        # out_pdb_lib_path = XXX # control the output
-        # option_path = Config.Rosetta.generate_xmlNoption(self.path, [cofactor_params, sub_params], score_path, nstruct=100, task='RDock')
-        # # Run rosetta script
-        # PDB.Run_Rosetta_Script(option_path)
-        # Final_pdbs = self.RDock_get_result(score_path, out_pdb_lib_path)
-        # self.Rosetta_pdb_to_Amber()
-
-
-
-    '''
-    ========
     Mutation
     ========
     '''
@@ -841,17 +817,26 @@ class PDB():
 
         # Run tLeap 
         #make input
+        #Reecan: added custom frcmod and atom bonds
         leapin_path = self.cache_path+'/leap_P2PwL.in'
         leap_input=open(leapin_path,'w')
-        leap_input.write('source leaprc.protein.ff14SB\n')
+        leap_input.write('source leaprc.protein.ff14SBmod\n')
+        leap_input.write('loadAmberParams ../ligands/ligand_ASX.frcmod1\n')
+        leap_input.write('loadAmberParams ../ligands/ligand_ASX.frcmod2\n')
+        leap_input.write('loadAmberPrep ../ligands/ligand_ASX.prepin\n')
         leap_input.write('a = loadpdb '+out_PDB_path1+'\n')
+        leap_input.write('bond a.2.N a.ASX.C\n')
+        leap_input.write('bond a.ASX.CG a.14.N\n')
         leap_input.write('savepdb a '+out_PDB_path2+'\n')
+        #
+       # leap_input.write('saveamberparm a '+out_PDB_path2+'.prmtop '+out_PDB_path2+'.inpcrd'+line_feed)
+        #
         leap_input.write('quit\n')
         leap_input.close()
         #run
         os.system('tleap -s -f '+leapin_path+' > '+self.cache_path+'/leap_P2PwL.out')
         if Config.debug <= 1:
-            os.system('rm leap.log')
+         os.system('rm leap.log')
 
         #Update the file
         self.path = out_PDB_path2
@@ -859,6 +844,54 @@ class PDB():
 
         return self.path
 
+    def partition(self):
+        '''
+        partition the lasso structure into parts -Reecan
+        '''
+
+        a = list(self.topology_sort())
+
+        upperLoop = a[0] #loop
+        tail = a[1] #tail
+        plugs = a[2] #plugs
+        ring = a[3] #ring
+        upperPlug = a[4] #upper plug
+        lowerPlug = a[5] #lower plug
+        essentialRes = a[6]
+      
+        sect = 'loop' #blank string: mutate any topological section.
+
+        self.get_stru()
+
+        chain = choice(self.stru.chains)
+        resi = choice(chain.residues)
+
+        if sect == 'loop':
+            if str(resi.id) not in upperLoop:
+                while str(resi.id) not in upperLoop:
+                    resi = choice(chain.residues)
+        elif sect == 'tail':
+            while str(resi.id) not in tail:
+                resi = choice(chain.residues)
+        elif sect == 'plugs':
+            while str(resi.id) not in plugs:
+                resi = choice(chain.residues)
+        elif sect == 'ring':
+            while str(resi.id) not in ring:
+                resi = choice(chain.residues)
+        elif sect == 'upper plug':
+            while str(resi.id) not in upperPlug:
+                resi = choice(chain.residues)
+        elif sect == 'lower plug':
+            while str(resi.id) not in lowerPlug:
+                resi = choice(chain.residues)
+        elif sect == '':
+            resi = choice(chain.residues)
+            if str(resi.id) in essentialRes:
+                while str(resi.id) in essentialRes:
+                    resi = choice(chain.residues)
+
+        return chain, resi
 
     def Add_MutaFlag(self,Flag = 'r', if_U = 0, if_self=0):
         '''
@@ -881,6 +914,16 @@ class PDB():
         ----------------------------------------------------
         return a label of mutations
         '''
+      
+        '''
+        lasso Peptide topology.        
+      
+        -Reecan
+        '''
+        a = self.topology_sort()
+        mutaNum = int(5)#number of random mutations on the structure.
+        if mutaNum > len(a[0]): #todo: adjust based on chosen structure to mutate.
+            sys.exit("Number of mutations greater than number of section residues")
 
         if type(Flag) == str:
 
@@ -889,33 +932,60 @@ class PDB():
                 resi_2 = ''
                 Muta_c_id = ''
                 Muta_r_id = ''
+               
+               #make multiple, random mutations on the same structure 
+               #avoid mutations on duplicate residues - Reecan
+                alteredRes = []
+                
+                for i in range(mutaNum):
 
                 # Flag Generation：
                 # Random over the self.stru. Strictly correponding residue indexes in the original file. (no sort applied)
-                self.get_stru()
+                    #self.get_stru()
                 # random over the structure "protein" part.
-                chain = choice(self.stru.chains)
-                resi = choice(chain.residues)
-                Muta_c_id = chain.id
-                Muta_r_id = str(resi.id)
-                if resi.name in Resi_map2:
-                    resi_1 = Resi_map2[resi.name]
-                else:
-                    resi_1 = resi.name
+                    #chain = choice(self.stru.chains)
+                    #resi = choice(chain.residues)
+
+                    chain, resi = self.partition()
+                    Muta_r_id = str(resi.id)
+                    Muta_c_id = chain.id
+                    if resi.name in Resi_map2:
+                        resi_1 = Resi_map2[resi.name]
+                    else:
+                        resi_1 = resi.name
                 # random over the residue list
-                if if_U:
-                    m_Resi_list = Resi_list
-                else:
-                    m_Resi_list = Resi_list[:-1]
-                resi_2 = choice(m_Resi_list)
+                    if if_U:
+                        m_Resi_list = Resi_list
+                    else:
+                        m_Resi_list = Resi_list[:-1]
+                    resi_2 = choice(m_Resi_list)
                 # avoid or not mutation to self
-                if not if_self:
-                    while resi_2 == resi_1:
-                        resi_2 = choice(m_Resi_list)
+                    if not if_self:
+                        while resi_2 == resi_1:
+                            resi_2 = choice(m_Resi_list)
 
-                MutaFlag = (resi_1, Muta_c_id, Muta_r_id ,resi_2)
-                self.MutaFlags.append(MutaFlag)
+                    MutaFlag = (resi_1, Muta_c_id, Muta_r_id ,resi_2)
 
+                    if not self.MutaFlags:
+                        self.MutaFlags.append(MutaFlag)
+                        alteredRes.append(Muta_r_id)
+                    else: #if there is something in MutaFlags
+                        if Muta_r_id not in alteredRes: 
+                            self.MutaFlags.append(MutaFlag)
+                            alteredRes.append(Muta_r_id)
+                        else:
+                            while Muta_r_id in alteredRes:
+                                chain, resi = self.partition()
+                                if str(resi.id) not in alteredRes:
+                                    Muta_r_id = str(resi.id)
+                                    break
+                            if resi.name in Resi_map2:
+                                resi_1 = Resi_map2[resi.name]
+                            else:
+                                resi_1 = resi.name
+                            MutaFlag = (resi_1, Muta_c_id, Muta_r_id, resi_2)
+                            self.MutaFlags.append(MutaFlag)
+                    
             else:
                 MutaFlag = self._read_MutaFlag(Flag)
                 self.MutaFlags.append(MutaFlag)
@@ -1063,14 +1133,9 @@ class PDB():
             with open(self.path) as f:
                 with open(o_path,'w') as of:
                     for line in f:
-                        if line.startswith('ATOM'):
-                            atom_name = line[12:16].strip()
-                            if atom_name[0] == 'H':
-                                if len(atom_name) >= 2:
-                                    if atom_name[:2] not in not_H_list:
-                                        continue
-                                else:
-                                    continue
+                        atom_name = line[12:16].strip()
+                        if atom_name[0] == 'H' and (atom_name[:2] not in not_H_list):
+                            continue
                         of.write(line)
         else:
             # H list (residue only)
@@ -1082,7 +1147,7 @@ class PDB():
             with open(self.path) as f:
                 with open(o_path,'w') as of:
                     for line in f:
-                        if line[12:16].strip() in H_namelist and line[17:20].strip() in Resi_map2.keys():
+                        if line[12:16].strip() in H_namelist:
                             continue
                         of.write(line)
         self.path=o_path
@@ -1146,7 +1211,6 @@ class PDB():
         -----------
         method  : method use for ligand charge. Only support AM1BCC now.
         renew   : 0:(default) use old parm files if exist. 1: renew parm files everytime
-        TODO check if the ligand is having correct name. (isolate the renaming function and also use in the class structure)
         * WARN: The parm file for ligand will always be like xxx/ligand_1.frcmod. Remember to enable renew when different object is sharing a same path.
         * BUG: Antechamber has a bug that if current dir has temp files from previous antechamber run (ANTECHAMBER_AC.AC, etc.) sqm will fail. Now remove them everytime.
         '''
@@ -1185,7 +1249,7 @@ class PDB():
         return parm_paths
 
 
-    def _combine_parm(self, lig_parms, prm_out_path='', o_dir='', ifsavepdb=0, ifsolve=1, box_type=None, box_size=Config.Amber.box_size, igb=None, if_prm_only=0):
+    def _combine_parm(self, lig_parms, prm_out_path='', o_dir='', ifsavepdb=0, ifsolve=1, box_type='oct', box_size=Config.Amber.box_size, igb=None, if_prm_only=0):
         '''
         combine different parmeter files and make finally inpcrd and prmtop
         -------
@@ -1199,14 +1263,20 @@ class PDB():
         leap_path= self.cache_path+'/leap.in'
         sol_path= self.path_name+'_ff.pdb'
         with open(leap_path, 'w') as of:
-            of.write('source leaprc.protein.ff14SB'+line_feed)
+            of.write('source leaprc.protein.ff14SBmod'+line_feed) #using modified ff14SB - Reecan
             of.write('source leaprc.gaff'+line_feed)
             of.write('source leaprc.water.tip3p'+line_feed)
             # ligands
+            of.write('loadAmberParams ../ligands/ligand_ASX.frcmod1'+line_feed)
+            of.write('loadAmberParams ../ligands/ligand_ASX.frcmod2'+line_feed)
+            of.write('loadAmberPrep ../ligands/ligand_ASX.prepin'+line_feed)
             for prepi, frcmod in lig_parms:
                 of.write('loadAmberParams '+frcmod+line_feed)
                 of.write('loadAmberPrep '+prepi+line_feed)
             of.write('a = loadpdb '+self.path+line_feed)
+            #no need to change this for l.p.'s of any ring size. - Reecan
+            of.write('bond a.2.N a.ASX.C'+line_feed) # lasso peptide thread
+            of.write('bond a.ASX.CG a.14.N'+line_feed) #isopeptide
             # igb Radii
             if igb != None:
                 radii = radii_map[str(igb)]
@@ -1214,8 +1284,8 @@ class PDB():
             of.write('center a'+line_feed)
             # solvation
             if ifsolve:
-                of.write('addions a Na+ 0'+line_feed)
-                of.write('addions a Cl- 0'+line_feed)
+               # of.write('addions a Na+ 0'+line_feed)
+               # of.write('addions a Cl- 0'+line_feed)
                 if box_type == 'box':
                     of.write('solvatebox a TIP3PBOX '+box_size+line_feed)
                 if box_type == 'oct':
@@ -1398,7 +1468,17 @@ class PDB():
             ntr_line = '  ntr   = '+self.conf_min['ntr']+',	 restraint_wt = '+self.conf_min['restraint_wt']+', restraintmask = '+self.conf_min['restraintmask']+','+line_feed
         else:
             ntr_line = ''
-
+        if self.conf_min['nmropt_rest'] == '1':
+            self.conf_min['nmropt'] = '1'
+            nmropt_line = '  nmropt= '+self.conf_min['nmropt']+','+line_feed
+            DISANG_tail = ''' &wt
+  type='END'
+ /
+  DISANG= '''+self.conf_min['DISANG']+line_feed
+            self._build_MD_rs(step='min',o_path=self.conf_min['DISANG'])
+        else:
+            nmropt_line = ''
+            DISANG_tail = ''
         #text        
         conf_str='''Minimize
  &cntrl
@@ -1407,8 +1487,8 @@ class PDB():
   cut   = '''+self.conf_min['cut']+''',
   maxcyc= '''+maxcyc+''', ncyc  = '''+ncyc+''',
   ntpr  = '''+ntpr+''', ntwx  = 0,
-'''+ntr_line+''' /
-'''
+'''+ntr_line+nmropt_line+''' /
+'''+DISANG_tail
         #write
         with open(o_path,'w') as of:
             of.write(conf_str)
@@ -1439,7 +1519,11 @@ class PDB():
             ntr_line = '  ntr   = '+self.conf_heat['ntr']+', restraint_wt = '+self.conf_heat['restraint_wt']+', restraintmask = '+self.conf_heat['restraintmask']+','+line_feed
         else:
             ntr_line = ''
-
+        if self.conf_heat['nmropt_rest'] == '1':
+            DISANG_tail = '''  DISANG='''+self.conf_heat['DISANG']+line_feed
+            self._build_MD_rs(step='heat',o_path=self.conf_heat['DISANG'])
+        else:
+            DISANG_tail = ''
         conf_str='''Heat
  &cntrl
   imin  = 0,  ntx = 1, irest = 0,
@@ -1467,7 +1551,7 @@ class PDB():
  &wt
   type  = 'END',
  /
-'''
+'''+DISANG_tail
         #write
         with open(o_path,'w') as of:
             of.write(conf_str)
@@ -1493,6 +1577,17 @@ class PDB():
             ntr_line = '  ntr   = '+self.conf_equi['ntr']+', restraint_wt = '+self.conf_equi['restraint_wt']+', restraintmask = '+self.conf_equi['restraintmask']+','+line_feed
         else:
             ntr_line = ''
+        if self.conf_equi['nmropt_rest'] == '1':
+            self.conf_equi['nmropt'] = '1'
+            nmropt_line = '  nmropt= '+self.conf_equi['nmropt']+','+line_feed
+            DISANG_tail = ''' &wt
+  type='END'
+ /
+  DISANG= '''+self.conf_equi['DISANG']+line_feed
+            self._build_MD_rs(step='equi',o_path=self.conf_equi['DISANG'])
+        else:
+            nmropt_line = ''
+            DISANG_tail = ''
 
 
         conf_str='''Equilibration:constant pressure
@@ -1507,8 +1602,8 @@ class PDB():
   ntb   = 2,  ntp = 1,
   iwrap = '''+self.conf_equi['iwarp']+''',
   ig    = -1,
-'''+ntr_line+''' /
-'''
+'''+ntr_line+nmropt_line+''' /
+'''+DISANG_tail
         #write
         with open(o_path,'w') as of:
             of.write(conf_str)
@@ -1534,7 +1629,18 @@ class PDB():
         if self.conf_prod['ntr'] == '1':
             ntr_line = '  ntr   = '+self.conf_prod['ntr']+', restraint_wt = '+self.conf_prod['restraint_wt']+', restraintmask = '+self.conf_prod['restraintmask']+','+line_feed
         else:
-            ntr_line = ''        
+            ntr_line = ''
+        if self.conf_prod['nmropt_rest'] == '1':
+            self.conf_prod['nmropt'] = '1'
+            nmropt_line = '  nmropt= '+self.conf_prod['nmropt']+','+line_feed
+            DISANG_tail = ''' &wt
+  type='END'
+ /
+  DISANG= '''+self.conf_prod['DISANG']+line_feed
+            self._build_MD_rs(step='prod',o_path=self.conf_prod['DISANG'])
+        else:
+            nmropt_line = ''
+            DISANG_tail = ''
 
         conf_str='''Production: constant pressure
  &cntrl
@@ -1548,13 +1654,31 @@ class PDB():
   ntb   = 2,  ntp = 1,
   iwrap = '''+self.conf_prod['iwarp']+''',
   ig    = -1,
-'''+ntr_line+''' /
-'''        
+'''+ntr_line+nmropt_line+''' /
+'''+DISANG_tail
         #write
         with open(o_path,'w') as of:
             of.write(conf_str)
         return o_path
     
+
+    def _build_MD_rs(self,step,o_path):
+        '''
+        Generate a file for DISANG restraint. Get parameters from self.conf_step.
+        '''
+        rs_str=''
+        rs_data_step=self.__dict__['conf_'+step]['rs_constraints']
+        for rest_data in rs_data_step:
+            rs_str=rs_str+'''  &rst
+   iat=  '''+','.join(rest_data['iat'])+''', r1= '''+rest_data['r1']+''', r2= '''+rest_data['r2']+''', r3= '''+rest_data['r3']+''', r4= '''+rest_data['r4']+''',
+   rk2='''+rest_data['rk2']+''', rk3='''+rest_data['rk3']+''', ir6='''+rest_data['ir6']+''', ialtd='''+rest_data['ialtd']+''',
+  &end
+'''
+        #write
+        with open(o_path,'w') as of:
+            of.write(rs_str)
+        return o_path
+
 
     def reset_MD_conf(self):
         '''
@@ -2085,7 +2209,7 @@ class PDB():
             for gjf in inp:
                 out = gjf[:-3]+'out'
                 if Config.debug > 1:
-                    print('running: '+Config.Gaussian.g09_exe+' < '+gjf+' > '+out)
+                    print('running: '+Config.Gaussian.g16_exe+' < '+gjf+' > '+out)
                 os.system(Config.Gaussian.g09_exe+' < '+gjf+' > '+out)
                 outs.append(out)
             return outs
@@ -2177,7 +2301,7 @@ class PDB():
                 # search for coord and chrg
                 coord = frame.coord[atom_id-1]
                 chrg = chrg_list[atom_id-1]
-                E += get_field_strength_value(coord, chrg, p1, p2=p2, d1=d1)
+                E += get_field_strength(coord, chrg, p1, p2=p2, d1=d1)
             Es.append(E)
 
         return Es
@@ -2186,32 +2310,23 @@ class PDB():
     def get_bond_dipole(cls, qm_fch_paths, a1, a2, prog='Multiwfn'):
         '''
         get bond dipole using wfn analysis with fchk files.
+        * NEED nosymm in gaussian input if want to compare resulting coord and original mdcrd/gjf stru.
+        * requires a out file with only tail difference. 
         -----------
-        Args:
-            qm_fch_paths: paths of fchk files 
-                        * requires correponding out files with only ext difference
-                        * (if want to compare resulting coord to original mdcrd/gjf stru)
-                            requires nosymm in gaussian input that generate the fch file.
-            a1          : QM I/O id of atom 1 of the target bond
-            a2          : QM I/O id of atom 2 of the target bond
-            prog        : program for wfn analysis (default: multiwfn)
-                          **Multiwfn workflow**
-                            1. Multiwfn xxx.fchk < parameter_file > output
-                            the result will be in ./LMOdip.txt 
-                            2. extract value and project to the bond accordingly
-        Returns:
-            Dipoles     : A list of dipole data in a form of [(dipole_norm_signed, dipole_vec), ...]
-                          *dipole_norm_signed* is the signed norm of the dipole according to its projection
-                                               to be bond vector.
-                          *dipole_vec* is the vector of the dipole
+        qm_fch_paths: paths of fchk files
+        a1          : QM I/O id of atom 1 of the target bond
+        a2          : QM I/O id of atom 2 of the target bond
+        prog        : program for wfn analysis (default: multiwfn)
         -----------
-        LMO bond dipole: 
-        (Method: Multiwfn manual 3.22/4.19.4)
+        Multiwfn workflow:
+        1. Multiwfn xxx.fchk < parameter_file > output
+           the result will be in ./LMOdip.txt 
+        2. extract value and project to the bond accordingly
+        -----------
+        LMO bond dipole: (Multiwfn manual 3.22/4.19.4)
         2-center LMO dipole is defined by the deviation of the eletronic mass center relative to the bond center.
         Dipole positive Direction: negative(-) to positive(+).
         Result direction: a1 -> a2
-        
-        REF: Lu, T.; Chen, F., Multiwfn: A multifunctional wavefunction analyzer. J. Comput. Chem. 2012, 33 (5), 580-592.
         '''
         Dipoles = []
 
@@ -2237,7 +2352,7 @@ class PDB():
                     coord_flag = 0
                     skip_flag = 0
                     for line0 in f0:
-                        if 'Input orientation' in line0:
+                        if 'Standard orientation' in line0:
                             coord_flag = 1
                             continue
                         if coord_flag:
@@ -2317,4 +2432,3 @@ def PDB_to_AMBER_PDB(path):
     - WARNINGs
     '''
     pass
-
