@@ -19,7 +19,7 @@ For now, you can check our paper (https://pubs.acs.org/doi/10.1021/acs.jcim.1c01
 
 # Installation 
 ## dependence
-0. Install conda & create an environment
+0. (optional) Install conda & create an environment
 1. install numpy `conda install numpy`
 2. Install openbabel `conda install openbabel -c conda-forge`
 3. Install pdb2pqr 
@@ -28,4 +28,5 @@ git clone https://github.com/Electrostatics/pdb2pqr.git
 cd pdb2pqr
 pip install .
 ```
-3. Install Multiwfn (install demo in author's blog: http://bbs.keinsci.com/thread-12020-1-1.html) (The LMO func seems not working for WSL) (Note that run Multiwfn on ACCRE requires loading the GCC module) 
+4. (optional) Install RDKit `conda install -c conda-forge rdkit`
+5. (optional) Install Multiwfn (install demo in author's blog: http://bbs.keinsci.com/thread-12020-1-1.html) (The LMO func seems not working for WSL) (Note that run Multiwfn on ACCRE requires loading the GCC module) 
