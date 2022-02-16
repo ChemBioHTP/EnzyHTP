@@ -21,7 +21,7 @@ Complete documentation for EnzyHTP is in progress, and its code is under refacto
 
 # Installation 
 ## Dependence
-1. Install conda & create an environment
+1. Install conda & (optional) create an environment
 2. install numpy `conda install numpy`
 3. Install openbabel `conda install openbabel -c conda-forge`
 4. Install pdb2pqr 
@@ -30,4 +30,7 @@ git clone https://github.com/Electrostatics/pdb2pqr.git
 cd pdb2pqr
 pip install .
 ```
-5. Install Multiwfn (install demo in author's blog: http://bbs.keinsci.com/thread-12020-1-1.html) (The LMO func seems not working for WSL) (Note that run Multiwfn on ACCRE requires loading the GCC module) 
+5. Install [AmberTool](https://ambermd.org/AmberTools.php)
+6. (optional) Install RDKit `conda install -c conda-forge rdkit`
+7. (optional) Install Gaussian16 
+8. (optional) Install Multiwfn (install demo in author's blog: http://bbs.keinsci.com/thread-12020-1-1.html) (The LMO func seems not working for WSL) (Note that run Multiwfn on ACCRE requires loading the GCC module) 
