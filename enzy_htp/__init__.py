@@ -15,7 +15,7 @@ def init_logging() -> None:
 
 
 em = EnvironmentManager(
-    env_vars=["$AMBERHOME"],
+    env_vars=["AMBERHOME"],
     executables=[
         "tleap",
         "ambpdb",
