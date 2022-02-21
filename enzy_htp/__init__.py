@@ -4,7 +4,7 @@ import logging
 
 # enzy_htp imports
 from .structure import Structure
-from .core import EnvironmentManager
+from .core import EnvironmentManager, MissingEnvironmentElement, InvalidResidueCode
 
 
 def init_logging() -> None:

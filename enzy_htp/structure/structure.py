@@ -91,5 +91,6 @@ class Structure:
             aa = Atom(**row)
             mapper[aa.residue_key()].append(aa)
 
+
         for res_key, atoms in mapper.items():
             self.residues_[res_key] = Residue(residue_key=res_key, atoms=sorted(atoms, key=lambda a: a.atom_number))
