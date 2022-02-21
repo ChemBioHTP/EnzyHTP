@@ -861,31 +861,36 @@ class PDB():
 
 
     def Add_MutaFlag(self,Flag = 'r', if_U = 0, if_self=0):
-        '''
-        This function 
-        - check assigned mutation
-        - generate mutation randomly based on rules
-        - calculate mutation based on rules
-        Input: 
-        Flags or "random"
-        ----------------------------------------------------
-        Flag   :(e.g. XA11Y) Can be a str or a list of str (a list of flags).
-        if_U   :if consider mutation to U in random generation (Selenocysteine)
-        if_self:if consider mutation to the residue itself in random generation(wt)
-        ----------------------------------------------------
-        Append self.MutaFlags with the Flag.
-        Grammar:
-        X : Original residue name. Leave X if unknow. 
-            Only used for build filenames. **Do not affect any calculation.**
-        A : Chain index. Determine by 'TER' marks in the PDB file. (Do not consider chain_indexs in the original file.)
-        11: Residue index. Strictly correponding residue indexes in the original file. (NO sort applied)
-        Y : Target residue name.  
-        ----------------------------------------------------
-        'random' or 'r' (default)
-        ----------------------------------------------------
-        return a label of mutations
-        '''
-
+        '''Adds mutation flag(s) to the protein structure object.
+        
+        Appends self.MutaFlags with the Flag to generate mutations randomly or assign specified mutations.
+        
+        Args: 
+          Flags: Can be a string or a list of strings. Each individual string either specifies
+            the mutation (e.g. MA99V) or indicates a random mutation ('r' or 'random'). For specified
+            mutation flag, the first digit is the 1-letter symbol of the original AA. One can Leave it as X
+            if the original AA is unknown. The second digit is the chain index determined by 'TER' marks in
+            the PDB file. This digit can be omitted. These two digits are followed by an integer indicating
+            the residue index. It is strictly correponding to the residue indexes in the original file.
+            The last digit is the 1-letter symbol of the target AA. The default is 'r'. The random mutation
+            cannot be in the list of multiple mutations. For example, obj.Add_MutaFlag(['V23T', 'W36F'])
+            is appropriate whereas obj.Add_MutaFlag(['V23T', 'r']) is not.
+          if_U: If considers mutation to U (selenocysteine) in the random generation. 0 is not to consider
+            and any other numbers is to consider. 0 is the default.
+          if_self: If considers mutation to the original residue in the random generation. 0 is not to consider
+            and other numbers is to consider. 0 is the default.
+        
+        Returns:
+          A list of tuples of the mutation flags is appended to self.MutaFlags. Each tuple contains four
+          items (strings) representing the original AA, chain ID, residue index, and target AA, respectively.
+          For example, the resulting self.MutaFlags of self.Add_MutaFlag(['K212F','W36F']) is
+          
+          [('K', 'A', '212', 'F'), ('W', 'A', '36', 'F')]
+          
+        Raises:
+          ?
+        '''   
+       
         if type(Flag) == str:
 
             if Flag == 'r' or Flag == 'random':
