@@ -87,10 +87,29 @@ class PDB_line(object):
             charge = "{:2}".format(self.charge)
 
         # example: ATOM   5350  HB2 PRO   347      32.611  15.301  24.034  1.00  0.00
-        line = (l_type + a_index + " " + a_name + AL_id + r_name + " " +
-                c_index + r_index + insert_code + "   " + x + y + z +
-                occupancy + temp_factor + "      " + seg_id + element + charge +
-                line_feed)
+        line = (
+            l_type
+            + a_index
+            + " "
+            + a_name
+            + AL_id
+            + r_name
+            + " "
+            + c_index
+            + r_index
+            + insert_code
+            + "   "
+            + x
+            + y
+            + z
+            + occupancy
+            + temp_factor
+            + "      "
+            + seg_id
+            + element
+            + charge
+            + line_feed
+        )
         return line
 
     # misc

@@ -19,6 +19,7 @@ setup(name='enzy_htp',
         author_email='cjurich2@huskers.unl.edu',
         packages=['enzy_htp',
 		'enzy_htp.structure',
+		'enzy_htp.chemical',
 		'enzy_htp.core',
 		],
 		install_requirements=requirements

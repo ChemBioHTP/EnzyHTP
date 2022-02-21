@@ -20,8 +20,8 @@ class EnvironmentManager:
 	"""
 
     def __init__(self, **kwargs):
-        self.env_vars_ = kwargs.get('env_vars', [])
-        self.executables_ = kwargs.get('executables', [])
+        self.env_vars_ = kwargs.get("env_vars", [])
+        self.executables_ = kwargs.get("executables", [])
         self.missing_env_vars_ = []
         self.missing_executables_ = []
 
@@ -37,7 +37,6 @@ class EnvironmentManager:
                 self.missing_env_vars_.append(env_var)
 
     def check_executables(self):
-
         def exe_exists(exe_name):
             full_path = os.path.expandvars(exe_name)
             return shutil.which(exe_name) is not None
@@ -48,26 +47,26 @@ class EnvironmentManager:
 
     def display_missing(self):
         if not self.is_missing():
-            logging.info('Environment has all required elements!')
+            logging.info("Environment has all required elements!")
             return
-        logging.warning('Environment is missing some required elements...')
+        logging.warning("Environment is missing some required elements...")
 
         if len(self.missing_executables_):
-            logging.warning('\tMissing excecutables:')
+            logging.warning("\tMissing excecutables:")
             for me in self.missing_executables_:
-                logging.warning(f'\t\t{me}')
+                logging.warning(f"\t\t{me}")
 
         if len(self.missing_env_vars_):
-            logging.warning('\tMissing environment variables:')
+            logging.warning("\tMissing environment variables:")
             for mev in self.missing_env_vars_:
-                logging.warning(f'\t\t{mev}')
+                logging.warning(f"\t\t{mev}")
 
     def check_environment(self):
-        logging.info('Checking environment for required elements...')
+        logging.info("Checking environment for required elements...")
         self.check_env_vars()
         self.check_executables()
         self.display_missing()
-        logging.info('Environment check completed!')
+        logging.info("Environment check completed!")
 
     def reset(self):
         self.executables_ = []
