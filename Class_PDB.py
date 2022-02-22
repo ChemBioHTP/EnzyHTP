@@ -861,24 +861,24 @@ class PDB():
 
 
     def Add_MutaFlag(self,Flag = 'r', if_U = 0, if_self=0):
-        '''Adds mutation flag(s) to the protein structure object.
+        """Adds mutation flag(s) to the protein structure object.
         
-        Appends self.MutaFlags with the Flag to generate mutations randomly or assign specified mutations.
+        Appends self.MutaFlags with the flags to generate mutations randomly or assign specified mutations.
         
         Args: 
-          Flags: Can be a string or a list of strings. Each individual string either specifies
-            the mutation (e.g. MA99V) or indicates a random mutation ('r' or 'random'). For specified
+          Flag: Can be a string or a list of strings. Each individual string either specifies
+            the mutation (e.g. K212F) or indicates a random mutation ('r' or 'random'). For specified
             mutation flag, the first digit is the 1-letter symbol of the original AA. One can Leave it as X
             if the original AA is unknown. The second digit is the chain index determined by 'TER' marks in
             the PDB file. This digit can be omitted. These two digits are followed by an integer indicating
-            the residue index. It is strictly correponding to the residue indexes in the original file.
-            The last digit is the 1-letter symbol of the target AA. The default is 'r'. The random mutation
-            cannot be in the list of multiple mutations. For example, obj.Add_MutaFlag(['V23T', 'W36F'])
+            the residue index. It is strictly correponding to the residue indeces in the original file.
+            The last digit is the 1-letter symbol of the target AA. The default of Flag is 'r'. The random
+            mutation cannot be in the list of multiple mutations. For example, obj.Add_MutaFlag(['V23T', 'W36F'])
             is appropriate whereas obj.Add_MutaFlag(['V23T', 'r']) is not.
           if_U: If considers mutation to U (selenocysteine) in the random generation. 0 is not to consider
-            and any other numbers is to consider. 0 is the default.
+            and any other numbers are to consider. 0 is the default.
           if_self: If considers mutation to the original residue in the random generation. 0 is not to consider
-            and other numbers is to consider. 0 is the default.
+            and other numbers are to consider. 0 is the default.
         
         Returns:
           A list of tuples of the mutation flags is appended to self.MutaFlags. Each tuple contains four
@@ -886,10 +886,7 @@ class PDB():
           For example, the resulting self.MutaFlags of self.Add_MutaFlag(['K212F','W36F']) is
           
           [('K', 'A', '212', 'F'), ('W', 'A', '36', 'F')]
-          
-        Raises:
-          ?
-        '''   
+        """   
        
         if type(Flag) == str:
 
