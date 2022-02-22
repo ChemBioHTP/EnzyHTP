@@ -861,26 +861,36 @@ class PDB():
 
 
     def Add_MutaFlag(self,Flag = 'r', if_U = 0, if_self=0):
-        '''
-        Input: 
-        Flags or "random"
-        ----------------------------------------------------
-        Flag   :(e.g. XA11Y) Can be a str or a list of str (a list of flags).
-        if_U   :if consider mutation to U in random generation (Selenocysteine)
-        if_self:if consider mutation to the residue itself in random generation(wt)
-        ----------------------------------------------------
-        Append self.MutaFlags with the Flag.
-        Grammer:
-        X : Original residue name. Leave X if unknow. 
-            Only used for build filenames. **Do not affect any calculation.**
-        A : Chain index. Determine by 'TER' marks in the PDB file. (Do not consider chain_indexs in the original file.)
-        11: Residue index. Strictly correponding residue indexes in the original file. (NO sort applied)
-        Y : Target residue name.  
-        ----------------------------------------------------
-        'random' or 'r' (default)
-        ----------------------------------------------------
-        return a label of mutations
-        '''
+        """Adds flags of mutation over the protein structure.
+
+        After manually inputs name of flags, which should be name of existed 
+        flags or name of new flags, matches name of existed flags to corresponding 
+        specific mutations or generates new mutations according to name of new 
+        flags. If generates new mutations, appends the contents of input flags 
+        into self.MutaFlags.
+        
+        Args:
+            Flags: 
+                A string or a list of strings (e.g. XA11Y).
+            if_U:
+                If considers mutation to U in random generation (Selenocysteine).
+            if_self:
+                If considers mutation to the original residue in random generation.
+            #TODO(Alvin) If necessary, add specific info.
+
+        Returns:
+            A list of tuples of mutation flags from self.MutaFlags. Each tuple 
+            consists of four strings: [('Original residue name', 'Chain index', 'Residue index', 
+            'Target residue name'). For example: 
+            
+            [('X','A','11','Y')]
+        
+        Raises:
+            Error: An error occurred accessing...
+                #TODO(Alvin) If necessary, add Raise function.
+
+        # TODO(Alvin) Edit if there were any misunderstanding above.
+        """
 
         if type(Flag) == str:
 
