@@ -3,6 +3,7 @@ import os
 import re
 from subprocess import run, CalledProcessError
 from random import choice
+from xmlrpc.client import boolean
 from AmberMaps import *
 from wrapper import *
 from Class_Structure import *
@@ -860,31 +861,29 @@ class PDB():
         return self.path
 
 
-    def Add_MutaFlag(self,Flag = 'r', if_U = 0, if_self=0):
-        '''
-        This function 
-        - check assigned mutation
-        - generate mutation randomly based on rules
-        - calculate mutation based on rules
-        Input: 
-        Flags or "random"
-        ----------------------------------------------------
-        Flag   :(e.g. XA11Y) Can be a str or a list of str (a list of flags).
-        if_U   :if consider mutation to U in random generation (Selenocysteine)
-        if_self:if consider mutation to the residue itself in random generation(wt)
-        ----------------------------------------------------
-        Append self.MutaFlags with the Flag.
-        Grammar:
+    def Add_MutaFlag(self, Flag : str = 'r', if_U : bool = 0, if_self : bool = 0):
+        """Validates and adds mutations to PDB.
+        
+        Checks assigned mutations, generate mutation randomly based on rules,
+        and calculate mutation based on rules.
+
+        Args:
+            Flag: str or list of strings indicating mutation to perform (see below)
+            if_U: if selenocysteine (U) is allowed for random mutation
+            if_self: if mutation to the same amino acid is allowed for random mutation
+        
+        Returns:
+            A str representing the current mutations to the PDB.
+        
+        Flag Grammar:
+        using example "XA11Y"
         X : Original residue name. Leave X if unknow. 
             Only used for build filenames. **Do not affect any calculation.**
-        A : Chain index. Determine by 'TER' marks in the PDB file. (Do not consider chain_indexs in the original file.)
+        A : Chain index. Determine by 'TER' marks in the PDB file. 
+            (Do not consider chain_indexs in the original file.)
         11: Residue index. Strictly correponding residue indexes in the original file. (NO sort applied)
         Y : Target residue name.  
-        ----------------------------------------------------
-        'random' or 'r' (default)
-        ----------------------------------------------------
-        return a label of mutations
-        '''
+        """
 
         if type(Flag) == str:
 
