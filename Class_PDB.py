@@ -861,25 +861,32 @@ class PDB():
 
 
     def Add_MutaFlag(self,Flag = 'r', if_U = 0, if_self=0):
-        '''
-        Input: 
-        Flags or "random"
-        ----------------------------------------------------
-        Flag   :(e.g. XA11Y) Can be a str or a list of str (a list of flags).
-        if_U   :if consider mutation to U in random generation (Selenocysteine)
-        if_self:if consider mutation to the residue itself in random generation(wt)
-        ----------------------------------------------------
-        Append self.MutaFlags with the Flag.
-        Grammer:
-        X : Original residue name. Leave X if unknow. 
+        '''generate the mutation letter  and add mutations to PDB.
+        
+        Append Flags on the self.MutaFlags list with mutation residues letter from
+        randomly assigned or from the manually assigned 
+        
+        Args:  
+            Flag   :A string or A list of string indicate the mutation residues
+            on PDB files.
+            if_U   :if U can be used for random generations (Selenocysteine).
+            Default 0
+            if_self:if the same amino acids can be used  in random
+            generation(wildtype)
+        
+
+        Return:
+            Label   :A list mutation labels with ['aa_letter(Original residue
+            name)','chain_id', 'residues_id','aa_letter(Target residue name)']
+
+        Flag Grammer:(e.g. XA11Y)
+            X : Original residue name. Leave X if unknow.
             Only used for build filenames. **Do not affect any calculation.**
-        A : Chain index. Determine by 'TER' marks in the PDB file. (Do not consider chain_indexs in the original file.)
-        11: Residue index. Strictly correponding residue indexes in the original file. (NO sort applied)
-        Y : Target residue name.  
-        ----------------------------------------------------
-        'random' or 'r' (default)
-        ----------------------------------------------------
-        return a label of mutations
+            A : Chain index. Determine by 'TER' marks in the PDB file. 
+            (Do not consider chain_indexs in the original file.)
+            11: Residue index. Strictly correponding resiue indexes in the
+            original file. (No sort applied)
+            Y : Target residue name.  
         '''
 
         if type(Flag) == str:
