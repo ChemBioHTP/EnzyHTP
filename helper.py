@@ -228,3 +228,7 @@ def write_data(tag, data, out_path):
 
     return out_path
         
+'''
+Mutant assigner
+'''
+#TODO
