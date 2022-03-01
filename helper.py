@@ -232,3 +232,26 @@ def write_data(tag, data, out_path):
 Mutant assigner
 '''
 #TODO
+
+'''
+Sans_check
+'''
+def MutaFlag_san_check(self, chains):
+    ''' Checks if MutaFlag list is in correct indices.
+
+    Input: [ 'X', 'X', #, 'X' ]
+
+    Raises exception if input is out of range.
+    '''
+    self.get_stru()
+
+    chain_id_list = [i.id for i in self.stru.chains]
+
+    if not chain_id in chain_id_list:
+        raise Exception('_MutaFlag_san_check: failed. Input chain id in not in range.'+line_feed+' range: '+ repr(chain_id_list))
+    chain_int = ord(chain_id)-65
+    resi_id_list = [str(i.id) for i in self.stru.chains[chain_int].residues]
+    if not resi_id in resi_id_list:
+        raise Exception('_MutaFlag_san_check: San check failed. Input resi id in not in range.'+line_feed+' range: '+ repr(resi_id_list))
+    if not resi_2 in Resi_list:
+        raise Exception('_MutaFlag_san_check: Only support mutate to the known 21 residues. AmberMaps.Resi_list: '+ repr(Resi_list))
