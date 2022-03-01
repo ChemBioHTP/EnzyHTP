@@ -877,8 +877,11 @@ class PDB():
             the target residue is within the range of canonical AAs
 
         Args:
+        (self):
+        The requirements for the input pdb object are:
+            TODO(shaoqz): add after refactoring
         Flag: 
-            str or list of strings indicating specifc mutation(s) or a rule of randomlization.
+            str or list of strings indicating specifc mutation(s) or a rule of randomlization. (default: r)
             Grammer:
             **Assign specific mutation(s)**
                 'XA##Y'
@@ -911,8 +914,10 @@ class PDB():
                        'target_resi':'keyword'}]
                 To assigne random mutaion, start the list with 'r' or 'random' followed by a map that
                 defines the rule of the randomlization. In the map dictionary there are 2 keys to fill:
-                position : use a keyword or a pattern to define availiable positions to mutate.
-                target_residue : use a keyword or a pattern to define availiable target residues.
+                position        : use a keyword or a pattern to define availiable positions to mutate.
+                target_residue  : use a keyword or a pattern to define availiable target residues.
+                (* Note that when using random assignment, the list can no longer contain any manual assign str for mutation.
+                e.g.: pdb_obj.Add_MutaFlag(['V23T', 'r']) is not valid)
             example:
                 TODO(shaoqz): finish this function.
         if_U: 
