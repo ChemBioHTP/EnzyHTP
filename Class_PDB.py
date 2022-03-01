@@ -862,27 +862,77 @@ class PDB():
 
 
     def Add_MutaFlag(self, Flag : str = 'r', if_U : bool = 0, if_self : bool = 0):
-        """Validates and adds mutations to PDB.
+        """Determine which mutation to deploy to the structure.
         
-        Checks assigned mutations, generate mutation randomly based on rules,
-        and calculate mutation based on rules.
+        User can 1. assign specific mutation(s). 
+              or 2. assign random mutation(s) by specifing a rule of randomlization.
+        The function will 
+        1. decode the input to a list of python tuples that 
+            each contains the information of a mutation as ('X','A','###','Y') 
+            save to *self.MutaFlags*
+        2. check the if the assigned mutation is reasonable that
+            specifing the correct original residue
+            within the range of chain ids
+            within the range of residue ids
+            the target residue is within the range of canonical AAs
 
         Args:
-            Flag: str or list of strings indicating mutation to perform (see below)
-            if_U: if selenocysteine (U) is allowed for random mutation
-            if_self: if mutation to the same amino acid is allowed for random mutation
-        
+        (self):
+        The requirements for the input pdb object are:
+            TODO(shaoqz): add after refactoring
+        Flag: 
+            str or list of strings indicating specifc mutation(s) or a rule of randomlization. (default: r)
+            Grammer:
+            **Assign specific mutation(s)**
+                'XA##Y'
+                For each str that represent a mutation, the format should be 'XA##Y', in which
+                X : Original residue letter (One-letter code). Leave X if unknow. 
+                    (Only used for checking that will pop a warning if the residue doesn't match, 
+                    which usually means you are using a wrong residue id and requires a double check.)
+                A : Chain index. This is optional witha default value: A.
+                    (Different chains are defined by 'TER' marks in the PDB file and the index is noted in order.
+                    * Note this will not always be the same as the chain id in the PDB line
+                    * defined in self.stru)
+                ##: Residue index. 
+                    (Strictly correponding residue indexes in the original file.
+                    * defined in self.stru)
+                Y : Target residue letter.
+                    (The residue type after the mutation.) 
+            example:
+                >>> pdb_obj.Add_MutaFlag('D83K')
+                >>> pdb_obj.MutaFlags
+                [('D', 'A', '83', 'K')]
+                >>> pdb_obj.Add_MutaFlag('DA83K')
+                >>> pdb_obj.MutaFlags
+                [('D', 'A', '83', 'K')]
+                >>> pdb_obj.Add_MutaFlag(['DA83K', 'EB226P'])
+                >>> pdb_obj.MutaFlags
+                [('D', 'A', '83', 'K'), ('E', 'B', '226', 'P')]
+            
+            **Assign random mutation(s)** 
+                ['r', {'position': 'keyword', 
+                       'target_resi':'keyword'}]
+                To assigne random mutaion, start the list with 'r' or 'random' followed by a map that
+                defines the rule of the randomlization. In the map dictionary there are 2 keys to fill:
+                position        : use a keyword or a pattern to define availiable positions to mutate.
+                target_residue  : use a keyword or a pattern to define availiable target residues.
+                (* Note that when using random assignment, the list can no longer contain any manual assign str for mutation.
+                e.g.: pdb_obj.Add_MutaFlag(['V23T', 'r']) is not valid)
+            example:
+                TODO(shaoqz): finish this function.
+        if_U: 
+            if include mutations to U (selenocysteine) in random generation.
+        if_self:
+            if "mutation to the same amino acid" is allowed for random mutation.
+
         Returns:
-            A str representing the current mutations to the PDB.
-        
-        Flag Grammar:
-        using example "XA11Y"
-        X : Original residue name. Leave X if unknow. 
-            Only used for build filenames. **Do not affect any calculation.**
-        A : Chain index. Determine by 'TER' marks in the PDB file. 
-            (Do not consider chain_indexs in the original file.)
-        11: Residue index. Strictly correponding residue indexes in the original file. (NO sort applied)
-        Y : Target residue name.  
+        There are two parts of actually outputs:
+        In self.MutaFlags: Assigned mutations in a list of tuples
+            example: 
+            [('D', 'A', '83', 'K'), ('E', 'B', '226', 'P')]
+        In return value: A str representing a tag of current mutations to the PDB.
+            example:
+            _DA83K_EB226P
         """
 
         if type(Flag) == str:
