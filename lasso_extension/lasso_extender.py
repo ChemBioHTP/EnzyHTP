@@ -3,7 +3,8 @@
 
 import numpy as np
 
-def read_structure(filename : str) -> list:
+
+def read_structure(filename: str) -> list:
     """Reads xyz or pdb file containing structure.
 
     Args:
@@ -16,7 +17,7 @@ def read_structure(filename : str) -> list:
         ValueError: A file format other than xyz or pdb is used
     """
     coords = []
-    
+
     with open(filename, encoding="utf-8") as infile:
         if filename.endswith(".xyz"):
             lines = infile.readlines()[2:]
@@ -38,7 +39,8 @@ def read_structure(filename : str) -> list:
             raise ValueError("Filename must end in .xyz or .pdb")
     return coords
 
-def find_vector(structure: list, coord_1 : int, coord_2 : int) -> np.array:
+
+def find_vector(structure: list, coord_1: int, coord_2: int) -> np.array:
     """Finds vector between atoms in the structure of the given coordinates.
     
     Args:
@@ -51,7 +53,8 @@ def find_vector(structure: list, coord_1 : int, coord_2 : int) -> np.array:
     """
     return structure[coord_2][1] - structure[coord_1][1]
 
-def rotation_matrix_from_vectors(vec1 : np.array, vec2 : np.array) -> np.matrix:
+
+def rotation_matrix_from_vectors(vec1: np.array, vec2: np.array) -> np.matrix:
     """Calculates rotation matrix between two vectors.
 
     Code borrowed from:
@@ -74,17 +77,18 @@ def rotation_matrix_from_vectors(vec1 : np.array, vec2 : np.array) -> np.matrix:
         raise ValueError("Input vectors must be 3D vectors")
     vec1_norm = (vec1 / np.linalg.norm(vec1)).reshape(3)
     vec2_norm = (vec2 / np.linalg.norm(vec2)).reshape(3)
-    
+
     cross = np.cross(vec1_norm, vec2_norm)
     dot = np.dot(vec1_norm, vec2_norm)
     cross_mag = np.linalg.norm(cross)
     if cross_mag == 0:
         return np.eye(3)
     kmat = np.array([[0, -cross[2], cross[1]], [cross[2], 0, -cross[0]], [-cross[1], cross[0], 0]])
-    rotation_matrix = np.eye(3) + kmat + kmat.dot(kmat) * ((1 - dot) / (cross_mag ** 2))
+    rotation_matrix = np.eye(3) + kmat + kmat.dot(kmat) * ((1 - dot) / (cross_mag**2))
     return rotation_matrix
 
-def write_xyz(coords : list, outfile_name : str) -> None:
+
+def write_xyz(coords: list, outfile_name: str) -> None:
     """Writes the calculated coordinates to an xyz file.
 
     Args:
@@ -96,19 +100,21 @@ def write_xyz(coords : list, outfile_name : str) -> None:
     """
     if not outfile_name.endswith(".xyz"):
         outfile_name += ".xyz"
-    
-    with open("lasso_extension/structures/"+outfile_name, "w+", encoding="utf-8") as outfile:
+
+    with open("lasso_extension/structures/" + outfile_name, "w+", encoding="utf-8") as outfile:
         print(len(coords), file=outfile)
         print(outfile_name, file=outfile)
 
         for atom in coords:
-            coord_string = atom[0] + "  " if len(atom[0]) == 1 else "" 
-            coord_string += "".join([" " * (7 if atom[1][i] < 0 else 8) +f"{atom[1][i]:.5f}" for i in range(3)])
+            coord_string = atom[0] + "  " if len(atom[0]) == 1 else ""
+            coord_string += "".join([" " * (7 if atom[1][i] < 0 else 8) + f"{atom[1][i]:.5f}" for i in range(3)])
             print(coord_string, file=outfile)
-        
 
-def lasso_extender(base_file : str, tail_length : int,  outfile : str, 
-                   extension_file : str = "lasso_extension/structures/alanine_planar_N.xyz") -> None:
+
+def lasso_extender(base_file: str,
+                   tail_length: int,
+                   outfile: str,
+                   extension_file: str = "lasso_extension/structures/alanine_planar_N.xyz") -> None:
     """Extends the base lasso peptide using the extension amino acid by tail_length.
     
     Args:
@@ -120,7 +126,7 @@ def lasso_extender(base_file : str, tail_length : int,  outfile : str,
     Returns:
         None
     """
-    
+
     base = read_structure(base_file)
     attachment_point = base[35][1]
 
@@ -130,27 +136,25 @@ def lasso_extender(base_file : str, tail_length : int,  outfile : str,
     vec_extender = find_vector(extender, 12, 11)
     vec_base = find_vector(base, 27, 35)
     extension_matrix = rotation_matrix_from_vectors(vec_base, vec_extender)
-    
+
     rotated_extension = list(map(lambda vec: [vec[0], np.dot(vec[1], extension_matrix)], extender_vectors))
-    
-    
-    base = base[:35]+base[41:]  # N36-H41 are H3C-N-H group
+
+    base = base[:35] + base[41:]  # N36-H41 are H3C-N-H group
     for vector in rotated_extension:
         base.append([vector[0], vector[1] + attachment_point])
-    
-    
+
     for _ in range(tail_length - 1):
         attachment_point = base[-4][1]
 
-        vec_base = find_vector(base, -6, -4) # C-O bond in alanine
+        vec_base = find_vector(base, -6, -4)  # C-O single bond in alanine
         extension_matrix = rotation_matrix_from_vectors(vec_base, vec_extender)
-        
+
         rotated_extension = list(map(lambda vec: [vec[0], np.dot(vec[1], extension_matrix)], extender_vectors))
-        
-        base = base[:-4]+base[-2:]  # -4 and -3 are -OH group
+
+        base = base[:-4] + base[-2:]  # -4 and -3 are -OH group
         for vector in rotated_extension:
             base.append([vector[0], vector[1] + attachment_point])
-    
+
     write_xyz(base, outfile)
 
 
@@ -160,11 +164,9 @@ def main():
     Extends the severedLassoPeptide.xyz file by 4 of the default Alanine extender
     """
     base = "lasso_extension/structures/severedLassoPeptide.xyz"
-    tail_len = 4
+    tail_length = 4
     outfile = "extendedPeptideMulti"
-    lasso_extender(base, tail_len, outfile)
-    
-
+    lasso_extender(base, tail_length, outfile)
 
 
 if __name__ == "__main__":
