@@ -1,6 +1,7 @@
 from math import exp, ceil
 import os
 import re
+from typing import Union
 from subprocess import run, CalledProcessError
 from random import choice
 from xmlrpc.client import boolean
@@ -127,7 +128,7 @@ class PDB():
         # make cache
         self.cache_path = self.dir+'/cache'
         mkdir(self.cache_path)
-        
+
 
     def _update_name(self):
         '''
@@ -136,7 +137,7 @@ class PDB():
         suffix_len = len(self.path.split('.')[-1]) + 1
         self.name=self.path.split(os.sep)[-1][:-suffix_len]
         self.path_name = self.dir+'/'+self.name
-        
+
 
     def get_stru(self, ligand_list=None, renew = 0):
         '''
@@ -281,12 +282,12 @@ class PDB():
         self.sequence_one = {}
 
         Chain_str = PDB_str.split(line_feed+'TER') # Note LF is required
-        
+
         for chain,i in enumerate(Chain_str):
 
             Chain_index = chr(65+chain) # Covert to ABC using ACSII mapping
             Chain_sequence=[]
-            
+
             # Get the Chain_sequence
             lines=i.split(line_feed)
 
@@ -295,7 +296,7 @@ class PDB():
                 pdb_l = PDB_line(line)
 
                 if pdb_l.line_type == 'ATOM' or pdb_l.line_type == 'HETATM':
-                    
+
                     # Deal with the first residue
                     if len(Chain_sequence) == 0:
                         Chain_sequence.append(pdb_l.resi_name)
@@ -306,20 +307,20 @@ class PDB():
                     if pdb_l.resi_id != last_resi_index:
 
                         # Deal with missing residue, fill with "NAN"
-                        missing_length = pdb_l.resi_id - last_resi_index - 1 
+                        missing_length = pdb_l.resi_id - last_resi_index - 1
                         if missing_length > 0:
-                            Chain_sequence = Chain_sequence + ['NAN',] * missing_length 
-                        
+                            Chain_sequence = Chain_sequence + ['NAN',] * missing_length
+
                         # Store the new resi
                         Chain_sequence.append(pdb_l.resi_name)
 
-                    # Update for next loop                
+                    # Update for next loop
                     last_resi_index = pdb_l.resi_id
-            
+
             self.raw_sequence[Chain_index] = Chain_sequence
-            
+
         self._strip_raw_seq() # strip the raw_sequence and save to sequence
-        
+
         self.get_if_complete()
 
         if Oneletter == 1:
@@ -354,7 +355,7 @@ class PDB():
             raise IndexError
 
         for chain in self.raw_sequence:
-            
+
             chain_seq=[]
             if_realchain = 0
 
@@ -363,25 +364,25 @@ class PDB():
                 clean_name = name.strip(' ')
                 if clean_name in Resi_map2.keys():
                     if_realchain = 1
-            
+
             if if_realchain:
                 for name in self.raw_sequence[chain]:
-                    clean_name = name.strip(' ')                               
+                    clean_name = name.strip(' ')
                     chain_seq.append(clean_name)
 
                     # An artificial residue will be a residue in a realchain but not included in force field map
                     if clean_name not in Resi_map2 and clean_name != 'NAN':
-                        self.if_art_resi = 1                        
+                        self.if_art_resi = 1
                         ## PLACE HOLDER for further operation on artificial residue ##
 
             else:
                 # Judge if containing any ligand
                 for name in self.raw_sequence[chain]:
-                    clean_name = name.strip(' ') 
+                    clean_name = name.strip(' ')
                     if clean_name not in TIP3P_map and clean_name != 'NAN':
                         self.if_ligand = 1
                         ## PLACE HOLDER for further operation on artificial residue ##
-            
+
             # only add realchain to the self.sequence
             if len(chain_seq) != 0:
                 chain_Index=chr(new_index+65)
@@ -412,7 +413,7 @@ class PDB():
                         chain_Seq=chain_Seq+Resi_map2[c_name]
                     else:
                         chain_Seq=chain_Seq+' '+c_name+' '
-                
+
             self.sequence_one[chain]=chain_Seq
 
 
@@ -426,10 +427,10 @@ class PDB():
         if len(self.sequence.keys()) == 0:
             print('Please get the sequence first')
             raise IndexError
-        
+
         self.if_complete=1 # if not flow in then 1
         self.if_complete_chain = {}
-        
+
         for chain in self.sequence:
             self.if_complete_chain[chain]=1 # if not flow in then 1
             for resi in self.sequence[chain]:
@@ -507,7 +508,7 @@ class PDB():
             self.pqr_path = self.path_name+'.pqr'
         else:
             self.pqr_path = out_path
-        
+
         # input of PDB2PQR
         pdb2pqr_parser = build_pdb2pqr_parser()
         args = pdb2pqr_parser.parse_args(['--ff=PARSE','--ffout='+ffout,'--with-ph='+str(ph),self.path,self.pqr_path])
@@ -522,7 +523,7 @@ class PDB():
         save to self.path
         '''
 
-        # Add missing atom (from the PDB2PQR step. Update to func result after update the _get_protonation_pdb2pqr func)       
+        # Add missing atom (from the PDB2PQR step. Update to func result after update the _get_protonation_pdb2pqr func)
         # Now metal and ligand
 
         old_stru = Structure.fromPDB(self.path)
@@ -642,7 +643,7 @@ class PDB():
                         if ref_name_path == None:
                             ele = pdb_l.get_element()
                         else:
-                            if line_count < len(ref_a_names):    
+                            if line_count < len(ref_a_names):
                                 ele = ref_a_names[line_count]
                             else:
                                 ele = pdb_l.get_element() # New atoms
@@ -657,7 +658,7 @@ class PDB():
                             ele_count[ele] = 0
                             pdb_l.atom_name = ele
                         of.write(pdb_l.build())
-            
+
 
     @classmethod
     def _ob_pdb_charge(cls, pdb_path):
@@ -697,11 +698,11 @@ class PDB():
                         atom_name_1
                     --- Will Generate ---
                     [reacting residue]
-                        name 
+                        name
                         atom_name_2
                         atom_name_3
                     [substrate]
-                        id 
+                        id
                         name 
                         atom_name_2 
                         atom_name_3
@@ -727,7 +728,7 @@ class PDB():
         mkdir(lig_dir)
         mkdir(met_dir)
 
-        # Build ligands 
+        # Build ligands
         cofactors = self.stru.build_ligands(lig_dir, ifcharge=1, ifunique=1)
         # cofactor_params, cofactors_pdb = generate_Rosetta_params(cofactors, lig_dir, resn='same', out_pdb_name='same')
         # # clean enzyme
@@ -737,7 +738,7 @@ class PDB():
         # sub_params, sub_pdb, sub_confs_pdb = generate_Rosetta_params(sub_confs, lig_dir, resn='SUB', out_pdb_name='SUB')
         # # define reactive
         # -- search for RULE OF INPUT ID and get a map --
-        # self.RDock_generate_cst_file(reactive_define, name_map?)        
+        # self.RDock_generate_cst_file(reactive_define, name_map?)
         # # initial placement
         # self._RDock_initial_placement(sub_pdb)
         # self._RDock_add_remark_line()
@@ -799,7 +800,7 @@ class PDB():
                 chain_count = 1
                 for line in f:
                     pdb_l = PDB_line(line)
-                                        
+
                     TER_flag = 0
                     if pdb_l.line_type == 'TER':
                         TER_flag = 1
@@ -816,7 +817,7 @@ class PDB():
 
                             if chr(64+chain_count) == t_chain_id:
                                 if pdb_l.resi_id == int(t_resi_id):
-                                    
+
                                     # do not write old line if match a MutaFlag
                                     match=1
                                     # Keep OldAtoms of targeted old residue
@@ -830,17 +831,17 @@ class PDB():
 
                                     for i in OldAtoms:
                                         if i == pdb_l.atom_name:
-                                            new_line=line[:17]+Resi_map[resi_2]+line[20:]                                        
+                                            new_line=line[:17]+Resi_map[resi_2]+line[20:]
                                             of.write(new_line)
-                                            break                                
+                                            break
                                     #Dont run for other Flags after first Flag matches.
                                     break
 
-                    if not match:               
+                    if not match:
                         of.write(line)
 
 
-        # Run tLeap 
+        # Run tLeap
         #make input
         leapin_path = self.cache_path+'/leap_P2PwL.in'
         leap_input=open(leapin_path,'w')
@@ -860,15 +861,15 @@ class PDB():
 
         return self.path
 
-
-    def Add_MutaFlag(self, Flag : str = 'r', if_U : bool = 0, if_self : bool = 0):
+    MutaFlag_pattern = Union[str, list[str], list[str, dict[str, str]]] # define var type for Flag
+    def Add_MutaFlag(self, Flag: MutaFlag_pattern = 'r', chain_sync_list: list[tuple[str, ...]] = None, if_U: bool = 0, if_self: bool = 0):
         """Determine which mutation to deploy to the structure.
-        
-        User can 1. assign specific mutation(s). 
+
+        User can 1. assign specific mutatßion(s).
               or 2. assign random mutation(s) by specifing a rule of randomlization.
-        The function will 
-        1. decode the input to a list of python tuples that 
-            each contains the information of a mutation as ('X','A','###','Y') 
+        The function will
+        1. decode the input to a list of python tuples that
+            each contains the information of a mutation as ('X','A','###','Y')
             save to *self.MutaFlags*
         2. check the if the assigned mutation is reasonable that
             specifing the correct original residue
@@ -880,7 +881,7 @@ class PDB():
         (self):
         The requirements for the input pdb object are:
             TODO(shaoqz): add after refactoring
-        Flag: 
+        Flag:
             str or list of strings indicating specifc mutation(s) or a rule of randomlization. (default: r)
             Grammer:
             **Assign specific mutation(s)**
@@ -893,11 +894,11 @@ class PDB():
                     (Different chains are defined by 'TER' marks in the PDB file and the index is noted in order.
                     * Note this will not always be the same as the chain id in the PDB line
                     * defined in self.stru)
-                ##: Residue index. 
+                ##: Residue index.
                     (Strictly correponding residue indexes in the original file.
                     * defined in self.stru)
                 Y : Target residue letter.
-                    (The residue type after the mutation.) 
+                    (The residue type after the mutation.)
             example:
                 >>> pdb_obj.Add_MutaFlag('D83K')
                 >>> pdb_obj.MutaFlags
@@ -908,9 +909,9 @@ class PDB():
                 >>> pdb_obj.Add_MutaFlag(['DA83K', 'EB226P'])
                 >>> pdb_obj.MutaFlags
                 [('D', 'A', '83', 'K'), ('E', 'B', '226', 'P')]
-            
-            **Assign random mutation(s)** 
-                ['r', {'position': 'keyword', 
+
+            **Assign random mutation(s)**
+                ['r', {'position': 'keyword',
                        'target_resi':'keyword'}]
                 To assigne random mutaion, start the list with 'r' or 'random' followed by a map that
                 defines the rule of the randomlization. In the map dictionary there are 2 keys to fill:
@@ -920,6 +921,8 @@ class PDB():
                 e.g.: pdb_obj.Add_MutaFlag(['V23T', 'r']) is not valid)
             example:
                 TODO(shaoqz): finish this function.
+        chain_sync_list:
+            a list of specify which chains should mutate synchronously.
         if_U: 
             if include mutations to U (selenocysteine) in random generation.
         if_self:
@@ -987,9 +990,9 @@ class PDB():
 
         label=''
         for flag in self.MutaFlags:
-            label=label+'_'+self._build_MutaName(flag) 
+            label=label+'_'+self._build_MutaName(flag)
         return label
-                
+
 
     def _read_MutaFlag(self, Flag):
         '''
@@ -1011,7 +1014,7 @@ class PDB():
         F_match = re.match(pattern, Flag)
         if F_match is None:
             raise Exception('_read_MutaFlag: Required format: XA123Y (or X123Y indicating the first chain)')
-        
+
         resi_1 = F_match.group(1)
         chain_id = F_match.group(2)
         resi_id = str(F_match.group(3))
@@ -1021,7 +1024,7 @@ class PDB():
         if F_match.group(2) is None:
             chain_id = 'A'
             if Config.debug >= 1:
-                print('_read_MutaFlag: No chain_id is provided! Mutate in the first chain by default. Input: ' + Flag)   
+                print('_read_MutaFlag: No chain_id is provided! Mutate in the first chain by default. Input: ' + Flag)
 
         # san check of the manual input
         self.get_stru()
@@ -1037,7 +1040,7 @@ class PDB():
 
 
         return (resi_1, chain_id, resi_id, resi_2)
-    
+
 
     def _build_MutaName(self, Flag):
         '''
@@ -1053,7 +1056,7 @@ class PDB():
         Save changed PDB to self.path (containing water and ions)
         Mainly used for remove bad contact from PDB2PDBwLeap.
         '''
-        
+
         out4_PDB_path=self.path_name+'_min.pdb'
 
         #make sander input
@@ -1075,7 +1078,7 @@ class PDB():
         min_input.write('  cut=8.0,'+line_feed)
         min_input.write(' /'+line_feed)
         min_input.close()
-    
+
         # express engine
         PC_cmd, engine_path = Config.Amber.get_Amber_engine(engine=engine)
 
@@ -1090,7 +1093,7 @@ class PDB():
             if Config.debug >= 1:
                 print('Error: ambpdb cannot read PDBMin result .rst')
                 return 1
-        
+
         os.system('mv '+self.prmtop_path+' '+self.inpcrd_path+' '+min_dir)
 
         self.path = out4_PDB_path
@@ -1141,7 +1144,7 @@ class PDB():
                             continue
                         of.write(line)
         self.path=o_path
-        self._update_name()       
+        self._update_name()
 
 
     '''
@@ -1190,10 +1193,10 @@ class PDB():
         if ifsavepdb:
             self.path = self.path_name+'_ff.pdb'
             self._update_name()
-        
+
         return (self.prmtop_path,self.inpcrd_path)
 
-    
+
     def _ligand_parm(self, paths, method='AM1BCC', renew=0):
         '''
         Turn ligands to prepi (w/net charge), parameterize with parmchk
@@ -1232,7 +1235,7 @@ class PDB():
                     #gen frcmod
                     if Config.debug >= 1:
                         print('running: '+Config.Amber.AmberHome+'/bin/parmchk2 -i '+out_prepi+' -f prepi -o '+out_frcmod)
-                    run(Config.Amber.AmberHome+'/bin/parmchk2 -i '+out_prepi+' -f prepi -o '+out_frcmod, check=True, text=True, shell=True, capture_output=True)                
+                    run(Config.Amber.AmberHome+'/bin/parmchk2 -i '+out_prepi+' -f prepi -o '+out_frcmod, check=True, text=True, shell=True, capture_output=True)
                 #record
                 parm_paths.append((out_prepi, out_frcmod))
                 self.prepi_path[lig_name] = out_prepi
@@ -1250,7 +1253,7 @@ class PDB():
         '''
         if box_type == None:
             box_type = Config.Amber.box_type
-            
+
         leap_path= self.cache_path+'/leap.in'
         sol_path= self.path_name+'_ff.pdb'
         with open(leap_path, 'w') as of:
@@ -1279,7 +1282,7 @@ class PDB():
                     raise Exception('PDB._combine_parm().box_type: Only support box and oct now!')
             # save
             if prm_out_path == '':
-                if o_dir == '':                        
+                if o_dir == '':
                     of.write('saveamberparm a '+self.path_name+'.prmtop '+self.path_name+'.inpcrd'+line_feed)
                     self.prmtop_path=self.path_name+'.prmtop'
                     self.inpcrd_path=self.path_name+'.inpcrd'
@@ -1414,9 +1417,9 @@ class PDB():
         if Config.debug >= 1:
             print('running: '+PC_cmd +' '+ engine_path +' -O -i '+heat_path+' -o '+o_dir+'/heat.out -p '+self.prmtop_path+' -c '+o_dir+'/min.rst -ref ' +o_dir+'/min.rst -r ' +o_dir+'/heat.rst')
         os.system(PC_cmd +' '+ engine_path +' -O -i '+heat_path+' -o '+o_dir+'/heat.out -p '+self.prmtop_path+' -c '+o_dir+'/min.rst -ref ' +o_dir+'/min.rst -r ' +o_dir+'/heat.rst')
-        
+
         # gpu debug for equi
-        if equi_cpu: 
+        if equi_cpu:
             # use Config.PC_cmd and cpu_engine_path
             if Config.debug >= 1:
                 print('running: '+Config.PC_cmd +' '+ cpu_engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
@@ -1425,7 +1428,7 @@ class PDB():
             if Config.debug >= 1:
                 print('running: '+PC_cmd +' '+ engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
             os.system(PC_cmd +' '+ engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
-        
+
         if Config.debug >= 1:
             print('running: '+PC_cmd +' '+ engine_path +' -O -i '+prod_path+' -o '+o_dir+'/prod.out -p '+self.prmtop_path+' -c '+o_dir+'/equi.rst -ref '+o_dir+'/equi.rst -r '+o_dir+'/prod.rst -x '+o_dir+'/prod.nc')
         os.system(PC_cmd +' '+ engine_path +' -O -i '+prod_path+' -o '+o_dir+'/prod.out -p '+self.prmtop_path+' -c '+o_dir+'/equi.rst -ref '+o_dir+'/equi.rst -r '+o_dir+'/prod.rst -x '+o_dir+'/prod.nc')
@@ -1464,7 +1467,7 @@ class PDB():
         else:
             nmropt_line = ''
             DISANG_tail = ''
-        #text        
+        #text
         conf_str='''Minimize
  &cntrl
   imin  = 1,  ntx   = 1,  irest = 0,
@@ -1645,7 +1648,7 @@ class PDB():
         with open(o_path,'w') as of:
             of.write(conf_str)
         return o_path
-    
+
 
     def _build_MD_rs(self,step,o_path):
         '''
@@ -1762,11 +1765,11 @@ class PDB():
             cnt_table = self.stru.get_connectivty_table(prepi_path=prepi_path)
             coord = self._get_oniom_g16_coord(prmtop_path) # use connectivity info from the line above.
             add_prm = self._get_oniom_g16_add_prm() # test for rules of missing parameters
-            
-            #combine and write 
+
+            #combine and write
             with open(g_temp_path,'w') as of:
-                of.write(self.route) 
-                of.write(line_feed) 
+                of.write(self.route)
+                of.write(line_feed)
                 of.write(title)
                 of.write(line_feed)
                 of.write(chrgspin)
@@ -1776,7 +1779,7 @@ class PDB():
                 of.write(cnt_table)
                 of.write(line_feed)
                 of.write(add_prm)
-        
+
         # deploy to inp files
         frames = Frame.fromMDCrd(self.mdcrd)
         self.frames = frames
@@ -1865,7 +1868,7 @@ class PDB():
         if len(self.layer_chrgspin) != len(spin_list):
             raise Exception('spin specification need to match the layer setting. e.g.: spin_list=[h_spin, l_spin]')
         for i,spin in enumerate(spin_list):
-            self.layer_chrgspin[i] = (self.layer_chrgspin[i], spin)    
+            self.layer_chrgspin[i] = (self.layer_chrgspin[i], spin)
         # make string
         if len(self.layer) == 2:
             c1 = str(round(self.layer_chrgspin[0][0]))
@@ -1918,7 +1921,7 @@ class PDB():
                             if cnt_atom.id in self.layer[0]:
                                 if repeat_flag:
                                     raise Exception('A low layer atom is connecting 2 higher layer atoms')
-                                cnt_info = ['H', cnt_atom.get_pseudo_H_type(atom), cnt_atom.id] 
+                                cnt_info = ['H', cnt_atom.get_pseudo_H_type(atom), cnt_atom.id]
                                 repeat_flag = 1
                         # general low layer
                         coord += atom.build_oniom('l', self.chrg_list_all[atom.id-1], cnt_info=cnt_info)
@@ -1934,7 +1937,7 @@ class PDB():
                         print('\033[1;31;0m In PDB2QMMM in _get_oniom_g16_coord: WARNING: Found ligand atom in low layer \033[0m')
                     # consider connection
                     cnt_info = None
-                    repeat_flag = 0 
+                    repeat_flag = 0
                     for cnt_atom in atom.connect:
                         if repeat_flag:
                             raise Exception('A low layer atom is connecting 2 higher layer atoms')
@@ -1969,7 +1972,7 @@ class PDB():
                                 print('\033[1;31;0m In PDB2QMMM in _get_oniom_g16_coord: WARNING: Found solvent atom'+str(atom.id)+' in seperate layers \033[0m')
                             if repeat_flag:
                                 raise Exception('A low layer atom is connecting 2 higher layer atoms')
-                            cnt_info = ['H', cnt_atom.get_pseudo_H_type(atom), cnt_atom.id] 
+                            cnt_info = ['H', cnt_atom.get_pseudo_H_type(atom), cnt_atom.id]
                             repeat_flag = 1
                     coord += atom.build_oniom('l', self.chrg_list_all[atom.id-1], cnt_info=cnt_info, if_sol=1)
 
@@ -2008,14 +2011,14 @@ class PDB():
         * Unit transfer in prmtop: http://ambermd.org/Questions/units.html
         '''
         with open(prmtop_path) as f:
-            
+
             charge_list=[]
             line_index=0
 
             for line in f:
-                
+
                 line_index=line_index+1 #current line
-                
+
                 if line.strip() == r'%FLAG POINTERS':
                     format_flag=line_index
                 if line.strip() == r'%FLAG CHARGE':
@@ -2025,7 +2028,7 @@ class PDB():
                     if line_index == format_flag+2:
                         N_atom=int(line.split()[0])
                         del format_flag
-                        
+
                 if 'charge_flag' in dir():
                     if line_index >= charge_flag+2 and line_index <= charge_flag+1+ceil(N_atom/5):
                         for i in line.strip().split():
@@ -2062,7 +2065,7 @@ class PDB():
 
             if engine not in ['pytraj', 'cpptraj']:
                 raise Exception('engine: pytraj or cpptraj')
-            
+
             if engine == 'pytraj':
                 pass
 
@@ -2079,7 +2082,7 @@ class PDB():
 
         self.mdcrd=o_path
         return o_path
-            
+
 
     '''
     ========
@@ -2146,9 +2149,9 @@ class PDB():
         if ifchk:
             self.qm_cluster_chk = qm_cluster_chk_paths
             return self.qm_cluster_out, self.qm_cluster_chk
-        
+
         return self.qm_cluster_out
-    
+
 
     def _get_qmcluster_chrgspin(self, sele, spin=1):
         '''
@@ -2226,7 +2229,7 @@ class PDB():
 
         self.qm_cluster_fchk = fchk_paths
         return self.qm_cluster_fchk
-        
+
 
     '''
     ========
@@ -2338,7 +2341,7 @@ class PDB():
 
             bond_id_pattern = r'\( *([0-9]+)[A-Z][A-z]? *- *([0-9]+)[A-Z][A-z]? *\)'
             bond_data_pattern = r'X\/Y\/Z: *([0-9\.\-]+) *([0-9\.\-]+) *([0-9\.\-]+) *Norm: *([0-9\.]+)'
-            
+
             for fchk in qm_fch_paths:
                 # get a1->a2 vector from .out (update to using fchk TODO)
                 G_out_path = fchk[:-len(fchk.split('.')[-1])]+'out'
@@ -2362,7 +2365,7 @@ class PDB():
                             if str(a2) == l_p[0]:
                                 coord_a2 = np.array((float(l_p[3]), float(l_p[4]), float(l_p[5])))
                 Bond_vec = (coord_a2 - coord_a1)
-                
+
                 # Run Multiwfn
                 mltwfn_out_path = fchk[:-len(fchk.split('.')[-1])]+'dip'
                 if Config.debug >= 2:
@@ -2370,7 +2373,7 @@ class PDB():
                 run(Config.Multiwfn.exe+' '+fchk+' < '+mltwfn_in_path, check=True, text=True, shell=True, capture_output=True)
                 run('mv LMOdip.txt '+mltwfn_out_path, check=True, text=True, shell=True, capture_output=True)
                 run('rm LMOcen.txt new.fch', check=True, text=True, shell=True, capture_output=True)
-                
+
                 # get dipole
                 with open(mltwfn_out_path) as f:
                     read_flag = 0
@@ -2408,7 +2411,7 @@ class PDB():
             print("Running: "+"sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  "+n_cores+"/' "+Config.Multiwfn.DIR+"/settings.ini")
         run("sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  "+n_cores+"/' "+Config.Multiwfn.DIR+"/settings.ini", check=True, text=True, shell=True, capture_output=True)
 
-    
+
 
 def get_PDB(name):
     '''
@@ -2426,4 +2429,3 @@ def PDB_to_AMBER_PDB(path):
     - WARNINGs
     '''
     pass
-
