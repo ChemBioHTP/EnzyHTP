@@ -861,8 +861,12 @@ class PDB():
 
         return self.path
 
-    MutaFlag_pattern = Union[str, list[str], list[str, dict[str, str]]] # define var type for Flag
-    def Add_MutaFlag(self, Flag: MutaFlag_pattern = 'r', chain_sync_list: list[tuple[str, ...]] = None, if_U: bool = 0, if_self: bool = 0):
+    MutaFlag_pattern = Union[str, list[str], list[str, dict[str, str]]] # define var type for "Flag"
+    def Add_MutaFlag(self,
+                     Flag: MutaFlag_pattern = 'r',
+                     chain_sync_list: list[tuple[str, ...]] = None,
+                     if_U: bool = 0,
+                     if_self: bool = 0):
         """Determine which mutation to deploy to the structure.
 
         User can 1. assign specific mutatßion(s).
@@ -881,14 +885,15 @@ class PDB():
         (self):
         The requirements for the input pdb object are:
             TODO(shaoqz): add after refactoring
+
         Flag:
             str or list of strings indicating specifc mutation(s) or a rule of randomlization. (default: r)
             Grammer:
             **Assign specific mutation(s)**
                 'XA##Y'
                 For each str that represent a mutation, the format should be 'XA##Y', in which
-                X : Original residue letter (One-letter code). Leave X if unknow. 
-                    (Only used for checking that will pop a warning if the residue doesn't match, 
+                X : Original residue letter (One-letter code). Leave X if unknow.
+                    (Only used for checking that will pop a warning if the residue doesn't match,
                     which usually means you are using a wrong residue id and requires a double check.)
                 A : Chain index. This is optional witha default value: A.
                     (Different chains are defined by 'TER' marks in the PDB file and the index is noted in order.
@@ -921,23 +926,34 @@ class PDB():
                 e.g.: pdb_obj.Add_MutaFlag(['V23T', 'r']) is not valid)
             example:
                 TODO(shaoqz): finish this function.
+
         chain_sync_list:
-            a list of specify which chains should mutate synchronously.
-        if_U: 
+            a list of chain ids that specifies which chains should be mutated synchronously.
+            Each element in the list is a tuple that constains str of chain ids that should change synchronously. 
+            example:
+                >>> len(pdb_obj.stru.chains)    # for a structure that have 4 chains that is a dimer of protein complexes (AB).
+                4  
+                >>> pdb_obj.Add_MutaFlag('DA83K', chain_sync_list=[('A', 'C'), ('B', 'D')])
+                >>> pdb_obj.MutaFlags
+                [('D', 'A', '83', 'K'), ('D', 'C', '83', 'K')]
+
+        if_U:
             if include mutations to U (selenocysteine) in random generation.
+
         if_self:
             if "mutation to the same amino acid" is allowed for random mutation.
 
         Returns:
         There are two parts of actually outputs:
         In self.MutaFlags: Assigned mutations in a list of tuples
-            example: 
+            example:
             [('D', 'A', '83', 'K'), ('E', 'B', '226', 'P')]
         In return value: A str representing a tag of current mutations to the PDB.
             example:
             _DA83K_EB226P
         """
 
+        # detect different input cases
         if type(Flag) == str:
 
             if Flag == 'r' or Flag == 'random':
