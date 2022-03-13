@@ -1,6 +1,12 @@
+[![DOI](https://zenodo.org/badge/459668860.svg)](https://zenodo.org/badge/latestdoi/459668860)
+[![build](https://github.com/google/yapf/actions/workflows/ci.yml/badge.svg)](https://github.com/google/yapf/actions)
+
 # EnzyHTP
-  We built a holistic platform EnzyHTP that allows the molecular simulation of enzymes in a high-throughput manner. Molecular simulations, such as quantum mechanics (QM), molecular mechanics (MM), and QM/MM modeling, have been widely applied to guide the design and discovery of new biocatalysts. They inform the time-resolved, atomic (even electronic) detail of enzymatic reactions, which complements the sequence and structure-level information obtained in experiments. As such, augmenting molecular simulation data holds great promise to improve the predictive power of machine learning models to evaluate mutation effects for enzyme catalysis. However, large-scale collection of molecular simulation data presents a big challenge. Multiple hierarchies of structural treatments are necessary for building a simulation-ready enzyme model, including determining protein stoichiometry, identifying the binding site, predicting amino acid protonation state, adding missing residues, performing an amino acid substitution, creating reacting species, and so on. In most enzyme modeling practices, these structural operations rely on manual curation, which is highly inefficient and hampers reproducibility. Here we are developing a high-throughput enzyme simulation tool, EnzyHTP, that automates molecular model construction, mutation, sampling, and energy calculation.
-![](Four_modules.png)
+  EnzyHTP is a holistic platform that allows high-throughput molecular simulation of enzymes. Molecular simulations, such as quantum mechanics (QM), molecular mechanics (MM), and QM/MM modeling, are highly applicable to the design and discovery of new biocatalysts. Molecular simulations provide time-resolved, atomic and electronic detail for enzymatic reactions, complementing experimental sequence and structure-level information. As such, expanding molecular simulation data can improve the predictive power of machine learning models to evaluate mutation effects in enzyme catalysis. However, large-scale collection of molecular simulation data presents a significant challenge due to complex demands. To build an enzyme model appropriate for simulations, multiple hierarchies of structural definitions and treatments must be established such as protein stoichiometry, binding site, predicting amino acid protonation state, addition of missing residues, performing an amino acid substitution, and creating reacting species. Most enzyme modeling practices use similar structural operations but rely on manual curation, which is highly inefficient and hampers reproducibility. EnzyHTP, a high-throughput enzyme simulation tool, bypasses these issues through automation of molecular model construction, mutation, sampling and energy calculation.
+![](Four_modules_whitebg.png)
+
+# Documentation
+Complete documentation for EnzyHTP is in progress, and its code is under refactoring. Stay tuned for documentation and the refactored code. For an in-depth description of EnzyHTP, please refer to our paper (https://pubs.acs.org/doi/10.1021/acs.jcim.1c01424) and corresponding use cases under /Test_file/FAcD_expanse
 
 # Requirement
 ## External Program
@@ -14,14 +20,17 @@
 - openbabel
 
 # Installation 
-## dependence
-0. Install conda & create an environment
-1. install numpy `conda install numpy`
-2. Install openbabel `conda install openbabel -c conda-forge`
-3. Install pdb2pqr 
+## Dependence
+1. Install conda & (optional) create an environment
+2. install numpy `conda install numpy`
+3. Install openbabel `conda install openbabel -c conda-forge`
+4. Install pdb2pqr 
 ```
 git clone https://github.com/Electrostatics/pdb2pqr.git
 cd pdb2pqr
 pip install .
 ```
-3. Install Multiwfn (install demo in author's blog: http://sobereva.com/454) (The LMO func seems not working for WSL)
+5. Install [AmberTool](https://ambermd.org/AmberTools.php)
+6. (optional) Install RDKit `conda install -c conda-forge rdkit`
+7. (optional) Install Gaussian16 
+8. (optional) Install Multiwfn (install demo in author's blog: http://bbs.keinsci.com/thread-12020-1-1.html) (The LMO func seems not working for WSL) (Note that run Multiwfn on ACCRE requires loading the GCC module) 
