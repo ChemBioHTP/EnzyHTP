@@ -188,3 +188,8 @@ def write_data(tag, data, out_path):
             of.write(repr(data[item]) + line_feed)
 
     return out_path
+        
+'''
+Mutant assigner
+'''
+#TODO

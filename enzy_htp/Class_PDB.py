@@ -3,6 +3,7 @@ import os
 import re
 from subprocess import run, CalledProcessError
 from random import choice
+from xmlrpc.client import boolean
 from AmberMaps import *
 from wrapper import *
 from Class_Structure import *
@@ -877,26 +878,79 @@ class PDB:
 
         return self.path
 
-    def Add_MutaFlag(self, Flag="r", if_U=0, if_self=0):
-        """
-        Input: 
-        Flags or "random"
-        ----------------------------------------------------
-        Flag   :(e.g. XA11Y) Can be a str or a list of str (a list of flags).
-        if_U   :if consider mutation to U in random generation (Selenocysteine)
-        if_self:if consider mutation to the residue itself in random generation(wt)
-        ----------------------------------------------------
-        Append self.MutaFlags with the Flag.
-        Grammer:
-        X : Original residue name. Leave X if unknow. 
-            Only used for build filenames. **Do not affect any calculation.**
-        A : Chain index. Determine by 'TER' marks in the PDB file. (Do not consider chain_indexs in the original file.)
-        11: Residue index. Strictly correponding residue indexes in the original file. (NO sort applied)
-        Y : Target residue name.  
-        ----------------------------------------------------
-        'random' or 'r' (default)
-        ----------------------------------------------------
-        return a label of mutations
+
+    def Add_MutaFlag(self, Flag : str = 'r', if_U : bool = 0, if_self : bool = 0):
+        """Determine which mutation to deploy to the structure.
+        
+        User can 1. assign specific mutation(s). 
+              or 2. assign random mutation(s) by specifing a rule of randomlization.
+        The function will 
+        1. decode the input to a list of python tuples that 
+            each contains the information of a mutation as ('X','A','###','Y') 
+            save to *self.MutaFlags*
+        2. check the if the assigned mutation is reasonable that
+            specifing the correct original residue
+            within the range of chain ids
+            within the range of residue ids
+            the target residue is within the range of canonical AAs
+
+        Args:
+        (self):
+        The requirements for the input pdb object are:
+            TODO(shaoqz): add after refactoring
+        Flag: 
+            str or list of strings indicating specifc mutation(s) or a rule of randomlization. (default: r)
+            Grammer:
+            **Assign specific mutation(s)**
+                'XA##Y'
+                For each str that represent a mutation, the format should be 'XA##Y', in which
+                X : Original residue letter (One-letter code). Leave X if unknow. 
+                    (Only used for checking that will pop a warning if the residue doesn't match, 
+                    which usually means you are using a wrong residue id and requires a double check.)
+                A : Chain index. This is optional witha default value: A.
+                    (Different chains are defined by 'TER' marks in the PDB file and the index is noted in order.
+                    * Note this will not always be the same as the chain id in the PDB line
+                    * defined in self.stru)
+                ##: Residue index. 
+                    (Strictly correponding residue indexes in the original file.
+                    * defined in self.stru)
+                Y : Target residue letter.
+                    (The residue type after the mutation.) 
+            example:
+                >>> pdb_obj.Add_MutaFlag('D83K')
+                >>> pdb_obj.MutaFlags
+                [('D', 'A', '83', 'K')]
+                >>> pdb_obj.Add_MutaFlag('DA83K')
+                >>> pdb_obj.MutaFlags
+                [('D', 'A', '83', 'K')]
+                >>> pdb_obj.Add_MutaFlag(['DA83K', 'EB226P'])
+                >>> pdb_obj.MutaFlags
+                [('D', 'A', '83', 'K'), ('E', 'B', '226', 'P')]
+            
+            **Assign random mutation(s)** 
+                ['r', {'position': 'keyword', 
+                       'target_resi':'keyword'}]
+                To assigne random mutaion, start the list with 'r' or 'random' followed by a map that
+                defines the rule of the randomlization. In the map dictionary there are 2 keys to fill:
+                position        : use a keyword or a pattern to define availiable positions to mutate.
+                target_residue  : use a keyword or a pattern to define availiable target residues.
+                (* Note that when using random assignment, the list can no longer contain any manual assign str for mutation.
+                e.g.: pdb_obj.Add_MutaFlag(['V23T', 'r']) is not valid)
+            example:
+                TODO(shaoqz): finish this function.
+        if_U: 
+            if include mutations to U (selenocysteine) in random generation.
+        if_self:
+            if "mutation to the same amino acid" is allowed for random mutation.
+
+        Returns:
+        There are two parts of actually outputs:
+        In self.MutaFlags: Assigned mutations in a list of tuples
+            example: 
+            [('D', 'A', '83', 'K'), ('E', 'B', '226', 'P')]
+        In return value: A str representing a tag of current mutations to the PDB.
+            example:
+            _DA83K_EB226P
         """
 
         if type(Flag) == str:
@@ -918,6 +972,8 @@ class PDB:
                 if resi.name in Resi_map2:
                     resi_1 = Resi_map2[resi.name]
                 else:
+                    if Config.debug >= 1:
+                        print('WARNING: pdb.Add_MutaFlag(): A non-canonical animo acid is being mutated! The MutaFlag will have a 3-letter code for the original residue .')
                     resi_1 = resi.name
                 # random over the residue list
                 if if_U:
@@ -1774,36 +1830,30 @@ class PDB:
                 + line_feed
             )
         else:
-            ntr_line = ""
-
-        # text
-        conf_str = (
-            """Minimize
+            ntr_line = ''
+        if self.conf_min['nmropt_rest'] == '1':
+            self.conf_min['nmropt'] = '1'
+            nmropt_line = '  nmropt= '+self.conf_min['nmropt']+','+line_feed
+            DISANG_tail = ''' &wt
+  type='END'
+ /
+  DISANG= '''+self.conf_min['DISANG']+line_feed
+            self._build_MD_rs(step='min',o_path=self.conf_min['DISANG'])
+        else:
+            nmropt_line = ''
+            DISANG_tail = ''
+        #text        
+        conf_str='''Minimize
  &cntrl
   imin  = 1,  ntx   = 1,  irest = 0,
-  ntc   = """
-            + self.conf_min["ntc"]
-            + """,    ntf = """
-            + self.conf_min["ntf"]
-            + """,
-  cut   = """
-            + self.conf_min["cut"]
-            + """,
-  maxcyc= """
-            + maxcyc
-            + """, ncyc  = """
-            + ncyc
-            + """,
-  ntpr  = """
-            + ntpr
-            + """, ntwx  = 0,
-"""
-            + ntr_line
-            + """ /
-"""
-        )
-        # write
-        with open(o_path, "w") as of:
+  ntc   = '''+self.conf_min['ntc']+''',    ntf = '''+self.conf_min['ntf']+''',
+  cut   = '''+self.conf_min['cut']+''',
+  maxcyc= '''+maxcyc+''', ncyc  = '''+ncyc+''',
+  ntpr  = '''+ntpr+''', ntwx  = 0,
+'''+ntr_line+nmropt_line+''' /
+'''+DISANG_tail
+        #write
+        with open(o_path,'w') as of:
             of.write(conf_str)
         return o_path
 
@@ -1839,10 +1889,13 @@ class PDB:
                 + line_feed
             )
         else:
-            ntr_line = ""
-
-        conf_str = (
-            """Heat
+            ntr_line = ''
+        if self.conf_heat['nmropt_rest'] == '1':
+            DISANG_tail = '''  DISANG='''+self.conf_heat['DISANG']+line_feed
+            self._build_MD_rs(step='heat',o_path=self.conf_heat['DISANG'])
+        else:
+            DISANG_tail = ''
+        conf_str='''Heat
  &cntrl
   imin  = 0,  ntx = 1, irest = 0,
   ntc   = """
@@ -1909,10 +1962,9 @@ class PDB:
  &wt
   type  = 'END',
  /
-"""
-        )
-        # write
-        with open(o_path, "w") as of:
+'''+DISANG_tail
+        #write
+        with open(o_path,'w') as of:
             of.write(conf_str)
         return o_path
 
@@ -1943,7 +1995,18 @@ class PDB:
                 + line_feed
             )
         else:
-            ntr_line = ""
+            ntr_line = ''
+        if self.conf_equi['nmropt_rest'] == '1':
+            self.conf_equi['nmropt'] = '1'
+            nmropt_line = '  nmropt= '+self.conf_equi['nmropt']+','+line_feed
+            DISANG_tail = ''' &wt
+  type='END'
+ /
+  DISANG= '''+self.conf_equi['DISANG']+line_feed
+            self._build_MD_rs(step='equi',o_path=self.conf_equi['DISANG'])
+        else:
+            nmropt_line = ''
+            DISANG_tail = ''
 
         conf_str = (
             """Equilibration:constant pressure
@@ -1984,13 +2047,10 @@ class PDB:
             + self.conf_equi["iwarp"]
             + """,
   ig    = -1,
-"""
-            + ntr_line
-            + """ /
-"""
-        )
-        # write
-        with open(o_path, "w") as of:
+'''+ntr_line+nmropt_line+''' /
+'''+DISANG_tail
+        #write
+        with open(o_path,'w') as of:
             of.write(conf_str)
         return o_path
 
@@ -2021,7 +2081,18 @@ class PDB:
                 + line_feed
             )
         else:
-            ntr_line = ""
+            ntr_line = ''
+        if self.conf_prod['nmropt_rest'] == '1':
+            self.conf_prod['nmropt'] = '1'
+            nmropt_line = '  nmropt= '+self.conf_prod['nmropt']+','+line_feed
+            DISANG_tail = ''' &wt
+  type='END'
+ /
+  DISANG= '''+self.conf_prod['DISANG']+line_feed
+            self._build_MD_rs(step='prod',o_path=self.conf_prod['DISANG'])
+        else:
+            nmropt_line = ''
+            DISANG_tail = ''
 
         conf_str = (
             """Production: constant pressure
@@ -2062,15 +2133,30 @@ class PDB:
             + self.conf_prod["iwarp"]
             + """,
   ig    = -1,
-"""
-            + ntr_line
-            + """ /
-"""
-        )
-        # write
-        with open(o_path, "w") as of:
+'''+ntr_line+nmropt_line+''' /
+'''+DISANG_tail
+        #write
+        with open(o_path,'w') as of:
             of.write(conf_str)
         return o_path
+
+    def _build_MD_rs(self,step,o_path):
+        '''
+        Generate a file for DISANG restraint. Get parameters from self.conf_step.
+        '''
+        rs_str=''
+        rs_data_step=self.__dict__['conf_'+step]['rs_constraints']
+        for rest_data in rs_data_step:
+            rs_str=rs_str+'''  &rst
+   iat=  '''+','.join(rest_data['iat'])+''', r1= '''+rest_data['r1']+''', r2= '''+rest_data['r2']+''', r3= '''+rest_data['r3']+''', r4= '''+rest_data['r4']+''',
+   rk2='''+rest_data['rk2']+''', rk3='''+rest_data['rk3']+''', ir6='''+rest_data['ir6']+''', ialtd='''+rest_data['ialtd']+''',
+  &end
+'''
+        #write
+        with open(o_path,'w') as of:
+            of.write(rs_str)
+        return o_path
+
 
     def reset_MD_conf(self):
         """
@@ -3033,7 +3119,7 @@ def PDB_to_AMBER_PDB(path):
     Make the file convertable with tleap without error
     - Test result: The header part cause duplication of the residues. Deleting that part may give normal tleap output
     - Test result: For some reason, some ligand will miss if directly covert after simple header cutting
-    - Test result: `cat 1NVG.pdb |grep "^ATOM\|^HETATM\|^TER|^END" > 1NVG-grep.pdb` will be fine
+    - Test result: `cat 1NVG.pdb |grep "^ATOM\\|^HETATM\\|^TER|^END" > 1NVG-grep.pdb` will be fine
     - WARNINGs
     """
     pass
