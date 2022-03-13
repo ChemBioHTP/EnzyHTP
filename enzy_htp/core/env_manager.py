@@ -32,7 +32,7 @@ class EnvironmentManager:
         self.env_vars_.append(env_var)
 
     def check_env_vars(self):
-        for env_var in self.env_vars_:
+       	for env_var in self.env_vars_:
             if os.getenv(env_var) is None:
                 self.missing_env_vars_.append(env_var)
 
