@@ -869,7 +869,7 @@ class PDB():
                      if_self: bool = 0):
         """Determine which mutation to deploy to the structure.
 
-        User can 1. assign specific mutatßion(s).
+        User can 1. assign specific mutation(s).
               or 2. assign random mutation(s) by specifing a rule of randomlization.
         The function will
         1. decode the input to a list of python tuples that
@@ -889,7 +889,7 @@ class PDB():
         Flag:
             str or list of strings indicating specifc mutation(s) or a rule of randomlization. (default: r)
             Grammer:
-            **Assign specific mutation(s)**
+            **1. Assign specific mutation(s)**
                 'XA##Y'
                 For each str that represent a mutation, the format should be 'XA##Y', in which
                 X : Original residue letter (One-letter code). Leave X if unknow.
@@ -915,7 +915,7 @@ class PDB():
                 >>> pdb_obj.MutaFlags
                 [('D', 'A', '83', 'K'), ('E', 'B', '226', 'P')]
 
-            **Assign random mutation(s)**
+            **2. Assign random mutation(s)**
                 ['r', {'position': 'keyword',
                        'target_resi':'keyword'}]
                 To assigne random mutaion, start the list with 'r' or 'random' followed by a map that
@@ -953,53 +953,31 @@ class PDB():
             _DA83K_EB226P
         """
 
+        mutation_flags = []
         # detect different input cases
         if type(Flag) == str:
-
-            if Flag == 'r' or Flag == 'random':
-                resi_1 = ''
-                resi_2 = ''
-                Muta_c_id = ''
-                Muta_r_id = ''
-
-                # Flag Generation：
-                # Random over the self.stru. Strictly correponding residue indexes in the original file. (no sort applied)
-                self.get_stru()
-                # random over the structure "protein" part.
-                chain = choice(self.stru.chains)
-                resi = choice(chain.residues)
-                Muta_c_id = chain.id
-                Muta_r_id = str(resi.id)
-                if resi.name in Resi_map2:
-                    resi_1 = Resi_map2[resi.name]
-                else:
-                    if Config.debug >= 1:
-                        print('WARNING: pdb.Add_MutaFlag(): A non-canonical animo acid is being mutated! The MutaFlag will have a 3-letter code for the original residue .')
-                    resi_1 = resi.name
-                # random over the residue list
-                if if_U:
-                    m_Resi_list = Resi_list
-                else:
-                    m_Resi_list = Resi_list[:-1]
-                resi_2 = choice(m_Resi_list)
-                # avoid or not mutation to self
-                if not if_self:
-                    while resi_2 == resi_1:
-                        resi_2 = choice(m_Resi_list)
-
-                MutaFlag = (resi_1, Muta_c_id, Muta_r_id ,resi_2)
-                self.MutaFlags.append(MutaFlag)
-
+            if Flag in ['r', 'random']:
+                mutate_position_range = _gen_mutate_position_range()
+                mutate_position = choice(mutate_position_range)
+                mutation_flags = _gen_mutate_residue(mutate_position)
             else:
-                MutaFlag = self._read_MutaFlag(Flag)
-                self.MutaFlags.append(MutaFlag)
-
+                mutation_flags = _decode_assigned_MutaFlag(Flag)
         if type(Flag) == list:
-            for i in Flag:
-                MutaFlag = self._read_MutaFlag(i)
-                self.MutaFlags.append(MutaFlag)
+            if Flag[0] in ['r', 'random']:
+                mutate_position_range = _gen_mutate_position_range(Flag[1]) #TODO if theres a way to unify these.
+                mutate_position = choice(mutate_position_range)
+                mutation_flags = _gen_mutate_residue(mutate_position)
+            else:
+                for single_flag in Flag:
+                    mutation_flags.extend(decode_assigned_MutaFlag(single_flag))
+        
+        # check if mutation flags are valid
+        _check_mutation_flag(mutation_flags, self.stru)
 
-        if Config.debug >= 1:
+        # output assigned mutation to object
+        self.MutaFlags.extend(mutation_flags)
+
+        if Config.debug >= 1:   # TODO change to logger
             print('Current MutaFlags:')
             for flag in self.MutaFlags:
                 print(self._build_MutaName(flag))
