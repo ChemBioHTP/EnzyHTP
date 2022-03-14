@@ -1,131 +1,61 @@
-from math import exp, ceil
-import os
-import re
-from subprocess import run, CalledProcessError
-from random import choice
-from xmlrpc.client import boolean
-from AmberMaps import *
-from wrapper import *
-from Class_Structure import *
-from Class_line import *
-from Class_Conf import Config, Layer
-from Class_ONIOM_Frame import *
-from helper import Conformer_Gen_wRDKit, decode_atom_mask, get_center, get_field_strength_value, line_feed, mkdir, generate_Rosetta_params
-try:
-    from pdb2pqr.main import main_driver as run_pdb2pqr
-    from pdb2pqr.main import build_main_parser as build_pdb2pqr_parser
-except ImportError:
-    raise ImportError("PDB2PQR not installed.")
+"""Defines a PDBPrepper class that takes in a raw pdb and prepares it for analysis.
+For existing users of EnzyHTP, this largely replaces what Class_PDB did.
 
-try:
-    import propka.lib
-except ImportError:
-    raise ImportError("PropKa not installed.")
-try:
-    import openbabel
-    import openbabel.pybel as pybel
-except ImportError:
-    raise ImportError("OpenBabel not installed.")
-
-__doc__ = """
-This module handles file I/O and external programs.
--------------------------------------------------------------------------------------
-Class PDB
--------------------------------------------------------------------------------------
-__init__(self, PDB_input, wk_dir = '', name = '', input_type='path')
--------------------------------------------------------------------------------------
-Information collecting methods:
--------------------------------------------------------------------------------------
-get_stru(self, ligand_list=None)
-get_seq(self)
-get_if_ligand = get_seq # alias
-get_if_art_resi = get_seq # alias
-get_missing(self, seq)
--------------------------------------------------------------------------------------
-PDB operating methods: (changes the self.path to indicated new pdb)
--------------------------------------------------------------------------------------
-PDB2PDBwLeap(self, Flag):
-PDBMin(self,cycle):
-rm_wat(self): remove water and ion for current pdb. (For potential docking)
-loopmodel_refine(self): Use different method to model the missing sequence
-
--------------------------------------------------------------------------------------
-Mutation Tools:
--------------------------------------------------------------------------------------
-Add_MutaFlag(self,Flag): User assigned Flag or Random Flag using "random"
-PDB_check(self):
-
--------------------------------------------------------------------------------------
-Input file generating methods:
--------------------------------------------------------------------------------------
-PDB2FF(self):
-PDBMD(self):
--------------------------------------------------------------------------------------
-For every potential first use of self.file_str or self.path or self.stru
-Will do nothing if the correct var is already exist.
- - use _get_file_str
- - use _get_file_path
- - use get_stru 
+Author: Chris Jurich, <chris.jurich@vanderbilt.edu>
+Date: 2022-03-12
 """
+import shutil
+import numpy as np
+from pdb2pqr.main import main_driver as run_pdb2pqr
+from pdb2pqr.main import build_main_parser as build_pdb2pqr_parser
 
+from typing import Set
+from ..core.system import base_file_name, get_current_time, safe_mkdir, lines_from_file, write_lines
+from .structure import structure_from_pdb
 
-class PDB:
-    def __init__(self, PDB_input, wk_dir="", name="", input_type="path"):
-        # TODO this thing does wayyy too much. jk
+from .structure import Structure
+from .pdb_line import PDBLine, read_pdb_lines
+
+class PDBPrepper:
+    def __init__(self, pdb_name, **kwargs): #, PDB_input, wk_dir="", name="", input_type="path"):
+        """Inits PDBPrepper with a pdb file and optionally a work directory to place temporary files."""
+        #self.path_name = pdb_name
+        # orig PDB
+        # orig copy PDB
+        # dehydrated
+        # protonated
+        # curr path
+        self.no_water_path = None
+        self.pdb_path = pdb_name
+        self.base_pdb_name = base_file_name( pdb_name ) 
+       	self.work_dir = kwargs.get('work_dir', f"{get_current_time()}_{self.base_pdb_name}") 
+        safe_mkdir( self.work_dir )
+        shutil.copy(self.pdb_path, f"{self.work_dir}/{self.base_pdb_name}.pdb")
+        self.path_name = f"{self.work_dir}/{self.base_pdb_name}.pdb"
+        self.pqr_path = f"{self.work_dir}/{self.base_pdb_name}.pqr.pdb"
+
+    def rm_wat(self) -> str:
         """
-        initiate PDB object
-        -------------------
-        PDB_input
-        wk_dir      : working directory (default: current dir ) **all file in the workflow are constructed base on this.**
-        name        : self assigned filename (default: from path or UNKNOW if no path)
-        input_type  : path (default) / file_str / file
-        -------------------
+        Remove water and ion for the pdb. Remians the same if there's no water or ion.
+        Now only skip [Na+,Cl-,WAT,HOH] // Append more in the future.
+        Save changed files into self.path.
+        TODO: need to support key water.
         """
-        # Nessessary initilize for empty judging
-        self.stru = None
-        self.path = None
-        self.prmtop_path = None
-        self.MutaFlags = []
-        self.nc = None
-        self.frames = None
-        # default MD conf.
-        self._init_MD_conf()
-        # default ONIOM layer setting
-        self.layer_preset = Config.Gaussian.layer_preset
-        self.layer_atoms = Config.Gaussian.layer_atoms
-
-        if wk_dir == "":
-            # current dir by default
-            self.dir = "."
-        else:
-            if wk_dir[-1] == "/":
-                self.dir = wk_dir[:-1]
-            else:
-                self.dir = wk_dir
-
-        if input_type == "path":
-            self.path = PDB_input
-            self._update_name()
-        if input_type == "file_str":
-            self.file_str = PDB_input
-            if name == "":
-                # default name
-                name = "UNKNOW"
-            self.name = name
-            self.path_name = self.dir + "/" + self.name
-        if input_type == "file":
-            self.file_str = PDB_input.read()
-            if name == "":
-                # default name
-                name = "UNKNOW"
-            self.name = name
-            self.path_name = self.dir + "/" + self.name
-        if input_type not in ["path", "file_str", "file"]:
-            raise Exception("PDB.__init__: only take path or file_str or file.")
-
-        # make cache
-        self.cache_path = self.dir + "/cache"
-        mkdir(self.cache_path)
+        
+        pdb_lines : List[PDBLine] = read_pdb_lines( self.path_name )
+        pdb_lines = list(filter(lambda pl: not (pl.is_water() or pl.is_CRYST1()), pdb_lines ))
+        mask = [True]*len(pdb_lines)
+        
+        for pidx, pl in enumerate(pdb_lines[1:]):
+            if pl.is_TER() and pdb_lines[pidx-1].is_TER():
+                mask[pidx] = False
+        
+        pdb_lines = np.array( pdb_lines )[mask]
+        self.no_water_path = f"{self.work_dir}/{self.base_pdb_name}_rmW.pdb"
+        write_lines( self.no_water_path,  list(map(str, pdb_lines)) )
+        
+        return self.no_water_path 
+        
 
     def _update_name(self):
         """
@@ -466,7 +396,7 @@ class PDB:
     Protonation
     ========
     """ 
-    def get_protonation(self, ph=7.0, keep_id=0, if_prt_ligand=1):
+    def get_protonation(self, ph : float=7.0, keep_id: int=0, if_prt_ligand: int=1) -> None:
         '''
         Get protonation state based on PDB2PQR:
         1. Use PDB2PQR, save output to self.pqr_path
@@ -485,15 +415,16 @@ class PDB:
         keep_id: if keep ids of original pdb file
         if_prt_ligand: if re-protonate ligand. (since sometime its already protonated)
         '''
-        out_path=self.path_name+'_aH.pdb'
-        self._get_file_path()
+        # TODO check that the ph is in the range 0-14
+        #out_path=self.path_name+'_aH.pdb'
+        #self._get_file_path()
         self._get_protonation_pdb2pqr(ph=ph)
-        self._protonation_Fix(out_path, ph=ph, keep_id=keep_id, if_prt_ligand=if_prt_ligand)
-        self.path = out_path
-        self._update_name()
-        self.stru.name = self.name
+        #self._protonation_Fix(out_path, ph=ph, keep_id=keep_id, if_prt_ligand=if_prt_ligand)
+        #self.path = out_path
+        #self._update_name()
+        #self.stru.name = self.name
 
-    def _get_protonation_pdb2pqr(self, ffout="AMBER", ph=7.0, out_path=""):
+    def _get_protonation_pdb2pqr(self, ffout: str="AMBER", ph: float=7.0, out_path: str=""):
         """
         Use PDB2PQR to get the protonation state for current PDB. (self.path)
         current implementation just use the outer layer of PDB2PQR. Update to inner one and get more infomation in the furture. 
@@ -502,11 +433,11 @@ class PDB:
         save the result to self.pqr_path
         """
         # set default value for output pqr path
-        if len(out_path) == 0:
-            self.pqr_path = self.path_name + ".pqr"
-        else:
-            self.pqr_path = out_path
-
+#        if len(out_path) == 0:
+#            self.pqr_path = self.path_name + ".pqr"
+#        else:
+#            self.pqr_path = out_path
+#
         # input of PDB2PQR
         pdb2pqr_parser = build_pdb2pqr_parser()
         args = pdb2pqr_parser.parse_args(
@@ -514,16 +445,15 @@ class PDB:
                 "--ff=PARSE",
                 "--ffout=" + ffout,
                 "--with-ph=" + str(ph),
-                self.path,
+                self.path_name,
                 self.pqr_path,
             ]
         )
         # use context manager to hide output
-        with HiddenPrints("./._get_protonation_pdb2pqr.log"):
-            run_pdb2pqr(args)
-
-
-    def _protonation_Fix(self, out_path, Metal_Fix='1', ph = 7.0, keep_id=0, if_prt_ligand=1):
+        # TODO maybe check if this actually works... figure out what to do with this stuff
+        #with HiddenPrints("./._get_protonation_pdb2pqr.log"):
+        run_pdb2pqr(args)
+    #def _protonation_Fix(self, out_path, Metal_Fix='1', ph = 7.0, keep_id=0, if_prt_ligand=1):
         '''
         Add in the missing atoms and run detailed fixing
         save to self.path
@@ -531,43 +461,43 @@ class PDB:
 
         # Add missing atom (from the PDB2PQR step. Update to func result after update the _get_protonation_pdb2pqr func)
         # Now metal and ligand
-
-        old_stru = Structure.fromPDB(self.path)
-        new_stru = Structure.fromPDB(self.pqr_path)
-
-        # find Metal center and combine with the pqr file
-        metal_list = old_stru.get_metal_center()
-        if len(metal_list) > 0:
-            new_stru.add(metal_list, sort=0)
-            # fix metal environment
-            new_stru.protonation_metal_fix(Fix=1)
-
-        # protonate ligands and combine with the pqr file
-        if len(old_stru.ligands) > 0:
-            lig_dir = self.dir + "/ligands/"
-            mkdir(lig_dir)
-            lig_paths = [
-                (i, k) for i, j, k in old_stru.build_ligands(lig_dir, ifname=1)
-            ]
-
-            new_ligs = []
-            for lig_path, lig_name in lig_paths:
-                if if_prt_ligand:
-                    new_lig_path, net_charge = self.protonate_ligand(lig_path, ph=ph)
-                else:
-                    # keep original structure
-                    new_lig_path, net_charge = (lig_path, None)
-                new_ligs.append(Ligand.fromPDB(new_lig_path, resi_name=lig_name, net_charge=net_charge, input_type='path'))
-            new_stru.add(new_ligs, sort = 0)
-
-        # PLACE HOLDER for other fix
-
-        # build file
-        if not keep_id:
-            new_stru.sort()
-        new_stru.build(out_path, keep_id=keep_id)
-        self.stru = new_stru
-
+        old_stru = structure_from_pdb(self.no_water_path)
+        new_stru = structure_from_pdb(self.pqr_path)
+    
+        if False:
+            # find Metal center and combine with the pqr file
+            metal_list = old_stru.get_metal_center()
+            if len(metal_list) > 0:
+                new_stru.add(metal_list, sort=0)
+                # fix metal environment
+                new_stru.protonation_metal_fix(Fix=1)
+    
+            # protonate ligands and combine with the pqr file
+            if len(old_stru.ligands) > 0:
+                lig_dir = self.dir + "/ligands/"
+                mkdir(lig_dir)
+                lig_paths = [
+                    (i, k) for i, j, k in old_stru.build_ligands(lig_dir, ifname=1)
+                ]
+    
+                new_ligs = []
+                for lig_path, lig_name in lig_paths:
+                    if if_prt_ligand:
+                        new_lig_path, net_charge = self.protonate_ligand(lig_path, ph=ph)
+                    else:
+                        # keep original structure
+                        new_lig_path, net_charge = (lig_path, None)
+                    new_ligs.append(Ligand.fromPDB(new_lig_path, resi_name=lig_name, net_charge=net_charge, input_type='path'))
+                new_stru.add(new_ligs, sort = 0)
+    
+            # PLACE HOLDER for other fix
+    
+            # build file
+            if not keep_id:
+                new_stru.sort()
+            new_stru.build(out_path, keep_id=keep_id)
+            self.stru = new_stru
+    
     @classmethod
     def protonate_ligand(cls, path, method="PYBEL", ph=7.0, keep_name=1):
         """
@@ -1381,7 +1311,7 @@ class PDB:
         ifsavepdb=0,
         ifsolve=1,
         box_type=None,
-        box_size=Config.Amber.box_size,
+        box_size=3,#Config.Amber.box_size,
         igb=None,
         if_prm_only=0,
     ):
@@ -1504,60 +1434,6 @@ class PDB:
 
         return self.prmtop_path, self.inpcrd_path
 
-    def rm_wat(self):
-        """
-        Remove water and ion for the pdb. Remians the same if there's no water or ion.
-        Now only skip [Na+,Cl-,WAT,HOH] // Append more in the future.
-        Save changed files into self.path.
-        TODO: need to support key water.
-        """
-        out_path = self.path_name + "_rmW.pdb"
-        self._get_file_path()
-        with open(self.path) as f:
-            with open(out_path, "w") as of:
-                skip_list = ["Na+", "Cl-", "WAT", "HOH"]
-                change_flag = 0
-                for line in f:
-                    PDB_l = PDB_line(line)
-                    # Skip some lines
-                    skip_flag = 0
-                    # skip the CRYST1 line
-                    if line[:6] == "CRYST1":
-                        change_flag = 1
-                        continue
-                    # keep TER and END
-                    if line[:3] == "END":
-                        of.write(line)
-                        continue
-                    if line[:3] == "TER":
-                        # if ter_flag is still 1. It means this first line kept after last TER is still a TER
-                        # skip TER in this case
-                        if ter_flag == 1:
-                            continue
-                        of.write(line)
-                        ter_flag = 1
-                        continue
-
-                    # skip the water and ion(Append in the future)
-                    for i in skip_list:
-                        if PDB_l.resi_name == i:
-                            skip_flag = 1
-                            break
-                    if skip_flag:
-                        change_flag = 1
-                        continue
-
-                    of.write(line)
-                    # set to 0 until first following line after TER is kept (not TER or skip_list)
-                    ter_flag = 0
-
-                if not change_flag:
-                    print("rm_wat(): No change.")
-
-        self.path = out_path
-        self._update_name()
-
-        return self.path
 
     def PDBMD(self, tag="", o_dir="", engine="Amber_GPU", equi_cpu=0):
         """
@@ -1976,80 +1852,80 @@ class PDB:
         """
         # path
         o_path = o_dir + "/equi.in"
-
-        # nstlim related
-        nstlim = self.conf_equi["nstlim"]
-        if self.conf_equi["ntpr"] == "0.002nstlim":
-            ntpr = str(int(nstlim * 0.002))
-        nstlim = str(nstlim)
-        # restrain related
-        if self.conf_equi["ntr"] == "1":
-            ntr_line = (
-                "  ntr   = "
-                + self.conf_equi["ntr"]
-                + ", restraint_wt = "
-                + self.conf_equi["restraint_wt"]
-                + ", restraintmask = "
-                + self.conf_equi["restraintmask"]
-                + ","
-                + line_feed
-            )
-        else:
-            ntr_line = ''
-        if self.conf_equi['nmropt_rest'] == '1':
-            self.conf_equi['nmropt'] = '1'
-            nmropt_line = '  nmropt= '+self.conf_equi['nmropt']+','+line_feed
-            DISANG_tail = ''' &wt
-  type='END'
- /
-  DISANG= '''+self.conf_equi['DISANG']+line_feed
-            self._build_MD_rs(step='equi',o_path=self.conf_equi['DISANG'])
-        else:
-            nmropt_line = ''
-            DISANG_tail = ''
-
-        conf_str = (
-            """Equilibration:constant pressure
- &cntrl
-  imin  = 0,  ntx = """
-            + self.conf_equi["ntx"]
-            + """,  irest = """
-            + self.conf_equi["irest"]
-            + """,
-  ntf   = """
-            + self.conf_equi["ntf"]
-            + """,  ntc = """
-            + self.conf_equi["ntc"]
-            + """,
-  nstlim= """
-            + nstlim
-            + """, dt= """
-            + self.conf_equi["dt"]
-            + """,
-  cut   = """
-            + self.conf_equi["cut"]
-            + """,
-  temp0 = """
-            + self.conf_equi["temp0"]
-            + """,
-  ntpr  = """
-            + ntpr
-            + """, ntwx = """
-            + self.conf_equi["ntwx"]
-            + """,
-  ntt   = """
-            + self.conf_equi["ntt"]
-            + """, gamma_ln = """
-            + self.conf_equi["gamma_ln"]
-            + """,
-  ntb   = 2,  ntp = 1,
-  iwrap = """
-            + self.conf_equi["iwarp"]
-            + """,
-  ig    = -1,
-'''+ntr_line+nmropt_line+''' /
-'''+DISANG_tail
-        #write
+#
+#        # nstlim related
+#        nstlim = self.conf_equi["nstlim"]
+#        if self.conf_equi["ntpr"] == "0.002nstlim":
+#            ntpr = str(int(nstlim * 0.002))
+#        nstlim = str(nstlim)
+#        # restrain related
+#        if self.conf_equi["ntr"] == "1":
+#            ntr_line = (
+#                "  ntr   = "
+#                + self.conf_equi["ntr"]
+#                + ", restraint_wt = "
+#                + self.conf_equi["restraint_wt"]
+#                + ", restraintmask = "
+#                + self.conf_equi["restraintmask"]
+#                + ","
+#                + line_feed
+#            )
+#        else:
+#            ntr_line = ''
+#        if self.conf_equi['nmropt_rest'] == '1':
+#            self.conf_equi['nmropt'] = '1'
+#            nmropt_line = '  nmropt= '+self.conf_equi['nmropt']+','+line_feed
+#            DISANG_tail = ''' &wt
+#  type='END'
+# /
+#  DISANG= '''+self.conf_equi['DISANG']+line_feed
+#            self._build_MD_rs(step='equi',o_path=self.conf_equi['DISANG'])
+#        else:
+#            nmropt_line = ''
+#            DISANG_tail = ''
+#
+#        conf_str = (
+#            """Equilibration:constant pressure
+# &cntrl
+#  imin  = 0,  ntx = """
+#            + self.conf_equi["ntx"]
+#            + """,  irest = """
+#            + self.conf_equi["irest"]
+#            + """,
+#  ntf   = """
+#            + self.conf_equi["ntf"]
+#            + """,  ntc = """
+#            + self.conf_equi["ntc"]
+#            + """,
+#  nstlim= """
+#            + nstlim
+#            + """, dt= """
+#            + self.conf_equi["dt"]
+#            + """,
+#  cut   = """
+#            + self.conf_equi["cut"]
+#            + """,
+#  temp0 = """
+#            + self.conf_equi["temp0"]
+#            + """,
+#  ntpr  = """
+#            + ntpr
+#            + """, ntwx = """
+#            + self.conf_equi["ntwx"]
+#            + """,
+#  ntt   = """
+#            + self.conf_equi["ntt"]
+#            + """, gamma_ln = """
+#            + self.conf_equi["gamma_ln"]
+#            + """,
+#  ntb   = 2,  ntp = 1,
+#  iwrap = """
+#            + self.conf_equi["iwarp"]
+#            + """,
+#  ig    = -1,
+#"""+ntr_line+nmropt_line+''' /
+#'''+DISANG_tail
+#        #write
         with open(o_path,'w') as of:
             of.write(conf_str)
         return o_path
@@ -2063,78 +1939,78 @@ class PDB:
         # path
         o_path = o_dir + "/prod.in"
 
-        # nstlim related
-        nstlim = self.conf_prod["nstlim"]
-        if self.conf_prod["ntpr"] == "0.001nstlim":
-            ntpr = str(int(nstlim * 0.001))
-        nstlim = str(nstlim)
-        # restrain related
-        if self.conf_prod["ntr"] == "1":
-            ntr_line = (
-                "  ntr   = "
-                + self.conf_prod["ntr"]
-                + ", restraint_wt = "
-                + self.conf_prod["restraint_wt"]
-                + ", restraintmask = "
-                + self.conf_prod["restraintmask"]
-                + ","
-                + line_feed
-            )
-        else:
-            ntr_line = ''
-        if self.conf_prod['nmropt_rest'] == '1':
-            self.conf_prod['nmropt'] = '1'
-            nmropt_line = '  nmropt= '+self.conf_prod['nmropt']+','+line_feed
-            DISANG_tail = ''' &wt
-  type='END'
- /
-  DISANG= '''+self.conf_prod['DISANG']+line_feed
-            self._build_MD_rs(step='prod',o_path=self.conf_prod['DISANG'])
-        else:
-            nmropt_line = ''
-            DISANG_tail = ''
-
-        conf_str = (
-            """Production: constant pressure
- &cntrl
-  imin  = 0, ntx = """
-            + self.conf_prod["ntx"]
-            + """, irest = """
-            + self.conf_prod["irest"]
-            + """,
-  ntf   = """
-            + self.conf_prod["ntf"]
-            + """,  ntc = """
-            + self.conf_prod["ntc"]
-            + """,
-  nstlim= """
-            + nstlim
-            + """, dt= """
-            + self.conf_prod["dt"]
-            + """,
-  cut   = """
-            + self.conf_prod["cut"]
-            + """,
-  temp0 = """
-            + self.conf_prod["temp0"]
-            + """,
-  ntpr  = """
-            + ntpr
-            + """, ntwx = """
-            + self.conf_prod["ntwx"]
-            + """,
-  ntt   = """
-            + self.conf_prod["ntt"]
-            + """, gamma_ln = """
-            + self.conf_prod["gamma_ln"]
-            + """,
-  ntb   = 2,  ntp = 1,
-  iwrap = """
-            + self.conf_prod["iwarp"]
-            + """,
-  ig    = -1,
-'''+ntr_line+nmropt_line+''' /
-'''+DISANG_tail
+#        # nstlim related
+#        nstlim = self.conf_prod["nstlim"]
+#        if self.conf_prod["ntpr"] == "0.001nstlim":
+#            ntpr = str(int(nstlim * 0.001))
+#        nstlim = str(nstlim)
+#        # restrain related
+#        if self.conf_prod["ntr"] == "1":
+#            ntr_line = (
+#                "  ntr   = "
+#                + self.conf_prod["ntr"]
+#                + ", restraint_wt = "
+#                + self.conf_prod["restraint_wt"]
+#                + ", restraintmask = "
+#                + self.conf_prod["restraintmask"]
+#                + ","
+#                + line_feed
+#            )
+#        else:
+#            ntr_line = ''
+#        if self.conf_prod['nmropt_rest'] == '1':
+#            self.conf_prod['nmropt'] = '1'
+#            nmropt_line = '  nmropt= '+self.conf_prod['nmropt']+','+line_feed
+#            DISANG_tail = ''' &wt
+#  type='END'
+# /
+#  DISANG= '''+self.conf_prod['DISANG']+line_feed
+#            self._build_MD_rs(step='prod',o_path=self.conf_prod['DISANG'])
+#        else:
+#            nmropt_line = ''
+#            DISANG_tail = ''
+#
+#        conf_str = (
+#            """Production: constant pressure
+# &cntrl
+#  imin  = 0, ntx = """
+#            + self.conf_prod["ntx"]
+#            + """, irest = """
+#            + self.conf_prod["irest"]
+#            + """,
+#  ntf   = """
+#            + self.conf_prod["ntf"]
+#            + """,  ntc = """
+#            + self.conf_prod["ntc"]
+#            + """,
+#  nstlim= """
+#            + nstlim
+#            + """, dt= """
+#            + self.conf_prod["dt"]
+#            + """,
+#  cut   = """
+#            + self.conf_prod["cut"]
+#            + """,
+#  temp0 = """
+#            + self.conf_prod["temp0"]
+#            + """,
+#  ntpr  = """
+#            + ntpr
+#            + """, ntwx = """
+#            + self.conf_prod["ntwx"]
+#            + """,
+#  ntt   = """
+#            + self.conf_prod["ntt"]
+#            + """, gamma_ln = """
+#            + self.conf_prod["gamma_ln"]
+#            + """,
+#  ntb   = 2,  ntp = 1,
+#  iwrap = """
+#            + self.conf_prod["iwarp"]
+#            + """,
+#  ig    = -1,
+#"""+ntr_line+nmropt_line+''' /
+#'''+DISANG_tail
         #write
         with open(o_path,'w') as of:
             of.write(conf_str)
@@ -2959,7 +2835,7 @@ class PDB:
         Result direction: a1 -> a2
         
         REF: Lu, T.; Chen, F., Multiwfn: A multifunctional wavefunction analyzer. J. Comput. Chem. 2012, 33 (5), 580-592.
-        '''
+        """ 
         Dipoles = []
 
         if prog == "Multiwfn":

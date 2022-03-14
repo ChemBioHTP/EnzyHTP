@@ -3,7 +3,7 @@ import sys
 import logging
 
 # enzy_htp imports
-from .structure import Structure, Residue
+from .structure import Structure, Residue, PDBPrepper
 from .core import EnvironmentManager, MissingEnvironmentElement, InvalidResidueCode
 from .chemical import ResidueType
 

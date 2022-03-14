@@ -1,8 +1,12 @@
-from helper import line_feed
-from AmberMaps import Resi_Ele_map
+from typing import List
+#from helper import line_feed
+#from AmberMaps import Resi_Ele_map
 
+from ..core.system import lines_from_file
 
-class PDB_line(object):
+# TODO CJ: add documentation
+
+class PDBLine:
     """
     Class for decoding the line in the PDB file. Functions used internally. 
     Generate from:
@@ -10,11 +14,18 @@ class PDB_line(object):
     lines: PDB_line.fromlines(lines) --> [PDB_line, ...]
     """
 
-    def __init__(self, line):
+    def __init__(self, line : str):
         """
         initilize with a specific line in the PDB file.
         Get self.line_type
         """
+        # TODO figure out why this throws	
+        self.line = str
+        self.resi_name = str
+        self.line = str
+        self.line = str
+        self.line = str
+        self.line = str
         try:
             self.line = line
             self.line_type = self.line[0:6].strip()
@@ -112,6 +123,15 @@ class PDB_line(object):
         )
         return line
 
+    def is_TER(self) -> bool:
+        return self.line[:3] == "TER"
+    
+    def is_END(self) -> bool:
+        return self.line[:3] == "END"
+    
+    def is_CRYST1(self) -> bool:
+        return self.line[:6] == "CRYST1"
+
     # misc
     def get_alternate_location_indicator(self):
         self.AL_id = self.line[16:17].strip()
@@ -149,6 +169,20 @@ class PDB_line(object):
         #         self.element = Resi_Ele_map['Amber'][self.atom_name]
         return self.element
 
+    def is_water(self) -> bool:
+        return self.resi_name in {"Na+", "Cl-", "WAT", "HOH"}
+
     def get_charge(self):
         self.charge = self.line[78:80].strip()
         return self.charge
+
+    def __str__(self) -> str:
+        return self.line
+    
+    def __repr__(self) -> str:
+        return self.line
+
+def read_pdb_lines( fname : str ) -> List[PDBLine]:
+    """Generates a list() of PDBLine objexts from a given PDB file"""
+    non_empty = list(filter(len,lines_from_file(fname)))
+    return list(map(PDBLine, non_empty))
