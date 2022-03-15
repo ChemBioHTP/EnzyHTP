@@ -5,6 +5,7 @@ from distutils.command.config import config
 from AmberMaps import Resi_list
 import os
 import numpy as np
+import re
 '''
 ====
 Tree
@@ -232,3 +233,56 @@ def write_data(tag, data, out_path):
 Mutant assigner
 '''
 #TODO
+def MutaFlag_decode(self, Flag):
+    """Decode the manually input MutaFlag(s) into tuple or a list of tuples    
+    User can input string of MutaFlag or list of MutaFlag strings.          
+    The function will decode the input into tuple or list of tuples. 
+    Tuple will contains information of MutaFlag as ('X','A','11','Y').
+    
+    Args:
+        Flag: 
+            String of MutaFlag or list of MutaFlag strings representing specifc mutation(s).
+            Requirement: r'([A-Z])([A-Z])?([0-9]+)([A-Z])'
+            Grammer:        
+                X : A letter represents the original residue name.
+                    Leave X if unknow. 
+                    Only used for build filenames and check the residue name.
+                    Doesn't affect any calculation.
+                A : Chain index. 
+                    Determine by 'TER' marks in the PDB file.
+                    Range in self.stru.chains.
+                    Default value as A if chain index is null.
+                11: Residue index. 
+                    Strictly correponding residue indexes in the original file. 
+                    Range in self.stru.chain[int].residues.
+                Y : A letter represents the target residue name.                       
+    
+    Returns:
+        Tuple or list of tuples:
+            Each contains information of MutaFlag(s)
+            Example: 
+                Tuple: ('X','A','11','Y') 
+                List of tuples: [('X', 'A', '11', 'Y'), ('X', 'A', '11', 'Y'),...]
+    
+    Raises:
+        Exception: 
+            An exception occurred.
+            Input doesn't match the required format.
+    """
+    pattern = r'([A-Z])([A-Z])?([0-9]+)([A-Z])'
+    F_match = re.match(pattern, Flag)
+
+    if F_match is None:
+        raise Exception('_read_MutaFlag: Required format: XA11Y or X11Y')  
+    resi_1 = F_match.group(1)
+    chain_id = F_match.group(2)
+    resi_id = str(F_match.group(3))
+    resi_2 = F_match.group(4)
+
+    # Assign default value to chain index
+    if F_match.group(2) is None:
+        chain_id = 'A'
+        if Config.debug >= 1:
+            print('_read_MutaFlag: No chain_id is provided!'
+                  'Mutate in the first chain by default. Input: ' + Flag)
+
