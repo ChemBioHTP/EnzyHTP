@@ -236,7 +236,7 @@ Mutant assigner
 '''
 Sans_check
 '''
-def MutaFlag_san_check(self, chains):
+def MutaFlag_san_check(self, flag):
     ''' Checks if MutaFlag list is in correct indices.
 
     Input: [ 'X', 'X', #, 'X' ]
@@ -255,3 +255,13 @@ def MutaFlag_san_check(self, chains):
         raise Exception('_MutaFlag_san_check: San check failed. Input resi id in not in range.'+line_feed+' range: '+ repr(resi_id_list))
     if not resi_2 in Resi_list:
         raise Exception('_MutaFlag_san_check: Only support mutate to the known 21 residues. AmberMaps.Resi_list: '+ repr(Resi_list))
+    
+    return chain_id_list
+
+def test_1():
+    with assertRaises(Exception):
+        x = MutaFlag_san_check['A','A',1,'C']
+        
+def test_2():
+    with assertRaises(Exception):
+        x = MutaFlag_san_check['A','A',1000000,'C']
