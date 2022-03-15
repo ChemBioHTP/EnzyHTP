@@ -258,10 +258,13 @@ def MutaFlag_san_check(self, flag):
     
     return chain_id_list
 
-def test_1():
-    with assertRaises(Exception):
-        x = MutaFlag_san_check['A','A',1,'C']
+'''
+Sans_check_test
+'''
+def test_pass():
+    with pytest.raises(Exception):
+        x = MutaFlag_san_check(['A','A',1,'C'])
         
-def test_2():
-    with assertRaises(Exception):
-        x = MutaFlag_san_check['A','A',1000000,'C']
+def test_fail():
+    with pytest.raises(Exception):
+        x = MutaFlag_san_check(['A','A',1000000,'C'])
