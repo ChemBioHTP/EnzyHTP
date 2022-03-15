@@ -157,14 +157,14 @@ def lasso_extender(scaffold_file: str,
 
     attachment_location, scaffold = read_scaffold(scaffold_file)
     attachment_point = scaffold[attachment_location - 1][1]
-
+    
     extender = read_extender(extension_file)
     extender_vectors = [[extender[i][0], find_vector(extender, 11, i)] for i in range(12)]
 
     vec_extender = find_vector(extender, 12, 11)
-    vec_scaffold = find_vector(scaffold, attachment_location - 2, attachment_location - 1)
+    vec_scaffold = find_vector(scaffold, attachment_location - 3, attachment_location - 1)
     extension_matrix = rotation_matrix_from_vectors(vec_scaffold, vec_extender)
-
+    
     rotated_extension = list(map(lambda vec: [vec[0], np.dot(vec[1], extension_matrix)], extender_vectors))
 
     scaffold = scaffold[:attachment_location-1] + scaffold[attachment_location + 5:]
@@ -212,10 +212,13 @@ def main():
     Extends the severedLassoPeptide.xyz file by 4 of the default Alanine extender
     """
     # print(pybel.informats)
-    scaffold = "lasso_extension/scaffolds/7mr_lassoPeptide_asx_7A.pdb"
+    ring = 7
+    loop = 7
     tail_length = 4
+    isopeptide = "asx"
     outfile = "asx_7A"
-    lasso_extender(scaffold, tail_length, outfile)
+
+    lasso_peptide_gen(ring, loop, tail_length, isopeptide, outfile)
 
 
 if __name__ == "__main__":
