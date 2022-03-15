@@ -5,6 +5,7 @@ import numpy as np
 from openbabel import pybel
 
 
+
 def read_scaffold(filename: str) -> list:
     """Reads pdb file containing scaffold structure.
 
@@ -84,7 +85,7 @@ def find_vector(structure: list, coord_1: int, coord_2: int) -> np.array:
 def rotation_matrix_from_vectors(vec1: np.array, vec2: np.array) -> np.matrix:
     """Calculates rotation matrix between two vectors.
 
-    Code borrowed from:
+    Code adapted from:
     https://stackoverflow.com/questions/63525482/finding-the-rotation-matrix-between-two-vectors-in-python
 
     Args:
@@ -236,10 +237,10 @@ def main():
 
     ring = 7
     loop = 7
-    tail_length = 4
+    tail_length = 100
     isopeptide = "asx"
     outfile = "asx_7A"
-
+    
     lasso_peptide_gen(ring, loop, tail_length, isopeptide, outfile)
 
 
