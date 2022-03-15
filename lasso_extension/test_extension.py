@@ -1,6 +1,7 @@
 import pytest
-import lasso_extender as lasso
 import numpy as np
+import lasso_extension.lasso_peptide_gen as lasso
+
 
 def test_rotation_matrix_parallel():
     assert np.array_equiv(lasso.rotation_matrix_from_vectors(np.array([1, 1, 1]), np.array([2, 2, 2])), np.eye(3))
