@@ -12,12 +12,13 @@ def read_scaffold(filename: str) -> list:
         filename: str containing name/path of file to be read
 
     Return:
-        Coordinate of N-Methyl attachment point
+        Coordinate of N-Methyl attachment point from first line of scaffold file
         list containing [element_symbol, np.array(x, y, z)] for each atom
 
     Raises:
         ValueError: A file format other than pdb is used
     """
+
     if not filename.endswith(".pdb"):
         raise ValueError("Filename must end in .xyz or .pdb")
 
@@ -48,6 +49,7 @@ def read_extender(filename: str) -> list:
     Raises:
         ValueError: A file format other than xyz is used
     """
+
     if not filename.endswith(".xyz"):
         raise ValueError("Filename must end in .xyz")
 
@@ -75,6 +77,7 @@ def find_vector(structure: list, coord_1: int, coord_2: int) -> np.array:
     Returns:
         The vector points from coord_1 to coord_2
     """
+
     return structure[coord_2][1] - structure[coord_1][1]
 
 
@@ -113,28 +116,34 @@ def rotation_matrix_from_vectors(vec1: np.array, vec2: np.array) -> np.matrix:
 
 
 def gen_xyz(coords: list, outfile_name: str) -> str:
-    """Writes the calculated coordinates to an .xyz formatted string.
+    """Writes the calculated coordinates to an xyz-formatted string.
 
     Args:
         coords: The list of coordinates in [[element_symbol, xyz_coord_array], ...] form
-        outfile_name: The name of the xyz file to write the coordinates
+        outfile_name: The title entry for the xyz string
 
     Returns:
         A string containing the coordinates in xyz format
     """
-    xyz_str = ""
-    xyz_str += str(len(coords)) + "\n"
+
+    xyz_str = str(len(coords)) + "\n"
     xyz_str += outfile_name + "\n"
     for atom in coords:
         coord_string = atom[0] + "  " if len(atom[0]) == 1 else ""
         coord_string += "".join([" " * (7 if atom[1][i] < 0 else 8) + f"{atom[1][i]:.5f}" for i in range(3)])
         xyz_str += coord_string + "\n"
- 
+
     return xyz_str
 
 
 def convert_to_PDB(xyz_str: str, outfile_name: str) -> None:
-    # extended = pybel.readfile("xyz", "lasso_extension/structures/" + outfile_name + ".xyz")
+    """Converts an xyz-formatted string to a PDB file in the output_structures folder
+    
+    Args:
+        xyz_str: The xyz-formatted string to read coordinates from
+        outfile_name:The name of the final PDB file    
+    """
+
     extended = pybel.readstring("xyz", xyz_str)
     extended.write("pdb", "lasso_extension/output_structures/" + outfile_name + ".pdb", overwrite=True)
 
@@ -157,17 +166,17 @@ def lasso_extender(scaffold_file: str,
 
     attachment_location, scaffold = read_scaffold(scaffold_file)
     attachment_point = scaffold[attachment_location - 1][1]
-    
+
     extender = read_extender(extension_file)
     extender_vectors = [[extender[i][0], find_vector(extender, 11, i)] for i in range(12)]
 
     vec_extender = find_vector(extender, 12, 11)
     vec_scaffold = find_vector(scaffold, attachment_location - 3, attachment_location - 1)
     extension_matrix = rotation_matrix_from_vectors(vec_scaffold, vec_extender)
-    
+
     rotated_extension = list(map(lambda vec: [vec[0], np.dot(vec[1], extension_matrix)], extender_vectors))
 
-    scaffold = scaffold[:attachment_location-1] + scaffold[attachment_location + 5:]
+    scaffold = scaffold[:attachment_location - 1] + scaffold[attachment_location + 5:]
     for vector in rotated_extension:
         scaffold.append([vector[0], vector[1] + attachment_point])
 
@@ -183,17 +192,30 @@ def lasso_extender(scaffold_file: str,
         for vector in rotated_extension:
             scaffold.append([vector[0], vector[1] + attachment_point])
 
-    
     if outfile.endswith(".pdb"):
         outfile = outfile[:-4]
     xyz_str = gen_xyz(scaffold, outfile)
-  
+
     convert_to_PDB(xyz_str, outfile)
 
-def lasso_peptide_gen(ring : int, loop : int, tail : int, isopeptide : str, outfile : str,
-                      extender : str = "lasso_extension/extenders/alanine_planar_N.xyz"):
-    """Creates lasso peptide according to specifications
+
+def lasso_peptide_gen(ring: int,
+                      loop: int,
+                      tail: int,
+                      isopeptide: str,
+                      outfile: str,
+                      extender: str = "lasso_extension/extenders/alanine_planar_N.xyz"):
+    """Creates lasso peptide PDB with desired ring, loop, and tail size
+
+    Args:
+        ring: The number of residues in the lasso peptide ring
+        loop: The number of residues in the lasso peptide upper loop
+        tail: The number of residues in the lasso peptide tail
+        isopeptide: The type of linkage closing the ring. asx for aspartate or glx for glutamate
+        outfile: The name of the final PDB to be placed into the output_structure file
+        extender: The xyz file containing the amino acid extender if not alanine
     """
+
     if ring != 7:
         raise ValueError("That ring size is not currently available")
     elif loop not in [7, 8]:
@@ -206,12 +228,12 @@ def lasso_peptide_gen(ring : int, loop : int, tail : int, isopeptide : str, outf
     scaffold = f"lasso_extension/scaffolds/{ring}mr_lassoPeptide_{isopeptide}_{loop}A.pdb"
     lasso_extender(scaffold, tail, outfile, extender)
 
-def main():
-    """Driver for lasso_extender()
 
-    Extends the severedLassoPeptide.xyz file by 4 of the default Alanine extender
+def main():
+    """Driver for lasso_peptide_gen()
+
     """
-    # print(pybel.informats)
+
     ring = 7
     loop = 7
     tail_length = 4
