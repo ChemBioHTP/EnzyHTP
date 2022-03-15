@@ -2,7 +2,6 @@
 """
 
 import numpy as np
-import openbabel
 from openbabel import pybel
 
 
@@ -130,23 +129,14 @@ def gen_xyz(coords: list, outfile_name: str) -> str:
         coord_string = atom[0] + "  " if len(atom[0]) == 1 else ""
         coord_string += "".join([" " * (7 if atom[1][i] < 0 else 8) + f"{atom[1][i]:.5f}" for i in range(3)])
         xyz_str += coord_string + "\n"
-    """
-    with open("lasso_extension/structures/" + outfile_name, "w+", encoding="utf-8") as outfile:
-        print(len(coords), file=outfile)
-        print(outfile_name, file=outfile)
-
-        for atom in coords:
-            coord_string = atom[0] + "  " if len(atom[0]) == 1 else ""
-            coord_string += "".join([" " * (7 if atom[1][i] < 0 else 8) + f"{atom[1][i]:.5f}" for i in range(3)])
-            print(coord_string, file=outfile)
-    """
+ 
     return xyz_str
 
 
 def convert_to_PDB(xyz_str: str, outfile_name: str) -> None:
     # extended = pybel.readfile("xyz", "lasso_extension/structures/" + outfile_name + ".xyz")
     extended = pybel.readstring("xyz", xyz_str)
-    extended.write("pdb", "lasso_extension/structures/" + outfile_name + ".pdb")
+    extended.write("pdb", "lasso_extension/output_structures/" + outfile_name + ".pdb", overwrite=True)
 
 
 def lasso_extender(scaffold_file: str,
@@ -172,12 +162,12 @@ def lasso_extender(scaffold_file: str,
     extender_vectors = [[extender[i][0], find_vector(extender, 11, i)] for i in range(12)]
 
     vec_extender = find_vector(extender, 12, 11)
-    vec_scaffold = find_vector(scaffold, attachment_location - 1, attachment_location)
+    vec_scaffold = find_vector(scaffold, attachment_location - 2, attachment_location - 1)
     extension_matrix = rotation_matrix_from_vectors(vec_scaffold, vec_extender)
 
     rotated_extension = list(map(lambda vec: [vec[0], np.dot(vec[1], extension_matrix)], extender_vectors))
 
-    scaffold = scaffold[:35] + scaffold[41:]  # N36-H41 are H3C-N-H group
+    scaffold = scaffold[:attachment_location-1] + scaffold[attachment_location + 5:]
     for vector in rotated_extension:
         scaffold.append([vector[0], vector[1] + attachment_point])
 
@@ -193,14 +183,14 @@ def lasso_extender(scaffold_file: str,
         for vector in rotated_extension:
             scaffold.append([vector[0], vector[1] + attachment_point])
 
-    print(scaffold)
+    
     if outfile.endswith(".pdb"):
         outfile = outfile[:-4]
     xyz_str = gen_xyz(scaffold, outfile)
-    print(xyz_str)
+  
     convert_to_PDB(xyz_str, outfile)
 
-def lasso_peptide_gen(ring : int, loop : int, tail : int, outfile : str, isopeptide : str,
+def lasso_peptide_gen(ring : int, loop : int, tail : int, isopeptide : str, outfile : str,
                       extender : str = "lasso_extension/extenders/alanine_planar_N.xyz"):
     """Creates lasso peptide according to specifications
     """
