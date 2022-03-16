@@ -99,15 +99,15 @@ class EnvironmentManager:
         return self.mapper[key]
 
 
-em = EnvironmentManager(
-    env_vars=["AMBERHOME"],
-    executables=[
-        "tleap",
-        "ambpdb",
-        "cpptraj",
-        "mpirun",
-        "$AMBERHOME/bin/sander.MPI",
-        "$AMBERHOME/bin/pmemd.cuda",
-        "$AMBERHOME/bin/MMPBSA.py.MPI",
-    ],
-)
+#em = EnvironmentManager(
+#    env_vars=["AMBERHOME"],
+#    executables=[
+#        "tleap",
+#        "ambpdb",
+#        "cpptraj",
+#        "mpirun",
+#        "$AMBERHOME/bin/sander.MPI",
+#        "$AMBERHOME/bin/pmemd.cuda",
+#        "$AMBERHOME/bin/MMPBSA.py.MPI",
+#    ],
+#)
