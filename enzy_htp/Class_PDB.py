@@ -514,7 +514,7 @@ class PDB:
                 "--ff=PARSE",
                 "--ffout=" + ffout,
                 "--with-ph=" + str(ph),
-                self.path,
+                self.path
                 self.pqr_path,
             ]
         )

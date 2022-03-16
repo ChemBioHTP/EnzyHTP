@@ -11,7 +11,7 @@ except ImportError:
 with open('requirements.txt', 'r') as f:
 	requirements = f.read().splitlines()
 
-
+#TODO add entry points for executables
 setup(name='enzy_htp',
         version='0.1.0',
         description='TODO',

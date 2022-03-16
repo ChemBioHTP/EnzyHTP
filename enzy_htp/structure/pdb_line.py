@@ -3,6 +3,7 @@ from typing import List
 #from AmberMaps import Resi_Ele_map
 
 from ..core.system import lines_from_file
+from ..chemical import THREE_LETTER_AA_MAPPER
 
 # TODO CJ: add documentation
 
@@ -20,12 +21,8 @@ class PDBLine:
         Get self.line_type
         """
         # TODO figure out why this throws	
-        self.line = str
+        self.line = str()
         self.resi_name = str
-        self.line = str
-        self.line = str
-        self.line = str
-        self.line = str
         try:
             self.line = line
             self.line_type = self.line[0:6].strip()
@@ -130,6 +127,9 @@ class PDBLine:
     
     def is_CRYST1(self) -> bool:
         return self.line[:6] == "CRYST1"
+
+    def is_residue_line(self) -> bool:
+        return self.resi_name in THREE_LETTER_AA_MAPPER
 
     # misc
     def get_alternate_location_indicator(self):

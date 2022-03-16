@@ -4,7 +4,7 @@ import logging
 
 # enzy_htp imports
 from .structure import Structure, Residue, PDBPrepper
-from .core import EnvironmentManager, MissingEnvironmentElement, InvalidResidueCode, _LOGGER
+from .core import EnvironmentManager, MissingEnvironmentElement, InvalidResidueCode, _LOGGER, em
 from .chemical import ResidueType
 
 #def init_logging() -> None:
@@ -13,17 +13,5 @@ from .chemical import ResidueType
 #    )
 
 
-em = EnvironmentManager(
-    env_vars=["AMBERHOME"],
-    executables=[
-        "tleap",
-        "ambpdb",
-        "cpptraj",
-        "mpirun",
-        "$AMBERHOME/bin/sander.MPI",
-        "$AMBERHOME/bin/pmemd.cuda",
-        "$AMBERHOME/bin/MMPBSA.py.MPI",
-    ],
-)
 
 em.check_environment()

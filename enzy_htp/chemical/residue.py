@@ -1,5 +1,5 @@
 """TODO: DOCUMENATION"""
-
+from typing import List, Set
 from ..core import InvalidResidueCode
 
 # TODO maybe check for non-canonical?
@@ -56,6 +56,137 @@ ONE_LETTER_AA_MAPPER = {
     "W": "TRP",
 }
 
+RESIDUE_ELEMENT_MAP = {
+    "Amber": {
+        "C": "C",
+        "CA": "C",
+        "CB": "C",
+        "CD": "C",
+        "CD1": "C",
+        "CD2": "C",
+        "CE": "C",
+        "CE1": "C",
+        "CE2": "C",
+        "CE3": "C",
+        "CG": "C",
+        "CG1": "C",
+        "CG2": "C",
+        "CH2": "C",
+        "CZ": "C",
+        "CZ2": "C",
+        "CZ3": "C",
+        "H": "H",
+        "H1": "H",
+        "H2": "H",
+        "H3": "H",
+        "HA": "H",
+        "HA2": "H",
+        "HA3": "H",
+        "HB": "H",
+        "HB1": "H",
+        "HB2": "H",
+        "HB3": "H",
+        "HD1": "H",
+        "HD11": "H",
+        "HD12": "H",
+        "HD13": "H",
+        "HD2": "H",
+        "HD21": "H",
+        "HD22": "H",
+        "HD23": "H",
+        "HD3": "H",
+        "HE": "H",
+        "HE1": "H",
+        "HE2": "H",
+        "HE21": "H",
+        "HE22": "H",
+        "HE3": "H",
+        "HG": "H",
+        "HG1": "H",
+        "HG11": "H",
+        "HG12": "H",
+        "HG13": "H",
+        "HG2": "H",
+        "HG21": "H",
+        "HG22": "H",
+        "HG23": "H",
+        "HG3": "H",
+        "HH": "H",
+        "HH11": "H",
+        "HH12": "H",
+        "HH2": "H",
+        "HH21": "H",
+        "HH22": "H",
+        "HZ": "H",
+        "HZ1": "H",
+        "HZ2": "H",
+        "HZ3": "H",
+        "N": "N",
+        "ND1": "N",
+        "ND2": "N",
+        "NE": "N",
+        "NE1": "N",
+        "NE2": "N",
+        "NH1": "N",
+        "NH2": "N",
+        "NZ": "N",
+        "O": "O",
+        "OD1": "O",
+        "OD2": "O",
+        "OE1": "O",
+        "OE2": "O",
+        "OG": "O",
+        "OG1": "O",
+        "OH": "O",
+        "OXT": "O",
+        "SD": "S",
+        "SG": "S",
+        "LI": "Li",
+        "NA": "Na",
+        "K": "K",
+        "RB": "Rb",
+        "CS": "Cs",
+        "MG": "Mg",
+        "TL": "Tl",
+        "CU": "Cu",
+        "AG": "Ag",
+        "BE": "Be",
+        "NI": "Ni",
+        "PT": "Pt",
+        "ZN": "Zn",
+        "CO": "Co",
+        "PD": "Pd",
+        "CR": "Cr",
+        "FE": "Fe",
+        "V": "V",
+        "MN": "Mn",
+        "YB": "Yb",
+        "SN": "Sn",
+        "PB": "Pb",
+        "EU": "Eu",
+        "SR": "Sr",
+        "SM": "Sm",
+        "BA": "Ba",
+        "RA": "Ra",
+        "AL": "Al",
+        "IN": "In",
+        "Y": "Y",
+        "LA": "La",
+        "PR": "Pr",
+        "ND": "Nd",
+        "GD": "Gd",
+        "TB": "Tb",
+        "DY": "Dy",
+        "ER": "Er",
+        "TM": "Tm",
+        "LU": "Lu",
+        "HF": "Hf",
+        "ZR": "Zr",
+        "U": "U",
+        "PU": "Pu",
+        "TH": "Th",
+    }
+}
 
 def convert_to_three_letter(one_letter: str) -> str:
     """TODO DOCUMENTATION"""
@@ -81,3 +212,18 @@ def convert_to_one_letter(three_letter: str) -> str:
     if not result:
         raise InvalidResidueCode(f"Invalid residue code {three_letter}")
     return result
+
+
+def get_element_aliases( ff : str, element : str ) -> Set[str]:
+    # TODO check that ff is defined
+    ff_dict = RESIDUE_ELEMENT_MAP[ff]
+    aliases = []
+    for alias, elem in ff_dict.items():
+        if elem  == element:
+            aliases.append( alias )
+
+    return set(aliases)
+
+def one_letters_except(existing : str ) -> List[str]:
+    result = list(ONE_LETTER_AA_MAPPER.keys())
+    return list(filter(lambda s: s != existing, result))

@@ -1,6 +1,6 @@
 #TODO add documentation
 import string
-from typing import List
+from typing import List, Set
 from collections import defaultdict
 from biopandas.pdb import PandasPdb
 
@@ -10,6 +10,10 @@ from .residue import Residue
 from ..core.logger import _LOGGER
 from .ligand import Ligand, residue_to_ligand
 from .solvent import Solvent, residue_to_solvent
+
+from ..chemical import one_letters_except, convert_to_one_letter
+
+from .mutate import MutaFlag
 
 class Structure:
     def __init__(self, pandas_pdb : PandasPdb ):
@@ -21,6 +25,25 @@ class Structure:
         self.metalatoms = []
         self.ligands = []
         self.solvents = []
+
+
+    def residue_state(self) -> Set:
+        print(self.chains_)
+        exit( 0 )
+    
+    def all_possible_mutations(self) -> List[MutaFlag]:
+        result = list()
+        for cname, chain in self.chains_.items():
+            # TODO check that the chain can have this done
+                for residue in chain.residues():
+                    orig_one_letter = convert_to_one_letter( residue.name )
+                    result.extend(
+					    list(map(lambda mut: MutaFlag(orig_residue=orig_one_letter, chain_index=cname, residue_index=residue.num_, target_residue=mut),one_letters_except(orig_one_letter) ))
+                    )
+                    #print(residue)
+
+        return result
+
 
     def get_metalatoms(self):
         """

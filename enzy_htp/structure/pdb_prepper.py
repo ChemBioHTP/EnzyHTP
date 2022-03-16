@@ -25,6 +25,13 @@ import openbabel.pybel as pybel
 
 from .ligand import Ligand, protonate_ligand
 
+from typing import List
+
+from .mutate import MutaFlag, mutaflag_to_str
+
+from ..core import em
+from ..chemical import convert_to_three_letter, get_element_aliases
+
 class PDBPrepper:
     def __init__(self, pdb_name, **kwargs): #, PDB_input, wk_dir="", name="", input_type="path"):
         """Inits PDBPrepper with a pdb file and optionally a work directory to place temporary files."""
@@ -36,6 +43,7 @@ class PDBPrepper:
         shutil.copy(self.pdb_path, f"{self.work_dir}/{self.base_pdb_name}.pdb")
         self.path_name = f"{self.work_dir}/{self.base_pdb_name}.pdb"
         self.pqr_path = f"{self.work_dir}/{self.base_pdb_name}.pqr.pdb"
+        self.mutations = []
 
     def rm_wat(self) -> str:
         """
@@ -461,8 +469,6 @@ class PDBPrepper:
         new_stru.build(f"{self.work_dir}/final.pdb", keep_id=keep_id)
         self.stru = new_stru
     
-
-
     """
     ========
     Docking
@@ -544,7 +550,9 @@ class PDBPrepper:
     ========
     """
 
-    def PDB2PDBwLeap(self):
+    #def PDB2PDBwLeap(self):
+    def apply_mutations(self) -> None:
+
         """
         Apply mutations using tleap. Save mutated structure PDB in self.path
         ------------------------------
@@ -559,103 +567,91 @@ class PDBPrepper:
         **WARNING** if there are multiple mutations on the same index, only the first one will be used.
         """
 
-        # Judge if there are same MutaIndex (c_id + r_id)
-        for i in range(len(self.MutaFlags)):
-            for j in range(len(self.MutaFlags)):
-                if i >= j:
-                    pass
-                else:
-                    if (self.MutaFlags[i][1], self.MutaFlags[i][2]) == (
-                        self.MutaFlags[j][1],
-                        self.MutaFlags[j][2],
-                    ):
-                        if Config.debug >= 1:
-                            print(
-                                "PDB2PDBwLeap: There are multiple mutations at the same index, only the first one will be used: "
-                                + self.MutaFlags[i][0]
-                                + self.MutaFlags[i][1]
-                                + self.MutaFlags[i][2]
-                            )
-
         # Prepare a label for the filename
-        tot_Flag_name = ""
-        for Flag in self.MutaFlags:
-            Flag_name = self._build_MutaName(Flag)
-            tot_Flag_name = tot_Flag_name + "_" + Flag_name
-
+        tot_Flag_name = '_'.join(list(map(mutaflag_to_str, self.mutations)))
         # Operate the PDB
-        out_PDB_path1 = self.cache_path + "/" + self.name + tot_Flag_name + "_tmp.pdb"
+        out_PDB_path1 = self.work_dir + "/" + self.base_pdb_name + tot_Flag_name + "_tmp.pdb"
         out_PDB_path2 = self.path_name + tot_Flag_name + ".pdb"
+        chain_count = 1
+        pdb_lines = read_pdb_lines( self.path_name )
+        mask = [True]*len(pdb_lines)
+        for pdb_l in pdb_lines:
+            if pdb_l.is_TER():
+                chain_count += 1
+            match = 0
+            # only match in the dataline and keep all non data lines
+            if not pdb_l.is_ATOM():
+                continue
+            for mf in self.mutations:
+                # Test for every Flag for every lines
 
-        self._get_file_path()
-        with open(self.path, "r") as f:
-            with open(out_PDB_path1, "w") as of:
-                chain_count = 1
-                for line in f:
-                    pdb_l = PDB_line(line)
+                if chr(64 + chain_count) == mf.chain_index and pdb_l.resi_id == mf.residue_index:
+                    # do not write old line if match a MutaFlag
+                    match = 1
+                    # Keep OldAtoms of targeted old residue
+                    target_residue = mf.target_residue
+                    # fix for mutations of Gly & Pro
+                    old_atoms = {
+                           "G": ["N", "H", "CA", "C", "O"],
+			               "P": ["N", "CA", "HA", "CB", "C", "O"]
+					}.get( mf.target_residue, ["N", "H", "CA", "HA", "CB", "C", "O"] )
+                    
+                    line = pdb_l.line
+                    for oa in old_atoms:
+                        if oa == pdb_l.atom_name:
+                            pdb_l.line = f"{line[:17]}{convert_to_three_letter(mf.target_residue)}{line[20:]}"
 
-                    TER_flag = 0
-                    if pdb_l.line_type == "TER":
-                        TER_flag = 1
-                    # add chain count in next loop for next line
-                    if TER_flag:
-                        chain_count += 1
-                    match = 0
-                    # only match in the dataline and keep all non data lines
-                    if pdb_l.line_type == "ATOM":
-                        for Flag in self.MutaFlags:
-                            # Test for every Flag for every lines
-                            t_chain_id = Flag[1]
-                            t_resi_id = Flag[2]
+        write_lines( out_PDB_path1, list(map(lambda pl: pl.line, pdb_lines)))
+        leapin_path = f"{self.work_dir}/leap_P2PwL.in"
+        leap_lines = ["source leaprc.protein.ff14SB", f"a = loadpdb {out_PDB_path1}", f"savepdb a {out_PDB_path2}", "quit"]
+        write_lines( leapin_path, leap_lines )
+        em.run_command("tleap", [f"-s -f {leapin_path} > {self.work_dir}/leap_P2PwL.out"])
+        safe_rm( 'leap.log' )
 
-                            if chr(64 + chain_count) == t_chain_id:
-                                if pdb_l.resi_id == int(t_resi_id):
+    def generate_mutations(self, n : int, muta_flags: List[MutaFlag]=None, restrictions: str=None, random_state=100) -> None:
+        # TODO add restrictions
+        # TODO check for restrictions
+        # TODO setup to be compliant with the existing API grammar
+        existing = set()
+        temp = []
+        if muta_flags:
+            # TODO convert and check if the mutations are valid
+            # TODO check the target residue exists in the structure
+            for mf in muta_flags:
+                key = (mf.chain_index, mf.residue_index)
+                if key in existing:
+                    _LOGGER.warn(f"Multiple mutations supplied at location {key}")
+                else:
+                    existing.add(key)
+                    temp.append( mf )
+        
+        muta_flags = temp
+        
+        if muta_flags and len(muta_flags) >= n:
+            _LOGGER.warn(f"Supplied mutation flags meet or exceed the number of desired mutations")
+            self.mutations = muta_flags
+            return
+        
+        candidates = self.stru.all_possible_mutations()
+        np.random.seed( random_state )        
+        np.random.shuffle( candidates )
 
-                                    # do not write old line if match a MutaFlag
-                                    match = 1
-                                    # Keep OldAtoms of targeted old residue
-                                    resi_2 = Flag[3]
-                                    OldAtoms = ["N", "H", "CA", "HA", "CB", "C", "O"]
-                                    # fix for mutations of Gly & Pro
-                                    if resi_2 == "G":
-                                        OldAtoms = ["N", "H", "CA", "C", "O"]
-                                    if resi_2 == "P":
-                                        OldAtoms = ["N", "CA", "HA", "CB", "C", "O"]
+        while len(muta_flags) < n and len(candidates):
+            curr = candidates.pop()
+            key = (curr.chain_index, curr.residue_index)
+            if key in existing:
+                continue
+            else:
+                muta_flags.append( curr )
+                existing.add( key )
 
-                                    for i in OldAtoms:
-                                        if i == pdb_l.atom_name:
-                                            new_line = (
-                                                line[:17] + Resi_map[resi_2] + line[20:]
-                                            )
-                                            of.write(new_line)
-                                            break
-                                    # Dont run for other Flags after first Flag matches.
-                                    break
+        if len(muta_flags) != n:
+            _LOGGER.warn(f"Unable to generate enough mutations. Missing {n-len(muta_flags)}")
+ 
+        self.mutations = muta_flags
+        assert len(self.mutations) == len(set(self.mutations))
 
-                    if not match:
-                        of.write(line)
-
-        # Run tLeap
-        # make input
-        leapin_path = self.cache_path + "/leap_P2PwL.in"
-        leap_input = open(leapin_path, "w")
-        leap_input.write("source leaprc.protein.ff14SB\n")
-        leap_input.write("a = loadpdb " + out_PDB_path1 + "\n")
-        leap_input.write("savepdb a " + out_PDB_path2 + "\n")
-        leap_input.write("quit\n")
-        leap_input.close()
-        # run
-        os.system(
-            "tleap -s -f " + leapin_path + " > " + self.cache_path + "/leap_P2PwL.out"
-        )
-        if Config.debug <= 1:
-            os.system("rm leap.log")
-
-        # Update the file
-        self.path = out_PDB_path2
-        self._update_name()
-
-        return self.path
+    
 
 
     def Add_MutaFlag(self, Flag : str = 'r', if_U : bool = 0, if_self : bool = 0):
@@ -953,7 +949,8 @@ class PDBPrepper:
 
         return self.path
 
-    def rm_allH(self, ff="Amber", if_ligand=0):
+    def rm_allH(self, ff="Amber", ligand=False):
+        # TODO: CJ: should this get called by mutation method?
         """
         remove wrong hydrogens added by leap after mutation. (In the case that the input file was a H-less one from crystal.)
         ----------
@@ -963,38 +960,24 @@ class PDBPrepper:
         """
         # out path
         o_path = self.path_name + "_rmH.pdb"
-
+        pdb_lines : List[PDBLine] = read_pdb_lines(self.curr_path)
+        mask = [True]*len(pdb_lines)
         # crude judgement of H including customized H
-        if if_ligand:
+        if ligand:
             not_H_list = ["HG", "HF", "HS"]  # non-H elements that start with "H"
-            with open(self.path) as f:
-                with open(o_path, "w") as of:
-                    for line in f:
-                        if line.startswith('ATOM'):
-                            atom_name = line[12:16].strip()
-                            if atom_name[0] == 'H':
-                                if len(atom_name) >= 2:
-                                    if atom_name[:2] not in not_H_list:
-                                        continue
-                                else:
-                                    continue
-                        of.write(line)
+            for idx, pl in enumerate(pdb_lines):
+                if pl.is_ATOM():
+                    atom_name = line[12:16].strip()
+                    if pl.atom_name.startswith("H") and pl.atom_name[:2] not in not_H_list:
+                        mask[idx] = False
         else:
-            # H list (residue only)
-            H_namelist = []
-            for name in Resi_Ele_map[ff]:
-                if Resi_Ele_map[ff][name] == "H":
-                    H_namelist.append(name)
+            H_aliases = get_element_aliases( ff, "H" )
+            for idx, pl in enumerate( pdb_lines ):
+                if pl.atom_name in H_aliases and pl.is_residue_line():
+                    mask[idx] = False
 
-            with open(self.path) as f:
-                with open(o_path, "w") as of:
-                    for line in f:
-                        if line[12:16].strip() in H_namelist and line[17:20].strip() in Resi_map2.keys():
-                            continue
-                        of.write(line)
-        self.path = o_path
-        self._update_name()
-
+        pdb_lines = np.array(pdb_lines)[mask]
+        write_lines( o_path, list(map(str,pdb_lines)))
     """
     ========
     General MD

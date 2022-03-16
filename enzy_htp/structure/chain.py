@@ -13,7 +13,7 @@ class Chain:
         # CJ: not sure if I should do this but I am overwriting every time
         # right now
         _ = list(map(lambda r: r.set_chain(self.name_), self.residues_))
-    
+
     def is_metal(self) -> bool:
         for rr in self.residues_:
             if rr.is_metal():

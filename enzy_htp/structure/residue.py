@@ -1,4 +1,5 @@
 """TODO DOCUMENATION"""
+# TODO update key when chain's name is changed
 from __future__ import annotations
 
 import numpy as np

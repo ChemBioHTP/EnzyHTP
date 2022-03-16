@@ -5,6 +5,8 @@ Date: 2022-02-12
 """
 import os
 import shutil
+from typing import List
+
 from .logger import _LOGGER
 from .exception import MissingEnvironmentElement
 
@@ -22,6 +24,7 @@ class EnvironmentManager:
     def __init__(self, **kwargs):
         self.env_vars_ = kwargs.get("env_vars", [])
         self.executables_ = kwargs.get("executables", [])
+        self.mapper = dict()
         self.missing_env_vars_ = []
         self.missing_executables_ = []
 
@@ -44,6 +47,9 @@ class EnvironmentManager:
         for exe in self.executables_:
             if not exe_exists(exe):
                 self.missing_executables_.append(exe)
+            else:
+                self.mapper[exe] = shutil.which(exe) 
+
 
     def display_missing(self):
         if not self.is_missing():
@@ -76,3 +82,31 @@ class EnvironmentManager:
 
     def is_missing(self):
         return len(self.missing_executables_) or len(self.missing_env_vars_)
+
+    def run_command(self, exe, args) -> List[str]:
+        cmd = f"{self.mapper.get(exe,exe)} {' '.join(args)}"
+        if exe in self.missing_executables_:
+            _LOGGER.error(f"This environment is missing '{exe}' and cannot run the command '{cmd}'")
+            _LOGGER.error(f"Exiting...")
+            exit( 1 )
+        _LOGGER.info(f"Running command: '{cmd}'...")
+        result = os.popen( cmd ).read().splitlines()
+        return result
+
+
+    def __getattr__(self, key : str ) -> str:
+        return self.mapper[key]
+
+em = EnvironmentManager(
+    env_vars=["AMBERHOME"],
+    executables=[
+        "tleap",
+        "ambpdb",
+        "cpptraj",
+        "mpirun",
+        "$AMBERHOME/bin/sander.MPI",
+        "$AMBERHOME/bin/pmemd.cuda",
+        "$AMBERHOME/bin/MMPBSA.py.MPI",
+    ],
+)
+
