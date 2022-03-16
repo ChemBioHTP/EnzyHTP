@@ -1,6 +1,6 @@
 """TODO: DOCUMENATION"""
 
-from .core import InvalidResidueCode
+from ..core import InvalidResidueCode
 
 # TODO maybe check for non-canonical?
 

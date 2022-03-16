@@ -4,14 +4,13 @@ import logging
 
 # enzy_htp imports
 from .structure import Structure, Residue, PDBPrepper
-from .core import EnvironmentManager, MissingEnvironmentElement, InvalidResidueCode
+from .core import EnvironmentManager, MissingEnvironmentElement, InvalidResidueCode, _LOGGER
 from .chemical import ResidueType
 
-
-def init_logging() -> None:
-    logging.basicConfig(
-        level=logging.INFO, handlers=[logging.StreamHandler(sys.stdout)]
-    )
+#def init_logging() -> None:
+#    logging.basicConfig(
+#        level=logging.INFO, handlers=[logging.StreamHandler(sys.stdout)], foj
+#    )
 
 
 em = EnvironmentManager(
@@ -27,5 +26,4 @@ em = EnvironmentManager(
     ],
 )
 
-init_logging()
 em.check_environment()

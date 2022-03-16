@@ -3,12 +3,12 @@
 Author: Chris Jurich, <chris.jurich@vanderbilt.edu>
 Date: 2022-03-14
 """
-import os
+import os, sys
 import shutil
-import logging
 import datetime
 from typing import List
 from pathlib import Path
+from .logger import _LOGGER
 
 
 def safe_rm(fname: str) -> None:
@@ -36,6 +36,10 @@ def base_file_name( fname : str ) -> str:
     return os.path.splitext(base_file)[0]
 
 
+def get_file_ext( fname : str ) -> str:
+    """TODO"""
+    return Path( fname ).suffix
+
 def get_current_time() -> str:
     """Gets current system time in format YYYY_MM_DD_H_m"""
     return datetime.datetime.now().strftime('%Y_%m_%d_%H_%M')
@@ -43,7 +47,7 @@ def get_current_time() -> str:
 def lines_from_file(fname: str) -> List[str]:
     """Extracts and returns lines from supplied filename. Returns empty list() if file odes not exist."""
     if not os.path.exists( fname ):
-        logging.error(f"The file {fname} does not exist.")
+        _LOGGER.error(f"The file {fname} does not exist.")
         return list()
     fh = open(fname, 'r')
     result = fh.read().splitlines()
@@ -53,7 +57,29 @@ def lines_from_file(fname: str) -> List[str]:
 def write_lines( fname: str, lines : List[str] ) -> None:
     """Writes lines to specified file, checking if file exists first and warning if it does."""
     if os.path.exists( fname ):
-         logging.warn(f"The file '{fname}' exists and will be overwritten")
+         _LOGGER.warn(f"The file '{fname}' exists and will be overwritten")
     fh = open( fname, 'w' )
     fh.write('\n'.join(lines))
     fh.close()
+
+class HiddenPrints:
+    """
+    HiddenPrints(redirect=os.devnull)
+    -----
+    block or redirect stdout prints to "redirect"
+    """
+
+    def __init__(self, redirect=os.devnull):
+        self.redirect = redirect
+
+    def __enter__(self):
+        self._original_stdout = sys.stdout
+        self._original_stderr = sys.stderr
+        sys.stdout = open(self.redirect, "w")
+        sys.stderr = open(self.redirect, "w")
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sys.stdout.close()
+        sys.stderr.close()
+        sys.stdout = self._original_stdout
+        sys.stderr = self._original_stderr

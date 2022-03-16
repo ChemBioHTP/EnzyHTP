@@ -11,3 +11,7 @@ class InvalidResidueCode(Exception):
     """Exception corresponding to an invalid one letter or three letter nucleotide being entered"""
 
     pass
+
+
+class UnsupportedFileType(Exception):
+    """Exception corresponding to a file type that EnzyHTP does not support"""

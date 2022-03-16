@@ -19,24 +19,4 @@ import os, sys
 #     return blockprint_dec
 
 
-class HiddenPrints:
-    """
-    HiddenPrints(redirect=os.devnull)
-    -----
-    block or redirect stdout prints to "redirect"
-    """
 
-    def __init__(self, redirect=os.devnull):
-        self.redirect = redirect
-
-    def __enter__(self):
-        self._original_stdout = sys.stdout
-        self._original_stderr = sys.stderr
-        sys.stdout = open(self.redirect, "w")
-        sys.stderr = open(self.redirect, "w")
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        sys.stdout.close()
-        sys.stderr.close()
-        sys.stdout = self._original_stdout
-        sys.stderr = self._original_stderr

@@ -5,7 +5,7 @@ Date: 2022-02-12
 """
 import os
 import shutil
-import logging
+from .logger import _LOGGER
 from .exception import MissingEnvironmentElement
 
 
@@ -47,26 +47,26 @@ class EnvironmentManager:
 
     def display_missing(self):
         if not self.is_missing():
-            logging.info("Environment has all required elements!")
+            _LOGGER.info("Environment has all required elements!")
             return
-        logging.warning("Environment is missing some required elements...")
+        _LOGGER.warning("Environment is missing some required elements...")
 
         if len(self.missing_executables_):
-            logging.warning("\tMissing excecutables:")
+            _LOGGER.warning("\tMissing excecutables:")
             for me in self.missing_executables_:
-                logging.warning(f"\t\t{me}")
+                _LOGGER.warning(f"\t\t{me}")
 
         if len(self.missing_env_vars_):
-            logging.warning("\tMissing environment variables:")
+            _LOGGER.warning("\tMissing environment variables:")
             for mev in self.missing_env_vars_:
-                logging.warning(f"\t\t{mev}")
+                _LOGGER.warning(f"\t\t{mev}")
 
     def check_environment(self):
-        logging.info("Checking environment for required elements...")
+        _LOGGER.info("Checking environment for required elements...")
         self.check_env_vars()
         self.check_executables()
         self.display_missing()
-        logging.info("Environment check completed!")
+        _LOGGER.info("Environment check completed!")
 
     def reset(self):
         self.executables_ = []

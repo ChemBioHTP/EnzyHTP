@@ -81,7 +81,7 @@ class PDBLine:
             else:
                 a_name = "{:<3}".format(self.atom_name)
                 a_name = " " + a_name
-            r_name = "{:>3}".format(self.resi_name)
+            r_name = f"{self.resi_name}"
 
             c_index = self.chain_id
             r_index = "{:>4d}".format(self.resi_id)
@@ -119,7 +119,6 @@ class PDBLine:
             + seg_id
             + element
             + charge
-            + line_feed
         )
         return line
 
@@ -171,6 +170,12 @@ class PDBLine:
 
     def is_water(self) -> bool:
         return self.resi_name in {"Na+", "Cl-", "WAT", "HOH"}
+
+    def is_HETATM(self) -> bool:
+        return self.line.startswith('HETATM')
+
+    def is_ATOM(self) -> bool:
+        return self.line.startswith('ATOM')
 
     def get_charge(self):
         self.charge = self.line[78:80].strip()
