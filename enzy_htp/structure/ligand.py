@@ -26,9 +26,10 @@ class Ligand(Residue):
     set_parent
     -------------
     """
-    def __init__(self, residue_key : str, atoms : List[Atom], **kwargs):
+
+    def __init__(self, residue_key: str, atoms: List[Atom], **kwargs):
         self.net_charge = kwargs.get('net_charge', None)
-        Residue.__init__(self,'A.B.10', atoms)
+        Residue.__init__(self, 'A.B.10', atoms)
 #
 #    @classmethod
 #
@@ -88,19 +89,22 @@ class Ligand(Residue):
 #    def sort(self):
 #        pass
 #
+
     def get_net_charge(self) -> int:
         return self.net_charge
-	
-    def build(self, out_path : str ) -> None:
+
+    def build(self, out_path: str) -> None:
         """
         build ligand file(out_path) with ft format
         """
-        ext = get_file_ext( out_path ).lower()
+        ext = get_file_ext(out_path).lower()
         if ext != '.pdb':
             raise UnsupportedFileType(out_path)
-        lines = list(map(lambda pr: pr[1].build(a_id=pr[0]+1, c_id=" "), enumerate(self.atoms) )) + ["TER","END"]
-        write_lines( out_path, lines )
-        return 
+        lines = list(
+            map(lambda pr: pr[1].build(a_id=pr[0] + 1, c_id=" "),
+                enumerate(self.atoms))) + ["TER", "END"]
+        write_lines(out_path, lines)
+        return
         with open(out_path, "w") as of:
             a_id = 0
             for atom in self:
@@ -108,6 +112,7 @@ class Ligand(Residue):
                 line = atom.build(a_id=a_id, c_id=" ")
                 of.write(line)
             of.write("TER" + line_feed + "END" + line_feed)
+
 
 #    def get_net_charge(self, method="PYBEL", ph=7.0, o_dir="."):
 #        """
@@ -144,15 +149,19 @@ class Ligand(Residue):
 #
 
 
-def residue_to_ligand( ptr : Residue ) -> Ligand:
+def residue_to_ligand(ptr: Residue) -> Ligand:
     """
     generate from a Residue object. copy data
     """
     return Ligand(ptr.name, ptr.atoms)
 
 
-def protonate_ligand(ligand : Ligand, dirname='.', method="PYBEL", ph=7.0, keep_name=1) -> Ligand:
-#def protonate_ligand(cls, path, method="PYBEL", ph=7.0, keep_name=1):
+def protonate_ligand(ligand: Ligand,
+                     dirname='.',
+                     method="PYBEL",
+                     ph=7.0,
+                     keep_name=1) -> Ligand:
+    #def protonate_ligand(cls, path, method="PYBEL", ph=7.0, keep_name=1):
     """
     Protonate the ligand from 'path' with 'method', provide out_path and net charge.
     TODO "obabel -ipdb ligand_1.pdb -opdb pdb -O ligand_1_aHt.pdb -h" can keep names, but how is it accessed by pybel
@@ -165,7 +174,7 @@ def protonate_ligand(ligand : Ligand, dirname='.', method="PYBEL", ph=7.0, keep_
                     - check if there're duplicated names, add suffix if are.
     """
     path = f"{dirname}/ligand_{ligand.name}.pdb"
-    ligand.build( path )
+    ligand.build(path)
     outp1_path = path[:-4] + "_badname_aH.pdb"
     out_path = path[:-4] + "_aH.pdb"
     # outm2_path = path[:-4]+'_aH.mol2'
@@ -202,6 +211,7 @@ def protonate_ligand(ligand : Ligand, dirname='.', method="PYBEL", ph=7.0, keep_
         pass
     return out_path, net_charge
 
+
 def _fix_ob_output(pdb_path, out_path, ref_name_path=None):
     """
     fix atom label in pdb_pat write to out_path
@@ -214,7 +224,7 @@ def _fix_ob_output(pdb_path, out_path, ref_name_path=None):
     """
     if ref_name_path:
         ref_a_names = []
-        pdb_ls = read_pdb_lines( pdb_path )
+        pdb_ls = read_pdb_lines(pdb_path)
         ref_resi_name = pdb_ls[0].resi_name
         for pdb_l in pdb_ls:
             if pdb_l.line_type == "HETATM" or pdb_l.line_type == "ATOM":
@@ -223,13 +233,13 @@ def _fix_ob_output(pdb_path, out_path, ref_name_path=None):
 
     # count element in a dict
     ele_count = {}
-    pdb_ls = read_pdb_lines( pdb_path )
+    pdb_ls = read_pdb_lines(pdb_path)
     line_count = 0
     lines = []
     for pdb_l in pdb_ls:
         if not pdb_l.is_ATOM() and not pdb_l.is_HETATM():
             continue
-        
+
         if ref_name_path == None:
             ele = pdb_l.get_element()
         else:
@@ -249,20 +259,21 @@ def _fix_ob_output(pdb_path, out_path, ref_name_path=None):
             pdb_l.atom_name = ele
         lines.append(pdb_l.build())
 
-    write_lines( out_path, lines )
+    write_lines(out_path, lines)
+
 
 def _ob_pdb_charge(pdb_path):
     """
     extract net charge from openbabel exported pdb file
     """
 
-    pdb_ls = read_pdb_lines( pdb_path )
+    pdb_ls = read_pdb_lines(pdb_path)
     net_charge = 0
     for pdb_l in pdb_ls:
         if pdb_l.is_HETATM() or pdb_l.is_ATOM():
             if len(pdb_l.get_charge()) != 0:
                 charge = pdb_l.charge[::-1]
-                _LOGGER.info(f"Found formal charge: {pdb_l.atom_name} {charge}") # TODO make this more intuitive/make sense
+                _LOGGER.info(f"Found formal charge: {pdb_l.atom_name} {charge}"
+                            )  # TODO make this more intuitive/make sense
                 net_charge += int(charge)
     return net_charge
-

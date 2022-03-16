@@ -1,6 +1,5 @@
 """TODO: Documentation"""
 
-
 METAL_MAPPER = {
     "LI": "Li",
     "NA": "Na",
@@ -53,7 +52,6 @@ METAL_MAPPER = {
     "PU": "Pu",
     "TH": "Th",
 }
-
 
 METAL_CENTER_MAP = {
     "MG": "Mg",

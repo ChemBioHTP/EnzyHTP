@@ -2,6 +2,7 @@ from .atom import Atom
 from .residue import Residue
 from typing import List
 
+
 class Solvent(Residue):
     """
     -------------
@@ -21,13 +22,13 @@ class Solvent(Residue):
     -------------
     """
 
-    def __init__(self, residue_key : str, atoms : List[Atom]):
+    def __init__(self, residue_key: str, atoms: List[Atom]):
         Residue.__init__(residue_key, atoms)
-
 
     def sort(self):
         pass
 
-def residue_to_solvent( ptr : Residue) -> Solvent:
+
+def residue_to_solvent(ptr: Residue) -> Solvent:
     # TODO documentation
-    return Solvent( residue_key, atoms )
+    return Solvent(residue_key, atoms)

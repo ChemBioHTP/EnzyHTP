@@ -17,6 +17,3 @@ import os, sys
 #             return results
 #         return wrapper
 #     return blockprint_dec
-
-
-

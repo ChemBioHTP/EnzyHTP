@@ -31,7 +31,6 @@ THREE_LETTER_AA_MAPPER = {
     "TRP": "W",
 }
 
-
 ONE_LETTER_AA_MAPPER = {
     "R": "ARG",
     "H": "HIS",
@@ -188,12 +187,12 @@ RESIDUE_ELEMENT_MAP = {
     }
 }
 
+
 def convert_to_three_letter(one_letter: str) -> str:
     """TODO DOCUMENTATION"""
     if len(one_letter) != 1:
         raise InvalidResidueCode(
-            f"expecting one letter residue code. '{one_letter}' is invalid"
-        )
+            f"expecting one letter residue code. '{one_letter}' is invalid")
     one_letter = one_letter.upper()
     result = ONE_LETTER_AA_MAPPER.get(one_letter, None)
     if not result:
@@ -205,8 +204,7 @@ def convert_to_one_letter(three_letter: str) -> str:
     """TODO DOCUMENTATION"""
     if len(three_letter) != 3:
         raise InvalidResidueCode(
-            f"expecting three letter residue code. '{three_letter}' is invalid"
-        )
+            f"expecting three letter residue code. '{three_letter}' is invalid")
     three_letter = three_letter.upper()
     result = THREE_LETTER_AA_MAPPER.get(three_letter, None)
     if not result:
@@ -214,16 +212,17 @@ def convert_to_one_letter(three_letter: str) -> str:
     return result
 
 
-def get_element_aliases( ff : str, element : str ) -> Set[str]:
+def get_element_aliases(ff: str, element: str) -> Set[str]:
     # TODO check that ff is defined
     ff_dict = RESIDUE_ELEMENT_MAP[ff]
     aliases = []
     for alias, elem in ff_dict.items():
-        if elem  == element:
-            aliases.append( alias )
+        if elem == element:
+            aliases.append(alias)
 
     return set(aliases)
 
-def one_letters_except(existing : str ) -> List[str]:
+
+def one_letters_except(existing: str) -> List[str]:
     result = list(ONE_LETTER_AA_MAPPER.keys())
     return list(filter(lambda s: s != existing, result))

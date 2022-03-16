@@ -2,6 +2,7 @@ import numpy as np
 
 
 class Atom:
+
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
             setattr(self, k, v)
@@ -34,15 +35,12 @@ class Atom:
         return f"{self.chain_id}.{self.residue_name}.{self.residue_number}"
 
     def distance(self, other):
-        return np.sqrt(
-            (self.x_coord - other.x_coord) ** 2
-            + (self.y_coord - other.y_coord) ** 2
-            + (self.z_coord - other.z_coord) ** 2
-        )
+        return np.sqrt((self.x_coord - other.x_coord)**2 +
+                       (self.y_coord - other.y_coord)**2 +
+                       (self.z_coord - other.z_coord)**2)
 
     def __getitem__(self, key):
         return self.__dict__[key]
-
 
 #class Atom(Child):
 #    """
@@ -133,7 +131,7 @@ class Atom:
 #        2. parent residue name
 #        ------------
 #        * require standard Amber format (atom name and C/N terminal name)
-#        save found list of Atom object to self.connect 
+#        save found list of Atom object to self.connect
 #        """
 #        self.connect = []
 #
@@ -198,8 +196,8 @@ class Atom:
 #        determine the connecting pseudo H atom type base on the environment for ONIOM input
 #        A low layer atom will be replaced to a pesudo H for "model-low" layer modeling
 #        self    : the atom in the "model" layer
-#        old_atom: the original connecting atom replacing by H. 
-#        method  : 
+#        old_atom: the original connecting atom replacing by H.
+#        method  :
 #        1 ----- : Only consider some main cases:
 #                    - truncating CA-CB
 #                    - truncating C-N
@@ -246,7 +244,7 @@ class Atom:
 #        """
 #        get the connected atom that closer to CA in the *network*
 #        -------
-#        check if connectivity is obtained. get if not.        
+#        check if connectivity is obtained. get if not.
 #        """
 #        return None
 #
@@ -268,7 +266,13 @@ class Atom:
 #        """
 #        pass
 #
-    def build(self, a_id=None, r_id=None, c_id=None, ff="AMBER", forcefield="ff14SB"):
+
+    def build(self,
+              a_id=None,
+              r_id=None,
+              c_id=None,
+              ff="AMBER",
+              forcefield="ff14SB"):
         """
         generate an output line. End with LF
         return a line str
@@ -309,7 +313,13 @@ class Atom:
 
         return f"{l_type}{a_index} {a_name} {r_name} {c_index}{r_index}    {x}{y}{z}  1.00  0.00"
 #
-    def build_oniom(self, layer, chrg=None, cnt_info: list = None, if_lig=0, if_sol=0):
+
+    def build_oniom(self,
+                    layer,
+                    chrg=None,
+                    cnt_info: list = None,
+                    if_lig=0,
+                    if_sol=0):
         """
         build line for oniom. Use element name for ligand atoms since they are mostly in QM regions.
         Gaussian use *ff96* which the atom type is corresponding to all_amino94.lib and ion94.lib in Amber distribution
@@ -329,9 +339,8 @@ class Atom:
             fz_flag = "-1"
             ly_flag = "L"
             if cnt_info != None:
-                cnt_flag = (
-                    " " + cnt_info[0] + "-" + cnt_info[1] + " " + str(cnt_info[2])
-                )
+                cnt_flag = (" " + cnt_info[0] + "-" + cnt_info[1] + " " +
+                            str(cnt_info[2]))
 
         # label: deal with N/C terminal and ligand
         if if_lig:
@@ -359,31 +368,18 @@ class Atom:
                     "You need to at least provide a charge or use get_atom_charge to get one from prmtop file."
                 )
 
-        atom_label = "{:<16}".format(
-            " " + self.ele + "-" + G16_label + "-" + str(round(chrg, 6))
-        )
+        atom_label = "{:<16}".format(" " + self.ele + "-" + G16_label + "-" +
+                                     str(round(chrg, 6)))
         fz_flag = "{:>2}".format(fz_flag)
         x = "{:<14.8f}".format(self.coord[0])
         y = "{:<14.8f}".format(self.coord[1])
         z = "{:<14.8f}".format(self.coord[2])
 
-        line = (
-            atom_label
-            + " "
-            + fz_flag
-            + "   "
-            + x
-            + " "
-            + y
-            + " "
-            + z
-            + " "
-            + ly_flag
-            + cnt_flag
-            + line_feed
-        )
+        line = (atom_label + " " + fz_flag + "   " + x + " " + y + " " + z +
+                " " + ly_flag + cnt_flag + line_feed)
 
         return line
+
 
 #    def get_around(self, rad):
 #        pass
@@ -413,4 +409,3 @@ class Atom:
 #        return self.id
 #
 #
-

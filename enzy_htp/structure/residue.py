@@ -11,6 +11,7 @@ from enzy_htp.chemical import ResidueType, METAL_MAPPER, THREE_LETTER_AA_MAPPER,
 
 class Residue:
     """TODO DOCUMENTATION"""
+
     def __init__(self, residue_key, atoms):
         self.atoms = atoms
         self.residue_key = residue_key
@@ -27,11 +28,11 @@ class Residue:
     def atom_list(self) -> List[Atom]:
         return self.atoms
 
-    def __determine_residue_type( self ):
+    def __determine_residue_type(self):
         # TODO finish this algorithm
         # 1. canoncial code => canonical
         # 2. Solvent = WAT or HOH, also solvent ions (NA+, CL-)
-        # 3. Metal-center: only from metal center residue 
+        # 3. Metal-center: only from metal center residue
         #.4. Non-Canonical/Ligand => similar but ligand will be in its own chain... ligand will NEVER be in the same cahin as a canonical amino acid
         pass
 
@@ -41,7 +42,7 @@ class Residue:
     def chain(self) -> str:
         return self.chain_
 
-    def set_chain(self, val : str ) -> None:
+    def set_chain(self, val: str) -> None:
         # TODO:CJ maybe fix this? its kinda janky
         for idx in range(len(self.atoms)):
             self.atoms[idx].chain_id = val
@@ -52,7 +53,7 @@ class Residue:
 
     def min_line(self) -> int:
         return self.min_line_
-    
+
     def max_line(self) -> int:
         return self.max_line_
 
@@ -62,12 +63,13 @@ class Residue:
     def is_canonical(self) -> bool:
         return self.name in THREE_LETTER_AA_MAPPER
 
-    def line_range(self) -> Tuple[int,int]:
+    def line_range(self) -> Tuple[int, int]:
         return (self.min_line(), self.max_line())
 
-    def neighbors(self, other : Residue) -> bool:
+    def neighbors(self, other: Residue) -> bool:
         """Checks if two residues from the same PDB are neighbors."""
-        return (abs(self.min_line()-other.max_line()) == 1 ) or ( abs(self.max_line() - other.min_line()) == 1 )
+        return (abs(self.min_line() - other.max_line())
+                == 1) or (abs(self.max_line() - other.min_line()) == 1)
 
     def is_rd_solvent(self) -> bool:
         return self.name in RD_SOLVENT_LIST
@@ -80,8 +82,9 @@ class Residue:
         pass
 
     @dispatch
-    def rtype( self ) -> ResidueType:
+    def rtype(self) -> ResidueType:
         pass
+
     #TODO add operator overloading to move the chain?
 
 
@@ -101,7 +104,7 @@ class Residue:
 #    # --after metalatom.get_donor_resi--
 #    d_atom (donor atom when work as a ligand)
 #    a_metal (acceptor metal)
-#    
+#
 #    #TODO
 #    if_art_resi
 #    -------------
@@ -113,7 +116,7 @@ class Residue:
 #    _find_atom_name
 #    -------------
 #    __getitem__
-#        Residue_obj[int]: Residue_obj.residues[int]    
+#        Residue_obj[int]: Residue_obj.residues[int]
 #    __getattr__
 #        Residue_obj.123 = Residue_obj.atoms[123-1] // index mimic (start from 1)
 #        Residue_obj.CA = Residue_obj.find_atom_name('CA') // search mimic
@@ -321,7 +324,7 @@ class Residue:
 #        """
 #        rotate the dihedral relate to the target H-atom bond
 #        -----
-#        TODO  
+#        TODO
 #        """
 #
 #        if self.name == "TRP":
@@ -474,4 +477,3 @@ class Residue:
 #        return len(self.atoms)
 #
 #
-

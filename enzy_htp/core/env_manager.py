@@ -35,11 +35,12 @@ class EnvironmentManager:
         self.env_vars_.append(env_var)
 
     def check_env_vars(self):
-       	for env_var in self.env_vars_:
+        for env_var in self.env_vars_:
             if os.getenv(env_var) is None:
                 self.missing_env_vars_.append(env_var)
 
     def check_executables(self):
+
         def exe_exists(exe_name):
             full_path = os.path.expandvars(exe_name)
             return shutil.which(exe_name) is not None
@@ -48,8 +49,7 @@ class EnvironmentManager:
             if not exe_exists(exe):
                 self.missing_executables_.append(exe)
             else:
-                self.mapper[exe] = shutil.which(exe) 
-
+                self.mapper[exe] = shutil.which(exe)
 
     def display_missing(self):
         if not self.is_missing():
@@ -86,16 +86,18 @@ class EnvironmentManager:
     def run_command(self, exe, args) -> List[str]:
         cmd = f"{self.mapper.get(exe,exe)} {' '.join(args)}"
         if exe in self.missing_executables_:
-            _LOGGER.error(f"This environment is missing '{exe}' and cannot run the command '{cmd}'")
+            _LOGGER.error(
+                f"This environment is missing '{exe}' and cannot run the command '{cmd}'"
+            )
             _LOGGER.error(f"Exiting...")
-            exit( 1 )
+            exit(1)
         _LOGGER.info(f"Running command: '{cmd}'...")
-        result = os.popen( cmd ).read().splitlines()
+        result = os.popen(cmd).read().splitlines()
         return result
 
-
-    def __getattr__(self, key : str ) -> str:
+    def __getattr__(self, key: str) -> str:
         return self.mapper[key]
+
 
 em = EnvironmentManager(
     env_vars=["AMBERHOME"],
@@ -109,4 +111,3 @@ em = EnvironmentManager(
         "$AMBERHOME/bin/MMPBSA.py.MPI",
     ],
 )
-

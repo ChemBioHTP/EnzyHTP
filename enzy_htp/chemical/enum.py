@@ -16,11 +16,11 @@ class ResidueType(IntEnum):
     UNKNOWN = 5
 
 
-RESIDUE_TYPE_MAPPER =  {
-    ResidueType.CANONICAL:"CANONICAL",
-    ResidueType.NONCANONICAL : "NONCANONICAL",
-    ResidueType.SOLVENT : "SOLVENT",
-    ResidueType.METAL : "METAL",
-    ResidueType.LIGAND : "LIGAND",
-    ResidueType.UNKNOWN  : "UNKNOWN"
+RESIDUE_TYPE_MAPPER = {
+    ResidueType.CANONICAL: "CANONICAL",
+    ResidueType.NONCANONICAL: "NONCANONICAL",
+    ResidueType.SOLVENT: "SOLVENT",
+    ResidueType.METAL: "METAL",
+    ResidueType.LIGAND: "LIGAND",
+    ResidueType.UNKNOWN: "UNKNOWN"
 }

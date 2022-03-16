@@ -12,6 +12,4 @@ from .chemical import ResidueType
 #        level=logging.INFO, handlers=[logging.StreamHandler(sys.stdout)], foj
 #    )
 
-
-
 em.check_environment()

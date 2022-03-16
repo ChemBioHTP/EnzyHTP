@@ -7,6 +7,7 @@ from ..chemical import THREE_LETTER_AA_MAPPER
 
 # TODO CJ: add documentation
 
+
 class PDBLine:
     """
     Class for decoding the line in the PDB file. Functions used internally. 
@@ -15,12 +16,12 @@ class PDBLine:
     lines: PDB_line.fromlines(lines) --> [PDB_line, ...]
     """
 
-    def __init__(self, line : str):
+    def __init__(self, line: str):
         """
         initilize with a specific line in the PDB file.
         Get self.line_type
         """
-        # TODO figure out why this throws	
+        # TODO figure out why this throws
         self.line = str()
         self.resi_name = str
         try:
@@ -95,36 +96,17 @@ class PDBLine:
             charge = "{:2}".format(self.charge)
 
         # example: ATOM   5350  HB2 PRO   347      32.611  15.301  24.034  1.00  0.00
-        line = (
-            l_type
-            + a_index
-            + " "
-            + a_name
-            + AL_id
-            + r_name
-            + " "
-            + c_index
-            + r_index
-            + insert_code
-            + "   "
-            + x
-            + y
-            + z
-            + occupancy
-            + temp_factor
-            + "      "
-            + seg_id
-            + element
-            + charge
-        )
+        line = (l_type + a_index + " " + a_name + AL_id + r_name + " " +
+                c_index + r_index + insert_code + "   " + x + y + z +
+                occupancy + temp_factor + "      " + seg_id + element + charge)
         return line
 
     def is_TER(self) -> bool:
         return self.line[:3] == "TER"
-    
+
     def is_END(self) -> bool:
         return self.line[:3] == "END"
-    
+
     def is_CRYST1(self) -> bool:
         return self.line[:6] == "CRYST1"
 
@@ -183,11 +165,12 @@ class PDBLine:
 
     def __str__(self) -> str:
         return self.line
-    
+
     def __repr__(self) -> str:
         return self.line
 
-def read_pdb_lines( fname : str ) -> List[PDBLine]:
+
+def read_pdb_lines(fname: str) -> List[PDBLine]:
     """Generates a list() of PDBLine objexts from a given PDB file"""
-    non_empty = list(filter(len,lines_from_file(fname)))
+    non_empty = list(filter(len, lines_from_file(fname)))
     return list(map(PDBLine, non_empty))

@@ -15,35 +15,40 @@ from ..chemical import one_letters_except, convert_to_one_letter
 
 from .mutate import MutaFlag
 
+
 class Structure:
-    def __init__(self, pandas_pdb : PandasPdb ):
+
+    def __init__(self, pandas_pdb: PandasPdb):
         # TODO maybe set the pdb filename as well
         self.chains_ = dict()
         self.residues_ = dict()
-        self.pandas_pdb = pandas_pdb 
+        self.pandas_pdb = pandas_pdb
         self.current_pdb = str()
         self.metalatoms = []
         self.ligands = []
         self.solvents = []
 
-
     def residue_state(self) -> Set:
         print(self.chains_)
-        exit( 0 )
-    
+        exit(0)
+
     def all_possible_mutations(self) -> List[MutaFlag]:
         result = list()
         for cname, chain in self.chains_.items():
             # TODO check that the chain can have this done
-                for residue in chain.residues():
-                    orig_one_letter = convert_to_one_letter( residue.name )
-                    result.extend(
-					    list(map(lambda mut: MutaFlag(orig_residue=orig_one_letter, chain_index=cname, residue_index=residue.num_, target_residue=mut),one_letters_except(orig_one_letter) ))
-                    )
-                    #print(residue)
+            for residue in chain.residues():
+                orig_one_letter = convert_to_one_letter(residue.name)
+                result.extend(
+                    list(
+                        map(
+                            lambda mut: MutaFlag(orig_residue=orig_one_letter,
+                                                 chain_index=cname,
+                                                 residue_index=residue.num_,
+                                                 target_residue=mut),
+                            one_letters_except(orig_one_letter))))
+                #print(residue)
 
         return result
-
 
     def get_metalatoms(self):
         """
@@ -51,12 +56,12 @@ class Structure:
         """
         for cname, chain in self.chains_.items():
             if chain.is_metal():
-                self.metalatoms.append( chain )
+                self.metalatoms.append(chain)
                 del self.chains_[cname]
         if not len(self.metalatoms):
-             return
+            return
         raise TypeError
-		# Break pseudo residues into atoms and convert to Metalatom object
+        # Break pseudo residues into atoms and convert to Metalatom object
         holders = []
         for pseudo_resi in self.metalatoms:
             for metal in pseudo_resi:
@@ -70,7 +75,8 @@ class Structure:
 
         return raw_chains, metalatoms
 
-    def get_ligands(self, ligand_list=None): # Not sure what type ligand_list is
+    def get_ligands(self,
+                    ligand_list=None):  # Not sure what type ligand_list is
         """
         get ligand from raw chains and clean chains by deleting the ligand part
         -----
@@ -82,27 +88,32 @@ class Structure:
         bad_chains = []
         ligands = []
         for cname, chain in self.chains_.items():
-            
+
             if chain.is_HET():
                 continue
-            
-            for idx, residue in enumerate( chain.residues()[::-1] ):
+
+            for idx, residue in enumerate(chain.residues()[::-1]):
                 if ligand_list is not None and residue.name in ligand_list:
-                    _LOGGER.info(f"Structure: Found user assigned ligand in raw {chain.name()} {residue.name} {residue.num_}")
+                    _LOGGER.info(
+                        f"Structure: Found user assigned ligand in raw {chain.name()} {residue.name} {residue.num_}"
+                    )
                     ligands.append(residue)
                     del chain[idx]
-                elif not residue.is_rd_solvent() and not residue.is_rd_non_ligand():
-                    _LOGGER.warn(f"Structure: Found ligand in raw {chain.name()} {residue.name} {residue.num_}")
+                elif not residue.is_rd_solvent(
+                ) and not residue.is_rd_non_ligand():
+                    _LOGGER.warn(
+                        f"Structure: Found ligand in raw {chain.name()} {residue.name} {residue.num_}"
+                    )
                     ligands.append(residue)
                     del chain[idx]
-                
+
             if chain.empty():
-                bad_chains.append( cname )
-       
+                bad_chains.append(cname)
+
         for bc in bad_chains:
             del self.chains_[bc]
-        
-        self.ligands = list(map(residue_to_ligand, ligands ))
+
+        self.ligands = list(map(residue_to_ligand, ligands))
 
     def get_solvents(self):
         """
@@ -113,20 +124,21 @@ class Structure:
         solvents = []
         bad_chains = []
         for cname, chain in self.chains_.items():
-            for idx, residue in enumerate( chain.residues()[::-1] ):
+            for idx, residue in enumerate(chain.residues()[::-1]):
                 if residue.is_rd_solvent():
-                    _LOGGER.warn(f"Structure: found solvent in raw {residue.name} {residue.id}")
+                    _LOGGER.warn(
+                        f"Structure: found solvent in raw {residue.name} {residue.id}"
+                    )
                     solvents.append(residue)
                     del chain[idx]
 
             if chain.empty():
-                 bad_chains.append( cname )
+                bad_chains.append(cname)
         # Convert pseudo residues to Ligand object
         for bc in bad_chains:
             del self.chains_[bc]
-          
-        self.solvents = list(map(residue_to_solvent, solvents ))
 
+        self.solvents = list(map(residue_to_solvent, solvents))
 
     def get_metal_center(self):
         """
@@ -134,7 +146,8 @@ class Structure:
         save to self.metal_centers
         return self.metal_centers
         """
-        self.metal_centers = list(filter(lambda ma: ma.is_metal_center(), self.metalatoms))
+        self.metal_centers = list(
+            filter(lambda ma: ma.is_metal_center(), self.metalatoms))
         # TODO maybe this should be copied?
         return self.metal_centers
 
@@ -145,7 +158,7 @@ class Structure:
         pass
 
     def add(self, obj, id=None, sort=0):
-        _LOGGER.warn(f"Structure.add has not been implemented yet!!!""")
+        _LOGGER.warn(f"Structure.add has not been implemented yet!!!" "")
         return
         """
         1. judge obj type (go into the list)
@@ -168,12 +181,8 @@ class Structure:
 
             obj_ele = obj[0]
 
-            if (
-                type(obj_ele) != Chain
-                and type(obj_ele) != Metalatom
-                and type(obj_ele) != Ligand
-                and type(obj_ele) != Solvent
-            ):
+            if (type(obj_ele) != Chain and type(obj_ele) != Metalatom and
+                    type(obj_ele) != Ligand and type(obj_ele) != Solvent):
                 raise TypeError(
                     "structure.Add() method only take Chain / Metalatom / Ligand / Solvent"
                 )
@@ -205,12 +214,8 @@ class Structure:
 
         # single building block
         else:
-            if (
-                type(obj) != Chain
-                and type(obj) != Metalatom
-                and type(obj) != Ligand
-                and type(obj) != Solvent
-            ):
+            if (type(obj) != Chain and type(obj) != Metalatom and
+                    type(obj) != Ligand and type(obj) != Solvent):
                 raise TypeError(
                     "structure.Add() method only take Chain / Metalatom / Ligand / Solvent"
                 )
@@ -237,7 +242,7 @@ class Structure:
         if sort:
             self.sort()
 
-    def sort(self, if_local=0): 
+    def sort(self, if_local=0):
         _LOGGER.warn(f"Structure.sort has not been implemented yet!!")
         return
         """
@@ -316,11 +321,13 @@ class Structure:
                         # write chain
                         for resi in chain.residues():
                             r_id = r_id + 1
-                            for atom in resi.atom_list(): # TODO fix this horrible name
+                            for atom in resi.atom_list(
+                            ):  # TODO fix this horrible name
                                 a_id = a_id + 1  # current line index
-                                line = atom.build(
-                                    a_id=a_id, r_id=r_id, ff=ff, forcefield=forcefield
-                                )
+                                line = atom.build(a_id=a_id,
+                                                  r_id=r_id,
+                                                  ff=ff,
+                                                  forcefield=forcefield)
                                 of.write(line + '\n')
                         # write TER after each chain
                         of.write("TER\n")
@@ -355,11 +362,12 @@ class Structure:
                             ff=ff,
                             forcefield=forcefield,
                         )
-                        of.write(line+ '\n')
+                        of.write(line + '\n')
                         of.write("TER" + line_feed)
 
                     if len(self.solvents) != 0:
-                        c_id = chr(ord(c_id) + 1)  # same chain_id for all solvent
+                        c_id = chr(ord(c_id) +
+                                   1)  # same chain_id for all solvent
                         for solvent in self.solvents:
                             r_id = r_id + 1
                             for atom in solvent:
@@ -389,13 +397,17 @@ class Structure:
                     for ligand in self.ligands:
                         c_id = chr(ord(c_id) + 1)
                         for atom in ligand:
-                            line = atom.build(c_id=c_id, ff=ff, forcefield=forcefield)
+                            line = atom.build(c_id=c_id,
+                                              ff=ff,
+                                              forcefield=forcefield)
                             of.write(line + '\n')
                         of.write("TER" + line_feed)
 
                     for metal in self.metalatoms:
                         c_id = chr(ord(c_id) + 1)
-                        line = metal.build(c_id=c_id, ff=ff, forcefield=forcefield)
+                        line = metal.build(c_id=c_id,
+                                           ff=ff,
+                                           forcefield=forcefield)
                         of.write(line + '\n')
                         of.write("TER" + line_feed)
 
@@ -403,9 +415,9 @@ class Structure:
                         c_id = chr(ord(c_id) + 1)  # chain_id for all solvent
                         for solvent in self.solvents:
                             for atom in solvent:
-                                line = atom.build(
-                                    c_id=c_id, ff=ff, forcefield=forcefield
-                                )
+                                line = atom.build(c_id=c_id,
+                                                  ff=ff,
+                                                  forcefield=forcefield)
                                 of.write(line + '\n')
                         of.write("TER" + line_feed)
 
@@ -415,9 +427,14 @@ class Structure:
 
             of.write("END\n")
 
-    def build_ligands(
-        self, dir, ft="PDB", ifcharge=0, c_method="PYBEL", ph=7.0, ifname=0, ifunique=0
-    ):
+    def build_ligands(self,
+                      dir,
+                      ft="PDB",
+                      ifcharge=0,
+                      c_method="PYBEL",
+                      ph=7.0,
+                      ifname=0,
+                      ifunique=0):
         """
         build files for every ligand in self.ligands
         -------
@@ -448,7 +465,8 @@ class Structure:
             if ifunique:
                 out_path = dir + "/ligand_" + lig.name + ".pdb"
             else:
-                out_path = dir + "/ligand_" + str(l_id) + "_" + lig.name + ".pdb"
+                out_path = dir + "/ligand_" + str(
+                    l_id) + "_" + lig.name + ".pdb"
             # write
             lig.build(out_path)
             # net charge
@@ -457,7 +475,9 @@ class Structure:
                 if lig.net_charge != None:
                     net_charge = lig.net_charge
                 else:
-                    net_charge = lig.get_net_charge(method=c_method, ph=ph, o_dir=dir)
+                    net_charge = lig.get_net_charge(method=c_method,
+                                                    ph=ph,
+                                                    o_dir=dir)
 
             # record
             if ifname:
@@ -561,8 +581,7 @@ class Structure:
                         if if_loop:
                             lp = line.strip().split()
                             lig._find_atom_name(lp[0]).connect.append(
-                                lig._find_atom_name(lp[1])
-                            )
+                                lig._find_atom_name(lp[1]))
                             continue
                         # loop connect starts at LOOP
                         if line.strip() == "LOOP":
@@ -574,12 +593,16 @@ class Structure:
                             atom_id = int(lp[0]) - 3
                             atom_cnt = int(lp[4]) - 3
                             if atom_cnt != 0:
-                                lig[atom_id - 1].connect.append(lig[atom_cnt - 1])
-                                lig[atom_cnt - 1].connect.append(lig[atom_id - 1])
+                                lig[atom_id - 1].connect.append(lig[atom_cnt -
+                                                                    1])
+                                lig[atom_cnt - 1].connect.append(lig[atom_id -
+                                                                     1])
 
-    def get_connectivty_table(
-        self, ff="GAUSSIAN", metal_fix=1, ligand_fix=1, prepi_path=None
-    ):
+    def get_connectivty_table(self,
+                              ff="GAUSSIAN",
+                              metal_fix=1,
+                              ligand_fix=1,
+                              prepi_path=None):
         """
         get connectivity table with atom index based on 'ff' settings:
         ff = GAUSSIAN  -- continuous atom index start from 1, do not seperate by chain
@@ -726,13 +749,9 @@ class Structure:
             for res in chain:
                 for atom in res:
                     if atom.id == None:
-                        raise Exception(
-                            "Detected None in chain "
-                            + str(chain.id)
-                            + str(res.id)
-                            + " "
-                            + atom.name
-                        )
+                        raise Exception("Detected None in chain " +
+                                        str(chain.id) + str(res.id) + " " +
+                                        atom.name)
                     atom_id_list.append(atom.id)
 
         for metal in self.metalatoms:
@@ -743,13 +762,15 @@ class Structure:
         for lig in self.ligands:
             for atom in lig:
                 if atom.id == None:
-                    raise Exception("Detected None in ligands", res.id, atom.name)
+                    raise Exception("Detected None in ligands", res.id,
+                                    atom.name)
                 atom_id_list.append(atom.id)
 
         for sol in self.solvents:
             for atom in sol:
                 if atom.id == None:
-                    raise Exception("Detected None in solvent", res.id, atom.name)
+                    raise Exception("Detected None in solvent", res.id,
+                                    atom.name)
                 atom_id_list.append(atom.id)
 
         return atom_id_list
@@ -784,10 +805,8 @@ class Structure:
                         del format_flag
 
                 if "type_flag" in dir():
-                    if (
-                        line_index >= type_flag + 2
-                        and line_index <= type_flag + 1 + ceil(N_atom / 5)
-                    ):
+                    if (line_index >= type_flag + 2 and
+                            line_index <= type_flag + 1 + ceil(N_atom / 5)):
                         for i in line.strip().split():
                             type_list.append(i)
         # assign type to atom
@@ -802,12 +821,14 @@ class Structure:
         for lig in self.ligands:
             for atom in lig:
                 if atom.id == None:
-                    raise Exception("Detected None in ligands", res.id, atom.name)
+                    raise Exception("Detected None in ligands", res.id,
+                                    atom.name)
                 atom.type = type_list[atom.id - 1]
         for sol in self.solvents:
             for atom in sol:
                 if atom.id == None:
-                    raise Exception("Detected None in solvent", res.id, atom.name)
+                    raise Exception("Detected None in solvent", res.id,
+                                    atom.name)
                 atom.type = type_list[atom.id - 1]
 
     def get_sele_list(self, atom_mask, fix_end="H", prepi_path=None):
@@ -846,7 +867,8 @@ class Structure:
                         resi_obj = resi
             else:
                 chain_id = chain_id.group(0)
-                resi_obj = self.chains[int(chain_id) - 65]._find_resi_id(resi_id)
+                resi_obj = self.chains[int(chain_id) -
+                                       65]._find_resi_id(resi_id)
 
             sele_stru_objs.append(resi_obj)
 
@@ -878,8 +900,7 @@ class Structure:
                         if fix_end == "H":
                             d_XH = X_H_bond_length[atom.name]
                             label = "-".join(
-                                (str(atom.id), str(cnt_atom.id), str(d_XH))
-                            )
+                                (str(atom.id), str(cnt_atom.id), str(d_XH)))
                             fix_atom = "H"
                         if fix_end == "Me":
                             # TODO
@@ -925,12 +946,8 @@ class Structure:
         """
         len(obj) = len(obj.child_list)
         """
-        return (
-            len(self.chains)
-            + len(self.metalatoms)
-            + len(self.ligands)
-            + len(self.solvents)
-        )
+        return (len(self.chains) + len(self.metalatoms) + len(self.ligands) +
+                len(self.solvents))
 
     def __getitem__(self, i):
         """
@@ -950,37 +967,37 @@ class Structure:
         if i > 3:
             raise StopIteration
 
+    def name_chains(self, mapper: defaultdict) -> None:
 
-    def name_chains(self, mapper : defaultdict) -> None:
-        def legal_chain_names( mapper ) -> List[str]:
+        def legal_chain_names(mapper) -> List[str]:
             result = list(string.ascii_uppercase)
             taken = set(list(mapper.keys()))
             result = list(filter(lambda s: s not in taken, result))
-            return list(reversed( result ))
- 		
+            return list(reversed(result))
+
         key_names = set(list(map(lambda kk: kk.strip(), mapper.keys())))
         if '' not in key_names:
             return mapper
         unnamed = list(mapper[''])
         del mapper['']
-          
-        names = legal_chain_names( mapper )
-        unnamed = sorted( unnamed, key=lambda r: -r.min_line())
-        new_chain : List[Residue] = [unnamed.pop()]
-        
+
+        names = legal_chain_names(mapper)
+        unnamed = sorted(unnamed, key=lambda r: -r.min_line())
+        new_chain: List[Residue] = [unnamed.pop()]
+
         while len(unnamed):
             new_res = unnamed.pop()
-            if new_chain[-1].neighbors( new_res ):
-                new_chain.append( new_res )
+            if new_chain[-1].neighbors(new_res):
+                new_chain.append(new_res)
                 continue
 
             new_name = names.pop()
             mapper[new_name] = new_chain
             new_chain = [new_res]
-       
+
         if len(new_chain):
             new_name = names.pop()
-            mapper[new_name] = new_chain 
+            mapper[new_name] = new_chain
 
         return mapper
 
@@ -988,17 +1005,16 @@ class Structure:
         """"""
         # TODO check if there are chain_ids
         self.build_residues()
-        
+
         mapper = defaultdict(list)
         for res in self.residues_.values():
             mapper[res.chain()].append(res)
-        
-        mapper = self.name_chains( mapper )
+
+        mapper = self.name_chains(mapper)
         # ok this is where we handle missing chain ids
         for chain_name, residues in mapper.items():
             self.chains_[chain_name] = Chain(
-                chain_name, sorted(residues, key=lambda r: r.num())
-            )
+                chain_name, sorted(residues, key=lambda r: r.num()))
 
     def build_residues(self) -> None:
         mapper = defaultdict(list)
@@ -1007,11 +1023,13 @@ class Structure:
             mapper[aa.residue_key()].append(aa)
 
         for res_key, atoms in mapper.items():
-            self.residues_[res_key] = Residue(
-                residue_key=res_key, atoms=sorted(atoms, key=lambda a: a.atom_number)
-            )
+            self.residues_[res_key] = Residue(residue_key=res_key,
+                                              atoms=sorted(
+                                                  atoms,
+                                                  key=lambda a: a.atom_number))
 
-def structure_from_pdb( fname : str ) -> Structure:
+
+def structure_from_pdb(fname: str) -> Structure:
     """
     extract the structure from PDB path. Capable with raw experimental and Amber format
     ---------
@@ -1028,12 +1046,10 @@ def structure_from_pdb( fname : str ) -> Structure:
     - ... (add upon usage)
     """
     parser = PandasPdb()
-    parser.read_pdb( fname )
-    result = Structure( parser )
+    parser.read_pdb(fname)
+    result = Structure(parser)
     result.build_chains()
     result.get_metalatoms()
     result.get_ligands()
     result.get_solvents()
     return result
-
-

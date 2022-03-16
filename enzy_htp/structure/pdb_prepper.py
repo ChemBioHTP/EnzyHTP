@@ -19,7 +19,6 @@ from .structure import structure_from_pdb
 from .structure import Structure
 from .pdb_line import PDBLine, read_pdb_lines
 
-
 import openbabel
 import openbabel.pybel as pybel
 
@@ -32,14 +31,19 @@ from .mutate import MutaFlag, mutaflag_to_str
 from ..core import em
 from ..chemical import convert_to_three_letter, get_element_aliases
 
+
 class PDBPrepper:
-    def __init__(self, pdb_name, **kwargs): #, PDB_input, wk_dir="", name="", input_type="path"):
+
+    def __init__(
+            self, pdb_name,
+            **kwargs):  #, PDB_input, wk_dir="", name="", input_type="path"):
         """Inits PDBPrepper with a pdb file and optionally a work directory to place temporary files."""
         self.no_water_path = None
         self.pdb_path = pdb_name
-        self.base_pdb_name = base_file_name( pdb_name ) 
-       	self.work_dir = kwargs.get('work_dir', f"{get_current_time()}_{self.base_pdb_name}") 
-        safe_mkdir( self.work_dir )
+        self.base_pdb_name = base_file_name(pdb_name)
+        self.work_dir = kwargs.get(
+            'work_dir', f"{get_current_time()}_{self.base_pdb_name}")
+        safe_mkdir(self.work_dir)
         shutil.copy(self.pdb_path, f"{self.work_dir}/{self.base_pdb_name}.pdb")
         self.path_name = f"{self.work_dir}/{self.base_pdb_name}.pdb"
         self.pqr_path = f"{self.work_dir}/{self.base_pdb_name}.pqr.pdb"
@@ -52,21 +56,21 @@ class PDBPrepper:
         Save changed files into self.path.
         TODO: need to support key water.
         """
-        
-        pdb_lines : List[PDBLine] = read_pdb_lines( self.path_name )
-        pdb_lines = list(filter(lambda pl: not (pl.is_water() or pl.is_CRYST1()), pdb_lines ))
-        mask = [True]*len(pdb_lines)
-        
+
+        pdb_lines: List[PDBLine] = read_pdb_lines(self.path_name)
+        pdb_lines = list(
+            filter(lambda pl: not (pl.is_water() or pl.is_CRYST1()), pdb_lines))
+        mask = [True] * len(pdb_lines)
+
         for pidx, pl in enumerate(pdb_lines[1:]):
-            if pl.is_TER() and pdb_lines[pidx-1].is_TER():
+            if pl.is_TER() and pdb_lines[pidx - 1].is_TER():
                 mask[pidx] = False
-        
-        pdb_lines = np.array( pdb_lines )[mask]
+
+        pdb_lines = np.array(pdb_lines)[mask]
         self.no_water_path = f"{self.work_dir}/{self.base_pdb_name}_rmW.pdb"
-        write_lines( self.no_water_path,  list(map(str, pdb_lines)) )
-        
-        return self.no_water_path 
-        
+        write_lines(self.no_water_path, list(map(str, pdb_lines)))
+
+        return self.no_water_path
 
     def _update_name(self):
         """
@@ -93,7 +97,8 @@ class PDBPrepper:
                 get_flag = 1
                 # warn if possible wrong self.stru
                 if Config.debug >= 1:
-                    print("PDB.get_stru: WARNING: self.stru has a different name")
+                    print(
+                        "PDB.get_stru: WARNING: self.stru has a different name")
                     print("     -self.name: " + self.name)
                     print("     -self.stru.name: " + self.stru.name)
                     print("Getting new stru")
@@ -102,9 +107,9 @@ class PDBPrepper:
 
         if get_flag or renew:
             if self.path is not None:
-                self.stru = Structure.fromPDB(
-                    self.path, input_name=input_name, ligand_list=ligand_list
-                )
+                self.stru = Structure.fromPDB(self.path,
+                                              input_name=input_name,
+                                              ligand_list=ligand_list)
             else:
                 self.stru = Structure.fromPDB(
                     self.file_str,
@@ -253,7 +258,9 @@ class PDBPrepper:
                         # Deal with missing residue, fill with "NAN"
                         missing_length = pdb_l.resi_id - last_resi_index - 1
                         if missing_length > 0:
-                            Chain_sequence = Chain_sequence + ["NAN",] * missing_length
+                            Chain_sequence = Chain_sequence + [
+                                "NAN",
+                            ] * missing_length
 
                         # Store the new resi
                         Chain_sequence.append(pdb_l.resi_name)
@@ -402,7 +409,11 @@ class PDBPrepper:
         """
         pass
 
-    def get_protonation(self, ph : float=7.0, ffout: str="AMBER", keep_id: int=0, if_prt_ligand: int=1) -> None:
+    def get_protonation(self,
+                        ph: float = 7.0,
+                        ffout: str = "AMBER",
+                        keep_id: int = 0,
+                        if_prt_ligand: int = 1) -> None:
         # TODO check that the ph is in the range 0-14
         #self._get_protonation_pdb2pqr(ph=ph)
         #self._protonation_Fix(out_path, ph=ph, keep_id=keep_id, if_prt_ligand=if_prt_ligand)
@@ -410,7 +421,7 @@ class PDBPrepper:
         #self._update_name()
         #self.stru.name = self.name
 
-    #def _get_protonation_pdb2pqr(self, ffout: str="AMBER", ph: float=7.0, out_path: str=""):
+        #def _get_protonation_pdb2pqr(self, ffout: str="AMBER", ph: float=7.0, out_path: str=""):
         """
         Use PDB2PQR to get the protonation state for current PDB. (self.path)
         current implementation just use the outer layer of PDB2PQR. Update to inner one and get more infomation in the furture. 
@@ -420,20 +431,19 @@ class PDBPrepper:
         """
         # input of PDB2PQR
         pdb2pqr_parser = build_pdb2pqr_parser()
-        args = pdb2pqr_parser.parse_args(
-            [
-                "--ff=PARSE",
-                "--ffout=" + ffout,
-                "--with-ph=" + str(ph),
-                "--log-level=CRITICAL",
-                self.path_name,
-                self.pqr_path,
-            ]
-        )
+        args = pdb2pqr_parser.parse_args([
+            "--ff=PARSE",
+            "--ffout=" + ffout,
+            "--with-ph=" + str(ph),
+            "--log-level=CRITICAL",
+            self.path_name,
+            self.pqr_path,
+        ])
         pdb2pqr_log = f"{self.work_dir}/pdb2pqr_output.log"
         _LOGGER.info(f"Running pdb2pqr on '{self.path_name}'...")
         run_pdb2pqr(args)
-        _LOGGER.info(f"Finished running pdb2pqr! Output saved to '{self.pqr_path}'")
+        _LOGGER.info(
+            f"Finished running pdb2pqr! Output saved to '{self.pqr_path}'")
         # Add missing atom (from the PDB2PQR step. Update to func result after update the _get_protonation_pdb2pqr func)
         # Now metal and ligand
         old_stru = structure_from_pdb(self.no_water_path)
@@ -441,34 +451,38 @@ class PDBPrepper:
         # find Metal center and combine with the pqr file
         metal_list = old_stru.get_metal_center()
         if len(metal_list):
-            _LOGGER.info(f"Merging {len(metal_list)} metal centers in old structure!") 
-            _LOGGER.info(f"Adding metal centers to new structure...") 
+            _LOGGER.info(
+                f"Merging {len(metal_list)} metal centers in old structure!")
+            _LOGGER.info(f"Adding metal centers to new structure...")
             new_stru.add(metal_list, sort=0)
-            _LOGGER.info(f"Metal centers added!") 
+            _LOGGER.info(f"Metal centers added!")
             # fix metal environment
-            _LOGGER.info(f"Protonating newly added metals...") 
+            _LOGGER.info(f"Protonating newly added metals...")
             new_stru.protonation_metal_fix(Fix=1)
-            _LOGGER.info(f"Protonation complete!") 
-    
+            _LOGGER.info(f"Protonation complete!")
+
         # protonate ligands and combine with the pqr file
         ligand_list = old_stru.ligands
         if len(old_stru.ligands):
-            _LOGGER.info(f"Merging {len(ligand_list)} ligands in old structure!") 
+            _LOGGER.info(
+                f"Merging {len(ligand_list)} ligands in old structure!")
             lig_dir = self.work_dir + "/ligands/"
             safe_mkdir(lig_dir)
-		    # TODO: logging
-            new_ligands = list(map(lambda ll: protonate_ligand(ll, dirname=lig_dir, ph=ph), ligand_list )) 
-            new_stru.add(new_ligands, sort = 0)
-    
+            # TODO: logging
+            new_ligands = list(
+                map(lambda ll: protonate_ligand(ll, dirname=lig_dir, ph=ph),
+                    ligand_list))
+            new_stru.add(new_ligands, sort=0)
+
         # PLACE HOLDER for other fix
-    
+
         # build file
         if not keep_id:
             new_stru.sort()
         # TODO make this better for nameing
         new_stru.build(f"{self.work_dir}/final.pdb", keep_id=keep_id)
         self.stru = new_stru
-    
+
     """
     ========
     Docking
@@ -552,7 +566,6 @@ class PDBPrepper:
 
     #def PDB2PDBwLeap(self):
     def apply_mutations(self) -> None:
-
         """
         Apply mutations using tleap. Save mutated structure PDB in self.path
         ------------------------------
@@ -573,8 +586,8 @@ class PDBPrepper:
         out_PDB_path1 = self.work_dir + "/" + self.base_pdb_name + tot_Flag_name + "_tmp.pdb"
         out_PDB_path2 = self.path_name + tot_Flag_name + ".pdb"
         chain_count = 1
-        pdb_lines = read_pdb_lines( self.path_name )
-        mask = [True]*len(pdb_lines)
+        pdb_lines = read_pdb_lines(self.path_name)
+        mask = [True] * len(pdb_lines)
         for pdb_l in pdb_lines:
             if pdb_l.is_TER():
                 chain_count += 1
@@ -585,30 +598,40 @@ class PDBPrepper:
             for mf in self.mutations:
                 # Test for every Flag for every lines
 
-                if chr(64 + chain_count) == mf.chain_index and pdb_l.resi_id == mf.residue_index:
+                if chr(64 + chain_count
+                      ) == mf.chain_index and pdb_l.resi_id == mf.residue_index:
                     # do not write old line if match a MutaFlag
                     match = 1
                     # Keep OldAtoms of targeted old residue
                     target_residue = mf.target_residue
                     # fix for mutations of Gly & Pro
                     old_atoms = {
-                           "G": ["N", "H", "CA", "C", "O"],
-			               "P": ["N", "CA", "HA", "CB", "C", "O"]
-					}.get( mf.target_residue, ["N", "H", "CA", "HA", "CB", "C", "O"] )
-                    
+                        "G": ["N", "H", "CA", "C", "O"],
+                        "P": ["N", "CA", "HA", "CB", "C", "O"]
+                    }.get(mf.target_residue,
+                          ["N", "H", "CA", "HA", "CB", "C", "O"])
+
                     line = pdb_l.line
                     for oa in old_atoms:
                         if oa == pdb_l.atom_name:
                             pdb_l.line = f"{line[:17]}{convert_to_three_letter(mf.target_residue)}{line[20:]}"
 
-        write_lines( out_PDB_path1, list(map(lambda pl: pl.line, pdb_lines)))
+        write_lines(out_PDB_path1, list(map(lambda pl: pl.line, pdb_lines)))
         leapin_path = f"{self.work_dir}/leap_P2PwL.in"
-        leap_lines = ["source leaprc.protein.ff14SB", f"a = loadpdb {out_PDB_path1}", f"savepdb a {out_PDB_path2}", "quit"]
-        write_lines( leapin_path, leap_lines )
-        em.run_command("tleap", [f"-s -f {leapin_path} > {self.work_dir}/leap_P2PwL.out"])
-        safe_rm( 'leap.log' )
+        leap_lines = [
+            "source leaprc.protein.ff14SB", f"a = loadpdb {out_PDB_path1}",
+            f"savepdb a {out_PDB_path2}", "quit"
+        ]
+        write_lines(leapin_path, leap_lines)
+        em.run_command(
+            "tleap", [f"-s -f {leapin_path} > {self.work_dir}/leap_P2PwL.out"])
+        safe_rm('leap.log')
 
-    def generate_mutations(self, n : int, muta_flags: List[MutaFlag]=None, restrictions: str=None, random_state=100) -> None:
+    def generate_mutations(self,
+                           n: int,
+                           muta_flags: List[MutaFlag] = None,
+                           restrictions: str = None,
+                           random_state=100) -> None:
         # TODO add restrictions
         # TODO check for restrictions
         # TODO setup to be compliant with the existing API grammar
@@ -620,21 +643,24 @@ class PDBPrepper:
             for mf in muta_flags:
                 key = (mf.chain_index, mf.residue_index)
                 if key in existing:
-                    _LOGGER.warn(f"Multiple mutations supplied at location {key}")
+                    _LOGGER.warn(
+                        f"Multiple mutations supplied at location {key}")
                 else:
                     existing.add(key)
-                    temp.append( mf )
-        
+                    temp.append(mf)
+
         muta_flags = temp
-        
+
         if muta_flags and len(muta_flags) >= n:
-            _LOGGER.warn(f"Supplied mutation flags meet or exceed the number of desired mutations")
+            _LOGGER.warn(
+                f"Supplied mutation flags meet or exceed the number of desired mutations"
+            )
             self.mutations = muta_flags
             return
-        
+
         candidates = self.stru.all_possible_mutations()
-        np.random.seed( random_state )        
-        np.random.shuffle( candidates )
+        np.random.seed(random_state)
+        np.random.shuffle(candidates)
 
         while len(muta_flags) < n and len(candidates):
             curr = candidates.pop()
@@ -642,19 +668,18 @@ class PDBPrepper:
             if key in existing:
                 continue
             else:
-                muta_flags.append( curr )
-                existing.add( key )
+                muta_flags.append(curr)
+                existing.add(key)
 
         if len(muta_flags) != n:
-            _LOGGER.warn(f"Unable to generate enough mutations. Missing {n-len(muta_flags)}")
- 
+            _LOGGER.warn(
+                f"Unable to generate enough mutations. Missing {n-len(muta_flags)}"
+            )
+
         self.mutations = muta_flags
         assert len(self.mutations) == len(set(self.mutations))
 
-    
-
-
-    def Add_MutaFlag(self, Flag : str = 'r', if_U : bool = 0, if_self : bool = 0):
+    def Add_MutaFlag(self, Flag: str = 'r', if_U: bool = 0, if_self: bool = 0):
         """Determine which mutation to deploy to the structure.
         
         User can 1. assign specific mutation(s). 
@@ -748,7 +773,9 @@ class PDBPrepper:
                     resi_1 = Resi_map2[resi.name]
                 else:
                     if Config.debug >= 1:
-                        print('WARNING: pdb.Add_MutaFlag(): A non-canonical animo acid is being mutated! The MutaFlag will have a 3-letter code for the original residue .')
+                        print(
+                            'WARNING: pdb.Add_MutaFlag(): A non-canonical animo acid is being mutated! The MutaFlag will have a 3-letter code for the original residue .'
+                        )
                     resi_1 = resi.name
                 # random over the residue list
                 if if_U:
@@ -817,8 +844,7 @@ class PDBPrepper:
             if Config.debug >= 1:
                 print(
                     "_read_MutaFlag: No chain_id is provided! Mutate in the first chain by default. Input: "
-                    + Flag
-                )
+                    + Flag)
 
         # san check of the manual input
         self.get_stru()
@@ -826,24 +852,17 @@ class PDBPrepper:
         if not chain_id in chain_id_list:
             raise Exception(
                 "_read_MutaFlag: San check failed. Input chain id in not in range."
-                + line_feed
-                + " range: "
-                + repr(chain_id_list)
-            )
+                + line_feed + " range: " + repr(chain_id_list))
         chain_int = ord(chain_id) - 65
         resi_id_list = [str(i.id) for i in self.stru.chains[chain_int].residues]
         if not resi_id in resi_id_list:
             raise Exception(
                 "_read_MutaFlag: San check failed. Input resi id in not in range."
-                + line_feed
-                + " range: "
-                + repr(resi_id_list)
-            )
+                + line_feed + " range: " + repr(resi_id_list))
         if not resi_2 in Resi_list:
             raise Exception(
                 "_read_MutaFlag: Only support mutate to the known 21 residues. AmberMaps.Resi_list: "
-                + repr(Resi_list)
-            )
+                + repr(Resi_list))
 
         return (resi_1, chain_id, resi_id, resi_2)
 
@@ -867,9 +886,8 @@ class PDBPrepper:
         min_dir = self.cache_path + "/PDBMin"
         minin_path = min_dir + "/min.in"
         minout_path = min_dir + "/min.out"
-        minrst_path = (
-            min_dir + "/min.ncrst"
-        )  # change to ncrst seeking for solution of rst error
+        minrst_path = (min_dir + "/min.ncrst"
+                      )  # change to ncrst seeking for solution of rst error
         mkdir(min_dir)
         min_input = open(minin_path, "w")
         min_input.write("Minimize" + line_feed)
@@ -890,46 +908,18 @@ class PDBPrepper:
 
         # run
         if Config.debug >= 1:
-            print(
-                "running: "
-                + PC_cmd
-                + " "
-                + engine_path
-                + " -O -i "
-                + minin_path
-                + " -o "
-                + minout_path
-                + " -p "
-                + self.prmtop_path
-                + " -c "
-                + self.inpcrd_path
-                + " -r "
-                + minrst_path
-            )
-        os.system(
-            PC_cmd
-            + " "
-            + engine_path
-            + " -O -i "
-            + minin_path
-            + " -o "
-            + minout_path
-            + " -p "
-            + self.prmtop_path
-            + " -c "
-            + self.inpcrd_path
-            + " -r "
-            + minrst_path
-        )
+            print("running: " + PC_cmd + " " + engine_path + " -O -i " +
+                  minin_path + " -o " + minout_path + " -p " +
+                  self.prmtop_path + " -c " + self.inpcrd_path + " -r " +
+                  minrst_path)
+        os.system(PC_cmd + " " + engine_path + " -O -i " + minin_path + " -o " +
+                  minout_path + " -p " + self.prmtop_path + " -c " +
+                  self.inpcrd_path + " -r " + minrst_path)
         # rst2pdb
         try:
             run(
-                "ambpdb -p "
-                + self.prmtop_path
-                + " -c "
-                + minrst_path
-                + " > "
-                + out4_PDB_path,
+                "ambpdb -p " + self.prmtop_path + " -c " + minrst_path + " > " +
+                out4_PDB_path,
                 check=True,
                 text=True,
                 shell=True,
@@ -940,7 +930,8 @@ class PDBPrepper:
                 print("Error: ambpdb cannot read PDBMin result .rst")
                 return 1
 
-        os.system("mv " + self.prmtop_path + " " + self.inpcrd_path + " " + min_dir)
+        os.system("mv " + self.prmtop_path + " " + self.inpcrd_path + " " +
+                  min_dir)
 
         self.path = out4_PDB_path
         self._update_name()
@@ -960,24 +951,27 @@ class PDBPrepper:
         """
         # out path
         o_path = self.path_name + "_rmH.pdb"
-        pdb_lines : List[PDBLine] = read_pdb_lines(self.curr_path)
-        mask = [True]*len(pdb_lines)
+        pdb_lines: List[PDBLine] = read_pdb_lines(self.curr_path)
+        mask = [True] * len(pdb_lines)
         # crude judgement of H including customized H
         if ligand:
-            not_H_list = ["HG", "HF", "HS"]  # non-H elements that start with "H"
+            not_H_list = ["HG", "HF",
+                          "HS"]  # non-H elements that start with "H"
             for idx, pl in enumerate(pdb_lines):
                 if pl.is_ATOM():
                     atom_name = line[12:16].strip()
-                    if pl.atom_name.startswith("H") and pl.atom_name[:2] not in not_H_list:
+                    if pl.atom_name.startswith(
+                            "H") and pl.atom_name[:2] not in not_H_list:
                         mask[idx] = False
         else:
-            H_aliases = get_element_aliases( ff, "H" )
-            for idx, pl in enumerate( pdb_lines ):
+            H_aliases = get_element_aliases(ff, "H")
+            for idx, pl in enumerate(pdb_lines):
                 if pl.atom_name in H_aliases and pl.is_residue_line():
                     mask[idx] = False
 
         pdb_lines = np.array(pdb_lines)[mask]
-        write_lines( o_path, list(map(str,pdb_lines)))
+        write_lines(o_path, list(map(str, pdb_lines)))
+
     """
     ========
     General MD
@@ -1022,12 +1016,14 @@ class PDBPrepper:
         mkdir(lig_dir)
         mkdir(met_dir)
 
-        ligands_pathNchrg = self.stru.build_ligands(lig_dir, ifcharge=1, ifunique=1)
+        ligands_pathNchrg = self.stru.build_ligands(lig_dir,
+                                                    ifcharge=1,
+                                                    ifunique=1)
         # metalcenters_path = self.stru.build_metalcenters(met_dir)
         # parm
-        ligand_parm_paths = self._ligand_parm(
-            ligands_pathNchrg, method=lig_method, renew=renew_lig
-        )
+        ligand_parm_paths = self._ligand_parm(ligands_pathNchrg,
+                                              method=lig_method,
+                                              renew=renew_lig)
         # self._metal_parm(metalcenters_path)
         # combine
         if o_dir != "":
@@ -1070,35 +1066,23 @@ class PDBPrepper:
                         if pdbl.line_type == "ATOM" or pdbl.line_type == "HETATM":
                             lig_name = pdbl.resi_name
                 # if renew
-                if (
-                    os.path.isfile(out_prepi)
-                    and os.path.isfile(out_frcmod)
-                    and not renew
-                ):
+                if (os.path.isfile(out_prepi) and os.path.isfile(out_frcmod) and
+                        not renew):
                     if Config.debug >= 1:
-                        print("Parm files exist: " + out_prepi + " " + out_frcmod)
+                        print("Parm files exist: " + out_prepi + " " +
+                              out_frcmod)
                         print("Using old parm files.")
                 else:
                     # gen prepi (net charge and correct protonation state is important)
                     if Config.debug >= 1:
-                        print(
-                            "running: "
-                            + Config.Amber.AmberHome
-                            + "/bin/antechamber -i "
-                            + lig_pdb
-                            + " -fi pdb -o "
-                            + out_prepi
-                            + " -fo prepi -c bcc -s 0 -nc "
-                            + str(net_charge)
-                        )
+                        print("running: " + Config.Amber.AmberHome +
+                              "/bin/antechamber -i " + lig_pdb +
+                              " -fi pdb -o " + out_prepi +
+                              " -fo prepi -c bcc -s 0 -nc " + str(net_charge))
                     run(
-                        Config.Amber.AmberHome
-                        + "/bin/antechamber -i "
-                        + lig_pdb
-                        + " -fi pdb -o "
-                        + out_prepi
-                        + " -fo prepi -c bcc -s 0 -nc "
-                        + str(net_charge),
+                        Config.Amber.AmberHome + "/bin/antechamber -i " +
+                        lig_pdb + " -fi pdb -o " + out_prepi +
+                        " -fo prepi -c bcc -s 0 -nc " + str(net_charge),
                         check=True,
                         text=True,
                         shell=True,
@@ -1110,20 +1094,12 @@ class PDBPrepper:
                         )
                     # gen frcmod
                     if Config.debug >= 1:
-                        print(
-                            "running: "
-                            + Config.Amber.AmberHome
-                            + "/bin/parmchk2 -i "
-                            + out_prepi
-                            + " -f prepi -o "
-                            + out_frcmod
-                        )
+                        print("running: " + Config.Amber.AmberHome +
+                              "/bin/parmchk2 -i " + out_prepi +
+                              " -f prepi -o " + out_frcmod)
                     run(
-                        Config.Amber.AmberHome
-                        + "/bin/parmchk2 -i "
-                        + out_prepi
-                        + " -f prepi -o "
-                        + out_frcmod,
+                        Config.Amber.AmberHome + "/bin/parmchk2 -i " +
+                        out_prepi + " -f prepi -o " + out_frcmod,
                         check=True,
                         text=True,
                         shell=True,
@@ -1143,7 +1119,7 @@ class PDBPrepper:
         ifsavepdb=0,
         ifsolve=1,
         box_type=None,
-        box_size=3,#Config.Amber.box_size,
+        box_size=3,  #Config.Amber.box_size,
         igb=None,
         if_prm_only=0,
     ):
@@ -1188,73 +1164,39 @@ class PDBPrepper:
             # save
             if prm_out_path == "":
                 if o_dir == "":
-                    of.write(
-                        "saveamberparm a "
-                        + self.path_name
-                        + ".prmtop "
-                        + self.path_name
-                        + ".inpcrd"
-                        + line_feed
-                    )
+                    of.write("saveamberparm a " + self.path_name + ".prmtop " +
+                             self.path_name + ".inpcrd" + line_feed)
                     self.prmtop_path = self.path_name + ".prmtop"
                     self.inpcrd_path = self.path_name + ".inpcrd"
                 else:
-                    of.write(
-                        "saveamberparm a "
-                        + o_dir
-                        + self.name
-                        + ".prmtop "
-                        + o_dir
-                        + self.name
-                        + ".inpcrd"
-                        + line_feed
-                    )
+                    of.write("saveamberparm a " + o_dir + self.name +
+                             ".prmtop " + o_dir + self.name + ".inpcrd" +
+                             line_feed)
                     self.prmtop_path = o_dir + self.name + ".prmtop"
                     self.inpcrd_path = o_dir + self.name + ".inpcrd"
             else:
                 if o_dir == "":
                     if if_prm_only:
                         mkdir("./tmp")
-                        of.write(
-                            "saveamberparm a "
-                            + prm_out_path
-                            + " ./tmp/tmp.inpcrd"
-                            + line_feed
-                        )
+                        of.write("saveamberparm a " + prm_out_path +
+                                 " ./tmp/tmp.inpcrd" + line_feed)
                         self.prmtop_path = prm_out_path
                         self.inpcrd_path = None
                     else:
-                        of.write(
-                            "saveamberparm a "
-                            + prm_out_path
-                            + " "
-                            + self.path_name
-                            + ".inpcrd"
-                            + line_feed
-                        )
+                        of.write("saveamberparm a " + prm_out_path + " " +
+                                 self.path_name + ".inpcrd" + line_feed)
                         self.prmtop_path = prm_out_path
                         self.inpcrd_path = self.path_name + ".inpcrd"
                 else:
                     if if_prm_only:
                         mkdir("./tmp")
-                        of.write(
-                            "saveamberparm a "
-                            + prm_out_path
-                            + " ./tmp/tmp.inpcrd"
-                            + line_feed
-                        )
+                        of.write("saveamberparm a " + prm_out_path +
+                                 " ./tmp/tmp.inpcrd" + line_feed)
                         self.prmtop_path = prm_out_path
                         self.inpcrd_path = None
                     else:
-                        of.write(
-                            "saveamberparm a "
-                            + prm_out_path
-                            + " "
-                            + o_dir
-                            + self.name
-                            + ".inpcrd"
-                            + line_feed
-                        )
+                        of.write("saveamberparm a " + prm_out_path + " " +
+                                 o_dir + self.name + ".inpcrd" + line_feed)
                         self.prmtop_path = prm_out_path
                         self.inpcrd_path = o_dir + self.name + ".inpcrd"
 
@@ -1265,7 +1207,6 @@ class PDBPrepper:
         os.system("tleap -s -f " + leap_path + " > " + leap_path[:-2] + "out")
 
         return self.prmtop_path, self.inpcrd_path
-
 
     def PDBMD(self, tag="", o_dir="", engine="Amber_GPU", equi_cpu=0):
         """
@@ -1302,211 +1243,61 @@ class PDBPrepper:
 
         # run sander
         if Config.debug >= 1:
-            print(
-                "running: "
-                + PC_cmd
-                + " "
-                + engine_path
-                + " -O -i "
-                + min_path
-                + " -o "
-                + o_dir
-                + "/min.out -p "
-                + self.prmtop_path
-                + " -c "
-                + self.inpcrd_path
-                + " -r "
-                + o_dir
-                + "/min.rst -ref "
-                + self.inpcrd_path
-            )
-        os.system(
-            PC_cmd
-            + " "
-            + engine_path
-            + " -O -i "
-            + min_path
-            + " -o "
-            + o_dir
-            + "/min.out -p "
-            + self.prmtop_path
-            + " -c "
-            + self.inpcrd_path
-            + " -r "
-            + o_dir
-            + "/min.rst -ref "
-            + self.inpcrd_path
-        )
+            print("running: " + PC_cmd + " " + engine_path + " -O -i " +
+                  min_path + " -o " + o_dir + "/min.out -p " +
+                  self.prmtop_path + " -c " + self.inpcrd_path + " -r " +
+                  o_dir + "/min.rst -ref " + self.inpcrd_path)
+        os.system(PC_cmd + " " + engine_path + " -O -i " + min_path + " -o " +
+                  o_dir + "/min.out -p " + self.prmtop_path + " -c " +
+                  self.inpcrd_path + " -r " + o_dir + "/min.rst -ref " +
+                  self.inpcrd_path)
         if Config.debug >= 1:
-            print(
-                "running: "
-                + PC_cmd
-                + " "
-                + engine_path
-                + " -O -i "
-                + heat_path
-                + " -o "
-                + o_dir
-                + "/heat.out -p "
-                + self.prmtop_path
-                + " -c "
-                + o_dir
-                + "/min.rst -ref "
-                + o_dir
-                + "/min.rst -r "
-                + o_dir
-                + "/heat.rst"
-            )
-        os.system(
-            PC_cmd
-            + " "
-            + engine_path
-            + " -O -i "
-            + heat_path
-            + " -o "
-            + o_dir
-            + "/heat.out -p "
-            + self.prmtop_path
-            + " -c "
-            + o_dir
-            + "/min.rst -ref "
-            + o_dir
-            + "/min.rst -r "
-            + o_dir
-            + "/heat.rst"
-        )
+            print("running: " + PC_cmd + " " + engine_path + " -O -i " +
+                  heat_path + " -o " + o_dir + "/heat.out -p " +
+                  self.prmtop_path + " -c " + o_dir + "/min.rst -ref " + o_dir +
+                  "/min.rst -r " + o_dir + "/heat.rst")
+        os.system(PC_cmd + " " + engine_path + " -O -i " + heat_path + " -o " +
+                  o_dir + "/heat.out -p " + self.prmtop_path + " -c " + o_dir +
+                  "/min.rst -ref " + o_dir + "/min.rst -r " + o_dir +
+                  "/heat.rst")
 
         # gpu debug for equi
         if equi_cpu:
             # use Config.PC_cmd and cpu_engine_path
             if Config.debug >= 1:
-                print(
-                    "running: "
-                    + Config.PC_cmd
-                    + " "
-                    + cpu_engine_path
-                    + " -O -i "
-                    + equi_path
-                    + " -o "
-                    + o_dir
-                    + "/equi.out -p "
-                    + self.prmtop_path
-                    + " -c "
-                    + o_dir
-                    + "/heat.rst -ref "
-                    + o_dir
-                    + "/heat.rst -r "
-                    + o_dir
-                    + "/equi.rst -x "
-                    + o_dir
-                    + "/equi.nc"
-                )
-            os.system(
-                Config.PC_cmd
-                + " "
-                + cpu_engine_path
-                + " -O -i "
-                + equi_path
-                + " -o "
-                + o_dir
-                + "/equi.out -p "
-                + self.prmtop_path
-                + " -c "
-                + o_dir
-                + "/heat.rst -ref "
-                + o_dir
-                + "/heat.rst -r "
-                + o_dir
-                + "/equi.rst -x "
-                + o_dir
-                + "/equi.nc"
-            )
+                print("running: " + Config.PC_cmd + " " + cpu_engine_path +
+                      " -O -i " + equi_path + " -o " + o_dir + "/equi.out -p " +
+                      self.prmtop_path + " -c " + o_dir + "/heat.rst -ref " +
+                      o_dir + "/heat.rst -r " + o_dir + "/equi.rst -x " +
+                      o_dir + "/equi.nc")
+            os.system(Config.PC_cmd + " " + cpu_engine_path + " -O -i " +
+                      equi_path + " -o " + o_dir + "/equi.out -p " +
+                      self.prmtop_path + " -c " + o_dir + "/heat.rst -ref " +
+                      o_dir + "/heat.rst -r " + o_dir + "/equi.rst -x " +
+                      o_dir + "/equi.nc")
         else:
             if Config.debug >= 1:
-                print(
-                    "running: "
-                    + PC_cmd
-                    + " "
-                    + engine_path
-                    + " -O -i "
-                    + equi_path
-                    + " -o "
-                    + o_dir
-                    + "/equi.out -p "
-                    + self.prmtop_path
-                    + " -c "
-                    + o_dir
-                    + "/heat.rst -ref "
-                    + o_dir
-                    + "/heat.rst -r "
-                    + o_dir
-                    + "/equi.rst -x "
-                    + o_dir
-                    + "/equi.nc"
-                )
-            os.system(
-                PC_cmd
-                + " "
-                + engine_path
-                + " -O -i "
-                + equi_path
-                + " -o "
-                + o_dir
-                + "/equi.out -p "
-                + self.prmtop_path
-                + " -c "
-                + o_dir
-                + "/heat.rst -ref "
-                + o_dir
-                + "/heat.rst -r "
-                + o_dir
-                + "/equi.rst -x "
-                + o_dir
-                + "/equi.nc"
-            )
+                print("running: " + PC_cmd + " " + engine_path + " -O -i " +
+                      equi_path + " -o " + o_dir + "/equi.out -p " +
+                      self.prmtop_path + " -c " + o_dir + "/heat.rst -ref " +
+                      o_dir + "/heat.rst -r " + o_dir + "/equi.rst -x " +
+                      o_dir + "/equi.nc")
+            os.system(PC_cmd + " " + engine_path + " -O -i " + equi_path +
+                      " -o " + o_dir + "/equi.out -p " + self.prmtop_path +
+                      " -c " + o_dir + "/heat.rst -ref " + o_dir +
+                      "/heat.rst -r " + o_dir + "/equi.rst -x " + o_dir +
+                      "/equi.nc")
 
         if Config.debug >= 1:
-            print(
-                "running: "
-                + PC_cmd
-                + " "
-                + engine_path
-                + " -O -i "
-                + prod_path
-                + " -o "
-                + o_dir
-                + "/prod.out -p "
-                + self.prmtop_path
-                + " -c "
-                + o_dir
-                + "/equi.rst -ref "
-                + o_dir
-                + "/equi.rst -r "
-                + o_dir
-                + "/prod.rst -x "
-                + o_dir
-                + "/prod.nc"
-            )
-        os.system(
-            PC_cmd
-            + " "
-            + engine_path
-            + " -O -i "
-            + prod_path
-            + " -o "
-            + o_dir
-            + "/prod.out -p "
-            + self.prmtop_path
-            + " -c "
-            + o_dir
-            + "/equi.rst -ref "
-            + o_dir
-            + "/equi.rst -r "
-            + o_dir
-            + "/prod.rst -x "
-            + o_dir
-            + "/prod.nc"
-        )
+            print("running: " + PC_cmd + " " + engine_path + " -O -i " +
+                  prod_path + " -o " + o_dir + "/prod.out -p " +
+                  self.prmtop_path + " -c " + o_dir + "/equi.rst -ref " +
+                  o_dir + "/equi.rst -r " + o_dir + "/prod.rst -x " + o_dir +
+                  "/prod.nc")
+        os.system(PC_cmd + " " + engine_path + " -O -i " + prod_path + " -o " +
+                  o_dir + "/prod.out -p " + self.prmtop_path + " -c " + o_dir +
+                  "/equi.rst -ref " + o_dir + "/equi.rst -r " + o_dir +
+                  "/prod.rst -x " + o_dir + "/prod.nc")
 
         self.nc = o_dir + "/prod.nc"
         return o_dir + "/prod.nc"
@@ -1527,41 +1318,37 @@ class PDBPrepper:
         maxcyc = str(maxcyc)
         # restrain related
         if self.conf_min["ntr"] == "1":
-            ntr_line = (
-                "  ntr   = "
-                + self.conf_min["ntr"]
-                + ",	 restraint_wt = "
-                + self.conf_min["restraint_wt"]
-                + ", restraintmask = "
-                + self.conf_min["restraintmask"]
-                + ","
-                + line_feed
-            )
+            ntr_line = ("  ntr   = " + self.conf_min["ntr"] +
+                        ",	 restraint_wt = " + self.conf_min["restraint_wt"] +
+                        ", restraintmask = " + self.conf_min["restraintmask"] +
+                        "," + line_feed)
         else:
             ntr_line = ''
         if self.conf_min['nmropt_rest'] == '1':
             self.conf_min['nmropt'] = '1'
-            nmropt_line = '  nmropt= '+self.conf_min['nmropt']+','+line_feed
+            nmropt_line = '  nmropt= ' + self.conf_min[
+                'nmropt'] + ',' + line_feed
             DISANG_tail = ''' &wt
   type='END'
  /
-  DISANG= '''+self.conf_min['DISANG']+line_feed
-            self._build_MD_rs(step='min',o_path=self.conf_min['DISANG'])
+  DISANG= ''' + self.conf_min['DISANG'] + line_feed
+            self._build_MD_rs(step='min', o_path=self.conf_min['DISANG'])
         else:
             nmropt_line = ''
             DISANG_tail = ''
-        #text        
-        conf_str='''Minimize
+        #text
+        conf_str = '''Minimize
  &cntrl
   imin  = 1,  ntx   = 1,  irest = 0,
-  ntc   = '''+self.conf_min['ntc']+''',    ntf = '''+self.conf_min['ntf']+''',
-  cut   = '''+self.conf_min['cut']+''',
-  maxcyc= '''+maxcyc+''', ncyc  = '''+ncyc+''',
-  ntpr  = '''+ntpr+''', ntwx  = 0,
-'''+ntr_line+nmropt_line+''' /
-'''+DISANG_tail
+  ntc   = ''' + self.conf_min['ntc'] + ''',    ntf = ''' + self.conf_min[
+            'ntf'] + ''',
+  cut   = ''' + self.conf_min['cut'] + ''',
+  maxcyc= ''' + maxcyc + ''', ncyc  = ''' + ncyc + ''',
+  ntpr  = ''' + ntpr + ''', ntwx  = 0,
+''' + ntr_line + nmropt_line + ''' /
+''' + DISANG_tail
         #write
-        with open(o_path,'w') as of:
+        with open(o_path, 'w') as of:
             of.write(conf_str)
         return o_path
 
@@ -1586,24 +1373,18 @@ class PDBPrepper:
         nstlim = str(nstlim)
         # restrain related
         if self.conf_heat["ntr"] == "1":
-            ntr_line = (
-                "  ntr   = "
-                + self.conf_heat["ntr"]
-                + ", restraint_wt = "
-                + self.conf_heat["restraint_wt"]
-                + ", restraintmask = "
-                + self.conf_heat["restraintmask"]
-                + ","
-                + line_feed
-            )
+            ntr_line = ("  ntr   = " + self.conf_heat["ntr"] +
+                        ", restraint_wt = " + self.conf_heat["restraint_wt"] +
+                        ", restraintmask = " + self.conf_heat["restraintmask"] +
+                        "," + line_feed)
         else:
             ntr_line = ''
         if self.conf_heat['nmropt_rest'] == '1':
-            DISANG_tail = '''  DISANG='''+self.conf_heat['DISANG']+line_feed
-            self._build_MD_rs(step='heat',o_path=self.conf_heat['DISANG'])
+            DISANG_tail = '''  DISANG=''' + self.conf_heat['DISANG'] + line_feed
+            self._build_MD_rs(step='heat', o_path=self.conf_heat['DISANG'])
         else:
             DISANG_tail = ''
-        conf_str='''Heat
+        conf_str = '''Heat
  &cntrl
   imin  = 0,  ntx = 1, irest = 0,
   ntc   = """
@@ -1670,9 +1451,9 @@ class PDBPrepper:
  &wt
   type  = 'END',
  /
-'''+DISANG_tail
+''' + DISANG_tail
         #write
-        with open(o_path,'w') as of:
+        with open(o_path, 'w') as of:
             of.write(conf_str)
         return o_path
 
@@ -1684,81 +1465,81 @@ class PDBPrepper:
         """
         # path
         o_path = o_dir + "/equi.in"
-#
-#        # nstlim related
-#        nstlim = self.conf_equi["nstlim"]
-#        if self.conf_equi["ntpr"] == "0.002nstlim":
-#            ntpr = str(int(nstlim * 0.002))
-#        nstlim = str(nstlim)
-#        # restrain related
-#        if self.conf_equi["ntr"] == "1":
-#            ntr_line = (
-#                "  ntr   = "
-#                + self.conf_equi["ntr"]
-#                + ", restraint_wt = "
-#                + self.conf_equi["restraint_wt"]
-#                + ", restraintmask = "
-#                + self.conf_equi["restraintmask"]
-#                + ","
-#                + line_feed
-#            )
-#        else:
-#            ntr_line = ''
-#        if self.conf_equi['nmropt_rest'] == '1':
-#            self.conf_equi['nmropt'] = '1'
-#            nmropt_line = '  nmropt= '+self.conf_equi['nmropt']+','+line_feed
-#            DISANG_tail = ''' &wt
-#  type='END'
-# /
-#  DISANG= '''+self.conf_equi['DISANG']+line_feed
-#            self._build_MD_rs(step='equi',o_path=self.conf_equi['DISANG'])
-#        else:
-#            nmropt_line = ''
-#            DISANG_tail = ''
-#
-#        conf_str = (
-#            """Equilibration:constant pressure
-# &cntrl
-#  imin  = 0,  ntx = """
-#            + self.conf_equi["ntx"]
-#            + """,  irest = """
-#            + self.conf_equi["irest"]
-#            + """,
-#  ntf   = """
-#            + self.conf_equi["ntf"]
-#            + """,  ntc = """
-#            + self.conf_equi["ntc"]
-#            + """,
-#  nstlim= """
-#            + nstlim
-#            + """, dt= """
-#            + self.conf_equi["dt"]
-#            + """,
-#  cut   = """
-#            + self.conf_equi["cut"]
-#            + """,
-#  temp0 = """
-#            + self.conf_equi["temp0"]
-#            + """,
-#  ntpr  = """
-#            + ntpr
-#            + """, ntwx = """
-#            + self.conf_equi["ntwx"]
-#            + """,
-#  ntt   = """
-#            + self.conf_equi["ntt"]
-#            + """, gamma_ln = """
-#            + self.conf_equi["gamma_ln"]
-#            + """,
-#  ntb   = 2,  ntp = 1,
-#  iwrap = """
-#            + self.conf_equi["iwarp"]
-#            + """,
-#  ig    = -1,
-#"""+ntr_line+nmropt_line+''' /
-#'''+DISANG_tail
-#        #write
-        with open(o_path,'w') as of:
+        #
+        #        # nstlim related
+        #        nstlim = self.conf_equi["nstlim"]
+        #        if self.conf_equi["ntpr"] == "0.002nstlim":
+        #            ntpr = str(int(nstlim * 0.002))
+        #        nstlim = str(nstlim)
+        #        # restrain related
+        #        if self.conf_equi["ntr"] == "1":
+        #            ntr_line = (
+        #                "  ntr   = "
+        #                + self.conf_equi["ntr"]
+        #                + ", restraint_wt = "
+        #                + self.conf_equi["restraint_wt"]
+        #                + ", restraintmask = "
+        #                + self.conf_equi["restraintmask"]
+        #                + ","
+        #                + line_feed
+        #            )
+        #        else:
+        #            ntr_line = ''
+        #        if self.conf_equi['nmropt_rest'] == '1':
+        #            self.conf_equi['nmropt'] = '1'
+        #            nmropt_line = '  nmropt= '+self.conf_equi['nmropt']+','+line_feed
+        #            DISANG_tail = ''' &wt
+        #  type='END'
+        # /
+        #  DISANG= '''+self.conf_equi['DISANG']+line_feed
+        #            self._build_MD_rs(step='equi',o_path=self.conf_equi['DISANG'])
+        #        else:
+        #            nmropt_line = ''
+        #            DISANG_tail = ''
+        #
+        #        conf_str = (
+        #            """Equilibration:constant pressure
+        # &cntrl
+        #  imin  = 0,  ntx = """
+        #            + self.conf_equi["ntx"]
+        #            + """,  irest = """
+        #            + self.conf_equi["irest"]
+        #            + """,
+        #  ntf   = """
+        #            + self.conf_equi["ntf"]
+        #            + """,  ntc = """
+        #            + self.conf_equi["ntc"]
+        #            + """,
+        #  nstlim= """
+        #            + nstlim
+        #            + """, dt= """
+        #            + self.conf_equi["dt"]
+        #            + """,
+        #  cut   = """
+        #            + self.conf_equi["cut"]
+        #            + """,
+        #  temp0 = """
+        #            + self.conf_equi["temp0"]
+        #            + """,
+        #  ntpr  = """
+        #            + ntpr
+        #            + """, ntwx = """
+        #            + self.conf_equi["ntwx"]
+        #            + """,
+        #  ntt   = """
+        #            + self.conf_equi["ntt"]
+        #            + """, gamma_ln = """
+        #            + self.conf_equi["gamma_ln"]
+        #            + """,
+        #  ntb   = 2,  ntp = 1,
+        #  iwrap = """
+        #            + self.conf_equi["iwarp"]
+        #            + """,
+        #  ig    = -1,
+        #"""+ntr_line+nmropt_line+''' /
+        #'''+DISANG_tail
+        #        #write
+        with open(o_path, 'w') as of:
             of.write(conf_str)
         return o_path
 
@@ -1771,100 +1552,105 @@ class PDBPrepper:
         # path
         o_path = o_dir + "/prod.in"
 
-#        # nstlim related
-#        nstlim = self.conf_prod["nstlim"]
-#        if self.conf_prod["ntpr"] == "0.001nstlim":
-#            ntpr = str(int(nstlim * 0.001))
-#        nstlim = str(nstlim)
-#        # restrain related
-#        if self.conf_prod["ntr"] == "1":
-#            ntr_line = (
-#                "  ntr   = "
-#                + self.conf_prod["ntr"]
-#                + ", restraint_wt = "
-#                + self.conf_prod["restraint_wt"]
-#                + ", restraintmask = "
-#                + self.conf_prod["restraintmask"]
-#                + ","
-#                + line_feed
-#            )
-#        else:
-#            ntr_line = ''
-#        if self.conf_prod['nmropt_rest'] == '1':
-#            self.conf_prod['nmropt'] = '1'
-#            nmropt_line = '  nmropt= '+self.conf_prod['nmropt']+','+line_feed
-#            DISANG_tail = ''' &wt
-#  type='END'
-# /
-#  DISANG= '''+self.conf_prod['DISANG']+line_feed
-#            self._build_MD_rs(step='prod',o_path=self.conf_prod['DISANG'])
-#        else:
-#            nmropt_line = ''
-#            DISANG_tail = ''
-#
-#        conf_str = (
-#            """Production: constant pressure
-# &cntrl
-#  imin  = 0, ntx = """
-#            + self.conf_prod["ntx"]
-#            + """, irest = """
-#            + self.conf_prod["irest"]
-#            + """,
-#  ntf   = """
-#            + self.conf_prod["ntf"]
-#            + """,  ntc = """
-#            + self.conf_prod["ntc"]
-#            + """,
-#  nstlim= """
-#            + nstlim
-#            + """, dt= """
-#            + self.conf_prod["dt"]
-#            + """,
-#  cut   = """
-#            + self.conf_prod["cut"]
-#            + """,
-#  temp0 = """
-#            + self.conf_prod["temp0"]
-#            + """,
-#  ntpr  = """
-#            + ntpr
-#            + """, ntwx = """
-#            + self.conf_prod["ntwx"]
-#            + """,
-#  ntt   = """
-#            + self.conf_prod["ntt"]
-#            + """, gamma_ln = """
-#            + self.conf_prod["gamma_ln"]
-#            + """,
-#  ntb   = 2,  ntp = 1,
-#  iwrap = """
-#            + self.conf_prod["iwarp"]
-#            + """,
-#  ig    = -1,
-#"""+ntr_line+nmropt_line+''' /
-#'''+DISANG_tail
+        #        # nstlim related
+        #        nstlim = self.conf_prod["nstlim"]
+        #        if self.conf_prod["ntpr"] == "0.001nstlim":
+        #            ntpr = str(int(nstlim * 0.001))
+        #        nstlim = str(nstlim)
+        #        # restrain related
+        #        if self.conf_prod["ntr"] == "1":
+        #            ntr_line = (
+        #                "  ntr   = "
+        #                + self.conf_prod["ntr"]
+        #                + ", restraint_wt = "
+        #                + self.conf_prod["restraint_wt"]
+        #                + ", restraintmask = "
+        #                + self.conf_prod["restraintmask"]
+        #                + ","
+        #                + line_feed
+        #            )
+        #        else:
+        #            ntr_line = ''
+        #        if self.conf_prod['nmropt_rest'] == '1':
+        #            self.conf_prod['nmropt'] = '1'
+        #            nmropt_line = '  nmropt= '+self.conf_prod['nmropt']+','+line_feed
+        #            DISANG_tail = ''' &wt
+        #  type='END'
+        # /
+        #  DISANG= '''+self.conf_prod['DISANG']+line_feed
+        #            self._build_MD_rs(step='prod',o_path=self.conf_prod['DISANG'])
+        #        else:
+        #            nmropt_line = ''
+        #            DISANG_tail = ''
+        #
+        #        conf_str = (
+        #            """Production: constant pressure
+        # &cntrl
+        #  imin  = 0, ntx = """
+        #            + self.conf_prod["ntx"]
+        #            + """, irest = """
+        #            + self.conf_prod["irest"]
+        #            + """,
+        #  ntf   = """
+        #            + self.conf_prod["ntf"]
+        #            + """,  ntc = """
+        #            + self.conf_prod["ntc"]
+        #            + """,
+        #  nstlim= """
+        #            + nstlim
+        #            + """, dt= """
+        #            + self.conf_prod["dt"]
+        #            + """,
+        #  cut   = """
+        #            + self.conf_prod["cut"]
+        #            + """,
+        #  temp0 = """
+        #            + self.conf_prod["temp0"]
+        #            + """,
+        #  ntpr  = """
+        #            + ntpr
+        #            + """, ntwx = """
+        #            + self.conf_prod["ntwx"]
+        #            + """,
+        #  ntt   = """
+        #            + self.conf_prod["ntt"]
+        #            + """, gamma_ln = """
+        #            + self.conf_prod["gamma_ln"]
+        #            + """,
+        #  ntb   = 2,  ntp = 1,
+        #  iwrap = """
+        #            + self.conf_prod["iwarp"]
+        #            + """,
+        #  ig    = -1,
+        #"""+ntr_line+nmropt_line+''' /
+        #'''+DISANG_tail
         #write
-        with open(o_path,'w') as of:
+        with open(o_path, 'w') as of:
             of.write(conf_str)
         return o_path
 
-    def _build_MD_rs(self,step,o_path):
+    def _build_MD_rs(self, step, o_path):
         '''
         Generate a file for DISANG restraint. Get parameters from self.conf_step.
         '''
-        rs_str=''
-        rs_data_step=self.__dict__['conf_'+step]['rs_constraints']
+        rs_str = ''
+        rs_data_step = self.__dict__['conf_' + step]['rs_constraints']
         for rest_data in rs_data_step:
-            rs_str=rs_str+'''  &rst
-   iat=  '''+','.join(rest_data['iat'])+''', r1= '''+rest_data['r1']+''', r2= '''+rest_data['r2']+''', r3= '''+rest_data['r3']+''', r4= '''+rest_data['r4']+''',
-   rk2='''+rest_data['rk2']+''', rk3='''+rest_data['rk3']+''', ir6='''+rest_data['ir6']+''', ialtd='''+rest_data['ialtd']+''',
+            rs_str = rs_str + '''  &rst
+   iat=  ''' + ','.join(
+                rest_data['iat']
+            ) + ''', r1= ''' + rest_data['r1'] + ''', r2= ''' + rest_data[
+                'r2'] + ''', r3= ''' + rest_data[
+                    'r3'] + ''', r4= ''' + rest_data['r4'] + ''',
+   rk2=''' + rest_data['rk2'] + ''', rk3=''' + rest_data[
+                        'rk3'] + ''', ir6=''' + rest_data[
+                            'ir6'] + ''', ialtd=''' + rest_data['ialtd'] + ''',
   &end
 '''
         #write
-        with open(o_path,'w') as of:
+        with open(o_path, 'w') as of:
             of.write(rs_str)
         return o_path
-
 
     def reset_MD_conf(self):
         """
@@ -1944,9 +1730,8 @@ class PDBPrepper:
         # san check
         support_work_type = ["spe", "opt", "tsopt"]
         if work_type not in support_work_type:
-            raise Exception(
-                "PDB2QMMM.work_type : only support: " + repr(support_work_type)
-            )
+            raise Exception("PDB2QMMM.work_type : only support: " +
+                            repr(support_work_type))
         support_qm = ["g16"]
         if qm not in support_qm:
             raise Exception("PDB2QMMM.qm: only support: " + repr(support_qm))
@@ -1970,23 +1755,19 @@ class PDBPrepper:
 
         # build template
         if qm == "g16":
-            self.route = self._get_oniom_g16_route(
-                work_type, o_name, key_words=keywords
-            )
+            self.route = self._get_oniom_g16_route(work_type,
+                                                   o_name,
+                                                   key_words=keywords)
             title = (
                 "ONIOM input template generated by PDB2QMMM module of XXX(software name)"
-                + line_feed
-            )
-            chrgspin = self._get_oniom_chrgspin(
-                prmtop_path=prmtop_path, spin_list=spin_list
-            )
+                + line_feed)
+            chrgspin = self._get_oniom_chrgspin(prmtop_path=prmtop_path,
+                                                spin_list=spin_list)
             cnt_table = self.stru.get_connectivty_table(prepi_path=prepi_path)
             coord = self._get_oniom_g16_coord(
-                prmtop_path
-            )  # use connectivity info from the line above.
-            add_prm = (
-                self._get_oniom_g16_add_prm()
-            )  # test for rules of missing parameters
+                prmtop_path)  # use connectivity info from the line above.
+            add_prm = (self._get_oniom_g16_add_prm()
+                      )  # test for rules of missing parameters
 
             # combine and write
             with open(g_temp_path, "w") as of:
@@ -2011,13 +1792,14 @@ class PDBPrepper:
             print("Writing QMMM gjfs.")
         for i, frame in enumerate(frames):
             if ifchk:
-                frame_path = frame.write_to_template(g_temp_path, index=str(i), ifchk=1)
+                frame_path = frame.write_to_template(g_temp_path,
+                                                     index=str(i),
+                                                     ifchk=1)
                 gjf_paths.append(frame_path[0])
                 chk_paths.append(frame_path[1])
             else:
                 gjf_paths.append(
-                    frame.write_to_template(g_temp_path, index=str(i), ifchk=0)
-                )
+                    frame.write_to_template(g_temp_path, index=str(i), ifchk=0))
         # run Gaussian job
         self.qmmm_out = PDB.Run_QM(gjf_paths)
 
@@ -2043,9 +1825,10 @@ class PDBPrepper:
         else:
             self.layer = Layer.preset(self, self.layer_preset)
 
-    def _get_oniom_g16_route(
-        self, work_type, chk_name="chk_place_holder", key_words=""
-    ):
+    def _get_oniom_g16_route(self,
+                             work_type,
+                             chk_name="chk_place_holder",
+                             key_words=""):
         """
         generate gaussian 16 ONIOM route section. Base on settings in the config module.
         -------
@@ -2059,17 +1842,15 @@ class PDBPrepper:
         proc = "%nprocshared=" + str(Config.n_cores) + line_feed
         mem = "%mem=" + str(Config.n_cores * Config.max_core) + "MB" + line_feed
         if type(key_words) == str and key_words != "":
-            keyword_line = (
-                "# "
-                + " ".join(Config.Gaussian.keywords[work_type] + [key_words,])
-                + line_feed
-            )
+            keyword_line = ("# " +
+                            " ".join(Config.Gaussian.keywords[work_type] + [
+                                key_words,
+                            ]) + line_feed)
         if type(key_words) == list:
             keyword_line = (
-                "# "
-                + " ".join(Config.Gaussian.keywords[work_type] + key_words)
-                + line_feed
-            )
+                "# " +
+                " ".join(Config.Gaussian.keywords[work_type] + key_words) +
+                line_feed)
 
         route = chk + proc + mem + keyword_line
         return route
@@ -2150,7 +1931,8 @@ class PDBPrepper:
                     if atom.id != a_id:
                         raise Exception("atom id error.")
                     if atom.id in self.layer[0]:
-                        coord += atom.build_oniom("h", self.chrg_list_all[atom.id - 1])
+                        coord += atom.build_oniom(
+                            "h", self.chrg_list_all[atom.id - 1])
                     else:
                         # consider connection
                         cnt_info = None
@@ -2168,18 +1950,19 @@ class PDBPrepper:
                                 ]
                                 repeat_flag = 1
                         # general low layer
-                        coord += atom.build_oniom(
-                            "l", self.chrg_list_all[atom.id - 1], cnt_info=cnt_info
-                        )
+                        coord += atom.build_oniom("l",
+                                                  self.chrg_list_all[atom.id -
+                                                                     1],
+                                                  cnt_info=cnt_info)
         for lig in self.stru.ligands:
             for atom in lig:
                 a_id += 1
                 if atom.id != a_id:
                     raise Exception("atom id error.")
                 if atom.id in self.layer[0]:
-                    coord += atom.build_oniom(
-                        "h", self.chrg_list_all[atom.id - 1], if_lig=1
-                    )
+                    coord += atom.build_oniom("h",
+                                              self.chrg_list_all[atom.id - 1],
+                                              if_lig=1)
                 else:
                     if Config.debug >= 1:
                         print(
@@ -2197,9 +1980,8 @@ class PDBPrepper:
                             if Config.debug >= 1:
                                 print(
                                     "\033[1;31;0m In PDB2QMMM in _get_oniom_g16_coord: WARNING: Found ligand atom"
-                                    + str(atom.id)
-                                    + " in seperate layers \033[0m"
-                                )
+                                    + str(atom.id) +
+                                    " in seperate layers \033[0m")
                             cnt_info = [
                                 "H",
                                 cnt_atom.get_pseudo_H_type(atom),
@@ -2226,9 +2008,9 @@ class PDBPrepper:
                 if atom.id != a_id:
                     raise Exception("atom id error.")
                 if atom.id in self.layer[0]:
-                    coord += atom.build_oniom(
-                        "h", self.chrg_list_all[atom.id - 1], if_sol=1
-                    )
+                    coord += atom.build_oniom("h",
+                                              self.chrg_list_all[atom.id - 1],
+                                              if_sol=1)
                 else:
                     # consider connection
                     cnt_info = None  # for future update
@@ -2238,9 +2020,8 @@ class PDBPrepper:
                             if Config.debug >= 1:
                                 print(
                                     "\033[1;31;0m In PDB2QMMM in _get_oniom_g16_coord: WARNING: Found solvent atom"
-                                    + str(atom.id)
-                                    + " in seperate layers \033[0m"
-                                )
+                                    + str(atom.id) +
+                                    " in seperate layers \033[0m")
                             if repeat_flag:
                                 raise Exception(
                                     "A low layer atom is connecting 2 higher layer atoms"
@@ -2311,10 +2092,8 @@ class PDBPrepper:
                         del format_flag
 
                 if "charge_flag" in dir():
-                    if (
-                        line_index >= charge_flag + 2
-                        and line_index <= charge_flag + 1 + ceil(N_atom / 5)
-                    ):
+                    if (line_index >= charge_flag + 2 and
+                            line_index <= charge_flag + 1 + ceil(N_atom / 5)):
                         for i in line.strip().split():
                             charge_list.append(float(i) / 18.2223)
         return charge_list
@@ -2325,9 +2104,13 @@ class PDBPrepper:
     ========
     """
 
-    def nc2mdcrd(
-        self, o_path="", point=None, start=1, end=-1, step=1, engine="cpptraj"
-    ):
+    def nc2mdcrd(self,
+                 o_path="",
+                 point=None,
+                 start=1,
+                 end=-1,
+                 step=1,
+                 engine="cpptraj"):
         """
         convert self.nc to a mdcrd file to read and operate.(self.nc[:-2]+'.mdcrd' by default)
         a easier way is to use pytraj directly.
@@ -2341,15 +2124,15 @@ class PDBPrepper:
         """
         if self.nc == None:
             raise Exception(
-                "No nc file found. Please assign self.nc or run PDBMD first"
-            )
+                "No nc file found. Please assign self.nc or run PDBMD first")
         else:
             if o_path == "":
                 o_path = self.nc[:-2] + "mdcrd"
             if end == -1:
                 end = "last"
             if point != None:
-                all_p = int(self.conf_prod["nstlim"]) / int(self.conf_prod["ntwx"])
+                all_p = int(self.conf_prod["nstlim"]) / int(
+                    self.conf_prod["ntwx"])
                 step = int(all_p / point)
 
             if engine not in ["pytraj", "cpptraj"]:
@@ -2363,17 +2146,8 @@ class PDBPrepper:
                 cpp_out_path = self.cache_path + "/cpptraj_nc2mdcrd.out"
                 with open(cpp_in_path, "w") as of:
                     of.write("parm " + self.prmtop_path + line_feed)
-                    of.write(
-                        "trajin "
-                        + self.nc
-                        + " "
-                        + str(start)
-                        + " "
-                        + end
-                        + " "
-                        + str(step)
-                        + line_feed
-                    )
+                    of.write("trajin " + self.nc + " " + str(start) + " " +
+                             end + " " + str(step) + line_feed)
                     of.write("trajout " + o_path + line_feed)
                     of.write("run" + line_feed)
                     of.write("quit" + line_feed)
@@ -2424,10 +2198,10 @@ class PDBPrepper:
         # get sele
         if val_fix == "internal":
             sele_lines, sele_map = self.stru.get_sele_list(
-                atom_mask, fix_end="H", prepi_path=self.prepi_path
-            )
+                atom_mask, fix_end="H", prepi_path=self.prepi_path)
         else:
-            sele_lines, sele_map = self.stru.get_sele_list(atom_mask, fix_end=None)
+            sele_lines, sele_map = self.stru.get_sele_list(atom_mask,
+                                                           fix_end=None)
         self.qm_cluster_map = sele_map
         # get chrgspin
         chrgspin = self._get_qmcluster_chrgspin(sele_lines, spin=spin)
@@ -2503,14 +2277,8 @@ class PDBPrepper:
             for gjf in inp:
                 out = gjf[:-3] + "out"
                 if Config.debug > 1:
-                    print(
-                        "running: "
-                        + Config.Gaussian.g16_exe
-                        + " < "
-                        + gjf
-                        + " > "
-                        + out
-                    )
+                    print("running: " + Config.Gaussian.g16_exe + " < " + gjf +
+                          " > " + out)
                 os.system(Config.Gaussian.g16_exe + " < " + gjf + " > " + out)
                 outs.append(out)
             return outs
@@ -2520,14 +2288,8 @@ class PDBPrepper:
             for gjf in inp:
                 out = gjf[:-3] + "out"
                 if Config.debug > 1:
-                    print(
-                        "running: "
-                        + Config.Gaussian.g09_exe
-                        + " < "
-                        + gjf
-                        + " > "
-                        + out
-                    )
+                    print("running: " + Config.Gaussian.g09_exe + " < " + gjf +
+                          " > " + out)
                 os.system(Config.Gaussian.g09_exe + " < " + gjf + " > " + out)
                 outs.append(out)
             return outs
@@ -2571,9 +2333,14 @@ class PDBPrepper:
     ========
     """
 
-    def get_field_strength(
-        self, atom_mask, a1=None, a2=None, bond_p1="center", p1=None, p2=None, d1=None
-    ):
+    def get_field_strength(self,
+                           atom_mask,
+                           a1=None,
+                           a2=None,
+                           bond_p1="center",
+                           p1=None,
+                           p2=None,
+                           d1=None):
         """
         use frame coordinate from *mdcrd* and MM charge from *prmtop* to calculate the field strength of *p1* along *p2-p1* or *d1*
         atoms in *atom_mask* is included. (TODO: or an exclude one?)
@@ -2630,8 +2397,8 @@ class PDBPrepper:
             E = 0
             for atom_id in atom_list:
                 # search for coord and chrg
-                coord = frame.coord[atom_id-1]
-                chrg = chrg_list[atom_id-1]
+                coord = frame.coord[atom_id - 1]
+                chrg = chrg_list[atom_id - 1]
                 E += get_field_strength_value(coord, chrg, p1, p2=p2, d1=d1)
             Es.append(E)
 
@@ -2667,15 +2434,14 @@ class PDBPrepper:
         Result direction: a1 -> a2
         
         REF: Lu, T.; Chen, F., Multiwfn: A multifunctional wavefunction analyzer. J. Comput. Chem. 2012, 33 (5), 580-592.
-        """ 
+        """
         Dipoles = []
 
         if prog == "Multiwfn":
             # self.init_Multiwfn()
             ref_path = qm_fch_paths[0]
-            mltwfn_in_path = (
-                ref_path[: -(len(ref_path.split(".")[-1]) + 1)] + "_dipole.in"
-            )
+            mltwfn_in_path = (ref_path[:-(len(ref_path.split(".")[-1]) + 1)] +
+                              "_dipole.in")
 
             with open(mltwfn_in_path, "w") as of:
                 of.write("19" + line_feed)
@@ -2691,7 +2457,7 @@ class PDBPrepper:
 
             for fchk in qm_fch_paths:
                 # get a1->a2 vector from .out (update to using fchk TODO)
-                G_out_path = fchk[: -len(fchk.split(".")[-1])] + "out"
+                G_out_path = fchk[:-len(fchk.split(".")[-1])] + "out"
                 with open(G_out_path) as f0:
                     coord_flag = 0
                     skip_flag = 0
@@ -2709,25 +2475,19 @@ class PDBPrepper:
                             l_p = line0.strip().split()
                             if str(a1) == l_p[0]:
                                 coord_a1 = np.array(
-                                    (float(l_p[3]), float(l_p[4]), float(l_p[5]))
-                                )
+                                    (float(l_p[3]), float(l_p[4]),
+                                     float(l_p[5])))
                             if str(a2) == l_p[0]:
                                 coord_a2 = np.array(
-                                    (float(l_p[3]), float(l_p[4]), float(l_p[5]))
-                                )
+                                    (float(l_p[3]), float(l_p[4]),
+                                     float(l_p[5])))
                 Bond_vec = coord_a2 - coord_a1
 
                 # Run Multiwfn
-                mltwfn_out_path = fchk[: -len(fchk.split(".")[-1])] + "dip"
+                mltwfn_out_path = fchk[:-len(fchk.split(".")[-1])] + "dip"
                 if Config.debug >= 2:
-                    print(
-                        "Running: "
-                        + Config.Multiwfn.exe
-                        + " "
-                        + fchk
-                        + " < "
-                        + mltwfn_in_path
-                    )
+                    print("Running: " + Config.Multiwfn.exe + " " + fchk +
+                          " < " + mltwfn_in_path)
                 run(
                     Config.Multiwfn.exe + " " + fchk + " < " + mltwfn_in_path,
                     check=True,
@@ -2754,22 +2514,19 @@ class PDBPrepper:
                 with open(mltwfn_out_path) as f:
                     read_flag = 0
                     for line in f:
-                        if line.strip() == "Two-center bond dipole moments (a.u.):":
+                        if line.strip(
+                        ) == "Two-center bond dipole moments (a.u.):":
                             read_flag = 1
                             continue
                         if read_flag:
                             if "Sum" in line:
-                                raise Exception(
-                                    "Cannot find bond:"
-                                    + str(a1)
-                                    + "-"
-                                    + str(a2)
-                                    + line_feed
-                                )
+                                raise Exception("Cannot find bond:" + str(a1) +
+                                                "-" + str(a2) + line_feed)
                             Bond_id = re.search(bond_id_pattern, line).groups()
                             # find target bond
                             if str(a1) in Bond_id and str(a2) in Bond_id:
-                                Bond_data = re.search(bond_data_pattern, line).groups()
+                                Bond_data = re.search(bond_data_pattern,
+                                                      line).groups()
                                 dipole_vec = (
                                     float(Bond_data[0]),
                                     float(Bond_data[1]),
@@ -2794,20 +2551,11 @@ class PDBPrepper:
         if n_cores == None:
             n_cores = str(Config.n_cores)
         if Config.debug >= 1:
-            print(
-                "Running: "
-                + "sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  "
-                + n_cores
-                + "/' "
-                + Config.Multiwfn.DIR
-                + "/settings.ini"
-            )
+            print("Running: " + "sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  " +
+                  n_cores + "/' " + Config.Multiwfn.DIR + "/settings.ini")
         run(
-            "sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  "
-            + n_cores
-            + "/' "
-            + Config.Multiwfn.DIR
-            + "/settings.ini",
+            "sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  " + n_cores + "/' " +
+            Config.Multiwfn.DIR + "/settings.ini",
             check=True,
             text=True,
             shell=True,

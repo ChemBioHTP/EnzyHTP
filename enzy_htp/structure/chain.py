@@ -6,10 +6,12 @@ from typing import List
 
 from .residue import Residue
 
+
 class Chain:
+
     def __init__(self, name, residues):
         self.name_ = name
-        self.residues_ : List[Residue] = residues
+        self.residues_: List[Residue] = residues
         # CJ: not sure if I should do this but I am overwriting every time
         # right now
         _ = list(map(lambda r: r.set_chain(self.name_), self.residues_))
@@ -17,7 +19,9 @@ class Chain:
     def is_metal(self) -> bool:
         for rr in self.residues_:
             if rr.is_metal():
-                _LOGGER.warn(f"Structure: found metal in raw: {self.name_} {rr.name} {residue.id}")
+                _LOGGER.warn(
+                    f"Structure: found metal in raw: {self.name_} {rr.name} {residue.id}"
+                )
                 return True
         return False
 
@@ -32,16 +36,15 @@ class Chain:
 
     def residues(self) -> List[Residue]:
         return self.residues_
-   
-    def name(self) -> str:
-       return self.name_ 
-    def __getitem__(self, key: int) -> Residue:
-       return self.residues[key]
 
+    def name(self) -> str:
+        return self.name_
+
+    def __getitem__(self, key: int) -> Residue:
+        return self.residues[key]
 
     def __delitem__(self, key: int) -> None:
-       del self.residues_[key]
-
+        del self.residues_[key]
 
 
 #class Chain(Child):
@@ -402,4 +405,3 @@ class Chain:
 #        return len(self.residues)
 #
 #
-

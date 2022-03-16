@@ -4,10 +4,15 @@ import logging
 import colorlog
 
 
-def init_logger(dunder_name, log_outfile=None, testing_mode=False, start=False) -> logging.Logger:
-    log_format = (
-        "[%(asctime)s " "%(name)s " "%(funcName)s] " "%(levelname)s " "%(message)s"
-    )
+def init_logger(dunder_name,
+                log_outfile=None,
+                testing_mode=False,
+                start=False) -> logging.Logger:
+    log_format = ("[%(asctime)s "
+                  "%(name)s "
+                  "%(funcName)s] "
+                  "%(levelname)s "
+                  "%(message)s")
     bold_seq = "\033[1m"
     colorlog_format = f"{bold_seq}" "%(log_color)s" f"{log_format}"
     logger = logging.getLogger(dunder_name)
@@ -24,8 +29,7 @@ def init_logger(dunder_name, log_outfile=None, testing_mode=False, start=False) 
                 "ERROR": "red",
                 "CRITICAL": "red,bg_white",
             },
-        )
-    )
+        ))
 
     logger.addHandler(handler)
 
@@ -43,7 +47,6 @@ def init_logger(dunder_name, log_outfile=None, testing_mode=False, start=False) 
         logger.setLevel(logging.INFO)
 
     return logger
-
 
 
 _LOGGER = init_logger('EnzyHTP', None, start=True)
