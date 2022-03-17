@@ -22,6 +22,7 @@ class Config:
         self._multiwfn_config = MultiwfnConfig(self)
         self._em = None 
         self.update_paths()
+        self.WORK_DIR = '.'
 
     def update_paths(self):
         self.env_vars = deepcopy(self.ev_base )
@@ -55,5 +56,8 @@ class Config:
     
     def gaussian_config(self):
         return self._gaussian_config
+
+    def env_manager(self):
+        return self._em
 
 CONFIG = Config()

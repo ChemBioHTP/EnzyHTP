@@ -84,6 +84,7 @@ class EnvironmentManager:
         return len(self.missing_executables_) or len(self.missing_env_vars_)
 
     def run_command(self, exe, args) -> List[str]:
+        # TODO figure out something that happens when the whole things fails
         cmd = f"{self.mapper.get(exe,exe)} {' '.join(args)}"
         if exe in self.missing_executables_:
             _LOGGER.error(

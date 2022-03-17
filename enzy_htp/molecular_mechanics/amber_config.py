@@ -7,7 +7,7 @@ class AmberConfig:
         self._parent = parent
 
     def required_executables(self):
-        return [ self.CPU_ENGINE, self.GPU_ENGINE, 'tleap' ]
+        return [ self.CPU_ENGINE, self.GPU_ENGINE, 'tleap', 'ampdb' ]
 
     def required_env_vars(self):
         return [ self.HOME ]

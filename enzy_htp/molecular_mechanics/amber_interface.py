@@ -1,10 +1,12 @@
 # TODO documentation
-
+import shutil
+from ..core.logger import _LOGGER
 
 class AmberInterface:
-	pass
+    def __init__(self, config=None):
+        self._confg = config
 
-    def minimize_structure(self):
+    def minimize_structure(self, pdb : str, mode: str = 'CPU' ):
 
     #def PDBMin(self, cycle=2000, engine="Amber_GPU"):
         """
@@ -39,33 +41,12 @@ class AmberInterface:
 
         # express engine
         PC_cmd, engine_path = Config.Amber.get_Amber_engine(engine=engine)
-
-        # run
-        if Config.debug >= 1:
-            print("running: " + PC_cmd + " " + engine_path + " -O -i " +
-                  minin_path + " -o " + minout_path + " -p " +
-                  self.prmtop_path + " -c " + self.inpcrd_path + " -r " +
-                  minrst_path)
-        os.system(PC_cmd + " " + engine_path + " -O -i " + minin_path + " -o " +
-                  minout_path + " -p " + self.prmtop_path + " -c " +
-                  self.inpcrd_path + " -r " + minrst_path)
-        # rst2pdb
-        try:
-            run(
-                "ambpdb -p " + self.prmtop_path + " -c " + minrst_path + " > " +
-                out4_PDB_path,
-                check=True,
-                text=True,
-                shell=True,
-                capture_output=True,
-            )
-        except CalledProcessError:
-            if Config.debug >= 1:
-                print("Error: ambpdb cannot read PDBMin result .rst")
-                return 1
+        engine = self._config.amber_confg()[ 'CPU_ENGINE' if mode == 'CPU' else 'GPU_ENGINE' ]
+        self._config.env_manager().run_command( engine, f"-O -i {minin_path} -o {minout_path} -p {self.prmtop_path} -c {self.inpcrd_path} -r {minrst_path}")
+        self._config.env_manager().run_command('ambpdp', f"-p {self.prmtop_path} -c {minrst_path} > {out4_PDB_path}")
 
         os.system("mv " + self.prmtop_path + " " + self.inpcrd_path + " " +
-                  min_dir)
+                  min_dir) # TODO CJ: not sure if this actually works...
 
         self.path = out4_PDB_path
         self._update_name()

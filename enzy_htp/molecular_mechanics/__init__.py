@@ -1,1 +1,1 @@
-print('hell mm')
+from .amber_interface import AmberInterface
