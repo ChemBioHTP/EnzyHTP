@@ -1,4 +1,4 @@
-#TODO
+# TODO
 class MultiwfnInterface:
     @classmethod
     def get_bond_dipole(cls, qm_fch_paths, a1, a2, prog="Multiwfn"):
@@ -36,8 +36,9 @@ class MultiwfnInterface:
         if prog == "Multiwfn":
             # self.init_Multiwfn()
             ref_path = qm_fch_paths[0]
-            mltwfn_in_path = (ref_path[:-(len(ref_path.split(".")[-1]) + 1)] +
-                              "_dipole.in")
+            mltwfn_in_path = (
+                ref_path[: -(len(ref_path.split(".")[-1]) + 1)] + "_dipole.in"
+            )
 
             with open(mltwfn_in_path, "w") as of:
                 of.write("19" + line_feed)
@@ -53,12 +54,12 @@ class MultiwfnInterface:
 
             for fchk in qm_fch_paths:
                 # get a1->a2 vector from .out (update to using fchk TODO)
-                G_out_path = fchk[:-len(fchk.split(".")[-1])] + "out"
+                G_out_path = fchk[: -len(fchk.split(".")[-1])] + "out"
                 with open(G_out_path) as f0:
                     coord_flag = 0
                     skip_flag = 0
                     for line0 in f0:
-                        if 'Input orientation' in line0:
+                        if "Input orientation" in line0:
                             coord_flag = 1
                             continue
                         if coord_flag:
@@ -71,19 +72,25 @@ class MultiwfnInterface:
                             l_p = line0.strip().split()
                             if str(a1) == l_p[0]:
                                 coord_a1 = np.array(
-                                    (float(l_p[3]), float(l_p[4]),
-                                     float(l_p[5])))
+                                    (float(l_p[3]), float(l_p[4]), float(l_p[5]))
+                                )
                             if str(a2) == l_p[0]:
                                 coord_a2 = np.array(
-                                    (float(l_p[3]), float(l_p[4]),
-                                     float(l_p[5])))
+                                    (float(l_p[3]), float(l_p[4]), float(l_p[5]))
+                                )
                 Bond_vec = coord_a2 - coord_a1
 
                 # Run Multiwfn
-                mltwfn_out_path = fchk[:-len(fchk.split(".")[-1])] + "dip"
+                mltwfn_out_path = fchk[: -len(fchk.split(".")[-1])] + "dip"
                 if Config.debug >= 2:
-                    print("Running: " + Config.Multiwfn.exe + " " + fchk +
-                          " < " + mltwfn_in_path)
+                    print(
+                        "Running: "
+                        + Config.Multiwfn.exe
+                        + " "
+                        + fchk
+                        + " < "
+                        + mltwfn_in_path
+                    )
                 run(
                     Config.Multiwfn.exe + " " + fchk + " < " + mltwfn_in_path,
                     check=True,
@@ -110,19 +117,22 @@ class MultiwfnInterface:
                 with open(mltwfn_out_path) as f:
                     read_flag = 0
                     for line in f:
-                        if line.strip(
-                        ) == "Two-center bond dipole moments (a.u.):":
+                        if line.strip() == "Two-center bond dipole moments (a.u.):":
                             read_flag = 1
                             continue
                         if read_flag:
                             if "Sum" in line:
-                                raise Exception("Cannot find bond:" + str(a1) +
-                                                "-" + str(a2) + line_feed)
+                                raise Exception(
+                                    "Cannot find bond:"
+                                    + str(a1)
+                                    + "-"
+                                    + str(a2)
+                                    + line_feed
+                                )
                             Bond_id = re.search(bond_id_pattern, line).groups()
                             # find target bond
                             if str(a1) in Bond_id and str(a2) in Bond_id:
-                                Bond_data = re.search(bond_data_pattern,
-                                                      line).groups()
+                                Bond_data = re.search(bond_data_pattern, line).groups()
                                 dipole_vec = (
                                     float(Bond_data[0]),
                                     float(Bond_data[1]),
@@ -147,14 +157,22 @@ class MultiwfnInterface:
         if n_cores == None:
             n_cores = str(Config.n_cores)
         if Config.debug >= 1:
-            print("Running: " + "sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  " +
-                  n_cores + "/' " + Config.Multiwfn.DIR + "/settings.ini")
+            print(
+                "Running: "
+                + "sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  "
+                + n_cores
+                + "/' "
+                + Config.Multiwfn.DIR
+                + "/settings.ini"
+            )
         run(
-            "sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  " + n_cores + "/' " +
-            Config.Multiwfn.DIR + "/settings.ini",
+            "sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  "
+            + n_cores
+            + "/' "
+            + Config.Multiwfn.DIR
+            + "/settings.ini",
             check=True,
             text=True,
             shell=True,
             capture_output=True,
         )
-

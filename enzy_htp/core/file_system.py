@@ -46,7 +46,7 @@ def get_file_ext(fname: str) -> str:
 
 def get_current_time() -> str:
     """Gets current system time in format YYYY_MM_DD_H_m"""
-    return datetime.datetime.now().strftime('%Y_%m_%d_%H_%M')
+    return datetime.datetime.now().strftime("%Y_%m_%d_%H_%M")
 
 
 def lines_from_file(fname: str) -> List[str]:
@@ -54,7 +54,7 @@ def lines_from_file(fname: str) -> List[str]:
     if not os.path.exists(fname):
         _LOGGER.error(f"The file {fname} does not exist.")
         return list()
-    fh = open(fname, 'r')
+    fh = open(fname, "r")
     result = fh.read().splitlines()
     fh.close()
     return result
@@ -65,6 +65,6 @@ def write_lines(fname: str, lines: List[str]) -> None:
     # TODO(CJ) check if binary file and dont return if so
     if os.path.exists(fname):
         _LOGGER.warning(f"The file '{fname}' exists and will be overwritten")
-    fh = open(fname, 'w')
-    fh.write('\n'.join(lines))
+    fh = open(fname, "w")
+    fh.write("\n".join(lines))
     fh.close()

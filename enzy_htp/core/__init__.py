@@ -1,4 +1,9 @@
-"""Core module for enzy_htp. Responsibilities include file system management, environment management, exceptions and logging."""
+"""
+core module for enzy_htp. Responsibilities include file system management, environment management, exceptions and logging.
+
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Date: 2022-03-19
+"""
 from .logger import _LOGGER
 from .env_manager import EnvironmentManager
 from .exception import (

@@ -2,13 +2,14 @@
 import shutil
 from ..core.logger import _LOGGER
 
+
 class AmberInterface:
     def __init__(self, config=None):
         self._confg = config
 
-    def minimize_structure(self, pdb : str, mode: str = 'CPU' ):
+    def minimize_structure(self, pdb: str, mode: str = "CPU"):
 
-    #def PDBMin(self, cycle=2000, engine="Amber_GPU"):
+        # def PDBMin(self, cycle=2000, engine="Amber_GPU"):
         """
         Run a minization use self.prmtop and self.inpcrd and setting form class Config.
         --------------------------------------------------
@@ -22,8 +23,9 @@ class AmberInterface:
         min_dir = self.cache_path + "/PDBMin"
         minin_path = min_dir + "/min.in"
         minout_path = min_dir + "/min.out"
-        minrst_path = (min_dir + "/min.ncrst"
-                      )  # change to ncrst seeking for solution of rst error
+        minrst_path = (
+            min_dir + "/min.ncrst"
+        )  # change to ncrst seeking for solution of rst error
         mkdir(min_dir)
         min_input = open(minin_path, "w")
         min_input.write("Minimize" + line_feed)
@@ -41,18 +43,25 @@ class AmberInterface:
 
         # express engine
         PC_cmd, engine_path = Config.Amber.get_Amber_engine(engine=engine)
-        engine = self._config.amber_confg()[ 'CPU_ENGINE' if mode == 'CPU' else 'GPU_ENGINE' ]
-        self._config.env_manager().run_command( engine, f"-O -i {minin_path} -o {minout_path} -p {self.prmtop_path} -c {self.inpcrd_path} -r {minrst_path}")
-        self._config.env_manager().run_command('ambpdp', f"-p {self.prmtop_path} -c {minrst_path} > {out4_PDB_path}")
+        engine = self._config.amber_confg()[
+            "CPU_ENGINE" if mode == "CPU" else "GPU_ENGINE"
+        ]
+        self._config.env_manager().run_command(
+            engine,
+            f"-O -i {minin_path} -o {minout_path} -p {self.prmtop_path} -c {self.inpcrd_path} -r {minrst_path}",
+        )
+        self._config.env_manager().run_command(
+            "ambpdp", f"-p {self.prmtop_path} -c {minrst_path} > {out4_PDB_path}"
+        )
 
-        os.system("mv " + self.prmtop_path + " " + self.inpcrd_path + " " +
-                  min_dir) # TODO CJ: not sure if this actually works...
+        os.system(
+            "mv " + self.prmtop_path + " " + self.inpcrd_path + " " + min_dir
+        )  # TODO CJ: not sure if this actually works...
 
         self.path = out4_PDB_path
         self._update_name()
         self.prmtop_path = min_dir + "/" + self.prmtop_path
         self.inpcrd_path = min_dir + "/" + self.inpcrd_path
-
 
     def PDB2FF(
         self,
@@ -92,14 +101,12 @@ class AmberInterface:
         mkdir(lig_dir)
         mkdir(met_dir)
 
-        ligands_pathNchrg = self.stru.build_ligands(lig_dir,
-                                                    ifcharge=1,
-                                                    ifunique=1)
+        ligands_pathNchrg = self.stru.build_ligands(lig_dir, ifcharge=1, ifunique=1)
         # metalcenters_path = self.stru.build_metalcenters(met_dir)
         # parm
-        ligand_parm_paths = self._ligand_parm(ligands_pathNchrg,
-                                              method=lig_method,
-                                              renew=renew_lig)
+        ligand_parm_paths = self._ligand_parm(
+            ligands_pathNchrg, method=lig_method, renew=renew_lig
+        )
         # self._metal_parm(metalcenters_path)
         # combine
         if o_dir != "":
@@ -142,23 +149,35 @@ class AmberInterface:
                         if pdbl.line_type == "ATOM" or pdbl.line_type == "HETATM":
                             lig_name = pdbl.resi_name
                 # if renew
-                if (os.path.isfile(out_prepi) and os.path.isfile(out_frcmod) and
-                        not renew):
+                if (
+                    os.path.isfile(out_prepi)
+                    and os.path.isfile(out_frcmod)
+                    and not renew
+                ):
                     if Config.debug >= 1:
-                        print("Parm files exist: " + out_prepi + " " +
-                              out_frcmod)
+                        print("Parm files exist: " + out_prepi + " " + out_frcmod)
                         print("Using old parm files.")
                 else:
                     # gen prepi (net charge and correct protonation state is important)
                     if Config.debug >= 1:
-                        print("running: " + Config.Amber.AmberHome +
-                              "/bin/antechamber -i " + lig_pdb +
-                              " -fi pdb -o " + out_prepi +
-                              " -fo prepi -c bcc -s 0 -nc " + str(net_charge))
+                        print(
+                            "running: "
+                            + Config.Amber.AmberHome
+                            + "/bin/antechamber -i "
+                            + lig_pdb
+                            + " -fi pdb -o "
+                            + out_prepi
+                            + " -fo prepi -c bcc -s 0 -nc "
+                            + str(net_charge)
+                        )
                     run(
-                        Config.Amber.AmberHome + "/bin/antechamber -i " +
-                        lig_pdb + " -fi pdb -o " + out_prepi +
-                        " -fo prepi -c bcc -s 0 -nc " + str(net_charge),
+                        Config.Amber.AmberHome
+                        + "/bin/antechamber -i "
+                        + lig_pdb
+                        + " -fi pdb -o "
+                        + out_prepi
+                        + " -fo prepi -c bcc -s 0 -nc "
+                        + str(net_charge),
                         check=True,
                         text=True,
                         shell=True,
@@ -170,12 +189,20 @@ class AmberInterface:
                         )
                     # gen frcmod
                     if Config.debug >= 1:
-                        print("running: " + Config.Amber.AmberHome +
-                              "/bin/parmchk2 -i " + out_prepi +
-                              " -f prepi -o " + out_frcmod)
+                        print(
+                            "running: "
+                            + Config.Amber.AmberHome
+                            + "/bin/parmchk2 -i "
+                            + out_prepi
+                            + " -f prepi -o "
+                            + out_frcmod
+                        )
                     run(
-                        Config.Amber.AmberHome + "/bin/parmchk2 -i " +
-                        out_prepi + " -f prepi -o " + out_frcmod,
+                        Config.Amber.AmberHome
+                        + "/bin/parmchk2 -i "
+                        + out_prepi
+                        + " -f prepi -o "
+                        + out_frcmod,
                         check=True,
                         text=True,
                         shell=True,
@@ -191,7 +218,6 @@ class AmberInterface:
 
         pass
 
-
     def _combine_parm(
         self,
         lig_parms,
@@ -200,7 +226,7 @@ class AmberInterface:
         ifsavepdb=0,
         ifsolve=1,
         box_type=None,
-        box_size=3,  #Config.Amber.box_size,
+        box_size=3,  # Config.Amber.box_size,
         igb=None,
         if_prm_only=0,
     ):
@@ -245,39 +271,73 @@ class AmberInterface:
             # save
             if prm_out_path == "":
                 if o_dir == "":
-                    of.write("saveamberparm a " + self.path_name + ".prmtop " +
-                             self.path_name + ".inpcrd" + line_feed)
+                    of.write(
+                        "saveamberparm a "
+                        + self.path_name
+                        + ".prmtop "
+                        + self.path_name
+                        + ".inpcrd"
+                        + line_feed
+                    )
                     self.prmtop_path = self.path_name + ".prmtop"
                     self.inpcrd_path = self.path_name + ".inpcrd"
                 else:
-                    of.write("saveamberparm a " + o_dir + self.name +
-                             ".prmtop " + o_dir + self.name + ".inpcrd" +
-                             line_feed)
+                    of.write(
+                        "saveamberparm a "
+                        + o_dir
+                        + self.name
+                        + ".prmtop "
+                        + o_dir
+                        + self.name
+                        + ".inpcrd"
+                        + line_feed
+                    )
                     self.prmtop_path = o_dir + self.name + ".prmtop"
                     self.inpcrd_path = o_dir + self.name + ".inpcrd"
             else:
                 if o_dir == "":
                     if if_prm_only:
                         mkdir("./tmp")
-                        of.write("saveamberparm a " + prm_out_path +
-                                 " ./tmp/tmp.inpcrd" + line_feed)
+                        of.write(
+                            "saveamberparm a "
+                            + prm_out_path
+                            + " ./tmp/tmp.inpcrd"
+                            + line_feed
+                        )
                         self.prmtop_path = prm_out_path
                         self.inpcrd_path = None
                     else:
-                        of.write("saveamberparm a " + prm_out_path + " " +
-                                 self.path_name + ".inpcrd" + line_feed)
+                        of.write(
+                            "saveamberparm a "
+                            + prm_out_path
+                            + " "
+                            + self.path_name
+                            + ".inpcrd"
+                            + line_feed
+                        )
                         self.prmtop_path = prm_out_path
                         self.inpcrd_path = self.path_name + ".inpcrd"
                 else:
                     if if_prm_only:
                         mkdir("./tmp")
-                        of.write("saveamberparm a " + prm_out_path +
-                                 " ./tmp/tmp.inpcrd" + line_feed)
+                        of.write(
+                            "saveamberparm a "
+                            + prm_out_path
+                            + " ./tmp/tmp.inpcrd"
+                            + line_feed
+                        )
                         self.prmtop_path = prm_out_path
                         self.inpcrd_path = None
                     else:
-                        of.write("saveamberparm a " + prm_out_path + " " +
-                                 o_dir + self.name + ".inpcrd" + line_feed)
+                        of.write(
+                            "saveamberparm a "
+                            + prm_out_path
+                            + " "
+                            + o_dir
+                            + self.name
+                            + ".inpcrd"
+                            + line_feed
+                        )
                         self.prmtop_path = prm_out_path
                         self.inpcrd_path = o_dir + self.name + ".inpcrd"
 
@@ -288,7 +348,6 @@ class AmberInterface:
         os.system("tleap -s -f " + leap_path + " > " + leap_path[:-2] + "out")
 
         return self.prmtop_path, self.inpcrd_path
-
 
     def PDBMD(self, tag="", o_dir="", engine="Amber_GPU", equi_cpu=0):
         """
@@ -325,65 +384,214 @@ class AmberInterface:
 
         # run sander
         if Config.debug >= 1:
-            print("running: " + PC_cmd + " " + engine_path + " -O -i " +
-                  min_path + " -o " + o_dir + "/min.out -p " +
-                  self.prmtop_path + " -c " + self.inpcrd_path + " -r " +
-                  o_dir + "/min.rst -ref " + self.inpcrd_path)
-        os.system(PC_cmd + " " + engine_path + " -O -i " + min_path + " -o " +
-                  o_dir + "/min.out -p " + self.prmtop_path + " -c " +
-                  self.inpcrd_path + " -r " + o_dir + "/min.rst -ref " +
-                  self.inpcrd_path)
+            print(
+                "running: "
+                + PC_cmd
+                + " "
+                + engine_path
+                + " -O -i "
+                + min_path
+                + " -o "
+                + o_dir
+                + "/min.out -p "
+                + self.prmtop_path
+                + " -c "
+                + self.inpcrd_path
+                + " -r "
+                + o_dir
+                + "/min.rst -ref "
+                + self.inpcrd_path
+            )
+        os.system(
+            PC_cmd
+            + " "
+            + engine_path
+            + " -O -i "
+            + min_path
+            + " -o "
+            + o_dir
+            + "/min.out -p "
+            + self.prmtop_path
+            + " -c "
+            + self.inpcrd_path
+            + " -r "
+            + o_dir
+            + "/min.rst -ref "
+            + self.inpcrd_path
+        )
         if Config.debug >= 1:
-            print("running: " + PC_cmd + " " + engine_path + " -O -i " +
-                  heat_path + " -o " + o_dir + "/heat.out -p " +
-                  self.prmtop_path + " -c " + o_dir + "/min.rst -ref " + o_dir +
-                  "/min.rst -r " + o_dir + "/heat.rst")
-        os.system(PC_cmd + " " + engine_path + " -O -i " + heat_path + " -o " +
-                  o_dir + "/heat.out -p " + self.prmtop_path + " -c " + o_dir +
-                  "/min.rst -ref " + o_dir + "/min.rst -r " + o_dir +
-                  "/heat.rst")
+            print(
+                "running: "
+                + PC_cmd
+                + " "
+                + engine_path
+                + " -O -i "
+                + heat_path
+                + " -o "
+                + o_dir
+                + "/heat.out -p "
+                + self.prmtop_path
+                + " -c "
+                + o_dir
+                + "/min.rst -ref "
+                + o_dir
+                + "/min.rst -r "
+                + o_dir
+                + "/heat.rst"
+            )
+        os.system(
+            PC_cmd
+            + " "
+            + engine_path
+            + " -O -i "
+            + heat_path
+            + " -o "
+            + o_dir
+            + "/heat.out -p "
+            + self.prmtop_path
+            + " -c "
+            + o_dir
+            + "/min.rst -ref "
+            + o_dir
+            + "/min.rst -r "
+            + o_dir
+            + "/heat.rst"
+        )
 
         # gpu debug for equi
         if equi_cpu:
             # use Config.PC_cmd and cpu_engine_path
             if Config.debug >= 1:
-                print("running: " + Config.PC_cmd + " " + cpu_engine_path +
-                      " -O -i " + equi_path + " -o " + o_dir + "/equi.out -p " +
-                      self.prmtop_path + " -c " + o_dir + "/heat.rst -ref " +
-                      o_dir + "/heat.rst -r " + o_dir + "/equi.rst -x " +
-                      o_dir + "/equi.nc")
-            os.system(Config.PC_cmd + " " + cpu_engine_path + " -O -i " +
-                      equi_path + " -o " + o_dir + "/equi.out -p " +
-                      self.prmtop_path + " -c " + o_dir + "/heat.rst -ref " +
-                      o_dir + "/heat.rst -r " + o_dir + "/equi.rst -x " +
-                      o_dir + "/equi.nc")
+                print(
+                    "running: "
+                    + Config.PC_cmd
+                    + " "
+                    + cpu_engine_path
+                    + " -O -i "
+                    + equi_path
+                    + " -o "
+                    + o_dir
+                    + "/equi.out -p "
+                    + self.prmtop_path
+                    + " -c "
+                    + o_dir
+                    + "/heat.rst -ref "
+                    + o_dir
+                    + "/heat.rst -r "
+                    + o_dir
+                    + "/equi.rst -x "
+                    + o_dir
+                    + "/equi.nc"
+                )
+            os.system(
+                Config.PC_cmd
+                + " "
+                + cpu_engine_path
+                + " -O -i "
+                + equi_path
+                + " -o "
+                + o_dir
+                + "/equi.out -p "
+                + self.prmtop_path
+                + " -c "
+                + o_dir
+                + "/heat.rst -ref "
+                + o_dir
+                + "/heat.rst -r "
+                + o_dir
+                + "/equi.rst -x "
+                + o_dir
+                + "/equi.nc"
+            )
         else:
             if Config.debug >= 1:
-                print("running: " + PC_cmd + " " + engine_path + " -O -i " +
-                      equi_path + " -o " + o_dir + "/equi.out -p " +
-                      self.prmtop_path + " -c " + o_dir + "/heat.rst -ref " +
-                      o_dir + "/heat.rst -r " + o_dir + "/equi.rst -x " +
-                      o_dir + "/equi.nc")
-            os.system(PC_cmd + " " + engine_path + " -O -i " + equi_path +
-                      " -o " + o_dir + "/equi.out -p " + self.prmtop_path +
-                      " -c " + o_dir + "/heat.rst -ref " + o_dir +
-                      "/heat.rst -r " + o_dir + "/equi.rst -x " + o_dir +
-                      "/equi.nc")
+                print(
+                    "running: "
+                    + PC_cmd
+                    + " "
+                    + engine_path
+                    + " -O -i "
+                    + equi_path
+                    + " -o "
+                    + o_dir
+                    + "/equi.out -p "
+                    + self.prmtop_path
+                    + " -c "
+                    + o_dir
+                    + "/heat.rst -ref "
+                    + o_dir
+                    + "/heat.rst -r "
+                    + o_dir
+                    + "/equi.rst -x "
+                    + o_dir
+                    + "/equi.nc"
+                )
+            os.system(
+                PC_cmd
+                + " "
+                + engine_path
+                + " -O -i "
+                + equi_path
+                + " -o "
+                + o_dir
+                + "/equi.out -p "
+                + self.prmtop_path
+                + " -c "
+                + o_dir
+                + "/heat.rst -ref "
+                + o_dir
+                + "/heat.rst -r "
+                + o_dir
+                + "/equi.rst -x "
+                + o_dir
+                + "/equi.nc"
+            )
 
         if Config.debug >= 1:
-            print("running: " + PC_cmd + " " + engine_path + " -O -i " +
-                  prod_path + " -o " + o_dir + "/prod.out -p " +
-                  self.prmtop_path + " -c " + o_dir + "/equi.rst -ref " +
-                  o_dir + "/equi.rst -r " + o_dir + "/prod.rst -x " + o_dir +
-                  "/prod.nc")
-        os.system(PC_cmd + " " + engine_path + " -O -i " + prod_path + " -o " +
-                  o_dir + "/prod.out -p " + self.prmtop_path + " -c " + o_dir +
-                  "/equi.rst -ref " + o_dir + "/equi.rst -r " + o_dir +
-                  "/prod.rst -x " + o_dir + "/prod.nc")
+            print(
+                "running: "
+                + PC_cmd
+                + " "
+                + engine_path
+                + " -O -i "
+                + prod_path
+                + " -o "
+                + o_dir
+                + "/prod.out -p "
+                + self.prmtop_path
+                + " -c "
+                + o_dir
+                + "/equi.rst -ref "
+                + o_dir
+                + "/equi.rst -r "
+                + o_dir
+                + "/prod.rst -x "
+                + o_dir
+                + "/prod.nc"
+            )
+        os.system(
+            PC_cmd
+            + " "
+            + engine_path
+            + " -O -i "
+            + prod_path
+            + " -o "
+            + o_dir
+            + "/prod.out -p "
+            + self.prmtop_path
+            + " -c "
+            + o_dir
+            + "/equi.rst -ref "
+            + o_dir
+            + "/equi.rst -r "
+            + o_dir
+            + "/prod.rst -x "
+            + o_dir
+            + "/prod.nc"
+        )
 
         self.nc = o_dir + "/prod.nc"
         return o_dir + "/prod.nc"
-
 
     def _build_MD_min(self, o_dir):
         """
@@ -401,37 +609,63 @@ class AmberInterface:
         maxcyc = str(maxcyc)
         # restrain related
         if self.conf_min["ntr"] == "1":
-            ntr_line = ("  ntr   = " + self.conf_min["ntr"] +
-                        ",	 restraint_wt = " + self.conf_min["restraint_wt"] +
-                        ", restraintmask = " + self.conf_min["restraintmask"] +
-                        "," + line_feed)
+            ntr_line = (
+                "  ntr   = "
+                + self.conf_min["ntr"]
+                + ",	 restraint_wt = "
+                + self.conf_min["restraint_wt"]
+                + ", restraintmask = "
+                + self.conf_min["restraintmask"]
+                + ","
+                + line_feed
+            )
         else:
-            ntr_line = ''
-        if self.conf_min['nmropt_rest'] == '1':
-            self.conf_min['nmropt'] = '1'
-            nmropt_line = '  nmropt= ' + self.conf_min[
-                'nmropt'] + ',' + line_feed
-            DISANG_tail = ''' &wt
+            ntr_line = ""
+        if self.conf_min["nmropt_rest"] == "1":
+            self.conf_min["nmropt"] = "1"
+            nmropt_line = "  nmropt= " + self.conf_min["nmropt"] + "," + line_feed
+            DISANG_tail = (
+                """ &wt
   type='END'
  /
-  DISANG= ''' + self.conf_min['DISANG'] + line_feed
-            self._build_MD_rs(step='min', o_path=self.conf_min['DISANG'])
+  DISANG= """
+                + self.conf_min["DISANG"]
+                + line_feed
+            )
+            self._build_MD_rs(step="min", o_path=self.conf_min["DISANG"])
         else:
-            nmropt_line = ''
-            DISANG_tail = ''
-        #text
-        conf_str = '''Minimize
+            nmropt_line = ""
+            DISANG_tail = ""
+        # text
+        conf_str = (
+            """Minimize
  &cntrl
   imin  = 1,  ntx   = 1,  irest = 0,
-  ntc   = ''' + self.conf_min['ntc'] + ''',    ntf = ''' + self.conf_min[
-            'ntf'] + ''',
-  cut   = ''' + self.conf_min['cut'] + ''',
-  maxcyc= ''' + maxcyc + ''', ncyc  = ''' + ncyc + ''',
-  ntpr  = ''' + ntpr + ''', ntwx  = 0,
-''' + ntr_line + nmropt_line + ''' /
-''' + DISANG_tail
-        #write
-        with open(o_path, 'w') as of:
+  ntc   = """
+            + self.conf_min["ntc"]
+            + """,    ntf = """
+            + self.conf_min["ntf"]
+            + """,
+  cut   = """
+            + self.conf_min["cut"]
+            + """,
+  maxcyc= """
+            + maxcyc
+            + """, ncyc  = """
+            + ncyc
+            + """,
+  ntpr  = """
+            + ntpr
+            + """, ntwx  = 0,
+"""
+            + ntr_line
+            + nmropt_line
+            + """ /
+"""
+            + DISANG_tail
+        )
+        # write
+        with open(o_path, "w") as of:
             of.write(conf_str)
         return o_path
 
@@ -456,18 +690,25 @@ class AmberInterface:
         nstlim = str(nstlim)
         # restrain related
         if self.conf_heat["ntr"] == "1":
-            ntr_line = ("  ntr   = " + self.conf_heat["ntr"] +
-                        ", restraint_wt = " + self.conf_heat["restraint_wt"] +
-                        ", restraintmask = " + self.conf_heat["restraintmask"] +
-                        "," + line_feed)
+            ntr_line = (
+                "  ntr   = "
+                + self.conf_heat["ntr"]
+                + ", restraint_wt = "
+                + self.conf_heat["restraint_wt"]
+                + ", restraintmask = "
+                + self.conf_heat["restraintmask"]
+                + ","
+                + line_feed
+            )
         else:
-            ntr_line = ''
-        if self.conf_heat['nmropt_rest'] == '1':
-            DISANG_tail = '''  DISANG=''' + self.conf_heat['DISANG'] + line_feed
-            self._build_MD_rs(step='heat', o_path=self.conf_heat['DISANG'])
+            ntr_line = ""
+        if self.conf_heat["nmropt_rest"] == "1":
+            DISANG_tail = """  DISANG=""" + self.conf_heat["DISANG"] + line_feed
+            self._build_MD_rs(step="heat", o_path=self.conf_heat["DISANG"])
         else:
-            DISANG_tail = ''
-        conf_str = '''Heat
+            DISANG_tail = ""
+        conf_str = (
+            '''Heat
  &cntrl
   imin  = 0,  ntx = 1, irest = 0,
   ntc   = """
@@ -534,9 +775,11 @@ class AmberInterface:
  &wt
   type  = 'END',
  /
-''' + DISANG_tail
-        #write
-        with open(o_path, 'w') as of:
+'''
+            + DISANG_tail
+        )
+        # write
+        with open(o_path, "w") as of:
             of.write(conf_str)
         return o_path
 
@@ -619,10 +862,10 @@ class AmberInterface:
         #            + self.conf_equi["iwarp"]
         #            + """,
         #  ig    = -1,
-        #"""+ntr_line+nmropt_line+''' /
+        # """+ntr_line+nmropt_line+''' /
         #'''+DISANG_tail
         #        #write
-        with open(o_path, 'w') as of:
+        with open(o_path, "w") as of:
             of.write(conf_str)
         return o_path
 
@@ -705,34 +948,48 @@ class AmberInterface:
         #            + self.conf_prod["iwarp"]
         #            + """,
         #  ig    = -1,
-        #"""+ntr_line+nmropt_line+''' /
+        # """+ntr_line+nmropt_line+''' /
         #'''+DISANG_tail
-        #write
-        with open(o_path, 'w') as of:
+        # write
+        with open(o_path, "w") as of:
             of.write(conf_str)
         return o_path
 
-
     def _build_MD_rs(self, step, o_path):
-        '''
+        """
         Generate a file for DISANG restraint. Get parameters from self.conf_step.
-        '''
-        rs_str = ''
-        rs_data_step = self.__dict__['conf_' + step]['rs_constraints']
+        """
+        rs_str = ""
+        rs_data_step = self.__dict__["conf_" + step]["rs_constraints"]
         for rest_data in rs_data_step:
-            rs_str = rs_str + '''  &rst
-   iat=  ''' + ','.join(
-                rest_data['iat']
-            ) + ''', r1= ''' + rest_data['r1'] + ''', r2= ''' + rest_data[
-                'r2'] + ''', r3= ''' + rest_data[
-                    'r3'] + ''', r4= ''' + rest_data['r4'] + ''',
-   rk2=''' + rest_data['rk2'] + ''', rk3=''' + rest_data[
-                        'rk3'] + ''', ir6=''' + rest_data[
-                            'ir6'] + ''', ialtd=''' + rest_data['ialtd'] + ''',
+            rs_str = (
+                rs_str
+                + """  &rst
+   iat=  """
+                + ",".join(rest_data["iat"])
+                + """, r1= """
+                + rest_data["r1"]
+                + """, r2= """
+                + rest_data["r2"]
+                + """, r3= """
+                + rest_data["r3"]
+                + """, r4= """
+                + rest_data["r4"]
+                + """,
+   rk2="""
+                + rest_data["rk2"]
+                + """, rk3="""
+                + rest_data["rk3"]
+                + """, ir6="""
+                + rest_data["ir6"]
+                + """, ialtd="""
+                + rest_data["ialtd"]
+                + """,
   &end
-'''
-        #write
-        with open(o_path, 'w') as of:
+"""
+            )
+        # write
+        with open(o_path, "w") as of:
             of.write(rs_str)
         return o_path
 
@@ -754,14 +1011,9 @@ class AmberInterface:
         print("Equi:     " + repr(self.conf_equi))
         print("Prod:     " + repr(self.conf_prod))
 
-
-    def nc2mdcrd(self,
-                 o_path="",
-                 point=None,
-                 start=1,
-                 end=-1,
-                 step=1,
-                 engine="cpptraj"):
+    def nc2mdcrd(
+        self, o_path="", point=None, start=1, end=-1, step=1, engine="cpptraj"
+    ):
         """
         convert self.nc to a mdcrd file to read and operate.(self.nc[:-2]+'.mdcrd' by default)
         a easier way is to use pytraj directly.
@@ -775,15 +1027,15 @@ class AmberInterface:
         """
         if self.nc == None:
             raise Exception(
-                "No nc file found. Please assign self.nc or run PDBMD first")
+                "No nc file found. Please assign self.nc or run PDBMD first"
+            )
         else:
             if o_path == "":
                 o_path = self.nc[:-2] + "mdcrd"
             if end == -1:
                 end = "last"
             if point != None:
-                all_p = int(self.conf_prod["nstlim"]) / int(
-                    self.conf_prod["ntwx"])
+                all_p = int(self.conf_prod["nstlim"]) / int(self.conf_prod["ntwx"])
                 step = int(all_p / point)
 
             if engine not in ["pytraj", "cpptraj"]:
@@ -797,8 +1049,17 @@ class AmberInterface:
                 cpp_out_path = self.cache_path + "/cpptraj_nc2mdcrd.out"
                 with open(cpp_in_path, "w") as of:
                     of.write("parm " + self.prmtop_path + line_feed)
-                    of.write("trajin " + self.nc + " " + str(start) + " " +
-                             end + " " + str(step) + line_feed)
+                    of.write(
+                        "trajin "
+                        + self.nc
+                        + " "
+                        + str(start)
+                        + " "
+                        + end
+                        + " "
+                        + str(step)
+                        + line_feed
+                    )
                     of.write("trajout " + o_path + line_feed)
                     of.write("run" + line_feed)
                     of.write("quit" + line_feed)
@@ -806,4 +1067,3 @@ class AmberInterface:
 
         self.mdcrd = o_path
         return o_path
-

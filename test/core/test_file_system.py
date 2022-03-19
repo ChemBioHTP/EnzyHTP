@@ -1,4 +1,8 @@
-"""Testing the utility functions in the enzy_htp.core.system sub module."""
+"""Testing the utility functions in the enzy_htp.core.system sub module.
+
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Date: 2022-03-19
+"""
 import os
 
 import enzy_htp.core.file_system as fs

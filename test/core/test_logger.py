@@ -1,4 +1,8 @@
-"""Testing the logger from enzy_hpt.core.logger"""
+"""Testing the logger from enzy_hpt.core.logger.
+
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Date: 2022-03-19
+"""
 import os
 import pytest
 import logging

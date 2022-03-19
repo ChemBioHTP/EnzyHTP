@@ -8,6 +8,7 @@ from enum import IntEnum
 
 class ResidueType(IntEnum):
     """Enumerated type representing types of residues found in PDB entries."""
+
     CANONICAL = 0
     NONCANONICAL = 1
     SOLVENT = 2
@@ -22,5 +23,5 @@ RESIDUE_TYPE_MAPPER = {
     ResidueType.SOLVENT: "SOLVENT",
     ResidueType.METAL: "METAL",
     ResidueType.LIGAND: "LIGAND",
-    ResidueType.UNKNOWN: "UNKNOWN"
+    ResidueType.UNKNOWN: "UNKNOWN",
 }

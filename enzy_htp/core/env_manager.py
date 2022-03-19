@@ -35,11 +35,11 @@ class EnvironmentManager:
         self.missing_env_vars_ = []
         self.missing_executables_ = []
 
-    def add_executable(self, exe_name : str) -> None:
+    def add_executable(self, exe_name: str) -> None:
         """Adds the name of an executable to check for."""
         self.executables_.append(exe_name)
 
-    def add_env_var(self, env_var : str) -> None:
+    def add_env_var(self, env_var: str) -> None:
         """Adds the name of an environment variable to check for."""
         self.env_vars_.append(env_var)
 
@@ -48,12 +48,12 @@ class EnvironmentManager:
         for env_var in self.env_vars_:
             if os.getenv(env_var) is None:
                 self.missing_env_vars_.append(env_var)
-    
+
     def __exe_exists(self, exe_name: str) -> bool:
         """Helper method that checks if executable exists in current environment."""
         full_path = os.path.expandvars(exe_name)
         return shutil.which(exe_name) is not None
-   
+
     def check_executables(self) -> None:
         """Checks which executables are available in the system, storing paths to those which exist or noting if they are not found."""
         for exe in self.executables_:
@@ -98,7 +98,7 @@ class EnvironmentManager:
         """Checks if any executables or environment variables are missing."""
         return len(self.missing_executables_) or len(self.missing_env_vars_)
 
-    def run_command(self, exe : str, args : List[str]) -> List[str]:
+    def run_command(self, exe: str, args: List[str]) -> List[str]:
         """Interface to run a command with the exectuables specified by exe as well as a list of arguments."""
         cmd = f"{self.mapper.get(exe,exe)} {' '.join(args)}"
         if exe in self.missing_executables_ or not self.__exe_exists(exe):
@@ -110,17 +110,22 @@ class EnvironmentManager:
         _LOGGER.info(f"Running command: '{cmd}'...")
         try:
             result = run(cmd, shell=True, capture_output=True)
-            res_lines = list(map(lambda ss: ss.decode('utf-8'), result.stdout.splitlines()))
+            res_lines = list(
+                map(lambda ss: ss.decode("utf-8"), result.stdout.splitlines())
+            )
             _LOGGER.info(f"Command run!")
         except Exception as e:
-            _LOGGER.error(f"Following error was raised during command excecution: '{e}'. Exiting...")
-            exit( 1 )
+            _LOGGER.error(
+                f"Following error was raised during command excecution: '{e}'. Exiting..."
+            )
+            exit(1)
         return res_lines
 
     def __getattr__(self, key: str) -> str:
         """Allows accession into acquired executables."""
         if key not in self.mapper and key in self.executables_:
-            _LOGGER.error(f"Executable '{key}' is in list of executables to check but has not been searched for yet. Call .check_environment() first. Exiting...")
-            exit( 1 )
+            _LOGGER.error(
+                f"Executable '{key}' is in list of executables to check but has not been searched for yet. Call .check_environment() first. Exiting..."
+            )
+            exit(1)
         return self.mapper[key]
-

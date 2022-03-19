@@ -30,4 +30,3 @@ def get_fchk(self, keep_chk=0):
 
     self.qm_cluster_fchk = fchk_paths
     return self.qm_cluster_fchk
-

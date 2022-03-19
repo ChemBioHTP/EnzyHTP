@@ -7,6 +7,7 @@ Date: 2022-03-19
 
 class MissingEnvironmentElement(Exception):
     """Exception corresponding to a missing executable or environment variable."""
+
     pass
 
 
@@ -18,4 +19,5 @@ class InvalidResidueCode(Exception):
 
 class UnsupportedFileType(Exception):
     """Exception corresponding to a file type that enzy_htp does not support."""
+
     pass

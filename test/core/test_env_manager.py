@@ -1,4 +1,8 @@
-"""Testing the enzy_htp.core.EnvironmentManager() object."""
+"""Testing the enzy_htp.core.EnvironmentManager() object.
+
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Date: 2022-03-19
+"""
 import os
 import pytest
 

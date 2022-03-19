@@ -2,7 +2,13 @@ from .atom import Atom
 from typing import List
 from .residue import Residue
 from .pdb_line import PDBLine, read_pdb_lines
-from ..core import get_file_ext, write_lines, UnsupportedFileType, lines_from_file, _LOGGER
+from ..core import (
+    get_file_ext,
+    write_lines,
+    UnsupportedFileType,
+    lines_from_file,
+    _LOGGER,
+)
 
 import openbabel
 import openbabel.pybel as pybel
@@ -28,67 +34,68 @@ class Ligand(Residue):
     """
 
     def __init__(self, residue_key: str, atoms: List[Atom], **kwargs):
-        self.net_charge = kwargs.get('net_charge', None)
-        Residue.__init__(self, 'A.B.10', atoms)
-#
-#    @classmethod
-#
-#    @classmethod
-#    def fromPDB(
-#        cls,
-#        resi_input,
-#        resi_id=None,
-#        resi_name=None,
-#        net_charge=None,
-#        input_type="PDB_line",
-#    ):
-#        """
-#        generate resi from PDB. Require 'ATOM' and 'HETATM' lines.
-#        ---------
-#        resi_input = PDB_line (or line_str or file or path)
-#        resi_id : int (use the number in the line by default // support customize)
-#        net_charge : user assigned net charge for further use
-#        Use PDB_line in the list to init each atom
-#        """
-#
-#        # adapt general input // converge to a list of PDB_line (resi_lines)
-#        if input_type == "path":
-#            f = open(resi_input)
-#            resi_lines = PDB_line.fromlines(f.read())
-#            f.close()
-#        if input_type == "file":
-#            resi_lines = PDB_line.fromlines(resi_input.read())
-#        if input_type == "line_str":
-#            resi_lines = PDB_line.fromlines(resi_input)
-#        if input_type == "PDB_line":
-#            resi_lines = resi_input
-#
-#        # clean lines
-#        for i in range(len(resi_lines) - 1, -1, -1):
-#            if (
-#                resi_lines[i].line_type != "ATOM"
-#                and resi_lines[i].line_type != "HETATM"
-#            ):
-#                if Config.debug > 1:
-#                    print("Residue.fromPDB: delete error line in input.")
-#                del resi_lines[i]
-#
-#        # Default resi_id
-#        if resi_id is None:
-#            resi_id = resi_lines[0].resi_id
-#        # get name from first line
-#        if resi_name is None:
-#            resi_name = resi_lines[0].resi_name
-#        # get child atoms
-#        atoms = []
-#        for pdb_l in resi_lines:
-#            atoms.append(Atom.fromPDB(pdb_l))
-#
-#        return cls(atoms, resi_id, resi_name, net_charge=net_charge)
-#
-#    def sort(self):
-#        pass
-#
+        self.net_charge = kwargs.get("net_charge", None)
+        Residue.__init__(self, "A.B.10", atoms)
+
+    #
+    #    @classmethod
+    #
+    #    @classmethod
+    #    def fromPDB(
+    #        cls,
+    #        resi_input,
+    #        resi_id=None,
+    #        resi_name=None,
+    #        net_charge=None,
+    #        input_type="PDB_line",
+    #    ):
+    #        """
+    #        generate resi from PDB. Require 'ATOM' and 'HETATM' lines.
+    #        ---------
+    #        resi_input = PDB_line (or line_str or file or path)
+    #        resi_id : int (use the number in the line by default // support customize)
+    #        net_charge : user assigned net charge for further use
+    #        Use PDB_line in the list to init each atom
+    #        """
+    #
+    #        # adapt general input // converge to a list of PDB_line (resi_lines)
+    #        if input_type == "path":
+    #            f = open(resi_input)
+    #            resi_lines = PDB_line.fromlines(f.read())
+    #            f.close()
+    #        if input_type == "file":
+    #            resi_lines = PDB_line.fromlines(resi_input.read())
+    #        if input_type == "line_str":
+    #            resi_lines = PDB_line.fromlines(resi_input)
+    #        if input_type == "PDB_line":
+    #            resi_lines = resi_input
+    #
+    #        # clean lines
+    #        for i in range(len(resi_lines) - 1, -1, -1):
+    #            if (
+    #                resi_lines[i].line_type != "ATOM"
+    #                and resi_lines[i].line_type != "HETATM"
+    #            ):
+    #                if Config.debug > 1:
+    #                    print("Residue.fromPDB: delete error line in input.")
+    #                del resi_lines[i]
+    #
+    #        # Default resi_id
+    #        if resi_id is None:
+    #            resi_id = resi_lines[0].resi_id
+    #        # get name from first line
+    #        if resi_name is None:
+    #            resi_name = resi_lines[0].resi_name
+    #        # get child atoms
+    #        atoms = []
+    #        for pdb_l in resi_lines:
+    #            atoms.append(Atom.fromPDB(pdb_l))
+    #
+    #        return cls(atoms, resi_id, resi_name, net_charge=net_charge)
+    #
+    #    def sort(self):
+    #        pass
+    #
 
     def get_net_charge(self) -> int:
         return self.net_charge
@@ -98,11 +105,11 @@ class Ligand(Residue):
         build ligand file(out_path) with ft format
         """
         ext = get_file_ext(out_path).lower()
-        if ext != '.pdb':
+        if ext != ".pdb":
             raise UnsupportedFileType(out_path)
         lines = list(
-            map(lambda pr: pr[1].build(a_id=pr[0] + 1, c_id=" "),
-                enumerate(self.atoms))) + ["TER", "END"]
+            map(lambda pr: pr[1].build(a_id=pr[0] + 1, c_id=" "), enumerate(self.atoms))
+        ) + ["TER", "END"]
         write_lines(out_path, lines)
         return
         with open(out_path, "w") as of:
@@ -156,12 +163,10 @@ def residue_to_ligand(ptr: Residue) -> Ligand:
     return Ligand(ptr.name, ptr.atoms)
 
 
-def protonate_ligand(ligand: Ligand,
-                     dirname='.',
-                     method="PYBEL",
-                     ph=7.0,
-                     keep_name=1) -> Ligand:
-    #def protonate_ligand(cls, path, method="PYBEL", ph=7.0, keep_name=1):
+def protonate_ligand(
+    ligand: Ligand, dirname=".", method="PYBEL", ph=7.0, keep_name=1
+) -> Ligand:
+    # def protonate_ligand(cls, path, method="PYBEL", ph=7.0, keep_name=1):
     """
     Protonate the ligand from 'path' with 'method', provide out_path and net charge.
     TODO "obabel -ipdb ligand_1.pdb -opdb pdb -O ligand_1_aHt.pdb -h" can keep names, but how is it accessed by pybel
@@ -273,7 +278,8 @@ def _ob_pdb_charge(pdb_path):
         if pdb_l.is_HETATM() or pdb_l.is_ATOM():
             if len(pdb_l.get_charge()) != 0:
                 charge = pdb_l.charge[::-1]
-                _LOGGER.info(f"Found formal charge: {pdb_l.atom_name} {charge}"
-                            )  # TODO make this more intuitive/make sense
+                _LOGGER.info(
+                    f"Found formal charge: {pdb_l.atom_name} {charge}"
+                )  # TODO make this more intuitive/make sense
                 net_charge += int(charge)
     return net_charge

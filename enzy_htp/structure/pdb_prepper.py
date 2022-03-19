@@ -13,7 +13,13 @@ from pdb2pqr.main import main_driver as run_pdb2pqr
 from pdb2pqr.main import build_main_parser as build_pdb2pqr_parser
 
 from typing import Set
-from ..core.system import base_file_name, get_current_time, safe_mkdir, lines_from_file, write_lines 
+from ..core.file_system import (
+    base_file_name,
+    get_current_time,
+    safe_mkdir,
+    lines_from_file,
+    write_lines,
+)
 from .structure import structure_from_pdb
 
 from .structure import Structure
@@ -26,23 +32,24 @@ from .ligand import Ligand, protonate_ligand
 
 from typing import List
 
-#from .mutate import MutaFlag, mutaflag_to_str
+# from .mutate import MutaFlag, mutaflag_to_str
 from ..preparation import MutaFlag, mutaflag_to_str
-#from ..core import em
+
+# from ..core import em
 from ..chemical import convert_to_three_letter, get_element_aliases
 
 
 class PDBPrepper:
-
     def __init__(
-            self, pdb_name,
-            **kwargs):  #, PDB_input, wk_dir="", name="", input_type="path"):
+        self, pdb_name, **kwargs
+    ):  # , PDB_input, wk_dir="", name="", input_type="path"):
         """Inits PDBPrepper with a pdb file and optionally a work directory to place temporary files."""
         self.no_water_path = None
         self.pdb_path = pdb_name
         self.base_pdb_name = base_file_name(pdb_name)
         self.work_dir = kwargs.get(
-            'work_dir', f"{get_current_time()}_{self.base_pdb_name}")
+            "work_dir", f"{get_current_time()}_{self.base_pdb_name}"
+        )
         safe_mkdir(self.work_dir)
         shutil.copy(self.pdb_path, f"{self.work_dir}/{self.base_pdb_name}.pdb")
         self.path_name = f"{self.work_dir}/{self.base_pdb_name}.pdb"
@@ -59,7 +66,8 @@ class PDBPrepper:
 
         pdb_lines: List[PDBLine] = read_pdb_lines(self.path_name)
         pdb_lines = list(
-            filter(lambda pl: not (pl.is_water() or pl.is_CRYST1()), pdb_lines))
+            filter(lambda pl: not (pl.is_water() or pl.is_CRYST1()), pdb_lines)
+        )
         mask = [True] * len(pdb_lines)
 
         for pidx, pl in enumerate(pdb_lines[1:]):
@@ -97,8 +105,7 @@ class PDBPrepper:
                 get_flag = 1
                 # warn if possible wrong self.stru
                 if Config.debug >= 1:
-                    print(
-                        "PDB.get_stru: WARNING: self.stru has a different name")
+                    print("PDB.get_stru: WARNING: self.stru has a different name")
                     print("     -self.name: " + self.name)
                     print("     -self.stru.name: " + self.stru.name)
                     print("Getting new stru")
@@ -107,9 +114,9 @@ class PDBPrepper:
 
         if get_flag or renew:
             if self.path is not None:
-                self.stru = Structure.fromPDB(self.path,
-                                              input_name=input_name,
-                                              ligand_list=ligand_list)
+                self.stru = Structure.fromPDB(
+                    self.path, input_name=input_name, ligand_list=ligand_list
+                )
             else:
                 self.stru = Structure.fromPDB(
                     self.file_str,
@@ -258,9 +265,7 @@ class PDBPrepper:
                         # Deal with missing residue, fill with "NAN"
                         missing_length = pdb_l.resi_id - last_resi_index - 1
                         if missing_length > 0:
-                            Chain_sequence = Chain_sequence + [
-                                "NAN",
-                            ] * missing_length
+                            Chain_sequence = Chain_sequence + ["NAN",] * missing_length
 
                         # Store the new resi
                         Chain_sequence.append(pdb_l.resi_name)
@@ -409,19 +414,21 @@ class PDBPrepper:
         """
         pass
 
-    def get_protonation(self,
-                        ph: float = 7.0,
-                        ffout: str = "AMBER",
-                        keep_id: int = 0,
-                        if_prt_ligand: int = 1) -> None:
+    def get_protonation(
+        self,
+        ph: float = 7.0,
+        ffout: str = "AMBER",
+        keep_id: int = 0,
+        if_prt_ligand: int = 1,
+    ) -> None:
         # TODO check that the ph is in the range 0-14
-        #self._get_protonation_pdb2pqr(ph=ph)
-        #self._protonation_Fix(out_path, ph=ph, keep_id=keep_id, if_prt_ligand=if_prt_ligand)
-        #self.path = out_path
-        #self._update_name()
-        #self.stru.name = self.name
+        # self._get_protonation_pdb2pqr(ph=ph)
+        # self._protonation_Fix(out_path, ph=ph, keep_id=keep_id, if_prt_ligand=if_prt_ligand)
+        # self.path = out_path
+        # self._update_name()
+        # self.stru.name = self.name
 
-        #def _get_protonation_pdb2pqr(self, ffout: str="AMBER", ph: float=7.0, out_path: str=""):
+        # def _get_protonation_pdb2pqr(self, ffout: str="AMBER", ph: float=7.0, out_path: str=""):
         """
         Use PDB2PQR to get the protonation state for current PDB. (self.path)
         current implementation just use the outer layer of PDB2PQR. Update to inner one and get more infomation in the furture. 
@@ -431,19 +438,20 @@ class PDBPrepper:
         """
         # input of PDB2PQR
         pdb2pqr_parser = build_pdb2pqr_parser()
-        args = pdb2pqr_parser.parse_args([
-            "--ff=PARSE",
-            "--ffout=" + ffout,
-            "--with-ph=" + str(ph),
-            "--log-level=CRITICAL",
-            self.path_name,
-            self.pqr_path,
-        ])
+        args = pdb2pqr_parser.parse_args(
+            [
+                "--ff=PARSE",
+                "--ffout=" + ffout,
+                "--with-ph=" + str(ph),
+                "--log-level=CRITICAL",
+                self.path_name,
+                self.pqr_path,
+            ]
+        )
         pdb2pqr_log = f"{self.work_dir}/pdb2pqr_output.log"
         _LOGGER.info(f"Running pdb2pqr on '{self.path_name}'...")
         run_pdb2pqr(args)
-        _LOGGER.info(
-            f"Finished running pdb2pqr! Output saved to '{self.pqr_path}'")
+        _LOGGER.info(f"Finished running pdb2pqr! Output saved to '{self.pqr_path}'")
         # Add missing atom (from the PDB2PQR step. Update to func result after update the _get_protonation_pdb2pqr func)
         # Now metal and ligand
         old_stru = structure_from_pdb(self.no_water_path)
@@ -451,8 +459,7 @@ class PDBPrepper:
         # find Metal center and combine with the pqr file
         metal_list = old_stru.get_metal_center()
         if len(metal_list):
-            _LOGGER.info(
-                f"Merging {len(metal_list)} metal centers in old structure!")
+            _LOGGER.info(f"Merging {len(metal_list)} metal centers in old structure!")
             _LOGGER.info(f"Adding metal centers to new structure...")
             new_stru.add(metal_list, sort=0)
             _LOGGER.info(f"Metal centers added!")
@@ -464,14 +471,15 @@ class PDBPrepper:
         # protonate ligands and combine with the pqr file
         ligand_list = old_stru.ligands
         if len(old_stru.ligands):
-            _LOGGER.info(
-                f"Merging {len(ligand_list)} ligands in old structure!")
+            _LOGGER.info(f"Merging {len(ligand_list)} ligands in old structure!")
             lig_dir = self.work_dir + "/ligands/"
             safe_mkdir(lig_dir)
             # TODO: logging
             new_ligands = list(
-                map(lambda ll: protonate_ligand(ll, dirname=lig_dir, ph=ph),
-                    ligand_list))
+                map(
+                    lambda ll: protonate_ligand(ll, dirname=lig_dir, ph=ph), ligand_list
+                )
+            )
             new_stru.add(new_ligands, sort=0)
 
         # PLACE HOLDER for other fix
@@ -564,7 +572,7 @@ class PDBPrepper:
     ========
     """
 
-    #def PDB2PDBwLeap(self):
+    # def PDB2PDBwLeap(self):
     def apply_mutations(self) -> None:
         """
         Apply mutations using tleap. Save mutated structure PDB in self.path
@@ -581,9 +589,11 @@ class PDBPrepper:
         """
 
         # Prepare a label for the filename
-        tot_Flag_name = '_'.join(list(map(mutaflag_to_str, self.mutations)))
+        tot_Flag_name = "_".join(list(map(mutaflag_to_str, self.mutations)))
         # Operate the PDB
-        out_PDB_path1 = self.work_dir + "/" + self.base_pdb_name + tot_Flag_name + "_tmp.pdb"
+        out_PDB_path1 = (
+            self.work_dir + "/" + self.base_pdb_name + tot_Flag_name + "_tmp.pdb"
+        )
         out_PDB_path2 = self.path_name + tot_Flag_name + ".pdb"
         chain_count = 1
         pdb_lines = read_pdb_lines(self.path_name)
@@ -598,8 +608,10 @@ class PDBPrepper:
             for mf in self.mutations:
                 # Test for every Flag for every lines
 
-                if chr(64 + chain_count
-                      ) == mf.chain_index and pdb_l.resi_id == mf.residue_index:
+                if (
+                    chr(64 + chain_count) == mf.chain_index
+                    and pdb_l.resi_id == mf.residue_index
+                ):
                     # do not write old line if match a MutaFlag
                     match = 1
                     # Keep OldAtoms of targeted old residue
@@ -607,9 +619,8 @@ class PDBPrepper:
                     # fix for mutations of Gly & Pro
                     old_atoms = {
                         "G": ["N", "H", "CA", "C", "O"],
-                        "P": ["N", "CA", "HA", "CB", "C", "O"]
-                    }.get(mf.target_residue,
-                          ["N", "H", "CA", "HA", "CB", "C", "O"])
+                        "P": ["N", "CA", "HA", "CB", "C", "O"],
+                    }.get(mf.target_residue, ["N", "H", "CA", "HA", "CB", "C", "O"])
 
                     line = pdb_l.line
                     for oa in old_atoms:
@@ -619,19 +630,24 @@ class PDBPrepper:
         write_lines(out_PDB_path1, list(map(lambda pl: pl.line, pdb_lines)))
         leapin_path = f"{self.work_dir}/leap_P2PwL.in"
         leap_lines = [
-            "source leaprc.protein.ff14SB", f"a = loadpdb {out_PDB_path1}",
-            f"savepdb a {out_PDB_path2}", "quit"
+            "source leaprc.protein.ff14SB",
+            f"a = loadpdb {out_PDB_path1}",
+            f"savepdb a {out_PDB_path2}",
+            "quit",
         ]
         write_lines(leapin_path, leap_lines)
         em.run_command(
-            "tleap", [f"-s -f {leapin_path} > {self.work_dir}/leap_P2PwL.out"])
-        safe_rm('leap.log')
+            "tleap", [f"-s -f {leapin_path} > {self.work_dir}/leap_P2PwL.out"]
+        )
+        safe_rm("leap.log")
 
-    def generate_mutations(self,
-                           n: int,
-                           muta_flags: List[MutaFlag] = None,
-                           restrictions: str = None,
-                           random_state=100) -> None:
+    def generate_mutations(
+        self,
+        n: int,
+        muta_flags: List[MutaFlag] = None,
+        restrictions: str = None,
+        random_state=100,
+    ) -> None:
         # TODO add restrictions
         # TODO check for restrictions
         # TODO setup to be compliant with the existing API grammar
@@ -643,8 +659,7 @@ class PDBPrepper:
             for mf in muta_flags:
                 key = (mf.chain_index, mf.residue_index)
                 if key in existing:
-                    _LOGGER.warn(
-                        f"Multiple mutations supplied at location {key}")
+                    _LOGGER.warn(f"Multiple mutations supplied at location {key}")
                 else:
                     existing.add(key)
                     temp.append(mf)
@@ -679,7 +694,7 @@ class PDBPrepper:
         self.mutations = muta_flags
         assert len(self.mutations) == len(set(self.mutations))
 
-    def Add_MutaFlag(self, Flag: str = 'r', if_U: bool = 0, if_self: bool = 0):
+    def Add_MutaFlag(self, Flag: str = "r", if_U: bool = 0, if_self: bool = 0):
         """Determine which mutation to deploy to the structure.
         
         User can 1. assign specific mutation(s). 
@@ -774,7 +789,7 @@ class PDBPrepper:
                 else:
                     if Config.debug >= 1:
                         print(
-                            'WARNING: pdb.Add_MutaFlag(): A non-canonical animo acid is being mutated! The MutaFlag will have a 3-letter code for the original residue .'
+                            "WARNING: pdb.Add_MutaFlag(): A non-canonical animo acid is being mutated! The MutaFlag will have a 3-letter code for the original residue ."
                         )
                     resi_1 = resi.name
                 # random over the residue list
@@ -844,7 +859,8 @@ class PDBPrepper:
             if Config.debug >= 1:
                 print(
                     "_read_MutaFlag: No chain_id is provided! Mutate in the first chain by default. Input: "
-                    + Flag)
+                    + Flag
+                )
 
         # san check of the manual input
         self.get_stru()
@@ -852,17 +868,24 @@ class PDBPrepper:
         if not chain_id in chain_id_list:
             raise Exception(
                 "_read_MutaFlag: San check failed. Input chain id in not in range."
-                + line_feed + " range: " + repr(chain_id_list))
+                + line_feed
+                + " range: "
+                + repr(chain_id_list)
+            )
         chain_int = ord(chain_id) - 65
         resi_id_list = [str(i.id) for i in self.stru.chains[chain_int].residues]
         if not resi_id in resi_id_list:
             raise Exception(
                 "_read_MutaFlag: San check failed. Input resi id in not in range."
-                + line_feed + " range: " + repr(resi_id_list))
+                + line_feed
+                + " range: "
+                + repr(resi_id_list)
+            )
         if not resi_2 in Resi_list:
             raise Exception(
                 "_read_MutaFlag: Only support mutate to the known 21 residues. AmberMaps.Resi_list: "
-                + repr(Resi_list))
+                + repr(Resi_list)
+            )
 
         return (resi_1, chain_id, resi_id, resi_2)
 
@@ -871,7 +894,6 @@ class PDBPrepper:
         Take a MutaFlag Tuple and return a str of name
         """
         return Flag[0] + Flag[1] + Flag[2] + Flag[3]
-
 
     def rm_allH(self, ff="Amber", ligand=False):
         # TODO: CJ: should this get called by mutation method?
@@ -888,13 +910,14 @@ class PDBPrepper:
         mask = [True] * len(pdb_lines)
         # crude judgement of H including customized H
         if ligand:
-            not_H_list = ["HG", "HF",
-                          "HS"]  # non-H elements that start with "H"
+            not_H_list = ["HG", "HF", "HS"]  # non-H elements that start with "H"
             for idx, pl in enumerate(pdb_lines):
                 if pl.is_ATOM():
                     atom_name = line[12:16].strip()
-                    if pl.atom_name.startswith(
-                            "H") and pl.atom_name[:2] not in not_H_list:
+                    if (
+                        pl.atom_name.startswith("H")
+                        and pl.atom_name[:2] not in not_H_list
+                    ):
                         mask[idx] = False
         else:
             H_aliases = get_element_aliases(ff, "H")
@@ -910,8 +933,6 @@ class PDBPrepper:
     General MD
     ========
     """
-
-
 
     @classmethod
     def get_charge_list(cls, prmtop_path):
@@ -941,13 +962,13 @@ class PDBPrepper:
                         del format_flag
 
                 if "charge_flag" in dir():
-                    if (line_index >= charge_flag + 2 and
-                            line_index <= charge_flag + 1 + ceil(N_atom / 5)):
+                    if (
+                        line_index >= charge_flag + 2
+                        and line_index <= charge_flag + 1 + ceil(N_atom / 5)
+                    ):
                         for i in line.strip().split():
                             charge_list.append(float(i) / 18.2223)
         return charge_list
-
-
 
     """
     ========
@@ -991,10 +1012,10 @@ class PDBPrepper:
         # get sele
         if val_fix == "internal":
             sele_lines, sele_map = self.stru.get_sele_list(
-                atom_mask, fix_end="H", prepi_path=self.prepi_path)
+                atom_mask, fix_end="H", prepi_path=self.prepi_path
+            )
         else:
-            sele_lines, sele_map = self.stru.get_sele_list(atom_mask,
-                                                           fix_end=None)
+            sele_lines, sele_map = self.stru.get_sele_list(atom_mask, fix_end=None)
         self.qm_cluster_map = sele_map
         # get chrgspin
         chrgspin = self._get_qmcluster_chrgspin(sele_lines, spin=spin)
@@ -1070,8 +1091,14 @@ class PDBPrepper:
             for gjf in inp:
                 out = gjf[:-3] + "out"
                 if Config.debug > 1:
-                    print("running: " + Config.Gaussian.g16_exe + " < " + gjf +
-                          " > " + out)
+                    print(
+                        "running: "
+                        + Config.Gaussian.g16_exe
+                        + " < "
+                        + gjf
+                        + " > "
+                        + out
+                    )
                 os.system(Config.Gaussian.g16_exe + " < " + gjf + " > " + out)
                 outs.append(out)
             return outs
@@ -1081,12 +1108,17 @@ class PDBPrepper:
             for gjf in inp:
                 out = gjf[:-3] + "out"
                 if Config.debug > 1:
-                    print("running: " + Config.Gaussian.g09_exe + " < " + gjf +
-                          " > " + out)
+                    print(
+                        "running: "
+                        + Config.Gaussian.g09_exe
+                        + " < "
+                        + gjf
+                        + " > "
+                        + out
+                    )
                 os.system(Config.Gaussian.g09_exe + " < " + gjf + " > " + out)
                 outs.append(out)
             return outs
-
 
     """
     ========
@@ -1094,14 +1126,9 @@ class PDBPrepper:
     ========
     """
 
-    def get_field_strength(self,
-                           atom_mask,
-                           a1=None,
-                           a2=None,
-                           bond_p1="center",
-                           p1=None,
-                           p2=None,
-                           d1=None):
+    def get_field_strength(
+        self, atom_mask, a1=None, a2=None, bond_p1="center", p1=None, p2=None, d1=None
+    ):
         """
         use frame coordinate from *mdcrd* and MM charge from *prmtop* to calculate the field strength of *p1* along *p2-p1* or *d1*
         atoms in *atom_mask* is included. (TODO: or an exclude one?)
@@ -1164,7 +1191,6 @@ class PDBPrepper:
             Es.append(E)
 
         return Es
-
 
 
 def get_PDB(name):

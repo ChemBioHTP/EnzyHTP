@@ -6,7 +6,13 @@ import numpy as np
 from typing import Tuple, List
 from plum import dispatch
 from .atom import Atom
-from enzy_htp.chemical import ResidueType, METAL_MAPPER, THREE_LETTER_AA_MAPPER, RD_SOLVENT_LIST, RD_NON_LIGAND_LIST
+from enzy_htp.chemical import (
+    ResidueType,
+    METAL_MAPPER,
+    THREE_LETTER_AA_MAPPER,
+    RD_SOLVENT_LIST,
+    RD_NON_LIGAND_LIST,
+)
 
 
 class Residue:
@@ -15,7 +21,7 @@ class Residue:
     def __init__(self, residue_key, atoms):
         self.atoms = atoms
         self.residue_key = residue_key
-        (chain, name, num) = self.residue_key.split('.')
+        (chain, name, num) = self.residue_key.split(".")
         self.chain_ = chain
         self.name = name
         self.num_ = int(num)
@@ -33,7 +39,7 @@ class Residue:
         # 1. canoncial code => canonical
         # 2. Solvent = WAT or HOH, also solvent ions (NA+, CL-)
         # 3. Metal-center: only from metal center residue
-        #.4. Non-Canonical/Ligand => similar but ligand will be in its own chain... ligand will NEVER be in the same cahin as a canonical amino acid
+        # .4. Non-Canonical/Ligand => similar but ligand will be in its own chain... ligand will NEVER be in the same cahin as a canonical amino acid
         pass
 
     def empty_chain(self) -> bool:
@@ -68,8 +74,9 @@ class Residue:
 
     def neighbors(self, other: Residue) -> bool:
         """Checks if two residues from the same PDB are neighbors."""
-        return (abs(self.min_line() - other.max_line())
-                == 1) or (abs(self.max_line() - other.min_line()) == 1)
+        return (abs(self.min_line() - other.max_line()) == 1) or (
+            abs(self.max_line() - other.min_line()) == 1
+        )
 
     def is_rd_solvent(self) -> bool:
         return self.name in RD_SOLVENT_LIST
@@ -85,10 +92,10 @@ class Residue:
     def rtype(self) -> ResidueType:
         pass
 
-    #TODO add operator overloading to move the chain?
+    # TODO add operator overloading to move the chain?
 
 
-#class Residue(Child):
+# class Residue(Child):
 #    """
 #    -------------
 #    initilize from

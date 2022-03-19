@@ -8,7 +8,6 @@ from .residue import Residue
 
 
 class Chain:
-
     def __init__(self, name, residues):
         self.name_ = name
         self.residues_: List[Residue] = residues
@@ -47,7 +46,7 @@ class Chain:
         del self.residues_[key]
 
 
-#class Chain(Child):
+# class Chain(Child):
 #    """
 #    -------------
 #    initilize from

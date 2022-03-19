@@ -255,7 +255,7 @@ def convert_to_one_letter(three_letter: str) -> str:
 
 def get_element_aliases(ff: str, element: str) -> Set[str]:
     """Gets all element aliases for a given force field (ff) and element name, retungin in a set. If the ff is not supported, will log and exit."""
-    if ff not in ff_dict:
+    if ff not in RESIDUE_ELEMENT_MAP:
         _LOGGER.error(f"{ff} is not a supported force field type. Allowed are '{', '.join(list(RESIDUE_ELEMENT_MAP.keys()))}'. Exiting...")
         exit( 0 )
     ff_dict = RESIDUE_ELEMENT_MAP[ff]
@@ -268,8 +268,9 @@ def get_element_aliases(ff: str, element: str) -> Set[str]:
 
 
 def one_letters_except(existing: str) -> List[str]:
-    """Creates a list of all one letter amino acid codes. If an invalid code is supplied, an enzy_htp.core.InvalidResidueCode() error is thrown."""
+    """Creates a list of all one letter amino acid codes. Case insensitive. If an invalid code is supplied, an enzy_htp.core.InvalidResidueCode() error is thrown."""
+    existing = existing.upper()
     if existing not in ONE_LETTER_AA_MAPPER:
         raise InvalidResidueCode(f"{existing} is not a valid one letter amino acid")
-    result = list(ONE_LETTER_AA_MAPPER.keys())
+    result = list(set(list(ONE_LETTER_AA_MAPPER.keys())))
     return list(filter(lambda s: s != existing, result))

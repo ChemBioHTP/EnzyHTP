@@ -1,16 +1,16 @@
 from typing import Any
 from plum import dispatch
 
-#TODO documentation
+# TODO documentation
 class AmberConfig:
-    def __init__(self, parent=None ):
+    def __init__(self, parent=None):
         self._parent = parent
 
     def required_executables(self):
-        return [ self.CPU_ENGINE, self.GPU_ENGINE, 'tleap', 'ampdb' ]
+        return [self.CPU_ENGINE, self.GPU_ENGINE, "tleap", "ampdb"]
 
     def required_env_vars(self):
-        return [ self.HOME ]
+        return [self.HOME]
 
     # -----------------------------
     # Amber Home dir
@@ -44,7 +44,8 @@ class AmberConfig:
     #   ntr   = 1,	restraint_wt = 2.0, restraintmask = '@C,CA,N',
     #  /
     CONF_MIN = {
-        "ntc": "2", "ntf": "2",
+        "ntc": "2",
+        "ntf": "2",
         "cut": "10.0",
         "maxcyc": 20000,
         "ncyc": "0.5maxcyc",
@@ -129,8 +130,7 @@ class AmberConfig:
         "dt": "0.002",
         "temp0": "300.0",
         "ntpr": "0.002nstlim",
-        "ntwx":
-            "5000",  # default 10ps (TODO support different power numbers)
+        "ntwx": "5000",  # default 10ps (TODO support different power numbers)
         "ntt": "3",
         "gamma_ln": "5.0",
         "iwarp": "1",
@@ -172,16 +172,14 @@ class AmberConfig:
         "restraint_wt": "2.0",  # the later two are only used when ntr = 1
     }
 
-    def __getitem__(self, key : str ) -> Any:
-        return getattr(self,key)
-     
-    def __setitem__(self, key : str, value: Any ) -> None:
+    def __getitem__(self, key: str) -> Any:
+        return getattr(self, key)
+
+    def __setitem__(self, key: str, value: Any) -> None:
         is_path = False
         if key in {"CPU_ENGINE", "GPU_ENGINE", "HOME"}:
             is_path = True
-        
-        setattr(self,key,value)
+
+        setattr(self, key, value)
         if is_path:
             self._parent.update_paths()
-
-  

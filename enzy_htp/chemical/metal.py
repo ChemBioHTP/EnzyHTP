@@ -6,7 +6,7 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 
 from typing import Dict
 
-METAL_MAPPER : Dict[str, str] = {
+METAL_MAPPER: Dict[str, str] = {
     "LI": "Li",
     "NA": "Na",
     "Na+": "Na",
@@ -23,16 +23,16 @@ METAL_MAPPER : Dict[str, str] = {
     "PT": "Pt",
     "ZN": "Zn",
     "CO": "Co",
-    "PD": "Pd", 
-	"CR": "Cr",
+    "PD": "Pd",
+    "CR": "Cr",
     "FE": "Fe",
     "V": "V",
     "MN": "Mn",
     "HG": "Hg",
     "CD": "Cd",
     "YB": "Yb",
-    "CA": "Ca",
-    "SN": "Sn",
+    "CA": "Ca", 
+	"SN": "Sn",
     "PB": "Pb",
     "EU": "Eu",
     "SR": "Sr",
@@ -59,7 +59,7 @@ METAL_MAPPER : Dict[str, str] = {
     "TH": "Th",
 }
 
-METAL_CENTER_MAP = {
+METAL_CENTER_MAP : Dict[str,str] = {
     "MG": "Mg",
     "TL": "Tl",
     "CU": "Cu",

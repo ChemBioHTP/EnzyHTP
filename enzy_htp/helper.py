@@ -5,6 +5,7 @@ from distutils.command.config import config
 from AmberMaps import Resi_list
 import os
 import numpy as np
+
 """
 ====
 Tree
@@ -13,7 +14,6 @@ Tree
 
 
 class Child:
-
     def __init__(self):
         self.parent = None
 
@@ -67,9 +67,9 @@ def get_distance(p1, p2):
 
     return D
 
-    #---
-    #numConfs: number of conformers output
-    '''
+    # ---
+    # numConfs: number of conformers output
+    """
     from rdkit import Chem
     from rdkit.Chem import AllChem
     from Class_Conf import Config
@@ -121,16 +121,13 @@ def get_distance(p1, p2):
 
 
 #Rosetta
-'''
+"""
 
 
-def generate_Rosetta_params(input_file,
-                            out_dir,
-                            resn,
-                            out_pdb_name,
-                            if_conformer=0,
-                            overwrite=0):
-    '''
+def generate_Rosetta_params(
+    input_file, out_dir, resn, out_pdb_name, if_conformer=0, overwrite=0
+):
+    """
     generate rosetta params file using molfile_to_params.py
     The command will be:
     [some_path]/molfile_to_params.py -n [resn] -p [out_pdb_name] --keep-names
@@ -140,7 +137,7 @@ def generate_Rosetta_params(input_file,
     out_pdb_name:   if out_pdb_name is 'same' then extract the resi name from the input_file
     if_conformer:   if add --conformers-in-one-file flag
     overwrite:      if add --clobber flag
-    '''
+    """
     pass
     # return params_path, out_pdb_path, conformers_path (can only under the same dir as params)
 
@@ -197,4 +194,4 @@ def write_data(tag, data, out_path):
         
 Mutant assigner
 '''
-#TODO
+# TODO

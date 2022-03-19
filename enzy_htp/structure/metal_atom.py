@@ -103,9 +103,16 @@ class MetalAtom:
                     if dist <= (R_d + R_m):
                         self.donor_atoms.append(atom)
                         if Config.debug > 1:
-                            print("Metalatom.get_donor_atom: " + self.name +
-                                  " find donor atom:" + atom.resi.name + " " +
-                                  str(atom.resi.id) + " " + atom.name)
+                            print(
+                                "Metalatom.get_donor_atom: "
+                                + self.name
+                                + " find donor atom:"
+                                + atom.resi.name
+                                + " "
+                                + str(atom.resi.id)
+                                + " "
+                                + atom.name
+                            )
 
     def get_donor_residue(self, method="INC"):
         """
@@ -127,8 +134,10 @@ class MetalAtom:
                     if self.donor_resi[index2].id == self.donor_resi[index].id:
                         print(
                             "\033[1;31;40m!WARNING! found more than 1 donor atom from residue: "
-                            + self.donor_resi[index].name +
-                            str(self.donor_resi[index].id) + "\033[m")
+                            + self.donor_resi[index].name
+                            + str(self.donor_resi[index].id)
+                            + "\033[m"
+                        )
 
     def _metal_fix_1(self):
         """
@@ -140,8 +149,13 @@ class MetalAtom:
                 resi.deprotonate(resi.d_atom)
             else:
                 if resi.name not in NoProton_list:
-                    print("!WARNING!: uncommon donor residue -- " +
-                          resi.chain.id + " " + resi.name + str(resi.id))
+                    print(
+                        "!WARNING!: uncommon donor residue -- "
+                        + resi.chain.id
+                        + " "
+                        + resi.name
+                        + str(resi.id)
+                    )
                     # resi.rot_proton(resi.d_atom)
 
     def _metal_fix_2(self):
@@ -158,12 +172,7 @@ class MetalAtom:
         """
         pass
 
-    def build(self,
-              a_id=None,
-              r_id=None,
-              c_id=None,
-              ff="AMBER",
-              forcefield="ff14SB"):
+    def build(self, a_id=None, r_id=None, c_id=None, ff="AMBER", forcefield="ff14SB"):
         """
         generate an metal atom output line. End with LF
         return a line str
@@ -199,9 +208,23 @@ class MetalAtom:
             z = "{:>8.3f}".format(self.coord[2])
 
         # example: ATOM   5350  HB2 PRO   347      32.611  15.301  24.034  1.00  0.00
-        line = (l_type + a_index + " " + a_name + "   " + r_name + " " +
-                c_index + r_index + "    " + x + y + z + "  1.00  0.00" +
-                line_feed)
+        line = (
+            l_type
+            + a_index
+            + " "
+            + a_name
+            + "   "
+            + r_name
+            + " "
+            + c_index
+            + r_index
+            + "    "
+            + x
+            + y
+            + z
+            + "  1.00  0.00"
+            + line_feed
+        )
 
         return line
 
@@ -225,16 +248,16 @@ class MetalAtom:
             fz_flag = "-1"
             ly_flag = "L"
             if cnt_info != None:
-                cnt_flag = (" " + cnt_info[0] + "-" + cnt_info[1] + " " +
-                            str(cnt_info[2]))
+                cnt_flag = (
+                    " " + cnt_info[0] + "-" + cnt_info[1] + " " + str(cnt_info[2])
+                )
 
         # label
         if self.resi_name in G16_label_map.keys():
             G16_label = G16_label_map[self.resi_name][self.name]
         else:
             if Config.debug >= 1:
-                print("Metal: " + self.name +
-                      " not in build-in atom type of ff96.")
+                print("Metal: " + self.name + " not in build-in atom type of ff96.")
                 print(
                     "Use parameters and atom types from TIP3P (frcmod.ionsjc_tip3p & frcmod.ions234lm_126_tip3p)"
                 )
@@ -251,15 +274,29 @@ class MetalAtom:
                     "You need to at least provide a charge or use get_atom_charge to get one from prmtop file."
                 )
 
-        atom_label = "{:<16}".format(" " + self.ele + "-" + G16_label + "-" +
-                                     str(round(chrg, 6)))
+        atom_label = "{:<16}".format(
+            " " + self.ele + "-" + G16_label + "-" + str(round(chrg, 6))
+        )
         fz_flag = "{:>2}".format(fz_flag)
         x = "{:<14.8f}".format(self.coord[0])
         y = "{:<14.8f}".format(self.coord[1])
         z = "{:<14.8f}".format(self.coord[2])
 
-        line = (atom_label + " " + fz_flag + "   " + x + " " + y + " " + z +
-                " " + ly_flag + cnt_flag + line_feed)
+        line = (
+            atom_label
+            + " "
+            + fz_flag
+            + "   "
+            + x
+            + " "
+            + y
+            + " "
+            + z
+            + " "
+            + ly_flag
+            + cnt_flag
+            + line_feed
+        )
 
         return line
 
@@ -281,7 +318,7 @@ class MetalAtom:
             raise StopIteration
 
 
-#class Metalatom(Atom):
+# class Metalatom(Atom):
 #    """
 #    -------------
 #    initilize from

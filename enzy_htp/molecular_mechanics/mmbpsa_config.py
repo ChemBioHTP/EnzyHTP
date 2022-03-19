@@ -1,19 +1,21 @@
 from typing import Any
 
+
 class MMPBSAConfig:
     def __init__(self, parent=None):
         self._parent = parent
+
     # -----------------------------
-    # User defined MMPBSA.py(.MPI) exe dir other than 
+    # User defined MMPBSA.py(.MPI) exe dir other than
     #
-    HOME = '$AMBERHOME' 
+    HOME = "$AMBERHOME"
     EXE = "$AMBERHOME/bin/MMPBSA.py.MPI"
-    
+
     def required_executables(self):
-        return [ self.EXE ]
+        return [self.EXE]
 
     def required_env_vars(self):
-        return [ self.HOME ]
+        return [self.HOME]
 
     # ==============================
     # Method to express MMPBSA EXE path
@@ -74,15 +76,27 @@ class MMPBSAConfig:
         frame_line = "  "
         for i in ("startframe", "endframe", "interval"):
             if cls.conf_in[i] != None:
-                frame_line = frame_line + i + "=" + str(
-                    cls.conf_in[i]) + ", "
-        output_line = ("  verbose=" + str(cls.conf_in["verbose"]) +
-                       ", keep_files=" +
-                       str(cls.conf_in["keep_files"]) + ",")
-        gb_line = ("  igb=" + str(cls.conf_in["igb"]) + ", saltcon=" +
-                   str(cls.conf_in["saltcon"]) + ",")
-        pb_line = ("  istrng=" + str(cls.conf_in["istrng"]) +
-                   ", fillratio=" + str(cls.conf_in["fillratio"]))
+                frame_line = frame_line + i + "=" + str(cls.conf_in[i]) + ", "
+        output_line = (
+            "  verbose="
+            + str(cls.conf_in["verbose"])
+            + ", keep_files="
+            + str(cls.conf_in["keep_files"])
+            + ","
+        )
+        gb_line = (
+            "  igb="
+            + str(cls.conf_in["igb"])
+            + ", saltcon="
+            + str(cls.conf_in["saltcon"])
+            + ","
+        )
+        pb_line = (
+            "  istrng="
+            + str(cls.conf_in["istrng"])
+            + ", fillratio="
+            + str(cls.conf_in["fillratio"])
+        )
 
         with open(out_path, "w") as of:
             print("GB and PB calculation", end=line_feed, file=of)
@@ -98,16 +112,15 @@ class MMPBSAConfig:
             print("/", end=line_feed, file=of)
 
         return out_path
-    
-    def __getitem__(self, key : str ) -> Any:
-        return getattr(self,key)
-     
-    def __setitem__(self, key : str, value: Any ) -> None:
+
+    def __getitem__(self, key: str) -> Any:
+        return getattr(self, key)
+
+    def __setitem__(self, key: str, value: Any) -> None:
         is_path = False
         if key in {"HOME", "EXE"}:
             is_path = True
-        
-        setattr(self,key,value)
+
+        setattr(self, key, value)
         if is_path:
             self._parent.update_paths()
-

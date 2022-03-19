@@ -8,16 +8,16 @@ import logging
 import colorlog
 
 
-def init_logger(dunder_name : str,
-                log_outfile: str = None,
-                testing_mode: bool = False ,
-                start: bool = False) -> logging.Logger:
+def init_logger(
+    dunder_name: str,
+    log_outfile: str = None,
+    testing_mode: bool = False,
+    start: bool = False,
+) -> logging.Logger:
     """Function for creating the formatted logger. Taken from https://github.com/jyesselm/dreem/dreem/logger.py."""
-    log_format = ("[%(asctime)s "
-                  "%(name)s "
-                  "%(funcName)s] "
-                  "%(levelname)s "
-                  "%(message)s")
+    log_format = (
+        "[%(asctime)s " "%(name)s " "%(funcName)s] " "%(levelname)s " "%(message)s"
+    )
     bold_seq = "\033[1m"
     colorlog_format = f"{bold_seq}" "%(log_color)s" f"{log_format}"
     logger = logging.getLogger(dunder_name)
@@ -34,7 +34,8 @@ def init_logger(dunder_name : str,
                 "ERROR": "red",
                 "CRITICAL": "red,bg_white",
             },
-        ))
+        )
+    )
 
     logger.addHandler(handler)
 
@@ -53,6 +54,6 @@ def init_logger(dunder_name : str,
 
     return logger
 
-  
-_LOGGER = init_logger('EnzyHTP', None, start=True)
+
+_LOGGER = init_logger("EnzyHTP", None, start=True)
 """Singleton logging object to log to throught enzy_htp."""

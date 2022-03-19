@@ -1,18 +1,19 @@
 from typing import Any
 
+
 class GaussianConfig:
     # -----------------------------
     #   >>>>>>>>ONIOM<<<<<<<<
     # -----------------------------
     def __init__(self, parent=None):
         self._parent = parent
-    
+
     def required_executables(self):
-        return [ self.G16_EXE, self.G09_EXE ]
-    
+        return [self.G16_EXE, self.G09_EXE]
+
     def required_env_vars(self):
-        return [  ]
-    
+        return []
+
     # -----------------------------
     # Cores for gaussian job (higher pirority)
     #
@@ -41,7 +42,7 @@ class GaussianConfig:
     ]  # add in the order of theory level  e.g.: ['wb97xd/def2svp', 'PM7', 'amber']
     # -- open for edit --
     ONIOM_KW = "oniom(" + ":".join(OM_LVL) + ")"
-    
+
     # complete keywords
     KEYWORDS = {
         "spe": [
@@ -72,18 +73,15 @@ class GaussianConfig:
     # preset: 0: no preset (fill layer atom manually) 1: preset_1 -> xxx
     LAYER_PRESET = 0
     LAYER_ATOMS = []
-    
-    
-    
-    def __getitem__(self, key : str ) -> Any:
-        return getattr(self,key)
-     
-    def __setitem__(self, key : str, value: Any ) -> None:
+
+    def __getitem__(self, key: str) -> Any:
+        return getattr(self, key)
+
+    def __setitem__(self, key: str, value: Any) -> None:
         is_path = False
         if key in {"G09_EXE", "G16_EXE"}:
             is_path = True
-        
-        setattr(self,key,value)
+
+        setattr(self, key, value)
         if is_path:
             self._parent.update_paths()
-    
