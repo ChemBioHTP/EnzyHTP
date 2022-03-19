@@ -6,13 +6,18 @@ Date: 2022-02-12
 import os
 import shutil
 from typing import List
+from subprocess import run
 
 from .logger import _LOGGER
 from .exception import MissingEnvironmentElement
 
 
 class EnvironmentManager:
-    """Checks whether given applications and environment variables are set in the current environment.
+    """Serves as general interface between module and the current computer environment.
+	Checks whether given applications and environment variables are set in the current environment.
+	After check, stores names of executables.
+	Serves as interfrace for running commands on system.
+       
 	
 	Attributes:
 		env_vars_: A list of strings containing environment variables to check for.
@@ -22,25 +27,29 @@ class EnvironmentManager:
 	"""
 
     def __init__(self, **kwargs):
+        """Initializes object, optionally with starting environment variables and executables."""
         self.env_vars_ = kwargs.get("env_vars", [])
         self.executables_ = kwargs.get("executables", [])
         self.mapper = dict()
         self.missing_env_vars_ = []
         self.missing_executables_ = []
 
-    def add_executable(self, exe_name):
+    def add_executable(self, exe_name : str) -> None:
+        """Adds the name of an executable to check for."""
         self.executables_.append(exe_name)
 
-    def add_env_var(self, env_var):
+    def add_env_var(self, env_var : str) -> None:
+        """Adds the name of an environment variable to check for."""
         self.env_vars_.append(env_var)
 
-    def check_env_vars(self):
-        for env_var in self.env_vars_:
+    def check_env_vars(self) -> None:
+        """Checks which environment variables are defined, storing those which are not defined."""
+	    for env_var in self.env_vars_:
             if os.getenv(env_var) is None:
                 self.missing_env_vars_.append(env_var)
 
-    def check_executables(self):
-
+    def check_executables(self) -> None:
+        """Checks which executables are available in the system, storing paths to those which exist or noting if they are not found."""
         def exe_exists(exe_name):
             full_path = os.path.expandvars(exe_name)
             return shutil.which(exe_name) is not None
@@ -51,7 +60,8 @@ class EnvironmentManager:
             else:
                 self.mapper[exe] = shutil.which(exe)
 
-    def display_missing(self):
+    def display_missing(self) -> None:
+        """Displays a list of missing environment variables and exectuables to the logger. Should be called after .check_environment() and .check_env_vars()."""
         if not self.is_missing():
             _LOGGER.info("Environment has all required elements!")
             return
@@ -67,24 +77,27 @@ class EnvironmentManager:
             for mev in self.missing_env_vars_:
                 _LOGGER.warning(f"\t\t{mev}")
 
-    def check_environment(self):
+    def check_environment(self) -> None:
+        """Preferred client method for validating environment. Performs checks and logs output."""
         _LOGGER.info("Checking environment for required elements...")
         self.check_env_vars()
         self.check_executables()
         self.display_missing()
         _LOGGER.info("Environment check completed!")
 
-    def reset(self):
+    def reset(self) -> None:
+        """Resets internal lists of env vars and executables."""
         self.executables_ = []
         self.missing_executables_ = []
         self.env_vars_ = []
         self.missing_env_vars_ = []
 
-    def is_missing(self):
+    def is_missing(self) -> bool:
+        """Checks if any executables or environment variables are missing."""
         return len(self.missing_executables_) or len(self.missing_env_vars_)
 
-    def run_command(self, exe, args) -> List[str]:
-        # TODO figure out something that happens when the whole things fails
+    def run_command(self, exe : str, args : List[str]) -> List[str]:
+        """Interface to run a command with the exectuables specified by exe as well as a list of arguments."""
         cmd = f"{self.mapper.get(exe,exe)} {' '.join(args)}"
         if exe in self.missing_executables_:
             _LOGGER.error(
@@ -93,22 +106,17 @@ class EnvironmentManager:
             _LOGGER.error(f"Exiting...")
             exit(1)
         _LOGGER.info(f"Running command: '{cmd}'...")
-        result = os.popen(cmd).read().splitlines()
-        return result
+        try:
+            result = os.run(cmd, shell=True, capture_output=True)
+            res_lines = list(map(lambda ss: ss.decode('utf-8'), result.stdout.splitlines()))
+            _LOGGER.info(f"Command run!")
+            return res_lines
+        except Exception as e:
+            _LOGGER.error(f"Following error was raised during command excecution: '{e}'. Exiting...")
+            exit( 0 )
+        return res_lines
 
     def __getattr__(self, key: str) -> str:
+        """Allows accession into acquired executables."""
         return self.mapper[key]
 
-
-#em = EnvironmentManager(
-#    env_vars=["AMBERHOME"],
-#    executables=[
-#        "tleap",
-#        "ambpdb",
-#        "cpptraj",
-#        "mpirun",
-#        "$AMBERHOME/bin/sander.MPI",
-#        "$AMBERHOME/bin/pmemd.cuda",
-#        "$AMBERHOME/bin/MMPBSA.py.MPI",
-#    ],
-#)
