@@ -1,10 +1,17 @@
-"""TODO DOCUMENATION"""
-# TODO update key when chain's name is changed
+"""Definition for the Residue class. Residues are the most common unit of function within 
+enzy_htp. A Residue() can be canonincal, non-canonical, solvent, or ligand. It is essentially
+the catch all for PDB objects.
+
+Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Date: 2022-03-19
+"""
 from __future__ import annotations
 
 import numpy as np
-from typing import Tuple, List
 from plum import dispatch
+from typing import Tuple, List
+
 from .atom import Atom
 from enzy_htp.chemical import (
     ResidueType,
@@ -16,9 +23,21 @@ from enzy_htp.chemical import (
 
 
 class Residue:
-    """TODO DOCUMENTATION"""
+    """Most common functional unit in enzy_htp. Made up of Atom() objects and can be either
+	canonical, non-canonical, solvent or a metal center. 
 
-    def __init__(self, residue_key, atoms):
+    Attributes:
+        self.atoms : A list of Atom() objects that make up the Residue().
+        self.residue_key : Unique string identifier with format "chain.name.num".
+		self.chain_ : Parent chain name.
+		self.name : Residue name.
+		self.num_ : The index of the Residue within the chain.
+		self.rtype_ : The ResidueType of the Residue().
+		self.min_line_ : The lowest one-indexed line of the children atoms.
+		self.max_line_ : The highest one-indexed line of the children atoms.
+    """
+
+    def __init__(self, residue_key : str, atoms : List[Atom]):
         self.atoms = atoms
         self.residue_key = residue_key
         (chain, name, num) = self.residue_key.split(".")
@@ -32,6 +51,7 @@ class Residue:
         # TODO what are the checks that we should be doing here?
 
     def atom_list(self) -> List[Atom]:
+        """Returns a list of all Atom() objects that the Residue() "owns" """
         return self.atoms
 
     def __determine_residue_type(self):
@@ -43,33 +63,36 @@ class Residue:
         pass
 
     def empty_chain(self) -> bool:
+        """Whether the Residue() lacks a chain identitifer. NOT a chain object accessor."""
         return not len(self.chain_.strip())
 
     def chain(self) -> str:
+        """Getter for the Residue()'s parent chain id."""
         return self.chain_
 
     def set_chain(self, val: str) -> None:
-        # TODO:CJ maybe fix this? its kinda janky
+        """Sets chain and all child atoms to new value. Re-generates the self.residue_key attribute."""
+        chain = val
         for idx in range(len(self.atoms)):
             self.atoms[idx].chain_id = val
         self.chain_ = val
+        self.residue_key = f"{self.chain_}.{self.name}.{self.num_}"
+
 
     def num(self) -> int:
+        """Getter for the Residue()'s number."""
         return self.num_
 
     def min_line(self) -> int:
+        """The lowest one-indexed line one of the Residue()'s atoms come from."""
         return self.min_line_
 
     def max_line(self) -> int:
+        """The highest one-indexed line one of the Residue()'s atoms come from."""
         return self.max_line_
 
-    def is_metal(self) -> bool:
-        return self.name in METAL_MAPPER
-
-    def is_canonical(self) -> bool:
-        return self.name in THREE_LETTER_AA_MAPPER
-
     def line_range(self) -> Tuple[int, int]:
+        """A tuple of the he lowest and highest one-indexed lines that the Residue()'s atoms come from."""
         return (self.min_line(), self.max_line())
 
     def neighbors(self, other: Residue) -> bool:
@@ -78,10 +101,21 @@ class Residue:
             abs(self.max_line() - other.min_line()) == 1
         )
 
+
+    def is_metal(self) -> bool:
+        """Checks if the Residue() is a metal as defined by enzy_htp.chemical.metal.METAL_MAPPER"""
+        return self.name in METAL_MAPPER
+
+    def is_canonical(self) -> bool:
+        """Checks if the Residue() is a canonical amino acid."""
+        return self.name in THREE_LETTER_AA_MAPPER
+
     def is_rd_solvent(self) -> bool:
+        """Checks if the Residue() is an rd_sovlent as defined by enzy_htp.chemical.solvent.RD_SOLVENT"""
         return self.name in RD_SOLVENT_LIST
 
     def is_rd_non_ligand(self) -> bool:
+        """Checks if the Residue() is an rd_non_ligand as defined by enzy_htp.chemical.solvent.RD_NON_LIGAND_LIST"""
         return self.name in RD_NON_LIGAND_LIST
 
     @dispatch
