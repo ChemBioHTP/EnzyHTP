@@ -4,6 +4,31 @@ from ..core import InvalidResidueCode
 
 # TODO maybe check for non-canonical?
 
+AA_LIST = [
+    "R",
+    "H",
+    "K",
+    "D",
+    "E",
+    "S",
+    "T",
+    "N",
+    "Q",
+    "C",
+    "G",
+    "P",
+    "A",
+    "V",
+    "I",
+    "L",
+    "M",
+    "F",
+    "Y",
+    "W",
+    "U",
+]
+
+
 THREE_LETTER_AA_MAPPER = {
     "ARG": "R",
     "HIS": "H",

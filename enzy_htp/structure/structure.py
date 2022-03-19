@@ -13,7 +13,7 @@ from .solvent import Solvent, residue_to_solvent
 
 from ..chemical import one_letters_except, convert_to_one_letter
 
-from .mutate import MutaFlag
+from ..preparation import MutaFlag
 
 
 class Structure:
