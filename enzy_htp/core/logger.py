@@ -1,13 +1,18 @@
-#TODO documentation
+"""Defines a logger format using the python logging module. Also creates a singleton _LOGGER for use throughout the module.
+
+Author: Chris Jurich, <chris.jurich@vanderbilt.edu>
+Date: 2022-03-19
+"""
 import os
 import logging
 import colorlog
 
 
-def init_logger(dunder_name,
-                log_outfile=None,
-                testing_mode=False,
-                start=False) -> logging.Logger:
+def init_logger(dunder_name : str,
+                log_outfile: str = None,
+                testing_mode: bool = False ,
+                start: bool = False) -> logging.Logger:
+    """Function for creating the formatted logger. Taken from https://github.com/jyesselm/dreem/dreem/logger.py."""
     log_format = ("[%(asctime)s "
                   "%(name)s "
                   "%(funcName)s] "
@@ -48,5 +53,6 @@ def init_logger(dunder_name,
 
     return logger
 
-
+  
 _LOGGER = init_logger('EnzyHTP', None, start=True)
+"""Singleton logging object to log to throught enzy_htp."""

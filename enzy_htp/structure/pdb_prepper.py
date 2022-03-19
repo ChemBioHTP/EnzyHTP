@@ -13,7 +13,7 @@ from pdb2pqr.main import main_driver as run_pdb2pqr
 from pdb2pqr.main import build_main_parser as build_pdb2pqr_parser
 
 from typing import Set
-from ..core.system import base_file_name, get_current_time, safe_mkdir, lines_from_file, write_lines, HiddenPrints
+from ..core.system import base_file_name, get_current_time, safe_mkdir, lines_from_file, write_lines 
 from .structure import structure_from_pdb
 
 from .structure import Structure

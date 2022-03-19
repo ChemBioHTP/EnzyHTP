@@ -1,4 +1,5 @@
-"""Defines an EnvironmentManager class that checks for applications and environment variables that enzy_htp needs.
+"""Defines an EnvironmentManager class that checks for applications and environment variables that enzy_htp needs. Also stores values for these variables 
+and serves as interface for running external applications.
 
 Author: Chris Jurich, <chris.jurich@vanderbilt.edu>
 Date: 2022-02-12
@@ -44,18 +45,19 @@ class EnvironmentManager:
 
     def check_env_vars(self) -> None:
         """Checks which environment variables are defined, storing those which are not defined."""
-	    for env_var in self.env_vars_:
+        for env_var in self.env_vars_:
             if os.getenv(env_var) is None:
                 self.missing_env_vars_.append(env_var)
-
+    
+    def __exe_exists(self, exe_name: str) -> bool:
+        """Helper method that checks if executable exists in current environment."""
+        full_path = os.path.expandvars(exe_name)
+        return shutil.which(exe_name) is not None
+   
     def check_executables(self) -> None:
         """Checks which executables are available in the system, storing paths to those which exist or noting if they are not found."""
-        def exe_exists(exe_name):
-            full_path = os.path.expandvars(exe_name)
-            return shutil.which(exe_name) is not None
-
         for exe in self.executables_:
-            if not exe_exists(exe):
+            if not self.__exe_exists(exe):
                 self.missing_executables_.append(exe)
             else:
                 self.mapper[exe] = shutil.which(exe)
@@ -99,7 +101,7 @@ class EnvironmentManager:
     def run_command(self, exe : str, args : List[str]) -> List[str]:
         """Interface to run a command with the exectuables specified by exe as well as a list of arguments."""
         cmd = f"{self.mapper.get(exe,exe)} {' '.join(args)}"
-        if exe in self.missing_executables_:
+        if exe in self.missing_executables_ or not self.__exe_exists(exe):
             _LOGGER.error(
                 f"This environment is missing '{exe}' and cannot run the command '{cmd}'"
             )
@@ -107,16 +109,18 @@ class EnvironmentManager:
             exit(1)
         _LOGGER.info(f"Running command: '{cmd}'...")
         try:
-            result = os.run(cmd, shell=True, capture_output=True)
+            result = run(cmd, shell=True, capture_output=True)
             res_lines = list(map(lambda ss: ss.decode('utf-8'), result.stdout.splitlines()))
             _LOGGER.info(f"Command run!")
-            return res_lines
         except Exception as e:
             _LOGGER.error(f"Following error was raised during command excecution: '{e}'. Exiting...")
-            exit( 0 )
+            exit( 1 )
         return res_lines
 
     def __getattr__(self, key: str) -> str:
         """Allows accession into acquired executables."""
+        if key not in self.mapper and key in self.executables_:
+            _LOGGER.error(f"Executable '{key}' is in list of executables to check but has not been searched for yet. Call .check_environment() first. Exiting...")
+            exit( 1 )
         return self.mapper[key]
 

@@ -1,6 +1,12 @@
-"""TODO: Documentation"""
+"""Stores mappers and definitions for different types of metals often found in PDBs.
 
-METAL_MAPPER = {
+Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+"""
+
+from typing import Dict
+
+METAL_MAPPER : Dict[str, str] = {
     "LI": "Li",
     "NA": "Na",
     "Na+": "Na",
@@ -17,8 +23,8 @@ METAL_MAPPER = {
     "PT": "Pt",
     "ZN": "Zn",
     "CO": "Co",
-    "PD": "Pd",
-    "CR": "Cr",
+    "PD": "Pd", 
+	"CR": "Cr",
     "FE": "Fe",
     "V": "V",
     "MN": "Mn",
@@ -98,3 +104,4 @@ METAL_CENTER_MAP = {
     "PU": "Pu",
     "TH": "Th",
 }
+"""Contains mapping of metal types. Used to check if a residue atom name from a PDB is a metal."""

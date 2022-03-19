@@ -1,10 +1,15 @@
-"""TODO: DOCUMENATION"""
-from typing import List, Set
-from ..core import InvalidResidueCode
+"""Stores mappers and testing functions for residue information. Much of this functionality is later used in 
 
-# TODO maybe check for non-canonical?
+Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+"""
 
-AA_LIST = [
+from typing import List, Set, Dict
+
+from ..core import InvalidResidueCode, _LOGGER
+
+
+AA_LIST : List[str]= [
     "R",
     "H",
     "K",
@@ -27,9 +32,9 @@ AA_LIST = [
     "W",
     "U",
 ]
+"""Capitalized list of all one-letter amino acid names."""
 
-
-THREE_LETTER_AA_MAPPER = {
+THREE_LETTER_AA_MAPPER : Dict[str,str] = {
     "ARG": "R",
     "HIS": "H",
     "HIE": "H",
@@ -55,8 +60,9 @@ THREE_LETTER_AA_MAPPER = {
     "TYR": "Y",
     "TRP": "W",
 }
+"""Contains mapping of all amino acids codes, with key value pairs of (three letter code, one letter code). Should NOT be called directly for code conversion. Instead used enzy_htp.chemical.residue.convert_to_three_letter()"""
 
-ONE_LETTER_AA_MAPPER = {
+ONE_LETTER_AA_MAPPER : Dict[str,str] = {
     "R": "ARG",
     "H": "HIS",
     "K": "LYS",
@@ -79,8 +85,9 @@ ONE_LETTER_AA_MAPPER = {
     "Y": "TYR",
     "W": "TRP",
 }
+"""Contains mapping of all amino acids codes, with key value pairs of (one letter code, three letter code). Should NOT be called directly for code conversion. Instead used enzy_htp.chemical.residue.convert_to_one_letter()"""
 
-RESIDUE_ELEMENT_MAP = {
+RESIDUE_ELEMENT_MAP : Dict[str,Dict[str,str]] = {
     "Amber": {
         "C": "C",
         "CA": "C",
@@ -211,10 +218,19 @@ RESIDUE_ELEMENT_MAP = {
         "TH": "Th",
     }
 }
+"""Mapper that shows element names for alternative names of atoms. Key value structure is (force field name, (atom mapper)), where atom mapper is an additional
+mapper that maps altered atom names to base atom names. Currently only defined for "Amber".
 
+Example usage:
+
+>>> initial_atom_name = "CA"
+>>> RESIDUE_ELEMENT_MAP["Amber"][initial_atom_name]
+"C"
+
+"""
 
 def convert_to_three_letter(one_letter: str) -> str:
-    """TODO DOCUMENTATION"""
+    """Converts a one letter amino acid name to a three letter. If supplied code is invalid, raises an enzy_htp.core.InvalidResidueCode() exception."""
     if len(one_letter) != 1:
         raise InvalidResidueCode(
             f"expecting one letter residue code. '{one_letter}' is invalid")
@@ -226,7 +242,7 @@ def convert_to_three_letter(one_letter: str) -> str:
 
 
 def convert_to_one_letter(three_letter: str) -> str:
-    """TODO DOCUMENTATION"""
+    """Converts a threee letter amino acid name to a one letter. If supplied code is invalid, raises an enzy_htp.core.InvalidResidueCode() exception."""
     if len(three_letter) != 3:
         raise InvalidResidueCode(
             f"expecting three letter residue code. '{three_letter}' is invalid")
@@ -238,7 +254,10 @@ def convert_to_one_letter(three_letter: str) -> str:
 
 
 def get_element_aliases(ff: str, element: str) -> Set[str]:
-    # TODO check that ff is defined
+    """Gets all element aliases for a given force field (ff) and element name, retungin in a set. If the ff is not supported, will log and exit."""
+    if ff not in ff_dict:
+        _LOGGER.error(f"{ff} is not a supported force field type. Allowed are '{', '.join(list(RESIDUE_ELEMENT_MAP.keys()))}'. Exiting...")
+        exit( 0 )
     ff_dict = RESIDUE_ELEMENT_MAP[ff]
     aliases = []
     for alias, elem in ff_dict.items():
@@ -249,5 +268,8 @@ def get_element_aliases(ff: str, element: str) -> Set[str]:
 
 
 def one_letters_except(existing: str) -> List[str]:
+    """Creates a list of all one letter amino acid codes. If an invalid code is supplied, an enzy_htp.core.InvalidResidueCode() error is thrown."""
+    if existing not in ONE_LETTER_AA_MAPPER:
+        raise InvalidResidueCode(f"{existing} is not a valid one letter amino acid")
     result = list(ONE_LETTER_AA_MAPPER.keys())
     return list(filter(lambda s: s != existing, result))

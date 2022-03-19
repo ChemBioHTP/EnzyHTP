@@ -1,4 +1,18 @@
-from .system import safe_rm, safe_rmdir, safe_mkdir, base_file_name, get_current_time, lines_from_file, write_lines, HiddenPrints, get_file_ext
-from .env_manager import EnvironmentManager
-from .exception import MissingEnvironmentElement, InvalidResidueCode, UnsupportedFileType
+"""Core module for enzy_htp. Responsibilities include file system management, environment management, exceptions and logging."""
 from .logger import _LOGGER
+from .env_manager import EnvironmentManager
+from .exception import (
+    MissingEnvironmentElement,
+    InvalidResidueCode,
+    UnsupportedFileType,
+)
+from .file_system import (
+    safe_rm,
+    safe_rmdir,
+    safe_mkdir,
+    base_file_name,
+    get_current_time,
+    lines_from_file,
+    write_lines,
+    get_file_ext,
+)
