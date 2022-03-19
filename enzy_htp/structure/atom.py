@@ -1,4 +1,4 @@
-"""Definition for the Atom class. Mean to be the base unit of structure in package. Most of this 
+"""Definition for the Atom class. Meant to be the base unit of structure in package. Most of this 
 functionality should NOT be directly called by users, but used within algorithm development instead.
 
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>

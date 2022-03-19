@@ -1,3 +1,12 @@
+"""Definition for the PDBLine class. This is a convenient representation of a PDB line that allows
+for easy editing of raw files.
+
+
+Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Date: 2022-03-19
+"""
+
 from typing import List
 
 # from helper import line_feed
@@ -5,9 +14,6 @@ from typing import List
 
 from ..core.file_system import lines_from_file
 from ..chemical import THREE_LETTER_AA_MAPPER
-
-# TODO CJ: add documentation
-
 
 class PDBLine:
     """
@@ -22,7 +28,6 @@ class PDBLine:
         initilize with a specific line in the PDB file.
         Get self.line_type
         """
-        # TODO figure out why this throws
         self.line = str()
         self.resi_name = str
         try:
@@ -40,7 +45,7 @@ class PDBLine:
             self.atom_x = float(self.line[30:38])
             self.atom_y = float(self.line[38:46])
             self.atom_z = float(self.line[46:54])
-        except ValueError:
+        except ValueError as err:
             pass
 
     @classmethod
@@ -121,16 +126,26 @@ class PDBLine:
         )
         return line
 
+    def is_HETATM(self) -> bool:
+        return self.line.startswith("HETATM")
+
+    def is_ATOM(self) -> bool:
+        return self.line.startswith("ATOM")
+
     def is_TER(self) -> bool:
+        """Checks if a line is a "TER" terminating code."""
         return self.line[:3] == "TER"
 
     def is_END(self) -> bool:
+        """Checks if a line is an "END" end of file code."""
         return self.line[:3] == "END"
 
     def is_CRYST1(self) -> bool:
+        """Checks if a line starts with a "CRYST1" code."""
         return self.line[:6] == "CRYST1"
 
     def is_residue_line(self) -> bool:
+        """Checks if a line is part of a residue."""
         return self.resi_name in THREE_LETTER_AA_MAPPER
 
     # misc
@@ -171,13 +186,9 @@ class PDBLine:
         return self.element
 
     def is_water(self) -> bool:
+        """Checks if a line is an alias to water."""
         return self.resi_name in {"Na+", "Cl-", "WAT", "HOH"}
 
-    def is_HETATM(self) -> bool:
-        return self.line.startswith("HETATM")
-
-    def is_ATOM(self) -> bool:
-        return self.line.startswith("ATOM")
 
     def get_charge(self):
         self.charge = self.line[78:80].strip()
