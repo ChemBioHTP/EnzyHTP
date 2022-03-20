@@ -1,6 +1,7 @@
 # TODO add documentation
 import string
-from typing import List, Set
+import pandas as pd
+from typing import List, Set, Dict, Tuple
 from collections import defaultdict
 from biopandas.pdb import PandasPdb
 
@@ -10,6 +11,7 @@ from .residue import Residue
 from ..core.logger import _LOGGER
 from .ligand import Ligand, residue_to_ligand
 from .solvent import Solvent, residue_to_solvent
+from .metal_atom import MetalAtom
 
 from ..chemical import one_letters_except, convert_to_one_letter
 
@@ -17,11 +19,17 @@ from ..chemical import one_letters_except, convert_to_one_letter
 
 
 class Structure:
-    def __init__(self, pandas_pdb: PandasPdb):
+    #TODO(CJ) fix these types
+    def __init__(self, chains : List[Chain] = None, solvents : List[Solvent] = None,
+        metal_atoms : List[MetalAtom] = None, ligands : List[Ligand] = None
+    ):
+        self.chains = chains
+        self.solvents = solvents
+        self.metal_atoms = metal_atoms
+        self.ligands = ligands
         # TODO maybe set the pdb filename as well
         self.chains_ = dict()
         self.residues_ = dict()
-        self.pandas_pdb = pandas_pdb
         self.current_pdb = str()
         self.metalatoms = []
         self.ligands = []
@@ -53,94 +61,6 @@ class Structure:
                 # print(residue)
 
         return result
-
-    def get_metalatoms(self):
-        """
-        get metal from raw chains and clean chains by deleting the metal part
-        """
-        for cname, chain in self.chains_.items():
-            if chain.is_metal():
-                self.metalatoms.append(chain)
-                del self.chains_[cname]
-        if not len(self.metalatoms):
-            return
-        raise TypeError
-        # Break pseudo residues into atoms and convert to Metalatom object
-        holders = []
-        for pseudo_resi in self.metalatoms:
-            for metal in pseudo_resi:
-                holders.append(Metalatom.fromAtom(metal))
-        metalatoms = holders
-
-        # clean empty chains
-        for i in range(len(raw_chains) - 1, -1, -1):
-            if len(raw_chains[i]) == 0:
-                del raw_chains[i]
-
-        return raw_chains, metalatoms
-
-    def get_ligands(self, ligand_list=None):  # Not sure what type ligand_list is
-        """
-        get ligand from raw chains and clean chains by deleting the ligand part
-        -----
-        ligand_list: only record user specified ligand if provided
-        Method: Assume metal/ligand/solvent can only be in a seperate chain (or it can not be distinguish from artificial residues.)
-                - delete names from rd_non_ligand_list
-                + get names from ligand_list only if provided.
-        """
-        bad_chains = []
-        ligands = []
-        for cname, chain in self.chains_.items():
-
-            if chain.is_HET():
-                continue
-
-            for idx, residue in enumerate(chain.residues()[::-1]):
-                if ligand_list is not None and residue.name in ligand_list:
-                    _LOGGER.info(
-                        f"Structure: Found user assigned ligand in raw {chain.name()} {residue.name} {residue.num_}"
-                    )
-                    ligands.append(residue)
-                    del chain[idx]
-                elif not residue.is_rd_solvent() and not residue.is_rd_non_ligand():
-                    _LOGGER.warn(
-                        f"Structure: Found ligand in raw {chain.name()} {residue.name} {residue.num_}"
-                    )
-                    ligands.append(residue)
-                    del chain[idx]
-
-            if chain.empty():
-                bad_chains.append(cname)
-
-        for bc in bad_chains:
-            del self.chains_[bc]
-
-        self.ligands = list(map(residue_to_ligand, ligands))
-
-    def get_solvents(self):
-        """
-        get solvent from raw chains and clean chains by deleting the solvent part
-        -----
-        Method: Assume metal/ligand/solvent can anywhere. Base on rd_solvent_list
-        """
-        solvents = []
-        bad_chains = []
-        for cname, chain in self.chains_.items():
-            for idx, residue in enumerate(chain.residues()[::-1]):
-                if residue.is_rd_solvent():
-                    _LOGGER.warn(
-                        f"Structure: found solvent in raw {residue.name} {residue.id}"
-                    )
-                    solvents.append(residue)
-                    del chain[idx]
-
-            if chain.empty():
-                bad_chains.append(cname)
-        # Convert pseudo residues to Ligand object
-        for bc in bad_chains:
-            del self.chains_[bc]
-
-        self.solvents = list(map(residue_to_solvent, solvents))
 
     def get_metal_center(self):
         """
@@ -966,88 +886,8 @@ class Structure:
         if i > 3:
             raise StopIteration
 
-    def name_chains(self, mapper: defaultdict) -> None:
-        def legal_chain_names(mapper) -> List[str]:
-            result = list(string.ascii_uppercase)
-            taken = set(list(mapper.keys()))
-            result = list(filter(lambda s: s not in taken, result))
-            return list(reversed(result))
-
-        key_names = set(list(map(lambda kk: kk.strip(), mapper.keys())))
-        if "" not in key_names:
-            return mapper
-        unnamed = list(mapper[""])
-        del mapper[""]
-
-        names = legal_chain_names(mapper)
-        unnamed = sorted(unnamed, key=lambda r: -r.min_line())
-        new_chain: List[Residue] = [unnamed.pop()]
-
-        while len(unnamed):
-            new_res = unnamed.pop()
-            if new_chain[-1].neighbors(new_res):
-                new_chain.append(new_res)
-                continue
-
-            new_name = names.pop()
-            mapper[new_name] = new_chain
-            new_chain = [new_res]
-
-        if len(new_chain):
-            new_name = names.pop()
-            mapper[new_name] = new_chain
-
-        return mapper
-
-    def build_chains(self) -> None:
-        """"""
-        # TODO check if there are chain_ids
-        self.build_residues()
-
-        mapper = defaultdict(list)
-        for res in self.residues_.values():
-            mapper[res.chain()].append(res)
-
-        mapper = self.name_chains(mapper)
-        # ok this is where we handle missing chain ids
-        for chain_name, residues in mapper.items():
-            self.chains_[chain_name] = Chain(
-                chain_name, sorted(residues, key=lambda r: r.num())
-            )
-
-    def build_residues(self) -> None:
-        mapper = defaultdict(list)
-        for i, row in self.pandas_pdb.df["ATOM"].iterrows():
-            aa = Atom(**row)
-            mapper[aa.residue_key()].append(aa)
-
-        for res_key, atoms in mapper.items():
-            self.residues_[res_key] = Residue(
-                residue_key=res_key, atoms=sorted(atoms, key=lambda a: a.atom_number)
-            )
 
 
-def structure_from_pdb(fname: str) -> Structure:
-    """
-    extract the structure from PDB path. Capable with raw experimental and Amber format
-    ---------
-    input = path (or file or file_str)
-        split the file_str to chain and init each chain
-    ligand_list: ['NAME',...]
-        User specific ligand names. Only extract these if provided. 
-    ---------
-    Target:
-    - structure(w/name)  - chain - residue - atom
-                        |- metalatom(atom)
-                        |- ligand(residue)
-                        |- solvent(residue)
-    - ... (add upon usage)
-    """
-    parser = PandasPdb()
-    parser.read_pdb(fname)
-    result = Structure(parser)
-    result.build_chains()
-    result.get_metalatoms()
-    result.get_ligands()
-    result.get_solvents()
-    return result
+
+
+

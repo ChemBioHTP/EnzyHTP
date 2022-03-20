@@ -9,6 +9,7 @@ from .atom import Atom
 from .ligand import Ligand, protonate_ligand
 from .residue import Residue
 from .chain import Chain
-from .structure import Structure, structure_from_pdb
+from .structure import Structure
+from .structure_parser import structure_from_pdb
 #from .pdb_line import PDBLine, read_pdb_lines
 #from .pdb_prepper import PDBPrepper

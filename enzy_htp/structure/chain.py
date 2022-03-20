@@ -5,18 +5,26 @@ Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-20
 """
-
-
-# TODO what the heck else does this class do???
-# CJ: I think this class should be able to remove bad residues on its own
-# Should this class know what PDB it came from?
 from ..core import _LOGGER
 from typing import List
 
 from .residue import Residue
 
+# TODO(CJ) I think this class should be able to remove bad residues on its own
+# Should this class know what PDB it came from?
+
+# TODO(CJ) Add ability to rename the chain
+
 class Chain:
+    """Class that represents a Chain of residues in a PDB file. Serves as a manager to the 
+    Residue() objects that it owns.
+
+    Attributes:
+        self.name_ : The name of the chain as a string.
+		self.residues_ : A list of Residue() objects.
+    """
     def __init__(self, name : str, residues : List[Residue]):
+        """Initiation of a Chain with a name and list of residues."""
         self.name_ = name
         self.residues_: List[Residue] = residues
         # CJ: not sure if I should do this but I am overwriting every time
@@ -40,18 +48,23 @@ class Chain:
         return True
 
     def empty(self) -> bool:
+        """Does the chain have any Residue()'s."""
         return len(self.residues_) == 0
 
     def residues(self) -> List[Residue]:
+        """Access the child Residue() objects."""
         return self.residues_
 
     def name(self) -> str:
+        """Getter for the Chain's name."""
         return self.name_
 
     def __getitem__(self, key: int) -> Residue:
+        """Allows indexing into the child Residue() objects."""
         return self.residues[key]
 
     def __delitem__(self, key: int) -> None:
+        """Allows deleting of the child Residue() objects."""
         del self.residues_[key]
 
 

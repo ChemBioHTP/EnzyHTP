@@ -8,6 +8,11 @@ import os
 from enzy_htp.structure import Chain, Residue
 
 
-def test_test():
-    assert True
-    assert False 
+def test_proper_ctor_behavior():
+    """Making sure that the default Chain() works."""
+    chain = Chain('test', [])
+    assert chain.name() == 'test'
+    assert chain.empty()
+    assert not chain.residues()
+
+#TODO(CJ): add tests for residue accession and chain renaming
