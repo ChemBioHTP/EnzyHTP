@@ -1,3 +1,12 @@
+"""Definition for the Chain class. Chains primarily store Residue() objects and organize them
+within the overall structure of an enzyme.
+
+Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Date: 2022-03-20
+"""
+
+
 # TODO what the heck else does this class do???
 # CJ: I think this class should be able to remove bad residues on its own
 # Should this class know what PDB it came from?
@@ -6,9 +15,8 @@ from typing import List
 
 from .residue import Residue
 
-
 class Chain:
-    def __init__(self, name, residues):
+    def __init__(self, name : str, residues : List[Residue]):
         self.name_ = name
         self.residues_: List[Residue] = residues
         # CJ: not sure if I should do this but I am overwriting every time
@@ -16,6 +24,7 @@ class Chain:
         _ = list(map(lambda r: r.set_chain(self.name_), self.residues_))
 
     def is_metal(self) -> bool:
+        """Checks if any metals are contained within the current chain."""
         for rr in self.residues_:
             if rr.is_metal():
                 _LOGGER.warn(

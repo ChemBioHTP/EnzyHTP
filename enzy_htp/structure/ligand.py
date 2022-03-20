@@ -1,7 +1,7 @@
 from .atom import Atom
 from typing import List
 from .residue import Residue
-from .pdb_line import PDBLine, read_pdb_lines
+#from enzy_htp.preparation import PDBLine, read_pdb_lines
 from ..core import (
     get_file_ext,
     write_lines,

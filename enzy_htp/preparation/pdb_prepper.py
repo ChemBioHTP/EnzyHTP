@@ -12,7 +12,9 @@ from ..core.logger import _LOGGER, init_logger
 from pdb2pqr.main import main_driver as run_pdb2pqr
 from pdb2pqr.main import build_main_parser as build_pdb2pqr_parser
 
+
 from typing import Set
+import enzy_htp.core as core
 from ..core.file_system import (
     base_file_name,
     get_current_time,
@@ -20,23 +22,26 @@ from ..core.file_system import (
     lines_from_file,
     write_lines,
 )
-from .structure import structure_from_pdb
 
-from .structure import Structure
+from enzy_htp.core import file_system as fs
+
+from enzy_htp.structure import structure_from_pdb, Ligand, protonate_ligand
+
+from ..structure.structure import Structure
 from .pdb_line import PDBLine, read_pdb_lines
 
 import openbabel
 import openbabel.pybel as pybel
 
-from .ligand import Ligand, protonate_ligand
+#from .ligand import Ligand, protonate_ligand
 
 from typing import List
 
 # from .mutate import MutaFlag, mutaflag_to_str
-from ..preparation import MutaFlag, mutaflag_to_str
+from .mutate import MutaFlag, mutaflag_to_str
 
 # from ..core import em
-from ..chemical import convert_to_three_letter, get_element_aliases
+from enzy_htp.chemical import convert_to_three_letter, get_element_aliases
 
 
 class PDBPrepper:
@@ -44,6 +49,7 @@ class PDBPrepper:
         self, pdb_name, **kwargs
     ):  # , PDB_input, wk_dir="", name="", input_type="path"):
         """Inits PDBPrepper with a pdb file and optionally a work directory to place temporary files."""
+        self.current_path_ : str = None
         self.no_water_path = None
         self.pdb_path = pdb_name
         self.base_pdb_name = base_file_name(pdb_name)
@@ -53,32 +59,34 @@ class PDBPrepper:
         safe_mkdir(self.work_dir)
         shutil.copy(self.pdb_path, f"{self.work_dir}/{self.base_pdb_name}.pdb")
         self.path_name = f"{self.work_dir}/{self.base_pdb_name}.pdb"
-        self.pqr_path = f"{self.work_dir}/{self.base_pdb_name}.pqr.pdb"
+        self.pqr_path = str() 
         self.mutations = []
+        self.current_path_ = self.path_name
+        self.all_paths = [ self.current_path_ ]
+
+    def current_path(self) -> str:
+        """Gets the most recent PDB that has been created."""
+        return self.current_path_
 
     def rm_wat(self) -> str:
-        """
-        Remove water and ion for the pdb. Remians the same if there's no water or ion.
-        Now only skip [Na+,Cl-,WAT,HOH] // Append more in the future.
-        Save changed files into self.path.
-        TODO: need to support key water.
-        """
-
+        """Removes water and ions from the PDB and saves a version in the specified work_dir. Returns the path to the non water PDB."""
         pdb_lines: List[PDBLine] = read_pdb_lines(self.path_name)
         pdb_lines = list(
             filter(lambda pl: not (pl.is_water() or pl.is_CRYST1()), pdb_lines)
         )
         mask = [True] * len(pdb_lines)
 
-        for pidx, pl in enumerate(pdb_lines[1:]):
-            if pl.is_TER() and pdb_lines[pidx - 1].is_TER():
-                mask[pidx] = False
-
+        for pidx, pl in enumerate(pdb_lines[:-1]):
+            if pl.is_TER() and pdb_lines[pidx+1].is_TER():
+                mask[pidx+1] = False
+        
         pdb_lines = np.array(pdb_lines)[mask]
         self.no_water_path = f"{self.work_dir}/{self.base_pdb_name}_rmW.pdb"
         write_lines(self.no_water_path, list(map(str, pdb_lines)))
 
-        return self.no_water_path
+        self.current_path_ = self.no_water_path
+        self.all_paths.append( self.current_path_ )
+        return self.current_path_
 
     def _update_name(self):
         """
@@ -420,7 +428,7 @@ class PDBPrepper:
         ffout: str = "AMBER",
         keep_id: int = 0,
         if_prt_ligand: int = 1,
-    ) -> None:
+    ) -> str:
         # TODO check that the ph is in the range 0-14
         # self._get_protonation_pdb2pqr(ph=ph)
         # self._protonation_Fix(out_path, ph=ph, keep_id=keep_id, if_prt_ligand=if_prt_ligand)
@@ -436,7 +444,10 @@ class PDBPrepper:
         
         save the result to self.pqr_path
         """
+        if ph < 0 or ph > 14:
+            raise core.InvalidPH(f"{ph:.2f} must be on range: [0.00,14.00]")
         # input of PDB2PQR
+        self.pqr_path = f"{fs.remove_ext(self.current_path_)}.pqr"
         pdb2pqr_parser = build_pdb2pqr_parser()
         args = pdb2pqr_parser.parse_args(
             [
@@ -452,6 +463,8 @@ class PDBPrepper:
         _LOGGER.info(f"Running pdb2pqr on '{self.path_name}'...")
         run_pdb2pqr(args)
         _LOGGER.info(f"Finished running pdb2pqr! Output saved to '{self.pqr_path}'")
+        self.all_paths.append( self.pqr_path )
+        return self.pqr_path
         # Add missing atom (from the PDB2PQR step. Update to func result after update the _get_protonation_pdb2pqr func)
         # Now metal and ligand
         old_stru = structure_from_pdb(self.no_water_path)

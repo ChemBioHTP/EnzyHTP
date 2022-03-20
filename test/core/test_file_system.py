@@ -133,7 +133,7 @@ def test_lines_from_file():
 def test_write_lines():
     """Checking that test_write_lines() functions correctly."""
     contents = ["line1", "line2", "line3"]
-    fname1 = f"{CURR_DIR}/test_file.txt"
+    fname1 = f"{CURR_DIR}/test_fle.txt"
     make_test_file( fname1, "" )
     assert fs.lines_from_file(fname1) != contents
     fs.write_lines(fname1, contents )
@@ -141,3 +141,5 @@ def test_write_lines():
     fs.safe_rm( fname1 )
     assert not os.path.exists( fname1 ) 
 
+
+#TODO(CJ) add tests for remove_ext

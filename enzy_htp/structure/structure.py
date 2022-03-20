@@ -13,7 +13,7 @@ from .solvent import Solvent, residue_to_solvent
 
 from ..chemical import one_letters_except, convert_to_one_letter
 
-from ..preparation import MutaFlag
+#from enzy_htp.preparation import MutaFlag
 
 
 class Structure:
@@ -31,24 +31,24 @@ class Structure:
         print(self.chains_)
         exit(0)
 
-    def all_possible_mutations(self) -> List[MutaFlag]:
+    def all_possible_mutations(self):
         result = list()
         for cname, chain in self.chains_.items():
             # TODO check that the chain can have this done
             for residue in chain.residues():
                 orig_one_letter = convert_to_one_letter(residue.name)
-                result.extend(
-                    list(
-                        map(
-                            lambda mut: MutaFlag(
-                                orig_residue=orig_one_letter,
-                                chain_index=cname,
-                                residue_index=residue.num_,
-                                target_residue=mut,
-                            ),
-                            one_letters_except(orig_one_letter),
-                        )
-                    )
+                result.extend( None
+#                    list(
+#                        map(
+#                            lambda mut: MutaFlag(
+#                                orig_residue=orig_one_letter,
+#                                chain_index=cname,
+#                                residue_index=residue.num_,
+#                                target_residue=mut,
+#                            ),
+#                            one_letters_except(orig_one_letter),
+#                        )
+#                    )
                 )
                 # print(residue)
 

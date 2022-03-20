@@ -12,61 +12,97 @@ from typing import List
 # from helper import line_feed
 # from AmberMaps import Resi_Ele_map
 
+import enzy_htp.core as core
 from ..core.file_system import lines_from_file
 from ..chemical import THREE_LETTER_AA_MAPPER
 
 class PDBLine:
     """
-    Class for decoding the line in the PDB file. Functions used internally. 
-    Generate from:
-    line: PDB_line(line) --> PDB_line
-    lines: PDB_line.fromlines(lines) --> [PDB_line, ...]
+    Represents a line in a PDB file. Stores the original line and provides a basic description
+	of the data it holds. Has a number of getters for determining the type of line that 
+	it is.
+
+
+    Attributes:
+	    self.line : The original line from the file, without newline.
+		self.line_type : Type of PDB line/record.
+		self.atom_id : One-indexed index of the atom.
+		self.atom_name : Name of the atom as a string.
+		self.resi_name : Name of the residue as a string.
+		self.resi_id : One-indexed index of the atom.
+		self.chain_id : Chain id, typically a single character/string of length 1.
+		self.atom_x : x coordinate value with 3 points of decimal precision.
+		self.atom_y : y coordinate value with 3 points of decimal precision.
+		self.atom_z : z coordinate value with 3 points of decimal precision.
     """
 
     def __init__(self, line: str):
         """
-        initilize with a specific line in the PDB file.
-        Get self.line_type
+        Initilize with a specific line in the PDB file. Tries to parse out all information but stores the original str() as well.
         """
-        self.line = str()
         self.resi_name = str
-        try:
-            self.line = line
-            self.line_type = self.line[0:6].strip()
-            # atom
-            self.atom_id = int(self.line[6:11])
-            self.atom_name = self.line[12:16].strip()
-            # residue
-            self.resi_name = self.line[17:20].strip()
-            self.resi_id = int(self.line[22:26])
-            # chain
-            self.chain_id = self.line[21:22]
-            # coord
-            self.atom_x = float(self.line[30:38])
-            self.atom_y = float(self.line[38:46])
-            self.atom_z = float(self.line[46:54])
-        except ValueError as err:
-            pass
+        self.line = line
+        if not ( self.is_ATOM() or self.is_HETATM() ):
+            return
 
-    @classmethod
-    def fromlines(cls, lines):
-        """
-        capable with multiple lines
-        return a list of PDB_line object
-        """
-        line_feed = "\n"  # potential update
+        self.line_type = self.line[0:6].strip() # atom
+        self.atom_id = int(self.line[6:11])
+        self.atom_name = self.line[12:16].strip()
+        # residue
+        self.resi_name = self.line[17:20].strip()
+        self.resi_id = int(self.line[22:26])
+        # chain
+        self.chain_id = self.line[21:22]
+        # coord
+        self.atom_x = float(self.line[30:38])
+        self.atom_y = float(self.line[38:46])
+        self.atom_z = float(self.line[46:54])
 
-        line_list = lines.strip().split(line_feed)
-        pdb_l_list = []
-        for line in line_list:
-            pdb_l_list.append(cls(line))
+    def is_REMARK(self)->bool:
+        """Checks if a line is a REMARK record."""
+        return self.line.startswith('REMARK')
 
-        return pdb_l_list
 
-    def build(self, ff="AMBER"):
-        """
-        build a pdb line str
-        """
+    def is_DBREF(self)->bool:
+        """Checks if a line is a DBREF record."""
+        return self.line.startswith('DBREF')
+
+
+    def is_JRNL(self)->bool:
+        """Checks if a line is a JRNL record."""
+        return self.line.startswith('JRNL')
+
+
+    def is_REVDAT(self)->bool:
+        """Checks if a line is a REVDAT record."""
+        return self.line.startswith('REVDAT')
+
+
+    def is_AUTHOR(self)->bool:
+        """Checks if a line is a AUTHOR record."""
+        return self.line.startswith('AUTHOR')
+
+
+    def is_EXPDTA(self)->bool:
+        """Checks if a line is a EXPDTA record."""
+        return self.line.startswith('EXPDTA')
+
+
+    def is_KEYWDS(self)->bool:
+        """Checks if a line is a KEYWDS record."""
+        return self.line.startswith('KEYWDS')
+
+    def is_SOURCE(self) -> bool:
+        """Checks if a line is a SOURCE record."""
+        return self.line.startswith('SOURCE')
+
+    def build(self, ff : str="AMBER") -> str:
+        """Converts the PDBLine() object into a PDB line ready to be written to file. Is compatible with the specified force field (ff)."""
+        #TODO(CJ): This function needs some work. 
+		# 1. Needs an F string instead of the weird concatentation
+		# 2. throw some kind of error if the ff is not suported
+        if not (self.is_ATOM() or self.is_HETATM()):
+            return self.line
         self.get_alternate_location_indicator()
         self.get_charge()
         self.get_element()
@@ -102,39 +138,31 @@ class PDBLine:
             charge = "{:2}".format(self.charge)
 
         # example: ATOM   5350  HB2 PRO   347      32.611  15.301  24.034  1.00  0.00
-        line = (
-            l_type
-            + a_index
-            + " "
-            + a_name
-            + AL_id
-            + r_name
-            + " "
-            + c_index
-            + r_index
-            + insert_code
-            + "   "
-            + x
-            + y
-            + z
-            + occupancy
-            + temp_factor
-            + "      "
-            + seg_id
-            + element
-            + charge
-        )
-        return line
+        return f"{l_type}{a_index} {a_name}{AL_id}{r_name} {c_index}{r_index}{insert_code}   {x}{y}{z}{occupancy}{temp_factor}       {seg_id}{element}{charge}"
+
+    def is_COMPND(self)->bool:
+        """Checks if a line is a COMPND record."""
+        return self.line.startswith('COMPND')
+
+    def is_TITLE(self)-> bool:
+        """Checks if a line is a TITLE record."""
+        return self.line.startswith('TITLE')
+
+    def is_HEADER(self) -> bool:
+        """Checks if a line is a HEADER record."""
+        return self.line.startswith('HEADER')
 
     def is_HETATM(self) -> bool:
+        """Checks if a line is a HETATM record."""
         return self.line.startswith("HETATM")
 
     def is_ATOM(self) -> bool:
+        """Checks if a line is a ATOM record."""
         return self.line.startswith("ATOM")
 
     def is_TER(self) -> bool:
         """Checks if a line is a "TER" terminating code."""
-        return self.line[:3] == "TER"
+        return self.line.startswith('TER')
 
     def is_END(self) -> bool:
         """Checks if a line is an "END" end of file code."""
@@ -177,7 +205,7 @@ class PDBLine:
         self.seg_id = self.line[72:76].strip()
         return self.seg_id
 
-    def get_element(self):
+    def get_element(self) -> str:
         self.element = self.line[76:78].strip()
         # try to get if not exist
         # if self.element == '':
@@ -190,7 +218,8 @@ class PDBLine:
         return self.resi_name in {"Na+", "Cl-", "WAT", "HOH"}
 
 
-    def get_charge(self):
+    def get_charge(self) -> str:
+        """Finds and returns the charge of line as a string."""
         self.charge = self.line[78:80].strip()
         return self.charge
 
@@ -203,5 +232,9 @@ class PDBLine:
 
 def read_pdb_lines(fname: str) -> List[PDBLine]:
     """Generates a list() of PDBLine objexts from a given PDB file"""
+    #TODO(CJ): there is a chance that we only want HETATM/ATOM/TER/END... will figure out if this is the case later
+    ending = core.get_file_ext(fname).lower()
+    if not ending == ".pdb":
+        raise core.UnsupportedFileType(f"read_pdb_lines() requires a .pdb file. Could not read '{fname}'")
     non_empty = list(filter(len, lines_from_file(fname)))
     return list(map(PDBLine, non_empty))

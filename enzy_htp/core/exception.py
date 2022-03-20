@@ -21,3 +21,8 @@ class UnsupportedFileType(Exception):
     """Exception corresponding to a file type that enzy_htp does not support."""
 
     pass
+
+
+class InvalidPH(Exception):
+    """Exception corresponding to an invalid pH not in the range 0-14."""
+    pass
