@@ -1,9 +1,10 @@
 # python imports
 import sys
 import logging
+from typing import Tuple
 
 # enzy_htp imports
-from .config import CONFIG
+from .config import Config 
 from .interface import Interface
 from .structure import Structure, Residue
 from .core import (
@@ -15,10 +16,13 @@ from .core import (
 from .preparation import PDBLine, PDBPrepper, read_pdb_lines
 from .chemical import ResidueType
 
-# def init_logging() -> None:
-#    logging.basicConfig(
-#        level=logging.INFO, handlers=[logging.StreamHandler(sys.stdout)], foj
-#    )
-# em.check_environment()
+CONFIG = None
+INTERFACE = None
 
-INTERFACE = Interface(CONFIG)
+def init() -> Tuple[Config, Interface]:
+    """"""
+    global CONFIG
+    global INTERFACE 
+    CONFIG = Config()
+    INTERFACE = Interface( CONFIG )
+    return (CONFIG, INTERFACE )

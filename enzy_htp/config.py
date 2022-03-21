@@ -64,4 +64,3 @@ class Config:
         return self._em
 
 
-CONFIG = Config()
