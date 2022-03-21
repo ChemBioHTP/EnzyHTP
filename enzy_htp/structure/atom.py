@@ -115,14 +115,16 @@ class Atom:
             else:
                 raise Exception("Only support ff14SB atom/resiude name now")
 
-            c_index = c_id
+            c_index = c_id.strip()
+            if not c_index: c_index = ' '
             r_index = "{:>4d}".format(r_id)
+            r_name = r_name.strip()
             x = "{:>8.3f}".format(self.x_coord)
             y = "{:>8.3f}".format(self.y_coord)
             z = "{:>8.3f}".format(self.z_coord)
         # TODO(CJ) figure out a less janky way to do all of this
         a_type = ''.join(list(filter(lambda c: not c.isdigit(), a_name))).strip()[0]
-        return f"{l_type}{a_index} {a_name} {r_name} {c_index} {r_index}    {x}{y}{z}  1.00  0.00           {a_type}  "
+        return f"{l_type}{a_index} {a_name} {r_name} {c_index}{r_index}    {x}{y}{z}  1.00  0.00           {a_type}  "
 
     #
 

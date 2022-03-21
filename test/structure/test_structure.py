@@ -13,4 +13,4 @@ def test_load_structure():
     """"""
     TEST_FILE = f"{TEST_DIR}/preparation/data/3NIR.pdb"
     structure_from_pdb(TEST_FILE)
-    assert False
+    #assert False

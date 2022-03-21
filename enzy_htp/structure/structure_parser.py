@@ -1,4 +1,6 @@
 #TODO(CJ) documentation
+import string
+import warnings
 import pandas as pd
 from collections import defaultdict
 from biopandas.pdb import PandasPdb
@@ -12,6 +14,7 @@ from .solvent import Solvent, residue_to_solvent
 from .ligand import Ligand, residue_to_ligand
 from .chain import Chain
 from .structure import Structure
+from enzy_htp.core import _LOGGER
 
 
 def structure_from_pdb(fname: str) -> Structure:
@@ -38,7 +41,6 @@ def structure_from_pdb(fname: str) -> Structure:
             taken = set(list(mapper.keys()))
             result = list(filter(lambda s: s not in taken, result))
             return list(reversed(result))
-
         key_names = set(list(map(lambda kk: kk.strip(), mapper.keys())))
         if "" not in key_names:
             return mapper
@@ -79,14 +81,13 @@ def structure_from_pdb(fname: str) -> Structure:
         return result 
 
     def build_chains(mapper : Dict[str, Residue]) -> Dict[str,Chain]:
-        mapper = defaultdict(list)
+        chain_mapper = defaultdict(list)
         for res in mapper.values():
-            mapper[res.chain()].append(res)
-
-        mapper = name_chains(mapper)
+            chain_mapper[res.chain()].append(res)
+        chain_mapper = name_chains(chain_mapper)
         result : Dict[str,Chain] = dict()
         # ok this is where we handle missing chain ids
-        for chain_name, residues in mapper.items():
+        for chain_name, residues in chain_mapper.items():
             result[chain_name] = Chain(
                 chain_name, sorted(residues, key=lambda r: r.num())
             )
@@ -99,7 +100,7 @@ def structure_from_pdb(fname: str) -> Structure:
                 metalatoms.append(chain)
                 del chains[cname]
         
-        if not len(metalatoms):
+        if not metalatoms:
             return (chains, metalatoms)
         # Break pseudo residues into atoms and convert to Metalatom object
         holders = []
@@ -107,7 +108,6 @@ def structure_from_pdb(fname: str) -> Structure:
             for metal in pseudo_resi:
                 holders.append(Metalatom.fromAtom(metal))
         metalatoms = holders
-
         # clean empty chains
         for i in range(len(raw_chains) - 1, -1, -1):
             if len(raw_chains[i]) == 0:
@@ -132,7 +132,7 @@ def structure_from_pdb(fname: str) -> Structure:
                     ligands.append(residue)
                     del chain[idx]
                 elif not residue.is_rd_solvent() and not residue.is_rd_non_ligand():
-                    _LOGGER.warn(
+                    _LOGGER.warning(
                         f"Structure: Found ligand in raw {chain.name()} {residue.name} {residue.num_}"
                     )
                     ligands.append(residue)
@@ -158,7 +158,7 @@ def structure_from_pdb(fname: str) -> Structure:
         for cname, chain in chains.items():
             for idx, residue in enumerate(chain.residues()[::-1]):
                 if residue.is_rd_solvent():
-                    _LOGGER.warn(
+                    _LOGGER.warning(
                         f"Structure: found solvent in raw {residue.name} {residue.id}"
                     )
                     solvents.append(residue)
@@ -184,8 +184,49 @@ def structure_from_pdb(fname: str) -> Structure:
     (chain_mapper, solvents ) = get_solvents( chain_mapper )
     result = Structure(
         chains=chain_mapper,
-        metal_atoms=chain_mapper,
+        metal_atoms=metal_atoms,
         solvents=solvents,
         ligands=ligands
 	)
+    
     return result
+
+def ligand_from_pdb( fname : str, net_charge: float = None ) -> Ligand:
+#def from_pdb(
+#    fname : str ,
+#    resi_id=None,
+#    resi_name=None,
+#    net_charge=None,
+#    input_type="PDB_line",
+#) -> Ligand:
+    """
+    generate resi from PDB. Require 'ATOM' and 'HETATM' lines.
+    ---------
+    resi_input = PDB_line (or line_str or file or path)
+    resi_id : int (use the number in the line by default // support customize)
+    net_charge : user assigned net charge for further use
+    Use PDB_line in the list to init each atom
+    """
+    warnings.filterwarnings('ignore')
+    # adapt general input // converge to a list of PDB_line (resi_lines)
+    parser = PandasPdb()
+    parser.read_pdb(fname)
+    atoms = list(map(lambda pr: Atom(**pr[1]), parser.df['HETATM'].iterrows()))
+    #TODO(CJ) figure out the residue key
+    result = Residue( '..10', atoms )
+    result = residue_to_ligand( result )
+    result.net_charge = net_charge
+    return result
+    # Default resi_id
+    if resi_id is None:
+        resi_id = resi_lines[0].resi_id
+    # get name from first line
+    if resi_name is None:
+        resi_name = resi_lines[0].resi_name
+    # get child atoms
+    atoms = []
+    for pdb_l in resi_lines:
+        atoms.append(Atom.fromPDB(pdb_l))
+
+    return Ligand(atoms, resi_id, resi_name, net_charge=net_charge)
+

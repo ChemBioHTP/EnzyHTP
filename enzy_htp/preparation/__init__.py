@@ -6,6 +6,6 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-19
 """
 
-from .mutate import MutaFlag, mutaflag_to_str
+from .mutate import Mutation, mutation_to_str 
 from .pdb_line import PDBLine, read_pdb_lines
 from .pdb_prepper import PDBPrepper

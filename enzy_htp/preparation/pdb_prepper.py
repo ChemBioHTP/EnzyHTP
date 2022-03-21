@@ -13,7 +13,7 @@ from pdb2pqr.main import main_driver as run_pdb2pqr
 from pdb2pqr.main import build_main_parser as build_pdb2pqr_parser
 
 
-from typing import Set
+from typing import Set, Union, List, Tuple
 import enzy_htp.core as core
 from ..core.file_system import (
     base_file_name,
@@ -24,11 +24,10 @@ from ..core.file_system import (
 )
 
 from enzy_htp.core import file_system as fs
-
-from enzy_htp.structure import structure_from_pdb, Ligand, protonate_ligand
-
+from enzy_htp.structure import structure_from_pdb, Ligand, ligand_from_pdb
 from ..structure.structure import Structure
 from .pdb_line import PDBLine, read_pdb_lines
+
 
 import openbabel
 import openbabel.pybel as pybel
@@ -38,7 +37,7 @@ import openbabel.pybel as pybel
 from typing import List
 
 # from .mutate import MutaFlag, mutaflag_to_str
-from .mutate import MutaFlag, mutaflag_to_str
+from .mutate import Mutation, mutation_to_str, decode_mutaflags, get_all_combinations, get_all_combinations
 
 # from ..core import em
 from enzy_htp.chemical import convert_to_three_letter, get_element_aliases
@@ -422,6 +421,172 @@ class PDBPrepper:
         """
         pass
 
+
+    def protonate_ligand(
+    self, ligand: Ligand, dirname=".", method="PYBEL", ph=7.0, keep_name=1
+) -> Ligand:
+        # def protonate_ligand(cls, path, method="PYBEL", ph=7.0, keep_name=1):
+        """
+        Protonate the ligand from 'path' with 'method', provide out_path and net charge.
+        TODO "obabel -ipdb ligand_1.pdb -opdb pdb -O ligand_1_aHt.pdb -h" can keep names, but how is it accessed by pybel
+        ---------------
+        method      : PYBEL (default)
+                      Dimorphite (from https://durrantlab.pitt.edu/dimorphite-dl/) TODO seems better and with better python API.
+                      OPENBABEL (not working if block warning output)
+        ph          : 7.0 by default 
+        keep_name   : if keep original atom names of ligands (default: 1)
+                        - check if there're duplicated names, add suffix if are.
+        """
+        path = f"{dirname}/ligand_{ligand.name}.pdb"
+        ligand.build(path)
+        outp1_path = path[:-4] + "_badname_aH.pdb"
+        out_path = path[:-4] + "_aH.pdb"
+        # outm2_path = path[:-4]+'_aH.mol2'
+
+        if method == "OPENBABEL":
+            # not working if block warning output for some reason
+            # openbabel.obErrorLog.SetOutputLevel(0)
+            obConversion = openbabel.OBConversion()
+            obConversion.SetInAndOutFormats("pdb", "pdb")
+            mol = openbabel.OBMol()
+            obConversion.ReadFile(mol, path)
+            mol.AddHydrogens(False, True, ph)
+            obConversion.WriteFile(mol, out_path)
+        if method == "PYBEL":
+            pybel.ob.obErrorLog.SetOutputLevel(0)
+            mol = next(pybel.readfile("pdb", path))
+            mol.OBMol.AddHydrogens(False, True, ph)
+            mol.write("pdb", outp1_path, overwrite=True)
+            # fix atom label abd determing net charge
+            if keep_name:
+                self._fix_ob_output(outp1_path, out_path, ref_name_path=path)
+            else:
+                self._fix_ob_output(outp1_path, out_path)
+            # determine partial charge
+            # > METHOD 1<
+            net_charge = self._ob_pdb_charge(outp1_path)
+            # > METHOD 2 <
+            # mol.write('mol2', outm2_path, overwrite=True)
+            # mol = next(pybel.readfile('mol2', outm2_path))
+            # net_charge=0
+            # for atom in mol:
+            #     net_charge=net_charge+atom.formalcharge
+        if method == "Dimorphite":
+            pass
+        return ligand_from_pdb(out_path,net_charge)
+
+
+    def _fix_ob_output(self, pdb_path, out_path, ref_name_path=None):
+        """
+        fix atom label in pdb_pat write to out_path
+        ---------
+        ref_name_path: if use original atom names from pdb
+        - default: None
+            according to tleap output, the name could be just *counting* the element start from ' ' to number
+        - : not None
+            check if there're duplicated names originally, add suffix if there are.
+        """
+        if ref_name_path:
+            ref_a_atoms = read_pdb_lines( ref_name_path )
+            pdb_atoms  = read_pdb_lines( pdb_path )
+            ref_a_atoms = list(filter(lambda aa: aa.is_ATOM() or aa.is_HETATM(), ref_a_atoms))
+            pdb_atoms = list(filter(lambda aa: aa.is_ATOM() or aa.is_HETATM(), pdb_atoms))
+            assert len(pdb_atoms) == len(ref_a_atoms )
+            for idx,(p,a) in enumerate(zip(pdb_atoms, ref_a_atoms)):
+                pdb_atoms[idx].atom_name = a.atom_name
+                pdb_atoms[idx].atom_id = a.atom_id
+                pdb_atoms[idx].resi_id = a.resi_id
+                pdb_atoms[idx].resi_name = a.resi_name
+            #exit( 0 )
+        write_lines( out_path, list(map(lambda aa: aa.build() , pdb_atoms )))
+#            assert len(pdb_atoms) == len(ref_a_names )
+#            print('hereere')
+#            pdb_ls = read_pdb_lines(pdb_path)
+#            ref_resi_name = pdb_ls[0].resi_name
+#            for pdb_l in pdb_ls:
+#                if pdb_l.is_HETATM() or pdb_l.is_ATOM():
+#                    # pybel use line order (not atom id) to assign new atom id
+#                    ref_a_names.append(pdb_l.atom_name)
+#        print(ref_a_names) 
+#        # count element in a dict
+#        ele_count = {}
+#        pdb_ls = read_pdb_lines(pdb_path)
+#        line_count = 0
+#        lines = []
+#        for pdb_l in pdb_ls:
+#            if not pdb_l.is_ATOM() and not pdb_l.is_HETATM():
+#                continue
+#    
+#            if ref_name_path == None:
+#                ele = pdb_l.get_element()
+#            else:
+#                if line_count < len(ref_a_names):
+#                    ele = ref_a_names[line_count]
+#                else:
+#                    ele = pdb_l.get_element()  # New atoms
+#                pdb_l.resi_name = ref_resi_name
+#                line_count += 1
+#            # determine the element count
+#            try:
+#                # rename if more than one (add count)
+#                ele_count[ele] += 1
+#                pdb_l.atom_name = ele + str(ele_count[ele])
+#            except KeyError:
+#                ele_count[ele] = 0
+#                pdb_l.atom_name = ele
+#            lines.append(pdb_l.build())
+    
+        #write_lines(out_path, lines)
+    
+    
+    def _ob_pdb_charge(self, pdb_path):
+        """
+        extract net charge from openbabel exported pdb file
+        """
+    
+        pdb_ls = read_pdb_lines(pdb_path)
+        net_charge = 0
+        for pdb_l in pdb_ls:
+            if pdb_l.is_HETATM() or pdb_l.is_ATOM():
+                if len(pdb_l.get_charge()) != 0:
+                    charge = pdb_l.charge[::-1]
+                    _LOGGER.info(
+                        f"Found formal charge: {pdb_l.atom_name} {charge}"
+                    )  # TODO make this more intuitive/make sense
+                    net_charge += int(charge)
+        return net_charge
+
+
+    def merge_structure_elements(self, old_stru, new_stru ):
+        #TODO(CJ) documentation and type hints        
+        metal_list = old_stru.get_metal_center()
+        if len(metal_list):
+            _LOGGER.info(f"Merging {len(metal_list)} metal centers in old structure!")
+            _LOGGER.info(f"Adding metal centers to new structure...")
+            new_stru.add(metal_list, sort=0)
+            _LOGGER.info(f"Metal centers added!")
+            # fix metal environment
+            _LOGGER.info(f"Protonating newly added metals...")
+            new_stru.protonation_metal_fxi(Fix=1)
+            _LOGGER.info(f"Protonation complete!")
+
+        # protonate ligands and combine with the pqr file
+        ligand_list = old_stru.ligands
+        if len(old_stru.ligands):
+            _LOGGER.info(f"Merging {len(ligand_list)} ligands in old structure!")
+            lig_dir = self.work_dir + "/ligands/"
+            safe_mkdir(lig_dir)
+            # TODO: logging
+            print(lig_dir)
+            new_ligands = list(
+                map(
+                    lambda ll: self.protonate_ligand(ll, dirname=lig_dir, ph=7), ligand_list
+                )
+            )
+            print(new_ligands)
+            new_stru.add(new_ligands, sort=0)
+        return new_stru
+
     def get_protonation(
         self,
         ph: float = 7.0,
@@ -444,10 +609,14 @@ class PDBPrepper:
         
         save the result to self.pqr_path
         """
-        if ph < 0 or ph > 14:
-            raise core.InvalidPH(f"{ph:.2f} must be on range: [0.00,14.00]")
+        def check_valid_ph( ph : float ) -> None: #TODO(CJ) maybe move this to somewhere else
+            if ph < 0 or ph > 14:
+                raise core.InvalidPH(f"{ph:.2f} must be on range: [0.00,14.00]")
+        check_valid_ph( ph )
         # input of PDB2PQR
-        self.pqr_path = f"{fs.remove_ext(self.current_path_)}.pqr"
+        self.pqr_path = f"{fs.remove_ext(self.current_path_)}.pqr.pdb"
+        self.all_paths.append( self.pqr_path )
+       
         pdb2pqr_parser = build_pdb2pqr_parser()
         args = pdb2pqr_parser.parse_args(
             [
@@ -459,50 +628,27 @@ class PDBPrepper:
                 self.pqr_path,
             ]
         )
-        pdb2pqr_log = f"{self.work_dir}/pdb2pqr_output.log"
         _LOGGER.info(f"Running pdb2pqr on '{self.path_name}'...")
         run_pdb2pqr(args)
         _LOGGER.info(f"Finished running pdb2pqr! Output saved to '{self.pqr_path}'")
-        self.all_paths.append( self.pqr_path )
-        return self.pqr_path
         # Add missing atom (from the PDB2PQR step. Update to func result after update the _get_protonation_pdb2pqr func)
         # Now metal and ligand
         old_stru = structure_from_pdb(self.no_water_path)
         new_stru = structure_from_pdb(self.pqr_path)
         # find Metal center and combine with the pqr file
-        metal_list = old_stru.get_metal_center()
-        if len(metal_list):
-            _LOGGER.info(f"Merging {len(metal_list)} metal centers in old structure!")
-            _LOGGER.info(f"Adding metal centers to new structure...")
-            new_stru.add(metal_list, sort=0)
-            _LOGGER.info(f"Metal centers added!")
-            # fix metal environment
-            _LOGGER.info(f"Protonating newly added metals...")
-            new_stru.protonation_metal_fi(Fix=1)
-            _LOGGER.info(f"Protonation complete!")
+        if old_stru != new_stru:
+            new_stru = self.merge_structure_elements(old_stru, new_stru)
 
-        # protonate ligands and combine with the pqr file
-        ligand_list = old_stru.ligands
-        if len(old_stru.ligands):
-            _LOGGER.info(f"Merging {len(ligand_list)} ligands in old structure!")
-            lig_dir = self.work_dir + "/ligands/"
-            safe_mkdir(lig_dir)
-            # TODO: logging
-            new_ligands = list(
-                map(
-                    lambda ll: protonate_ligand(ll, dirname=lig_dir, ph=ph), ligand_list
-                )
-            )
-            new_stru.add(new_ligands, sort=0)
-
-        # PLACE HOLDER for other fix
-
-        # build file
         if not keep_id:
             new_stru.sort()
-        # TODO make this better for nameing
-        new_stru.build(f"{self.work_dir}/final.pdb", keep_id=keep_id)
+        
+        self.current_path_ = f"{fs.remove_ext(fs.remove_ext(self.pqr_path))}_aH.pdb"
+        self.all_paths.append( self.current_path_ )
+        
+        new_stru.to_pdb(self.current_path_, keep_id=keep_id)
         self.stru = new_stru
+
+        return self.current_path_
 
     """
     ========
@@ -585,8 +731,7 @@ class PDBPrepper:
     ========
     """
 
-    # def PDB2PDBwLeap(self):
-    def apply_mutations(self) -> None:
+    def apply_mutations(self) -> str:
         """
         Apply mutations using tleap. Save mutated structure PDB in self.path
         ------------------------------
@@ -657,19 +802,16 @@ class PDBPrepper:
     def generate_mutations(
         self,
         n: int,
-        muta_flags: List[MutaFlag] = None,
-        restrictions: str = None,
-        random_state=100,
+        muta_flags: Union[str,List[str]] = None,
+        restrictions: List[Union[int,Tuple[int,int]]] = None,
+        random_state: int = 100
     ) -> None:
-        # TODO add restrictions
-        # TODO check for restrictions
-        # TODO setup to be compliant with the existing API grammar
+        """"""
         existing = set()
         temp = []
         if muta_flags:
-            # TODO convert and check if the mutations are valid
-            # TODO check the target residue exists in the structure
-            for mf in muta_flags:
+            decoded : List[MutaFlag] = decode_mutaflags( muta_flags )
+            for mf in decoded:
                 key = (mf.chain_index, mf.residue_index)
                 if key in existing:
                     _LOGGER.warn(f"Multiple mutations supplied at location {key}")
@@ -680,13 +822,15 @@ class PDBPrepper:
         muta_flags = temp
 
         if muta_flags and len(muta_flags) >= n:
-            _LOGGER.warn(
+            _LOGGER.warning(
                 f"Supplied mutation flags meet or exceed the number of desired mutations"
             )
             self.mutations = muta_flags
             return
-
-        candidates = self.stru.all_possible_mutations()
+        struct : Structure = structure_from_pdb( self.current_path() )
+        curr_state = struct.residue_state()
+        candidates : List[MutaFlag] = get_all_combinations( curr_state, restrictions=restrictions )
+        
         np.random.seed(random_state)
         np.random.shuffle(candidates)
 
@@ -700,207 +844,13 @@ class PDBPrepper:
                 existing.add(key)
 
         if len(muta_flags) != n:
-            _LOGGER.warn(
+            _LOGGER.warning(
                 f"Unable to generate enough mutations. Missing {n-len(muta_flags)}"
             )
 
         self.mutations = muta_flags
         assert len(self.mutations) == len(set(self.mutations))
 
-    def Add_MutaFlag(self, Flag: str = "r", if_U: bool = 0, if_self: bool = 0):
-        """Determine which mutation to deploy to the structure.
-        
-        User can 1. assign specific mutation(s). 
-              or 2. assign random mutation(s) by specifing a rule of randomlization.
-        The function will 
-        1. decode the input to a list of python tuples that 
-            each contains the information of a mutation as ('X','A','###','Y') 
-            save to *self.MutaFlags*
-        2. check the if the assigned mutation is reasonable that
-            specifing the correct original residue
-            within the range of chain ids
-            within the range of residue ids
-            the target residue is within the range of canonical AAs
-
-        Args:
-        (self):
-        The requirements for the input pdb object are:
-            TODO(shaoqz): add after refactoring
-        Flag: 
-            str or list of strings indicating specifc mutation(s) or a rule of randomlization. (default: r)
-            Grammer:
-            **Assign specific mutation(s)**
-                'XA##Y'
-                For each str that represent a mutation, the format should be 'XA##Y', in which
-                X : Original residue letter (One-letter code). Leave X if unknow. 
-                    (Only used for checking that will pop a warning if the residue doesn't match, 
-                    which usually means you are using a wrong residue id and requires a double check.)
-                A : Chain index. This is optional witha default value: A.
-                    (Different chains are defined by 'TER' marks in the PDB file and the index is noted in order.
-                    * Note this will not always be the same as the chain id in the PDB line
-                    * defined in self.stru)
-                ##: Residue index. 
-                    (Strictly correponding residue indexes in the original file.
-                    * defined in self.stru)
-                Y : Target residue letter.
-                    (The residue type after the mutation.) 
-            example:
-                >>> pdb_obj.Add_MutaFlag('D83K')
-                >>> pdb_obj.MutaFlags
-                [('D', 'A', '83', 'K')]
-                >>> pdb_obj.Add_MutaFlag('DA83K')
-                >>> pdb_obj.MutaFlags
-                [('D', 'A', '83', 'K')]
-                >>> pdb_obj.Add_MutaFlag(['DA83K', 'EB226P'])
-                >>> pdb_obj.MutaFlags
-                [('D', 'A', '83', 'K'), ('E', 'B', '226', 'P')]
-            
-            **Assign random mutation(s)** 
-                ['r', {'position': 'keyword', 
-                       'target_resi':'keyword'}]
-                To assigne random mutaion, start the list with 'r' or 'random' followed by a map that
-                defines the rule of the randomlization. In the map dictionary there are 2 keys to fill:
-                position        : use a keyword or a pattern to define availiable positions to mutate.
-                target_residue  : use a keyword or a pattern to define availiable target residues.
-                (* Note that when using random assignment, the list can no longer contain any manual assign str for mutation.
-                e.g.: pdb_obj.Add_MutaFlag(['V23T', 'r']) is not valid)
-            example:
-                TODO(shaoqz): finish this function.
-        if_U: 
-            if include mutations to U (selenocysteine) in random generation.
-        if_self:
-            if "mutation to the same amino acid" is allowed for random mutation.
-
-        Returns:
-        There are two parts of actually outputs:
-        In self.MutaFlags: Assigned mutations in a list of tuples
-            example: 
-            [('D', 'A', '83', 'K'), ('E', 'B', '226', 'P')]
-        In return value: A str representing a tag of current mutations to the PDB.
-            example:
-            _DA83K_EB226P
-        """
-
-        if type(Flag) == str:
-
-            if Flag == "r" or Flag == "random":
-                resi_1 = ""
-                resi_2 = ""
-                Muta_c_id = ""
-                Muta_r_id = ""
-
-                # Flag Generation：
-                # Random over the self.stru. Strictly correponding residue indexes in the original file. (no sort applied)
-                self.get_stru()
-                # random over the structure "protein" part.
-                chain = choice(self.stru.chains)
-                resi = choice(chain.residues)
-                Muta_c_id = chain.id
-                Muta_r_id = str(resi.id)
-                if resi.name in Resi_map2:
-                    resi_1 = Resi_map2[resi.name]
-                else:
-                    if Config.debug >= 1:
-                        print(
-                            "WARNING: pdb.Add_MutaFlag(): A non-canonical animo acid is being mutated! The MutaFlag will have a 3-letter code for the original residue ."
-                        )
-                    resi_1 = resi.name
-                # random over the residue list
-                if if_U:
-                    m_Resi_list = Resi_list
-                else:
-                    m_Resi_list = Resi_list[:-1]
-                resi_2 = choice(m_Resi_list)
-                # avoid or not mutation to self
-                if not if_self:
-                    while resi_2 == resi_1:
-                        resi_2 = choice(m_Resi_list)
-
-                MutaFlag = (resi_1, Muta_c_id, Muta_r_id, resi_2)
-                self.MutaFlags.append(MutaFlag)
-
-            else:
-                MutaFlag = self._read_MutaFlag(Flag)
-                self.MutaFlags.append(MutaFlag)
-
-        if type(Flag) == list:
-            for i in Flag:
-                MutaFlag = self._read_MutaFlag(i)
-                self.MutaFlags.append(MutaFlag)
-
-        if Config.debug >= 1:
-            print("Current MutaFlags:")
-            for flag in self.MutaFlags:
-                print(self._build_MutaName(flag))
-
-        label = ""
-        for flag in self.MutaFlags:
-            label = label + "_" + self._build_MutaName(flag)
-        return label
-
-    def _read_MutaFlag(self, Flag):
-        """
-        decode the manually input MutaFlag. Return (resi_1, chain_id, resi_id, resi_2)
-        --------------
-        Grammer(XA11Y):
-        X : Original residue name. Leave X if unknow. 
-            Only used for build filenames. **Do not affect any calculation.**
-        A : Chain index. Determine by 'TER' marks in the PDB file. (Do not consider chain_indexs in the original file.)
-        11: Residue index. Strictly correponding residue indexes in the original file. (NO sort applied)
-        Y : Target residue name.
-
-        the later 3 will go through a san check to make sure they are within the range:
-        A : chain.id range in self.stru.chains
-        11: resi.id range in self.stru.chain[int].residues
-        Y : Resi_list
-        """
-        pattern = r"([A-Z])([A-Z])?([0-9]+)([A-Z])"
-        F_match = re.match(pattern, Flag)
-        if F_match is None:
-            raise Exception(
-                "_read_MutaFlag: Required format: XA123Y (or X123Y indicating the first chain)"
-            )
-
-        resi_1 = F_match.group(1)
-        chain_id = F_match.group(2)
-        resi_id = str(F_match.group(3))
-        resi_2 = F_match.group(4)
-
-        # default
-        if F_match.group(2) is None:
-            chain_id = "A"
-            if Config.debug >= 1:
-                print(
-                    "_read_MutaFlag: No chain_id is provided! Mutate in the first chain by default. Input: "
-                    + Flag
-                )
-
-        # san check of the manual input
-        self.get_stru()
-        chain_id_list = [i.id for i in self.stru.chains]
-        if not chain_id in chain_id_list:
-            raise Exception(
-                "_read_MutaFlag: San check failed. Input chain id in not in range."
-                + line_feed
-                + " range: "
-                + repr(chain_id_list)
-            )
-        chain_int = ord(chain_id) - 65
-        resi_id_list = [str(i.id) for i in self.stru.chains[chain_int].residues]
-        if not resi_id in resi_id_list:
-            raise Exception(
-                "_read_MutaFlag: San check failed. Input resi id in not in range."
-                + line_feed
-                + " range: "
-                + repr(resi_id_list)
-            )
-        if not resi_2 in Resi_list:
-            raise Exception(
-                "_read_MutaFlag: Only support mutate to the known 21 residues. AmberMaps.Resi_list: "
-                + repr(Resi_list)
-            )
-
-        return (resi_1, chain_id, resi_id, resi_2)
 
     def _build_MutaName(self, Flag):
         """

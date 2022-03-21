@@ -1,4 +1,6 @@
-# TODO add documentation
+# TODO(CJ) add documentation
+from __future__ import annotations
+
 import string
 import pandas as pd
 from typing import List, Set, Dict, Tuple
@@ -8,6 +10,7 @@ from biopandas.pdb import PandasPdb
 from .atom import Atom
 from .chain import Chain
 from .residue import Residue
+from .metal_atom import MetalAtom
 from ..core.logger import _LOGGER
 from .ligand import Ligand, residue_to_ligand
 from .solvent import Solvent, residue_to_solvent
@@ -16,6 +19,7 @@ from .metal_atom import MetalAtom
 from ..chemical import one_letters_except, convert_to_one_letter
 
 #from enzy_htp.preparation import MutaFlag
+from enzy_htp.core import file_system as fs
 
 
 class Structure:
@@ -27,39 +31,14 @@ class Structure:
         self.solvents = solvents
         self.metal_atoms = metal_atoms
         self.ligands = ligands
-        # TODO maybe set the pdb filename as well
-        self.chains_ = dict()
-        self.residues_ = dict()
-        self.current_pdb = str()
-        self.metalatoms = []
-        self.ligands = []
-        self.solvents = []
 
-    def residue_state(self) -> Set:
-        print(self.chains_)
-        exit(0)
-
-    def all_possible_mutations(self):
+    def residue_state(self) -> List[Tuple[str,str,int]]:
+        """Generates a list of tuples of all residues in the Structure. Format for each tuple is (chain_id, one_letter_res_name, res_index)."""
         result = list()
-        for cname, chain in self.chains_.items():
-            # TODO check that the chain can have this done
+        for cname, chain in self.chains.items():
             for residue in chain.residues():
-                orig_one_letter = convert_to_one_letter(residue.name)
-                result.extend( None
-#                    list(
-#                        map(
-#                            lambda mut: MutaFlag(
-#                                orig_residue=orig_one_letter,
-#                                chain_index=cname,
-#                                residue_index=residue.num_,
-#                                target_residue=mut,
-#                            ),
-#                            one_letters_except(orig_one_letter),
-#                        )
-#                    )
-                )
-                # print(residue)
-
+                (chain, res_name, index ) = residue.residue_key.split('.')
+                result.append( (chain, convert_to_one_letter(res_name), int(index) ) )
         return result
 
     def get_metal_center(self):
@@ -68,8 +47,9 @@ class Structure:
         save to self.metal_centers
         return self.metal_centers
         """
+        print(self.metal_atoms)
         self.metal_centers = list(
-            filter(lambda ma: ma.is_metal_center(), self.metalatoms)
+            filter(lambda ma: ma.is_metal_center(), self.metal_atoms)
         )
         # TODO maybe this should be copied?
         return self.metal_centers
@@ -79,10 +59,8 @@ class Structure:
         find art_resi
         """
         pass
-
+    # TODO(CJ) implement add_[ligand|metal_center|chain], etc.
     def add(self, obj, id=None, sort=0):
-        _LOGGER.warn(f"Structure.add has not been implemented yet!!!" "")
-        return
         """
         1. judge obj type (go into the list)
         2. assign parent
@@ -106,7 +84,7 @@ class Structure:
 
             if (
                 type(obj_ele) != Chain
-                and type(obj_ele) != Metalatom
+                and type(obj_ele) != MetalAtom
                 and type(obj_ele) != Ligand
                 and type(obj_ele) != Solvent
             ):
@@ -119,20 +97,20 @@ class Structure:
             #          |     |    0     |   1   |
             # assigned |  0  |   keep   | clean |
             #          |  1  |  assign  | mark  |
-            for i in obj:
-                i.set_parent(self)
-                if sort:
-                    if id != None:
-                        i.id = str(id) + "i"  # str mark
-                    else:
-                        i.id = id  # None
-                else:
-                    if id != None:
-                        i.id = id
+            #for i in obj:
+            #    i.set_parent(self)
+            #    if sort:
+            #        if id != None:
+            #            i.id = str(id) + "i"  # str mark
+            #        else:
+            #            i.id = id  # None
+            #    else:
+            #        if id != None:
+            #            i.id = id
 
             if type(obj_ele) == Chain:
                 self.chains.extend(obj)
-            if type(obj_ele) == Metalatom:
+            if type(obj_ele) == MetalAtom:
                 self.metalatoms.extend(obj)
             if type(obj_ele) == Ligand:
                 self.ligands.extend(obj)
@@ -174,7 +152,7 @@ class Structure:
             self.sort()
 
     def sort(self, if_local=0):
-        _LOGGER.warn(f"Structure.sort has not been implemented yet!!")
+        _LOGGER.warning(f"Structure.sort has not been implemented yet!!")
         return
         """
         assign index according to current items
@@ -230,7 +208,7 @@ class Structure:
                     a_id += 1
                     atom.id = a_id
 
-    def build(self, path, ff="AMBER", forcefield="ff14SB", keep_id=0):
+    def to_pdb(self, path, ff="AMBER", forcefield="ff14SB", keep_id=0):
         """
         build PDB after the change based on the chosen format and forcefield
         - line based on atom and contain chain index and residue index
@@ -243,113 +221,50 @@ class Structure:
             - ligand -> metal -> solvent order
             * do not sort atomic order in a residue like tleap does.
         """
-        with open(path, "w") as of:
-            if ff == "AMBER":
-                if not keep_id:
-                    a_id = 0
-                    r_id = 0
-                    for chain in self.chains_.values():
-                        # write chain
-                        for resi in chain.residues():
-                            r_id = r_id + 1
-                            for atom in resi.atom_list():  # TODO fix this horrible name
-                                a_id = a_id + 1  # current line index
-                                line = atom.build(
-                                    a_id=a_id, r_id=r_id, ff=ff, forcefield=forcefield
-                                )
-                                of.write(line + "\n")
-                        # write TER after each chain
-                        of.write("TER\n")
+        # TODO(CJ) add warning for overwriting an existing file
+        # TODO(CJ) need to add an error for when a different file format is specifieid 
+        lines = list()
+        if ff == "AMBER":
+            for cname, chain in self.chains.items():
+                # write chain
+                chain : Chain
+                a_idx = 0
+                for resi in chain.residues():
+                    resi : Residue
+                    for atom in resi.atom_list():
+                        a_idx += 1
+                        lines.append(atom.to_pdb_line(a_id=a_idx,ff=ff, forcefield=forcefield))
+                # add TER after each chain
+                lines.append("TER")
 
-                    c_id = chr(len(self.chains_) + 64)
+            c_id = chr(len(self.chains) + 64)
 
-                    for ligand in self.ligands:
-                        r_id = r_id + 1
-                        c_id = chr(ord(c_id) + 1)
+            for ligand in self.ligands:
+                c_id = chr(ord(c_id) + 1)
+                for atom in ligand.atom_list():
+                    a_idx += 1
+                    lines.append(atom.to_pdb_line(a_id=a_idx,c_id=c_id, ff=ff, forcefield=forcefield))
+                lines.append("TER")
 
-                        for atom in ligand:
-                            a_id = a_id + 1
-                            line = atom.build(
-                                a_id=a_id,
-                                r_id=r_id,
-                                c_id=c_id,
-                                ff=ff,
-                                forcefield=forcefield,
-                            )
-                            of.write(line + "\n")
-                        of.write("TER" + line_feed)
+            for metal in self.metal_atoms:
+                c_id = chr(ord(c_id) + 1)
+                a_idx += 1
+                lines.append(metal.build(a_id=a_idx,c_id=c_id, ff=ff, forcefield=forcefield))
+                lines.append("TER")
 
-                    for metal in self.metalatoms:
-                        a_id = a_id + 1
-                        r_id = r_id + 1
-                        c_id = chr(ord(c_id) + 1)
+            if len(self.solvents):
+                c_id = chr(ord(c_id) + 1)  # chain_id for all solvent
+                for solvent in self.solvents:
+                    for atom in solvent:
+                        a_idx += 1
+                        lines.append(atom.build(
+                            a_id=a_idx,
+                            c_id=c_id, ff=ff, forcefield=forcefield
+                        ))
+                lines.append("TER")
 
-                        line = metal.build(
-                            a_id=a_id,
-                            r_id=r_id,
-                            c_id=c_id,
-                            ff=ff,
-                            forcefield=forcefield,
-                        )
-                        of.write(line + "\n")
-                        of.write("TER" + line_feed)
-
-                    if len(self.solvents) != 0:
-                        c_id = chr(ord(c_id) + 1)  # same chain_id for all solvent
-                        for solvent in self.solvents:
-                            r_id = r_id + 1
-                            for atom in solvent:
-                                a_id = a_id + 1
-                                line = atom.build(
-                                    a_id=a_id,
-                                    r_id=r_id,
-                                    c_id=c_id,
-                                    ff=ff,
-                                    forcefield=forcefield,
-                                )
-                                of.write(line + "\n")
-                        of.write("TER" + line_feed)
-
-                else:
-                    for chain in self.chains:
-                        # write chain
-                        for resi in chain:
-                            for atom in resi:
-                                line = atom.build(ff=ff, forcefield=forcefield)
-                                of.write(line + "\n")
-                        # write TER after each chain
-                        of.write("TER" + line_feed)
-
-                    c_id = chr(len(self.chains) + 64)
-
-                    for ligand in self.ligands:
-                        c_id = chr(ord(c_id) + 1)
-                        for atom in ligand:
-                            line = atom.build(c_id=c_id, ff=ff, forcefield=forcefield)
-                            of.write(line + "\n")
-                        of.write("TER" + line_feed)
-
-                    for metal in self.metalatoms:
-                        c_id = chr(ord(c_id) + 1)
-                        line = metal.build(c_id=c_id, ff=ff, forcefield=forcefield)
-                        of.write(line + "\n")
-                        of.write("TER" + line_feed)
-
-                    if len(self.solvents) != 0:
-                        c_id = chr(ord(c_id) + 1)  # chain_id for all solvent
-                        for solvent in self.solvents:
-                            for atom in solvent:
-                                line = atom.build(
-                                    c_id=c_id, ff=ff, forcefield=forcefield
-                                )
-                                of.write(line + "\n")
-                        of.write("TER" + line_feed)
-
-            if ff == "XXX":
-                # place holder
-                pass
-
-            of.write("END\n")
+        lines.append("END")
+        fs.write_lines(path, lines)
 
     def build_ligands(
         self, dir, ft="PDB", ifcharge=0, c_method="PYBEL", ph=7.0, ifname=0, ifunique=0
@@ -886,7 +801,9 @@ class Structure:
         if i > 3:
             raise StopIteration
 
-
+    def __eq__(self, other : Structure ) -> bool:
+        """TODO"""
+        return self.chains == other.chains and self.solvents == other.solvents and self.metal_atoms == other.metal_atoms and self.ligands == other.ligands
 
 
 
