@@ -10,7 +10,15 @@ from collections import namedtuple
 
 import enzy_htp.core as core
 import enzy_htp.chemical as chem
-
+#TODO(CJ): Function that looks for good places to mutate. 
+# smaller to larger
+# larger to smaller
+# positive to negative
+# positive to neutral 
+# neutral to positive 
+# neutral to negative 
+# negative to positive
+# negative to neutral 
 Mutation = namedtuple(
     "Mutation", "orig_residue chain_index residue_index target_residue"
 )
