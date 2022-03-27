@@ -232,8 +232,9 @@ def write_data(tag, data, out_path):
 '''
 Mutant assigner
 '''
-#TODO
-def MutaFlag_decode(self, Flag):
+
+    
+def MutaFlag_decode(Flag):
     """Decode the manually input MutaFlag(s) into tuple or a list of tuples    
     User can input string of MutaFlag or list of MutaFlag strings.          
     The function will decode the input into tuple or list of tuples. 
@@ -265,24 +266,28 @@ def MutaFlag_decode(self, Flag):
                 List of tuples: [('X', 'A', '11', 'Y'), ('X', 'A', '11', 'Y'),...]
     
     Raises:
-        Exception: 
-            An exception occurred.
+        TypeError: 
             Input doesn't match the required format.
     """
-    pattern = r'([A-Z])([A-Z])?([0-9]+)([A-Z])'
-    F_match = re.match(pattern, Flag)
-
-    if F_match is None:
-        raise Exception('_read_MutaFlag: Required format: XA11Y or X11Y')  
-    resi_1 = F_match.group(1)
-    chain_id = F_match.group(2)
-    resi_id = str(F_match.group(3))
-    resi_2 = F_match.group(4)
-
-    # Assign default value to chain index
-    if F_match.group(2) is None:
-        chain_id = 'A'
-        if Config.debug >= 1:
-            print('_read_MutaFlag: No chain_id is provided!'
-                  'Mutate in the first chain by default. Input: ' + Flag)
-
+    Flag_list = Flag.split(',')
+    MutaFlags = []
+    for i in Flag_list:
+        T = []
+        pattern = r'([A-Z])([A-Z])?([0-9]+)([A-Z])'
+        F_match = re.match(pattern, i)
+        if F_match:
+            resi_1 = F_match.group(1)
+            chain_id = F_match.group(2)
+            resi_id = str(F_match.group(3))
+            resi_2 = F_match.group(4)
+            if F_match.group(2) is None:
+                chain_id = 'A'    
+            T = (resi_1, chain_id, resi_id, resi_2)
+            MutaFlags.append(T)
+        try:
+            if F_match is None:
+                raise TypeError('Not in _read_MutaFlag required format (XA11Y or X11Y)')
+                continue
+        except TypeError as e:
+            print(repr(e),'Error input:',i)         
+    return(MutaFlags)
