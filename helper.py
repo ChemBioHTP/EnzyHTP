@@ -243,6 +243,22 @@ def MutaFlag_san_check(self, flag):
 
     Raises exception if input is out of range.
     '''
+    pattern = r'([A-Z])([A-Z])?([0-9]+)([A-Z])'
+    F_match = re.match(pattern, Flag)
+    if F_match is None:
+        raise Exception('_read_MutaFlag: Required format: XA123Y (or X123Y indicating the first chain)')
+        
+    resi_1 = F_match.group(1)
+    chain_id = F_match.group(2)
+    resi_id = str(F_match.group(3))
+    resi_2 = F_match.group(4)
+
+    # default
+    if F_match.group(2) is None:
+        chain_id = 'A'
+        if Config.debug >= 1:
+            print('_read_MutaFlag: No chain_id is provided! Mutate in the first chain by default. Input: ' + Flag)   
+    
     self.get_stru()
 
     chain_id_list = [i.id for i in self.stru.chains]
@@ -253,6 +269,8 @@ def MutaFlag_san_check(self, flag):
     resi_id_list = [str(i.id) for i in self.stru.chains[chain_int].residues]
     if not resi_id in resi_id_list:
         raise Exception('_MutaFlag_san_check: San check failed. Input resi id in not in range.'+line_feed+' range: '+ repr(resi_id_list))
+    if not resi_1 in resi_id_list[resi_id]: #checks if input residue matches original structure residue 
+        raise Exception('_MutaFlag_san_check: failed: Input residue is incorrect.')
     if not resi_2 in Resi_list:
         raise Exception('_MutaFlag_san_check: Only support mutate to the known 21 residues. AmberMaps.Resi_list: '+ repr(Resi_list))
     
