@@ -1,5 +1,5 @@
 from random import choice
-from Class_PDB import *
+from Class_PDB import PDB
 from AmberMaps import Resi_map2
 
 
@@ -84,3 +84,10 @@ def test_Add_MutaFlag_good_random():
 # good PDB non-c AA
 # good PDB solvent
 # bad PDB
+
+def test_select_residues_by_distance():
+    pdb_obj = PDB('./test/testfile_Class_PDB/FAcD.pdb')
+    
+    return pdb_obj.select_residues_by_dist((0,0,0), 1000.0, ['ALA', 'GLY', 'SER'])
+
+print(test_select_residues_by_distance())

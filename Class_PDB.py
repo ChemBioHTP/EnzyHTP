@@ -10,7 +10,7 @@ from Class_Structure import *
 from Class_line import *
 from Class_Conf import Config, Layer
 from Class_ONIOM_Frame import *
-from helper import Conformer_Gen_wRDKit, decode_atom_mask, get_center, get_field_strength_value, line_feed, mkdir, generate_Rosetta_params
+from helper import Conformer_Gen_wRDKit, decode_atom_mask, get_center, get_distance, get_field_strength_value, line_feed, mkdir, generate_Rosetta_params
 try:
     from pdb2pqr.main import main_driver as run_pdb2pqr
     from pdb2pqr.main import build_main_parser as build_pdb2pqr_parser
@@ -2408,7 +2408,22 @@ class PDB():
             print("Running: "+"sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  "+n_cores+"/' "+Config.Multiwfn.DIR+"/settings.ini")
         run("sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  "+n_cores+"/' "+Config.Multiwfn.DIR+"/settings.ini", check=True, text=True, shell=True, capture_output=True)
 
-    
+    def select_residues_by_dist(self, center : tuple, distance : float, allowed_residues : list) -> list:
+        """Returns residues within given distance of center (based on alpha carbon of residue)
+        """
+        self.get_stru()
+        res_within_distance = []
+        for chain in self.stru.chains:
+            for residue in chain:
+                if residue.name in allowed_residues:
+                    for atom in residue.atoms:
+                        if atom.name == 'CA':
+                            CA_coords = atom.coord
+                            if get_distance(center, CA_coords) <= distance:
+                                res_within_distance.append(residue.name + str(residue.id))
+                            break
+        
+        return res_within_distance
 
 def get_PDB(name):
     '''
