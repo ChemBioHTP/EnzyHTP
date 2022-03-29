@@ -90,6 +90,7 @@ def test_select_residues_by_distance():
     pdb_obj.get_stru()
     center=tuple(pdb_obj.stru.ligands[0].F.coord)
     
-    return pdb_obj.select_residues_geo('dis', center, [10.0,20.0], ['PRO', 'SER'])
+    #return pdb_obj.select_residues_geo('dis', center, [10.0,20.0], ['PRO', 'SER'])
+    return pdb_obj.select_residues_geo('dis', center, [10.0,20.0], ['all'])
 
 print(test_select_residues_by_distance())
