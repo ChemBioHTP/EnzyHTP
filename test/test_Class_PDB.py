@@ -87,7 +87,9 @@ def test_Add_MutaFlag_good_random():
 
 def test_select_residues_by_distance():
     pdb_obj = PDB('./test/testfile_Class_PDB/FAcD.pdb')
+    pdb_obj.get_stru()
+    center=tuple(pdb_obj.stru.ligands[0].F.coord)
     
-    return pdb_obj.select_residues_by_dist((0,0,0), 1000.0, ['ALA', 'GLY', 'SER'])
+    return pdb_obj.select_residues_geo('dis', center, [10.0,20.0], ['PRO', 'SER'])
 
 print(test_select_residues_by_distance())
