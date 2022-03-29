@@ -2408,20 +2408,22 @@ class PDB():
             print("Running: "+"sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  "+n_cores+"/' "+Config.Multiwfn.DIR+"/settings.ini")
         run("sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  "+n_cores+"/' "+Config.Multiwfn.DIR+"/settings.ini", check=True, text=True, shell=True, capture_output=True)
 
-    def select_residues_by_dist(self, center : tuple, distance : float, allowed_residues : list) -> list:
-        """Returns residues within given distance of center (based on alpha carbon of residue)
+    def select_residues_geo(self, task : str, center : tuple, threshold : list, allowed_residues : list) -> list:
+        """
+        Returns residues within given distance of center (based on alpha carbon of residue)
         """
         self.get_stru()
-        res_within_distance = []
-        for chain in self.stru.chains:
-            for residue in chain:
-                if residue.name in allowed_residues:
-                    for atom in residue.atoms:
-                        if atom.name == 'CA':
-                            CA_coords = atom.coord
-                            if get_distance(center, CA_coords) <= distance:
-                                res_within_distance.append(residue.name + str(residue.id))
-                            break
+        if task == 'dis':
+           res_within_distance = []
+           for chain in self.stru.chains:
+               for residue in chain:
+                   if residue.name in allowed_residues:
+                       for atom in residue.atoms:
+                           if atom.name == 'CA':
+                               CA_coords = atom.coord
+                               if threshold[0] <= get_distance(center, CA_coords) <= threshold[1]:
+                                   res_within_distance.append(residue.name + str(residue.id))
+                               break
         
         return res_within_distance
 
