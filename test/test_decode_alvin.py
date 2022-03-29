@@ -18,7 +18,7 @@ def test_string():
             raise Error('MutaFlag produced by decode function is wrong')
 
 def test_strings():
-    x = MutaFlag_decode('XA11Y,AB22A')
+    x = MutaFlag_decode('AB12C,AB222A')
     for item in x:
         try:
             print('for',item,':')
@@ -35,7 +35,7 @@ def test_strings():
             raise Error('MutaFlag produced by decode function is wrong')
 
 def test_strings_no_chainid():
-    x = MutaFlag_decode('X11Y,A22A')
+    x = MutaFlag_decode('E11F,G22H')
     for item in x:
         try:
             print('for',item,':')
@@ -51,8 +51,8 @@ def test_strings_no_chainid():
         except:
             raise Error('MutaFlag produced by decode function is wrong')
 
-def decode_print():
-    x = MutaFlag_decode('XA11Y,AB22A,A33333A,3dsadsa44,43242343')
+def decode_all_test():
+    x = MutaFlag_decode('  XA1 1Y , a b22a,A33333A,  3 dsa dsa 44, 43242343   ')
     print(x)
 
 test_string()
@@ -61,4 +61,4 @@ test_strings()
 
 test_strings_no_chainid()
 
-decode_print()
+decode_all_test()
