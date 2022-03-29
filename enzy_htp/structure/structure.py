@@ -58,8 +58,10 @@ class Structure:
         """
         find art_resi
         """
-        pass
-    # TODO(CJ) implement add_[ligand|metal_center|chain], etc.
+        pass # TODO(CJ) implement add_[ligand|metal_center|chain], etc.
+    
+
+
     def add(self, obj, id=None, sort=0):
         """
         1. judge obj type (go into the list)
