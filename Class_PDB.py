@@ -861,7 +861,7 @@ class PDB():
 
 
     def random_target_residues(self, flag):
-        mutant =  _read_MutaFlag(flag)
+        mutant =  self._read_MutaFlag(flag)
         for idx, aa in enumerate(resi_vol_rank):
             if mutant[0] ==  aa:
                 resi_target = idx
@@ -869,8 +869,7 @@ class PDB():
             if mutant[3] == aa:
                 resi_output = idx
                 if resi_target > resi_output :
-                    print("the aa volume will increase, may change cavity
-                          volume")
+                    print("the aa volume will increase, may change cavity volume")
                 else:
                     print("mutation is good to use")
 
