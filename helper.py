@@ -261,14 +261,13 @@ Mutant assigner
 
 
 def MutaFlag_decode(Flag):
-    """Decode the input Flag(s) into tuple or a list of tuples.
-    User can input a string of Flag or a list strings of Flags.
-    The function will decode the input into tuple or list of tuples. 
-    Each contains information of MutaFlag as ('X','A','11','Y').
+    """Decode the input Flag into tuple.
+    User can input a string of Flag in this decode function.
+    The function will return the input into tuple as ('X','A','11','Y').
     
     Args:
         Flag: 
-            String of MutaFlag or list of MutaFlag strings representing specifc mutation(s).
+            String of MutaFlag represents a specifc mutation.
             Extra space insensitive;
             Upper or lower case insensitive;
             Grammer:        
@@ -286,37 +285,33 @@ def MutaFlag_decode(Flag):
                 Y : A letter represents the target residue name.                       
     
     Returns:
-        Tuple or list of tuples:
-            Each contains information of MutaFlag(s)
+        Tuple:
+            Output contains information of MutaFlag
             Example: 
-                Tuple: ('X','A','11','Y') 
-                List of tuples: [('X', 'A', '11', 'Y'), ('X', 'A', '11', 'Y'),...]
+                ('X','A','11','Y') 
+                
     
     Raises:
         TypeError: 
             Input doesn't match the required format.
-    """
-    Flag_upper = ','.join([i.strip() for i in Flag.upper().split(',')])
-    Flag_list = ''.join([i for i in Flag_upper.split()]).split(',')
-    MutaFlags = []
-    for i in Flag_list:
-        T = []
-        pattern = r'([A-Z])([A-Z])?([0-9]+)([A-Z])'
-        F_match = re.match(pattern, i)
-        if F_match:
-            resi_1 = F_match.group(1)
-            chain_id = F_match.group(2)
-            resi_id = str(F_match.group(3))
-            resi_2 = F_match.group(4)
-            if F_match.group(2) is None:
-                chain_id = 'A'
-            T = (resi_1, chain_id, resi_id, resi_2)
-            MutaFlags.append(T)
-        try:
-            if F_match is None:
-                raise TypeError(
-                    'Not in _read_MutaFlag required format (XA11Y or X11Y)')
-                continue
-        except TypeError as e:
-            print(repr(e), 'Error input:', i)
-    return (MutaFlags)
+    """  
+    Flag_formatted = ''.join([i.strip() for i in Flag.upper()])
+    pattern = r'([A-Z])([A-Z])?([0-9]+)([A-Z])'
+    F_match = re.match(pattern, Flag_formatted)
+    if F_match:
+        resi_1 = F_match.group(1)
+        chain_id = F_match.group(2)
+        resi_id = str(F_match.group(3))
+        resi_2 = F_match.group(4)
+        if F_match.group(2) is None:
+            chain_id = 'A'
+            match = ''.join([resi_1, resi_id, resi_2])
+        else:
+            match = ''.join([resi_1,chain_id,resi_id,resi_2])
+        if match == Flag_formatted:
+            MutaFlag = (resi_1, chain_id, resi_id, resi_2)
+            return(MutaFlag)
+        else:
+            raise Exception('Input is not in MutaFlag_decode required format (XA11Y or X11Y)')
+    else:
+        raise Exception('Input is not in MutaFlag_decode required format (XA11Y or X11Y)')
