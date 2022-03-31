@@ -14,9 +14,9 @@ from enzy_htp.core.file_system import lines_from_file
 from enzy_htp.structure.atom import Atom
 
 CURR_FILE  = os.path.dirname( os.path.abspath( __file__ ))
-TEST_PDB_NAME =f"{CURR_FILE}/data/atom_test_pdb.pdb"
+TEST_PDB_NAME =f"{CURR_FILE}/data/atom_test_pdb.pdb" #@shaoqz: for the pdb set up maybe we can import from a common test script?
 RAW_ATOMS : pd.DataFrame = PandasPdb().read_pdb(TEST_PDB_NAME  ).df['ATOM']
-atoms : List[Atom] = list(map(lambda pr: Atom(**pr[1]), RAW_ATOMS.iterrows()))
+atoms : List[Atom] = list(map(lambda pr: Atom(**pr[1]), RAW_ATOMS.iterrows())) #@shaoqz: what does the **pr mean?
 
 
 
