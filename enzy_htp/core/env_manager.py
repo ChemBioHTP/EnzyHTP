@@ -85,7 +85,6 @@ class EnvironmentManager:
         self.check_env_vars()
         self.check_executables()
         self.display_missing()
-        raise TypeError
         _LOGGER.info("Environment check completed!")
 
     def reset(self) -> None:
