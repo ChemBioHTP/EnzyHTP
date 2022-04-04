@@ -43,6 +43,7 @@ def remove_ext(fname: str) -> str:
     """Given a file name, returns the full filename EXCEPT the suffx."""
     return os.path.splitext(fname)[0]
 
+
 def get_file_ext(fname: str) -> str:
     """Gets the file extension for a supplied file name."""
     return Path(fname).suffix

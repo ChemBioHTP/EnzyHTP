@@ -3,7 +3,8 @@ import numpy as np
 from .atom import Atom
 from typing import List
 from .residue import Residue
-#from enzy_htp.preparation import PDBLine, read_pdb_lines
+
+# from enzy_htp.preparation import PDBLine, read_pdb_lines
 from ..core import (
     get_file_ext,
     write_lines,
@@ -14,6 +15,7 @@ from ..core import (
 
 import openbabel
 import openbabel.pybel as pybel
+
 
 class Ligand(Residue):
     """
@@ -37,6 +39,7 @@ class Ligand(Residue):
     def __init__(self, residue_key: str, atoms: List[Atom], **kwargs):
         self.net_charge = kwargs.get("net_charge", None)
         Residue.__init__(self, "A.B.10", atoms)
+
     #
     #    @classmethod
     #
@@ -46,8 +49,8 @@ class Ligand(Residue):
     #        pass
     #
 
-    def set_residue_number( self, num : int ) -> None:
-        for idx, aa in enumerate( self.atoms ):
+    def set_residue_number(self, num: int) -> None:
+        for idx, aa in enumerate(self.atoms):
             self.atoms[idx].residue_number = num
 
     def get_net_charge(self) -> int:
@@ -61,7 +64,10 @@ class Ligand(Residue):
         if ext != ".pdb":
             raise UnsupportedFileType(out_path)
         lines = list(
-            map(lambda pr: pr[1].to_pdb_line(a_id=pr[0] + 1, c_id=" "), enumerate(self.atoms))
+            map(
+                lambda pr: pr[1].to_pdb_line(a_id=pr[0] + 1, c_id=" "),
+                enumerate(self.atoms),
+            )
         ) + ["TER", "END"]
         write_lines(out_path, lines)
 
@@ -106,4 +112,3 @@ def residue_to_ligand(ptr: Residue) -> Ligand:
     generate from a Residue object. copy data
     """
     return Ligand(ptr.name, ptr.atoms)
-

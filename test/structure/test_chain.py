@@ -16,3 +16,4 @@ def test_proper_ctor_behavior():
     assert not chain.residues()
 
 #TODO(CJ): add tests for residue accession and chain renaming
+#TODO(CJ): need to add tests for checking if the chain has ceratin residues/residue types.

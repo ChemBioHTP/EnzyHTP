@@ -37,7 +37,7 @@ class Residue:
 		self.max_line_ : The highest one-indexed line of the children atoms.
     """
 
-    def __init__(self, residue_key : str, atoms : List[Atom]):
+    def __init__(self, residue_key: str, atoms: List[Atom]):
         self.atoms = atoms
         self.residue_key = residue_key
         (chain, name, num) = self.residue_key.split(".")
@@ -46,9 +46,11 @@ class Residue:
         self.num_ = int(num)
         self.rtype_ = ResidueType.UNKNOWN
         line_idxs = np.array(list(map(lambda aa: aa.line_idx, self.atoms)))
-        self.min_line_ = np.min(line_idxs)
-        self.max_line_ = np.max(line_idxs)
-        # TODO what are the checks that we should be doing here?
+
+        if line_idxs.any():
+            #TODO(CJ): maybe put an error warning in here
+            self.min_line_ = np.min(line_idxs)
+            self.max_line_ = np.max(line_idxs)
 
     def atom_list(self) -> List[Atom]:
         """Returns a list of all Atom() objects that the Residue() "owns" """
@@ -78,7 +80,6 @@ class Residue:
         self.chain_ = val
         self.residue_key = f"{self.chain_}.{self.name}.{self.num_}"
 
-
     def num(self) -> int:
         """Getter for the Residue()'s number."""
         return self.num_
@@ -101,7 +102,6 @@ class Residue:
             abs(self.max_line() - other.min_line()) == 1
         )
 
-
     def is_metal(self) -> bool:
         """Checks if the Residue() is a metal as defined by enzy_htp.chemical.metal.METAL_MAPPER"""
         return self.name in METAL_MAPPER
@@ -117,6 +117,10 @@ class Residue:
     def is_rd_non_ligand(self) -> bool:
         """Checks if the Residue() is an rd_non_ligand as defined by enzy_htp.chemical.solvent.RD_NON_LIGAND_LIST"""
         return self.name in RD_NON_LIGAND_LIST
+
+    def sequence_equivalent(self, other : Residue ) -> bool:
+        """Comparator that checks for sequence same-ness."""
+        return self.residue_key == other.residue_key
 
     @dispatch
     def rtype(self, new_rtype: ResidueType) -> None:

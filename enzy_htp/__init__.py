@@ -4,7 +4,7 @@ import logging
 from typing import Tuple
 
 # enzy_htp imports
-from .config import Config 
+from .config import Config
 from .interface import Interface
 from .structure import Structure, Residue
 from .core import (
@@ -19,10 +19,11 @@ from .chemical import ResidueType
 CONFIG = None
 INTERFACE = None
 
+
 def init() -> Tuple[Config, Interface]:
     """"""
     global CONFIG
-    global INTERFACE 
+    global INTERFACE
     CONFIG = Config()
-    INTERFACE = Interface( CONFIG )
-    return (CONFIG, INTERFACE )
+    INTERFACE = Interface(CONFIG)
+    return (CONFIG, INTERFACE)

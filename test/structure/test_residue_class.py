@@ -70,6 +70,41 @@ def test_check_all_canonical():
         assert rr.is_canonical()
         assert not rr.is_metal()
         assert not rr.is_rd_solvent()
-        assert not rr.is_rd_non_ligand()
+    assert not rr.is_rd_non_ligand()
 
+def test_sequence_equivalent_return_true():
+    """Testing that the Residue.sequence_equivalent() method returns True when desired."""
+    r1 = Residue("A.A.1",list())
+    r2 = Residue("A.A.1",list())
+    assert r1.sequence_equivalent( r2 )
+    assert r1.sequence_equivalent( deepcopy(r1) )
+    r3 = Residue("A.A.1",list())
+    r3.set_chain( 'B' )
+    assert not r1.sequence_equivalent( r3 )
+    r3.set_chain( 'A' )
+    assert r1.sequence_equivalent( r3 )
+
+def test_sequence_equivalent_return_false():
+    """Testing that the Residue.sequence_equivalent() method returns False when desired."""
+    r1 = Residue("A.A.1",list())
+    r2 = Residue("A.A.3",list())
+    assert not r1.sequence_equivalent( r2 )
+    r3 = Residue("A.B.1",list())
+    assert not r1.sequence_equivalent( r3 )
+    r4 = Residue("B.A.1",list())
+    assert not r1.sequence_equivalent( r4 )
 #TODO(CJ) add in some tests for other types of residues
+
+def test_chain_getters_and_setters():
+    """Testing the chain accession methods."""
+    test_res = Residue("A.A.1",list())
+    assert test_res.chain() == "A"
+    assert not test_res.empty_chain()
+    test_res.set_chain("")
+    assert test_res.residue_key == ".A.1"
+    assert test_res.empty_chain()
+    assert test_res.chain() == ""
+    test_res.set_chain("B")
+    assert not test_res.empty_chain()
+    assert test_res.chain() == "B"
+    assert test_res.residue_key == "B.A.1"

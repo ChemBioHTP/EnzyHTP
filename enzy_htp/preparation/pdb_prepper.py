@@ -15,13 +15,14 @@ from pdb2pqr.main import build_main_parser as build_pdb2pqr_parser
 
 from typing import Set, Union, List, Tuple
 import enzy_htp.core as core
-from ..core.file_system import (
-    base_file_name,
-    get_current_time,
-    safe_mkdir,
-    lines_from_file,
-    write_lines,
-)
+from enzy_htp.core import file_system as fs
+#from ..core.file_system import (
+#    base_file_name,
+#    get_current_time,
+#    safe_mkdir,
+#    lines_from_file,
+#    write_lines,
+#)
 
 from enzy_htp.core import file_system as fs
 from enzy_htp.structure import structure_from_pdb, Ligand, ligand_from_pdb
@@ -32,12 +33,18 @@ from .pdb_line import PDBLine, read_pdb_lines
 import openbabel
 import openbabel.pybel as pybel
 
-#from .ligand import Ligand, protonate_ligand
+# from .ligand import Ligand, protonate_ligand
 
 from typing import List
 
 # from .mutate import MutaFlag, mutaflag_to_str
-from .mutate import Mutation, mutation_to_str, decode_mutaflags, get_all_combinations, get_all_combinations
+from .mutate import (
+    Mutation,
+    mutation_to_str,
+    decode_mutaflags,
+    get_all_combinations,
+    get_all_combinations,
+)
 
 # from ..core import em
 from enzy_htp.chemical import convert_to_three_letter, get_element_aliases
@@ -48,20 +55,20 @@ class PDBPrepper:
         self, pdb_name, **kwargs
     ):  # , PDB_input, wk_dir="", name="", input_type="path"):
         """Inits PDBPrepper with a pdb file and optionally a work directory to place temporary files."""
-        self.current_path_ : str = None
+        self.current_path_: str = None
         self.no_water_path = None
         self.pdb_path = pdb_name
-        self.base_pdb_name = base_file_name(pdb_name)
+        self.base_pdb_name = fs.base_file_name(pdb_name)
         self.work_dir = kwargs.get(
-            "work_dir", f"{get_current_time()}_{self.base_pdb_name}"
+            "work_dir", f"{fs.get_current_time()}_{self.base_pdb_name}"
         )
-        safe_mkdir(self.work_dir)
+        fs.safe_mkdir(self.work_dir)
         shutil.copy(self.pdb_path, f"{self.work_dir}/{self.base_pdb_name}.pdb")
         self.path_name = f"{self.work_dir}/{self.base_pdb_name}.pdb"
-        self.pqr_path = str() 
+        self.pqr_path = str()
         self.mutations = []
         self.current_path_ = self.path_name
-        self.all_paths = [ self.current_path_ ]
+        self.all_paths = [self.current_path_]
 
     def current_path(self) -> str:
         """Gets the most recent PDB that has been created."""
@@ -76,15 +83,15 @@ class PDBPrepper:
         mask = [True] * len(pdb_lines)
 
         for pidx, pl in enumerate(pdb_lines[:-1]):
-            if pl.is_TER() and pdb_lines[pidx+1].is_TER():
-                mask[pidx+1] = False
-        
+            if pl.is_TER() and pdb_lines[pidx + 1].is_TER():
+                mask[pidx + 1] = False
+
         pdb_lines = np.array(pdb_lines)[mask]
         self.no_water_path = f"{self.work_dir}/{self.base_pdb_name}_rmW.pdb"
-        write_lines(self.no_water_path, list(map(str, pdb_lines)))
+        fs.write_lines(self.no_water_path, list(map(str, pdb_lines)))
 
         self.current_path_ = self.no_water_path
-        self.all_paths.append( self.current_path_ )
+        self.all_paths.append(self.current_path_)
         return self.current_path_
 
     def _update_name(self):
@@ -421,10 +428,9 @@ class PDBPrepper:
         """
         pass
 
-
     def protonate_ligand(
-    self, ligand: Ligand, dirname=".", method="PYBEL", ph=7.0, keep_name=1
-) -> Ligand:
+        self, ligand: Ligand, dirname=".", method="PYBEL", ph=7.0, keep_name=1
+    ) -> Ligand:
         # def protonate_ligand(cls, path, method="PYBEL", ph=7.0, keep_name=1):
         """
         Protonate the ligand from 'path' with 'method', provide out_path and net charge.
@@ -473,8 +479,7 @@ class PDBPrepper:
             #     net_charge=net_charge+atom.formalcharge
         if method == "Dimorphite":
             pass
-        return ligand_from_pdb(out_path,net_charge)
-
+        return ligand_from_pdb(out_path, net_charge)
 
     def _fix_ob_output(self, pdb_path, out_path, ref_name_path=None):
         """
@@ -487,63 +492,67 @@ class PDBPrepper:
             check if there're duplicated names originally, add suffix if there are.
         """
         if ref_name_path:
-            ref_a_atoms = read_pdb_lines( ref_name_path )
-            pdb_atoms  = read_pdb_lines( pdb_path )
-            ref_a_atoms = list(filter(lambda aa: aa.is_ATOM() or aa.is_HETATM(), ref_a_atoms))
-            pdb_atoms = list(filter(lambda aa: aa.is_ATOM() or aa.is_HETATM(), pdb_atoms))
-            assert len(pdb_atoms) == len(ref_a_atoms )
-            for idx,(p,a) in enumerate(zip(pdb_atoms, ref_a_atoms)):
+            ref_a_atoms = read_pdb_lines(ref_name_path)
+            pdb_atoms = read_pdb_lines(pdb_path)
+            ref_a_atoms = list(
+                filter(lambda aa: aa.is_ATOM() or aa.is_HETATM(), ref_a_atoms)
+            )
+            pdb_atoms = list(
+                filter(lambda aa: aa.is_ATOM() or aa.is_HETATM(), pdb_atoms)
+            )
+            assert len(pdb_atoms) == len(ref_a_atoms)
+            for idx, (p, a) in enumerate(zip(pdb_atoms, ref_a_atoms)):
                 pdb_atoms[idx].atom_name = a.atom_name
                 pdb_atoms[idx].atom_id = a.atom_id
                 pdb_atoms[idx].resi_id = a.resi_id
                 pdb_atoms[idx].resi_name = a.resi_name
-            #exit( 0 )
-        write_lines( out_path, list(map(lambda aa: aa.build() , pdb_atoms )))
-#            assert len(pdb_atoms) == len(ref_a_names )
-#            print('hereere')
-#            pdb_ls = read_pdb_lines(pdb_path)
-#            ref_resi_name = pdb_ls[0].resi_name
-#            for pdb_l in pdb_ls:
-#                if pdb_l.is_HETATM() or pdb_l.is_ATOM():
-#                    # pybel use line order (not atom id) to assign new atom id
-#                    ref_a_names.append(pdb_l.atom_name)
-#        print(ref_a_names) 
-#        # count element in a dict
-#        ele_count = {}
-#        pdb_ls = read_pdb_lines(pdb_path)
-#        line_count = 0
-#        lines = []
-#        for pdb_l in pdb_ls:
-#            if not pdb_l.is_ATOM() and not pdb_l.is_HETATM():
-#                continue
-#    
-#            if ref_name_path == None:
-#                ele = pdb_l.get_element()
-#            else:
-#                if line_count < len(ref_a_names):
-#                    ele = ref_a_names[line_count]
-#                else:
-#                    ele = pdb_l.get_element()  # New atoms
-#                pdb_l.resi_name = ref_resi_name
-#                line_count += 1
-#            # determine the element count
-#            try:
-#                # rename if more than one (add count)
-#                ele_count[ele] += 1
-#                pdb_l.atom_name = ele + str(ele_count[ele])
-#            except KeyError:
-#                ele_count[ele] = 0
-#                pdb_l.atom_name = ele
-#            lines.append(pdb_l.build())
-    
-        #write_lines(out_path, lines)
-    
-    
+            # exit( 0 )
+        write_lines(out_path, list(map(lambda aa: aa.build(), pdb_atoms)))
+
+    #            assert len(pdb_atoms) == len(ref_a_names )
+    #            print('hereere')
+    #            pdb_ls = read_pdb_lines(pdb_path)
+    #            ref_resi_name = pdb_ls[0].resi_name
+    #            for pdb_l in pdb_ls:
+    #                if pdb_l.is_HETATM() or pdb_l.is_ATOM():
+    #                    # pybel use line order (not atom id) to assign new atom id
+    #                    ref_a_names.append(pdb_l.atom_name)
+    #        print(ref_a_names)
+    #        # count element in a dict
+    #        ele_count = {}
+    #        pdb_ls = read_pdb_lines(pdb_path)
+    #        line_count = 0
+    #        lines = []
+    #        for pdb_l in pdb_ls:
+    #            if not pdb_l.is_ATOM() and not pdb_l.is_HETATM():
+    #                continue
+    #
+    #            if ref_name_path == None:
+    #                ele = pdb_l.get_element()
+    #            else:
+    #                if line_count < len(ref_a_names):
+    #                    ele = ref_a_names[line_count]
+    #                else:
+    #                    ele = pdb_l.get_element()  # New atoms
+    #                pdb_l.resi_name = ref_resi_name
+    #                line_count += 1
+    #            # determine the element count
+    #            try:
+    #                # rename if more than one (add count)
+    #                ele_count[ele] += 1
+    #                pdb_l.atom_name = ele + str(ele_count[ele])
+    #            except KeyError:
+    #                ele_count[ele] = 0
+    #                pdb_l.atom_name = ele
+    #            lines.append(pdb_l.build())
+
+    # write_lines(out_path, lines)
+
     def _ob_pdb_charge(self, pdb_path):
         """
         extract net charge from openbabel exported pdb file
         """
-    
+
         pdb_ls = read_pdb_lines(pdb_path)
         net_charge = 0
         for pdb_l in pdb_ls:
@@ -556,9 +565,8 @@ class PDBPrepper:
                     net_charge += int(charge)
         return net_charge
 
-
-    def merge_structure_elements(self, old_stru, new_stru ):
-        #TODO(CJ) documentation and type hints        
+    def merge_structure_elements(self, old_stru, new_stru):
+        # TODO(CJ) documentation and type hints
         metal_list = old_stru.get_metal_center()
         if len(metal_list):
             _LOGGER.info(f"Merging {len(metal_list)} metal centers in old structure!")
@@ -580,7 +588,8 @@ class PDBPrepper:
             print(lig_dir)
             new_ligands = list(
                 map(
-                    lambda ll: self.protonate_ligand(ll, dirname=lig_dir, ph=7), ligand_list
+                    lambda ll: self.protonate_ligand(ll, dirname=lig_dir, ph=7),
+                    ligand_list,
                 )
             )
             print(new_ligands)
@@ -609,14 +618,18 @@ class PDBPrepper:
         
         save the result to self.pqr_path
         """
-        def check_valid_ph( ph : float ) -> None: #TODO(CJ) maybe move this to somewhere else
+
+        def check_valid_ph(
+            ph: float,
+        ) -> None:  # TODO(CJ) maybe move this to somewhere else
             if ph < 0 or ph > 14:
                 raise core.InvalidPH(f"{ph:.2f} must be on range: [0.00,14.00]")
-        check_valid_ph( ph )
+
+        check_valid_ph(ph)
         # input of PDB2PQR
         self.pqr_path = f"{fs.remove_ext(self.current_path_)}.pqr.pdb"
-        self.all_paths.append( self.pqr_path )
-       
+        self.all_paths.append(self.pqr_path)
+
         pdb2pqr_parser = build_pdb2pqr_parser()
         args = pdb2pqr_parser.parse_args(
             [
@@ -641,10 +654,10 @@ class PDBPrepper:
 
         if not keep_id:
             new_stru.sort()
-        
+
         self.current_path_ = f"{fs.remove_ext(fs.remove_ext(self.pqr_path))}_aH.pdb"
-        self.all_paths.append( self.current_path_ )
-        
+        self.all_paths.append(self.current_path_)
+
         new_stru.to_pdb(self.current_path_, keep_id=keep_id)
         self.stru = new_stru
 
@@ -802,15 +815,15 @@ class PDBPrepper:
     def generate_mutations(
         self,
         n: int,
-        muta_flags: Union[str,List[str]] = None,
-        restrictions: List[Union[int,Tuple[int,int]]] = None,
-        random_state: int = 100
+        muta_flags: Union[str, List[str]] = None,
+        restrictions: List[Union[int, Tuple[int, int]]] = None,
+        random_state: int = 100,
     ) -> None:
         """"""
         existing = set()
         temp = []
         if muta_flags:
-            decoded : List[MutaFlag] = decode_mutaflags( muta_flags )
+            decoded: List[MutaFlag] = decode_mutaflags(muta_flags)
             for mf in decoded:
                 key = (mf.chain_index, mf.residue_index)
                 if key in existing:
@@ -827,10 +840,12 @@ class PDBPrepper:
             )
             self.mutations = muta_flags
             return
-        struct : Structure = structure_from_pdb( self.current_path() )
+        struct: Structure = structure_from_pdb(self.current_path())
         curr_state = struct.residue_state()
-        candidates : List[MutaFlag] = get_all_combinations( curr_state, restrictions=restrictions )
-        
+        candidates: List[MutaFlag] = get_all_combinations(
+            curr_state, restrictions=restrictions
+        )
+
         np.random.seed(random_state)
         np.random.shuffle(candidates)
 
@@ -850,7 +865,6 @@ class PDBPrepper:
 
         self.mutations = muta_flags
         assert len(self.mutations) == len(set(self.mutations))
-
 
     def _build_MutaName(self, Flag):
         """

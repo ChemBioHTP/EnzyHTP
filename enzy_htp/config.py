@@ -62,5 +62,3 @@ class Config:
 
     def env_manager(self):
         return self._em
-
-

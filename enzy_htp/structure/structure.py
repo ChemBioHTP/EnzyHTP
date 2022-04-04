@@ -1,4 +1,11 @@
-# TODO(CJ) add documentation
+"""Definition for the Structure class. Structure objects represent a single protein/enzyme system. They
+are composed of Chain objects and their respecitve residues. The majority of EnzyHTP's structural 
+manipulations are carried out throughthis class.
+
+Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Date: 2022-04-03
+"""
 from __future__ import annotations
 
 import string
@@ -18,27 +25,42 @@ from .metal_atom import MetalAtom
 
 from ..chemical import one_letters_except, convert_to_one_letter
 
-#from enzy_htp.preparation import MutaFlag
+# from enzy_htp.preparation import MutaFlag
 from enzy_htp.core import file_system as fs
 
 
 class Structure:
-    #TODO(CJ) fix these types
-    def __init__(self, chains : List[Chain] = None, solvents : List[Solvent] = None,
-        metal_atoms : List[MetalAtom] = None, ligands : List[Ligand] = None
-    ):
-        self.chains = chains
-        self.solvents = solvents
-        self.metal_atoms = metal_atoms
-        self.ligands = ligands
+    """High level representation of protein/enzyme structure. Composed of Chain() objects and serves
+	as wrapper to their respective data and fucntionality.
 
-    def residue_state(self) -> List[Tuple[str,str,int]]:
+	Note: This class SHOULD NOT be created directly by users. It should be created with the enzy_htp.structure.structure_from_pdb() method.
+
+	Attributes:
+		chains : A list of Chain objects contained within the structure. 
+		chain_mapper : A dict() which maps chain id to the chain object.
+	"""
+
+    def __init__(self, chains: List[Chain]):
+        self.chains = chains
+        self.chain_mapper = dict()
+        ch: Chain
+        for ch in chains:
+            if ch.name() in self.chain_mapper:
+                _LOGGER.error(
+                    "Duplicate chain names given to Structure() object. Exiting..."
+                )
+                exit(1)
+            self.chain_mapper[ch.name()] = ch
+
+    def residue_state(self) -> List[Tuple[str, str, int]]:
         """Generates a list of tuples of all residues in the Structure. Format for each tuple is (chain_id, one_letter_res_name, res_index)."""
         result = list()
-        for cname, chain in self.chains.items():
+        for cname, chain in self.chain_mapper.items():
             for residue in chain.residues():
-                (chain, res_name, index ) = residue.residue_key.split('.')
-                result.append( (chain, convert_to_one_letter(res_name), int(index) ) )
+                if not residue.is_canonical():
+                    continue
+                (chain, res_name, index) = residue.residue_key.split(".")
+                result.append((chain, convert_to_one_letter(res_name), int(index)))
         return result
 
     def get_metal_center(self):
@@ -58,9 +80,7 @@ class Structure:
         """
         find art_resi
         """
-        pass # TODO(CJ) implement add_[ligand|metal_center|chain], etc.
-    
-
+        pass  # TODO(CJ) implement add_[ligand|metal_center|chain], etc.
 
     def add(self, obj, id=None, sort=0):
         """
@@ -99,7 +119,7 @@ class Structure:
             #          |     |    0     |   1   |
             # assigned |  0  |   keep   | clean |
             #          |  1  |  assign  | mark  |
-            #for i in obj:
+            # for i in obj:
             #    i.set_parent(self)
             #    if sort:
             #        if id != None:
@@ -224,18 +244,20 @@ class Structure:
             * do not sort atomic order in a residue like tleap does.
         """
         # TODO(CJ) add warning for overwriting an existing file
-        # TODO(CJ) need to add an error for when a different file format is specifieid 
+        # TODO(CJ) need to add an error for when a different file format is specifieid
         lines = list()
         if ff == "AMBER":
             for cname, chain in self.chains.items():
                 # write chain
-                chain : Chain
+                chain: Chain
                 a_idx = 0
                 for resi in chain.residues():
-                    resi : Residue
+                    resi: Residue
                     for atom in resi.atom_list():
                         a_idx += 1
-                        lines.append(atom.to_pdb_line(a_id=a_idx,ff=ff, forcefield=forcefield))
+                        lines.append(
+                            atom.to_pdb_line(a_id=a_idx, ff=ff, forcefield=forcefield)
+                        )
                 # add TER after each chain
                 lines.append("TER")
 
@@ -245,13 +267,19 @@ class Structure:
                 c_id = chr(ord(c_id) + 1)
                 for atom in ligand.atom_list():
                     a_idx += 1
-                    lines.append(atom.to_pdb_line(a_id=a_idx,c_id=c_id, ff=ff, forcefield=forcefield))
+                    lines.append(
+                        atom.to_pdb_line(
+                            a_id=a_idx, c_id=c_id, ff=ff, forcefield=forcefield
+                        )
+                    )
                 lines.append("TER")
 
             for metal in self.metal_atoms:
                 c_id = chr(ord(c_id) + 1)
                 a_idx += 1
-                lines.append(metal.build(a_id=a_idx,c_id=c_id, ff=ff, forcefield=forcefield))
+                lines.append(
+                    metal.build(a_id=a_idx, c_id=c_id, ff=ff, forcefield=forcefield)
+                )
                 lines.append("TER")
 
             if len(self.solvents):
@@ -259,10 +287,11 @@ class Structure:
                 for solvent in self.solvents:
                     for atom in solvent:
                         a_idx += 1
-                        lines.append(atom.build(
-                            a_id=a_idx,
-                            c_id=c_id, ff=ff, forcefield=forcefield
-                        ))
+                        lines.append(
+                            atom.build(
+                                a_id=a_idx, c_id=c_id, ff=ff, forcefield=forcefield
+                            )
+                        )
                 lines.append("TER")
 
         lines.append("END")
@@ -803,10 +832,20 @@ class Structure:
         if i > 3:
             raise StopIteration
 
-    def __eq__(self, other : Structure ) -> bool:
-        """TODO"""
-        return self.chains == other.chains and self.solvents == other.solvents and self.metal_atoms == other.metal_atoms and self.ligands == other.ligands
+    def __eq__(self, other: Structure) -> bool:
+        """Comparison operator for other Structure() objects. Checks first if both have same chain names and then if each named chain is identical."""
+        if set(self.chain_mapper.keys()) != set(other.chain_mapper.keys()):
+            return False
 
+        chain_name : Chain
+        other_chain : Chain
+        for chain_name, self_chain in self.chain_mapper.items():
+            other_chain = other.chain_mapper[chain_name]
+            if self_chain.same_sequence(other_chain):
+                return False
+        return True
 
-
+    def __neq__(self, other: Structure) -> bool:
+        """Negation operator for other Structure() objects. Inverstion of Structure.__eq__ """
+        return not (self == other)
 

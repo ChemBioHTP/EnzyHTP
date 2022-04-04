@@ -25,4 +25,5 @@ class UnsupportedFileType(Exception):
 
 class InvalidPH(Exception):
     """Exception corresponding to an invalid pH not in the range 0-14."""
+
     pass

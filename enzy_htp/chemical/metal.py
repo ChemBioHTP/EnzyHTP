@@ -31,8 +31,8 @@ METAL_MAPPER: Dict[str, str] = {
     "HG": "Hg",
     "CD": "Cd",
     "YB": "Yb",
-    "CA": "Ca", 
-	"SN": "Sn",
+    "CA": "Ca",
+    "SN": "Sn",
     "PB": "Pb",
     "EU": "Eu",
     "SR": "Sr",
@@ -59,7 +59,7 @@ METAL_MAPPER: Dict[str, str] = {
     "TH": "Th",
 }
 
-METAL_CENTER_MAP : Dict[str,str] = {
+METAL_CENTER_MAP: Dict[str, str] = {
     "MG": "Mg",
     "TL": "Tl",
     "CU": "Cu",

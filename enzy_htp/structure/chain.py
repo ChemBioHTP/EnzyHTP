@@ -5,6 +5,7 @@ Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-20
 """
+from __future__ import annotations
 from ..core import _LOGGER
 from typing import List
 
@@ -15,6 +16,7 @@ from .residue import Residue
 
 # TODO(CJ) Add ability to rename the chain
 
+
 class Chain:
     """Class that represents a Chain of residues in a PDB file. Serves as a manager to the 
     Residue() objects that it owns.
@@ -23,7 +25,8 @@ class Chain:
         self.name_ : The name of the chain as a string.
 		self.residues_ : A list of Residue() objects.
     """
-    def __init__(self, name : str, residues : List[Residue]):
+
+    def __init__(self, name: str, residues: List[Residue]):
         """Initiation of a Chain with a name and list of residues."""
         self.name_ = name
         self.residues_: List[Residue] = residues
@@ -67,6 +70,19 @@ class Chain:
         """Allows deleting of the child Residue() objects."""
         del self.residues_[key]
 
+    def same_sequence(self, other : Chain ) -> bool:
+        """Comparison operator for use with other Chain() objects. Checks if residue list is identical in terms of residue name only."""
+        self_residues : List[Residue] = self.residues_
+        other_residues : List[Residue] = other.residues_
+        if len(self_residues) != len(other_residues):
+            return False
+      
+        for s, o in zip(self_residues, other_residues):
+            s : Residue
+            o : Residue
+            if not s.sequence_equivalent( o ):
+                return False
+        return True
 
 # class Chain(Child):
 #    """
