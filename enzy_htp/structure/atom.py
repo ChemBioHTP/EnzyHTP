@@ -52,7 +52,7 @@ class Atom:
         self.blank_2 = None
         self.blank_3 = None
         self.blank_4 = None #@shaoqz: why do we need to extract everything from pandas.Serie. Probably just extract useful ones. So that it is easier to read. or denote useful ones in the doc string. 
-        self.chain_id = str()
+        self.chain_id = str() #@shaoqz: another reason to have less interfacing attributes is that atom objects do not only come from PDB files. A case would be add_H function in fix_metal protocol where an atom is created only base on the coordinate and the associated parent residue and added to the residue. This is another reason to also have the parent pointer so that we dont need to pass chain informations to the atom again.
         self.charge = float()
         self.element_symbol = str()
         self.insertion = None

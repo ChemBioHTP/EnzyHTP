@@ -1,6 +1,6 @@
 """Definition for the Residue class. Residues are the most common unit of function within 
 enzy_htp. A Residue() can be canonincal, non-canonical, solvent, or ligand. It is essentially
-the catch all for PDB objects.
+the catch all for PDB objects. #@shaoqz: wym by PDB object. The new pdb parser object?
 
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
@@ -24,7 +24,7 @@ from enzy_htp.chemical import (
 
 class Residue:
     """Most common functional unit in enzy_htp. Made up of Atom() objects and can be either
-	canonical, non-canonical, solvent or a metal center. 
+	canonical, non-canonical, solvent or a metal center. #@shaoqz: or ligand.
 
     Attributes:
         self.atoms : A list of Atom() objects that make up the Residue().
@@ -43,16 +43,16 @@ class Residue:
         (chain, name, num) = self.residue_key.split(".")
         self.chain_ = chain
         self.name = name
-        self.num_ = int(num)
+        self.num_ = int(num)  #@shaoqz: call it id will make more sense to users, idk why biopanda call it num lol but we should avoid confusions.
         self.rtype_ = ResidueType.UNKNOWN
         line_idxs = np.array(list(map(lambda aa: aa.line_idx, self.atoms)))
         self.min_line_ = np.min(line_idxs)
-        self.max_line_ = np.max(line_idxs)
+        self.max_line_ = np.max(line_idxs) #@shaoqz: We should aviod attributes having relationship with detailed PDB formatting in the structure class. Since a residue object could from different sources. (e.g. user made one inside of python that added to the chain.)
         # TODO what are the checks that we should be doing here?
 
     def atom_list(self) -> List[Atom]:
         """Returns a list of all Atom() objects that the Residue() "owns" """
-        return self.atoms
+        return self.atoms #@shaoqz: is it a common thing to have functions instead of the attribute itself to call? 
 
     def __determine_residue_type(self):
         # TODO finish this algorithm
@@ -72,7 +72,7 @@ class Residue:
 
     def set_chain(self, val: str) -> None:
         """Sets chain and all child atoms to new value. Re-generates the self.residue_key attribute."""
-        chain = val
+        chain = val #@shaoqz: forgot this line?
         for idx in range(len(self.atoms)):
             self.atoms[idx].chain_id = val
         self.chain_ = val
@@ -99,7 +99,7 @@ class Residue:
         """Checks if two residues from the same PDB are neighbors."""
         return (abs(self.min_line() - other.max_line()) == 1) or (
             abs(self.max_line() - other.min_line()) == 1
-        )
+        ) #@shaoqz: these PDB related methods should be under the class related to the pdb parser.
 
 
     def is_metal(self) -> bool:
@@ -125,7 +125,7 @@ class Residue:
     @dispatch
     def rtype(self) -> ResidueType:
         pass
-
+    #@shaoqz: the add() method will be important as a basic framework of every component of the structure class
     # TODO add operator overloading to move the chain?
 
 
