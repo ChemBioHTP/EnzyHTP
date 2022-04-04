@@ -66,17 +66,16 @@ class Structure:
 
     def get_metals(self) -> List[Residue]:
         """Filters out the metal Residue()'s from the chains in the Structure()."""
-        result : List[Residue] = list()
+        result: List[Residue] = list()
         for chain in self.chains:
-            result.extend( list(filter(lambda r : r.is_metal(), chain.residues() )))
+            result.extend(list(filter(lambda r: r.is_metal(), chain.residues())))
         return result
-
 
     def get_ligands(self) -> List[Residue]:
         """Filters out the ligand Residue()'s from the chains in the Structure()."""
-        result : List[Residue] = list()
+        result: List[Residue] = list()
         for chain in self.chains:
-            result.extend( list(filter(lambda r : r.is_ligand(), chain.residues() )))
+            result.extend(list(filter(lambda r: r.is_ligand(), chain.residues())))
         return result
 
     def get_art_resi(self):
@@ -85,14 +84,14 @@ class Structure:
         """
         pass  # TODO(CJ) implement add_[ligand|metal_center|chain], etc.
 
-    def insert_chain(self, new_chain : Chain ) -> None:
-        #TODO(CJ): documentation
+    def insert_chain(self, new_chain: Chain) -> None:
+        # TODO(CJ): documentation
         self.chains.append(new_chain)
         self.chain_mapper[new_chain.name()] = new_chain
 
     def add(self, obj, id=None, sort=0):
-        #TODO(CJ): figure out how this works
-        return 
+        # TODO(CJ): figure out how this works
+        return
         """
         1. judge obj type (go into the list)
         2. assign parent
@@ -240,21 +239,20 @@ class Structure:
                     a_id += 1
                     atom.id = a_id
 
-    def to_pdb(self, out_path : str) -> None:
+    def to_pdb(self, out_path: str) -> None:
         """Saves the structure to the specified file in the PDB file format."""
         lines = list()
         a_idx = 1
         for cname, chain in self.chain_mapper.items():
-            a_idx = chain.renumber_atoms(a_idx) 
-            lines.extend( chain.get_pdb_lines() )
-            a_idx += 1 
+            a_idx = chain.renumber_atoms(a_idx)
+            lines.extend(chain.get_pdb_lines())
+            a_idx += 1
         lines.append("END")
         fs.write_lines(out_path, lines)
 
     def get_solvents(self):
-        #TODO(CJ)
+        # TODO(CJ)
         return []
-
 
     def build_ligands(
         self, dir, ft="PDB", ifcharge=0, c_method="PYBEL", ph=7.0, ifname=0, ifunique=0
@@ -796,8 +794,8 @@ class Structure:
         if set(self.chain_mapper.keys()) != set(other.chain_mapper.keys()):
             return False
 
-        chain_name : Chain
-        other_chain : Chain
+        chain_name: Chain
+        other_chain: Chain
         for chain_name, self_chain in self.chain_mapper.items():
             other_chain = other.chain_mapper[chain_name]
             if self_chain.same_sequence(other_chain):
@@ -807,4 +805,3 @@ class Structure:
     def __neq__(self, other: Structure) -> bool:
         """Negation operator for other Structure() objects. Inverstion of Structure.__eq__(). """
         return not (self == other)
-

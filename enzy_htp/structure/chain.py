@@ -12,6 +12,7 @@ from typing import List
 
 from .residue import Residue
 
+
 class Chain:
     """Class that represents a Chain of residues in a PDB file. Serves as a manager to the 
     Residue() objects that it owns.
@@ -25,7 +26,7 @@ class Chain:
         """Initiation of a Chain with a name and list of residues."""
         self.name_ = name
         self.residues_: List[Residue] = deepcopy(residues)
-        self.rename( self.name_ )
+        self.rename(self.name_)
 
     def is_metal(self) -> bool:
         """Checks if any metals are contained within the current chain."""
@@ -63,26 +64,26 @@ class Chain:
         """Allows deleting of the child Residue() objects."""
         del self.residues_[key]
 
-    def same_sequence(self, other : Chain ) -> bool:
+    def same_sequence(self, other: Chain) -> bool:
         """Comparison operator for use with other Chain() objects. Checks if residue list is identical in terms of residue name only."""
-        self_residues : List[Residue] = self.residues_
-        other_residues : List[Residue] = other.residues_
+        self_residues: List[Residue] = self.residues_
+        other_residues: List[Residue] = other.residues_
         if len(self_residues) != len(other_residues):
             return False
-      
+
         for s, o in zip(self_residues, other_residues):
-            s : Residue
-            o : Residue
-            print(s,o)
-            if not s.sequence_equivalent( o ):
+            s: Residue
+            o: Residue
+            print(s, o)
+            if not s.sequence_equivalent(o):
                 return False
         return True
 
-    def rename(self, new_name : str ) -> None:
+    def rename(self, new_name: str) -> None:
         """Renames the chain and propagates the new chain name to all child Residue()'s."""
         self.name_ = new_name
-        res : Residue
-        for ridx, res in enumerate( self.residues_ ):
+        res: Residue
+        for ridx, res in enumerate(self.residues_):
             self.residues_[ridx].set_chain(new_name)
 
     def num_atoms(self) -> int:
@@ -97,19 +98,21 @@ class Chain:
 		Exits if start index <= 0.
 		"""
         if start <= 0:
-            _LOGGER.error(f"Illegal start number '{start}'. Value must be >= 0. Exiting...")
-            exit( 1 )
-        self.residues_ = sorted( self.residues_, key=lambda r: r.num())
+            _LOGGER.error(
+                f"Illegal start number '{start}'. Value must be >= 0. Exiting..."
+            )
+            exit(1)
+        self.residues_ = sorted(self.residues_, key=lambda r: r.num())
         idx = start
         for ridx, res in enumerate(self.residues_):
             idx = self.residues_[ridx].renumber_atoms(idx)
             idx += 1
-        return (idx - 1)
+        return idx - 1
 
     def get_pdb_lines(self) -> List[str]:
         """Generates a list of PDB lines for the Atom() objects inside the Chain(). Last line is a TER."""
         result = list()
         for res in self.residues_:
-            result.extend( res.get_pdb_lines() )
+            result.extend(res.get_pdb_lines())
         result.append("TER")
         return result

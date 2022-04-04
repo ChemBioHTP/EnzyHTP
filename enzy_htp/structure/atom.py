@@ -196,6 +196,3 @@ class Atom:
         z = "{:<14.8f}".format(self.coord[2])
 
         return f"{atom_label} {fz_flag}   {x} {y} {z} {ly_flag}{cnt_flag}{line_feed}"
-
-
-

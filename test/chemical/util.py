@@ -6,10 +6,10 @@ Date: 2022-03-19
 
 from typing import List
 
-def all_caps( raw_vals : List[str] ) -> bool:
+
+def all_caps(raw_vals: List[str]) -> bool:
     """Helper method that checks all str() in a list() are capitalized."""
     for rv in raw_vals:
         if not rv.upper():
-            return False 
+            return False
     return True
-

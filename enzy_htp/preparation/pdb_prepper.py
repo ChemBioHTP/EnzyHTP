@@ -17,8 +17,15 @@ from typing import Set, Union, List, Tuple
 import enzy_htp.core as core
 
 from enzy_htp.core import file_system as fs
-from enzy_htp.structure import structure_from_pdb, Ligand, ligand_from_pdb, Chain, Structure
-#from ..structure.structure import Structure
+from enzy_htp.structure import (
+    structure_from_pdb,
+    Ligand,
+    ligand_from_pdb,
+    Chain,
+    Structure,
+)
+
+# from ..structure.structure import Structure
 from .pdb_line import PDBLine, read_pdb_lines
 
 
@@ -46,9 +53,8 @@ class PDBPrepper:
 		self.all_paths : A list of all paths created by the PDBPrepper() object. Stored in reverse order of age.
 
 	"""
-    def __init__(
-        self, pdb_name, **kwargs
-    ):  
+
+    def __init__(self, pdb_name, **kwargs):
         """Inits PDBPrepper with a pdb file and optionally a work directory to place temporary files."""
         self.current_path_: str = None
         self.no_water_path = None
@@ -560,9 +566,11 @@ class PDBPrepper:
                     net_charge += int(charge)
         return net_charge
 
-    def merge_structure_elements(self, old_stru : Structure, new_stru : Structure) -> Structure:
+    def merge_structure_elements(
+        self, old_stru: Structure, new_stru: Structure
+    ) -> Structure:
         """Method that compares two Structure() objects and combines missin elements from old_str to new_stru"""
-        # TODO(CJ) Maybe this should be part of the structure.structure.py file 
+        # TODO(CJ) Maybe this should be part of the structure.structure.py file
         metal_list = old_stru.get_metals()
         if len(metal_list):
             _LOGGER.info(f"Merging {len(metal_list)} metal centers in old structure!")
@@ -583,7 +591,7 @@ class PDBPrepper:
             fs.safe_mkdir(lig_dir)
             # TODO: logging
             print(lig_dir)
-            print('-asdgasdgasg')
+            print("-asdgasdgasg")
             old_keys = list(map(lambda l: l.residue_key, ligand_list))
             new_ligands = list(
                 map(
@@ -592,15 +600,17 @@ class PDBPrepper:
                 )
             )
             print(new_ligands)
-            for lig, ok  in zip(new_ligands, old_keys):
-                (c_id,r_name,r_id) = ok.split('.')
-                lig.set_chain( c_id )
+            for lig, ok in zip(new_ligands, old_keys):
+                (c_id, r_name, r_id) = ok.split(".")
+                lig.set_chain(c_id)
                 lig.name = r_name
-                lig.num_ = int(r_id) #TODO(CJ). make this a method for the Ligand() class
+                lig.num_ = int(
+                    r_id
+                )  # TODO(CJ). make this a method for the Ligand() class
                 lig.residue_key = ok
                 print(lig)
-                new_stru.insert_chain( Chain(lig.chain(), [lig] ) )
-            #new_stru.add(new_ligands, sort=0)
+                new_stru.insert_chain(Chain(lig.chain(), [lig]))
+            # new_stru.add(new_ligands, sort=0)
         return new_stru
 
     def get_protonation(

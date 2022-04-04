@@ -14,6 +14,7 @@ from ..chemical import METAL_CENTER_MAP
 class MetalAtom(Residue):
     """TODO(CJ): documentation
 	"""
+
     def __init__(self, name, resi_name, coord, ff, id=None, parent=None):
         """
         Have both atom_name, ele and resi_name 
@@ -304,7 +305,7 @@ class MetalAtom(Residue):
             raise StopIteration
 
 
-def residue_to_metal(residue : Residue) -> MetalAtom:
+def residue_to_metal(residue: Residue) -> MetalAtom:
     """Convenience function that converts Residue() to Metal() object."""
-    #TODO(CJ): implement this later
+    # TODO(CJ): implement this later
     pass

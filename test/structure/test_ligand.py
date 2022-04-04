@@ -18,6 +18,7 @@ def test_constat_data():
     assert not lig.is_metal()
     assert lig.rtype() == renum.ResidueType.LIGAND
 
+
 def test_net_charge():
     """Checking that the net_charge attribute works properly for both default and set values."""
     lig = Ligand("A.B.10", list())
@@ -30,9 +31,8 @@ def test_build_bad_fname():
     """Ensuring the Ligand.build() method fails when a non .pdb files is supplied."""
     lig = Ligand("A.B.10", list())
     with pytest.raises(SystemExit) as exe:
-         lig.build('test.txt')
+        lig.build("test.txt")
 
     assert exe
     assert exe.type == SystemExit
-    assert exe.value.code == 1 
-
+    assert exe.value.code == 1

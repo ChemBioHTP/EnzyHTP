@@ -25,11 +25,12 @@ class Ligand(Residue):
     Attributes:
 		self.net_charge : The net charge of the molecule.
     """
+
     def __init__(self, residue_key: str, atoms: List[Atom], **kwargs):
         """Constructor for Ligand. Identical to Residue() ctor but also takes net_charge value."""
         self.net_charge = kwargs.get("net_charge", None)
         Residue.__init__(self, residue_key, atoms)
-        self.set_rtype( renum.ResidueType.LIGAND )
+        self.set_rtype(renum.ResidueType.LIGAND)
 
     def is_ligand(self) -> bool:
         """Checks if the Residue is a ligand. Always returns True for this specialization."""
@@ -48,8 +49,10 @@ class Ligand(Residue):
         """Method that builds the given ligand to the specified path, making sure it is a pdb filepath."""
         ext = fs.get_file_ext(out_path).lower()
         if ext != ".pdb":
-            _LOGGER.error(f"The supplied file path '{out_path}' does not ahve a '.pdb' extension. Exiting...")
-            exit( 1 )
+            _LOGGER.error(
+                f"The supplied file path '{out_path}' does not ahve a '.pdb' extension. Exiting..."
+            )
+            exit(1)
         lines = list(
             map(
                 lambda pr: pr[1].to_pdb_line(a_id=pr[0] + 1, c_id=" "),
@@ -58,6 +61,7 @@ class Ligand(Residue):
         ) + ["TER", "END"]
         fs.write_lines(out_path, lines)
 
-def residue_to_ligand(ptr: Residue, net_charge : float = None) -> Ligand:
+
+def residue_to_ligand(ptr: Residue, net_charge: float = None) -> Ligand:
     """Convenience function that converts Residue to ligand."""
     return Ligand(ptr.residue_key, ptr.atoms, net_charge=net_charge)

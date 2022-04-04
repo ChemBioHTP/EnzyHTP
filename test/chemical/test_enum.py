@@ -15,6 +15,7 @@ def test_enum_value_comparisons():
     assert renum.ResidueType.METAL < renum.ResidueType.LIGAND
     assert renum.ResidueType.LIGAND < renum.ResidueType.UNKNOWN
 
+
 def test_converstion_to_integer():
     """Making sure conversion to integer works."""
     assert int(renum.ResidueType.CANONICAL) == 0
@@ -23,6 +24,7 @@ def test_converstion_to_integer():
     assert int(renum.ResidueType.METAL) == 3
     assert int(renum.ResidueType.LIGAND) == 4
     assert int(renum.ResidueType.UNKNOWN) == 5
+
 
 def test_conversion_from_integer():
     """Making sure conversion from integer works."""
@@ -42,4 +44,3 @@ def test_residue_type_mapper():
     assert renum.RESIDUE_TYPE_MAPPER[renum.ResidueType(3)] == "METAL"
     assert renum.RESIDUE_TYPE_MAPPER[renum.ResidueType(4)] == "LIGAND"
     assert renum.RESIDUE_TYPE_MAPPER[renum.ResidueType(5)] == "UNKNOWN"
-
