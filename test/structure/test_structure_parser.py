@@ -5,6 +5,7 @@ Date: 2022-03-31
 """
 import os
 import pytest
+import string
 
 from enzy_htp.core import file_system as fs
 from enzy_htp.structure import structure_parser as sp 
@@ -59,3 +60,9 @@ def test_check_valid_pdb_bad_input():
     fs.safe_rm( non_ascii_pdb )
     assert not os.path.exists( non_ascii_pdb )
 
+
+def test_legal_chain_names():
+    """Making sure all legal chains are created given a starting Residue() mapper."""
+    ALL_NAMES = list(string.ascii_uppercase) 
+    result1 = sp.legal_chain_names(dict())
+    assert set(result1) == set(ALL_NAMES)

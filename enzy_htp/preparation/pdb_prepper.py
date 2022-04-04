@@ -15,27 +15,15 @@ from pdb2pqr.main import build_main_parser as build_pdb2pqr_parser
 
 from typing import Set, Union, List, Tuple
 import enzy_htp.core as core
-from enzy_htp.core import file_system as fs
-#from ..core.file_system import (
-#    base_file_name,
-#    get_current_time,
-#    safe_mkdir,
-#    lines_from_file,
-#    write_lines,
-#)
 
 from enzy_htp.core import file_system as fs
-from enzy_htp.structure import structure_from_pdb, Ligand, ligand_from_pdb
-from ..structure.structure import Structure
+from enzy_htp.structure import structure_from_pdb, Ligand, ligand_from_pdb, Chain, Structure
+#from ..structure.structure import Structure
 from .pdb_line import PDBLine, read_pdb_lines
 
 
 import openbabel
 import openbabel.pybel as pybel
-
-# from .ligand import Ligand, protonate_ligand
-
-from typing import List
 
 # from .mutate import MutaFlag, mutaflag_to_str
 from .mutate import (
@@ -46,11 +34,15 @@ from .mutate import (
     get_all_combinations,
 )
 
-# from ..core import em
 from enzy_htp.chemical import convert_to_three_letter, get_element_aliases
 
 
 class PDBPrepper:
+    """
+
+	Attributes:
+
+	"""
     def __init__(
         self, pdb_name, **kwargs
     ):  # , PDB_input, wk_dir="", name="", input_type="path"):
@@ -507,7 +499,7 @@ class PDBPrepper:
                 pdb_atoms[idx].resi_id = a.resi_id
                 pdb_atoms[idx].resi_name = a.resi_name
             # exit( 0 )
-        write_lines(out_path, list(map(lambda aa: aa.build(), pdb_atoms)))
+        fs.write_lines(out_path, list(map(lambda aa: aa.build(), pdb_atoms)))
 
     #            assert len(pdb_atoms) == len(ref_a_names )
     #            print('hereere')
@@ -565,9 +557,10 @@ class PDBPrepper:
                     net_charge += int(charge)
         return net_charge
 
-    def merge_structure_elements(self, old_stru, new_stru):
-        # TODO(CJ) documentation and type hints
-        metal_list = old_stru.get_metal_center()
+    def merge_structure_elements(self, old_stru : Structure, new_stru : Structure) -> Structure:
+        """Method that compares two Structure() objects and combines missin elements from old_str to new_stru"""
+        # TODO(CJ) Maybe this should be part of the structure.structure.py file 
+        metal_list = old_stru.get_metals()
         if len(metal_list):
             _LOGGER.info(f"Merging {len(metal_list)} metal centers in old structure!")
             _LOGGER.info(f"Adding metal centers to new structure...")
@@ -579,13 +572,16 @@ class PDBPrepper:
             _LOGGER.info(f"Protonation complete!")
 
         # protonate ligands and combine with the pqr file
-        ligand_list = old_stru.ligands
-        if len(old_stru.ligands):
+        ligand_list = old_stru.get_ligands()
+        if len(ligand_list):
+            print(ligand_list)
             _LOGGER.info(f"Merging {len(ligand_list)} ligands in old structure!")
             lig_dir = self.work_dir + "/ligands/"
-            safe_mkdir(lig_dir)
+            fs.safe_mkdir(lig_dir)
             # TODO: logging
             print(lig_dir)
+            print('-asdgasdgasg')
+            old_keys = list(map(lambda l: l.residue_key, ligand_list))
             new_ligands = list(
                 map(
                     lambda ll: self.protonate_ligand(ll, dirname=lig_dir, ph=7),
@@ -593,7 +589,15 @@ class PDBPrepper:
                 )
             )
             print(new_ligands)
-            new_stru.add(new_ligands, sort=0)
+            for lig, ok  in zip(new_ligands, old_keys):
+                (c_id,r_name,r_id) = ok.split('.')
+                lig.set_chain( c_id )
+                lig.name = r_name
+                lig.num_ = int(r_id) #TODO(CJ). make this a method for the Ligand() class
+                lig.residue_key = ok
+                print(lig)
+                new_stru.insert_chain( Chain(lig.chain(), [lig] ) )
+            #new_stru.add(new_ligands, sort=0)
         return new_stru
 
     def get_protonation(

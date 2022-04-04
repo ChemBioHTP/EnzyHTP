@@ -1,114 +1,63 @@
+"""Specialization of the Residue() class for a Ligand. 
+
+Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Date: 2022-04-03
+"""
+
 import numpy as np
 
 from .atom import Atom
 from typing import List
 from .residue import Residue
+from enzy_htp.chemical import enum as renum
 
-# from enzy_htp.preparation import PDBLine, read_pdb_lines
-from ..core import (
-    get_file_ext,
-    write_lines,
+from enzy_htp.core import file_system as fs
+from enzy_htp.core import (
     UnsupportedFileType,
-    lines_from_file,
     _LOGGER,
 )
 
-import openbabel
-import openbabel.pybel as pybel
-
 
 class Ligand(Residue):
-    """
-    -------------
-    initilize from
-    PDB:        Residue.fromPDB(atom_input, input_type='PDB_line' or 'line_str' or 'file' or 'path')
-    raw data:   Residue(atom_name, coord)
-    Residue:    Ligand.fromResidue(atom_obj)
-    -------------
-    id
-    name
-    atoms = [atom, ...]
-    parent # the whole stru
-    -------------
-    Method
-    -------------
-    set_parent
-    -------------
-    """
+    """Represents a specific Ligand found in a .pdb file.
 
+    Attributes:
+		self.net_charge : The net charge of the molecule.
+    """
     def __init__(self, residue_key: str, atoms: List[Atom], **kwargs):
+        """Constructor for Ligand. Identical to Residue() ctor but also takes net_charge value."""
         self.net_charge = kwargs.get("net_charge", None)
-        Residue.__init__(self, "A.B.10", atoms)
+        Residue.__init__(self, residue_key, atoms)
+        self.set_rtype( renum.ResidueType.LIGAND )
 
-    #
-    #    @classmethod
-    #
-    #    @classmethod
-    #
-    #    def sort(self):
-    #        pass
-    #
+    def is_ligand(self) -> bool:
+        """Checks if the Residue is a ligand. Always returns True for this specialization."""
+        return True
 
     def set_residue_number(self, num: int) -> None:
+        """Changes the resdiue number for all of the substituent atoms."""
         for idx, aa in enumerate(self.atoms):
             self.atoms[idx].residue_number = num
 
     def get_net_charge(self) -> int:
+        """Getter for the net_charge attribute."""
         return self.net_charge
 
     def build(self, out_path: str) -> None:
-        """
-        build ligand file(out_path) with ft format
-        """
-        ext = get_file_ext(out_path).lower()
+        """Method that builds the given ligand to the specified path, making sure it is a pdb filepath."""
+        ext = fs.get_file_ext(out_path).lower()
         if ext != ".pdb":
-            raise UnsupportedFileType(out_path)
+            _LOGGER.error(f"The supplied file path '{out_path}' does not ahve a '.pdb' extension. Exiting...")
+            exit( 1 )
         lines = list(
             map(
                 lambda pr: pr[1].to_pdb_line(a_id=pr[0] + 1, c_id=" "),
                 enumerate(self.atoms),
             )
         ) + ["TER", "END"]
-        write_lines(out_path, lines)
+        fs.write_lines(out_path, lines)
 
-
-#    def get_net_charge(self, method="PYBEL", ph=7.0, o_dir="."):
-#        """
-#        get net charge for the ligand
-#        -------
-#        method   : PYBEL (default) use UNITY_ATOM_ATTR info from openbabel mol2
-#        """
-#        # build file
-#        mkdir(o_dir + "/cache")
-#        temp_path = o_dir + "/cache/ligand_temp.pdb"
-#        temp_pdb2_path = o_dir + "/cache/ligand_temp2.pdb"
-#        temp_pdb3_path = o_dir + "/cache/ligand_temp3.pdb"
-#        temp_m2_path = o_dir + "/cache/ligand_temp.mol2"
-#        self.build(temp_path)
-#        # charge
-#        if method == "PYBEL":
-#            pybel.ob.obErrorLog.SetOutputLevel(0)
-#            # remove H (or the )
-#            mol = next(pybel.readfile("pdb", temp_path))
-#            mol.removeh()
-#            mol.write("pdb", temp_pdb2_path, overwrite=True)
-#            # clean connectivity
-#            os.system("cat " + temp_pdb2_path + " |grep 'ATOM' > " + temp_pdb3_path)
-#            # add H and result net charge
-#            mol = next(pybel.readfile("pdb", temp_pdb3_path))
-#            mol.OBMol.AddHydrogens(False, True, ph)
-#            mol.write("mol2", temp_m2_path, overwrite=True)
-#            mol = next(pybel.readfile("mol2", temp_m2_path))
-#            net_charge = 0
-#            for atom in mol:
-#                net_charge = net_charge + atom.formalcharge
-#        self.net_charge = net_charge
-#        return net_charge
-#
-
-
-def residue_to_ligand(ptr: Residue) -> Ligand:
-    """
-    generate from a Residue object. copy data
-    """
-    return Ligand(ptr.name, ptr.atoms)
+def residue_to_ligand(ptr: Residue, net_charge : float = None) -> Ligand:
+    """Convenience function that converts Residue to ligand."""
+    return Ligand(ptr.residue_key, ptr.atoms, net_charge=net_charge)

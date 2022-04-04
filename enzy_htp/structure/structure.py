@@ -63,18 +63,20 @@ class Structure:
                 result.append((chain, convert_to_one_letter(res_name), int(index)))
         return result
 
-    def get_metal_center(self):
-        """
-        Extract metal centers from metalatoms. Judged by the MetalCenter_map
-        save to self.metal_centers
-        return self.metal_centers
-        """
-        print(self.metal_atoms)
-        self.metal_centers = list(
-            filter(lambda ma: ma.is_metal_center(), self.metal_atoms)
-        )
-        # TODO maybe this should be copied?
-        return self.metal_centers
+    def get_metals(self) -> List[Residue]:
+        """Filters out the metal Residue()'s from the chains in the Structure()."""
+        result : List[Residue] = list()
+        for chain in self.chains:
+            result.extend( list(filter(lambda r : r.is_metal(), chain.residues() )))
+        return result
+
+
+    def get_ligands(self) -> List[Residue]:
+        """Filters out the ligand Residue()'s from the chains in the Structure()."""
+        result : List[Residue] = list()
+        for chain in self.chains:
+            result.extend( list(filter(lambda r : r.is_ligand(), chain.residues() )))
+        return result
 
     def get_art_resi(self):
         """
@@ -82,7 +84,14 @@ class Structure:
         """
         pass  # TODO(CJ) implement add_[ligand|metal_center|chain], etc.
 
+    def insert_chain(self, new_chain : Chain ) -> None:
+        #TODO(CJ): documentation
+        self.chains.append(new_chain)
+        self.chain_mapper[new_chain.name()] = new_chain
+
     def add(self, obj, id=None, sort=0):
+        #TODO(CJ): figure out how this works
+        return 
         """
         1. judge obj type (go into the list)
         2. assign parent
@@ -245,57 +254,63 @@ class Structure:
         """
         # TODO(CJ) add warning for overwriting an existing file
         # TODO(CJ) need to add an error for when a different file format is specifieid
+        # TODO(CJ) have chains do this themselves 
         lines = list()
         if ff == "AMBER":
-            for cname, chain in self.chains.items():
+            a_idx = 0
+            for cname, chain in self.chain_mapper.items():
+                print(cname, chain.__dict__)
                 # write chain
                 chain: Chain
-                a_idx = 0
                 for resi in chain.residues():
                     resi: Residue
+                    print(resi,a_idx)
                     for atom in resi.atom_list():
                         a_idx += 1
                         lines.append(
-                            atom.to_pdb_line(a_id=a_idx, ff=ff, forcefield=forcefield)
+                            atom.to_pdb_line(a_id=a_idx, ff=ff, forcefield=forcefield, c_id=cname)
                         )
                 # add TER after each chain
                 lines.append("TER")
 
             c_id = chr(len(self.chains) + 64)
 
-            for ligand in self.ligands:
-                c_id = chr(ord(c_id) + 1)
-                for atom in ligand.atom_list():
-                    a_idx += 1
-                    lines.append(
-                        atom.to_pdb_line(
-                            a_id=a_idx, c_id=c_id, ff=ff, forcefield=forcefield
-                        )
-                    )
-                lines.append("TER")
-
-            for metal in self.metal_atoms:
-                c_id = chr(ord(c_id) + 1)
-                a_idx += 1
-                lines.append(
-                    metal.build(a_id=a_idx, c_id=c_id, ff=ff, forcefield=forcefield)
-                )
-                lines.append("TER")
-
-            if len(self.solvents):
-                c_id = chr(ord(c_id) + 1)  # chain_id for all solvent
-                for solvent in self.solvents:
-                    for atom in solvent:
-                        a_idx += 1
-                        lines.append(
-                            atom.build(
-                                a_id=a_idx, c_id=c_id, ff=ff, forcefield=forcefield
-                            )
-                        )
-                lines.append("TER")
+#            for ligand in self.get_ligands():
+#                c_id = chr(ord(c_id) + 1)
+#                for atom in ligand.atom_list():
+#                    a_idx += 1
+#                    lines.append(
+#                        atom.to_pdb_line(
+#                            a_id=a_idx, c_id=c_id, ff=ff, forcefield=forcefield
+#                        )
+#                    )
+#                lines.append("TER")
+#
+#            for metal in self.get_metals():
+#                c_id = chr(ord(c_id) + 1)
+#                a_idx += 1
+#                lines.append(
+#                    metal.build(a_id=a_idx, c_id=c_id, ff=ff, forcefield=forcefield)
+#                )
+#                lines.append("TER")
+#            
+#            for solvent in self.get_solvents():
+#                for atom in solvent:
+#                    a_idx += 1
+#                    lines.append(
+#                        atom.build(
+#                            a_id=a_idx, c_id=c_id, ff=ff, forcefield=forcefield
+#                        )
+#                    )
+#                lines.append("TER")
 
         lines.append("END")
         fs.write_lines(path, lines)
+
+    def get_solvents(self):
+        #TODO(CJ)
+        return []
+
 
     def build_ligands(
         self, dir, ft="PDB", ifcharge=0, c_method="PYBEL", ph=7.0, ifname=0, ifunique=0

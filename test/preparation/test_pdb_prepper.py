@@ -84,35 +84,34 @@ def test_prepper_get_protonation():
     assert equiv_files( target_pqr_pdb_file, actual_pqr_pdb_file, 66 )
     
 
-if False:
 
-    def test_prepper_get_protonation_invalid_pH():
-        """Making sure that the get_protonation() method throws with an invalid pH value."""
+def test_prepper_get_protonation_invalid_pH():
+    """Making sure that the get_protonation() method throws with an invalid pH value."""
+
+    with pytest.raises(InvalidPH) as exe:
+        PREPPER.get_protonation(ph=-1.)
+
+    assert exe
+    assert exe.type == InvalidPH
+
+    with pytest.raises(InvalidPH) as exe:
+        PREPPER.get_protonation(ph=15)
+
+    assert exe
+    assert exe.type == InvalidPH
+
+
+def test_generate_mutations():
+    """Making sure the generate_mutations() method works correctly."""
+
+    PREPPER.generate_mutations(n=1)
+    assert len(PREPPER.mutations) == 1
+    first_run = PREPPER.mutations[0]
+    PREPPER.generate_mutations(n=1)
+    assert len(PREPPER.mutations) == 1
+    second_run = PREPPER.mutations[0]
     
-        with pytest.raises(InvalidPH) as exe:
-            PREPPER.get_protonation(ph=-1.)
-    
-        assert exe
-        assert exe.type == InvalidPH
-    
-        with pytest.raises(InvalidPH) as exe:
-            PREPPER.get_protonation(ph=15)
-    
-        assert exe
-        assert exe.type == InvalidPH
-    
-    
-    def test_generate_mutations():
-        """Making sure the generate_mutations() method works correctly."""
-    
-        PREPPER.generate_mutations(n=1)
-        assert len(PREPPER.mutations) == 1
-        first_run = PREPPER.mutations[0]
-        PREPPER.generate_mutations(n=1)
-        assert len(PREPPER.mutations) == 1
-        second_run = PREPPER.mutations[0]
-        
-        assert first_run == second_run
-    
-    def test_apply_mutations():
-        """Checking that the PDBPrepper() can apply the mutation using tleap."""
+    assert first_run == second_run
+
+def test_apply_mutations():
+    """Checking that the PDBPrepper() can apply the mutation using tleap."""
