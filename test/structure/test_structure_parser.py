@@ -6,14 +6,17 @@ Date: 2022-03-31
 import os
 import pytest
 import string
+import pandas as pd
+from typing import Dict
+from biopandas.pdb import PandasPdb
 
 from enzy_htp.core import file_system as fs
 from enzy_htp.structure import structure_parser as sp
-from enzy_htp.structure import Structure, structure_from_pdb
+from enzy_htp.structure import Structure,Residue,Chain, structure_from_pdb
 
 
 CURRDIR = os.path.dirname(os.path.abspath(__file__))
-
+DATA_DIR = f"{CURRDIR}/data/"
 
 def test_check_valid_pdb_good_input():
     """Good input for the check_valid_pdb() helper method."""
@@ -80,7 +83,32 @@ def test_legal_chain_names():
 
 def test_name_chains():
     """Ensuring that the name_chains() correctly names new chains."""
-    assert False
+    def get_chains( fname ) -> Dict[str,Chain]:
+        """Helper testing method to get the chains from a PDB file."""
+        reader = PandasPdb()
+        reader.read_pdb( fname )
+        res_mapper : Dict[str, Residue] = sp.build_residues( reader.df['ATOM'] ) 
+        chain_mapper : Dict[str, Chain] = sp.build_chains( res_mapper )
+        return chain_mapper
+    two_chain = f"{DATA_DIR}/two_chain.pdb"
+    three_chain = f"{DATA_DIR}/three_chain.pdb"
+    four_chain = f"{DATA_DIR}/four_chain.pdb"
+    two_mapper : Dict[str, Chain] = get_chains( two_chain )
+    three_mapper : Dict[str, Chain] = get_chains( three_chain )
+    four_mapper : Dict[str, Chain] = get_chains( four_chain )
+    two_mapper = sp.name_chains( two_mapper )
+    three_mapper = sp.name_chains( three_mapper )
+    four_mapper = sp.name_chains( four_mapper )
+
+    assert set(two_mapper.keys()) == {"A","B"}
+    assert set(three_mapper.keys()) == {"A","B","C"}
+    assert set(four_mapper.keys()) == {"A","B","C","D"}
+
+def test_name_chains_already_named():
+    """Ensuring that the name_chains() does not changed already named chains."""
+    already_named = {'A':[],'B':[]}
+    already_named = sp.name_chains( already_named )
+    assert set(already_named.keys()) == {'A','B'}
 
 
 def test_categorize_residues():
