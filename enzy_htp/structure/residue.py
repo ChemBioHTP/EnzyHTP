@@ -12,6 +12,7 @@ from plum import dispatch
 from typing import Tuple, List
 
 from .atom import Atom
+from enzy_htp.core import _LOGGER
 import enzy_htp.chemical as chem 
 
 class Residue:
@@ -30,6 +31,7 @@ class Residue:
     """
 
     def __init__(self, residue_key: str, atoms: List[Atom]):
+        """Constructor for the Residue() object. Takes residue_key in format of "chain_name.resdue_name.residue_id" and a list of Atom() objects."""
         self.atoms = atoms
         self.residue_key = residue_key
         (chain, name, num) = self.residue_key.split(".")
@@ -43,6 +45,25 @@ class Residue:
             self.min_line_ = np.min(line_idxs)
             self.max_line_ = np.max(line_idxs)
 
+
+    def renumber_atoms(self, start : int = 1 ) -> int:
+        """Renumbers the Residue()'s Atom()'s beginning with "start" paramter, defaulted to 1. Returns the index of the last Atom().
+		NOTE: errors if "start" is <= 0.
+		"""
+        if start <= 0:
+            _LOGGER.error(f"Illegal start number '{start}'. Value must be >= 0. Exiting...")
+            exit( 1 )
+        aa : Atom
+        self.atoms = sorted(self.atoms, key=lambda aa: aa.atom_number)
+        
+        for idx, aa in enumerate( self.atoms ):
+            self.atoms[idx].atom_number = (idx + start) 
+        return (idx+start)
+
+
+    def num_atoms(self) -> int:
+        """Number of atoms in the Residue."""
+        return len(self.atoms)
 
     def atom_list(self) -> List[Atom]:
         """Returns a list of all Atom() objects that the Residue() "owns" """
@@ -117,6 +138,13 @@ class Residue:
     def rtype(self) -> ResidueType:
         """Getter for the Residue()'s chem.ResidueType value."""
         return self.rtype_
+
+    def get_pdb_lines(self) -> List[str]:
+        """Method that gets the PDB lines for all of the Atom() objects in the Residue() object."""
+        result = list()
+        for aa in self.atoms:
+            result.append( aa.to_pdb_line() )
+        return result
 
     def __str__(self) -> str:
         """String representationt that just shows residue key in format "chain_id.residue_name.residue_num" """

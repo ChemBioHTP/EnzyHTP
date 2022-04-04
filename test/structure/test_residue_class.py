@@ -4,6 +4,7 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-19
 """
 import os
+import pytest
 import pandas as pd
 from typing import List
 from copy import deepcopy
@@ -108,3 +109,41 @@ def test_chain_getters_and_setters():
     assert not test_res.empty_chain()
     assert test_res.chain() == "B"
     assert test_res.residue_key == "B.A.1"
+
+def test_num_atoms():
+    """Making sure the Residue.num_atoms() method works correctly."""
+    empty_residue = Residue("A.A.1",list())
+    assert not empty_residue.num_atoms()
+    assert RESIDUES[0].num_atoms() == 32
+    res_cpy = deepcopy(RESIDUES[0])
+    res_cpy.atoms = [] 
+    assert not empty_residue.num_atoms()
+
+
+def test_renumber_atoms():
+    """Ensuring the Residue.renumber_atoms() method works and returns the correct offset number."""
+
+    res_cpy = deepcopy( RESIDUES[0] )
+    assert res_cpy.renumber_atoms(1) == 32
+    assert [aa.atom_number for aa in res_cpy.atoms] == list(range(1,33))
+    
+    res_cpy = deepcopy( RESIDUES[1] )
+    assert res_cpy.renumber_atoms(10) == 37
+    assert [aa.atom_number for aa in res_cpy.atoms] == list(range(10,38))
+
+
+def test_renumber_atoms_bad_input():
+    """Ensuring the Residue.renumber_atoms() method fails when an invalid start index (<= 0) is given."""
+    
+    with pytest.raises(SystemExit) as exe:
+         RESIDUES[0].renumber_atoms(0)
+
+    assert exe.type == SystemExit
+    assert exe.value.code == 1
+
+    with pytest.raises(SystemExit) as exe:
+         RESIDUES[0].renumber_atoms(-1)
+
+    assert exe.type == SystemExit
+    assert exe.value.code == 1
+

@@ -38,14 +38,17 @@ from enzy_htp.chemical import convert_to_three_letter, get_element_aliases
 
 
 class PDBPrepper:
-    """
+    """Class that handles initial preparation of a specified Structure().
 
 	Attributes:
+        self.current_path_ : The path to the most recently saved version of the Structure().
+	    self.work_dir : The scratch directory where temporary files are saved. The current time in the format "YYYY_MM_DD" is used if the keyword is not specified.
+		self.all_paths : A list of all paths created by the PDBPrepper() object. Stored in reverse order of age.
 
 	"""
     def __init__(
         self, pdb_name, **kwargs
-    ):  # , PDB_input, wk_dir="", name="", input_type="path"):
+    ):  
         """Inits PDBPrepper with a pdb file and optionally a work directory to place temporary files."""
         self.current_path_: str = None
         self.no_water_path = None
@@ -662,7 +665,7 @@ class PDBPrepper:
         self.current_path_ = f"{fs.remove_ext(fs.remove_ext(self.pqr_path))}_aH.pdb"
         self.all_paths.append(self.current_path_)
 
-        new_stru.to_pdb(self.current_path_, keep_id=keep_id)
+        new_stru.to_pdb(self.current_path_)
         self.stru = new_stru
 
         return self.current_path_
@@ -698,8 +701,7 @@ class PDBPrepper:
                     [distance]
                         ideal
                         allowed deviation
-                        force constant
-                        if_covalent
+                        force constant if_covalent
                     [angle]
                         ideal
                         allowed deviation

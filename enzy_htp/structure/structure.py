@@ -41,6 +41,7 @@ class Structure:
 	"""
 
     def __init__(self, chains: List[Chain]):
+        """Constructor that takes just a list of Chain() objects as input."""
         self.chains = chains
         self.chain_mapper = dict()
         ch: Chain
@@ -239,73 +240,16 @@ class Structure:
                     a_id += 1
                     atom.id = a_id
 
-    def to_pdb(self, path, ff="AMBER", forcefield="ff14SB", keep_id=0):
-        """
-        build PDB after the change based on the chosen format and forcefield
-        - line based on atom and contain chain index and residue index
-        ----------------------------
-        ff = 
-        AMBER (standard amber format: from tleap examples)
-            - resi and atom indexes start from 1 and DO NOT reset reaching a new chain. 
-            - use atom and residue names from amber force field.
-            - place metal, ligand, solvent in seperate chains (seperate with TER)
-            - ligand -> metal -> solvent order
-            * do not sort atomic order in a residue like tleap does.
-        """
-        # TODO(CJ) add warning for overwriting an existing file
-        # TODO(CJ) need to add an error for when a different file format is specifieid
-        # TODO(CJ) have chains do this themselves 
+    def to_pdb(self, out_path : str) -> None:
+        """Saves the structure to the specified file in the PDB file format."""
         lines = list()
-        if ff == "AMBER":
-            a_idx = 0
-            for cname, chain in self.chain_mapper.items():
-                print(cname, chain.__dict__)
-                # write chain
-                chain: Chain
-                for resi in chain.residues():
-                    resi: Residue
-                    print(resi,a_idx)
-                    for atom in resi.atom_list():
-                        a_idx += 1
-                        lines.append(
-                            atom.to_pdb_line(a_id=a_idx, ff=ff, forcefield=forcefield, c_id=cname)
-                        )
-                # add TER after each chain
-                lines.append("TER")
-
-            c_id = chr(len(self.chains) + 64)
-
-#            for ligand in self.get_ligands():
-#                c_id = chr(ord(c_id) + 1)
-#                for atom in ligand.atom_list():
-#                    a_idx += 1
-#                    lines.append(
-#                        atom.to_pdb_line(
-#                            a_id=a_idx, c_id=c_id, ff=ff, forcefield=forcefield
-#                        )
-#                    )
-#                lines.append("TER")
-#
-#            for metal in self.get_metals():
-#                c_id = chr(ord(c_id) + 1)
-#                a_idx += 1
-#                lines.append(
-#                    metal.build(a_id=a_idx, c_id=c_id, ff=ff, forcefield=forcefield)
-#                )
-#                lines.append("TER")
-#            
-#            for solvent in self.get_solvents():
-#                for atom in solvent:
-#                    a_idx += 1
-#                    lines.append(
-#                        atom.build(
-#                            a_id=a_idx, c_id=c_id, ff=ff, forcefield=forcefield
-#                        )
-#                    )
-#                lines.append("TER")
-
+        a_idx = 1
+        for cname, chain in self.chain_mapper.items():
+            a_idx = chain.renumber_atoms(a_idx) 
+            lines.extend( chain.get_pdb_lines() )
+            a_idx += 1 
         lines.append("END")
-        fs.write_lines(path, lines)
+        fs.write_lines(out_path, lines)
 
     def get_solvents(self):
         #TODO(CJ)
@@ -861,6 +805,6 @@ class Structure:
         return True
 
     def __neq__(self, other: Structure) -> bool:
-        """Negation operator for other Structure() objects. Inverstion of Structure.__eq__ """
+        """Negation operator for other Structure() objects. Inverstion of Structure.__eq__(). """
         return not (self == other)
 

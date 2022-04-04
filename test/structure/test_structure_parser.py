@@ -66,3 +66,20 @@ def test_legal_chain_names():
     ALL_NAMES = list(string.ascii_uppercase) 
     result1 = sp.legal_chain_names(dict())
     assert set(result1) == set(ALL_NAMES)
+    
+    dummy_mapper = dict(zip(ALL_NAMES,range(len(ALL_NAMES)))) 
+    result2 = sp.legal_chain_names( dummy_mapper )
+    assert not result2
+
+    ALL_NAMES.remove('A')
+    dummy_mapper = dict(zip(ALL_NAMES,range(len(ALL_NAMES)))) 
+    result3 = sp.legal_chain_names( dummy_mapper )
+    assert result3 == ['A'] 
+
+
+def test_name_chains():
+    """Ensuring that the name_chains() correctly names new chains."""
+    assert False
+
+def test_categorize_residues():
+    assert False
