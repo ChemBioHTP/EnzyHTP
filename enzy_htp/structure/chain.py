@@ -18,8 +18,8 @@ class Chain:
     Residue() objects that it owns.
 
     Attributes:
-        self.name_ : The name of the chain as a string.
-		self.residues_ : A list of Residue() objects.
+        name_ : The name of the chain as a string.
+		residues_ : A list of Residue() objects or derived types.
     """
 
     def __init__(self, name: str, residues: List[Residue]):
@@ -30,13 +30,7 @@ class Chain:
 
     def is_metal(self) -> bool:
         """Checks if any metals are contained within the current chain."""
-        for rr in self.residues_:
-            if rr.is_metal():
-                _LOGGER.warn(
-                    f"Structure: found metal in raw: {self.name_} {rr.name} {residue.id}"
-                )
-                return True
-        return False
+        return sum(list(map(lambda rr: rr.is_metal(), self.residues_)))
 
     def is_HET(self) -> bool:
         for rr in self.residues_:

@@ -4,50 +4,49 @@ stored alongside other Residue() children types in the Chain() class.
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-04-03
-
 """
-# TODO(CJ) make sure we use 1NVG to test this.
-from enzy_htp.structure import Residue
-from ..chemical import METAL_CENTER_MAP
+from typing import List, Union
+import enzy_htp.chemical as chem
+from enzy_htp.structure import Residue, Atom
 
+#TODO(CJ): Figure out if this can only ever be one atom (I think so?)
 
 class MetalAtom(Residue):
-    """TODO(CJ): documentation
-	"""
+    """Class representing a metal atom in a protein/enzyme structure or system. Typically a single Atom but usually
 
-    def __init__(self, name, resi_name, coord, ff, id=None, parent=None):
-        """
-        Have both atom_name, ele and resi_name 
-        """
-        self.resi_name = resi_name
-        self.ele = Metal_map[resi_name]
-        Atom.__init__(self, name, coord, ff, id, parent)
 
-        self.donor_atoms = []
-        self.parm = None
-
+	Attributes:
+        atom_name_ : The name of the metal atom as a string. Compatible with methods in enzy_htp.chemical.
+    """
+    
+    def __init__(self, residue_key : str, atoms : List[Atom], atom_name : str = None):
+        """Constructor for MetalAtom. Identical to Residue() constructor."""
+        Residue.__init__(self, residue_key, atoms )
+        self.set_rtype( chem.ResidueType.METAL )
+        self.atom_name_ = atom_name
+    
+    def is_metal(self) -> bool:
+        """Checks if Residue is a metal. Always returns True for this specialization."""
+        return True
+    
     def is_metal_center(self) -> bool:
-        return self.name in METAL_CENTER_MAP
-
-    @classmethod
-    def fromAtom(cls, atom_obj):
-        """
-        generate from Atom object. copy data.
-        """
-        return cls(
-            atom_obj.name,
-            atom_obj.parent.name,
-            atom_obj.coord,
-            atom_obj.ff,
-            id=atom_obj.id,
-            parent=atom_obj.parent,
-        )
-
-    def get_valence(self):
-        pass
+        """Checks if Residue is a metal center. Always returns True for this specialization."""
+        return True
+    
+    def is_canonical(self) -> bool:
+        """Checks if the Residue is a canonical. Always returns False for this specialization."""
+        return False
+   
+    def get_radii(self, method : str = 'ionic' ) -> Union[float, None]:
+        """Gets the atomic radii for the metal using specified method. 
+		Allowed values are 'ionic' or 'vdw' for ionic and van-der waals, respectively.
+		Returns a float or None if the metal does not have a distance.
+		"""
+        return chem.get_metal_radii(self.atom_name_, method )
 
     # fix related
-    def get_donor_atom(self, method="INC", check_radius=4.0):
+    def get_donor_atom(self, method : str ="INC", check_radius=4.0):
+        #TODO(CJ): move this higher up in the structural hierarchy.
         """
         Get coordinated donor atom for a metal center.
         1. check all atoms by type, consider those in the "donor_map"
@@ -306,6 +305,11 @@ class MetalAtom(Residue):
 
 
 def residue_to_metal(residue: Residue) -> MetalAtom:
-    """Convenience function that converts Residue() to Metal() object."""
-    # TODO(CJ): implement this later
-    pass
+    """Convenience function that converts Residue() to MetalAtom() object."""
+    atom_name = None
+    if len(residue.atom_list()):
+        raw_name = list(residue.atom_list()[0].atom_name.lower())
+        raw_name[0] = raw_name[0].upper()
+        atom_name = ''.join(raw_name)
+        
+    return MetalAtom(residue.residue_key, residue.atoms, atom_name=atom_name )

@@ -72,10 +72,9 @@ def categorize_residue(residue: Residue) -> Union[Residue, Ligand, Solvent, Meta
     if residue.is_canonical():
         residue.set_rtype(chem.ResidueType.CANONICAL)
         return residue
-
-    if residue.is_metal():
+    
+    if residue.name in chem.METAL_MAPPER: #TODO(CJ): implement more OOP method for this 
         return residue_to_metal(residue)
-    print("we mae it hereerere")
     return residue_to_ligand(residue)
 
 
@@ -206,6 +205,6 @@ def structure_from_pdb(fname: str) -> Structure:
     check_valid_pdb(fname)
     parser = PandasPdb()
     parser.read_pdb(fname)
-    res_mapper: Dict[str, Residue] = build_residues(parser.df["ATOM"])
+    res_mapper: Dict[str, Residue] = build_residues(pd.concat((parser.df["ATOM"],parser.df['HETATM'])))
     chain_mapper: Dict[str, Chain] = build_chains(res_mapper)
     return Structure(list(chain_mapper.values()))
