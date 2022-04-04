@@ -51,7 +51,7 @@ class Atom:
         self.blank_1 = None
         self.blank_2 = None
         self.blank_3 = None
-        self.blank_4 = None #@shaoqz: why do we need to extract everything from pandas.Serie
+        self.blank_4 = None #@shaoqz: why do we need to extract everything from pandas.Serie. Probably just extract useful ones. So that it is easier to read. or denote useful ones in the doc string. 
         self.chain_id = str()
         self.charge = float()
         self.element_symbol = str()
