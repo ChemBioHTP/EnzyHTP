@@ -9,6 +9,7 @@ Date: 2022-03-19
 from __future__ import annotations
 import numpy as np
 from plum import dispatch
+from copy import deepcopy
 from typing import Tuple, List
 
 from .atom import Atom
@@ -154,3 +155,7 @@ class Residue:
     def __repr__(self) -> str:
         """String representationt that just shows residue key in format "chain_id.residue_name.residue_num" """
         return str(self)
+
+    def clone(self) -> Residue:
+        """Creates a deepcopy of self."""
+        return deepcopy( self )

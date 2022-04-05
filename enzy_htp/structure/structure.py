@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import string
 import pandas as pd
+from copy import deepcopy
 from typing import List, Set, Dict, Tuple
 from collections import defaultdict
 from biopandas.pdb import PandasPdb
@@ -62,6 +63,14 @@ class Structure:
                     continue
                 (chain, res_name, index) = residue.residue_key.split(".")
                 result.append((chain, convert_to_one_letter(res_name), int(index)))
+        return result
+
+    def residue_keys(self) -> List[str]:
+        """Generates a list of strings containing all residue_key values for all child Residue()'s"""
+        result = []
+        for chain in self.chains:
+            for res in chain.residues():
+                result.append( res.residue_key )
         return result
 
     def get_metals(self) -> List[Residue]:
@@ -789,6 +798,10 @@ class Structure:
         if i > 3:
             raise StopIteration
 
+    def __bool__(self) -> bool:
+        """Enables running assert Structure(). Checks if there is anything in the structure."""
+        return bool(len(self.chains))
+
     def __eq__(self, other: Structure) -> bool:
         """Comparison operator for other Structure() objects. Checks first if both have same chain names and then if each named chain is identical."""
         if set(self.chain_mapper.keys()) != set(other.chain_mapper.keys()):
@@ -805,3 +818,30 @@ class Structure:
     def __neq__(self, other: Structure) -> bool:
         """Negation operator for other Structure() objects. Inverstion of Structure.__eq__(). """
         return not (self == other)
+
+
+def compare_structures( left : Structure, right : Structure ) -> Dict[str,List[str]]:
+    """Compares two Structure() objects and returns a dict() of missing Residues with format:
+       
+	   {'left': ['residue_key1','residue_key1',..],
+	    'right': ['residue_key1','residue_key1',..]
+		}
+	"""
+    result = {'left':[], 'right':[]}
+    left_keys : Set[str] = set(left.residue_keys())
+    right_keys : Set[str] = set(right.residue_keys())
+    
+    result['left'] = list(filter(lambda ll: ll not in right_keys, left_keys ))
+    result['right'] = list(filter(lambda rr: rr not in left_keys, right_keys ))
+    return result
+
+
+def merge_right( left : Structure, right : Structure ) -> Structure:
+    """Merges Residue() and derived objects from left Structure() to right Structure()."""
+    struct_cpy : Structure = deepcopy( right )
+    diff : Dict[str,List[str]] = compare_structures( left, right )
+    
+    for missing in diff['left']:
+        pass
+
+    return struct_cpy

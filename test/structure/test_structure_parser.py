@@ -6,13 +6,15 @@ Date: 2022-03-31
 import os
 import pytest
 import string
+import warnings
 import pandas as pd
 from typing import Dict
 from biopandas.pdb import PandasPdb
 
+import enzy_htp.chemical as chem
 from enzy_htp.core import file_system as fs
 from enzy_htp.structure import structure_parser as sp
-from enzy_htp.structure import Structure,Residue,Chain, structure_from_pdb
+from enzy_htp.structure import Structure,Residue,Chain, structure_from_pdb, Atom, MetalAtom, Ligand
 
 
 CURRDIR = os.path.dirname(os.path.abspath(__file__))
@@ -111,5 +113,50 @@ def test_name_chains_already_named():
     assert set(already_named.keys()) == {'A','B'}
 
 
-def test_categorize_residues():
-    assert False
+def test_categorize_residue_all_canonical():
+    """Checking that the structure_parser.categorize_residue() works for only canonical Residues()."""
+    pdb_file = f"{DATA_DIR}/two_chain.pdb"
+    structure : Structure = structure_from_pdb( pdb_file )
+    assert len(structure.chains) == 2
+    #TODO(CJ): maybe make this a function for the Structure() class
+    residues : List[Residue] = structure.chains[0].residues() + structure.chains[1].residues()
+    
+    for rr in residues:
+        new_rr = sp.categorize_residue( rr )
+        assert isinstance(new_rr, Residue)
+        assert new_rr.is_canonical()
+        assert not new_rr.is_metal()
+        assert not new_rr.is_ligand()
+        assert new_rr.rtype() == chem.ResidueType.CANONICAL
+
+
+def test_categorize_residue_metal():
+    """Checking that the structure_parser.categorize_residue() works for something that should become a MetalAtom()."""
+    warnings.filterwarnings("ignore")
+    pdb_file = f"{DATA_DIR}/just_metal.pdb"
+    reader = PandasPdb()
+    reader.read_pdb(pdb_file)
+    zn_atom = Atom(**reader.df['HETATM'].iloc[0])
+    base_residue = Residue("A.ZN.500",[zn_atom])
+    metal : MetalAtom = sp.categorize_residue( base_residue )
+    assert isinstance( metal, MetalAtom )
+    assert not metal.is_canonical()
+    assert metal.is_metal()
+    assert not metal.is_ligand()
+    assert metal.rtype() == chem.ResidueType.METAL 
+
+def test_categorize_residue_ligand():
+    """Checking that the structure_parser.categorize_residue() works for something that should become a Ligand()."""
+
+    pdb_file = f"{DATA_DIR}/just_ligand.pdb"
+    reader = PandasPdb()
+    reader.read_pdb(pdb_file)
+    atoms : List[Residue] = list(map(lambda pr: Atom(**pr[-1]), reader.df['ATOM'].iterrows()))
+    base_residue = Residue(".FAH.1", atoms)
+    ligand : Ligand = sp.categorize_residue( base_residue )
+    assert isinstance( ligand, Ligand )
+    assert not ligand.is_canonical()
+    assert not ligand.is_metal()
+    assert ligand.is_ligand()
+    assert ligand.rtype() == chem.ResidueType.LIGAND
+

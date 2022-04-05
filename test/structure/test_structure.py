@@ -6,7 +6,8 @@ Date: 2022-04-03
 import os
 import pytest
 from copy import deepcopy
-from enzy_htp.structure import Structure, structure_from_pdb, Residue, Chain
+import enzy_htp.chemical as chem
+from enzy_htp.structure import Structure, structure_from_pdb, Residue, Chain, compare_structures
 
 
 CURR_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -15,9 +16,12 @@ TEST_DIR = os.path.dirname(CURR_DIR)
 
 def test_load_structure():
     """"""
-    TEST_FILE = f"{TEST_DIR}/preparation/data/3NIR.pdb"
-    structure_from_pdb(TEST_FILE)
-    # assert False
+    raw_answer = [("A","THR",  1),("A","THR",  2),("A","CYS",  3),("A","CYS",  4),("A","PRO",  5),("A","SER",  6),("A","ILE",  7),("A","VAL",  8),("A","ALA",  9),("A","ARG", 10),("A","SER", 11),("A","ASN", 12),("A","PHE", 13),("A","ASN", 14),("A","VAL", 15),("A","CYS", 16),("A","ARG", 17),("A","LEU", 18),("A","PRO", 19),("A","GLY", 20),("A","THR", 21),("A","PRO", 22),("A","SER", 22),("A","GLU", 23),("A","ALA", 24),("A","LEU", 25),("A","ILE", 25),("A","CYS", 26),("A","ALA", 27),("A","THR", 28),("A","TYR", 29),("A","THR", 30),("A","GLY", 31),("A","CYS", 32),("A","ILE", 33),("A","ILE", 34),("A","ILE", 35),("A","PRO", 36),("A","GLY", 37),("A","ALA", 38),("A","THR", 39),("A","CYS", 40),("A","PRO", 41),("A","GLY", 42),("A","ASP", 43),("A","TYR", 44),("A","ALA", 45),("A","ASN", 46)]    
+    fixed_answer = list(map(lambda pr: (pr[0], chem.convert_to_one_letter(pr[1]), pr[2]), raw_answer))
+    TEST_FILE = f"{TEST_DIR}/preparation/data/3NIR.pdb" 
+    struct : Structure = structure_from_pdb(TEST_FILE)
+    assert struct
+    struct.residue_state() == fixed_answer
 
 
 def test_structure_ctor_bad_input():
@@ -74,3 +78,52 @@ def test_structure_same_sequence():
     chain2 = Chain("A", list(map(lambda kk: Residue(kk, list()), keys4)))
     assert not chain1.same_sequence(chain2)
     assert not chain2.same_sequence(chain1)
+
+
+def test_compare_structures_equiv():
+    """Ensuring the enzy_htp.structure.compare_structures() free function identifies two identical structures."""
+    TEST_FILE = f"{TEST_DIR}/preparation/data/3NIR.pdb" 
+    structure1 : Structure = structure_from_pdb(TEST_FILE)
+    structure2 : Structure = structure_from_pdb(TEST_FILE)
+    result = compare_structures( structure1, structure2 )
+    assert result == {'left':[], 'right':[]}
+
+def test_compare_structures_not_equiv():
+    """Ensuring the enzy_htp.structure.compare_structures() free functions identifies differences between functions."""
+    #TODO(CJ): include non-canonical residues in here
+    TEST_FILE = f"{TEST_DIR}/preparation/data/3NIR.pdb" 
+    structure1 : Structure = structure_from_pdb(TEST_FILE)
+    structure2 : Structure = structure_from_pdb(TEST_FILE)
+    res_to_remove1 : Residue = structure1.chains[0][-1]
+    res_to_remove2 : Residue = structure2.chains[0][0]
+    # one missing residue
+    del structure1.chains[0][-1]
+    result = compare_structures( structure1, structure2 )
+    assert result == {'left': [], 'right': [res_to_remove1.residue_key]}
+    # two missing residues
+    del structure2.chains[0][0]
+    result = compare_structures( structure1, structure2 )
+    assert result == {'left': [res_to_remove2.residue_key], 'right': [res_to_remove1.residue_key]}
+
+
+def test_merge_right_canonical_only():
+    """Merges differences between two Structure() objects containing only canonical residues."""
+    #TODO(CJ): include non-canonical residues in here
+    TEST_FILE = f"{TEST_DIR}/preparation/data/3NIR.pdb" 
+    structure1 : Structure = structure_from_pdb(TEST_FILE)
+    structure2 : Structure = structure_from_pdb(TEST_FILE)
+    res_to_remove1 : Residue = structure2.chains[0][-1]
+    del structure2.chains[0][-1]
+    result = compare_structures( structure1, structure2 )
+    assert result == {'left': [res_to_remove1.residue_key], 'right': []}
+
+
+def test_merge_right_with_ligand():
+    """Merges differences between two Structure() objects containing a Ligand() object."""
+    assert False
+
+def test_merge_right_with_metal_atom():
+    """Merges differences between two Structure() objects containing a MetalAtom() object."""
+    assert False
+
+

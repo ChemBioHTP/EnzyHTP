@@ -7,7 +7,7 @@ import pytest
 import numpy as np
 
 from enzy_htp.chemical import enum as renum
-from enzy_htp.structure import Ligand
+from enzy_htp.structure import Ligand, Atom
 
 
 def test_constat_data():
@@ -36,3 +36,16 @@ def test_build_bad_fname():
     assert exe
     assert exe.type == SystemExit
     assert exe.value.code == 1
+
+
+def test_clone():
+    """Checking that the Ligand.clone() method returns a deepcopy of the current Ligand()."""
+    dummy_atoms = [Atom(line_idx=1),Atom(line_idx=2)]
+    lig = Ligand("A.B.10", dummy_atoms, net_charge=1.0)
+    lig_cpy = lig.clone()
+    assert isinstance(lig_cpy, Ligand)
+    assert id(lig) != id(lig_cpy)
+    for a1, a2 in zip(lig.atom_list(), lig_cpy.atom_list()):
+        assert id(a1) != id(a2)
+
+    

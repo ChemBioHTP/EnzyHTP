@@ -5,6 +5,9 @@ Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-04-03
 """
+from __future__ import annotations
+
+from copy import deepcopy
 from typing import List, Union
 import enzy_htp.chemical as chem
 from enzy_htp.structure import Residue, Atom
@@ -302,6 +305,10 @@ class MetalAtom(Residue):
             return self
         if key > 0:
             raise StopIteration
+
+    def clone(self) -> MetalAtom:
+        """Creates deepcopy of self."""
+        return deepcopy( self )
 
 
 def residue_to_metal(residue: Residue) -> MetalAtom:

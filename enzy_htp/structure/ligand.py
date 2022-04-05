@@ -4,6 +4,10 @@ Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-04-03
 """
+from __future__ import annotations
+
+
+from copy import deepcopy
 
 import numpy as np
 
@@ -61,6 +65,9 @@ class Ligand(Residue):
         ) + ["TER", "END"]
         fs.write_lines(out_path, lines)
 
+    def clone(self) -> Ligand:
+        """Creates deecopy of self."""
+        return deepcopy( self )
 
 def residue_to_ligand(ptr: Residue, net_charge: float = None) -> Ligand:
     """Convenience function that converts Residue to ligand."""
