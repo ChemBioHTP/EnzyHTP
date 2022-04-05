@@ -110,3 +110,7 @@ class Chain:
             result.extend(res.get_pdb_lines())
         result.append("TER")
         return result
+
+    def __len__(self) -> int:
+        """Returns number of Residue() or Residue()-dervied objects belonging to the Chain."""
+        return len(self.residues_)

@@ -4,11 +4,13 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-20
 """
 import os
-CURR_DIR = os.path.dirname(os.path.abspath( __file__ ))
+
+CURR_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = f"{CURR_DIR}/data/"
 
 
 from enzy_htp.structure import Chain, Residue, structure_from_pdb
+
 
 def test_proper_ctor_behavior():
     """Making sure that the default Chain() works."""
@@ -138,11 +140,12 @@ def test_num_atoms():
     empty_chain = Chain("A", residues)
     assert empty_chain.num_atoms() == 0
 
+
 def test_is_metal():
     """Checks if the Chain.is_metal() returns correct answers for both True and False cases."""
     pdb_file = f"{DATA_DIR}/1NVG.pdb"
-    structure : Structure = structure_from_pdb(pdb_file)
-    chain : Chain = structure.chains[0]
+    structure: Structure = structure_from_pdb(pdb_file)
+    chain: Chain = structure.chains[0]
     assert chain.is_metal()
     del chain[-1]
     del chain[-1]

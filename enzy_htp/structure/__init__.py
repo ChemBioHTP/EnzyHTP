@@ -8,6 +8,7 @@ Date: 2022-03-19
 from .atom import Atom
 from .ligand import Ligand
 from .residue import Residue
+from .solvent import Solvent, residue_to_solvent
 from .metal_atom import MetalAtom, residue_to_metal
 from .chain import Chain
 from .structure import Structure, compare_structures, merge_right

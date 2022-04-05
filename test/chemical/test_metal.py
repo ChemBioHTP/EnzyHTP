@@ -10,9 +10,45 @@ from enzy_htp.chemical import metal as mm
 
 from util import all_caps
 
-IONIC_ATOM_NAMES = ["N","O","S","Mg","Li","Zn","Co","Fe","Mn","Ca",]
+IONIC_ATOM_NAMES = [
+    "N",
+    "O",
+    "S",
+    "Mg",
+    "Li",
+    "Zn",
+    "Co",
+    "Fe",
+    "Mn",
+    "Ca",
+]
 
-VDW_ATOM_NAMES= ["N","O","S","Mg","Li","Tl","Cu","Ag","Be","Ni","Pt","Zn","Pd","Hg","Cd","Ca","Sn","Pb","Sr","Ba","Ra","Al","In",]
+VDW_ATOM_NAMES = [
+    "N",
+    "O",
+    "S",
+    "Mg",
+    "Li",
+    "Tl",
+    "Cu",
+    "Ag",
+    "Be",
+    "Ni",
+    "Pt",
+    "Zn",
+    "Pd",
+    "Hg",
+    "Cd",
+    "Ca",
+    "Sn",
+    "Pb",
+    "Sr",
+    "Ba",
+    "Ra",
+    "Al",
+    "In",
+]
+
 
 def test_variable_checks():
     """Basic testing for the metal mapper found in enzy_htp.chemical.metal"""
@@ -25,41 +61,43 @@ def test_variable_checks():
     assert all_caps(mcenter_keys)
     assert max(list(map(len, mcenter_keys)))
 
+
 def test_get_metal_radii_vdw():
     """Making sure the get_metal_radii() method works for all values in the original VDW_RADII dict()."""
-    
+
     for aname in VDW_ATOM_NAMES:
-        assert mm.get_metal_radii( aname, 'vdw') is not None
+        assert mm.get_metal_radii(aname, "vdw") is not None
+
 
 def test_get_metal_radii_ionic():
     """Making sure the get_metal_radii() method works for all values in the original IONIC_RADII dict()."""
-    
+
     for aname in IONIC_ATOM_NAMES:
-        assert mm.get_metal_radii( aname, 'ionic') is not None
+        assert mm.get_metal_radii(aname, "ionic") is not None
+
 
 def test_get_metal_radii_bad_inputs():
     """Making sure the get_metal_radii() method returns None for bad inputs both non-existent and case-insensitive."""
-    
+
     for aname in VDW_ATOM_NAMES:
         if len(aname) < 2:
             continue
-        assert mm.get_metal_radii( aname.upper(), 'vdw') is None
+        assert mm.get_metal_radii(aname.upper(), "vdw") is None
 
     for aname in IONIC_ATOM_NAMES:
         if len(aname) < 2:
             continue
-        assert mm.get_metal_radii( aname.upper(), 'ionic') is None
+        assert mm.get_metal_radii(aname.upper(), "ionic") is None
 
-    assert mm.get_metal_radii( 'DNE' ) is None
-    assert mm.get_metal_radii( 'C' ) is None
-    assert mm.get_metal_radii( 'H' ) is None
-
+    assert mm.get_metal_radii("DNE") is None
+    assert mm.get_metal_radii("C") is None
+    assert mm.get_metal_radii("H") is None
 
 
 def test_get_metal_radii_bad_input():
     """Ensuring that get_metal_radii() exits for an invalid input."""
     with pytest.raises(SystemExit) as exe:
-        mm.get_metal_radii('Li', 'not-real')
+        mm.get_metal_radii("Li", "not-real")
 
     assert exe.type == SystemExit
     assert exe.value.code == 1

@@ -839,9 +839,14 @@ def compare_structures( left : Structure, right : Structure ) -> Dict[str,List[s
 def merge_right( left : Structure, right : Structure ) -> Structure:
     """Merges Residue() and derived objects from left Structure() to right Structure()."""
     struct_cpy : Structure = deepcopy( right )
-    diff : Dict[str,List[str]] = compare_structures( left, right )
-    
-    for missing in diff['left']:
-        pass
-
+    #TODO(CJ): make this a method
+    left.chains = sorted(left.chains, key=lambda c: c.name())
+    struct_cpy.chains = sorted(struct_cpy.chains, key=lambda c: c.name())
+    while struct_cpy != left:
+        for chain_idx in range(len(left.chains)):
+            #TODO(CJ): make this more OOP and handle at Chain() level.
+            for r_idx,(r1, r2) in enumerate(zip(left.chains[chain_idx],struct_cpy.chains[chain_idx])):
+                if r1 != r2:
+                    struct_cpy.chains[chain_idx].insert(idx, r1.clone())
+                    break
     return struct_cpy

@@ -6,6 +6,7 @@ Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-19
 """
+#TODO(CJ): figure out how to inherit docstrings to the children classes.
 from __future__ import annotations
 import numpy as np
 from plum import dispatch
@@ -22,14 +23,14 @@ class Residue:
 	canonical, non-canonical, solvent or a metal center. 
 
     Attributes:
-        self.atoms : A list of Atom() objects that make up the Residue().
-        self.residue_key : Unique string identifier with format "chain.name.num".
-		self.chain_ : Parent chain name.
-		self.name : Residue name.
-		self.num_ : The index of the Residue within the chain.
-		self.rtype_ : The ResidueType of the Residue().
-		self.min_line_ : The lowest one-indexed line of the children atoms.
-		self.max_line_ : The highest one-indexed line of the children atoms.
+        atoms : A list of Atom() objects that make up the Residue().
+        residue_key : Unique string identifier with format "chain.name.num".
+		chain_ : Parent chain name.
+		name : Residue name.
+		num_ : The index of the Residue within the chain.
+		rtype_ : The ResidueType of the Residue().
+		min_line_ : The lowest one-indexed line of the children atoms.
+		max_line_ : The highest one-indexed line of the children atoms.
     """
 
     def __init__(self, residue_key: str, atoms: List[Atom]):

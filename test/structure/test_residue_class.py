@@ -161,10 +161,9 @@ def test_renumber_atoms_bad_input():
 
 def test_clone():
     """Making sure the Residue.clone() method returns a deepcopy of the current Residue."""
-    res : Residue = deepcopy(RESIDUES[0]) 
-    res_cpy : Residue = res.clone()
+    res: Residue = deepcopy(RESIDUES[0])
+    res_cpy: Residue = res.clone()
 
     assert id(res) != id(res_cpy)
     for a1, a2 in zip(res.atom_list(), res_cpy.atom_list()):
         assert id(a1) != id(a2)
-    

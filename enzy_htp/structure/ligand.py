@@ -1,4 +1,7 @@
-"""Specialization of the Residue() class for a Ligand. 
+"""Specialization of the Residue() class for a Ligand. Primarly used to interface with PDB2PQR for ONLY the ligand
+as it is removed from the full structure during protonation. In addition to Residue() object, has net_charge attribute.
+Meant to be stored alongside other Residue() and Residue() derived objets (MetalAtom() and Solvent()) inside of the
+Chain() object. Ligand() objects SHOULD NOT exist on their own.
 
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
@@ -24,14 +27,20 @@ from enzy_htp.core import (
 
 
 class Ligand(Residue):
-    """Represents a specific Ligand found in a .pdb file.
+    """Represents a specific Ligand found in a .pdb file. Typically created from a base Residue() object using 
+	the residue_to_ligand() method found in enzy_htp.structure.ligand.py. In addition to base attributes, has
+	net_charge attribute which is Union[float,None]. The value is_ligand() has been hard-coded to True and 
+	Ligand.rtype_ is set to ResidueType.LIGAND. Meant to be stored alongside other Residue() and Residue()-derived 
+	classes (MetalAtom() and Solvent()) in Chain() objects.
 
     Attributes:
-		self.net_charge : The net charge of the molecule.
+		net_charge : The net charge of the molecule as a float.
     """
 
     def __init__(self, residue_key: str, atoms: List[Atom], **kwargs):
-        """Constructor for Ligand. Identical to Residue() ctor but also takes net_charge value."""
+        """Constructor for Ligand. Identical to Residue() ctor but also takes net_charge value.
+		SHOULD NOT be called directly by users. Instead use enzy_htp.structure.ligand.residue_to_ligand()
+		"""
         self.net_charge = kwargs.get("net_charge", None)
         Residue.__init__(self, residue_key, atoms)
         self.set_rtype(renum.ResidueType.LIGAND)
