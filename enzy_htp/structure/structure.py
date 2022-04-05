@@ -98,6 +98,9 @@ class Structure:
         self.chains.append(new_chain)
         self.chain_mapper[new_chain.name()] = new_chain
 
+    def find_metal_donor(self): #TODO(CJ): implement.
+        pass
+
     def add(self, obj, id=None, sort=0):
         # TODO(CJ): figure out how this works
         return
@@ -499,31 +502,6 @@ class Structure:
 
         return connectivty_table
 
-    def protonation_metal_fix(self, Fix):
-        """
-        return a bool: if there's any metal center
-        """
-        # try once if not exist
-        if self.metal_centers == []:
-            self.get_metal_center()
-        if self.metal_centers == []:
-            print("No metal center is found. Exit Fix.")
-            return False
-
-        # start fix
-        # get donor atoms and residues
-        for metal in self.metal_centers:
-            metal.get_donor_residue(method="INC")
-
-            if Fix == 1:
-                metal._metal_fix_1()
-
-            if Fix == 2:
-                metal._metal_fix_2()
-
-            if Fix == 3:
-                metal._metal_fix_3()
-        return True
 
     def get_all_protein_atom(self):
         """

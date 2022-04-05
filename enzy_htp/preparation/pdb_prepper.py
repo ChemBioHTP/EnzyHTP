@@ -1,23 +1,25 @@
 """Defines a PDBPrepper class that takes in a raw pdb and prepares it for analysis.
 For existing users of EnzyHTP, this largely replaces what Class_PDB did.
 
-Author: Chris Jurich, <chris.jurich@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-12
 """
 import shutil
 import numpy as np
 
 import pdb2pqr
-from ..core.logger import _LOGGER, init_logger
-from pdb2pqr.main import main_driver as run_pdb2pqr
-from pdb2pqr.main import build_main_parser as build_pdb2pqr_parser
-
-
 from typing import Set, Union, List, Tuple
+from enzy_htp.core import _LOGGER
+
+from .protonate import protonate_pdb, protonate_missing_elements
+
 import enzy_htp.core as core
 
 from enzy_htp.core import file_system as fs
-from enzy_htp.structure import (
+from enzy_htp.structure import ( 
+    compare_structures,
+    merge_right,
     structure_from_pdb,
     Ligand,
     ligand_from_pdb,
@@ -25,14 +27,11 @@ from enzy_htp.structure import (
     Structure,
 )
 
-# from ..structure.structure import Structure
 from .pdb_line import PDBLine, read_pdb_lines
-
 
 import openbabel
 import openbabel.pybel as pybel
 
-# from .mutate import MutaFlag, mutaflag_to_str
 from .mutate import (
     Mutation,
     mutation_to_str,
@@ -43,14 +42,13 @@ from .mutate import (
 
 from enzy_htp.chemical import convert_to_three_letter, get_element_aliases
 
-
 class PDBPrepper:
     """Class that handles initial preparation of a specified Structure().
 
 	Attributes:
-        self.current_path_ : The path to the most recently saved version of the Structure().
-	    self.work_dir : The scratch directory where temporary files are saved. The current time in the format "YYYY_MM_DD" is used if the keyword is not specified.
-		self.all_paths : A list of all paths created by the PDBPrepper() object. Stored in reverse order of age.
+        current_path_ : The path to the most recently saved version of the Structure().
+	    work_dir : The scratch directory where temporary files are saved. The current time in the format "YYYY_MM_DD" is used if the keyword is not specified.
+		all_paths : A list of all paths created by the PDBPrepper() object. Stored in reverse order of age.
 
 	"""
 
@@ -409,78 +407,9 @@ class PDBPrepper:
                     break
         return self.if_complete, self.if_complete_chain
 
-    def get_missing(self, seq):
-        """
-        get_missing(self, seq)
-        Compare self.sequence (from the get_seq) with the seq (str from the uniport)
-        1. No missing
-        2. Terminal missing
-        3. Internal missing
-        """
+
+
         pass
-
-    def PDB_loopmodel_refine(self, method="Rosetta"):
-        """
-        Use different methods to model the missing sequence
-        Methods:
-        - pyRosetta
-        - trRosetta
-        remember to update the name.
-        """
-        pass
-
-    def protonate_ligand(
-        self, ligand: Ligand, dirname=".", method="PYBEL", ph=7.0, keep_name=1
-    ) -> Ligand:
-        # def protonate_ligand(cls, path, method="PYBEL", ph=7.0, keep_name=1):
-        """
-        Protonate the ligand from 'path' with 'method', provide out_path and net charge.
-        TODO "obabel -ipdb ligand_1.pdb -opdb pdb -O ligand_1_aHt.pdb -h" can keep names, but how is it accessed by pybel
-        ---------------
-        method      : PYBEL (default)
-                      Dimorphite (from https://durrantlab.pitt.edu/dimorphite-dl/) TODO seems better and with better python API.
-                      OPENBABEL (not working if block warning output)
-        ph          : 7.0 by default 
-        keep_name   : if keep original atom names of ligands (default: 1)
-                        - check if there're duplicated names, add suffix if are.
-        """
-        path = f"{dirname}/ligand_{ligand.name}.pdb"
-        ligand.build(path)
-        outp1_path = path[:-4] + "_badname_aH.pdb"
-        out_path = path[:-4] + "_aH.pdb"
-        # outm2_path = path[:-4]+'_aH.mol2'
-
-        if method == "OPENBABEL":
-            # not working if block warning output for some reason
-            # openbabel.obErrorLog.SetOutputLevel(0)
-            obConversion = openbabel.OBConversion()
-            obConversion.SetInAndOutFormats("pdb", "pdb")
-            mol = openbabel.OBMol()
-            obConversion.ReadFile(mol, path)
-            mol.AddHydrogens(False, True, ph)
-            obConversion.WriteFile(mol, out_path)
-        if method == "PYBEL":
-            pybel.ob.obErrorLog.SetOutputLevel(0)
-            mol = next(pybel.readfile("pdb", path))
-            mol.OBMol.AddHydrogens(False, True, ph)
-            mol.write("pdb", outp1_path, overwrite=True)
-            # fix atom label abd determing net charge
-            if keep_name:
-                self._fix_ob_output(outp1_path, out_path, ref_name_path=path)
-            else:
-                self._fix_ob_output(outp1_path, out_path)
-            # determine partial charge
-            # > METHOD 1<
-            net_charge = self._ob_pdb_charge(outp1_path)
-            # > METHOD 2 <
-            # mol.write('mol2', outm2_path, overwrite=True)
-            # mol = next(pybel.readfile('mol2', outm2_path))
-            # net_charge=0
-            # for atom in mol:
-            #     net_charge=net_charge+atom.formalcharge
-        if method == "Dimorphite":
-            pass
-        return ligand_from_pdb(out_path, net_charge)
 
     def _fix_ob_output(self, pdb_path, out_path, ref_name_path=None):
         """
@@ -566,193 +495,30 @@ class PDBPrepper:
                     net_charge += int(charge)
         return net_charge
 
-    def merge_structure_elements(
-        self, old_stru: Structure, new_stru: Structure
-    ) -> Structure:
-        """Method that compares two Structure() objects and combines missin elements from old_str to new_stru"""
-        # TODO(CJ) Maybe this should be part of the structure.structure.py file
-        metal_list = old_stru.get_metals()
-        if len(metal_list):
-            _LOGGER.info(f"Merging {len(metal_list)} metal centers in old structure!")
-            _LOGGER.info(f"Adding metal centers to new structure...")
-            new_stru.add(metal_list, sort=0)
-            _LOGGER.info(f"Metal centers added!")
-            # fix metal environment
-            _LOGGER.info(f"Protonating newly added metals...")
-            new_stru.protonation_metal_fxi(Fix=1)
-            _LOGGER.info(f"Protonation complete!")
-
-        # protonate ligands and combine with the pqr file
-        ligand_list = old_stru.get_ligands()
-        if len(ligand_list):
-            print(ligand_list)
-            _LOGGER.info(f"Merging {len(ligand_list)} ligands in old structure!")
-            lig_dir = self.work_dir + "/ligands/"
-            fs.safe_mkdir(lig_dir)
-            # TODO: logging
-            print(lig_dir)
-            print("-asdgasdgasg")
-            old_keys = list(map(lambda l: l.residue_key, ligand_list))
-            new_ligands = list(
-                map(
-                    lambda ll: self.protonate_ligand(ll, dirname=lig_dir, ph=7),
-                    ligand_list,
-                )
-            )
-            print(new_ligands)
-            for lig, ok in zip(new_ligands, old_keys):
-                (c_id, r_name, r_id) = ok.split(".")
-                lig.set_chain(c_id)
-                lig.name = r_name
-                lig.num_ = int(
-                    r_id
-                )  # TODO(CJ). make this a method for the Ligand() class
-                lig.residue_key = ok
-                print(lig)
-                new_stru.insert_chain(Chain(lig.chain(), [lig]))
-            # new_stru.add(new_ligands, sort=0)
-        return new_stru
 
     def get_protonation(
         self,
         ph: float = 7.0,
         ffout: str = "AMBER",
-        keep_id: int = 0,
-        if_prt_ligand: int = 1,
     ) -> str:
-        # TODO check that the ph is in the range 0-14
-        # self._get_protonation_pdb2pqr(ph=ph)
-        # self._protonation_Fix(out_path, ph=ph, keep_id=keep_id, if_prt_ligand=if_prt_ligand)
-        # self.path = out_path
-        # self._update_name()
-        # self.stru.name = self.name
-
-        # def _get_protonation_pdb2pqr(self, ffout: str="AMBER", ph: float=7.0, out_path: str=""):
-        """
-        Use PDB2PQR to get the protonation state for current PDB. (self.path)
-        current implementation just use the outer layer of PDB2PQR. Update to inner one and get more infomation in the furture. 
-            (TARGET: 1. what is deleted from the structure // metal, ligand)
-        
-        save the result to self.pqr_path
-        """
-
-        def check_valid_ph(
-            ph: float,
-        ) -> None:  # TODO(CJ) maybe move this to somewhere else
-            if ph < 0 or ph > 14:
-                raise core.InvalidPH(f"{ph:.2f} must be on range: [0.00,14.00]")
-
-        check_valid_ph(ph)
+        """Uses PDB2PQR to get the protonation state for a PDB file, saving the protonated .pdb file.
+		Separately runs PDB2PQR on the ligand and metal and combines the output. Returns path to the protonated
+		PDB file."""
         # input of PDB2PQR
         self.pqr_path = f"{fs.remove_ext(self.current_path_)}.pqr.pdb"
         self.all_paths.append(self.pqr_path)
-
-        pdb2pqr_parser = build_pdb2pqr_parser()
-        args = pdb2pqr_parser.parse_args(
-            [
-                "--ff=PARSE",
-                "--ffout=" + ffout,
-                "--with-ph=" + str(ph),
-                "--log-level=CRITICAL",
-                self.path_name,
-                self.pqr_path,
-            ]
-        )
-        _LOGGER.info(f"Running pdb2pqr on '{self.path_name}'...")
-        run_pdb2pqr(args)
-        _LOGGER.info(f"Finished running pdb2pqr! Output saved to '{self.pqr_path}'")
+        protonate_pdb(self.path_name, self.pqr_path)
         # Add missing atom (from the PDB2PQR step. Update to func result after update the _get_protonation_pdb2pqr func)
         # Now metal and ligand
-        old_stru = structure_from_pdb(self.no_water_path)
-        new_stru = structure_from_pdb(self.pqr_path)
-        # find Metal center and combine with the pqr file
-        if old_stru != new_stru:
-            new_stru = self.merge_structure_elements(old_stru, new_stru)
-
-        if not keep_id:
-            new_stru.sort()
+        new_structure : Structure = protonate_missing_elements(self.no_water_path, self.pqr_path)
 
         self.current_path_ = f"{fs.remove_ext(fs.remove_ext(self.pqr_path))}_aH.pdb"
         self.all_paths.append(self.current_path_)
 
-        new_stru.to_pdb(self.current_path_)
+        new_structure.to_pdb(self.current_path_)
         self.stru = new_stru
 
         return self.current_path_
-
-    """
-    ========
-    Docking
-    ========
-    '''
-    def Dock_Reactive_Substrate(self, substrate, reactive_define, local_lig = 0):
-        '''
-        Dock substrates into the apo enzyme in a reactive conformation
-        Update self.path after docking. Will not update self.path in the middle of the docking
-        -----
-        In:     "apo-enzyme structure" self.path (pdb)
-                "substrate structure" substrate (smile/sdf)
-                "constraint parameters" reactive_define - a set of constraint information that defines *Reactive*
-                    [reacting residue]
-                        id
-                        atom_name_1
-                    [substrate]
-                        atom_name_1
-                    --- Will Generate ---
-                    [reacting residue]
-                        name 
-                        atom_name_2
-                        atom_name_3
-                    [substrate]
-                        id 
-                        name 
-                        atom_name_2 
-                        atom_name_3
-                    [distance]
-                        ideal
-                        allowed deviation
-                        force constant if_covalent
-                    [angle]
-                        ideal
-                        allowed deviation
-                        force constant
-        Out:    Enzyme-Substrate Reactive Complex
-        -----
-        '''
-        apo_enzyme = self.path
-        if local_lig:
-            lig_dir = self.dir+'/ligands/'
-            met_dir = self.dir+'/metalcenters/'
-        else:
-            lig_dir = self.dir+'/../ligands/'
-            met_dir = self.dir+'/../metalcenters/'
-        mkdir(lig_dir)
-        mkdir(met_dir)
-
-        # Build ligands 
-        cofactors = self.stru.build_ligands(lig_dir, ifcharge=1, ifunique=1)
-        # cofactor_params, cofactors_pdb = generate_Rosetta_params(cofactors, lig_dir, resn='same', out_pdb_name='same')
-        # # clean enzyme
-        # self.fix_residue_names_for_rosetta()
-        # # prepare substrate
-        # sub_confs = Conformer_Gen(substrate, method='rdkit')
-        # sub_params, sub_pdb, sub_confs_pdb = generate_Rosetta_params(sub_confs, lig_dir, resn='SUB', out_pdb_name='SUB')
-        # # define reactive
-        # -- search for RULE OF INPUT ID and get a map --
-        # self.RDock_generate_cst_file(reactive_define, name_map?)        
-        # # initial placement
-        # self._RDock_initial_placement(sub_pdb)
-        # self._RDock_add_remark_line()
-        # # make config file for Rosetta
-        # score_path = XXX
-        # out_pdb_lib_path = XXX # control the output
-        # option_path = Config.Rosetta.generate_xmlNoption(self.path, [cofactor_params, sub_params], score_path, nstruct=100, task='RDock')
-        # # Run rosetta script
-        # PDB.Run_Rosetta_Script(option_path)
-        # Final_pdbs = self.RDock_get_result(score_path, out_pdb_lib_path)
-        # self.Rosetta_pdb_to_Amber()
-
-
 
     '''
     ========
@@ -1185,20 +951,3 @@ class PDBPrepper:
 
         return Es
 
-
-def get_PDB(name):
-    """
-    connect to the database
-    """
-    pass
-
-
-def PDB_to_AMBER_PDB(path):
-    """
-    Make the file convertable with tleap without error
-    - Test result: The header part cause duplication of the residues. Deleting that part may give normal tleap output
-    - Test result: For some reason, some ligand will miss if directly covert after simple header cutting
-    - Test result: `cat 1NVG.pdb |grep "^ATOM\\|^HETATM\\|^TER|^END" > 1NVG-grep.pdb` will be fine
-    - WARNINGs
-    """
-    pass

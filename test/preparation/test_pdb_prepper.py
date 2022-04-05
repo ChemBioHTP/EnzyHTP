@@ -21,7 +21,6 @@ PREPPER: PDBPrepper = None
 
 fs.safe_rmdir(WORK_DIR)
 
-
 def equiv_files(fname1: str, fname2: str, width: int = None) -> bool:
     """Helper method to check if two files are exactly equivalent."""
     for l1, l2 in zip(fs.lines_from_file(fname1), fs.lines_from_file(fname2)):
@@ -66,8 +65,8 @@ def test_prepper_rm_water():
     assert equiv_files(target_no_water, actual_no_water)
 
 
-def test_prepper_get_protonation():
-    """Making sure that the get_protonation() method works."""
+def test_prepper_get_protonation_FAcD():
+    """Making sure that the get_protonation() method works for the FAcD enzyme that has a ligand.."""
     global PREPPER
     pqr_name = "FAcD-FA-ASP_rmW.pqr.pdb"
     target_pqr = f"{DATA_DIR}/FAcD-FA-ASP_rmW.pqr"
@@ -84,6 +83,7 @@ def test_prepper_get_protonation():
 
     assert equiv_files(target_pqr, actual_pqr)
     assert equiv_files(target_pqr_pdb_file, actual_pqr_pdb_file, 66)
+    assert False
 
 
 def test_prepper_get_protonation_invalid_pH():
@@ -117,3 +117,4 @@ def test_generate_mutations():
 
 def test_apply_mutations():
     """Checking that the PDBPrepper() can apply the mutation using tleap."""
+    pass

@@ -49,7 +49,6 @@ def name_chains(mapper: Dict[str, List[Residue]]) -> None:
 
     names = legal_chain_names(mapper)
     unnamed = sorted(unnamed, key=lambda r: r.min_line())
-    print(unnamed)
     new_chain: List[Residue] = []
 
 

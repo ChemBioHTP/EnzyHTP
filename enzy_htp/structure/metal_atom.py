@@ -311,6 +311,10 @@ class MetalAtom(Residue):
         return deepcopy( self )
 
 
+    def location(self) -> np.array:
+        """Gets the location of the MetalAtom."""
+        return self.atoms[0]
+
 def residue_to_metal(residue: Residue) -> MetalAtom:
     """Convenience function that converts Residue() to MetalAtom() object."""
     atom_name = None

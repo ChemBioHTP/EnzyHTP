@@ -21,6 +21,20 @@ CURR_DIR = os.path.dirname(os.path.abspath(__file__))
 TEST_DIR = os.path.dirname(CURR_DIR)
 
 
+def equiv_files(fname1: str, fname2: str, width: int = None) -> bool:
+    """Helper method to check if two files are exactly equivalent."""
+    for l1, l2 in zip(fs.lines_from_file(fname1), fs.lines_from_file(fname2)):
+        if width:
+            l1 = l1[:width]
+            l2 = l2[:width]
+
+        if l1 != l2:
+            print(f"'{l1}'")
+            print(f"'{l2}'")
+            return False
+    return True
+
+
 def test_load_structure():
     """Testing that the structure_from_pdb() method works for a basic example."""
     raw_answer = [
@@ -189,4 +203,8 @@ def test_merge_right_with_ligand():
 
 def test_merge_right_with_metal_atom():
     """Merges differences between two Structure() objects containing a MetalAtom() object."""
+    assert False
+
+def test_round_trip_pdb():
+    """Ensuring that the Structure() class be loaded into a .pdb and saved back in a round trip without error."""
     assert False
