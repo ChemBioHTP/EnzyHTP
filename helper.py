@@ -2,7 +2,7 @@
 Misc helper func and class
 '''
 from distutils.command.config import config
-from AmberMaps import *
+from AmberMaps import Resi_list
 import os
 import numpy as np
 '''
@@ -234,7 +234,7 @@ def select_residues_geo(self, task : str, center : tuple, threshold : list, allo
     """
     self.get_stru()
     if allowed_residues == [] or allowed_residues == ['all']:
-       allowed_residues = Resi_map2.keys()
+       allowed_residues=Resi_map2.keys()
     if task == 'dis':
        res_within_distance = []
        for chain in self.stru.chains:
