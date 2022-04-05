@@ -228,25 +228,6 @@ def write_data(tag, data, out_path):
 
     return out_path
         
-def select_residues_geo(self, task : str, center : tuple, threshold : list, allowed_residues : list) -> list:
-    """
-    Returns residues within given distance of center (based on alpha carbon of residue)
-    """
-    self.get_stru()
-    if allowed_residues == [] or allowed_residues == ['all']:
-       allowed_residues=Resi_map2.keys()
-    if task == 'dis':
-       res_within_distance = []
-       for chain in self.stru.chains:
-           for residue in chain:
-               if residue.name in allowed_residues:
-                   for atom in residue.atoms:
-                       if atom.name == 'CA':
-                           CA_coords = atom.coord
-                           if threshold[0] <= get_distance(center, CA_coords) <= threshold[1]:
-                               res_within_distance.append(residue.name + str(residue.id))
-                           break
-    return res_within_distance    
 '''
 Mutant assigner
 '''
