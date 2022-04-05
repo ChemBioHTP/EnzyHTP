@@ -1,7 +1,6 @@
 from random import choice
 from Class_PDB import PDB
 from AmberMaps import Resi_map2
-from helper import *
 
 
 def _random_gen_good_MutaFlag_for_test(stru, abbr=0):
