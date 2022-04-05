@@ -6,13 +6,18 @@ Date: 2022-04-05
 """
 #TODO(CJ): add more documentation
 import enzy_htp.core as core
-from enzy_htp.structure import Structure
+from enzy_htp.core import file_system as fs
+from enzy_htp.structure import Structure, Ligand, structure_from_pdb, ligand_from_pdb, Chain
 
 from pdb2pqr.main import main_driver as run_pdb2pqr
 from pdb2pqr.main import build_main_parser as build_pdb2pqr_parser
+import openbabel
+import openbabel.pybel as pybel
+from .pdb_line import read_pdb_lines
 
 
-def check_valid_ph( ph: float ) -> None:  # TODO(CJ) maybe move this to somewhere else
+def check_valid_ph( ph: float ) -> None: 
+    """Helper function that checks the pH is on the range: [0.00, 14.00]. Throws core.InvalidPH() if not."""
     if ph < 0 or ph > 14:
         raise core.InvalidPH(f"{ph:.2f} must be on range: [0.00,14.00]")
 
@@ -30,18 +35,15 @@ def protonate_pdb( pdb_path : str, pqr_path : str, ph : float = 7.0, ffout : str
             pqr_path,
         ]
     )
-    core._LOGGER.info(f"Running pdb2pqr on '{self.path_name}'...")
+    core._LOGGER.info(f"Running pdb2pqr on '{pdb_path}'...")
     run_pdb2pqr(args)
-    core._LOGGER.info(f"Finished running pdb2pqr! Output saved to '{self.pqr_path}'")
+    core._LOGGER.info(f"Finished running pdb2pqr! Output saved to '{pqr_path}'")
 
 
-def protonate_missing_elements(old_pdb_path : str, new_pdb_pth : str) -> Structure:
-    #def merge_structure_elements(
-    #    self, old_pdb_path: str, new_pdb_path: str
-    #) -> Structure:
+def protonate_missing_elements(old_pdb_path : str, new_pdb_path : str, work_dir : str) -> Structure:
     """Method that compares two Structure() objects and combines missin elements from old_str to new_stru"""
     # TODO(CJ) Maybe this should be part of the structure.structure.py file
-	old_stru = structure_from_pdb(old_pdb_path)
+    old_stru = structure_from_pdb(old_pdb_path)
     new_stru = structure_from_pdb(new_pdb_path)
     
     if old_stru == new_stru: #CHECK(CJ): Only sequence elements.
@@ -51,21 +53,21 @@ def protonate_missing_elements(old_pdb_path : str, new_pdb_pth : str) -> Structu
     #print(compare_structures(old_stru,new_stru))
     metal_list = old_stru.get_metals()
     if len(metal_list):
-        _LOGGER.info(f"Merging {len(metal_list)} metal centers in old structure!")
-        _LOGGER.info(f"Adding metal centers to new structure...")
+        core._LOGGER.info(f"Merging {len(metal_list)} metal centers in old structure!")
+        core._LOGGER.info(f"Adding metal centers to new structure...")
         new_stru.add(metal_list, sort=0)
-        _LOGGER.info(f"Metal centers added!")
+        core._LOGGER.info(f"Metal centers added!")
         # fix metal environment
-        _LOGGER.info(f"Protonating newly added metals...")
+        core._LOGGER.info(f"Protonating newly added metals...")
         new_stru.protonation_metal_fxi(Fix=1)
-        _LOGGER.info(f"Protonation complete!")
+        core._LOGGER.info(f"Protonation complete!")
 
     # protonate ligands and combine with the pqr file
     ligand_list = old_stru.get_ligands()
     if len(ligand_list):
         print('lig-list',ligand_list)
-        _LOGGER.info(f"Merging {len(ligand_list)} ligands in old structure!")
-        lig_dir = self.work_dir + "/ligands/"
+        core._LOGGER.info(f"Merging {len(ligand_list)} ligands in old structure!")
+        lig_dir = work_dir + "/ligands/"
         fs.safe_mkdir(lig_dir)
         # TODO: logging
         #print(lig_dir)
@@ -73,7 +75,7 @@ def protonate_missing_elements(old_pdb_path : str, new_pdb_pth : str) -> Structu
         old_keys = list(map(lambda l: l.residue_key, ligand_list))
         new_ligands = list(
             map(
-                lambda ll: self.protonate_ligand(ll, dirname=lig_dir, ph=7),
+                lambda ll: protonate_ligand(ll, dirname=lig_dir, ph=7),
                 ligand_list,
             )
         )
@@ -93,7 +95,7 @@ def protonate_missing_elements(old_pdb_path : str, new_pdb_pth : str) -> Structu
 
 
 def protonate_ligand(
-    self, ligand: Ligand, dirname=".", method="PYBEL", ph=7.0, keep_name=1
+    ligand: Ligand, dirname=".", method="PYBEL", ph=7.0, keep_name=1
 ) -> Ligand:
     # def protonate_ligand(cls, path, method="PYBEL", ph=7.0, keep_name=1):
     """
@@ -129,12 +131,12 @@ def protonate_ligand(
         mol.write("pdb", outp1_path, overwrite=True)
         # fix atom label abd determing net charge
         if keep_name:
-            self._fix_ob_output(outp1_path, out_path, ref_name_path=path)
+            _fix_ob_output(outp1_path, out_path, ref_name_path=path)
         else:
-            self._fix_ob_output(outp1_path, out_path)
+            _fix_ob_output(outp1_path, out_path)
         # determine partial charge
         # > METHOD 1<
-        net_charge = self._ob_pdb_charge(outp1_path)
+        net_charge = _ob_pdb_charge(outp1_path)
         # > METHOD 2 <
         # mol.write('mol2', outm2_path, overwrite=True)
         # mol = next(pybel.readfile('mol2', outm2_path))
@@ -171,4 +173,90 @@ def protonation_metal_fix(self, Fix): #TODO(CJ): change to protonate_metal()
         if Fix == 3:
             metal._metal_fix_3()
     return True
+
+
+def _fix_ob_output(pdb_path, out_path, ref_name_path=None):
+    """
+    fix atom label in pdb_pat write to out_path
+    ---------
+    ref_name_path: if use original atom names from pdb
+    - default: None
+        according to tleap output, the name could be just *counting* the element start from ' ' to number
+    - : not None
+        check if there're duplicated names originally, add suffix if there are.
+    """
+    if ref_name_path:
+        ref_a_atoms = read_pdb_lines(ref_name_path)
+        pdb_atoms = read_pdb_lines(pdb_path)
+        ref_a_atoms = list(
+            filter(lambda aa: aa.is_ATOM() or aa.is_HETATM(), ref_a_atoms)
+        )
+        pdb_atoms = list(
+            filter(lambda aa: aa.is_ATOM() or aa.is_HETATM(), pdb_atoms)
+        )
+        assert len(pdb_atoms) == len(ref_a_atoms)
+        for idx, (p, a) in enumerate(zip(pdb_atoms, ref_a_atoms)):
+            pdb_atoms[idx].atom_name = a.atom_name
+            pdb_atoms[idx].atom_id = a.atom_id
+            pdb_atoms[idx].resi_id = a.resi_id
+            pdb_atoms[idx].resi_name = a.resi_name
+        # exit( 0 )
+    fs.write_lines(out_path, list(map(lambda aa: aa.build(), pdb_atoms)))
+
+#            assert len(pdb_atoms) == len(ref_a_names )
+#            print('hereere')
+#            pdb_ls = read_pdb_lines(pdb_path)
+#            ref_resi_name = pdb_ls[0].resi_name
+#            for pdb_l in pdb_ls:
+#                if pdb_l.is_HETATM() or pdb_l.is_ATOM():
+#                    # pybel use line order (not atom id) to assign new atom id
+#                    ref_a_names.append(pdb_l.atom_name)
+#        print(ref_a_names)
+#        # count element in a dict
+#        ele_count = {}
+#        pdb_ls = read_pdb_lines(pdb_path)
+#        line_count = 0
+#        lines = []
+#        for pdb_l in pdb_ls:
+#            if not pdb_l.is_ATOM() and not pdb_l.is_HETATM():
+#                continue
+#
+#            if ref_name_path == None:
+#                ele = pdb_l.get_element()
+#            else:
+#                if line_count < len(ref_a_names):
+#                    ele = ref_a_names[line_count]
+#                else:
+#                    ele = pdb_l.get_element()  # New atoms
+#                pdb_l.resi_name = ref_resi_name
+#                line_count += 1
+#            # determine the element count
+#            try:
+#                # rename if more than one (add count)
+#                ele_count[ele] += 1
+#                pdb_l.atom_name = ele + str(ele_count[ele])
+#            except KeyError:
+#                ele_count[ele] = 0
+#                pdb_l.atom_name = ele
+#            lines.append(pdb_l.build())
+
+# write_lines(out_path, lines)
+
+
+def _ob_pdb_charge(pdb_path):
+    """
+    extract net charge from openbabel exported pdb file
+    """
+
+    pdb_ls = read_pdb_lines(pdb_path)
+    net_charge = 0
+    for pdb_l in pdb_ls:
+        if pdb_l.is_HETATM() or pdb_l.is_ATOM():
+            if len(pdb_l.get_charge()) != 0:
+                charge = pdb_l.charge[::-1]
+                core._LOGGER.info(
+                    f"Found formal charge: {pdb_l.atom_name} {charge}"
+                )  # TODO make this more intuitive/make sense
+                net_charge += int(charge)
+    return net_charge
 
