@@ -2413,6 +2413,8 @@ class PDB():
         Returns residues within given distance of center (based on alpha carbon of residue)
         """
         self.get_stru()
+        if allowed_residues == [] or allowed_residues == ['all']:
+           allowed_residues=Resi_map2.keys()
         if task == 'dis':
            res_within_distance = []
            for chain in self.stru.chains:
@@ -2422,10 +2424,10 @@ class PDB():
                            if atom.name == 'CA':
                                CA_coords = atom.coord
                                if threshold[0] <= get_distance(center, CA_coords) <= threshold[1]:
-                                   res_within_distance.append(residue.name + str(residue.id))
+                                   res_within_distance.append(chain.id + residue.name + str(residue.id))
                                break
-        
-        return res_within_distance
+           
+           return res_within_distance
 
 def get_PDB(name):
     '''
