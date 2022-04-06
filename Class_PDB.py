@@ -2408,13 +2408,24 @@ class PDB():
             print("Running: "+"sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  "+n_cores+"/' "+Config.Multiwfn.DIR+"/settings.ini")
         run("sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  "+n_cores+"/' "+Config.Multiwfn.DIR+"/settings.ini", check=True, text=True, shell=True, capture_output=True)
 
-    def select_residues_geo(self, task : str, center : tuple, threshold : list, allowed_residues : list) -> list:
+    def select_residues_geo(self, task : str, center : list, threshold : list, allowed_residues : list) -> list:
         """
         Returns residues within given distance of center (based on alpha carbon of residue)
         """
         self.get_stru()
+        # Determine the center
+        if center[0] == 'cnt' and len(center) == 4: # Provide coordinate
+           cnt = tuple(center[1:])
+        elif center[0] == 'pro' and len(center) == 4: # Atom in protein
+           cnt = tuple(self.stru.chains[center[1]].residues[center[2]]._find_atom_name(center[3]).coord)
+        elif center[0] == 'lig' and len(center) == 3: # Atom in ligand
+           cnt = tuple(self.stru.ligands[center[1]]._find_atom_name(center[2]).coord)
+        elif center[0] == 'met' and len(center) == 2: # Metal ion
+           cnt = tuple(self.stru.metalatoms[center[1]].coord)
+        # Determine the desired residue type(s)
         if allowed_residues == [] or allowed_residues == ['all']:
-           allowed_residues=Resi_map2.keys()
+           allowed_residues = Resi_map2.keys()
+        # Determine the type of geometric criteria. Should add more in the future.
         if task == 'dis':
            res_within_distance = []
            for chain in self.stru.chains:
@@ -2423,7 +2434,7 @@ class PDB():
                        for atom in residue.atoms:
                            if atom.name == 'CA':
                                CA_coords = atom.coord
-                               if threshold[0] <= get_distance(center, CA_coords) <= threshold[1]:
+                               if threshold[0] <= get_distance(cnt, CA_coords) <= threshold[1]:
                                    res_within_distance.append(chain.id + residue.name + str(residue.id))
                                break
            
