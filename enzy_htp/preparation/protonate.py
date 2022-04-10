@@ -22,7 +22,10 @@ def check_valid_ph( ph: float ) -> None:
         raise core.InvalidPH(f"{ph:.2f} must be on range: [0.00,14.00]")
 
 
-def protonate_pdb( pdb_path : str, pqr_path : str, ph : float = 7.0, ffout : str = "AMBER"):
+def protonate_pdb( pdb_path : str, pqr_path : str, ph : float = 7.0, ffout : str = "AMBER") -> None:
+    """Runs PDB2PQR on a specified pdb file and saves it to the specified pqr path."""
+    #TODO(CJ): check if ffout is valid. 
+	#TODO(CJ): maybe improve the documentation here?
     check_valid_ph(ph)
     pdb2pqr_parser = build_pdb2pqr_parser()
     args = pdb2pqr_parser.parse_args(
