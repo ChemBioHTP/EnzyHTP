@@ -23,7 +23,10 @@ def check_valid_ph( ph: float ) -> None:
 
 
 def protonate_pdb( pdb_path : str, pqr_path : str, ph : float = 7.0, ffout : str = "AMBER") -> None:
-    """Runs PDB2PQR on a specified pdb file and saves it to the specified pqr path."""
+    """Runs PDB2PQR on a specified pdb file and saves it to the specified pqr path. This preparation step
+    makes use of [PDB2PQR](https://www.poissonboltzmann.org/) via the pdb2pqr python [package](https://pdb2pqr.readthedocs.io/en/latest/).
+    Adds in missing atoms and finds the protonation state of the pdb file.
+	"""
     #TODO(CJ): check if ffout is valid. 
 	#TODO(CJ): maybe improve the documentation here?
     check_valid_ph(ph)
@@ -98,58 +101,27 @@ def protonate_missing_elements(old_pdb_path : str, new_pdb_path : str, work_dir 
 
 
 def protonate_ligand(
-    ligand: Ligand, dirname=".", method="PYBEL", ph=7.0, keep_name=1
-) -> Ligand:
-    # def protonate_ligand(cls, path, method="PYBEL", ph=7.0, keep_name=1):
-    """
-    Protonate the ligand from 'path' with 'method', provide out_path and net charge.
-    TODO "obabel -ipdb ligand_1.pdb -opdb pdb -O ligand_1_aHt.pdb -h" can keep names, but how is it accessed by pybel
-    ---------------
-    method      : PYBEL (default)
-                  Dimorphite (from https://durrantlab.pitt.edu/dimorphite-dl/) TODO seems better and with better python API.
-                  OPENBABEL (not working if block warning output)
-    ph          : 7.0 by default 
-    keep_name   : if keep original atom names of ligands (default: 1)
-                    - check if there're duplicated names, add suffix if are.
-    """
-    path = f"{dirname}/ligand_{ligand.name}.pdb"
-    ligand.build(path)
-    outp1_path = path[:-4] + "_badname_aH.pdb"
-    out_path = path[:-4] + "_aH.pdb"
-    # outm2_path = path[:-4]+'_aH.mol2'
+    ligand: Ligand, dirname : str =".", method : str="PYBEL", ph : float =7.0, keep_name:bool=True
+) -> Ligand :
+    """Helper method that protonates a given ligand and returns the modified version."""
 
-    if method == "OPENBABEL":
-        # not working if block warning output for some reason
-        # openbabel.obErrorLog.SetOutputLevel(0)
-        obConversion = openbabel.OBConversion()
-        obConversion.SetInAndOutFormats("pdb", "pdb")
-        mol = openbabel.OBMol()
-        obConversion.ReadFile(mol, path)
-        mol.AddHydrogens(False, True, ph)
-        obConversion.WriteFile(mol, out_path)
-    if method == "PYBEL":
-        pybel.ob.obErrorLog.SetOutputLevel(0)
-        mol = next(pybel.readfile("pdb", path))
-        mol.OBMol.AddHydrogens(False, True, ph)
-        mol.write("pdb", outp1_path, overwrite=True)
-        # fix atom label abd determing net charge
-        if keep_name:
-            _fix_ob_output(outp1_path, out_path, ref_name_path=path)
-        else:
-            _fix_ob_output(outp1_path, out_path)
-        # determine partial charge
-        # > METHOD 1<
-        net_charge = _ob_pdb_charge(outp1_path)
-        # > METHOD 2 <
-        # mol.write('mol2', outm2_path, overwrite=True)
-        # mol = next(pybel.readfile('mol2', outm2_path))
-        # net_charge=0
-        # for atom in mol:
-        #     net_charge=net_charge+atom.formalcharge
-    if method == "Dimorphite":
-        pass
-    return ligand_from_pdb(out_path, net_charge)
-
+    _MAPPER = {
+        'OPENBABEL': _protonate_ligand_OPENBABEL,
+        'PYBEL': _protonate_ligand_PYBEL,
+	}
+    
+    if method not in _MAPPER:
+        error_msg = f"{method} is not supported for protonate_ligand()."
+        error_msg += f"Allowed are '{', '.join(list(_MAPPER.keys()))}'"
+        raise core.exception.UnsupportedMethod(error_msg)
+    else:
+        #TODO(CJ): Do we want to delete the temporary files?
+        path = f"{dirname}/ligand_{ligand.name}.pdb"
+        fs.safe_mkdir( dirname )
+        ligand.build(path)
+        base_name = fs.base_file_name(path)
+        out_path = f"{base_name}_aH.pdb"
+        return _MAPPER[method]( path, ph, out_path )
 
 def protonation_metal_fix(self, Fix): #TODO(CJ): change to protonate_metal()
     """
@@ -159,7 +131,7 @@ def protonation_metal_fix(self, Fix): #TODO(CJ): change to protonate_metal()
     if self.metal_centers == []:
         self.get_metal_center()
     if self.metal_centers == []:
-        print("No metal center is found. Exit Fix.")
+        print("No meNontal center is found. Exit Fix.")
         return False
 
     # start fix
@@ -177,89 +149,59 @@ def protonation_metal_fix(self, Fix): #TODO(CJ): change to protonate_metal()
             metal._metal_fix_3()
     return True
 
+def _protonate_ligand_OPENBABEL( path: str, ph : float, out_path: str ) -> None:
+    raise Exception(f"Method: __protonate_OPENBABEL is not implemented yet!")
 
-def _fix_ob_output(pdb_path, out_path, ref_name_path=None):
-    """
-    fix atom label in pdb_pat write to out_path
-    ---------
-    ref_name_path: if use original atom names from pdb
-    - default: None
-        according to tleap output, the name could be just *counting* the element start from ' ' to number
-    - : not None
-        check if there're duplicated names originally, add suffix if there are.
-    """
-    if ref_name_path:
-        ref_a_atoms = read_pdb_lines(ref_name_path)
-        pdb_atoms = read_pdb_lines(pdb_path)
-        ref_a_atoms = list(
-            filter(lambda aa: aa.is_ATOM() or aa.is_HETATM(), ref_a_atoms)
-        )
-        pdb_atoms = list(
-            filter(lambda aa: aa.is_ATOM() or aa.is_HETATM(), pdb_atoms)
-        )
-        assert len(pdb_atoms) == len(ref_a_atoms)
-        for idx, (p, a) in enumerate(zip(pdb_atoms, ref_a_atoms)):
-            pdb_atoms[idx].atom_name = a.atom_name
-            pdb_atoms[idx].atom_id = a.atom_id
-            pdb_atoms[idx].resi_id = a.resi_id
-            pdb_atoms[idx].resi_name = a.resi_name
-        # exit( 0 )
-    fs.write_lines(out_path, list(map(lambda aa: aa.build(), pdb_atoms)))
+def _protonate_ligand_PYBEL(path: str, ph : float, out_path : str ) -> Ligand:
+    """Impelemntation of protonate_ligand() using the pybel method. SHOULD NOT be called directly by users."""
+    def _ob_pdb_charge(pdb_path) -> int:
+        """
+        extract net charge from openbabel exported pdb file
+        """
+        pdb_ls = read_pdb_lines(pdb_path)
+        net_charge = 0
+        for pdb_l in pdb_ls:
+            if pdb_l.is_HETATM() or pdb_l.is_ATOM():
+                if len(pdb_l.get_charge()) != 0:
+                    charge = pdb_l.charge[::-1]
+                    core._LOGGER.info(
+                        f"Found formal charge: {pdb_l.atom_name} {charge}"
+                    )  # TODO make this more intuitive/make sense
+                    net_charge += int(charge)
+        return net_charge
 
-#            assert len(pdb_atoms) == len(ref_a_names )
-#            print('hereere')
-#            pdb_ls = read_pdb_lines(pdb_path)
-#            ref_resi_name = pdb_ls[0].resi_name
-#            for pdb_l in pdb_ls:
-#                if pdb_l.is_HETATM() or pdb_l.is_ATOM():
-#                    # pybel use line order (not atom id) to assign new atom id
-#                    ref_a_names.append(pdb_l.atom_name)
-#        print(ref_a_names)
-#        # count element in a dict
-#        ele_count = {}
-#        pdb_ls = read_pdb_lines(pdb_path)
-#        line_count = 0
-#        lines = []
-#        for pdb_l in pdb_ls:
-#            if not pdb_l.is_ATOM() and not pdb_l.is_HETATM():
-#                continue
-#
-#            if ref_name_path == None:
-#                ele = pdb_l.get_element()
-#            else:
-#                if line_count < len(ref_a_names):
-#                    ele = ref_a_names[line_count]
-#                else:
-#                    ele = pdb_l.get_element()  # New atoms
-#                pdb_l.resi_name = ref_resi_name
-#                line_count += 1
-#            # determine the element count
-#            try:
-#                # rename if more than one (add count)
-#                ele_count[ele] += 1
-#                pdb_l.atom_name = ele + str(ele_count[ele])
-#            except KeyError:
-#                ele_count[ele] = 0
-#                pdb_l.atom_name = ele
-#            lines.append(pdb_l.build())
+    def _fix_ob_output(pdb_path, out_path, ref_name_path=None) -> None:
+        """
+        fix atom label in pdb_pat write to out_path
+        ---------
+        ref_name_path: if use original atom names from pdb
+        - default: None
+            according to tleap output, the name could be just *counting* the element start from ' ' to number
+        - : not None
+            check if there're duplicated names originally, add suffix if there are.
+        """
+        if ref_name_path:
+            ref_a_atoms = read_pdb_lines(ref_name_path)
+            pdb_atoms = read_pdb_lines(pdb_path)
+            ref_a_atoms = list(
+                filter(lambda aa: aa.is_ATOM() or aa.is_HETATM(), ref_a_atoms)
+            )
+            pdb_atoms = list(
+                filter(lambda aa: aa.is_ATOM() or aa.is_HETATM(), pdb_atoms)
+            )
+            assert len(pdb_atoms) == len(ref_a_atoms)
+            for idx, (p, a) in enumerate(zip(pdb_atoms, ref_a_atoms)):
+                pdb_atoms[idx].atom_name = a.atom_name
+                pdb_atoms[idx].atom_id = a.atom_id
+                pdb_atoms[idx].resi_id = a.resi_id
+                pdb_atoms[idx].resi_name = a.resi_name
+            # exit( 0 )
+        fs.write_lines(out_path, list(map(lambda aa: aa.build(), pdb_atoms)))
 
-# write_lines(out_path, lines)
-
-
-def _ob_pdb_charge(pdb_path):
-    """
-    extract net charge from openbabel exported pdb file
-    """
-
-    pdb_ls = read_pdb_lines(pdb_path)
-    net_charge = 0
-    for pdb_l in pdb_ls:
-        if pdb_l.is_HETATM() or pdb_l.is_ATOM():
-            if len(pdb_l.get_charge()) != 0:
-                charge = pdb_l.charge[::-1]
-                core._LOGGER.info(
-                    f"Found formal charge: {pdb_l.atom_name} {charge}"
-                )  # TODO make this more intuitive/make sense
-                net_charge += int(charge)
-    return net_charge
-
+    pybel.ob.obErrorLog.SetOutputLevel(0)
+    mol = next(pybel.readfile("pdb", path))
+    mol.OBMol.AddHydrogens(False, True, ph)
+    mol.write("pdb", out_path, overwrite=True)
+    _fix_ob_output(out_path, out_path, path)
+    
+    return ligand_from_pdb(out_path, _ob_pdb_charge(out_path))

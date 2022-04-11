@@ -117,4 +117,4 @@ def test_generate_mutations():
 
 def test_apply_mutations():
     """Checking that the PDBPrepper() can apply the mutation using tleap."""
-    pass
+    assert False

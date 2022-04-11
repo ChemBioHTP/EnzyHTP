@@ -9,6 +9,7 @@ import pytest
 import numpy as np
 from enzy_htp import core  as cc
 from enzy_htp.core import file_system as fs
+import enzy_htp.structure as struct
 from enzy_htp.preparation import protonate as prot
 
 
@@ -73,3 +74,20 @@ def test_protonate_pdb_4NKK():
     assert equiv_files( target_pqr, actual_pqr )
     fs.safe_rm( actual_pqr )
     assert not os.path.exists( actual_pqr )
+
+def test_protonate_ligand():
+    """Ensuring that the protonate_ligand() method works."""
+    #TODO(CJ): remove the old stuff we dont care about
+    file_to_remove = list()
+    ligand_dir = f"{WORK_DIR}/ligands/"
+    assert not os.path.isdir( ligand_dir )
+    base_pdb = f"{DATA_DIR}/FAcD-FA-ASP.pdb"
+    structure : struct.Structure = struct.structure_from_pdb( base_pdb )
+    ligand = structure.get_ligands()[0]
+    print(ligand.atoms[0].__dict__)
+    ligand.build(f"{WORK_DIR}/ligand.pdb")
+    assert not os.path.isdir( ligand_dir )
+    protonated_ligand : struct.Ligand = prot.protonate_ligand( ligand, ligand_dir )
+    assert protonated_ligand.net_charge == -1
+    fs.safe_rmdir( ligand_dir )
+    assert not os.path.isdir( ligand_dir )
