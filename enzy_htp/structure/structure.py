@@ -16,7 +16,7 @@ from collections import defaultdict
 from biopandas.pdb import PandasPdb
 
 from .atom import Atom
-from .chain import Chain
+from . import Chain
 from .residue import Residue
 from .metal_atom import MetalAtom
 from ..core.logger import _LOGGER
@@ -37,13 +37,13 @@ class Structure:
 	Note: This class SHOULD NOT be created directly by users. It should be created with the enzy_htp.structure.structure_from_pdb() method.
 
 	Attributes:
-		chains : A list of Chain objects contained within the structure. 
+		chains_ : A list of Chain objects contained within the structure. 
 		chain_mapper : A dict() which maps chain id to the chain object.
 	"""
 
     def __init__(self, chains: List[Chain]):
         """Constructor that takes just a list of Chain() objects as input."""
-        self.chains = chains
+        self.chains_ = chains
         self.chain_mapper = dict()
         ch: Chain
         for ch in chains:
@@ -59,16 +59,17 @@ class Structure:
         result = list()
         for cname, chain in self.chain_mapper.items():
             for residue in chain.residues():
-                if not residue.is_canonical():
-                    continue
                 (chain, res_name, index) = residue.residue_key.split(".")
-                result.append((chain, convert_to_one_letter(res_name), int(index)))
+                if residue.is_canonical():
+                    result.append((chain, convert_to_one_letter(res_name), int(index)))
+                elif residue.is_metal():
+                    result.append((chain, res_name, int(index)))
         return result
 
     def residue_keys(self) -> List[str]:
         """Generates a list of strings containing all residue_key values for all child Residue()'s"""
         result = []
-        for chain in self.chains:
+        for chain in self.chains_:
             for res in chain.residues():
                 result.append( res.residue_key )
         return result
@@ -76,14 +77,14 @@ class Structure:
     def get_metals(self) -> List[Residue]:
         """Filters out the metal Residue()'s from the chains in the Structure()."""
         result: List[Residue] = list()
-        for chain in self.chains:
+        for chain in self.chains_:
             result.extend(list(filter(lambda r: r.is_metal(), chain.residues())))
         return result
 
     def get_ligands(self) -> List[Residue]:
         """Filters out the ligand Residue()'s from the chains in the Structure()."""
         result: List[Residue] = list()
-        for chain in self.chains:
+        for chain in self.chains_:
             result.extend(list(filter(lambda r: r.is_ligand(), chain.residues())))
         return result
 
@@ -93,10 +94,34 @@ class Structure:
         """
         pass  # TODO(CJ) implement add_[ligand|metal_center|chain], etc.
 
+    def remove_chain(self, chain_name : str ) -> None: 
+        """Given a chain name, removes the Chain() object form both self.chains_ and self.chain_mapper."""
+        del self.chain_mapper[chain_name]
+        to_remove = -1
+        for idx, chain in enumerate( self.chains_ ):
+            if chain.name() == chain_name:
+                to_remove = idx
+                break
+    
+        if to_remove != -1:
+             del self.chains_[to_remove]
+
     def insert_chain(self, new_chain: Chain) -> None:
-        # TODO(CJ): documentation
-        self.chains.append(new_chain)
+        """Method that inserts a new chain and then sorts the chains based on name.
+		Will overwrite if Chain() with existing name already in object.
+		"""
+        new_chain_name : str = new_chain.name()
+        if new_chain_name in self.chain_mapper:
+            self.remove_chain( new_chain_name )            
+
+        self.chains_.append(new_chain)
         self.chain_mapper[new_chain.name()] = new_chain
+        self.chains_.sort(key=lambda c: c.name())
+
+
+    def has_chain(self, chain_name : str ) -> bool:
+        """Checks if the Structure() has a chain with the specified chain_name."""
+        return chain_name in self.chain_mapper
 
     def find_metal_donor(self): #TODO(CJ): implement.
         pass
@@ -152,7 +177,7 @@ class Structure:
             #            i.id = id
 
             if type(obj_ele) == Chain:
-                self.chains.extend(obj)
+                self.chains_.extend(obj)
             if type(obj_ele) == MetalAtom:
                 self.metalatoms.extend(obj)
             if type(obj_ele) == Ligand:
@@ -183,7 +208,7 @@ class Structure:
                     obj.id = id
 
             if type(obj) == Chain:
-                self.chains.append(obj)
+                self.chains_.append(obj)
             if type(obj) == Metalatom:
                 self.metalatoms.append(obj)
             if type(obj) == Ligand:
@@ -215,9 +240,9 @@ class Structure:
         """
         if if_local:
             # sort chain order
-            self.chains.sort(key=lambda chain: chain.id)
+            self.chains_.sort(key=lambda chain: chain.id)
             # rename each chain
-            for index, chain in enumerate(self.chains):
+            for index, chain in enumerate(self.chains_):
                 chain.id = chr(65 + index)  # Covert to ABC using ACSII mapping
                 # sort each chain
                 chain.sort()
@@ -228,7 +253,7 @@ class Structure:
         else:
             r_id = 0
             a_id = 0
-            for chain in self.chains:
+            for chain in self.chains_:
                 for res in chain:
                     r_id += 1
                     res.id = r_id
@@ -335,7 +360,7 @@ class Structure:
             with open(out_path, "w") as of:
                 a_id = 0
                 r_id = 0
-                for chain in self.chains:
+                for chain in self.chains_:
                     # write chain
                     for resi in chain:
                         r_id = r_id + 1
@@ -374,7 +399,7 @@ class Structure:
         if ligand_fix == 1 and prepi_path == None:
             raise Exception("Ligand fix 1 requires prepin_path.")
         # chain part
-        for chain in self.chains:
+        for chain in self.chains_:
             for res in chain:
                 for atom in res:
                     atom.get_connect()
@@ -452,7 +477,7 @@ class Structure:
         # write str in order
         # Note: Only write the connected atom with larger id
         a_id = 0
-        for chain in self.chains:
+        for chain in self.chains_:
             for res in chain:
                 for atom in res:
                     a_id += 1
@@ -509,14 +534,14 @@ class Structure:
         return all_P_atoms 
         """
         all_P_atoms = []
-        for chain in self.chains:
+        for chain in self.chains_:
             for residue in chain:
                 all_P_atoms.extend(residue.atoms)
         return all_P_atoms
 
     def get_all_residue_unit(self, ifsolvent=0):
         all_r_list = []
-        for chain in self.chains:
+        for chain in self.chains_:
             for resi in chain:
                 all_r_list.append(resi)
 
@@ -543,12 +568,18 @@ class Structure:
             if resi.id == int(id):
                 return resi
 
+    def chains(self) -> List[Chain]:
+        """Getter for the list of Chain() objects contained within the Structure() object."""
+        self.chains_.sort( key=lambda c: c.name())
+        #TODO(CJ): should this be a deep copy or no?
+        return self.chains_
+
     def get_atom_id(self):
         """
         return a list of id of all atoms in the structure
         """
         atom_id_list = []
-        for chain in self.chains:
+        for chain in self.chains_:
             for res in chain:
                 for atom in res:
                     if atom.id == None:
@@ -617,7 +648,7 @@ class Structure:
                         for i in line.strip().split():
                             type_list.append(i)
         # assign type to atom
-        for chain in self.chains:
+        for chain in self.chains_:
             for res in chain:
                 for atom in res:
                     atom.type = type_list[atom.id - 1]
@@ -672,7 +703,7 @@ class Structure:
                         resi_obj = resi
             else:
                 chain_id = chain_id.group(0)
-                resi_obj = self.chains[int(chain_id) - 65]._find_resi_id(resi_id)
+                resi_obj = self.chains_[int(chain_id) - 65]._find_resi_id(resi_id)
 
             sele_stru_objs.append(resi_obj)
 
@@ -752,7 +783,7 @@ class Structure:
         len(obj) = len(obj.child_list)
         """
         return (
-            len(self.chains)
+            len(self.chains_)
             + len(self.metalatoms)
             + len(self.ligands)
             + len(self.solvents)
@@ -766,7 +797,7 @@ class Structure:
         """
 
         if i == 0:
-            return self.chains
+            return self.chains_
         if i == 1:
             return self.ligands
         if i == 2:
@@ -778,7 +809,7 @@ class Structure:
 
     def __bool__(self) -> bool:
         """Enables running assert Structure(). Checks if there is anything in the structure."""
-        return bool(len(self.chains))
+        return bool(len(self.chains_))
 
     def __eq__(self, other: Structure) -> bool:
         """Comparison operator for other Structure() objects. Checks first if both have same chain names and then if each named chain is identical."""
@@ -789,14 +820,26 @@ class Structure:
         other_chain: Chain
         for chain_name, self_chain in self.chain_mapper.items():
             other_chain = other.chain_mapper[chain_name]
-            if self_chain.same_sequence(other_chain):
+            if not self_chain.same_sequence(other_chain):
                 return False
         return True
 
-    def __neq__(self, other: Structure) -> bool:
+    def __ne__(self, other: Structure) -> bool:
         """Negation operator for other Structure() objects. Inverstion of Structure.__eq__(). """
         return not (self == other)
 
+    def insert_residue(self, new_res : Residue ) -> None:
+        new_res.chain()
+        self.chain_mapper[new_res.chain()].residues_.append( deepcopy(new_res) )
+        self.chain_mapper[new_res.chain()].residues_.sort(key=lambda r: r.num())
+
+    def get_residue(self, target_key : str ) -> Residue:
+        for chain in self.chains_:
+            for res in chain.residues():
+                if res.residue_key == target_key:
+                    return res
+        return None
+        
 
 def compare_structures( left : Structure, right : Structure ) -> Dict[str,List[str]]:
     """Compares two Structure() objects and returns a dict() of missing Residues with format:
@@ -818,13 +861,16 @@ def merge_right( left : Structure, right : Structure ) -> Structure:
     """Merges Residue() and derived objects from left Structure() to right Structure()."""
     struct_cpy : Structure = deepcopy( right )
     #TODO(CJ): make this a method
-    left.chains = sorted(left.chains, key=lambda c: c.name())
-    struct_cpy.chains = sorted(struct_cpy.chains, key=lambda c: c.name())
-    while struct_cpy != left:
-        for chain_idx in range(len(left.chains)):
-            #TODO(CJ): make this more OOP and handle at Chain() level.
-            for r_idx,(r1, r2) in enumerate(zip(left.chains[chain_idx],struct_cpy.chains[chain_idx])):
-                if r1 != r2:
-                    struct_cpy.chains[chain_idx].insert(idx, r1.clone())
-                    break
+    left.chains_ = sorted(left.chains_, key=lambda c: c.name())
+    struct_cpy.chains_ = sorted(struct_cpy.chains_, key=lambda c: c.name())
+    # this is the case where there is straight up a missing chain
+    for cname, chain in left.chain_mapper.items():
+        if not struct_cpy.has_chain( cname ):
+            struct_cpy.insert_chain(deepcopy(chain))
+   
+
+    right_keys  = struct_cpy.residue_keys()
+    for lkey in left.residue_keys():
+        if lkey not in right_keys:
+            struct_cpy.insert_residue( left.get_residue( lkey ))
     return struct_cpy

@@ -166,5 +166,4 @@ def structure_from_pdb(fname: str) -> Structure:
     parser.read_pdb(fname)
     res_mapper: Dict[str, Residue] = build_residues(pd.concat((parser.df["ATOM"],parser.df['HETATM'])))
     chain_mapper: Dict[str, Chain] = build_chains(res_mapper)
-    print(f"CM {len(chain_mapper)}")
     return Structure(list(chain_mapper.values()))

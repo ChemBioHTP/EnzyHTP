@@ -91,3 +91,12 @@ def test_protonate_ligand():
     assert protonated_ligand.net_charge == -1
     fs.safe_rmdir( ligand_dir )
     assert not os.path.isdir( ligand_dir )
+
+
+def test_protonate_missing_elements_ligand():
+    """Testing protonate_missing_elements() for PDB with a ligand included."""
+    assert False
+
+def test_protonate_missing_elements_metal():
+    """Testing protonate_missing_elements() for PDB with a metal included."""
+    assert False

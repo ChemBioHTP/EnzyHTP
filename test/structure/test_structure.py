@@ -19,6 +19,7 @@ from enzy_htp.structure import (
 
 CURR_DIR = os.path.dirname(os.path.abspath(__file__))
 TEST_DIR = os.path.dirname(CURR_DIR)
+DATA_DIR = f"{CURR_DIR}/data/"
 
 
 def equiv_files(fname1: str, fname2: str, width: int = None) -> bool:
@@ -119,7 +120,6 @@ def test_residue_state():
     ss = Structure(
         [chain1]
     )  # TODO(CJ): need error in Structure() ctor if NOT a list of chains
-    print(ss.residue_state(), "here")
     assert ss.residue_state() == answer
 
 
@@ -167,14 +167,14 @@ def test_compare_structures_not_equiv():
     TEST_FILE = f"{TEST_DIR}/preparation/data/3NIR.pdb"
     structure1: Structure = structure_from_pdb(TEST_FILE)
     structure2: Structure = structure_from_pdb(TEST_FILE)
-    res_to_remove1: Residue = structure1.chains[0][-1]
-    res_to_remove2: Residue = structure2.chains[0][0]
+    res_to_remove1: Residue = structure1.chains()[0][-1]
+    res_to_remove2: Residue = structure2.chains()[0][0]
     # one missing residue
-    del structure1.chains[0][-1]
+    del structure1.chains()[0][-1]
     result = compare_structures(structure1, structure2)
     assert result == {"left": [], "right": [res_to_remove1.residue_key]}
     # two missing residues
-    del structure2.chains[0][0]
+    del structure2.chains()[0][0]
     result = compare_structures(structure1, structure2)
     assert result == {
         "left": [res_to_remove2.residue_key],
@@ -188,8 +188,8 @@ def test_merge_right_canonical_only():
     TEST_FILE = f"{TEST_DIR}/preparation/data/3NIR.pdb"
     structure1: Structure = structure_from_pdb(TEST_FILE)
     structure2: Structure = structure_from_pdb(TEST_FILE)
-    res_to_remove1: Residue = structure2.chains[0][-1]
-    del structure2.chains[0][-1]
+    res_to_remove1: Residue = structure2.chains()[0][-1]
+    del structure2.chains()[0][-1]
     result = compare_structures(structure1, structure2)
     assert result == {"left": [res_to_remove1.residue_key], "right": []}
     result = merge_right(structure1, structure2)
@@ -198,12 +198,28 @@ def test_merge_right_canonical_only():
 
 def test_merge_right_with_ligand():
     """Merges differences between two Structure() objects containing a Ligand() object."""
-    assert False
+    TEST_FILE = f"{DATA_DIR}/FAcD-FA-ASP_rmW.pdb"
+    structure1: Structure = structure_from_pdb(TEST_FILE)
+    structure2: Structure = structure_from_pdb(TEST_FILE)
+    structure2.remove_chain( 'B' )
+    assert structure1 != structure2
+    structure2 : Structure = merge_right(structure1, structure2)
+    assert structure1 == structure2
+    print(DATA_DIR)
+    #assert False
 
 
 def test_merge_right_with_metal_atom():
     """Merges differences between two Structure() objects containing a MetalAtom() object."""
-    assert False
+    TEST_FILE = f"{DATA_DIR}/1NVG.pdb"
+    structure1: Structure = structure_from_pdb(TEST_FILE)
+    structure2: Structure = structure_from_pdb(TEST_FILE)
+    del structure2.chains_[0].residues_[-1]
+    print(structure1.chains_[0].residues_)
+    print(structure2.chains_[0].residues_)
+    assert structure1 != structure2
+    structure2 : Structure = merge_right(structure1, structure2)
+    assert structure1 == structure2
 
 def test_round_trip_pdb():
     """Ensuring that the Structure() class be loaded into a .pdb and saved back in a round trip without error."""

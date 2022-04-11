@@ -71,7 +71,7 @@ def protonate_missing_elements(old_pdb_path : str, new_pdb_path : str, work_dir 
     # protonate ligands and combine with the pqr file
     ligand_list = old_stru.get_ligands()
     if len(ligand_list):
-        print('lig-list',ligand_list)
+        #print('lig-list',ligand_list)
         core._LOGGER.info(f"Merging {len(ligand_list)} ligands in old structure!")
         lig_dir = work_dir + "/ligands/"
         fs.safe_mkdir(lig_dir)
@@ -85,7 +85,7 @@ def protonate_missing_elements(old_pdb_path : str, new_pdb_path : str, work_dir 
                 ligand_list,
             )
         )
-        print(new_ligands)
+        #print(new_ligands)
         for lig, ok in zip(new_ligands, old_keys):
             (c_id, r_name, r_id) = ok.split(".")
             lig.set_chain(c_id)
@@ -94,7 +94,7 @@ def protonate_missing_elements(old_pdb_path : str, new_pdb_path : str, work_dir 
                 r_id
             )  # TODO(CJ). make this a method for the Ligand() class
             lig.residue_key = ok
-            print(lig)
+            #print(lig)
             new_stru.insert_chain(Chain(lig.chain(), [lig]))
         # new_stru.add(new_ligands, sort=0)
     return new_stru
