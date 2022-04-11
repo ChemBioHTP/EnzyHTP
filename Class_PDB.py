@@ -860,7 +860,7 @@ class PDB():
         return self.path
 
     # def resi_distance(resi_id_1,chain_id_1, resi_id_1, chain_id_1)
-    def random_mut_generator(self, resi_id: int, chain_id: str):
+    def random_mut_generator(self, resi_id: int, chain_id: str) -> list:
         #from helper import get_distance
         MutaFlag = []
         resi_allowed_list = [] #first create the list for the resi changing candidate
@@ -870,25 +870,24 @@ class PDB():
         #Muta_c_id = chain_mk_random.id
         #Muta_r_id = str(resi_mk_random.id)
         chain_int = ord(chain_id)-65
-        chain_int_mut = ord(Muta_c_id)-65
+        #chain_int_mut = ord(Muta_c_id)-65
         resi_name_target = self.stru.chains[chain_int].residues[resi_id].name
         resi_target_flag = Resi_map2[resi_name_target]
-        resi_name_mut = self.stru.chains[chain_int_mut].residues[resi_mk_random.id].name
-        resi_mut_flag = Resi_map2[resi_name_mut]
+        #resi_name_mut = self.stru.chains[chain_int_mut].residues[resi_mk_random.id].name
+        #resi_mut_flag = Resi_map2[resi_name_mut]
 
         #def distance_checker(resi_1 : str, resi_2 : str):
         #    resi.atoms == 'CB'
         #    resi.atoms == 'CB'
 
         for idx, aa in enumerate(resi_vol_rank):
+            resi_ranking_id = 0
             if resi_target_flag ==  aa:
-                resi_mut = idx
-                if resi_target > resi_mut :
-                    MutaFlag = str(resi_target_flag) + chain_id + chain_mk_random + resi_mut_flag
-                    print("Warning!the aa volume will increase, may change cavity volume")
-                else:
-                    MutaFlag = str(resi_target_flag) + chain_id + chain_mk_random + resi_mut_flag
-                    print("mutation is good to use")
+                resi_ranking_id = idx
+                resi_allowed_list = resi_vol_rank[:resi_ranking_id]
+
+        resi_mk_random = choice(resi_allowed_list)
+        MutaFlag = str(resi_target_flag) + str(resi_id) + str(chain_id) + str(resi_mk_random)
         return MutaFlag
             
 
