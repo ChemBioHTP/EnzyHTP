@@ -28,6 +28,23 @@ class Chain:
         self.residues_: List[Residue] = deepcopy(residues)
         self.rename(self.name_)
 
+    def insert_residue(self, new_res : Residue, sort_after : bool = True ) -> None:
+        """Allows for insertion of a new Residue() object into the Chain. If the new Residue() is an exact
+        copy, it fully overwrites the existing value. The sort_after flag specifies if the Residue()'s should
+        be sorted by residue_number after the insertion.
+        """
+        for ridx, res in enumerate(self.residues_):
+            if new_res.name == res.name and new_res.num_ == res.num_:
+                self.residues_[idx] = deepcopy( new_res )
+                break
+        else:
+            self.residues_.append( new_res )
+        
+        self.rename( self.name_ )
+        
+        if sort_after:
+            self.residues_.sort( key=lambda r: r.num() )
+
     def is_metal(self) -> bool:
         """Checks if any metals are contained within the current chain."""
         return sum(list(map(lambda rr: rr.is_metal(), self.residues_)))
@@ -114,3 +131,20 @@ class Chain:
     def __len__(self) -> int:
         """Returns number of Residue() or Residue()-dervied objects belonging to the Chain."""
         return len(self.residues_)
+
+
+    def num_residues(self) -> int:
+        """Returns number of Residue() or Residue()-dervied objects belonging to the Chain."""
+        return len(self)
+
+    def remove_residue(self, target_key : str ) -> None:
+        """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format, 
+        the Residue() is removed if it currently exists in the Chain() object."""
+        for ridx, res in enumerate(self.residues_):
+            if res.residue_key == target_key:
+                break
+        else:
+            return
+        
+        del self.residues_[ridx]
+

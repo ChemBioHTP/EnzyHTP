@@ -5,6 +5,7 @@ Date: 2022-04-03
 """
 import os
 import pytest
+import numpy as np
 from copy import deepcopy
 import enzy_htp.chemical as chem
 from enzy_htp.core import file_system as fs
@@ -25,14 +26,26 @@ DATA_DIR = f"{CURR_DIR}/data/"
 
 def equiv_files(fname1: str, fname2: str, width: int = None) -> bool:
     """Helper method to check if two files are exactly equivalent."""
-    for l1, l2 in zip(fs.lines_from_file(fname1), fs.lines_from_file(fname2)):
+    def find_first_diff( l1, l2 ):
+        for idx, (ch1, ch2) in enumerate(zip(l1,l2)):
+            if ch1 != ch2:
+                return idx+1
+        return -1
+
+    for line_idx, (l1, l2) in enumerate(zip(fs.lines_from_file(fname1), fs.lines_from_file(fname2))):
         if width:
             l1 = l1[:width]
             l2 = l2[:width]
 
-        if l1 != l2:
+        first_diff = find_first_diff(l1,l2)
+        if first_diff != -1:
+            diff = [' ']*min(len(l1),len(l2))
+            diff[first_diff] = '^'
+            
             print(f"'{l1}'")
             print(f"'{l2}'")
+            print(''.join(diff))
+            print(f"Difference encountered on line {line_idx}. '{fname1}' and '{fname2}' are NOT equivalent")
             return False
     return True
 
