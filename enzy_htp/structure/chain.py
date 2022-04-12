@@ -148,3 +148,9 @@ class Chain:
         
         del self.residues_[ridx]
 
+
+
+
+
+
+
