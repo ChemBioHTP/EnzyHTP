@@ -6,7 +6,7 @@ Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-19
 """
-#TODO(CJ): figure out how to inherit docstrings to the children classes.
+# TODO(CJ): figure out how to inherit docstrings to the children classes.
 from __future__ import annotations
 import numpy as np
 from plum import dispatch
@@ -159,4 +159,8 @@ class Residue:
 
     def clone(self) -> Residue:
         """Creates a deepcopy of self."""
-        return deepcopy( self )
+        return deepcopy(self)
+
+    def sort_key(self) -> Tuple[str, int]:
+        """Generates the sorting key for the Residue(). Specifically, a tuple of [chain_id, res_num]."""
+        return (self.chain_, self.num_)

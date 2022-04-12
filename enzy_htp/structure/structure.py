@@ -71,7 +71,7 @@ class Structure:
         result = []
         for chain in self.chains_:
             for res in chain.residues():
-                result.append( res.residue_key )
+                result.append(res.residue_key)
         return result
 
     def get_metals(self) -> List[Residue]:
@@ -94,36 +94,47 @@ class Structure:
         """
         pass  # TODO(CJ) implement add_[ligand|metal_center|chain], etc.
 
-    def remove_chain(self, chain_name : str ) -> None: 
+    def remove_chain(self, chain_name: str) -> None:
         """Given a chain name, removes the Chain() object form both self.chains_ and self.chain_mapper."""
         del self.chain_mapper[chain_name]
         to_remove = -1
-        for idx, chain in enumerate( self.chains_ ):
+        for idx, chain in enumerate(self.chains_):
             if chain.name() == chain_name:
                 to_remove = idx
                 break
-    
+
         if to_remove != -1:
-             del self.chains_[to_remove]
+            del self.chains_[to_remove]
 
     def insert_chain(self, new_chain: Chain) -> None:
         """Method that inserts a new chain and then sorts the chains based on name.
 		Will overwrite if Chain() with existing name already in object.
 		"""
-        new_chain_name : str = new_chain.name()
+        new_chain_name: str = new_chain.name()
         if new_chain_name in self.chain_mapper:
-            self.remove_chain( new_chain_name )            
+            self.remove_chain(new_chain_name)
 
         self.chains_.append(new_chain)
         self.chain_mapper[new_chain.name()] = new_chain
         self.chains_.sort(key=lambda c: c.name())
 
+    def num_chains(self) -> int:
+        """Returns the number of Chain() objects in the current Structure()."""
+        return len(self.chains_)
 
-    def has_chain(self, chain_name : str ) -> bool:
+    def has_chain(self, chain_name: str) -> bool:
         """Checks if the Structure() has a chain with the specified chain_name."""
         return chain_name in self.chain_mapper
 
-    def find_metal_donor(self): #TODO(CJ): implement.
+    def residues(self) -> List[Residue]:
+        """Creates a deep copied list of the residues in the Structure() object."""
+        result = list()
+        for ch in self.chains_:
+            result.extend(ch.residues())
+        result.sort(key=lambda r: r.sort_key())
+        return result
+
+    def find_metal_donor(self):  # TODO(CJ): implement.
         pass
 
     def add(self, obj, id=None, sort=0):
@@ -527,7 +538,6 @@ class Structure:
 
         return connectivty_table
 
-
     def get_all_protein_atom(self):
         """
         get a list of all protein atoms
@@ -570,8 +580,8 @@ class Structure:
 
     def chains(self) -> List[Chain]:
         """Getter for the list of Chain() objects contained within the Structure() object."""
-        self.chains_.sort( key=lambda c: c.name())
-        #TODO(CJ): should this be a deep copy or no?
+        self.chains_.sort(key=lambda c: c.name())
+        # TODO(CJ): should this be a deep copy or no?
         return self.chains_
 
     def get_atom_id(self):
@@ -828,49 +838,48 @@ class Structure:
         """Negation operator for other Structure() objects. Inverstion of Structure.__eq__(). """
         return not (self == other)
 
-    def insert_residue(self, new_res : Residue ) -> None:
+    def insert_residue(self, new_res: Residue) -> None:
         new_res.chain()
-        self.chain_mapper[new_res.chain()].residues_.append( deepcopy(new_res) )
+        self.chain_mapper[new_res.chain()].residues_.append(deepcopy(new_res))
         self.chain_mapper[new_res.chain()].residues_.sort(key=lambda r: r.num())
 
-    def get_residue(self, target_key : str ) -> Residue:
+    def get_residue(self, target_key: str) -> Union[None, Residue]:
         for chain in self.chains_:
             for res in chain.residues():
                 if res.residue_key == target_key:
                     return res
         return None
-        
 
-def compare_structures( left : Structure, right : Structure ) -> Dict[str,List[str]]:
+
+def compare_structures(left: Structure, right: Structure) -> Dict[str, List[str]]:
     """Compares two Structure() objects and returns a dict() of missing Residues with format:
        
 	   {'left': ['residue_key1','residue_key1',..],
 	    'right': ['residue_key1','residue_key1',..]
 		}
 	"""
-    result = {'left':[], 'right':[]}
-    left_keys : Set[str] = set(left.residue_keys())
-    right_keys : Set[str] = set(right.residue_keys())
-    
-    result['left'] = list(filter(lambda ll: ll not in right_keys, left_keys ))
-    result['right'] = list(filter(lambda rr: rr not in left_keys, right_keys ))
+    result = {"left": [], "right": []}
+    left_keys: Set[str] = set(left.residue_keys())
+    right_keys: Set[str] = set(right.residue_keys())
+
+    result["left"] = list(filter(lambda ll: ll not in right_keys, left_keys))
+    result["right"] = list(filter(lambda rr: rr not in left_keys, right_keys))
     return result
 
 
-def merge_right( left : Structure, right : Structure ) -> Structure:
+def merge_right(left: Structure, right: Structure) -> Structure:
     """Merges Residue() and derived objects from left Structure() to right Structure()."""
-    struct_cpy : Structure = deepcopy( right )
-    #TODO(CJ): make this a method
+    struct_cpy: Structure = deepcopy(right)
+    # TODO(CJ): make this a method
     left.chains_ = sorted(left.chains_, key=lambda c: c.name())
     struct_cpy.chains_ = sorted(struct_cpy.chains_, key=lambda c: c.name())
     # this is the case where there is straight up a missing chain
     for cname, chain in left.chain_mapper.items():
-        if not struct_cpy.has_chain( cname ):
+        if not struct_cpy.has_chain(cname):
             struct_cpy.insert_chain(deepcopy(chain))
-   
 
-    right_keys  = struct_cpy.residue_keys()
+    right_keys = struct_cpy.residue_keys()
     for lkey in left.residue_keys():
         if lkey not in right_keys:
-            struct_cpy.insert_residue( left.get_residue( lkey ))
+            struct_cpy.insert_residue(left.get_residue(lkey))
     return struct_cpy

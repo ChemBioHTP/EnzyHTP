@@ -145,7 +145,7 @@ def test_is_metal():
     """Checks if the Chain.is_metal() returns correct answers for both True and False cases."""
     pdb_file = f"{DATA_DIR}/1NVG.pdb"
     structure: Structure = structure_from_pdb(pdb_file)
-    chain: Chain = structure.chains[0]
+    chain: Chain = structure.chains()[0]
     assert chain.is_metal()
     del chain[-1]
     del chain[-1]

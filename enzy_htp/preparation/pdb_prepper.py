@@ -17,7 +17,7 @@ from .protonate import protonate_pdb, protonate_missing_elements, check_valid_ph
 import enzy_htp.core as core
 
 from enzy_htp.core import file_system as fs
-from enzy_htp.structure import ( 
+from enzy_htp.structure import (
     compare_structures,
     merge_right,
     structure_from_pdb,
@@ -39,6 +39,7 @@ from .mutate import (
 )
 
 from enzy_htp.chemical import convert_to_three_letter, get_element_aliases
+
 
 class PDBPrepper:
     """Class that handles initial preparation of a specified Structure().
@@ -405,29 +406,22 @@ class PDBPrepper:
                     break
         return self.if_complete, self.if_complete_chain
 
-
-
         pass
 
-
-
-
-    def get_protonation(
-        self,
-        ph: float = 7.0,
-        ffout: str = "AMBER",
-    ) -> str:
+    def get_protonation(self, ph: float = 7.0, ffout: str = "AMBER",) -> str:
         """Uses PDB2PQR to get the protonation state for a PDB file, saving the protonated .pdb file.
 		Separately runs PDB2PQR on the ligand and metal and combines the output. Returns path to the protonated
 		PDB file."""
         # input of PDB2PQR
-        check_valid_ph( ph ) 
+        check_valid_ph(ph)
         self.pqr_path = f"{fs.remove_ext(self.current_path_)}.pqr.pdb"
         self.all_paths.append(self.pqr_path)
         protonate_pdb(self.path_name, self.pqr_path)
         # Add missing atom (from the PDB2PQR step. Update to func result after update the _get_protonation_pdb2pqr func)
         # Now metal and ligand
-        new_structure : Structure = protonate_missing_elements(self.no_water_path, self.pqr_path, self.work_dir)
+        new_structure: Structure = protonate_missing_elements(
+            self.no_water_path, self.pqr_path, self.work_dir
+        )
 
         self.current_path_ = f"{fs.remove_ext(fs.remove_ext(self.pqr_path))}_aH.pdb"
         self.all_paths.append(self.current_path_)
@@ -437,11 +431,11 @@ class PDBPrepper:
 
         return self.current_path_
 
-    '''
+    """
     ========
     Mutation
     ========
-    '''
+    """
 
     def apply_mutations(self) -> str:
         """
@@ -867,4 +861,3 @@ class PDBPrepper:
             Es.append(E)
 
         return Es
-

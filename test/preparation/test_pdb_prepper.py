@@ -21,6 +21,7 @@ PREPPER: PDBPrepper = None
 
 fs.safe_rmdir(WORK_DIR)
 
+
 def equiv_files(fname1: str, fname2: str, width: int = None) -> bool:
     """Helper method to check if two files are exactly equivalent."""
     for l1, l2 in zip(fs.lines_from_file(fname1), fs.lines_from_file(fname2)):
@@ -83,7 +84,6 @@ def test_prepper_get_protonation_FAcD():
 
     assert equiv_files(target_pqr, actual_pqr)
     assert equiv_files(target_pqr_pdb_file, actual_pqr_pdb_file, 66)
-    assert False
 
 
 def test_prepper_get_protonation_invalid_pH():

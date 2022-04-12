@@ -30,7 +30,7 @@ class Solvent(Residue):
         """Constructor for Solvent. Identical to Residue() ctor. SHOULD NOT be called directly by users.
 		Instead use enzy_htp.structure.solvent.residue_to_solvent()."""
         Residue.__init__(self, residue_key, atoms)
-        self.set_rtype( renum.ResidueType.SOLVENT )	
+        self.set_rtype(renum.ResidueType.SOLVENT)
 
     def is_rd_solvent(self) -> bool:
         """Checks if the Solvent() is an rd solvent. Hard-coded to True for this derived class."""
@@ -38,7 +38,8 @@ class Solvent(Residue):
 
     def clone(self) -> Solvent:
         """Creates deepcopy of self."""
-        return deepcopy( self )
+        return deepcopy(self)
+
 
 def residue_to_solvent(ptr: Residue) -> Solvent:
     """Conversion method that creates a deepcopied Solvent() instance from a base Residue()."""

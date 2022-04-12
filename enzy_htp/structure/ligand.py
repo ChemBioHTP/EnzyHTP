@@ -76,7 +76,8 @@ class Ligand(Residue):
 
     def clone(self) -> Ligand:
         """Creates deecopy of self."""
-        return deepcopy( self )
+        return deepcopy(self)
+
 
 def residue_to_ligand(ptr: Residue, net_charge: float = None) -> Ligand:
     """Convenience function that converts Residue to ligand."""

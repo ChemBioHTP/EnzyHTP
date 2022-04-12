@@ -62,7 +62,7 @@ class Chain:
         """Comparison operator for use with other Chain() objects. Checks if residue list is identical in terms of residue name only."""
         self_residues: List[Residue] = self.residues_
         other_residues: List[Residue] = other.residues_
-        #print(len(self_residues),'\t',len(other_residues))
+        # print(len(self_residues),'\t',len(other_residues))
         if len(self_residues) != len(other_residues):
             return False
 

@@ -7,13 +7,14 @@ import os
 import pytest
 from copy import deepcopy
 import enzy_htp.chemical as chem
+from enzy_htp.core import file_system as fs
 from enzy_htp.structure import (
     Structure,
     structure_from_pdb,
     Residue,
     Chain,
     compare_structures,
-	merge_right,
+    merge_right,
 )
 
 
@@ -201,12 +202,12 @@ def test_merge_right_with_ligand():
     TEST_FILE = f"{DATA_DIR}/FAcD-FA-ASP_rmW.pdb"
     structure1: Structure = structure_from_pdb(TEST_FILE)
     structure2: Structure = structure_from_pdb(TEST_FILE)
-    structure2.remove_chain( 'B' )
+    structure2.remove_chain("B")
     assert structure1 != structure2
-    structure2 : Structure = merge_right(structure1, structure2)
+    structure2: Structure = merge_right(structure1, structure2)
     assert structure1 == structure2
     print(DATA_DIR)
-    #assert False
+    # assert False
 
 
 def test_merge_right_with_metal_atom():
@@ -214,13 +215,26 @@ def test_merge_right_with_metal_atom():
     TEST_FILE = f"{DATA_DIR}/1NVG.pdb"
     structure1: Structure = structure_from_pdb(TEST_FILE)
     structure2: Structure = structure_from_pdb(TEST_FILE)
+    # NOTE(CJ): Below is NOT the recommended way to manipulate this stuff
     del structure2.chains_[0].residues_[-1]
     print(structure1.chains_[0].residues_)
     print(structure2.chains_[0].residues_)
     assert structure1 != structure2
-    structure2 : Structure = merge_right(structure1, structure2)
+    structure2: Structure = merge_right(structure1, structure2)
     assert structure1 == structure2
+
 
 def test_round_trip_pdb():
     """Ensuring that the Structure() class be loaded into a .pdb and saved back in a round trip without error."""
-    assert False
+    # FIXME(CJ): This test doesn't currently work for 1NVG: figure out the PDBline stuff
+    # that will make this work
+    TEST_FILE = f"{DATA_DIR}/1NVG.pdb"
+    actual_file = f"{DATA_DIR}/1NVG_cpy.pdb"
+    structure1: Structure = structure_from_pdb(TEST_FILE)
+    fs.safe_rm(actual_file)
+    assert not os.path.exists(actual_file)
+    structure1.to_pdb(actual_file)
+    assert os.path.exists(actual_file)
+    assert equiv_files(TEST_FILE, actual_file, 60)
+    fs.safe_rm(actual_file)
+    assert not os.path.exists(actual_file)

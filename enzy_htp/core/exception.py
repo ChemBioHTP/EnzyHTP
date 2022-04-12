@@ -31,5 +31,5 @@ class InvalidPH(Exception):
 
 class UnsupportedMethod(Exception):
     """Exception corresponding to a method that is NOT implemented and/or supported."""
-    
+
     pass
