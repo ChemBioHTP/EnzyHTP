@@ -6,7 +6,7 @@ Date: 2022-03-19
 import os
 import pytest
 
-from enzy_htp.core import EnvironmentManager
+from enzy_htp.core import EnvironmentManager, file_system as fs
 
 
 def test_check_environment():
@@ -91,3 +91,14 @@ def test_run_command():
 
     assert exe.type == SystemExit
     assert exe.value.code == 1
+
+def test_run_command_with_whitespace():
+    """Ensuring the EnvironmentManager.run_command() method works when there is whitespace in the command."""
+    em = EnvironmentManager()
+    CURR_DIR = os.path.dirname(os.path.abspath( __file__ ))
+    name_with_spaces = f"{CURR_DIR}/this has spaces/"
+    #assert not os.path.isdir( name_with_spaces )
+    fs.safe_mkdir( name_with_spaces )
+    assert em.run_command("stat", [name_with_spaces])
+    fs.safe_rm( name_with_spaces ) 
+    assert not os.path.isdir( name_with_spaces )

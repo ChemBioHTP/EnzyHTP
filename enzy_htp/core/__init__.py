@@ -22,3 +22,5 @@ from .file_system import (
     write_lines,
     get_file_ext,
 )
+
+from .settings import (get_version, data_dir, is_compatible_os, EnzyHTPVersion)

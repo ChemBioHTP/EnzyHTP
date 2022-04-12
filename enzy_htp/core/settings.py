@@ -3,32 +3,31 @@
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 2022-04-03
 """
+from collections import namedtuple
 
+EnzyHTPVersion = namedtuple('EnzyHTPVersion', 'major minor patch')
 
-# TODO(CJ): Define a named tuple ( https://realpython.com/python-namedtuple/ ) with the following information:
-# Major Version, Minor version, Patch
+_VERSION = None #TODO(CJ): fill in the version here with major=0, minor=1 and patch = 0
 
-
-# TODO(CJ): Create function that returns the Version Tuple of the current version of enzy_htp
-
-
-# TODO(CJ): Create test file in test/core/test_settings.py and test all functions.
-
-
-# TODO fill out the below functions
-
-
-def get_version():  # should return version named tuple
+def get_version() -> EnzyHTPVersion:  # should return version named tuple
+    """Method that gets the current EnzyHTPVersion from the module."""
     pass
 
+def version_to_str(version : EnzyHTPVersion) -> str:
+    """Method that takes an EnzyHTPVersion and converts it to a str in the format "major.minor.patch".
+	Should truncate floats:
+	>>> version = EnzyHTPVersion(major=1.5, minor=3.2, patch=8.9)
+	>>> version_to_str( version ) = "1.3.8"
+	"""
+    pass
 
 def data_dir() -> str:
+    """Returns a path to the data directory at enzy_htp/data/"""
     pass
-
 
 # returns path to a data/ directory in enzy_htp/data/
 
-
 def is_compatible_os() -> bool:
+    """Checks if the operating system is compatible. Should fail if operating system is not linux or mac-os"""
+	#HINT(CJ): Use sys.platform
     pass
-    # checks if the operating system is compatbile
