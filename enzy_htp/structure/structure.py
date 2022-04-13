@@ -1,270 +1,226 @@
-# TODO(CJ) add documentation
+"""Definition for the Structure class. Structure objects represent a single protein/enzyme system. They
+are composed of Chain objects and their respecitve residues. The majority of EnzyHTP's structural 
+manipulations are carried out through this class. Note that Structure() objects SHOULD NOT be created
+by the user directly and instead creted through enzy_htp.structure_from_pdb(). Common Structure() operations 
+include the insertion/deletion of child Residue() and Chain() objects. 
+
+Sub-module also contains two utility free functions for comparing and merging structural elements.
+compare_structures() and merge_right() are used for comparing and merging structural components for Structure()
+objects, respectively.
+
+NOTE: The below code assumes a trivial protein structure with two chains containing 3 and 1 residue, respectively.
+
+Loading a structure from PDB:
+	>>> import enzy_htp
+	>>> structure : enzy_htp.Structure = enzy_htp.structure_from_pdb("/path/to/pdb")
+
+Surveying basic information:
+    >>> structure.num_chains()
+	2
+	>>> structure.residue_state()
+	[('A','ASP',1),('A','ASP',2),('A','ASP',3),('B','ASP',1)]
+	>>> structure.num_residues()
+	4
+
+Interfacing with Chain()'s:
+    >>> structure.chains()
+    [<enzy_htp.structure.chain.Chain object at 0x7fdc680ac670>, 
+	    <enzy_htp.structure.chain.Chain object at 0x7fdc680855b0>]
+    >>> structure.chain_names()
+    ['A', 'B']
+    >>> chain_cpy : enzy_htp.Chain = structure.get_chain( 'B' )
+    >>> structure.remove_chain( 'B' )
+    >>> structure.chains()
+    [<enzy_htp.structure.chain.Chain object at 0x7fdc680ac670>]
+	>>> structure.num_chains()
+	1
+	>>> structure.num_residues()
+	3
+	>>> structure.insert_chain( chain_cpy )
+    >>> structure.chains()
+    [<enzy_htp.structure.chain.Chain object at 0x7fdc680ac670>, 
+	    <enzy_htp.structure.chain.Chain object at 0x7fdc680855b0>]
+    >>> structure.chain_names()
+    ['A', 'B']
+	>>> structure.num_chains()
+    2	
+	>>> structure.num_residues()
+    4	
+
+Interfacing with Residue()'s:
+    >>> structure.residues()
+    ['A.ASP.1','A.ASP.2','A.ASP.3','B.ASP.1']
+	>>> structure.num_residues()
+	4
+	>>> res_cpy : enzy_htp.Residue = structure.get_residue( 'B.ASP.1' )
+    >>> structure.remove_residue( 'B.ASP.1' )
+    >>> structure.residues()
+    ['A.ASP.1','A.ASP.2','A.ASP.3']
+	>>> structure.num_residues()
+	3
+	>>> structure.insert_residue( res_cpy )
+    >>> structure.residues()
+    ['A.ASP.1','A.ASP.2','A.ASP.3','B.ASP.1']
+	>>> structure.num_residues()
+	4
+
+Saving the structure:
+    >>> structure.to_pdb( "/path/to/copy/of/pdb" )
+
+
+Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Date: 2022-04-03
+"""
 from __future__ import annotations
 
 import string
 import pandas as pd
+from copy import deepcopy
 from typing import List, Set, Dict, Tuple
 from collections import defaultdict
 from biopandas.pdb import PandasPdb
 
+from enzy_htp.core import _LOGGER
+from enzy_htp.core import file_system as fs
+from enzy_htp.chemical import one_letters_except, convert_to_one_letter
+
 from .atom import Atom
-from .chain import Chain
+from . import Chain
 from .residue import Residue
 from .metal_atom import MetalAtom
-from ..core.logger import _LOGGER
 from .ligand import Ligand, residue_to_ligand
 from .solvent import Solvent, residue_to_solvent
 from .metal_atom import MetalAtom
 
-from ..chemical import one_letters_except, convert_to_one_letter
-
-#from enzy_htp.preparation import MutaFlag
-from enzy_htp.core import file_system as fs
-
 
 class Structure:
-    #TODO(CJ) fix these types
-    def __init__(self, chains : List[Chain] = None, solvents : List[Solvent] = None,
-        metal_atoms : List[MetalAtom] = None, ligands : List[Ligand] = None
-    ):
-        self.chains = chains
-        self.solvents = solvents
-        self.metal_atoms = metal_atoms
-        self.ligands = ligands
+    """High level representation of protein/enzyme structure designed for direct interfacing by users. 
+	Composed of child Chain() objects and their subsequent child Residue() objects. High level wrappers
+	in the Structure() class enable direct manipulation of both Chain() and Residue() state while abstracting
+	these details away from the user. 
+	Note: This class SHOULD NOT be created directly by users. It should be created with the enzy_htp.structure.structure_from_pdb() method.
 
-    def residue_state(self) -> List[Tuple[str,str,int]]:
+	Attributes:
+		chains_ : A list of Chain objects contained within the structure. 
+		chain_mapper : A dict() which maps chain id to the chain object.
+	"""
+
+    def __init__(self, chains: List[Chain]):
+        """Constructor that takes just a list of Chain() objects as input."""
+        self.chains_ = chains
+        self.chain_mapper = dict()
+        ch: Chain
+        for ch in chains:
+            if ch.name() in self.chain_mapper:
+                _LOGGER.error(
+                    "Duplicate chain names given to Structure() object. Exiting..."
+                )
+                exit(1)
+            self.chain_mapper[ch.name()] = ch
+
+    def residue_state(self) -> List[Tuple[str, str, int]]:
         """Generates a list of tuples of all residues in the Structure. Format for each tuple is (chain_id, one_letter_res_name, res_index)."""
         result = list()
-        for cname, chain in self.chains.items():
+        for cname, chain in self.chain_mapper.items():
             for residue in chain.residues():
-                (chain, res_name, index ) = residue.residue_key.split('.')
-                result.append( (chain, convert_to_one_letter(res_name), int(index) ) )
+                (chain, res_name, index) = residue.residue_key.split(".")
+                if residue.is_canonical():
+                    result.append((chain, convert_to_one_letter(res_name), int(index)))
+                elif residue.is_metal():
+                    result.append((chain, res_name, int(index)))
         return result
 
-    def get_metal_center(self):
-        """
-        Extract metal centers from metalatoms. Judged by the MetalCenter_map
-        save to self.metal_centers
-        return self.metal_centers
-        """
-        print(self.metal_atoms)
-        self.metal_centers = list(
-            filter(lambda ma: ma.is_metal_center(), self.metal_atoms)
-        )
-        # TODO maybe this should be copied?
-        return self.metal_centers
+    def residue_keys(self) -> List[str]:
+        """Generates a list of strings containing all residue_key values for all child Residue()'s"""
+        result = []
+        for chain in self.chains_:
+            for res in chain.residues():
+                result.append(res.residue_key)
+        return result
 
-    def get_art_resi(self):
-        """
-        find art_resi
-        """
-        pass
-    # TODO(CJ) implement add_[ligand|metal_center|chain], etc.
-    def add(self, obj, id=None, sort=0):
-        """
-        1. judge obj type (go into the list)
-        2. assign parent
-        3. id
-        if sort:
-            clean original id (use a place holder to represent last)
-        if not None:
-            assign id
-        if sort and not None:
-            mark as id+i
-        4. add to corresponding list
-                                                    sort
-                  |     |               0             |                     1               |
-         assigned |  0  |   keep (for direct output)  | clean (for sort)                    |
-                  |  1  |  assign (for direct output) | mark  (for relative order in sort ) |
-        """
-        # list
-        if type(obj) == list:
+    def get_metals(self) -> List[Residue]:
+        """Filters out the metal Residue()'s from the chains in the Structure()."""
+        result: List[Residue] = list()
+        for chain in self.chains_:
+            result.extend(list(filter(lambda r: r.is_metal(), chain.residues())))
+        return result
 
-            obj_ele = obj[0]
+    def get_ligands(self) -> List[Residue]:
+        """Filters out the ligand Residue()'s from the chains in the Structure()."""
+        result: List[Residue] = list()
+        for chain in self.chains_:
+            result.extend(list(filter(lambda r: r.is_ligand(), chain.residues())))
+        return result
 
-            if (
-                type(obj_ele) != Chain
-                and type(obj_ele) != MetalAtom
-                and type(obj_ele) != Ligand
-                and type(obj_ele) != Solvent
-            ):
-                raise TypeError(
-                    "structure.Add() method only take Chain / Metalatom / Ligand / Solvent"
-                )
+    def remove_chain(self, chain_name: str) -> None:
+        """Given a chain name, removes the Chain() object form both self.chains_ and self.chain_mapper."""
+        del self.chain_mapper[chain_name]
+        to_remove = -1
+        for idx, chain in enumerate(self.chains_):
+            if chain.name() == chain_name:
+                to_remove = idx
+                break
 
-            # add parent and clean id (if sort) assign id (if assigned) leave mark if sort and assigned
-            #                         sort
-            #          |     |    0     |   1   |
-            # assigned |  0  |   keep   | clean |
-            #          |  1  |  assign  | mark  |
-            #for i in obj:
-            #    i.set_parent(self)
-            #    if sort:
-            #        if id != None:
-            #            i.id = str(id) + "i"  # str mark
-            #        else:
-            #            i.id = id  # None
-            #    else:
-            #        if id != None:
-            #            i.id = id
+        if to_remove != -1:
+            del self.chains_[to_remove]
 
-            if type(obj_ele) == Chain:
-                self.chains.extend(obj)
-            if type(obj_ele) == MetalAtom:
-                self.metalatoms.extend(obj)
-            if type(obj_ele) == Ligand:
-                self.ligands.extend(obj)
-            if type(obj_ele) == Solvent:
-                self.solvents.extend(obj)
+    def insert_chain(self, new_chain: Chain) -> None:
+        """Method that inserts a new chain and then sorts the chains based on name.
+		Will overwrite if Chain() with existing name already in object.
+		"""
+        new_chain_name: str = new_chain.name()
+        if new_chain_name in self.chain_mapper:
+            self.remove_chain(new_chain_name)
 
-        # single building block
-        else:
-            if (
-                type(obj) != Chain
-                and type(obj) != Metalatom
-                and type(obj) != Ligand
-                and type(obj) != Solvent
-            ):
-                raise TypeError(
-                    "structure.Add() method only take Chain / Metalatom / Ligand / Solvent"
-                )
+        self.chains_.append(new_chain)
+        self.chain_mapper[new_chain.name()] = new_chain
+        self.chains_.sort(key=lambda c: c.name())
 
-            obj.set_parent(self)
-            if sort:
-                if id != None:
-                    obj.id = str(id) + "i"  # str mark
-                else:
-                    obj.id = id  # None
-            else:
-                if id != None:
-                    obj.id = id
+    def num_chains(self) -> int:
+        """Returns the number of Chain() objects in the current Structure()."""
+        return len(self.chains_)
 
-            if type(obj) == Chain:
-                self.chains.append(obj)
-            if type(obj) == Metalatom:
-                self.metalatoms.append(obj)
-            if type(obj) == Ligand:
-                self.ligands.append(obj)
-            if type(obj) == Solvent:
-                self.solvents.append(obj)
+    def num_residues(self) -> int:
+        """Returns the number of Residue() objects contained within the current Structure()."""
+        total : int = 0
+        ch : Chain
+        for ch in self.chains_:
+            total += ch.num_residues()
+        return total
 
-        if sort:
-            self.sort()
 
-    def sort(self, if_local=0):
-        _LOGGER.warning(f"Structure.sort has not been implemented yet!!")
-        return
-        """
-        assign index according to current items
-        chain.id
-        resi.id
-        atom.id
-        -----------
-        Chain/Residue level: 
-            Base on the order of the old obj.id 
-            and potential insert mark from add (higher than same number without the mark)
-            *if added object has same id and is not assigned with a insert mark -- place after a original one.
-        Atom level:
-            base on the parent order (parent.id):
-            chains -> metalatoms -> ligands
-            residue.id within each above.
-            list order within each residues.
-        """
-        if if_local:
-            # sort chain order
-            self.chains.sort(key=lambda chain: chain.id)
-            # rename each chain
-            for index, chain in enumerate(self.chains):
-                chain.id = chr(65 + index)  # Covert to ABC using ACSII mapping
-                # sort each chain
-                chain.sort()
+    def get_chain(self, chain_name : str ) -> Union[Chain,None]:
+        """Gets a chain of the given name. Returns None if the Chain() is not present."""
+        return self.chain_mapper.get( chain_name, None )
+        
 
-            # sort ligand // Do I really need?
-            for ligand in self.ligands:
-                ligand.sort()  # Do nothing
-        else:
-            r_id = 0
-            a_id = 0
-            for chain in self.chains:
-                for res in chain:
-                    r_id += 1
-                    res.id = r_id
-                    for atom in res:
-                        a_id += 1
-                        atom.id = a_id
-            for metal in self.metalatoms:
-                a_id += 1
-                metal.id = a_id
-            for lig in self.ligands:
-                r_id += 1
-                lig.id = r_id
-                for atom in lig:
-                    a_id += 1
-                    atom.id = a_id
-            for sol in self.solvents:
-                r_id += 1
-                sol.id = r_id
-                for atom in sol:
-                    a_id += 1
-                    atom.id = a_id
+    def has_chain(self, chain_name: str) -> bool:
+        """Checks if the Structure() has a chain with the specified chain_name."""
+        return chain_name in self.chain_mapper
 
-    def to_pdb(self, path, ff="AMBER", forcefield="ff14SB", keep_id=0):
-        """
-        build PDB after the change based on the chosen format and forcefield
-        - line based on atom and contain chain index and residue index
-        ----------------------------
-        ff = 
-        AMBER (standard amber format: from tleap examples)
-            - resi and atom indexes start from 1 and DO NOT reset reaching a new chain. 
-            - use atom and residue names from amber force field.
-            - place metal, ligand, solvent in seperate chains (seperate with TER)
-            - ligand -> metal -> solvent order
-            * do not sort atomic order in a residue like tleap does.
-        """
-        # TODO(CJ) add warning for overwriting an existing file
-        # TODO(CJ) need to add an error for when a different file format is specifieid 
+    def residues(self) -> List[Residue]:
+        """Creates a deep copied list of the residues in the Structure() object."""
+        result = list()
+        for ch in self.chains_:
+            result.extend(ch.residues())
+        result.sort(key=lambda r: r.sort_key())
+        return result
+
+    def to_pdb(self, out_path: str) -> None:
+        """Saves the structure to the specified file in the PDB file format."""
         lines = list()
-        if ff == "AMBER":
-            for cname, chain in self.chains.items():
-                # write chain
-                chain : Chain
-                a_idx = 0
-                for resi in chain.residues():
-                    resi : Residue
-                    for atom in resi.atom_list():
-                        a_idx += 1
-                        lines.append(atom.to_pdb_line(a_id=a_idx,ff=ff, forcefield=forcefield))
-                # add TER after each chain
-                lines.append("TER")
-
-            c_id = chr(len(self.chains) + 64)
-
-            for ligand in self.ligands:
-                c_id = chr(ord(c_id) + 1)
-                for atom in ligand.atom_list():
-                    a_idx += 1
-                    lines.append(atom.to_pdb_line(a_id=a_idx,c_id=c_id, ff=ff, forcefield=forcefield))
-                lines.append("TER")
-
-            for metal in self.metal_atoms:
-                c_id = chr(ord(c_id) + 1)
-                a_idx += 1
-                lines.append(metal.build(a_id=a_idx,c_id=c_id, ff=ff, forcefield=forcefield))
-                lines.append("TER")
-
-            if len(self.solvents):
-                c_id = chr(ord(c_id) + 1)  # chain_id for all solvent
-                for solvent in self.solvents:
-                    for atom in solvent:
-                        a_idx += 1
-                        lines.append(atom.build(
-                            a_id=a_idx,
-                            c_id=c_id, ff=ff, forcefield=forcefield
-                        ))
-                lines.append("TER")
-
+        a_idx = 1
+        for cname, chain in self.chain_mapper.items():
+            a_idx = chain.renumber_atoms(a_idx)
+            lines.extend(chain.get_pdb_lines())
+            a_idx += 1
         lines.append("END")
-        fs.write_lines(path, lines)
+        fs.write_lines(out_path, lines)
+
+    def get_solvents(self):
+        # TODO(CJ)
+        return []
 
     def build_ligands(
         self, dir, ft="PDB", ifcharge=0, c_method="PYBEL", ph=7.0, ifname=0, ifunique=0
@@ -335,7 +291,7 @@ class Structure:
             with open(out_path, "w") as of:
                 a_id = 0
                 r_id = 0
-                for chain in self.chains:
+                for chain in self.chains_:
                     # write chain
                     for resi in chain:
                         r_id = r_id + 1
@@ -374,7 +330,7 @@ class Structure:
         if ligand_fix == 1 and prepi_path == None:
             raise Exception("Ligand fix 1 requires prepin_path.")
         # chain part
-        for chain in self.chains:
+        for chain in self.chains_:
             for res in chain:
                 for atom in res:
                     atom.get_connect()
@@ -452,7 +408,7 @@ class Structure:
         # write str in order
         # Note: Only write the connected atom with larger id
         a_id = 0
-        for chain in self.chains:
+        for chain in self.chains_:
             for res in chain:
                 for atom in res:
                     a_id += 1
@@ -502,46 +458,20 @@ class Structure:
 
         return connectivty_table
 
-    def protonation_metal_fix(self, Fix):
-        """
-        return a bool: if there's any metal center
-        """
-        # try once if not exist
-        if self.metal_centers == []:
-            self.get_metal_center()
-        if self.metal_centers == []:
-            print("No metal center is found. Exit Fix.")
-            return False
-
-        # start fix
-        # get donor atoms and residues
-        for metal in self.metal_centers:
-            metal.get_donor_residue(method="INC")
-
-            if Fix == 1:
-                metal._metal_fix_1()
-
-            if Fix == 2:
-                metal._metal_fix_2()
-
-            if Fix == 3:
-                metal._metal_fix_3()
-        return True
-
     def get_all_protein_atom(self):
         """
         get a list of all protein atoms
         return all_P_atoms 
         """
         all_P_atoms = []
-        for chain in self.chains:
+        for chain in self.chains_:
             for residue in chain:
                 all_P_atoms.extend(residue.atoms)
         return all_P_atoms
 
     def get_all_residue_unit(self, ifsolvent=0):
         all_r_list = []
-        for chain in self.chains:
+        for chain in self.chains_:
             for resi in chain:
                 all_r_list.append(resi)
 
@@ -568,12 +498,18 @@ class Structure:
             if resi.id == int(id):
                 return resi
 
+    def chains(self) -> List[Chain]:
+        """Getter for the list of Chain() objects contained within the Structure() object."""
+        self.chains_.sort(key=lambda c: c.name())
+        # TODO(CJ): should this be a deep copy or no?
+        return self.chains_
+
     def get_atom_id(self):
         """
         return a list of id of all atoms in the structure
         """
         atom_id_list = []
-        for chain in self.chains:
+        for chain in self.chains_:
             for res in chain:
                 for atom in res:
                     if atom.id == None:
@@ -642,7 +578,7 @@ class Structure:
                         for i in line.strip().split():
                             type_list.append(i)
         # assign type to atom
-        for chain in self.chains:
+        for chain in self.chains_:
             for res in chain:
                 for atom in res:
                     atom.type = type_list[atom.id - 1]
@@ -661,95 +597,6 @@ class Structure:
                     raise Exception("Detected None in solvent", res.id, atom.name)
                 atom.type = type_list[atom.id - 1]
 
-    def get_sele_list(self, atom_mask, fix_end="H", prepi_path=None):
-        """
-        interface with class ONIOM_Frame. Generate a list for sele build. Make sure use same pdb as the one generate the frame.
-        ------------
-        resi_list: selected residue list
-        atom_mask: atom selection with the standard grammer of Amber (incomplete)
-        fix_end: fix valence of the cut bond. (default: H)
-                - H: add H to where the original connecting atom is.
-                    special fix for classical case:
-                    "sele by residue" (cut N-C) -- adjust dihedral for added H on N.
-                = Interface with write_sele_lines:
-                    add {fix_flag+element_mark: coord} in sele_lines 
-        ------------
-        return a sele list:
-        - Fixing atoms are labeled as qm_atom_id-qm_atom_cnt_id-distance
-        - backbone atoms are marked as b at the end (for qmcluster charge calculation)
-        - other atoms use _ as place holder
-        return a sele map:
-        (PDB atom id -> QM atom id)
-        """
-        sele_lines = {}
-        # decode atom_mask (maybe in helper later) TODO
-        resi_list = atom_mask[1:].strip().split(",")
-        all_resi_list = self.get_all_residue_unit()
-
-        # decode and get obj
-        sele_stru_objs = []
-        for resi in resi_list:
-            chain_id = re.match("[A-Z]", resi)
-            resi_id = int(re.match("[0-9]+", resi).group(0))
-            if chain_id == None:
-                for resi in all_resi_list:
-                    if resi_id == resi.id:
-                        resi_obj = resi
-            else:
-                chain_id = chain_id.group(0)
-                resi_obj = self.chains[int(chain_id) - 65]._find_resi_id(resi_id)
-
-            sele_stru_objs.append(resi_obj)
-
-        # combine the sele
-        sele_atoms = []
-        for obj in sele_stru_objs:
-            for atom in obj:
-                sele_atoms.append(atom)
-
-        if fix_end != None:
-            self.get_connect(prepi_path=prepi_path)
-
-        # operate on the sele objs
-        for atom in sele_atoms:
-            # add current atom
-            atom.get_ele()
-            if type(atom.parent) != Ligand:
-                if atom.name in ["C", "CA", "O", "N", "H", "HA"]:
-                    sele_lines[str(atom.id) + "b"] = atom.ele
-                else:
-                    sele_lines[str(atom.id) + "_"] = atom.ele
-            else:
-                sele_lines[str(atom.id) + "_"] = atom.ele
-
-            if fix_end != None:
-                # search for cut bond
-                for cnt_atom in atom.connect:
-                    if not cnt_atom in sele_atoms:
-                        if fix_end == "H":
-                            d_XH = X_H_bond_length[atom.name]
-                            label = "-".join(
-                                (str(atom.id), str(cnt_atom.id), str(d_XH))
-                            )
-                            fix_atom = "H"
-                        if fix_end == "Me":
-                            # TODO
-                            pass
-                        # write to sele_lines
-                        sele_lines[label] = fix_atom
-        # make sele_map (PDB atom id -> QM atom id)
-        sele_map = {}
-        for i, key in enumerate(sele_lines.keys()):
-            if key[-1] not in "1234567890":
-                key = key[:-1]
-            sele_map[key] = i + 1
-
-        if Config.debug >= 1:
-            print("Selected QM cluster atoms: ")
-            print(sele_lines)
-
-        return sele_lines, sele_map
-
     def get_resi_dist(self, r1, r2, method="mass_center"):
         """
         r1: residue 1. (residue_obj)
@@ -766,45 +613,102 @@ class Structure:
 
         return D
 
-    """
-    ====
-    Special Method
-    ====
-    """
+    def __bool__(self) -> bool:
+        """Enables running assert Structure(). Checks if there is anything in the structure."""
+        return bool(len(self.chains_))
 
-    def __len__(self):
+    def __eq__(self, other: Structure) -> bool:
+        """Comparison operator for other Structure() objects. Checks first if both have same chain names and then if each named chain is identical."""
+        if set(self.chain_mapper.keys()) != set(other.chain_mapper.keys()):
+            return False
+
+        chain_name: Chain
+        other_chain: Chain
+        for chain_name, self_chain in self.chain_mapper.items():
+            other_chain = other.chain_mapper[chain_name]
+            if not self_chain.same_sequence(other_chain):
+                return False
+        return True
+
+    def __ne__(self, other: Structure) -> bool:
+        """Negation operator for other Structure() objects. Inverstion of Structure.__eq__(). """
+        return not (self == other)
+
+    def insert_residue(self, new_res: Residue) -> None:
+        """Inserts a new Residue() object into the Structure(). If the exact Residue (chain_id, name, residue_id) already
+        exists, the new Residue overwrites it. If the new Residue specifies a Chain() that does not exist, a new chain is made.
         """
-        len(obj) = len(obj.child_list)
-        """
-        return (
-            len(self.chains)
-            + len(self.metalatoms)
-            + len(self.ligands)
-            + len(self.solvents)
-        )
+        chain_name : str = new_res.chain()
+        if not self.has_chain( chain_name ):
+            new_chain : Chain = Chain( chain_name, [new_res] )
+            self.chains_.apppend( new_chain )
+            self.chain_mapper[chain_name] = new_chain
+        else:
+            self.chain_mapper[chain_name].insert_residue( new_res )
+        
+        self.chains_ = list( self.chain_mapper.values() )
+        self.chains_.sort(key=lambda c: c.name()) 
 
-    def __getitem__(self, i):
-        """
-        pop four elements with fixed order
-        -----------------
-        capable with future update
-        """
+    def get_residue(self, target_key: str) -> Union[None, Residue]:
+        """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format, 
+		a deepcopy of the corresponding Residue() is returned, if it exists. None is returned if it cannot be found."""
+        for chain in self.chains_:
+            for res in chain.residues():
+                if res.residue_key == target_key:
+                    return deepcopy( res )
+        return None
 
-        if i == 0:
-            return self.chains
-        if i == 1:
-            return self.ligands
-        if i == 2:
-            return self.metalatoms
-        if i == 3:
-            return self.solvents
-        if i > 3:
-            raise StopIteration
+    def remove_residue(self, target_key : str ) -> None:
+        """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format, 
+		the Residue() is removed if it currently exists in one of the child Chain()'s. If the Chain() is empty after this
+		removal, the chain is deleted."""
+        (chain_name,_,_) = target_key.split('.')
+        if self.has_chain( chain_name ):
+            self.chain_mapper[chain_name].remove_residue( target_key )
+            if self.chain_mapper[chain_name].empty():
+                self.remove_chain( chain_name )
 
-    def __eq__(self, other : Structure ) -> bool:
-        """TODO"""
-        return self.chains == other.chains and self.solvents == other.solvents and self.metal_atoms == other.metal_atoms and self.ligands == other.ligands
-
+    def chain_names(self) -> List[str]:
+        """Returns a list of all the chain names for the Structure()"""
+        return list(self.chain_mapper.keys())
 
 
 
+def compare_structures(left: Structure, right: Structure) -> Dict[str, List[str]]:
+    """Compares two Structure() objects and returns a dict() of missing Residues with format:
+       
+	   {'left': ['residue_key1','residue_key1',..],
+	    'right': ['residue_key1','residue_key1',..]
+		}
+	"""
+    result = {"left": [], "right": []}
+    left_keys: Set[str] = set(left.residue_keys())
+    right_keys: Set[str] = set(right.residue_keys())
+
+    result["left"] = list(filter(lambda ll: ll not in right_keys, left_keys))
+    result["right"] = list(filter(lambda rr: rr not in left_keys, right_keys))
+    return result
+
+
+def merge_right(left: Structure, right: Structure) -> Structure:
+    """Merges Residue() and derived objects from left Structure() to right Structure(), making sure that ALL Residue() and 
+	Residue() derived objects from the left are in the right. Note that the reverse is not applied and that elements initially found only in right are NOT
+	merged back over to left. Also not the resulting Structure() is a deepcopy and no changes are made to the original left or right objects. 
+
+    Example:
+	    #TODO(CJ): add this in
+	"""
+    struct_cpy: Structure = deepcopy(right)
+    # TODO(CJ): make this a method
+    left.chains_ = sorted(left.chains_, key=lambda c: c.name())
+    struct_cpy.chains_ = sorted(struct_cpy.chains_, key=lambda c: c.name())
+    # this is the case where there is straight up a missing chain
+    for cname, chain in left.chain_mapper.items():
+        if not struct_cpy.has_chain(cname):
+            struct_cpy.insert_chain(deepcopy(chain))
+
+    right_keys = struct_cpy.residue_keys()
+    for lkey in left.residue_keys():
+        if lkey not in right_keys:
+            struct_cpy.insert_residue(left.get_residue(lkey))
+    return struct_cpy

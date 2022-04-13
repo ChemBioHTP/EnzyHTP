@@ -1,0 +1,6 @@
+biopandas
+pdb2pqr
+plum-dispatch
+numpy
+openbabel
+pandas

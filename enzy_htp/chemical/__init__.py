@@ -5,7 +5,7 @@ Author: Chris Jurich <chris.jurich@vanerbilt.edu>
 Date: 2022-03-19
 """
 from .enum import ResidueType
-from .metal import METAL_MAPPER, METAL_CENTER_MAP
+from .metal import METAL_MAPPER, METAL_CENTER_MAP, get_metal_radii
 from .solvent import RD_SOLVENT_LIST, RD_NON_LIGAND_LIST
 from .residue import (
     THREE_LETTER_AA_MAPPER,

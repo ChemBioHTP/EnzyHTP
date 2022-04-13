@@ -10,7 +10,7 @@ from typing import List, Set, Dict
 from ..core import InvalidResidueCode, _LOGGER
 
 
-AA_LIST : List[str]= [
+AA_LIST: List[str] = [
     "R",
     "H",
     "K",
@@ -35,7 +35,7 @@ AA_LIST : List[str]= [
 ]
 """Capitalized list of all one-letter amino acid names."""
 
-THREE_LETTER_AA_MAPPER : Dict[str,str] = {
+THREE_LETTER_AA_MAPPER: Dict[str, str] = {
     "ARG": "R",
     "HIS": "H",
     "HIE": "H",
@@ -63,7 +63,7 @@ THREE_LETTER_AA_MAPPER : Dict[str,str] = {
 }
 """Contains mapping of all amino acids codes, with key value pairs of (three letter code, one letter code). Should NOT be called directly for code conversion. Instead used enzy_htp.chemical.residue.convert_to_three_letter()"""
 
-ONE_LETTER_AA_MAPPER : Dict[str,str] = {
+ONE_LETTER_AA_MAPPER: Dict[str, str] = {
     "R": "ARG",
     "H": "HIS",
     "K": "LYS",
@@ -88,7 +88,7 @@ ONE_LETTER_AA_MAPPER : Dict[str,str] = {
 }
 """Contains mapping of all amino acids codes, with key value pairs of (one letter code, three letter code). Should NOT be called directly for code conversion. Instead used enzy_htp.chemical.residue.convert_to_one_letter()"""
 
-RESIDUE_ELEMENT_MAP : Dict[str,Dict[str,str]] = {
+RESIDUE_ELEMENT_MAP: Dict[str, Dict[str, str]] = {
     "Amber": {
         "C": "C",
         "CA": "C",
@@ -230,11 +230,13 @@ Example usage:
 
 """
 
+
 def convert_to_three_letter(one_letter: str) -> str:
     """Converts a one letter amino acid name to a three letter. If supplied code is invalid, raises an enzy_htp.core.InvalidResidueCode() exception."""
     if len(one_letter) != 1:
         raise InvalidResidueCode(
-            f"expecting one letter residue code. '{one_letter}' is invalid")
+            f"expecting one letter residue code. '{one_letter}' is invalid"
+        )
     one_letter = one_letter.upper()
     result = ONE_LETTER_AA_MAPPER.get(one_letter, None)
     if not result:
@@ -246,7 +248,8 @@ def convert_to_one_letter(three_letter: str) -> str:
     """Converts a threee letter amino acid name to a one letter. If supplied code is invalid, raises an enzy_htp.core.InvalidResidueCode() exception."""
     if len(three_letter) != 3:
         raise InvalidResidueCode(
-            f"expecting three letter residue code. '{three_letter}' is invalid")
+            f"expecting three letter residue code. '{three_letter}' is invalid"
+        )
     three_letter = three_letter.upper()
     result = THREE_LETTER_AA_MAPPER.get(three_letter, None)
     if not result:
@@ -257,8 +260,10 @@ def convert_to_one_letter(three_letter: str) -> str:
 def get_element_aliases(ff: str, element: str) -> Set[str]:
     """Gets all element aliases for a given force field (ff) and element name, retungin in a set. If the ff is not supported, will log and exit."""
     if ff not in RESIDUE_ELEMENT_MAP:
-        _LOGGER.error(f"{ff} is not a supported force field type. Allowed are '{', '.join(list(RESIDUE_ELEMENT_MAP.keys()))}'. Exiting...")
-        exit( 0 )
+        _LOGGER.error(
+            f"{ff} is not a supported force field type. Allowed are '{', '.join(list(RESIDUE_ELEMENT_MAP.keys()))}'. Exiting..."
+        )
+        exit(0)
     ff_dict = RESIDUE_ELEMENT_MAP[ff]
     aliases = []
     for alias, elem in ff_dict.items():

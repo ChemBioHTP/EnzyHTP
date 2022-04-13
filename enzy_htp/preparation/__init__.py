@@ -6,6 +6,7 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-19
 """
 
-from .mutate import Mutation, mutation_to_str 
+from .mutate import Mutation, mutation_to_str
 from .pdb_line import PDBLine, read_pdb_lines
+from .protonate import protonate_pdb, protonate_missing_elements
 from .pdb_prepper import PDBPrepper
