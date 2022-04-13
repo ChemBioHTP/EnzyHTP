@@ -36,6 +36,10 @@ def equiv_files(fname1: str, fname2: str, width: int = None) -> bool:
         if width:
             l1 = l1[:width]
             l2 = l2[:width]
+            if len(l2) < width:
+                l2 += ' '*(width-len(l2))
+            if len(l1) < width:
+                l1 += ' '*(width-len(l1))
 
         first_diff = find_first_diff(l1,l2)
         if first_diff != -1:
@@ -243,7 +247,7 @@ def test_round_trip_pdb():
     # that will make this work
     TEST_FILE = f"{DATA_DIR}/1NVG.pdb"
     actual_file = f"{DATA_DIR}/1NVG_cpy.pdb"
-    structure1: Structure = structure_from_pdb(TEST_FILE)
+    structure1: Structure = structure_from_pdb(TEST_FILE, 'all')
     fs.safe_rm(actual_file)
     assert not os.path.exists(actual_file)
     structure1.to_pdb(actual_file)

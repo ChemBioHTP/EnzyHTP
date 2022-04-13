@@ -314,7 +314,13 @@ class MetalAtom(Residue):
     def location(self) -> np.array:
         """Gets the location of the MetalAtom."""
         return self.atoms[0]
-
+    
+    def get_pdb_lines(self, _) -> List[str]:
+        """Method that gets the PDB lines for all of the Atom() objects."""
+        result : List[str] = Residue.get_pdb_lines( self, False )
+        for idx, line in enumerate( result ):
+            result[idx] = 'HETATM' + line[6:]
+        return result
 
 def residue_to_metal(residue: Residue) -> MetalAtom:
     """Convenience function that converts Residue() to MetalAtom() object."""

@@ -69,6 +69,10 @@ class Atom:
         for k, v in kwargs.items():
             setattr(self, k, v)
 
+    def has_alt_loc(self) -> bool:
+        """Checks if the atom has a non-empty alt_loc."""
+        return len(self.alt_loc.strip()) != 0
+
     def residue_key(self) -> str:
         """Creates a residue key of format "chain_id.residue_name.residue_number". Used for residue construction."""
         return f"{self.chain_id}.{self.residue_name}.{self.residue_number}"
@@ -119,7 +123,9 @@ class Atom:
                 else:
                     a_name = "{:<3}".format(self.atom_name)
                     a_name = " " + a_name
-                r_name = "{:>3}".format(self.residue_name)
+                if "ZN" in a_name:#TODO(CJ) FIX THIS
+                    a_name = a_name.strip() + "  "
+                r_name = "{:<3}".format(self.residue_name)
             else:
                 raise Exception("Only support ff14SB atom/resiude name now")
 
@@ -133,7 +139,7 @@ class Atom:
             z = "{:>8.3f}".format(self.z_coord)
         # TODO(CJ) figure out a less janky way to do all of this
         a_type = "".join(list(filter(lambda c: not c.isdigit(), a_name))).strip()[0]
-        return f"{l_type}{a_index} {a_name} {r_name} {c_index}{r_index}    {x}{y}{z}  1.00  0.00           {a_type}  "
+        return f"{l_type}{a_index} {a_name}{self.alt_loc:1}{r_name: >3} {c_index}{r_index}    {x}{y}{z}{self.occupancy:6.2f}  0.00           {a_type}  "
 
     #
 

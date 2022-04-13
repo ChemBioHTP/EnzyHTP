@@ -1,6 +1,8 @@
 """Definition for the PDBLine class. This is a convenient representation of a PDB line that allows
 for easy editing of raw files.
 
+PDBLine objects should not be handled by non-developer users and are primarily intended as a lighter
+weight representation of PDB objects when manipulating the files directly.
 
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
@@ -9,12 +11,9 @@ Date: 2022-03-19
 
 from typing import List
 
-# from helper import line_feed
-# from AmberMaps import Resi_Ele_map
-
 import enzy_htp.core as core
-from ..core.file_system import lines_from_file
-from ..chemical import THREE_LETTER_AA_MAPPER
+from enzy_htp.core import file_system as fs 
+from enzy_htp.chemical import THREE_LETTER_AA_MAPPER
 
 
 class PDBLine:
@@ -25,16 +24,16 @@ class PDBLine:
 
 
     Attributes:
-	    self.line : The original line from the file, without newline.
-		self.line_type : Type of PDB line/record.
-		self.atom_id : One-indexed index of the atom.
-		self.atom_name : Name of the atom as a string.
-		self.resi_name : Name of the residue as a string.
-		self.resi_id : One-indexed index of the atom.
-		self.chain_id : Chain id, typically a single character/string of length 1.
-		self.atom_x : x coordinate value with 3 points of decimal precision.
-		self.atom_y : y coordinate value with 3 points of decimal precision.
-		self.atom_z : z coordinate value with 3 points of decimal precision.
+	    line : The original line from the file, without newline.
+		line_type : Type of PDB line/record.
+		atom_id : One-indexed index of the atom.
+		atom_name : Name of the atom as a string.
+		resi_name : Name of the residue as a string.
+		resi_id : One-indexed index of the atom.
+		chain_id : Chain id, typically a single character/string of length 1.
+		atom_x : x coordinate value with 3 points of decimal precision.
+		atom_y : y coordinate value with 3 points of decimal precision.
+		atom_z : z coordinate value with 3 points of decimal precision.
     """
 
     def __init__(self, line: str):
@@ -227,10 +226,10 @@ class PDBLine:
 def read_pdb_lines(fname: str) -> List[PDBLine]:
     """Generates a list() of PDBLine objexts from a given PDB file"""
     # TODO(CJ): there is a chance that we only want HETATM/ATOM/TER/END... will figure out if this is the case later
-    ending = core.get_file_ext(fname).lower()
+    ending = fs.get_file_ext(fname).lower()
     if not ending == ".pdb":
         raise core.UnsupportedFileType(
             f"read_pdb_lines() requires a .pdb file. Could not read '{fname}'"
         )
-    non_empty = list(filter(len, lines_from_file(fname)))
+    non_empty = list(filter(len, fs.lines_from_file(fname)))
     return list(map(PDBLine, non_empty))
