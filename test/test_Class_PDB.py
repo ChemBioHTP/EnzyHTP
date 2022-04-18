@@ -1,4 +1,6 @@
 from random import choice
+from os.path import isfile,getsize
+from os import remove
 from Class_PDB import *
 from AmberMaps import Resi_map2
 
@@ -84,3 +86,12 @@ def test_Add_MutaFlag_good_random():
 # good PDB non-c AA
 # good PDB solvent
 # bad PDB
+
+def test_PDB2FF_keep():
+    pdb_obj = PDB('./test/testfile_Class_PDB/FAcD.pdb', wk_dir='./test/testfile_Class_PDB')
+    prm_files = pdb_obj.PDB2FF(local_lig=1)
+    for f in prm_files:
+        assert isfile(f)
+        assert getsize(f) != 0 # prmtop will be 0K if failed
+        remove(f)
+    assert len(pdb_obj.prepi_path) != 0
