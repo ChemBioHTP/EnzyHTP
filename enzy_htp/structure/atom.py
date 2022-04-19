@@ -7,7 +7,6 @@ Date: 2022-03-19
 """
 from __future__ import annotations
 from typing import Union, Any
-
 import numpy as np
 
 
