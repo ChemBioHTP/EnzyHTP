@@ -30,7 +30,8 @@ def data_dir() -> str:
         #fulldirct = os.path.join(dirct,i)
         #full_dirct = fulldirct[5:]
         #return(full_dirct)
-    return f'enzy_htp/data/'
+    dirct = 'enzy_htp/data/'
+    return(dirct)
 
 # returns path to a data/ directory in enzy_htp/data/
 
