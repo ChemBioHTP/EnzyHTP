@@ -100,7 +100,9 @@ class EnvironmentManager:
 
     def run_command(self, exe: str, args: List[str]) -> List[str]:
         """Interface to run a command with the exectuables specified by exe as well as a list of arguments."""
-        cmd = f"{self.mapper.get(exe,exe)} {' '.join(args)}"
+        #cmd = f"{self.mapper.get(exe,exe)} {' '.join(args)}"
+	cmd = f"{self.mapper.get(exe,exe)}"
+        for arg in args: cmd = cmd + " '" + arg + "'"
         if exe in self.missing_executables_ or not self.__exe_exists(exe):
             _LOGGER.error(
                 f"This environment is missing '{exe}' and cannot run the command '{cmd}'"
