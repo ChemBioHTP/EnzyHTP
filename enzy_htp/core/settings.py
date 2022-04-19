@@ -4,30 +4,37 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 2022-04-03
 """
 from collections import namedtuple
+import os
+import sys
 
 EnzyHTPVersion = namedtuple('EnzyHTPVersion', 'major minor patch')
 
-_VERSION = None #TODO(CJ): fill in the version here with major=0, minor=1 and patch = 0
+_VERSION = _VERSION = EnzyHTPVersion(major = 0, minor = 1, patch = 0)
 
-def get_version() -> EnzyHTPVersion:  # should return version named tuple
-    """Method that gets the current EnzyHTPVersion from the module."""
-    pass
+def get_version() -> EnzyHTPVersion:
+    version_tuple = (_VERSION[0],_VERSION[1],_VERSION[2])
+    return(version_tuple)
 
 def version_to_str(version : EnzyHTPVersion) -> str:
-    """Method that takes an EnzyHTPVersion and converts it to a str in the format "major.minor.patch".
-	Should truncate floats:
-	>>> version = EnzyHTPVersion(major=1.5, minor=3.2, patch=8.9)
-	>>> version_to_str( version ) = "1.3.8"
-	"""
-    pass
+    version_main = []
+    for item in version:
+        float_split = str(item).split('.')
+        version_main.append(float_split[0])
+    version_id = '.'.join(version_main)
+    return(version_id)
+
 
 def data_dir() -> str:
-    """Returns a path to the data directory at enzy_htp/data/"""
-    pass
+    dirct = '../../enzy_htp/data/'
+    for i in os.listdir(dirct):
+        fulldirct = os.path.join(dirct,i)
+        full_dirct = fulldirct[5:]
+        print(full_dirct)
 
 # returns path to a data/ directory in enzy_htp/data/
 
 def is_compatible_os() -> bool:
-    """Checks if the operating system is compatible. Should fail if operating system is not linux or mac-os"""
-	#HINT(CJ): Use sys.platform
-    pass
+    if sys.platform == 'darwin' or 'linux' or 'linux2':
+        return('Pass')
+    else:
+        return('Fail')
