@@ -97,8 +97,13 @@ def test_run_command_with_whitespace():
     em = EnvironmentManager()
     CURR_DIR = os.path.dirname(os.path.abspath( __file__ ))
     name_with_spaces = f"{CURR_DIR}/this has spaces/"
+    name_with_spaces2 = f"{CURR_DIR}/this has spaces 2/"
     #assert not os.path.isdir( name_with_spaces )
     fs.safe_mkdir( name_with_spaces )
-    assert em.run_command("stat", [name_with_spaces])
-    fs.safe_rm( name_with_spaces ) 
+    fs.safe_mkdir( name_with_spaces2 )
+    assert em.run_command("stat", [name_with_spaces,name_with_spaces2])
+    #fs.safe_rm( name_with_spaces ) 
+    fs.safe_rmdir( name_with_spaces )
+    fs.safe_rmdir( name_with_spaces2 )
     assert not os.path.isdir( name_with_spaces )
+    assert not os.path.isdir( name_with_spaces2 )
