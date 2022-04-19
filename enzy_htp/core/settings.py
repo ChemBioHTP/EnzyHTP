@@ -25,16 +25,14 @@ def version_to_str(version : EnzyHTPVersion) -> str:
 
 
 def data_dir() -> str:
-    dirct = '../../enzy_htp/data/'
-    for i in os.listdir(dirct):
-        fulldirct = os.path.join(dirct,i)
-        full_dirct = fulldirct[5:]
-        print(full_dirct)
+    #dirct = '../../enzy_htp/data/'
+    #for i in os.listdir(dirct):
+        #fulldirct = os.path.join(dirct,i)
+        #full_dirct = fulldirct[5:]
+        #return(full_dirct)
+    return f'enzy_htp/data/'
 
 # returns path to a data/ directory in enzy_htp/data/
 
 def is_compatible_os() -> bool:
-    if sys.platform == 'darwin' or 'linux' or 'linux2':
-        return('Pass')
-    else:
-        return('Fail')
+    return sys.platform  in ['darwin', 'linux','linux2']

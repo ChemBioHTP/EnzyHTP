@@ -45,4 +45,5 @@ def test_data_dir():
     result = ss.data_dir()
     tks = list(filter(len,result.split('/')))
     assert tks[-1] == 'data'
-    assert tks[-1] == 'enzy_htp'
+    #assert tks[-1] == 'enzy_htp'
+    assert tks[-2] == 'enzy_htp'
