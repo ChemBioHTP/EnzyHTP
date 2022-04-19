@@ -9,7 +9,7 @@ import sys
 
 EnzyHTPVersion = namedtuple('EnzyHTPVersion', 'major minor patch')
 
-_VERSION = _VERSION = EnzyHTPVersion(major = 0, minor = 1, patch = 0)
+_VERSION = EnzyHTPVersion(major = 0, minor = 1, patch = 0)
 
 def get_version() -> EnzyHTPVersion:
     version_tuple = (_VERSION[0],_VERSION[1],_VERSION[2])
