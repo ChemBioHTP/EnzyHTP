@@ -4,30 +4,32 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 2022-04-03
 """
 from collections import namedtuple
+import os.path
+import sys
 
 EnzyHTPVersion = namedtuple('EnzyHTPVersion', 'major minor patch')
 
-_VERSION = None #TODO(CJ): fill in the version here with major=0, minor=1 and patch = 0
+_VERSION = EnzyHTPVersion(0,1,0)
 
 def get_version() -> EnzyHTPVersion:  # should return version named tuple
     """Method that gets the current EnzyHTPVersion from the module."""
-    pass
+    return _VERSION
 
 def version_to_str(version : EnzyHTPVersion) -> str:
-    """Method that takes an EnzyHTPVersion and converts it to a str in the format "major.minor.patch".
-	Should truncate floats:
-	>>> version = EnzyHTPVersion(major=1.5, minor=3.2, patch=8.9)
-	>>> version_to_str( version ) = "1.3.8"
-	"""
-    pass
+    """Method that takes an EnzyHTPVersion and converts it to a str in the format "major.minor.patch"."""
+    version = get_version()
+    x = [ (int(a)) for a in version ]
+    y = ".".join(str(elem) for elem in x)
+    return y
 
 def data_dir() -> str:
     """Returns a path to the data directory at enzy_htp/data/"""
-    pass
+    path = '/enzyhtp/data'
+    return path
 
 # returns path to a data/ directory in enzy_htp/data/
 
 def is_compatible_os() -> bool:
     """Checks if the operating system is compatible. Should fail if operating system is not linux or mac-os"""
-	#HINT(CJ): Use sys.platform
-    pass
+	if sys.platform != 'linux' or 'darwin':
+        raise Exception('Compatible OS linux or macos only')
