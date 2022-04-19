@@ -15,9 +15,9 @@ from .logger import _LOGGER
 
 def safe_rm(fname: str) -> None:
     """Removes a file if and only if the directory already exists."""
-    # TODO(CJ): need to check if it is a directory. maybe re-direct if so?
     if os.path.exists(fname):
-        os.remove(fname)
+        if os.path.isdir(fname):
+            os.remove(fname)
 
 
 def safe_rmdir(dirname: str) -> None:
