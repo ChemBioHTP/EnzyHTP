@@ -100,5 +100,5 @@ def test_run_command_with_whitespace():
     #assert not os.path.isdir( name_with_spaces )
     fs.safe_mkdir( name_with_spaces )
     assert em.run_command("stat", [name_with_spaces])
-    fs.safe_rm( name_with_spaces ) 
+    fs.safe_rmdir( name_with_spaces ) 
     assert not os.path.isdir( name_with_spaces )
