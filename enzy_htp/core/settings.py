@@ -31,5 +31,5 @@ def data_dir() -> str:
 
 def is_compatible_os() -> bool:
     """Checks if the operating system is compatible. Should fail if operating system is not linux or mac-os"""
-	if sys.platform != 'linux' or 'darwin':
+    if sys.platform != 'linux' or 'darwin':
         raise Exception('Compatible OS linux or macos only')
