@@ -10,4 +10,7 @@ class ClusterInterface(ABC):
     Defines the interface of a cluster:
     property
     '''
-    pass
+    @property
+    @abstractmethod
+    def SUBMIT_CMD(self) -> str:
+        pass

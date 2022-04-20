@@ -13,10 +13,11 @@ res_keyword = { 'core_type' : 'cpu',
                 'account' : 'xxx'}
 
 def test_submit_by_keyword():
-    job = ClusterJob(commands= command_2_run,
-                     env_lines= env_setting,
-                     cluster= accre.Accre(),
-                     res_keyword= res_keyword
-                     )
-    job.submit(debug=1)
+    job = ClusterJob('test_g16', cluster= accre.Accre()) # create a job first so that can config with useful cluster presets
+    job.config(
+        command = command_2_run,
+        env_setting = env_setting,
+        res_keyword = res_keyword
+    )
+    job.submit(debug=1, script_path='./test/core/test_file/test.cmd')
 
