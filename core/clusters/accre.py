@@ -19,6 +19,8 @@ class Accre(ClusterInterface):
     ##########################
     # command for submission
     SUBMIT_CMD = 'sbatch'
+    # command for kill
+    KILL_CMD = 'scancel'
 
     ### presets ###
     # environment presets
@@ -58,10 +60,17 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''' # remember to add the command that 
     JOB_ID_PATTERN = r'Submitted batch job ([0-9]+)'
 
     @classmethod
-    def submit_job(cls, sub_dir, script_path, debug=0) -> None:
+    def submit_job(cls, sub_dir, script_path, debug=0) -> tuple(str, str):
         '''
-        interal method that submit current job submission script to the cluster queue
+        submit job submission script to the cluster queue
         cd to the sub_path and run submit cmd
+        Return:
+            (job_id, slurm_log_file_path)
+
+        ACCRE sbatch rule:
+            stdout: Submitted batch job ########
+            file: slurm-#######.out will be generated in the *submission dir*
+            exec: commands in the script will run under the *submission dir*
         '''
         cmd = cls._format_submit_cmd(script_path)
         # debug
@@ -78,7 +87,8 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''' # remember to add the command that 
         os.chdir(cwd)
         
         job_id = cls._get_job_id_from_submit(submit_cmd)
-        return job_id
+        slurm_log_path = cls._get_log_from_id(sub_dir, job_id)
+        return (job_id, slurm_log_path)
 
     @classmethod
     def _format_submit_cmd(cls, sub_script_path: str) -> str:
@@ -93,14 +103,20 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''' # remember to add the command that 
     def _get_job_id_from_submit(cls, submit_job: CompletedProcess) -> str:
         '''
         extract job id from the output of the submission command run.
-        ACCRE sbatch rule:
-            stdout: Submitted batch job ########
-            file: slurm-#######.out will be generated in the *submission dir*
-            exec: commands in the script will run under the *submission dir*
         '''
         job_id = re.search(cls.JOB_ID_PATTERN, submit_job.stdout).group(1)
         return job_id
 
     @classmethod
-    def kill_job(cls, job_id: str) -> str:
-        pass
+    def _get_log_from_id(cls, sub_dir: str, job_id: str) -> str:
+        '''
+        file: slurm-#######.out will be generated in the *submission dir*
+        '''
+        file_path = sub_dir + f'/slurm-{job_id}.out'
+        return file_path
+
+    @classmethod
+    def kill_job(cls, job_id: str) -> CompletedProcess:
+        cmd = f'{cls.KILL_CMD} {job_id}'
+        kill_cmd = run(cmd, timeout=20, check=True,  text=True, shell=True, capture_output=True)
+        return kill_cmd

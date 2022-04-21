@@ -99,6 +99,7 @@ def test_submit_job_id_ACCRE():
     job = ClusterJob(accre.Accre(), sub_script_str=sub_script_str)
     job.submit( sub_dir='/home/shaoq1/EnzyHTP-test/test_job_manager/',
                 script_path='/home/shaoq1/EnzyHTP-test/test_job_manager/test.cmd')
+    print(job.job_cluster_log)
     assert len(job.job_id) > 0
 
 @pytest.mark.accre

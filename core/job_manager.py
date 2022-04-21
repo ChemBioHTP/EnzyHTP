@@ -13,7 +13,6 @@ Feature:
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Date: 2022-04-13
 """
-from subprocess import run
 from typing import Union
 from plum import dispatch
 import os
@@ -191,7 +190,7 @@ class ClusterJob():
                 script_path = sub_dir + f'/submit_{i}.cmd'  # TODO(shaoqz): move to helper
 
         self.sub_script_path = self._deploy_sub_script(script_path)
-        self.job_id = self.cluster.submit_job(sub_dir, script_path, debug=debug)
+        self.job_id, self.job_cluster_log = self.cluster.submit_job(sub_dir, script_path, debug=debug)
         self.sub_dir = sub_dir
 
         return self.job_id
