@@ -159,15 +159,40 @@ class ClusterJob():
         return sub_script_str
 
     ### submit ###
-    def submit(self, sub_dir, script_path, debug=0):
+    def submit(self, sub_dir, script_path=None, debug=0):
         '''
         submit the job to the cluster queue. Make the submission script. Submit.
         Arg:
             sub_dir: dir for submission. commands in the sub script usually run under this dir. 
-            script_path: path for submission script generation.
+            script_path: path for submission script generation. '
+                         (default: sub_dir/submit.cmd; 
+                          will be sub_dir/submit_#.cmd if the file exists
+                          # is a growing index)
+                         
+        Return:
+            self.job_id
+
+        Attribute added:
+            sub_script_path
+            job_id
+            sub_dir
+        
+        Example:
+            >>> sub_dir = '/EnzyHTP-test/test_job_manager/'
+            >>> job.submit( sub_dir= sub_dir,
+                            script_path= sub_dir + 'test.cmd')
         '''
+        # make default value for filename
+        if script_path is None:
+            script_path = sub_dir + '/submit.cmd'
+            i = 0
+            while os.path.isfile(script_path):
+                i += 1
+                script_path = sub_dir + f'/submit_{i}.cmd'   
+
         self.sub_script_path = self._deploy_sub_script(script_path)
         self.job_id = self._submit(sub_dir, debug=debug)
+        self.sub_dir = sub_dir
 
         return self.job_id
 

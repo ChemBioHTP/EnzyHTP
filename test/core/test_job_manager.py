@@ -91,7 +91,7 @@ def test_ClusterJob_preset():
     )
     # print(job.sub_script_str)
 
-@pytest.mark.accre # only run on ACCRE
+@pytest.mark.accre
 def test_submit_job_id_ACCRE():
     '''
     only run on accre
@@ -99,4 +99,13 @@ def test_submit_job_id_ACCRE():
     job = ClusterJob(accre.Accre(), sub_script_str=sub_script_str)
     job.submit( sub_dir='/home/shaoq1/EnzyHTP-test/test_job_manager/',
                 script_path='/home/shaoq1/EnzyHTP-test/test_job_manager/test.cmd')
+    assert len(job.job_id) > 0
+
+@pytest.mark.accre
+def test_submit_default_script_path_ACCRE():
+    '''
+    only run on accre
+    '''
+    job = ClusterJob(accre.Accre(), sub_script_str=sub_script_str)
+    job.submit( sub_dir='/home/shaoq1/EnzyHTP-test/test_job_manager/')
     assert len(job.job_id) > 0
