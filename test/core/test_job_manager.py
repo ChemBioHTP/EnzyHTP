@@ -100,8 +100,8 @@ def test_submit_job_id_ACCRE():
     job = ClusterJob(accre.Accre(), sub_script_str=sub_script_str)
     job.submit( sub_dir='/home/shaoq1/EnzyHTP-test/test_job_manager/',
                 script_path='/home/shaoq1/EnzyHTP-test/test_job_manager/test.cmd')
-    assert os.path.isfile(job.job_cluster_log)
     run(f'scancel {job.job_id}', timeout=20, check=True,  text=True, shell=True, capture_output=True)
+    assert len(job.job_cluster_log) > 0
     assert len(job.job_id) > 0
 
 @pytest.mark.accre
