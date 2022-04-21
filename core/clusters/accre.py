@@ -67,8 +67,10 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''' # remember to add the command that 
     def get_job_id_from_submit(cls, submit_job: CompletedProcess) -> str:
         '''
         extract job id from the output of the submission command run.
-        ACCRE style: 
-        Submitted batch job ########
+        ACCRE sbatch rule:
+            stdout: Submitted batch job ########
+            file: slurm-#######.out will be generated in the *submission dir*
+            exec: commands in the script will run under the *submission dir*
         '''
         job_id = re.search(cls.JOB_ID_PATTERN, submit_job.stdout).group(1)
         return job_id

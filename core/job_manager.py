@@ -16,7 +16,7 @@ Date: 2022-04-13
 from subprocess import run
 from typing import Union
 from plum import dispatch
-import re
+import os
 
 from .clusters import *  # pylint: disable=unused-wildcard-import,wildcard-import
 from core.clusters._interface import ClusterInterface
@@ -159,12 +159,15 @@ class ClusterJob():
         return sub_script_str
 
     ### submit ###
-    def submit(self, debug=0, script_path=None):
+    def submit(self, sub_dir, script_path, debug=0):
         '''
         submit the job to the cluster queue. Make the submission script. Submit.
+        Arg:
+            sub_dir: dir for submission. commands in the sub script usually run under this dir. 
+            script_path: path for submission script generation.
         '''
         self.sub_script_path = self._deploy_sub_script(script_path)
-        self.job_id = self._submit(debug=debug)
+        self.job_id = self._submit(sub_dir, debug=debug)
 
         return self.job_id
 
@@ -177,17 +180,22 @@ class ClusterJob():
             f.write(self.sub_script_str)
         return out_path
     
-    def _submit(self, debug=0) -> None:
+    def _submit(self, sub_dir, debug=0) -> None:
         '''
         interal method that submit current job submission script to the cluster queue
+        cd to the sub_path and run submit cmd
         '''
+        cwd = os.getcwd()
+        # cd to sub_path
+        os.chdir(sub_dir)
         cmd = self.cluster.format_submit_cmd(self.sub_script_path)
-
+        # debug
         if debug:
             print(cmd)
             return cmd
-        
         submit_cmd = run(cmd, timeout=10, check=True,  text=True, shell=True, capture_output=True)
+        # cd back
+        os.chdir(cwd)
         # TODO(shaoqz) timeout condition is hard to test
         job_id = self.cluster.get_job_id_from_submit(submit_cmd)
 
