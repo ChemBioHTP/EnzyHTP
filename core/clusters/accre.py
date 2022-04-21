@@ -4,6 +4,8 @@ for Research and Education) of Vanderbilt
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Date: 2022-04-13
 """
+import re
+from subprocess import CompletedProcess
 from ._interface import ClusterInterface
 
 
@@ -14,9 +16,12 @@ class Accre(ClusterInterface):
     SUBMIT_CMD      # job script submission command
 
     '''
-    # submission format
+    # command for submission
     SUBMIT_CMD = 'sbatch'
+    # regex pattern for extract job id from stdout
+    JOB_ID_PATTERN = r'Submitted batch job ([0-9]+)'
 
+    ### presets ###
     # environment presets
     AMBER_GPU_ENV = '''export AMBERHOME=/dors/csb/apps/amber19/
 export CUDA_HOME=$AMBERHOME/cuda/10.0.130
@@ -35,8 +40,18 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''' # remember to add the command that 
                 'walltime' : '24:00:00',
                 'account' : 'xxx'}
 
+    @classmethod
+    def format_submit_cmd(cls, sub_script_path: str) -> str:
+        '''
+        format the command for job submission on ACCRE
+        return the format command.
+        '''
+        cmd = ' '.join((cls.SUBMIT_CMD, sub_script_path))
+        return cmd
+
     # resource format
-    def format_resource_str(self, res_dict) -> str:
+    @classmethod
+    def format_resource_str(cls, res_dict: dict) -> str:
         '''
         format the head of the submission script for ACCRE
         res_dict: the dictionary with exact the keyword and value
@@ -47,3 +62,13 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''' # remember to add the command that 
             res_line = f'#SBATCH --{k}={v}\n'
             res_str += res_line
         return res_str
+    
+    @classmethod
+    def get_job_id_from_submit(cls, submit_job: CompletedProcess) -> str:
+        '''
+        extract job id from the output of the submission command run.
+        ACCRE style: 
+        Submitted batch job ########
+        '''
+        job_id = re.search(cls.JOB_ID_PATTERN, submit_job).group(1)
+        return job_id
