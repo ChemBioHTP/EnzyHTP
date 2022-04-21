@@ -53,6 +53,8 @@ class ClusterJob():
         self._deploy_sub_script(script_path)
         self._submit(debug=debug)
 
+        return # TODO need to return the queue info
+
     def _deploy_sub_script(self, out_path: str) -> None:
         '''
         deploy the submission scirpt for current job
