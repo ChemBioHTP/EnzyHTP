@@ -35,7 +35,7 @@ class ClusterInterface(ABC):
 
     @classmethod
     @abstractmethod
-    def submit_job(cls, sub_dir: str, script_path: str) -> tuple(str, str):
+    def submit_job(cls, sub_dir: str, script_path: str) -> tuple[str, str]:
         '''
         submit job submission script to the cluster queue
         cd to the sub_path and run submit cmd

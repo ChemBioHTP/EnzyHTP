@@ -60,7 +60,7 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''' # remember to add the command that 
     JOB_ID_PATTERN = r'Submitted batch job ([0-9]+)'
 
     @classmethod
-    def submit_job(cls, sub_dir, script_path, debug=0) -> tuple(str, str):
+    def submit_job(cls, sub_dir, script_path, debug=0) -> tuple[str, str]:
         '''
         submit job submission script to the cluster queue
         cd to the sub_path and run submit cmd
