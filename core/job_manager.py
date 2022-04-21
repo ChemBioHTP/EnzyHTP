@@ -163,10 +163,10 @@ class ClusterJob():
         '''
         submit the job to the cluster queue. Make the submission script. Submit.
         '''
-        self._deploy_sub_script(script_path)
-        self._submit(debug=debug)
+        self.sub_script_path = self._deploy_sub_script(script_path)
+        self.job_id = self._submit(debug=debug)
 
-        return 
+        return self.job_id
 
     def _deploy_sub_script(self, out_path: str) -> None:
         '''
@@ -175,7 +175,7 @@ class ClusterJob():
         '''
         with open(out_path, 'w', encoding='utf-8') as f:
             f.write(self.sub_script_str)
-        self.sub_script_path = out_path
+        return out_path
     
     def _submit(self, debug=0) -> None:
         '''

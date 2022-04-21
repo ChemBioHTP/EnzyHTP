@@ -1,3 +1,5 @@
+import pytest
+
 from core import clusters
 from core.job_manager import *
 
@@ -26,6 +28,20 @@ res_keywords_str = '''#!/bin/bash
 #SBATCH --time=5-00:00:00         # Total run time limit (HH:MM:SS)
 #SBATCH --export=ALL
 '''
+sub_script_str = '''#!/bin/bash
+#SBATCH --partition=debug
+#SBATCH --job-name=JM-test
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=24
+#SBATCH --mem-per-cpu=2G
+#SBATCH --time=30:00
+#SBATCH --account=yang_lab_csb
+
+module load Gaussian/16.B.01
+mkdir $TMPDIR/$SLURM_JOB_ID
+export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID
+
+g16 < TS-2-dp-opt.gjf > TS-2-dp-opt.out'''
 
 cluster = accre.Accre()
 
@@ -57,3 +73,11 @@ def test_ClusterJob_preset():
     )
     print(job.sub_script_str)
 
+@pytest.mark.accre # only run on ACCRE
+def test_submit_job_id_ACCRE():
+    '''
+    only run on accre
+    '''
+    job = ClusterJob(accre.Accre(), sub_script_str=sub_script_str)
+    job.submit(script_path='~/EnzyHTP-test/test_job_manager/test.cmd')
+    assert len(job.job_id) > 0
