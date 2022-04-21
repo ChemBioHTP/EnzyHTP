@@ -14,3 +14,7 @@ class ClusterInterface(ABC):
     @abstractmethod
     def SUBMIT_CMD(self) -> str:
         pass
+
+    @abstractmethod
+    def format_resource_str(self, res_dict) -> str:
+        pass
