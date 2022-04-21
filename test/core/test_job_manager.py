@@ -79,5 +79,5 @@ def test_submit_job_id_ACCRE():
     only run on accre
     '''
     job = ClusterJob(accre.Accre(), sub_script_str=sub_script_str)
-    job.submit(script_path='$HOME/EnzyHTP-test/test_job_manager/test.cmd')
+    job.submit(script_path='/home/shaoq1/EnzyHTP-test/test_job_manager/test.cmd')
     assert len(job.job_id) > 0
