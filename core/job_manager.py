@@ -188,10 +188,10 @@ class ClusterJob():
             i = 0
             while os.path.isfile(script_path):
                 i += 1
-                script_path = sub_dir + f'/submit_{i}.cmd'   
+                script_path = sub_dir + f'/submit_{i}.cmd'  # TODO(shaoqz): move to helper
 
         self.sub_script_path = self._deploy_sub_script(script_path)
-        self.job_id = self._submit(sub_dir, debug=debug)
+        self.job_id = self.cluster.submit_job(sub_dir, script_path, debug=debug)
         self.sub_dir = sub_dir
 
         return self.job_id
@@ -204,29 +204,13 @@ class ClusterJob():
         with open(out_path, 'w', encoding='utf-8') as f:
             f.write(self.sub_script_str)
         return out_path
-    
-    def _submit(self, sub_dir, debug=0) -> None:
-        '''
-        interal method that submit current job submission script to the cluster queue
-        cd to the sub_path and run submit cmd
-        '''
-        cwd = os.getcwd()
-        # cd to sub_path
-        os.chdir(sub_dir)
-        cmd = self.cluster.format_submit_cmd(self.sub_script_path)
-        # debug
-        if debug:
-            print(cmd)
-            return cmd
-        submit_cmd = run(cmd, timeout=10, check=True,  text=True, shell=True, capture_output=True)
-        # cd back
-        os.chdir(cwd)
-        # TODO(shaoqz) timeout condition is hard to test
-        job_id = self.cluster.get_job_id_from_submit(submit_cmd)
-
-        return job_id
-        
             
+    ### kill ###
+    def kill(self):
+        '''
+        kill the job with the job_id
+        '''
+        self.cluster.kill_job(self.job_id)
 
     ### monitor ###
 

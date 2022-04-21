@@ -4,14 +4,13 @@ Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Date: 2022-04-13
 """
 from abc import ABC, abstractmethod
-from subprocess import CompletedProcess
 
 class ClusterInterface(ABC):
     '''
     Defines the interface of a cluster
     ----------
     SUBMIT_CMD: the command for job submission
-    
+
     '''
     ### class attribute ###
     @property
@@ -22,15 +21,15 @@ class ClusterInterface(ABC):
     ### classmethods ###
     @classmethod
     @abstractmethod
-    def format_submit_cmd(cls, sub_script_path: str) -> str:
-        pass
-
-    @classmethod
-    @abstractmethod
     def format_resource_str(cls, res_dict: dict) -> str:
         pass
 
     @classmethod
     @abstractmethod
-    def get_job_id_from_submit(cls, submit_job: CompletedProcess) -> str:
+    def submit_job(cls, sub_dir: str, script_path: str) -> str:
+        pass
+
+    @classmethod
+    @abstractmethod
+    def kill_job(cls, job_id: str) -> str:
         pass
