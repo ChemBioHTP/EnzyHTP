@@ -70,5 +70,5 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''' # remember to add the command that 
         ACCRE style: 
         Submitted batch job ########
         '''
-        job_id = re.search(cls.JOB_ID_PATTERN, submit_job).group(1)
+        job_id = re.search(cls.JOB_ID_PATTERN, submit_job.stdout).group(1)
         return job_id
