@@ -1,3 +1,4 @@
+from subprocess import run
 import re
 import pytest
 
@@ -100,6 +101,7 @@ def test_submit_job_id_ACCRE():
     job.submit( sub_dir='/home/shaoq1/EnzyHTP-test/test_job_manager/',
                 script_path='/home/shaoq1/EnzyHTP-test/test_job_manager/test.cmd')
     print(job.job_cluster_log)
+    run(f'scancel {job.job_id}', timeout=20, check=True,  text=True, shell=True, capture_output=True)
     assert len(job.job_id) > 0
 
 @pytest.mark.accre
@@ -109,4 +111,16 @@ def test_submit_default_script_path_ACCRE():
     '''
     job = ClusterJob(accre.Accre(), sub_script_str=sub_script_str)
     job.submit( sub_dir='/home/shaoq1/EnzyHTP-test/test_job_manager/')
+    run(f'scancel {job.job_id}', timeout=20, check=True,  text=True, shell=True, capture_output=True)
     assert len(job.job_id) > 0
+
+@pytest.mark.accre
+def test_kill_job_ACCRE():
+    '''
+    only run on accre
+    '''
+    job = ClusterJob(accre.Accre(), sub_script_str=sub_script_str)
+    job.submit( sub_dir='/home/shaoq1/EnzyHTP-test/test_job_manager/')
+    print(f'killing: {job.job_id}')
+    job.kill()
+    
