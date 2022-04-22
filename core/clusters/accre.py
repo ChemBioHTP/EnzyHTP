@@ -7,6 +7,7 @@ Date: 2022-04-13
 import re
 import os
 from subprocess import CompletedProcess, run
+import time
 from ._interface import ClusterInterface
 
 
@@ -148,14 +149,21 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''' # remember to add the command that 
         return release_cmd
 
     @classmethod
-    def get_job_info(cls, job_id: str, field: str) -> str:
+    def get_job_info(cls, job_id: str, field: str, wait_time=3) -> str:
         '''
         get information about the job_id job by field keyword
-        supported keywords can be found at https://slurm.schedmd.com/sacct.html
+        Arg:
+            job_id
+            field: supported keywords can be found at https://slurm.schedmd.com/sacct.html
+            wait_time: in second (default: 3s)
+            **The `sacct` command takes some time (1-5s) to update the information of the job**   
         '''
+        # wait a update gap
+        time.sleep(wait_time)
+        # get info
         cmd = f'{cls.INFO_CMD} -j {job_id} -o {field}'
         info_cmd = run(cmd, timeout=20, check=True,  text=True, shell=True, capture_output=True)
-        job_field_info = info_cmd.stdout.strip().splitlines()[2].strip()
+        job_field_info = info_cmd.stdout.strip().splitlines()[2].strip().strip('+')
         return job_field_info
 
     @classmethod
