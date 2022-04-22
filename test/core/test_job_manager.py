@@ -123,6 +123,7 @@ def test_kill_job_ACCRE():
     job.submit( sub_dir='/home/shaoq1/EnzyHTP-test/test_job_manager/')
     job.kill()
 
+@pytest.mark.accre
 def test_get_state_ACCRE():
     '''
     only run on accre
