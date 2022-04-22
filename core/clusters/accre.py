@@ -167,7 +167,7 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''' # remember to add the command that 
         '''
         # get info
         # squeue
-        cmd = f'{cls.INFO_CMD[0]} -j {job_id} -o {field}'
+        cmd = f'{cls.INFO_CMD[0]} -j {job_id} -O {field}'
         info_run = run(cmd, timeout=20, check=True,  text=True, shell=True, capture_output=True)
         # if exist
         info_out = info_run.stdout.strip().splitlines()
