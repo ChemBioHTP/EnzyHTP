@@ -6,7 +6,7 @@ Date: 2022-04-13
 """
 import re
 import os
-from subprocess import CompletedProcess, run
+from subprocess import CalledProcessError, CompletedProcess, TimeoutExpired, run
 import time
 from ._interface import ClusterInterface
 
@@ -27,7 +27,7 @@ class Accre(ClusterInterface):
     KILL_CMD = 'scancel'
     HOLD_CMD = 'scontrol hold'
     RELEASE_CMD = 'scontrol release'
-    INFO_CMD = 'sacct'
+    INFO_CMD = ['squeue', 'sacct'] # will check by order if previous one has no info
 
     # dict of job state
     JOB_STATE_MAP = {
@@ -91,8 +91,12 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''' # remember to add the command that 
 
         cwd = os.getcwd()
         # cd to sub_path
-        os.chdir(sub_dir)        
-        submit_cmd = run(cmd, timeout=20, check=True,  text=True, shell=True, capture_output=True)
+        os.chdir(sub_dir)
+        try:    
+            submit_cmd = run(cmd, timeout=20, check=True,  text=True, shell=True, capture_output=True)
+        except CalledProcessError as e:
+            print(e)
+            raise e
         # TODO(shaoqz) timeout condition is hard to test
         # cd back
         os.chdir(cwd)
@@ -152,20 +156,36 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''' # remember to add the command that 
     def get_job_info(cls, job_id: str, field: str, wait_time=3) -> str:
         '''
         get information about the job_id job by field keyword
+        use squeue frist (fast) and
+        if nothing is found (job finished)
+        wait for wait time and use sacct (slow)
         Arg:
             job_id
             field: supported keywords can be found at https://slurm.schedmd.com/sacct.html
-            wait_time: in second (default: 3s)
+            wait_time: for sacct run in second (default: 3s)
             **The `sacct` command takes some time (1-5s) to update the information of the job**   
         '''
+        # get info
+        # squeue
+        cmd = f'{cls.INFO_CMD[0]} -j {job_id} -o {field}'
+        info_run = run(cmd, timeout=20, check=True,  text=True, shell=True, capture_output=True)
+        # if exist
+        info_out = info_run.stdout.strip().splitlines()
+        if len(info_out) >= 2:
+            job_field_info = info_out[1].strip().strip('+')
+            return job_field_info
+        # use sacct if squeue do not have info
         # wait a update gap
         time.sleep(wait_time)
-        # get info
-        cmd = f'{cls.INFO_CMD} -j {job_id} -o {field}'
-        info_cmd = run(cmd, timeout=20, check=True,  text=True, shell=True, capture_output=True)
-        job_field_info = info_cmd.stdout.strip().splitlines()[2].strip().strip('+')
-        return job_field_info
-
+        cmd = f'{cls.INFO_CMD[1]} -j {job_id} -o {field}'
+        info_run = run(cmd, timeout=20, check=True,  text=True, shell=True, capture_output=True)
+        # if exist
+        info_out = info_run.stdout.strip().splitlines()
+        if len(info_out) >= 3:
+            job_field_info = info_out[2].strip().strip('+')
+            return job_field_info
+        raise Exception(f'No information is found for {job_id}')
+    
     @classmethod
     def get_job_state(cls, job_id: str) -> tuple[str, str]:
         '''
