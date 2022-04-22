@@ -155,7 +155,7 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''' # remember to add the command that 
         '''
         cmd = f'{cls.INFO_CMD} -j {job_id} -o {field}'
         info_cmd = run(cmd, timeout=20, check=True,  text=True, shell=True, capture_output=True)
-        job_field_info = info_cmd.stdout.strip().splitline()[2].strip()
+        job_field_info = info_cmd.stdout.strip().splitlines()[2].strip()
         return job_field_info
 
     @classmethod
