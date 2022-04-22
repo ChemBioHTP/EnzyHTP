@@ -14,13 +14,29 @@ class Accre(ClusterInterface):
     '''
     The ACCRE interface
     '''
+    NAME = 'ACCRE'
     ##########################
     ### Submission Related ###
     ##########################
     # command for submission
     SUBMIT_CMD = 'sbatch'
+    # regex pattern for extracting job id from stdout
+    JOB_ID_PATTERN = r'Submitted batch job ([0-9]+)'
     # command for kill
     KILL_CMD = 'scancel'
+    HOLD_CMD = 'scontrol hold'
+    RELEASE_CMD = 'scontrol release'
+    INFO_CMD = 'sacct'
+
+    # dict of job state
+    JOB_STATE_MAP = {
+        'pend' : ['CONFIGURING', 'PENDING', 'REQUEUE_FED', 'REQUEUE_HOLD', 'REQUEUED'],
+        'run' : ['COMPLETING', 'RUNNING', 'STAGE_OUT'],
+        'cancel' : ['CANCELLED', 'DEADLINE', 'TIMEOUT'],
+        'complete' : ['COMPLETED'],
+        'error' : ['BOOT_FAIL', 'FAILED', 'NODE_FAIL', 'OUT_OF_MEMORY', 'PREEMPTED', 'REVOKED', 'STOPPED', 'SUSPENDED'],
+        'exception': ['RESIZING', 'SIGNALING', 'SPECIAL_EXIT', 'RESV_DEL_HOLD' ]
+    }
 
     ### presets ###
     # environment presets
@@ -53,12 +69,6 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''' # remember to add the command that 
             res_str += res_line
         return res_str
     
-    ###############################
-    ### Post-submission Related ###
-    ##########################
-    # regex pattern for extracting job id from stdout
-    JOB_ID_PATTERN = r'Submitted batch job ([0-9]+)'
-
     @classmethod
     def submit_job(cls, sub_dir, script_path, debug=0) -> tuple[str, str]:
         '''
@@ -115,8 +125,50 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''' # remember to add the command that 
         file_path = sub_dir + f'/slurm-{job_id}.out'
         return file_path
 
+    ###############################
+    ### Post-submission Related ###
+    ###############################
+
     @classmethod
     def kill_job(cls, job_id: str) -> CompletedProcess:
         cmd = f'{cls.KILL_CMD} {job_id}'
         kill_cmd = run(cmd, timeout=20, check=True,  text=True, shell=True, capture_output=True)
         return kill_cmd
+
+    @classmethod
+    def hold_job(cls, job_id: str) -> CompletedProcess:
+        cmd = f'{cls.HOLD_CMD} {job_id}'
+        hold_cmd = run(cmd, timeout=20, check=True,  text=True, shell=True, capture_output=True)
+        return hold_cmd
+
+    @classmethod
+    def release_job(cls, job_id: str) -> CompletedProcess:
+        cmd = f'{cls.RELEASE_CMD} {job_id}'
+        release_cmd = run(cmd, timeout=20, check=True,  text=True, shell=True, capture_output=True)
+        return release_cmd
+
+    @classmethod
+    def get_job_info(cls, job_id: str, field: str) -> str:
+        '''
+        get information about the job_id job by field keyword
+        supported keywords can be found at https://slurm.schedmd.com/sacct.html
+        '''
+        cmd = f'{cls.INFO_CMD} -j {job_id} -o {field}'
+        info_cmd = run(cmd, timeout=20, check=True,  text=True, shell=True, capture_output=True)
+        job_field_info = info_cmd.strip().splitline()[2].strip()
+        return job_field_info
+
+    @classmethod
+    def get_job_state(cls, job_id: str) -> tuple[str, str]:
+        '''
+        determine if the job is:
+        Pend or Run or Complete or Canel or Error
+        Return: 
+            a tuple of
+            (a str of pend or run or complete or canel or error,
+                the real keyword form the cluster)
+        '''
+        state = cls.get_job_info(job_id, 'State')
+        for k, v in cls.JOB_STATE_MAP.items():
+            if state in v:
+                return (k, state)

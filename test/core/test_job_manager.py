@@ -121,5 +121,15 @@ def test_kill_job_ACCRE():
     '''
     job = ClusterJob(accre.Accre(), sub_script_str=sub_script_str)
     job.submit( sub_dir='/home/shaoq1/EnzyHTP-test/test_job_manager/')
-    print(f'killing: {job.job_id}')
     job.kill()
+
+def test_get_state_ACCRE():
+    '''
+    only run on accre
+    '''
+    job = ClusterJob(accre.Accre(), sub_script_str=sub_script_str)
+    job.submit( sub_dir='/home/shaoq1/EnzyHTP-test/test_job_manager/')
+    assert job.get_state()[0] == 'pend'
+    job.kill()
+    assert job.get_state()[0] == 'cancel'
+    

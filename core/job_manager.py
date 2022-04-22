@@ -13,6 +13,7 @@ Feature:
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Date: 2022-04-13
 """
+import time
 from typing import Union
 from plum import dispatch
 import os
@@ -21,6 +22,7 @@ from .clusters import *  # pylint: disable=unused-wildcard-import,wildcard-impor
 from core.clusters._interface import ClusterInterface
 from helper import line_feed
 from Class_Conf import Config
+
 
 class ClusterJob():
     '''
@@ -36,14 +38,15 @@ class ClusterJob():
         submit()
     '''
 
-    def __init__(self,
-                 cluster: ClusterInterface,
-                 sub_script_str: str
-                 ) -> None:
+    def __init__(self, cluster: ClusterInterface, sub_script_str: str) -> None:
         self.cluster = cluster
         self.sub_script_str = sub_script_str
-        
-        self.sub_script_path: str
+
+        self.sub_script_path: str = None
+        self.sub_dir: str = None
+        self.job_cluster_log: str = None
+        self.job_id: str = None
+        self.state: tuple = None # state and the update time in s
 
     ### config (construct object) ###
     @classmethod
@@ -120,33 +123,31 @@ class ClusterJob():
     @staticmethod
     @dispatch
     def _get_command_str(cmd: list) -> str:
-        return line_feed.join(cmd)+line_feed
+        return line_feed.join(cmd) + line_feed
 
     @staticmethod
     @dispatch
     def _get_command_str(cmd: str) -> str:
-        return cmd+line_feed
+        return cmd + line_feed
 
     @staticmethod
     @dispatch
     def _get_env_str(env: list) -> str:
-        return line_feed.join(env)+line_feed
+        return line_feed.join(env) + line_feed
 
     @staticmethod
     @dispatch
     def _get_env_str(env: str) -> str:
-        return env+line_feed
+        return env + line_feed
 
     @staticmethod
     @dispatch
-    def _get_res_str(res: dict, 
-                     cluster: ClusterInterface) -> str:
+    def _get_res_str(res: dict, cluster: ClusterInterface) -> str:
         return cluster.format_resource_str(res)
 
     @staticmethod
     @dispatch
-    def _get_res_str(res: str, 
-                     cluster: ClusterInterface) -> str:
+    def _get_res_str(res: str, cluster: ClusterInterface) -> str:
         return res
 
     @staticmethod
@@ -154,7 +155,7 @@ class ClusterJob():
         '''
         combine command_str, env_str, res_str to sub_script_str
         '''
-        sub_script_str= line_feed.join((res_str, watermark, env_str, command_str))
+        sub_script_str = line_feed.join((res_str, watermark, env_str, command_str))
         return sub_script_str
 
     ### submit ###
@@ -203,18 +204,62 @@ class ClusterJob():
         with open(out_path, 'w', encoding='utf-8') as f:
             f.write(self.sub_script_str)
         return out_path
-            
-    ### kill ###
+
+    ### control ###
     def kill(self):
         '''
         kill the job with the job_id
         '''
+        self.require_job_id()
+        
+        if Config.debug >= 1:
+            print(f'killing: {self.job_id}')
         self.cluster.kill_job(self.job_id)
 
-    ### monitor ###
+    def hold(self):
+        '''
+        hold the job from running
+        '''
+        self.require_job_id()
 
+        if Config.debug >= 1:
+            print(f'holding: {self.job_id}')
+        self.cluster.hold_job(self.job_id)
+
+    def release(self):
+        '''
+        release the job to run
+        '''
+        self.require_job_id()
+
+        if Config.debug >= 1:
+            print(f'releasing: {self.job_id}')
+        self.cluster.release_job(self.job_id)
+
+    ### monitor ###
+    def get_state(self) -> tuple[str, str]:
+        '''
+        determine if the job is:
+        Pend or Run or Complete or Canel or Error
+        Return: 
+            a tuple of
+            (a str of pend or run or complete or canel or error,
+                the real keyword form the cluster)
+        '''
+        self.require_job_id()
+
+        result = self.cluster.get_job_state(self.job_id)
+        self.state = (result, time.time())
+        return result
 
     ### misc ###
+    def require_job_id(self) -> bool:
+        '''
+        require job to be submitted and have an id
+        '''
+        if self.job_id is None:
+            raise AttributeError('Need to submit the job and get an job id!')
+    
     @dispatch
     def _(self):
         '''

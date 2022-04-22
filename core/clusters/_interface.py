@@ -16,10 +16,7 @@ class ClusterInterface(ABC):
     ### class attribute ###
     @property
     @abstractmethod
-    def SUBMIT_CMD(self) -> str:
-        '''
-        cmd for submission TODO dont need this
-        '''
+    def NAME(self) -> str:
         pass
 
     ### classmethods ###
@@ -30,6 +27,7 @@ class ClusterInterface(ABC):
         format the head of the submission script
         res_dict: the dictionary with exact the keyword and value
                   required by the cluster
+        return the string of the resource section
         '''
         pass
 
@@ -47,3 +45,27 @@ class ClusterInterface(ABC):
     @abstractmethod
     def kill_job(cls, job_id: str) -> CompletedProcess:
         pass
+
+    @classmethod
+    @abstractmethod
+    def hold_job(cls, job_id: str) -> CompletedProcess:
+        pass
+
+    @classmethod
+    @abstractmethod
+    def release_job(cls, job_id: str) -> CompletedProcess:
+        pass
+
+    @classmethod
+    @abstractmethod
+    def get_job_state(cls, job_id: str) -> tuple[str, str]:
+        '''
+        determine if the job is:
+        Pend or Run or Complete or Canel or Error
+        Return:
+            a tuple of
+            (a str of pend or run or complete or canel or error,
+             the real keyword form the cluster)
+        '''
+        pass
+   
