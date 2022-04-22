@@ -200,4 +200,4 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''' # remember to add the command that 
         for k, v in cls.JOB_STATE_MAP.items():
             if state in v:
                 return (k, state)
-        raise Exception('Do not regonize state: {state}')
+        raise Exception(f'Do not regonize state: {state}')
