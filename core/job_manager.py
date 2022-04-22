@@ -211,7 +211,7 @@ class ClusterJob():
         kill the job with the job_id
         '''
         self.require_job_id()
-        
+
         if Config.debug >= 1:
             print(f'killing: {self.job_id}')
         self.cluster.kill_job(self.job_id)
@@ -240,7 +240,7 @@ class ClusterJob():
     def get_state(self) -> tuple[str, str]:
         '''
         determine if the job is:
-        Pend or Run or Complete or Canel or Error
+        pend or run or complete or canel or error
         Return: 
             a tuple of
             (a str of pend or run or complete or canel or error,
@@ -251,6 +251,19 @@ class ClusterJob():
         result = self.cluster.get_job_state(self.job_id)
         self.state = (result, time.time())
         return result
+
+    def ifcomplete(self) -> bool:
+        '''
+        determine if the job is complete.
+        '''
+        return self.get_state()[0] == 'complete'
+
+    def wait_to_end(self) -> bool:
+        '''
+        monitor the job until it ends with 
+        complete, error, or cancel TODO finish this and test then can apply to MD & QM
+        '''
+        pass
 
     ### misc ###
     def require_job_id(self) -> bool:
