@@ -1178,10 +1178,9 @@ class PDB():
         mkdir(lig_dir)
         mkdir(met_dir)
 
-        ligands_pathNchrg = self.stru.build_ligands(lig_dir, ifcharge=1, ifunique=1)
         # metalcenters_path = self.stru.build_metalcenters(met_dir)
         # parm
-        ligand_parm_paths = self._ligand_parm(ligands_pathNchrg, method=lig_method, renew=renew_lig)
+        ligand_parm_paths = self._ligand_parm(lig_dir, method=lig_method, renew=renew_lig)
         # self._metal_parm(metalcenters_path)
         # combine
         if o_dir != '':
@@ -1194,7 +1193,7 @@ class PDB():
         return (self.prmtop_path,self.inpcrd_path)
 
     
-    def _ligand_parm(self, paths, method='AM1BCC', renew=0):
+    def _ligand_parm(self, lig_dir, method='AM1BCC', lig_charge_method='PYBEL', lig_charge_ph=7.0, renew=0):
         '''
         Turn ligands to prepi (w/net charge), parameterize with parmchk
         return [(perpi_1, frcmod_1), ...]
@@ -1207,35 +1206,41 @@ class PDB():
         '''
         parm_paths = []
         self.prepi_path = {}
+        
+        lig_list = self.stru.get_all_ligands(ifunique=1)
+        for lig in lig_list:
+            if Config.debug >= 1:
+                print( 'Working on: '+'_'.join((lig.name, str(lig.id))) )            
+            # target files
+            out_prepi = lig_dir+'ligand_'+lig.name+'.prepin'
+            out_frcmod = lig_dir+'ligand_'+lig.name+'.frcmod'
+            # if renew
+            if os.path.isfile(out_prepi) and os.path.isfile(out_frcmod) and not renew:
+                if Config.debug >= 1:
+                    print('Parm files exist: ' + out_prepi + ' ' + out_frcmod)
+                    print('Using old parm files.')
+            else:
+                # build ligand pdb file
+                lig_pdb_path = lig_dir+'ligand_'+lig.name+'.pdb'
+                lig.build(lig_pdb_path, ft='PDB')
+                # get net charge
+                net_charge = lig.get_net_charge(method=lig_charge_method, ph=lig_charge_ph, o_dir=lig_dir)
 
-        for lig_pdb, net_charge in paths:
-            if method == 'AM1BCC':
-                out_prepi = lig_pdb[:-3]+'prepin'
-                out_frcmod = lig_pdb[:-3]+'frcmod'
-                with open(lig_pdb) as f:
-                    for line in f:
-                        pdbl=PDB_line(line)
-                        if pdbl.line_type == 'ATOM' or pdbl.line_type == 'HETATM':
-                            lig_name = pdbl.resi_name
-                # if renew
-                if os.path.isfile(out_prepi) and os.path.isfile(out_frcmod) and not renew:
-                    if Config.debug >= 1:
-                        print('Parm files exist: ' + out_prepi + ' ' + out_frcmod)
-                        print('Using old parm files.')
-                else:
+                # get parameters
+                if method == 'AM1BCC':
                     #gen prepi (net charge and correct protonation state is important)
                     if Config.debug >= 1:
-                        print('running: '+Config.Amber.AmberHome+'/bin/antechamber -i '+lig_pdb+' -fi pdb -o '+out_prepi+' -fo prepi -c bcc -s 0 -nc '+str(net_charge))
-                    run(Config.Amber.AmberHome+'/bin/antechamber -i '+lig_pdb+' -fi pdb -o '+out_prepi+' -fo prepi -c bcc -s 0 -nc '+str(net_charge), check=True, text=True, shell=True, capture_output=True)
+                        print('running: '+Config.Amber.AmberHome+'/bin/antechamber -i '+lig_pdb_path+' -fi pdb -o '+out_prepi+' -fo prepi -c bcc -s 0 -nc '+str(net_charge))
+                    run(Config.Amber.AmberHome+'/bin/antechamber -i '+lig_pdb_path+' -fi pdb -o '+out_prepi+' -fo prepi -c bcc -s 0 -nc '+str(net_charge), check=True, text=True, shell=True, capture_output=True)
                     if Config.debug <= 1:
                         os.system('rm ANTECHAMBER* ATOMTYPE.INF NEWPDB.PDB PREP.INF sqm.pdb sqm.in sqm.out')
                     #gen frcmod
                     if Config.debug >= 1:
                         print('running: '+Config.Amber.AmberHome+'/bin/parmchk2 -i '+out_prepi+' -f prepi -o '+out_frcmod)
                     run(Config.Amber.AmberHome+'/bin/parmchk2 -i '+out_prepi+' -f prepi -o '+out_frcmod, check=True, text=True, shell=True, capture_output=True)                
-                #record
-                parm_paths.append((out_prepi, out_frcmod))
-                self.prepi_path[lig_name] = out_prepi
+            #record
+            parm_paths.append((out_prepi, out_frcmod))
+            self.prepi_path[lig.name] = out_prepi
 
         return parm_paths
 
