@@ -65,6 +65,9 @@ g16 < TS-2-dp-opt.gjf > TS-2-dp-opt.out'''
 
 cluster = accre.Accre()
 
+test_sub_dir = './test/core/test_file/'
+test_file_paths = [f'{test_sub_dir}TS-2-dp-opt.out'] # paths to be cleaned
+
 def test_ClusterJob_config_by_list():
     job = ClusterJob.config_job(
         commands = command_2_run,
@@ -93,44 +96,68 @@ def test_ClusterJob_preset():
     # print(job.sub_script_str)
 
 @pytest.mark.accre
-def test_submit_job_id_ACCRE():
+def test_ClusterJob_submit_job_id_ACCRE():
     '''
     only run on accre
     '''
     job = ClusterJob(accre.Accre(), sub_script_str=sub_script_str)
-    job.submit( sub_dir='/home/shaoq1/EnzyHTP-test/test_job_manager/',
-                script_path='/home/shaoq1/EnzyHTP-test/test_job_manager/test.cmd')
+    job.submit( sub_dir=test_sub_dir,
+                script_path=f'{test_sub_dir}test.cmd')
+    test_file_paths.extend([job.job_cluster_log, job.sub_script_path])
     run(f'scancel {job.job_id}', timeout=20, check=True,  text=True, shell=True, capture_output=True)
     assert len(job.job_cluster_log) > 0
     assert len(job.job_id) > 0
 
 @pytest.mark.accre
-def test_submit_default_script_path_ACCRE():
+def test_ClusterJob_submit_default_script_path_ACCRE():
     '''
     only run on accre
     '''
     job = ClusterJob(accre.Accre(), sub_script_str=sub_script_str)
-    job.submit( sub_dir='/home/shaoq1/EnzyHTP-test/test_job_manager/')
+    job.submit( sub_dir=test_sub_dir)
+    test_file_paths.extend([job.job_cluster_log, job.sub_script_path])
+    # use explictly the scancel here to decouple the test
     run(f'scancel {job.job_id}', timeout=20, check=True,  text=True, shell=True, capture_output=True)
     assert len(job.job_id) > 0
 
 @pytest.mark.accre
-def test_kill_job_ACCRE():
+def test_ClusterJob_kill_job_ACCRE():
     '''
     only run on accre
     '''
     job = ClusterJob(accre.Accre(), sub_script_str=sub_script_str)
-    job.submit( sub_dir='/home/shaoq1/EnzyHTP-test/test_job_manager/')
+    job.submit( sub_dir=test_sub_dir)
+    test_file_paths.extend([job.job_cluster_log, job.sub_script_path])
     job.kill()
 
 @pytest.mark.accre
-def test_get_state_ACCRE():
+def test_ClusterJob_get_state_ACCRE():
     '''
     only run on accre
     '''
     job = ClusterJob(accre.Accre(), sub_script_str=sub_script_str)
-    job.submit( sub_dir='/home/shaoq1/EnzyHTP-test/test_job_manager/')
+    job.submit( sub_dir=test_sub_dir)
+    test_file_paths.extend([job.job_cluster_log, job.sub_script_path])
     assert job.get_state()[0] in ['pend', 'run']
     job.kill()
     assert job.get_state()[0] == 'cancel'
-    
+
+@pytest.mark.accre_long
+def test_ClusterJob_wait_to_end_ACCRE():
+    '''
+    only run on accre
+    '''
+    job = ClusterJob(accre.Accre(), sub_script_str=sub_script_str)
+    job.submit( sub_dir=test_sub_dir)
+    test_file_paths.extend([job.job_cluster_log, job.sub_script_path])
+    assert job.get_state()[0] in ['pend', 'run']
+    job.kill()
+    assert job.get_state()[0] == 'cancel'
+
+@pytest.mark.clean
+def test_clean_files():
+    for f_path in test_file_paths:
+        if os.path.isfile(f_path):
+            os.remove(f_path)
+        else:
+            print(f'no such file {f_path}')
