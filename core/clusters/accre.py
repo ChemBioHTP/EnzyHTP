@@ -83,7 +83,7 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''' # remember to add the command that 
             file: slurm-#######.out will be generated in the *submission dir*
             exec: commands in the script will run under the *submission dir*
         '''
-        cmd = cls._format_submit_cmd(script_path)
+        cmd = cls._format_submit_cmd(os.path.abspath(script_path))
         # debug
         if debug:
             print(cmd)
