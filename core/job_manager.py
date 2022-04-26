@@ -282,7 +282,7 @@ class ClusterJob():
             # check every {period} second 
             if Config.debug >= 2:
                 local_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(self.state[1]))
-                print(f'Job {self.job_id} state: {self.state[0][0]} at {local_time}')
+                print(f'Job {self.job_id} state: {self.state[0][0]} (at {local_time})')
             time.sleep(period)
 
     def _action_end_with(self, end_state: str) -> None:
