@@ -62,7 +62,24 @@ mkdir $TMPDIR/$SLURM_JOB_ID
 export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID
 
 g16 < TS-2-dp-opt.gjf > TS-2-dp-opt.out
-rm -r $TMPDIR/$SLURM_JOB_ID'''
+rm -r $TMPDIR/$SLURM_JOB_ID
+trap 'rm -rf $TMPDIR/$SLURM_JOB_ID' EXIT'''
+
+sub_script_long_str = '''#!/bin/bash
+#SBATCH --partition=production
+#SBATCH --job-name=JM-test
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=24
+#SBATCH --mem-per-cpu=2G
+#SBATCH --time=3-00:00:00
+#SBATCH --account=yang_lab_csb
+
+module load Gaussian/16.B.01
+mkdir $TMPDIR/$SLURM_JOB_ID
+export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID
+
+g16 < TS-2-dp-opt.gjf > TS-2-dp-opt.out
+trap 'rm -rf $TMPDIR/$SLURM_JOB_ID' EXIT'''
 
 cluster = accre.Accre()
 
@@ -148,7 +165,7 @@ def test_ClusterJob_wait_to_end_ACCRE():
     '''
     only run on accre
     '''
-    job = ClusterJob(accre.Accre(), sub_script_str=sub_script_str)
+    job = ClusterJob(accre.Accre(), sub_script_str=sub_script_long_str)
     # submit and record the file
     job.submit(sub_dir=test_sub_dir)
     test_file_paths.extend([job.job_cluster_log, job.sub_script_path])
