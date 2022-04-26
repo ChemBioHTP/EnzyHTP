@@ -61,7 +61,8 @@ module load Gaussian/16.B.01
 mkdir $TMPDIR/$SLURM_JOB_ID
 export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID
 
-g16 < TS-2-dp-opt.gjf > TS-2-dp-opt.out'''
+g16 < TS-2-dp-opt.gjf > TS-2-dp-opt.out
+rm -r $TMPDIR/$SLURM_JOB_ID'''
 
 cluster = accre.Accre()
 
