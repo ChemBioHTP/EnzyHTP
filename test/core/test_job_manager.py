@@ -152,7 +152,8 @@ def test_ClusterJob_wait_to_end_ACCRE():
     job.submit(sub_dir=test_sub_dir)
     test_file_paths.extend([job.job_cluster_log, job.sub_script_path])
 
-    job.wait_to_end()
+    Config.debug = 2
+    job.wait_to_end(60)
 
 ### utilities ###
 @pytest.mark.clean

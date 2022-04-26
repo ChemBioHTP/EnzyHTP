@@ -280,6 +280,8 @@ class ClusterJob():
             if self.get_state()[0] in ('complete', 'error', 'cancel'):
                 return self._action_end_with(self.state[0])
             # check every {period} second 
+            if Config.debug >= 2:
+                print(f'Job {self.job_id} state: {self.state[0][0]} at {self.state[1]}')
             time.sleep(period)
 
     def _action_end_with(self, end_state: str) -> None:
