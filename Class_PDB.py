@@ -1089,6 +1089,9 @@ class PDB():
         except CalledProcessError:
             if Config.debug >= 1:
                 print('Error: ambpdb cannot read PDBMin result .rst')
+                os.system('mv '+self.prmtop_path+' '+self.inpcrd_path+' '+min_dir)
+                self.prmtop_path=min_dir+'/'+self.prmtop_path
+                self.inpcrd_path=min_dir+'/'+self.inpcrd_path
                 return 1
         
         os.system('mv '+self.prmtop_path+' '+self.inpcrd_path+' '+min_dir)
