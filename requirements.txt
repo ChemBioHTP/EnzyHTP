@@ -4,3 +4,4 @@ plum-dispatch
 numpy
 openbabel
 pandas
+colorlog
