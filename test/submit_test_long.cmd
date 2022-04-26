@@ -11,4 +11,4 @@ source ~/bin/miniconda3/bin/activate
 conda activate MutaGen
 export PYTHONPATH=$PYTHONPATH:~/bin/EnzyHTP
 
-pytest -s -m 'accre_long or clean'
+pytest -s -m 'accre_long or clean' > ./test/pytest.out
