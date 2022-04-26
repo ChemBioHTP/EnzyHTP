@@ -240,7 +240,12 @@ class ClusterJob():
     def get_state(self) -> tuple[str, str]:
         '''
         determine if the job is:
-        pend or run or complete or canel or error
+        pend, 
+        run, 
+        complete, 
+        canel,
+        error
+
         Return: 
             a tuple of
             (a str of pend or run or complete or canel or error,
@@ -258,15 +263,48 @@ class ClusterJob():
         '''
         return self.get_state()[0] == 'complete'
 
-    def wait_to_end(self) -> bool:
+    def wait_to_end(self, period: int) -> None:
         '''
-        monitor the job until it ends with 
-        complete, error, or cancel TODO finish this and test then can apply to MD & QM
+        monitor the job in a specified frequency
+        until it ends with 
+        complete, error, or cancel
+
+        Args:
+            period: the time cycle for each job state change (Unit: s)
         '''
-        pass
+        # san check
+        self.require_job_id()
+        # monitor job
+        while True:
+            # exit if job ended
+            if self.get_state()[0] in ('complete', 'error', 'cancel'):
+                return self._action_end_with(self.state[0])
+            # check every {period} second 
+            time.sleep(period)
+
+    def _action_end_with(self, end_state: str) -> None:
+        '''
+        the action when job ends with the {end_state}
+        the end_state can only be one of ('complete', 'error', 'cancel')
+        '''
+        general_state = end_state[0]
+        detailed_state = end_state[1]
+
+        if general_state not in ('complete', 'error', 'cancel'):
+            raise TypeError("_action_end_with: only take state in ('complete', 'error', 'cancel')")
+        # general action
+        if Config.debug > 0:
+            print(f'Job {self.job_id} end with {general_state}::{detailed_state} !')
+        # state related action
+        if general_state is 'complete':
+            pass
+        if general_state is 'error':
+            pass
+        if general_state is 'cancel':
+            pass # may be support pass in callable to do like resubmit
 
     ### misc ###
-    def require_job_id(self) -> bool:
+    def require_job_id(self) -> None:
         '''
         require job to be submitted and have an id
         '''

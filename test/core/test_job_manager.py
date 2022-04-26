@@ -114,7 +114,7 @@ def test_ClusterJob_submit_default_script_path_ACCRE():
     only run on accre
     '''
     job = ClusterJob(accre.Accre(), sub_script_str=sub_script_str)
-    job.submit( sub_dir=test_sub_dir)
+    job.submit(sub_dir=test_sub_dir)
     test_file_paths.extend([job.job_cluster_log, job.sub_script_path])
     # use explictly the scancel here to decouple the test
     run(f'scancel {job.job_id}', timeout=20, check=True,  text=True, shell=True, capture_output=True)
@@ -126,7 +126,7 @@ def test_ClusterJob_kill_job_ACCRE():
     only run on accre
     '''
     job = ClusterJob(accre.Accre(), sub_script_str=sub_script_str)
-    job.submit( sub_dir=test_sub_dir)
+    job.submit(sub_dir=test_sub_dir)
     test_file_paths.extend([job.job_cluster_log, job.sub_script_path])
     job.kill()
 
@@ -136,7 +136,7 @@ def test_ClusterJob_get_state_ACCRE():
     only run on accre
     '''
     job = ClusterJob(accre.Accre(), sub_script_str=sub_script_str)
-    job.submit( sub_dir=test_sub_dir)
+    job.submit(sub_dir=test_sub_dir)
     test_file_paths.extend([job.job_cluster_log, job.sub_script_path])
     assert job.get_state()[0] in ['pend', 'run']
     job.kill()
@@ -148,12 +148,13 @@ def test_ClusterJob_wait_to_end_ACCRE():
     only run on accre
     '''
     job = ClusterJob(accre.Accre(), sub_script_str=sub_script_str)
-    job.submit( sub_dir=test_sub_dir)
+    # submit and record the file
+    job.submit(sub_dir=test_sub_dir)
     test_file_paths.extend([job.job_cluster_log, job.sub_script_path])
-    assert job.get_state()[0] in ['pend', 'run']
-    job.kill()
-    assert job.get_state()[0] == 'cancel'
 
+    job.wait_to_end()
+
+### utilities ###
 @pytest.mark.clean
 def test_clean_files():
     for f_path in test_file_paths:
