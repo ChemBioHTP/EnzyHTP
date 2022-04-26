@@ -154,6 +154,7 @@ def test_ClusterJob_wait_to_end_ACCRE():
 
     Config.debug = 2
     job.wait_to_end(60)
+    # TODO add some assert
 
 ### utilities ###
 @pytest.mark.clean
