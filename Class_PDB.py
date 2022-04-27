@@ -768,7 +768,8 @@ class PDB():
             Only used for build filenames. **Do not affect any calculation.**
         A : Chain index. Determine by 'TER' marks in the PDB file. (Do not consider chain_indexs in the original file.)
         11: Residue index. Strictly correponding residue indexes in the original file. (NO sort applied)
-        Y : Target residue name.  
+        Y : Target residue name.
+        * will just load and save in tleap if MutaFlag is only 'WT'.
 
         **WARNING** if there are multiple mutations on the same index, only the first one will be used.
         '''
@@ -810,6 +811,8 @@ class PDB():
                     # only match in the dataline and keep all non data lines
                     if pdb_l.line_type == 'ATOM':
                         for Flag in self.MutaFlags:
+                            if 'WT' in Flag:
+                                continue
                             # Test for every Flag for every lines
                             t_chain_id=Flag[1]
                             t_resi_id =Flag[2]
@@ -898,6 +901,8 @@ class PDB():
                     * defined in self.stru)
                 Y : Target residue letter.
                     (The residue type after the mutation.) 
+                'WT'
+                Can also use WT to specify the WT. The decoded MutaFlag will be ('WT', 'WT', 'WT', 'WT') to fit in the format.
             example:
                 >>> pdb_obj.Add_MutaFlag('D83K')
                 >>> pdb_obj.MutaFlags
@@ -1002,12 +1007,16 @@ class PDB():
         11: Residue index. Strictly correponding residue indexes in the original file. (NO sort applied)
         Y : Target residue name.
 
+        * can also use WT to specify the WT. The decoded MutaFlag will be ('WT', 'WT', 'WT', 'WT') to fit in the format
+
         the later 3 will go through a san check to make sure they are within the range:
         A : chain.id range in self.stru.chains
         11: resi.id range in self.stru.chain[int].residues
         Y : Resi_list
         '''
         pattern = r'([A-Z])([A-Z])?([0-9]+)([A-Z])'
+        if Flag is 'WT':
+            return ('WT', 'WT', 'WT', 'WT')
         F_match = re.match(pattern, Flag)
         if F_match is None:
             raise Exception('_read_MutaFlag: Required format: XA123Y (or X123Y indicating the first chain)')
@@ -1043,6 +1052,8 @@ class PDB():
         '''
         Take a MutaFlag Tuple and return a str of name
         '''
+        if 'WT' in Flag:
+            return 'WT'
         return Flag[0]+Flag[1]+Flag[2]+Flag[3]
 
 
