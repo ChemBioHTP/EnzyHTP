@@ -24,7 +24,7 @@ Text
 line_feed = '\n'
 
 '''
-func
+file system
 '''
 def mkdir(dir):
     if os.path.exists(dir):
@@ -32,6 +32,18 @@ def mkdir(dir):
     else:
         os.makedirs(dir)
 
+def is_empty_dir(dir_path):
+    '''
+    check if the dir_path is an empty dir
+    '''
+    if os.path.isdir(dir_path):
+        if not os.listdir(dir_path):
+            return 1
+        else:
+            return 0
+    else:
+        print(f"No such directory: {dir_path}")
+        return 2
 
 '''
 math

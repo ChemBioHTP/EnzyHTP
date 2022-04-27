@@ -1173,17 +1173,17 @@ class PDB():
 
         # build things seperately
         if local_lig:
-            lig_dir = self.dir+'/ligands/'
-            met_dir = self.dir+'/metalcenters/'
+            self.lig_dir = self.dir+'/ligands/'
+            self.met_dir = self.dir+'/metalcenters/'
         else:
-            lig_dir = self.dir+'/../ligands/'
-            met_dir = self.dir+'/../metalcenters/'
-        mkdir(lig_dir)
-        mkdir(met_dir)
+            self.lig_dir = self.dir+'/../ligands/'
+            self.met_dir = self.dir+'/../metalcenters/'
+        mkdir(self.lig_dir)
+        mkdir(self.met_dir)
 
-        # metalcenters_path = self.stru.build_metalcenters(met_dir)
+        # metalcenters_path = self.stru.build_metalcenters(self.met_dir)
         # parm
-        ligand_parm_paths = self._ligand_parm(lig_dir, method=lig_method, renew=renew_lig)
+        ligand_parm_paths = self._ligand_parm(self.lig_dir, method=lig_method, renew=renew_lig)
         # self._metal_parm(metalcenters_path)
         # combine
         if o_dir != '':
@@ -2094,11 +2094,25 @@ class PDB():
     QM Cluster
     ========    
     '''
-    def PDB2QMCluster(self, atom_mask, spin=1, o_dir='', tag='', QM='g16',g_route=None, ifchk=0, val_fix = 'internal'):
+    def PDB2QMCluster(
+        self, 
+        atom_mask: str, 
+        spin: int = 1, 
+        o_dir: str = None, 
+        tag='', 
+        QM='g16',
+        g_route=None, 
+        ifchk=0, 
+        val_fix = 'internal'
+    ):
         '''
         Build & Run QM cluster input from self.mdcrd with selected atoms according to atom_mask
         ---------
-        spin: specific spin state for the qm cluster. (default: 1)
+        Args:
+        spin: 
+            specific spin state for the qm cluster. (default: 1)
+        o_dir:
+            The output directory that contain all QM input & output jobs.
         QM: QM engine (default: Gaussian)
             g_route: Gaussian route line
             ifchk: if save chk file of a gaussian job. (default: 0)
@@ -2112,7 +2126,7 @@ class PDB():
         self.qm_cluster_map (PDB atom id -> QM atom id)
         '''
         # make folder
-        if o_dir == '':
+        if o_dir == None:
             o_dir = self.dir+'/QM_cluster'+tag
         mkdir(o_dir)
         # update stru

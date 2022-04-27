@@ -1,10 +1,15 @@
 from random import choice
-from os.path import isfile,getsize
-from os import remove
+import os
+import pytest
+
 from Class_PDB import *
+from helper import is_empty_dir
 from AmberMaps import Resi_map2
 
+test_file_paths = []
+test_file_dirs = []
 
+@pytest.mark.mutation
 def _random_gen_good_MutaFlag_for_test(stru, abbr=0):
     '''
     this should be seperate from Add_MutaFlag
@@ -28,8 +33,8 @@ def _random_gen_good_MutaFlag_for_test(stru, abbr=0):
 
     return test_flag, correct_answer
 
-
 # how should we determine how many types of input should one function contain.
+@pytest.mark.mutation
 def test_Add_MutaFlag_good_assign_mutaflag_canonical():
     '''
     test assign a specific reasonable mutation to a canonical amino acid
@@ -63,6 +68,7 @@ def test_Add_MutaFlag_good_assign_mutaflag_canonical():
     pdb_obj.Add_MutaFlag(test_flag_1)
     assert pdb_obj.MutaFlags == [correct_answer]
 
+@pytest.mark.mutation
 def test_Add_MutaFlag_good_random():
     '''
     test random generate a mutation
@@ -87,11 +93,51 @@ def test_Add_MutaFlag_good_random():
 # good PDB solvent
 # bad PDB
 
+@pytest.mark.md
 def test_PDB2FF_keep():
     pdb_obj = PDB('./test/testfile_Class_PDB/FAcD.pdb', wk_dir='./test/testfile_Class_PDB')
     prm_files = pdb_obj.PDB2FF(local_lig=1)
+    test_file_paths.extend(prm_files) #clean up record
+    test_file_paths.extend([pdb_obj.cache_path+'/leap.in', 
+                            './tmp/tmp.inpcrd', 
+                            pdb_obj.cache_path+'/leap.out',
+                            pdb_obj.lig_dir+'/cache/ligand_temp2.pdb',
+                            pdb_obj.lig_dir+'/cache/ligand_temp3.pdb',
+                            pdb_obj.lig_dir+'/cache/ligand_temp.mol2',
+                            './leap.log'])
+    test_file_dirs.extend([pdb_obj.lig_dir+'/cache'])
+
     for f in prm_files:
-        assert isfile(f)
-        assert getsize(f) != 0 # prmtop will be 0K if failed
-        remove(f)
+        assert os.path.isfile(f)
+        assert os.path.getsize(f) != 0 # prmtop will be 0K if failed
+
     assert len(pdb_obj.prepi_path) != 0
+
+@pytest.mark.md
+@pytest.mark.accre
+def test_pdbmd_with_job_manager():
+    pass
+
+@pytest.mark.qm
+@pytest.mark.accre
+def test_pdb2qmcluster_with_job_manager():
+    pass
+
+### utilities ###
+@pytest.mark.clean
+def test_clean_files():
+    # clean files
+    for f_path in test_file_paths:
+        if os.path.isfile(f_path):
+            os.remove(f_path)
+            print(f'removed {f_path}')
+        else:
+            print(f'no such file {f_path}')
+    # clean dirs
+    for f_dir in test_file_dirs:
+        if is_empty_dir(f_dir) != 2:
+            if is_empty_dir(f_dir):
+                os.removedirs(f_dir)
+                print(f'removed {f_dir}')
+            else:
+                print(f'{f_dir} is not empty. wont rm it')
