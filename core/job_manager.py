@@ -226,6 +226,8 @@ class ClusterJob():
                     script_path = sub_dir + f'/submit_{i}.cmd'  # TODO(shaoqz): move to helper
 
         self.sub_script_path = self._deploy_sub_script(script_path)
+        if Config.debug > 1:
+            print(f'submitting {script_path} in {sub_dir}')
         self.job_id, self.job_cluster_log = self.cluster.submit_job(sub_dir, script_path, debug=debug)
         self.sub_dir = sub_dir
 
@@ -391,18 +393,18 @@ class ClusterJob():
         while len(finished_job) < total_job_num:
             # before every job finishes, run
             # 1. make up the running chunk to the array size
-            while len(current_active_job) < array_size:
+            while len(current_active_job) < array_size and i < len(jobs):
                 jobs[i].submit(sub_dir, sub_scirpt_path)
                 current_active_job.append(jobs[i])
                 i += 1
             # 2. check every job in the array to detect completion of jobs and deal with some error
-            for i in range(len(current_active_job)-1,-1,-1):
-                job = current_active_job[i]
+            for j in range(len(current_active_job)-1,-1,-1):
+                job = current_active_job[j]
                 if job.get_state()[0] not in ['pend', 'run']:
                     if Config.debug > 1:
                         cls._action_end_with(job)
                     finished_job.append(job)
-                    del current_active_job[i]
+                    del current_active_job[j]
             # 3. wait a period before next check
             time.sleep(period)
         
