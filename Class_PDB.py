@@ -3,6 +3,7 @@ import os
 import re
 from subprocess import run, CalledProcessError
 from random import choice
+import time
 from typing import Union
 from AmberMaps import *
 from wrapper import *
@@ -10,7 +11,8 @@ from Class_Structure import *
 from Class_line import *
 from Class_Conf import Config, Layer
 from Class_ONIOM_Frame import *
-import core.job_manager
+from core import job_manager
+from core.clusters._interface import ClusterInterface
 from helper import Conformer_Gen_wRDKit, decode_atom_mask, get_center, get_field_strength_value, line_feed, mkdir, generate_Rosetta_params
 try:
     from pdb2pqr.main import main_driver as run_pdb2pqr
@@ -2219,7 +2221,8 @@ class PDB():
         prog: str = 'g16', 
         if_cluster_job: bool = 1,
         cluster: ClusterInterface = None,
-        job_array_size: int = 0
+        job_array_size: int = 0,
+        period: int = 600,
     ):
         '''
         Run QM with {prog} for {inp} files and return paths of output files.
@@ -2236,6 +2239,8 @@ class PDB():
             how many jobs are allowed to submit simultaneously. (default: "all" -> len(inp))
             (e.g. 5 for 100 jobs means run 20 groups. All groups will be submitted and 
             in each group, submit the next job only after the previous one finishes.)
+        period:
+            the time cycle for each job state change (Unit: s) (default: 600)
 
         TODO put this individually as part of the qm interface
              maybe introduct the current executor object to decouple this module with the job manager.
@@ -2247,17 +2252,6 @@ class PDB():
                 if job_array_size is 0:
                     job_array_size = len(inp)
                 # setting up job array
-                current_active_job = []
-                total_job_num = len(inp)
-                finished_job = []
-                while len(finished_job) < total_job_num:
-                    while len(current_active_job) <= job_array_size:
-                        # each job
-                        gjf_path = inp[i]
-                        out_path = gjf_path.removesuffix('gjf')+'out'
-                        # submit to the computation node
-                        cls._submit_single_g16_job(gjf_path, out_path, cluster)
-                        i += 1
 
         else:
             # local job
@@ -2287,18 +2281,24 @@ class PDB():
             gjf_path: str, 
             out_path: str, 
             cluster: ClusterInterface
-        ) -> ClusterJob :
+        ) -> job_manager.ClusterJob :
         '''
         submit g16 for gjf > out to cluster
         return a ClusterJob object
         '''
         cmd = f'{Config.Gaussian.g16_exe} < {gjf_path} > {out_path}'
-        job = core.job_manager.ClusterJob.config_job(
+        # interface check
+        if 'G16_CPU_ENV' not in dir(cluster):
+            raise Exception('RunQM(prog = g16) requires the input cluster have the G16_CPU_ENV attr')
+        job = job_manager.ClusterJob.config_job(
             commands = cmd,
             cluster = cluster,
             env_settings = cluster.G16_CPU_ENV,
             res_keywords = Config.Gaussian.QMCLUSTER_CPU_RES,
         )
+        job.submit(sub_dir = './', script_path = gjf_path.removesuffix('gjf')+'cmd')
+
+        return job
 
     def get_fchk(self, keep_chk=0):
         '''

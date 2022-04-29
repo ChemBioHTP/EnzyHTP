@@ -19,6 +19,8 @@ class ClusterInterface(ABC):
     def NAME(self) -> str:
         pass
 
+    # G16_CPU_ENV # need this if use g16 in the workflow with this cluster
+
     ### classmethods ###
     @classmethod
     @abstractmethod

@@ -18,7 +18,6 @@ from typing import Union
 from plum import dispatch
 import os
 
-from .clusters import *  # pylint: disable=unused-wildcard-import,wildcard-import
 from core.clusters._interface import ClusterInterface
 from helper import line_feed
 from Class_Conf import Config
@@ -38,12 +37,12 @@ class ClusterJob():
         submit()
     '''
 
-    def __init__(self, cluster: ClusterInterface, sub_script_str: str) -> None:
+    def __init__(self, cluster: ClusterInterface, sub_script_str: str, sub_dir=None, sub_script_path=None) -> None:
         self.cluster = cluster
         self.sub_script_str = sub_script_str
+        self.sub_script_path = sub_script_path
+        self.sub_dir = sub_dir
 
-        self.sub_script_path: str = None
-        self.sub_dir: str = None
         self.job_cluster_log: str = None
         self.job_id: str = None
         self.state: tuple = None # state and the update time in s
@@ -54,7 +53,9 @@ class ClusterJob():
                 commands: Union[list[str], str],
                 cluster: ClusterInterface,
                 env_settings: Union[list[str], str],
-                res_keywords: dict[str, str]
+                res_keywords: dict[str, str],
+                sub_dir: Union[str, None] = None,
+                sub_script_path: Union[str, None] = None
                 ) -> 'ClusterJob':
         '''
         config job and generate a ClusterJob instance (cluster, sub_script_str)
@@ -119,7 +120,7 @@ class ClusterJob():
                             f'# {Config.WATERMARK}{line_feed}'
                             )
 
-        return cls(cluster, sub_script_str)
+        return cls(cluster, sub_script_str, sub_dir, sub_script_path)
 
     @staticmethod
     @dispatch
@@ -183,15 +184,19 @@ class ClusterJob():
         return sub_script_str
 
     ### submit ###
-    def submit(self, sub_dir, script_path=None, debug=0):
+    def submit(self, sub_dir=None, script_path=None, debug=0):
         '''
         submit the job to the cluster queue. Make the submission script. Submit.
         Arg:
-            sub_dir: dir for submission. commands in the sub script usually run under this dir. 
-            script_path: path for submission script generation. '
-                         (default: sub_dir/submit.cmd; 
-                          will be sub_dir/submit_#.cmd if the file exists
-                          # is a growing index)
+            sub_dir: 
+                dir for submission. commands in the sub script usually run under this dir.
+                * will use self.sub_dir if not provided
+            script_path: 
+                path for submission script generation.
+                (default: sub_dir/submit.cmd; 
+                will be sub_dir/submit_#.cmd if the file exists
+                # is a growing index)
+                * will use self.sub_script_path if sub_dir is not provided
                          
         Return:
             self.job_id
@@ -206,13 +211,18 @@ class ClusterJob():
             >>> job.submit( sub_dir= sub_dir,
                             script_path= sub_dir + 'test.cmd')
         '''
+        # use self attr if nothing is provided
+        if sub_dir is None:
+            sub_dir = self.sub_dir
+            script_path = self.sub_script_path
+        else:
         # make default value for filename
-        if script_path is None:
-            script_path = sub_dir + '/submit.cmd'
-            i = 0
-            while os.path.isfile(script_path):
-                i += 1
-                script_path = sub_dir + f'/submit_{i}.cmd'  # TODO(shaoqz): move to helper
+            if script_path is None:
+                script_path = sub_dir + '/submit.cmd'
+                i = 0
+                while os.path.isfile(script_path):
+                    i += 1
+                    script_path = sub_dir + f'/submit_{i}.cmd'  # TODO(shaoqz): move to helper
 
         self.sub_script_path = self._deploy_sub_script(script_path)
         self.job_id, self.job_cluster_log = self.cluster.submit_job(sub_dir, script_path, debug=debug)
@@ -329,6 +339,45 @@ class ClusterJob():
             pass
         if general_state == 'cancel':
             pass # may be support pass in callable to do like resubmit
+
+    @classmethod
+    def wait_to_array_end(
+            cls, jobs: list['ClusterJob'], 
+            period: int, 
+            array_size: int = 0, 
+            sub_dir = None, 
+            sub_scirpt_path = None
+        ) -> None:
+        '''
+        submit an array of jobs in a way that only {array_size} number of jobs is submitted simultaneously
+        '''
+        # san check
+        pass
+        # for job in jobs:
+        #     if job.cluster.NAME != jobs[0].cluster.NAME:
+        #         raise TypeError(f'array job need to use the same cluster! while {job.cluster.NAME} and {jobs[0].cluster.NAME} are found.')
+        # # default value
+        # if array_size == 0:
+        #     array_size = len(jobs)
+        # # set up array job
+        # current_active_job = []
+        # total_job_num = len(jobs)
+        # finished_job = []
+        # i = 0
+        # while len(finished_job) < total_job_num:
+        #     while len(current_active_job) <= array_size:
+        #         # each job
+        #         gjf_path = inp[i]
+        #         out_path = gjf_path.removesuffix('gjf')+'out'
+        #         # submit to the computation node
+        #         current_active_job.append(job.submit())
+        #         i += 1
+        #     # check the array with a time gap
+        #     for job in current_active_job:
+        #         if job.get_state() 
+        #     time.sleep()
+
+
 
     ### misc ###
     def require_job_id(self) -> None:

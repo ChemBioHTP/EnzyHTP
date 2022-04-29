@@ -6,7 +6,7 @@ Date: 2022-04-13
 """
 import re
 import os
-from subprocess import CalledProcessError, CompletedProcess, TimeoutExpired, run
+from subprocess import CalledProcessError, CompletedProcess, run
 import time
 from ._interface import ClusterInterface
 
@@ -89,7 +89,7 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''',
         # debug
         if debug:
             print(cmd)
-            return cmd
+            return (cmd, sub_dir, script_path), None
 
         cwd = os.getcwd()
         # cd to sub_path
