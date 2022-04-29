@@ -333,6 +333,29 @@ class Config:
 
     class Gaussian:
         # -----------------------------
+        # Executable g16 command for current environment
+        # 
+        g16_exe = 'g16'
+        # -----------------------------
+        # Executable g16 command for current environment
+        # 
+        g09_exe = 'g09'
+
+        # -----------------------------
+        #   >>>>>>>>QMcluster<<<<<<<<
+        # -----------------------------
+
+        # -----------------------------
+        # Computational resources for gaussian qm cluster job for job submission on a cluster
+        # 
+        QMCLUSTER_CPU_RES = {   'core_type' : 'cpu',
+                                'node_cores' : '24',
+                                'job_name' : 'EnzyHTP_QMCluster',
+                                'partition' : 'production',
+                                'mem_per_core' : '3G',
+                                'walltime' : '24:00:00',
+                                'account' : 'yang_lab_csb'}
+        # -----------------------------
         #   >>>>>>>>ONIOM<<<<<<<<
         # -----------------------------
 
@@ -344,14 +367,6 @@ class Config:
         # Per core memory in MB for gaussian job (higher pirority)
         # 
         # max_core = max_core
-        # -----------------------------
-        # Executable g16 command for current environment
-        # 
-        g16_exe = 'g16'
-        # -----------------------------
-        # Executable g16 command for current environment
-        # 
-        g09_exe = 'g09'
         # -----------------------------
         # key words for ONIOM job (strategy: use work type as a key to indicate different keyword set.)
         # Use mechanic embedding as default / hardfirst means find user assigned parameters first / iops are for reduce the size of output. 

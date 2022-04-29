@@ -239,8 +239,9 @@ def write_data(tag, data, out_path):
             of.write(repr(data[item])+line_feed)
 
     return out_path
-        
-'''
-Mutant assigner
-'''
-#TODO
+
+def chunked(iter_, size):
+    '''
+    chunk iter_ by size and return generator for chunked list 
+    '''
+    return (iter_[position : position + size] for position in range(0, len(iter_), size))

@@ -133,6 +133,9 @@ def test_clean_files():
             print(f'removed {f_path}')
         else:
             print(f'no such file {f_path}')
+            
+@pytest.mark.clean            
+def test_clean_dirs():
     # clean dirs
     for f_dir in test_file_dirs:
         if is_empty_dir(f_dir) != 2:

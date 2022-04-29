@@ -47,8 +47,9 @@ export LD_LIBRARY_PATH=$AMBERHOME/cuda/10.0.130/lib64:$AMBERHOME/cuda/RHEL7/10.0
 
     G16_CPU_ENV = '''module load Gaussian/16.B.01
 mkdir $TMPDIR/$SLURM_JOB_ID
-export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''' # remember to add the command that remove the SCRDIR
-    # resource preset TODO
+export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''' # remember to add the command that remove the SCRDIR # TODO add to ABC def
+    # resource preset TODO this should stand along for job in general. (do not involve in any workflow layer thing)
+    # workflow related presets should go to Config module (so above the core layer)
     CPU_RES = { 'core_type' : 'cpu',
                 'node_cores' : '24',
                 'job_name' : 'job_name',
@@ -58,7 +59,7 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''' # remember to add the command that 
                 'account' : 'xxx'}
 
     @classmethod
-    def format_resource_str(cls, res_dict: dict) -> str:
+    def format_resource_str(cls, res_dict: dict) -> str: # TODO this is not working. the keyword need to be parsed
         '''
         format the head of the submission script for ACCRE
         res_dict: the dictionary with exact the keyword and value
