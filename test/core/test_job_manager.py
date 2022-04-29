@@ -250,7 +250,7 @@ def test_ClusterJob_wait_to_array_end_ACCRE():
                                 sub_script_path=f'{test_sub_dir}/test_{i}.cmd'))
     # job array
     Config.debug = 2
-    ClusterJob.wait_to_array_end(jobs, period=600, array_size=5)
+    ClusterJob.wait_to_array_end(jobs, period=30, array_size=5)
 
 
 

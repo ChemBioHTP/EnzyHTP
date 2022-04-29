@@ -391,7 +391,7 @@ class ClusterJob():
         while len(finished_job) < total_job_num:
             # before every job finishes, run
             # 1. make up the running chunk to the array size
-            while len(current_active_job) <= array_size:
+            while len(current_active_job) < array_size:
                 jobs[i].submit(sub_dir, sub_scirpt_path)
                 current_active_job.append(jobs[i])
                 i += 1
@@ -414,7 +414,6 @@ class ClusterJob():
             print(f'Job array finished: {len(n_complete)} complete {len(n_error)} error {len(n_cancel)} cancel')
         
         return n_error + n_cancel
-
 
     ### misc ###
     def require_job_id(self) -> None:
