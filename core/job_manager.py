@@ -13,6 +13,7 @@ Feature:
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Date: 2022-04-13
 """
+from sqlite3 import complete_statement
 import time
 from typing import Union
 from plum import dispatch
@@ -304,7 +305,7 @@ class ClusterJob():
         complete, error, or cancel
 
         Args:
-            period: the time cycle for each job state change (Unit: s)
+            period: the time cycle for detect job state (Unit: s)
         '''
         # san check
         self.require_job_id()
@@ -312,18 +313,20 @@ class ClusterJob():
         while True:
             # exit if job ended
             if self.get_state()[0] in ('complete', 'error', 'cancel'):
-                return self._action_end_with(self.state[0])
+                return type(self)._action_end_with(self)
             # check every {period} second 
             if Config.debug >= 2:
                 local_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(self.state[1]))
                 print(f'Job {self.job_id} state: {self.state[0][0]} (at {local_time})')
             time.sleep(period)
 
-    def _action_end_with(self, end_state: str) -> None:
+    @staticmethod
+    def _action_end_with(ended_job: 'ClusterJob') -> None:
         '''
         the action when job ends with the {end_state}
         the end_state can only be one of ('complete', 'error', 'cancel')
         '''
+        end_state = ended_job.state[0]
         general_state = end_state[0]
         detailed_state = end_state[1]
 
@@ -331,7 +334,8 @@ class ClusterJob():
             raise TypeError("_action_end_with: only take state in ('complete', 'error', 'cancel')")
         # general action
         if Config.debug > 0:
-            print(f'Job {self.job_id} end with {general_state}::{detailed_state} !')
+            local_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ended_job.state[1]))
+            print(f'Job {ended_job.job_id} end with {general_state}::{detailed_state} at {local_time} !')
         # state related action
         if general_state == 'complete':
             pass
@@ -342,41 +346,73 @@ class ClusterJob():
 
     @classmethod
     def wait_to_array_end(
-            cls, jobs: list['ClusterJob'], 
+            cls, 
+            jobs: list['ClusterJob'], 
             period: int, 
             array_size: int = 0, 
             sub_dir = None, 
             sub_scirpt_path = None
         ) -> None:
         '''
-        submit an array of jobs in a way that only {array_size} number of jobs is submitted simultaneously
+        submit an array of jobs in a way that only {array_size} number of jobs is submitted simultaneously.
+        Wait until all job ends.
+        
+        Args:
+        jobs:
+            a list of ClusterJob object to be execute
+        period:
+            the time cycle for update job state change (Unit: s)
+        array_size:
+            how many jobs are allowed to submit simultaneously. (default: 0 means all -> len(inp))
+            (e.g. 5 for 100 jobs means run 20 groups. All groups will be submitted and 
+            in each group, submit the next job only after the previous one finishes.)
+        sub_dir: (default: self.sub_dir)
+            submission directory for all jobs in the array. Overwrite existing self.sub_dir in the job obj
+            * you can set the self value during config_job to make each job different
+        sub_scirpt_path: (default: self.sub_script_path)
+            path of the submission script. Overwrite existing self.sub_script_path in the job obj
+            * you can set the self value during config_job to make each job different
+        
+        Return:
+        return a list of not completed job. (error + canceled)
         '''
         # san check
-        pass
-        # for job in jobs:
-        #     if job.cluster.NAME != jobs[0].cluster.NAME:
-        #         raise TypeError(f'array job need to use the same cluster! while {job.cluster.NAME} and {jobs[0].cluster.NAME} are found.')
-        # # default value
-        # if array_size == 0:
-        #     array_size = len(jobs)
-        # # set up array job
-        # current_active_job = []
-        # total_job_num = len(jobs)
-        # finished_job = []
-        # i = 0
-        # while len(finished_job) < total_job_num:
-        #     while len(current_active_job) <= array_size:
-        #         # each job
-        #         gjf_path = inp[i]
-        #         out_path = gjf_path.removesuffix('gjf')+'out'
-        #         # submit to the computation node
-        #         current_active_job.append(job.submit())
-        #         i += 1
-        #     # check the array with a time gap
-        #     for job in current_active_job:
-        #         if job.get_state() 
-        #     time.sleep()
-
+        for job in jobs:
+            if job.cluster.NAME != jobs[0].cluster.NAME:
+                raise TypeError(f'array job need to use the same cluster! while {job.cluster.NAME} and {jobs[0].cluster.NAME} are found.')
+        # default value
+        if array_size == 0:
+            array_size = len(jobs)
+        # set up array job
+        current_active_job = []
+        total_job_num = len(jobs)
+        finished_job = []
+        i = 0 # submitted job number
+        while len(finished_job) < total_job_num:
+            # before every job finishes, run
+            # 1. make up the running chunk to the array size
+            while len(current_active_job) <= array_size:
+                current_active_job.append(jobs[i].submit(sub_dir, sub_scirpt_path))
+                i += 1
+            # 2. check every job in the array to detect completion of jobs and deal with some error
+            for i in range(len(current_active_job)-1,-1,-1):
+                job = current_active_job[i]
+                if job.get_state()[0] not in ['pend', 'run']:
+                    if Config.debug > 1:
+                        cls._action_end_with(job)
+                    finished_job.append(job)
+                    del current_active_job[i]
+            # 3. wait a period before next check
+            time.sleep(period)
+        
+        # summarize
+        n_complete = list(filter(lambda x: x.state[0][0] == 'complete', finished_job))
+        n_error = list(filter(lambda x: x.state[0][0] == 'error', finished_job))
+        n_cancel = list(filter(lambda x: x.state[0][0] == 'cancel', finished_job))
+        if Config.debug > 0:
+            print(f'Job array finished: {len(n_complete)} complete {len(n_error)} error {len(n_cancel)} cancel')
+        
+        return n_error + n_cancel
 
 
     ### misc ###
