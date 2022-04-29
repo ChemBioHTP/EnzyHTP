@@ -393,7 +393,7 @@ class ClusterJob():
             # 1. make up the running chunk to the array size
             while len(current_active_job) <= array_size:
                 jobs[i].submit(sub_dir, sub_scirpt_path)
-                current_active_job.append(job[i])
+                current_active_job.append(jobs[i])
                 i += 1
             # 2. check every job in the array to detect completion of jobs and deal with some error
             for i in range(len(current_active_job)-1,-1,-1):
