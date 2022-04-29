@@ -20,7 +20,7 @@ from plum import dispatch
 import os
 
 from core.clusters._interface import ClusterInterface
-from helper import line_feed
+from helper import get_localtime, line_feed
 from Class_Conf import Config
 
 
@@ -185,7 +185,7 @@ class ClusterJob():
         return sub_script_str
 
     ### submit ###
-    def submit(self, sub_dir=None, script_path=None, debug=0):
+    def submit(self, sub_dir: Union[str, None] = None, script_path: Union[str, None] = None, debug: int=0):
         '''
         submit the job to the cluster queue. Make the submission script. Submit.
         Arg:
@@ -198,6 +198,8 @@ class ClusterJob():
                 will be sub_dir/submit_#.cmd if the file exists
                 # is a growing index)
                 * will use self.sub_script_path if sub_dir is not provided
+            debug:
+                debug behavior that does not submit the job but print out the submission command.
                          
         Return:
             self.job_id
@@ -224,6 +226,14 @@ class ClusterJob():
                 while os.path.isfile(script_path):
                     i += 1
                     script_path = sub_dir + f'/submit_{i}.cmd'  # TODO(shaoqz): move to helper
+
+        # san check
+        if self.job_id is not None:
+            if self.state[0][0] in ['run', 'pend']:
+                raise Exception(f'attempt to submit a non-finished (pend, run) job.{line_feed} id: {self.job_id} state: {self.state[0][0]}::{self.state[0][1]} @{get_localtime(self.state[1])}')
+            else: #finished job
+                if Config.debug > 0:
+                    print(f'WARNING: re-submitting a ended job. The job id will be renewed and the old job id will be lose tracked{line_feed}\ id: {self.job_id} state: {self.state[0][0]}::{self.state[0][1]} @{get_localtime(self.state[1])}')
 
         self.sub_script_path = self._deploy_sub_script(script_path)
         if Config.debug > 1:

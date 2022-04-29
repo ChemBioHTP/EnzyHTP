@@ -2,6 +2,7 @@
 Misc helper func and class
 '''
 from distutils.command.config import config
+import time
 from AmberMaps import Resi_list
 import os
 import numpy as np
@@ -245,3 +246,6 @@ def chunked(iter_, size):
     chunk iter_ by size and return generator for chunked list 
     '''
     return (iter_[position : position + size] for position in range(0, len(iter_), size))
+
+def get_localtime(time_stamp):
+    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time_stamp))
