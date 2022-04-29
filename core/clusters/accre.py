@@ -45,9 +45,10 @@ class Accre(ClusterInterface):
 export CUDA_HOME=$AMBERHOME/cuda/10.0.130
 export LD_LIBRARY_PATH=$AMBERHOME/cuda/10.0.130/lib64:$AMBERHOME/cuda/RHEL7/10.0.130/lib:$LD_LIBRARY_PATH'''
 
-    G16_CPU_ENV = '''module load Gaussian/16.B.01
+    G16_CPU_ENV = {'head' : '''module load Gaussian/16.B.01
 mkdir $TMPDIR/$SLURM_JOB_ID
-export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''' # remember to add the command that remove the SCRDIR # TODO add to ABC def
+export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''',
+                   'tail' : '''rm -rf $TMPDIR/$SLURM_JOB_ID'''} # TODO add to ABC def
     # resource preset TODO this should stand along for job in general. (do not involve in any workflow layer thing)
     # workflow related presets should go to Config module (so above the core layer)
     CPU_RES = { 'core_type' : 'cpu',

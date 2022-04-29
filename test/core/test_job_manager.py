@@ -108,7 +108,7 @@ def test_ClusterJob_preset():
     job = ClusterJob.config_job(
         commands = command_2_run,
         cluster = cluster,
-        env_settings = [cluster.AMBER_GPU_ENV, cluster.G16_CPU_ENV],
+        env_settings = cluster.G16_CPU_ENV,
         res_keywords = cluster.CPU_RES
     )
     # print(job.sub_script_str)
@@ -160,7 +160,8 @@ def test_ClusterJob_get_state_ACCRE():
     job.kill()
     assert job.get_state()[0] == 'cancel'
 
-@pytest.mark.accre_long
+@pytest.mark.accre
+@pytest.mark.long
 def test_ClusterJob_wait_to_end_ACCRE():
     '''
     only run on accre

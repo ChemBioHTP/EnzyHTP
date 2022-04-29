@@ -68,7 +68,8 @@ class ClusterJob():
             To define a new cluster class for support, reference the ClusterInterface requirement.
         env_settings: 
             environment settings in the submission script. Can be a string or list of strings
-            for cmds in each line.
+            for cmds in each line or a dict of strings for settings before and after the commands.
+            In this case the key of the dict can only be 'head' and 'tail'
             Since environment settings are attached to job types. It is more conserved than the command.
             **Use presets in ClusterInterface classes to save effort**
         res_keywords: 
@@ -137,6 +138,19 @@ class ClusterJob():
 
     @staticmethod
     @dispatch
+    def _get_env_str(env: dict) -> dict:
+        '''
+        this means env setting is presented in a way that 
+        there's cmd at the beginning and the end
+        '''
+        if list(env.keys()) == ['head', 'tail'] or list(env.keys()) == ['tail', 'head']:
+            for i in env:
+                env[i] += line_feed
+            return env
+        raise KeyError("Can only have 'head' or 'tail' as key in env_settings")
+
+    @staticmethod
+    @dispatch
     def _get_env_str(env: str) -> str:
         return env + line_feed
 
@@ -151,11 +165,21 @@ class ClusterJob():
         return res
 
     @staticmethod
+    @dispatch
     def _get_sub_script_str(command_str: str, env_str: str, res_str: str, watermark: str) -> str:
         '''
         combine command_str, env_str, res_str to sub_script_str
         '''
         sub_script_str = line_feed.join((res_str, watermark, env_str, command_str))
+        return sub_script_str
+    
+    @staticmethod
+    @dispatch
+    def _get_sub_script_str(command_str: str, env_str: dict, res_str: str, watermark: str) -> str:
+        '''
+        combine command_str, env_str, res_str to sub_script_str
+        '''
+        sub_script_str = line_feed.join((res_str, watermark, env_str['head'], command_str, env_str['tail']))
         return sub_script_str
 
     ### submit ###
@@ -299,11 +323,11 @@ class ClusterJob():
         if Config.debug > 0:
             print(f'Job {self.job_id} end with {general_state}::{detailed_state} !')
         # state related action
-        if general_state is 'complete':
+        if general_state == 'complete':
             pass
-        if general_state is 'error':
+        if general_state == 'error':
             pass
-        if general_state is 'cancel':
+        if general_state == 'cancel':
             pass # may be support pass in callable to do like resubmit
 
     ### misc ###
