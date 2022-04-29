@@ -251,8 +251,11 @@ def test_ClusterJob_wait_to_array_end_ACCRE():
     # job array
     Config.debug = 2
     ClusterJob.wait_to_array_end(jobs, period=30, array_size=5)
-
-
+    for i, job in enumerate(jobs):
+        test_file_paths.extend([job.sub_script_path, job.job_cluster_log, f'{job.sub_dir}/QM_test_{i}.out'])
+    for job in jobs:
+        assert job.job_id is not None
+        assert job.state[0][0] in ('complete', 'cancel', 'error')
 
 ### utilities ###
 @pytest.mark.clean

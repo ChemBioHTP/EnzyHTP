@@ -233,7 +233,7 @@ class ClusterJob():
                 raise Exception(f'attempt to submit a non-finished (pend, run) job.{line_feed} id: {self.job_id} state: {self.state[0][0]}::{self.state[0][1]} @{get_localtime(self.state[1])}')
             else: #finished job
                 if Config.debug > 0:
-                    print(f'WARNING: re-submitting a ended job. The job id will be renewed and the old job id will be lose tracked{line_feed}\ id: {self.job_id} state: {self.state[0][0]}::{self.state[0][1]} @{get_localtime(self.state[1])}')
+                    print(f'WARNING: re-submitting a ended job. The job id will be renewed and the old job id will be lose tracked{line_feed} id: {self.job_id} state: {self.state[0][0]}::{self.state[0][1]} @{get_localtime(self.state[1])}')
 
         self.sub_script_path = self._deploy_sub_script(script_path)
         if Config.debug > 1:
