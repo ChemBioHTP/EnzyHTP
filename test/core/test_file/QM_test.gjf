@@ -1,7 +1,6 @@
 %mem=50000MB
 %nprocshared=24
-# opt=(calcfc,ts,noeigen,cartesian) freq b3lyp/6-31+g(d,p)
-scrf=(smd,solvent=ch2cl2) em=gd3bj
+# b3lyp/6-31g(d,p) em=gd3bj
 
 Title Card Required
 

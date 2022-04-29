@@ -100,13 +100,30 @@ module load Gaussian/16.B.01
 mkdir $TMPDIR/$SLURM_JOB_ID
 export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID
 
-g16 < TS-2-dp-opt.gjf > TS-2-dp-opt.out
+g16 < QM_test.gjf > QM_test.out
+trap 'rm -rf $TMPDIR/$SLURM_JOB_ID' EXIT'''
+
+def get_array_sub_str(idx):
+    return f'''#!/bin/bash
+#SBATCH --partition=production
+#SBATCH --job-name=JM-test
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=24
+#SBATCH --mem-per-cpu=2G
+#SBATCH --time=3-00:00:00
+#SBATCH --account=yang_lab_csb
+
+module load Gaussian/16.B.01
+mkdir $TMPDIR/$SLURM_JOB_ID
+export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID
+
+g16 < QM_test.gjf > QM_test_{idx}.out
 trap 'rm -rf $TMPDIR/$SLURM_JOB_ID' EXIT'''
 
 cluster = clusters.accre.Accre()
 
 test_sub_dir = './test/core/test_file/'
-test_file_paths = [f'{test_sub_dir}TS-2-dp-opt.out'] # paths to be cleaned
+test_file_paths = [f'{test_sub_dir}QM_test.out'] # paths to be cleaned
 
 def test_ClusterJob_config_by_list():
     job = ClusterJob.config_job(
@@ -149,7 +166,6 @@ def test_ClusterJob_config_also_submit_info():
     test_file_paths.append(test_sub_script_path)
     assert info == (f'sbatch {os.path.abspath(test_sub_script_path)}', test_sub_dir, test_sub_script_path)
 
-
 def test_ClusterJob_preset():
     job = ClusterJob.config_job(
         commands = command_2_run,
@@ -164,7 +180,7 @@ def test_ClusterJob_submit_job_id_ACCRE():
     '''
     only run on accre
     '''
-    job = ClusterJob(accre.Accre(), sub_script_str=sub_script_str)
+    job = ClusterJob(clusters.accre.Accre(), sub_script_str=sub_script_str)
     job.submit( sub_dir=test_sub_dir,
                 script_path=f'{test_sub_dir}test.cmd')
     test_file_paths.extend([job.job_cluster_log, job.sub_script_path])
@@ -177,7 +193,7 @@ def test_ClusterJob_submit_default_script_path_ACCRE():
     '''
     only run on accre
     '''
-    job = ClusterJob(accre.Accre(), sub_script_str=sub_script_str)
+    job = ClusterJob(clusters.accre.Accre(), sub_script_str=sub_script_str)
     job.submit(sub_dir=test_sub_dir)
     test_file_paths.extend([job.job_cluster_log, job.sub_script_path])
     # use explictly the scancel here to decouple the test
@@ -189,7 +205,7 @@ def test_ClusterJob_kill_job_ACCRE():
     '''
     only run on accre
     '''
-    job = ClusterJob(accre.Accre(), sub_script_str=sub_script_str)
+    job = ClusterJob(clusters.accre.Accre(), sub_script_str=sub_script_str)
     job.submit(sub_dir=test_sub_dir)
     test_file_paths.extend([job.job_cluster_log, job.sub_script_path])
     job.kill()
@@ -199,7 +215,7 @@ def test_ClusterJob_get_state_ACCRE():
     '''
     only run on accre
     '''
-    job = ClusterJob(accre.Accre(), sub_script_str=sub_script_str)
+    job = ClusterJob(clusters.accre.Accre(), sub_script_str=sub_script_str)
     job.submit(sub_dir=test_sub_dir)
     test_file_paths.extend([job.job_cluster_log, job.sub_script_path])
     assert job.get_state()[0] in ['pend', 'run']
@@ -212,7 +228,7 @@ def test_ClusterJob_wait_to_end_ACCRE():
     '''
     only run on accre
     '''
-    job = ClusterJob(accre.Accre(), sub_script_str=sub_script_long_str)
+    job = ClusterJob(clusters.accre.Accre(), sub_script_str=sub_script_long_str)
     # submit and record the file
     job.submit(sub_dir=test_sub_dir)
     test_file_paths.extend([job.job_cluster_log, job.sub_script_path])
@@ -220,6 +236,21 @@ def test_ClusterJob_wait_to_end_ACCRE():
     Config.debug = 2
     job.wait_to_end(60)
     # TODO add some assert
+
+@pytest.mark.temp
+@pytest.mark.accre
+@pytest.mark.long
+def test_ClusterJob_wait_to_array_end_ACCRE():
+    # make the test array
+    jobs = []
+    for i in range(10):
+        jobs.append(ClusterJob( clusters.accre.Accre(), 
+                                sub_script_str=get_array_sub_str(i), 
+                                sub_dir=test_sub_dir, 
+                                sub_script_path=f'{test_sub_dir}/test_{i}.cmd'))
+    # job array
+
+
 
 ### utilities ###
 @pytest.mark.clean
