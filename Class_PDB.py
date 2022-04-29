@@ -3,7 +3,6 @@ import os
 import re
 from subprocess import run, CalledProcessError
 from random import choice
-import time
 from typing import Union
 from AmberMaps import *
 from wrapper import *
@@ -2106,6 +2105,9 @@ class PDB():
         QM: str = 'g16',
         g_route: Union[str, None] =None,    # TODO move this to class config
         if_cluster_job: bool = 1, 
+        cluster: ClusterInterface = None,
+        job_array_size: int = 0,
+        period: int = 600,
         ifchk: bool = 0, 
         val_fix: str = 'internal'
     ) -> list :
@@ -2127,6 +2129,8 @@ class PDB():
             Gaussian route line
         if_cluster_job:
             if submit the calculation to a cluster using the job manager
+        cluster, job_array_size, period:
+            see Run_QM
         ifchk: 
             if save chk file of a gaussian job. (default: 0)
         val_fix: 
@@ -2172,7 +2176,16 @@ class PDB():
                 frame.write_sele_lines(sele_lines, out_path=gjf_path, g_route=g_route, chrgspin=chrgspin, ifchk=ifchk)
                 gjf_paths.append(gjf_path)
             # Run inp files
-            qm_cluster_out_paths = PDB.Run_QM(gjf_paths, prog=QM, if_cluster_job=if_cluster_job)
+            if if_cluster_job:
+                qm_cluster_out_paths = PDB.Run_QM(  gjf_paths, 
+                                                    prog=QM, 
+                                                    if_cluster_job=if_cluster_job, 
+                                                    cluster = cluster,
+                                                    job_array_size = job_array_size,
+                                                    period = period,
+                                                    res_setting=Config.Gaussian.QMCLUSTER_CPU_RES)
+            else:
+                qm_cluster_out_paths = PDB.Run_QM(gjf_paths, prog=QM, if_cluster_job=0)
             # get chk files if ifchk
             if ifchk:
                 qm_cluster_chk_paths = []
@@ -2223,6 +2236,7 @@ class PDB():
         cluster: ClusterInterface = None,
         job_array_size: int = 0,
         period: int = 600,
+        res_setting: dict = None
     ):
         '''
         Run QM with {prog} for {inp} files and return paths of output files.
@@ -2236,7 +2250,7 @@ class PDB():
         cluster:
             The cluster used when if_cluster_job is 1.
         job_array_size:
-            how many jobs are allowed to submit simultaneously. (default: "all" -> len(inp))
+            how many jobs are allowed to submit simultaneously. (default: 0 means len(inp))
             (e.g. 5 for 100 jobs means run 20 groups. All groups will be submitted and 
             in each group, submit the next job only after the previous one finishes.)
         period:
@@ -2246,13 +2260,23 @@ class PDB():
              maybe introduct the current executor object to decouple this module with the job manager.
         '''
         if if_cluster_job:
+            #san check
+            if not isinstance(cluster, ClusterInterface):
+                raise TypeError('cluster job need a cluster (ClusterInterface object) input')
+            
             if prog == 'g16':
                 outs = []
-                # default value
-                if job_array_size is 0:
-                    job_array_size = len(inp)
-                # setting up job array
-
+                # config jobs
+                jobs = []
+                for gjf_path in inp:
+                    out_path = gjf_path.removesuffix('gjf')+'out'
+                    jobs.append(cls._make_single_g16_job(gjf_path, out_path, cluster, res_setting))
+                    outs.append(out_path)
+                # submit and run in array
+                if Config.debug > 1:
+                    print(f'''Running QM array on {cluster.NAME}: number: {len(jobs)} size: {job_array_size} period: {period}''')
+                job_manager.ClusterJob.wait_to_array_end(jobs, period, job_array_size)
+                return outs
         else:
             # local job
             if prog == 'g16':
@@ -2276,14 +2300,15 @@ class PDB():
                 return outs
 
     @classmethod
-    def _submit_single_g16_job(
+    def _make_single_g16_job(
             cls, 
             gjf_path: str, 
             out_path: str, 
-            cluster: ClusterInterface
+            cluster: ClusterInterface,
+            res_setting: dict
         ) -> job_manager.ClusterJob :
         '''
-        submit g16 for gjf > out to cluster
+        job for submit g16 for gjf > out to cluster
         return a ClusterJob object
         '''
         cmd = f'{Config.Gaussian.g16_exe} < {gjf_path} > {out_path}'
@@ -2294,10 +2319,10 @@ class PDB():
             commands = cmd,
             cluster = cluster,
             env_settings = cluster.G16_CPU_ENV,
-            res_keywords = Config.Gaussian.QMCLUSTER_CPU_RES,
+            res_keywords = res_setting,
+            sub_dir = './', # because gjf path are relative
+            sub_script_path = gjf_path.removesuffix('gjf')+'cmd'
         )
-        job.submit(sub_dir = './', script_path = gjf_path.removesuffix('gjf')+'cmd')
-
         return job
 
     def get_fchk(self, keep_chk=0):
