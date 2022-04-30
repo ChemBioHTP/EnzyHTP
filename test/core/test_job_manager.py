@@ -237,7 +237,6 @@ def test_ClusterJob_wait_to_end_ACCRE():
     job.wait_to_end(60)
     # TODO add some assert
 
-@pytest.mark.temp
 @pytest.mark.accre
 @pytest.mark.long
 def test_ClusterJob_wait_to_array_end_ACCRE():

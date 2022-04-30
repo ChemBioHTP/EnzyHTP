@@ -3,6 +3,7 @@ import os
 import pytest
 
 from Class_PDB import *
+from core.clusters import accre
 from helper import is_empty_dir
 from AmberMaps import Resi_map2
 
@@ -118,10 +119,27 @@ def test_PDB2FF_keep():
 def test_pdbmd_with_job_manager():
     pass
 
+@pytest.mark.temp
 @pytest.mark.qm
 @pytest.mark.accre
 def test_pdb2qmcluster_with_job_manager():
-    pass
+    test_dir_qmcluster = 'test/testfile_Class_PDB/QMCluster_test/'
+    # interface of PDB2QMCluster
+    pdb_obj = PDB(f'{test_dir_qmcluster}FAcD_RA124M_ff.pdb', wk_dir=test_dir_qmcluster)
+    pdb_obj.prmtop_path = f'{test_dir_qmcluster}FAcD_RA124M_ff.prmtop'
+    pdb_obj.mdcrd = f'{test_dir_qmcluster}prod.mdcrd'
+    # arguments of PDB2QMCluster
+    atom_mask = ':108,298'
+    g_route = '# hf/6-31G(d) nosymm'
+    print(pdb_obj.PDB2QMCluster(
+        atom_mask, 
+        g_route=g_route, 
+        if_cluster_job=1, 
+        cluster=accre.Accre(), 
+        job_array_size=20, 
+        period=30
+    ))
+
 
 ### utilities ###
 @pytest.mark.clean

@@ -2115,6 +2115,19 @@ class PDB():
         Build & Run QM cluster input from self.mdcrd with selected atoms according to atom_mask
         ---------
         Args:
+        self (Pre-requisites):
+            dir 
+                - for *default dir*
+            path 
+                - for *get_stru()* 
+                - need the same pdb representing the structure in the MD frames
+            prmtop_path 
+                - for get *charge* list 
+                - need the prmtop file used as MD input
+            mdcrd 
+                - for *coordinates* of each QM cluster 
+                - the mdcrd file that sampled from the traj
+            (* the later 3 should of the consistancy from the same MD*)
         atom_mask:
             Amber-style atom mask for specifing the the QM region.
         spin: 
@@ -2206,6 +2219,7 @@ class PDB():
     def _get_qmcluster_chrgspin(self, sele, spin=1):
         '''
         get charge for qmcluster of sele from self.prmtop
+        # TODO refine charge count for qm region cut interface
         '''
         # get chrg list
         chrg_list_all = PDB.get_charge_list(self.prmtop_path)
