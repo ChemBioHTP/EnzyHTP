@@ -137,6 +137,7 @@ def test_pdb2qmcluster_with_job_manager():
     pdb_obj = PDB(f'{test_dir_qmcluster}FAcD_RA124M_ff.pdb', wk_dir=test_dir_qmcluster)
     pdb_obj.prmtop_path = f'{test_dir_qmcluster}FAcD_RA124M_ff.prmtop'
     pdb_obj.mdcrd = f'{test_dir_qmcluster}prod.mdcrd'
+    pdb_obj.prepi_path = {'FAH':f'{test_dir_qmcluster}../ligands/ligand_FAH.prepin'}
     # arguments of PDB2QMCluster
     atom_mask = ':108,298'
     g_route = '# hf/6-31G(d) nosymm'

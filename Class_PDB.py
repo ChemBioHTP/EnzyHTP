@@ -2129,6 +2129,9 @@ class PDB():
             mdcrd 
                 - for *coordinates* of each QM cluster 
                 - the mdcrd file that sampled from the traj
+            prepi_path (val_fix='internal')
+                - for get *connectivity (ligand part)* and fix free valances if they exist
+                - the dict for prepin files for all ligands {'3_letter_name':'path_to_prepin_file', ...}
             (* the later 3 should of the consistancy from the same MD*)
         atom_mask:
             Amber-style atom mask for specifing the the QM region.
