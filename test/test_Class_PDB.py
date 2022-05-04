@@ -114,7 +114,7 @@ def test_PDB2FF_keep():
 
     assert len(pdb_obj.prepi_path) != 0
 
-@pytest.mark.temp  
+
 @pytest.mark.md
 @pytest.mark.accre
 def test_pdbmd_with_job_manager():
@@ -129,6 +129,7 @@ def test_get_default_res_setting_qmcluster():
     assert PDB._get_default_res_setting_qmcluster('''test_str''') == '''test_str'''
     assert Config.Gaussian.QMCLUSTER_CPU_RES == config_default_before # should not change the global default
 
+@pytest.mark.temp  
 @pytest.mark.qm
 @pytest.mark.accre
 def test_pdb2qmcluster_with_job_manager():
@@ -141,17 +142,18 @@ def test_pdb2qmcluster_with_job_manager():
     # arguments of PDB2QMCluster
     atom_mask = ':108,298'
     g_route = '# hf/6-31G(d) nosymm'
-    qm_outs, qm_jobs = pdb_obj.PDB2QMCluster(
-                            atom_mask, 
-                            g_route=g_route, 
-                            if_cluster_job=1, 
-                            cluster=accre.Accre(), 
-                            job_array_size=20, 
-                            period=30,
-                            res_setting={'account':'yang_lab_csb'},
-                            cluster_debug=1
+    qm_outs = pdb_obj.PDB2QMCluster(
+                        atom_mask, 
+                        g_route=g_route, 
+                        if_cluster_job=1, 
+                        cluster=accre.Accre(), 
+                        job_array_size=20, 
+                        period=30,
+                        res_setting={'account':'yang_lab_csb'},
+                        cluster_debug=1
                         )
     # track files
+    qm_jobs = pdb_obj.qm_cluster_jobs
     qm_ins = list(map(lambda x: x.removesuffix('out')+'gjf',qm_outs))
     test_file_paths.extend(qm_outs)
     test_file_paths.extend(qm_ins)
