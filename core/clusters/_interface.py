@@ -4,6 +4,7 @@ Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Date: 2022-04-13
 """
 from abc import ABC, abstractmethod
+from ctypes import Union
 from subprocess import CompletedProcess
 
 class ClusterInterface(ABC):
@@ -19,16 +20,44 @@ class ClusterInterface(ABC):
     def NAME(self) -> str:
         pass
 
-    # G16_CPU_ENV # need this if use g16 in the workflow with this cluster
+    @property
+    @abstractmethod    
+    def G16_ENV(self) -> dict:
+        '''
+        the cluster need to know the environment setting for each software
+        This should be a dictionary with CPU and GPU as key.
+        In each value, you can also use head and tail for env setting before and after the command.
+        (see ClusterJob.config_job for more detail)
+        '''
+        pass
 
-    ### classmethods ###
+    @property
+    @abstractmethod    
+    def AMBER_ENV(self) -> dict:
+        '''
+        the cluster need to know the environment setting for each software
+        This should be a dictionary with CPU and GPU as key.
+        In each value, you can also use head and tail for env setting before and after the command.
+        (see ClusterJob.config_job for more detail)
+        '''
+        pass
+    
+   ### classmethods ###
     @classmethod
     @abstractmethod
-    def format_resource_str(cls, res_dict: dict) -> str:
+    def parser_resource_str(cls, res_dict: dict) -> str:
         '''
-        format the head of the submission script
-        res_dict: the dictionary with exact the keyword and value
-                  required by the cluster
+        1. parser general resource keywords to accre specified keywords
+        2. format the head of the submission script
+        res_dict: the dictionary with general keywords and value
+           (Available keys & value format:
+                'core_type' : 'cpu',
+                'node_cores' : '24',
+                'job_name' : 'job_name',
+                'partition' : 'production',
+                'mem_per_core' : '4G',
+                'walltime' : '24:00:00',
+                'account' : 'xxx')
         return the string of the resource section
         '''
         pass

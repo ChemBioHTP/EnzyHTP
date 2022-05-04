@@ -4,6 +4,7 @@ for Research and Education) of Vanderbilt
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Date: 2022-04-13
 """
+import copy
 import re
 import os
 from subprocess import CalledProcessError, CompletedProcess, run
@@ -15,20 +16,37 @@ class Accre(ClusterInterface):
     '''
     The ACCRE interface
     '''
+    #############################
+    ### External use constant ###
+    #############################
     NAME = 'ACCRE'
-    ##########################
-    ### Submission Related ###
-    ##########################
+
+    # environment presets #
+    AMBER_ENV = { 
+        'CPU': None,
+        'GPU': '''source /home/shaoq1/bin/amber_env/amber-accre.sh'''
+    }
+
+    G16_ENV = {
+        'CPU':{ 'head' : '''module load Gaussian/16.B.01
+mkdir $TMPDIR/$SLURM_JOB_ID
+export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''',
+                'tail' : '''rm -rf $TMPDIR/$SLURM_JOB_ID'''},
+        'GPU': None
+    }
+
+    #############################
+    ### Internal use constant ###
+    #############################
     # command for submission
     SUBMIT_CMD = 'sbatch'
     # regex pattern for extracting job id from stdout
     JOB_ID_PATTERN = r'Submitted batch job ([0-9]+)'
-    # command for kill
+    # command for control & monitor
     KILL_CMD = 'scancel'
     HOLD_CMD = 'scontrol hold'
     RELEASE_CMD = 'scontrol release'
     INFO_CMD = ['squeue', 'sacct'] # will check by order if previous one has no info
-
     # dict of job state
     JOB_STATE_MAP = {
         'pend' : ['CONFIGURING', 'PENDING', 'REQUEUE_FED', 'REQUEUE_HOLD', 'REQUEUED'],
@@ -39,36 +57,73 @@ class Accre(ClusterInterface):
         'exception': ['RESIZING', 'SIGNALING', 'SPECIAL_EXIT', 'RESV_DEL_HOLD' ]
     }
 
-    ### presets ###
-    # environment presets
-    AMBER_GPU_ENV = '''export AMBERHOME=/dors/csb/apps/amber19/
-export CUDA_HOME=$AMBERHOME/cuda/10.0.130
-export LD_LIBRARY_PATH=$AMBERHOME/cuda/10.0.130/lib64:$AMBERHOME/cuda/RHEL7/10.0.130/lib:$LD_LIBRARY_PATH'''
+    RES_KEYWORDS_MAP = { 
+        'core_type' : None,
+        'nodes':'nodes=',
+        'node_cores' : {'cpu': 'tasks-per-node=', 'gpu': 'gres=gpu:'},
+        'job_name' : 'job-name=',
+        'partition' : 'partition=',
+        'mem_per_core' : {'cpu': 'mem-per-cpu=', 'gpu': 'mem-per-gpu='},
+        'walltime' : 'time=',
+        'account' : 'account='
+    }
 
-    G16_CPU_ENV = {'head' : '''module load Gaussian/16.B.01
-mkdir $TMPDIR/$SLURM_JOB_ID
-export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''',
-                   'tail' : '''rm -rf $TMPDIR/$SLURM_JOB_ID'''} # TODO add to ABC def
-    # resource preset TODO this should stand along for job in general. (do not involve in any workflow layer thing)
-    # workflow related presets should go to Config module (so above the core layer)
-    CPU_RES = { 'core_type' : 'cpu',
+    PARTITION_VALUE_MAP = {
+        'production' : {'cpu': 'production',
+                        'gpu': '{maxwell,pascal,turing}'},
+        'debug': {'cpu': 'debug',
+                  'gpu': 'maxwell'}
+    } # TODO do we really want to make partition general and parse it for each cluster?
+
+    ##########################
+    ### Submission Related ###
+    ##########################
+    @classmethod
+    def parser_resource_str(cls, res_dict: dict) -> str:
+        '''
+        1. parser general resource keywords to accre specified keywords
+        2. format the head of the submission script
+        res_dict: the dictionary with general keywords and value
+           (Available keys & value format:
+                'core_type' : 'cpu',
                 'node_cores' : '24',
                 'job_name' : 'job_name',
                 'partition' : 'production',
                 'mem_per_core' : '4G',
                 'walltime' : '24:00:00',
-                'account' : 'xxx'}
+                'account' : 'xxx')
+        return the string of the resource section
+        '''
+        parsered_res_dict = cls._parser_res_dict(res_dict)
+        res_str = cls._format_res_str(parsered_res_dict)
+        return res_str
 
     @classmethod
-    def format_resource_str(cls, res_dict: dict) -> str: # TODO this is not working. the keyword need to be parsed
+    def _parser_res_dict(cls, res_dict):
         '''
-        format the head of the submission script for ACCRE
-        res_dict: the dictionary with exact the keyword and value
-                  required by ACCRE
+        parser keywords into ACCRE style
+        '''
+        new_dict = {}
+        for k, v in res_dict.items():
+            # remove core type line
+            if k == 'core_type':
+                continue
+            # select core type
+            if k in ('node_cores', 'mem_per_core'):
+                new_k = cls.RES_KEYWORDS_MAP[k][res_dict['core_type']]
+            else:
+                new_k = cls.RES_KEYWORDS_MAP[k]
+            new_dict[new_k] = v
+        return new_dict
+
+    @staticmethod
+    def _format_res_str(parsered_res_dict):
+        '''
+        format parsered dictionary
         '''
         res_str = '#!/bin/bash\n'
-        for k, v in res_dict.items():
-            res_line = f'#SBATCH --{k}={v}\n'
+        for k, v in parsered_res_dict.items():
+            res_line = f'#SBATCH --{k}{v}\n'
             res_str += res_line
         return res_str
     

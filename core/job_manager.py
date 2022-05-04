@@ -159,7 +159,7 @@ class ClusterJob():
     @staticmethod
     @dispatch
     def _get_res_str(res: dict, cluster: ClusterInterface) -> str:
-        return cluster.format_resource_str(res)
+        return cluster.parser_resource_str(res)
 
     @staticmethod
     @dispatch
