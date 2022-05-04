@@ -1385,18 +1385,58 @@ class PDB():
         return self.path
 
 
-    def PDBMD(self, tag='', o_dir='', engine='Amber_GPU', equi_cpu=0):
+    def PDBMD(  
+        self, 
+        tag: str = '', 
+        o_dir: str = '', 
+        engine: str = 'Amber_GPU', 
+        equi_cpu: bool = 0,
+        if_cluster_job: bool = 1, # TODO(qz) maybe its better to make everything below a dictionary 
+        cluster: ClusterInterface = None, # since the requirement is similar for a cluster job
+        period: int = 600,
+        res_setting: Union[dict, None] = None,
+        cluster_debug: bool = 0
+        ):
         '''
         Use self.prmtop_path and self.inpcrd_path to initilize a MD simulation.
         The default MD configuration settings are assigned by class Config.Amber.
         * User can also set MD configuration for the current object by assigning values in self.conf_xxxx.
         * e.g.: self.conf_heat['nstlim'] = 50000
         --------------
-        o_dir   : Write files in o_dir (current self.dir/MD by default).
-        tag     : tag the name of the MD folder
-        engine  : MD engine (cpu/gpu)
-        equi_cpu: if use cpu for equi step
-        Return the nc path of the prod step and store in self.nc
+        Args:
+        self    :
+            dir 
+                - for creating the MD storage dir under
+            prmtop_path 
+                - MD input file
+            inpcrd_path 
+                - MD input file
+        o_dir   : 
+            Write files in o_dir (current self.dir/MD by default).
+        tag     : 
+            tag the assigned tag to the MD folder
+        engine  : 
+            MD engine (cpu/gpu)
+        equi_cpu: 
+            if use cpu for equi step
+        if_cluster_job:
+            if submit the calculation to a cluster using the job manager
+        cluster: (if_cluster_job is 1)
+            The cluster used
+        period: (if_cluster_job is 1)
+            the time cycle for each job state check (Unit: s) (default: 600)
+        res_setting: (if_cluster_job is 1)
+            (default: Config.Amber.MD_CPU_RES)
+            provide specific keys you want to change the rest will remain default.
+            (e.g. res_setting = {'node_cores':'2'} will still use a complete dictionary 
+            with only node_cores modified.)
+        cluster_debug:
+           1:  add also the pdbmd job obj to the pdb obj
+        --data--
+        Attribute:
+            store resulting NetCrd traj file path in self.nc
+        Return:
+            Return the nc path of the prod step
         '''
         # make folder
         if o_dir == '':
@@ -1418,29 +1458,33 @@ class PDB():
         equi_path = self._build_MD_equi(o_dir)
         prod_path = self._build_MD_prod(o_dir)
 
-        # run sander
-        if Config.debug >= 1:
-            print('running: '+PC_cmd +' '+ engine_path +' -O -i '+min_path +' -o '+o_dir+'/min.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+o_dir+'/min.rst -ref '+self.inpcrd_path)
-        os.system(PC_cmd +' '+ engine_path +' -O -i '+min_path +' -o '+o_dir+'/min.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+o_dir+'/min.rst -ref '+self.inpcrd_path)
-        if Config.debug >= 1:
-            print('running: '+PC_cmd +' '+ engine_path +' -O -i '+heat_path+' -o '+o_dir+'/heat.out -p '+self.prmtop_path+' -c '+o_dir+'/min.rst -ref ' +o_dir+'/min.rst -r ' +o_dir+'/heat.rst')
-        os.system(PC_cmd +' '+ engine_path +' -O -i '+heat_path+' -o '+o_dir+'/heat.out -p '+self.prmtop_path+' -c '+o_dir+'/min.rst -ref ' +o_dir+'/min.rst -r ' +o_dir+'/heat.rst')
-        
-        # gpu debug for equi
-        if equi_cpu: 
-            # use Config.PC_cmd and cpu_engine_path
-            if Config.debug >= 1:
-                print('running: '+Config.PC_cmd +' '+ cpu_engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
-            os.system(Config.PC_cmd +' '+ cpu_engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
+        # run MD exe
+        if if_cluster_job:
+            pass
         else:
             if Config.debug >= 1:
-                print('running: '+PC_cmd +' '+ engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
-            os.system(PC_cmd +' '+ engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
-        
-        if Config.debug >= 1:
-            print('running: '+PC_cmd +' '+ engine_path +' -O -i '+prod_path+' -o '+o_dir+'/prod.out -p '+self.prmtop_path+' -c '+o_dir+'/equi.rst -ref '+o_dir+'/equi.rst -r '+o_dir+'/prod.rst -x '+o_dir+'/prod.nc')
-        os.system(PC_cmd +' '+ engine_path +' -O -i '+prod_path+' -o '+o_dir+'/prod.out -p '+self.prmtop_path+' -c '+o_dir+'/equi.rst -ref '+o_dir+'/equi.rst -r '+o_dir+'/prod.rst -x '+o_dir+'/prod.nc')
+                print('running: '+PC_cmd +' '+ engine_path +' -O -i '+min_path +' -o '+o_dir+'/min.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+o_dir+'/min.rst -ref '+self.inpcrd_path)
+            os.system(PC_cmd +' '+ engine_path +' -O -i '+min_path +' -o '+o_dir+'/min.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+o_dir+'/min.rst -ref '+self.inpcrd_path)
+            if Config.debug >= 1:
+                print('running: '+PC_cmd +' '+ engine_path +' -O -i '+heat_path+' -o '+o_dir+'/heat.out -p '+self.prmtop_path+' -c '+o_dir+'/min.rst -ref ' +o_dir+'/min.rst -r ' +o_dir+'/heat.rst')
+            os.system(PC_cmd +' '+ engine_path +' -O -i '+heat_path+' -o '+o_dir+'/heat.out -p '+self.prmtop_path+' -c '+o_dir+'/min.rst -ref ' +o_dir+'/min.rst -r ' +o_dir+'/heat.rst')
+            
+            # gpu debug for equi
+            if equi_cpu: 
+                # use Config.PC_cmd and cpu_engine_path
+                if Config.debug >= 1:
+                    print('running: '+Config.PC_cmd +' '+ cpu_engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
+                os.system(Config.PC_cmd +' '+ cpu_engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
+            else:
+                if Config.debug >= 1:
+                    print('running: '+PC_cmd +' '+ engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
+                os.system(PC_cmd +' '+ engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
+            
+            if Config.debug >= 1:
+                print('running: '+PC_cmd +' '+ engine_path +' -O -i '+prod_path+' -o '+o_dir+'/prod.out -p '+self.prmtop_path+' -c '+o_dir+'/equi.rst -ref '+o_dir+'/equi.rst -r '+o_dir+'/prod.rst -x '+o_dir+'/prod.nc')
+            os.system(PC_cmd +' '+ engine_path +' -O -i '+prod_path+' -o '+o_dir+'/prod.out -p '+self.prmtop_path+' -c '+o_dir+'/equi.rst -ref '+o_dir+'/equi.rst -r '+o_dir+'/prod.rst -x '+o_dir+'/prod.nc')
 
+        # return value
         self.nc = o_dir+'/prod.nc'
         return o_dir+'/prod.nc'
 
@@ -2164,7 +2208,7 @@ class PDB():
             (e.g. res_setting = {'node_cores':'8'} will still use a complete dictionary 
             with only node_cores modified.)
         cluster_debug:
-           1:  add also the qm cluster job log path to the pdb obj
+           1:  add also the qm cluster job obj to the pdb obj
         ---data---
         Attribute:
             self.frames
@@ -2306,7 +2350,7 @@ class PDB():
             the time cycle for each job state change (Unit: s) (default: 600)
         res_setting:
             resource setting dictionary
-        debug:
+        cluster_debug:
             1: return also the job objects
             0: return only the out file paths
 

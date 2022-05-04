@@ -114,11 +114,44 @@ def test_PDB2FF_keep():
 
     assert len(pdb_obj.prepi_path) != 0
 
+@pytest.mark.temp  
+@pytest.mark.md
+@pytest.mark.accre
+def test_pdbmd_with_job_manager_no_equi_cpu():
+    test_dir_md = 'test/testfile_Class_PDB/MD_test/'
+    # interface to PDBMD
+    pdb_obj = PDB(f'{test_dir_md}FAcD_RA124M_ff.pdb', wk_dir=test_dir_md)
+    pdb_obj.prmtop_path = f'{test_dir_md}FAcD_RA124M_ff.prmtop'
+    pdb_obj.inpcrd_path = f'{test_dir_md}FAcD_RA124M_ff.inpcrd'
+    # run MD
+    nc_path = pdb_obj.PDBMD(engine='Amber_GPU', 
+                            equi_cpu=0, 
+                            if_cluster_job=1,
+                            cluster=accre.Accre(),
+                            period=30,
+                            res_setting={'account':'yang_lab_csb'},
+                            cluster_debug=1 )
+    assert os.path.isfile(nc_path)
+    assert os.path.getsize(nc_path) != 0
 
 @pytest.mark.md
 @pytest.mark.accre
-def test_pdbmd_with_job_manager():
-    pass
+def test_pdbmd_with_job_manager_equi_cpu():
+    test_dir_md = 'test/testfile_Class_PDB/MD_test/'
+    # interface to PDBMD
+    pdb_obj = PDB(f'{test_dir_md}FAcD_RA124M_ff.pdb', wk_dir=test_dir_md)
+    pdb_obj.prmtop_path = f'{test_dir_md}FAcD_RA124M_ff.prmtop'
+    pdb_obj.inpcrd_path = f'{test_dir_md}FAcD_RA124M_ff.inpcrd'
+    # run MD
+    nc_path = pdb_obj.PDBMD(engine='Amber_GPU', 
+                            equi_cpu=1, 
+                            if_cluster_job=1,
+                            cluster=accre.Accre(),
+                            period=30,
+                            res_setting={'account':'yang_lab_csb'},
+                            cluster_debug=1 )
+    assert os.path.isfile(nc_path)
+    assert os.path.getsize(nc_path) != 0
 
 @pytest.mark.qm
 def test_get_default_res_setting_qmcluster():
@@ -129,7 +162,6 @@ def test_get_default_res_setting_qmcluster():
     assert PDB._get_default_res_setting_qmcluster('''test_str''') == '''test_str'''
     assert Config.Gaussian.QMCLUSTER_CPU_RES == config_default_before # should not change the global default
 
-@pytest.mark.temp  
 @pytest.mark.qm
 @pytest.mark.accre
 def test_pdb2qmcluster_with_job_manager():
