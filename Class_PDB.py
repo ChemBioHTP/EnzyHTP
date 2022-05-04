@@ -2352,8 +2352,8 @@ class PDB():
         '''
         cmd = f'{Config.Gaussian.g16_exe} < {gjf_path} > {out_path}'
         # interface check
-        if 'G16_CPU_ENV' not in dir(cluster):
-            raise Exception('RunQM(prog = g16) requires the input cluster have the G16_CPU_ENV attr')
+        if 'G16_ENV' not in dir(cluster):
+            raise Exception('RunQM(prog = g16) requires the input cluster have the G16_ENV attr')
         job = job_manager.ClusterJob.config_job(
             commands = cmd,
             cluster = cluster,

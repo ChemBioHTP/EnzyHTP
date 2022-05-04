@@ -20,27 +20,28 @@ class ClusterInterface(ABC):
     def NAME(self) -> str:
         pass
 
-    @property
-    @abstractmethod    
-    def G16_ENV(self) -> dict:
-        '''
-        the cluster need to know the environment setting for each software
-        This should be a dictionary with CPU and GPU as key.
-        In each value, you can also use head and tail for env setting before and after the command.
-        (see ClusterJob.config_job for more detail)
-        '''
-        pass
+    # -- This will be checked whenever a related function is used -- #
+    # @property
+    # @abstractmethod    
+    # def G16_ENV(self) -> dict:
+    #     '''
+    #     the cluster need to know the environment setting for each software
+    #     This should be a dictionary with CPU and GPU as key.
+    #     In each value, you can also use head and tail for env setting before and after the command.
+    #     (see ClusterJob.config_job for more detail)
+    #     '''
+    #     pass
 
-    @property
-    @abstractmethod    
-    def AMBER_ENV(self) -> dict:
-        '''
-        the cluster need to know the environment setting for each software
-        This should be a dictionary with CPU and GPU as key.
-        In each value, you can also use head and tail for env setting before and after the command.
-        (see ClusterJob.config_job for more detail)
-        '''
-        pass
+    # @property
+    # @abstractmethod    
+    # def AMBER_ENV(self) -> dict:
+    #     '''
+    #     the cluster need to know the environment setting for each software
+    #     This should be a dictionary with CPU and GPU as key.
+    #     In each value, you can also use head and tail for env setting before and after the command.
+    #     (see ClusterJob.config_job for more detail)
+    #     '''
+    #     pass
     
    ### classmethods ###
     @classmethod
