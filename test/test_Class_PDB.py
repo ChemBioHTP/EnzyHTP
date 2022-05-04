@@ -141,15 +141,22 @@ def test_pdb2qmcluster_with_job_manager():
     # arguments of PDB2QMCluster
     atom_mask = ':108,298'
     g_route = '# hf/6-31G(d) nosymm'
-    print(pdb_obj.PDB2QMCluster(
-        atom_mask, 
-        g_route=g_route, 
-        if_cluster_job=1, 
-        cluster=accre.Accre(), 
-        job_array_size=20, 
-        period=30,
-        res_setting={'account':'yang_lab_csb'}
-    ))
+    qm_outs, qm_jobs = pdb_obj.PDB2QMCluster(
+                            atom_mask, 
+                            g_route=g_route, 
+                            if_cluster_job=1, 
+                            cluster=accre.Accre(), 
+                            job_array_size=20, 
+                            period=30,
+                            res_setting={'account':'yang_lab_csb'},
+                            cluster_debug=1
+                        )
+    # track files
+    qm_ins = list(map(lambda x: x.removesuffix('out')+'gjf',qm_outs))
+    test_file_paths.extend(qm_outs)
+    test_file_paths.extend(qm_ins)
+    for job in qm_jobs:
+        test_file_paths.extend([job.sub_script_path, job.job_cluster_log])
 
 ### utilities ###
 @pytest.mark.clean

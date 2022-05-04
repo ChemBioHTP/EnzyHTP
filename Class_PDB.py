@@ -2111,7 +2111,8 @@ class PDB():
         cluster: ClusterInterface = None,
         job_array_size: int = 0,
         period: int = 600,
-        res_setting: Union[dict, None] = None
+        res_setting: Union[dict, None] = None,
+        cluster_debug: bool = 0
     ) -> list :
         '''
         Build & Run QM cluster input from self.mdcrd with selected atoms according to atom_mask
@@ -2162,6 +2163,8 @@ class PDB():
             provide specific keys you want to change the rest will remain default.
             (e.g. res_setting = {'node_cores':'8'} will still use a complete dictionary 
             with only node_cores modified.)
+        cluster_debug:
+           1:  add also the qm cluster job log path to the pdb obj
         ---data---
         Attribute:
             self.frames
@@ -2202,13 +2205,19 @@ class PDB():
             if if_cluster_job:
                 # default values TODO should contain them in Config.Gaussian
                 res_setting = type(self)._get_default_res_setting_qmcluster(res_setting)
-                qm_cluster_out_paths = PDB.Run_QM(  gjf_paths, 
-                                                    prog=QM, 
-                                                    if_cluster_job=if_cluster_job, 
-                                                    cluster = cluster,
-                                                    job_array_size = job_array_size,
-                                                    period = period,
-                                                    res_setting=res_setting)
+                Run_QM_out = PDB.Run_QM( gjf_paths, 
+                                         prog=QM, 
+                                         if_cluster_job=if_cluster_job, 
+                                         cluster = cluster,
+                                         job_array_size = job_array_size,
+                                         period = period,
+                                         res_setting=res_setting,
+                                         cluster_debug=cluster_debug)
+                if cluster_debug:
+                    qm_cluster_out_paths = Run_QM_out[0]
+                    self.qm_cluster_jobs = Run_QM_out[1]
+                else:
+                    qm_cluster_out_paths = Run_QM_out
             else:
                 qm_cluster_out_paths = PDB.Run_QM(gjf_paths, prog=QM, if_cluster_job=0)
             # get chk files if ifchk
@@ -2275,7 +2284,8 @@ class PDB():
         cluster: ClusterInterface = None,
         job_array_size: int = 0,
         period: int = 600,
-        res_setting: dict = None
+        res_setting: dict = None,
+        cluster_debug: bool = 0
     ):
         '''
         Run QM with {prog} for {inp} files and return paths of output files.
@@ -2294,6 +2304,11 @@ class PDB():
             in each group, submit the next job only after the previous one finishes.)
         period:
             the time cycle for each job state change (Unit: s) (default: 600)
+        res_setting:
+            resource setting dictionary
+        debug:
+            1: return also the job objects
+            0: return only the out file paths
 
         TODO put this individually as part of the qm interface
              maybe introduct the current executor object to decouple this module with the job manager.
@@ -2315,6 +2330,9 @@ class PDB():
                 if Config.debug > 1:
                     print(f'''Running QM array on {cluster.NAME}: number: {len(jobs)} size: {job_array_size} period: {period}''')
                 job_manager.ClusterJob.wait_to_array_end(jobs, period, job_array_size)
+
+                if cluster_debug:
+                    return outs, jobs
                 return outs
         else:
             # local job
