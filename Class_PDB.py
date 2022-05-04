@@ -1,3 +1,4 @@
+import copy
 from math import ceil
 import os
 import re
@@ -198,7 +199,7 @@ class PDB():
 
     def _init_MD_conf(self):
         '''
-        initialize default MD configuration. Replaced by manual setting if assigned later.
+        initialize default MD configuration. Replaced by manual setting if assigned later. TODO may be need copy & operation in where it is used.
         '''
         self.conf_min = Config.Amber.conf_min
         self.conf_heat = Config.Amber.conf_heat
@@ -2103,13 +2104,14 @@ class PDB():
         o_dir: Union[str, None] = None, 
         tag: str = '', 
         QM: str = 'g16',
-        g_route: Union[str, None] =None,    # TODO move this to class config
+        g_route: Union[str, None] =None,
+        ifchk: bool = 0, 
+        val_fix: str = 'internal',
         if_cluster_job: bool = 1, 
         cluster: ClusterInterface = None,
         job_array_size: int = 0,
         period: int = 600,
-        ifchk: bool = 0, 
-        val_fix: str = 'internal'
+        res_setting: Union[dict, None] = None
     ) -> list :
         '''
         Build & Run QM cluster input from self.mdcrd with selected atoms according to atom_mask
@@ -2140,10 +2142,6 @@ class PDB():
             QM engine (default: g16)
         g_route: 
             Gaussian route line
-        if_cluster_job:
-            if submit the calculation to a cluster using the job manager
-        cluster, job_array_size, period:
-            see Run_QM
         ifchk: 
             if save chk file of a gaussian job. (default: 0)
         val_fix: 
@@ -2152,6 +2150,15 @@ class PDB():
                         special fix for classical case:
                         "sele by residue" (cut N-C) -- adjust dihedral for added H on N.
             = openbabel TODO
+        if_cluster_job:
+            if submit the calculation to a cluster using the job manager
+        cluster, job_array_size, period
+            see Run_QM
+        res_setting
+            see Run_QM for detail (default: Config.Gaussian.QMCLUSTER_CPU_RES)
+            provide specific keys you want to change the rest will remain default.
+            (e.g. res_setting = {'node_cores':'8'} will still use a complete dictionary 
+            with only node_cores modified.)
         ---data---
         Attribute:
             self.frames
@@ -2190,13 +2197,15 @@ class PDB():
                 gjf_paths.append(gjf_path)
             # Run inp files
             if if_cluster_job:
+                # default values TODO should contain them in Config.Gaussian
+                res_setting = type(self)._get_default_res_setting_qmcluster(res_setting)
                 qm_cluster_out_paths = PDB.Run_QM(  gjf_paths, 
                                                     prog=QM, 
                                                     if_cluster_job=if_cluster_job, 
                                                     cluster = cluster,
                                                     job_array_size = job_array_size,
                                                     period = period,
-                                                    res_setting=Config.Gaussian.QMCLUSTER_CPU_RES)
+                                                    res_setting=res_setting)
             else:
                 qm_cluster_out_paths = PDB.Run_QM(gjf_paths, prog=QM, if_cluster_job=0)
             # get chk files if ifchk
@@ -2240,6 +2249,19 @@ class PDB():
             sele_chrg += chrg_list_all[int(sele_id)-1]
 
         return (round(sele_chrg), spin)
+
+    @staticmethod
+    def _get_default_res_setting_qmcluster(res_setting):
+        if res_setting is None:
+            res_setting = dict()
+        if isinstance(res_setting, dict):
+            res_setting_holder = copy.deepcopy(Config.Gaussian.QMCLUSTER_CPU_RES)
+            # replace assigned key in default dict
+            for k, v in res_setting.items():
+                res_setting_holder[k] = v
+            return res_setting_holder
+        if isinstance(res_setting, str):
+            return res_setting
 
     @classmethod
     def Run_QM(
@@ -2332,7 +2354,7 @@ class PDB():
         job = job_manager.ClusterJob.config_job(
             commands = cmd,
             cluster = cluster,
-            env_settings = cluster.G16_CPU_ENV,
+            env_settings = cluster.G16_ENV['CPU'],
             res_keywords = res_setting,
             sub_dir = './', # because gjf path are relative
             sub_script_path = gjf_path.removesuffix('gjf')+'cmd'

@@ -119,7 +119,16 @@ def test_PDB2FF_keep():
 def test_pdbmd_with_job_manager():
     pass
 
-@pytest.mark.temp
+@pytest.mark.qm
+def test_get_default_res_setting_qmcluster():
+    config_default_before = copy.deepcopy(Config.Gaussian.QMCLUSTER_CPU_RES)
+    correct_res_setting = copy.deepcopy(config_default_before)
+    correct_res_setting['node_cores'] = '8'
+    assert PDB._get_default_res_setting_qmcluster({'node_cores': '8'}) == correct_res_setting
+    assert PDB._get_default_res_setting_qmcluster('''test_str''') == '''test_str'''
+    assert Config.Gaussian.QMCLUSTER_CPU_RES == config_default_before # should not change the global default
+
+@pytest.mark.temp  
 @pytest.mark.qm
 @pytest.mark.accre
 def test_pdb2qmcluster_with_job_manager():
@@ -137,9 +146,9 @@ def test_pdb2qmcluster_with_job_manager():
         if_cluster_job=1, 
         cluster=accre.Accre(), 
         job_array_size=20, 
-        period=30
+        period=30,
+        res_setting={'account':'yang_lab_csb'}
     ))
-
 
 ### utilities ###
 @pytest.mark.clean

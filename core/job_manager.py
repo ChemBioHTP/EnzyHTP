@@ -13,7 +13,6 @@ Feature:
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Date: 2022-04-13
 """
-from sqlite3 import complete_statement
 import time
 from typing import Union
 from plum import dispatch

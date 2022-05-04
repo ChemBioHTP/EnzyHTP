@@ -14,6 +14,10 @@ from helper import mkdir, line_feed
 
 
 class Config:
+    '''
+    since the workflow is not settled, workflow related value should not be the global var here.
+    It is better to have default settings here.
+    '''
     # >>>>>> Resource <<<<<<
 	# -----------------------------
     # Cores available (used in MD(Amber) and QM(Gaussian) calculations)
@@ -346,17 +350,19 @@ class Config:
         # -----------------------------
 
         # -----------------------------
-        # Computational resources for gaussian qm cluster job for job submission on a cluster
+        # Default computational resources for gaussian qm cluster job for job submission on a cluster
         # 
         QMCLUSTER_CPU_RES = {   'core_type' : 'cpu',
-                                'node_cores' : '24',
+                                'nodes':'1',
+                                'node_cores' : '8',
                                 'job_name' : 'EnzyHTP_QMCluster',
                                 'partition' : 'production',
                                 'mem_per_core' : '3G',
-                                'walltime' : '24:00:00',
+                                'walltime' : '3-00:00:00',
                                 'account' : 'yang_lab_csb'}
+
         # -----------------------------
-        #   >>>>>>>>ONIOM<<<<<<<<
+        #   >>>>>>>>ONIOM<<<<<<<< TODO make a seperate subclass
         # -----------------------------
 
         # -----------------------------
