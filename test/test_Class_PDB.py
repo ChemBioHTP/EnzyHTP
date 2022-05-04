@@ -129,10 +129,11 @@ def test_pdbmd_with_job_manager_no_equi_cpu():
                             if_cluster_job=1,
                             cluster=accre.Accre(),
                             period=30,
-                            res_setting={'account':'yang_lab_csb'},
+                            res_setting={'account':'csb_gpu_acc'},
                             cluster_debug=1 )
     assert os.path.isfile(nc_path)
     assert os.path.getsize(nc_path) != 0
+    os.remove(nc_path)
 
 @pytest.mark.md
 @pytest.mark.accre
@@ -148,10 +149,12 @@ def test_pdbmd_with_job_manager_equi_cpu():
                             if_cluster_job=1,
                             cluster=accre.Accre(),
                             period=30,
-                            res_setting={'account':'yang_lab_csb'},
+                            res_setting={'account':'csb_gpu_acc'},
+                            res_setting_equi_cpu={'account':'yang_lab_csb'},
                             cluster_debug=1 )
     assert os.path.isfile(nc_path)
     assert os.path.getsize(nc_path) != 0
+    os.remove(nc_path)
 
 @pytest.mark.qm
 def test_get_default_res_setting_qmcluster():

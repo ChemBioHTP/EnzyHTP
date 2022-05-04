@@ -1395,6 +1395,7 @@ class PDB():
         cluster: ClusterInterface = None, # since the requirement is similar for a cluster job
         period: int = 600,
         res_setting: Union[dict, None] = None,
+        res_setting_equi_cpu: Union[dict, None] = None,
         cluster_debug: bool = 0
         ):
         '''
@@ -1430,6 +1431,9 @@ class PDB():
             provide specific keys you want to change the rest will remain default.
             (e.g. res_setting = {'node_cores':'2'} will still use a complete dictionary 
             with only node_cores modified.)
+        res_setting_equi_cpu: 
+            resource for equi cpu job if use cpu for equi
+            provide specific keys you want to change the rest will remain default.
         cluster_debug:
            1:  add also the pdbmd job obj to the pdb obj
         --data--
@@ -1457,36 +1461,127 @@ class PDB():
         heat_path = self._build_MD_heat(o_dir)
         equi_path = self._build_MD_equi(o_dir)
         prod_path = self._build_MD_prod(o_dir)
+        # build md commands
+        cmd_min = f'{PC_cmd} {engine_path} -O -i {min_path} -o {o_dir}/min.out -p {self.prmtop_path} -c {self.inpcrd_path} -r {o_dir}/min.rst -ref {self.inpcrd_path}{line_feed}'
+        cmd_heat = f'{PC_cmd} {engine_path} -O -i {heat_path} -o {o_dir}/heat.out -p {self.prmtop_path} -c {o_dir}/min.rst -r {o_dir}/heat.rst -ref {o_dir}/min.rst{line_feed}'
+        cmd_prod = f'{PC_cmd} {engine_path} -O -i {prod_path} -o {o_dir}/prod.out -p {self.prmtop_path} -c {o_dir}/equi.rst -r {o_dir}/prod.rst -ref {o_dir}/equi.rst -x {o_dir}/prod.nc{line_feed}'
+        # gpu debug for equi
+        if equi_cpu:
+            cmd_equi = f'{Config.PC_cmd} {cpu_engine_path} -O -i {equi_path} -o {o_dir}/equi.out -p {self.prmtop_path} -c {o_dir}/heat.rst -r {o_dir}/equi.rst -ref {o_dir}/heat.rst -x {o_dir}/equi.nc{line_feed}'
+        else:
+            cmd_equi = f'{PC_cmd} {engine_path} -O -i {equi_path} -o {o_dir}/equi.out -p {self.prmtop_path} -c {o_dir}/heat.rst -r {o_dir}/equi.rst -ref {o_dir}/heat.rst -x {o_dir}/equi.nc{line_feed}'
 
         # run MD exe
         if if_cluster_job:
-            pass
+            core_type = engine.split('_')[-1]
+            res_setting, env_settings = type(self)._prepare_cluster_job_pdbmd(cluster, core_type, res_setting)
+            md_jobs = []
+            if equi_cpu:
+                # divide into 3 jobs
+                cmd_1 = cmd_min + cmd_heat
+                cmd_2 = cmd_equi
+                cmd_3 = cmd_prod
+                # get env res for equi
+                env_settings_equi_cpu = cluster.AMBER_ENV['CPU']
+                res_setting_equi_cpu = type(self)._get_default_res_setting_pdbmd(res_setting_equi_cpu, 'CPU')
+                # make job: 1&3 are in same environment 2 is always in CPU environment
+                job_1 = job_manager.ClusterJob.config_job(
+                    commands = cmd_1,
+                    cluster = cluster,
+                    env_settings = env_settings,
+                    res_keywords = res_setting,
+                    sub_dir = './', # because path are relative
+                    sub_script_path = f'{o_dir}/submit_PDBMD_1_{core_type}.cmd')
+                job_1.submit()
+                job_1.wait_to_end(period)
+
+                job_2 = job_manager.ClusterJob.config_job(
+                    commands = cmd_2,
+                    cluster = cluster,
+                    env_settings = env_settings_equi_cpu,
+                    res_keywords = res_setting_equi_cpu,
+                    sub_dir = './', # because path are relative
+                    sub_script_path = f'{o_dir}/submit_PDBMD_2_CPU.cmd')
+                job_2.submit()
+                job_2.wait_to_end(period)
+
+                job_3 = job_manager.ClusterJob.config_job(
+                    commands = cmd_3,
+                    cluster = cluster,
+                    env_settings = env_settings,
+                    res_keywords = res_setting,
+                    sub_dir = './', # because path are relative
+                    sub_script_path = f'{o_dir}/submit_PDBMD_3_{core_type}.cmd')
+                job_3.submit()
+                job_3.wait_to_end(period)
+                md_jobs.extend([job_1, job_2, job_3])
+            else:
+                # all GPU or CPU
+                cmd = cmd_min + cmd_heat + cmd_equi + cmd_prod
+                job = job_manager.ClusterJob.config_job(
+                    commands = cmd,
+                    cluster = cluster,
+                    env_settings = env_settings,
+                    res_keywords = res_setting,
+                    sub_dir = './', # because path are relative
+                    sub_script_path = f'{o_dir}/submit_PDBMD_{core_type}.cmd'
+                )
+                job.submit()
+                job.wait_to_end(period=period)
+                md_jobs.append(job)
+            
+            if cluster_debug:
+                self.pdbmd_jobs = md_jobs
+
         else:
             if Config.debug >= 1:
-                print('running: '+PC_cmd +' '+ engine_path +' -O -i '+min_path +' -o '+o_dir+'/min.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+o_dir+'/min.rst -ref '+self.inpcrd_path)
-            os.system(PC_cmd +' '+ engine_path +' -O -i '+min_path +' -o '+o_dir+'/min.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+o_dir+'/min.rst -ref '+self.inpcrd_path)
+                print(cmd_min)
+            os.system(cmd_min)
             if Config.debug >= 1:
-                print('running: '+PC_cmd +' '+ engine_path +' -O -i '+heat_path+' -o '+o_dir+'/heat.out -p '+self.prmtop_path+' -c '+o_dir+'/min.rst -ref ' +o_dir+'/min.rst -r ' +o_dir+'/heat.rst')
-            os.system(PC_cmd +' '+ engine_path +' -O -i '+heat_path+' -o '+o_dir+'/heat.out -p '+self.prmtop_path+' -c '+o_dir+'/min.rst -ref ' +o_dir+'/min.rst -r ' +o_dir+'/heat.rst')
-            
-            # gpu debug for equi
-            if equi_cpu: 
-                # use Config.PC_cmd and cpu_engine_path
-                if Config.debug >= 1:
-                    print('running: '+Config.PC_cmd +' '+ cpu_engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
-                os.system(Config.PC_cmd +' '+ cpu_engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
-            else:
-                if Config.debug >= 1:
-                    print('running: '+PC_cmd +' '+ engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
-                os.system(PC_cmd +' '+ engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
-            
+                print(cmd_heat)
+            os.system(cmd_heat)
             if Config.debug >= 1:
-                print('running: '+PC_cmd +' '+ engine_path +' -O -i '+prod_path+' -o '+o_dir+'/prod.out -p '+self.prmtop_path+' -c '+o_dir+'/equi.rst -ref '+o_dir+'/equi.rst -r '+o_dir+'/prod.rst -x '+o_dir+'/prod.nc')
-            os.system(PC_cmd +' '+ engine_path +' -O -i '+prod_path+' -o '+o_dir+'/prod.out -p '+self.prmtop_path+' -c '+o_dir+'/equi.rst -ref '+o_dir+'/equi.rst -r '+o_dir+'/prod.rst -x '+o_dir+'/prod.nc')
+                print(cmd_equi)
+            os.system(cmd_equi)
+            if Config.debug >= 1:
+                print(cmd_prod)
+            os.system(cmd_prod)
 
         # return value
         self.nc = o_dir+'/prod.nc'
         return o_dir+'/prod.nc'
+
+    @staticmethod
+    def _get_default_res_setting_pdbmd(res_setting, core_type):
+        if res_setting is None:
+            res_setting = dict()
+        if isinstance(res_setting, dict):
+            res_setting_holder = copy.deepcopy(Config.Amber.MD_RES[core_type])
+            # replace assigned key in default dict
+            for k, v in res_setting.items():
+                res_setting_holder[k] = v
+            return res_setting_holder
+        if isinstance(res_setting, str):
+            return res_setting
+
+    @classmethod
+    def _prepare_cluster_job_pdbmd(cls, cluster, core_type, res_setting) -> tuple[str, str]:
+        '''
+        update the default res_setting with the input
+        get env_setting according to the core type
+        '''
+        #san check
+        if not isinstance(cluster, ClusterInterface):
+            raise TypeError('cluster job need a cluster (ClusterInterface object) input')
+        # get res and env settinng
+        # interface check
+        if 'AMBER_ENV' not in dir(cluster):
+            raise Exception('PDBMD requires the input cluster have the AMBER_ENV attr')
+        env_settings = cluster.AMBER_ENV[core_type]
+        # default for res
+        res_setting = cls._get_default_res_setting_pdbmd(res_setting, core_type)
+
+        return res_setting, env_settings
 
 
     def _build_MD_min(self, o_dir):

@@ -61,6 +61,26 @@ class Config:
         #
         AmberEXE_GPU = None
         # -----------------------------
+        # Default computational resources for amber md job for job submission on a cluster
+        # 
+        MD_RES = {
+            'CPU': {'core_type' : 'cpu',
+                    'nodes':'1',
+                    'node_cores' : '24',
+                    'job_name' : 'EnzyHTP_PDBMD',
+                    'partition' : 'production',
+                    'mem_per_core' : '3G',
+                    'walltime' : '1-00:00:00',
+                    'account' : 'xxx'}, #TODO decouple this with accre
+            'GPU': {'core_type' : 'gpu',
+                    'nodes':'1',
+                    'node_cores' : '1',
+                    'job_name' : 'EnzyHTP_PDBMD',
+                    'partition' : '{maxwell,pascal,turing}', #TODO decouple this with accre
+                    'mem_per_core' : '32G',
+                    'walltime' : '3-00:00:00',
+                    'account' : 'xxx'}} #TODO decouple this with accre
+        # -----------------------------
         # Default configuration for MD
         #
         # -----------------------------
