@@ -114,6 +114,7 @@ def test_PDB2FF_keep():
 
     assert len(pdb_obj.prepi_path) != 0
 
+@pytest.mark.temp  
 @pytest.mark.md
 @pytest.mark.accre
 def test_pdbmd_with_job_manager():
@@ -128,7 +129,6 @@ def test_get_default_res_setting_qmcluster():
     assert PDB._get_default_res_setting_qmcluster('''test_str''') == '''test_str'''
     assert Config.Gaussian.QMCLUSTER_CPU_RES == config_default_before # should not change the global default
 
-@pytest.mark.temp  
 @pytest.mark.qm
 @pytest.mark.accre
 def test_pdb2qmcluster_with_job_manager():
@@ -157,6 +157,10 @@ def test_pdb2qmcluster_with_job_manager():
     test_file_paths.extend(qm_ins)
     for job in qm_jobs:
         test_file_paths.extend([job.sub_script_path, job.job_cluster_log])
+    # assert result
+    for out in qm_outs:
+        assert os.path.isfile(out)
+        assert os.path.getsize(out) != 0
 
 ### utilities ###
 @pytest.mark.clean

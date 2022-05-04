@@ -2327,7 +2327,7 @@ class PDB():
                     jobs.append(cls._make_single_g16_job(gjf_path, out_path, cluster, res_setting))
                     outs.append(out_path)
                 # submit and run in array
-                if Config.debug > 1:
+                if Config.debug > 0:
                     print(f'''Running QM array on {cluster.NAME}: number: {len(jobs)} size: {job_array_size} period: {period}''')
                 job_manager.ClusterJob.wait_to_array_end(jobs, period, job_array_size)
 
