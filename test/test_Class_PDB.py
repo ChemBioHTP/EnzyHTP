@@ -117,7 +117,6 @@ def test_PDB2FF_keep():
 
     assert len(pdb_obj.prepi_path) != 0
 
-@pytest.mark.temp  
 @pytest.mark.md
 @pytest.mark.accre
 def test_pdbmd_with_job_manager_capture_amber_err():
@@ -137,14 +136,15 @@ def test_pdbmd_with_job_manager_capture_amber_err():
                         cluster_debug=1 )
         assert 'STOP PMEMD Terminated Abnormally!' in str(e.value)
 
+@pytest.mark.temp  
 @pytest.mark.md
 @pytest.mark.accre
 def test_pdbmd_with_job_manager_no_equi_cpu():
-    test_dir_md = 'test/testfile_Class_PDB/MD_test/'
+    test_dir_md = 'test/testfile_Class_PDB/MD_test_full_GPU/'
     # interface to PDBMD
-    pdb_obj = PDB(f'{test_dir_md}FAcD_RA124M_ff.pdb', wk_dir=test_dir_md)
-    pdb_obj.prmtop_path = f'{test_dir_md}FAcD_RA124M_ff.prmtop'
-    pdb_obj.inpcrd_path = f'{test_dir_md}FAcD_RA124M_ff.inpcrd'
+    pdb_obj = PDB(f'{test_dir_md}GPU_test_ff.pdb', wk_dir=test_dir_md)
+    pdb_obj.prmtop_path = f'{test_dir_md}GPU_test_ff.prmtop'
+    pdb_obj.inpcrd_path = f'{test_dir_md}GPU_test_ff.inpcrd'
     # run MD
     nc_path = pdb_obj.PDBMD(engine='Amber_GPU', 
                             equi_cpu=0, 
