@@ -1496,6 +1496,7 @@ class PDB():
                 if Config.debug > 0:
                     print(f'''Running MD on {cluster.NAME}: job_id: {job_1.job_id} script: {job_1.sub_script_path} period: {period}''')
                 job_1.wait_to_end(period)
+                type(self)._detect_amber_error(job_1)
 
                 job_2 = job_manager.ClusterJob.config_job(
                     commands = cmd_2,
@@ -1508,6 +1509,7 @@ class PDB():
                 if Config.debug > 0:
                     print(f'''Running MD on {cluster.NAME}: job_id: {job_2.job_id} script: {job_2.sub_script_path} period: {period}''')
                 job_2.wait_to_end(period)
+                type(self)._detect_amber_error(job_2)
 
                 job_3 = job_manager.ClusterJob.config_job(
                     commands = cmd_3,
@@ -1520,6 +1522,7 @@ class PDB():
                 if Config.debug > 0:
                     print(f'''Running MD on {cluster.NAME}: job_id: {job_3.job_id} script: {job_3.sub_script_path} period: {period}''')
                 job_3.wait_to_end(period)
+                type(self)._detect_amber_error(job_3)
                 md_jobs.extend([job_1, job_2, job_3])
             else:
                 # all GPU or CPU
@@ -1536,6 +1539,7 @@ class PDB():
                 if Config.debug > 0:
                     print(f'''Running MD on {cluster.NAME}: job_id: {job.job_id} script: {job.sub_script_path} period: {period}''')
                 job.wait_to_end(period=period)
+                type(self)._detect_amber_error(job)
                 md_jobs.append(job)
             
             if cluster_debug:
@@ -1558,6 +1562,18 @@ class PDB():
         # return value
         self.nc = o_dir+'/prod.nc'
         return o_dir+'/prod.nc'
+
+    @staticmethod
+    def _detect_amber_error(amber_job):
+        '''
+        amber pmemd tend to delay the error show up in the workflow.
+        It does not provide abnormal exit code but just output some error information to the stdout/stderr
+        '''
+        with open(amber_job.job_cluster_log) as f:
+            f_str = f.read()
+            if 'ERROR' in f_str or 'Error' in f_str:
+                raise Exception(f'Amber Terminated Abnormally! Here is the output ({amber_job.job_cluster_log}):{line_feed} {f_str}') 
+                # TODO make a workflow exception that can show some more step releted info
 
     @staticmethod
     def _get_default_res_setting_pdbmd(res_setting, core_type):
