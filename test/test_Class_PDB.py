@@ -157,6 +157,7 @@ def test_pdbmd_with_job_manager_no_equi_cpu():
     assert os.path.getsize(nc_path) != 0
     os.remove(nc_path)
 
+@pytest.mark.temp
 @pytest.mark.md
 @pytest.mark.accre
 def test_pdbmd_with_job_manager_equi_cpu():
