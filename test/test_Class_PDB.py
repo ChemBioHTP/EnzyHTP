@@ -1,11 +1,14 @@
+import copy
+from glob import glob
 from random import choice
 import os
 import pytest
 
-from Class_PDB import *
+from Class_PDB import PDB
+from Class_Conf import Config
 from core.clusters import accre
 from helper import is_empty_dir
-from AmberMaps import Resi_map2
+from AmberMaps import Resi_list, Resi_map2
 
 test_file_paths = []
 test_file_dirs = []
@@ -135,8 +138,11 @@ def test_pdbmd_with_job_manager_capture_amber_err():
                         res_setting={'account':'csb_gpu_acc'},
                         cluster_debug=1 )
         assert 'STOP PMEMD Terminated Abnormally!' in str(e.value)
+    # track files
+    test_file_paths.extend(['mdcrd', 'mdinfo'])
+    test_file_paths.extend(glob(f'{test_dir_md}MD/*'))
+    test_file_dirs.extend([f'{test_dir_md}cache',f'{test_dir_md}MD'])
 
-@pytest.mark.temp  
 @pytest.mark.md
 @pytest.mark.accre
 def test_pdbmd_with_job_manager_no_equi_cpu():
@@ -155,9 +161,12 @@ def test_pdbmd_with_job_manager_no_equi_cpu():
                             cluster_debug=1 )
     assert os.path.isfile(nc_path)
     assert os.path.getsize(nc_path) != 0
+    # track files
     os.remove(nc_path)
+    test_file_paths.extend(['mdcrd', 'mdinfo'])
+    test_file_paths.extend(glob(f'{test_dir_md}MD/*'))
+    test_file_dirs.extend([f'{test_dir_md}cache',f'{test_dir_md}MD'])
 
-@pytest.mark.temp
 @pytest.mark.md
 @pytest.mark.accre
 def test_pdbmd_with_job_manager_equi_cpu():
@@ -178,6 +187,10 @@ def test_pdbmd_with_job_manager_equi_cpu():
     assert os.path.isfile(nc_path)
     assert os.path.getsize(nc_path) != 0
     os.remove(nc_path)
+    # track files
+    test_file_paths.extend(['mdcrd', 'mdinfo'])
+    test_file_paths.extend(glob(f'{test_dir_md}MD/*'))
+    test_file_dirs.extend([f'{test_dir_md}cache',f'{test_dir_md}MD'])
 
 @pytest.mark.qm
 def test_get_default_res_setting_qmcluster():
