@@ -33,8 +33,19 @@ class ClusterJob():
         cluster:    cluster used for running the job (pick from list in /core/cluster/)
         sub_script_str: submission script content
         sub_script_path: submission script path
+        sub_dir
+        job_cluster_log
+        job_id
+        state: ((general_state, detailed_state), time_stamp)
     method:
         submit()
+        kill()
+        hold()
+        release()
+        get_state()
+        ifcomplete()
+        wait_to_end()
+        wait_to_array_end()
     '''
 
     def __init__(self, cluster: ClusterInterface, sub_script_str: str, sub_dir=None, sub_script_path=None) -> None:

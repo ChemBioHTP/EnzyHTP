@@ -153,7 +153,8 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''',
         try:    
             submit_cmd = run(cmd, timeout=20, check=True,  text=True, shell=True, capture_output=True)
         except CalledProcessError as e:
-            print(e)
+            print(f'stderr: {e.stderr}')
+            print(f'stdout: {e.stdout}')
             os.chdir(cwd) # avoid messing up the dir
             raise e
         # TODO(shaoqz) timeout condition is hard to test

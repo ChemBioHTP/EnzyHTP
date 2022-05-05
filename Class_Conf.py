@@ -76,7 +76,7 @@ class Config:
                     'nodes':'1',
                     'node_cores' : '1',
                     'job_name' : 'EnzyHTP_PDBMD',
-                    'partition' : '{maxwell,pascal,turing}', #TODO decouple this with accre
+                    'partition' : 'pascal', #TODO decouple this with accre
                     'mem_per_core' : '32G',
                     'walltime' : '3-00:00:00',
                     'account' : 'xxx'}} #TODO decouple this with accre
