@@ -1462,14 +1462,14 @@ class PDB():
         equi_path = self._build_MD_equi(o_dir)
         prod_path = self._build_MD_prod(o_dir)
         # build md commands
-        cmd_min = f'{PC_cmd} {engine_path} -O -i {min_path} -o {o_dir}/min.out -p {self.prmtop_path} -c {self.inpcrd_path} -r {o_dir}/min.rst -ref {self.inpcrd_path}{line_feed}'
-        cmd_heat = f'{PC_cmd} {engine_path} -O -i {heat_path} -o {o_dir}/heat.out -p {self.prmtop_path} -c {o_dir}/min.rst -r {o_dir}/heat.rst -ref {o_dir}/min.rst{line_feed}'
-        cmd_prod = f'{PC_cmd} {engine_path} -O -i {prod_path} -o {o_dir}/prod.out -p {self.prmtop_path} -c {o_dir}/equi.rst -r {o_dir}/prod.rst -ref {o_dir}/equi.rst -x {o_dir}/prod.nc{line_feed}'
+        cmd_min = f'{PC_cmd} {engine_path} -O -i {min_path} -o {o_dir}/min.out -p {self.prmtop_path} -c {self.inpcrd_path} -r {o_dir}/min.rst -ref {self.inpcrd_path}{line_feed}'.strip(' ')
+        cmd_heat = f'{PC_cmd} {engine_path} -O -i {heat_path} -o {o_dir}/heat.out -p {self.prmtop_path} -c {o_dir}/min.rst -r {o_dir}/heat.rst -ref {o_dir}/min.rst{line_feed}'.strip(' ')
+        cmd_prod = f'{PC_cmd} {engine_path} -O -i {prod_path} -o {o_dir}/prod.out -p {self.prmtop_path} -c {o_dir}/equi.rst -r {o_dir}/prod.rst -ref {o_dir}/equi.rst -x {o_dir}/prod.nc{line_feed}'.strip(' ')
         # gpu debug for equi
         if equi_cpu:
-            cmd_equi = f'{Config.PC_cmd} {cpu_engine_path} -O -i {equi_path} -o {o_dir}/equi.out -p {self.prmtop_path} -c {o_dir}/heat.rst -r {o_dir}/equi.rst -ref {o_dir}/heat.rst -x {o_dir}/equi.nc{line_feed}'
+            cmd_equi = f'{Config.PC_cmd} {cpu_engine_path} -O -i {equi_path} -o {o_dir}/equi.out -p {self.prmtop_path} -c {o_dir}/heat.rst -r {o_dir}/equi.rst -ref {o_dir}/heat.rst -x {o_dir}/equi.nc{line_feed}'.strip(' ')
         else:
-            cmd_equi = f'{PC_cmd} {engine_path} -O -i {equi_path} -o {o_dir}/equi.out -p {self.prmtop_path} -c {o_dir}/heat.rst -r {o_dir}/equi.rst -ref {o_dir}/heat.rst -x {o_dir}/equi.nc{line_feed}'
+            cmd_equi = f'{PC_cmd} {engine_path} -O -i {equi_path} -o {o_dir}/equi.out -p {self.prmtop_path} -c {o_dir}/heat.rst -r {o_dir}/equi.rst -ref {o_dir}/heat.rst -x {o_dir}/equi.nc{line_feed}'.strip(' ')
 
         # run MD exe
         if if_cluster_job:
