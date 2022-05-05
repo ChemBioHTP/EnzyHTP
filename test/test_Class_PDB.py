@@ -9,6 +9,7 @@ from AmberMaps import Resi_map2
 
 test_file_paths = []
 test_file_dirs = []
+Config.debug=2
 
 @pytest.mark.mutation
 def _random_gen_good_MutaFlag_for_test(stru, abbr=0):
