@@ -10,6 +10,8 @@ from AmberMaps import Resi_map2
 test_file_paths = []
 test_file_dirs = []
 Config.debug=2
+Config.Amber.conf_equi['nstlim'] = 50000
+Config.Amber.conf_prod['nstlim'] = 500000
 
 @pytest.mark.mutation
 def _random_gen_good_MutaFlag_for_test(stru, abbr=0):
@@ -116,6 +118,25 @@ def test_PDB2FF_keep():
     assert len(pdb_obj.prepi_path) != 0
 
 @pytest.mark.temp  
+@pytest.mark.md
+@pytest.mark.accre
+def test_pdbmd_with_job_manager_capture_amber_err():
+    test_dir_md = 'test/testfile_Class_PDB/MD_test/'
+    # interface to PDBMD
+    pdb_obj = PDB(f'{test_dir_md}FAcD_RA124M_ff.pdb', wk_dir=test_dir_md)
+    pdb_obj.prmtop_path = f'{test_dir_md}FAcD_RA124M_ff.prmtop'
+    pdb_obj.inpcrd_path = f'{test_dir_md}FAcD_RA124M_ff.inpcrd'
+    # run MD
+    with pytest.raises(Exception) as e:
+        pdb_obj.PDBMD(  engine='Amber_GPU', 
+                        equi_cpu=0, 
+                        if_cluster_job=1,
+                        cluster=accre.Accre(),
+                        period=30,
+                        res_setting={'account':'csb_gpu_acc'},
+                        cluster_debug=1 )
+        assert 'STOP PMEMD Terminated Abnormally!' in str(e.value)
+
 @pytest.mark.md
 @pytest.mark.accre
 def test_pdbmd_with_job_manager_no_equi_cpu():
