@@ -1493,6 +1493,8 @@ class PDB():
                     sub_dir = './', # because path are relative
                     sub_script_path = f'{o_dir}/submit_PDBMD_1_{core_type}.cmd')
                 job_1.submit()
+                if Config.debug > 0:
+                    print(f'''Running MD on {cluster.NAME}: job_id: {job_1.job_id} script: {job_1.sub_script_path} period: {period}''')
                 job_1.wait_to_end(period)
 
                 job_2 = job_manager.ClusterJob.config_job(
@@ -1503,6 +1505,8 @@ class PDB():
                     sub_dir = './', # because path are relative
                     sub_script_path = f'{o_dir}/submit_PDBMD_2_CPU.cmd')
                 job_2.submit()
+                if Config.debug > 0:
+                    print(f'''Running MD on {cluster.NAME}: job_id: {job_2.job_id} script: {job_2.sub_script_path} period: {period}''')
                 job_2.wait_to_end(period)
 
                 job_3 = job_manager.ClusterJob.config_job(
@@ -1513,6 +1517,8 @@ class PDB():
                     sub_dir = './', # because path are relative
                     sub_script_path = f'{o_dir}/submit_PDBMD_3_{core_type}.cmd')
                 job_3.submit()
+                if Config.debug > 0:
+                    print(f'''Running MD on {cluster.NAME}: job_id: {job_3.job_id} script: {job_3.sub_script_path} period: {period}''')
                 job_3.wait_to_end(period)
                 md_jobs.extend([job_1, job_2, job_3])
             else:
@@ -1527,6 +1533,8 @@ class PDB():
                     sub_script_path = f'{o_dir}/submit_PDBMD_{core_type}.cmd'
                 )
                 job.submit()
+                if Config.debug > 0:
+                    print(f'''Running MD on {cluster.NAME}: job_id: {job.job_id} script: {job.sub_script_path} period: {period}''')
                 job.wait_to_end(period=period)
                 md_jobs.append(job)
             
@@ -1535,16 +1543,16 @@ class PDB():
 
         else:
             if Config.debug >= 1:
-                print(cmd_min)
+                print(f'running: {cmd_min}')
             os.system(cmd_min)
             if Config.debug >= 1:
-                print(cmd_heat)
+                print(f'running: {cmd_heat}')
             os.system(cmd_heat)
             if Config.debug >= 1:
-                print(cmd_equi)
+                print(f'running: {cmd_equi}')
             os.system(cmd_equi)
             if Config.debug >= 1:
-                print(cmd_prod)
+                print(f'running: {cmd_prod}')
             os.system(cmd_prod)
 
         # return value
