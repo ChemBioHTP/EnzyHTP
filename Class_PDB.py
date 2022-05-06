@@ -2699,7 +2699,7 @@ class PDB():
         Result direction: a1 -> a2
         
         REF: Lu, T.; Chen, F., Multiwfn: A multifunctional wavefunction analyzer. J. Comput. Chem. 2012, 33 (5), 580-592.
-        '''
+        ''' # TODO support array job
         Dipoles = []
 
         if prog == 'Multiwfn':
