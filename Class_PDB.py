@@ -1049,7 +1049,16 @@ class PDB():
         return Flag[0]+Flag[1]+Flag[2]+Flag[3]
 
 
-    def PDBMin(self,cycle=2000,engine='Amber_GPU'):
+    def PDBMin(
+        self,
+        cycle: int = 20000,
+        engine: str = 'Amber_GPU',
+        if_cluster_job: bool = 1, 
+        cluster: ClusterInterface = None, 
+        period: int = 10,
+        res_setting: Union[dict, None] = None,
+        cluster_debug: bool = 0
+        ):
         '''
         Run a minization use self.prmtop and self.inpcrd and setting form class Config.
         --------------------------------------------------
@@ -1059,7 +1068,7 @@ class PDB():
         
         out4_PDB_path=self.path_name+'_min.pdb'
 
-        #make sander input
+        #make MD config
         min_dir = self.cache_path+'/PDBMin'
         minin_path = min_dir + '/min.in'
         minout_path = min_dir + '/min.out'
@@ -1082,10 +1091,33 @@ class PDB():
         # express engine
         PC_cmd, engine_path = Config.Amber.get_Amber_engine(engine=engine)
 
-        #run
-        if Config.debug >= 1:
-            print('running: '+PC_cmd +' '+ engine_path +' -O -i '+minin_path+' -o '+minout_path+' -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+minrst_path)
-        os.system(PC_cmd +' '+ engine_path +' -O -i '+minin_path+' -o '+minout_path+' -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+minrst_path)
+        # make cmd
+        cmd = f'{PC_cmd} {engine_path} -O -i {minin_path} -o {minout_path} -p {self.prmtop_path} -c {self.inpcrd_path} -r {minrst_path}'
+        
+        # run
+        if if_cluster_job:
+            core_type = engine.split('_')[-1]
+            res_setting, env_settings = type(self)._prepare_cluster_job_pdbmd(cluster, core_type, res_setting)
+            job = job_manager.ClusterJob.config_job(
+                commands = cmd,
+                cluster = cluster,
+                env_settings = env_settings,
+                res_keywords = res_setting,
+                sub_dir = './', # because path are relative
+                sub_script_path = f'{min_dir}/submit_PDBMin_{core_type}.cmd'
+            )
+            job.submit()
+            if Config.debug > 0:
+                print(f'''Running Min on {cluster.NAME}: job_id: {job.job_id} script: {job.sub_script_path} period: {period}''')
+            job.wait_to_end(period=period)
+            type(self)._detect_amber_error(job)
+            
+            if cluster_debug:
+                self.pdbmin_job = job
+        else:
+            if Config.debug >= 1:
+                print(f'running: {cmd}')
+            os.system(cmd)
         #rst2pdb
         try:
             run('ambpdb -p '+self.prmtop_path+' -c '+minrst_path+' > '+out4_PDB_path, check=True, text=True, shell=True, capture_output=True)
@@ -1574,6 +1606,7 @@ class PDB():
             if 'ERROR' in f_str or 'Error' in f_str:
                 raise Exception(f'Amber Terminated Abnormally! Here is the output ({amber_job.job_cluster_log}):{line_feed} {f_str}') 
                 # TODO make a workflow exception that can show some more step releted info
+                # So that can use try except to do some special action when dont want one fail ruin the HTP
 
     @staticmethod
     def _get_default_res_setting_pdbmd(res_setting, core_type):

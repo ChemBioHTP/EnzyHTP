@@ -67,7 +67,7 @@ class Config:
             'CPU': {'core_type' : 'cpu',
                     'nodes':'1',
                     'node_cores' : '24',
-                    'job_name' : 'EnzyHTP_PDBMD',
+                    'job_name' : 'EnzyHTP_MD',
                     'partition' : 'production',
                     'mem_per_core' : '3G',
                     'walltime' : '1-00:00:00',
@@ -75,7 +75,7 @@ class Config:
             'GPU': {'core_type' : 'gpu',
                     'nodes':'1',
                     'node_cores' : '1',
-                    'job_name' : 'EnzyHTP_PDBMD',
+                    'job_name' : 'EnzyHTP_MD',
                     'partition' : 'pascal', #TODO decouple this with accre
                     'mem_per_core' : '32G',
                     'walltime' : '3-00:00:00',
