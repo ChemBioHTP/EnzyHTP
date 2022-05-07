@@ -2,7 +2,7 @@ import copy
 from math import ceil
 import os
 import re
-from subprocess import run, CalledProcessError
+from subprocess import SubprocessError, run, CalledProcessError
 from random import choice
 from typing import Union
 from AmberMaps import *
@@ -1356,7 +1356,12 @@ class PDB():
                 of.write('savepdb a '+sol_path+line_feed)
             of.write('quit'+line_feed)
 
-        os.system('tleap -s -f '+leap_path+' > '+leap_path[:-2]+'out')
+        try:
+            run('tleap -s -f '+leap_path+' > '+leap_path[:-2]+'out', check=True,  text=True, shell=True, capture_output=True)
+        except SubprocessError as e:
+            print(f'stderr: {e.stderr}')
+            print(f'stdout: {e.stdout}')
+            raise e
 
         return self.prmtop_path, self.inpcrd_path
 
