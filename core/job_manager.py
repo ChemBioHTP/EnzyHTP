@@ -250,6 +250,8 @@ class ClusterJob():
             print(f'submitting {script_path} in {sub_dir}')
         self.job_id, self.job_cluster_log = self.cluster.submit_job(sub_dir, script_path, debug=debug)
         self.sub_dir = sub_dir
+        if Config.debug > 0:
+            self.record_job_id_to_file()
 
         return self.job_id
 
@@ -261,6 +263,19 @@ class ClusterJob():
         with open(out_path, 'w', encoding='utf-8') as f:
             f.write(self.sub_script_str)
         return out_path
+
+    def record_job_id_to_file(self):
+        '''
+        record submitted job id to a file to help removing and tracking all jobs upon aborting
+        '''
+        # get file path
+        if Config.JOB_ID_LOG_PATH == '':
+            job_id_log_path = f'{self.sub_dir}/submitted_job_ids.log'
+        else:
+            job_id_log_path = Config.JOB_ID_LOG_PATH
+        # write to
+        with open(job_id_log_path, 'a') as of:
+            of.write(f'{self.job_id} {self.sub_script_path}{line_feed}')
 
     ### control ###
     def kill(self):
