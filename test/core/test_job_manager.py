@@ -105,7 +105,7 @@ sub_script_str = '''#!/bin/bash
 #SBATCH --tasks-per-node=24
 #SBATCH --mem-per-cpu=2G
 #SBATCH --time=30:00
-#SBATCH --account=yang_lab_csb
+#SBATCH --account=yang_lab
 
 module load Gaussian/16.B.01
 mkdir $TMPDIR/$SLURM_JOB_ID
@@ -122,7 +122,7 @@ sub_script_long_str = '''#!/bin/bash
 #SBATCH --tasks-per-node=24
 #SBATCH --mem-per-cpu=2G
 #SBATCH --time=3-00:00:00
-#SBATCH --account=yang_lab_csb
+#SBATCH --account=yang_lab
 
 module load Gaussian/16.B.01
 mkdir $TMPDIR/$SLURM_JOB_ID
