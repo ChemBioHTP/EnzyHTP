@@ -84,7 +84,7 @@ def main():
                             cluster=Accre(), 
                             job_array_size=20, # this is how many job can on queue the same time
                             period=30,
-                            res_setting={'account':'yang_lab_csb'} )
+                            res_setting={'account':'yang_lab'} )
     pdb_obj.get_fchk(keep_chk=0)
 
     endtime_3 = datetime.datetime.now()
