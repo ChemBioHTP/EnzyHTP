@@ -210,6 +210,7 @@ def test_ClusterJob_config_also_submit_info():
     )
     info = job.submit(debug=1)
     test_file_paths.append(test_sub_script_path)
+    test_file_paths.append(f'{test_sub_dir}/submitted_job_ids.log')
     assert info == (f'sbatch {os.path.abspath(test_sub_script_path)}', test_sub_dir, test_sub_script_path)
 
 def test_ClusterJob_preset():
@@ -230,6 +231,7 @@ def test_ClusterJob_submit_job_id_ACCRE():
     job.submit( sub_dir=test_sub_dir,
                 script_path=f'{test_sub_dir}test.cmd')
     test_file_paths.extend([job.job_cluster_log, job.sub_script_path])
+    test_file_paths.append(f'{test_sub_dir}/submitted_job_ids.log')
     run(f'scancel {job.job_id}', timeout=20, check=True,  text=True, shell=True, capture_output=True)
     assert len(job.job_cluster_log) > 0
     assert len(job.job_id) > 0
@@ -242,6 +244,7 @@ def test_ClusterJob_submit_default_script_path_ACCRE():
     job = ClusterJob(clusters.accre.Accre(), sub_script_str=sub_script_str)
     job.submit(sub_dir=test_sub_dir)
     test_file_paths.extend([job.job_cluster_log, job.sub_script_path])
+    test_file_paths.append(f'{test_sub_dir}/submitted_job_ids.log')
     # use explictly the scancel here to decouple the test
     run(f'scancel {job.job_id}', timeout=20, check=True,  text=True, shell=True, capture_output=True)
     assert len(job.job_id) > 0
@@ -254,6 +257,7 @@ def test_ClusterJob_kill_job_ACCRE():
     job = ClusterJob(clusters.accre.Accre(), sub_script_str=sub_script_str)
     job.submit(sub_dir=test_sub_dir)
     test_file_paths.extend([job.job_cluster_log, job.sub_script_path])
+    test_file_paths.append(f'{test_sub_dir}/submitted_job_ids.log')
     job.kill()
 
 @pytest.mark.accre
@@ -264,6 +268,7 @@ def test_ClusterJob_get_state_ACCRE():
     job = ClusterJob(clusters.accre.Accre(), sub_script_str=sub_script_str)
     job.submit(sub_dir=test_sub_dir)
     test_file_paths.extend([job.job_cluster_log, job.sub_script_path])
+    test_file_paths.append(f'{test_sub_dir}/submitted_job_ids.log')
     assert job.get_state()[0] in ['pend', 'run']
     job.kill()
     assert job.get_state()[0] == 'cancel'
@@ -278,6 +283,7 @@ def test_ClusterJob_wait_to_end_ACCRE():
     # submit and record the file
     job.submit(sub_dir=test_sub_dir)
     test_file_paths.extend([job.job_cluster_log, job.sub_script_path])
+    test_file_paths.append(f'{test_sub_dir}/submitted_job_ids.log')
 
     Config.debug = 2
     job.wait_to_end(60)
@@ -296,6 +302,7 @@ def test_ClusterJob_wait_to_array_end_ACCRE():
     # job array
     Config.debug = 2
     ClusterJob.wait_to_array_end(jobs, period=30, array_size=5)
+    test_file_paths.append(f'{test_sub_dir}/submitted_job_ids.log')
     for i, job in enumerate(jobs):
         test_file_paths.extend([job.sub_script_path, job.job_cluster_log, f'{job.sub_dir}/QM_test_{i}.out'])
     for job in jobs:

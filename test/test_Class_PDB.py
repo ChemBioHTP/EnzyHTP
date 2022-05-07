@@ -139,7 +139,7 @@ def test_pdbmd_with_job_manager_capture_amber_err():
                         cluster_debug=1 )
         assert 'STOP PMEMD Terminated Abnormally!' in str(e.value)
     # track files
-    test_file_paths.extend(['mdcrd', 'mdinfo'])
+    test_file_paths.extend(['mdcrd', 'mdinfo', 'submitted_job_ids.log'])
     test_file_paths.extend(glob(f'{test_dir_md}MD/*'))
     test_file_dirs.extend([f'{test_dir_md}cache',f'{test_dir_md}MD'])
 
@@ -163,7 +163,7 @@ def test_pdbmd_with_job_manager_no_equi_cpu():
     assert os.path.getsize(nc_path) != 0
     # track files
     os.remove(nc_path)
-    test_file_paths.extend(['mdcrd', 'mdinfo'])
+    test_file_paths.extend(['mdcrd', 'mdinfo', 'submitted_job_ids.log'])
     test_file_paths.extend(glob(f'{test_dir_md}MD/*'))
     test_file_dirs.extend([f'{test_dir_md}cache',f'{test_dir_md}MD'])
 
@@ -188,7 +188,7 @@ def test_pdbmd_with_job_manager_equi_cpu():
     assert os.path.getsize(nc_path) != 0
     os.remove(nc_path)
     # track files
-    test_file_paths.extend(['mdcrd', 'mdinfo'])
+    test_file_paths.extend(['mdcrd', 'mdinfo', 'submitted_job_ids.log'])
     test_file_paths.extend(glob(f'{test_dir_md}MD/*'))
     test_file_dirs.extend([f'{test_dir_md}cache',f'{test_dir_md}MD'])
 
@@ -228,6 +228,7 @@ def test_pdb2qmcluster_with_job_manager():
     qm_ins = list(map(lambda x: x.removesuffix('out')+'gjf',qm_outs))
     test_file_paths.extend(qm_outs)
     test_file_paths.extend(qm_ins)
+    test_file_paths.append('submitted_job_ids.log')
     for job in qm_jobs:
         test_file_paths.extend([job.sub_script_path, job.job_cluster_log])
     # assert result

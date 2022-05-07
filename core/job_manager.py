@@ -251,7 +251,7 @@ class ClusterJob():
         self.job_id, self.job_cluster_log = self.cluster.submit_job(sub_dir, script_path, debug=debug)
         self.sub_dir = sub_dir
         if Config.debug > 0:
-            self.record_job_id_to_file()
+            self._record_job_id_to_file()
 
         return self.job_id
 
@@ -264,7 +264,7 @@ class ClusterJob():
             f.write(self.sub_script_str)
         return out_path
 
-    def record_job_id_to_file(self):
+    def _record_job_id_to_file(self):
         '''
         record submitted job id to a file to help removing and tracking all jobs upon aborting
         '''
