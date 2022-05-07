@@ -8,6 +8,8 @@ import re
 import os
 from subprocess import CompletedProcess, SubprocessError, run
 import time
+
+from Class_Conf import Config
 from ._interface import ClusterInterface
 
 
@@ -236,6 +238,8 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''',
                 return job_field_info
         # use sacct if squeue do not have info
         # wait a update gap
+        if Config.debug > 1:
+            print('No info from squeue. Switch to sacct')
         time.sleep(wait_time)
         cmd = f'{cls.INFO_CMD[1]} -j {job_id} -o {field}'
         info_run = run(cmd, timeout=60, check=True,  text=True, shell=True, capture_output=True)
