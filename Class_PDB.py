@@ -1087,17 +1087,22 @@ class PDB():
         min_input.write('  cut=8.0,'+line_feed)
         min_input.write(' /'+line_feed)
         min_input.close()
-    
+
+        # determine cluster rescources
+        cpu_cores = None
+        if if_cluster_job:
+            core_type = engine.split('_')[-1] # this go front because needed in expressing cmd
+            res_setting, env_settings = type(self)._prepare_cluster_job_pdbmd(cluster, core_type, res_setting)
+            if core_type == 'CPU':
+                cpu_cores = res_setting['node_cores']
         # express engine
-        PC_cmd, engine_path = Config.Amber.get_Amber_engine(engine=engine)
+        PC_cmd, engine_path = Config.Amber.get_Amber_engine(engine=engine, n_cores=cpu_cores)
 
         # make cmd
         cmd = f'{PC_cmd} {engine_path} -O -i {minin_path} -o {minout_path} -p {self.prmtop_path} -c {self.inpcrd_path} -r {minrst_path}'
         
         # run
         if if_cluster_job:
-            core_type = engine.split('_')[-1]
-            res_setting, env_settings = type(self)._prepare_cluster_job_pdbmd(cluster, core_type, res_setting)
             job = job_manager.ClusterJob.config_job(
                 commands = cmd,
                 cluster = cluster,
