@@ -372,11 +372,11 @@ class Config:
         # 
         g09_exe = 'g09'
         # -----------------------------
-        # non-repeatable error keywords
+        # error keywords handle::add additional keywords
         # 
-        ERROR_KEYWORD_NOREPEAT = [
-            'Inaccurate quadrature in CalDSu'
-            ]
+        ERROR_ADDKEYWORD = {
+            'Inaccurate quadrature in CalDSu' : 'scf=qc'
+            }
 
         # -----------------------------
         #   >>>>>>>>QMcluster<<<<<<<<

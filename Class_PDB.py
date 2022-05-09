@@ -2632,7 +2632,12 @@ class PDB():
         self.qm_cluster_fchk = fchk_paths
         return self.qm_cluster_fchk
         
-
+    def gaussian_error_handling():
+        '''
+        TODO handle gaussian errors. can be enabled in RunQM
+        use maps in Config.Gaussian
+        '''
+        pass
     '''
     ========
     QM Analysis 
