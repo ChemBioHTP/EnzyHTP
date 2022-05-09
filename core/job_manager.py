@@ -16,6 +16,7 @@ Date: 2022-04-13
 import time
 from typing import Union
 from plum import dispatch
+from copy import deepcopy
 import os
 
 from core.clusters._interface import ClusterInterface
@@ -156,6 +157,7 @@ class ClusterJob():
         there's cmd at the beginning and the end
         '''
         if list(env.keys()) == ['head', 'tail'] or list(env.keys()) == ['tail', 'head']:
+            env = deepcopy(env)
             for i in env:
                 env[i] += line_feed
             return env

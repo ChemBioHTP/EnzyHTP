@@ -236,6 +236,21 @@ def test_pdb2qmcluster_with_job_manager():
         assert os.path.isfile(out)
         assert os.path.getsize(out) != 0
 
+@pytest.mark.qm
+def test_make_single_g16_job_loop():
+    '''
+    test the loop section in RunQM
+    '''
+    inp = [f'test_{i}.gjf' for i in range(10)]
+    cluster = accre.Accre()
+    jobs = []
+    for gjf_path in inp:
+        out_path = gjf_path.removesuffix('gjf')+'out'
+        jobs.append(PDB._make_single_g16_job(gjf_path, out_path, cluster, PDB._get_default_res_setting_qmcluster(None)))
+    for job in jobs:
+        pass# assert len(job.sub_script_str.splitlines()) == len(jobs[0].sub_script_str.splitlines())
+
+
 ### utilities ###
 @pytest.mark.clean
 def test_clean_files():
