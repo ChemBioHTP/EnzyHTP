@@ -80,7 +80,7 @@ for m_data in Data:
     m_data['E_med'] = np.median(E)
 
     #G
-    G = -BD_norm * E * A0/A  # G = -BD_norm * E * A0/A # add minus except for the tests before 2021.7.30.
+    G = BD_norm * E * A0/A  # G = -BD_norm * E * A0/A # add minus except for the tests before 2021.7.30.
 
     m_data['G_mean'] = G.mean()
     m_data['G_SD'] = G.std()
