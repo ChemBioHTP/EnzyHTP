@@ -39,7 +39,7 @@ def main():
                     cluster=Accre(),
                     period=10,
                     res_setting={'partition': 'maxwell',
-                                 'mem_per_core' : '29G',
+                                 'mem_per_core' : '10G',
                                  'account':'csb_gpu_acc'} ) # see full setting in Conf
     pdb_obj.rm_wat()
 

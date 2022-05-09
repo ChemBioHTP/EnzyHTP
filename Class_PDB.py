@@ -1483,9 +1483,23 @@ class PDB():
         if o_dir == '':
             o_dir = self.dir+'/MD'+tag
         mkdir(o_dir)
+        # default cpu cores
+        cpu_cores = None # these will be used in Config.get_PC_cmd(cpu_cores) and None will mean using Config.n_cores
+        equi_cpu_cores = None
+        # format settings for cluster job (since it also influence the command)
+        if if_cluster_job:
+            core_type = engine.split('_')[-1]
+            res_setting, env_settings = type(self)._prepare_cluster_job_pdbmd(cluster, core_type, res_setting)
+            if core_type == 'CPU':
+                cpu_cores = res_setting['node_cores']
+            if core_type == 'GPU' and equi_cpu:
+                # get env res for equi
+                env_settings_equi_cpu = cluster.AMBER_ENV['CPU']
+                res_setting_equi_cpu = type(self)._get_default_res_setting_pdbmd(res_setting_equi_cpu, 'CPU')
+                equi_cpu_cores = res_setting_equi_cpu['node_cores']
 
         # express engine (pirority: AmberEXE_GPU/AmberEXE_CPU - AmberHome/bin/xxx)
-        PC_cmd, engine_path = Config.Amber.get_Amber_engine(engine=engine)
+        PC_cmd, engine_path = Config.Amber.get_Amber_engine(engine=engine, n_cores=cpu_cores)
         # express cpu engine if equi_cpu
         if equi_cpu:
             if Config.Amber.AmberEXE_CPU == None:
@@ -1504,23 +1518,18 @@ class PDB():
         cmd_prod = f'{PC_cmd} {engine_path} -O -i {prod_path} -o {o_dir}/prod.out -p {self.prmtop_path} -c {o_dir}/equi.rst -r {o_dir}/prod.rst -ref {o_dir}/equi.rst -x {o_dir}/prod.nc{line_feed}'.strip(' ')
         # gpu debug for equi
         if equi_cpu:
-            cmd_equi = f'{Config.PC_cmd} {cpu_engine_path} -O -i {equi_path} -o {o_dir}/equi.out -p {self.prmtop_path} -c {o_dir}/heat.rst -r {o_dir}/equi.rst -ref {o_dir}/heat.rst -x {o_dir}/equi.nc{line_feed}'.strip(' ')
+            cmd_equi = f'{Config.get_PC_cmd(equi_cpu_cores)} {cpu_engine_path} -O -i {equi_path} -o {o_dir}/equi.out -p {self.prmtop_path} -c {o_dir}/heat.rst -r {o_dir}/equi.rst -ref {o_dir}/heat.rst -x {o_dir}/equi.nc{line_feed}'.strip(' ')
         else:
             cmd_equi = f'{PC_cmd} {engine_path} -O -i {equi_path} -o {o_dir}/equi.out -p {self.prmtop_path} -c {o_dir}/heat.rst -r {o_dir}/equi.rst -ref {o_dir}/heat.rst -x {o_dir}/equi.nc{line_feed}'.strip(' ')
 
         # run MD exe
         if if_cluster_job:
-            core_type = engine.split('_')[-1]
-            res_setting, env_settings = type(self)._prepare_cluster_job_pdbmd(cluster, core_type, res_setting)
             md_jobs = []
             if equi_cpu:
                 # divide into 3 jobs
                 cmd_1 = cmd_min + cmd_heat
                 cmd_2 = cmd_equi
                 cmd_3 = cmd_prod
-                # get env res for equi
-                env_settings_equi_cpu = cluster.AMBER_ENV['CPU']
-                res_setting_equi_cpu = type(self)._get_default_res_setting_pdbmd(res_setting_equi_cpu, 'CPU')
                 # make job: 1&3 are in same environment 2 is always in CPU environment
                 job_1 = job_manager.ClusterJob.config_job(
                     commands = cmd_1,

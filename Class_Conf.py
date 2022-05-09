@@ -36,9 +36,11 @@ class Config:
     # 
     PC_cmd = 'mpirun'
     @classmethod
-    def get_PC_cmd(cls):
+    def get_PC_cmd(cls, n_cores=None):
         if cls.PC_cmd == 'mpirun':
-            return 'mpirun -np '+str(cls.n_cores) 
+            if n_cores == None:
+                n_cores = cls.n_cores
+            return 'mpirun -np '+str(n_cores) 
         return cls.PC_cmd
     # -----------------------------
     # watermark for script generation
@@ -70,7 +72,7 @@ class Config:
         MD_RES = {
             'CPU': {'core_type' : 'cpu',
                     'nodes':'1',
-                    'node_cores' : '24',
+                    'node_cores' : '16',
                     'job_name' : 'EnzyHTP_MD',
                     'partition' : 'production',
                     'mem_per_core' : '3G',
@@ -249,10 +251,11 @@ class Config:
         # Method to express Amber EXE path and PC_cmd
         #
         @classmethod
-        def get_Amber_engine(cls, engine='Amber_GPU'):
+        def get_Amber_engine(cls, engine='Amber_GPU', n_cores=None):
             '''
             Give default value to Amber cpu/gpu engines
             engine: ['Amber_CPU', 'Amber_GPU'] 
+            default n_cores use Config.n_cores. 
             ---
             return (PC_cmd, AmberEXE path)
             '''
@@ -265,7 +268,7 @@ class Config:
                     engine_path = cls.AmberHome+'/bin/sander.MPI'
                 else:
                     engine_path = cls.AmberEXE_CPU
-                PC_cmd = Config.get_PC_cmd()
+                PC_cmd = Config.get_PC_cmd(n_cores)
 
             if engine == 'Amber_GPU':
                 if cls.AmberEXE_GPU == None:
@@ -368,6 +371,12 @@ class Config:
         # Executable g16 command for current environment
         # 
         g09_exe = 'g09'
+        # -----------------------------
+        # non-repeatable error keywords
+        # 
+        ERROR_KEYWORD_NOREPEAT = [
+            'Inaccurate quadrature in CalDSu'
+            ]
 
         # -----------------------------
         #   >>>>>>>>QMcluster<<<<<<<<
