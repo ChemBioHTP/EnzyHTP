@@ -2404,6 +2404,16 @@ class PDB():
         chrgspin = self._get_qmcluster_chrgspin(sele_lines, spin=spin)
         if Config.debug >= 1:
             print('Charge: '+str(chrgspin[0])+' Spin: '+str(chrgspin[1]))
+        # get res setting
+        cpu_cores = Config.n_cores
+        cpu_mem = Config.max_core
+        # overwrite those if cluster job is true
+        if if_cluster_job:
+            # default values TODO should contain them in Config.Gaussian
+            res_setting = type(self)._get_default_res_setting_qmcluster(res_setting)
+            if QM in ['g16','g09']:
+                cpu_cores = res_setting['node_cores']
+                cpu_mem = int(float(res_setting['mem_per_core'].rstrip('GB')) * 1024)
 
         #make inp files
         frames = Frame.fromMDCrd(self.mdcrd)
@@ -2414,12 +2424,10 @@ class PDB():
                 print('Writing QMcluster gjfs.')
             for i, frame in enumerate(frames):
                 gjf_path = o_dir+'/qm_cluster_'+str(i)+'.gjf'
-                frame.write_sele_lines(sele_lines, out_path=gjf_path, g_route=g_route, chrgspin=chrgspin, ifchk=ifchk)
+                frame.write_sele_lines(sele_lines, out_path=gjf_path, g_route=g_route, g_cores=cpu_cores, g_mem_cores=cpu_mem, chrgspin=chrgspin, ifchk=ifchk)
                 gjf_paths.append(gjf_path)
             # Run inp files
             if if_cluster_job:
-                # default values TODO should contain them in Config.Gaussian
-                res_setting = type(self)._get_default_res_setting_qmcluster(res_setting)
                 Run_QM_out = PDB.Run_QM( gjf_paths, 
                                          prog=QM, 
                                          if_cluster_job=if_cluster_job, 

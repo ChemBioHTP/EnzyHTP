@@ -75,7 +75,7 @@ class Config:
                     'node_cores' : '16',
                     'job_name' : 'EnzyHTP_MD',
                     'partition' : 'production',
-                    'mem_per_core' : '3G',
+                    'mem_per_core' : '3G', # in GB
                     'walltime' : '1-00:00:00',
                     'account' : 'xxx'}, #TODO decouple this with accre
             'GPU': {'core_type' : 'gpu',
@@ -83,7 +83,7 @@ class Config:
                     'node_cores' : '1',
                     'job_name' : 'EnzyHTP_MD',
                     'partition' : 'pascal', #TODO decouple this with accre
-                    'mem_per_core' : '32G',
+                    'mem_per_core' : '32G', # in GB
                     'walltime' : '3-00:00:00',
                     'account' : 'xxx'}} #TODO decouple this with accre
         # -----------------------------
@@ -390,7 +390,7 @@ class Config:
                                 'node_cores' : '8',
                                 'job_name' : 'EnzyHTP_QMCluster',
                                 'partition' : 'production',
-                                'mem_per_core' : '3G',
+                                'mem_per_core' : '3G', # in GB downward round up after multiple with 1024
                                 'walltime' : '3-00:00:00',
                                 'account' : 'yang_lab_csb'}
 
