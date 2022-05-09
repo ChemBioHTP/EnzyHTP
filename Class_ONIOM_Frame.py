@@ -321,7 +321,7 @@ class Frame:
             if ff == 'gjf':
                 if ifchk:
                     of.write(r'%chk='+chk_path+line_feed)
-                of.write(f'%mem={int(g_cores)*int(g_mem_cores)}MB{line_feed}')
+                of.write(f'%mem={int(g_cores)*int(g_mem_cores)-1000}MB{line_feed}') # left 1000MB for outer usage
                 of.write(f'%nprocshared={g_cores}{line_feed}')
                 of.write(g_route+line_feed)
                 of.write(line_feed)

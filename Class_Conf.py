@@ -390,7 +390,7 @@ class Config:
                                 'node_cores' : '8',
                                 'job_name' : 'EnzyHTP_QMCluster',
                                 'partition' : 'production',
-                                'mem_per_core' : '3G', # in GB downward round up after multiple with 1024
+                                'mem_per_core' : '3G', # in GB. Will used in gjf as downward round up after * 1024 and will - 1000 after multiple with cores
                                 'walltime' : '3-00:00:00',
                                 'account' : 'yang_lab_csb'}
 
