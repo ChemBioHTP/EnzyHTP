@@ -83,7 +83,7 @@ class Config:
                     'node_cores' : '1',
                     'job_name' : 'EnzyHTP_MD',
                     'partition' : 'pascal', #TODO decouple this with accre
-                    'mem_per_core' : '32G', # in GB
+                    'mem_per_core' : '8G', # in GB
                     'walltime' : '3-00:00:00',
                     'account' : 'xxx'}} #TODO decouple this with accre
         # -----------------------------
