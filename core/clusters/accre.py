@@ -161,6 +161,7 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''',
         try:    
             submit_cmd = run(cmd, timeout=20, check=True,  text=True, shell=True, capture_output=True)
         except SubprocessError as e: # capture both error and timeout
+            print(f'Error running {cmd}: {repr(e)}')
             print(f'stderr: {e.stderr}')
             print(f'stdout: {e.stdout}')
             os.chdir(cwd) # avoid messing up the dir
@@ -249,7 +250,14 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''',
             print('No info from squeue. Switch to sacct')
         time.sleep(wait_time)
         cmd = f'{cls.INFO_CMD[1]} -j {job_id} -o {field}'
-        info_run = run(cmd, timeout=60, check=True,  text=True, shell=True, capture_output=True)
+        try:
+            info_run = run(cmd, timeout=60, check=True,  text=True, shell=True, capture_output=True)
+        except SubprocessError as e:
+            print(f'Error running {cmd}: {repr(e)}')
+            print(f'stderr: {e.stderr}')
+            print(f'stdout: {e.stdout}')
+            raise e
+            
         # if exist
         info_out = info_run.stdout.strip().splitlines()
         if len(info_out) >= 3:
