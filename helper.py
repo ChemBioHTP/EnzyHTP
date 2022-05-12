@@ -2,6 +2,8 @@
 Misc helper func and class
 '''
 from distutils.command.config import config
+import math
+import time
 from AmberMaps import Resi_list
 import os
 import numpy as np
@@ -24,7 +26,7 @@ Text
 line_feed = '\n'
 
 '''
-func
+file system
 '''
 def mkdir(dir):
     if os.path.exists(dir):
@@ -32,6 +34,18 @@ def mkdir(dir):
     else:
         os.makedirs(dir)
 
+def is_empty_dir(dir_path):
+    '''
+    check if the dir_path is an empty dir
+    '''
+    if os.path.isdir(dir_path):
+        if not os.listdir(dir_path):
+            return 1
+        else:
+            return 0
+    else:
+        print(f"No such directory: {dir_path}")
+        return 2
 
 '''
 math
@@ -100,6 +114,15 @@ def get_center(p1, p2):
 
     return tuple(p3)
 
+def round_by(num: float, cutnum: float) -> int:
+    '''
+    round the float number up if the decimal part is larger than cutnum
+    otherwise round down
+    '''
+    dec_part, int_part = math.modf(num)
+    if dec_part > cutnum:
+        int_part += 1
+    return int(int_part)
 
 '''
 Cheminfo
@@ -227,8 +250,12 @@ def write_data(tag, data, out_path):
             of.write(repr(data[item])+line_feed)
 
     return out_path
-        
-'''
-Mutant assigner
-'''
-#TODO
+
+def chunked(iter_, size):
+    '''
+    chunk iter_ by size and return generator for chunked list 
+    '''
+    return (iter_[position : position + size] for position in range(0, len(iter_), size))
+
+def get_localtime(time_stamp):
+    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time_stamp))

@@ -1,15 +1,18 @@
-from math import exp, ceil
+import copy
+from math import ceil
 import os
 import re
-from subprocess import run, CalledProcessError
+from subprocess import SubprocessError, run, CalledProcessError
 from random import choice
-from xmlrpc.client import boolean
+from typing import Union
 from AmberMaps import *
 from wrapper import *
 from Class_Structure import *
 from Class_line import *
 from Class_Conf import Config, Layer
 from Class_ONIOM_Frame import *
+from core import job_manager
+from core.clusters._interface import ClusterInterface
 from helper import Conformer_Gen_wRDKit, decode_atom_mask, get_center, get_field_strength_value, line_feed, mkdir, generate_Rosetta_params
 try:
     from pdb2pqr.main import main_driver as run_pdb2pqr
@@ -196,7 +199,7 @@ class PDB():
 
     def _init_MD_conf(self):
         '''
-        initialize default MD configuration. Replaced by manual setting if assigned later.
+        initialize default MD configuration. Replaced by manual setting if assigned later. TODO may be need copy & operation in where it is used.
         '''
         self.conf_min = Config.Amber.conf_min
         self.conf_heat = Config.Amber.conf_heat
@@ -1057,7 +1060,16 @@ class PDB():
         return Flag[0]+Flag[1]+Flag[2]+Flag[3]
 
 
-    def PDBMin(self,cycle=2000,engine='Amber_GPU'):
+    def PDBMin(
+        self,
+        cycle: int = 20000,
+        engine: str = 'Amber_GPU',
+        if_cluster_job: bool = 1, 
+        cluster: ClusterInterface = None, 
+        period: int = 10,
+        res_setting: Union[dict, None] = None,
+        cluster_debug: bool = 0
+        ):
         '''
         Run a minization use self.prmtop and self.inpcrd and setting form class Config.
         --------------------------------------------------
@@ -1067,7 +1079,7 @@ class PDB():
         
         out4_PDB_path=self.path_name+'_min.pdb'
 
-        #make sander input
+        #make MD config
         min_dir = self.cache_path+'/PDBMin'
         minin_path = min_dir + '/min.in'
         minout_path = min_dir + '/min.out'
@@ -1086,14 +1098,42 @@ class PDB():
         min_input.write('  cut=8.0,'+line_feed)
         min_input.write(' /'+line_feed)
         min_input.close()
-    
-        # express engine
-        PC_cmd, engine_path = Config.Amber.get_Amber_engine(engine=engine)
 
-        #run
-        if Config.debug >= 1:
-            print('running: '+PC_cmd +' '+ engine_path +' -O -i '+minin_path+' -o '+minout_path+' -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+minrst_path)
-        os.system(PC_cmd +' '+ engine_path +' -O -i '+minin_path+' -o '+minout_path+' -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+minrst_path)
+        # determine cluster rescources
+        cpu_cores = None
+        if if_cluster_job:
+            core_type = engine.split('_')[-1] # this go front because needed in expressing cmd
+            res_setting, env_settings = type(self)._prepare_cluster_job_pdbmd(cluster, core_type, res_setting)
+            if core_type == 'CPU':
+                cpu_cores = res_setting['node_cores']
+        # express engine
+        PC_cmd, engine_path = Config.Amber.get_Amber_engine(engine=engine, n_cores=cpu_cores)
+
+        # make cmd
+        cmd = f'{PC_cmd} {engine_path} -O -i {minin_path} -o {minout_path} -p {self.prmtop_path} -c {self.inpcrd_path} -r {minrst_path}'
+        
+        # run
+        if if_cluster_job:
+            job = job_manager.ClusterJob.config_job(
+                commands = cmd,
+                cluster = cluster,
+                env_settings = env_settings,
+                res_keywords = res_setting,
+                sub_dir = './', # because path are relative
+                sub_script_path = f'{min_dir}/submit_PDBMin_{core_type}.cmd'
+            )
+            job.submit()
+            if Config.debug > 0:
+                print(f'''Running Min on {cluster.NAME}: job_id: {job.job_id} script: {job.sub_script_path} period: {period}''')
+            job.wait_to_end(period=period)
+            type(self)._detect_amber_error(job)
+            
+            if cluster_debug:
+                self.pdbmin_job = job
+        else:
+            if Config.debug >= 1:
+                print(f'running: {cmd}')
+            os.system(cmd)
         #rst2pdb
         try:
             run('ambpdb -p '+self.prmtop_path+' -c '+minrst_path+' > '+out4_PDB_path, check=True, text=True, shell=True, capture_output=True)
@@ -1184,17 +1224,17 @@ class PDB():
 
         # build things seperately
         if local_lig:
-            lig_dir = self.dir+'/ligands/'
-            met_dir = self.dir+'/metalcenters/'
+            self.lig_dir = self.dir+'/ligands/'
+            self.met_dir = self.dir+'/metalcenters/'
         else:
-            lig_dir = self.dir+'/../ligands/'
-            met_dir = self.dir+'/../metalcenters/'
-        mkdir(lig_dir)
-        mkdir(met_dir)
+            self.lig_dir = self.dir+'/../ligands/'
+            self.met_dir = self.dir+'/../metalcenters/'
+        mkdir(self.lig_dir)
+        mkdir(self.met_dir)
 
-        # metalcenters_path = self.stru.build_metalcenters(met_dir)
+        # metalcenters_path = self.stru.build_metalcenters(self.met_dir)
         # parm
-        ligand_parm_paths = self._ligand_parm(lig_dir, method=lig_method, renew=renew_lig)
+        ligand_parm_paths = self._ligand_parm(self.lig_dir, method=lig_method, renew=renew_lig)
         # self._metal_parm(metalcenters_path)
         # combine
         if o_dir != '':
@@ -1332,7 +1372,12 @@ class PDB():
                 of.write('savepdb a '+sol_path+line_feed)
             of.write('quit'+line_feed)
 
-        os.system('tleap -s -f '+leap_path+' > '+leap_path[:-2]+'out')
+        try:
+            run('tleap -s -f '+leap_path+' > '+leap_path[:-2]+'out', check=True,  text=True, shell=True, capture_output=True)
+        except SubprocessError as e:
+            print(f'stderr: {e.stderr}')
+            print(f'stdout: {e.stdout}')
+            raise e
 
         return self.prmtop_path, self.inpcrd_path
 
@@ -1393,26 +1438,84 @@ class PDB():
         return self.path
 
 
-    def PDBMD(self, tag='', o_dir='', engine='Amber_GPU', equi_cpu=0):
+    def PDBMD(  
+        self, 
+        tag: str = '', 
+        o_dir: str = '', 
+        engine: str = 'Amber_GPU', 
+        equi_cpu: bool = 0,
+        if_cluster_job: bool = 1, # TODO(qz) maybe its better to make everything below a dictionary 
+        cluster: ClusterInterface = None, # since the requirement is similar for a cluster job
+        period: int = 600,
+        res_setting: Union[dict, None] = None,
+        res_setting_equi_cpu: Union[dict, None] = None,
+        cluster_debug: bool = 0
+        ):
         '''
         Use self.prmtop_path and self.inpcrd_path to initilize a MD simulation.
         The default MD configuration settings are assigned by class Config.Amber.
         * User can also set MD configuration for the current object by assigning values in self.conf_xxxx.
         * e.g.: self.conf_heat['nstlim'] = 50000
         --------------
-        o_dir   : Write files in o_dir (current self.dir/MD by default).
-        tag     : tag the name of the MD folder
-        engine  : MD engine (cpu/gpu)
-        equi_cpu: if use cpu for equi step
-        Return the nc path of the prod step and store in self.nc
+        Args:
+        self    :
+            dir 
+                - for creating the MD storage dir under
+            prmtop_path 
+                - MD input file
+            inpcrd_path 
+                - MD input file
+        o_dir   : 
+            Write files in o_dir (current self.dir/MD by default).
+        tag     : 
+            tag the assigned tag to the MD folder
+        engine  : 
+            MD engine (cpu/gpu)
+        equi_cpu: 
+            if use cpu for equi step
+        if_cluster_job:
+            if submit the calculation to a cluster using the job manager
+        cluster: (if_cluster_job is 1)
+            The cluster used
+        period: (if_cluster_job is 1)
+            the time cycle for each job state check (Unit: s) (default: 600)
+        res_setting: (if_cluster_job is 1)
+            (default: Config.Amber.MD_CPU_RES)
+            provide specific keys you want to change the rest will remain default.
+            (e.g. res_setting = {'node_cores':'2'} will still use a complete dictionary 
+            with only node_cores modified.)
+        res_setting_equi_cpu: 
+            resource for equi cpu job if use cpu for equi
+            provide specific keys you want to change the rest will remain default.
+        cluster_debug:
+           1:  add also the pdbmd job obj to the pdb obj
+        --data--
+        Attribute:
+            store resulting NetCrd traj file path in self.nc
+        Return:
+            Return the nc path of the prod step
         '''
         # make folder
         if o_dir == '':
             o_dir = self.dir+'/MD'+tag
         mkdir(o_dir)
+        # default cpu cores
+        cpu_cores = None # these will be used in Config.get_PC_cmd(cpu_cores) and None will mean using Config.n_cores
+        equi_cpu_cores = None
+        # format settings for cluster job (since it also influence the command)
+        if if_cluster_job:
+            core_type = engine.split('_')[-1]
+            res_setting, env_settings = type(self)._prepare_cluster_job_pdbmd(cluster, core_type, res_setting)
+            if core_type == 'CPU':
+                cpu_cores = res_setting['node_cores']
+            if core_type == 'GPU' and equi_cpu:
+                # get env res for equi
+                env_settings_equi_cpu = cluster.AMBER_ENV['CPU']
+                res_setting_equi_cpu = type(self)._get_default_res_setting_pdbmd(res_setting_equi_cpu, 'CPU')
+                equi_cpu_cores = res_setting_equi_cpu['node_cores']
 
         # express engine (pirority: AmberEXE_GPU/AmberEXE_CPU - AmberHome/bin/xxx)
-        PC_cmd, engine_path = Config.Amber.get_Amber_engine(engine=engine)
+        PC_cmd, engine_path = Config.Amber.get_Amber_engine(engine=engine, n_cores=cpu_cores)
         # express cpu engine if equi_cpu
         if equi_cpu:
             if Config.Amber.AmberEXE_CPU == None:
@@ -1425,32 +1528,147 @@ class PDB():
         heat_path = self._build_MD_heat(o_dir)
         equi_path = self._build_MD_equi(o_dir)
         prod_path = self._build_MD_prod(o_dir)
-
-        # run sander
-        if Config.debug >= 1:
-            print('running: '+PC_cmd +' '+ engine_path +' -O -i '+min_path +' -o '+o_dir+'/min.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+o_dir+'/min.rst -ref '+self.inpcrd_path)
-        os.system(PC_cmd +' '+ engine_path +' -O -i '+min_path +' -o '+o_dir+'/min.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+o_dir+'/min.rst -ref '+self.inpcrd_path)
-        if Config.debug >= 1:
-            print('running: '+PC_cmd +' '+ engine_path +' -O -i '+heat_path+' -o '+o_dir+'/heat.out -p '+self.prmtop_path+' -c '+o_dir+'/min.rst -ref ' +o_dir+'/min.rst -r ' +o_dir+'/heat.rst')
-        os.system(PC_cmd +' '+ engine_path +' -O -i '+heat_path+' -o '+o_dir+'/heat.out -p '+self.prmtop_path+' -c '+o_dir+'/min.rst -ref ' +o_dir+'/min.rst -r ' +o_dir+'/heat.rst')
-        
+        # build md commands
+        cmd_min = f'{PC_cmd} {engine_path} -O -i {min_path} -o {o_dir}/min.out -p {self.prmtop_path} -c {self.inpcrd_path} -r {o_dir}/min.rst -ref {self.inpcrd_path}{line_feed}'.strip(' ')
+        cmd_heat = f'{PC_cmd} {engine_path} -O -i {heat_path} -o {o_dir}/heat.out -p {self.prmtop_path} -c {o_dir}/min.rst -r {o_dir}/heat.rst -ref {o_dir}/min.rst{line_feed}'.strip(' ')
+        cmd_prod = f'{PC_cmd} {engine_path} -O -i {prod_path} -o {o_dir}/prod.out -p {self.prmtop_path} -c {o_dir}/equi.rst -r {o_dir}/prod.rst -ref {o_dir}/equi.rst -x {o_dir}/prod.nc{line_feed}'.strip(' ')
         # gpu debug for equi
-        if equi_cpu: 
-            # use Config.PC_cmd and cpu_engine_path
-            if Config.debug >= 1:
-                print('running: '+Config.PC_cmd +' '+ cpu_engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
-            os.system(Config.PC_cmd +' '+ cpu_engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
+        if equi_cpu:
+            cmd_equi = f'{Config.get_PC_cmd(equi_cpu_cores)} {cpu_engine_path} -O -i {equi_path} -o {o_dir}/equi.out -p {self.prmtop_path} -c {o_dir}/heat.rst -r {o_dir}/equi.rst -ref {o_dir}/heat.rst -x {o_dir}/equi.nc{line_feed}'.strip(' ')
+        else:
+            cmd_equi = f'{PC_cmd} {engine_path} -O -i {equi_path} -o {o_dir}/equi.out -p {self.prmtop_path} -c {o_dir}/heat.rst -r {o_dir}/equi.rst -ref {o_dir}/heat.rst -x {o_dir}/equi.nc{line_feed}'.strip(' ')
+
+        # run MD exe
+        if if_cluster_job:
+            md_jobs = []
+            if equi_cpu:
+                # divide into 3 jobs
+                cmd_1 = cmd_min + cmd_heat
+                cmd_2 = cmd_equi
+                cmd_3 = cmd_prod
+                # make job: 1&3 are in same environment 2 is always in CPU environment
+                job_1 = job_manager.ClusterJob.config_job(
+                    commands = cmd_1,
+                    cluster = cluster,
+                    env_settings = env_settings,
+                    res_keywords = res_setting,
+                    sub_dir = './', # because path are relative
+                    sub_script_path = f'{o_dir}/submit_PDBMD_1_{core_type}.cmd')
+                job_1.submit()
+                if Config.debug > 0:
+                    print(f'''Running MD on {cluster.NAME}: job_id: {job_1.job_id} script: {job_1.sub_script_path} period: {period}''')
+                job_1.wait_to_end(period)
+                type(self)._detect_amber_error(job_1)
+
+                job_2 = job_manager.ClusterJob.config_job(
+                    commands = cmd_2,
+                    cluster = cluster,
+                    env_settings = env_settings_equi_cpu,
+                    res_keywords = res_setting_equi_cpu,
+                    sub_dir = './', # because path are relative
+                    sub_script_path = f'{o_dir}/submit_PDBMD_2_CPU.cmd')
+                job_2.submit()
+                if Config.debug > 0:
+                    print(f'''Running MD on {cluster.NAME}: job_id: {job_2.job_id} script: {job_2.sub_script_path} period: {period}''')
+                job_2.wait_to_end(period)
+                type(self)._detect_amber_error(job_2)
+
+                job_3 = job_manager.ClusterJob.config_job(
+                    commands = cmd_3,
+                    cluster = cluster,
+                    env_settings = env_settings,
+                    res_keywords = res_setting,
+                    sub_dir = './', # because path are relative
+                    sub_script_path = f'{o_dir}/submit_PDBMD_3_{core_type}.cmd')
+                job_3.submit()
+                if Config.debug > 0:
+                    print(f'''Running MD on {cluster.NAME}: job_id: {job_3.job_id} script: {job_3.sub_script_path} period: {period}''')
+                job_3.wait_to_end(period)
+                type(self)._detect_amber_error(job_3)
+                md_jobs.extend([job_1, job_2, job_3])
+            else:
+                # all GPU or CPU
+                cmd = cmd_min + cmd_heat + cmd_equi + cmd_prod
+                job = job_manager.ClusterJob.config_job(
+                    commands = cmd,
+                    cluster = cluster,
+                    env_settings = env_settings,
+                    res_keywords = res_setting,
+                    sub_dir = './', # because path are relative
+                    sub_script_path = f'{o_dir}/submit_PDBMD_{core_type}.cmd'
+                )
+                job.submit()
+                if Config.debug > 0:
+                    print(f'''Running MD on {cluster.NAME}: job_id: {job.job_id} script: {job.sub_script_path} period: {period}''')
+                job.wait_to_end(period=period)
+                type(self)._detect_amber_error(job)
+                md_jobs.append(job)
+            
+            if cluster_debug:
+                self.pdbmd_jobs = md_jobs
+
         else:
             if Config.debug >= 1:
-                print('running: '+PC_cmd +' '+ engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
-            os.system(PC_cmd +' '+ engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
-        
-        if Config.debug >= 1:
-            print('running: '+PC_cmd +' '+ engine_path +' -O -i '+prod_path+' -o '+o_dir+'/prod.out -p '+self.prmtop_path+' -c '+o_dir+'/equi.rst -ref '+o_dir+'/equi.rst -r '+o_dir+'/prod.rst -x '+o_dir+'/prod.nc')
-        os.system(PC_cmd +' '+ engine_path +' -O -i '+prod_path+' -o '+o_dir+'/prod.out -p '+self.prmtop_path+' -c '+o_dir+'/equi.rst -ref '+o_dir+'/equi.rst -r '+o_dir+'/prod.rst -x '+o_dir+'/prod.nc')
+                print(f'running: {cmd_min}')
+            os.system(cmd_min)
+            if Config.debug >= 1:
+                print(f'running: {cmd_heat}')
+            os.system(cmd_heat)
+            if Config.debug >= 1:
+                print(f'running: {cmd_equi}')
+            os.system(cmd_equi)
+            if Config.debug >= 1:
+                print(f'running: {cmd_prod}')
+            os.system(cmd_prod)
 
+        # return value
         self.nc = o_dir+'/prod.nc'
         return o_dir+'/prod.nc'
+
+    @staticmethod
+    def _detect_amber_error(amber_job):
+        '''
+        amber pmemd tend to delay the error show up in the workflow.
+        It does not provide abnormal exit code but just output some error information to the stdout/stderr
+        '''
+        with open(amber_job.job_cluster_log) as f:
+            f_str = f.read()
+            if 'ERROR' in f_str or 'Error' in f_str:
+                raise Exception(f'Amber Terminated Abnormally! Here is the output ({amber_job.job_cluster_log}):{line_feed} {f_str}') 
+                # TODO make a workflow exception that can show some more step releted info
+                # So that can use try except to do some special action when dont want one fail ruin the HTP
+
+    @staticmethod
+    def _get_default_res_setting_pdbmd(res_setting, core_type):
+        if res_setting is None:
+            res_setting = dict()
+        if isinstance(res_setting, dict):
+            res_setting_holder = copy.deepcopy(Config.Amber.MD_RES[core_type])
+            # replace assigned key in default dict
+            for k, v in res_setting.items():
+                res_setting_holder[k] = v
+            return res_setting_holder
+        if isinstance(res_setting, str):
+            return res_setting
+
+    @classmethod
+    def _prepare_cluster_job_pdbmd(cls, cluster, core_type, res_setting) -> tuple[str, str]:
+        '''
+        update the default res_setting with the input
+        get env_setting according to the core type
+        '''
+        #san check
+        if not isinstance(cluster, ClusterInterface):
+            raise TypeError('cluster job need a cluster (ClusterInterface object) input')
+        # get res and env settinng
+        # interface check
+        if 'AMBER_ENV' not in dir(cluster):
+            raise Exception('PDBMD requires the input cluster have the AMBER_ENV attr')
+        env_settings = cluster.AMBER_ENV[core_type]
+        # default for res
+        res_setting = cls._get_default_res_setting_pdbmd(res_setting, core_type)
+
+        return res_setting, env_settings
 
 
     def _build_MD_min(self, o_dir):
@@ -1612,7 +1830,6 @@ class PDB():
         with open(o_path,'w') as of:
             of.write(conf_str)
         return o_path
-
 
 
     def _build_MD_prod(self, o_dir):
@@ -2105,25 +2322,84 @@ class PDB():
     QM Cluster
     ========    
     '''
-    def PDB2QMCluster(self, atom_mask, spin=1, o_dir='', tag='', QM='g16',g_route=None, ifchk=0, val_fix = 'internal'):
+    def PDB2QMCluster(
+        self, 
+        atom_mask: str, 
+        spin: int = 1, 
+        o_dir: Union[str, None] = None, 
+        tag: str = '', 
+        QM: str = 'g16',
+        g_route: Union[str, None] =None,
+        ifchk: bool = 0, 
+        val_fix: str = 'internal',
+        if_cluster_job: bool = 1, 
+        cluster: ClusterInterface = None,
+        job_array_size: int = 0,
+        period: int = 600,
+        res_setting: Union[dict, None] = None,
+        cluster_debug: bool = 0
+    ) -> list :
         '''
         Build & Run QM cluster input from self.mdcrd with selected atoms according to atom_mask
         ---------
-        spin: specific spin state for the qm cluster. (default: 1)
-        QM: QM engine (default: Gaussian)
-            g_route: Gaussian route line
-            ifchk: if save chk file of a gaussian job. (default: 0)
-        val_fix: fix free valance of truncated strutures
+        Args:
+        self (Pre-requisites):
+            dir 
+                - for *default dir*
+            path 
+                - for *get_stru()* 
+                - need the same pdb representing the structure in the MD frames
+            prmtop_path 
+                - for get *charge* list 
+                - need the prmtop file used as MD input
+            mdcrd 
+                - for *coordinates* of each QM cluster 
+                - the mdcrd file that sampled from the traj
+            prepi_path (val_fix='internal')
+                - for get *connectivity (ligand part)* and fix free valances if they exist
+                - the dict for prepin files for all ligands {'3_letter_name':'path_to_prepin_file', ...}
+            (* the later 3 should of the consistancy from the same MD*)
+        atom_mask:
+            Amber-style atom mask for specifing the the QM region.
+        spin: 
+            specific spin state for the qm cluster. (default: 1)
+        o_dir:
+            The output directory that contain all QM input & output jobs.
+        tag:
+            Add tag to default out_dir. It will be {self.dir}/QM_cluster{tag}
+        QM: 
+            QM engine (default: g16)
+        g_route: 
+            Gaussian route line
+        ifchk: 
+            if save chk file of a gaussian job. (default: 0)
+        val_fix: 
+            fix free valance of truncated strutures
             = internal: add H to where the original connecting atom is. 
                         special fix for classical case:
                         "sele by residue" (cut N-C) -- adjust dihedral for added H on N.
             = openbabel TODO
+        if_cluster_job:
+            if submit the calculation to a cluster using the job manager
+        cluster, job_array_size, period
+            see Run_QM
+        res_setting
+            see Run_QM for detail (default: Config.Gaussian.QMCLUSTER_CPU_RES)
+            provide specific keys you want to change the rest will remain default.
+            (e.g. res_setting = {'node_cores':'8'} will still use a complete dictionary 
+            with only node_cores modified.)
+        cluster_debug:
+           1:  add also the qm cluster job obj to the pdb obj
         ---data---
-        self.frames
-        self.qm_cluster_map (PDB atom id -> QM atom id)
+        Attribute:
+            self.frames
+            self.qm_cluster_map (PDB atom id -> QM atom id)
+        Return:
+            self.qm_cluster_out
+                the list of paths of the qm cluster output files
         '''
         # make folder
-        if o_dir == '':
+        if o_dir == None:
             o_dir = self.dir+'/QM_cluster'+tag
         mkdir(o_dir)
         # update stru
@@ -2138,6 +2414,16 @@ class PDB():
         chrgspin = self._get_qmcluster_chrgspin(sele_lines, spin=spin)
         if Config.debug >= 1:
             print('Charge: '+str(chrgspin[0])+' Spin: '+str(chrgspin[1]))
+        # get res setting
+        cpu_cores = Config.n_cores
+        cpu_mem = Config.max_core
+        # overwrite those if cluster job is true
+        if if_cluster_job:
+            # default values TODO should contain them in Config.Gaussian
+            res_setting = type(self)._get_default_res_setting_qmcluster(res_setting)
+            if QM in ['g16','g09']:
+                cpu_cores = res_setting['node_cores']
+                cpu_mem = int(float(res_setting['mem_per_core'].rstrip('GB')) * 1024)
 
         #make inp files
         frames = Frame.fromMDCrd(self.mdcrd)
@@ -2148,10 +2434,25 @@ class PDB():
                 print('Writing QMcluster gjfs.')
             for i, frame in enumerate(frames):
                 gjf_path = o_dir+'/qm_cluster_'+str(i)+'.gjf'
-                frame.write_sele_lines(sele_lines, out_path=gjf_path, g_route=g_route, chrgspin=chrgspin, ifchk=ifchk)
+                frame.write_sele_lines(sele_lines, out_path=gjf_path, g_route=g_route, g_cores=cpu_cores, g_mem_cores=cpu_mem, chrgspin=chrgspin, ifchk=ifchk)
                 gjf_paths.append(gjf_path)
             # Run inp files
-            qm_cluster_out_paths = PDB.Run_QM(gjf_paths, prog=QM)
+            if if_cluster_job:
+                Run_QM_out = PDB.Run_QM( gjf_paths, 
+                                         prog=QM, 
+                                         if_cluster_job=if_cluster_job, 
+                                         cluster = cluster,
+                                         job_array_size = job_array_size,
+                                         period = period,
+                                         res_setting=res_setting,
+                                         cluster_debug=cluster_debug)
+                if cluster_debug:
+                    qm_cluster_out_paths = Run_QM_out[0]
+                    self.qm_cluster_jobs = Run_QM_out[1]
+                else:
+                    qm_cluster_out_paths = Run_QM_out
+            else:
+                qm_cluster_out_paths = PDB.Run_QM(gjf_paths, prog=QM, if_cluster_job=0)
             # get chk files if ifchk
             if ifchk:
                 qm_cluster_chk_paths = []
@@ -2172,6 +2473,7 @@ class PDB():
     def _get_qmcluster_chrgspin(self, sele, spin=1):
         '''
         get charge for qmcluster of sele from self.prmtop
+        # TODO refine charge count for qm region cut interface
         '''
         # get chrg list
         chrg_list_all = PDB.get_charge_list(self.prmtop_path)
@@ -2193,31 +2495,125 @@ class PDB():
 
         return (round(sele_chrg), spin)
 
+    @staticmethod
+    def _get_default_res_setting_qmcluster(res_setting):
+        if res_setting is None:
+            res_setting = dict()
+        if isinstance(res_setting, dict):
+            res_setting_holder = copy.deepcopy(Config.Gaussian.QMCLUSTER_CPU_RES)
+            # replace assigned key in default dict
+            for k, v in res_setting.items():
+                res_setting_holder[k] = v
+            return res_setting_holder
+        if isinstance(res_setting, str):
+            return res_setting
+
     @classmethod
-    def Run_QM(cls, inp, prog='g16'):
+    def Run_QM(
+        cls, 
+        inp: list[str], 
+        prog: str = 'g16', 
+        if_cluster_job: bool = 1,
+        cluster: ClusterInterface = None,
+        job_array_size: int = 0,
+        period: int = 600,
+        res_setting: dict = None,
+        cluster_debug: bool = 0
+    ):
         '''
-        Run QM with prog
+        Run QM with {prog} for {inp} files and return paths of output files.
+        Args:
+        inp: 
+            list of paths of input files
+        prog:
+            the QM program (default: g16)
+        if_cluster_job:
+            if submit the QM calculation to a HPC (default: 1)
+        cluster:
+            The cluster used when if_cluster_job is 1.
+        job_array_size:
+            how many jobs are allowed to submit simultaneously. (default: 0 means len(inp))
+            (e.g. 5 for 100 jobs means run 20 groups. All groups will be submitted and 
+            in each group, submit the next job only after the previous one finishes.)
+        period:
+            the time cycle for each job state change (Unit: s) (default: 600)
+        res_setting:
+            resource setting dictionary
+        cluster_debug:
+            1: return also the job objects
+            0: return only the out file paths
+
+        TODO put this individually as part of the qm interface
+             maybe introduct the current executor object to decouple this module with the job manager.
         '''
-        if prog == 'g16':
-            outs = []
-            for gjf in inp:
-                out = gjf[:-3]+'out'
-                if Config.debug > 1:
-                    print('running: '+Config.Gaussian.g16_exe+' < '+gjf+' > '+out)
-                os.system(Config.Gaussian.g16_exe+' < '+gjf+' > '+out)
-                outs.append(out)
-            return outs
+        if if_cluster_job:
+            #san check
+            if not isinstance(cluster, ClusterInterface):
+                raise TypeError('cluster job need a cluster (ClusterInterface object) input')
+            
+            if prog == 'g16':
+                outs = []
+                # config jobs
+                jobs = []
+                for gjf_path in inp:
+                    out_path = gjf_path.removesuffix('gjf')+'out'
+                    jobs.append(cls._make_single_g16_job(gjf_path, out_path, cluster, res_setting))
+                    outs.append(out_path)
+                # submit and run in array
+                if Config.debug > 0:
+                    print(f'''Running QM array on {cluster.NAME}: number: {len(jobs)} size: {job_array_size} period: {period}''')
+                job_manager.ClusterJob.wait_to_array_end(jobs, period, job_array_size)
 
-        if prog == 'g09':
-            outs = []
-            for gjf in inp:
-                out = gjf[:-3]+'out'
-                if Config.debug > 1:
-                    print('running: '+Config.Gaussian.g09_exe+' < '+gjf+' > '+out)
-                os.system(Config.Gaussian.g09_exe+' < '+gjf+' > '+out)
-                outs.append(out)
-            return outs
+                if cluster_debug:
+                    return outs, jobs
+                return outs
+        else:
+            # local job
+            if prog == 'g16':
+                outs = []
+                for gjf in inp:
+                    out = gjf[:-3]+'out'
+                    if Config.debug > 1:
+                        print('running: '+Config.Gaussian.g16_exe+' < '+gjf+' > '+out)
+                    os.system(Config.Gaussian.g16_exe+' < '+gjf+' > '+out)
+                    outs.append(out)
+                return outs
 
+            if prog == 'g09':
+                outs = []
+                for gjf in inp:
+                    out = gjf[:-3]+'out'
+                    if Config.debug > 1:
+                        print('running: '+Config.Gaussian.g09_exe+' < '+gjf+' > '+out)
+                    os.system(Config.Gaussian.g09_exe+' < '+gjf+' > '+out)
+                    outs.append(out)
+                return outs
+
+    @classmethod
+    def _make_single_g16_job(
+            cls, 
+            gjf_path: str, 
+            out_path: str, 
+            cluster: ClusterInterface,
+            res_setting: dict
+        ) -> job_manager.ClusterJob :
+        '''
+        job for submit g16 for gjf > out to cluster
+        return a ClusterJob object
+        '''
+        cmd = f'{Config.Gaussian.g16_exe} < {gjf_path} > {out_path}'
+        # interface check
+        if 'G16_ENV' not in dir(cluster):
+            raise Exception('RunQM(prog = g16) requires the input cluster have the G16_ENV attr')
+        job = job_manager.ClusterJob.config_job(
+            commands = cmd,
+            cluster = cluster,
+            env_settings = cluster.G16_ENV['CPU'],
+            res_keywords = res_setting,
+            sub_dir = './', # because gjf path are relative
+            sub_script_path = gjf_path.removesuffix('gjf')+'cmd'
+        )
+        return job
 
     def get_fchk(self, keep_chk=0):
         '''
@@ -2246,7 +2642,12 @@ class PDB():
         self.qm_cluster_fchk = fchk_paths
         return self.qm_cluster_fchk
         
-
+    def gaussian_error_handling():
+        '''
+        TODO handle gaussian errors. can be enabled in RunQM
+        use maps in Config.Gaussian
+        '''
+        pass
     '''
     ========
     QM Analysis 
@@ -2340,7 +2741,7 @@ class PDB():
         Result direction: a1 -> a2
         
         REF: Lu, T.; Chen, F., Multiwfn: A multifunctional wavefunction analyzer. J. Comput. Chem. 2012, 33 (5), 580-592.
-        '''
+        ''' # TODO support array job
         Dipoles = []
 
         if prog == 'Multiwfn':
