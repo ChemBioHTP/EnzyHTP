@@ -2,6 +2,7 @@
 Misc helper func and class
 '''
 from distutils.command.config import config
+import math
 import time
 from AmberMaps import Resi_list
 import os
@@ -113,6 +114,15 @@ def get_center(p1, p2):
 
     return tuple(p3)
 
+def round_by(num: float, cutnum: float) -> int:
+    '''
+    round the float number up if the decimal part is larger than cutnum
+    otherwise round down
+    '''
+    dec_part, int_part = math.modf(num)
+    if dec_part > cutnum:
+        int_part += 1
+    return int(int_part)
 
 '''
 Cheminfo

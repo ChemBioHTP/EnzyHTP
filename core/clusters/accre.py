@@ -10,6 +10,7 @@ from subprocess import CompletedProcess, SubprocessError, run
 import time
 
 from Class_Conf import Config
+from helper import round_by
 from ._interface import ClusterInterface
 
 
@@ -65,7 +66,7 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''',
         'node_cores' : {'cpu': 'tasks-per-node=', 'gpu': 'gres=gpu:'},
         'job_name' : 'job-name=',
         'partition' : 'partition=',
-        'mem_per_core' : {'cpu': 'mem-per-cpu=', 'gpu': 'mem-per-gpu='},
+        'mem_per_core' : {'cpu': 'mem-per-cpu=', 'gpu': 'mem='}, # previously using mem-per-gpu= change to mem= (calculate the total memory) base on issue #57
         'walltime' : 'time=',
         'account' : 'account='
     }
@@ -116,6 +117,12 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''',
             else:
                 new_k = cls.RES_KEYWORDS_MAP[k]
             new_dict[new_k] = v
+        # process total mem
+        for k in new_dict:
+            if k == 'mem=':
+                mem_per_core_n_gb = new_dict[k].rstrip('GB')
+                total_mem = round_by(float(mem_per_core_n_gb) * float(res_dict['node_cores']), 0.1) # round up
+                new_dict[k] = f'{total_mem}G'
         return new_dict
 
     @staticmethod
