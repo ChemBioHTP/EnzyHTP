@@ -73,7 +73,7 @@ class Config:
             'CPU': {'core_type' : 'cpu',
                     'nodes':'1',
                     'node_cores' : '16',
-                    'job_name' : 'EnzyHTP_MD',
+                    'job_name' : 'EHTP_MD',
                     'partition' : 'production',
                     'mem_per_core' : '3G', # in GB
                     'walltime' : '1-00:00:00',
@@ -81,7 +81,7 @@ class Config:
             'GPU': {'core_type' : 'gpu',
                     'nodes':'1',
                     'node_cores' : '1',
-                    'job_name' : 'EnzyHTP_MD',
+                    'job_name' : 'EHTP_MD',
                     'partition' : 'pascal', #TODO decouple this with accre
                     'mem_per_core' : '8G', # in GB
                     'walltime' : '3-00:00:00',
