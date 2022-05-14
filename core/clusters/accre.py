@@ -10,7 +10,7 @@ from subprocess import CompletedProcess, SubprocessError, run
 import time
 
 from Class_Conf import Config
-from helper import round_by
+from helper import round_by, run_cmd
 from ._interface import ClusterInterface
 
 
@@ -159,16 +159,15 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''',
         # cd to sub_path
         os.chdir(sub_dir)
         try:    
-            submit_cmd = run(cmd, timeout=20, check=True,  text=True, shell=True, capture_output=True)
+            submit_cmd = run(cmd, timeout=120, check=True,  text=True, shell=True, capture_output=True)
         except SubprocessError as e: # capture both error and timeout
             print(f'Error running {cmd}: {repr(e)}')
             print(f'stderr: {e.stderr}')
-            print(f'stdout: {e.stdout}')
-            os.chdir(cwd) # avoid messing up the dir
+            print(f'stdout: {e.stdout}')            
             raise e
-        # TODO(shaoqz) timeout condition is hard to test
-        # cd back
-        os.chdir(cwd)
+        finally:
+            # TODO(shaoqz) timeout condition is hard to test
+            os.chdir(cwd) # avoid messing up the dir
         
         job_id = cls._get_job_id_from_submit(submit_cmd)
         slurm_log_path = cls._get_log_from_id(sub_dir, job_id)
@@ -228,6 +227,7 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''',
         1. use squeue frist (fast) and
         if nothing is found (job finished)
         wait for wait time and 2. use sacct (slow)
+        * will try each command (if fail) up to 2880 times with a 30s gap (covers 1 day time span)
         Arg:
             job_id
             field: supported keywords can be found at https://slurm.schedmd.com/sacct.html
@@ -237,7 +237,7 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''',
         # get info
         # squeue
         cmd = f'{cls.INFO_CMD[0]} -u $USER -O JobID,{field}' # donot use the -j method to be more stable
-        info_run = run(cmd, timeout=120, check=True,  text=True, shell=True, capture_output=True)
+        info_run = run_cmd(cmd, try_time=2880, wait_time=30, timeout=120)
         # if exist
         info_out_lines = info_run.stdout.strip().splitlines()
         for info_line in info_out_lines:
@@ -250,14 +250,7 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''',
             print('No info from squeue. Switch to sacct')
         time.sleep(wait_time)
         cmd = f'{cls.INFO_CMD[1]} -j {job_id} -o {field}'
-        try:
-            info_run = run(cmd, timeout=60, check=True,  text=True, shell=True, capture_output=True)
-        except SubprocessError as e:
-            print(f'Error running {cmd}: {repr(e)}')
-            print(f'stderr: {e.stderr}')
-            print(f'stdout: {e.stdout}')
-            raise e
-            
+        info_run = run_cmd(cmd, try_time=2880, wait_time=30, timeout=120)            
         # if exist
         info_out = info_run.stdout.strip().splitlines()
         if len(info_out) >= 3:

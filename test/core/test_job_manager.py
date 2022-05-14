@@ -111,8 +111,7 @@ module load Gaussian/16.B.01
 mkdir $TMPDIR/$SLURM_JOB_ID
 export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID
 
-g16 < TS-2-dp-opt.gjf > TS-2-dp-opt.out
-rm -r $TMPDIR/$SLURM_JOB_ID
+g16 < QM_test.gjf > QM_test.out
 trap 'rm -rf $TMPDIR/$SLURM_JOB_ID' EXIT'''
 
 sub_script_long_str = '''#!/bin/bash
@@ -279,14 +278,14 @@ def test_ClusterJob_wait_to_end_ACCRE():
     '''
     only run on accre
     '''
-    job = ClusterJob(clusters.accre.Accre(), sub_script_str=sub_script_long_str)
+    job = ClusterJob(clusters.accre.Accre(), sub_script_str=sub_script_str)
     # submit and record the file
     job.submit(sub_dir=test_sub_dir)
     test_file_paths.extend([job.job_cluster_log, job.sub_script_path])
     test_file_paths.append(f'{test_sub_dir}/submitted_job_ids.log')
 
     Config.debug = 2
-    job.wait_to_end(60)
+    job.wait_to_end(10)
     # TODO add some assert
 
 @pytest.mark.accre
