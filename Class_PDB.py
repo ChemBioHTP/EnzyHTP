@@ -1018,7 +1018,7 @@ class PDB():
         Y : Resi_list
         '''
         pattern = r'([A-Z])([A-Z])?([0-9]+)([A-Z])'
-        if Flag is 'WT':
+        if Flag == 'WT':
             return ('WT', 'WT', 'WT', 'WT')
         F_match = re.match(pattern, Flag)
         if F_match is None:
