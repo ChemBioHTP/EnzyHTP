@@ -8,9 +8,9 @@ Config --- Amber
         |- Multiwfn
 -------------------------------------------------------------------------------------
 '''
+import os
 from time import strftime, localtime
 import re
-from helper import mkdir, line_feed
 
 
 class Config:
@@ -18,6 +18,7 @@ class Config:
     since the workflow is not settled, workflow related value should not be the global var here.
     It is better to have default settings here.
     '''
+    line_feed = '\n'
     # >>>>>> Resource <<<<<<
 	# -----------------------------
     # Cores available (used in MD(Amber) and QM(Gaussian) calculations)
@@ -334,7 +335,10 @@ class Config:
                 build MMPBSA.in in out_path
                 '''
                 if out_path == '':
-                    mkdir('./tmp')
+                    if os.path.exists('./tmp'):
+                        pass
+                    else:
+                        os.makedirs('./tmp')
                     out_path = './tmp/MMPBSA.in'
 
                 # make lines
