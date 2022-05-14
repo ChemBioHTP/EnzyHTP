@@ -1375,8 +1375,8 @@ class PDB():
         try:
             run('tleap -s -f '+leap_path+' > '+leap_path[:-2]+'out', check=True,  text=True, shell=True, capture_output=True)
         except SubprocessError as e:
-            print(f'stderr: {e.stderr}')
-            print(f'stdout: {e.stdout}')
+            print(f'stderr: {e.stderr.strip()}')
+            print(f'stdout: {e.stdout.strip()}')
             raise e
 
         return self.prmtop_path, self.inpcrd_path

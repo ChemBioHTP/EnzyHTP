@@ -162,8 +162,8 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''',
             submit_cmd = run(cmd, timeout=120, check=True,  text=True, shell=True, capture_output=True)
         except SubprocessError as e: # capture both error and timeout
             print(f'Error running {cmd}: {repr(e)}')
-            print(f'stderr: {e.stderr}')
-            print(f'stdout: {e.stdout}')            
+            print(f'stderr: {e.stderr.strip()}')
+            print(f'stdout: {e.stdout.strip()}')            
             raise e
         finally:
             # TODO(shaoqz) timeout condition is hard to test
