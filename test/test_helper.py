@@ -7,6 +7,7 @@ def test_run_cmd_fail_case():
     with pytest.raises(SubprocessError) as e:
         helper.run_cmd(cmd_fail, try_time=3, wait_time=1)
 
+@pytest.mark.accre
 def test_run_cmd_no_retry():
     cmd = 'squeue -u $USER'
     assert len(helper.run_cmd(cmd).stdout) != 0
