@@ -121,6 +121,30 @@ def test_PDB2FF_keep():
     assert len(pdb_obj.prepi_path) != 0
 
 @pytest.mark.md
+def test_pdbmd_without_job_manager_but_input_cpu_cores():
+    test_dir_md = 'test/testfile_Class_PDB/MD_test/'
+    # interface to PDBMD
+    pdb_obj = PDB(f'{test_dir_md}FAcD_RA124M_ff.pdb', wk_dir=test_dir_md)
+    pdb_obj.prmtop_path = f'{test_dir_md}FAcD_RA124M_ff.prmtop'
+    pdb_obj.inpcrd_path = f'{test_dir_md}FAcD_RA124M_ff.inpcrd'
+    # run MD
+    with pytest.raises(TypeError) as e:
+        pdb_obj.PDBMD(  engine='Amber_GPU', 
+                        equi_cpu=1, 
+                        if_cluster_job=0,
+                        equi_cpu_cores=10
+                         )
+        assert 'ERROR: cpu_cores or equi_cpu_cores should be None if not submit to cluster.' in str(e.value)
+    with pytest.raises(TypeError) as e:
+        pdb_obj.PDBMD(  engine='Amber_CPU',
+                        cpu_cores= 10,
+                        if_cluster_job=0,
+                        equi_cpu_cores=10
+                         )
+        assert 'ERROR: cpu_cores or equi_cpu_cores should be None if not submit to cluster.' in str(e.value)
+
+
+@pytest.mark.md
 @pytest.mark.accre
 def test_pdbmd_with_job_manager_capture_amber_err():
     test_dir_md = 'test/testfile_Class_PDB/MD_test/'

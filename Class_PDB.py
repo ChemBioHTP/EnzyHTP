@@ -1068,6 +1068,7 @@ class PDB():
         cluster: ClusterInterface = None, 
         period: int = 10,
         res_setting: Union[dict, None] = None,
+        cpu_cores: Union[str, None] = None,
         cluster_debug: bool = 0
         ):
         '''
@@ -1075,6 +1076,9 @@ class PDB():
         --------------------------------------------------
         Save changed PDB to self.path (containing water and ions)
         Mainly used for remove bad contact from PDB2PDBwLeap.
+        cpu_cores
+            provide these for configure the gaussian input file when using a non-dict res_setting.
+            these values should be the same as indicated in the res_setting.
         '''
         
         out4_PDB_path=self.path_name+'_min.pdb'
@@ -1100,12 +1104,18 @@ class PDB():
         min_input.close()
 
         # determine cluster rescources
-        cpu_cores = None
         if if_cluster_job:
             core_type = engine.split('_')[-1] # this go front because needed in expressing cmd
             res_setting, env_settings = type(self)._prepare_cluster_job_pdbmd(cluster, core_type, res_setting)
             if core_type == 'CPU':
-                cpu_cores = res_setting['node_cores']
+                # should some how wrap this up to a function
+                if isinstance(res_setting, dict):
+                    cpu_cores = res_setting['node_cores']
+                else: # directly use argument -> support non-dict res_setting input e.g.: str
+                    if cpu_cores == None: # TODO may be require the cluster interface to resolve different res_setting type in the future.
+                        raise TypeError('ERROR: Requires cpu_cores input if using CPU and provide res_setting not as a dict')
+        elif cpu_cores != None:
+            raise TypeError('ERROR: cpu_cores should be None if not submit to cluster.')
         # express engine
         PC_cmd, engine_path = Config.Amber.get_Amber_engine(engine=engine, n_cores=cpu_cores)
 
@@ -1448,7 +1458,9 @@ class PDB():
         cluster: ClusterInterface = None, # since the requirement is similar for a cluster job
         period: int = 600,
         res_setting: Union[dict, None] = None,
+        cpu_cores: Union[str, int, None] = None,
         res_setting_equi_cpu: Union[dict, None] = None,
+        equi_cpu_cores: Union[str, int, None] = None,
         cluster_debug: bool = 0
         ):
         '''
@@ -1487,7 +1499,10 @@ class PDB():
         res_setting_equi_cpu: 
             resource for equi cpu job if use cpu for equi
             provide specific keys you want to change the rest will remain default.
-        cluster_debug:
+        cpu_cores, equi_cpu_cores
+            provide these for configure the gaussian input file when using a non-dict res_setting.
+            these values should be the same as indicated in the res_setting.
+    cluster_debug:
            1:  add also the pdbmd job obj to the pdb obj
         --data--
         Attribute:
@@ -1500,20 +1515,30 @@ class PDB():
             o_dir = self.dir+'/MD'+tag
         mkdir(o_dir)
         # default cpu cores
-        cpu_cores = None # these will be used in Config.get_PC_cmd(cpu_cores) and None will mean using Config.n_cores
-        equi_cpu_cores = None
         # format settings for cluster job (since it also influence the command)
         if if_cluster_job:
             core_type = engine.split('_')[-1]
             res_setting, env_settings = type(self)._prepare_cluster_job_pdbmd(cluster, core_type, res_setting)
             if core_type == 'CPU':
-                # TODO(shaoqz) make this an object so that have common interface.
-                cpu_cores = res_setting['node_cores']
+                # TODO(shaoqz) see PDBMin, somehow wrap this up
+                if isinstance(res_setting, dict):
+                    cpu_cores = res_setting['node_cores']
+                else: # support non-dict res_setting input e.g.: str
+                    if cpu_cores == None: # TODO may be require the cluster interface to resolve different res_setting type in the future.
+                        raise TypeError('ERROR: Requires cpu_cores input if using CPU and provide res_setting not as a dict')
+
             if core_type == 'GPU' and equi_cpu:
                 # get env res for equi
                 env_settings_equi_cpu = cluster.AMBER_ENV['CPU']
                 res_setting_equi_cpu = type(self)._get_default_res_setting_pdbmd(res_setting_equi_cpu, 'CPU')
-                equi_cpu_cores = res_setting_equi_cpu['node_cores']
+                if isinstance(res_setting_equi_cpu, dict):
+                    equi_cpu_cores = res_setting_equi_cpu['node_cores']
+                else: # support non-dict res_setting input e.g.: str
+                    if equi_cpu_cores == None: # TODO may be require the cluster interface to resolve different res_setting type in the future.
+                        raise TypeError('ERROR: Requires equi_cpu_cores input if using CPU and provide equi_res_setting not as a dict')
+        else:
+            if cpu_cores != None or equi_cpu_cores != None:
+                raise TypeError('ERROR: cpu_cores or equi_cpu_cores should be None if not submit to cluster.')        
 
         # express engine (pirority: AmberEXE_GPU/AmberEXE_CPU - AmberHome/bin/xxx)
         PC_cmd, engine_path = Config.Amber.get_Amber_engine(engine=engine, n_cores=cpu_cores)
@@ -2338,6 +2363,8 @@ class PDB():
         job_array_size: int = 0,
         period: int = 600,
         res_setting: Union[dict, None] = None,
+        cpu_cores: Union[int, str, None] = None,
+        cpu_mem: Union[int, str, None] = None,
         cluster_debug: bool = 0
     ) -> list :
         '''
@@ -2389,6 +2416,9 @@ class PDB():
             provide specific keys you want to change the rest will remain default.
             (e.g. res_setting = {'node_cores':'8'} will still use a complete dictionary 
             with only node_cores modified.)
+        cpu_cores, cpu_mem
+            provide these for configure the gaussian input file when using a non-dict res_setting.
+            these values should be the same as indicated in the res_setting.
         cluster_debug:
            1:  add also the qm cluster job obj to the pdb obj
         ---data---
@@ -2416,15 +2446,19 @@ class PDB():
         if Config.debug >= 1:
             print('Charge: '+str(chrgspin[0])+' Spin: '+str(chrgspin[1]))
         # get res setting
-        cpu_cores = Config.n_cores
-        cpu_mem = Config.max_core
         # overwrite those if cluster job is true
         if if_cluster_job:
             # default values TODO should contain them in Config.Gaussian
             res_setting = type(self)._get_default_res_setting_qmcluster(res_setting)
             if QM in ['g16','g09']:
-                cpu_cores = res_setting['node_cores']
-                cpu_mem = int(float(res_setting['mem_per_core'].rstrip('GB')) * 1024)
+                if isinstance(res_setting, dict):
+                    cpu_cores = res_setting['node_cores']
+                    cpu_mem = int(float(res_setting['mem_per_core'].rstrip('GB')) * 1024)
+                elif cpu_cores is None or cpu_mem is None:
+                    raise TypeError('ERROR: Requires cpu_cores and cpu_mem input if using CPU and provide res_setting not as a dict')
+        else:
+            cpu_cores = Config.n_cores
+            cpu_mem = Config.max_core
 
         #make inp files
         frames = Frame.fromMDCrd(self.mdcrd)
