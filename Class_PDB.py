@@ -1507,6 +1507,7 @@ class PDB():
             core_type = engine.split('_')[-1]
             res_setting, env_settings = type(self)._prepare_cluster_job_pdbmd(cluster, core_type, res_setting)
             if core_type == 'CPU':
+                # TODO(shaoqz) make this an object so that have common interface.
                 cpu_cores = res_setting['node_cores']
             if core_type == 'GPU' and equi_cpu:
                 # get env res for equi
