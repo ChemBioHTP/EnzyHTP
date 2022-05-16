@@ -276,8 +276,8 @@ def run_cmd(cmd, try_time=1, wait_time=3, timeout=120) -> CompletedProcess:
         except SubprocessError as e:
             if Config.debug > 0:
                 print(f'Error running {cmd}: {repr(e)}')
-                print(f'    stderr: {e.stderr.strip()}')
-                print(f'    stdout: {e.stdout.strip()}')
+                print(f'    stderr: {str(e.stderr).strip()}')
+                print(f'    stdout: {str(e.stdout).strip()}')
                 print(f'trying again... (max_try: {try_time})')
         else: # untill there's no error
             if Config.debug > 0:
