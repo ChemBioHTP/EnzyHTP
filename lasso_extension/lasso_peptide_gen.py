@@ -196,7 +196,7 @@ def lasso_extender(scaffold_file: str,
     if outfile.endswith(".pdb"):
         outfile = outfile[:-4]
     xyz_str = gen_xyz(scaffold, outfile)
-
+    
     convert_to_PDB(xyz_str, outfile)
 
 
@@ -217,7 +217,7 @@ def lasso_peptide_gen(ring: int,
         extender: The xyz file containing the amino acid extender if not alanine
     """
 
-    if ring != 7:
+    if ring not in [7,8]:
         raise ValueError("That ring size is not currently available")
     elif loop not in [7, 8]:
         raise ValueError("That loop size is not currently available")
