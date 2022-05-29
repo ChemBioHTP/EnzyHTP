@@ -25,7 +25,7 @@ class Config:
     #
     n_cores = 24
     # -----------------------------
-    # Per core memory in MB
+    # Per core memory in MB (required by Gaussian input by now)
     #
     max_core = 2000
     # -----------------------------

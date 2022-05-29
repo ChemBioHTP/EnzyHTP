@@ -1112,8 +1112,8 @@ class PDB():
                 if isinstance(res_setting, dict):
                     cpu_cores = res_setting['node_cores']
                 else: # directly use argument -> support non-dict res_setting input e.g.: str
-                    if cpu_cores == None: # TODO may be require the cluster interface to resolve different res_setting type in the future.
-                        raise TypeError('ERROR: Requires cpu_cores input if using CPU and provide res_setting not as a dict')
+                    if cpu_cores == None:
+                        raise TypeError('ERROR: Requires cpu_cores input for configuring sander if using CPU and provide res_setting not as a dict')
         elif cpu_cores != None:
             raise TypeError('ERROR: cpu_cores should be None if not submit to cluster.')
         # express engine
@@ -1524,8 +1524,8 @@ class PDB():
                 if isinstance(res_setting, dict):
                     cpu_cores = res_setting['node_cores']
                 else: # support non-dict res_setting input e.g.: str
-                    if cpu_cores == None: # TODO may be require the cluster interface to resolve different res_setting type in the future.
-                        raise TypeError('ERROR: Requires cpu_cores input if using CPU and provide res_setting not as a dict')
+                    if cpu_cores == None:
+                        raise TypeError('ERROR: Requires cpu_cores input for configuring sander if using CPU and provide res_setting not as a dict')
 
             if core_type == 'GPU' and equi_cpu:
                 # get env res for equi
@@ -1534,8 +1534,8 @@ class PDB():
                 if isinstance(res_setting_equi_cpu, dict):
                     equi_cpu_cores = res_setting_equi_cpu['node_cores']
                 else: # support non-dict res_setting input e.g.: str
-                    if equi_cpu_cores == None: # TODO may be require the cluster interface to resolve different res_setting type in the future.
-                        raise TypeError('ERROR: Requires equi_cpu_cores input if using CPU and provide equi_res_setting not as a dict')
+                    if equi_cpu_cores == None:
+                        raise TypeError('ERROR: Requires equi_cpu_cores input for configuring sander if using CPU and provide equi_res_setting not as a dict')
         else:
             if cpu_cores != None or equi_cpu_cores != None:
                 raise TypeError('ERROR: cpu_cores or equi_cpu_cores should be None if not submit to cluster.')        
@@ -2362,7 +2362,7 @@ class PDB():
         cluster: ClusterInterface = None,
         job_array_size: int = 0,
         period: int = 600,
-        res_setting: Union[dict, None] = None,
+        res_setting: Union[dict, str, None] = None,
         cpu_cores: Union[int, str, None] = None,
         cpu_mem: Union[int, str, None] = None,
         cluster_debug: bool = 0
@@ -2453,9 +2453,10 @@ class PDB():
             if QM in ['g16','g09']:
                 if isinstance(res_setting, dict):
                     cpu_cores = res_setting['node_cores']
-                    cpu_mem = int(float(res_setting['mem_per_core'].rstrip('GB')) * 1024)
+                    cpu_mem = res_setting['mem_per_core']
                 elif cpu_cores is None or cpu_mem is None:
-                    raise TypeError('ERROR: Requires cpu_cores and cpu_mem input if using CPU and provide res_setting not as a dict')
+                    raise TypeError('ERROR: Requires cpu_cores and cpu_mem input for configuring Gaussian input file if using CPU and provide res_setting not as a dict')
+                cpu_mem = int(float(cpu_mem.rstrip('GB')) * 1024) # convert to number in MB
         else:
             cpu_cores = Config.n_cores
             cpu_mem = Config.max_core
