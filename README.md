@@ -21,8 +21,9 @@ For now, you can check our paper (https://pubs.acs.org/doi/10.1021/acs.jcim.1c01
 ## dependence
 0. Install conda & create an environment
 1. install numpy `conda install numpy`
-2. Install openbabel `conda install openbabel -c conda-forge`
-3. Install pdb2pqr 
+2. install plum `conda install -c conda-forge plum-dispatch`
+3. Install openbabel `conda install openbabel -c conda-forge`
+4. Install pdb2pqr 
 ```
 git clone https://github.com/Electrostatics/pdb2pqr.git
 cd pdb2pqr
