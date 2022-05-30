@@ -3,10 +3,12 @@ Misc helper func and class
 '''
 from distutils.command.config import config
 import math
+from subprocess import CompletedProcess, SubprocessError, run
 import time
-from AmberMaps import Resi_list
 import os
 import numpy as np
+
+from Class_Conf import Config
 '''
 ====
 Tree
@@ -23,7 +25,7 @@ class Child():
 '''
 Text
 '''
-line_feed = '\n'
+line_feed = Config.line_feed
 
 '''
 file system
@@ -257,5 +259,34 @@ def chunked(iter_, size):
     '''
     return (iter_[position : position + size] for position in range(0, len(iter_), size))
 
-def get_localtime(time_stamp):
-    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time_stamp))
+def get_localtime(time_stamp=None):
+    if time_stamp is None:
+        return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+    else:
+        return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time_stamp))
+
+def run_cmd(cmd, try_time=1, wait_time=3, timeout=120) -> CompletedProcess:
+    '''
+    try running the info cmd {try_time} times and wait {wait_time} between each run if subprocessexceptions are raised.
+    default be 1 run.
+    '''
+    for i in range(try_time):
+        try:
+            this_run = run(cmd, timeout=timeout, check=True,  text=True, shell=True, capture_output=True)
+        except SubprocessError as e:
+            if Config.debug > 0:
+                print(f'Error running {cmd}: {repr(e)}')
+                print(f'    stderr: {str(e.stderr).strip()}')
+                print(f'    stdout: {str(e.stdout).strip()}')
+                print(f'trying again... (max_try: {try_time})')
+        else: # untill there's no error
+            if Config.debug > 0:
+                if i > 0:
+                    print(f'finished {cmd} after {i+1} tries @{get_localtime()}')
+            return this_run
+        # wait before next try
+        time.sleep(wait_time)
+    # exceed the try time
+    if Config.debug > 0:
+        print(f'Failed running `{cmd}` after {try_time} tries @{get_localtime()}')
+    raise SubprocessError # TODO change to a costum error

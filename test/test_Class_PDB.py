@@ -121,6 +121,30 @@ def test_PDB2FF_keep():
     assert len(pdb_obj.prepi_path) != 0
 
 @pytest.mark.md
+def test_pdbmd_without_job_manager_but_input_cpu_cores():
+    test_dir_md = 'test/testfile_Class_PDB/MD_test/'
+    # interface to PDBMD
+    pdb_obj = PDB(f'{test_dir_md}FAcD_RA124M_ff.pdb', wk_dir=test_dir_md)
+    pdb_obj.prmtop_path = f'{test_dir_md}FAcD_RA124M_ff.prmtop'
+    pdb_obj.inpcrd_path = f'{test_dir_md}FAcD_RA124M_ff.inpcrd'
+    # run MD
+    with pytest.raises(TypeError) as e:
+        pdb_obj.PDBMD(  engine='Amber_GPU', 
+                        equi_cpu=1, 
+                        if_cluster_job=0,
+                        equi_cpu_cores=10
+                         )
+        assert 'ERROR: cpu_cores or equi_cpu_cores should be None if not submit to cluster.' in str(e.value)
+    with pytest.raises(TypeError) as e:
+        pdb_obj.PDBMD(  engine='Amber_CPU',
+                        cpu_cores= 10,
+                        if_cluster_job=0,
+                        equi_cpu_cores=10
+                         )
+        assert 'ERROR: cpu_cores or equi_cpu_cores should be None if not submit to cluster.' in str(e.value)
+
+
+@pytest.mark.md
 @pytest.mark.accre
 def test_pdbmd_with_job_manager_capture_amber_err():
     test_dir_md = 'test/testfile_Class_PDB/MD_test/'
@@ -223,6 +247,64 @@ def test_pdb2qmcluster_with_job_manager():
                         res_setting={'account':'yang_lab_csb'},
                         cluster_debug=1
                         )
+    # track files
+    qm_jobs = pdb_obj.qm_cluster_jobs
+    qm_ins = list(map(lambda x: x.removesuffix('out')+'gjf',qm_outs))
+    test_file_paths.extend(qm_outs)
+    test_file_paths.extend(qm_ins)
+    test_file_paths.append('submitted_job_ids.log')
+    for job in qm_jobs:
+        test_file_paths.extend([job.sub_script_path, job.job_cluster_log])
+    # assert result
+    for out in qm_outs:
+        assert os.path.isfile(out)
+        assert os.path.getsize(out) != 0
+
+@pytest.mark.qm
+@pytest.mark.accre
+def test_pdb2qmcluster_with_job_manager_str_res_setting():
+    test_dir_qmcluster = 'test/testfile_Class_PDB/QMCluster_test/'
+    # interface of PDB2QMCluster
+    pdb_obj = PDB(f'{test_dir_qmcluster}FAcD_RA124M_ff.pdb', wk_dir=test_dir_qmcluster)
+    pdb_obj.prmtop_path = f'{test_dir_qmcluster}FAcD_RA124M_ff.prmtop'
+    pdb_obj.mdcrd = f'{test_dir_qmcluster}prod.mdcrd'
+    pdb_obj.prepi_path = {'FAH':f'{test_dir_qmcluster}../ligands/ligand_FAH.prepin'}
+    # arguments of PDB2QMCluster
+    atom_mask = ':108,298'
+    g_route = '# hf/6-31G(d) nosymm'
+    res_str = '''#!/bin/bash
+#SBATCH --partition=production
+#SBATCH --job-name=EnzyHTP-test-str
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=8
+#SBATCH --mem=30G
+#SBATCH --time=30:00
+#SBATCH --account=yang_lab_csb
+'''
+    with pytest.raises(TypeError) as e: # the case without nessessary information
+        pdb_obj.PDB2QMCluster(
+            atom_mask, 
+            g_route=g_route, 
+            if_cluster_job=1, 
+            cluster=accre.Accre(), 
+            job_array_size=20, 
+            period=30,
+            res_setting=res_str,
+            cluster_debug=1
+            )
+        assert 'ERROR: Requires cpu_cores and cpu_mem input for configuring Gaussian input file if using CPU and provide res_setting not as a dict' in str(e.value)
+    qm_outs = pdb_obj.PDB2QMCluster(
+                atom_mask, 
+                g_route=g_route, 
+                if_cluster_job=1, 
+                cluster=accre.Accre(), 
+                job_array_size=20, 
+                period=30,
+                res_setting=res_str,
+                cpu_cores=8,
+                cpu_mem='2GB',
+                cluster_debug=1
+                )
     # track files
     qm_jobs = pdb_obj.qm_cluster_jobs
     qm_ins = list(map(lambda x: x.removesuffix('out')+'gjf',qm_outs))
