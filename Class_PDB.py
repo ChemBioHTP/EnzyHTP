@@ -161,16 +161,18 @@ class PDB():
                     print('PDB.get_stru: WARNING: self.stru has a different name')
                     print('     -self.name: '+self.name)
                     print('     -self.stru.name: '+self.stru.name)
-                    print('Getting new stru')
         else:
             get_flag = 1
 
         if get_flag or renew:
+            if Config.debug >= 1:
+                print('PDB.get_stru: Getting new stru')
             if self.path is not None:
                 self.stru = Structure.fromPDB(self.path, input_name=input_name, ligand_list=ligand_list)
             else:
                 self.stru = Structure.fromPDB(self.file_str, input_type='file_str', input_name=input_name, ligand_list=ligand_list)
-
+        elif Config.debug >= 1:
+            print('PDB.get_stru: Not getting new stru - have existing self.stru with the same name and renew == 0')
 
     def _get_file_str(self):
         '''
