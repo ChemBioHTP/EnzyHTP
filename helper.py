@@ -269,6 +269,8 @@ def run_cmd(cmd, try_time=1, wait_time=3, timeout=120) -> CompletedProcess:
     '''
     try running the info cmd {try_time} times and wait {wait_time} between each run if subprocessexceptions are raised.
     default be 1 run.
+    along with common run() settings (including exception handling)
+    # TODO(shaoqz): should use this as general function to run commands in local shell.
     '''
     for i in range(try_time):
         try:
@@ -278,7 +280,7 @@ def run_cmd(cmd, try_time=1, wait_time=3, timeout=120) -> CompletedProcess:
                 print(f'Error running {cmd}: {repr(e)}')
                 print(f'    stderr: {str(e.stderr).strip()}')
                 print(f'    stdout: {str(e.stdout).strip()}')
-                print(f'trying again... (max_try: {try_time})')
+                print(f'trying again... ({i+1}/{try_time})')
         else: # untill there's no error
             if Config.debug > 0:
                 if i > 0:
@@ -287,6 +289,5 @@ def run_cmd(cmd, try_time=1, wait_time=3, timeout=120) -> CompletedProcess:
         # wait before next try
         time.sleep(wait_time)
     # exceed the try time
-    if Config.debug > 0:
-        print(f'Failed running `{cmd}` after {try_time} tries @{get_localtime()}')
-    raise SubprocessError # TODO change to a costum error
+    raise SubprocessError(f'Failed running `{cmd}` after {try_time} tries @{get_localtime()}')
+    # TODO change to a custom error
