@@ -1,17 +1,26 @@
-from typing import Any
+"""
+Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+
+Date: 2022-06-02
+"""
+
+from typing import Any, List
 from plum import dispatch
 
-# TODO documentation
 class AmberConfig:
+    """
+    TODO(CJ)
+    """
     def __init__(self, parent=None):
         self._parent = parent
-
-    def required_executables(self):
+    
+    def required_executables(self) -> List[str]:
         return [self.CPU_ENGINE, self.GPU_ENGINE, "tleap", "ampdb"]
-
+    
     def required_env_vars(self):
         return [self.HOME]
-
+    
     # -----------------------------
     # Amber Home dir
     #
@@ -171,15 +180,15 @@ class AmberConfig:
         "restraintmask": None,
         "restraint_wt": "2.0",  # the later two are only used when ntr = 1
     }
-
+    
     def __getitem__(self, key: str) -> Any:
         return getattr(self, key)
-
+    
     def __setitem__(self, key: str, value: Any) -> None:
         is_path = False
         if key in {"CPU_ENGINE", "GPU_ENGINE", "HOME"}:
             is_path = True
-
+    
         setattr(self, key, value)
         if is_path:
             self._parent.update_paths()

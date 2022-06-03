@@ -16,6 +16,8 @@ from .core import (
 from .preparation import PDBLine, PDBPrepper, read_pdb_lines
 from .chemical import ResidueType
 
+from .molecular_mechanics import AmberInterface
+
 CONFIG = None
 INTERFACE = None
 

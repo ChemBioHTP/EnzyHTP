@@ -1,3 +1,14 @@
+"""Defines an AmberInterface class that serves as a bridge for enzy_htp to utilize AmberMD software. Uses the AmberConfig class
+found in enzy_htp/molecular_mechanics/amber_interface.py. Supported operations include:
+	+ structure minimization
+	+ 
+
+Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+
+Date: 2022-06-02
+"""
+
 from .molecular_mechanics.amber_config import AmberConfig
 from .molecular_mechanics.mmbpsa_config import MMPBSAConfig
 from .quantum_mechanics.gaussian_config import GaussianConfig
@@ -6,10 +17,9 @@ from .core.env_manager import EnvironmentManager
 from .core import _LOGGER
 from copy import deepcopy
 
-# TODO add documentation and logging for when things are changed
-
-
 class Config:
+    """
+    """
     def __init__(self):
         self.ev_base = []
         self.exe_base = ["tleap"]
