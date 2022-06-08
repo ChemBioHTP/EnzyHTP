@@ -15,17 +15,17 @@ from .exception import MissingEnvironmentElement
 
 class EnvironmentManager:
     """Serves as general interface between module and the current computer environment.
-	Checks whether given applications and environment variables are set in the current environment.
-	After check, stores names of executables.
-	Serves as interfrace for running commands on system.
-       
-	
-	Attributes:
-		env_vars_: A list of strings containing environment variables to check for.
-		executables_: a list of strings containing executables to check for.
-		missing_env_vars_: A list of strings corresponding to environment variables that are missing.	
-		missing_executables_: A list of strings corresponding to executables that are missing.
-	"""
+    Checks whether given applications and environment variables are set in the current environment.
+    After check, stores names of executables.
+    Serves as interfrace for running commands on system.
+
+
+    Attributes:
+            env_vars_: A list of strings containing environment variables to check for.
+            executables_: a list of strings containing executables to check for.
+            missing_env_vars_: A list of strings corresponding to environment variables that are missing.
+            missing_executables_: A list of strings corresponding to executables that are missing.
+    """
 
     def __init__(self, **kwargs):
         """Initializes object, optionally with starting environment variables and executables."""

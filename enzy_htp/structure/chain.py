@@ -14,12 +14,12 @@ from .residue import Residue
 
 
 class Chain:
-    """Class that represents a Chain of residues in a PDB file. Serves as a manager to the 
+    """Class that represents a Chain of residues in a PDB file. Serves as a manager to the
     Residue() objects that it owns.
 
     Attributes:
         name_ : The name of the chain as a string.
-		residues_ : A list of Residue() objects or derived types.
+                residues_ : A list of Residue() objects or derived types.
     """
 
     def __init__(self, name: str, residues: List[Residue]):
@@ -106,8 +106,8 @@ class Chain:
 
     def renumber_atoms(self, start: int = 1) -> int:
         """Renumbers the Atom()'s inside the chain beginning with "start" value and returns index of the last atom.
-		Exits if start index <= 0.
-		"""
+        Exits if start index <= 0.
+        """
         if start <= 0:
             _LOGGER.error(
                 f"Illegal start number '{start}'. Value must be >= 0. Exiting..."
@@ -147,7 +147,7 @@ class Chain:
         return len(self)
 
     def remove_residue(self, target_key: str) -> None:
-        """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format, 
+        """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format,
         the Residue() is removed if it currently exists in the Chain() object."""
         for ridx, res in enumerate(self.residues_):
             if res.residue_key == target_key:

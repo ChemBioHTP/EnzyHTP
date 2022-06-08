@@ -42,23 +42,23 @@ class GaussianInterface:
         ========
         # route section (from config module / leave work type as an inp arg)
         # charge and spin
-        # coordinate 
-        	- atom label (from .lib)
-        	- atom charge
-        	- freeze part (general option / some presupposition / freeze MM) 
-        	- layer (same as above)
-        	- xyz (1. new system 2. existing template (do we still need?) -- from pdb / mdcrd / gout) ref: ONIOM_template_tool
+        # coordinate
+                - atom label (from .lib)
+                - atom charge
+                - freeze part (general option / some presupposition / freeze MM)
+                - layer (same as above)
+                - xyz (1. new system 2. existing template (do we still need?) -- from pdb / mdcrd / gout) ref: ONIOM_template_tool
         # connectivity
         # missing parameters (ligand related?)
         ---------
-        In Config.Gaussian 
+        In Config.Gaussian
         ---------
         n_cores     : Cores for gaussian job (higher pirority)
         max_core    : Per core memory in MB for gaussian job (higher pirority)
         keywords    : a list of keywords that joined together when build
         layer_preset：default preset id copied to self.layer_preset
         layer_atoms : default layer_atoms copied to self.layer_atoms
-        
+
         *om_lvl     : *(can only be edit manually before loading the module) oniom method level
         """
         # san check
@@ -181,7 +181,12 @@ class GaussianInterface:
         if type(key_words) == str and key_words != "":
             keyword_line = (
                 "# "
-                + " ".join(Config.Gaussian.keywords[work_type] + [key_words,])
+                + " ".join(
+                    Config.Gaussian.keywords[work_type]
+                    + [
+                        key_words,
+                    ]
+                )
                 + line_feed
             )
         if type(key_words) == list:
@@ -252,11 +257,11 @@ class GaussianInterface:
         ---------------
         for a coord line:
             - element name
-        	- atom name (from .lib)
-        	- atom charge (from self.charge_list_all)
-        	- freeze part (general option / some presupposition) 
-        	- xyz (from self.stru)
-        	- layer (general option / some presupposition)
+                - atom name (from .lib)
+                - atom charge (from self.charge_list_all)
+                - freeze part (general option / some presupposition)
+                - xyz (from self.stru)
+                - layer (general option / some presupposition)
         """
         coord = ""
 

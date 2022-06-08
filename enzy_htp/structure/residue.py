@@ -21,17 +21,17 @@ import enzy_htp.chemical as chem
 
 class Residue:
     """Most common functional unit in enzy_htp. Made up of Atom() objects and can be either
-	canonical, non-canonical, solvent or a metal center. 
+        canonical, non-canonical, solvent or a metal center.
 
     Attributes:
         atoms : A list of Atom() objects that make up the Residue().
         residue_key : Unique string identifier with format "chain.name.num".
-		chain_ : Parent chain name.
-		name : Residue name.
-		num_ : The index of the Residue within the chain.
-		rtype_ : The ResidueType of the Residue().
-		min_line_ : The lowest one-indexed line of the children atoms.
-		max_line_ : The highest one-indexed line of the children atoms.
+                chain_ : Parent chain name.
+                name : Residue name.
+                num_ : The index of the Residue within the chain.
+                rtype_ : The ResidueType of the Residue().
+                min_line_ : The lowest one-indexed line of the children atoms.
+                max_line_ : The highest one-indexed line of the children atoms.
     """
 
     def __init__(self, residue_key: str, atoms: List[Atom]):
@@ -51,8 +51,8 @@ class Residue:
 
     def renumber_atoms(self, start: int = 1) -> int:
         """Renumbers the Residue()'s Atom()'s beginning with "start" paramter, defaulted to 1. Returns the index of the last Atom().
-		NOTE: errors if "start" is <= 0.
-		"""
+        NOTE: errors if "start" is <= 0.
+        """
         if start <= 0:
             _LOGGER.error(
                 f"Illegal start number '{start}'. Value must be >= 0. Exiting..."
@@ -100,7 +100,7 @@ class Residue:
         self.atoms.sort(key=lambda aa: aa.atom_number)
 
     def remove_occupancy(self) -> None:
-        """Makes the occupancy for each of the child Atom() objects blank. """
+        """Makes the occupancy for each of the child Atom() objects blank."""
         for idx in range(len(self.atoms)):
             self.atoms[idx].occupancy = ""
 

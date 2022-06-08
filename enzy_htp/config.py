@@ -19,8 +19,7 @@ from copy import deepcopy
 
 
 class Config:
-    """
-    """
+    """ """
 
     def __init__(self):
         self.ev_base = []

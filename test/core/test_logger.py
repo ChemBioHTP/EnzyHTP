@@ -7,13 +7,13 @@ import os
 import pytest
 import logging
 
-from enzy_htp.core import system as esys
+from enzy_htp.core import file_system as fs 
 from enzy_htp.core import logger as lg
 
 
 CURR_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_FILE = f"{CURR_DIR}/__log.test"
-esys.safe_rm(LOG_FILE)
+fs.safe_rm(LOG_FILE)
 
 
 def test_get_logger():
@@ -23,14 +23,14 @@ def test_get_logger():
     _LOG_ALIAS = lg.init_logger("unit-testing", LOG_FILE, start=True)
     assert os.path.exists(LOG_FILE)
     assert _LOG_ALIAS
-    esys.safe_rm(LOG_FILE)
+    fs.safe_rm(LOG_FILE)
     assert not os.path.exists(LOG_FILE)
 
 
 def test_log_data_debug_level():
     """Making sure that the logger works at debug level."""
     _LOG_ALIAS = lg.init_logger("unit-testing", LOG_FILE, start=True)
-    assert not esys.lines_from_file(LOG_FILE)
+    assert not fs.lines_from_file(LOG_FILE)
     _LOG_ALIAS.setLevel(logging.DEBUG)
     _LOG_ALIAS.debug("testing the logger, debug")
     _LOG_ALIAS.info("testing the logger, info")
@@ -38,7 +38,7 @@ def test_log_data_debug_level():
     _LOG_ALIAS.error("testing the logger, error")
     _LOG_ALIAS.critical("testing the logger, info")
 
-    lines = esys.lines_from_file(LOG_FILE)
+    lines = fs.lines_from_file(LOG_FILE)
 
     assert len(lines) == 5
     assert lines[0].find("DEBUG") != -1
@@ -47,14 +47,14 @@ def test_log_data_debug_level():
     assert lines[3].find("ERROR") != -1
     assert lines[4].find("CRITICAL") != -1
 
-    esys.safe_rm(LOG_FILE)
+    fs.safe_rm(LOG_FILE)
     assert not os.path.exists(LOG_FILE)
 
 
 def test_log_data_info_level():
     """Making sure that the logger works at info level."""
     _LOG_ALIAS = lg.init_logger("unit-testing", LOG_FILE, start=True)
-    assert not esys.lines_from_file(LOG_FILE)
+    assert not fs.lines_from_file(LOG_FILE)
     _LOG_ALIAS.setLevel(logging.INFO)
     _LOG_ALIAS.debug("testing the logger, debug")
     _LOG_ALIAS.info("testing the logger, info")
@@ -62,7 +62,7 @@ def test_log_data_info_level():
     _LOG_ALIAS.error("testing the logger, error")
     _LOG_ALIAS.critical("testing the logger, info")
 
-    lines = esys.lines_from_file(LOG_FILE)
+    lines = fs.lines_from_file(LOG_FILE)
 
     assert len(lines) == 4
     assert lines[0].find("INFO") != -1
@@ -70,14 +70,14 @@ def test_log_data_info_level():
     assert lines[2].find("ERROR") != -1
     assert lines[3].find("CRITICAL") != -1
 
-    esys.safe_rm(LOG_FILE)
+    fs.safe_rm(LOG_FILE)
     assert not os.path.exists(LOG_FILE)
 
 
 def test_log_data_warning_level():
     """Making sure that the logger works at warning level."""
     _LOG_ALIAS = lg.init_logger("unit-testing", LOG_FILE, start=True)
-    assert not esys.lines_from_file(LOG_FILE)
+    assert not fs.lines_from_file(LOG_FILE)
     _LOG_ALIAS.setLevel(logging.WARNING)
     _LOG_ALIAS.debug("testing the logger, debug")
     _LOG_ALIAS.info("testing the logger, info")
@@ -85,21 +85,21 @@ def test_log_data_warning_level():
     _LOG_ALIAS.error("testing the logger, error")
     _LOG_ALIAS.critical("testing the logger, info")
 
-    lines = esys.lines_from_file(LOG_FILE)
+    lines = fs.lines_from_file(LOG_FILE)
 
     assert len(lines) == 3
     assert lines[0].find("WARNING") != -1
     assert lines[1].find("ERROR") != -1
     assert lines[2].find("CRITICAL") != -1
 
-    esys.safe_rm(LOG_FILE)
+    fs.safe_rm(LOG_FILE)
     assert not os.path.exists(LOG_FILE)
 
 
 def test_log_data_error_level():
     """Making sure that the logger works at error level."""
     _LOG_ALIAS = lg.init_logger("unit-testing", LOG_FILE, start=True)
-    assert not esys.lines_from_file(LOG_FILE)
+    assert not fs.lines_from_file(LOG_FILE)
     _LOG_ALIAS.setLevel(logging.ERROR)
     _LOG_ALIAS.debug("testing the logger, debug")
     _LOG_ALIAS.info("testing the logger, info")
@@ -107,20 +107,20 @@ def test_log_data_error_level():
     _LOG_ALIAS.error("testing the logger, error")
     _LOG_ALIAS.critical("testing the logger, info")
 
-    lines = esys.lines_from_file(LOG_FILE)
+    lines = fs.lines_from_file(LOG_FILE)
 
     assert len(lines) == 2
     assert lines[0].find("ERROR") != -1
     assert lines[1].find("CRITICAL") != -1
 
-    esys.safe_rm(LOG_FILE)
+    fs.safe_rm(LOG_FILE)
     assert not os.path.exists(LOG_FILE)
 
 
 def test_log_data_critical_level():
     """Making sure that the logger works at critical level."""
     _LOG_ALIAS = lg.init_logger("unit-testing", LOG_FILE, start=True)
-    assert not esys.lines_from_file(LOG_FILE)
+    assert not fs.lines_from_file(LOG_FILE)
     _LOG_ALIAS.setLevel(logging.CRITICAL)
     _LOG_ALIAS.debug("testing the logger, debug")
     _LOG_ALIAS.info("testing the logger, info")
@@ -128,10 +128,10 @@ def test_log_data_critical_level():
     _LOG_ALIAS.error("testing the logger, error")
     _LOG_ALIAS.critical("testing the logger, info")
 
-    lines = esys.lines_from_file(LOG_FILE)
+    lines = fs.lines_from_file(LOG_FILE)
 
     assert len(lines) == 1
     assert lines[0].find("CRITICAL") != -1
 
-    esys.safe_rm(LOG_FILE)
+    fs.safe_rm(LOG_FILE)
     assert not os.path.exists(LOG_FILE)

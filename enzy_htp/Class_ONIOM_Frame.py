@@ -47,7 +47,7 @@ class Frame:
     """
     store and operate massive coordinate for ONIOM I/O
     ---------
-    raw coordniate only. use .prmtop to relate to the chemistry info 
+    raw coordniate only. use .prmtop to relate to the chemistry info
     """
 
     def __init__(self, coord):
@@ -446,7 +446,7 @@ def getFreq(g_out_file):
     """
     Get frequencies from a gaussian output file.
     --------
-    return a list of frequencies. (value) 
+    return a list of frequencies. (value)
     """
     freqs = []
     with open(g_out_file) as f:

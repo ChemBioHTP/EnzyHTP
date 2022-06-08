@@ -18,10 +18,10 @@ from .amber_config import AmberConfig, default_amber_config
 
 
 class AmberInterface:
-    """Class that provides a direct inteface for enzy_htp to utilize AmberMD software. 
+    """Class that provides a direct inteface for enzy_htp to utilize AmberMD software.
 
-	Atributes:
-		config_	: The AmberConfig class which provides settings.
+    Atributes:
+            config_	: The AmberConfig class which provides settings.
     """
 
     def __init__(self, config: AmberConfig = None) -> None:
@@ -32,10 +32,10 @@ class AmberInterface:
 
     def write_minimize_input_file(self, fname: str, cycle: int) -> None:
         """Creates a minimization file to be used in an amber run. SHOULD NOT BE CALLED BY USERS DIRECTLY.
-		All parameters in the &ctrl block are hardcoded except for ncyc and ntpr, which are 0.5*cycle 
-		and 0.2*cycle as integers, respectively.
-		"""
-		#TODO(CJ): move to AmberConfig()
+        All parameters in the &ctrl block are hardcoded except for ncyc and ntpr, which are 0.5*cycle
+        and 0.2*cycle as integers, respectively.
+        """
+        # TODO(CJ): move to AmberConfig()
         minimize_lines: List[str] = [
             "Minimize",
             " &cntrl",
@@ -56,7 +56,7 @@ class AmberInterface:
         self, pdb: str, mode: str = "CPU", outdir: str = "", cycle: int = 2000
     ) -> str:
         """Class method that minimizes the structure found in a supplied .pdb file, returning
-		the path to the minimized file.
+        the path to the minimized file.
         """
         inpath = Path(pdb)
         min_dir = f"{inpath.parent}/pdb_min/"
@@ -65,38 +65,41 @@ class AmberInterface:
         min_in = f"{min_dir}/min.in"
         min_out = f"{min_dir}/min.out"
         min_rst = f"{min_dir}/min.ncrst"
-        #self.write_minimize_input_file(min_in, cycle)
-        #engine = self.config_.get_engine( mode )
+        # self.write_minimize_input_file(min_in, cycle)
+        # engine = self.config_.get_engine( mode )
         #
-        #self.config_.env_manager().run_command(
+        # self.config_.env_manager().run_command(
         #    engine,
         #        ["-O", "-i", min_in, "-o", min_out, "-p", prmtop, "-c", inpcrd, "-r", min_rst,
-        #)
+        # )
         #
-        #self.config_.env_manager().run_command(
+        # self.config_.env_manager().run_command(
         #    "ambpdb", [f"-p", prmtop, "-c", min_rst, ">", outfile]
-        #)
-		#
-        #shutil.move(prmtop, min_dir )
-		#shutil.move(inpcrd, min_dir )
+        # )
 
-        #return outfile
+    #
+    # shutil.move(prmtop, min_dir )
+    # shutil.move(inpcrd, min_dir )
 
-    def build_param_files(self, in_pdb : str, build_dir : str) -> Tuple[str,str]:
-        #TODO(CJ): add parameter to select the charge calculation method 
+    # return outfile
+
+    def build_param_files(self, in_pdb: str, build_dir: str) -> Tuple[str, str]:
+        # TODO(CJ): add parameter to select the charge calculation method
         # for the ligands.
         # what do we want to do here?
         # 1. analyze pdb and see if there are any ligands
         # 2. if ligands exist, make their input files
-        # 3. 
-        ligand_dir : str = f"{build_dir}/ligand/"
-        metalcenter_dir : str = f"{build_dir}/metalcenter/"
-        fs.safe_mkdir( ligand_dir )
-        fs.safe_mkdir( metalcenter_dir )
-        structure : struct.Structure = struct.structure_from_pdb( in_pdb ) 
+        # 3.
+        ligand_dir: str = f"{build_dir}/ligand/"
+        metalcenter_dir: str = f"{build_dir}/metalcenter/"
+        fs.safe_mkdir(ligand_dir)
+        fs.safe_mkdir(metalcenter_dir)
+        structure: struct.Structure = struct.structure_from_pdb(in_pdb)
         ligand_paths: List[str] = structure.build_ligands(ligand_dir, True)
-        ligand_charges: List[int] = list(map(lambda pp: prep._ob_pdb_charge(pp), ligand_paths))
-        pass 
+        ligand_charges: List[int] = list(
+            map(lambda pp: prep._ob_pdb_charge(pp), ligand_paths)
+        )
+        pass
 
     def PDB2FF(
         self,
@@ -115,12 +118,12 @@ class AmberInterface:
         prm_out_path: output path of the prmtop file
         o_dir contral where the leap.in and leap.log go: has to contain a / at the end (e.g.: ./dir/)
         renew_lig: 0 use old ligand parm files if detected.
-                   1 generate new ones. 
+                   1 generate new ones.
         local_lig: 0 export lig files to the workdir level in HTP jobs.
-                   1 keep local 
+                   1 keep local
         --------------------
         chains:
-        ligand: - less junk files if your workflow contains a protonation step in advance.  
+        ligand: - less junk files if your workflow contains a protonation step in advance.
         metal:
         """
         # check and generate self.stru
@@ -160,34 +163,41 @@ class AmberInterface:
 
         return (self.prmtop_path, self.inpcrd_path)
 
-    
-        def build_ligand_param_files(self, paths : List[str], charges: List[int]) -> List[Tuple[str,str]]:
-            #TODO(CJ): add the method flag?
+        def build_ligand_param_files(
+            self, paths: List[str], charges: List[int]
+        ) -> List[Tuple[str, str]]:
+            # TODO(CJ): add the method flag?
             """TODO(CJ): Documentation"""
-            result: List[Tuple[str,str]] = list()
+            result: List[Tuple[str, str]] = list()
             parm_paths = []
             self.prepi_path = {}
-            #TODO(CJ): Beef up these checks 
+            # TODO(CJ): Beef up these checks
             assert len(paths) == len(charges)
-            for lig_pdb, net_charge in zip(paths,charges):
+            for lig_pdb, net_charge in zip(paths, charges):
                 lig_pdb = Path(lig_pdb)
-                prepin : Path = lig_pdb.with_suffix('.prepin')
-                frcmod : Path = lig_pdb.with_suffix('.frcmod')
-                #TODO(CJ): check if you can get the ligand name from the 
-				# .pdb filename alone... I think this may be possible
-				lig_name: str = struct.structure_parser.get_ligand_name(lig_pdb)
+                prepin: Path = lig_pdb.with_suffix(".prepin")
+                frcmod: Path = lig_pdb.with_suffix(".frcmod")
+                # TODO(CJ): check if you can get the ligand name from the
+                # .pdb filename alone... I think this may be possible
+                lig_name: str = struct.structure_parser.get_ligand_name(lig_pdb)
                 # if renew
-                #TODO(CJ): figure out how to implement the environment manager here
-                run(f"{Config.Amber.AmberHome}/bin/antechamber -i {lig_pdb} -fi pdb -o {prepin} -fo prepi -c bcc -s 0 -nc {net_charge}")
-                files_to_remove: List[str] = "ATOMTYPE.INF NEWPDB.PDB PREP.INF sqm.pdb sqm.in sqm.out".split()
-                files_to_remove.extend(list(map(str, Path('.').glob('ANTECHAMBER*'))))
-                _ = list(map(lambda fname: fs.safe_rm( fname ), files_to_remove))
+                # TODO(CJ): figure out how to implement the environment manager here
+                run(
+                    f"{Config.Amber.AmberHome}/bin/antechamber -i {lig_pdb} -fi pdb -o {prepin} -fo prepi -c bcc -s 0 -nc {net_charge}"
+                )
+                files_to_remove: List[
+                    str
+                ] = "ATOMTYPE.INF NEWPDB.PDB PREP.INF sqm.pdb sqm.in sqm.out".split()
+                files_to_remove.extend(list(map(str, Path(".").glob("ANTECHAMBER*"))))
+                _ = list(map(lambda fname: fs.safe_rm(fname), files_to_remove))
                 # gen frcmod
-				#TODO(CJ): add some kind of check that this all actually runs correctly w/o errors
-                 run(f"{Config.Amber.AmberHome}/bin/parmchk2 -i {prepin} -f prepi -o {frcmod}")
+                # TODO(CJ): add some kind of check that this all actually runs correctly w/o errors
+                run(
+                    f"{Config.Amber.AmberHome}/bin/parmchk2 -i {prepin} -f prepi -o {frcmod}"
+                )
                 # record
                 result.append((prepin, frcmod))
-            return result    
+            return result
 
     def _combine_parm(
         self,

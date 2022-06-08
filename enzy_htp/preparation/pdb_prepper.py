@@ -44,12 +44,12 @@ from enzy_htp.chemical import convert_to_three_letter, get_element_aliases
 class PDBPrepper:
     """Class that handles initial preparation of a specified Structure().
 
-	Attributes:
-        current_path_ : The path to the most recently saved version of the Structure().
-	    work_dir : The scratch directory where temporary files are saved. The current time in the format "YYYY_MM_DD" is used if the keyword is not specified.
-		all_paths : A list of all paths created by the PDBPrepper() object. Stored in reverse order of age.
+    Attributes:
+    current_path_ : The path to the most recently saved version of the Structure().
+        work_dir : The scratch directory where temporary files are saved. The current time in the format "YYYY_MM_DD" is used if the keyword is not specified.
+            all_paths : A list of all paths created by the PDBPrepper() object. Stored in reverse order of age.
 
-	"""
+    """
 
     def __init__(self, pdb_name, **kwargs):
         """Inits PDBPrepper with a pdb file and optionally a work directory to place temporary files."""
@@ -277,7 +277,13 @@ class PDBPrepper:
                         # Deal with missing residue, fill with "NAN"
                         missing_length = pdb_l.resi_id - last_resi_index - 1
                         if missing_length > 0:
-                            Chain_sequence = Chain_sequence + ["NAN",] * missing_length
+                            Chain_sequence = (
+                                Chain_sequence
+                                + [
+                                    "NAN",
+                                ]
+                                * missing_length
+                            )
 
                         # Store the new resi
                         Chain_sequence.append(pdb_l.resi_name)
@@ -408,10 +414,14 @@ class PDBPrepper:
 
         pass
 
-    def get_protonation(self, ph: float = 7.0, ffout: str = "AMBER",) -> str:
+    def get_protonation(
+        self,
+        ph: float = 7.0,
+        ffout: str = "AMBER",
+    ) -> str:
         """Uses PDB2PQR to get the protonation state for a PDB file, saving the protonated .pdb file.
-		Separately runs PDB2PQR on the ligand and metal and combines the output. Returns path to the protonated
-		PDB file."""
+        Separately runs PDB2PQR on the ligand and metal and combines the output. Returns path to the protonated
+        PDB file."""
         # input of PDB2PQR
         check_valid_ph(ph)
         self.pqr_path = f"{fs.remove_ext(self.current_path_)}.pqr.pdb"
@@ -443,11 +453,11 @@ class PDBPrepper:
         ------------------------------
         Use MutaFlag in self.MutaFlags
         Grammer (from Add_MutaFlag):
-        X : Original residue name. Leave X if unknow. 
+        X : Original residue name. Leave X if unknow.
             Only used for build filenames. **Do not affect any calculation.**
         A : Chain index. Determine by 'TER' marks in the PDB file. (Do not consider chain_indexs in the original file.)
         11: Residue index. Strictly correponding residue indexes in the original file. (NO sort applied)
-        Y : Target residue name.  
+        Y : Target residue name.
 
         **WARNING** if there are multiple mutations on the same index, only the first one will be used.
         """
@@ -665,7 +675,7 @@ class PDBPrepper:
             g_route: Gaussian route line
             ifchk: if save chk file of a gaussian job. (default: 0)
         val_fix: fix free valance of truncated strutures
-            = internal: add H to where the original connecting atom is. 
+            = internal: add H to where the original connecting atom is.
                         special fix for classical case:
                         "sele by residue" (cut N-C) -- adjust dihedral for added H on N.
             = openbabel TODO

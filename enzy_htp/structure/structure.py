@@ -246,7 +246,7 @@ class Structure:
             result.append(out_pdb)
             existing.append(lig_name)
        
-	    return result
+        return result
 
 
     def build_protein(self, dir, ft="PDB"):

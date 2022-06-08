@@ -21,7 +21,7 @@ import openbabel
 import openbabel.pybel as pybel
 from .pdb_line import read_pdb_lines
 
-#TODO(CJ): this probably needs to go to core so that structure.Structure can use it
+# TODO(CJ): this probably needs to go to core so that structure.Structure can use it
 def check_valid_ph(ph: float) -> None:
     """Helper function that checks the pH is on the range: [0.00, 14.00]. Throws core.InvalidPH() if not."""
     if ph < 0 or ph > 14:
@@ -34,7 +34,7 @@ def protonate_pdb(
     """Runs PDB2PQR on a specified pdb file and saves it to the specified pqr path. This preparation step
     makes use of [PDB2PQR](https://www.poissonboltzmann.org/) via the pdb2pqr python [package](https://pdb2pqr.readthedocs.io/en/latest/).
     Adds in missing atoms and finds the protonation state of the pdb file.
-	"""
+    """
     # TODO(CJ): check if ffout is valid.
     # TODO(CJ): maybe improve the documentation here?
     check_valid_ph(ph)
@@ -90,7 +90,10 @@ def protonate_missing_elements(
         # print("-asdgasdgasg")
         old_keys = list(map(lambda l: l.residue_key, ligand_list))
         new_ligands = list(
-            map(lambda ll: protonate_ligand(ll, dirname=lig_dir, ph=7), ligand_list,)
+            map(
+                lambda ll: protonate_ligand(ll, dirname=lig_dir, ph=7),
+                ligand_list,
+            )
         )
         # print(new_ligands)
         for lig, ok in zip(new_ligands, old_keys):
@@ -164,7 +167,7 @@ def _protonate_ligand_OPENBABEL(path: str, ph: float, out_path: str) -> None:
     raise Exception(f"Method: __protonate_OPENBABEL is not implemented yet!")
 
 
-def _ob_pdb_charge(pdb_path : str ) -> int:
+def _ob_pdb_charge(pdb_path: str) -> int:
     """
     extract net charge from openbabel exported pdb file
     """
@@ -183,7 +186,6 @@ def _ob_pdb_charge(pdb_path : str ) -> int:
 
 def _protonate_ligand_PYBEL(path: str, ph: float, out_path: str) -> Ligand:
     """Impelemntation of protonate_ligand() using the pybel method. SHOULD NOT be called directly by users."""
-
 
     def _fix_ob_output(pdb_path, out_path, ref_name_path=None) -> None:
         """

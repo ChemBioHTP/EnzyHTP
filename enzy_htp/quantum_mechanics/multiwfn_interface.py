@@ -6,7 +6,7 @@ class MultiwfnInterface:
         get bond dipole using wfn analysis with fchk files.
         -----------
         Args:
-            qm_fch_paths: paths of fchk files 
+            qm_fch_paths: paths of fchk files
                         * requires correponding out files with only ext difference
                         * (if want to compare resulting coord to original mdcrd/gjf stru)
                             requires nosymm in gaussian input that generate the fch file.
@@ -15,7 +15,7 @@ class MultiwfnInterface:
             prog        : program for wfn analysis (default: multiwfn)
                           **Multiwfn workflow**
                             1. Multiwfn xxx.fchk < parameter_file > output
-                            the result will be in ./LMOdip.txt 
+                            the result will be in ./LMOdip.txt
                             2. extract value and project to the bond accordingly
         Returns:
             Dipoles     : A list of dipole data in a form of [(dipole_norm_signed, dipole_vec), ...]
@@ -23,12 +23,12 @@ class MultiwfnInterface:
                                                to be bond vector.
                           *dipole_vec* is the vector of the dipole
         -----------
-        LMO bond dipole: 
+        LMO bond dipole:
         (Method: Multiwfn manual 3.22/4.19.4)
         2-center LMO dipole is defined by the deviation of the eletronic mass center relative to the bond center.
         Dipole positive Direction: negative(-) to positive(+).
         Result direction: a1 -> a2
-        
+
         REF: Lu, T.; Chen, F., Multiwfn: A multifunctional wavefunction analyzer. J. Comput. Chem. 2012, 33 (5), 580-592.
         """
         Dipoles = []

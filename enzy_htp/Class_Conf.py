@@ -42,16 +42,16 @@ class Config:
 
 class Layer:
     """
-	set / use preset of oniom layer
-	------------
-	PDB: related PDB object
-	layer: list of layer's list of atom indexes 
-	"""
+    set / use preset of oniom layer
+    ------------
+    PDB: related PDB object
+    layer: list of layer's list of atom indexes
+    """
 
     def __init__(self, PDB_obj, atom_lists, if_set=0):
         """
-		general way to assign layer: list of atom indexes
-		"""
+        general way to assign layer: list of atom indexes
+        """
         self.PDB = PDB_obj
         if not if_set:
             self.layer = []
@@ -92,17 +92,17 @@ class Layer:
     @classmethod
     def preset(cls, PDB_obj, set_id, lig_list=[]):
         """
-		preset layer settings for ONIOM
-                ------------
-		set_id = 
-			(two layers)
-			1: Substrate only
-			2: Key ligands (specify ligand index or name; all ligand by default)
-			3: Substrate and key residues (manually assigned)
-			4: Substrate and all residues/ligands within a assigned radius (Need to keep consistant molecular number)
-			5: Based on some parameters to select the QM region
-		lig_list: (set_id = 2) key ligand index
-		"""
+        preset layer settings for ONIOM
+        ------------
+        set_id =
+                (two layers)
+                1: Substrate only
+                2: Key ligands (specify ligand index or name; all ligand by default)
+                3: Substrate and key residues (manually assigned)
+                4: Substrate and all residues/ligands within a assigned radius (Need to keep consistant molecular number)
+                5: Based on some parameters to select the QM region
+        lig_list: (set_id = 2) key ligand index
+        """
         layer_atoms = []
         PDB_obj.get_stru()
         stru = PDB_obj.stru
@@ -173,10 +173,10 @@ class Layer:
 
     def __getitem__(self, key: int):
         """
-		Chain_obj[int]: Chain_obj.residues[int]
-		-----
-		use residue index within the chain, start from 0
-		"""
+        Chain_obj[int]: Chain_obj.residues[int]
+        -----
+        use residue index within the chain, start from 0
+        """
         return self.layer[key]
 
     def __len__(self):

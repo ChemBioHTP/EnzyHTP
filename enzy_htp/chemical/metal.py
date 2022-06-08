@@ -152,8 +152,8 @@ VDW_RADII = {
 
 
 def get_metal_radii(atom_name: str, method: str = "ionic") -> Union[float, None]:
-    """Given a metal atom and a method, returns the radii for that metal type. Allowed methods are 'ionic' and 'vdw'. Exits if an invalid radii type is given. 
-	Returns 'None' if not defined."""
+    """Given a metal atom and a method, returns the radii for that metal type. Allowed methods are 'ionic' and 'vdw'. Exits if an invalid radii type is given.
+    Returns 'None' if not defined."""
     # TODO(CJ): provide some basic input atom sanitization. (i.e. LI -> Li, li -> Li)
     if method == "ionic":
         return IONIC_RADII.get(atom_name, None)

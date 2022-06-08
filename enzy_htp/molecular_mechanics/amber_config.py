@@ -16,20 +16,20 @@ from plum import dispatch
 
 class AmberConfig:
     """Class that holds default values for running Amber within enzy_htp and also creates
-	input files for minimzation, heating, constant pressure production, and constant
-	pressure equilibration.
+    input files for minimzation, heating, constant pressure production, and constant
+    pressure equilibration.
 
-	Attributes:
-		parent_ : Points to parent config object. Optional and defaults to None.
-		HOME : str() corresponding to Amber home directory on the system.
-		CPU_ENGINE : str() corresponding to Amber cpu sander.
-		GPU_ENGINE : str() corresponding to Amber gpu sander.
-		BOX_TYPE : str() corresponding to type of water box.
-		BOX_SIZE : TODO
-		CONF_MIN : dict() holding settings for Amber minimization.
-		CONF_HEAT : dict() holding settings for Amber heating.
-		CONF_EQUI : dict() holding settings for Amber constant pressure equilibration run.
-		CONF_PROD : dict() holding settings for Amber constant pressure production run.
+    Attributes:
+            parent_ : Points to parent config object. Optional and defaults to None.
+            HOME : str() corresponding to Amber home directory on the system.
+            CPU_ENGINE : str() corresponding to Amber cpu sander.
+            GPU_ENGINE : str() corresponding to Amber gpu sander.
+            BOX_TYPE : str() corresponding to type of water box.
+            BOX_SIZE : TODO
+            CONF_MIN : dict() holding settings for Amber minimization.
+            CONF_HEAT : dict() holding settings for Amber heating.
+            CONF_EQUI : dict() holding settings for Amber constant pressure equilibration run.
+            CONF_PROD : dict() holding settings for Amber constant pressure production run.
     """
 
     HOME: str = "$AMBERHOME"
@@ -148,16 +148,16 @@ class AmberConfig:
         if is_path:
             self.parent_.update_paths()
 
-
-    def get_engine(self, mode : str) -> str:
+    def get_engine(self, mode: str) -> str:
         """Getter that returns the path to either the CPU or GPU engine configured for Amber."""
-        if mode == 'CPU':
+        if mode == "CPU":
             return self.CPU_ENGINE
-        elif mode == 'GPU':
+        elif mode == "GPU":
             return self.GPU_ENGINE
         else:
             raise TypeError()
-            #TODO(CJ): proper error and documentation
+            # TODO(CJ): proper error and documentation
+
 
 def default_amber_config() -> AmberConfig:
     """Creates a deep-copied default version of the AmberConfig() class."""
