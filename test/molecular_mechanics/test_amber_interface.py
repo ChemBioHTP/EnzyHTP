@@ -3,6 +3,8 @@
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-03
 """
+import shutil 
+
 from enzy_htp.core import file_system as fs
 from enzy_htp import AmberInterface
 from pathlib import Path
@@ -14,9 +16,12 @@ TARGET_MINIMIZE_INPUT_1 = f"{MM_DATA_DIR}/target_min_1.inp"
 MINIMIZE_INPUT_2 = f"{MM_DATA_DIR}/min_2.inp"
 TARGET_MINIMIZE_INPUT_2 = f"{MM_DATA_DIR}/target_min_2.inp"
 
+def exe_exists(exe:str) -> bool:
+    """Helper method that checks if an executable exists."""
+    return shutil.which(exe) is not None
 
 def files_equivalent( fname1 : str, fname2 : str ) -> bool:
-    """"""
+    """Helper method that checks if the contents of two files are equivalent."""
     lines1, lines2 = fs.lines_from_file(fname1), fs.lines_from_file(fname2)
     
     if len(lines1) != len(lines2):
@@ -44,3 +49,14 @@ def test_write_minimize_input_file():
     assert not Path(MINIMIZE_INPUT_1).exists()
     assert not Path(MINIMIZE_INPUT_2).exists()
 
+
+def test_minimize_structure():
+    """Testing that a structure can be minimized with the AmberInterface.minimize_structure() method."""
+    assert False
+
+def test_build_param_files():
+    assert False
+
+
+def test_build_ligand_param_files():
+    assert False

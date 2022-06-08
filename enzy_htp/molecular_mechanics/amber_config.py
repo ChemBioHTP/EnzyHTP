@@ -126,6 +126,10 @@ class AmberConfig:
         """Trivial constructor that optionally sets parent_ dependency. parent_ is None by default."""
         self.parent_ = parent
 
+    def valid_box_type(self) -> bool:
+        """Checks if the BOX_TYPE attribute is an acceptable value. Current allowed values are "box" and "oct"."""	 
+        return self.BOX_TYPE in set("box oct".split())
+
     def required_executables(self) -> List[str]:
         """A hardcoded list of required executables for Amber."""
         return [self.CPU_ENGINE, self.GPU_ENGINE, "tleap", "ampdb"]
@@ -135,95 +139,44 @@ class AmberConfig:
         return [self.HOME]
 
     def __getitem__(self, key: str) -> Any:
-        """Getter that enables dot-operator accession of AmberConfig() attributes."""
+        """Getter that enables [] accession of AmberConfig() attributes."""
         return getattr(self, key)
 
     def __setitem__(self, key: str, value: Any) -> None:
-        """Setter that enables dot-operator accession of AmberConfig() attributes with value validation."""
+        """Setter that enables [] accession of AmberConfig() attributes with value validation."""
+        print(key)
         is_path = False
         if key in {"CPU_ENGINE", "GPU_ENGINE", "HOME"}:
             is_path = True
-
+        
         setattr(self, key, value)
-        if is_path:
+        if not self.valid_box_type():
+             raise TypeError() #TODO(CJ): make a custom error for this part
+
+        if is_path and self.parent_:
             self.parent_.update_paths()
 
     def get_engine(self, mode: str) -> str:
-        """Getter that returns the path to either the CPU or GPU engine configured for Amber."""
+        """Getter that returns the path to either the CPU or GPU engine configured for Amber.
+		
+		Args:
+			mode: The mode that amber will be run in. Allowed values are "CPU" and "GPU".
+
+		Returns:
+			Path to the specified engine.
+
+		Raises:
+			TypeError if an invalid engine type is supplied.	
+		"""
         if mode == "CPU":
             return self.CPU_ENGINE
         elif mode == "GPU":
             return self.GPU_ENGINE
         else:
+			#TODO(CJ): add a custom error for this part
             raise TypeError()
-            # TODO(CJ): proper error and documentation
 
 
 def default_amber_config() -> AmberConfig:
     """Creates a deep-copied default version of the AmberConfig() class."""
     return deepcopy(AmberConfig())
-
-    # -----------------------------
-    #            heat
-    # Heat
-    #  &cntrl
-    #   imin  = 0,  ntx = 1, irest = 0,
-    #   ntc   = 2, ntf = 2,
-    #   cut   = 10.0,
-    #   nstlim= 20000, dt= 0.002,
-    #   tempi = 0.0,  temp0=300.0,
-    #   ntpr  = {0.01nstlim},  ntwx={nstlim},
-    #   ntt   = 3, gamma_ln = 5.0,
-    #   ntb   = 1,  ntp = 0,
-    #   iwrap = 1,
-    #   nmropt= 1,
-    #   ig    = -1,
-    #   ntr   = 1,	restraint_wt = 2.0, restraintmask = '@C,CA,N',
-    #  /
-    #  &wt
-    #   type  = 'TEMP0',
-    #   istep1= 0, istep2={0.9nstlim},
-    #   value1= 0.0, value2=300.0,
-    #  /
-    #  &wt
-    #   type  = 'TEMP0',
-    #   istep1= {A_istep2+1}, istep2={nstlim},
-    #   value1= 300.0, value2=300.0,
-    #  /
-    #  &wt
-    #   type  = 'END',
-    #  /
-
-    # -----------------------------
-    #            prod
-    # Production: constant pressure
-    #  &cntrl
-    #   imin  = 0, ntx = 1, irest = 0,
-    #   ntf   = 2,  ntc = 2,
-    #   nstlim= 50000000, dt= 0.002,
-    #   cut   = 10.0,
-    #   temp0 = 300.0,
-    #   ntpr  = 50000, ntwx = 5000,
-    #   ntt   = 3, gamma_ln = 5.0,
-    #   ntb   = 2,  ntp = 1,
-    #   iwrap = 1,
-    #   ig    = -1,
-    #  /
-
-    # -----------------------------
-    #            equi
-    # Equilibration: constant pressure
-    #  &cntrl
-    #   imin  = 0,  ntx = 5,  irest = 1,
-    #   ntf   = 2,  ntc = 2,
-    #   nstlim= 500000, dt= 0.002,
-    #   cut   = 10.0,
-    #   temp0 = 300.0,
-    #   ntpr  = {0.002nstlim}, ntwx = 5000,
-    #   ntt   = 3, gamma_ln = 5.0,
-    #   ntb   = 2,  ntp = 1,
-    #   iwrap = 1,
-    #   ig    = -1,
-    #   ntr   = 1,	restraint_wt = 2.0,
-    #   restraintmask = '@C,CA,N',
-    #  /

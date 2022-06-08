@@ -35,7 +35,6 @@ class AmberInterface:
         All parameters in the &ctrl block are hardcoded except for ncyc and ntpr, which are 0.5*cycle
         and 0.2*cycle as integers, respectively.
         """
-        # TODO(CJ): move to AmberConfig()
         minimize_lines: List[str] = [
             "Minimize",
             " &cntrl",
@@ -53,11 +52,21 @@ class AmberInterface:
         fs.write_lines(fname, minimize_lines)
 
     def minimize_structure(
-        self, pdb: str, mode: str = "CPU", outdir: str = "", cycle: int = 2000
+        self, pdb: str, mode: str = "CPU", min_dir: str = "./", cycle: int = 2000
     ) -> str:
         """Class method that minimizes the structure found in a supplied .pdb file, returning
         the path to the minimized file.
+
+		Args:
+			pdb: The .pdb file with the structure to be minimized.
+			mode: Which version of Amber to use. Allowed values are "CPU" and "GPU". 
+			min_dir: Work directory where the paramter files and output are saved.
+			cycle: TODO
+
+		Returns:
+			Path to the minimized structure in a .pdb file.
         """
+		#TODO(CJ): add some checks for inputs
         inpath = Path(pdb)
         min_dir = f"{inpath.parent}/pdb_min/"
         fs.safe_mkdir(min_dir)
@@ -65,31 +74,36 @@ class AmberInterface:
         min_in = f"{min_dir}/min.in"
         min_out = f"{min_dir}/min.out"
         min_rst = f"{min_dir}/min.ncrst"
-        # self.write_minimize_input_file(min_in, cycle)
-        # engine = self.config_.get_engine( mode )
-        #
-        # self.config_.env_manager().run_command(
-        #    engine,
-        #        ["-O", "-i", min_in, "-o", min_out, "-p", prmtop, "-c", inpcrd, "-r", min_rst,
-        # )
-        #
-        # self.config_.env_manager().run_command(
-        #    "ambpdb", [f"-p", prmtop, "-c", min_rst, ">", outfile]
-        # )
+        (prmtop, inpcrd) = self.build_param_files(inpath, outdir)
+        self.write_minimize_input_file(min_in, cycle)
+        engine = self.config_.get_engine( mode )
+        
+        self.config_.env_manager().run_command(
+           engine,
+               ["-O", "-i", min_in, "-o", min_out, "-p", prmtop, "-c", inpcrd, "-r", min_rst,]
+        )
+        
+        self.config_.env_manager().run_command(
+           "ambpdb", [f"-p", prmtop, "-c", min_rst, ">", outfile]
+        )
 
-    #
-    # shutil.move(prmtop, min_dir )
-    # shutil.move(inpcrd, min_dir )
+    
+        shutil.move(prmtop, min_dir )
+        shutil.move(inpcrd, min_dir )
 
-    # return outfile
+        return outfile
 
     def build_param_files(self, in_pdb: str, build_dir: str) -> Tuple[str, str]:
-        # TODO(CJ): add parameter to select the charge calculation method
-        # for the ligands.
-        # what do we want to do here?
-        # 1. analyze pdb and see if there are any ligands
-        # 2. if ligands exist, make their input files
-        # 3.
+        """Creates the .prmtop and .inpcrd files for the supplied .pdb file. Handles 
+        processing of the Ligand() and MetalCenter() objects in the structure.
+
+		Args:
+			in_pdb: The .pdb file to build parameter files for.
+			buld_dir: The directory to build the parameter files in.
+
+		Returns:
+			A Tuple[str,str] with the layout (.prmtop path, .inpcrd path).
+		"""
         ligand_dir: str = f"{build_dir}/ligand/"
         metalcenter_dir: str = f"{build_dir}/metalcenter/"
         fs.safe_mkdir(ligand_dir)
@@ -99,7 +113,26 @@ class AmberInterface:
         ligand_charges: List[int] = list(
             map(lambda pp: prep._ob_pdb_charge(pp), ligand_paths)
         )
-        pass
+        ligand_params: List[Tuple[str,str]] = self.build_ligand_param_files(ligand_paths,ligand_charges)
+        leap_path: str = f"{build_dir}/leap.in"
+        leap_log: str = f"{build_dir}/leap.out"
+        #sol_path: str = f"{build_dir}/leap.in"
+        leap_contents: List[str] = ['source leaprc.protein.ff14SB', 'source leaprc.gaff', 'source leaprc.water.tip3p']
+        for (prepin, frcmod) in ligand_params:
+            leap_contents.extend([f"loadAmberParams {frcmod}", f"loadAmberPrep {prepin}"])
+        leap_contents.append(f"a = loadpdb {in_pdb}")
+        #TODO(CJ): Include igb
+        leap_contents.append("center a")
+        #TODO(CJ): include solvation stuff
+        pdb_path: Path = Path(in_pdb)
+        prmtop: str = f"{build_dir}/{pdb_path.stem}.prmtop"
+        inpcrd: str = f"{build_dir}/{pdb_path.stem}.inpcrd"
+        pdb_ff: str = f"{build_dir}/{pdb_path.stem}_ff.pdb"
+        leap_contents.extend([f"saveamberparm a {prmptop} {inpcrd}", f"savepdb a {pdb_ff}", "quit"])
+        fs.write_lines(leap_path, leap_contents)
+        #TODO(CJ): Check that this actually works before returning
+        os.system(f"tleap -s -f {leap_path} > {leap_log}")
+        return (prmtop, inpcrd)
 
     def PDB2FF(
         self,
