@@ -17,9 +17,11 @@ from .core.env_manager import EnvironmentManager
 from .core import _LOGGER
 from copy import deepcopy
 
+
 class Config:
     """
     """
+
     def __init__(self):
         self.ev_base = []
         self.exe_base = ["tleap"]

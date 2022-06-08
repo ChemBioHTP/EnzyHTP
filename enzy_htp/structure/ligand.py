@@ -22,8 +22,7 @@ from enzy_htp.chemical import enum as renum
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import (
     UnsupportedFileType,
-    _LOGGER,
-)
+    _LOGGER,)
 
 
 class Ligand(Residue):

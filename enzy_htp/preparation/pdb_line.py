@@ -12,7 +12,7 @@ Date: 2022-03-19
 from typing import List
 
 import enzy_htp.core as core
-from enzy_htp.core import file_system as fs 
+from enzy_htp.core import file_system as fs
 from enzy_htp.chemical import THREE_LETTER_AA_MAPPER
 
 

@@ -122,7 +122,7 @@ class Atom:
                 else:
                     a_name = "{:<3}".format(self.atom_name)
                     a_name = " " + a_name
-                if "ZN" in a_name:#TODO(CJ) FIX THIS
+                if "ZN" in a_name:  # TODO(CJ) FIX THIS
                     a_name = a_name.strip() + "  "
                 r_name = "{:<3}".format(self.residue_name)
             else:

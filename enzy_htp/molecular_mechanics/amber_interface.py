@@ -1,7 +1,6 @@
 """Defines an AmberInterface class that serves as a bridge for enzy_htp to utilize AmberMD software. Uses the AmberConfig class
-found in enzy_htp/molecular_mechanics/amber_interface.py. Supported operations include:
-	+ structure minimization
-	+ 
+found in enzy_htp/molecular_mechanics/amber_interface.py. Supported operations include minimization, 
+heating, constant pressure production, and constant pressure equilibration.
 
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
@@ -9,11 +8,13 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-02
 """
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 import shutil
 from ..core.logger import _LOGGER
 from enzy_htp.core import file_system as fs
-from .amber_config import AmberConfig 
+import enzy_htp.structure as struct
+import enzy_htp.preparation as prep
+from .amber_config import AmberConfig, default_amber_config
 
 
 class AmberInterface:
@@ -22,17 +23,20 @@ class AmberInterface:
 	Atributes:
 		config_	: The AmberConfig class which provides settings.
     """
-    def __init__(self, config : AmberConfig =None) -> None:
+
+    def __init__(self, config: AmberConfig = None) -> None:
         """Simplistic constructor that optionally takes an AmberConfig object as its only argument."""
-        #TODO(CJ): figure out what to do when a config class is not supplied
         self.config_ = config
-    
-    def write_minimize_input_file(self, fname : str, cycle:int) -> None:
+        if not self.config_:
+            self.config_ = default_amber_config()
+
+    def write_minimize_input_file(self, fname: str, cycle: int) -> None:
         """Creates a minimization file to be used in an amber run. SHOULD NOT BE CALLED BY USERS DIRECTLY.
 		All parameters in the &ctrl block are hardcoded except for ncyc and ntpr, which are 0.5*cycle 
 		and 0.2*cycle as integers, respectively.
 		"""
-        minimize_lines : List[str] = [
+		#TODO(CJ): move to AmberConfig()
+        minimize_lines: List[str] = [
             "Minimize",
             " &cntrl",
             "  imin=1,",
@@ -44,58 +48,56 @@ class AmberInterface:
             "  ntwx=0,",
             "  cut=8.0,",
             " /",
-            ""
+            "",
         ]
-        fs.write_lines( fname, minimize_lines ) 
-    
-    def minimize_structure(self, pdb: str, mode: str = "CPU", outdir : str = '', cycle:int=2000) -> str:
-        """Relaxes the structure in a .pdb file using Amber.
-        Run a minization use self.prmtop and self.inpcrd and setting form class Config.
-        --------------------------------------------------
-        Save changed PDB to self.path (containing water and ions)
-        Mainly used for remove bad contact from PDB2PDBwLeap.
+        fs.write_lines(fname, minimize_lines)
+
+    def minimize_structure(
+        self, pdb: str, mode: str = "CPU", outdir: str = "", cycle: int = 2000
+    ) -> str:
+        """Class method that minimizes the structure found in a supplied .pdb file, returning
+		the path to the minimized file.
         """
         inpath = Path(pdb)
         min_dir = f"{inpath.parent}/pdb_min/"
-        fs.safe_mkdir( min_dir )
+        fs.safe_mkdir(min_dir)
         outfile = f"{min_dir}/{inpath.stem}_min.pdb"
         min_in = f"{min_dir}/min.in"
         min_out = f"{min_dir}/min.out"
         min_rst = f"{min_dir}/min.ncrst"
-        self.write_minimize_input_file(min_in, cycle)
-        #out4_PDB_path = self.path_name + "_min.pdb"
-         #TODO(CJ) add input checks    
-        # make sander input
-#        min_dir = self.cache_path + "/PDBMin"
-#        minin_path = min_dir + "/min.in"
-#        minout_path = min_dir + "/min.out"
-#        minrst_path = (
-#            min_dir + "/min.ncrst"
-#        )  # change to ncrst seeking for solution of rst error
-        #mkdir(min_dir)
-    
-        # express engine
-#        PC_cmd, engine_path = Config.Amber.get_Amber_engine(engine=engine)
-#        engine = self.config_.amber_confg()[
-#            "CPU_ENGINE" if mode == "CPU" else "GPU_ENGINE"
-#        ]
-#        self.config_.env_manager().run_command(
-#            engine,
-#            f"-O -i {minin_path} -o {minout_path} -p {self.prmtop_path} -c {self.inpcrd_path} -r {minrst_path}",
-#        )
-#        self.config_.env_manager().run_command(
-#            "ambpdp", f"-p {self.prmtop_path} -c {minrst_path} > {out4_PDB_path}"
-#        )
-#        #shutil.move( 
-#        os.system(
-#            "mv " + self.prmtop_path + " " + self.inpcrd_path + " " + min_dir
-#        )  # TODO CJ: not sure if this actually works...
-#    
-#        self.path = out4_PDB_path
-#        self._update_name()
-#        self.prmtop_path = min_dir + "/" + self.prmtop_path
-#        self.inpcrd_path = min_dir + "/" + self.inpcrd_path
-    
+        #self.write_minimize_input_file(min_in, cycle)
+        #engine = self.config_.get_engine( mode )
+        #
+        #self.config_.env_manager().run_command(
+        #    engine,
+        #        ["-O", "-i", min_in, "-o", min_out, "-p", prmtop, "-c", inpcrd, "-r", min_rst,
+        #)
+        #
+        #self.config_.env_manager().run_command(
+        #    "ambpdb", [f"-p", prmtop, "-c", min_rst, ">", outfile]
+        #)
+		#
+        #shutil.move(prmtop, min_dir )
+		#shutil.move(inpcrd, min_dir )
+
+        #return outfile
+
+    def build_param_files(self, in_pdb : str, build_dir : str) -> Tuple[str,str]:
+        #TODO(CJ): add parameter to select the charge calculation method 
+        # for the ligands.
+        # what do we want to do here?
+        # 1. analyze pdb and see if there are any ligands
+        # 2. if ligands exist, make their input files
+        # 3. 
+        ligand_dir : str = f"{build_dir}/ligand/"
+        metalcenter_dir : str = f"{build_dir}/metalcenter/"
+        fs.safe_mkdir( ligand_dir )
+        fs.safe_mkdir( metalcenter_dir )
+        structure : struct.Structure = struct.structure_from_pdb( in_pdb ) 
+        ligand_paths: List[str] = structure.build_ligands(ligand_dir, True)
+        ligand_charges: List[int] = list(map(lambda pp: prep._ob_pdb_charge(pp), ligand_paths))
+        pass 
+
     def PDB2FF(
         self,
         prm_out_path="",
@@ -123,7 +125,7 @@ class AmberInterface:
         """
         # check and generate self.stru
         self.get_stru()
-    
+
         # build things seperately
         if local_lig:
             lig_dir = self.dir + "/ligands/"
@@ -133,7 +135,7 @@ class AmberInterface:
             met_dir = self.dir + "/../metalcenters/"
         mkdir(lig_dir)
         mkdir(met_dir)
-    
+
         ligands_pathNchrg = self.stru.build_ligands(lig_dir, ifcharge=1, ifunique=1)
         # metalcenters_path = self.stru.build_metalcenters(met_dir)
         # parm
@@ -155,102 +157,38 @@ class AmberInterface:
         if ifsavepdb:
             self.path = self.path_name + "_ff.pdb"
             self._update_name()
-    
+
         return (self.prmtop_path, self.inpcrd_path)
-#    
-#    def _ligand_parm(self, paths, method="AM1BCC", renew=0):
-#        """
-#        Turn ligands to prepi (w/net charge), parameterize with parmchk
-#        return [(perpi_1, frcmod_1), ...]
-#        -----------
-#        method  : method use for ligand charge. Only support AM1BCC now.
-#        renew   : 0:(default) use old parm files if exist. 1: renew parm files everytime
-#        TODO check if the ligand is having correct name. (isolate the renaming function and also use in the class structure)
-#        * WARN: The parm file for ligand will always be like xxx/ligand_1.frcmod. Remember to enable renew when different object is sharing a same path.
-#        * BUG: Antechamber has a bug that if current dir has temp files from previous antechamber run (ANTECHAMBER_AC.AC, etc.) sqm will fail. Now remove them everytime.
-#        """
-#        parm_paths = []
-#        self.prepi_path = {}
-#    
-#        for lig_pdb, net_charge in paths:
-#            if method == "AM1BCC":
-#                out_prepi = lig_pdb[:-3] + "prepin"
-#                out_frcmod = lig_pdb[:-3] + "frcmod"
-#                with open(lig_pdb) as f:
-#                    for line in f:
-#                        pdbl = PDB_line(line)
-#                        if pdbl.line_type == "ATOM" or pdbl.line_type == "HETATM":
-#                            lig_name = pdbl.resi_name
-#                # if renew
-#                if (
-#                    os.path.isfile(out_prepi)
-#                    and os.path.isfile(out_frcmod)
-#                    and not renew
-#                ):
-#                    if Config.debug >= 1:
-#                        print("Parm files exist: " + out_prepi + " " + out_frcmod)
-#                        print("Using old parm files.")
-#                else:
-#                    # gen prepi (net charge and correct protonation state is important)
-#                    if Config.debug >= 1:
-#                        print(
-#                            "running: "
-#                            + Config.Amber.AmberHome
-#                            + "/bin/antechamber -i "
-#                            + lig_pdb
-#                            + " -fi pdb -o "
-#                            + out_prepi
-#                            + " -fo prepi -c bcc -s 0 -nc "
-#                            + str(net_charge)
-#                        )
-#                    run(
-#                        Config.Amber.AmberHome
-#                        + "/bin/antechamber -i "
-#                        + lig_pdb
-#                        + " -fi pdb -o "
-#                        + out_prepi
-#                        + " -fo prepi -c bcc -s 0 -nc "
-#                        + str(net_charge),
-#                        check=True,
-#                        text=True,
-#                        shell=True,
-#                        capture_output=True,
-#                    )
-#                    if Config.debug <= 1:
-#                        os.system(
-#                            "rm ANTECHAMBER* ATOMTYPE.INF NEWPDB.PDB PREP.INF sqm.pdb sqm.in sqm.out"
-#                        )
-#                    # gen frcmod
-#                    if Config.debug >= 1:
-#                        print(
-#                            "running: "
-#                            + Config.Amber.AmberHome
-#                            + "/bin/parmchk2 -i "
-#                            + out_prepi
-#                            + " -f prepi -o "
-#                            + out_frcmod
-#                        )
-#                    run(
-#                        Config.Amber.AmberHome
-#                        + "/bin/parmchk2 -i "
-#                        + out_prepi
-#                        + " -f prepi -o "
-#                        + out_frcmod,
-#                        check=True,
-#                        text=True,
-#                        shell=True,
-#                        capture_output=True,
-#                    )
-#                # record
-#                parm_paths.append((out_prepi, out_frcmod))
-#                self.prepi_path[lig_name] = out_prepi
-#    
-#        return parm_paths
-#    
-#        return self.path
-#    
-#        pass
-#    
+
+    
+        def build_ligand_param_files(self, paths : List[str], charges: List[int]) -> List[Tuple[str,str]]:
+            #TODO(CJ): add the method flag?
+            """TODO(CJ): Documentation"""
+            result: List[Tuple[str,str]] = list()
+            parm_paths = []
+            self.prepi_path = {}
+            #TODO(CJ): Beef up these checks 
+            assert len(paths) == len(charges)
+            for lig_pdb, net_charge in zip(paths,charges):
+                lig_pdb = Path(lig_pdb)
+                prepin : Path = lig_pdb.with_suffix('.prepin')
+                frcmod : Path = lig_pdb.with_suffix('.frcmod')
+                #TODO(CJ): check if you can get the ligand name from the 
+				# .pdb filename alone... I think this may be possible
+				lig_name: str = struct.structure_parser.get_ligand_name(lig_pdb)
+                # if renew
+                #TODO(CJ): figure out how to implement the environment manager here
+                run(f"{Config.Amber.AmberHome}/bin/antechamber -i {lig_pdb} -fi pdb -o {prepin} -fo prepi -c bcc -s 0 -nc {net_charge}")
+                files_to_remove: List[str] = "ATOMTYPE.INF NEWPDB.PDB PREP.INF sqm.pdb sqm.in sqm.out".split()
+                files_to_remove.extend(list(map(str, Path('.').glob('ANTECHAMBER*'))))
+                _ = list(map(lambda fname: fs.safe_rm( fname ), files_to_remove))
+                # gen frcmod
+				#TODO(CJ): add some kind of check that this all actually runs correctly w/o errors
+                 run(f"{Config.Amber.AmberHome}/bin/parmchk2 -i {prepin} -f prepi -o {frcmod}")
+                # record
+                result.append((prepin, frcmod))
+            return result    
+
     def _combine_parm(
         self,
         lig_parms,
@@ -272,13 +210,19 @@ class AmberInterface:
         """
         if box_type == None:
             box_type = Config.Amber.box_type
-        ll = list()    
+        ll = list()
         leap_path = self.cache_path + "/leap.in"
         sol_path = self.path_name + "_ff.pdb"
-        ll.extend(["source leaprc.protein.ff14SB","source leaprc.gaff","source leaprc.water.tip3p"])
+        ll.extend(
+            [
+                "source leaprc.protein.ff14SB",
+                "source leaprc.gaff",
+                "source leaprc.water.tip3p",
+            ]
+        )
         # ligands
         for prepi, frcmod in lig_parms:
-            ll.extend([f"loadAmberParams {frcmod}",f"loadAmberPrep {prepi}"])
+            ll.extend([f"loadAmberParams {frcmod}", f"loadAmberPrep {prepi}"])
         ll.append("a = loadpdb {self.path}")
         # igb Radii
         if igb != None:
@@ -300,11 +244,15 @@ class AmberInterface:
         # save
         if prm_out_path == "":
             if o_dir == "":
-                ll.append(f"saveamberparm a {self.path_name}.prmtop {self.path_name}.inpcrd")
+                ll.append(
+                    f"saveamberparm a {self.path_name}.prmtop {self.path_name}.inpcrd"
+                )
                 self.prmtop_path = self.path_name + ".prmtop"
                 self.inpcrd_path = self.path_name + ".inpcrd"
             else:
-                ll.append(f"saveamberparm a {o_dir}/{self.name}.prmtop {o_dir}/{self.name}.inpcrd")
+                ll.append(
+                    f"saveamberparm a {o_dir}/{self.name}.prmtop {o_dir}/{self.name}.inpcrd"
+                )
                 self.prmtop_path = o_dir + self.name + ".prmtop"
                 self.inpcrd_path = o_dir + self.name + ".inpcrd"
         else:
@@ -325,18 +273,21 @@ class AmberInterface:
                     self.prmtop_path = prm_out_path
                     self.inpcrd_path = None
                 else:
-                    of.write(f"saveamberparm a {prm_out_path} {o_dir}/{self.name}.inpcrd")
+                    of.write(
+                        f"saveamberparm a {prm_out_path} {o_dir}/{self.name}.inpcrd"
+                    )
                     self.prmtop_path = prm_out_path
                     self.inpcrd_path = o_dir + self.name + ".inpcrd"
-        
+
         if ifsavepdb:
             of.write("savepdb a " + sol_path + line_feed)
         of.write("quit" + line_feed)
-        #TODO(CJ): use EnvironmentManager() to run
+        # TODO(CJ): use EnvironmentManager() to run
         os.system("tleap -s -f " + leap_path + " > " + leap_path[:-2] + "out")
-        
+
         return self.prmtop_path, self.inpcrd_path
-    
+
+
 #    def PDBMD(self, tag="", o_dir="", engine="Amber_GPU", equi_cpu=0):
 #        """
 #        Use self.prmtop_path and self.inpcrd_path to initilize a MD simulation.
@@ -354,7 +305,7 @@ class AmberInterface:
 #        if o_dir == "":
 #            o_dir = self.dir + "/MD" + tag
 #        mkdir(o_dir)
-#    
+#
 #        # express engine (pirority: AmberEXE_GPU/AmberEXE_CPU - AmberHome/bin/xxx)
 #        PC_cmd, engine_path = Config.Amber.get_Amber_engine(engine=engine)
 #        # express cpu engine if equi_cpu
@@ -363,13 +314,13 @@ class AmberInterface:
 #                cpu_engine_path = Config.Amber.AmberHome + "/bin/sander.MPI"
 #            else:
 #                cpu_engine_path = Config.Amber.AmberEXE_CPU
-#    
+#
 #        # build input file (use self.MD_conf_xxxx)
 #        min_path = self._build_MD_min(o_dir)
 #        heat_path = self._build_MD_heat(o_dir)
 #        equi_path = self._build_MD_equi(o_dir)
 #        prod_path = self._build_MD_prod(o_dir)
-#    
+#
 #        # run sander
 #        if Config.debug >= 1:
 #            print(
@@ -445,7 +396,7 @@ class AmberInterface:
 #            + o_dir
 #            + "/heat.rst"
 #        )
-#    
+#
 #        # gpu debug for equi
 #        if equi_cpu:
 #            # use Config.PC_cmd and cpu_engine_path
@@ -534,7 +485,7 @@ class AmberInterface:
 #                + o_dir
 #                + "/equi.nc"
 #            )
-#    
+#
 #        if Config.debug >= 1:
 #            print(
 #                "running: "
@@ -577,10 +528,10 @@ class AmberInterface:
 #            + o_dir
 #            + "/prod.nc"
 #        )
-#    
+#
 #        self.nc = o_dir + "/prod.nc"
 #        return o_dir + "/prod.nc"
-#    
+#
 #    def _build_MD_min(self, o_dir):
 #        """
 #        Build configuration file for a minimization job
@@ -615,7 +566,7 @@ class AmberInterface:
 #            DISANG_tail = (
 #                """ &wt
 #    pe='END'
-#    
+#
 #    SANG= """
 #                + self.conf_min["DISANG"]
 #                + line_feed
@@ -645,18 +596,18 @@ class AmberInterface:
 #    pr  = """
 #            + ntpr
 #            + """, ntwx  = 0,
-#    
+#
 #            + ntr_line
 #            + nmropt_line
 #            + """ /
-#    
+#
 #            + DISANG_tail
 #        )
 #        # write
 #        with open(o_path, "w") as of:
 #            of.write(conf_str)
 #        return o_path
-#    
+#
 #    def _build_MD_heat(self, o_dir):
 #        """
 #        Build configuration file for a heat job
@@ -664,7 +615,7 @@ class AmberInterface:
 #        """
 #        # path
 #        o_path = o_dir + "/heat.in"
-#    
+#
 #        # nstlim related
 #        nstlim = self.conf_heat["nstlim"]
 #        if self.conf_heat["A_istep2"] == "0.9nstlim":
@@ -716,7 +667,7 @@ class AmberInterface:
 #            + self.conf_heat["tempi"]
 #            + """,  temp0="""
 #            + self.conf_heat["temp0"]
-#            + """,  
+#            + """,
 #    pr  = """
 #            + ntpr
 #            + """,  ntwx="""
@@ -733,10 +684,10 @@ class AmberInterface:
 #            + """,
 #    ropt= 1,
 #        = -1,
-#    
+#
 #            + ntr_line
 #            + """ /
-#    
+#
 #    pe  = 'TEMP0',
 #    tep1= 0, istep2="""
 #            + A_istep2
@@ -746,8 +697,8 @@ class AmberInterface:
 #            + """, value2="""
 #            + self.conf_heat["temp0"]
 #            + """,
-#    
-#    
+#
+#
 #    pe  = 'TEMP0',
 #    tep1= """
 #            + B_istep1
@@ -759,18 +710,18 @@ class AmberInterface:
 #            + """, value2="""
 #            + self.conf_heat["temp0"]
 #            + """,
-#    
-#    
+#
+#
 #    pe  = 'END',
-#    
-#    
+#
+#
 #            + DISANG_tail
 #        )
 #        # write
 #        with open(o_path, "w") as of:
 #            of.write(conf_str)
 #        return o_path
-#    
+#
 #    def _build_MD_equi(self, o_dir):
 #        """
 #        Build configuration file for the equilibration step
@@ -856,7 +807,7 @@ class AmberInterface:
 #        with open(o_path, "w") as of:
 #            of.write(conf_str)
 #        return o_path
-#    
+#
 #    def _build_MD_prod(self, o_dir):
 #        """
 #        Build configuration file for the production step
@@ -865,7 +816,7 @@ class AmberInterface:
 #        """
 #        # path
 #        o_path = o_dir + "/prod.in"
-#    
+#
 #        #        # nstlim related
 #        #        nstlim = self.conf_prod["nstlim"]
 #        #        if self.conf_prod["ntpr"] == "0.001nstlim":
@@ -942,7 +893,7 @@ class AmberInterface:
 #        with open(o_path, "w") as of:
 #            of.write(conf_str)
 #        return o_path
-#    
+#
 #    def _build_MD_rs(self, step, o_path):
 #        """
 #        Generate a file for DISANG restraint. Get parameters from self.conf_step.
@@ -974,31 +925,31 @@ class AmberInterface:
 #                + rest_data["ialtd"]
 #                + """,
 #    nd
-#    
+#
 #            )
 #        # write
 #        with open(o_path, "w") as of:
 #            of.write(rs_str)
 #        return o_path
-#    
+#
 #    def reset_MD_conf(self):
 #        """
-#        reset MD configuration of current object to default. 
+#        reset MD configuration of current object to default.
 #        """
 #        self.conf_min = Config.Amber.conf_min
 #        self.conf_heat = Config.Amber.conf_heat
 #        self.conf_equi = Config.Amber.conf_equi
 #        self.conf_prod = Config.Amber.conf_prod
-#    
+#
 #    def show_MD_conf(self):
 #        """
-#        Show MD configuration of current object. 
+#        Show MD configuration of current object.
 #        """
 #        print("Min :     " + repr(self.conf_min))
 #        print("Heat:     " + repr(self.conf_heat))
 #        print("Equi:     " + repr(self.conf_equi))
 #        print("Prod:     " + repr(self.conf_prod))
-#    
+#
 #    def nc2mdcrd(
 #        self, o_path="", point=None, start=1, end=-1, step=1, engine="cpptraj"
 #    ):
@@ -1025,13 +976,13 @@ class AmberInterface:
 #            if point != None:
 #                all_p = int(self.conf_prod["nstlim"]) / int(self.conf_prod["ntwx"])
 #                step = int(all_p / point)
-#    
+#
 #            if engine not in ["pytraj", "cpptraj"]:
 #                raise Exception("engine: pytraj or cpptraj")
-#    
+#
 #            if engine == "pytraj":
 #                pass
-#    
+#
 #            if engine == "cpptraj":
 #                cpp_in_path = self.cache_path + "/cpptraj_nc2mdcrd.in"
 #                cpp_out_path = self.cache_path + "/cpptraj_nc2mdcrd.out"
@@ -1052,6 +1003,6 @@ class AmberInterface:
 #                    of.write("run" + line_feed)
 #                    of.write("quit" + line_feed)
 #                os.system("cpptraj -i " + cpp_in_path + " > " + cpp_out_path)
-#    
+#
 #        self.mdcrd = o_path
 #        return o_path

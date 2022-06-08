@@ -67,48 +67,47 @@ class Residue:
 
     def has_alt_loc(self) -> bool:
         """Checks if any of the child Atom() objects have non-emptry alt_loc values."""
-        result : bool = False
+        result: bool = False
         for aa in self.atoms:
             result |= aa.has_alt_loc()
         return result
 
-    def resolve_alt_loc(self, keep : str = 'first' ) -> None:
+    def resolve_alt_loc(self, keep: str = "first") -> None:
         """Resolves the alt_loc atoms owned by the current Residue().
         Optional argument "keep" specifies the resolution method. Default
         is "first" which forces Residue() to keep lowest location. Otherwise,
         keeps the specific alt_loc identifier, assuming it exists.
         """
-        if keep == 'all':
+        if keep == "all":
             return
-        mapper : Dict[str,List[Atom]] = defaultdict( list )
+        mapper: Dict[str, List[Atom]] = defaultdict(list)
         for aa in self.atoms:
-            mapper[aa.alt_loc.strip()].append( aa )
+            mapper[aa.alt_loc.strip()].append(aa)
 
         if len(mapper.keys()) == 1:
             return
-        
-        self.atoms = mapper['']
-        del mapper['']        
-        
-        if keep == 'first':
-            keys : List[str] = sorted(list(mapper.keys()))
-            self.atoms.extend( mapper[keys[0]] )
+
+        self.atoms = mapper[""]
+        del mapper[""]
+
+        if keep == "first":
+            keys: List[str] = sorted(list(mapper.keys()))
+            self.atoms.extend(mapper[keys[0]])
         else:
             assert keep in mapper
-            self.atoms.extend( mapper[keep] )
-        
-        self.atoms.sort( key=lambda aa: aa.atom_number )
+            self.atoms.extend(mapper[keep])
 
+        self.atoms.sort(key=lambda aa: aa.atom_number)
 
     def remove_occupancy(self) -> None:
         """Makes the occupancy for each of the child Atom() objects blank. """
         for idx in range(len(self.atoms)):
-            self.atoms[idx].occupancy = ''
+            self.atoms[idx].occupancy = ""
 
     def remove_alt_loc(self) -> None:
         """Makes the alt_loc for each of the child Atom() objects blank."""
         for idx in range(len(self.atoms)):
-            self.atoms[idx].alt_loc = ''
+            self.atoms[idx].alt_loc = ""
 
     def num_atoms(self) -> int:
         """Number of atoms in the Residue."""
@@ -188,7 +187,7 @@ class Residue:
         """Getter for the Residue()'s chem.ResidueType value."""
         return self.rtype_
 
-    def get_pdb_lines(self, terminal : bool = False) -> List[str]:
+    def get_pdb_lines(self, terminal: bool = False) -> List[str]:
         """Method that gets the PDB lines for all of the Atom() objects in the Residue() object."""
         result = list()
         for aa in self.atoms:
@@ -196,16 +195,20 @@ class Residue:
         if terminal:
             num = int(result[-1][6:11])
             ter_line = result[-1]
-            ter_line = ter_line[:26] + ' '*(len(ter_line)-26)
-            ter_line = 'TER   '+ ter_line[6:]
+            ter_line = ter_line[:26] + " " * (len(ter_line) - 26)
+            ter_line = "TER   " + ter_line[6:]
             print(result[-1][6:12])
-            num = int( result[-1][6:12])
+            num = int(result[-1][6:12])
             ter_line = ter_line[0:6] + f"{num+1: >5d}     " + ter_line[16:]
             result.append(ter_line)
         return result
 
+    def get_name(self) -> str:
+        """Getter for the Residue()'s name."""
+        return self.name
+
     def __str__(self) -> str:
-        """String representationt that just shows residue key in format "chain_id.residue_name.residue_num" """
+        """String representation that just shows residue key in format "chain_id.residue_name.residue_num" """
         return self.residue_key
 
     def __repr__(self) -> str:

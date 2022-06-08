@@ -183,17 +183,15 @@ class Structure:
 
     def num_residues(self) -> int:
         """Returns the number of Residue() objects contained within the current Structure()."""
-        total : int = 0
-        ch : Chain
+        total: int = 0
+        ch: Chain
         for ch in self.chains_:
             total += ch.num_residues()
         return total
 
-
-    def get_chain(self, chain_name : str ) -> Union[Chain,None]:
+    def get_chain(self, chain_name: str) -> Union[Chain, None]:
         """Gets a chain of the given name. Returns None if the Chain() is not present."""
-        return self.chain_mapper.get( chain_name, None )
-        
+        return self.chain_mapper.get(chain_name, None)
 
     def has_chain(self, chain_name: str) -> bool:
         """Checks if the Structure() has a chain with the specified chain_name."""
@@ -222,57 +220,34 @@ class Structure:
         # TODO(CJ)
         return []
 
-    def build_ligands(
-        self, dir, ft="PDB", ifcharge=0, c_method="PYBEL", ph=7.0, ifname=0, ifunique=0
-    ):
-        """
-        build files for every ligand in self.ligands
-        -------
-        dir      : output dir. (e.g. File path for ligand i is $dir/ligand_i.pdb)
-        ft       : file type / now support: PDB(default)
-        ifcharge : if calculate net charge info. (do not before add H)
-        c_method : method determining the net charge (default: PYBEL)
-        ph       : pH value used for determine the net charge
-        ifname   : export residue name if 1 (default: 0)
-        ifunique : 1: only build one ligand if there's multiple same ones. 0: build every ligand
-        """
-        out_ligs = []
-        # TODO ph check
-        l_id = 0
-        lig_list = self.ligands
-        # Only build ligand with same name once
-        if ifunique:
-            lig_list_uni = {}
-            for lig in lig_list:
-                lig_list_uni[lig.name] = lig
-            lig_list = lig_list_uni.values()
+    def build_ligands(self, out_dir : str, unique : bool = False) -> List[str]:
+        """Exports all the Ligand() objects in the Structure() to .pdb files.
 
-        for lig in lig_list:
-            l_id = l_id + 1  # current ligand id
-            # make output path
-            if dir[-1] == "/":
-                dir = dir[:-1]
-            if ifunique:
-                out_path = dir + "/ligand_" + lig.name + ".pdb"
-            else:
-                out_path = dir + "/ligand_" + str(l_id) + "_" + lig.name + ".pdb"
-            # write
-            lig.build(out_path)
-            # net charge
-            net_charge = None
-            if ifcharge:
-                if lig.net_charge != None:
-                    net_charge = lig.net_charge
-                else:
-                    net_charge = lig.get_net_charge(method=c_method, ph=ph, o_dir=dir)
+		Args:
+			out_dir: The base directory to save the .pdb files to.
+			unique: Whether or not the saved .pdb files should be unique.
+		
+		Returns: 
+			A list of str() with paths to the exported ligand .pdb files.
+		"""
+        result : List[str] = []
+        existing : List[str] = []
+        ligands : List[Ligand] = self.get_ligands()
+        
+        for lidx, lig in enumerate(ligands):
+           	#TODO(CJ): add some kind of formatting for lidx 
+            lig_name : str = lig.get_name()
+            out_pdb : str = f"{out_dir}/ligand_{lig_name}_{lidx}.pdb"
+            
+            if unique and lig_name in existing:
+                continue
+            
+            lig.build(out_pdb)
+            result.append(out_pdb)
+            existing.append(lig_name)
+       
+	    return result
 
-            # record
-            if ifname:
-                out_ligs.append((out_path, net_charge, lig.name))
-            else:
-                out_ligs.append((out_path, net_charge))
-
-        return out_ligs
 
     def build_protein(self, dir, ft="PDB"):
         """
@@ -638,16 +613,16 @@ class Structure:
         """Inserts a new Residue() object into the Structure(). If the exact Residue (chain_id, name, residue_id) already
         exists, the new Residue overwrites it. If the new Residue specifies a Chain() that does not exist, a new chain is made.
         """
-        chain_name : str = new_res.chain()
-        if not self.has_chain( chain_name ):
-            new_chain : Chain = Chain( chain_name, [new_res] )
-            self.chains_.apppend( new_chain )
+        chain_name: str = new_res.chain()
+        if not self.has_chain(chain_name):
+            new_chain: Chain = Chain(chain_name, [new_res])
+            self.chains_.apppend(new_chain)
             self.chain_mapper[chain_name] = new_chain
         else:
-            self.chain_mapper[chain_name].insert_residue( new_res )
-        
-        self.chains_ = list( self.chain_mapper.values() )
-        self.chains_.sort(key=lambda c: c.name()) 
+            self.chain_mapper[chain_name].insert_residue(new_res)
+
+        self.chains_ = list(self.chain_mapper.values())
+        self.chains_.sort(key=lambda c: c.name())
 
     def get_residue(self, target_key: str) -> Union[None, Residue]:
         """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format, 
@@ -655,23 +630,22 @@ class Structure:
         for chain in self.chains_:
             for res in chain.residues():
                 if res.residue_key == target_key:
-                    return deepcopy( res )
+                    return deepcopy(res)
         return None
 
-    def remove_residue(self, target_key : str ) -> None:
+    def remove_residue(self, target_key: str) -> None:
         """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format, 
 		the Residue() is removed if it currently exists in one of the child Chain()'s. If the Chain() is empty after this
 		removal, the chain is deleted."""
-        (chain_name,_,_) = target_key.split('.')
-        if self.has_chain( chain_name ):
-            self.chain_mapper[chain_name].remove_residue( target_key )
+        (chain_name, _, _) = target_key.split(".")
+        if self.has_chain(chain_name):
+            self.chain_mapper[chain_name].remove_residue(target_key)
             if self.chain_mapper[chain_name].empty():
-                self.remove_chain( chain_name )
+                self.remove_chain(chain_name)
 
     def chain_names(self) -> List[str]:
         """Returns a list of all the chain names for the Structure()"""
         return list(self.chain_mapper.keys())
-
 
 
 def compare_structures(left: Structure, right: Structure) -> Dict[str, List[str]]:

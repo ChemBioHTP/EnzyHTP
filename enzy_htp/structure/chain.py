@@ -28,22 +28,22 @@ class Chain:
         self.residues_: List[Residue] = deepcopy(residues)
         self.rename(self.name_)
 
-    def insert_residue(self, new_res : Residue, sort_after : bool = True ) -> None:
+    def insert_residue(self, new_res: Residue, sort_after: bool = True) -> None:
         """Allows for insertion of a new Residue() object into the Chain. If the new Residue() is an exact
         copy, it fully overwrites the existing value. The sort_after flag specifies if the Residue()'s should
         be sorted by residue_number after the insertion.
         """
         for ridx, res in enumerate(self.residues_):
             if new_res.name == res.name and new_res.num_ == res.num_:
-                self.residues_[idx] = deepcopy( new_res )
+                self.residues_[idx] = deepcopy(new_res)
                 break
         else:
-            self.residues_.append( new_res )
-        
-        self.rename( self.name_ )
-        
+            self.residues_.append(new_res)
+
+        self.rename(self.name_)
+
         if sort_after:
-            self.residues_.sort( key=lambda r: r.num() )
+            self.residues_.sort(key=lambda r: r.num())
 
     def is_metal(self) -> bool:
         """Checks if any metals are contained within the current chain."""
@@ -115,11 +115,13 @@ class Chain:
             exit(1)
         self.residues_ = sorted(self.residues_, key=lambda r: r.num())
         idx = start
-        num_residues : int = self.num_residues()
+        num_residues: int = self.num_residues()
         for ridx, res in enumerate(self.residues_):
             idx = self.residues_[ridx].renumber_atoms(idx)
             idx += 1
-            terminal = (ridx < (num_residues-1)) and (res.is_canonical() and not self.residues_[ridx+1].is_canonical())
+            terminal = (ridx < (num_residues - 1)) and (
+                res.is_canonical() and not self.residues_[ridx + 1].is_canonical()
+            )
             if terminal:
                 idx += 1
         return idx - 1
@@ -127,9 +129,11 @@ class Chain:
     def get_pdb_lines(self) -> List[str]:
         """Generates a list of PDB lines for the Atom() objects inside the Chain(). Last line is a TER."""
         result = list()
-        num_residues : int = self.num_residues()
-        for idx,res in enumerate(self.residues_):
-            terminal = (idx < (num_residues-1)) and (res.is_canonical() and not self.residues_[idx+1].is_canonical())
+        num_residues: int = self.num_residues()
+        for idx, res in enumerate(self.residues_):
+            terminal = (idx < (num_residues - 1)) and (
+                res.is_canonical() and not self.residues_[idx + 1].is_canonical()
+            )
             result.extend(res.get_pdb_lines(terminal))
         result.append("TER")
         return result
@@ -138,12 +142,11 @@ class Chain:
         """Returns number of Residue() or Residue()-dervied objects belonging to the Chain."""
         return len(self.residues_)
 
-
     def num_residues(self) -> int:
         """Returns number of Residue() or Residue()-dervied objects belonging to the Chain."""
         return len(self)
 
-    def remove_residue(self, target_key : str ) -> None:
+    def remove_residue(self, target_key: str) -> None:
         """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format, 
         the Residue() is removed if it currently exists in the Chain() object."""
         for ridx, res in enumerate(self.residues_):
@@ -151,12 +154,5 @@ class Chain:
                 break
         else:
             return
-        
+
         del self.residues_[ridx]
-
-
-
-
-
-
-
