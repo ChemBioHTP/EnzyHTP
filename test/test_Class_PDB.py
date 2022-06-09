@@ -134,14 +134,14 @@ def test_pdbmd_without_job_manager_but_input_cpu_cores():
                         if_cluster_job=0,
                         equi_cpu_cores=10
                          )
-        assert 'ERROR: cpu_cores or equi_cpu_cores should be None if not submit to cluster.' in str(e.value)
+    assert 'ERROR: cpu_cores or equi_cpu_cores should be None if not submit to cluster.' in str(e.value)
     with pytest.raises(TypeError) as e:
         pdb_obj.PDBMD(  engine='Amber_CPU',
                         cpu_cores= 10,
                         if_cluster_job=0,
                         equi_cpu_cores=10
                          )
-        assert 'ERROR: cpu_cores or equi_cpu_cores should be None if not submit to cluster.' in str(e.value)
+    assert 'ERROR: cpu_cores or equi_cpu_cores should be None if not submit to cluster.' in str(e.value)
 
 
 @pytest.mark.md
@@ -161,7 +161,7 @@ def test_pdbmd_with_job_manager_capture_amber_err():
                         period=30,
                         res_setting={'account':'csb_gpu_acc'},
                         cluster_debug=1 )
-        assert 'STOP PMEMD Terminated Abnormally!' in str(e.value)
+    assert 'STOP PMEMD Terminated Abnormally!' in str(e.value)
     # track files
     test_file_paths.extend(['mdcrd', 'mdinfo', 'submitted_job_ids.log'])
     test_file_paths.extend(glob(f'{test_dir_md}MD/*'))
@@ -292,7 +292,7 @@ def test_pdb2qmcluster_with_job_manager_str_res_setting():
             res_setting=res_str,
             cluster_debug=1
             )
-        assert 'ERROR: Requires cpu_cores and cpu_mem input for configuring Gaussian input file if using CPU and provide res_setting not as a dict' in str(e.value)
+    assert 'ERROR: Requires cpu_cores and cpu_mem input for configuring Gaussian input file if using CPU and provide res_setting not as a dict' in str(e.value)
     qm_outs = pdb_obj.PDB2QMCluster(
                 atom_mask, 
                 g_route=g_route, 
