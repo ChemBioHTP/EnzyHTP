@@ -6,17 +6,13 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 
 Date: 2022-06-11
 """
-
+from enzy_htp.core import file_system as fs
 from .gaussian_config import GaussianConfig, default_gaussian_config
 
 class GaussianInterface:
-    pass
+    """TODO(CJ)
+	"""
 
-    """
-    ========
-    QM/MM
-    ========
-    """
     def __init__(self, config=None):
         self.config_ = config
         if not self.config_:
@@ -459,9 +455,10 @@ class GaussianInterface:
                 outs.append(out)
             return outs
 
-    def PDB2QMCluster(
+    def qm_cluster(
         self,
-        atom_mask,
+        atom_mask:str,
+        work_dir:str="./qm_cluster/",
         spin=1,
         o_dir="",
         tag="",
@@ -487,9 +484,7 @@ class GaussianInterface:
         self.qm_cluster_map (PDB atom id -> QM atom id)
         """
         # make folder
-        if o_dir == "":
-            o_dir = self.dir + "/QM_cluster" + tag
-        mkdir(o_dir)
+        fs.safe_mkdir( work_dir )
         # update stru
         self.get_stru()
         # get sele
@@ -530,8 +525,6 @@ class GaussianInterface:
                 for gjf in gjf_paths:
                     chk_path = gjf[:-3] + "chk"
                     qm_cluster_chk_paths.append(chk_path)
-        if QM == "ORCA":
-            pass
 
         self.qm_cluster_out = qm_cluster_out_paths
         if ifchk:

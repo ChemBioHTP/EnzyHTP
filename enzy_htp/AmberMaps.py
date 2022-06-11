@@ -413,7 +413,6 @@ Ionic_radius_map =
 # reference:  doi:10.1021/jp8111556 (element : radius)
 VDW_radius_map =
 # mimic the way GaussView/PyMol add H using PDB atom names (append in the future as needed)
-X_H_bond_length = {"N": 1.00, "C": 1.07}
 # ===============================================
 
 # from amino12.lib about residue and connectivity
