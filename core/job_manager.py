@@ -134,6 +134,7 @@ class ClusterJob():
 
         return cls(cluster, sub_script_str, sub_dir, sub_script_path)
 
+    # region (_get_command_str)
     @staticmethod
     @dispatch
     def _get_command_str(cmd: list) -> str:
@@ -143,7 +144,9 @@ class ClusterJob():
     @dispatch
     def _get_command_str(cmd: str) -> str:
         return cmd + line_feed
+    # endregion
 
+    # region (_get_env_str)
     @staticmethod
     @dispatch
     def _get_env_str(env: list) -> str:
@@ -167,7 +170,9 @@ class ClusterJob():
     @dispatch
     def _get_env_str(env: str) -> str:
         return env + line_feed
+    # endregion
 
+    # region (_get_res_str)
     @staticmethod
     @dispatch
     def _get_res_str(res: dict, cluster: ClusterInterface) -> str:
@@ -177,7 +182,9 @@ class ClusterJob():
     @dispatch
     def _get_res_str(res: str, cluster: ClusterInterface) -> str:
         return res
+    # endregion
 
+    # region (_get_sub_script_str)
     @staticmethod
     @dispatch
     def _get_sub_script_str(command_str: str, env_str: str, res_str: str, watermark: str) -> str:
@@ -195,6 +202,7 @@ class ClusterJob():
         '''
         sub_script_str = line_feed.join((res_str, watermark, env_str['head'], command_str, env_str['tail']))
         return sub_script_str
+    # endregion
 
     ### submit ###
     def submit(self, sub_dir: Union[str, None] = None, script_path: Union[str, None] = None, debug: int=0):
