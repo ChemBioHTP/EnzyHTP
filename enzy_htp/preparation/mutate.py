@@ -26,7 +26,7 @@ Mutation = namedtuple(
 """Namedtuple that represents a mutation that is supposed to occur in a PDB."""
 
 
-def mutation_to_str(mf: Mutation) -> str:
+def mutation_to_str(mf: Mutation) -> str: 
     """Converts a mutation to a string."""
     return f"{mf.orig_residue}{mf.chain_index}{mf.residue_index}{mf.target_residue}"
 

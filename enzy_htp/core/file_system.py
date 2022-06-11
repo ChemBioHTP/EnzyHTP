@@ -19,7 +19,6 @@ def safe_rm(fname: str) -> None:
     if os.path.exists(fname):
         os.remove(fname)
 
-
 def safe_rmdir(dirname: str) -> None:
     """Removes a directory if and only if the directory already exists."""
     if os.path.isdir(dirname):

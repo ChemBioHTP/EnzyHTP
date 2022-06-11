@@ -1,5 +1,13 @@
-# TODO
+"""Defines a GaussianInterface class that serves as a bridge for enzy_htp to utilize Gaussian software.
 
+TODO(CJ): elaborate this part
+Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+
+Date: 2022-06-11
+"""
+
+from .gaussian_config import GaussianConfig, default_gaussian_config
 
 class GaussianInterface:
     pass
@@ -9,6 +17,10 @@ class GaussianInterface:
     QM/MM
     ========
     """
+    def __init__(self, config=None):
+        self.config_ = config
+        if not self.config_:
+            self.config_ = default_gaussian_config()
 
     def PDB2QMMM(
         self,
@@ -446,3 +458,85 @@ class GaussianInterface:
                 os.system(Config.Gaussian.g09_exe + " < " + gjf + " > " + out)
                 outs.append(out)
             return outs
+
+    def PDB2QMCluster(
+        self,
+        atom_mask,
+        spin=1,
+        o_dir="",
+        tag="",
+        QM="g16",
+        g_route=None,
+        ifchk=0,
+        val_fix="internal",
+    ):
+        """
+        Build & Run QM cluster input from self.mdcrd with selected atoms according to atom_mask
+        ---------
+        spin: specific spin state for the qm cluster. (default: 1)
+        QM: QM engine (default: Gaussian)
+            g_route: Gaussian route line
+            ifchk: if save chk file of a gaussian job. (default: 0)
+        val_fix: fix free valance of truncated strutures
+            = internal: add H to where the original connecting atom is.
+                        special fix for classical case:
+                        "sele by residue" (cut N-C) -- adjust dihedral for added H on N.
+            = openbabel TODO
+        ---data---
+        self.frames
+        self.qm_cluster_map (PDB atom id -> QM atom id)
+        """
+        # make folder
+        if o_dir == "":
+            o_dir = self.dir + "/QM_cluster" + tag
+        mkdir(o_dir)
+        # update stru
+        self.get_stru()
+        # get sele
+        if val_fix == "internal":
+            sele_lines, sele_map = self.stru.get_sele_list(
+                atom_mask, fix_end="H", prepi_path=self.prepi_path
+            )
+        else:
+            sele_lines, sele_map = self.stru.get_sele_list(atom_mask, fix_end=None)
+        self.qm_cluster_map = sele_map
+        # get chrgspin
+        chrgspin = self._get_qmcluster_chrgspin(sele_lines, spin=spin)
+        if Config.debug >= 1:
+            print("Charge: " + str(chrgspin[0]) + " Spin: " + str(chrgspin[1]))
+
+        # make inp files
+        frames = Frame.fromMDCrd(self.mdcrd)
+        self.frames = frames
+        if QM in ["g16", "g09"]:
+            gjf_paths = []
+            if Config.debug >= 1:
+                print("Writing QMcluster gjfs.")
+            for i, frame in enumerate(frames):
+                gjf_path = o_dir + "/qm_cluster_" + str(i) + ".gjf"
+                frame.write_sele_lines(
+                    sele_lines,
+                    out_path=gjf_path,
+                    g_route=g_route,
+                    chrgspin=chrgspin,
+                    ifchk=ifchk,
+                )
+                gjf_paths.append(gjf_path)
+            # Run inp files
+            qm_cluster_out_paths = PDB.Run_QM(gjf_paths, prog=QM)
+            # get chk files if ifchk
+            if ifchk:
+                qm_cluster_chk_paths = []
+                for gjf in gjf_paths:
+                    chk_path = gjf[:-3] + "chk"
+                    qm_cluster_chk_paths.append(chk_path)
+        if QM == "ORCA":
+            pass
+
+        self.qm_cluster_out = qm_cluster_out_paths
+        if ifchk:
+            self.qm_cluster_chk = qm_cluster_chk_paths
+            return self.qm_cluster_out, self.qm_cluster_chk
+
+        return self.qm_cluster_out
+

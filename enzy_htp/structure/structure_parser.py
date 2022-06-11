@@ -177,12 +177,12 @@ def structure_from_pdb(fname: str, keep: str = "first") -> Structure:
         pd.concat((parser.df["ATOM"], parser.df["HETATM"])), keep
     )
     chain_mapper: Dict[str, Chain] = build_chains(res_mapper)
-    print(chain_mapper.values())
     return Structure(list(chain_mapper.values()))
 
 
 def get_ligand_name(fname: str) -> str:
     # TODO(CJ): add the documentation here
     # TODO(CJ): make this more efficient
-    ligand: Ligand = structure_parser(fname)
+	# TODO(CJ): add testing for this
+    ligand: Ligand = ligand_from_pdb(fname)
     return deepcopy(ligand.get_name())

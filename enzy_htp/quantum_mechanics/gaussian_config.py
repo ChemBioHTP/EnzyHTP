@@ -1,4 +1,14 @@
-from typing import Any
+"""Defines a GaussianConfig class that serves as a bridge for enzy_htp to utilize Gaussian software.
+
+TODO(CJ): elaborate this part
+Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+
+Date: 2022-06-11
+"""
+
+from copy import deepcopy
+from typing import Any, List
 
 
 class GaussianConfig:
@@ -8,7 +18,7 @@ class GaussianConfig:
     def __init__(self, parent=None):
         self._parent = parent
 
-    def required_executables(self):
+    def required_executables(self) -> List[str]:
         return [self.G16_EXE, self.G09_EXE]
 
     def required_env_vars(self):
@@ -85,3 +95,8 @@ class GaussianConfig:
         setattr(self, key, value)
         if is_path:
             self._parent.update_paths()
+
+
+def default_gaussian_config() -> GaussianConfig:
+    """Creates a deep-copied default version of the GaussianConfig() class."""
+    return deepcopy(GaussianConfig())

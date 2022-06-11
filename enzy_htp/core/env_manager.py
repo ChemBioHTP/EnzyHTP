@@ -109,7 +109,7 @@ class EnvironmentManager:
             exit(1)
         _LOGGER.info(f"Running command: '{cmd}'...")
         try:
-            result = run(cmd, shell=True, capture_output=True)
+            result = run(cmd, shell=True, capture_output=True, check=True)
             res_lines = list(
                 map(lambda ss: ss.decode("utf-8"), result.stdout.splitlines())
             )

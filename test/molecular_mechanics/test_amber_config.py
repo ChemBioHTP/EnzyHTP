@@ -52,12 +52,12 @@ def test_valid_box_type():
 def test_required_executables():
     """Checking that the AmberConfig.required_executables() has the correct values."""
     ac : mm.AmberConfig = mm.default_amber_config()
-    assert ac.required_executables() == ["$AMBERHOME/bin/sander.MPI","$AMBERHOME/bin/pmemd.cuda", "tleap", "ampdb"]
+    assert ac.required_executables() == ["$AMBERHOME/bin/sander.MPI","$AMBERHOME/bin/pmemd.cuda", "tleap", "ampdb", "parmchk2", "antechamber"]
 
 def test_required_env_vars():
     """Checking that the AmberConfig.required_env_vars() contains the correct values."""
     ac : mm.AmberConfig = mm.default_amber_config()
-    assert ac.required_env_vars() == ["$AMBERHOME"]
+    assert ac.required_env_vars() == ["AMBERHOME"]
 
 
 def test_get_engine_valid():

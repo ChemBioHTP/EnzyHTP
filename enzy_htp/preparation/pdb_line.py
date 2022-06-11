@@ -8,7 +8,7 @@ Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-19
 """
-
+#TODO(CJ): finish the documentation in here
 from typing import List
 
 import enzy_htp.core as core
@@ -34,6 +34,7 @@ class PDBLine:
                 atom_x : x coordinate value with 3 points of decimal precision.
                 atom_y : y coordinate value with 3 points of decimal precision.
                 atom_z : z coordinate value with 3 points of decimal precision.
+				charge : The int() charge of the line.
     """
 
     def __init__(self, line: str):

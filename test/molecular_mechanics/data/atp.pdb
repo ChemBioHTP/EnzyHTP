@@ -1,0 +1,95 @@
+HETATM    1  PG  ATP     0       1.200  -0.226  -6.850  0.00  0.00           P  
+HETATM    2  O1G ATP     0       1.740   1.140  -6.672  0.00  0.00           O  
+HETATM    3  O2G ATP     0       2.123  -1.036  -7.891  0.00  0.00           O  
+HETATM    4  O3G ATP     0      -0.302  -0.139  -7.421  0.00  0.00           O  
+HETATM    5  PB  ATP     0       0.255  -0.130  -4.446  0.00  0.00           P  
+HETATM    6  O1B ATP     0       0.810   1.234  -4.304  0.00  0.00           O  
+HETATM    7  O2B ATP     0      -1.231  -0.044  -5.057  0.00  0.00           O  
+HETATM    8  O3B ATP     0       1.192  -0.990  -5.433  0.00  0.00           O  
+HETATM    9  PA  ATP     0      -0.745   0.068  -2.071  0.00  0.00           P  
+HETATM   10  O1A ATP     0      -2.097   0.143  -2.669  0.00  0.00           O  
+HETATM   11  O2A ATP     0      -0.125   1.549  -1.957  0.00  0.00           O  
+HETATM   12  O3A ATP     0       0.203  -0.840  -3.002  0.00  0.00           O  
+HETATM   13  O5' ATP     0      -0.844  -0.587  -0.604  0.00  0.00           O  
+HETATM   14  C5' ATP     0      -1.694   0.260   0.170  0.00  0.00           C  
+HETATM   15  C4' ATP     0      -1.831  -0.309   1.584  0.00  0.00           C  
+HETATM   16  O4' ATP     0      -0.542  -0.355   2.234  0.00  0.00           O  
+HETATM   17  C3' ATP     0      -2.683   0.630   2.465  0.00  0.00           C  
+HETATM   18  O3' ATP     0      -4.033   0.165   2.534  0.00  0.00           O  
+HETATM   19  C2' ATP     0      -2.011   0.555   3.856  0.00  0.00           C  
+HETATM   20  O2' ATP     0      -2.926   0.043   4.827  0.00  0.00           O  
+HETATM   21  C1' ATP     0      -0.830  -0.418   3.647  0.00  0.00           C  
+HETATM   22  N9  ATP     0       0.332   0.015   4.425  0.00  0.00           N  
+HETATM   23  C8  ATP     0       1.302   0.879   4.012  0.00  0.00           C  
+HETATM   24  N7  ATP     0       2.184   1.042   4.955  0.00  0.00           N  
+HETATM   25  C5  ATP     0       1.833   0.300   6.033  0.00  0.00           C  
+HETATM   26  C6  ATP     0       2.391   0.077   7.303  0.00  0.00           C  
+HETATM   27  N6  ATP     0       3.564   0.706   7.681  0.00  0.00           N  
+HETATM   28  N1  ATP     0       1.763  -0.747   8.135  0.00  0.00           N  
+HETATM   29  C2  ATP     0       0.644  -1.352   7.783  0.00  0.00           C  
+HETATM   30  N3  ATP     0       0.088  -1.178   6.602  0.00  0.00           N  
+HETATM   31  C4  ATP     0       0.644  -0.371   5.704  0.00  0.00           C  
+HETATM   32 HOG2 ATP     0       2.100  -0.546  -8.725  0.00  0.00           H  
+HETATM   33 HOG3 ATP     0      -0.616  -1.048  -7.522  0.00  0.00           H  
+HETATM   34 HOB2 ATP     0      -1.554  -0.952  -5.132  0.00  0.00           H  
+HETATM   35 HOA2 ATP     0       0.752   1.455  -1.563  0.00  0.00           H  
+HETATM   36 H5'1 ATP     0      -2.678   0.312  -0.296  0.00  0.00           H  
+HETATM   37 H5'2 ATP     0      -1.263   1.259   0.221  0.00  0.00           H  
+HETATM   38  H4' ATP     0      -2.275  -1.304   1.550  0.00  0.00           H  
+HETATM   39  H3' ATP     0      -2.651   1.649   2.078  0.00  0.00           H  
+HETATM   40 HO3' ATP     0      -4.515   0.788   3.094  0.00  0.00           H  
+HETATM   41  H2' ATP     0      -1.646   1.537   4.157  0.00  0.00           H  
+HETATM   42 HO2' ATP     0      -3.667   0.662   4.867  0.00  0.00           H  
+HETATM   43  H1' ATP     0      -1.119  -1.430   3.931  0.00  0.00           H  
+HETATM   44  H8  ATP     0       1.334   1.357   3.044  0.00  0.00           H  
+HETATM   45 HN61 ATP     0       3.938   0.548   8.562  0.00  0.00           H  
+HETATM   46 HN62 ATP     0       4.015   1.303   7.064  0.00  0.00           H  
+HETATM   47  H2  ATP     0       0.166  -2.014   8.490  0.00  0.00           H  
+CONECT    1    2    3    4    8
+CONECT    2    1
+CONECT    3    1   32
+CONECT    4    1   33
+CONECT    5    6    7    8   12
+CONECT    6    5
+CONECT    7    5   34
+CONECT    8    1    5
+CONECT    9   10   11   12   13
+CONECT   10    9
+CONECT   11    9   35
+CONECT   12    5    9
+CONECT   13    9   14
+CONECT   14   13   15   36   37
+CONECT   15   14   16   17   38
+CONECT   16   15   21
+CONECT   17   15   18   19   39
+CONECT   18   17   40
+CONECT   19   17   20   21   41
+CONECT   20   19   42
+CONECT   21   16   19   22   43
+CONECT   22   21   23   31
+CONECT   23   22   24   44
+CONECT   24   23   25
+CONECT   25   24   26   31
+CONECT   26   25   27   28
+CONECT   27   26   45   46
+CONECT   28   26   29
+CONECT   29   28   30   47
+CONECT   30   29   31
+CONECT   31   22   25   30
+CONECT   32    3
+CONECT   33    4
+CONECT   34    7
+CONECT   35   11
+CONECT   36   14
+CONECT   37   14
+CONECT   38   15
+CONECT   39   17
+CONECT   40   18
+CONECT   41   19
+CONECT   42   20
+CONECT   43   21
+CONECT   44   23
+CONECT   45   27
+CONECT   46   27
+CONECT   47   29
+END
