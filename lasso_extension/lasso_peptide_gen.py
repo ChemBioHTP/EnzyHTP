@@ -3,6 +3,7 @@
 
 import numpy as np
 from openbabel import pybel
+from scipy.spatial.transform import Rotation
 
 
 
@@ -171,25 +172,38 @@ def lasso_extender(scaffold_file: str,
     extender = read_extender(extension_file)
     extender_vectors = [[extender[i][0], find_vector(extender, 11, i)] for i in range(12)]
 
-    vec_extender = find_vector(extender, 12, 11)
-    vec_scaffold = find_vector(scaffold, attachment_location - 3, attachment_location - 1)
-    extension_matrix = rotation_matrix_from_vectors(vec_scaffold, vec_extender)
+    vec_extender_attach = find_vector(extender, 12, 11)
+    vec_extender_align = find_vector(extender, 10, 11)
 
+    vec_scaffold_attach = find_vector(scaffold, attachment_location - 3, attachment_location - 1) # C-N amide
+    vec_scaffold_align = find_vector(scaffold, attachment_location - 3, attachment_location - 2)  # C=O amide
+
+    extension_matrix = Rotation.align_vectors([vec_extender_attach, vec_extender_align], [vec_scaffold_attach, vec_scaffold_align])
+    extension_matrix = extension_matrix[0].as_matrix()
     rotated_extension = list(map(lambda vec: [vec[0], np.dot(vec[1], extension_matrix)], extender_vectors))
+
+    if tail_length == 1:
+        rotated_extension.pop(9)
 
     scaffold = scaffold[:attachment_location - 1] + scaffold[attachment_location + 5:]
     for vector in rotated_extension:
         scaffold.append([vector[0], vector[1] + attachment_point])
 
-    for _ in range(tail_length - 1):
+
+    for i in range(tail_length - 1):
         attachment_point = scaffold[-4][1]
 
-        vec_scaffold = find_vector(scaffold, -6, -4)  # C-O single bond in alanine
-        extension_matrix = rotation_matrix_from_vectors(vec_scaffold, vec_extender)
+        vec_scaffold_attach = find_vector(scaffold, -6, -4)  # C-O bond in alanine
+        vec_scaffold_align = find_vector(scaffold, -6, -5)  # C=O bond in alanine
+        # extension_matrix = rotation_matrix_from_vectors(vec_scaffold_attach, vec_extender_attach)
+        extension_matrix = Rotation.align_vectors([vec_extender_attach, vec_extender_align], [vec_scaffold_attach, vec_scaffold_align])
+        extension_matrix = extension_matrix[0].as_matrix()
 
         rotated_extension = list(map(lambda vec: [vec[0], np.dot(vec[1], extension_matrix)], extender_vectors))
 
         scaffold = scaffold[:-4] + scaffold[-2:]  # -4 and -3 are -OH group
+        if i == tail_length - 2:
+            rotated_extension.pop(9)
         for vector in rotated_extension:
             scaffold.append([vector[0], vector[1] + attachment_point])
 

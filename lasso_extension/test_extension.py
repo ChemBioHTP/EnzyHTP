@@ -17,4 +17,4 @@ def test_rotation_matrix_wrong_dim():
     with pytest.raises(ValueError):
         assert lasso.rotation_matrix_from_vectors(np.array([1, 1]), np.array([0, 0, 0, 4]))
 
-lasso.lasso_peptide_gen(ring=8, loop=8, tail=10, isopeptide="asx", outfile="8mr_asx_8A")
+lasso.lasso_peptide_gen(ring=7, loop=8, tail=10, isopeptide="asx", outfile="7mr_asx_8A_10t")
