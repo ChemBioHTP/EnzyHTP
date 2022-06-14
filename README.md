@@ -33,4 +33,4 @@ pip install .
 5. Install [AmberTool](https://ambermd.org/AmberTools.php)
 6. (optional) Install RDKit `conda install -c conda-forge rdkit`
 7. (optional) Install Gaussian16 
-8. (optional) Install Multiwfn (install demo in author's blog: http://bbs.keinsci.com/thread-12020-1-1.html) (The LMO func seems not working for WSL) (Note that run Multiwfn on ACCRE requires loading the GCC module) 
+8. (optional) Install Multiwfn (In section 2.1.2 of the [manual](http://sobereva.com/multiwfn/)) (The LMO func seems not working for WSL) (Note that run Multiwfn on ACCRE requires loading the GCC module) 
