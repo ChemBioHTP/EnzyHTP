@@ -7,7 +7,9 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-11
 """
 from enzy_htp.core import file_system as fs
+from enzy_htp.structure import Structure, structure_from_pdb
 from .gaussian_config import GaussianConfig, default_gaussian_config
+from .selection import create_selection
 
 class GaussianInterface:
     """TODO(CJ)
@@ -457,15 +459,17 @@ class GaussianInterface:
 
     def qm_cluster(
         self,
+        pdb:str,
         atom_mask:str,
         work_dir:str="./qm_cluster/",
-        spin=1,
-        o_dir="",
-        tag="",
-        QM="g16",
-        g_route=None,
-        ifchk=0,
-        val_fix="internal",
+        cap_strat:str='H',
+        #spin:int=1,
+        #o_dir="",
+        #tag="",
+        #QM="g16",
+        #g_route=None,
+        #ifchk=0,
+        #val_fix="internal",
     ):
         """
         Build & Run QM cluster input from self.mdcrd with selected atoms according to atom_mask
@@ -486,50 +490,55 @@ class GaussianInterface:
         # make folder
         fs.safe_mkdir( work_dir )
         # update stru
-        self.get_stru()
-        # get sele
-        if val_fix == "internal":
-            sele_lines, sele_map = self.stru.get_sele_list(
-                atom_mask, fix_end="H", prepi_path=self.prepi_path
-            )
-        else:
-            sele_lines, sele_map = self.stru.get_sele_list(atom_mask, fix_end=None)
-        self.qm_cluster_map = sele_map
-        # get chrgspin
-        chrgspin = self._get_qmcluster_chrgspin(sele_lines, spin=spin)
-        if Config.debug >= 1:
-            print("Charge: " + str(chrgspin[0]) + " Spin: " + str(chrgspin[1]))
+        struct: Structure = structure_from_pdb(pdb)
+        #self.get_stru()
+        ## get sele
+        create_selection(struct, atom_mask, cap_strat)
+        #if cap_strat == "H":
+        #    create_selection(struct, mask, cap_strat)
+        #    sele_lines, sele_map = self.stru.get_sele_list(
+        #        atom_mask, fix_end="H", prepi_path=self.prepi_path
+        #    )
+        #elif cap_strat is None:
+        #    sele_lines, sele_map = self.stru.get_sele_list(atom_mask, fix_end=None)
+        #else:
+        #    raise TypeError()
+        #self.qm_cluster_map = sele_map
+        ## get chrgspin
+        #chrgspin = self._get_qmcluster_chrgspin(sele_lines, spin=spin)
+        #if Config.debug >= 1:
+        #    print("Charge: " + str(chrgspin[0]) + " Spin: " + str(chrgspin[1]))
 
-        # make inp files
-        frames = Frame.fromMDCrd(self.mdcrd)
-        self.frames = frames
-        if QM in ["g16", "g09"]:
-            gjf_paths = []
-            if Config.debug >= 1:
-                print("Writing QMcluster gjfs.")
-            for i, frame in enumerate(frames):
-                gjf_path = o_dir + "/qm_cluster_" + str(i) + ".gjf"
-                frame.write_sele_lines(
-                    sele_lines,
-                    out_path=gjf_path,
-                    g_route=g_route,
-                    chrgspin=chrgspin,
-                    ifchk=ifchk,
-                )
-                gjf_paths.append(gjf_path)
-            # Run inp files
-            qm_cluster_out_paths = PDB.Run_QM(gjf_paths, prog=QM)
-            # get chk files if ifchk
-            if ifchk:
-                qm_cluster_chk_paths = []
-                for gjf in gjf_paths:
-                    chk_path = gjf[:-3] + "chk"
-                    qm_cluster_chk_paths.append(chk_path)
+        ## make inp files
+        #frames = Frame.fromMDCrd(self.mdcrd)
+        #self.frames = frames
+        #if QM in ["g16", "g09"]:
+        #    gjf_paths = []
+        #    if Config.debug >= 1:
+        #        print("Writing QMcluster gjfs.")
+        #    for i, frame in enumerate(frames):
+        #        gjf_path = o_dir + "/qm_cluster_" + str(i) + ".gjf"
+        #        frame.write_sele_lines(
+        #            sele_lines,
+        #            out_path=gjf_path,
+        #            g_route=g_route,
+        #            chrgspin=chrgspin,
+        #            ifchk=ifchk,
+        #        )
+        #        gjf_paths.append(gjf_path)
+        #    # Run inp files
+        #    qm_cluster_out_paths = PDB.Run_QM(gjf_paths, prog=QM)
+        #    # get chk files if ifchk
+        #    if ifchk:
+        #        qm_cluster_chk_paths = []
+        #        for gjf in gjf_paths:
+        #            chk_path = gjf[:-3] + "chk"
+        #            qm_cluster_chk_paths.append(chk_path)
 
-        self.qm_cluster_out = qm_cluster_out_paths
-        if ifchk:
-            self.qm_cluster_chk = qm_cluster_chk_paths
-            return self.qm_cluster_out, self.qm_cluster_chk
+        #self.qm_cluster_out = qm_cluster_out_paths
+        #if ifchk:
+        #    self.qm_cluster_chk = qm_cluster_chk_paths
+        #    return self.qm_cluster_out, self.qm_cluster_chk
 
-        return self.qm_cluster_out
+        #return self.qm_cluster_out
 
