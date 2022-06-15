@@ -20,27 +20,41 @@ Usage:
 5. Read Frequencies
     - getFreq(g_out_file) // return a list of frequence numbers
 -----------------
+
+Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+
+Date: 2022-06-14
 """
 import numpy as np
 from Class_Conf import Config
 from helper import line_feed, set_distance
 import re
 import os
+from typing import List
+from pathlib import Path
 
-# In gjf:
-#   pattern for determining the beginning of the coordinate (strip)
-ChrgSpin_pattern = r"(?: ?\-?\+?[0-9] [0-9])+"
-#   pattern for unfreezed atoms
-unfreeze_pattern = r"[A-z,\-,0-9,\.]+ +0 "
-#   pattern for high layer atoms
-high_pattern = r"[0-9]+ +H"
-# In mdcrd:
-#   pattern for determining the end of a old frame (no strip)
-digit_pattern = r"[ ,\-,0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][0-9]"
-frame_sep_pattern = digit_pattern * 3 + line_feed
+from enzy_htp.core import file_system as fs
+from enzy_htp.core.exception import UnsupportedFileType
+
+GJF_CHRGPSIN_PATTERN:str = r"(?: ?\-?\+?[0-9] [0-9])+"
+"""Pattern for identifying the beginning of a stripped coordinate line in a .gjf file."""
+
+GJF_UNFREEZE_PATTERN:str = r"[A-z,\-,0-9,\.]+ +0 "
+"""Pattern for identifying an unfrozen atom in a .gjf file."""
+
+GJF_HIGH_PATTERN:str = r"[0-9]+ +H"
+"""Pattern for identifying a high layer of atoms in a .gjf file"""
+
+MDCRD_DIGIT_PATTERN:str = r"[ ,\-,0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][0-9]"
+"""Pattern for determining the end of an old frame from an unstripped file in an mdcrd file."""
+
+MDCRD_FRAME_SEP_PATTERN:str = digit_pattern * 3 + "\n"
+"""Pattern for identifying the separation of multiple frames in an mdcrd file."""
 # In log/out:
 #   pattern for determining the position of frequencies
-freq_pattern = r"Frequencies"
+MDCRD_FREQ_PATTERN:str = r"Frequencies"
+"""TODO(CJ): not sure if this is the right file type??"""
 
 
 class Frame:
@@ -56,133 +70,7 @@ class Frame:
         """
         self.coord = coord
 
-    @classmethod
-    def fromMDCrd(cls, mdcrd_file):
-        """
-        read a list of coordinates for frames
-        -------
-        return a list of Frame object
-        """
-        coords = []
-        coord = []
-        atom_coord = []
-        counter = 1
-        end_flag_1 = 0
-        fake_end_flag = 0
-        # os.system('echo >> '+mdcrd_file)
-        debug_counter = 0
 
-        with open(mdcrd_file) as f:
-            while True:
-                # use the while True format to detect the EOF
-                line = f.readline()
-
-                if re.match(digit_pattern, line) == None:
-                    # not data line // could be faster here
-                    if not end_flag_1 and not fake_end_flag:
-                        continue
-
-                if fake_end_flag:
-                    # if next line of fake end is the file end
-                    if line == "":
-                        break
-
-                if end_flag_1:
-                    debug_counter += 1
-                    if re.match(frame_sep_pattern, line) != None:
-                        # last line is a fake end line
-                        coord.append(holder)
-                        coords.append(cls(coord))
-                        # empty for next loop
-                        coord = []
-                        end_flag_1 = 0
-                        fake_end_flag = 1
-                        continue
-                    else:
-                        # last line is a real end line
-                        coords.append(cls(coord))
-                        # empty for next loop
-                        coord = []
-                        end_flag_1 = 0
-                        if line == "":
-                            # the last line
-                            break
-                        if line == line_feed:
-                            if Config.debug >= 1:
-                                print(
-                                    "Frame.fromMDCrd: WARNING: unexpected empty line detected. Treat as EOF. exit reading"
-                                )
-                            break
-                        # do not skip if normal next line
-
-                else:
-                    if re.match(frame_sep_pattern, line) != None:
-                        # find line that mark the end of a frame // possible fake line
-                        # store the last frame and empty the holder
-                        end_flag_1 = 1
-                        lp = re.split(" +", line.strip())
-                        # hold the info
-                        holder = [float(lp[0]), float(lp[1]), float(lp[2])]
-                        continue
-
-                # normal data lines
-                lp = re.split(" +", line.strip())
-                for i in lp:
-                    if counter < 3:
-                        atom_coord.append(float(i))
-                        counter = counter + 1
-                    else:
-                        atom_coord.append(float(i))
-                        coord.append(atom_coord)
-                        # empty for next atom
-                        atom_coord = []
-                        counter = 1
-        return coords
-
-    @classmethod
-    def fromGaussinOut(cls, g_out_file):
-        """
-        get last step from the Gaussian out file, according to the Input orientation
-        """
-        coord = []
-        f_counter = 0
-        f_counter_2 = 0
-        coord_flag = 0
-        skip4 = 0
-        with open(g_out_file) as f:
-            # get where is the last 'Input orientation:' mark by count the number
-            for line in f:
-                if line.strip() == "Input orientation:":
-                    f_counter = f_counter + 1
-
-        # reopen to avoid the mem problem
-        with open(g_out_file) as f:
-            # get the last part based on the count
-            for line in f:
-                if line.strip() == "Input orientation:":
-                    f_counter_2 = f_counter_2 + 1
-                    if f_counter_2 == f_counter:
-                        # here is the last frame
-                        coord_flag = 1
-
-                if coord_flag:
-                    # skip 4 title lines
-                    if skip4 <= 4:
-                        skip4 = skip4 + 1
-                        continue
-                    # detect end of the coord section
-                    if (
-                        line.strip()
-                        == "---------------------------------------------------------------------"
-                    ):
-                        coord_flag = 0
-                        break
-
-                    lp = line.strip().split()
-                    atom_coord = [float(lp[3]), float(lp[4]), float(lp[5])]
-                    coord.append(atom_coord)
-
-        return cls(coord)
 
     def shift_line(self, shift_list):
         """
@@ -459,3 +347,164 @@ def getFreq(g_out_file):
                     freqs.append(float(freq.strip()))
 
     return freqs
+
+
+def __from_mdcrd(fname:str) -> List[Frame]:
+    """Creates a list() of Frame objects from a supplied mdcrd file. SHOULD NOT BE CALLED BY THE USER DIRECTLY.
+
+    Args:
+		fname: Path to the mdcrd file.
+
+    Returns:
+		A list() of Frame objects.
+    """
+    coords = []
+    coord = []
+    atom_coord = []
+    counter = 1
+    end_flag_1 = 0
+    fake_end_flag = 0
+    # os.system('echo >> '+mdcrd_file)
+    debug_counter = 0
+
+    with open(mdcrd_file) as f:
+        while True:
+            # use the while True format to detect the EOF
+            line = f.readline()
+
+            if re.match(digit_pattern, line) == None:
+                # not data line // could be faster here
+                if not end_flag_1 and not fake_end_flag:
+                    continue
+
+            if fake_end_flag:
+                # if next line of fake end is the file end
+                if line == "":
+                    break
+
+            if end_flag_1:
+                debug_counter += 1
+                if re.match(frame_sep_pattern, line) != None:
+                    # last line is a fake end line
+                    coord.append(holder)
+                    coords.append(cls(coord))
+                    # empty for next loop
+                    coord = []
+                    end_flag_1 = 0
+                    fake_end_flag = 1
+                    continue
+                else:
+                    # last line is a real end line
+                    coords.append(cls(coord))
+                    # empty for next loop
+                    coord = []
+                    end_flag_1 = 0
+                    if line == "":
+                        # the last line
+                        break
+                    if line == line_feed:
+                        if Config.debug >= 1:
+                            print(
+                                "Frame.fromMDCrd: WARNING: unexpected empty line detected. Treat as EOF. exit reading"
+                            )
+                        break
+                    # do not skip if normal next line
+
+            else:
+                if re.match(frame_sep_pattern, line) != None:
+                    # find line that mark the end of a frame // possible fake line
+                    # store the last frame and empty the holder
+                    end_flag_1 = 1
+                    lp = re.split(" +", line.strip())
+                    # hold the info
+                    holder = [float(lp[0]), float(lp[1]), float(lp[2])]
+                    continue
+
+            # normal data lines
+            lp = re.split(" +", line.strip())
+            for i in lp:
+                if counter < 3:
+                    atom_coord.append(float(i))
+                    counter = counter + 1
+                else:
+                    atom_coord.append(float(i))
+                    coord.append(atom_coord)
+                    # empty for next atom
+                    atom_coord = []
+                    counter = 1
+    return coords
+
+
+
+def __from_gauss_out(cls, g_out_file):
+    """
+    get last step from the Gaussian out file, according to the Input orientation
+    """
+    coord = []
+    f_counter = 0
+    f_counter_2 = 0
+    coord_flag = 0
+    skip4 = 0
+    with open(g_out_file) as f:
+        # get where is the last 'Input orientation:' mark by count the number
+        for line in f:
+            if line.strip() == "Input orientation:":
+                f_counter = f_counter + 1
+
+    # reopen to avoid the mem problem
+    with open(g_out_file) as f:
+        # get the last part based on the count
+        for line in f:
+            if line.strip() == "Input orientation:":
+                f_counter_2 = f_counter_2 + 1
+                if f_counter_2 == f_counter:
+                    # here is the last frame
+                    coord_flag = 1
+
+            if coord_flag:
+                # skip 4 title lines
+                if skip4 <= 4:
+                    skip4 = skip4 + 1
+                    continue
+                # detect end of the coord section
+                if (
+                    line.strip()
+                    == "---------------------------------------------------------------------"
+                ):
+                    coord_flag = 0
+                    break
+
+                lp = line.strip().split()
+                atom_coord = [float(lp[3]), float(lp[4]), float(lp[5])]
+                coord.append(atom_coord)
+
+    return cls(coord)
+
+def load_frames(fname:str) -> List[Frame]:
+    """Creates a list() of Frame's from a supplied input file. Supported input file types include 
+	mdcrd and Gaussian .out files.
+
+	Args:
+		fname: The name of the mdcrd or .out file.
+
+	Raises:
+        UnsupportedFileType exception if the supplied file is neither a valid mdcrd file or Gaussian .out file.
+
+	Returns:
+		A list() of Frame objects built from the supplied filed.
+	"""
+    stripped_name = Path(fname).name
+    ftype=str()
+    if stripped_name == 'mdcrd':
+        ftype=stripped_name
+    elif striped_name.endswith('.out'):
+        ftype='gauss_out'
+    else:
+        raise UnsupportedFileType(f"{fname} is not a valid mdcrd or Gaussian .out file")
+
+    implementation = {
+        'mdcrd': __from_mdcrd,
+		'gauss_out':__from_gauss_out,
+    }
+    
+    return implementation[ftype](fname)
