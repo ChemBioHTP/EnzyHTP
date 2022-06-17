@@ -1,4 +1,6 @@
-"""
+"""Top level engine for mutating the structure in a .pdb file.
+
+
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 
@@ -10,9 +12,7 @@ from typing import List, Dict
 
 from enzy_htp.core import _LOGGER
 import enzy_htp.structure as struct
-# what kind of restrictions should there be?
-# 1. indices
-# 2. 
+
 
 def mutate_pdb(
     pdb: str,
@@ -26,21 +26,20 @@ def mutate_pdb(
     """Top-level method for mutating the structure contained in a .pdb file.
 
     Args:
-            pdb: str() of the path to a .pdb file.
-    out_dir:
-            n_mutations: number of desired mutations, default is 1.
-            mutations: list() of supplied mutations.
-    restrictions:
-            engine: The engine used to apply the mutation, default is 'tleap'.
-            random_state: random state used for seeding mutation selection, default is 100.
+        pdb: str() of the path to a .pdb file.
+        out_dir: The directory to save the mutated .pdb to. By default saves to the same directory as the base file.
+        n_mutations: number of desired mutations, default is 1.
+        mutations: list() of supplied mutations.
+        restrictions:
+        engine: The engine used to apply the mutation, default is 'tleap'.
+        random_state: random state used for seeding mutation selection, default is 100.
 
 
     Returns:
-            Path to the mutated .pdb file.
+        Path to the mutated .pdb file.
 
     Raises:
     """
-    # TODO(CJ): check that the .pdb exists and is the correct file
     mutations = list(set(mutations))
     structure: struct.Structure = struct.structure_from_pdb(pdb)
     if len(mutations) > n_mutations:

@@ -1,15 +1,13 @@
 """Testing the Mutation() namedtuple and associated compatability functions in the enzy_htp.mutation.mutation
 submodule.
 
-
-
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-15
 """
 from typing import List
 
 import enzy_htp.mutation as mut
-
+import enzy_htp.structure as es
 
 
 def test_valid_mutation_passes():
@@ -45,3 +43,30 @@ def test_valid_mutation_fails():
     for mm in mutations:
         assert not mut.valid_mutation(mm)		
 
+
+def test_generate_all_mutations():
+    assert False
+
+def test_size_increase_true():
+    assert False
+
+def test_size_increase_false():
+    assert False
+
+def test_size_decrease_true():
+    assert False
+
+def test_size_decrease_false():
+    assert False
+
+def test_polarity_change_true():
+    assert False
+
+def test_polarity_change_false():
+    assert False
+
+def test_same_polarity_true():
+    assert False
+
+def test_same_polarity_false():
+    assert False

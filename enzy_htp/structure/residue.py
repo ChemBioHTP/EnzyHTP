@@ -26,12 +26,12 @@ class Residue:
     Attributes:
         atoms : A list of Atom() objects that make up the Residue().
         residue_key : Unique string identifier with format "chain.name.num".
-                chain_ : Parent chain name.
-                name : Residue name.
-                num_ : The index of the Residue within the chain.
-                rtype_ : The ResidueType of the Residue().
-                min_line_ : The lowest one-indexed line of the children atoms.
-                max_line_ : The highest one-indexed line of the children atoms.
+        chain_ : Parent chain name.
+        name : Residue name.
+        num_ : The index of the Residue within the chain.
+        rtype_ : The ResidueType of the Residue().
+        min_line_ : The lowest one-indexed line of the children atoms.
+        max_line_ : The highest one-indexed line of the children atoms.
     """
 
     def __init__(self, residue_key: str, atoms: List[Atom]):
