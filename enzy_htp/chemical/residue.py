@@ -132,7 +132,6 @@ def one_letters_except(existing: str) -> List[str]:
 
 
 def residue_polarity(code: str) -> str:
-    # TODO(CJ): add unit tests for this part
     """Determines the polarity of a one-letter nucleotide, being 'negative', 'neutral' or 'positive."""
     if len(code) != 1:
         raise InvalidResidueCode(
@@ -141,13 +140,13 @@ def residue_polarity(code: str) -> str:
 
     result: str() = "unknown"
     for ptype in "positive negative neutral".split():
-        if code in REIDUE_CATEGORIES[ptype]:
+        if code in RESIDUE_CATEGORIES[ptype]:
             result = ptype
     return result
 
 
 def non_polar(code: str) -> bool:
-    # TODO(CJ): add unit tests for this part
+    # TODO(CJ): should probably check if it is a valid one letter residue code
     """Determines if a one-letter nucleotide amino acid is non-polar. Returns True if it is non-polar."""
     if len(code) != 1:
         raise InvalidResidueCode(
@@ -158,6 +157,6 @@ def non_polar(code: str) -> bool:
 
 
 def polar(code: str) -> bool:
-    # TODO(CJ): add unit tests for this part
     """Determines if a one-letter nucleotide amino acid is polar. Returns True if it is non-polar."""
+    # TODO(CJ): should probably check if it is a valid one letter residue code
     return not non_polar(code)
