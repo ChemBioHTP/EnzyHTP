@@ -113,3 +113,7 @@ def test_one_letters_except():
 
     assert exe
     assert exe.type == InvalidResidueCode
+
+
+def test_residue_polarity_valid_input():
+    """Checking that the residue_polarity()"""

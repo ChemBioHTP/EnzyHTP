@@ -1329,55 +1329,6 @@ tip3p_metal_map = {
 # Mutation rule related
 # ===============================================
 # Residue catageries (subgroups)
-resi_subgrp = {
-    "polar": ["R", "H", "K", "D", "E", "S", "T", "N", "Q", "C", "Y"],
-    "charged": ["R", "H", "K", "D", "E"],
-    "positive": ["R", "H", "K"],
-    "negative": ["D", "E"],
-    "polarNcharge": ["S", "T", "N", "Q", "C", "Y"],
-    "nonpolar": ["A", "V", "I", "L", "P", "M", "F", "W", "G"],
-    "neutral": [
-        "S",
-        "T",
-        "N",
-        "Q",
-        "C",
-        "Y",
-        "A",
-        "V",
-        "I",
-        "L",
-        "P",
-        "M",
-        "F",
-        "W",
-        "G",
-    ],
-}
-# Residue Volume Rank (From http://www.imgt.org/IMGTeducation/Aide-memoire/_UK/aminoacids/abbreviation.html)
-resi_vol_rank = [
-    "G",
-    "A",
-    "S",
-    "C",
-    "D",
-    "P",
-    "N",
-    "T",
-    "E",
-    "V",
-    "Q",
-    "H",
-    "M",
-    "I",
-    "L",
-    "K",
-    "R",
-    "F",
-    "Y",
-    "W",
-]
-
 # MMPB(GB)SA related
 # Radii mapping with igb methods
 radii_map = {
