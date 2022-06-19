@@ -70,8 +70,8 @@ def generate_all_mutations(
 ) -> Dict[Tuple[str, int], List[Mutation]]:
     """Creates all possible mutations for a given Structure() object. Puts all the mutations into a dict()
     where the (key, value) pairs are ((chain_id, residue), List[Mutation]). The List[Mutation] is all mutations
-    from the existing residue to the other 19 residues. For a given enzyme with N residues, there will be a total
-    of N*19 Mutation() objects in the dict().
+    from the existing residue to the other 20 residues. For a given enzyme with N residues, there will be a total
+    of N*20 Mutation() objects in the dict().
 
 
     Args:
@@ -86,6 +86,8 @@ def generate_all_mutations(
     for res in residues:
         (chain_id, num) = res.sort_key()
         orig: str = res.name
+        if len(orig) != 1:
+            orig = chem.convert_to_one_letter(orig)
         result[res.sort_key()] = list(
             map(
                 lambda ch: Mutation(
@@ -140,7 +142,7 @@ def polarity_change(mut: Mutation) -> bool:
     Returns:
         If the described mutation leads to a change in polarity.
     """
-    return chem.res.residue_polarity(mut.orig) != chem.res.residue_polarity(mut.target)
+    return chem.residue.residue_polarity(mut.orig) != chem.residue.residue_polarity(mut.target)
 
 
 def same_polarity(mut: Mutation) -> bool:

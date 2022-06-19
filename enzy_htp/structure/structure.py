@@ -114,7 +114,7 @@ class Structure:
         for ch in chains:
             if ch.name() in self.chain_mapper:
                 _LOGGER.error(
-                    "Duplicate chain names given to Structure() object. Exiting...") is not None
+                    "Duplicate chain names given to Structure() object. Exiting..."
                 )
                 exit(1)
             self.chain_mapper[ch.name()] = ch
