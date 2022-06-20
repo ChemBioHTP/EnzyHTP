@@ -72,3 +72,6 @@ def test_restriction_object():
     assert isinstance(mr, mut.MutationRestrictions)
     assert len(mr.mapper) == 1 
     assert mr.pdb ==  ONE_RES
+
+
+#TODO(CJ): add tests for the actual object.

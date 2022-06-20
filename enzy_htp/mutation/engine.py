@@ -12,19 +12,7 @@ from typing import List, Dict
 
 from enzy_htp.core import _LOGGER
 import enzy_htp.structure as struct
-
-
-# restrictions
-# locked residues
-# locked chains
-# no_size_increase
-# no_size_decrease
-# no_polarity_change
-#
-
-# restrictions: (key, value)
-# key (chain_id, res_num)
-#
+from .mutation_restrictions import MutationRestrictions
 
 
 def mutate_pdb(
@@ -32,7 +20,7 @@ def mutate_pdb(
     out_dir: str = None,
     n_mutations: int = 1,
     mutations: List[str] = None,
-    restrictions: Dict = None,
+    restrictions: MutationRestrictions = None,
     engine: str = "tleap",
     random_state: int = 100,
 ) -> str:
