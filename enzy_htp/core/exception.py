@@ -33,3 +33,9 @@ class UnsupportedMethod(Exception):
     """Exception corresponding to a method that is NOT implemented and/or supported."""
 
     pass
+
+
+class InvalidMutationRestriction(Exception):
+    """Exception corresponding to an invalid mutation restriction in enzy_htp.mutation.mutation_restrictions.py."""
+    
+    pass

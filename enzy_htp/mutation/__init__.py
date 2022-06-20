@@ -16,3 +16,9 @@ from .mutation import (
     polarity_change,
     same_polarity,
 )
+
+from .mutation_restrictions import (
+    MutationRestrictions,
+    restriction_object,
+    valid_restriction_dict,
+)

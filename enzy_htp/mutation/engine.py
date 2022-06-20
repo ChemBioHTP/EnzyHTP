@@ -20,11 +20,12 @@ import enzy_htp.structure as struct
 # no_size_increase
 # no_size_decrease
 # no_polarity_change
-# 
+#
 
 # restrictions: (key, value)
 # key (chain_id, res_num)
-# 
+#
+
 
 def mutate_pdb(
     pdb: str,

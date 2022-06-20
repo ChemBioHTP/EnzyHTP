@@ -11,6 +11,7 @@ from .exception import (
     InvalidResidueCode,
     UnsupportedFileType,
     InvalidPH,
+    InvalidMutationRestriction, 
 )
 from .file_system import (
     safe_rm,

@@ -142,7 +142,9 @@ def polarity_change(mut: Mutation) -> bool:
     Returns:
         If the described mutation leads to a change in polarity.
     """
-    return chem.residue.residue_polarity(mut.orig) != chem.residue.residue_polarity(mut.target)
+    return chem.residue.residue_polarity(mut.orig) != chem.residue.residue_polarity(
+        mut.target
+    )
 
 
 def same_polarity(mut: Mutation) -> bool:
