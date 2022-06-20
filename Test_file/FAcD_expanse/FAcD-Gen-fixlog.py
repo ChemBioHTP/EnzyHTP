@@ -11,7 +11,7 @@ from helper import write_data, line_feed
 # settings
 Config.n_cores = 16
 Config.max_core = 2000
-Config.PC_cmd = 'srun'
+#Config.PC_cmd = 'srun' # srun does not work like this use mpi instead
 Config.Amber.conf_equi['nstlim'] = 50000
 Config.Amber.conf_prod['nstlim'] = 500000
 Config.debug = 1

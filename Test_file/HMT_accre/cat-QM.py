@@ -8,7 +8,7 @@ from helper import write_data, line_feed
 # settings
 Config.n_cores = 12
 Config.max_core = 2000
-Config.PC_cmd = 'srun'
+#Config.PC_cmd = 'srun' # srun does not work like this use mpi instead
 Config.debug = 1
 data_output_path = './Mutation.dat'
 

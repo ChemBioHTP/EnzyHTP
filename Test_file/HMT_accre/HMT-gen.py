@@ -9,7 +9,7 @@ from helper import write_data
 Config.n_cores = 24 # still submit this script to 24 cores used by Multiwfn
 # run(f"sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  {Config.n_cores}/' {Config.Multiwfn.DIR}/settings.ini", check=True, text=True, shell=True, capture_output=True)
 Config.max_core = 2000
-Config.PC_cmd = 'srun'
+#Config.PC_cmd = 'srun' # srun does not work like this use mpi instead
 Config.Amber.conf_equi['nstlim'] = 500000
 Config.Amber.conf_prod['nstlim'] = 55000000
 Config.Amber.conf_prod['ntwx'] = '50000'

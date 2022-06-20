@@ -10,7 +10,6 @@ from helper import write_data
 # settings
 Config.n_cores = 8
 Config.max_core = 2000
-Config.PC_cmd = 'srun'
 Config.Amber.AmberHome='$AMBERHOME2'
 Config.Amber.Amber_sander_CPU = '$AMBERHOME/bin/sander.MPI'
 Config.Amber.conf_prod['nstlim'] = 500000
