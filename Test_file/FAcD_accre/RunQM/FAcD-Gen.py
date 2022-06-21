@@ -8,7 +8,7 @@ from Class_ONIOM_Frame import *
 
 Config.n_cores = 24
 Config.max_core = 2000
-Config.PC_cmd = 'srun'
+# Config.PC_cmd = 'srun'  # use mpirun instead
 #Config.Amber.AmberHome = '$AMBERHOME2'
 #Config.Amber.AmberEXE = '/dors/csb/apps/amber19/bin/pmemd.cuda_DPFP.MPI'
 Config.Amber.conf_prod['nstlim'] = 500000

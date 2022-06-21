@@ -21,7 +21,7 @@ from helper import line_feed
 # settings
 Config.n_cores = 1
 Config.max_core = 2000
-Config.PC_cmd = 'srun'
+# Config.PC_cmd = 'srun'  # use mpirun instead
 wkflow_log_path = './MD-gen.log'
 
 # MD settings
