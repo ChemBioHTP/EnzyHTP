@@ -13,26 +13,27 @@ from typing import List, Dict
 from enzy_htp.core import _LOGGER
 import enzy_htp.structure as struct
 from .mutation_restrictions import MutationRestrictions
+from .mutation import generate_all_mutations
 
 
 def mutate_pdb(
     pdb: str,
-    out_dir: str = None,
     n_mutations: int = 1,
     mutations: List[str] = None,
     restrictions: MutationRestrictions = None,
     engine: str = "tleap",
+    out_dir: str = None,
     random_state: int = 100,
 ) -> str:
     """Top-level method for mutating the structure contained in a .pdb file.
 
     Args:
         pdb: str() of the path to a .pdb file.
-        out_dir: The directory to save the mutated .pdb to. By default saves to the same directory as the base file.
         n_mutations: number of desired mutations, default is 1.
         mutations: list() of supplied mutations.
-        restrictions:
+        restrictions: MutationRestrictions() object which is created by calling TODO(CJ) on the input .pdb file.
         engine: The engine used to apply the mutation, default is 'tleap'.
+        out_dir: The directory to save the mutated .pdb to. By default saves to the same directory as the base file.
         random_state: random state used for seeding mutation selection, default is 100.
 
 
@@ -43,38 +44,39 @@ def mutate_pdb(
     """
     mutations = list(set(mutations))
     structure: struct.Structure = struct.structure_from_pdb(pdb)
+    # TODO(CJ): need to update mutations
+    # TODO(CJ): add warning if requested mutations are greater than
+    # number of residues.
     if len(mutations) > n_mutations:
         _LOGGER.warn("TODO(CJ)")
-    else:
-        needed: int = n_mutations - len(mutations)
-        mutations.extend(
-            get_n_mutations(structure, needed, restrictions, mutations, random_state)
-        )
 
-    return apply_mutations(structure, mutations, engine)
+    needed: int = n_mutations - len(mutations)
+    excess: Dict[Tuple[str, int], List[Mutation]] = generate_all_mutations(structure)
+    # TODO(CJ): remove the stuff we dont care about
+    mutations.extend(get_n_mutations(excess, needed, restrictions, random_state))
+
+    IMPLEMENTATION: Dict = {"tleap": apply_mutation_tleap}
+    if engine not in IMPLEMENTATION:
+        pass  # TODO(CJ): add some kind of error here
+    return IMPLEMENTATION[engine](structure, mutations)
 
 
 def get_n_mutations(
-    structure: struct.Structure,
-    n: int,
-    restrict: Dict,
-    existing: List[str],
+    excess: Dict[Tuple[str, int], List[Mutation]],
+    needed: int,
+    restrict: Union[MutationRestrictions, None],
     random_state: int,
 ):
-    """"""
+    """ """
     np.random.seed(random_state)
     pass
 
 
-def apply_mutations(structure: struct.Structure, mutations, engine) -> str:
+def apply_mutations(
+    structure: struct.Structure, mutations: List[Mutation], engine
+) -> str:
     pass
 
 
-def valid_mutation(structure: struct.Structure, mutation: str, restriction) -> bool:
-    """Checks if a given mutation is valid for the given Structure and set of restrictions.
-
-    Args:
-            structure: The Structure() object mutations will be performed on.
-            mutation: The given mutation str() that will be applied to the Structure().
-    """
+def apply_mutation_tleap():
     pass
