@@ -29,8 +29,8 @@ def valid_mutation(mut: Mutation) -> bool:
     """Checks if the supplied Mutation() namedtuple is valid according to the below criteria:
     Mutation.orig: a one-letter amino-acid code.
     Mutation.target: a one-letter amino-acid code different thatn Mutation.orig.
-            Mutation.chain_id: a single letter, can also be blank or whitespace.
-            Mutation.res_num: a 1-indexed int().
+    Mutation.chain_id: a single letter, can also be blank or whitespace.
+    Mutation.res_num: a 1-indexed int().
 
     Args:
         mut: The Mutation() namedtuple to be judged.

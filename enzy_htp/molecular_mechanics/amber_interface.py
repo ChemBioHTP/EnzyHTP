@@ -541,6 +541,23 @@ class AmberInterface:
 
         return prod_nc
 
+    def mutate(self, outfile: str) -> None:
+        """TODO(CJ)"""
+        work_dir: str = str(Path(outfile).parent)
+        leap_in: str = f"{work_dir}/leap_mutate.in"
+        leap_out: str = f"{work_dir}/leap_mutate.out"
+        pdb_temp = str(Path(outfile).with_suffix(".tmp.pdb"))
+        leap_lines: List[str] = [
+            "source leaprc.protein.ff14SB",
+            f"a = loadpdb {outfile}",
+            f"savepdb a {pdb_temp}",
+            "quit",
+        ]
+        fs.write_lines(leapin_path, leap_lines)
+        self.env_manager_.run_command("tleap", ["-s", "-f", leap_in, ">", leap_out])
+        shutil.move(pdb_temp, outfile)
+        fs.safe_rm("leap.log")
+
     def nc2mdcrd(
         self,
         nc_file: str,

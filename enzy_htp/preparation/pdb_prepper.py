@@ -30,14 +30,14 @@ from enzy_htp.structure import (
 from .pdb_line import PDBLine, read_pdb_lines
 
 
-from .mutate import (
-    Mutation,
-    mutation_to_str,
-    decode_mutaflags,
-    get_all_combinations,
-    get_all_combinations,
-)
-
+#from .mutate import (
+#    Mutation,
+#    mutation_to_str,
+#    decode_mutaflags,
+#    get_all_combinations,
+#    get_all_combinations,
+#)
+#
 from enzy_htp.chemical import convert_to_three_letter, get_element_aliases
 
 
@@ -64,7 +64,7 @@ class PDBPrepper:
         shutil.copy(self.pdb_path, f"{self.work_dir}/{self.base_pdb_name}.pdb")
         self.path_name = f"{self.work_dir}/{self.base_pdb_name}.pdb"
         self.pqr_path = str()
-        self.mutations = []
+        #self.mutations = []
         self.current_path_ = self.path_name
         self.all_paths = [self.current_path_]
 
@@ -447,127 +447,7 @@ class PDBPrepper:
     ========
     """
 
-    def apply_mutations(self) -> str:
-        """
-        Apply mutations using tleap. Save mutated structure PDB in self.path
-        ------------------------------
-        Use MutaFlag in self.MutaFlags
-        Grammer (from Add_MutaFlag):
-        X : Original residue name. Leave X if unknow.
-            Only used for build filenames. **Do not affect any calculation.**
-        A : Chain index. Determine by 'TER' marks in the PDB file. (Do not consider chain_indexs in the original file.)
-        11: Residue index. Strictly correponding residue indexes in the original file. (NO sort applied)
-        Y : Target residue name.
 
-        **WARNING** if there are multiple mutations on the same index, only the first one will be used.
-        """
-
-        # Prepare a label for the filename
-        tot_Flag_name = "_".join(list(map(mutaflag_to_str, self.mutations)))
-        # Operate the PDB
-        out_PDB_path1 = (
-            self.work_dir + "/" + self.base_pdb_name + tot_Flag_name + "_tmp.pdb"
-        )
-        out_PDB_path2 = self.path_name + tot_Flag_name + ".pdb"
-        chain_count = 1
-        pdb_lines = read_pdb_lines(self.path_name)
-        mask = [True] * len(pdb_lines)
-        for pdb_l in pdb_lines:
-            if pdb_l.is_TER():
-                chain_count += 1
-            match = 0
-            # only match in the dataline and keep all non data lines
-            if not pdb_l.is_ATOM():
-                continue
-            for mf in self.mutations:
-                # Test for every Flag for every lines
-
-                if (
-                    chr(64 + chain_count) == mf.chain_index
-                    and pdb_l.resi_id == mf.residue_index
-                ):
-                    # do not write old line if match a MutaFlag
-                    match = 1
-                    # Keep OldAtoms of targeted old residue
-                    target_residue = mf.target_residue
-                    # fix for mutations of Gly & Pro
-                    old_atoms = {
-                        "G": ["N", "H", "CA", "C", "O"],
-                        "P": ["N", "CA", "HA", "CB", "C", "O"],
-                    }.get(mf.target_residue, ["N", "H", "CA", "HA", "CB", "C", "O"])
-
-                    line = pdb_l.line
-                    for oa in old_atoms:
-                        if oa == pdb_l.atom_name:
-                            pdb_l.line = f"{line[:17]}{convert_to_three_letter(mf.target_residue)}{line[20:]}"
-
-        write_lines(out_PDB_path1, list(map(lambda pl: pl.line, pdb_lines)))
-        leapin_path = f"{self.work_dir}/leap_P2PwL.in"
-        leap_lines = [
-            "source leaprc.protein.ff14SB",
-            f"a = loadpdb {out_PDB_path1}",
-            f"savepdb a {out_PDB_path2}",
-            "quit",
-        ]
-        write_lines(leapin_path, leap_lines)
-        em.run_command(
-            "tleap", [f"-s -f {leapin_path} > {self.work_dir}/leap_P2PwL.out"]
-        )
-        safe_rm("leap.log")
-
-    def generate_mutations(
-        self,
-        n: int,
-        muta_flags: Union[str, List[str]] = None,
-        restrictions: List[Union[int, Tuple[int, int]]] = None,
-        random_state: int = 100,
-    ) -> None:
-        """"""
-        existing = set()
-        temp = []
-        if muta_flags:
-            decoded: List[MutaFlag] = decode_mutaflags(muta_flags)
-            for mf in decoded:
-                key = (mf.chain_index, mf.residue_index)
-                if key in existing:
-                    _LOGGER.warn(f"Multiple mutations supplied at location {key}")
-                else:
-                    existing.add(key)
-                    temp.append(mf)
-
-        muta_flags = temp
-
-        if muta_flags and len(muta_flags) >= n:
-            _LOGGER.warning(
-                f"Supplied mutation flags meet or exceed the number of desired mutations"
-            )
-            self.mutations = muta_flags
-            return
-        struct: Structure = structure_from_pdb(self.current_path())
-        curr_state = struct.residue_state()
-        candidates: List[MutaFlag] = get_all_combinations(
-            curr_state, restrictions=restrictions
-        )
-
-        np.random.seed(random_state)
-        np.random.shuffle(candidates)
-
-        while len(muta_flags) < n and len(candidates):
-            curr = candidates.pop()
-            key = (curr.chain_index, curr.residue_index)
-            if key in existing:
-                continue
-            else:
-                muta_flags.append(curr)
-                existing.add(key)
-
-        if len(muta_flags) != n:
-            _LOGGER.warning(
-                f"Unable to generate enough mutations. Missing {n-len(muta_flags)}"
-            )
-
-        self.mutations = muta_flags
-        assert len(self.mutations) == len(set(self.mutations))
 
     def _build_MutaName(self, Flag):
         """

@@ -14,6 +14,7 @@ from copy import deepcopy
 from typing import Any, List, Dict
 from plum import dispatch
 
+
 class AmberConfig:
     """Class that holds default values for running Amber within enzy_htp and also creates
     input files for minimzation, heating, constant pressure production, and constant
@@ -35,7 +36,7 @@ class AmberConfig:
     HOME: str = "AMBERHOME"
     """Environment variable for Amber's HOME Directory"""
 
-    CPU_ENGINE: str = "sander" #TODO(CJ): add in the .MPI? not sure about that
+    CPU_ENGINE: str = "sander"  # TODO(CJ): add in the .MPI? not sure about that
     """Environment variable for Amber's cpu engine"""
 
     GPU_ENGINE: str = "pmemd.cuda"
@@ -43,7 +44,7 @@ class AmberConfig:
 
     BOX_TYPE: str = "box"
     """Water Box type. Allowed values are 'box' and 'oct'"""
-    
+
     BOX_SIZE = "10"
     """Water Box size."""
 
@@ -126,20 +127,28 @@ class AmberConfig:
         self.parent_ = parent
 
     def valid_box_type(self) -> bool:
-        """Checks if the BOX_TYPE attribute is an acceptable value. Current allowed values are "box" and "oct"."""	 
+        """Checks if the BOX_TYPE attribute is an acceptable value. Current allowed values are "box" and "oct"."""
         return self.BOX_TYPE in set("box oct".split())
 
     def required_executables(self) -> List[str]:
         """A hardcoded list of required executables for Amber."""
-        return [self.CPU_ENGINE, self.GPU_ENGINE, "tleap", "ampdb", "parmchk2", "antechamber", "cpptraj"]
+        return [
+            self.CPU_ENGINE,
+            self.GPU_ENGINE,
+            "tleap",
+            "ampdb",
+            "parmchk2",
+            "antechamber",
+            "cpptraj",
+        ]
 
     def required_env_vars(self) -> List[str]:
         """A hardcoded list of required enviornment variables for Amber."""
         return [self.HOME]
-    
+
     def display(self) -> None:
         """TODO(CJ)"""
-        dash_line:str = '-'*40
+        dash_line: str = "-" * 40
         print("AmberConfig() settings:")
         print(dash_line)
         print(f"HOME = {self.HOME}")
@@ -175,33 +184,33 @@ class AmberConfig:
         is_path = False
         if key in {"CPU_ENGINE", "GPU_ENGINE", "HOME"}:
             is_path = True
-        
+
         setattr(self, key, value)
         if not self.valid_box_type():
-			#TODO(CJ): make a custom error for this part
-            raise TypeError() 
+            # TODO(CJ): make a custom error for this part
+            raise TypeError()
 
         if is_path and self.parent_:
             self.parent_.update_paths()
 
     def get_engine(self, mode: str) -> str:
         """Getter that returns the path to either the CPU or GPU engine configured for Amber.
-		
-		Args:
-			mode: The mode that amber will be run in. Allowed values are "CPU" and "GPU".
 
-		Returns:
-			Path to the specified engine.
+        Args:
+                mode: The mode that amber will be run in. Allowed values are "CPU" and "GPU".
 
-		Raises:
-			TypeError if an invalid engine type is supplied.	
-		"""
+        Returns:
+                Path to the specified engine.
+
+        Raises:
+                TypeError if an invalid engine type is supplied.
+        """
         if mode == "CPU":
             return self.CPU_ENGINE
         elif mode == "GPU":
             return self.GPU_ENGINE
         else:
-		#TODO(CJ): add a custom error for this part
+            # TODO(CJ): add a custom error for this part
             raise TypeError()
 
 
