@@ -11,6 +11,7 @@ from typing import List, Dict, Tuple
 
 import enzy_htp.structure as es
 import enzy_htp.chemical as chem
+import enzy_htp.preparation as prep
 from enzy_htp.chemical import ONE_LETTER_AA_MAPPER
 
 Mutation = namedtuple("Mutation", "orig target chain_id res_num")
@@ -23,7 +24,6 @@ Mutation.__doc__ = f"""Named tuple representing a single point mutation in an en
 		chain_id: a single capital letter.
 		res_num: the 1-indexed int() of the residue to Mutate
 """
-
 
 def valid_mutation(mut: Mutation) -> bool:
     """Checks if the supplied Mutation() namedtuple is valid according to the below criteria:

@@ -553,7 +553,7 @@ class AmberInterface:
             f"savepdb a {pdb_temp}",
             "quit",
         ]
-        fs.write_lines(leapin_path, leap_lines)
+        fs.write_lines(leap_in, leap_lines)
         self.env_manager_.run_command("tleap", ["-s", "-f", leap_in, ">", leap_out])
         shutil.move(pdb_temp, outfile)
         fs.safe_rm("leap.log")

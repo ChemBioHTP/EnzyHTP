@@ -8,12 +8,16 @@ Date: 2022-06-15
 """
 import numpy as np
 from pathlib import Path
+from string import ascii_uppercase
 from typing import List, Dict, Union
 
 
+import enzy_htp.chemical as chem
 from enzy_htp.core import _LOGGER
+from enzy_htp.core import file_system as fs
 import enzy_htp.structure as struct
 import enzy_htp.molecular_mechanics as mm
+import enzy_htp.preparation as prep
 from .mutation_restrictions import MutationRestrictions, restriction_object
 from .mutation import generate_all_mutations, Mutation
 
@@ -30,7 +34,7 @@ def mutate_pdb(
     """TODO(CJ)"""
     # quickly remove exact duplicates
     mutations = list(set(mutations))
-    needed: int = len(n_mutations) - len(mutations)
+    needed: int = n_mutations - len(mutations)
     if needed > 0:
         mutations.extend(
             get_mutations(pdb, needed, mutations, random_state, restrictions)
@@ -114,45 +118,57 @@ def mutated_name(pdb: str, outdir: str, mutations: List[str]) -> str:
         outdir = str(pdb_path.parent)
 
     name_stem: str = pdb_path.stem
-    mutations = sorted(mutations, lambda m: (m.chain_id, m.res_num))
+    mutations = sorted(mutations, key=lambda m: (m.chain_id, m.res_num))
     for mut in mutations:
         name_stem += f"_{mut.orig}{mut.res_num}{mut.target}"
     return f"{outdir}/{name_stem}.pdb"
 
 
 def _mutate_tleap(pdb: str, outfile: str, mutations: List[Mutation]) -> None:
-    """TODO(CJ) add in the documentation here"""
-    chain_count = 1
-    pdb_lines = read_pdb_lines(self.path_name)
-    mask = [True] * len(pdb_lines)
+    """Underlying implementation of mutation with tleap. Serves as impelementation only, SHOULD NOT
+    BE CALLED BY USERS DIRECTLY. Follows generalized function signature taking the name of the .pdb,
+    the oufile to save the mutated version to and a list() of mutations. Function assumes that the 
+    supplied mutations are valid.
+
+    Args:
+        pdb: The name of the original .pdb file as a str().
+        outfile: Name of the file to save the mutated structure to.
+        mutations: A list() of Mutation namedtuple()'s to apply.  
+    
+    Returns:
+        Nothing.
+    """
+    chain_count:int = 1
+    chain_names:List[str] = list(ascii_uppercase[::-1])
+    curr_chain:str = chain_names.pop()
+    pdb_lines:List[prep.PDBLine] = prep.read_pdb_lines(pdb)
+    mask:List[bool] = [True] * len(pdb_lines)
     for pdb_l in pdb_lines:
         if pdb_l.is_TER():
-            chain_count += 1
+            curr_chain = chain_names.pop()
         match = 0
         # only match in the dataline and keep all non data lines
         if not pdb_l.is_ATOM():
             continue
-        for mf in self.mutations:
+        for mf in mutations:
             # Test for every Flag for every lines
 
             if (
-                chr(64 + chain_count) == mf.chain_index
-                and pdb_l.resi_id == mf.residue_index
+                curr_chain == mf.chain_id
+                and pdb_l.resi_id == mf.res_num
             ):
                 # do not write old line if match a MutaFlag
                 match = 1
-                # Keep OldAtoms of targeted old residue
-                target_residue = mf.target_residue
                 # fix for mutations of Gly & Pro
-                old_atoms = {
+                old_atoms:List[str] = {
                     "G": ["N", "H", "CA", "C", "O"],
                     "P": ["N", "CA", "HA", "CB", "C", "O"],
-                }.get(mf.target_residue, ["N", "H", "CA", "HA", "CB", "C", "O"])
+                }.get(mf.target, ["N", "H", "CA", "HA", "CB", "C", "O"])
 
-                line = pdb_l.line
+                line:str = pdb_l.line
                 for oa in old_atoms:
                     if oa == pdb_l.atom_name:
-                        pdb_l.line = f"{line[:17]}{convert_to_three_letter(mf.target_residue)}{line[20:]}"
+                        pdb_l.line = f"{line[:17]}{chem.convert_to_three_letter(mf.target)}{line[20:]}"
 
     fs.write_lines(outfile, list(map(lambda pl: pl.line, pdb_lines)))
     ai = mm.AmberInterface()
