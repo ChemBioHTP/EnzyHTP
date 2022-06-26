@@ -83,7 +83,7 @@ correct_sub_script_str_gpu = r'''#!/bin/bash
 #SBATCH --gres=gpu:1
 #SBATCH --job-name=job_name
 #SBATCH --partition=maxwell
-#SBATCH --mem-per-gpu=32G
+#SBATCH --mem=32G
 #SBATCH --time=24:00:00
 #SBATCH --account=xxx
 
