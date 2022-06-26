@@ -186,7 +186,7 @@ def clean_PDB(outfile_name: str, scaffold_file : str, extender_file : str) -> No
     j += 1
 
     for k in range(j, len(lines) - 1):
-        res_num = (k-i)//e_length+n_residues+1
+        res_num = (k-i)//e_length+n_residues+ (1 if k < len(lines) - 2 else 0)
         lines[k] = lines[k][:20] + str(res_num).rjust(4).ljust(10) + lines[k][-49:-14] + "\n"
 
     with open(f"lasso_extension/output_structures/{outfile_name}.pdb", "w", encoding="utf-8") as pdb:
