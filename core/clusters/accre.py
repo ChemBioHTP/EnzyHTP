@@ -227,9 +227,11 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''',
         * will try each command (if fail) up to 2880 times with a 30s gap (covers 1 day time span)
         Arg:
             job_id
-            field: supported keywords can be found at https://slurm.schedmd.com/sacct.html
+            field: supported keywords can be found at https://slurm.schedmd.com/sacct.html *can only take one keyword at a time*
             wait_time: for sacct run in second (default: 3s)
-            **The `sacct` command takes some time (1-5s) to update the information of the job**   
+            **The `sacct` command takes some time (1-5s) to update the information of the job**
+        Return:
+            The field value as a string
         '''
         # get info
         # squeue
