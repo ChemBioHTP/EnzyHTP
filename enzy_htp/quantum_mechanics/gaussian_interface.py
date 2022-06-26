@@ -11,9 +11,9 @@ from enzy_htp.structure import Structure, structure_from_pdb
 from .gaussian_config import GaussianConfig, default_gaussian_config
 from .selection import create_selection
 
+
 class GaussianInterface:
-    """TODO(CJ)
-	"""
+    """TODO(CJ)"""
 
     def __init__(self, config=None):
         self.config_ = config
@@ -459,17 +459,17 @@ class GaussianInterface:
 
     def qm_cluster(
         self,
-        pdb:str,
-        atom_mask:str,
-        work_dir:str="./qm_cluster/",
-        cap_strat:str='H',
-        #spin:int=1,
-        #o_dir="",
-        #tag="",
-        #QM="g16",
-        #g_route=None,
-        #ifchk=0,
-        #val_fix="internal",
+        pdb: str,
+        atom_mask: str,
+        work_dir: str = "./qm_cluster/",
+        cap_strat: str = "H",
+        # spin:int=1,
+        # o_dir="",
+        # tag="",
+        # QM="g16",
+        # g_route=None,
+        # ifchk=0,
+        # val_fix="internal",
     ):
         """
         Build & Run QM cluster input from self.mdcrd with selected atoms according to atom_mask
@@ -488,31 +488,31 @@ class GaussianInterface:
         self.qm_cluster_map (PDB atom id -> QM atom id)
         """
         # make folder
-        fs.safe_mkdir( work_dir )
+        fs.safe_mkdir(work_dir)
         # update stru
         struct: Structure = structure_from_pdb(pdb)
-        #self.get_stru()
+        # self.get_stru()
         ## get sele
         create_selection(struct, atom_mask, cap_strat)
-        #if cap_strat == "H":
+        # if cap_strat == "H":
         #    create_selection(struct, mask, cap_strat)
         #    sele_lines, sele_map = self.stru.get_sele_list(
         #        atom_mask, fix_end="H", prepi_path=self.prepi_path
         #    )
-        #elif cap_strat is None:
+        # elif cap_strat is None:
         #    sele_lines, sele_map = self.stru.get_sele_list(atom_mask, fix_end=None)
-        #else:
+        # else:
         #    raise TypeError()
-        #self.qm_cluster_map = sele_map
+        # self.qm_cluster_map = sele_map
         ## get chrgspin
-        #chrgspin = self._get_qmcluster_chrgspin(sele_lines, spin=spin)
-        #if Config.debug >= 1:
+        # chrgspin = self._get_qmcluster_chrgspin(sele_lines, spin=spin)
+        # if Config.debug >= 1:
         #    print("Charge: " + str(chrgspin[0]) + " Spin: " + str(chrgspin[1]))
 
         ## make inp files
-        #frames = Frame.fromMDCrd(self.mdcrd)
-        #self.frames = frames
-        #if QM in ["g16", "g09"]:
+        # frames = Frame.fromMDCrd(self.mdcrd)
+        # self.frames = frames
+        # if QM in ["g16", "g09"]:
         #    gjf_paths = []
         #    if Config.debug >= 1:
         #        print("Writing QMcluster gjfs.")
@@ -535,10 +535,9 @@ class GaussianInterface:
         #            chk_path = gjf[:-3] + "chk"
         #            qm_cluster_chk_paths.append(chk_path)
 
-        #self.qm_cluster_out = qm_cluster_out_paths
-        #if ifchk:
+        # self.qm_cluster_out = qm_cluster_out_paths
+        # if ifchk:
         #    self.qm_cluster_chk = qm_cluster_chk_paths
         #    return self.qm_cluster_out, self.qm_cluster_chk
 
-        #return self.qm_cluster_out
-
+        # return self.qm_cluster_out

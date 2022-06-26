@@ -95,16 +95,16 @@ from .metal_atom import MetalAtom
 
 
 class Structure:
-    """High level representation of protein/enzyme structure designed for direct interfacing by users. 
-	Composed of child Chain() objects and their subsequent child Residue() objects. High level wrappers
-	in the Structure() class enable direct manipulation of both Chain() and Residue() state while abstracting
-	these details away from the user. 
-	Note: This class SHOULD NOT be created directly by users. It should be created with the enzy_htp.structure.structure_from_pdb() method.
+    """High level representation of protein/enzyme structure designed for direct interfacing by users.
+    Composed of child Chain() objects and their subsequent child Residue() objects. High level wrappers
+    in the Structure() class enable direct manipulation of both Chain() and Residue() state while abstracting
+    these details away from the user.
+    Note: This class SHOULD NOT be created directly by users. It should be created with the enzy_htp.structure.structure_from_pdb() method.
 
-	Attributes:
-		chains_ : A list of Chain objects contained within the structure. 
-		chain_mapper : A dict() which maps chain id to the chain object.
-	"""
+    Attributes:
+            chains_ : A list of Chain objects contained within the structure.
+            chain_mapper : A dict() which maps chain id to the chain object.
+    """
 
     def __init__(self, chains: List[Chain]):
         """Constructor that takes just a list of Chain() objects as input."""
@@ -167,8 +167,8 @@ class Structure:
 
     def insert_chain(self, new_chain: Chain) -> None:
         """Method that inserts a new chain and then sorts the chains based on name.
-		Will overwrite if Chain() with existing name already in object.
-		"""
+        Will overwrite if Chain() with existing name already in object.
+        """
         new_chain_name: str = new_chain.name()
         if new_chain_name in self.chain_mapper:
             self.remove_chain(new_chain_name)
@@ -220,41 +220,40 @@ class Structure:
         # TODO(CJ)
         return []
 
-    def build_ligands(self, out_dir : str, unique : bool = False) -> List[str]:
+    def build_ligands(self, out_dir: str, unique: bool = False) -> List[str]:
         """Exports all the Ligand() objects in the Structure() to .pdb files.
 
-		Args:
-			out_dir: The base directory to save the .pdb files to.
-			unique: Whether or not the saved .pdb files should be unique.
-		
-		Returns: 
-			A list of str() with paths to the exported ligand .pdb files.
-		"""
-        result : List[str] = []
-        existing : List[str] = []
-        ligands : List[Ligand] = self.get_ligands()
-        
+        Args:
+                out_dir: The base directory to save the .pdb files to.
+                unique: Whether or not the saved .pdb files should be unique.
+
+        Returns:
+                A list of str() with paths to the exported ligand .pdb files.
+        """
+        result: List[str] = []
+        existing: List[str] = []
+        ligands: List[Ligand] = self.get_ligands()
+
         for lidx, lig in enumerate(ligands):
-           	#TODO(CJ): add some kind of formatting for lidx 
-            lig_name : str = lig.get_name()
-            out_pdb : str = f"{out_dir}/ligand_{lig_name}_{lidx}.pdb"
-            
+            # TODO(CJ): add some kind of formatting for lidx
+            lig_name: str = lig.get_name()
+            out_pdb: str = f"{out_dir}/ligand_{lig_name}_{lidx}.pdb"
+
             if unique and lig_name in existing:
                 continue
-            
+
             lig.build(out_pdb)
             result.append(out_pdb)
             existing.append(lig_name)
-       
-        return result
 
+        return result
 
     def build_protein(self, dir, ft="PDB"):
         """
         build only protein and output under the dir
         -------
         dir: out put dir ($dir/protein.pdb)
-        ft : file type / now support: PDB(default) 
+        ft : file type / now support: PDB(default)
         """
         # make path
         if dir[-1] == "/":
@@ -436,7 +435,7 @@ class Structure:
     def get_all_protein_atom(self):
         """
         get a list of all protein atoms
-        return all_P_atoms 
+        return all_P_atoms
         """
         all_P_atoms = []
         for chain in self.chains_:
@@ -518,13 +517,13 @@ class Structure:
 
     def get_atom_charge(self, prmtop_path):
         """
-        requires generate the stru using !SAME! PDB as one that generate the prmtop. 
+        requires generate the stru using !SAME! PDB as one that generate the prmtop.
         """
         pass
 
     def get_atom_type(self, prmtop_path):
         """
-        requires generate the stru using !SAME! PDB as one that generate the prmtop. 
+        requires generate the stru using !SAME! PDB as one that generate the prmtop.
         """
         # get type list
         with open(prmtop_path) as f:
@@ -606,7 +605,7 @@ class Structure:
         return True
 
     def __ne__(self, other: Structure) -> bool:
-        """Negation operator for other Structure() objects. Inverstion of Structure.__eq__(). """
+        """Negation operator for other Structure() objects. Inverstion of Structure.__eq__()."""
         return not (self == other)
 
     def insert_residue(self, new_res: Residue) -> None:
@@ -625,8 +624,8 @@ class Structure:
         self.chains_.sort(key=lambda c: c.name())
 
     def get_residue(self, target_key: str) -> Union[None, Residue]:
-        """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format, 
-		a deepcopy of the corresponding Residue() is returned, if it exists. None is returned if it cannot be found."""
+        """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format,
+        a deepcopy of the corresponding Residue() is returned, if it exists. None is returned if it cannot be found."""
         for chain in self.chains_:
             for res in chain.residues():
                 if res.residue_key == target_key:
@@ -634,9 +633,9 @@ class Structure:
         return None
 
     def remove_residue(self, target_key: str) -> None:
-        """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format, 
-		the Residue() is removed if it currently exists in one of the child Chain()'s. If the Chain() is empty after this
-		removal, the chain is deleted."""
+        """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format,
+        the Residue() is removed if it currently exists in one of the child Chain()'s. If the Chain() is empty after this
+        removal, the chain is deleted."""
         (chain_name, _, _) = target_key.split(".")
         if self.has_chain(chain_name):
             self.chain_mapper[chain_name].remove_residue(target_key)
@@ -650,11 +649,11 @@ class Structure:
 
 def compare_structures(left: Structure, right: Structure) -> Dict[str, List[str]]:
     """Compares two Structure() objects and returns a dict() of missing Residues with format:
-       
-	   {'left': ['residue_key1','residue_key1',..],
-	    'right': ['residue_key1','residue_key1',..]
-		}
-	"""
+
+    {'left': ['residue_key1','residue_key1',..],
+     'right': ['residue_key1','residue_key1',..]
+         }
+    """
     result = {"left": [], "right": []}
     left_keys: Set[str] = set(left.residue_keys())
     right_keys: Set[str] = set(right.residue_keys())
@@ -665,13 +664,13 @@ def compare_structures(left: Structure, right: Structure) -> Dict[str, List[str]
 
 
 def merge_right(left: Structure, right: Structure) -> Structure:
-    """Merges Residue() and derived objects from left Structure() to right Structure(), making sure that ALL Residue() and 
-	Residue() derived objects from the left are in the right. Note that the reverse is not applied and that elements initially found only in right are NOT
-	merged back over to left. Also not the resulting Structure() is a deepcopy and no changes are made to the original left or right objects. 
+    """Merges Residue() and derived objects from left Structure() to right Structure(), making sure that ALL Residue() and
+        Residue() derived objects from the left are in the right. Note that the reverse is not applied and that elements initially found only in right are NOT
+        merged back over to left. Also not the resulting Structure() is a deepcopy and no changes are made to the original left or right objects.
 
     Example:
-	    #TODO(CJ): add this in
-	"""
+            #TODO(CJ): add this in
+    """
     struct_cpy: Structure = deepcopy(right)
     # TODO(CJ): make this a method
     left.chains_ = sorted(left.chains_, key=lambda c: c.name())

@@ -30,13 +30,13 @@ from enzy_htp.structure import (
 from .pdb_line import PDBLine, read_pdb_lines
 
 
-#from .mutate import (
+# from .mutate import (
 #    Mutation,
 #    mutation_to_str,
 #    decode_mutaflags,
 #    get_all_combinations,
 #    get_all_combinations,
-#)
+# )
 #
 from enzy_htp.chemical import convert_to_three_letter, get_element_aliases
 
@@ -45,9 +45,9 @@ class PDBPrepper:
     """Class that handles initial preparation of a specified Structure().
 
     Attributes:
-    current_path_ : The path to the most recently saved version of the Structure().
+        current_path_ : The path to the most recently saved version of the Structure().
         work_dir : The scratch directory where temporary files are saved. The current time in the format "YYYY_MM_DD" is used if the keyword is not specified.
-            all_paths : A list of all paths created by the PDBPrepper() object. Stored in reverse order of age.
+        all_paths : A list of all paths created by the PDBPrepper() object. Stored in reverse order of age.
 
     """
 
@@ -64,7 +64,7 @@ class PDBPrepper:
         shutil.copy(self.pdb_path, f"{self.work_dir}/{self.base_pdb_name}.pdb")
         self.path_name = f"{self.work_dir}/{self.base_pdb_name}.pdb"
         self.pqr_path = str()
-        #self.mutations = []
+        # self.mutations = []
         self.current_path_ = self.path_name
         self.all_paths = [self.current_path_]
 
@@ -447,8 +447,6 @@ class PDBPrepper:
     ========
     """
 
-
-
     def _build_MutaName(self, Flag):
         """
         Take a MutaFlag Tuple and return a str of name
@@ -535,7 +533,6 @@ class PDBPrepper:
     QM Cluster
     ========    
     """
-
 
     def _get_qmcluster_chrgspin(self, sele, spin=1):
         """

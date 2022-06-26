@@ -15,31 +15,31 @@ class GaussianConfig:
     """Class that holds default values for running Gaussian within enzy_htp and al
 
     Attributes:
-	    G16_EXE : str() corresponding to the Gaussian 16 executable.	
-	    G09_EXE	: str() corresponding to the Gaussian 09 executable.
-		OM_LVL : list() holding default values for ONIOM simulation header.
-		ONIOM_KW : str() with line of default ONIOM keywords.
-		KEYWORDS : dict() holding settings for ONIOM simulation.
+            G16_EXE : str() corresponding to the Gaussian 16 executable.
+            G09_EXE	: str() corresponding to the Gaussian 09 executable.
+                OM_LVL : list() holding default values for ONIOM simulation header.
+                ONIOM_KW : str() with line of default ONIOM keywords.
+                KEYWORDS : dict() holding settings for ONIOM simulation.
         LAYER_PRESET : int() default ONIOM level for simulation.
-		LAYER_ATOMS : list() holding the atom names.
+                LAYER_ATOMS : list() holding the atom names.
     """
 
-    G16_EXE:str = "g16"
+    G16_EXE: str = "g16"
     """Variable for the g16 version of Gaussian."""
 
-    G09_EXE:str = "g09"
+    G09_EXE: str = "g09"
     """Variable for the g09 version of Gaussian."""
 
-    OM_LVL:List[str] = [
+    OM_LVL: List[str] = [
         "wb97xd/6-31g(d)",
         "amber=hardfirst",
     ]
     """Keywords for an ONIOM job. Use mechanic embedding as default / hardfirst means find user assigned parameters first / iops are for reduce the size of output."""
 
-    ONIOM_KW:str = f"oniom({':'.join(OM_LVL)})"
+    ONIOM_KW: str = f"oniom({':'.join(OM_LVL)})"
     """Default ONIOM keywords. Note that it DOES NOT update when the OM_LEVEL keywords are changed."""
 
-    KEYWORDS:Dict[str,List[str]] = {
+    KEYWORDS: Dict[str, List[str]] = {
         "spe": [
             ONIOM_KW,
             "nosymm",
@@ -64,10 +64,10 @@ class GaussianConfig:
         ],
     }
 
-    LAYER_PRESET:int = 0
+    LAYER_PRESET: int = 0
     """Default layer preset for the ONIOM simulation."""
-    
-    LAYER_ATOMS:List[str] = []
+
+    LAYER_ATOMS: List[str] = []
     """Default Atoms in the ONION layer."""
 
     def __init__(self, parent=None):

@@ -37,23 +37,23 @@ from pathlib import Path
 from enzy_htp.core import file_system as fs
 from enzy_htp.core.exception import UnsupportedFileType
 
-GJF_CHRGPSIN_PATTERN:str = r"(?: ?\-?\+?[0-9] [0-9])+"
+GJF_CHRGPSIN_PATTERN: str = r"(?: ?\-?\+?[0-9] [0-9])+"
 """Pattern for identifying the beginning of a stripped coordinate line in a .gjf file."""
 
-GJF_UNFREEZE_PATTERN:str = r"[A-z,\-,0-9,\.]+ +0 "
+GJF_UNFREEZE_PATTERN: str = r"[A-z,\-,0-9,\.]+ +0 "
 """Pattern for identifying an unfrozen atom in a .gjf file."""
 
-GJF_HIGH_PATTERN:str = r"[0-9]+ +H"
+GJF_HIGH_PATTERN: str = r"[0-9]+ +H"
 """Pattern for identifying a high layer of atoms in a .gjf file"""
 
-MDCRD_DIGIT_PATTERN:str = r"[ ,\-,0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][0-9]"
+MDCRD_DIGIT_PATTERN: str = r"[ ,\-,0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][0-9]"
 """Pattern for determining the end of an old frame from an unstripped file in an mdcrd file."""
 
-MDCRD_FRAME_SEP_PATTERN:str = digit_pattern * 3 + "\n"
+MDCRD_FRAME_SEP_PATTERN: str = digit_pattern * 3 + "\n"
 """Pattern for identifying the separation of multiple frames in an mdcrd file."""
 # In log/out:
 #   pattern for determining the position of frequencies
-MDCRD_FREQ_PATTERN:str = r"Frequencies"
+MDCRD_FREQ_PATTERN: str = r"Frequencies"
 """TODO(CJ): not sure if this is the right file type??"""
 
 
@@ -69,8 +69,6 @@ class Frame:
         coord: a 2D list of coordinate of each atom [[x,y,z],...]
         """
         self.coord = coord
-
-
 
     def shift_line(self, shift_list):
         """
@@ -349,14 +347,14 @@ def getFreq(g_out_file):
     return freqs
 
 
-def __from_mdcrd(fname:str) -> List[Frame]:
+def __from_mdcrd(fname: str) -> List[Frame]:
     """Creates a list() of Frame objects from a supplied mdcrd file. SHOULD NOT BE CALLED BY THE USER DIRECTLY.
 
     Args:
-		fname: Path to the mdcrd file.
+                fname: Path to the mdcrd file.
 
     Returns:
-		A list() of Frame objects.
+                A list() of Frame objects.
     """
     coords = []
     coord = []
@@ -435,7 +433,6 @@ def __from_mdcrd(fname:str) -> List[Frame]:
     return coords
 
 
-
 def __from_gauss_out(cls, g_out_file):
     """
     get last step from the Gaussian out file, according to the Input orientation
@@ -480,31 +477,32 @@ def __from_gauss_out(cls, g_out_file):
 
     return cls(coord)
 
-def load_frames(fname:str) -> List[Frame]:
-    """Creates a list() of Frame's from a supplied input file. Supported input file types include 
-	mdcrd and Gaussian .out files.
 
-	Args:
-		fname: The name of the mdcrd or .out file.
+def load_frames(fname: str) -> List[Frame]:
+    """Creates a list() of Frame's from a supplied input file. Supported input file types include
+    mdcrd and Gaussian .out files.
 
-	Raises:
-        UnsupportedFileType exception if the supplied file is neither a valid mdcrd file or Gaussian .out file.
+    Args:
+            fname: The name of the mdcrd or .out file.
 
-	Returns:
-		A list() of Frame objects built from the supplied filed.
-	"""
+    Raises:
+    UnsupportedFileType exception if the supplied file is neither a valid mdcrd file or Gaussian .out file.
+
+    Returns:
+            A list() of Frame objects built from the supplied filed.
+    """
     stripped_name = Path(fname).name
-    ftype=str()
-    if stripped_name == 'mdcrd':
-        ftype=stripped_name
-    elif striped_name.endswith('.out'):
-        ftype='gauss_out'
+    ftype = str()
+    if stripped_name == "mdcrd":
+        ftype = stripped_name
+    elif striped_name.endswith(".out"):
+        ftype = "gauss_out"
     else:
         raise UnsupportedFileType(f"{fname} is not a valid mdcrd or Gaussian .out file")
 
     implementation = {
-        'mdcrd': __from_mdcrd,
-		'gauss_out':__from_gauss_out,
+        "mdcrd": __from_mdcrd,
+        "gauss_out": __from_gauss_out,
     }
-    
+
     return implementation[ftype](fname)

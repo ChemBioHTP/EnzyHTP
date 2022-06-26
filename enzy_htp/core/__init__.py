@@ -10,8 +10,9 @@ from .exception import (
     MissingEnvironmentElement,
     InvalidResidueCode,
     UnsupportedFileType,
+    UnsupportedMethod,
     InvalidPH,
-    InvalidMutationRestriction, 
+    InvalidMutationRestriction,
 )
 from .file_system import (
     safe_rm,

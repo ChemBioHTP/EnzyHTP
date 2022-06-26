@@ -168,7 +168,7 @@ def _protonate_ligand_OPENBABEL(path: str, ph: float, out_path: str) -> None:
 
 
 def _ob_pdb_charge(pdb_path: str) -> int:
-    #TODO(CJ): add tests for this function
+    # TODO(CJ): add tests for this function
     """
     extract net charge from openbabel exported pdb file
     """
@@ -176,7 +176,7 @@ def _ob_pdb_charge(pdb_path: str) -> int:
     net_charge = 0
     for pdb_l in pdb_ls:
         if pdb_l.is_HETATM() or pdb_l.is_ATOM():
-            raw:str = pdb_l.get_charge()
+            raw: str = pdb_l.get_charge()
             raw = raw.strip()
             if not len(raw):
                 continue

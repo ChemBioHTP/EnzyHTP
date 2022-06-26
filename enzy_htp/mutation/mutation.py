@@ -25,6 +25,7 @@ Mutation.__doc__ = f"""Named tuple representing a single point mutation in an en
 		res_num: the 1-indexed int() of the residue to Mutate
 """
 
+
 def valid_mutation(mut: Mutation) -> bool:
     """Checks if the supplied Mutation() namedtuple is valid according to the below criteria:
     Mutation.orig: a one-letter amino-acid code.

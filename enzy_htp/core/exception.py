@@ -37,5 +37,5 @@ class UnsupportedMethod(Exception):
 
 class InvalidMutationRestriction(Exception):
     """Exception corresponding to an invalid mutation restriction in enzy_htp.mutation.mutation_restrictions.py."""
-    
+
     pass

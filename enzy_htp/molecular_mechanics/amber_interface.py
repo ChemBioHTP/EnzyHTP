@@ -7,9 +7,13 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 
 Date: 2022-06-02
 """
+import shutil
 from pathlib import Path
 from typing import List, Tuple
-import shutil
+
+import pandas as pd
+from biopandas.pdb import PandasPdb
+
 from ..core.logger import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import env_manager as em
@@ -542,7 +546,44 @@ class AmberInterface:
         return prod_nc
 
     def mutate(self, outfile: str) -> None:
-        """TODO(CJ)"""
+        """Method that uses tleap to apply the mutations described in the supplied outfile
+        to that file. Because tleap writes the modified version to another file, the destination
+        file with name 'outfile.tmp.pdb' is copied over the outfile name. As a result there
+        may be additional files in the local directory when problems occur.
+
+        Args:
+            outfile: The name of the modified .pdb file that needs to be treated with tleap.
+        """
+
+        def renumber_pdb(opdb: str, npdb: str) -> None:
+            """Helper method that renumbers the residue chain id's and residue numbers in the
+            new structure found in npdb to the original values found in the opdb structure file.
+            TODO(CJ): This may need to get moved elsewhere since it has use elsewhere.
+
+            Args:
+                opdb: The name of the original .pdb file.
+                npdb: The name of the new .pdb file.
+            """
+
+            def get_all_keys(pdb: str) -> List[Tuple[str, str]]:
+                df: pd.DataFrame = PandasPdb().read_pdb(pdb).df["ATOM"]
+                return sorted(list(set(list(zip(df.chain_id, df.residue_number)))))
+
+            okeys, nkeys = get_all_keys(opdb), get_all_keys(npdb)
+            assert len(okeys) == len(nkeys)
+            mapper = dict(zip(nkeys, okeys))
+            nlines: List[prep.PDBLine] = prep.read_pdb_lines(npdb)
+            for nl in nlines:
+                if not nl.is_ATOM():
+                    continue
+                (n_chain, n_rid) = mapper[(nl.chain_id.strip(), int(nl.resi_id))]
+                # TODO(CJ): this should be done in the oop part of the PDBLine;
+                raw = nl.line
+                nl.line = f"{raw[0:21]}{n_chain}{n_rid: >4}{raw[26:]}"
+                # print(n_chain, n_rid)
+                # print(nl.__dict__);exit( 0 )
+            fs.write_lines(npdb, list(map(lambda pl: pl.line, nlines)))
+
         work_dir: str = str(Path(outfile).parent)
         leap_in: str = f"{work_dir}/leap_mutate.in"
         leap_out: str = f"{work_dir}/leap_mutate.out"
@@ -555,6 +596,7 @@ class AmberInterface:
         ]
         fs.write_lines(leap_in, leap_lines)
         self.env_manager_.run_command("tleap", ["-s", "-f", leap_in, ">", leap_out])
+        renumber_pdb(outfile, pdb_temp)
         shutil.move(pdb_temp, outfile)
         fs.safe_rm("leap.log")
 

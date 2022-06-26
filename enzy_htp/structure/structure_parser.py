@@ -183,6 +183,6 @@ def structure_from_pdb(fname: str, keep: str = "first") -> Structure:
 def get_ligand_name(fname: str) -> str:
     # TODO(CJ): add the documentation here
     # TODO(CJ): make this more efficient
-	# TODO(CJ): add testing for this
+    # TODO(CJ): add testing for this
     ligand: Ligand = ligand_from_pdb(fname)
     return deepcopy(ligand.get_name())

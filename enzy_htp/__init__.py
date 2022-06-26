@@ -5,7 +5,8 @@ from typing import Tuple
 
 # enzy_htp imports
 from .config import Config
-#from .interface import Interface
+
+# from .interface import Interface
 from .structure import Structure, Residue
 from .core import (
     EnvironmentManager,
@@ -22,7 +23,7 @@ CONFIG = None
 INTERFACE = None
 
 
-#def init() -> Tuple[Config, Interface]:
+# def init() -> Tuple[Config, Interface]:
 #    """"""
 #    global CONFIG
 #    global INTERFACE

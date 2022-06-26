@@ -5,23 +5,25 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 
 Date: 2022-06-11
 """
-#TODO(CJ): make the unit test for this part
+# TODO(CJ): make the unit test for this part
 from typing import List, Dict, Set
 from enzy_htp.structure import Structure, Residue
 
-def decode_mask_amber( mask:str ) -> List[int]:
-    #TODO(CJ): documentation
+
+def decode_mask_amber(mask: str) -> List[int]:
+    # TODO(CJ): documentation
     mask = mask.strip()
-    if not mask.startswith(':'):
+    if not mask.startswith(":"):
         raise TypeError()
 
-    result = mask[1:].strip().split(',')
-    result = list(map(float,result))
+    result = mask[1:].strip().split(",")
+    result = list(map(float, result))
     return result
 
-def create_selection( struct: Structure, mask:str, cap_strat:str=None ):
-#def get_sele_list(self, atom_mask, cap_strat='H', prepi_path=None):
-    '''
+
+def create_selection(struct: Structure, mask: str, cap_strat: str = None):
+    # def get_sele_list(self, atom_mask, cap_strat='H', prepi_path=None):
+    """
     interface with class ONIOM_Frame. Generate a list for sele build. Make sure use same pdb as the one generate the frame.
     ------------
     resi_list: selected residue list
@@ -39,27 +41,31 @@ def create_selection( struct: Structure, mask:str, cap_strat:str=None ):
     - other atoms use _ as place holder
     return a sele map:
     (PDB atom id -> QM atom id)
-    '''
+    """
     sele_lines = {}
-    #decode atom_mask (maybe in helper later) TODO
-    targets:List[int] = decode_mask_amber(mask)
+    # decode atom_mask (maybe in helper later) TODO
+    targets: List[int] = decode_mask_amber(mask)
 
-    B_ATOMS:Set = set(['C','CA','O','N','H','HA'])
-    selected:List[Residue] = list(filter(lambda r: r.num() in targets, struct.residues()))
-    selection_lines:Dict[str,str] = dict()
+    B_ATOMS: Set = set(["C", "CA", "O", "N", "H", "HA"])
+    selected: List[Residue] = list(
+        filter(lambda r: r.num() in targets, struct.residues())
+    )
+    selection_lines: Dict[str, str] = dict()
     for res in selected:
         for atom in res.atom_list():
             if not res.is_ligand() and atom.atom_name in B_ATOMS:
                 selection_lines[f"{str(atom.atom_number)}b"] = atom.element_symbol
             else:
                 selection_lines[f"{str(atom.atom_number)}_"] = atom.element_symbol
-            
+
             if cap_strat == None:
                 continue
-            elif cap_strat == 'H':            
+            elif cap_strat == "H":
                 pass
             pass
-    exit( 0 )
+    exit(0)
+
+
 #    all_resi_list = self.get_all_residue_unit()
 #
 #    # decode and get obj

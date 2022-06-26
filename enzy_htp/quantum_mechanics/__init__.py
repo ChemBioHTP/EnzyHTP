@@ -10,5 +10,5 @@ Supported packages include:
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-11
 """
-from .gaussian_interface import GaussianInterface 
+from .gaussian_interface import GaussianInterface
 from .gaussian_config import GaussianConfig, default_gaussian_config
