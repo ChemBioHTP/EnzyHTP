@@ -1,10 +1,13 @@
+"""
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+
+Date: 2022-06-26
+"""
 # python imports
 import sys
 import logging
 from typing import Tuple
 
-# enzy_htp imports
-from .config import Config
 
 # from .interface import Interface
 from .structure import Structure, Residue
@@ -19,8 +22,11 @@ from .chemical import ResidueType
 
 from .molecular_mechanics import AmberInterface
 
-CONFIG = None
-INTERFACE = None
+from .mutation import  MutationRestrictions, restriction_object, mutate_pdb
+
+
+#CONFIG = None
+#INTERFACE = None
 
 
 # def init() -> Tuple[Config, Interface]:

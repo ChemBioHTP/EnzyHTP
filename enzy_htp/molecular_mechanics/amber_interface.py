@@ -9,7 +9,7 @@ Date: 2022-06-02
 """
 import shutil
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 import pandas as pd
 from biopandas.pdb import PandasPdb
@@ -24,16 +24,21 @@ from .amber_config import AmberConfig, default_amber_config
 
 
 class AmberInterface:
-    """Class that provides a direct inteface for enzy_htp to utilize AmberMD software.
+    """Class that provides a direct inteface for enzy_htp to utilize AmberMD software. Supported operations
+    minimization, heating constant pressure production, constant pressure equilibration, trajectory file
+    conversion and mutation. Users should use this class as the only way to interact with any functionality
+    in Amber or associated tools like tleap.
 
     Atributes:
-            config_	: The AmberConfig() class which provides settings.
-            env_manager_ : TODO
-            compatible_env_ : TODO
+        config_	: The AmberConfig() class which provides settings for both running Amber and maintaining a compatible environment.
+        env_manager_ : The EnvironmentManager() class which ensure all required environment elements exist.
+        compatible_env_ : A bool() indicating if the current environment is compatible with the object itself.
     """
 
     def __init__(self, config: AmberConfig = None) -> None:
-        """Simplistic constructor that optionally takes an AmberConfig object as its only argument."""
+        """Simplistic constructor that optionally takes an AmberConfig object as its only argument.
+        Also checks if the current environment is compatible with the AmberInteface().
+        """
         self.config_ = config
         if not self.config_:
             self.config_ = default_amber_config()
@@ -45,11 +50,11 @@ class AmberInterface:
         self.compatible_env_ = self.env_manager_.is_missing()
 
     def config(self) -> AmberConfig:
-        """TODO(CJ)"""
+        """Getter for the AmberConfig() instance belonging to the class."""
         return self.config_
 
     def display_config(self) -> None:
-        """TODO(CJ)"""
+        """Prints all settings for the object's AmberConfig() inteface to stdout using AmberConfig.display()."""
         self.config_.display()
 
     def compatible_environment(self) -> bool:
@@ -87,18 +92,19 @@ class AmberInterface:
         """Class method that minimizes the structure found in a supplied .pdb file, returning
         the path to the minimized file.
 
-                Args:
-                        pdb: The .pdb file with the structure to be minimized.
-                        mode: Which version of Amber to use. Allowed values are "CPU" and "GPU".
-                        min_dir: Work directory where the paramter files and output are saved.
-                        cycle: TODO
+        Args:
+            pdb: The .pdb file with the structure to be minimized.
+            mode: Which version of Amber to use. Allowed values are "CPU" and "GPU".
+            min_dir: Work directory where the paramter files and output are saved.
+            cycle: Number of steps in the steepest descent of the cycle.
 
-                Returns:
-                        Path to the minimized structure in a .pdb file.
+        Returns:
+            Path to the minimized structure in a .pdb file.
         """
         # TODO(CJ): add some checks for inputs
         inpath = Path(pdb)
-        min_dir = f"{inpath.parent}/pdb_min/"
+        if min_dir == "./":
+            min_dir = f"{inpath.parent}/pdb_min/"
         fs.safe_mkdir(min_dir)
         outfile = f"{min_dir}/{inpath.stem}_min.pdb"
         min_in = f"{min_dir}/min.in"
@@ -136,13 +142,14 @@ class AmberInterface:
         """Creates the .prmtop and .inpcrd files for the supplied .pdb file. Handles
         processing of the Ligand() and MetalCenter() objects in the structure.
 
-                Args:
-                        in_pdb: The .pdb file to build parameter files for.
-                        buld_dir: The directory to build the parameter files in.
+        Args:
+            in_pdb: The .pdb file to build parameter files for.
+            buld_dir: The directory to build the parameter files in.
 
-                Returns:
-                        A Tuple[str,str] with the containing (.prmtop path, .inpcrd path).
+        Returns:
+            A Tuple[str,str] with the containing (.prmtop path, .inpcrd path).
         """
+        # TODO(CJ): add in the pH as a parameter
         ligand_dir: str = f"{build_dir}/ligand/"
         metalcenter_dir: str = f"{build_dir}/metalcenter/"
         fs.safe_mkdir(ligand_dir)
@@ -168,7 +175,7 @@ class AmberInterface:
         ]
         for (prepin, frcmod) in ligand_params:
             leap_contents.extend(
-                [f"loadAmberParams {frcmod}", f"loadAmberPrep {prepin}"]
+                [f"loadAmberPrep {prepin}", f"loadAmberParams {frcmod}"]
             )
         leap_contents.append(f"a = loadpdb {in_pdb}")
         # TODO(CJ): Include igb
@@ -197,17 +204,17 @@ class AmberInterface:
         # TODO(CJ): add the method flag?
         """Creates .prepin and .frcmod files for all the supplied .pdb files. Saves files to
         same directory as the supplied .pdb files. Removes intermediate files. Should not
-        be called directly by the user. Instad use TODO(CJ): name of method here
+        be called directly by the user. Instead use AmberInterface.build_param_files()
 
         Args:
-                paths: A list() of ligand .pdb files to prepare. MUST BE SAME LENGHT AS charges.
-                charges: A list() of charges accompanying the paths. MUST BE SAME LENGTH AS paths.
+            paths: A list() of ligand .pdb files to prepare. MUST BE SAME LENGHT AS charges.
+            charges: A list() of charges accompanying the paths. MUST BE SAME LENGTH AS paths.
 
         Returns:
-                A list() of filename pairs with with the .prepin and .frcmod files for each supplied .pdb file.
+            A list() of filename pairs with with the .prepin and .frcmod files for each supplied .pdb file.
 
         Raises:
-                AssertionErrors: When various input sanitization checks fail.
+            AssertionErrors: When various input sanitization checks fail.
         """
         result: List[Tuple[str, str]] = list()
         assert len(paths) == len(charges)
@@ -256,12 +263,13 @@ class AmberInterface:
 
     def md_min_file(self, outfile: str) -> str:
         """Using the settings specified by AmberConfig.CONF_MIN, creates a min.in file for an Amber minimization run.
-        TODO(CJ): add something about updating settings
+        These settings are updated by accessing the owned AmberConfig object through AmberInterface.config().
+
         Args:
-                outfile: The name of the file to save the minimization input file to..
+            outfile: The name of the file to save the minimization input file to..
 
         Returns:
-                Path to the minimization file.
+            Path to the minimization file.
         """
         config = self.config_.CONF_MIN
 
@@ -290,7 +298,15 @@ class AmberInterface:
         return outfile
 
     def md_heat_file(self, outfile: str) -> str:
-        """TODO(CJ)"""
+        """Using the settings specified by AmberConfig.CONF_HEAT, creates a heat.in file for an Amber heating run.
+        These settings are updated by accessing the owned AmberConfig object through AmberInterface.config().
+
+        Args:
+            outfile: The name of the file to save the heating input file to.
+
+        Returns:
+            Path to the heating input file.
+        """
         config = self.config_.CONF_HEAT
 
         contents: List[str] = [
@@ -350,7 +366,16 @@ class AmberInterface:
         return outfile
 
     def md_equi_file(self, outfile: str) -> str:
-        """TODO(CJ)"""
+        """Using the settings specified by AmberConfig.CONF_EQUI, creates an input file for an Amber constant
+        equilibration run. These settings are updated by accessing the owned AmberConfig object through
+        AmberInterface.config().
+
+        Args:
+            outfile: The name of the file to save the constant pressure equilibration input.
+
+        Returns:
+            Path to the constant pressure equilibration input file.
+        """
         config = self.config_.CONF_EQUI
         contents: List[str] = [
             "Equilibration:constant pressure",
@@ -389,7 +414,16 @@ class AmberInterface:
         return outfile
 
     def md_prod_file(self, outfile: str) -> str:
-        """TODO(CJ)"""
+        """Using the settings specified by AmberConfig.CONF_PROD, creates an input file for an Amber production
+        md run. These settings are updated by accessing the owned AmberConfig object through
+        AmberInterface.config().
+
+        Args:
+            outfile: The name of the file to save the production md input.
+
+        Returns:
+            Path to the production md input file.
+        """
         config = self.config_.CONF_PROD
         contents: List[str] = [
             "Production: constant pressure",
@@ -425,7 +459,6 @@ class AmberInterface:
         fs.write_lines(outfile, contents)
         return outfile
 
-    # TODO(CJ): add some way to interact with the AmberConfig() config_ attribute
     def md_run(self, prmtop: str, inpcrd: str, work_dir: str, mode: str = "CPU") -> str:
         """Runs a full MD simulation using the suplied prmtop and inpcrd files. Simulation is composed
         of four steps:
@@ -433,18 +466,19 @@ class AmberInterface:
                 2. heating
                 3. equilibration
                 4. production
+        The parameter files for these steps are created by AmberInterface.md_min_file(), AmberInterface.md_heat_file(),
+        AmberInterface.md_equi_file() and AmberInterface.md_prod_file(), respectively. All work is done in the supplied
+        work_dir location.
 
         Args:
-                prmtop:
-                                inpcrd:
-                                work_dir:
-                                mode:
+            prmtop: str() with a path to a .prmtop file generated by AmberInterface.build_param_files().
+            inpcrd: str() with a path to a .inpcrd file generated by AmberInterface.build_param_files().
+            work_dir: Directory where the temporary files should be stored.
+            mode: The mode to use for calculations. Only "CPU" and "GPU" are allowed.
 
         Returns:
-                Path to the
+            Path to the production .nc file.
 
-        Raises:
-                TODO
         """
         fs.safe_mkdir(work_dir)
         min_in: str = self.md_min_file(f"{work_dir}/min.in")
@@ -602,39 +636,39 @@ class AmberInterface:
 
     def nc2mdcrd(
         self,
-        nc_file: str,
+        nc_in: str,
         prmtop: str,
-        point=None,
-        start=1,
-        end=-1,
-        step=1,
+        point: Union[int, None] = None,
+        start: int = 1,
+        end: Union[int, str] = "last",
+        step: int = 1,
         engine: str = "cpptraj",
     ) -> str:
-        """Converts the supplied .nc file to an .mdcrd file.
-        convert self.nc to a mdcrd file to read and operate.(self.nc[:-2]+'.mdcrd' by default)
-        a easier way is to use pytraj directly.
-        ---------------
-        o_path: user assigned out path (self.nc[:-2]+'mdcrd' by default)
-        point:  sample point. use value from self.conf_prod['nstlim'] and self.conf_prod['ntwx'] to determine step size.
-        start:  start point
-        end:    end point
-        step:   step size
-        engine: pytraj or cpptraj (some package conflict may cause pytraj not available)
+        """Converts the supplied .nc file to an .mdcrd file. Scope of trajectory conversion can be
+        specified though by default all available frames are selected.
+
+        Args:
+            nc_in: The path to the .nc file as a str().
+            prmtop: The path to the prmtop file as  str().
+            point: If not None, step is (nstlim/ntwx)/point. Default is None, but value should be int() when given.
+            start: 1-indexed starting point. Default value is 1.
+            end: 1-indexed ending point. By default uses "last"
+            engine: The engine to convert the .nc file. Default value is "cpptraj".
+
+        Returns:
+            The name of the converted .mdcrd file.
         """
-        mdcrd: str = str(Path(nc_file).with_suffix(".mdcrd"))
+        mdcrd: str = str(Path(nc_in).with_suffix(".mdcrd"))
         config = self.config_.CONF_PROD
-        if end == -1:
-            end = "last"
-        if point != None:
-            all_p = int(config["nstlim"]) / int(config["ntwx"])
-            step = int(all_p / point)
+        if point is not None:
+            step: int = int((int(config["nstlim"]) / int(config["ntwx"])) / point)
 
         if engine == "cpptraj":
-            cpptraj_in = self.cache_path + "/cpptraj_nc2mdcrd.in"
-            cpptraj_out = self.cache_path + "/cpptraj_nc2mdcrd.out"
+            cpptraj_in = "./cpptraj_nc2mdcrd.in"
+            cpptraj_out = "./cpptraj_nc2mdcrd.out"
             contents: List[str] = [
                 f"parm {prmtop}",
-                f"trajin {nc_file} {start} {end} {step}",
+                f"trajin {nc_in} {start} {end} {step}",
                 f"trajout {mdcrd}",
                 "run",
                 "quit",
@@ -644,6 +678,8 @@ class AmberInterface:
                 "cpptraj", ["-i", cpptraj_in, ">", cpptraj_out]
             )
         else:
-            pass
+            raise UnsupportedMethod(
+                f"'{engine}' is not a supported method for AmberInteface.nc2mdcrd(). Allowed methods are: 'cpptraj'."
+            )
 
         return mdcrd

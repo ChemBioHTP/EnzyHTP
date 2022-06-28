@@ -7,6 +7,7 @@ Date: 2022-03-12
 """
 import shutil
 import numpy as np
+from pathlib import Path
 
 import pdb2pqr
 from typing import Set, Union, List, Tuple
@@ -28,16 +29,6 @@ from enzy_htp.structure import (
 )
 
 from .pdb_line import PDBLine, read_pdb_lines
-
-
-# from .mutate import (
-#    Mutation,
-#    mutation_to_str,
-#    decode_mutaflags,
-#    get_all_combinations,
-#    get_all_combinations,
-# )
-#
 from enzy_htp.chemical import convert_to_three_letter, get_element_aliases
 
 
@@ -61,7 +52,8 @@ class PDBPrepper:
             "work_dir", f"{fs.get_current_time()}_{self.base_pdb_name}"
         )
         fs.safe_mkdir(self.work_dir)
-        shutil.copy(self.pdb_path, f"{self.work_dir}/{self.base_pdb_name}.pdb")
+        if not Path(f"{self.work_dir}/{self.base_pdb_name}.pdb").exists(): #TODO(CJ): Do we need a safe_cpy function?
+            shutil.copy(self.pdb_path, f"{self.work_dir}/{self.base_pdb_name}.pdb")
         self.path_name = f"{self.work_dir}/{self.base_pdb_name}.pdb"
         self.pqr_path = str()
         # self.mutations = []
@@ -441,19 +433,7 @@ class PDBPrepper:
 
         return self.current_path_
 
-    """
-    ========
-    Mutation
-    ========
-    """
-
-    def _build_MutaName(self, Flag):
-        """
-        Take a MutaFlag Tuple and return a str of name
-        """
-        return Flag[0] + Flag[1] + Flag[2] + Flag[3]
-
-    def rm_allH(self, ff="Amber", ligand=False):
+    def rm_allH(self, ff:str="Amber", ligand:bool=False):
         # TODO: CJ: should this get called by mutation method?
         """
         remove wrong hydrogens added by leap after mutation. (In the case that the input file was a H-less one from crystal.)
@@ -463,8 +443,8 @@ class PDBPrepper:
         1 - remove all Hs base on the nomenclature. (start with H and not in the non_H_list)
         """
         # out path
-        o_path = self.path_name + "_rmH.pdb"
-        pdb_lines: List[PDBLine] = read_pdb_lines(self.curr_path)
+        o_path = self.path_name.replace('.pdb','') + "_rmH.pdb"
+        pdb_lines: List[PDBLine] = read_pdb_lines(self.current_path_)
         mask = [True] * len(pdb_lines)
         # crude judgement of H including customized H
         if ligand:
@@ -482,9 +462,10 @@ class PDBPrepper:
             for idx, pl in enumerate(pdb_lines):
                 if pl.atom_name in H_aliases and pl.is_residue_line():
                     mask[idx] = False
+                #print(pl.line, mask[idx])
 
         pdb_lines = np.array(pdb_lines)[mask]
-        write_lines(o_path, list(map(str, pdb_lines)))
+        fs.write_lines(o_path, list(map(str, pdb_lines)))
 
     """
     ========

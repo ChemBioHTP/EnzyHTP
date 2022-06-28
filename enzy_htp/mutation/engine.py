@@ -11,11 +11,12 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 
 Date: 2022-06-15
 """
+import hashlib
 from pathlib import Path
 from copy import deepcopy
 from string import ascii_uppercase
 from collections import defaultdict
-from typing import List, Dict, Union
+from typing import List, Dict, Union, Any
 
 import numpy as np
 import pandas as pd
@@ -76,7 +77,7 @@ def mutate_pdb(
         for mm in muts:
             holder[(mm.chain_id, mm.res_num)].append(deepcopy(mm))
         result = list()
-        for mlist in muts.values():
+        for mlist in holder.values():
             result.append(mlist.pop())
         return result
 
@@ -136,6 +137,12 @@ def get_mutations(
     Returns:
         A list() of Mutation() namedtuples compatible with the supplied enzyme system and constraints.
     """
+    def random_list_elem(ll:list) -> Any:
+        """Helper method that randomly chooses an element from a list. numpy.random.choice() doesn't 
+        like to take elements from list()'s of tuples so this is the work around.
+        """
+        return ll[np.random.randint(len(ll))]
+
     if restrictions is None:
         restrictions = restriction_object(pdb)
 
@@ -159,9 +166,9 @@ def get_mutations(
             )
 
         md_keys = list(mut_dict.keys())
-        chosen = np.random.choice(md_keys)
+        chosen = random_list_elem(md_keys)
         if len(mut_dict[chosen]):
-            result.append(np.random.choice(mut_dic[chosen]))
+            result.append(random_list_elem(sorted(mut_dict[chosen])))
         del mut_dict[chosen]
 
     return result
@@ -220,6 +227,21 @@ def _mutate_tleap(pdb: str, outfile: str, mutations: List[Mutation]) -> None:
     Returns:
         Nothing.
     """
+    def get_backup( fname: str ):
+        lines = prep.read_pdb_lines(fname) 
+        lines = list(filter(lambda ll: ll.is_ATOM() or ll.is_HETATM(), lines))
+        holder = defaultdict(list)
+        for ll in lines:
+            holder[f"{ll.chain_id}.{ll.resi_name}.{ll.resi_id}"].append( ll )    
+        to_remove = list()
+        for key in holder.keys():
+            if key.split('.')[1] in chem.THREE_LETTER_AA_MAPPER:
+                to_remove.append(key)
+        for tr in to_remove:
+            del holder[tr]
+        return holder
+
+    backup = get_backup(pdb)
     chain_count: int = 1
     chain_names: List[str] = list(ascii_uppercase[::-1])
     curr_chain: str = chain_names.pop()
@@ -253,3 +275,17 @@ def _mutate_tleap(pdb: str, outfile: str, mutations: List[Mutation]) -> None:
     fs.write_lines(outfile, np.array(list(map(lambda pl: pl.line, pdb_lines)))[mask])
     ai = mm.AmberInterface()
     ai.mutate(outfile)
+    if backup:
+        structure:struct.Structure = struct.structure_from_pdb(outfile)
+        for rkey in structure.residue_keys():
+            if rkey not in backup:
+                continue
+            tmp_file = f"/tmp/ligand.{rkey}.tmp.pdb"
+            fs.write_lines(tmp_file, list(map(lambda ll: ll.line, backup[rkey])) + ['END'])
+            lig:struct.Ligand = struct.ligand_from_pdb(tmp_file)
+            (cname,rname,rnum) = rkey.split('.')
+            rnum = int(rnum)
+            structure.chain_mapper[cname].residues_[rnum-1] = lig
+            fs.safe_rm(tmp_file)
+
+        structure.to_pdb(outfile)

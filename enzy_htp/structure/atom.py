@@ -7,6 +7,7 @@ Date: 2022-03-19
 """
 from __future__ import annotations
 from typing import Union, Any
+
 import numpy as np
 
 
@@ -18,27 +19,27 @@ class Atom:
     Note: The Atom class SHOULD NOT be created directly by users. It is handled by other functions in enzy_htp.
 
     Attributes:
-                alt_loc : Character indicating if alternative location is present.
-                atom_name : The name of the atom as a string.
-                atom_number : An integer number for the atom.
-                b_factor : A float representing the temperature factor (b factor).
-                blank_1 : Filler space 1.
-                blank_2 : Filler space 2.
-                blank_3 : Filler space 3.
-                blank_4 : Filler space 4.
-                chain_id : Optional letter designating parent chain.
-                charge : Charge of the atom.
-                element_symbol : Character representing element.
-                insertion : Character chode for insertion of residues.
-                line_idx : Index of line from original .pdb file.
-                occupancy : Float representing occupancy of the atom.
-                record_name : The record type of the atom as a string (ATOM, HETATM, etc.).
-                residue_name : Name of parent residue as string.
-                residue_number : Number for parent residue as integer.
-                segment_id : Segment identifier as a string.
-                x_coord : x coordinate in cartesian 3D space.
-                y_coord : y coordinate in cartesian 3D space.
-                z_coord : z coordinate in cartesian 3D space.
+        alt_loc : Character indicating if alternative location is present.
+        atom_name : The name of the atom as a string.
+        atom_number : An integer number for the atom.
+        b_factor : A float representing the temperature factor (b factor).
+        blank_1 : Filler space 1.
+        blank_2 : Filler space 2.
+        blank_3 : Filler space 3.
+        blank_4 : Filler space 4.
+        chain_id : Optional letter designating parent chain.
+        charge : Charge of the atom.
+        element_symbol : Character representing element.
+        insertion : Character chode for insertion of residues.
+        line_idx : Index of line from original .pdb file.
+        occupancy : Float representing occupancy of the atom.
+        record_name : The record type of the atom as a string (ATOM, HETATM, etc.).
+        residue_name : Name of parent residue as string.
+        residue_number : Number for parent residue as integer.
+        segment_id : Segment identifier as a string.
+        x_coord : x coordinate in cartesian 3D space.
+        y_coord : y coordinate in cartesian 3D space.
+        z_coord : z coordinate in cartesian 3D space.
     """
 
     def __init__(self, **kwargs):
@@ -67,6 +68,9 @@ class Atom:
 
         for k, v in kwargs.items():
             setattr(self, k, v)
+
+        if not np.isnan(self.charge):
+            self.charge = int(self.charge)
 
     def has_alt_loc(self) -> bool:
         """Checks if the atom has a non-empty alt_loc."""
@@ -138,7 +142,12 @@ class Atom:
             z = "{:>8.3f}".format(self.z_coord)
         # TODO(CJ) figure out a less janky way to do all of this
         a_type = "".join(list(filter(lambda c: not c.isdigit(), a_name))).strip()[0]
-        return f"{l_type}{a_index} {a_name}{self.alt_loc:1}{r_name: >3} {c_index}{r_index}    {x}{y}{z}{self.occupancy:6.2f}  0.00           {a_type}  "
+        charge = '  ' 
+        if not np.isnan(self.charge):
+            charge = str(self.charge)
+            if self.charge < 0:
+                charge = charge[::-1]
+        return f"{l_type}{a_index} {a_name}{self.alt_loc:1}{r_name: >3} {c_index}{r_index}    {x}{y}{z}{self.occupancy:6.2f}  0.00           {a_type}{charge}"
 
     #
 
@@ -199,5 +208,5 @@ class Atom:
         x = "{:<14.8f}".format(self.coord[0])
         y = "{:<14.8f}".format(self.coord[1])
         z = "{:<14.8f}".format(self.coord[2])
-
+        
         return f"{atom_label} {fz_flag}   {x} {y} {z} {ly_flag}{cnt_flag}{line_feed}"

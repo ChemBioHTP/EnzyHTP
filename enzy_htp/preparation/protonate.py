@@ -5,6 +5,8 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-04-05
 """
 # TODO(CJ): add more documentation
+from pathlib import Path
+
 import enzy_htp.core as core
 from enzy_htp.core import file_system as fs
 from enzy_htp.structure import (
@@ -132,7 +134,7 @@ def protonate_ligand(
         fs.safe_mkdir(dirname)
         ligand.build(path)
         base_name = fs.base_file_name(path)
-        out_path = f"{base_name}_aH.pdb"
+        out_path = f"{dirname}/{base_name}_aH.pdb"
         return _MAPPER[method](path, ph, out_path)
 
 
@@ -218,11 +220,21 @@ def _protonate_ligand_PYBEL(path: str, ph: float, out_path: str) -> Ligand:
                 pdb_atoms[idx].resi_name = a.resi_name
             # exit( 0 )
         fs.write_lines(out_path, list(map(lambda aa: aa.build(), pdb_atoms)))
-
+    def fix_atom_naming( out_path ):
+        lig_name = Path(out_path).stem.split('_')[1].strip()
+        lines = read_pdb_lines(out_path)
+        lines = list(filter(lambda ll: ll.is_ATOM() or ll.is_HETATM() or ll.line.startswith('END'), lines))                
+        for ll in lines:
+            if ll.line.startswith('END'):
+                continue
+            rawline = ll.line
+            aname = rawline[76:78].strip() 
+            ll.line = rawline[0:13] + f"{aname: <4}{lig_name: >3}"+rawline[20:]
+        fs.write_lines(out_path, list(map(lambda ll: ll.line, lines)))
     pybel.ob.obErrorLog.SetOutputLevel(0)
     mol = next(pybel.readfile("pdb", path))
     mol.OBMol.AddHydrogens(False, True, ph)
     mol.write("pdb", out_path, overwrite=True)
-    _fix_ob_output(out_path, out_path, path)
-
+    #_fix_ob_output(out_path, out_path, path)
+    fix_atom_naming(out_path)
     return ligand_from_pdb(out_path, _ob_pdb_charge(out_path))
