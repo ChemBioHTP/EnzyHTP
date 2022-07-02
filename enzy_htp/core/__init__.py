@@ -23,4 +23,5 @@ from .file_system import (
     lines_from_file,
     write_lines,
     get_file_ext,
+	write_data,
 )
