@@ -25,20 +25,3 @@ from .molecular_mechanics import AmberInterface
 from .quantum_mechanics import GaussianInterface, MultiwfnInterface
 
 from .mutation import  MutationRestrictions, restriction_object, mutate_pdb
-
-def welcome_msg():
-    _LOGGER.info(f"""
-
-#################################################### 
-#      _____                 _   _ _____ ____      # 
-#     | ____|_ __  _____   _| | | |_   _|  _ \     # 
-#     |  _| | '_ \|_  / | | | |_| | | | | |_) |    #
-#     | |___| | | |/ /| |_| |  _  | | | |  __/     # 
-#     |_____|_| |_/___|\__, |_| |_| |_| |_|        # 
-#                      |___/                       #
-#                                                  # 
-#################################################### 
-""")
-
-
-welcome_msg()

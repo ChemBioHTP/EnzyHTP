@@ -12,22 +12,22 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-15
 """
 import hashlib
-from pathlib import Path
-from copy import deepcopy
 from string import ascii_uppercase
 from collections import defaultdict
 from typing import List, Dict, Union, Any
+from pathlib import Path from copy import deepcopy
 
 import numpy as np
 import pandas as pd
 from biopandas.pdb import PandasPdb
 
 import enzy_htp.chemical as chem
-from enzy_htp.core import _LOGGER, UnsupportedMethod
-from enzy_htp.core import file_system as fs
 import enzy_htp.structure as struct
-import enzy_htp.molecular_mechanics as mm
 import enzy_htp.preparation as prep
+import enzy_htp.molecular_mechanics as mm
+from enzy_htp.core import file_system as fs
+from enzy_htp.core import _LOGGER, UnsupportedMethod
+
 from .mutation_restrictions import MutationRestrictions, restriction_object
 from .mutation import generate_all_mutations, Mutation
 
