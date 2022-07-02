@@ -12,3 +12,4 @@ Date: 2022-06-03
 """
 from .amber_interface import AmberInterface
 from .amber_config import AmberConfig, default_amber_config
+from .frame import Frame, frames_from_pdb

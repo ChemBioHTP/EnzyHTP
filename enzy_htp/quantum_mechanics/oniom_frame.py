@@ -27,8 +27,9 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-14
 """
 import numpy as np
-from Class_Conf import Config
-from helper import line_feed, set_distance
+
+# from Class_Conf import Config
+# from helper import line_feed, set_distance
 import re
 import os
 from typing import List
@@ -49,8 +50,8 @@ GJF_HIGH_PATTERN: str = r"[0-9]+ +H"
 MDCRD_DIGIT_PATTERN: str = r"[ ,\-,0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][0-9]"
 """Pattern for determining the end of an old frame from an unstripped file in an mdcrd file."""
 
-MDCRD_FRAME_SEP_PATTERN: str = digit_pattern * 3 + "\n"
-"""Pattern for identifying the separation of multiple frames in an mdcrd file."""
+# MDCRD_FRAME_SEP_PATTERN: str = digit_pattern * 3 + "\n"
+# """Pattern for identifying the separation of multiple frames in an mdcrd file."""
 # In log/out:
 #   pattern for determining the position of frequencies
 MDCRD_FREQ_PATTERN: str = r"Frequencies"

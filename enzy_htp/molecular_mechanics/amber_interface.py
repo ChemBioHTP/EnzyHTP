@@ -21,6 +21,7 @@ from enzy_htp.core.exception import UnsupportedMethod
 import enzy_htp.structure as struct
 import enzy_htp.preparation as prep
 from .amber_config import AmberConfig, default_amber_config
+from .frame import Frame, frames_from_pdb, read_charge_list
 
 
 class AmberInterface:
@@ -150,7 +151,7 @@ class AmberInterface:
             A Tuple[str,str] with the containing (.prmtop path, .inpcrd path).
         """
         # TODO(CJ): add in the pH as a parameter
-        ligand_dir: str = f"{build_dir}/ligand/"
+        ligand_dir: str = f"{build_dir}/ligands/"
         metalcenter_dir: str = f"{build_dir}/metalcenter/"
         fs.safe_mkdir(ligand_dir)
         fs.safe_mkdir(metalcenter_dir)
@@ -677,9 +678,59 @@ class AmberInterface:
             self.env_manager_.run_command(
                 "cpptraj", ["-i", cpptraj_in, ">", cpptraj_out]
             )
+            #fs.safe_rm(cpptraj_in)
+            #fs.safe_rm(cpptraj_out)
         else:
             raise UnsupportedMethod(
                 f"'{engine}' is not a supported method for AmberInteface.nc2mdcrd(). Allowed methods are: 'cpptraj'."
             )
 
         return mdcrd
+
+    def get_frames(
+        self,
+        nc_in: str,
+        prmtop: str,
+        point: Union[int, None] = None,
+        start: int = 1,
+        end: Union[int, str] = "last",
+        step: int = 1,
+    ) -> str:
+        """Converts the supplied .nc file to an .mdcrd file. Scope of trajectory conversion can be
+        TODO(CJ): update this
+        """
+        outfile: str = f"{Path(prmtop).parent}/cpptraj_frames.pdb"
+        config = self.config_.CONF_PROD
+        if point is not None:
+            step: int = int((int(config["nstlim"]) / int(config["ntwx"])) / point)
+
+        cpptraj_in = "./cpptraj_nc2mdcrd.in"
+        cpptraj_out = "./cpptraj_nc2mdcrd.out"
+        contents: List[str] = [
+            f"parm {prmtop}",
+            f"trajin {nc_in} {start} {end} {step}",
+             "strip :WAT",
+             "strip :Na+,Cl-",
+            f"trajout {outfile} conect",
+            "run",
+            "quit",
+        ]
+        fs.write_lines(cpptraj_in, contents)
+        self.env_manager_.run_command(
+            "cpptraj", ["-i", cpptraj_in, ">", cpptraj_out]
+        )
+        #fs.safe_rm(cpptraj_in)
+        fs.safe_rm(cpptraj_out)
+        charges = read_charge_list(prmtop)
+        result = frames_from_pdb( outfile )
+        
+        if not len(result):
+            return result
+		
+        num_atoms = len(result[0].atoms)
+        charges = charges[0:num_atoms]
+        for fidx, frame in enumerate(result):
+            result[fidx].update_charges( charges )
+
+        return result
+

@@ -1,27 +1,30 @@
-"""Defines a GaussianConfig class that serves as a bridge for enzy_htp to utilize Gaussian software.
+"""Defines a GaussianConfig class which is a direct companion to the main GaussianInterface class. Stores the
+required executables, enviornment variables and settings for using Gaussian within enzy_htp. Additionally
+features default_gaussian_config() which provides a deep-copied GaussianConfig() object for use in Gaussian based
+calculations.
 
-TODO(CJ): elaborate this part
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 
 Date: 2022-06-11
 """
-
 from copy import deepcopy
 from typing import Any, List, Dict
 
 
 class GaussianConfig:
-    """Class that holds default values for running Gaussian within enzy_htp and al
+    """Class that holds default values for running Gaussian within enzy_htp as well as the required
+    executables and variables that need to be present in the environment.
+
 
     Attributes:
-            G16_EXE : str() corresponding to the Gaussian 16 executable.
-            G09_EXE	: str() corresponding to the Gaussian 09 executable.
-                OM_LVL : list() holding default values for ONIOM simulation header.
-                ONIOM_KW : str() with line of default ONIOM keywords.
-                KEYWORDS : dict() holding settings for ONIOM simulation.
+        G16_EXE : str() corresponding to the Gaussian 16 executable.
+        G09_EXE	: str() corresponding to the Gaussian 09 executable.
+        OM_LVL : list() holding default values for ONIOM simulation header.
+        ONIOM_KW : str() with line of default ONIOM keywords.
+        KEYWORDS : dict() holding settings for ONIOM simulation.
         LAYER_PRESET : int() default ONIOM level for simulation.
-                LAYER_ATOMS : list() holding the atom names.
+        LAYER_ATOMS : list() holding the atom names.
     """
 
     G16_EXE: str = "g16"
@@ -68,7 +71,7 @@ class GaussianConfig:
     """Default layer preset for the ONIOM simulation."""
 
     LAYER_ATOMS: List[str] = []
-    """Default Atoms in the ONION layer."""
+    """Default Atoms in the ONIOM layer."""
 
     def __init__(self, parent=None):
         self._parent = parent
