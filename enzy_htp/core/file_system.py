@@ -7,7 +7,7 @@ import os
 import sys
 import shutil
 import datetime
-from typing import List
+from typing import List, Any, Dict
 from pathlib import Path
 
 from .logger import _LOGGER
@@ -74,3 +74,16 @@ def write_lines(fname: str, lines: List[str]) -> None:
     fh = open(fname, "w")
     fh.write("\n".join(lines))
     fh.close()
+
+def write_data(outfile:str, tag:Any, data:Dict) -> str:
+    #TODO(CJ): add the doc-string and also unittests
+    tag:str = repr(tag)
+    fh = open(outfile,'a')
+    fh.write("===TAG===\n")
+    fh.write(f"{tag}\n")
+    for key, value in data.items():
+        fh.write(f"---{key}---\n")
+        fh.write(f"{repr(value)}\n")
+    fh.close()
+    
+    return outfile

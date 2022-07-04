@@ -10,7 +10,7 @@ from enzy_htp.chemical import metal as mm
 
 from util import all_caps
 
-IONIC_ATOM_NAMES = [
+IONIC_ATOM_NAMES: List[str] = [
     "N",
     "O",
     "S",
@@ -23,7 +23,7 @@ IONIC_ATOM_NAMES = [
     "Ca",
 ]
 
-VDW_ATOM_NAMES = [
+VDW_ATOM_NAMES: List[str] = [
     "N",
     "O",
     "S",

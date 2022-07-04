@@ -5,6 +5,8 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-04-05
 """
 # TODO(CJ): add more documentation
+from pathlib import Path
+
 import enzy_htp.core as core
 from enzy_htp.core import file_system as fs
 from enzy_htp.structure import (
@@ -21,7 +23,7 @@ import openbabel
 import openbabel.pybel as pybel
 from .pdb_line import read_pdb_lines
 
-
+# TODO(CJ): this probably needs to go to core so that structure.Structure can use it
 def check_valid_ph(ph: float) -> None:
     """Helper function that checks the pH is on the range: [0.00, 14.00]. Throws core.InvalidPH() if not."""
     if ph < 0 or ph > 14:
@@ -34,7 +36,7 @@ def protonate_pdb(
     """Runs PDB2PQR on a specified pdb file and saves it to the specified pqr path. This preparation step
     makes use of [PDB2PQR](https://www.poissonboltzmann.org/) via the pdb2pqr python [package](https://pdb2pqr.readthedocs.io/en/latest/).
     Adds in missing atoms and finds the protonation state of the pdb file.
-	"""
+    """
     # TODO(CJ): check if ffout is valid.
     # TODO(CJ): maybe improve the documentation here?
     check_valid_ph(ph)
@@ -90,7 +92,10 @@ def protonate_missing_elements(
         # print("-asdgasdgasg")
         old_keys = list(map(lambda l: l.residue_key, ligand_list))
         new_ligands = list(
-            map(lambda ll: protonate_ligand(ll, dirname=lig_dir, ph=7), ligand_list,)
+            map(
+                lambda ll: protonate_ligand(ll, dirname=lig_dir, ph=7),
+                ligand_list,
+            )
         )
         # print(new_ligands)
         for lig, ok in zip(new_ligands, old_keys):
@@ -129,7 +134,7 @@ def protonate_ligand(
         fs.safe_mkdir(dirname)
         ligand.build(path)
         base_name = fs.base_file_name(path)
-        out_path = f"{base_name}_aH.pdb"
+        out_path = f"{dirname}/{base_name}_aH.pdb"
         return _MAPPER[method](path, ph, out_path)
 
 
@@ -164,24 +169,29 @@ def _protonate_ligand_OPENBABEL(path: str, ph: float, out_path: str) -> None:
     raise Exception(f"Method: __protonate_OPENBABEL is not implemented yet!")
 
 
+def _ob_pdb_charge(pdb_path: str) -> int:
+    # TODO(CJ): add tests for this function
+    """
+    extract net charge from openbabel exported pdb file
+    """
+    pdb_ls = read_pdb_lines(pdb_path)
+    net_charge = 0
+    for pdb_l in pdb_ls:
+        if pdb_l.is_HETATM() or pdb_l.is_ATOM():
+            raw: str = pdb_l.get_charge()
+            raw = raw.strip()
+            if not len(raw):
+                continue
+            charge = pdb_l.charge[::-1]
+            core._LOGGER.info(
+                f"Found formal charge: {pdb_l.atom_name} {charge}"
+            )  # TODO make this more intuitive/make sense
+            net_charge += int(charge)
+    return net_charge
+
+
 def _protonate_ligand_PYBEL(path: str, ph: float, out_path: str) -> Ligand:
     """Impelemntation of protonate_ligand() using the pybel method. SHOULD NOT be called directly by users."""
-
-    def _ob_pdb_charge(pdb_path) -> int:
-        """
-        extract net charge from openbabel exported pdb file
-        """
-        pdb_ls = read_pdb_lines(pdb_path)
-        net_charge = 0
-        for pdb_l in pdb_ls:
-            if pdb_l.is_HETATM() or pdb_l.is_ATOM():
-                if len(pdb_l.get_charge()) != 0:
-                    charge = pdb_l.charge[::-1]
-                    core._LOGGER.info(
-                        f"Found formal charge: {pdb_l.atom_name} {charge}"
-                    )  # TODO make this more intuitive/make sense
-                    net_charge += int(charge)
-        return net_charge
 
     def _fix_ob_output(pdb_path, out_path, ref_name_path=None) -> None:
         """
@@ -210,11 +220,21 @@ def _protonate_ligand_PYBEL(path: str, ph: float, out_path: str) -> Ligand:
                 pdb_atoms[idx].resi_name = a.resi_name
             # exit( 0 )
         fs.write_lines(out_path, list(map(lambda aa: aa.build(), pdb_atoms)))
-
+    def fix_atom_naming( out_path ):
+        lig_name = Path(out_path).stem.split('_')[1].strip()
+        lines = read_pdb_lines(out_path)
+        lines = list(filter(lambda ll: ll.is_ATOM() or ll.is_HETATM() or ll.line.startswith('END'), lines))                
+        for ll in lines:
+            if ll.line.startswith('END'):
+                continue
+            rawline = ll.line
+            aname = rawline[76:78].strip() 
+            ll.line = rawline[0:13] + f"{aname: <4}{lig_name: >3}"+rawline[20:]
+        fs.write_lines(out_path, list(map(lambda ll: ll.line, lines)))
     pybel.ob.obErrorLog.SetOutputLevel(0)
     mol = next(pybel.readfile("pdb", path))
     mol.OBMol.AddHydrogens(False, True, ph)
     mol.write("pdb", out_path, overwrite=True)
-    _fix_ob_output(out_path, out_path, path)
-
+    #_fix_ob_output(out_path, out_path, path)
+    fix_atom_naming(out_path)
     return ligand_from_pdb(out_path, _ob_pdb_charge(out_path))

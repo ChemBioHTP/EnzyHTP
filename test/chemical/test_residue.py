@@ -5,7 +5,6 @@ Date: 2022-03-19
 """
 import pytest
 from typing import List
-
 from enzy_htp.core import InvalidResidueCode
 from enzy_htp.chemical import residue as res
 
@@ -65,7 +64,10 @@ def test_convert_to_three_letter():
 
 def test_convert_to_one_letter():
     """Checking proper behavior and throwing of convert_to_one_letter()"""
-    for three, one, in res.THREE_LETTER_AA_MAPPER.items():
+    for (
+        three,
+        one,
+    ) in res.THREE_LETTER_AA_MAPPER.items():
         assert res.convert_to_one_letter(three) == one
         assert res.convert_to_one_letter(three.lower()) == one
 
@@ -113,3 +115,104 @@ def test_one_letters_except():
 
     assert exe
     assert exe.type == InvalidResidueCode
+
+
+def test_residue_polarity_positive():
+    """Checking that the residue_polarity() works for 'positive' amino acids."""
+    assert res.residue_polarity("R") == "positive"
+    assert res.residue_polarity("H") == "positive"
+    assert res.residue_polarity("K") == "positive"
+
+
+def test_residue_polarity_negative():
+    """Checking that the residue_polarity() works for 'negative' amino acids."""
+    assert res.residue_polarity("D") == "negative"
+    assert res.residue_polarity("E") == "negative"
+
+
+def test_residue_polarity_neutral():
+    """Checking that the residue_polarity() works for 'neutral' amino acids."""
+    assert res.residue_polarity("S") == "neutral"
+    assert res.residue_polarity("T") == "neutral"
+    assert res.residue_polarity("N") == "neutral"
+    assert res.residue_polarity("Q") == "neutral"
+    assert res.residue_polarity("C") == "neutral"
+    assert res.residue_polarity("Y") == "neutral"
+    assert res.residue_polarity("A") == "neutral"
+    assert res.residue_polarity("V") == "neutral"
+    assert res.residue_polarity("I") == "neutral"
+    assert res.residue_polarity("L") == "neutral"
+    assert res.residue_polarity("P") == "neutral"
+    assert res.residue_polarity("M") == "neutral"
+    assert res.residue_polarity("F") == "neutral"
+    assert res.residue_polarity("W") == "neutral"
+    assert res.residue_polarity("G") == "neutral"
+
+
+def test_residue_polarity_invalid_code():
+    """Checking that the residue_polarity() returns 'unknown' for uncoded letters."""
+    assert res.residue_polarity("1") == "unknown"
+    assert res.residue_polarity("X") == "unknown"
+    assert res.residue_polarity("&") == "unknown"
+
+
+def test_residue_polarity_bad_input():
+    """Checks that the function throws when given a non one-letter amino acid code."""
+    with pytest.raises(InvalidResidueCode) as exe:
+        res.residue_polarity("XX")
+
+    assert exe
+    assert exe.type == InvalidResidueCode
+    with pytest.raises(InvalidResidueCode) as exe:
+        res.residue_polarity("AAA")
+
+    assert exe
+    assert exe.type == InvalidResidueCode
+
+
+def test_non_polar_returns_true():
+    """Checking that the non_polar() function is True for the correct amino acid codes."""
+    assert res.non_polar("A")
+    assert res.non_polar("V")
+    assert res.non_polar("I")
+    assert res.non_polar("L")
+    assert res.non_polar("P")
+    assert res.non_polar("M")
+    assert res.non_polar("F")
+    assert res.non_polar("W")
+    assert res.non_polar("G")
+
+
+def test_non_polar_returns_false():
+    """Checking that the non_polar() function is False for the correct amino acid codes."""
+    assert not res.non_polar("R")
+    assert not res.non_polar("H")
+    assert not res.non_polar("K")
+    assert not res.non_polar("D")
+    assert not res.non_polar("E")
+    assert not res.non_polar("S")
+    assert not res.non_polar("T")
+    assert not res.non_polar("N")
+    assert not res.non_polar("Q")
+    assert not res.non_polar("C")
+    assert not res.non_polar("Y")
+
+
+def test_non_polar_bad_input():
+    """Checking that the function throws when given a non one-letter amino acid code."""
+    with pytest.raises(InvalidResidueCode) as exe:
+        res.non_polar("XX")
+
+    assert exe
+    assert exe.type == InvalidResidueCode
+    with pytest.raises(InvalidResidueCode) as exe:
+        res.non_polar("AAA")
+
+    assert exe
+    assert exe.type == InvalidResidueCode
+
+
+def test_polar():
+    """Because polar() is just the opposite of non_polar()"""
+    for olc in res.ONE_LETTER_AA_MAPPER.keys():
+        assert res.non_polar(olc) == (not res.polar(olc))

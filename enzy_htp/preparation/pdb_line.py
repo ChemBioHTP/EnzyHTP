@@ -8,39 +8,49 @@ Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-19
 """
-
+# TODO(CJ): finish the documentation in here
 from typing import List
 
 import enzy_htp.core as core
-from enzy_htp.core import file_system as fs 
+from enzy_htp.core import file_system as fs
 from enzy_htp.chemical import THREE_LETTER_AA_MAPPER
 
 
 class PDBLine:
     """
     Represents a line in a PDB file. Stores the original line and provides a basic description
-	of the data it holds. Has a number of getters for determining the type of line that 
-	it is.
+    of the data it holds. Has a number of getters for determining the type of line that
+    it is.
 
 
     Attributes:
-	    line : The original line from the file, without newline.
-		line_type : Type of PDB line/record.
-		atom_id : One-indexed index of the atom.
-		atom_name : Name of the atom as a string.
-		resi_name : Name of the residue as a string.
-		resi_id : One-indexed index of the atom.
-		chain_id : Chain id, typically a single character/string of length 1.
-		atom_x : x coordinate value with 3 points of decimal precision.
-		atom_y : y coordinate value with 3 points of decimal precision.
-		atom_z : z coordinate value with 3 points of decimal precision.
+        line : The original line from the file, without newline.
+        line_type : Type of PDB line/record.
+        atom_id : One-indexed index of the atom.
+        atom_name : Name of the atom as a string.
+        resi_name : Name of the residue as a string.
+        resi_id : One-indexed index of the atom.
+        chain_id : Chain id, typically a single character/string of length 1.
+        atom_x : x coordinate value with 3 points of decimal precision.
+        atom_y : y coordinate value with 3 points of decimal precision.
+        atom_z : z coordinate value with 3 points of decimal precision.
+        charge : The int() charge of the line.
     """
 
     def __init__(self, line: str):
         """
         Initilize with a specific line in the PDB file. Tries to parse out all information but stores the original str() as well.
         """
-        self.resi_name = str
+        self.resi_name = str()
+        self.line_type = str()
+        self.atom_id = int()
+        self.atom_name = str()
+        self.resi_id = int()
+        self.resi_name = str()
+        self.chain_id = str()
+        self.atom_x = float()
+        self.atom_y = float()
+        self.atom_z = float()
         self.line = line
         if not (self.is_ATOM() or self.is_HETATM()):
             return

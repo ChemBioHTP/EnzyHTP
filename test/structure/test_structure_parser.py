@@ -286,3 +286,5 @@ def test_ligand_from_pdb_bad_input():
     assert exe
     assert exe.type == SystemExit
     assert exe.value.code == 1
+
+#TODO(CJ): add tests for structure_parser.get_ligand_name()

@@ -17,7 +17,7 @@ CURR_DIR = os.path.dirname(os.path.abspath(__file__))
 
 TEST_PDB_FILE = f"{CURR_DIR}/data/3NIR.pdb"
 
-
+#TODO(CJ): add tests for the name getter
 def make_residues(pdbname: str) -> List[Residue]:
     """Helper method that retrieves a list of residues from a PDB file."""
     holder = defaultdict(list)

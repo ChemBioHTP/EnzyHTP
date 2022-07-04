@@ -1,1069 +1,736 @@
-# TODO documentation
+"""Defines an AmberInterface class that serves as a bridge for enzy_htp to utilize AmberMD software. Uses the AmberConfig class
+found in enzy_htp/molecular_mechanics/amber_config.py. Supported operations include minimization, 
+heating, constant pressure production, and constant pressure equilibration.
+
+Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+
+Date: 2022-06-02
+"""
 import shutil
+from pathlib import Path
+from typing import List, Tuple, Union
+
+import pandas as pd
+from biopandas.pdb import PandasPdb
+
 from ..core.logger import _LOGGER
+from enzy_htp.core import file_system as fs
+from enzy_htp.core import env_manager as em
+from enzy_htp.core.exception import UnsupportedMethod
+import enzy_htp.structure as struct
+import enzy_htp.preparation as prep
+from .amber_config import AmberConfig, default_amber_config
+from .frame import Frame, frames_from_pdb, read_charge_list
 
 
 class AmberInterface:
-    def __init__(self, config=None):
-        self._confg = config
+    """Class that provides a direct inteface for enzy_htp to utilize AmberMD software. Supported operations
+    minimization, heating constant pressure production, constant pressure equilibration, trajectory file
+    conversion and mutation. Users should use this class as the only way to interact with any functionality
+    in Amber or associated tools like tleap.
 
-    def minimize_structure(self, pdb: str, mode: str = "CPU"):
+    Atributes:
+        config_	: The AmberConfig() class which provides settings for both running Amber and maintaining a compatible environment.
+        env_manager_ : The EnvironmentManager() class which ensure all required environment elements exist.
+        compatible_env_ : A bool() indicating if the current environment is compatible with the object itself.
+    """
 
-        # def PDBMin(self, cycle=2000, engine="Amber_GPU"):
+    def __init__(self, config: AmberConfig = None) -> None:
+        """Simplistic constructor that optionally takes an AmberConfig object as its only argument.
+        Also checks if the current environment is compatible with the AmberInteface().
         """
-        Run a minization use self.prmtop and self.inpcrd and setting form class Config.
-        --------------------------------------------------
-        Save changed PDB to self.path (containing water and ions)
-        Mainly used for remove bad contact from PDB2PDBwLeap.
+        self.config_ = config
+        if not self.config_:
+            self.config_ = default_amber_config()
+        self.env_manager_ = em.EnvironmentManager(
+            env_vars=self.config_.required_env_vars(),
+            exectubles=self.config_.required_executables(),
+        )
+        self.env_manager_.check_environment()
+        self.compatible_env_ = self.env_manager_.is_missing()
+
+    def config(self) -> AmberConfig:
+        """Getter for the AmberConfig() instance belonging to the class."""
+        return self.config_
+
+    def display_config(self) -> None:
+        """Prints all settings for the object's AmberConfig() inteface to stdout using AmberConfig.display()."""
+        self.config_.display()
+
+    def compatible_environment(self) -> bool:
+        """Checks if the current environment is compatible with all possible needs for the AmberInterface.
+
+        Returns:
+                Whether the current environment is suitable for the AmberInterface().
         """
+        return self.compatible_env_
 
-        out4_PDB_path = self.path_name + "_min.pdb"
-
-        # make sander input
-        min_dir = self.cache_path + "/PDBMin"
-        minin_path = min_dir + "/min.in"
-        minout_path = min_dir + "/min.out"
-        minrst_path = (
-            min_dir + "/min.ncrst"
-        )  # change to ncrst seeking for solution of rst error
-        mkdir(min_dir)
-        min_input = open(minin_path, "w")
-        min_input.write("Minimize" + line_feed)
-        min_input.write(" &cntrl" + line_feed)
-        min_input.write("  imin=1," + line_feed)
-        min_input.write("  ntx=1," + line_feed)
-        min_input.write("  irest=0," + line_feed)
-        min_input.write("  maxcyc=" + str(cycle) + "," + line_feed)
-        min_input.write("  ncyc=" + str(int(0.5 * cycle)) + "," + line_feed)
-        min_input.write("  ntpr=" + str(int(0.2 * cycle)) + "," + line_feed)
-        min_input.write("  ntwx=0," + line_feed)
-        min_input.write("  cut=8.0," + line_feed)
-        min_input.write(" /" + line_feed)
-        min_input.close()
-
-        # express engine
-        PC_cmd, engine_path = Config.Amber.get_Amber_engine(engine=engine)
-        engine = self._config.amber_confg()[
-            "CPU_ENGINE" if mode == "CPU" else "GPU_ENGINE"
+    def write_minimize_input_file(self, fname: str, cycle: int) -> None:
+        """Creates a minimization file to be used in an amber run. SHOULD NOT BE CALLED BY USERS DIRECTLY.
+        All parameters in the &ctrl block are hardcoded except for ncyc and ntpr, which are 0.5*cycle
+        and 0.2*cycle as integers, respectively.
+        """
+        minimize_lines: List[str] = [
+            "Minimize",
+            " &cntrl",
+            "  imin=1,",
+            "  ntx=1,",
+            "  irest=0,",
+            f"  maxcyc={str(cycle)},",
+            f"  ncyc={int(0.5 * cycle)},",
+            f"  ntpr={int(0.2 * cycle)},",
+            "  ntwx=0,",
+            "  cut=8.0,",
+            " /",
+            "",
         ]
-        self._config.env_manager().run_command(
+        fs.write_lines(fname, minimize_lines)
+
+    def minimize_structure(
+        self, pdb: str, min_dir: str = "./", mode: str = "CPU", cycle: int = 2000
+    ) -> str:
+        """Class method that minimizes the structure found in a supplied .pdb file, returning
+        the path to the minimized file.
+
+        Args:
+            pdb: The .pdb file with the structure to be minimized.
+            mode: Which version of Amber to use. Allowed values are "CPU" and "GPU".
+            min_dir: Work directory where the paramter files and output are saved.
+            cycle: Number of steps in the steepest descent of the cycle.
+
+        Returns:
+            Path to the minimized structure in a .pdb file.
+        """
+        # TODO(CJ): add some checks for inputs
+        inpath = Path(pdb)
+        if min_dir == "./":
+            min_dir = f"{inpath.parent}/pdb_min/"
+        fs.safe_mkdir(min_dir)
+        outfile = f"{min_dir}/{inpath.stem}_min.pdb"
+        min_in = f"{min_dir}/min.in"
+        min_out = f"{min_dir}/min.out"
+        min_rst = f"{min_dir}/min.ncrst"
+        (prmtop, inpcrd) = self.build_param_files(str(inpath), min_dir)
+        self.write_minimize_input_file(min_in, cycle)
+        engine = self.config_.get_engine(mode)
+
+        self.env_manager_.run_command(
             engine,
-            f"-O -i {minin_path} -o {minout_path} -p {self.prmtop_path} -c {self.inpcrd_path} -r {minrst_path}",
+            [
+                "-O",
+                "-i",
+                min_in,
+                "-o",
+                min_out,
+                "-p",
+                prmtop,
+                "-c",
+                inpcrd,
+                "-r",
+                min_rst,
+            ],
         )
-        self._config.env_manager().run_command(
-            "ambpdp", f"-p {self.prmtop_path} -c {minrst_path} > {out4_PDB_path}"
+
+        self.env_manager_.run_command(
+            "ambpdb", [f"-p", prmtop, "-c", min_rst, ">", outfile]
         )
+        # shutil.move(prmtop, min_dir )
+        # shutil.move(inpcrd, min_dir )
+        return outfile
 
-        os.system(
-            "mv " + self.prmtop_path + " " + self.inpcrd_path + " " + min_dir
-        )  # TODO CJ: not sure if this actually works...
+    def build_param_files(self, in_pdb: str, build_dir: str) -> Tuple[str, str]:
+        """Creates the .prmtop and .inpcrd files for the supplied .pdb file. Handles
+        processing of the Ligand() and MetalCenter() objects in the structure.
 
-        self.path = out4_PDB_path
-        self._update_name()
-        self.prmtop_path = min_dir + "/" + self.prmtop_path
-        self.inpcrd_path = min_dir + "/" + self.inpcrd_path
+        Args:
+            in_pdb: The .pdb file to build parameter files for.
+            buld_dir: The directory to build the parameter files in.
 
-    def PDB2FF(
-        self,
-        prm_out_path="",
-        o_dir="",
-        lig_method="AM1BCC",
-        renew_lig=0,
-        local_lig=1,
-        ifsavepdb=0,
-        igb=None,
-        if_prm_only=0,
-    ):
+        Returns:
+            A Tuple[str,str] with the containing (.prmtop path, .inpcrd path).
         """
-        PDB2FF(self, o_dir='')
-        --------------------
-        prm_out_path: output path of the prmtop file
-        o_dir contral where the leap.in and leap.log go: has to contain a / at the end (e.g.: ./dir/)
-        renew_lig: 0 use old ligand parm files if detected.
-                   1 generate new ones. 
-        local_lig: 0 export lig files to the workdir level in HTP jobs.
-                   1 keep local 
-        --------------------
-        chains:
-        ligand: - less junk files if your workflow contains a protonation step in advance.  
-        metal:
-        """
-        # check and generate self.stru
-        self.get_stru()
-
-        # build things seperately
-        if local_lig:
-            lig_dir = self.dir + "/ligands/"
-            met_dir = self.dir + "/metalcenters/"
+        # TODO(CJ): add in the pH as a parameter
+        ligand_dir: str = f"{build_dir}/ligands/"
+        metalcenter_dir: str = f"{build_dir}/metalcenter/"
+        fs.safe_mkdir(ligand_dir)
+        fs.safe_mkdir(metalcenter_dir)
+        structure: struct.Structure = struct.structure_from_pdb(in_pdb)
+        ligand_paths: List[str] = structure.build_ligands(ligand_dir, True)
+        # TODO(CJ): we have to protonate this first. not sure if this id documented elsewhere
+        for lig in ligand_paths:
+            _ = prep.protonate._protonate_ligand_PYBEL(lig, 7.0, lig)
+        ligand_charges: List[int] = list(
+            map(lambda pp: prep.protonate._ob_pdb_charge(pp), ligand_paths)
+        )
+        ligand_params: List[Tuple[str, str]] = self.build_ligand_param_files(
+            ligand_paths, ligand_charges
+        )
+        leap_path: str = f"{build_dir}/leap.in"
+        leap_log: str = f"{build_dir}/leap.out"
+        # sol_path: str = f"{build_dir}/leap.in"
+        leap_contents: List[str] = [
+            "source leaprc.protein.ff14SB",
+            "source leaprc.gaff",
+            "source leaprc.water.tip3p",
+        ]
+        for (prepin, frcmod) in ligand_params:
+            leap_contents.extend(
+                [f"loadAmberPrep {prepin}", f"loadAmberParams {frcmod}"]
+            )
+        leap_contents.append(f"a = loadpdb {in_pdb}")
+        # TODO(CJ): Include igb
+        leap_contents.append("center a")
+        # TODO(CJ): include solvation stuff as a separate function
+        leap_contents.extend(["addions a Na+ 0", "addions a Cl- 0"])
+        if self.config_.BOX_TYPE == "oct":
+            leap_contents.append(f"solvateOct a TIP3PBOX {self.config_.BOX_SIZE}")
         else:
-            lig_dir = self.dir + "/../ligands/"
-            met_dir = self.dir + "/../metalcenters/"
-        mkdir(lig_dir)
-        mkdir(met_dir)
-
-        ligands_pathNchrg = self.stru.build_ligands(lig_dir, ifcharge=1, ifunique=1)
-        # metalcenters_path = self.stru.build_metalcenters(met_dir)
-        # parm
-        ligand_parm_paths = self._ligand_parm(
-            ligands_pathNchrg, method=lig_method, renew=renew_lig
+            leap_contents.append(f"solvatebox a TIP3PBOX {self.config_.BOX_SIZE}")
+        pdb_path: Path = Path(in_pdb)
+        prmtop: str = f"{build_dir}/{pdb_path.stem}.prmtop"
+        inpcrd: str = f"{build_dir}/{pdb_path.stem}.inpcrd"
+        pdb_ff: str = f"{build_dir}/{pdb_path.stem}_ff.pdb"
+        leap_contents.extend(
+            [f"saveamberparm a {prmtop} {inpcrd}", f"savepdb a {pdb_ff}", "quit"]
         )
-        # self._metal_parm(metalcenters_path)
-        # combine
-        if o_dir != "":
-            mkdir(o_dir)
-        self._combine_parm(
-            ligand_parm_paths,
-            prm_out_path=prm_out_path,
-            o_dir=o_dir,
-            ifsavepdb=ifsavepdb,
-            igb=igb,
-            if_prm_only=if_prm_only,
-        )
-        if ifsavepdb:
-            self.path = self.path_name + "_ff.pdb"
-            self._update_name()
+        fs.write_lines(leap_path, leap_contents)
+        # TODO(CJ): Check that this actually works before returning
+        self.env_manager_.run_command("tleap", ["-s", "-f", leap_path, ">", leap_log])
+        return (prmtop, inpcrd)
 
-        return (self.prmtop_path, self.inpcrd_path)
+    def build_ligand_param_files(
+        self, paths: List[str], charges: List[int]
+    ) -> List[Tuple[str, str]]:
+        # TODO(CJ): add the method flag?
+        """Creates .prepin and .frcmod files for all the supplied .pdb files. Saves files to
+        same directory as the supplied .pdb files. Removes intermediate files. Should not
+        be called directly by the user. Instead use AmberInterface.build_param_files()
 
-    def _ligand_parm(self, paths, method="AM1BCC", renew=0):
+        Args:
+            paths: A list() of ligand .pdb files to prepare. MUST BE SAME LENGHT AS charges.
+            charges: A list() of charges accompanying the paths. MUST BE SAME LENGTH AS paths.
+
+        Returns:
+            A list() of filename pairs with with the .prepin and .frcmod files for each supplied .pdb file.
+
+        Raises:
+            AssertionErrors: When various input sanitization checks fail.
         """
-        Turn ligands to prepi (w/net charge), parameterize with parmchk
-        return [(perpi_1, frcmod_1), ...]
-        -----------
-        method  : method use for ligand charge. Only support AM1BCC now.
-        renew   : 0:(default) use old parm files if exist. 1: renew parm files everytime
-        TODO check if the ligand is having correct name. (isolate the renaming function and also use in the class structure)
-        * WARN: The parm file for ligand will always be like xxx/ligand_1.frcmod. Remember to enable renew when different object is sharing a same path.
-        * BUG: Antechamber has a bug that if current dir has temp files from previous antechamber run (ANTECHAMBER_AC.AC, etc.) sqm will fail. Now remove them everytime.
-        """
-        parm_paths = []
-        self.prepi_path = {}
-
-        for lig_pdb, net_charge in paths:
-            if method == "AM1BCC":
-                out_prepi = lig_pdb[:-3] + "prepin"
-                out_frcmod = lig_pdb[:-3] + "frcmod"
-                with open(lig_pdb) as f:
-                    for line in f:
-                        pdbl = PDB_line(line)
-                        if pdbl.line_type == "ATOM" or pdbl.line_type == "HETATM":
-                            lig_name = pdbl.resi_name
-                # if renew
-                if (
-                    os.path.isfile(out_prepi)
-                    and os.path.isfile(out_frcmod)
-                    and not renew
-                ):
-                    if Config.debug >= 1:
-                        print("Parm files exist: " + out_prepi + " " + out_frcmod)
-                        print("Using old parm files.")
-                else:
-                    # gen prepi (net charge and correct protonation state is important)
-                    if Config.debug >= 1:
-                        print(
-                            "running: "
-                            + Config.Amber.AmberHome
-                            + "/bin/antechamber -i "
-                            + lig_pdb
-                            + " -fi pdb -o "
-                            + out_prepi
-                            + " -fo prepi -c bcc -s 0 -nc "
-                            + str(net_charge)
-                        )
-                    run(
-                        Config.Amber.AmberHome
-                        + "/bin/antechamber -i "
-                        + lig_pdb
-                        + " -fi pdb -o "
-                        + out_prepi
-                        + " -fo prepi -c bcc -s 0 -nc "
-                        + str(net_charge),
-                        check=True,
-                        text=True,
-                        shell=True,
-                        capture_output=True,
-                    )
-                    if Config.debug <= 1:
-                        os.system(
-                            "rm ANTECHAMBER* ATOMTYPE.INF NEWPDB.PDB PREP.INF sqm.pdb sqm.in sqm.out"
-                        )
-                    # gen frcmod
-                    if Config.debug >= 1:
-                        print(
-                            "running: "
-                            + Config.Amber.AmberHome
-                            + "/bin/parmchk2 -i "
-                            + out_prepi
-                            + " -f prepi -o "
-                            + out_frcmod
-                        )
-                    run(
-                        Config.Amber.AmberHome
-                        + "/bin/parmchk2 -i "
-                        + out_prepi
-                        + " -f prepi -o "
-                        + out_frcmod,
-                        check=True,
-                        text=True,
-                        shell=True,
-                        capture_output=True,
-                    )
-                # record
-                parm_paths.append((out_prepi, out_frcmod))
-                self.prepi_path[lig_name] = out_prepi
-
-        return parm_paths
-
-        return self.path
-
-        pass
-
-    def _combine_parm(
-        self,
-        lig_parms,
-        prm_out_path="",
-        o_dir="",
-        ifsavepdb=0,
-        ifsolve=1,
-        box_type=None,
-        box_size=3,  # Config.Amber.box_size,
-        igb=None,
-        if_prm_only=0,
-    ):
-        """
-        combine different parmeter files and make finally inpcrd and prmtop
-        -------
-        structure: pdb
-        ligands: prepi, frcmod
-        metalcenters, artificial residues: TODO
-        """
-        if box_type == None:
-            box_type = Config.Amber.box_type
-
-        leap_path = self.cache_path + "/leap.in"
-        sol_path = self.path_name + "_ff.pdb"
-        with open(leap_path, "w") as of:
-            of.write("source leaprc.protein.ff14SB" + line_feed)
-            of.write("source leaprc.gaff" + line_feed)
-            of.write("source leaprc.water.tip3p" + line_feed)
-            # ligands
-            for prepi, frcmod in lig_parms:
-                of.write("loadAmberParams " + frcmod + line_feed)
-                of.write("loadAmberPrep " + prepi + line_feed)
-            of.write("a = loadpdb " + self.path + line_feed)
-            # igb Radii
-            if igb != None:
-                radii = radii_map[str(igb)]
-                of.write("set default PBRadii " + radii + line_feed)
-            of.write("center a" + line_feed)
-            # solvation
-            if ifsolve:
-                of.write("addions a Na+ 0" + line_feed)
-                of.write("addions a Cl- 0" + line_feed)
-                if box_type == "box":
-                    of.write("solvatebox a TIP3PBOX " + box_size + line_feed)
-                if box_type == "oct":
-                    of.write("solvateOct a TIP3PBOX " + box_size + line_feed)
-                if box_type != "box" and box_type != "oct":
-                    raise Exception(
-                        "PDB._combine_parm().box_type: Only support box and oct now!"
-                    )
-            # save
-            if prm_out_path == "":
-                if o_dir == "":
-                    of.write(
-                        "saveamberparm a "
-                        + self.path_name
-                        + ".prmtop "
-                        + self.path_name
-                        + ".inpcrd"
-                        + line_feed
-                    )
-                    self.prmtop_path = self.path_name + ".prmtop"
-                    self.inpcrd_path = self.path_name + ".inpcrd"
-                else:
-                    of.write(
-                        "saveamberparm a "
-                        + o_dir
-                        + self.name
-                        + ".prmtop "
-                        + o_dir
-                        + self.name
-                        + ".inpcrd"
-                        + line_feed
-                    )
-                    self.prmtop_path = o_dir + self.name + ".prmtop"
-                    self.inpcrd_path = o_dir + self.name + ".inpcrd"
-            else:
-                if o_dir == "":
-                    if if_prm_only:
-                        mkdir("./tmp")
-                        of.write(
-                            "saveamberparm a "
-                            + prm_out_path
-                            + " ./tmp/tmp.inpcrd"
-                            + line_feed
-                        )
-                        self.prmtop_path = prm_out_path
-                        self.inpcrd_path = None
-                    else:
-                        of.write(
-                            "saveamberparm a "
-                            + prm_out_path
-                            + " "
-                            + self.path_name
-                            + ".inpcrd"
-                            + line_feed
-                        )
-                        self.prmtop_path = prm_out_path
-                        self.inpcrd_path = self.path_name + ".inpcrd"
-                else:
-                    if if_prm_only:
-                        mkdir("./tmp")
-                        of.write(
-                            "saveamberparm a "
-                            + prm_out_path
-                            + " ./tmp/tmp.inpcrd"
-                            + line_feed
-                        )
-                        self.prmtop_path = prm_out_path
-                        self.inpcrd_path = None
-                    else:
-                        of.write(
-                            "saveamberparm a "
-                            + prm_out_path
-                            + " "
-                            + o_dir
-                            + self.name
-                            + ".inpcrd"
-                            + line_feed
-                        )
-                        self.prmtop_path = prm_out_path
-                        self.inpcrd_path = o_dir + self.name + ".inpcrd"
-
-            if ifsavepdb:
-                of.write("savepdb a " + sol_path + line_feed)
-            of.write("quit" + line_feed)
-
-        os.system("tleap -s -f " + leap_path + " > " + leap_path[:-2] + "out")
-
-        return self.prmtop_path, self.inpcrd_path
-
-    def PDBMD(self, tag="", o_dir="", engine="Amber_GPU", equi_cpu=0):
-        """
-        Use self.prmtop_path and self.inpcrd_path to initilize a MD simulation.
-        The default MD configuration settings are assigned by class Config.Amber.
-        * User can also set MD configuration for the current object by assigning values in self.conf_xxxx.
-        * e.g.: self.conf_heat['nstlim'] = 50000
-        --------------
-        o_dir   : Write files in o_dir (current self.dir/MD by default).
-        tag     : tag the name of the MD folder
-        engine  : MD engine (cpu/gpu)
-        equi_cpu: if use cpu for equi step
-        Return the nc path of the prod step and store in self.nc
-        """
-        # make folder
-        if o_dir == "":
-            o_dir = self.dir + "/MD" + tag
-        mkdir(o_dir)
-
-        # express engine (pirority: AmberEXE_GPU/AmberEXE_CPU - AmberHome/bin/xxx)
-        PC_cmd, engine_path = Config.Amber.get_Amber_engine(engine=engine)
-        # express cpu engine if equi_cpu
-        if equi_cpu:
-            if Config.Amber.AmberEXE_CPU == None:
-                cpu_engine_path = Config.Amber.AmberHome + "/bin/sander.MPI"
-            else:
-                cpu_engine_path = Config.Amber.AmberEXE_CPU
-
-        # build input file (use self.MD_conf_xxxx)
-        min_path = self._build_MD_min(o_dir)
-        heat_path = self._build_MD_heat(o_dir)
-        equi_path = self._build_MD_equi(o_dir)
-        prod_path = self._build_MD_prod(o_dir)
-
-        # run sander
-        if Config.debug >= 1:
-            print(
-                "running: "
-                + PC_cmd
-                + " "
-                + engine_path
-                + " -O -i "
-                + min_path
-                + " -o "
-                + o_dir
-                + "/min.out -p "
-                + self.prmtop_path
-                + " -c "
-                + self.inpcrd_path
-                + " -r "
-                + o_dir
-                + "/min.rst -ref "
-                + self.inpcrd_path
+        result: List[Tuple[str, str]] = list()
+        assert len(paths) == len(charges)
+        for lig_pdb, net_charge in zip(paths, charges):
+            lig_name: str = struct.structure_parser.get_ligand_name(lig_pdb)
+            lig_pdb = Path(lig_pdb)
+            prepin: str = str(lig_pdb.with_suffix(".prepin"))
+            frcmod: str = str(lig_pdb.with_suffix(".frcmod"))
+            lig_pdb: str = str(lig_pdb)
+            # TODO(CJ): check if you can get the ligand name from the
+            # .pdb filename alone... I think this may be possible
+            # if renew
+            # TODO(CJ): figure out how to implement the environment manager here
+            self.env_manager_.run_command(
+                "antechamber",
+                [
+                    "-i",
+                    lig_pdb,
+                    "-fi",
+                    "pdb",
+                    "-o",
+                    prepin,
+                    "-fo",
+                    "prepi",
+                    "-c",
+                    "bcc",
+                    "-s",
+                    "0",
+                    "-nc",
+                    str(net_charge),
+                ],
             )
-        os.system(
-            PC_cmd
-            + " "
-            + engine_path
-            + " -O -i "
-            + min_path
-            + " -o "
-            + o_dir
-            + "/min.out -p "
-            + self.prmtop_path
-            + " -c "
-            + self.inpcrd_path
-            + " -r "
-            + o_dir
-            + "/min.rst -ref "
-            + self.inpcrd_path
-        )
-        if Config.debug >= 1:
-            print(
-                "running: "
-                + PC_cmd
-                + " "
-                + engine_path
-                + " -O -i "
-                + heat_path
-                + " -o "
-                + o_dir
-                + "/heat.out -p "
-                + self.prmtop_path
-                + " -c "
-                + o_dir
-                + "/min.rst -ref "
-                + o_dir
-                + "/min.rst -r "
-                + o_dir
-                + "/heat.rst"
+            files_to_remove: List[
+                str
+            ] = "ATOMTYPE.INF NEWPDB.PDB PREP.INF sqm.pdb sqm.in sqm.out".split()
+            files_to_remove.extend(list(map(str, Path(".").glob("ANTECHAMBER*"))))
+            _ = list(map(lambda fname: fs.safe_rm(fname), files_to_remove))
+            # gen frcmod
+            # TODO(CJ): add some kind of check that this all actually runs correctly w/o errors
+            self.env_manager_.run_command(
+                "parmchk2", ["-i", prepin, "-f", "prepi", "-o", frcmod]
             )
-        os.system(
-            PC_cmd
-            + " "
-            + engine_path
-            + " -O -i "
-            + heat_path
-            + " -o "
-            + o_dir
-            + "/heat.out -p "
-            + self.prmtop_path
-            + " -c "
-            + o_dir
-            + "/min.rst -ref "
-            + o_dir
-            + "/min.rst -r "
-            + o_dir
-            + "/heat.rst"
+            # record
+            result.append((prepin, frcmod))
+        return result
+
+    def md_min_file(self, outfile: str) -> str:
+        """Using the settings specified by AmberConfig.CONF_MIN, creates a min.in file for an Amber minimization run.
+        These settings are updated by accessing the owned AmberConfig object through AmberInterface.config().
+
+        Args:
+            outfile: The name of the file to save the minimization input file to..
+
+        Returns:
+            Path to the minimization file.
+        """
+        config = self.config_.CONF_MIN
+
+        contents: List[str] = [
+            "Minimize",
+            " &cntrl",
+            "  imin  = 1,",
+            "  ntx   = 1,",
+            "  irest = 0,",
+            f"  ntc = {config['ntc']},",
+            f"  ntf = {config['ntf']},",
+            f"  cut   = {config['cut']},",
+            f"  maxcyc = {config['maxcyc']},",
+            f"  ncyc  = {int(config['ncyc_mult']*config['maxcyc'])},",
+            f"  ntpr = {int(config['ntpr_mult']*config['maxcyc'])},",
+            f"  ntwx = 0,",
+        ]
+
+        last_line: str = ""
+        if config["ntr"] == 1:
+            last_line = f"  ntr   = {config['ntr']}, restraint_wt = {config['restraint_wt']}, restraintmask = {config['restraintmask']},"
+
+        contents.append(last_line)
+        contents.extend(["/", ""])
+        fs.write_lines(outfile, contents)
+        return outfile
+
+    def md_heat_file(self, outfile: str) -> str:
+        """Using the settings specified by AmberConfig.CONF_HEAT, creates a heat.in file for an Amber heating run.
+        These settings are updated by accessing the owned AmberConfig object through AmberInterface.config().
+
+        Args:
+            outfile: The name of the file to save the heating input file to.
+
+        Returns:
+            Path to the heating input file.
+        """
+        config = self.config_.CONF_HEAT
+
+        contents: List[str] = [
+            "Heat",
+            " &cntrl",
+            "  imin = 0,",
+            "  ntx = 1,",
+            "  irest = 0,",
+            f"  ntc = {config['ntc']},",
+            f"  ntf = {config['ntf']},",
+            f"  cut = {config['cut']},",
+            f"  nstlim = {config['nstlim']},",
+            f"  dt = {config['dt']},",
+            f"  tempi = {config['tempi']},",
+            f"  temp0 = {config['temp0']},",
+            f"  ntpr =  {int(config['ntpr']*config['nstlim'])},",
+            f"  ntwx =  {int(config['ntwx']*config['nstlim'])},",
+            f"  ntt = {config['ntt']},",
+            f"  gamma_ln = {config['gamma_ln']},",
+            "  ntb = 1,",
+            "  ntp = 0,",
+            f"  iwrap = {config['iwrap']},",
+            "  nmropt = 1,",
+            "  ig = -1,",
+        ]
+
+        if config["ntr"] == 1:
+            contents.append(f"  ntr = {config['ntr']},")
+            contents.append(f"  restraint_wt = {config['restraint_wt']},")
+            contents.append(f"  restraintmask = {config['restraintmask']},")
+        contents[-1] = contents[-1][0:-1]
+        contents.extend(
+            [
+                " /",
+                " &wt",
+                "  type = 'TEMP0',",
+                "  istep1 = 0,",
+                f"  istep2 = {int(config['A_istep2']*config['nstlim'])},",
+                f"  value1 = {config['tempi']},",
+                f"  value2 = {config['temp0']},",
+                " /",
+                f" &wt",
+                "  type = 'TEMP0',",
+                f"  istep1 = {int(config['A_istep2']*config['nstlim'])+1},",
+                f"  istep2 = {config['nstlim']},",
+                f"  value1 = {config['temp0']},",
+                f"  value2 = {config['temp0']},",
+                " /",
+                " &wt",
+                "  type = 'END',",
+                " /",
+                "",
+            ]
         )
 
-        # gpu debug for equi
-        if equi_cpu:
-            # use Config.PC_cmd and cpu_engine_path
-            if Config.debug >= 1:
-                print(
-                    "running: "
-                    + Config.PC_cmd
-                    + " "
-                    + cpu_engine_path
-                    + " -O -i "
-                    + equi_path
-                    + " -o "
-                    + o_dir
-                    + "/equi.out -p "
-                    + self.prmtop_path
-                    + " -c "
-                    + o_dir
-                    + "/heat.rst -ref "
-                    + o_dir
-                    + "/heat.rst -r "
-                    + o_dir
-                    + "/equi.rst -x "
-                    + o_dir
-                    + "/equi.nc"
-                )
-            os.system(
-                Config.PC_cmd
-                + " "
-                + cpu_engine_path
-                + " -O -i "
-                + equi_path
-                + " -o "
-                + o_dir
-                + "/equi.out -p "
-                + self.prmtop_path
-                + " -c "
-                + o_dir
-                + "/heat.rst -ref "
-                + o_dir
-                + "/heat.rst -r "
-                + o_dir
-                + "/equi.rst -x "
-                + o_dir
-                + "/equi.nc"
-            )
-        else:
-            if Config.debug >= 1:
-                print(
-                    "running: "
-                    + PC_cmd
-                    + " "
-                    + engine_path
-                    + " -O -i "
-                    + equi_path
-                    + " -o "
-                    + o_dir
-                    + "/equi.out -p "
-                    + self.prmtop_path
-                    + " -c "
-                    + o_dir
-                    + "/heat.rst -ref "
-                    + o_dir
-                    + "/heat.rst -r "
-                    + o_dir
-                    + "/equi.rst -x "
-                    + o_dir
-                    + "/equi.nc"
-                )
-            os.system(
-                PC_cmd
-                + " "
-                + engine_path
-                + " -O -i "
-                + equi_path
-                + " -o "
-                + o_dir
-                + "/equi.out -p "
-                + self.prmtop_path
-                + " -c "
-                + o_dir
-                + "/heat.rst -ref "
-                + o_dir
-                + "/heat.rst -r "
-                + o_dir
-                + "/equi.rst -x "
-                + o_dir
-                + "/equi.nc"
+        fs.write_lines(outfile, contents)
+        return outfile
+
+    def md_equi_file(self, outfile: str) -> str:
+        """Using the settings specified by AmberConfig.CONF_EQUI, creates an input file for an Amber constant
+        equilibration run. These settings are updated by accessing the owned AmberConfig object through
+        AmberInterface.config().
+
+        Args:
+            outfile: The name of the file to save the constant pressure equilibration input.
+
+        Returns:
+            Path to the constant pressure equilibration input file.
+        """
+        config = self.config_.CONF_EQUI
+        contents: List[str] = [
+            "Equilibration:constant pressure",
+            " &cntrl",
+            "  imin = 0,",
+            f"  ntx = {config['ntx']},",
+            f"  irest = {config['irest']},",
+            f"  ntf = {config['ntf']},",
+            f"  ntc = {config['ntc']},",
+            f"  nstlim = {config['nstlim']},",
+            f"  dt = {config['dt']},",
+            f"  cut = {config['cut']},",
+            f"  temp0 = {config['temp0']},",
+            f"  ntpr = {int(config['ntpr']*config['nstlim'])},",
+            f"  ntwx = {config['ntwx']},",
+            f"  ntt = {config['ntt']},",
+            f"  gamma_ln = {config['gamma_ln']},",
+            "  ntb = 2,",
+            "  ntp = 1,",
+            f"  iwrap = {config['iwrap']},",
+            "  ig = -1,",
+        ]
+
+        if config["ntr"] == 1:
+            contents.extend(
+                [
+                    f"  ntr   = {config['ntr']},",
+                    f"  restraint_wt = {config['restraint_wt']},",
+                    f"  restraintmask = {config['restraintmask']},",
+                ]
             )
 
-        if Config.debug >= 1:
-            print(
-                "running: "
-                + PC_cmd
-                + " "
-                + engine_path
-                + " -O -i "
-                + prod_path
-                + " -o "
-                + o_dir
-                + "/prod.out -p "
-                + self.prmtop_path
-                + " -c "
-                + o_dir
-                + "/equi.rst -ref "
-                + o_dir
-                + "/equi.rst -r "
-                + o_dir
-                + "/prod.rst -x "
-                + o_dir
-                + "/prod.nc"
+        contents.extend(["/", ""])
+
+        fs.write_lines(outfile, contents)
+        return outfile
+
+    def md_prod_file(self, outfile: str) -> str:
+        """Using the settings specified by AmberConfig.CONF_PROD, creates an input file for an Amber production
+        md run. These settings are updated by accessing the owned AmberConfig object through
+        AmberInterface.config().
+
+        Args:
+            outfile: The name of the file to save the production md input.
+
+        Returns:
+            Path to the production md input file.
+        """
+        config = self.config_.CONF_PROD
+        contents: List[str] = [
+            "Production: constant pressure",
+            " &cntrl",
+            "  imin = 0,",
+            f"  ntx = {config['ntx']},",
+            f"  irest = {config['irest']},",
+            f"  ntf = {config['ntf']},",
+            f"  ntc = {config['ntc']},",
+            f"  nstlim = {config['nstlim']},",
+            f"  dt = {config['dt']},",
+            f"  cut = {config['cut']},",
+            f"  ntpr = {int(config['ntpr']*config['nstlim'])},",
+            f"  ntwx = {config['ntwx']},",
+            f"  ntt = {config['ntt']},",
+            f"  gamma_ln = {config['gamma_ln']},",
+            "  ntb = 2,",
+            "  ntp = 1,",
+            f"  iwrap = {config['iwrap']},",
+            "  ig = -1,",
+        ]
+
+        if config["ntr"] == 1:
+            contents.extend(
+                [
+                    f"  ntr = {config['ntr']},",
+                    f"  restraint_wt = {config['restraint_wt']},",
+                    f"  restraintmask = {config['restraintmask']}",
+                ]
             )
-        os.system(
-            PC_cmd
-            + " "
-            + engine_path
-            + " -O -i "
-            + prod_path
-            + " -o "
-            + o_dir
-            + "/prod.out -p "
-            + self.prmtop_path
-            + " -c "
-            + o_dir
-            + "/equi.rst -ref "
-            + o_dir
-            + "/equi.rst -r "
-            + o_dir
-            + "/prod.rst -x "
-            + o_dir
-            + "/prod.nc"
+
+        contents.extend(["/", ""])
+        fs.write_lines(outfile, contents)
+        return outfile
+
+    def md_run(self, prmtop: str, inpcrd: str, work_dir: str, mode: str = "CPU") -> str:
+        """Runs a full MD simulation using the suplied prmtop and inpcrd files. Simulation is composed
+        of four steps:
+                1. minimization
+                2. heating
+                3. equilibration
+                4. production
+        The parameter files for these steps are created by AmberInterface.md_min_file(), AmberInterface.md_heat_file(),
+        AmberInterface.md_equi_file() and AmberInterface.md_prod_file(), respectively. All work is done in the supplied
+        work_dir location.
+
+        Args:
+            prmtop: str() with a path to a .prmtop file generated by AmberInterface.build_param_files().
+            inpcrd: str() with a path to a .inpcrd file generated by AmberInterface.build_param_files().
+            work_dir: Directory where the temporary files should be stored.
+            mode: The mode to use for calculations. Only "CPU" and "GPU" are allowed.
+
+        Returns:
+            Path to the production .nc file.
+
+        """
+        fs.safe_mkdir(work_dir)
+        min_in: str = self.md_min_file(f"{work_dir}/min.in")
+        heat_in: str = self.md_heat_file(f"{work_dir}/heat.in")
+        equi_in: str = self.md_equi_file(f"{work_dir}/equi.in")
+        prod_in: str = self.md_prod_file(f"{work_dir}/prod.in")
+        engine = self.config_.get_engine(mode)
+
+        min_out: str = f"{work_dir}/min.out"
+        min_rst: str = f"{work_dir}/min.rst"
+        self.env_manager_.run_command(
+            engine,
+            [
+                "-O",
+                "-i",
+                min_in,
+                "-o",
+                min_out,
+                "-p",
+                prmtop,
+                "-c",
+                inpcrd,
+                "-r",
+                min_rst,
+                "-ref",
+                inpcrd,
+            ],
         )
 
-        self.nc = o_dir + "/prod.nc"
-        return o_dir + "/prod.nc"
-
-    def _build_MD_min(self, o_dir):
-        """
-        Build configuration file for a minimization job
-        See default value Config.Amber.conf_min
-        """
-        # path
-        o_path = o_dir + "/min.in"
-        # maxcyc related
-        maxcyc = self.conf_min["maxcyc"]
-        if self.conf_min["ncyc"] == "0.5maxcyc":
-            ncyc = str(int(0.5 * maxcyc))
-        if self.conf_min["ntpr"] == "0.01maxcyc":
-            ntpr = str(int(0.01 * maxcyc))
-        maxcyc = str(maxcyc)
-        # restrain related
-        if self.conf_min["ntr"] == "1":
-            ntr_line = (
-                "  ntr   = "
-                + self.conf_min["ntr"]
-                + ",	 restraint_wt = "
-                + self.conf_min["restraint_wt"]
-                + ", restraintmask = "
-                + self.conf_min["restraintmask"]
-                + ","
-                + line_feed
-            )
-        else:
-            ntr_line = ""
-        if self.conf_min["nmropt_rest"] == "1":
-            self.conf_min["nmropt"] = "1"
-            nmropt_line = "  nmropt= " + self.conf_min["nmropt"] + "," + line_feed
-            DISANG_tail = (
-                """ &wt
-  type='END'
- /
-  DISANG= """
-                + self.conf_min["DISANG"]
-                + line_feed
-            )
-            self._build_MD_rs(step="min", o_path=self.conf_min["DISANG"])
-        else:
-            nmropt_line = ""
-            DISANG_tail = ""
-        # text
-        conf_str = (
-            """Minimize
- &cntrl
-  imin  = 1,  ntx   = 1,  irest = 0,
-  ntc   = """
-            + self.conf_min["ntc"]
-            + """,    ntf = """
-            + self.conf_min["ntf"]
-            + """,
-  cut   = """
-            + self.conf_min["cut"]
-            + """,
-  maxcyc= """
-            + maxcyc
-            + """, ncyc  = """
-            + ncyc
-            + """,
-  ntpr  = """
-            + ntpr
-            + """, ntwx  = 0,
-"""
-            + ntr_line
-            + nmropt_line
-            + """ /
-"""
-            + DISANG_tail
+        heat_out: str = f"{work_dir}/heat.out"
+        heat_rst: str = f"{work_dir}/heat.rst"
+        self.env_manager_.run_command(
+            engine,
+            [
+                "-O",
+                "-i",
+                heat_in,
+                "-o",
+                heat_out,
+                "-p",
+                prmtop,
+                "-c",
+                min_rst,
+                "-ref",
+                min_rst,
+                "-r",
+                heat_rst,
+            ],
         )
-        # write
-        with open(o_path, "w") as of:
-            of.write(conf_str)
-        return o_path
 
-    def _build_MD_heat(self, o_dir):
-        """
-        Build configuration file for a heat job
-        See default value Config.Amber.conf_heat
-        """
-        # path
-        o_path = o_dir + "/heat.in"
-
-        # nstlim related
-        nstlim = self.conf_heat["nstlim"]
-        if self.conf_heat["A_istep2"] == "0.9nstlim":
-            A_istep2 = str(int(nstlim * 0.9))
-        if self.conf_heat["B_istep1"] == "A_istep2+1":
-            B_istep1 = str(int(A_istep2) + 1)
-        if self.conf_heat["ntpr"] == "0.01nstlim":
-            ntpr = str(int(nstlim * 0.01))
-        if self.conf_heat["ntwx"] == "nstlim":
-            ntwx = str(nstlim)
-        nstlim = str(nstlim)
-        # restrain related
-        if self.conf_heat["ntr"] == "1":
-            ntr_line = (
-                "  ntr   = "
-                + self.conf_heat["ntr"]
-                + ", restraint_wt = "
-                + self.conf_heat["restraint_wt"]
-                + ", restraintmask = "
-                + self.conf_heat["restraintmask"]
-                + ","
-                + line_feed
-            )
-        else:
-            ntr_line = ""
-        if self.conf_heat["nmropt_rest"] == "1":
-            DISANG_tail = """  DISANG=""" + self.conf_heat["DISANG"] + line_feed
-            self._build_MD_rs(step="heat", o_path=self.conf_heat["DISANG"])
-        else:
-            DISANG_tail = ""
-        conf_str = (
-            '''Heat
- &cntrl
-  imin  = 0,  ntx = 1, irest = 0,
-  ntc   = """
-            + self.conf_heat["ntc"]
-            + """, ntf = """
-            + self.conf_heat["ntf"]
-            + """,
-  cut   = """
-            + self.conf_heat["cut"]
-            + """,
-  nstlim= """
-            + nstlim
-            + """, dt= """
-            + self.conf_heat["dt"]
-            + """,
-  tempi = """
-            + self.conf_heat["tempi"]
-            + """,  temp0="""
-            + self.conf_heat["temp0"]
-            + """,  
-  ntpr  = """
-            + ntpr
-            + """,  ntwx="""
-            + ntwx
-            + """,
-  ntt   = """
-            + self.conf_heat["ntt"]
-            + """, gamma_ln = """
-            + self.conf_heat["gamma_ln"]
-            + """,
-  ntb   = 1,  ntp = 0,
-  iwrap = """
-            + self.conf_heat["iwarp"]
-            + """,
-  nmropt= 1,
-  ig    = -1,
-"""
-            + ntr_line
-            + """ /
- &wt
-  type  = 'TEMP0',
-  istep1= 0, istep2="""
-            + A_istep2
-            + """,
-  value1= """
-            + self.conf_heat["tempi"]
-            + """, value2="""
-            + self.conf_heat["temp0"]
-            + """,
- /
- &wt
-  type  = 'TEMP0',
-  istep1= """
-            + B_istep1
-            + """, istep2="""
-            + nstlim
-            + """,
-  value1= """
-            + self.conf_heat["temp0"]
-            + """, value2="""
-            + self.conf_heat["temp0"]
-            + """,
- /
- &wt
-  type  = 'END',
- /
-'''
-            + DISANG_tail
+        equi_out: str = f"{work_dir}/equi.out"
+        equi_rst: str = f"{work_dir}/equi.rst"
+        equi_nc: str = f"{work_dir}/equi.nc"
+        self.env_manager_.run_command(
+            engine,
+            [
+                "-O",
+                "-i",
+                equi_in,
+                "-o",
+                equi_out,
+                "-p",
+                prmtop,
+                "-c",
+                heat_rst,
+                "-ref",
+                heat_rst,
+                "-r",
+                equi_rst,
+                "-x",
+                equi_nc,
+            ],
         )
-        # write
-        with open(o_path, "w") as of:
-            of.write(conf_str)
-        return o_path
 
-    def _build_MD_equi(self, o_dir):
-        """
-        Build configuration file for the equilibration step
-        See default value Config.Amber.conf_equi
-        default ntwx -> 10ps
-        """
-        # path
-        o_path = o_dir + "/equi.in"
-        #
-        #        # nstlim related
-        #        nstlim = self.conf_equi["nstlim"]
-        #        if self.conf_equi["ntpr"] == "0.002nstlim":
-        #            ntpr = str(int(nstlim * 0.002))
-        #        nstlim = str(nstlim)
-        #        # restrain related
-        #        if self.conf_equi["ntr"] == "1":
-        #            ntr_line = (
-        #                "  ntr   = "
-        #                + self.conf_equi["ntr"]
-        #                + ", restraint_wt = "
-        #                + self.conf_equi["restraint_wt"]
-        #                + ", restraintmask = "
-        #                + self.conf_equi["restraintmask"]
-        #                + ","
-        #                + line_feed
-        #            )
-        #        else:
-        #            ntr_line = ''
-        #        if self.conf_equi['nmropt_rest'] == '1':
-        #            self.conf_equi['nmropt'] = '1'
-        #            nmropt_line = '  nmropt= '+self.conf_equi['nmropt']+','+line_feed
-        #            DISANG_tail = ''' &wt
-        #  type='END'
-        # /
-        #  DISANG= '''+self.conf_equi['DISANG']+line_feed
-        #            self._build_MD_rs(step='equi',o_path=self.conf_equi['DISANG'])
-        #        else:
-        #            nmropt_line = ''
-        #            DISANG_tail = ''
-        #
-        #        conf_str = (
-        #            """Equilibration:constant pressure
-        # &cntrl
-        #  imin  = 0,  ntx = """
-        #            + self.conf_equi["ntx"]
-        #            + """,  irest = """
-        #            + self.conf_equi["irest"]
-        #            + """,
-        #  ntf   = """
-        #            + self.conf_equi["ntf"]
-        #            + """,  ntc = """
-        #            + self.conf_equi["ntc"]
-        #            + """,
-        #  nstlim= """
-        #            + nstlim
-        #            + """, dt= """
-        #            + self.conf_equi["dt"]
-        #            + """,
-        #  cut   = """
-        #            + self.conf_equi["cut"]
-        #            + """,
-        #  temp0 = """
-        #            + self.conf_equi["temp0"]
-        #            + """,
-        #  ntpr  = """
-        #            + ntpr
-        #            + """, ntwx = """
-        #            + self.conf_equi["ntwx"]
-        #            + """,
-        #  ntt   = """
-        #            + self.conf_equi["ntt"]
-        #            + """, gamma_ln = """
-        #            + self.conf_equi["gamma_ln"]
-        #            + """,
-        #  ntb   = 2,  ntp = 1,
-        #  iwrap = """
-        #            + self.conf_equi["iwarp"]
-        #            + """,
-        #  ig    = -1,
-        # """+ntr_line+nmropt_line+''' /
-        #'''+DISANG_tail
-        #        #write
-        with open(o_path, "w") as of:
-            of.write(conf_str)
-        return o_path
+        prod_out: str = f"{work_dir}/prod.out"
+        prod_rst: str = f"{work_dir}/prod.rst"
+        prod_nc: str = f"{work_dir}/prod.nc"
+        self.env_manager_.run_command(
+            engine,
+            [
+                "-O",
+                "-i",
+                prod_in,
+                "-o",
+                prod_out,
+                "-p",
+                prmtop,
+                "-c",
+                equi_rst,
+                "-ref",
+                equi_rst,
+                "-r",
+                prod_rst,
+                "-x",
+                prod_nc,
+            ],
+        )
 
-    def _build_MD_prod(self, o_dir):
-        """
-        Build configuration file for the production step
-        See default value Config.Amber.conf_prod
-        default ntwx -> 10ps
-        """
-        # path
-        o_path = o_dir + "/prod.in"
+        return prod_nc
 
-        #        # nstlim related
-        #        nstlim = self.conf_prod["nstlim"]
-        #        if self.conf_prod["ntpr"] == "0.001nstlim":
-        #            ntpr = str(int(nstlim * 0.001))
-        #        nstlim = str(nstlim)
-        #        # restrain related
-        #        if self.conf_prod["ntr"] == "1":
-        #            ntr_line = (
-        #                "  ntr   = "
-        #                + self.conf_prod["ntr"]
-        #                + ", restraint_wt = "
-        #                + self.conf_prod["restraint_wt"]
-        #                + ", restraintmask = "
-        #                + self.conf_prod["restraintmask"]
-        #                + ","
-        #                + line_feed
-        #            )
-        #        else:
-        #            ntr_line = ''
-        #        if self.conf_prod['nmropt_rest'] == '1':
-        #            self.conf_prod['nmropt'] = '1'
-        #            nmropt_line = '  nmropt= '+self.conf_prod['nmropt']+','+line_feed
-        #            DISANG_tail = ''' &wt
-        #  type='END'
-        # /
-        #  DISANG= '''+self.conf_prod['DISANG']+line_feed
-        #            self._build_MD_rs(step='prod',o_path=self.conf_prod['DISANG'])
-        #        else:
-        #            nmropt_line = ''
-        #            DISANG_tail = ''
-        #
-        #        conf_str = (
-        #            """Production: constant pressure
-        # &cntrl
-        #  imin  = 0, ntx = """
-        #            + self.conf_prod["ntx"]
-        #            + """, irest = """
-        #            + self.conf_prod["irest"]
-        #            + """,
-        #  ntf   = """
-        #            + self.conf_prod["ntf"]
-        #            + """,  ntc = """
-        #            + self.conf_prod["ntc"]
-        #            + """,
-        #  nstlim= """
-        #            + nstlim
-        #            + """, dt= """
-        #            + self.conf_prod["dt"]
-        #            + """,
-        #  cut   = """
-        #            + self.conf_prod["cut"]
-        #            + """,
-        #  temp0 = """
-        #            + self.conf_prod["temp0"]
-        #            + """,
-        #  ntpr  = """
-        #            + ntpr
-        #            + """, ntwx = """
-        #            + self.conf_prod["ntwx"]
-        #            + """,
-        #  ntt   = """
-        #            + self.conf_prod["ntt"]
-        #            + """, gamma_ln = """
-        #            + self.conf_prod["gamma_ln"]
-        #            + """,
-        #  ntb   = 2,  ntp = 1,
-        #  iwrap = """
-        #            + self.conf_prod["iwarp"]
-        #            + """,
-        #  ig    = -1,
-        # """+ntr_line+nmropt_line+''' /
-        #'''+DISANG_tail
-        # write
-        with open(o_path, "w") as of:
-            of.write(conf_str)
-        return o_path
+    def mutate(self, outfile: str) -> None:
+        """Method that uses tleap to apply the mutations described in the supplied outfile
+        to that file. Because tleap writes the modified version to another file, the destination
+        file with name 'outfile.tmp.pdb' is copied over the outfile name. As a result there
+        may be additional files in the local directory when problems occur.
 
-    def _build_MD_rs(self, step, o_path):
+        Args:
+            outfile: The name of the modified .pdb file that needs to be treated with tleap.
         """
-        Generate a file for DISANG restraint. Get parameters from self.conf_step.
-        """
-        rs_str = ""
-        rs_data_step = self.__dict__["conf_" + step]["rs_constraints"]
-        for rest_data in rs_data_step:
-            rs_str = (
-                rs_str
-                + """  &rst
-   iat=  """
-                + ",".join(rest_data["iat"])
-                + """, r1= """
-                + rest_data["r1"]
-                + """, r2= """
-                + rest_data["r2"]
-                + """, r3= """
-                + rest_data["r3"]
-                + """, r4= """
-                + rest_data["r4"]
-                + """,
-   rk2="""
-                + rest_data["rk2"]
-                + """, rk3="""
-                + rest_data["rk3"]
-                + """, ir6="""
-                + rest_data["ir6"]
-                + """, ialtd="""
-                + rest_data["ialtd"]
-                + """,
-  &end
-"""
-            )
-        # write
-        with open(o_path, "w") as of:
-            of.write(rs_str)
-        return o_path
 
-    def reset_MD_conf(self):
-        """
-        reset MD configuration of current object to default. 
-        """
-        self.conf_min = Config.Amber.conf_min
-        self.conf_heat = Config.Amber.conf_heat
-        self.conf_equi = Config.Amber.conf_equi
-        self.conf_prod = Config.Amber.conf_prod
+        def renumber_pdb(opdb: str, npdb: str) -> None:
+            """Helper method that renumbers the residue chain id's and residue numbers in the
+            new structure found in npdb to the original values found in the opdb structure file.
+            TODO(CJ): This may need to get moved elsewhere since it has use elsewhere.
 
-    def show_MD_conf(self):
-        """
-        Show MD configuration of current object. 
-        """
-        print("Min :     " + repr(self.conf_min))
-        print("Heat:     " + repr(self.conf_heat))
-        print("Equi:     " + repr(self.conf_equi))
-        print("Prod:     " + repr(self.conf_prod))
+            Args:
+                opdb: The name of the original .pdb file.
+                npdb: The name of the new .pdb file.
+            """
+
+            def get_all_keys(pdb: str) -> List[Tuple[str, str]]:
+                df: pd.DataFrame = PandasPdb().read_pdb(pdb).df["ATOM"]
+                return sorted(list(set(list(zip(df.chain_id, df.residue_number)))))
+
+            okeys, nkeys = get_all_keys(opdb), get_all_keys(npdb)
+            assert len(okeys) == len(nkeys)
+            mapper = dict(zip(nkeys, okeys))
+            nlines: List[prep.PDBLine] = prep.read_pdb_lines(npdb)
+            for nl in nlines:
+                if not nl.is_ATOM():
+                    continue
+                (n_chain, n_rid) = mapper[(nl.chain_id.strip(), int(nl.resi_id))]
+                # TODO(CJ): this should be done in the oop part of the PDBLine;
+                raw = nl.line
+                nl.line = f"{raw[0:21]}{n_chain}{n_rid: >4}{raw[26:]}"
+                # print(n_chain, n_rid)
+                # print(nl.__dict__);exit( 0 )
+            fs.write_lines(npdb, list(map(lambda pl: pl.line, nlines)))
+
+        work_dir: str = str(Path(outfile).parent)
+        leap_in: str = f"{work_dir}/leap_mutate.in"
+        leap_out: str = f"{work_dir}/leap_mutate.out"
+        pdb_temp = str(Path(outfile).with_suffix(".tmp.pdb"))
+        leap_lines: List[str] = [
+            "source leaprc.protein.ff14SB",
+            f"a = loadpdb {outfile}",
+            f"savepdb a {pdb_temp}",
+            "quit",
+        ]
+        fs.write_lines(leap_in, leap_lines)
+        self.env_manager_.run_command("tleap", ["-s", "-f", leap_in, ">", leap_out])
+        renumber_pdb(outfile, pdb_temp)
+        shutil.move(pdb_temp, outfile)
+        fs.safe_rm("leap.log")
 
     def nc2mdcrd(
-        self, o_path="", point=None, start=1, end=-1, step=1, engine="cpptraj"
-    ):
+        self,
+        nc_in: str,
+        prmtop: str,
+        point: Union[int, None] = None,
+        start: int = 1,
+        end: Union[int, str] = "last",
+        step: int = 1,
+        engine: str = "cpptraj",
+    ) -> str:
+        """Converts the supplied .nc file to an .mdcrd file. Scope of trajectory conversion can be
+        specified though by default all available frames are selected.
+
+        Args:
+            nc_in: The path to the .nc file as a str().
+            prmtop: The path to the prmtop file as  str().
+            point: If not None, step is (nstlim/ntwx)/point. Default is None, but value should be int() when given.
+            start: 1-indexed starting point. Default value is 1.
+            end: 1-indexed ending point. By default uses "last"
+            engine: The engine to convert the .nc file. Default value is "cpptraj".
+
+        Returns:
+            The name of the converted .mdcrd file.
         """
-        convert self.nc to a mdcrd file to read and operate.(self.nc[:-2]+'.mdcrd' by default)
-        a easier way is to use pytraj directly.
-        ---------------
-        o_path: user assigned out path (self.nc[:-2]+'mdcrd' by default)
-        point:  sample point. use value from self.conf_prod['nstlim'] and self.conf_prod['ntwx'] to determine step size.
-        start:  start point
-        end:    end point
-        step:   step size
-        engine: pytraj or cpptraj (some package conflict may cause pytraj not available)
-        """
-        if self.nc == None:
-            raise Exception(
-                "No nc file found. Please assign self.nc or run PDBMD first"
+        mdcrd: str = str(Path(nc_in).with_suffix(".mdcrd"))
+        config = self.config_.CONF_PROD
+        if point is not None:
+            step: int = int((int(config["nstlim"]) / int(config["ntwx"])) / point)
+
+        if engine == "cpptraj":
+            cpptraj_in = "./cpptraj_nc2mdcrd.in"
+            cpptraj_out = "./cpptraj_nc2mdcrd.out"
+            contents: List[str] = [
+                f"parm {prmtop}",
+                f"trajin {nc_in} {start} {end} {step}",
+                f"trajout {mdcrd}",
+                "run",
+                "quit",
+            ]
+            fs.write_lines(cpptraj_in, contents)
+            self.env_manager_.run_command(
+                "cpptraj", ["-i", cpptraj_in, ">", cpptraj_out]
             )
+            #fs.safe_rm(cpptraj_in)
+            #fs.safe_rm(cpptraj_out)
         else:
-            if o_path == "":
-                o_path = self.nc[:-2] + "mdcrd"
-            if end == -1:
-                end = "last"
-            if point != None:
-                all_p = int(self.conf_prod["nstlim"]) / int(self.conf_prod["ntwx"])
-                step = int(all_p / point)
+            raise UnsupportedMethod(
+                f"'{engine}' is not a supported method for AmberInteface.nc2mdcrd(). Allowed methods are: 'cpptraj'."
+            )
 
-            if engine not in ["pytraj", "cpptraj"]:
-                raise Exception("engine: pytraj or cpptraj")
+        return mdcrd
 
-            if engine == "pytraj":
-                pass
+    def get_frames(
+        self,
+        nc_in: str,
+        prmtop: str,
+        point: Union[int, None] = None,
+        start: int = 1,
+        end: Union[int, str] = "last",
+        step: int = 1,
+    ) -> str:
+        """Converts the supplied .nc file to an .mdcrd file. Scope of trajectory conversion can be
+        TODO(CJ): update this
+        """
+        outfile: str = f"{Path(prmtop).parent}/cpptraj_frames.pdb"
+        config = self.config_.CONF_PROD
+        if point is not None:
+            step: int = int((int(config["nstlim"]) / int(config["ntwx"])) / point)
 
-            if engine == "cpptraj":
-                cpp_in_path = self.cache_path + "/cpptraj_nc2mdcrd.in"
-                cpp_out_path = self.cache_path + "/cpptraj_nc2mdcrd.out"
-                with open(cpp_in_path, "w") as of:
-                    of.write("parm " + self.prmtop_path + line_feed)
-                    of.write(
-                        "trajin "
-                        + self.nc
-                        + " "
-                        + str(start)
-                        + " "
-                        + end
-                        + " "
-                        + str(step)
-                        + line_feed
-                    )
-                    of.write("trajout " + o_path + line_feed)
-                    of.write("run" + line_feed)
-                    of.write("quit" + line_feed)
-                os.system("cpptraj -i " + cpp_in_path + " > " + cpp_out_path)
+        cpptraj_in = "./cpptraj_nc2mdcrd.in"
+        cpptraj_out = "./cpptraj_nc2mdcrd.out"
+        contents: List[str] = [
+            f"parm {prmtop}",
+            f"trajin {nc_in} {start} {end} {step}",
+             "strip :WAT",
+             "strip :Na+,Cl-",
+            f"trajout {outfile} conect",
+            "run",
+            "quit",
+        ]
+        fs.write_lines(cpptraj_in, contents)
+        self.env_manager_.run_command(
+            "cpptraj", ["-i", cpptraj_in, ">", cpptraj_out]
+        )
+        #fs.safe_rm(cpptraj_in)
+        fs.safe_rm(cpptraj_out)
+        charges = read_charge_list(prmtop)
+        result = frames_from_pdb( outfile )
+        
+        if not len(result):
+            return result
+		
+        num_atoms = len(result[0].atoms)
+        charges = charges[0:num_atoms]
+        for fidx, frame in enumerate(result):
+            result[fidx].update_charges( charges )
 
-        self.mdcrd = o_path
-        return o_path
+        return result
+

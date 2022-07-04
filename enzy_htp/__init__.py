@@ -1,29 +1,27 @@
+"""
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+
+Date: 2022-06-26
+"""
 # python imports
 import sys
 import logging
 from typing import Tuple
 
-# enzy_htp imports
-from .config import Config
-from .interface import Interface
+
+# from .interface import Interface
 from .structure import Structure, Residue
 from .core import (
     EnvironmentManager,
     MissingEnvironmentElement,
     InvalidResidueCode,
     _LOGGER,
+	write_data
 )
 from .preparation import PDBLine, PDBPrepper, read_pdb_lines
 from .chemical import ResidueType
 
-CONFIG = None
-INTERFACE = None
+from .molecular_mechanics import AmberInterface
+from .quantum_mechanics import GaussianInterface, MultiwfnInterface
 
-
-def init() -> Tuple[Config, Interface]:
-    """"""
-    global CONFIG
-    global INTERFACE
-    CONFIG = Config()
-    INTERFACE = Interface(CONFIG)
-    return (CONFIG, INTERFACE)
+from .mutation import  MutationRestrictions, restriction_object, mutate_pdb

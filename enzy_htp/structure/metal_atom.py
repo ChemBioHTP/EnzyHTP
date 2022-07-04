@@ -19,8 +19,8 @@ class MetalAtom(Residue):
     """Class representing a metal atom in a protein/enzyme structure or system. Typically a single Atom but usually
 
 
-	Attributes:
-        atom_name_ : The name of the metal atom as a string. Compatible with methods in enzy_htp.chemical.
+    Attributes:
+    atom_name_ : The name of the metal atom as a string. Compatible with methods in enzy_htp.chemical.
     """
 
     def __init__(self, residue_key: str, atoms: List[Atom], atom_name: str = None):
@@ -42,10 +42,10 @@ class MetalAtom(Residue):
         return False
 
     def get_radii(self, method: str = "ionic") -> Union[float, None]:
-        """Gets the atomic radii for the metal using specified method. 
-		Allowed values are 'ionic' or 'vdw' for ionic and van-der waals, respectively.
-		Returns a float or None if the metal does not have a distance.
-		"""
+        """Gets the atomic radii for the metal using specified method.
+        Allowed values are 'ionic' or 'vdw' for ionic and van-der waals, respectively.
+        Returns a float or None if the metal does not have a distance.
+        """
         return chem.get_metal_radii(self.atom_name_, method)
 
     # fix related
@@ -150,7 +150,7 @@ class MetalAtom(Residue):
 
     def _metal_fix_2(self):
         """
-        Fix2: rotate if there're still lone pair left 
+        Fix2: rotate if there're still lone pair left
         """
         for resi in self.donor_resi:
             resi.rot_proton(resi.d_atom)
@@ -168,7 +168,7 @@ class MetalAtom(Residue):
         return a line str
         --------
         use self.id if not assigned
-        
+
         """
         # default
         if a_id == None:
@@ -220,7 +220,7 @@ class MetalAtom(Residue):
 
     def build_oniom(self, layer, chrg=None, cnt_info: list = None):
         """
-        build a metal line for oniom. 
+        build a metal line for oniom.
         Gaussian use *ff96* which the atom type is corresponding to all_amino94.lib and ion94.lib in Amber distribution
         For metals that do not exist in ion94.lib. Custom a type and get parms from TIP3P lib.
         ---------
@@ -314,13 +314,14 @@ class MetalAtom(Residue):
     def location(self) -> np.array:
         """Gets the location of the MetalAtom."""
         return self.atoms[0]
-    
+
     def get_pdb_lines(self, _) -> List[str]:
         """Method that gets the PDB lines for all of the Atom() objects."""
-        result : List[str] = Residue.get_pdb_lines( self, False )
-        for idx, line in enumerate( result ):
-            result[idx] = 'HETATM' + line[6:]
+        result: List[str] = Residue.get_pdb_lines(self, False)
+        for idx, line in enumerate(result):
+            result[idx] = "HETATM" + line[6:]
         return result
+
 
 def residue_to_metal(residue: Residue) -> MetalAtom:
     """Convenience function that converts Residue() to MetalAtom() object."""

@@ -15,8 +15,7 @@ from enzy_htp.preparation import protonate as prot
 
 CURR_FILE = os.path.abspath(__file__)
 CURR_DIR = os.path.dirname(CURR_FILE)
-DATA_DIR = f"{CURR_DIR}/data/"
-WORK_DIR = f"{CURR_DIR}/work_dir/"
+DATA_DIR = f"{CURR_DIR}/data/" WORK_DIR = f"{CURR_DIR}/work_dir/"
 
 # TODO(CJ): make testing utility files.
 def equiv_files(fname1: str, fname2: str, width: int = None) -> bool:

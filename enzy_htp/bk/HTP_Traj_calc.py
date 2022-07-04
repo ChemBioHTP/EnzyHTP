@@ -160,7 +160,7 @@ class Traj_calc:
                 * DO NOT use original chain id in the pdb file. Count from A and from 1.
         igb:        gb method used
         if_sol:     if use also generate solvent prmtop with tleap. (Because Parmed cannot use in the amber instance on many clusters)
-                
+
         update self.dc_prmtop, self.dl_prmtop, self.dr_prmtop
         """
         # make new fragment pdbs

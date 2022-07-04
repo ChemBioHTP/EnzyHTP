@@ -10,7 +10,9 @@ from .exception import (
     MissingEnvironmentElement,
     InvalidResidueCode,
     UnsupportedFileType,
+    UnsupportedMethod,
     InvalidPH,
+    InvalidMutationRestriction,
 )
 from .file_system import (
     safe_rm,
@@ -21,4 +23,5 @@ from .file_system import (
     lines_from_file,
     write_lines,
     get_file_ext,
+	write_data,
 )

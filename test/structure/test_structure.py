@@ -18,7 +18,7 @@ from enzy_htp.structure import (
     merge_right,
 )
 
-
+#TODO(CJ): add tests for Structure.build_ligands()
 CURR_DIR = os.path.dirname(os.path.abspath(__file__))
 TEST_DIR = os.path.dirname(CURR_DIR)
 DATA_DIR = f"{CURR_DIR}/data/"

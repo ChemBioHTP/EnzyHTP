@@ -6,219 +6,20 @@ Date: 2022-03-19
 """
 
 from typing import List, Set, Dict
-
+from .db import load_from_db
 from ..core import InvalidResidueCode, _LOGGER
 
 
-AA_LIST: List[str] = [
-    "R",
-    "H",
-    "K",
-    "D",
-    "E",
-    "S",
-    "T",
-    "N",
-    "Q",
-    "C",
-    "G",
-    "P",
-    "A",
-    "V",
-    "I",
-    "L",
-    "M",
-    "F",
-    "Y",
-    "W",
-    "U",
-]
+AA_LIST: List[str] = load_from_db("AA_LIST")
 """Capitalized list of all one-letter amino acid names."""
 
-THREE_LETTER_AA_MAPPER: Dict[str, str] = {
-    "ARG": "R",
-    "HIS": "H",
-    "HIE": "H",
-    "HIP": "H",
-    "HID": "H",
-    "LYS": "K",
-    "ASP": "D",
-    "GLU": "E",
-    "SER": "S",
-    "THR": "T",
-    "ASN": "N",
-    "GLN": "Q",
-    "CYS": "C",
-    "SEC": "U",
-    "GLY": "G",
-    "PRO": "P",
-    "ALA": "A",
-    "VAL": "V",
-    "ILE": "I",
-    "LEU": "L",
-    "MET": "M",
-    "PHE": "F",
-    "TYR": "Y",
-    "TRP": "W",
-}
+THREE_LETTER_AA_MAPPER: Dict[str, str] = load_from_db("THREE_LETTER_AA_MAPPER")
 """Contains mapping of all amino acids codes, with key value pairs of (three letter code, one letter code). Should NOT be called directly for code conversion. Instead used enzy_htp.chemical.residue.convert_to_three_letter()"""
 
-ONE_LETTER_AA_MAPPER: Dict[str, str] = {
-    "R": "ARG",
-    "H": "HIS",
-    "K": "LYS",
-    "D": "ASP",
-    "E": "GLU",
-    "S": "SER",
-    "T": "THR",
-    "N": "ASN",
-    "Q": "GLN",
-    "C": "CYS",
-    "U": "SEC",
-    "G": "GLY",
-    "P": "PRO",
-    "A": "ALA",
-    "V": "VAL",
-    "I": "ILE",
-    "L": "LEU",
-    "M": "MET",
-    "F": "PHE",
-    "Y": "TYR",
-    "W": "TRP",
-}
+ONE_LETTER_AA_MAPPER: Dict[str, str] = load_from_db("ONE_LETTER_AA_MAPPER")
 """Contains mapping of all amino acids codes, with key value pairs of (one letter code, three letter code). Should NOT be called directly for code conversion. Instead used enzy_htp.chemical.residue.convert_to_one_letter()"""
 
-RESIDUE_ELEMENT_MAP: Dict[str, Dict[str, str]] = {
-    "Amber": {
-        "C": "C",
-        "CA": "C",
-        "CB": "C",
-        "CD": "C",
-        "CD1": "C",
-        "CD2": "C",
-        "CE": "C",
-        "CE1": "C",
-        "CE2": "C",
-        "CE3": "C",
-        "CG": "C",
-        "CG1": "C",
-        "CG2": "C",
-        "CH2": "C",
-        "CZ": "C",
-        "CZ2": "C",
-        "CZ3": "C",
-        "H": "H",
-        "H1": "H",
-        "H2": "H",
-        "H3": "H",
-        "HA": "H",
-        "HA2": "H",
-        "HA3": "H",
-        "HB": "H",
-        "HB1": "H",
-        "HB2": "H",
-        "HB3": "H",
-        "HD1": "H",
-        "HD11": "H",
-        "HD12": "H",
-        "HD13": "H",
-        "HD2": "H",
-        "HD21": "H",
-        "HD22": "H",
-        "HD23": "H",
-        "HD3": "H",
-        "HE": "H",
-        "HE1": "H",
-        "HE2": "H",
-        "HE21": "H",
-        "HE22": "H",
-        "HE3": "H",
-        "HG": "H",
-        "HG1": "H",
-        "HG11": "H",
-        "HG12": "H",
-        "HG13": "H",
-        "HG2": "H",
-        "HG21": "H",
-        "HG22": "H",
-        "HG23": "H",
-        "HG3": "H",
-        "HH": "H",
-        "HH11": "H",
-        "HH12": "H",
-        "HH2": "H",
-        "HH21": "H",
-        "HH22": "H",
-        "HZ": "H",
-        "HZ1": "H",
-        "HZ2": "H",
-        "HZ3": "H",
-        "N": "N",
-        "ND1": "N",
-        "ND2": "N",
-        "NE": "N",
-        "NE1": "N",
-        "NE2": "N",
-        "NH1": "N",
-        "NH2": "N",
-        "NZ": "N",
-        "O": "O",
-        "OD1": "O",
-        "OD2": "O",
-        "OE1": "O",
-        "OE2": "O",
-        "OG": "O",
-        "OG1": "O",
-        "OH": "O",
-        "OXT": "O",
-        "SD": "S",
-        "SG": "S",
-        "LI": "Li",
-        "NA": "Na",
-        "K": "K",
-        "RB": "Rb",
-        "CS": "Cs",
-        "MG": "Mg",
-        "TL": "Tl",
-        "CU": "Cu",
-        "AG": "Ag",
-        "BE": "Be",
-        "NI": "Ni",
-        "PT": "Pt",
-        "ZN": "Zn",
-        "CO": "Co",
-        "PD": "Pd",
-        "CR": "Cr",
-        "FE": "Fe",
-        "V": "V",
-        "MN": "Mn",
-        "YB": "Yb",
-        "SN": "Sn",
-        "PB": "Pb",
-        "EU": "Eu",
-        "SR": "Sr",
-        "SM": "Sm",
-        "BA": "Ba",
-        "RA": "Ra",
-        "AL": "Al",
-        "IN": "In",
-        "Y": "Y",
-        "LA": "La",
-        "PR": "Pr",
-        "ND": "Nd",
-        "GD": "Gd",
-        "TB": "Tb",
-        "DY": "Dy",
-        "ER": "Er",
-        "TM": "Tm",
-        "LU": "Lu",
-        "HF": "Hf",
-        "ZR": "Zr",
-        "U": "U",
-        "PU": "Pu",
-        "TH": "Th",
-    }
-}
+RESIDUE_ELEMENT_MAP: Dict[str, Dict[str, str]] = load_from_db("RESIDUE_ELEMENT_MAP")
 """Mapper that shows element names for alternative names of atoms. Key value structure is (force field name, (atom mapper)), where atom mapper is an additional
 mapper that maps altered atom names to base atom names. Currently only defined for "Amber".
 
@@ -228,6 +29,54 @@ Example usage:
 >>> RESIDUE_ELEMENT_MAP["Amber"][initial_atom_name]
 "C"
 
+"""
+
+RESIDUE_CONNECTIVITY_MAP: Dict[str, Dict[str, List[str]]] = load_from_db(
+    "RESIDUE_CONNECTIVITY_MAP"
+)
+"""dict() that maps the connectivity of atom's based on their parent residue and atom identity.
+(key, value) pairs are (3-letter AA name, connector), where connector is another dict() with 
+(key, value) pairs of (atom name, list of connected atoms)."""
+
+RESIDUE_CONNECTIVITY_MAP_CTERMINAL: Dict[str, Dict[str, List[str]]] = load_from_db(
+    "RESIDUE_CONNECTIVITY_MAP_CTERMINAL"
+)
+"""dict() that maps the connectivity of atom's based on their parent residue and atom identity.
+(key, value) pairs are (3-letter AA name, connector), where connector is another dict() with 
+(key, value) pairs of (atom name, list of connected atoms). Similar to RESIDUE_CONNECTIVITY_MAP
+except has the mappings for the C-terminal version of each residue."""
+
+RESIDUE_CTERMINAL_ATOM_LIST: Dict[str, List[str]] = load_from_db(
+    "RESIDUE_CTERMINAL_ATOM_LIST"
+)
+"""dict() that lists the atoms in the C-terminal version of a residue. (key, value) pairs are
+(3-letter AA name, list of atom names) where the list of atom names are the modified list of 
+atom names for the C-terminal version of that residue."""
+
+RESIDUE_CTERMINAL_ATOM_LIST: Dict[str, List[str]] = load_from_db(
+    "RESIDUE_CTERMINAL_ATOM_LIST"
+)
+"""dict() that lists the atoms in the N-terminal version of a residue. (key, value) pairs are
+(3-letter AA name, list of atom names) where the list of atom names are the modified list of 
+atom names for the N-terminal version of that residue."""
+
+RESIDUE_CONNECTIVITY_MAP_NTERMINAL: Dict[str, Dict[str, List[str]]] = load_from_db(
+    "RESIDUE_CONNECTIVITY_MAP_NTERMINAL"
+)
+"""dict() that maps the connectivity of atom's based on their parent residue and atom identity.
+(key, value) pairs are (3-letter AA name, connector), where connector is another dict() with 
+(key, value) pairs of (atom name, list of connected atoms). Similar to RESIDUE_CONNECTIVITY_MAP
+except has the mappings for the N-terminal version of each residue."""
+
+
+RESIDUE_CATEGORIES: Dict[str, List[str]] = load_from_db("RESIDUE_CATEGORIES")
+"""dict() that describes basic characteristics of amino acids. Has (key,value) pairs
+of ('characteric', list() of one-letter amino-acid codes). Covered characteristics are:
+polar, nonpolar, charged, positive, negative, neutral."""
+
+RESIDUE_VOLUME_MAPPER: Dict[str, float] = load_from_db("RESIDUE_VOLUME_MAPPER")
+"""dict() that maps one-letter amino-acid codes to their volume in cubic angstroms. 
+source: https://www.imgt.org/IMGTeducation/Aide-memoire/_UK/aminoacids/abbreviation.html
 """
 
 
@@ -280,3 +129,34 @@ def one_letters_except(existing: str) -> List[str]:
         raise InvalidResidueCode(f"{existing} is not a valid one letter amino acid")
     result = list(set(list(ONE_LETTER_AA_MAPPER.keys())))
     return list(filter(lambda s: s != existing, result))
+
+
+def residue_polarity(code: str) -> str:
+    """Determines the polarity of a one-letter nucleotide, being 'negative', 'neutral' or 'positive."""
+    if len(code) != 1:
+        raise InvalidResidueCode(
+            f"expecting one letter residue code. '{code}' is invalid"
+        )
+
+    result: str() = "unknown"
+    for ptype in "positive negative neutral".split():
+        if code in RESIDUE_CATEGORIES[ptype]:
+            result = ptype
+    return result
+
+
+def non_polar(code: str) -> bool:
+    # TODO(CJ): should probably check if it is a valid one letter residue code
+    """Determines if a one-letter nucleotide amino acid is non-polar. Returns True if it is non-polar."""
+    if len(code) != 1:
+        raise InvalidResidueCode(
+            f"expecting one letter residue code. '{code}' is invalid"
+        )
+
+    return code in RESIDUE_CATEGORIES["nonpolar"]
+
+
+def polar(code: str) -> bool:
+    """Determines if a one-letter nucleotide amino acid is polar. Returns True if it is non-polar."""
+    # TODO(CJ): should probably check if it is a valid one letter residue code
+    return not non_polar(code)
