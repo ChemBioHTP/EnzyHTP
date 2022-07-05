@@ -1,6 +1,6 @@
 """ Extends lasso peptide from input coordinate file and writes to outfile.
 """
-
+import os.path
 import numpy as np
 from openbabel import pybel
 from scipy.spatial.transform import Rotation
@@ -273,18 +273,23 @@ def lasso_peptide_gen(ring: int,
         isopeptide: The type of linkage closing the ring. asx for aspartate or glx for glutamate
         outfile: The name of the final PDB to be placed into the output_structure file
         extender: The xyz file containing the amino acid extender if not alanine
-    """
+    """ 
 
-    if ring not in [7,8]:
-        raise ValueError("That ring size is not currently available")
-    elif loop not in [7, 8]:
-        raise ValueError("That loop size is not currently available")
-    elif tail <= 0:
-        raise ValueError("Tail size must be > 0")
-    elif isopeptide not in ["asx", "glx"]:
+    if isopeptide == "asx":
+        iso = "d"
+    elif isopeptide == "glx":
+        iso = "e"
+    else:
         raise ValueError("Isopeptide linker must be asx (aspartate) or glx (glutamate)")
 
-    scaffold = f"lasso_extension/scaffolds/{ring}mr_lassoPeptide_{isopeptide}_{loop}A.pdb"
+    scaffold = f"lasso_extension/scaffolds_new/{ring}{iso}_{loop}.pdb"
+    if ring not in [7,8,9]:
+        raise ValueError("That ring size is not currently available")
+    elif tail <= 0:
+        raise ValueError("Tail size must be > 0")
+    elif not os.path.exists(scaffold):
+        raise ValueError("That loop size is not currently available")
+   
     lasso_extender(scaffold, tail, outfile, extender)
 
 
@@ -294,10 +299,10 @@ def main():
     """
 
     ring = 8
-    loop = 8
+    loop = 16
     tail_length = 10
     isopeptide = "asx"
-    outfile = "8mr_asx_8A_10t"
+    outfile = "8d_16_10t"
     
     lasso_peptide_gen(ring, loop, tail_length, isopeptide, outfile)
 
