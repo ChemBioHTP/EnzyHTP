@@ -37,7 +37,7 @@ class Residue:
     def __init__(self, residue_key: str, atoms: List[Atom]):
         """Constructor for the Residue() object. Takes residue_key in format of "chain_name.resdue_name.residue_id" and a list of Atom() objects."""
         self.atoms = atoms
-        self.residue_key = residue_key
+        self.residue_key = residue_key #@shaoqz: @imp to identify a residue only chain_id and residue_id inside of the chain is enough. The residue name seem redundant especially when using it to aquire a residue.
         (chain, name, num) = self.residue_key.split(".")
         self.chain_ = chain
         self.name = name
