@@ -5,7 +5,7 @@ residues, chains and structures.
 Structural description utilizes polymorphic specialization of base Residue() class into Ligand(),
 MetalAtom() and Solvent() derived classes.
 
-Structures are loaded through the structure_from_pdb() method defined in enzy_htp.structure_parser.py.
+Structures are loaded through the structure_from_pdb() method defined in enzy_htp.structure_parser.py. #@shaoqz: an IO class in the future
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-19
