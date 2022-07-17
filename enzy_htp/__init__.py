@@ -21,7 +21,10 @@ from .core import (
 from .preparation import PDBLine, PDBPrepper, read_pdb_lines
 from .chemical import ResidueType
 
-from .molecular_mechanics import AmberInterface
-from .quantum_mechanics import GaussianInterface, MultiwfnInterface
+from ._config import Config
+config = Config()
 
-from .mutation import  MutationRestrictions, restriction_object, mutate_pdb
+#from .molecular_mechanics import AmberInterface
+#from .quantum_mechanics import GaussianInterface, MultiwfnInterface
+#
+#from .mutation import  MutationRestrictions, restriction_object, mutate_pdb

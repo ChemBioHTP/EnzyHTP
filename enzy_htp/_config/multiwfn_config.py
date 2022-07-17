@@ -27,9 +27,6 @@ class MultiwfnConfig:
 
     DIR: str = "$Multiwfnpath"
 
-    def __init__(self, parent=None):
-        self._parent = parent
-
     def required_executables(self):
         return [self.EXE]
 
@@ -37,16 +34,19 @@ class MultiwfnConfig:
         return [self.DIR]
 
     def __getitem__(self, key: str) -> Any:
-        return getattr(self, key)
+        if key.count('.'):
+            key1, key2 = key.split('.')
+            return getattr(self, key1)[key2]
+        else:
+            return getattr(self, key)
 
     def __setitem__(self, key: str, value: Any) -> None:
-        is_path = False
-        if key in {"DIR", "EXE"}:
-            is_path = True
+        if key.count('.'):
+            key1, key2 = key.split('.')
+            GaussianConfig.__dict__[key1][key2] = value 
+        else:
+            setattr(self, key, value)
 
-        setattr(self, key, value)
-        if is_path:
-            self._parent.update_paths()
 
 
 def default_multiwfn_config() -> MultiwfnConfig:
