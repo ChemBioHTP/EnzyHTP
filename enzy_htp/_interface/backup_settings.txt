@@ -1,0 +1,64 @@
+# -----------------------------
+#            heat
+# Heat
+#  &cntrl
+#   imin  = 0,  ntx = 1, irest = 0,
+#   ntc   = 2, ntf = 2,
+#   cut   = 10.0,
+#   nstlim= 20000, dt= 0.002,
+#   tempi = 0.0,  temp0=300.0,
+#   ntpr  = {0.01nstlim},  ntwx={nstlim},
+#   ntt   = 3, gamma_ln = 5.0,
+#   ntb   = 1,  ntp = 0,
+#   iwrap = 1,
+#   nmropt= 1,
+#   ig    = -1,
+#   ntr   = 1,	restraint_wt = 2.0, restraintmask = '@C,CA,N',
+#  /
+#  &wt
+#   type  = 'TEMP0',
+#   istep1= 0, istep2={0.9nstlim},
+#   value1= 0.0, value2=300.0,
+#  /
+#  &wt
+#   type  = 'TEMP0',
+#   istep1= {A_istep2+1}, istep2={nstlim},
+#   value1= 300.0, value2=300.0,
+#  /
+#  &wt
+#   type  = 'END',
+#  /
+
+# -----------------------------
+#            prod
+# Production: constant pressure
+#  &cntrl
+#   imin  = 0, ntx = 1, irest = 0,
+#   ntf   = 2,  ntc = 2,
+#   nstlim= 50000000, dt= 0.002,
+#   cut   = 10.0,
+#   temp0 = 300.0,
+#   ntpr  = 50000, ntwx = 5000,
+#   ntt   = 3, gamma_ln = 5.0,
+#   ntb   = 2,  ntp = 1,
+#   iwrap = 1,
+#   ig    = -1,
+#  /
+
+# -----------------------------
+#            equi
+# Equilibration: constant pressure
+#  &cntrl
+#   imin  = 0,  ntx = 5,  irest = 1,
+#   ntf   = 2,  ntc = 2,
+#   nstlim= 500000, dt= 0.002,
+#   cut   = 10.0,
+#   temp0 = 300.0,
+#   ntpr  = {0.002nstlim}, ntwx = 5000,
+#   ntt   = 3, gamma_ln = 5.0,
+#   ntb   = 2,  ntp = 1,
+#   iwrap = 1,
+#   ig    = -1,
+#   ntr   = 1,	restraint_wt = 2.0,
+#   restraintmask = '@C,CA,N',
+#  /
