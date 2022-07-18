@@ -19,7 +19,7 @@ class Atom:
     Note: The Atom class SHOULD NOT be created directly by users. It is handled by other functions in enzy_htp.
 
     Attributes:
-        alt_loc : Character indicating if alternative location is present.
+        alt_loc : Character indicating if alternative location is present. #@shaoqz: which specific column is it?
         atom_name : The name of the atom as a string.
         atom_number : An integer number for the atom.
         b_factor : A float representing the temperature factor (b factor).
