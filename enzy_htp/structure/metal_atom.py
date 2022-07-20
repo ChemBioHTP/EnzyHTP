@@ -12,7 +12,7 @@ from typing import List, Union
 import enzy_htp.chemical as chem
 from enzy_htp.structure import Residue, Atom
 
-# TODO(CJ): Figure out if this can only ever be one atom (I think so?)
+# TODO(CJ): Figure out if this can only ever be one atom (I think so?) #@shaoqz: no. even though there is only data of one atom the structural level is residue level.
 
 
 class MetalAtom(Residue):
@@ -35,7 +35,7 @@ class MetalAtom(Residue):
 
     def is_metal_center(self) -> bool:
         """Checks if Residue is a metal center. Always returns True for this specialization."""
-        return True
+        return True #@shaoqz: @imp2 not all metal is metalcenter. e.g.: Na+ and K+ is not considered a metal coordinating center.
 
     def is_canonical(self) -> bool:
         """Checks if the Residue is a canonical. Always returns False for this specialization."""
@@ -49,7 +49,7 @@ class MetalAtom(Residue):
         return chem.get_metal_radii(self.atom_name_, method)
 
     # fix related
-    def get_donor_atom(self, method: str = "INC", check_radius=4.0):
+    def get_donor_atom(self, method: str = "INC", check_radius=4.0): # @nu
         # TODO(CJ): move this higher up in the structural hierarchy.
         """
         Get coordinated donor atom for a metal center.
@@ -104,7 +104,7 @@ class MetalAtom(Residue):
                                 + atom.name
                             )
 
-    def get_donor_residue(self, method="INC"):
+    def get_donor_residue(self, method="INC"): # @nu
         """
         get donor residue based on donor atoms
         """
@@ -129,7 +129,7 @@ class MetalAtom(Residue):
                             + "\033[m"
                         )
 
-    def _metal_fix_1(self):
+    def _metal_fix_1(self): # @nu
         """
         Fix1: deprotonate all donor (rotate those with tight H, like Ser)
             - warn if uncommon donor residue shows up (like Ser)
@@ -148,21 +148,21 @@ class MetalAtom(Residue):
                     )
                     # resi.rot_proton(resi.d_atom)
 
-    def _metal_fix_2(self):
+    def _metal_fix_2(self): # @nu
         """
         Fix2: rotate if there're still lone pair left
         """
         for resi in self.donor_resi:
             resi.rot_proton(resi.d_atom)
 
-    def _metal_fix_3(self):
+    def _metal_fix_3(self): # @nu
         """
         Fix3: run pka calculate containing ion (maybe pypka) and run Fix2 based on the result
         waiting for response
         """
         pass
 
-    def build(self, a_id=None, r_id=None, c_id=None, ff="AMBER", forcefield="ff14SB"):
+    def build(self, a_id=None, r_id=None, c_id=None, ff="AMBER", forcefield="ff14SB"): # @nu
         """
         generate an metal atom output line. End with LF
         return a line str
@@ -218,7 +218,7 @@ class MetalAtom(Residue):
 
         return line
 
-    def build_oniom(self, layer, chrg=None, cnt_info: list = None):
+    def build_oniom(self, layer, chrg=None, cnt_info: list = None): # @nu
         """
         build a metal line for oniom.
         Gaussian use *ff96* which the atom type is corresponding to all_amino94.lib and ion94.lib in Amber distribution
@@ -311,11 +311,11 @@ class MetalAtom(Residue):
         """Creates deepcopy of self."""
         return deepcopy(self)
 
-    def location(self) -> np.array:
+    def location(self) -> np.array: #@shaoqz: maybe unify as coord etc.
         """Gets the location of the MetalAtom."""
         return self.atoms[0]
 
-    def get_pdb_lines(self, _) -> List[str]:
+    def get_pdb_lines(self, _) -> List[str]:  #@shaoqz: go to IO
         """Method that gets the PDB lines for all of the Atom() objects."""
         result: List[str] = Residue.get_pdb_lines(self, False)
         for idx, line in enumerate(result):

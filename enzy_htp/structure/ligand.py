@@ -27,7 +27,8 @@ from enzy_htp.core import (
 
 
 class Ligand(Residue):
-    """Represents a specific Ligand found in a .pdb file. Typically created from a base Residue() object using
+    """Represents a specific Ligand found in a .pdb file. (#@shaoqz: a non-covalently binding small molecule to the protein part of the enzyme. decouple with PDB)
+        Typically created from a base Residue() object using
         the residue_to_ligand() method found in enzy_htp.structure.ligand.py. In addition to base attributes, has
         net_charge attribute which is Union[float,None]. The value is_ligand() has been hard-coded to True and
         Ligand.rtype_ is set to ResidueType.LIGAND. Meant to be stored alongside other Residue() and Residue()-derived
@@ -50,7 +51,7 @@ class Ligand(Residue):
         return True
 
     def set_residue_number(self, num: int) -> None:
-        """Changes the resdiue number for all of the substituent atoms."""
+        """Changes the resdiue number for all of the substituent atoms."""  #@shaoqz: also set for itself?
         for idx, aa in enumerate(self.atoms):
             self.atoms[idx].residue_number = num
 
@@ -58,7 +59,7 @@ class Ligand(Residue):
         """Getter for the net_charge attribute."""
         return self.net_charge
 
-    def build(self, out_path: str) -> None:
+    def build(self, out_path: str) -> None: #@shaoqz: to IO ; also it should be the same as for residue
         """Method that builds the given ligand to the specified path, making sure it is a pdb filepath."""
         ext = fs.get_file_ext(out_path).lower()
         if ext != ".pdb":

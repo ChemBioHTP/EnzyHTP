@@ -19,7 +19,7 @@ class Chain:
 
     Attributes:
         name_ : The name of the chain as a string.
-                residues_ : A list of Residue() objects or derived types.
+        residues_ : A list of Residue() objects or derived types.
     """
 
     def __init__(self, name: str, residues: List[Residue]):
@@ -28,22 +28,22 @@ class Chain:
         self.residues_: List[Residue] = deepcopy(residues)
         self.rename(self.name_)
 
-    def insert_residue(self, new_res: Residue, sort_after: bool = True) -> None:
+    def insert_residue(self, new_res: Residue, sort_after: bool = True) -> None: #@shaoqz: @imp overwriting a residue is rarely a demand but instead inserting one with same name and index but different stru is.
         """Allows for insertion of a new Residue() object into the Chain. If the new Residue() is an exact
         copy, it fully overwrites the existing value. The sort_after flag specifies if the Residue()'s should
         be sorted by residue_number after the insertion.
         """
         for ridx, res in enumerate(self.residues_):
-            if new_res.name == res.name and new_res.num_ == res.num_:
-                self.residues_[idx] = deepcopy(new_res)
+            if new_res.name == res.name and new_res.num_ == res.num_: #@shaoqz: @imp should not work like this. Imaging the case where both residue is called LIG but they are different ligands. They are neither the same nor should be overwritten.
+                self.residues_[idx] = deepcopy(new_res) #@shaoqz: @imp a bug?
                 break
         else:
             self.residues_.append(new_res)
 
-        self.rename(self.name_)
+        self.rename(self.name_) #@shaoqz: maybe better to change this residue attribute only?
 
         if sort_after:
-            self.residues_.sort(key=lambda r: r.num())
+            self.residues_.sort(key=lambda r: r.num()) #@shaoqz: @imp this does not work when two different residue have the same index which often happens when you want to add a ligand to the structure.
 
     def is_metal(self) -> bool:
         """Checks if any metals are contained within the current chain."""
@@ -53,12 +53,12 @@ class Chain:
         for rr in self.residues_:
             if not rr.is_canonical():
                 return False
-        return True
+        return True #@shaoqz: why not use sum like above lol
 
-    def empty(self) -> bool:
+    def empty(self) -> bool: #@shaoqz: @imp2 maybe name it is_empty?
         """Does the chain have any Residue()'s."""
         return len(self.residues_) == 0
-
+    #@shaoqz: @prefer use property deco to distinguish more with actual non-getter methods
     def residues(self) -> List[Residue]:
         """Access the child Residue() objects."""
         return self.residues_
@@ -86,16 +86,16 @@ class Chain:
         for s, o in zip(self_residues, other_residues):
             s: Residue
             o: Residue
-            if not s.sequence_equivalent(o):
+            if not s.sequence_equivalent(o): #@shaoqz: this is a good idea of having different levels of comparsion @imp2 after reading this method I found here it already comparing residues in the same position we only need to compare the name but not the key
                 return False
         return True
 
-    def rename(self, new_name: str) -> None:
+    def rename(self, new_name: str) -> None: #@shaoqz: using the 2-way link sheet will get rid of functions like this but both works.
         """Renames the chain and propagates the new chain name to all child Residue()'s."""
         self.name_ = new_name
         res: Residue
         for ridx, res in enumerate(self.residues_):
-            self.residues_[ridx].set_chain(new_name)
+            self.residues_[ridx].set_chain(new_name) #@shaoqz: why not just use res?
 
     def num_atoms(self) -> int:
         """Finds the total number of Atom() objects contained in the Residue() children objects."""
@@ -104,7 +104,7 @@ class Chain:
             total += res.num_atoms()
         return total
 
-    def renumber_atoms(self, start: int = 1) -> int:
+    def renumber_atoms(self, start: int = 1) -> int: #@shaoqz: @imp need to record the mapping of the index  #@shaoqz: also need one for residues
         """Renumbers the Atom()'s inside the chain beginning with "start" value and returns index of the last atom.
         Exits if start index <= 0.
         """
@@ -120,13 +120,13 @@ class Chain:
             idx = self.residues_[ridx].renumber_atoms(idx)
             idx += 1
             terminal = (ridx < (num_residues - 1)) and (
-                res.is_canonical() and not self.residues_[ridx + 1].is_canonical()
+                res.is_canonical() and not self.residues_[ridx + 1].is_canonical() #@shaoqz: @imp what does this mean? the TER line?
             )
             if terminal:
                 idx += 1
-        return idx - 1
+        return idx - 1 
 
-    def get_pdb_lines(self) -> List[str]:
+    def get_pdb_lines(self) -> List[str]: #@shaoqz: @imp move to the IO class
         """Generates a list of PDB lines for the Atom() objects inside the Chain(). Last line is a TER."""
         result = list()
         num_residues: int = self.num_residues()
@@ -134,7 +134,7 @@ class Chain:
             terminal = (idx < (num_residues - 1)) and (
                 res.is_canonical() and not self.residues_[idx + 1].is_canonical()
             )
-            result.extend(res.get_pdb_lines(terminal))
+            result.extend(res.get_pdb_lines(terminal)) #@shaoqz: why terminal?
         result.append("TER")
         return result
 
@@ -146,7 +146,7 @@ class Chain:
         """Returns number of Residue() or Residue()-dervied objects belonging to the Chain."""
         return len(self)
 
-    def remove_residue(self, target_key: str) -> None:
+    def remove_residue(self, target_key: str) -> None: #@shaoqz: @imp2 target key should not require the name. We should minimize the prerequisite of any input since its for HTP.
         """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format,
         the Residue() is removed if it currently exists in the Chain() object."""
         for ridx, res in enumerate(self.residues_):
@@ -155,4 +155,4 @@ class Chain:
         else:
             return
 
-        del self.residues_[ridx]
+        del self.residues_[ridx] #@shaoqz: why not move this line inside the loop?

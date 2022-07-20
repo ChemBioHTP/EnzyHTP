@@ -13,13 +13,13 @@ import numpy as np
 
 class Atom:
     """Base unit of structure in enzy_htp. Effectively acts as dict() to store various data values
-    from each PDB lines. Designed to be used in tandem with the biopandas.pdb.PandasPdb() class.
+    from each PDB lines. Designed to be used in tandem with the biopandas.pdb.PandasPdb() class. #@shaoqz: @imp we should decouple PDB format with data structure in enzyhtp
     Each Atom() instance is created directly from each row in a PandasPDB() DataFrame().
 
     Note: The Atom class SHOULD NOT be created directly by users. It is handled by other functions in enzy_htp.
 
     Attributes:
-        alt_loc : Character indicating if alternative location is present.
+        alt_loc : Character indicating if alternative location is present. #@shaoqz: which specific column is it?
         atom_name : The name of the atom as a string.
         atom_number : An integer number for the atom.
         b_factor : A float representing the temperature factor (b factor).
@@ -42,7 +42,7 @@ class Atom:
         z_coord : z coordinate in cartesian 3D space.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs): #@shaoqz: @imp we should have a seperate IO module parsing PDB and have functions there as constructor and exportor of a structure object.
         """Constructor meant to be called as Atom(**row), where row is of type pandas.Series"""
         self.alt_loc = str()
         self.atom_name = str()
@@ -58,9 +58,9 @@ class Atom:
         self.insertion = None
         self.line_idx = int()
         self.occupancy = float()
-        self.record_name = str()
-        self.residue_name = str()
-        self.residue_number = int()
+        self.record_name = str() 
+        self.residue_name = str() #@shaoqz: in that case we do not need to have those redundant information in atom
+        self.residue_number = int() #@shaoqz: but also this makes me think about when an atom need to access residue but I remember we discussed we can not let that happen.
         self.segment_id = int()
         self.x_coord = float()
         self.y_coord = float()
@@ -70,13 +70,13 @@ class Atom:
             setattr(self, k, v)
 
         if not np.isnan(self.charge):
-            self.charge = int(self.charge)
+            self.charge = int(self.charge) #@shaoqz: charge should be float.
 
     def has_alt_loc(self) -> bool:
         """Checks if the atom has a non-empty alt_loc."""
         return len(self.alt_loc.strip()) != 0
 
-    def residue_key(self) -> str:
+    def residue_key(self) -> str: #@shaoqz: but this function is accessing information of residue. could it be better if atom store a reference of it? Also imaging we need more information about residue like those should be calculated (RMSD, for kinetic scoring) upon selection of one atom base on like distance.
         """Creates a residue key of format "chain_id.residue_name.residue_number". Used for residue construction."""
         return f"{self.chain_id}.{self.residue_name}.{self.residue_number}"
 

@@ -37,7 +37,7 @@ class Residue:
     def __init__(self, residue_key: str, atoms: List[Atom]):
         """Constructor for the Residue() object. Takes residue_key in format of "chain_name.resdue_name.residue_id" and a list of Atom() objects."""
         self.atoms = atoms
-        self.residue_key = residue_key
+        self.residue_key = residue_key #@shaoqz: @imp to identify a residue only chain_id and residue_id inside of the chain is enough. The residue name seem redundant especially when using it to aquire a residue. After reading more code i see you are using the key for 1) select the residue 2) comparing the residue 3) identifying the residue
         (chain, name, num) = self.residue_key.split(".")
         self.chain_ = chain
         self.name = name
@@ -59,20 +59,20 @@ class Residue:
             )
             exit(1)
         aa: Atom
-        self.atoms = sorted(self.atoms, key=lambda aa: aa.atom_number)
+        self.atoms = sorted(self.atoms, key=lambda aa: aa.atom_number) #@shaoqz: maybe use .sort to keep the reference.
 
         for idx, aa in enumerate(self.atoms):
-            self.atoms[idx].atom_number = idx + start
+            self.atoms[idx].atom_number = idx + start #@shaoqz: why dont use aa?
         return idx + start
 
     def has_alt_loc(self) -> bool:
         """Checks if any of the child Atom() objects have non-emptry alt_loc values."""
         result: bool = False
         for aa in self.atoms:
-            result |= aa.has_alt_loc()
+            result |= aa.has_alt_loc() #@shaoqz: cool!
         return result
 
-    def resolve_alt_loc(self, keep: str = "first") -> None:
+    def resolve_alt_loc(self, keep: str = "first") -> None: #@shaoqz: nice we have this now!
         """Resolves the alt_loc atoms owned by the current Residue().
         Optional argument "keep" specifies the resolution method. Default
         is "first" which forces Residue() to keep lowest location. Otherwise,
@@ -99,7 +99,7 @@ class Residue:
 
         self.atoms.sort(key=lambda aa: aa.atom_number)
 
-    def remove_occupancy(self) -> None:
+    def remove_occupancy(self) -> None: #@shaoqz: @imp2 really curious about the reason of putting all fundmental methods that edit data in residue instead of atom, which the later is more intuative to me.
         """Makes the occupancy for each of the child Atom() objects blank."""
         for idx in range(len(self.atoms)):
             self.atoms[idx].occupancy = ""
@@ -117,7 +117,7 @@ class Residue:
         """Returns a list of all Atom() objects that the Residue() "owns" """
         return self.atoms
 
-    def empty_chain(self) -> bool:
+    def empty_chain(self) -> bool: #@shaoqz: @imp2 add is_ maybe?
         """Whether the Residue() lacks a chain identitifer. NOT a chain object accessor."""
         return not len(self.chain_.strip())
 
@@ -127,7 +127,7 @@ class Residue:
 
     def set_chain(self, val: str) -> None:
         """Sets chain and all child atoms to new value. Re-generates the self.residue_key attribute."""
-        chain = val
+        chain = val #@shaoqz: Refine this line
         for idx in range(len(self.atoms)):
             self.atoms[idx].chain_id = val
         self.chain_ = val
@@ -137,7 +137,7 @@ class Residue:
         """Getter for the Residue()'s number."""
         return self.num_
 
-    def min_line(self) -> int:
+    def min_line(self) -> int: #@shaoqz: @imp2 move to the pdb IO class
         """The lowest one-indexed line one of the Residue()'s atoms come from."""
         return self.min_line_
 
@@ -149,7 +149,7 @@ class Residue:
         """A tuple of the he lowest and highest one-indexed lines that the Residue()'s atoms come from."""
         return (self.min_line(), self.max_line())
 
-    def neighbors(self, other: Residue) -> bool:
+    def neighbors(self, other: Residue) -> bool: #@shaoqz: @imp2 move to IO class / change to is_neighbors
         """Checks if two residues from the same PDB are neighbors."""
         return (abs(self.min_line() - other.max_line()) == 1) or (
             abs(self.max_line() - other.min_line()) == 1
@@ -165,9 +165,9 @@ class Residue:
 
     def is_canonical(self) -> bool:
         """Checks if Residue() is canonical. Inherited by children."""
-        return self.name in chem.THREE_LETTER_AA_MAPPER
+        return self.name in chem.THREE_LETTER_AA_MAPPER #@shaoqz: @imp2 why dont we have anything related to canonical in the name
 
-    def is_rd_solvent(self) -> bool:
+    def is_rd_solvent(self) -> bool: #@shaoqz: @imp2 move to the IO class. This is PDB related.
         """Checks if the Residue() is an rd_sovlent as defined by enzy_htp.chemical.solvent.RD_SOLVENT"""
         return self.name in chem.RD_SOLVENT_LIST
 
@@ -175,7 +175,7 @@ class Residue:
         """Checks if the Residue() is an rd_non_ligand as defined by enzy_htp.chemical.solvent.RD_NON_LIGAND_LIST"""
         return self.name in chem.RD_NON_LIGAND_LIST
 
-    def sequence_equivalent(self, other: Residue) -> bool:
+    def sequence_equivalent(self, other: Residue) -> bool: #@shaoqz: @imp2 why do we need to compare this? Because in the comparsion of residues there often some information exist and want to compare the rest.
         """Comparator that checks for sequence same-ness."""
         return self.residue_key == other.residue_key
 

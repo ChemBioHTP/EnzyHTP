@@ -200,7 +200,7 @@ def test_compare_structures_not_equiv():
     }
 
 
-def test_merge_right_canonical_only():
+def test_merge_right_canonical_only(): #@shaoqz: @imp a better idea is to merge 2 different protein.
     """Merges differences between two Structure() objects containing only canonical residues."""
     # TODO(CJ): include non-canonical residues in here
     TEST_FILE = f"{TEST_DIR}/preparation/data/3NIR.pdb"
