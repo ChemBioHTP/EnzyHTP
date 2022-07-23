@@ -278,7 +278,7 @@ def _mutate_tleap(pdb: str, outfile: str, mutations: List[Mutation]) -> None:
     ai.mutate(outfile)
     if backup:
         structure:struct.Structure = struct.structure_from_pdb(outfile)
-        for rkey in structure.residue_keys():
+        for rkey in structure.residue_keys:
             if rkey not in backup:
                 continue
             tmp_file = f"/tmp/ligand.{rkey}.tmp.pdb"

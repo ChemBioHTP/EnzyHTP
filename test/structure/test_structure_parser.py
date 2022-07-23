@@ -140,7 +140,7 @@ def test_categorize_residue_all_canonical():
     """Checking that the structure_parser.categorize_residue() works for only canonical Residues()."""
     pdb_file = f"{DATA_DIR}/two_chain.pdb"
     structure: Structure = structure_from_pdb(pdb_file)
-    assert structure.num_chains() == 2
+    assert structure.num_chains == 2
     # TODO(CJ): maybe make this a function for the Structure() class
     residues: List[Residue] = structure.residues
     for rr in residues:
@@ -239,7 +239,7 @@ def test_structure_from_pdb_simple():
 
     chain_A_target = ["A.ALA.10", "A.THR.11"]
     chain_B_target = ["B.GLY.12", "B.GLY.13", "B.ASN.14", "B.LEU.15", "B.PRO.16"]
-    assert structure.num_chains() == 2
+    assert structure.num_chains == 2
     (chain_A, chain_B) = structure.chains
     assert chain_A_target == list(map(str, chain_A))
     assert chain_B_target == list(map(str, chain_B))
@@ -249,7 +249,7 @@ def test_structure_from_pdb_mixed_case():
     """Checking that the main method structure_parser.structure_from_pdb() works for cases with mixed Residue() types.."""
     mixed_pdb = f"{DATA_DIR}/mixed_residues.pdb"
     structure: Structure = structure_from_pdb(mixed_pdb)
-    assert structure.num_chains() == 5
+    assert structure.num_chains == 5
     all_residues = structure.residues
 
     assert all_residues[0].is_canonical()

@@ -42,14 +42,14 @@ Operation:
         2
         >>> structure.residue_state
         [('A','ASP',1),('A','ASP',2),('A','ASP',3),('B','ASP',1)] #@shaoqz:shouldn't it be 1-letter name?
-        >>> structure.num_residues()
+        >>> structure.num_residues
         4
 
     Interfacing with Chain()'s:
         >>> structure.chains
         [<enzy_htp.structure.chain.Chain object at 0x7fdc680ac670>, 
             <enzy_htp.structure.chain.Chain object at 0x7fdc680855b0>]
-        >>> structure.chain_names()
+        >>> structure.chain_names
         ['A', 'B']
         >>> chain_cpy : enzy_htp.Chain = structure.get_chain( 'B' )
         >>> structure.remove_chain( 'B' )
@@ -57,34 +57,34 @@ Operation:
         [<enzy_htp.structure.chain.Chain object at 0x7fdc680ac670>]
         >>> structure.num_chains()
         1
-        >>> structure.num_residues()
+        >>> structure.num_residues
         3
         >>> structure.insert_chain( chain_cpy )
         >>> structure.chains
         [<enzy_htp.structure.chain.Chain object at 0x7fdc680ac670>, 
             <enzy_htp.structure.chain.Chain object at 0x7fdc680855b0>] # @shaoqz: why chain.Chain?
-        >>> structure.chain_names()
+        >>> structure.chain_names
         ['A', 'B']
         >>> structure.num_chains()
         2	
-        >>> structure.num_residues()
+        >>> structure.num_residues
         4	
 
     Interfacing with Residue()'s:
         >>> structure.residues()
         ['A.ASP.1','A.ASP.2','A.ASP.3','B.ASP.1']   # @shaoqz: shouldn't this be Residue objects?
-        >>> structure.num_residues()
+        >>> structure.num_residues
         4
         >>> res_cpy : enzy_htp.Residue = structure.get_residue( 'B.ASP.1' ) # @shaoqz: @imp we should not use residue name and id together as the identifier. Either id only to pinpoint or name only to batch select
         >>> structure.remove_residue( 'B.ASP.1' )
         >>> structure.residues()
         ['A.ASP.1','A.ASP.2','A.ASP.3']
-        >>> structure.num_residues()
+        >>> structure.num_residues
         3
         >>> structure.insert_residue( res_cpy )
         >>> structure.residues()
         ['A.ASP.1','A.ASP.2','A.ASP.3','B.ASP.1']
-        >>> structure.num_residues()
+        >>> structure.num_residues
         4
 
     Saving the structure:
@@ -150,13 +150,18 @@ class Structure:
                 exit(1)
             self.chain_mapper[ch.name()] = ch
 
-    # Getters
+    # === Getters (Attributes - accessing Structure data -  references) ===
+
     @property
     def chains(self) -> List[Chain]:
         """Getter for the list of Chain() objects contained within the Structure() object."""
         self.chains_.sort(key=lambda c: c.name())
         # TODO(CJ): should this be a deep copy or no? #@shaoqz: No
         return self.chains_
+
+    def get_chain(self, chain_name: str) -> Union[Chain, None]:
+        """Gets a chain of the given name. Returns None if the Chain() is not present."""
+        return self.chain_mapper.get(chain_name, None)
 
     @property
     def residues(self) -> List[Residue]:
@@ -166,6 +171,15 @@ class Structure:
             result.extend(ch.residues())
         result.sort(key=lambda r: r.sort_key())
         return result
+
+    def get_residue(self, target_key: str) -> Union[None, Residue]: #@shaoqz: we need to that gives a reference. In the case of editing the structure.
+        """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format,
+        a deepcopy of the corresponding Residue() is returned, if it exists. None is returned if it cannot be found."""
+        for chain in self.chains_:
+            for res in chain.residues():
+                if res.residue_key == target_key:
+                    return deepcopy(res)
+        return None
 
     @property
     def metals(self) -> List[Residue]:
@@ -189,14 +203,20 @@ class Structure:
         return []
 
     @ property
-    def atoms(self) -> List[Atom]:
+    def atoms(self) -> List[Atom]: # TODO(shaoqz) wait for test
         result = list()
         for chain in self.chains_:
             for residue in chain:
                 result.extend(residue.atom_list())
         return result
 
+    def get_atom(self) -> Atom:
+        '''TODO do we really need this? Providing access of deeper layer requires a key to select
+        maybe just use python objects to access is a better idea.
+        And these APIs are just for developers, users will have selector in the future to do selection'''
+        pass
 
+    # === Getter (Properities - derived data; wont affect Structure data - copy) ===
 
     @property
     def residue_state(self) -> List[Tuple[str, str, int]]: #@shaoqz: @residue_key
@@ -221,7 +241,27 @@ class Structure:
                 result.append(res.residue_key)
         return result
 
+    @property
+    def num_residues(self) -> int:
+        """Returns the number of Residue() objects contained within the current Structure()."""
+        total: int = 0
+        ch: Chain
+        for ch in self.chains_:
+            total += ch.num_residues()
+        return total
 
+    @property
+    def num_chains(self) -> int:
+        """Returns the number of Chain() objects in the current Structure()."""
+        return len(self.chains_)
+
+    @property
+    def chain_names(self) -> List[str]:
+        """Returns a list of all the chain names for the Structure()"""
+        return list(self.chain_mapper.keys())
+
+    # Checker
+    
     def remove_chain(self, chain_name: str) -> None:
         """Given a chain name, removes the Chain() object form both self.chains_ and self.chain_mapper."""
         del self.chain_mapper[chain_name]
@@ -246,26 +286,9 @@ class Structure:
         self.chain_mapper[new_chain.name()] = new_chain
         self.chains_.sort(key=lambda c: c.name())
 
-    def num_chains(self) -> int:
-        """Returns the number of Chain() objects in the current Structure()."""
-        return len(self.chains_)
-
-    def num_residues(self) -> int:
-        """Returns the number of Residue() objects contained within the current Structure()."""
-        total: int = 0
-        ch: Chain
-        for ch in self.chains_:
-            total += ch.num_residues()
-        return total
-
-    def get_chain(self, chain_name: str) -> Union[Chain, None]:
-        """Gets a chain of the given name. Returns None if the Chain() is not present."""
-        return self.chain_mapper.get(chain_name, None)
-
     def has_chain(self, chain_name: str) -> bool:
         """Checks if the Structure() has a chain with the specified chain_name."""
         return chain_name in self.chain_mapper
-
 
     def to_pdb(self, out_path: str) -> None: #@shaoqz: @imp2 move to the PDB interface in the future
         """Saves the structure to the specified file in the PDB file format."""
@@ -520,16 +543,16 @@ class Structure:
 
         return all_r_list
 
-    def get_residue(self, id): #@shaoqz: @imp duplicated ones?
-        """
-        re-search residue id with all residues count togethor from 1.
-        ----------
-        return a residue object
-        """
-        all_resi = self.get_all_residue_unit()
-        for resi in all_resi:
-            if resi.id == int(id):
-                return resi
+    # def get_residue(self, id): #@shaoqz: @imp duplicated ones?
+    #     """
+    #     re-search residue id with all residues count togethor from 1.
+    #     ----------
+    #     return a residue object
+    #     """
+    #     all_resi = self.get_all_residue_unit()
+    #     for resi in all_resi:
+    #         if resi.id == int(id):
+    #             return resi
 
 
     def get_atom_id(self): #@shaoqz: @nu
@@ -683,15 +706,6 @@ class Structure:
         self.chains_ = list(self.chain_mapper.values()) #@shaoqz: why need this
         self.chains_.sort(key=lambda c: c.name()) #@shaoqz: should this be in the 1st if block?
 
-    def get_residue(self, target_key: str) -> Union[None, Residue]: #@shaoqz: we need to that gives a reference. In the case of editing the structure.
-        """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format,
-        a deepcopy of the corresponding Residue() is returned, if it exists. None is returned if it cannot be found."""
-        for chain in self.chains_:
-            for res in chain.residues():
-                if res.residue_key == target_key:
-                    return deepcopy(res)
-        return None
-
     def remove_residue(self, target_key: str) -> None:
         """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format,
         the Residue() is removed if it currently exists in one of the child Chain()'s. If the Chain() is empty after this
@@ -702,9 +716,6 @@ class Structure:
             if self.chain_mapper[chain_name].empty():
                 self.remove_chain(chain_name)
 
-    def chain_names(self) -> List[str]:
-        """Returns a list of all the chain names for the Structure()"""
-        return list(self.chain_mapper.keys())
 
 
 def compare_structures(left: Structure, right: Structure) -> Dict[str, List[str]]:

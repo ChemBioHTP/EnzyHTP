@@ -257,7 +257,7 @@ def test_round_trip_pdb():
     assert not os.path.exists(actual_file)
 
 
-def test_atoms():
+def test_atoms(): # TODO(shaoqz) wait for test
     TEST_FILE = f"{TEST_DIR}/preparation/data/3NIR.pdb"
     struct: Structure = structure_from_pdb(TEST_FILE)
     print(struct.atoms)
