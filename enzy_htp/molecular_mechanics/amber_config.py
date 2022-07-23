@@ -13,7 +13,8 @@ from pprint import pprint
 from copy import deepcopy
 from typing import Any, List, Dict
 from plum import dispatch
-
+import json, os, glob
+import logging
 
 class AmberConfig:
     """Class that holds default values for running Amber within enzy_htp and also creates
@@ -213,6 +214,31 @@ class AmberConfig:
             # TODO(CJ): add a custom error for this part
             raise TypeError()
 
+def load_conf_equi(confiles:str)-> dict:
+    filename = glob.glob(confiles + '*')
+    logging.basicConfig(filename="core._LOGGER", filemode='a',
+                        level=logging.INFO)
+    
+    if filename == []:
+        logging.error(f"The supplied file:\'{confiles}\' does not exist!")
+    
+    elif os.path.exists(confiles + '.json') is not True:
+        logging.debug(f"The supplied file: \'{confiles}\' is not a .json file!")
+    
+    else:
+        with open(file+".json") as jsf:
+            conf_inp = json.load(jsf)
+        ref = CONF_EQUI
+        
+        for a in conf_inp.keys() - ref.keys():
+            logging.warning(f"Extra setting \'{a}\' found in CONF_EQUI.
+                            Removing ...")
+            conf_inp.pop(a)
+        
+        for c in ref.keys() - conf_inp.keys():
+            logging.error(f"missing input keys \'{c}\'")
+
+    return conf_inp
 
 def default_amber_config() -> AmberConfig:
     """Creates a deep-copied default version of the AmberConfig() class."""

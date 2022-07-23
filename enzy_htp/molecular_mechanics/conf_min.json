@@ -1,0 +1,11 @@
+{
+	"ntc": 2,
+	"ntf": 2,
+	"cut": 10.0,
+	"maxcyc": 20000,
+	"ncyc_mult": 0.5,
+	"ntpr_mult": 0.01,
+	"ntr": 1,
+	"restraintmask": "'@C,CA,N'",
+	"restraint_wt": 2.0
+}
