@@ -213,47 +213,47 @@ class AmberConfig:
             # TODO(CJ): add a custom error for this part
             raise TypeError()
 
-def load_conf_equi(confiles:str)-> dict:
-    """Load equi setup for MD
-    The function use to load the setting for equi step in Amber. Function will
-    return with a dictionary.
+    def load_conf_equi(confiles:str)-> dict:
+        """Load equi setup for MD
+        The function use to load the setting for equi step in Amber. Function will
+        return with a dictionary.
     
-    Args:
-        confiles: A string of configuration file name for the equi setting. The file
-        should be in json file format, otherwise it will print debug in log file.
+        Args:
+            confiles: A string of configuration file name for the equi setting. The file
+            should be in json file format, otherwise it will print debug in log file.
 
-    Return: 
-        A dict that read from the json file. The keys is the setting keywords
-        in Amebr. Some keys may be removed  if they are not included in the
-        template dict {CONF_EQUI}
+        Return: 
+            A dict that read from the json file. The keys is the setting keywords
+            in Amebr. Some keys may be removed  if they are not included in the
+            template dict {CONF_EQUI}
 
-    Raise:
-        None. Check the core._LOGGER for error information
-    """
-    filename = glob.glob(confiles + '*')
-    logging.basicConfig(filename="core._LOGGER", filemode='a',
-                        level=logging.INFO)
+        Raise:
+            None. Check the core._LOGGER for error information
+        """
+        filename = glob.glob(confiles + '*')
+        logging.basicConfig(filename="core._LOGGER", filemode='a',
+                            level=logging.INFO)
     
-    if filename == []:
-        logging.error(f"The supplied file:\'{confiles}\' does not exist!")
+        if filename == []:
+            logging.error(f"The supplied file:\'{confiles}\' does not exist!")
     
-    elif os.path.exists(confiles + '.json') is not True:
-        logging.debug(f"The supplied file: \'{confiles}\' is not a .json file!")
+        elif os.path.exists(confiles + '.json') is not True:
+            logging.debug(f"The supplied file: \'{confiles}\' is not a .json file!")
     
-    else:
-        with open(file+".json") as jsf:
-            conf_inp = json.load(jsf)
-        ref = CONF_EQUI
+        else:
+            with open(file+".json") as jsf:
+                conf_inp = json.load(jsf)
+            ref = CONF_EQUI
         
-        for a in conf_inp.keys() - ref.keys():
-            logging.warning(f"Extra setting \'{a}\' found in CONF_EQUI.
-                            Removing ...")
-            conf_inp.pop(a)
+            for a in conf_inp.keys() - ref.keys():
+                logging.warning(f"Extra setting \'{a}\' found in CONF_EQUI.
+                                Removing ...")
+                conf_inp.pop(a)
         
-        for c in ref.keys() - conf_inp.keys():
-            logging.error(f"missing input keys \'{c}\'")
+            for c in ref.keys() - conf_inp.keys():
+                logging.error(f"missing input keys \'{c}\'")
 
-    return conf_inp
+        return conf_inp
 
 def default_amber_config() -> AmberConfig:
     """Creates a deep-copied default version of the AmberConfig() class."""
