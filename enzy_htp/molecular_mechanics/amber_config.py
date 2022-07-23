@@ -13,8 +13,7 @@ from pprint import pprint
 from copy import deepcopy
 from typing import Any, List, Dict
 from plum import dispatch
-import json, os, glob
-import logging
+import json, os, glob, logging
 
 class AmberConfig:
     """Class that holds default values for running Amber within enzy_htp and also creates
