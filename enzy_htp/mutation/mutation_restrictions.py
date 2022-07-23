@@ -212,7 +212,7 @@ def restriction_object(pdb: str) -> MutationRestrictions:
     """
     struct: es.Structure = es.structure_from_pdb(pdb)
     mapper: Dict[Tuple[str, int], Dict] = dict()
-    for res in struct.residues():
+    for res in struct.residues:
         if not res.is_canonical():
             continue
         mapper[(res.chain(), res.num())] = default_restriction_dict()

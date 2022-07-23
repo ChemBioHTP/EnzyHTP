@@ -47,7 +47,7 @@ def create_selection(struct: Structure, atom_mask: str, fix_end: str = None):
     sele_lines = {}
     # decode atom_mask (maybe in helper later) TODO
     resi_list = atom_mask[1:].strip().split(",")
-    all_resi_list = struct.residues()
+    all_resi_list = struct.residues
 
     # decode and get obj
     sele_stru_objs = []

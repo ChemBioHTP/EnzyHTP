@@ -1,72 +1,94 @@
-"""Definition for the Structure class. Structure objects represent a single protein/enzyme system. They
-are composed of Chain objects and their respecitve residues. The majority of EnzyHTP's structural 
-manipulations are carried out through this class. Note that Structure() objects SHOULD NOT be created
-by the user directly and instead creted through enzy_htp.structure_from_pdb(). Common Structure() operations 
-include the insertion/deletion of child Residue() and Chain() objects. 
+"""This class define the core data structure of EnzyHTP: Structure. Structure stands for the single enzyme structure.
+As the core data class, Structure will be solely designed for **storing, accessing and editing** structural data.
 
-Sub-module also contains two utility free functions for comparing and merging structural elements.
-compare_structures() and merge_right() are used for comparing and merging structural components for Structure()
-objects, respectively.
+For the data point of view, the enzyme structure is composed by two parts of data:
+- topology (composition of atoms and their connectivity)
+  there are 2 common ways to store connectivity:
+    + the chain, residue division of atoms (inter-residue connectivity)
+      & the canonical residue name and atom names in it (intra-residue connectivity)
+      & the connectivity table for non-canonical parts
+    + the connectivity table for the whole enzyme
+- coordinate (atomic coordinate upon topology)
 
-NOTE: The below code assumes a trivial protein structure with two chains containing 3 and 1 residue, respectively.
+Base on this concept, Structure object holds a list of composing Chain objects which also contain Residue objects
+and so that Atom objects. In each Atom object, atom name and coordinate is stored. Every level (chain, residue, atom/
+coordinate/connectivity) of information can all be pulled out from the Structure object with getter methods and can be set
+with setter methods. Also Structure() supports common editing methods such as add/remove children objects.
 
-Loading a structure from PDB:
-	>>> import enzy_htp
-	>>> structure : enzy_htp.Structure = enzy_htp.structure_from_pdb("/path/to/pdb")
+Application of Structure objects - Binding modules:
+Generation:
+    Note that Structure() objects SHOULD NOT be created by the user directly and instead created through different generation 
+    methods from the binding StructureIO classes (e.g.: enzy_htp.structure_from_pdb()) from different file types and different 
+    external data structures.
+Selection:
+    Selection of Structural regions are handled by the Selection module.
+Operation:
+    Changes of the Structure data are handled by functions in main EnzyHTP modules: Preparation, Mutation, Geom Variation.
+    And structure based descriptors are derived by functions in the Energy Engine module.
 
-Surveying basic information:
-    >>> structure.num_chains()
-	2
-	>>> structure.residue_state()
-	[('A','ASP',1),('A','ASP',2),('A','ASP',3),('B','ASP',1)] #@shaoqz:shouldn't it be 1-letter name?
-	>>> structure.num_residues()
-	4
+    Sub-module also contains two utility free functions for comparing and merging structural elements.
+    compare_structures() and merge_right() are used for comparing and merging structural components for Structure()
+    objects, respectively.
 
-Interfacing with Chain()'s:
-    >>> structure.chains()
-    [<enzy_htp.structure.chain.Chain object at 0x7fdc680ac670>, 
-	    <enzy_htp.structure.chain.Chain object at 0x7fdc680855b0>]
-    >>> structure.chain_names()
-    ['A', 'B']
-    >>> chain_cpy : enzy_htp.Chain = structure.get_chain( 'B' )
-    >>> structure.remove_chain( 'B' )
-    >>> structure.chains()
-    [<enzy_htp.structure.chain.Chain object at 0x7fdc680ac670>]
-	>>> structure.num_chains()
-	1
-	>>> structure.num_residues()
-	3
-	>>> structure.insert_chain( chain_cpy )
-    >>> structure.chains()
-    [<enzy_htp.structure.chain.Chain object at 0x7fdc680ac670>, 
-	    <enzy_htp.structure.chain.Chain object at 0x7fdc680855b0>] # @shaoqz: why chain.Chain?
-    >>> structure.chain_names()
-    ['A', 'B']
-	>>> structure.num_chains()
-    2	
-	>>> structure.num_residues()
-    4	
+### below doc is waiting for update in the future if change ###
+    NOTE: The below code assumes a trivial protein structure with two chains containing 3 and 1 residue, respectively.
 
-Interfacing with Residue()'s:
-    >>> structure.residues()
-    ['A.ASP.1','A.ASP.2','A.ASP.3','B.ASP.1']   # @shaoqz: shouldn't this be Residue objects?
-	>>> structure.num_residues()
-	4
-	>>> res_cpy : enzy_htp.Residue = structure.get_residue( 'B.ASP.1' ) # @shaoqz: @imp we should not use residue name and id together as the identifier. Either id only to pinpoint or name only to batch select
-    >>> structure.remove_residue( 'B.ASP.1' )
-    >>> structure.residues()
-    ['A.ASP.1','A.ASP.2','A.ASP.3']
-	>>> structure.num_residues()
-	3
-	>>> structure.insert_residue( res_cpy )
-    >>> structure.residues()
-    ['A.ASP.1','A.ASP.2','A.ASP.3','B.ASP.1']
-	>>> structure.num_residues()
-	4
+    Loading a structure from PDB:
+        >>> import enzy_htp
+        >>> structure : enzy_htp.Structure = enzy_htp.structure_from_pdb("/path/to/pdb")
 
-Saving the structure:
-    >>> structure.to_pdb( "/path/to/copy/of/pdb" )
+    Surveying basic information:
+        >>> structure.num_chains()
+        2
+        >>> structure.residue_state
+        [('A','ASP',1),('A','ASP',2),('A','ASP',3),('B','ASP',1)] #@shaoqz:shouldn't it be 1-letter name?
+        >>> structure.num_residues()
+        4
 
+    Interfacing with Chain()'s:
+        >>> structure.chains
+        [<enzy_htp.structure.chain.Chain object at 0x7fdc680ac670>, 
+            <enzy_htp.structure.chain.Chain object at 0x7fdc680855b0>]
+        >>> structure.chain_names()
+        ['A', 'B']
+        >>> chain_cpy : enzy_htp.Chain = structure.get_chain( 'B' )
+        >>> structure.remove_chain( 'B' )
+        >>> structure.chains
+        [<enzy_htp.structure.chain.Chain object at 0x7fdc680ac670>]
+        >>> structure.num_chains()
+        1
+        >>> structure.num_residues()
+        3
+        >>> structure.insert_chain( chain_cpy )
+        >>> structure.chains
+        [<enzy_htp.structure.chain.Chain object at 0x7fdc680ac670>, 
+            <enzy_htp.structure.chain.Chain object at 0x7fdc680855b0>] # @shaoqz: why chain.Chain?
+        >>> structure.chain_names()
+        ['A', 'B']
+        >>> structure.num_chains()
+        2	
+        >>> structure.num_residues()
+        4	
+
+    Interfacing with Residue()'s:
+        >>> structure.residues()
+        ['A.ASP.1','A.ASP.2','A.ASP.3','B.ASP.1']   # @shaoqz: shouldn't this be Residue objects?
+        >>> structure.num_residues()
+        4
+        >>> res_cpy : enzy_htp.Residue = structure.get_residue( 'B.ASP.1' ) # @shaoqz: @imp we should not use residue name and id together as the identifier. Either id only to pinpoint or name only to batch select
+        >>> structure.remove_residue( 'B.ASP.1' )
+        >>> structure.residues()
+        ['A.ASP.1','A.ASP.2','A.ASP.3']
+        >>> structure.num_residues()
+        3
+        >>> structure.insert_residue( res_cpy )
+        >>> structure.residues()
+        ['A.ASP.1','A.ASP.2','A.ASP.3','B.ASP.1']
+        >>> structure.num_residues()
+        4
+
+    Saving the structure:
+        >>> structure.to_pdb( "/path/to/copy/of/pdb" )
 
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
@@ -76,15 +98,13 @@ Date: 2022-04-03
 from __future__ import annotations
 
 import string
-import pandas as pd
 from copy import deepcopy
 from typing import List, Set, Dict, Tuple
 from collections import defaultdict
-from biopandas.pdb import PandasPdb
 
 from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
-from enzy_htp.chemical import one_letters_except, convert_to_one_letter
+from enzy_htp.chemical import convert_to_one_letter
 
 from .atom import Atom
 from . import Chain
@@ -96,15 +116,25 @@ from .metal_atom import MetalAtom
 
 
 class Structure:
-    """High level representation of protein/enzyme structure designed for direct interfacing by users.
-    Composed of child Chain() objects and their subsequent child Residue() objects. High level wrappers
-    in the Structure() class enable direct manipulation of both Chain() and Residue() state while abstracting
-    these details away from the user.
-    Note: This class SHOULD NOT be created directly by users. It should be created with the enzy_htp.structure.structure_from_pdb() method.
+    """Enzyme structure.
+    Designed for direct interfacing by users.
+    Composed of child Chain() objects and their subsequent child Residue() objects and so on Atom() objects.
+    Note: This class SHOULD NOT be created directly by users. It should be created with methods from the StructureIO module.
 
     Attributes:
-            chains_ : A list of Chain objects contained within the structure.
-            chain_mapper : A dict() which maps chain id to the chain object.
+        + chains_: List[Chain]
+        + chain_mapper: Dict[]
+
+    Derived properties:
+        + residue_state : List[Tuple[str, str, int]]
+        + residue_keys() : List[str]
+        + residues : List
+        + metals : List[Residue]
+        + ligands : List[Residue]
+        + solvents : List
+        + num_chains
+        + num_residues
+        + chain_names
     """
 
     def __init__(self, chains: List[Chain]):
@@ -119,40 +149,78 @@ class Structure:
                 )
                 exit(1)
             self.chain_mapper[ch.name()] = ch
-    #@shaoqz: @prefer use property deco to distinguish more with actual non-getter methods
-    def residue_state(self) -> List[Tuple[str, str, int]]: #@shaoqz: @imp2 why this name. Maybe more doc or a better name to explain the concept (where to use it) of this function. 
-        """Generates a list of tuples of all residues in the Structure. Format for each tuple is (chain_id, one_letter_res_name, res_index)."""
+
+    # Getters
+    @property
+    def chains(self) -> List[Chain]:
+        """Getter for the list of Chain() objects contained within the Structure() object."""
+        self.chains_.sort(key=lambda c: c.name())
+        # TODO(CJ): should this be a deep copy or no? #@shaoqz: No
+        return self.chains_
+
+    @property
+    def residues(self) -> List[Residue]:
+        """Return a list of the residues in the Structure() object sorted by (chain_id, residue_id)"""
         result = list()
-        for cname, chain in self.chain_mapper.items():
-            for residue in chain.residues(): #@shaoqz: make a getitem
-                (chain, res_name, index) = residue.residue_key.split(".")
-                if residue.is_canonical():
-                    result.append((chain, convert_to_one_letter(res_name), int(index)))
-                elif residue.is_metal(): #@shaoqz: any non-canonical should be using 3-letter name
-                    result.append((chain, res_name, int(index)))
+        for ch in self.chains_:
+            result.extend(ch.residues())
+        result.sort(key=lambda r: r.sort_key())
         return result
 
-    def residue_keys(self) -> List[str]:
-        """Generates a list of strings containing all residue_key values for all child Residue()'s"""
-        result = [] #@shaoqz: unify the way to init list
-        for chain in self.chains_:
-            for res in chain.residues():
-                result.append(res.residue_key)
-        return result
-
-    def get_metals(self) -> List[Residue]: #@shaoqz: should be MetalAtom
+    @property
+    def metals(self) -> List[Residue]:
         """Filters out the metal Residue()'s from the chains in the Structure()."""
         result: List[Residue] = list()
         for chain in self.chains_:
             result.extend(list(filter(lambda r: r.is_metal(), chain.residues())))
         return result
 
-    def get_ligands(self) -> List[Residue]:
+    @property
+    def ligands(self) -> List[Residue]:
         """Filters out the ligand Residue()'s from the chains in the Structure()."""
         result: List[Residue] = list()
         for chain in self.chains_:
             result.extend(list(filter(lambda r: r.is_ligand(), chain.residues())))
         return result
+
+    @property
+    def solvents(self):
+        # TODO(CJ)
+        return []
+
+    @ property
+    def atoms(self) -> List[Atom]:
+        result = list()
+        for chain in self.chains_:
+            for residue in chain:
+                result.extend(residue.atom_list())
+        return result
+
+
+
+    @property
+    def residue_state(self) -> List[Tuple[str, str, int]]: #@shaoqz: @residue_key
+        """Generates a list of tuples of all residues in the Structure. Format for each tuple is (one_letter_res_name, chain_id, res_index).
+        This method is designed for debuging purpose"""
+        result = list()
+        for cname, chain in self.chain_mapper.items():
+            for residue in chain.residues():
+                (chain, res_name, index) = residue.residue_key.split(".")
+                if residue.is_canonical():
+                    result.append((chain, convert_to_one_letter(res_name), int(index)))
+                elif residue.is_metal(): #@shaoqz: @imp2 any non-canonical should be using 3-letter name
+                    result.append((chain, res_name, int(index)))
+        return result
+
+    @property
+    def residue_keys(self) -> List[str]:
+        """Generates a list of strings containing all residue_key values for all child Residue()'s"""
+        result = list()
+        for chain in self.chains_:
+            for res in chain.residues():
+                result.append(res.residue_key)
+        return result
+
 
     def remove_chain(self, chain_name: str) -> None:
         """Given a chain name, removes the Chain() object form both self.chains_ and self.chain_mapper."""
@@ -198,13 +266,6 @@ class Structure:
         """Checks if the Structure() has a chain with the specified chain_name."""
         return chain_name in self.chain_mapper
 
-    def residues(self) -> List[Residue]:
-        """Creates a deep copied list of the residues in the Structure() object.""" #@shaoqz: is it really a deep copy? it is not supposed to be anyway. One of the main task of Structure is to edit (record the change of ) the structure as needed 
-        result = list()
-        for ch in self.chains_:
-            result.extend(ch.residues())
-        result.sort(key=lambda r: r.sort_key())
-        return result
 
     def to_pdb(self, out_path: str) -> None: #@shaoqz: @imp2 move to the PDB interface in the future
         """Saves the structure to the specified file in the PDB file format."""
@@ -217,9 +278,6 @@ class Structure:
         lines.append("END")
         fs.write_lines(out_path, lines) #@shaoqz: @imp2 need to return a mapping of new indexes and old indexes
 
-    def get_solvents(self):
-        # TODO(CJ)
-        return []
 
     def build_ligands(self, out_dir: str, unique: bool = False) -> List[str]: #@shaoqz: @imp2 add more file format option
         """Exports all the Ligand() objects in the Structure() to .pdb files.
@@ -233,7 +291,7 @@ class Structure:
         """
         result: List[str] = []
         existing: List[str] = []
-        ligands: List[Ligand] = self.get_ligands()
+        ligands: List[Ligand] = self.ligands
 
         for lidx, lig in enumerate(ligands):
             # TODO(CJ): add some kind of formatting for lidx
@@ -473,11 +531,6 @@ class Structure:
             if resi.id == int(id):
                 return resi
 
-    def chains(self) -> List[Chain]:
-        """Getter for the list of Chain() objects contained within the Structure() object."""
-        self.chains_.sort(key=lambda c: c.name())
-        # TODO(CJ): should this be a deep copy or no? #@shaoqz: No
-        return self.chains_
 
     def get_atom_id(self): #@shaoqz: @nu
         """
@@ -662,8 +715,8 @@ def compare_structures(left: Structure, right: Structure) -> Dict[str, List[str]
          }
     """
     result = {"left": [], "right": []}
-    left_keys: Set[str] = set(left.residue_keys())
-    right_keys: Set[str] = set(right.residue_keys())
+    left_keys: Set[str] = set(left.residue_keys)
+    right_keys: Set[str] = set(right.residue_keys)
 
     result["left"] = list(filter(lambda ll: ll not in right_keys, left_keys))
     result["right"] = list(filter(lambda rr: rr not in left_keys, right_keys))
@@ -687,8 +740,8 @@ def merge_right(left: Structure, right: Structure) -> Structure: #@shaoqz: I bel
         if not struct_cpy.has_chain(cname):
             struct_cpy.insert_chain(deepcopy(chain))
 
-    right_keys = struct_cpy.residue_keys() #@shaoqz: @imp2 why is this part needed as all res is stored in chain.
-    for lkey in left.residue_keys():
+    right_keys = struct_cpy.residue_keys #@shaoqz: @imp2 why is this part needed as all res is stored in chain.
+    for lkey in left.residue_keys:
         if lkey not in right_keys:
             struct_cpy.insert_residue(left.get_residue(lkey))
     return struct_cpy
