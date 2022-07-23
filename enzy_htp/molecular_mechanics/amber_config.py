@@ -214,6 +214,22 @@ class AmberConfig:
             raise TypeError()
 
 def load_conf_equi(confiles:str)-> dict:
+    """Load equi setup for MD
+    The function use to load the setting for equi step in Amber. Function will
+    return with a dictionary.
+    
+    Args:
+        confiles: A string of configuration file name for the equi setting. The file
+        should be in json file format, otherwise it will print debug in log file.
+
+    Return: 
+        A dict that read from the json file. The keys is the setting keywords
+        in Amebr. Some keys may be removed  if they are not included in the
+        template dict {CONF_EQUI}
+
+    Raise:
+        None. Check the core._LOGGER for error information
+    """
     filename = glob.glob(confiles + '*')
     logging.basicConfig(filename="core._LOGGER", filemode='a',
                         level=logging.INFO)
