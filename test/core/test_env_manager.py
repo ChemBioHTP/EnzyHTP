@@ -75,8 +75,17 @@ def test_executable___gettattr__():
 def test_run_command():
     """Ensuring that EnvironmentManager.run_command() works and raises errors when it is supposed to."""
     em = EnvironmentManager()
-    contents = em.run_command("echo", ["hello world"])
-    assert contents == ["hello world"]
+    contents_str = em.run_command("echo", ["hello world"])
+    assert contents_str == ['"hello world"']
+    
+    contents_file_name = em.run_command("echo", ["test.txt"])
+    assert contents_file_name == ['"test.txt"']
+
+    contents_special_chr = em.run_command("echo", [">", "&&"])
+    assert contents_special_chr == ['> &&']
+
+    contents_all_kinds = em.run_command("echo", ["input.inp", "I am Enzyme", ">", "&&" , ">>>!@#$%^&*()"])
+    assert contents_all_kinds == ['"input.inp" "I am Enzyme" > && >>>!@#$%^&*()']
 
     with pytest.raises(SystemExit) as exe:
         em.run_command("dne", [""])

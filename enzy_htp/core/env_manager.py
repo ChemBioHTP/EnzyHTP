@@ -4,6 +4,7 @@ and serves as interface for running external applications.
 Author: Chris Jurich, <chris.jurich@vanderbilt.edu>
 Date: 2022-02-12
 """
+import re
 import os
 import shutil
 from typing import List
@@ -99,8 +100,26 @@ class EnvironmentManager:
         return len(self.missing_executables_) or len(self.missing_env_vars_)
 
     def run_command(self, exe: str, args: List[str]) -> List[str]:
-        """Interface to run a command with the exectuables specified by exe as well as a list of arguments."""
-        cmd = f"{self.mapper.get(exe,exe)} {' '.join(args)}"
+        """Interface to run a command with the exectuables specified by exe as well as a list of arguments.
+        
+        Args:
+            args: A list of strings as supplied arguments, including file names and special characters.
+
+        Returns:
+            Wrap each argument in quotes if it doesn't carry out a special instruction or alternate meaning.
+            Identify shell special characters without wrapping them in quotes.
+        """       
+        cmd = f"{self.mapper.get(exe,exe)} "
+        for arg in args:
+            special_chr = [re.search("\\W", i) for i in arg]
+            remove_none = list(filter(None, special_chr))
+            special_arg = ''.join([i[0] for i in remove_none])
+            if special_arg == arg:
+                cmd += f' '
+                for digit in arg:
+                    cmd += f'\\{digit}'
+            else:
+                cmd += f' \\"{arg}\\"'
         if exe in self.missing_executables_ or not self.__exe_exists(exe):
             _LOGGER.error(
                 f"This environment is missing '{exe}' and cannot run the command '{cmd}'"
