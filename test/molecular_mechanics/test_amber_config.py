@@ -81,3 +81,8 @@ def test_round_trip_getting_and_setting():
     assert ac.HOME == 'new_home'
     assert ac['HOME'] == 'new_home'
 
+def test_load_conf_equi():
+    """testing the configuration load for equi setup"""
+    ac: mm.AmberConfig = mm.default_amber_config()
+    assert  type(ac.load_conf_equi("./conf_eqi_test/conf_min")) == dict
+    assert os.path.exists(core._LOGGER) == True
