@@ -139,7 +139,7 @@ class Structure:
 
     def __init__(self, chains: List[Chain]):
         """Constructor that takes just a list of Chain() objects as input."""
-        self.chains_ = chains #@shaoqz: why tailing _ #@shaoqz: @imp2 why do we need this instead of just a mapper and the getter of chains
+        self.chains_ = chains #@shaoqz: why tailing _ #@shaoqz: @imp2 why do we need this instead of just a mapper and the getter of chains TODO change it to only one and make another one a getter
         self.chain_mapper = dict()
         ch: Chain
         for ch in chains:
