@@ -105,7 +105,7 @@ def protonate_missing_elements(
             lig.num_ = int(r_id)  # TODO(CJ). make this a method for the Ligand() class
             lig.residue_key = ok
             # print(lig)
-            new_stru.insert_chain(Chain(lig.chain(), [lig]))
+            new_stru.add_chain(Chain(lig.chain(), [lig]))
         # new_stru.add(new_ligands, sort=0)
     return new_stru
 

@@ -150,8 +150,7 @@ class Structure:
                 exit(1)
             self.chain_mapper[ch.name()] = ch
 
-    # === Getters (Attributes - accessing Structure data -  references) ===
-
+    # === Getters === (Attributes - accessing Structure data -  references)
     @property
     def chains(self) -> List[Chain]:
         """Getter for the list of Chain() objects contained within the Structure() object."""
@@ -216,8 +215,7 @@ class Structure:
         And these APIs are just for developers, users will have selector in the future to do selection'''
         pass
 
-    # === Getter (Properities - derived data; wont affect Structure data - copy) ===
-
+    # === Getter === (Properities - derived data; wont affect Structure data - copy)
     @property
     def residue_state(self) -> List[Tuple[str, str, int]]: #@shaoqz: @residue_key
         """Generates a list of tuples of all residues in the Structure. Format for each tuple is (one_letter_res_name, chain_id, res_index).
@@ -241,7 +239,7 @@ class Structure:
                 result.append(res.residue_key)
         return result
 
-    @property
+    @property # @shaoqz: @imp2 do we really need this here? residue key is nessessary since we are operating acrossing levels
     def num_residues(self) -> int:
         """Returns the number of Residue() objects contained within the current Structure()."""
         total: int = 0
@@ -260,8 +258,24 @@ class Structure:
         """Returns a list of all the chain names for the Structure()"""
         return list(self.chain_mapper.keys())
 
-    # Checker
-    
+    # === Checker === 
+    def has_chain(self, chain_name: str) -> bool:
+        """Checks if the Structure() has a chain with the specified chain_name."""
+        return chain_name in self.chain_mapper
+
+    # === Editor ===     
+    def add_chain(self, new_chain: Chain, overwrite: bool = False) -> None: #TODO add logic for overwriting
+        """Method that inserts a new chain and then sorts the chains based on name.
+        Will overwrite if Chain() with existing name already in object. #@shaoqz: add + sort = insert
+        """
+        new_chain_name: str = new_chain.name()
+        if new_chain_name in self.chain_mapper:
+            self.remove_chain(new_chain_name) #@shaoqz: give a warning. @imp should not overwrite. Since want to add a chain to a structure with a same-naming chain is very common. (like I want to merge 2 single chain object to a dimer) A better default strategy is to insert after the chain with the same name and also record a index map.
+
+        self.chains_.append(new_chain)
+        self.chain_mapper[new_chain.name()] = new_chain
+        self.chains_.sort(key=lambda c: c.name())
+
     def remove_chain(self, chain_name: str) -> None:
         """Given a chain name, removes the Chain() object form both self.chains_ and self.chain_mapper."""
         del self.chain_mapper[chain_name]
@@ -274,103 +288,62 @@ class Structure:
         if to_remove != -1:
             del self.chains_[to_remove]
 
-    def insert_chain(self, new_chain: Chain) -> None:
-        """Method that inserts a new chain and then sorts the chains based on name.
-        Will overwrite if Chain() with existing name already in object. #@shaoqz: add + sort = insert
+    def insert_residue(self, new_res: Residue) -> None:
+        """Inserts a new Residue() object into the Structure(). If the exact Residue (chain_id, name, residue_id) already
+        exists, the new Residue overwrites it. If the new Residue specifies a Chain() that does not exist, a new chain is made.
         """
-        new_chain_name: str = new_chain.name()
-        if new_chain_name in self.chain_mapper:
-            self.remove_chain(new_chain_name) #@shaoqz: give a warning. @imp should not overwrite. Since want to add a chain to a structure with a same-naming chain is very common. (like I want to merge 2 single chain object to a dimer) A better default strategy is to insert after the chain with the same name and also record a index map.
-
-        self.chains_.append(new_chain)
-        self.chain_mapper[new_chain.name()] = new_chain
-        self.chains_.sort(key=lambda c: c.name())
-
-    def has_chain(self, chain_name: str) -> bool:
-        """Checks if the Structure() has a chain with the specified chain_name."""
-        return chain_name in self.chain_mapper
-
-    def to_pdb(self, out_path: str) -> None: #@shaoqz: @imp2 move to the PDB interface in the future
-        """Saves the structure to the specified file in the PDB file format."""
-        lines = list()
-        a_idx = 1 #@shaoqz: not nessessary need to number from 1 everytime. It's better to leave a few options to meet different need.
-        for cname, chain in self.chain_mapper.items():
-            a_idx = chain.renumber_atoms(a_idx)
-            lines.extend(chain.get_pdb_lines())
-            a_idx += 1
-        lines.append("END")
-        fs.write_lines(out_path, lines) #@shaoqz: @imp2 need to return a mapping of new indexes and old indexes
-
-
-    def build_ligands(self, out_dir: str, unique: bool = False) -> List[str]: #@shaoqz: @imp2 add more file format option
-        """Exports all the Ligand() objects in the Structure() to .pdb files.
-
-        Args:
-                out_dir: The base directory to save the .pdb files to.
-                unique: Whether or not the saved .pdb files should be unique.
-
-        Returns:
-                A list of str() with paths to the exported ligand .pdb files.
-        """
-        result: List[str] = []
-        existing: List[str] = []
-        ligands: List[Ligand] = self.ligands
-
-        for lidx, lig in enumerate(ligands):
-            # TODO(CJ): add some kind of formatting for lidx
-            lig_name: str = lig.get_name()
-            out_pdb: str = f"{out_dir}/ligand_{lig_name}_{lidx}.pdb"
-
-            if unique and lig_name in existing:
-                continue
-
-            lig.build(out_pdb) #@shaoqz: use IO interface with different format instead
-            result.append(out_pdb)
-            existing.append(lig_name)
-
-        return result
-
-    def build_protein(self, dir, ft="PDB"): #@shaoqz: maybe unify these to a build sele option like pymol did? Support a grammer to indicate what should be contained in each file. But having these presets are also good.
-        """
-        build only protein and output under the dir
-        -------
-        dir: out put dir ($dir/protein.pdb)
-        ft : file type / now support: PDB(default)
-        """
-        # make path
-        if dir[-1] == "/":
-            dir = dir[:-1]
-        out_path = dir + "/protein.pdb"
-
-        # write
-        if ft == "PDB":
-            with open(out_path, "w") as of: #@shaoqz: same as build ligand use IO interface class
-                a_id = 0
-                r_id = 0
-                for chain in self.chains_:
-                    # write chain
-                    for resi in chain:
-                        r_id = r_id + 1
-                        for atom in resi:
-                            a_id = a_id + 1  # current line index
-                            line = atom.build(a_id=a_id, r_id=r_id)
-                            of.write(line)
-                    # write TER after each chain
-                    of.write("TER" + line_feed) #@shaoqz: @imp2 how do you solve these
-                of.write("END" + line_feed)
+        chain_name: str = new_res.chain()
+        if not self.has_chain(chain_name):
+            new_chain: Chain = Chain(chain_name, [new_res]) #@shaoqz: give a warning
+            self.chains_.apppend(new_chain)
+            self.chain_mapper[chain_name] = new_chain
         else:
-            raise Exception("Support only PDB output now.")
+            self.chain_mapper[chain_name].insert_residue(new_res)
 
-        return out_path
+        self.chains_ = list(self.chain_mapper.values()) #@shaoqz: why need this
+        self.chains_.sort(key=lambda c: c.name()) #@shaoqz: should this be in the 1st if block?
 
-    def build_metalcenters(self, dir, ft="PDB"):
-        """
-        build metalcenters only. Use for MCPB parameterization. Deal with donor residue with different protonation states.        ----------
-        TODO
-        """
-        out_paths = []
-        return out_paths
+    def remove_residue(self, target_key: str) -> None:
+        """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format,
+        the Residue() is removed if it currently exists in one of the child Chain()'s. If the Chain() is empty after this
+        removal, the chain is deleted."""
+        (chain_name, _, _) = target_key.split(".") #@shaoqz: why not use this in get lolll
+        if self.has_chain(chain_name):
+            self.chain_mapper[chain_name].remove_residue(target_key)
+            if self.chain_mapper[chain_name].empty():
+                self.remove_chain(chain_name)
 
+    # === Special === 
+    def __bool__(self) -> bool:
+        """Enables running assert Structure(). Checks if there is anything in the structure."""
+        return bool(len(self.chains_))
+
+    def __eq__(self, other: Structure) -> bool:
+        """Comparison operator for other Structure() objects. Checks first if both have same chain names and then if each named chain is identical."""
+        if set(self.chain_mapper.keys()) != set(other.chain_mapper.keys()):
+            return False
+
+        chain_name: Chain
+        other_chain: Chain
+        for chain_name, self_chain in self.chain_mapper.items():
+            other_chain = other.chain_mapper[chain_name]
+            if not self_chain.same_sequence(other_chain):
+                return False
+        return True #@shaoqz: so this comparsion is only in sequence level. This does not really make sense. Different levels of comparsion
+                    #         is needed for a pair structure
+                    #         for example:
+                    #            - if the *coordinate* of every atom is the same
+                    #            - if the *topology* is the same. (presence of atoms and their connectivity)
+                    #            - if the *sequence* is the same. (this is basic works as the topology one as topology inside and between
+                    #              residues are relatively conserved, but there are exceptions, e.g. different ligand both name LIG)
+
+    def __ne__(self, other: Structure) -> bool:
+        """Negation operator for other Structure() objects. Inverstion of Structure.__eq__()."""
+        return not (self == other)
+
+
+    #region (TODO+OLD)
+    # === TODO ===
     def get_connect(self, metal_fix=1, ligand_fix=1, prepi_path=None): #@shaoqz: @nu ### TODO rewrite doc # also change a name this is not a getter but to generate sth.
         """
         get connectivity 
@@ -513,210 +486,182 @@ class Structure:
                 connectivty_table += cnt_line + line_feed
 
         return connectivty_table
+    
+    # === TO BE MOVE ===
+    def to_pdb(self, out_path: str) -> None: #@shaoqz: @imp2 move to the PDB interface in the future
+        """Saves the structure to the specified file in the PDB file format."""
+        lines = list()
+        a_idx = 1 #@shaoqz: not nessessary need to number from 1 everytime. It's better to leave a few options to meet different need.
+        for cname, chain in self.chain_mapper.items():
+            a_idx = chain.renumber_atoms(a_idx)
+            lines.extend(chain.get_pdb_lines())
+            a_idx += 1
+        lines.append("END")
+        fs.write_lines(out_path, lines) #@shaoqz: @imp2 need to return a mapping of new indexes and old indexes
 
-    def get_all_protein_atom(self): #@shaoqz: @nu
+
+    def build_ligands(self, out_dir: str, unique: bool = False) -> List[str]: #@shaoqz: @imp2 add more file format option
+        """Exports all the Ligand() objects in the Structure() to .pdb files.
+
+        Args:
+                out_dir: The base directory to save the .pdb files to.
+                unique: Whether or not the saved .pdb files should be unique.
+
+        Returns:
+                A list of str() with paths to the exported ligand .pdb files.
         """
-        get a list of all protein atoms
-        return all_P_atoms
+        result: List[str] = []
+        existing: List[str] = []
+        ligands: List[Ligand] = self.ligands
+
+        for lidx, lig in enumerate(ligands):
+            # TODO(CJ): add some kind of formatting for lidx
+            lig_name: str = lig.get_name()
+            out_pdb: str = f"{out_dir}/ligand_{lig_name}_{lidx}.pdb"
+
+            if unique and lig_name in existing:
+                continue
+
+            lig.build(out_pdb) #@shaoqz: use IO interface with different format instead
+            result.append(out_pdb)
+            existing.append(lig_name)
+
+        return result
+
+    def build_protein(self, dir, ft="PDB"): #@shaoqz: maybe unify these to a build sele option like pymol did? Support a grammer to indicate what should be contained in each file. But having these presets are also good.
         """
-        all_P_atoms = []
-        for chain in self.chains_:
-            for residue in chain:
-                all_P_atoms.extend(residue.atoms)
-        return all_P_atoms
-
-    def get_all_residue_unit(self, ifsolvent=0): #@shaoqz:@nu
-        all_r_list = []
-        for chain in self.chains_:
-            for resi in chain:
-                all_r_list.append(resi)
-
-        for resi in self.ligands:
-            all_r_list.append(resi)
-
-        for resi in self.metalatoms:
-            all_r_list.append(resi)
-
-        if ifsolvent:
-            for resi in self.solvents:
-                all_r_list.append(resi)
-
-        return all_r_list
-
-    # def get_residue(self, id): #@shaoqz: @imp duplicated ones?
-    #     """
-    #     re-search residue id with all residues count togethor from 1.
-    #     ----------
-    #     return a residue object
-    #     """
-    #     all_resi = self.get_all_residue_unit()
-    #     for resi in all_resi:
-    #         if resi.id == int(id):
-    #             return resi
-
-
-    def get_atom_id(self): #@shaoqz: @nu
+        build only protein and output under the dir
+        -------
+        dir: out put dir ($dir/protein.pdb)
+        ft : file type / now support: PDB(default)
         """
-        return a list of id of all atoms in the structure
-        """
-        atom_id_list = []
-        for chain in self.chains_:
-            for res in chain:
-                for atom in res:
-                    if atom.id == None:
-                        raise Exception(
-                            "Detected None in chain "
-                            + str(chain.id)
-                            + str(res.id)
-                            + " "
-                            + atom.name
-                        )
-                    atom_id_list.append(atom.id)
+        # make path
+        if dir[-1] == "/":
+            dir = dir[:-1]
+        out_path = dir + "/protein.pdb"
 
-        for metal in self.metalatoms:
-            if metal.id == None:
-                raise Exception("Detected None in metal " + metal.name)
-            atom_id_list.append(metal.id)
-
-        for lig in self.ligands:
-            for atom in lig:
-                if atom.id == None:
-                    raise Exception("Detected None in ligands", res.id, atom.name)
-                atom_id_list.append(atom.id)
-
-        for sol in self.solvents:
-            for atom in sol:
-                if atom.id == None:
-                    raise Exception("Detected None in solvent", res.id, atom.name)
-                atom_id_list.append(atom.id)
-
-        return atom_id_list
-
-    def get_atom_charge(self, prmtop_path): #@shaoqz: @nu
-        """
-        requires generate the stru using !SAME! PDB as one that generate the prmtop.
-        """
-        pass
-
-    def get_atom_type(self, prmtop_path): #@shaoqz: @nu
-        """
-        requires generate the stru using !SAME! PDB as one that generate the prmtop.
-        """
-        # get type list
-        with open(prmtop_path) as f:
-            type_list = []
-            line_index = 0
-
-            for line in f:
-
-                line_index = line_index + 1  # current line
-
-                if line.strip() == r"%FLAG POINTERS":
-                    format_flag = line_index
-                if line.strip() == r"%FLAG AMBER_ATOM_TYPE":
-                    type_flag = line_index
-
-                if "format_flag" in dir():
-                    if line_index == format_flag + 2:
-                        N_atom = int(line.split()[0])
-                        del format_flag
-
-                if "type_flag" in dir():
-                    if (
-                        line_index >= type_flag + 2
-                        and line_index <= type_flag + 1 + ceil(N_atom / 5)
-                    ):
-                        for i in line.strip().split():
-                            type_list.append(i)
-        # assign type to atom
-        for chain in self.chains_:
-            for res in chain:
-                for atom in res:
-                    atom.type = type_list[atom.id - 1]
-        for atom in self.metalatoms:
-            if atom.id == None:
-                raise Exception("Detected None in metal " + atom.name)
-            atom.type = type_list[atom.id - 1]
-        for lig in self.ligands:
-            for atom in lig:
-                if atom.id == None:
-                    raise Exception("Detected None in ligands", res.id, atom.name)
-                atom.type = type_list[atom.id - 1]
-        for sol in self.solvents:
-            for atom in sol:
-                if atom.id == None:
-                    raise Exception("Detected None in solvent", res.id, atom.name)
-                atom.type = type_list[atom.id - 1]
-
-    def get_resi_dist(self, r1, r2, method="mass_center"): #@shaoqz: @nu
-        """
-        r1: residue 1. (residue_obj)
-        r2: residue 2. (residue_obj)
-        method: The method to narrow the residue down to a point.
-                - mass_center
-                - ...
-        """
-        if method == "mass_center":
-            p1 = r1.get_mass_center()
-            p2 = r2.get_mass_center()
-
-        D = get_distance(p1, p2)
-
-        return D
-
-    def __bool__(self) -> bool:
-        """Enables running assert Structure(). Checks if there is anything in the structure."""
-        return bool(len(self.chains_))
-
-    def __eq__(self, other: Structure) -> bool:
-        """Comparison operator for other Structure() objects. Checks first if both have same chain names and then if each named chain is identical."""
-        if set(self.chain_mapper.keys()) != set(other.chain_mapper.keys()):
-            return False
-
-        chain_name: Chain
-        other_chain: Chain
-        for chain_name, self_chain in self.chain_mapper.items():
-            other_chain = other.chain_mapper[chain_name]
-            if not self_chain.same_sequence(other_chain):
-                return False
-        return True #@shaoqz: so this comparsion is only in sequence level. This does not really make sense. Different levels of comparsion
-                    #         is needed for a pair structure
-                    #         for example:
-                    #            - if the *coordinate* of every atom is the same
-                    #            - if the *topology* is the same. (presence of atoms and their connectivity)
-                    #            - if the *sequence* is the same. (this is basic works as the topology one as topology inside and between
-                    #              residues are relatively conserved, but there are exceptions, e.g. different ligand both name LIG)
-
-    def __ne__(self, other: Structure) -> bool:
-        """Negation operator for other Structure() objects. Inverstion of Structure.__eq__()."""
-        return not (self == other)
-
-    def insert_residue(self, new_res: Residue) -> None:
-        """Inserts a new Residue() object into the Structure(). If the exact Residue (chain_id, name, residue_id) already
-        exists, the new Residue overwrites it. If the new Residue specifies a Chain() that does not exist, a new chain is made.
-        """
-        chain_name: str = new_res.chain()
-        if not self.has_chain(chain_name):
-            new_chain: Chain = Chain(chain_name, [new_res]) #@shaoqz: give a warning
-            self.chains_.apppend(new_chain)
-            self.chain_mapper[chain_name] = new_chain
+        # write
+        if ft == "PDB":
+            with open(out_path, "w") as of: #@shaoqz: same as build ligand use IO interface class
+                a_id = 0
+                r_id = 0
+                for chain in self.chains_:
+                    # write chain
+                    for resi in chain:
+                        r_id = r_id + 1
+                        for atom in resi:
+                            a_id = a_id + 1  # current line index
+                            line = atom.build(a_id=a_id, r_id=r_id)
+                            of.write(line)
+                    # write TER after each chain
+                    of.write("TER" + line_feed) #@shaoqz: @imp2 how do you solve these
+                of.write("END" + line_feed)
         else:
-            self.chain_mapper[chain_name].insert_residue(new_res)
+            raise Exception("Support only PDB output now.")
 
-        self.chains_ = list(self.chain_mapper.values()) #@shaoqz: why need this
-        self.chains_.sort(key=lambda c: c.name()) #@shaoqz: should this be in the 1st if block?
+        return out_path
 
-    def remove_residue(self, target_key: str) -> None:
-        """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format,
-        the Residue() is removed if it currently exists in one of the child Chain()'s. If the Chain() is empty after this
-        removal, the chain is deleted."""
-        (chain_name, _, _) = target_key.split(".") #@shaoqz: why not use this in get lolll
-        if self.has_chain(chain_name):
-            self.chain_mapper[chain_name].remove_residue(target_key)
-            if self.chain_mapper[chain_name].empty():
-                self.remove_chain(chain_name)
+    def build_metalcenters(self, dir, ft="PDB"):
+        """
+        build metalcenters only. Use for MCPB parameterization. Deal with donor residue with different protonation states.        ----------
+        TODO
+        """
+        out_paths = []
+        return out_paths
 
+    # def get_atom_id(self): #@shaoqz: @nu
+    #     """
+    #     return a list of id of all atoms in the structure
+    #     """
+    #     atom_id_list = []
+    #     for chain in self.chains_:
+    #         for res in chain:
+    #             for atom in res:
+    #                 if atom.id == None:
+    #                     raise Exception(
+    #                         "Detected None in chain "
+    #                         + str(chain.id)
+    #                         + str(res.id)
+    #                         + " "
+    #                         + atom.name
+    #                     )
+    #                 atom_id_list.append(atom.id)
+    #     for metal in self.metalatoms:
+    #         if metal.id == None:
+    #             raise Exception("Detected None in metal " + metal.name)
+    #         atom_id_list.append(metal.id)
+    #     for lig in self.ligands:
+    #         for atom in lig:
+    #             if atom.id == None:
+    #                 raise Exception("Detected None in ligands", res.id, atom.name)
+    #             atom_id_list.append(atom.id)
+    #     for sol in self.solvents:
+    #         for atom in sol:
+    #             if atom.id == None:
+    #                 raise Exception("Detected None in solvent", res.id, atom.name)
+    #             atom_id_list.append(atom.id)
+    #     return atom_id_list
 
+    # def get_atom_type(self, prmtop_path): #@shaoqz: @nu
+    #     """
+    #     requires generate the stru using !SAME! PDB as one that generate the prmtop.
+    #     """
+    #     # get type list
+    #     with open(prmtop_path) as f:
+    #         type_list = []
+    #         line_index = 0
+    #         for line in f:
+    #             line_index = line_index + 1  # current line
+    #             if line.strip() == r"%FLAG POINTERS":
+    #                 format_flag = line_index
+    #             if line.strip() == r"%FLAG AMBER_ATOM_TYPE":
+    #                 type_flag = line_index
+    #             if "format_flag" in dir():
+    #                 if line_index == format_flag + 2:
+    #                     N_atom = int(line.split()[0])
+    #                     del format_flag
+    #             if "type_flag" in dir():
+    #                 if (
+    #                     line_index >= type_flag + 2
+    #                     and line_index <= type_flag + 1 + ceil(N_atom / 5)
+    #                 ):
+    #                     for i in line.strip().split():
+    #                         type_list.append(i)
+    #     # assign type to atom
+    #     for chain in self.chains_:
+    #         for res in chain:
+    #             for atom in res:
+    #                 atom.type = type_list[atom.id - 1]
+    #     for atom in self.metalatoms:
+    #         if atom.id == None:
+    #             raise Exception("Detected None in metal " + atom.name)
+    #         atom.type = type_list[atom.id - 1]
+    #     for lig in self.ligands:
+    #         for atom in lig:
+    #             if atom.id == None:
+    #                 raise Exception("Detected None in ligands", res.id, atom.name)
+    #             atom.type = type_list[atom.id - 1]
+    #     for sol in self.solvents:
+    #         for atom in sol:
+    #             if atom.id == None:
+    #                 raise Exception("Detected None in solvent", res.id, atom.name)
+    #             atom.type = type_list[atom.id - 1]
+
+    # def get_resi_dist(self, r1, r2, method="mass_center"): #@shaoqz: @nu
+    #     """
+    #     r1: residue 1. (residue_obj)
+    #     r2: residue 2. (residue_obj)
+    #     method: The method to narrow the residue down to a point.
+    #             - mass_center
+    #             - ...
+    #     """
+    #     if method == "mass_center":
+    #         p1 = r1.get_mass_center()
+    #         p2 = r2.get_mass_center()
+    #     D = get_distance(p1, p2)
+    #     return D
+
+    #endregion
 
 def compare_structures(left: Structure, right: Structure) -> Dict[str, List[str]]:
     """Compares two Structure() objects and returns a dict() of missing Residues with format:
@@ -749,7 +694,7 @@ def merge_right(left: Structure, right: Structure) -> Structure: #@shaoqz: I bel
     # this is the case where there is straight up a missing chain
     for cname, chain in left.chain_mapper.items():
         if not struct_cpy.has_chain(cname):
-            struct_cpy.insert_chain(deepcopy(chain))
+            struct_cpy.add_chain(deepcopy(chain))
 
     right_keys = struct_cpy.residue_keys #@shaoqz: @imp2 why is this part needed as all res is stored in chain.
     for lkey in left.residue_keys:
