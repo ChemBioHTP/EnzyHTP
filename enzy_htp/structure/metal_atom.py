@@ -29,6 +29,24 @@ class MetalAtom(Residue):
         self.set_rtype(chem.ResidueType.METAL)
         self.atom_name_ = atom_name
 
+    # === Getter-Attr (ref) ===
+    def location(self) -> np.array: #@shaoqz: maybe unify as coord etc. TODO
+        """Gets the location of the MetalAtom."""
+        return self.atoms_[0]
+
+    # === Getter-Prop (cpy/new) ===
+    def get_radii(self, method: str = "ionic") -> Union[float, None]:
+        """Gets the atomic radii for the metal using specified method.
+        Allowed values are 'ionic' or 'vdw' for ionic and van-der waals, respectively.
+        Returns a float or None if the metal does not have a distance.
+        """
+        return chem.get_metal_radii(self.atom_name_, method)
+
+    def clone(self) -> MetalAtom:
+        """Creates deepcopy of self."""
+        return deepcopy(self)
+
+    # === Checker === 
     def is_metal(self) -> bool:
         """Checks if Residue is a metal. Always returns True for this specialization."""
         return True
@@ -41,13 +59,20 @@ class MetalAtom(Residue):
         """Checks if the Residue is a canonical. Always returns False for this specialization."""
         return False
 
-    def get_radii(self, method: str = "ionic") -> Union[float, None]:
-        """Gets the atomic radii for the metal using specified method.
-        Allowed values are 'ionic' or 'vdw' for ionic and van-der waals, respectively.
-        Returns a float or None if the metal does not have a distance.
+    # === Editor ===
+    # === Special ===
+    def __getitem__(self, key: int):
         """
-        return chem.get_metal_radii(self.atom_name_, method)
+        Metalatom_obj[0]: self
+        -----
+        return self when iter. Allow metalatom to be iterate like a residue that return a atom level obj.
+        """
+        if key == 0:
+            return self
+        if key > 0:
+            raise StopIteration
 
+    #region === TODO/TOMOVE ===
     # fix related
     def get_donor_atom(self, method: str = "INC", check_radius=4.0): # @nu
         # TODO(CJ): move this higher up in the structural hierarchy.
@@ -290,31 +315,6 @@ class MetalAtom(Residue):
 
         return line
 
-    """
-    ====
-    Special Method
-    ====
-    """
-
-    def __getitem__(self, key: int):
-        """
-        Metalatom_obj[0]: self
-        -----
-        return self when iter. Allow metalatom to be iterate like a residue that return a atom level obj.
-        """
-        if key == 0:
-            return self
-        if key > 0:
-            raise StopIteration
-
-    def clone(self) -> MetalAtom:
-        """Creates deepcopy of self."""
-        return deepcopy(self)
-
-    def location(self) -> np.array: #@shaoqz: maybe unify as coord etc.
-        """Gets the location of the MetalAtom."""
-        return self.atoms_[0]
-
     def get_pdb_lines(self, _) -> List[str]:  #@shaoqz: go to IO
         """Method that gets the PDB lines for all of the Atom() objects."""
         result: List[str] = Residue.get_pdb_lines(self, False)
@@ -322,6 +322,7 @@ class MetalAtom(Residue):
             result[idx] = "HETATM" + line[6:]
         return result
 
+    #endregion
 
 def residue_to_metal(residue: Residue) -> MetalAtom:
     """Convenience function that converts Residue() to MetalAtom() object."""

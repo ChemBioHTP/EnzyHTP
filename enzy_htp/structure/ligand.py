@@ -46,19 +46,30 @@ class Ligand(Residue):
         Residue.__init__(self, residue_key, atoms)
         self.set_rtype(renum.ResidueType.LIGAND)
 
+    # === Getter-Attr (ref) ===
+    # === Getter-Prop (cpy/new) ===
+    def get_net_charge(self) -> int:
+        """Getter for the net_charge attribute."""
+        return self.net_charge
+
+    def clone(self) -> Ligand:
+        """Creates deecopy of self."""
+        return deepcopy(self)
+
+    # === Checker === 
     def is_ligand(self) -> bool:
         """Checks if the Residue is a ligand. Always returns True for this specialization."""
         return True
 
+    # === Editor ===
     def set_residue_number(self, num: int) -> None:
         """Changes the resdiue number for all of the substituent atoms."""  #@shaoqz: also set for itself?
         for idx, aa in enumerate(self.atoms_):
             self.atoms_[idx].residue_number = num
 
-    def get_net_charge(self) -> int:
-        """Getter for the net_charge attribute."""
-        return self.net_charge
+    # === Special ===
 
+    #region === TODO/TOMOVE ===
     def build(self, out_path: str) -> None: #@shaoqz: to IO ; also it should be the same as for residue
         """Method that builds the given ligand to the specified path, making sure it is a pdb filepath."""
         ext = fs.get_file_ext(out_path).lower()
@@ -74,10 +85,7 @@ class Ligand(Residue):
             )
         ) + ["TER", "END"]
         fs.write_lines(out_path, lines)
-
-    def clone(self) -> Ligand:
-        """Creates deecopy of self."""
-        return deepcopy(self)
+    #endregion
 
 
 def residue_to_ligand(ptr: Residue, net_charge: float = None) -> Ligand:
