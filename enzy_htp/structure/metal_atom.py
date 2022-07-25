@@ -313,7 +313,7 @@ class MetalAtom(Residue):
 
     def location(self) -> np.array: #@shaoqz: maybe unify as coord etc.
         """Gets the location of the MetalAtom."""
-        return self.atoms[0]
+        return self.atoms_[0]
 
     def get_pdb_lines(self, _) -> List[str]:  #@shaoqz: go to IO
         """Method that gets the PDB lines for all of the Atom() objects."""
@@ -326,9 +326,9 @@ class MetalAtom(Residue):
 def residue_to_metal(residue: Residue) -> MetalAtom:
     """Convenience function that converts Residue() to MetalAtom() object."""
     atom_name = None
-    if len(residue.atom_list()):
-        raw_name = list(residue.atom_list()[0].atom_name.lower())
+    if len(residue.atoms_()):
+        raw_name = list(residue.atoms_()[0].atom_name.lower())
         raw_name[0] = raw_name[0].upper()
         atom_name = "".join(raw_name)
 
-    return MetalAtom(residue.residue_key, residue.atoms, atom_name=atom_name)
+    return MetalAtom(residue.residue_key, residue.atoms_, atom_name=atom_name)

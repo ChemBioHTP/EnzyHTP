@@ -52,8 +52,8 @@ class Ligand(Residue):
 
     def set_residue_number(self, num: int) -> None:
         """Changes the resdiue number for all of the substituent atoms."""  #@shaoqz: also set for itself?
-        for idx, aa in enumerate(self.atoms):
-            self.atoms[idx].residue_number = num
+        for idx, aa in enumerate(self.atoms_):
+            self.atoms_[idx].residue_number = num
 
     def get_net_charge(self) -> int:
         """Getter for the net_charge attribute."""
@@ -70,7 +70,7 @@ class Ligand(Residue):
         lines = list(
             map(
                 lambda pr: pr[1].to_pdb_line(a_id=pr[0] + 1, c_id=" "),
-                enumerate(self.atoms),
+                enumerate(self.atoms_),
             )
         ) + ["TER", "END"]
         fs.write_lines(out_path, lines)
@@ -82,4 +82,4 @@ class Ligand(Residue):
 
 def residue_to_ligand(ptr: Residue, net_charge: float = None) -> Ligand:
     """Convenience function that converts Residue to ligand."""
-    return Ligand(ptr.residue_key, ptr.atoms, net_charge=net_charge)
+    return Ligand(ptr.residue_key, ptr.atoms_, net_charge=net_charge)

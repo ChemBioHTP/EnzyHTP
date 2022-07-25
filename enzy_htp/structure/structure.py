@@ -206,7 +206,7 @@ class Structure:
         result = list()
         for chain in self.chains_:
             for residue in chain:
-                result.extend(residue.atom_list())
+                result.extend(residue.atoms_())
         return result
 
     def get_atom(self) -> Atom:

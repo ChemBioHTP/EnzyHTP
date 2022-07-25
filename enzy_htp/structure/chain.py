@@ -79,7 +79,7 @@ class Chain:
         for s, o in zip(self_residues, other_residues):
             s: Residue
             o: Residue
-            if not s.sequence_equivalent(o): #@shaoqz: this is a good idea of having different levels of comparsion @imp2 after reading this method I found here it already comparing residues in the same position we only need to compare the name but not the key
+            if not s.is_sequence_equivalent(o): #@shaoqz: this is a good idea of having different levels of comparsion @imp2 after reading this method I found here it already comparing residues in the same position we only need to compare the name but not the key
                 return False
         return True
 

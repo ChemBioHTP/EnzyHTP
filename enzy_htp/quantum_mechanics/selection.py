@@ -67,7 +67,7 @@ def create_selection(struct: Structure, atom_mask: str, fix_end: str = None):
     # combine the sele
     sele_atoms = []
     for obj in sele_stru_objs:
-        for atom in obj.atom_list():
+        for atom in obj.atoms():
             sele_atoms.append(atom)
 
     print(sele_atoms)

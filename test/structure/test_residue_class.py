@@ -66,7 +66,7 @@ def test_residue_key_information():
     assert local_res.residue_key == "B.THR.1"
     assert local_res.num() == 1
 
-    for aa in local_res.atom_list():
+    for aa in local_res.atoms_():
         assert aa.chain_id == "B"
 
 
@@ -80,27 +80,27 @@ def test_check_all_canonical():
 
 
 def test_sequence_equivalent_return_true():
-    """Testing that the Residue.sequence_equivalent() method returns True when desired."""
+    """Testing that the Residue.is_sequence_equivalent() method returns True when desired."""
     r1 = Residue("A.A.1", list())
     r2 = Residue("A.A.1", list())
-    assert r1.sequence_equivalent(r2)
-    assert r1.sequence_equivalent(deepcopy(r1))
+    assert r1.is_sequence_equivalent(r2)
+    assert r1.is_sequence_equivalent(deepcopy(r1))
     r3 = Residue("A.A.1", list())
     r3.set_chain("B")
-    assert not r1.sequence_equivalent(r3)
+    assert not r1.is_sequence_equivalent(r3)
     r3.set_chain("A")
-    assert r1.sequence_equivalent(r3)
+    assert r1.is_sequence_equivalent(r3)
 
 
 def test_sequence_equivalent_return_false():
-    """Testing that the Residue.sequence_equivalent() method returns False when desired."""
+    """Testing that the Residue.is_sequence_equivalent() method returns False when desired."""
     r1 = Residue("A.A.1", list())
     r2 = Residue("A.A.3", list())
-    assert not r1.sequence_equivalent(r2)
+    assert not r1.is_sequence_equivalent(r2)
     r3 = Residue("A.B.1", list())
-    assert not r1.sequence_equivalent(r3)
+    assert not r1.is_sequence_equivalent(r3)
     r4 = Residue("B.A.1", list())
-    assert not r1.sequence_equivalent(r4)
+    assert not r1.is_sequence_equivalent(r4)
 
 
 # TODO(CJ) add in some tests for other types of residues
@@ -110,13 +110,13 @@ def test_chain_getters_and_setters():
     """Testing the chain accession methods."""
     test_res = Residue("A.A.1", list())
     assert test_res.chain() == "A"
-    assert not test_res.empty_chain()
+    assert not test_res.is_empty_chain()
     test_res.set_chain("")
     assert test_res.residue_key == ".A.1"
-    assert test_res.empty_chain()
+    assert test_res.is_empty_chain()
     assert test_res.chain() == ""
     test_res.set_chain("B")
-    assert not test_res.empty_chain()
+    assert not test_res.is_empty_chain()
     assert test_res.chain() == "B"
     assert test_res.residue_key == "B.A.1"
 
@@ -127,7 +127,7 @@ def test_num_atoms():
     assert not empty_residue.num_atoms()
     assert RESIDUES[0].num_atoms() == 32
     res_cpy = deepcopy(RESIDUES[0])
-    res_cpy.atoms = []
+    res_cpy.atoms_ = []
     assert not empty_residue.num_atoms()
 
 
@@ -136,11 +136,11 @@ def test_renumber_atoms():
 
     res_cpy = deepcopy(RESIDUES[0])
     assert res_cpy.renumber_atoms(1) == 32
-    assert [aa.atom_number for aa in res_cpy.atoms] == list(range(1, 33))
+    assert [aa.atom_number for aa in res_cpy.atoms_] == list(range(1, 33))
 
     res_cpy = deepcopy(RESIDUES[1])
     assert res_cpy.renumber_atoms(10) == 37
-    assert [aa.atom_number for aa in res_cpy.atoms] == list(range(10, 38))
+    assert [aa.atom_number for aa in res_cpy.atoms_] == list(range(10, 38))
 
 
 def test_renumber_atoms_bad_input():
@@ -165,5 +165,5 @@ def test_clone():
     res_cpy: Residue = res.clone()
 
     assert id(res) != id(res_cpy)
-    for a1, a2 in zip(res.atom_list(), res_cpy.atom_list()):
+    for a1, a2 in zip(res.atoms_(), res_cpy.atoms_()):
         assert id(a1) != id(a2)

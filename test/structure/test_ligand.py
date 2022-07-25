@@ -45,5 +45,5 @@ def test_clone():
     lig_cpy = lig.clone()
     assert isinstance(lig_cpy, Ligand)
     assert id(lig) != id(lig_cpy)
-    for a1, a2 in zip(lig.atom_list(), lig_cpy.atom_list()):
+    for a1, a2 in zip(lig.atoms_(), lig_cpy.atoms_()):
         assert id(a1) != id(a2)

@@ -24,7 +24,7 @@ class Residue:
         canonical, non-canonical, solvent or a metal center.
 
     Attributes:
-        atoms : A list of Atom() objects that make up the Residue().
+        atoms_ : A list of Atom() objects that make up the Residue().
         residue_key : Unique string identifier with format "chain.name.num".
         chain_ : Parent chain name.
         name : Residue name.
@@ -36,124 +36,53 @@ class Residue:
 
     def __init__(self, residue_key: str, atoms: List[Atom]):
         """Constructor for the Residue() object. Takes residue_key in format of "chain_name.resdue_name.residue_id" and a list of Atom() objects."""
-        self.atoms = atoms
+        self.atoms_ = atoms
         self.residue_key = residue_key #@shaoqz: @imp to identify a residue only chain_id and residue_id inside of the chain is enough. The residue name seem redundant especially when using it to aquire a residue. After reading more code i see you are using the key for 1) select the residue 2) comparing the residue 3) identifying the residue
         (chain, name, num) = self.residue_key.split(".")
         self.chain_ = chain
         self.name = name
         self.num_ = int(num)
         self.rtype_ = chem.ResidueType.UNKNOWN
-        line_idxs = np.array(list(map(lambda aa: aa.line_idx, self.atoms)))
+        line_idxs = np.array(list(map(lambda aa: aa.line_idx, self.atoms_)))
 
         if line_idxs.any():
             self.min_line_ = np.min(line_idxs)
             self.max_line_ = np.max(line_idxs)
 
-    def renumber_atoms(self, start: int = 1) -> int:
-        """Renumbers the Residue()'s Atom()'s beginning with "start" paramter, defaulted to 1. Returns the index of the last Atom().
-        NOTE: errors if "start" is <= 0.
-        """
-        if start <= 0:
-            _LOGGER.error(
-                f"Illegal start number '{start}'. Value must be >= 0. Exiting..."
-            )
-            exit(1)
-        aa: Atom
-        self.atoms = sorted(self.atoms, key=lambda aa: aa.atom_number) #@shaoqz: maybe use .sort to keep the reference.
-
-        for idx, aa in enumerate(self.atoms):
-            self.atoms[idx].atom_number = idx + start #@shaoqz: why dont use aa?
-        return idx + start
-
-    def has_alt_loc(self) -> bool:
-        """Checks if any of the child Atom() objects have non-emptry alt_loc values."""
-        result: bool = False
-        for aa in self.atoms:
-            result |= aa.has_alt_loc() #@shaoqz: cool!
-        return result
-
-    def resolve_alt_loc(self, keep: str = "first") -> None: #@shaoqz: nice we have this now!
-        """Resolves the alt_loc atoms owned by the current Residue().
-        Optional argument "keep" specifies the resolution method. Default
-        is "first" which forces Residue() to keep lowest location. Otherwise,
-        keeps the specific alt_loc identifier, assuming it exists.
-        """
-        if keep == "all":
-            return
-        mapper: Dict[str, List[Atom]] = defaultdict(list)
-        for aa in self.atoms:
-            mapper[aa.alt_loc.strip()].append(aa)
-
-        if len(mapper.keys()) == 1:
-            return
-
-        self.atoms = mapper[""]
-        del mapper[""]
-
-        if keep == "first":
-            keys: List[str] = sorted(list(mapper.keys()))
-            self.atoms.extend(mapper[keys[0]])
-        else:
-            assert keep in mapper
-            self.atoms.extend(mapper[keep])
-
-        self.atoms.sort(key=lambda aa: aa.atom_number)
-
-    def remove_occupancy(self) -> None: #@shaoqz: @imp2 really curious about the reason of putting all fundmental methods that edit data in residue instead of atom, which the later is more intuative to me.
-        """Makes the occupancy for each of the child Atom() objects blank."""
-        for idx in range(len(self.atoms)):
-            self.atoms[idx].occupancy = ""
-
-    def remove_alt_loc(self) -> None:
-        """Makes the alt_loc for each of the child Atom() objects blank."""
-        for idx in range(len(self.atoms)):
-            self.atoms[idx].alt_loc = ""
-
-    def num_atoms(self) -> int:
-        """Number of atoms in the Residue."""
-        return len(self.atoms)
-
-    def atom_list(self) -> List[Atom]:
+    # === Getter-Attr (ref) ===
+    def atoms(self) -> List[Atom]:
         """Returns a list of all Atom() objects that the Residue() "owns" """
-        return self.atoms
-
-    def empty_chain(self) -> bool: #@shaoqz: @imp2 add is_ maybe?
-        """Whether the Residue() lacks a chain identitifer. NOT a chain object accessor."""
-        return not len(self.chain_.strip())
+        return self.atoms_
 
     def chain(self) -> str:
         """Getter for the Residue()'s parent chain id."""
         return self.chain_
 
-    def set_chain(self, val: str) -> None:
-        """Sets chain and all child atoms to new value. Re-generates the self.residue_key attribute."""
-        chain = val #@shaoqz: Refine this line
-        for idx in range(len(self.atoms)):
-            self.atoms[idx].chain_id = val
-        self.chain_ = val
-        self.residue_key = f"{self.chain_}.{self.name}.{self.num_}"
-
     def num(self) -> int:
         """Getter for the Residue()'s number."""
         return self.num_
 
-    def min_line(self) -> int: #@shaoqz: @imp2 move to the pdb IO class
-        """The lowest one-indexed line one of the Residue()'s atoms come from."""
-        return self.min_line_
+    def rtype(self) -> chem.ResidueType:
+        """Getter for the Residue()'s chem.ResidueType value."""
+        return self.rtype_
 
-    def max_line(self) -> int:
-        """The highest one-indexed line one of the Residue()'s atoms come from."""
-        return self.max_line_
+    def get_name(self) -> str:
+        """Getter for the Residue()'s name."""
+        return self.name
 
-    def line_range(self) -> Tuple[int, int]:
-        """A tuple of the he lowest and highest one-indexed lines that the Residue()'s atoms come from."""
-        return (self.min_line(), self.max_line())
+    # === Getter-Prop (cpy/new) ===
+    def num_atoms(self) -> int:
+        """Number of atoms in the Residue."""
+        return len(self.atoms_)
 
-    def neighbors(self, other: Residue) -> bool: #@shaoqz: @imp2 move to IO class / change to is_neighbors
-        """Checks if two residues from the same PDB are neighbors."""
-        return (abs(self.min_line() - other.max_line()) == 1) or (
-            abs(self.max_line() - other.min_line()) == 1
-        )
+    def clone(self) -> Residue:
+        """Creates a deepcopy of self."""
+        return deepcopy(self)
+
+    # === Checker === 
+    def is_empty_chain(self) -> bool:
+        """Whether the Residue() lacks a chain identitifer. NOT a chain object accessor."""
+        return not len(self.chain_.strip())
 
     def is_ligand(self) -> bool:
         """Checks if Residue() is a ligand. Inherited by children."""
@@ -175,22 +104,119 @@ class Residue:
         """Checks if the Residue() is an rd_non_ligand as defined by enzy_htp.chemical.solvent.RD_NON_LIGAND_LIST"""
         return self.name in chem.RD_NON_LIGAND_LIST
 
-    def sequence_equivalent(self, other: Residue) -> bool: #@shaoqz: @imp2 why do we need to compare this? Because in the comparsion of residues there often some information exist and want to compare the rest.
+    def is_sequence_equivalent(self, other: Residue) -> bool: #@shaoqz: @imp2 why do we need to compare this? Because in the comparsion of residues there often some information exist and want to compare the rest.
         """Comparator that checks for sequence same-ness."""
         return self.residue_key == other.residue_key
+
+    # === Editor ===
+    def set_chain(self, val: str) -> None:
+        """Sets chain and all child atoms to new value. Re-generates the self.residue_key attribute."""
+        chain = val #@shaoqz: Refine this line
+        for idx in range(len(self.atoms_)):
+            self.atoms_[idx].chain_id = val
+        self.chain_ = val
+        self.residue_key = f"{self.chain_}.{self.name}.{self.num_}"
+
+    def renumber_atoms(self, start: int = 1) -> int:
+        """Renumbers the Residue()'s Atom()'s beginning with "start" paramter, defaulted to 1. Returns the index of the last Atom().
+        NOTE: errors if "start" is <= 0.
+        """
+        if start <= 0:
+            _LOGGER.error(
+                f"Illegal start number '{start}'. Value must be >= 0. Exiting..."
+            )
+            exit(1)
+        aa: Atom
+        self.atoms_ = sorted(self.atoms_, key=lambda aa: aa.atom_number) #@shaoqz: maybe use .sort to keep the reference.
+
+        for idx, aa in enumerate(self.atoms_):
+            self.atoms_[idx].atom_number = idx + start #@shaoqz: why dont use aa?
+        return idx + start
 
     def set_rtype(self, new_rtype: chem.ResidueType) -> None:
         """Setter for the Residue()'s chem.ResidueType value."""
         self.rtype_ = new_rtype
 
-    def rtype(self) -> ResidueType:
-        """Getter for the Residue()'s chem.ResidueType value."""
-        return self.rtype_
+    def sort_key(self) -> Tuple[str, int]:
+        """Generates the sorting key for the Residue(). Specifically, a tuple of [chain_id, res_num]."""
+        return (self.chain_, self.num_)
+
+    # === Special ===
+    def __str__(self) -> str:
+        """String representation that just shows residue key in format "chain_id.residue_name.residue_num" """
+        return self.residue_key
+
+    def __repr__(self) -> str:
+        """String representationt that just shows residue key in format "chain_id.residue_name.residue_num" """
+        return str(self)
+
+    #region === TODO/TOMOVE ===
+    def has_alt_loc(self) -> bool:
+        """Checks if any of the child Atom() objects have non-emptry alt_loc values."""
+        result: bool = False
+        for aa in self.atoms_:
+            result |= aa.has_alt_loc() #@shaoqz: cool!
+        return result
+
+    def resolve_alt_loc(self, keep: str = "first") -> None: #@shaoqz: nice we have this now!
+        """Resolves the alt_loc atoms owned by the current Residue().
+        Optional argument "keep" specifies the resolution method. Default
+        is "first" which forces Residue() to keep lowest location. Otherwise,
+        keeps the specific alt_loc identifier, assuming it exists.
+        """
+        if keep == "all":
+            return
+        mapper: Dict[str, List[Atom]] = defaultdict(list)
+        for aa in self.atoms_:
+            mapper[aa.alt_loc.strip()].append(aa)
+
+        if len(mapper.keys()) == 1:
+            return
+
+        self.atoms_ = mapper[""]
+        del mapper[""]
+
+        if keep == "first":
+            keys: List[str] = sorted(list(mapper.keys()))
+            self.atoms_.extend(mapper[keys[0]])
+        else:
+            assert keep in mapper
+            self.atoms_.extend(mapper[keep])
+
+        self.atoms_.sort(key=lambda aa: aa.atom_number)
+
+    def remove_alt_loc(self) -> None:
+        """Makes the alt_loc for each of the child Atom() objects blank."""
+        for idx in range(len(self.atoms_)):
+            self.atoms_[idx].alt_loc = ""
+
+    def remove_occupancy(self) -> None: #@shaoqz: @imp2 really curious about the reason of putting all fundmental methods that edit data in residue instead of atom, which the later is more intuative to me.
+        """Makes the occupancy for each of the child Atom() objects blank."""
+        for idx in range(len(self.atoms_)):
+            self.atoms_[idx].occupancy = ""
+
+    def min_line(self) -> int: #@shaoqz: @imp2 move to the pdb IO class
+        """The lowest one-indexed line one of the Residue()'s atoms come from."""
+        return self.min_line_
+
+    def max_line(self) -> int:
+        """The highest one-indexed line one of the Residue()'s atoms come from."""
+        return self.max_line_
+
+    def line_range(self) -> Tuple[int, int]:
+        """A tuple of the he lowest and highest one-indexed lines that the Residue()'s atoms come from."""
+        return (self.min_line(), self.max_line())
+
+    def neighbors(self, other: Residue) -> bool: #@shaoqz: @imp2 move to IO class / change to is_neighbors
+        """Checks if two residues from the same PDB are neighbors."""
+        return (abs(self.min_line() - other.max_line()) == 1) or (
+            abs(self.max_line() - other.min_line()) == 1
+        )
 
     def get_pdb_lines(self, terminal: bool = False) -> List[str]:
         """Method that gets the PDB lines for all of the Atom() objects in the Residue() object."""
         result = list()
-        for aa in self.atoms:
+        for aa in self.atoms_:
             result.append(aa.to_pdb_line())
         if terminal:
             num = int(result[-1][6:11])
@@ -203,22 +229,4 @@ class Residue:
             result.append(ter_line)
         return result
 
-    def get_name(self) -> str:
-        """Getter for the Residue()'s name."""
-        return self.name
-
-    def __str__(self) -> str:
-        """String representation that just shows residue key in format "chain_id.residue_name.residue_num" """
-        return self.residue_key
-
-    def __repr__(self) -> str:
-        """String representationt that just shows residue key in format "chain_id.residue_name.residue_num" """
-        return str(self)
-
-    def clone(self) -> Residue:
-        """Creates a deepcopy of self."""
-        return deepcopy(self)
-
-    def sort_key(self) -> Tuple[str, int]:
-        """Generates the sorting key for the Residue(). Specifically, a tuple of [chain_id, res_num]."""
-        return (self.chain_, self.num_)
+    #endregion
