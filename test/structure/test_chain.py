@@ -16,7 +16,7 @@ def test_proper_ctor_behavior():
     """Making sure that the default Chain() works."""
     chain = Chain("test", [])
     assert chain.name() == "test"
-    assert chain.empty()
+    assert chain.is_empty()
     assert not chain.residues()
 
 
@@ -33,8 +33,8 @@ def test_same_sequence_equal():
     ]
     chain1 = Chain("A", residues)
     chain2 = Chain("A", residues)
-    assert chain1.same_sequence(chain2)
-    assert chain2.same_sequence(chain1)
+    assert chain1.is_same_sequence(chain2)
+    assert chain2.is_same_sequence(chain1)
 
     residues_alt = [
         Residue("B.A.1", list()),
@@ -43,8 +43,8 @@ def test_same_sequence_equal():
         Residue("B.D.5", list()),
     ]
     chain3 = Chain("A", residues_alt)
-    assert chain3.same_sequence(chain2)
-    assert chain2.same_sequence(chain3)
+    assert chain3.is_same_sequence(chain2)
+    assert chain2.is_same_sequence(chain3)
 
 
 def test_same_sequence_not_equal():
@@ -58,8 +58,8 @@ def test_same_sequence_not_equal():
 
     chain1 = Chain("A", residues)
     chain2 = Chain("B", residues)
-    assert not chain1.same_sequence(chain2)
-    assert not chain2.same_sequence(chain1)
+    assert not chain1.is_same_sequence(chain2)
+    assert not chain2.is_same_sequence(chain1)
 
     residues_alt1 = [
         Residue("A.B.1", list()),
@@ -68,8 +68,8 @@ def test_same_sequence_not_equal():
         Residue("A.D.5", list()),
     ]
     chain3 = Chain("A", residues_alt1)
-    assert not chain3.same_sequence(chain1)
-    assert not chain3.same_sequence(chain1)
+    assert not chain3.is_same_sequence(chain1)
+    assert not chain3.is_same_sequence(chain1)
 
     residues_alt2 = [
         Residue("A.A.3", list()),
@@ -78,14 +78,14 @@ def test_same_sequence_not_equal():
         Residue("A.D.5", list()),
     ]
     chain4 = Chain("A", residues_alt2)
-    assert not chain4.same_sequence(chain1)
-    assert not chain1.same_sequence(chain4)
+    assert not chain4.is_same_sequence(chain1)
+    assert not chain1.is_same_sequence(chain4)
 
     residues.pop()
     residues.pop()
     chain5 = Chain("A", residues)
-    assert not chain5.same_sequence(chain1)
-    assert not chain1.same_sequence(chain5)
+    assert not chain5.is_same_sequence(chain1)
+    assert not chain1.is_same_sequence(chain5)
 
 
 def test_rename():

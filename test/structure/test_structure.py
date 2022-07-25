@@ -154,20 +154,20 @@ def test_structure_same_sequence():
     # testing the same chain
     chain1 = Chain("A", list(map(lambda kk: Residue(kk, list()), keys1)))
     chain2 = Chain("A", list(map(lambda kk: Residue(kk, list()), keys1)))
-    assert chain1.same_sequence(chain2)
-    assert chain2.same_sequence(chain1)
+    assert chain1.is_same_sequence(chain2)
+    assert chain2.is_same_sequence(chain1)
     # testing different chain name
     chain2 = Chain("B", list(map(lambda kk: Residue(kk, list()), keys2)))
-    assert not chain1.same_sequence(chain2)
-    assert not chain2.same_sequence(chain1)
+    assert not chain1.is_same_sequence(chain2)
+    assert not chain2.is_same_sequence(chain1)
     # testing different residue name
     chain2 = Chain("A", list(map(lambda kk: Residue(kk, list()), keys3)))
-    assert not chain1.same_sequence(chain2)
-    assert not chain2.same_sequence(chain1)
+    assert not chain1.is_same_sequence(chain2)
+    assert not chain2.is_same_sequence(chain1)
     # testing different residue number
     chain2 = Chain("A", list(map(lambda kk: Residue(kk, list()), keys4)))
-    assert not chain1.same_sequence(chain2)
-    assert not chain2.same_sequence(chain1)
+    assert not chain1.is_same_sequence(chain2)
+    assert not chain2.is_same_sequence(chain1)
 
 
 def test_compare_structures_equiv():

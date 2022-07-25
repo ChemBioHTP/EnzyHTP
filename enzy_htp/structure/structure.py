@@ -59,7 +59,7 @@ Operation:
         1
         >>> structure.num_residues
         3
-        >>> structure.insert_chain( chain_cpy )
+        >>> structure.add_chain( chain_cpy )
         >>> structure.chains
         [<enzy_htp.structure.chain.Chain object at 0x7fdc680ac670>, 
             <enzy_htp.structure.chain.Chain object at 0x7fdc680855b0>] # @shaoqz: why chain.Chain?
@@ -81,7 +81,7 @@ Operation:
         ['A.ASP.1','A.ASP.2','A.ASP.3']
         >>> structure.num_residues
         3
-        >>> structure.insert_residue( res_cpy )
+        >>> structure.add_residue( res_cpy )
         >>> structure.residues()
         ['A.ASP.1','A.ASP.2','A.ASP.3','B.ASP.1']
         >>> structure.num_residues
@@ -288,7 +288,7 @@ class Structure:
         if to_remove != -1:
             del self.chains_[to_remove]
 
-    def insert_residue(self, new_res: Residue) -> None:
+    def add_residue(self, new_res: Residue) -> None:
         """Inserts a new Residue() object into the Structure(). If the exact Residue (chain_id, name, residue_id) already
         exists, the new Residue overwrites it. If the new Residue specifies a Chain() that does not exist, a new chain is made.
         """
@@ -298,7 +298,7 @@ class Structure:
             self.chains_.apppend(new_chain)
             self.chain_mapper[chain_name] = new_chain
         else:
-            self.chain_mapper[chain_name].insert_residue(new_res)
+            self.chain_mapper[chain_name].add_residue(new_res)
 
         self.chains_ = list(self.chain_mapper.values()) #@shaoqz: why need this
         self.chains_.sort(key=lambda c: c.name()) #@shaoqz: should this be in the 1st if block?
@@ -699,5 +699,5 @@ def merge_right(left: Structure, right: Structure) -> Structure: #@shaoqz: I bel
     right_keys = struct_cpy.residue_keys #@shaoqz: @imp2 why is this part needed as all res is stored in chain.
     for lkey in left.residue_keys:
         if lkey not in right_keys:
-            struct_cpy.insert_residue(left.get_residue(lkey))
+            struct_cpy.add_residue(left.get_residue(lkey))
     return struct_cpy
