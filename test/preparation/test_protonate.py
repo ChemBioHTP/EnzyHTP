@@ -83,7 +83,7 @@ def test_protonate_ligand():
     ligand_dir = f"{WORK_DIR}/ligands/"
     base_pdb = f"{DATA_DIR}/FAcD-FA-ASP.pdb"
     structure: struct.Structure = struct.structure_from_pdb(base_pdb)
-    ligand = structure.get_ligands()[0]
+    ligand = structure.ligands[0]
     ligand.build(f"{WORK_DIR}/ligand.pdb")
     # assert not os.path.isdir( ligand_dir )
     protonated_ligand: struct.Ligand = prot.protonate_ligand(ligand, ligand_dir)

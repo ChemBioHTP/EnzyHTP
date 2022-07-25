@@ -72,10 +72,8 @@ class Atom:
         if not np.isnan(self.charge):
             self.charge = int(self.charge) #@shaoqz: charge should be float.
 
-    def has_alt_loc(self) -> bool:
-        """Checks if the atom has a non-empty alt_loc."""
-        return len(self.alt_loc.strip()) != 0
-
+    # === Getter-Attr (ref) ===
+    # === Getter-Prop (cpy/new) ===
     def residue_key(self) -> str: #@shaoqz: but this function is accessing information of residue. could it be better if atom store a reference of it? Also imaging we need more information about residue like those should be calculated (RMSD, for kinetic scoring) upon selection of one atom base on like distance.
         """Creates a residue key of format "chain_id.residue_name.residue_number". Used for residue construction."""
         return f"{self.chain_id}.{self.residue_name}.{self.residue_number}"
@@ -88,6 +86,9 @@ class Atom:
             + (self.z_coord - other.z_coord) ** 2
         )
 
+    # === Checker === 
+    # === Editor ===
+    # === Special ===
     def __getitem__(self, key: str) -> Union[None, bool, int, float, str]:
         """Accessor to make Atom() callable like dctionary. If attribute is not defined, returns None"""
         return self.__dict__.get(key, None)
@@ -95,6 +96,11 @@ class Atom:
     def __setitem__(self, key: str, value: Any) -> None:
         """Setter to make indexable like a dicT()."""
         self.__dict__[key] = value
+
+    #region === TODO/TOMOVE ===
+    def has_alt_loc(self) -> bool:
+        """Checks if the atom has a non-empty alt_loc."""
+        return len(self.alt_loc.strip()) != 0
 
     def to_pdb_line(
         self,
@@ -148,8 +154,6 @@ class Atom:
             if self.charge < 0:
                 charge = charge[::-1]
         return f"{l_type}{a_index} {a_name}{self.alt_loc:1}{r_name: >3} {c_index}{r_index}    {x}{y}{z}{self.occupancy:6.2f}  0.00           {a_type}{charge}"
-
-    #
 
     def build_oniom(self, layer, chrg=None, cnt_info: list = None, if_lig=0, if_sol=0):
         """
@@ -210,3 +214,4 @@ class Atom:
         z = "{:<14.8f}".format(self.coord[2])
         
         return f"{atom_label} {fz_flag}   {x} {y} {z} {ly_flag}{cnt_flag}{line_feed}"
+    #endregion

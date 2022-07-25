@@ -37,7 +37,7 @@ def test_constant_data():
 def test_get_radii_method_good_input():
     """Ensuring the MetalAtom.get_radii() method works correctly."""
     pdb_file = f"{DATA_DIR}/1NVG.pdb"
-    metals: List[MetalAtom] = structure_from_pdb(pdb_file).get_metals()
+    metals: List[MetalAtom] = structure_from_pdb(pdb_file).metals
     assert np.isclose(metals[0].get_radii(), 0.88)
     assert np.isclose(metals[0].get_radii("vdw"), 1.39)
 
@@ -56,10 +56,10 @@ def test_residue_to_metal():
 def test_clone():
     """Checking that the Ligand.clone() method returns a deepcopy of the current MetalAtom()."""
     pdb_file = f"{DATA_DIR}/1NVG.pdb"
-    metals: List[MetalAtom] = structure_from_pdb(pdb_file).get_metals()
+    metals: List[MetalAtom] = structure_from_pdb(pdb_file).metals
     metal: MetalAtom = metals[0]
     metal_cpy: MetalAtom = metal.clone()
     assert isinstance(metal_cpy, MetalAtom)
     assert id(metal) != id(metal_cpy)
-    for a1, a2 in zip(metal.atom_list(), metal_cpy.atom_list()):
+    for a1, a2 in zip(metal.atoms_(), metal_cpy.atoms_()):
         assert id(a1) != id(a2)

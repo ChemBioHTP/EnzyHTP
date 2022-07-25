@@ -69,7 +69,7 @@ def protonate_missing_elements(
         new_stru = self.merge_structure_elements(old_stru, new_stru)
 
     # print(compare_structures(old_stru,new_stru))
-    metal_list = old_stru.get_metals()
+    metal_list = old_stru.metals
     if len(metal_list):
         core._LOGGER.info(f"Merging {len(metal_list)} metal centers in old structure!")
         core._LOGGER.info(f"Adding metal centers to new structure...")
@@ -81,7 +81,7 @@ def protonate_missing_elements(
         core._LOGGER.info(f"Protonation complete!")
 
     # protonate ligands and combine with the pqr file
-    ligand_list = old_stru.get_ligands()
+    ligand_list = old_stru.ligands
     if len(ligand_list):
         # print('lig-list',ligand_list)
         core._LOGGER.info(f"Merging {len(ligand_list)} ligands in old structure!")
@@ -105,7 +105,7 @@ def protonate_missing_elements(
             lig.num_ = int(r_id)  # TODO(CJ). make this a method for the Ligand() class
             lig.residue_key = ok
             # print(lig)
-            new_stru.insert_chain(Chain(lig.chain(), [lig]))
+            new_stru.add_chain(Chain(lig.chain(), [lig]))
         # new_stru.add(new_ligands, sort=0)
     return new_stru
 

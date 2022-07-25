@@ -112,7 +112,7 @@ def test_load_structure():
     TEST_FILE = f"{TEST_DIR}/preparation/data/3NIR.pdb"
     struct: Structure = structure_from_pdb(TEST_FILE)
     assert struct
-    assert struct.residue_state() == fixed_answer
+    assert struct.residue_state == fixed_answer
 
 
 def test_structure_ctor_bad_input():
@@ -130,7 +130,7 @@ def test_structure_ctor_bad_input():
 
 
 def test_residue_state():
-    """Checking that the Structure.residue_state() method properly returns the residue state for the Structure()."""
+    """Checking that the Structureresidue_state method properly returns the residue state for the Structure()."""
     start = [("A", "ARG", 1), ("A", "HIS", 2), ("A", "ARG", 3), ("A", "HIS", 4)]
     answer = [("A", "R", 1), ("A", "H", 2), ("A", "R", 3), ("A", "H", 4)]
     keys = list(map(lambda pr: f"{pr[0]}.{pr[1]}.{pr[2]}", start))
@@ -138,7 +138,7 @@ def test_residue_state():
     ss = Structure(
         [chain1]
     )  # TODO(CJ): need error in Structure() ctor if NOT a list of chains
-    assert ss.residue_state() == answer
+    assert ss.residue_state == answer
 
 
 def test_structure_same_sequence():
@@ -154,20 +154,20 @@ def test_structure_same_sequence():
     # testing the same chain
     chain1 = Chain("A", list(map(lambda kk: Residue(kk, list()), keys1)))
     chain2 = Chain("A", list(map(lambda kk: Residue(kk, list()), keys1)))
-    assert chain1.same_sequence(chain2)
-    assert chain2.same_sequence(chain1)
+    assert chain1.is_same_sequence(chain2)
+    assert chain2.is_same_sequence(chain1)
     # testing different chain name
     chain2 = Chain("B", list(map(lambda kk: Residue(kk, list()), keys2)))
-    assert not chain1.same_sequence(chain2)
-    assert not chain2.same_sequence(chain1)
+    assert not chain1.is_same_sequence(chain2)
+    assert not chain2.is_same_sequence(chain1)
     # testing different residue name
     chain2 = Chain("A", list(map(lambda kk: Residue(kk, list()), keys3)))
-    assert not chain1.same_sequence(chain2)
-    assert not chain2.same_sequence(chain1)
+    assert not chain1.is_same_sequence(chain2)
+    assert not chain2.is_same_sequence(chain1)
     # testing different residue number
     chain2 = Chain("A", list(map(lambda kk: Residue(kk, list()), keys4)))
-    assert not chain1.same_sequence(chain2)
-    assert not chain2.same_sequence(chain1)
+    assert not chain1.is_same_sequence(chain2)
+    assert not chain2.is_same_sequence(chain1)
 
 
 def test_compare_structures_equiv():
@@ -185,14 +185,14 @@ def test_compare_structures_not_equiv():
     TEST_FILE = f"{TEST_DIR}/preparation/data/3NIR.pdb"
     structure1: Structure = structure_from_pdb(TEST_FILE)
     structure2: Structure = structure_from_pdb(TEST_FILE)
-    res_to_remove1: Residue = structure1.chains()[0][-1]
-    res_to_remove2: Residue = structure2.chains()[0][0]
+    res_to_remove1: Residue = structure1.chains[0][-1]
+    res_to_remove2: Residue = structure2.chains[0][0]
     # one missing residue
-    del structure1.chains()[0][-1]
+    del structure1.chains[0][-1]
     result = compare_structures(structure1, structure2)
     assert result == {"left": [], "right": [res_to_remove1.residue_key]}
     # two missing residues
-    del structure2.chains()[0][0]
+    del structure2.chains[0][0]
     result = compare_structures(structure1, structure2)
     assert result == {
         "left": [res_to_remove2.residue_key],
@@ -206,8 +206,8 @@ def test_merge_right_canonical_only(): #@shaoqz: @imp a better idea is to merge 
     TEST_FILE = f"{TEST_DIR}/preparation/data/3NIR.pdb"
     structure1: Structure = structure_from_pdb(TEST_FILE)
     structure2: Structure = structure_from_pdb(TEST_FILE)
-    res_to_remove1: Residue = structure2.chains()[0][-1]
-    del structure2.chains()[0][-1]
+    res_to_remove1: Residue = structure2.chains[0][-1]
+    del structure2.chains[0][-1]
     result = compare_structures(structure1, structure2)
     assert result == {"left": [res_to_remove1.residue_key], "right": []}
     result = merge_right(structure1, structure2)
@@ -255,3 +255,9 @@ def test_round_trip_pdb():
     assert equiv_files(TEST_FILE, actual_file, 60)
     fs.safe_rm(actual_file)
     assert not os.path.exists(actual_file)
+
+
+def test_atoms(): # TODO(shaoqz) wait for test
+    TEST_FILE = f"{TEST_DIR}/preparation/data/3NIR.pdb"
+    struct: Structure = structure_from_pdb(TEST_FILE)
+    print(struct.atoms)

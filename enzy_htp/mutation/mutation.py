@@ -82,7 +82,7 @@ def generate_all_mutations(
         A dict() with (key, value) pairs of ((chain_id, residue), List[Mutation]).
     """
     result = dict()
-    residues: List[es.Residue] = structure.residues()
+    residues: List[es.Residue] = structure.residues
     residues = list(filter(lambda rr: rr.is_canonical(), residues))
     for res in residues:
         (chain_id, num) = res.sort_key()
