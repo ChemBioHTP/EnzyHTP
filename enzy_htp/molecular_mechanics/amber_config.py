@@ -218,22 +218,21 @@ class AmberConfig:
         import os
         import json
         if not os.path.exists(fname):
-            core._LOGGER = init_logger('EnzyHTP', f"The supplied file: \'{fname}\' does not exist!")
-            return
+            return core._LOGGER.error(f"The supplied file: \'{fname}\' does not exist!")
         elif fname[-5:] != '.json':
-            core._LOGGER = init_logger('EnzyHTP', f"The supplied file: \'{fname}\' is not a .json file!")
-            return
+            return core._LOGGER.error(f"The supplied file: \'{fname}\' is not a .json file!")
         else:
             with open(fname, "r") as json_file:
                 ReadDic = json.load(json_file)
             for key in ReadDic:
                 if key not in enzy_htp.molecular_mechanics.amber_config.AmberConfig.CONF_PROD:
-                    core._LOGGER = init_logger('EnzyHTP', f"Extra setting '{key}' found in CONF_PROD. Removing...")
+                    core._LOGGER.warning(f"Extra setting '{key}' found in CONF_PROD. Removing...")
                     del ReadDic[key]
-            for key in enzy_htp.molecular_mechanics.amber_config.AmberConfig.CONF_PROD:
+            for key, value in enzy_htp.molecular_mechanics.amber_config.AmberConfig.CONF_PROD.items():
                 if key not in ReadDic:
-                    core._LOGGER = init_logger('EnzyHTP', f"Missing '{key}' in CONF_PROD. (Using default)")
-                    return
+                    core._LOGGER.warning('EnzyHTP', f"Missing '{key}' in CONF_PROD. Using default")
+                    ReadDic[key] = value
+                    # Comment (Paul): I recommend using default values for missing parameters and passing an warning instead of an error.
         return ReadDic
 
 
