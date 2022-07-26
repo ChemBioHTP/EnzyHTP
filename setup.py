@@ -27,5 +27,5 @@ setup(name='enzy_htp',
 		'enzy_htp.molecular_mechanics',
 		'enzy_htp.quantum_mechanics',
 		],
-		install_requirements=requirements,
+		install_requires=requirements,
         )
