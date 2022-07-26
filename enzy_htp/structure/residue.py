@@ -50,6 +50,7 @@ class Residue:
             self.max_line_ = np.max(line_idxs)
 
     # === Getter-Attr (ref) ===
+    @property
     def atoms(self) -> List[Atom]:
         """Returns a list of all Atom() objects that the Residue() "owns" """
         return self.atoms_

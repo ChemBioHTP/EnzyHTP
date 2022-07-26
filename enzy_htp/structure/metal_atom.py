@@ -327,8 +327,8 @@ class MetalAtom(Residue):
 def residue_to_metal(residue: Residue) -> MetalAtom:
     """Convenience function that converts Residue() to MetalAtom() object."""
     atom_name = None
-    if len(residue.atoms_()):
-        raw_name = list(residue.atoms_()[0].atom_name.lower())
+    if len(residue.atoms):
+        raw_name = list(residue.atoms[0].atom_name.lower())
         raw_name[0] = raw_name[0].upper()
         atom_name = "".join(raw_name)
 

@@ -192,7 +192,7 @@ def test_categorize_residue_solvent():
     solvent: Solvent = sp.categorize_residue(base_residue)
     assert isinstance(solvent, Solvent)
     assert id(base_residue) != id(solvent)
-    for a1, a2 in zip(base_residue.atoms_(), solvent.atoms_()):
+    for a1, a2 in zip(base_residue.atoms, solvent.atoms):
         assert id(a1) != id(a2)
     assert solvent.is_rd_solvent()
     assert solvent.rtype() == chem.ResidueType.SOLVENT
@@ -274,7 +274,7 @@ def test_ligand_from_pdb():
     ligand_pdb = f"{DATA_DIR}/just_ligand.pdb"
     ligand = sp.ligand_from_pdb(ligand_pdb)
     assert ligand.is_ligand()
-    assert len(ligand.atoms_()) == 7
+    assert len(ligand.atoms) == 7
     assert ligand.name == "FAH"
 
 

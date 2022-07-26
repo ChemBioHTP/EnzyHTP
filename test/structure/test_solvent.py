@@ -21,7 +21,7 @@ def test_clone():
     solvent = Solvent("A.HOH.1", [Atom(line_idx=1), Atom(line_idx=2)])
     solvent_cpy: Solvent = solvent.clone()
     assert id(solvent) != id(solvent_cpy)
-    for a1, a2 in zip(solvent.atoms_(), solvent_cpy.atoms_()):
+    for a1, a2 in zip(solvent.atoms, solvent_cpy.atoms):
         assert id(a1) != id(a2)
 
 
@@ -31,5 +31,5 @@ def test_residue_to_solvent():
     solvent: Solvent = residue_to_solvent(residue)
     assert isinstance(solvent, Solvent)
     assert id(residue) != id(solvent)
-    for a1, a2 in zip(solvent.atoms_(), residue.atoms_()):
+    for a1, a2 in zip(solvent.atoms, residue.atoms):
         assert id(a1) != id(a2)

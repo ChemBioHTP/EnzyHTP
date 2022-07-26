@@ -61,5 +61,5 @@ def test_clone():
     metal_cpy: MetalAtom = metal.clone()
     assert isinstance(metal_cpy, MetalAtom)
     assert id(metal) != id(metal_cpy)
-    for a1, a2 in zip(metal.atoms_(), metal_cpy.atoms_()):
+    for a1, a2 in zip(metal.atoms, metal_cpy.atoms):
         assert id(a1) != id(a2)

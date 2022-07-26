@@ -66,7 +66,7 @@ def test_residue_key_information():
     assert local_res.residue_key == "B.THR.1"
     assert local_res.num() == 1
 
-    for aa in local_res.atoms_():
+    for aa in local_res.atoms:
         assert aa.chain_id == "B"
 
 
@@ -165,5 +165,5 @@ def test_clone():
     res_cpy: Residue = res.clone()
 
     assert id(res) != id(res_cpy)
-    for a1, a2 in zip(res.atoms_(), res_cpy.atoms_()):
+    for a1, a2 in zip(res.atoms, res_cpy.atoms):
         assert id(a1) != id(a2)
