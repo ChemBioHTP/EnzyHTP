@@ -142,7 +142,7 @@ def test_residue_state():
 
 
 def test_structure_same_sequence():
-    """Ensuring that the Chain.same_sequence() method works."""
+    """Ensuring that the Chain.is_same_sequence() method works."""
     start1 = [("A", "ARG", 1), ("A", "HIS", 2), ("A", "ARG", 3), ("A", "HIS", 4)]
     start2 = [("B", "ARG", 1), ("B", "HIS", 2), ("B", "ARG", 3), ("B", "HIS", 4)]
     start3 = [("A", "ARG", 1), ("A", "ARG", 2), ("A", "ARG", 3), ("A", "HIS", 4)]

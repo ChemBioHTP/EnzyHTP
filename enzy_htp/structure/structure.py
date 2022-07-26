@@ -327,7 +327,7 @@ class Structure:
         other_chain: Chain
         for chain_name, self_chain in self.chain_mapper.items():
             other_chain = other.chain_mapper[chain_name]
-            if not self_chain.same_sequence(other_chain):
+            if not self_chain.is_same_sequence(other_chain):
                 return False
         return True #@shaoqz: so this comparsion is only in sequence level. This does not really make sense. Different levels of comparsion
                     #         is needed for a pair structure
