@@ -12,6 +12,7 @@ Date: 2022-06-02
 from pprint import pprint
 from copy import deepcopy
 from typing import Any, List, Dict
+from enzy_htp.core.logger import init_logger
 from plum import dispatch
 
 
@@ -212,6 +213,28 @@ class AmberConfig:
         else:
             # TODO(CJ): add a custom error for this part
             raise TypeError()
+
+    def load_conf_prod(fname: str) -> Dict:
+        import os
+        import json
+        if not os.path.exists(fname):
+            core._LOGGER = init_logger('EnzyHTP', f"The supplied file: \'{fname}\' does not exist!")
+            return
+        elif fname[-5:] != '.json':
+            core._LOGGER = init_logger('EnzyHTP', f"The supplied file: \'{fname}\' is not a .json file!")
+            return
+        else:
+            with open(fname, "r") as json_file:
+                ReadDic = json.load(json_file)
+            for key in ReadDic:
+                if key not in enzy_htp.molecular_mechanics.amber_config.AmberConfig.CONF_PROD:
+                    core._LOGGER = init_logger('EnzyHTP', f"Extra setting '{key}' found in CONF_PROD. Removing...")
+                    del ReadDic[key]
+            for key in enzy_htp.molecular_mechanics.amber_config.AmberConfig.CONF_PROD:
+                if key not in ReadDic:
+                    core._LOGGER = init_logger('EnzyHTP', f"Missing '{key}' in CONF_PROD. (Using default)")
+                    return
+        return ReadDic
 
 
 def default_amber_config() -> AmberConfig:
