@@ -99,6 +99,7 @@ from __future__ import annotations
 
 import string
 from copy import deepcopy
+import sys
 from typing import List, Set, Dict, Tuple
 from collections import defaultdict
 
@@ -140,23 +141,30 @@ class Structure:
     def __init__(self, chains: List[Chain]):
         """Constructor that takes just a list of Chain() objects as input."""
         self.chains_ = chains #@shaoqz: why tailing _ #@shaoqz: @imp2 why do we need this instead of just a mapper and the getter of chains TODO change it to only one and make another one a getter
-        self.chain_mapper = dict()
-        ch: Chain
-        for ch in chains:
-            if ch.name() in self.chain_mapper:
-                _LOGGER.error(
-                    "Duplicate chain names given to Structure() object. Exiting..."
-                )
-                exit(1)
-            self.chain_mapper[ch.name()] = ch
+        if self.has_duplicate_chain_name():
+            self.resolve_duplicated_chain_name()
 
-    # === Getters === (Attributes - accessing Structure data -  references)
+    #region === Getters === (Attributes - accessing Structure data -  references)
     @property
     def chains(self) -> List[Chain]:
         """Getter for the list of Chain() objects contained within the Structure() object."""
         self.chains_.sort(key=lambda c: c.name())
-        # TODO(CJ): should this be a deep copy or no? #@shaoqz: No
         return self.chains_
+
+    @chains.setter
+    def chains(self, val) -> None:
+        '''setter for _chains'''
+        self.chains_ = val
+
+    @property
+    def chain_mapper(self) -> Dict[str, Chain]:
+        mapper = dict()
+        if self.has_duplicate_chain_name():
+            self.resolve_duplicated_chain_name()
+        ch: Chain
+        for ch in self.chains:
+            mapper[ch.name()] = ch
+        return mapper
 
     def get_chain(self, chain_name: str) -> Union[Chain, None]:
         """Gets a chain of the given name. Returns None if the Chain() is not present."""
@@ -166,7 +174,7 @@ class Structure:
     def residues(self) -> List[Residue]:
         """Return a list of the residues in the Structure() object sorted by (chain_id, residue_id)"""
         result = list()
-        for ch in self.chains_:
+        for ch in self.chains:
             result.extend(ch.residues())
         result.sort(key=lambda r: r.sort_key())
         return result
@@ -174,7 +182,7 @@ class Structure:
     def get_residue(self, target_key: str) -> Union[None, Residue]: #@shaoqz: we need to that gives a reference. In the case of editing the structure.
         """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format,
         a deepcopy of the corresponding Residue() is returned, if it exists. None is returned if it cannot be found."""
-        for chain in self.chains_:
+        for chain in self.chains:
             for res in chain.residues():
                 if res.residue_key == target_key:
                     return deepcopy(res)
@@ -184,7 +192,7 @@ class Structure:
     def metals(self) -> List[Residue]:
         """Filters out the metal Residue()'s from the chains in the Structure()."""
         result: List[Residue] = list()
-        for chain in self.chains_:
+        for chain in self.chains:
             result.extend(list(filter(lambda r: r.is_metal(), chain.residues())))
         return result
 
@@ -192,7 +200,7 @@ class Structure:
     def ligands(self) -> List[Residue]:
         """Filters out the ligand Residue()'s from the chains in the Structure()."""
         result: List[Residue] = list()
-        for chain in self.chains_:
+        for chain in self.chains:
             result.extend(list(filter(lambda r: r.is_ligand(), chain.residues())))
         return result
 
@@ -202,9 +210,9 @@ class Structure:
         return []
 
     @ property
-    def atoms(self) -> List[Atom]: # TODO(shaoqz) wait for test
+    def atoms(self) -> List[Atom]:
         result = list()
-        for chain in self.chains_:
+        for chain in self.chains:
             for residue in chain:
                 result.extend(residue.atoms)
         return result
@@ -214,8 +222,10 @@ class Structure:
         maybe just use python objects to access is a better idea.
         And these APIs are just for developers, users will have selector in the future to do selection'''
         pass
+    
+    #endregion
 
-    # === Getter === (Properities - derived data; wont affect Structure data - copy)
+    #region === Getter === (Properities - derived data; wont affect Structure data - copy)
     @property
     def residue_state(self) -> List[Tuple[str, str, int]]: #@shaoqz: @residue_key
         """Generates a list of tuples of all residues in the Structure. Format for each tuple is (one_letter_res_name, chain_id, res_index).
@@ -234,7 +244,7 @@ class Structure:
     def residue_keys(self) -> List[str]:
         """Generates a list of strings containing all residue_key values for all child Residue()'s"""
         result = list()
-        for chain in self.chains_:
+        for chain in self.chains:
             for res in chain.residues():
                 result.append(res.residue_key)
         return result
@@ -244,26 +254,65 @@ class Structure:
         """Returns the number of Residue() objects contained within the current Structure()."""
         total: int = 0
         ch: Chain
-        for ch in self.chains_:
+        for ch in self.chains:
             total += ch.num_residues()
         return total
 
     @property
     def num_chains(self) -> int:
         """Returns the number of Chain() objects in the current Structure()."""
-        return len(self.chains_)
+        return len(self.chains)
 
     @property
     def chain_names(self) -> List[str]:
         """Returns a list of all the chain names for the Structure()"""
         return list(self.chain_mapper.keys())
 
-    # === Checker === 
+    #endregion
+
+    #region === Checker === 
     def has_chain(self, chain_name: str) -> bool:
         """Checks if the Structure() has a chain with the specified chain_name."""
         return chain_name in self.chain_mapper
 
-    # === Editor ===     
+    def has_duplicate_chain_name(self) -> bool: #TODO add test
+        '''check if self._chain have duplicated chain name
+        give warning if do.'''
+        mapper = dict()
+        ch: Chain
+        for ch in self.chains_:
+            if ch.name() in mapper:
+                _LOGGER.warning(
+                    f"Duplicate chain names detected in Structure obj during {sys._getframe().f_back.f_code.co_name}()! "
+                )
+                return True
+            mapper[ch.name()] = ch
+        return False
+    
+    def resolve_duplicated_chain_name(self, keep: bool = 0) -> None: #TODO add test
+        '''resolve for duplicated chain name in self.chains_
+        A. rename the chain to be one character after the same one if they are different 
+        B. give error if they are the same (in coordinate)'''        
+        mapper = dict()
+        if_rename = 0
+        for ch in self.chains:
+            if ch.name() in mapper:
+                if ch.is_same_coord(mapper[ch.name()]):
+                    _LOGGER.error(
+                        "Duplicate chain (same coordinate) detected in Structure obj! Exiting... "
+                    )
+                    exit(1)
+                new_name = chr(ord(ch.name()) + 1)
+                ch.rename(new_name)
+                if_rename = 1
+            mapper[ch.name()] = ch
+        if if_rename:
+            _LOGGER.warning(
+                'Resolved duplicated chain (different ones) name by renaming.'
+            )
+    #endregion
+
+    #region === Editor ===     
     def add_chain(self, new_chain: Chain, overwrite: bool = False) -> None: #TODO add logic for overwriting
         """Method that inserts a new chain and then sorts the chains based on name.
         Will overwrite if Chain() with existing name already in object. #@shaoqz: add + sort = insert
@@ -272,21 +321,21 @@ class Structure:
         if new_chain_name in self.chain_mapper:
             self.remove_chain(new_chain_name) #@shaoqz: give a warning. @imp should not overwrite. Since want to add a chain to a structure with a same-naming chain is very common. (like I want to merge 2 single chain object to a dimer) A better default strategy is to insert after the chain with the same name and also record a index map.
 
-        self.chains_.append(new_chain)
+        self.chains.append(new_chain)
         self.chain_mapper[new_chain.name()] = new_chain
-        self.chains_.sort(key=lambda c: c.name())
+        self.chains.sort(key=lambda c: c.name())
 
     def remove_chain(self, chain_name: str) -> None:
         """Given a chain name, removes the Chain() object form both self.chains_ and self.chain_mapper."""
         del self.chain_mapper[chain_name]
         to_remove = -1
-        for idx, chain in enumerate(self.chains_):
+        for idx, chain in enumerate(self.chains):
             if chain.name() == chain_name:
                 to_remove = idx
                 break
 
         if to_remove != -1:
-            del self.chains_[to_remove]
+            del self.chains[to_remove]
 
     def add_residue(self, new_res: Residue) -> None:
         """Inserts a new Residue() object into the Structure(). If the exact Residue (chain_id, name, residue_id) already
@@ -295,13 +344,13 @@ class Structure:
         chain_name: str = new_res.chain()
         if not self.has_chain(chain_name):
             new_chain: Chain = Chain(chain_name, [new_res]) #@shaoqz: give a warning
-            self.chains_.apppend(new_chain)
+            self.chains.apppend(new_chain)
             self.chain_mapper[chain_name] = new_chain
         else:
             self.chain_mapper[chain_name].add_residue(new_res)
 
-        self.chains_ = list(self.chain_mapper.values()) #@shaoqz: why need this
-        self.chains_.sort(key=lambda c: c.name()) #@shaoqz: should this be in the 1st if block?
+        self.chains = list(self.chain_mapper.values()) #@shaoqz: why need this
+        self.chains.sort(key=lambda c: c.name()) #@shaoqz: should this be in the 1st if block?
 
     def remove_residue(self, target_key: str) -> None:
         """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format,
@@ -313,10 +362,12 @@ class Structure:
             if self.chain_mapper[chain_name].empty():
                 self.remove_chain(chain_name)
 
-    # === Special === 
+    #endregion
+
+    #region === Special === 
     def __bool__(self) -> bool:
         """Enables running assert Structure(). Checks if there is anything in the structure."""
-        return bool(len(self.chains_))
+        return bool(len(self.chains))
 
     def __eq__(self, other: Structure) -> bool:
         """Comparison operator for other Structure() objects. Checks first if both have same chain names and then if each named chain is identical."""
@@ -340,7 +391,7 @@ class Structure:
     def __ne__(self, other: Structure) -> bool:
         """Negation operator for other Structure() objects. Inverstion of Structure.__eq__()."""
         return not (self == other)
-
+    #endregion
 
     #region (TODO+OLD)
     # === TODO ===
@@ -359,7 +410,7 @@ class Structure:
         if ligand_fix == 1 and prepi_path == None:
             raise Exception("Ligand fix 1 requires prepin_path.")
         # chain part
-        for chain in self.chains_:
+        for chain in self.chains:
             for res in chain:
                 for atom in res: #@shaoqz: @imp this no longer works right?
                     atom.get_connect()
@@ -437,7 +488,7 @@ class Structure:
         # write str in order
         # Note: Only write the connected atom with larger id
         a_id = 0
-        for chain in self.chains_:
+        for chain in self.chains:
             for res in chain:
                 for atom in res:
                     a_id += 1
@@ -545,7 +596,7 @@ class Structure:
             with open(out_path, "w") as of: #@shaoqz: same as build ligand use IO interface class
                 a_id = 0
                 r_id = 0
-                for chain in self.chains_:
+                for chain in self.chains:
                     # write chain
                     for resi in chain:
                         r_id = r_id + 1
@@ -689,8 +740,8 @@ def merge_right(left: Structure, right: Structure) -> Structure: #@shaoqz: I bel
     """
     struct_cpy: Structure = deepcopy(right)
     # TODO(CJ): make this a method
-    left.chains_ = sorted(left.chains_, key=lambda c: c.name())
-    struct_cpy.chains_ = sorted(struct_cpy.chains_, key=lambda c: c.name())
+    left.chains = sorted(left.chains, key=lambda c: c.name())
+    struct_cpy.chains = sorted(struct_cpy.chains, key=lambda c: c.name())
     # this is the case where there is straight up a missing chain
     for cname, chain in left.chain_mapper.items():
         if not struct_cpy.has_chain(cname):

@@ -10,6 +10,8 @@ from copy import deepcopy
 from enzy_htp.core import _LOGGER
 from typing import List
 
+from enzy_htp.structure.atom import Atom
+
 from .residue import Residue
 #TODO(CJ): add a method for changing/accessing a specific residue
 
@@ -40,6 +42,14 @@ class Chain:
     def name(self) -> str:
         """Getter for the Chain's name."""
         return self.name_
+
+    @property
+    def atoms(self) -> List[Atom]:
+        '''get all children Atoms'''
+        result = list()
+        for res in self:
+            result.extend(res.atoms)
+        return result
 
     # === Getter-Prop (cpy/new) ===
     def num_atoms(self) -> int:
@@ -83,6 +93,19 @@ class Chain:
                 return False
         return True
 
+    def is_same_coord(self, other: Chain) -> bool:
+        '''check if self is same as other in coordinate of every atom'''
+        self_atoms = self.atoms
+        self_atoms.sort(key=lambda a: a.num)
+        self_coord = map(lambda x:x.coord, self_atoms)
+        other_atoms = other.atoms
+        other_atoms.sort(key=lambda a: a.num)
+        other_coord = map(lambda x:x.coord, other_atoms)
+        for s, o in zip(self_coord, other_coord):
+            if s != o:
+                return False
+        return True    
+        
     # === Editor ===
     def add_residue(self, new_res: Residue, sort_after: bool = True, overwrite: bool = False) -> None: #@shaoqz: @imp overwriting a residue is rarely a demand but instead inserting one with same name and index but different stru is.
         """Allows for insertion of a new Residue() object into the Chain. If the new Residue() is an exact # TODO work on overwriting

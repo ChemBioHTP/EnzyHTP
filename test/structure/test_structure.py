@@ -14,6 +14,7 @@ from enzy_htp.structure import (
     structure_from_pdb,
     Residue,
     Chain,
+    Atom,
     compare_structures,
     merge_right,
 )
@@ -117,9 +118,9 @@ def test_load_structure():
 
 def test_structure_ctor_bad_input():
     """Testing that the Structure() ctor fails when given duplicate chains."""
-    chain1 = Chain("A", list())
-    chain2 = Chain("B", list())
-    chain3 = Chain("A", list())
+    chain1 = Chain("A", [Residue('A.XXX.1', [Atom(x_coord=1, y_coord=2, z_coord=3)])])
+    chain2 = Chain("B", [Residue('B.XXX.1', [Atom(x_coord=2, y_coord=2, z_coord=3)])])
+    chain3 = Chain("A", [Residue('A.XXX.1', [Atom(x_coord=1, y_coord=2, z_coord=3)])])
 
     with pytest.raises(SystemExit) as exe:
         struct = Structure([chain1, chain2, chain3])
