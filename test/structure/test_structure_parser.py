@@ -221,6 +221,17 @@ def test_build_chains():
         for res in chain.residues():
             assert isinstance(res, Residue)
 
+def test_build_chains_wANISOU(): # TODO(shaoqz): fix this by fixing missing chain id
+    '''test if works well with PDB that contain ANISOU records'''
+    pdb_file = f"{DATA_DIR}/four_chain_no_id_ANISOU.pdb"
+    reader = PandasPdb()
+    reader.read_pdb(pdb_file)
+    res_mapper: Dict[str, Residue] = sp.build_residues(
+        pd.concat((reader.df["ATOM"], reader.df["HETATM"]))
+    )
+    chain_mapper: Dict[str, Chain] = sp.build_chains(res_mapper)
+    for key in chain_mapper:
+        print(key)
 
 def test_structure_from_pdb_bad_input():
     """Checking that the main method structure_parser.structure_from_pdb() fails for bad input."""
