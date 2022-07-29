@@ -215,6 +215,18 @@ class AmberConfig:
             raise TypeError()
 
     def load_conf_prod(fname: str) -> Dict:
+        """Load MD production setup
+        This function loads the setup for the Amber MD production run from a json file. The return is a dictionary.
+        
+        Args:
+            fname: A string of the filename of the input json file. The name should end with ".json".
+
+        Regurn:
+            A dictionary from the json file. The keys that are not in the predefined AmberConfig.CONF_PROD are removed. The missing keys and corresponding default values from AmberConfig.CONF_PROD are added.
+
+        Raise:
+            None. All error and warning messages are passed to core._LOGGER.
+        """
         import os, json, enzy_htp.core
         if not os.path.exists(fname):
             core._LOGGER.error(f"The supplied file: \'{fname}\' does not exist!")
@@ -229,7 +241,7 @@ class AmberConfig:
                     del ReadDic[key]
             for key, value in enzy_htp.molecular_mechanics.amber_config.AmberConfig.CONF_PROD.items():
                 if key not in ReadDic:
-                    core._LOGGER.warning(f'EnzyHTP', f"Missing '{key}' in CONF_PROD. Using default")
+                    core._LOGGER.warning(f'EnzyHTP', f"Missing '{key}' in CONF_PROD. Using default.")
                     ReadDic[key] = value
         return ReadDic
 
