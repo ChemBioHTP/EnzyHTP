@@ -215,12 +215,11 @@ class AmberConfig:
             raise TypeError()
 
     def load_conf_prod(fname: str) -> Dict:
-        import os
-        import json
+        import os, json, enzy_htp.core
         if not os.path.exists(fname):
-            return core._LOGGER.error(f"The supplied file: \'{fname}\' does not exist!")
+            core._LOGGER.error(f"The supplied file: \'{fname}\' does not exist!")
         elif fname[-5:] != '.json':
-            return core._LOGGER.error(f"The supplied file: \'{fname}\' is not a .json file!")
+            core._LOGGER.error(f"The supplied file: \'{fname}\' is not a .json file!")
         else:
             with open(fname, "r") as json_file:
                 ReadDic = json.load(json_file)
@@ -230,9 +229,8 @@ class AmberConfig:
                     del ReadDic[key]
             for key, value in enzy_htp.molecular_mechanics.amber_config.AmberConfig.CONF_PROD.items():
                 if key not in ReadDic:
-                    core._LOGGER.warning('EnzyHTP', f"Missing '{key}' in CONF_PROD. Using default")
+                    core._LOGGER.warning(f'EnzyHTP', f"Missing '{key}' in CONF_PROD. Using default")
                     ReadDic[key] = value
-                    # Comment (Paul): I recommend using default values for missing parameters and passing an warning instead of an error.
         return ReadDic
 
 
