@@ -14,6 +14,7 @@ from enzy_htp.structure import (
     structure_from_pdb,
     Residue,
     Chain,
+    Atom,
     compare_structures,
     merge_right,
 )
@@ -117,9 +118,9 @@ def test_load_structure():
 
 def test_structure_ctor_bad_input():
     """Testing that the Structure() ctor fails when given duplicate chains."""
-    chain1 = Chain("A", list())
-    chain2 = Chain("B", list())
-    chain3 = Chain("A", list())
+    chain1 = Chain("A", [Residue('A.XXX.1', [Atom(x_coord=1, y_coord=2, z_coord=3)])])
+    chain2 = Chain("B", [Residue('B.XXX.1', [Atom(x_coord=2, y_coord=2, z_coord=3)])])
+    chain3 = Chain("A", [Residue('A.XXX.1', [Atom(x_coord=1, y_coord=2, z_coord=3)])])
 
     with pytest.raises(SystemExit) as exe:
         struct = Structure([chain1, chain2, chain3])
@@ -142,7 +143,7 @@ def test_residue_state():
 
 
 def test_structure_same_sequence():
-    """Ensuring that the Chain.same_sequence() method works."""
+    """Ensuring that the Chain.is_same_sequence() method works."""
     start1 = [("A", "ARG", 1), ("A", "HIS", 2), ("A", "ARG", 3), ("A", "HIS", 4)]
     start2 = [("B", "ARG", 1), ("B", "HIS", 2), ("B", "ARG", 3), ("B", "HIS", 4)]
     start3 = [("A", "ARG", 1), ("A", "ARG", 2), ("A", "ARG", 3), ("A", "HIS", 4)]

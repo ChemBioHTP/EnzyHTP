@@ -73,6 +73,13 @@ class Atom:
             self.charge = int(self.charge) #@shaoqz: charge should be float.
 
     # === Getter-Attr (ref) ===
+    @property
+    def coord(self) -> Tuple(int, int, int):
+        return (self.x_coord, self.y_coord, self.z_coord)
+
+    @property
+    def num(self) -> int:
+        return self.atom_name
     # === Getter-Prop (cpy/new) ===
     def residue_key(self) -> str: #@shaoqz: but this function is accessing information of residue. could it be better if atom store a reference of it? Also imaging we need more information about residue like those should be calculated (RMSD, for kinetic scoring) upon selection of one atom base on like distance.
         """Creates a residue key of format "chain_id.residue_name.residue_number". Used for residue construction."""

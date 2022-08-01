@@ -24,7 +24,7 @@ def test_proper_ctor_behavior():
 
 
 def test_same_sequence_equal():
-    """Ensuring the Chain.same_sequence() method works for equivalent chains."""
+    """Ensuring the Chain.is_same_sequence() method works for equivalent chains."""
     residues = [
         Residue("A.A.1", list()),
         Residue("A.A.2", list()),
@@ -48,7 +48,7 @@ def test_same_sequence_equal():
 
 
 def test_same_sequence_not_equal():
-    """Ensuring the Chain.same_sequence() method works for non-equivalent chains."""
+    """Ensuring the Chain.is_same_sequence() method works for non-equivalent chains."""
     residues = [
         Residue("A.A.1", list()),
         Residue("A.A.2", list()),
