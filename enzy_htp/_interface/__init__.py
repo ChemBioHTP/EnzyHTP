@@ -14,7 +14,9 @@ Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-11
 """
-from .gaussian_interface import GaussianInterface
-from .gaussian_config import GaussianConfig, default_gaussian_config
-from .multiwfn_interface import MultiwfnInterface
-from .multiwfn_config import MultiwfnConfig, default_multiwfn_config
+#from .gaussian_interface import GaussianInterface
+#from .gaussian_config import GaussianConfig, default_gaussian_config
+#from .multiwfn_interface import MultiwfnInterface
+#from .multiwfn_config import MultiwfnConfig, default_multiwfn_config
+
+from .interface import Interface
