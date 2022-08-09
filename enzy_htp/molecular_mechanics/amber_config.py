@@ -13,7 +13,8 @@ from pprint import pprint
 from copy import deepcopy
 from typing import Any, List, Dict
 from plum import dispatch
-
+from ..core.logger import _LOGGER
+import json, os, glob
 
 class AmberConfig:
     """Class that holds default values for running Amber within enzy_htp and also creates
@@ -212,6 +213,46 @@ class AmberConfig:
         else:
             # TODO(CJ): add a custom error for this part
             raise TypeError()
+    
+    def load_conf_equi(confiles:str) -> dict:
+        """Load equi setup for MD
+        The functionuse to load the setting for equi step in Amber. Fucntion
+        will return a dictionary
+
+        Args:
+            confiles: A string of configuration file name for the equi setting.
+            The file should be in json file format, otherwise it will print
+            debug in log file.
+
+        Return:
+            A dict that read from the json file. The keys are the setting
+            keywors in Amber. Some keys may be removed if they are not included
+            in the template dict {CONF_EQUI}
+
+        """
+        
+        filename = glob.glob(confiles + '*')
+        if filename == []:
+            _LOGGER.error(f"The supplied file:\'{confiles}\' does not exist! ")
+
+        elif os.path.exists(confiles + '.json') is not True:
+            _LOGGER.debug(f"The suplied file: \'{confiles}\' is not a .json
+                          file!")
+
+        else:
+            with open(file + ".json") as jsf:
+                conf_inp = json.load(jsf)
+            ref = CONF_EQUI
+            
+            for a in conf_inp.keys() - ref.keys():
+                _LOGGER.warn(f"Extra setting \'{a}\' found in CONF_EQUI. Removing...")
+                conf_inp.pop(a)
+
+            for c in ref.keys() - conf_inp.keys():
+                _LOGGER.error(f"missing input keys \'{c}\'")
+
+        return conf_inp
+
 
 
 def default_amber_config() -> AmberConfig:
