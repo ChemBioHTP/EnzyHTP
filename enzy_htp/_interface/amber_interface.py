@@ -20,7 +20,7 @@ from enzy_htp.core import env_manager as em
 from enzy_htp.core.exception import UnsupportedMethod
 import enzy_htp.structure as struct
 import enzy_htp.preparation as prep
-from .amber_config import AmberConfig, default_amber_config
+from enzy_htp._config.amber_config import AmberConfig, default_amber_config
 from .frame import Frame, frames_from_pdb, read_charge_list
 
 

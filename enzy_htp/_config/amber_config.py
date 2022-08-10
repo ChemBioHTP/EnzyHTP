@@ -176,22 +176,23 @@ class AmberConfig:
 
     def __getitem__(self, key: str) -> Any:
         """Getter that enables [] accession of AmberConfig() attributes."""
-        return getattr(self, key)
+        if key.count('.'):
+            key1, key2 = key.split('.',1)
+            return getattr(self, key1)[key2]
+        else:
+            return getattr(self, key)
 
     def __setitem__(self, key: str, value: Any) -> None:
         """Setter that enables [] accession of AmberConfig() attributes with value validation."""
-        print(key)
-        is_path = False
-        if key in {"CPU_ENGINE", "GPU_ENGINE", "HOME"}:
-            is_path = True
+        if key.count('.'):
+            key1, key2 = key.split('.')
+            AmberConfig.__dict__[key1][key2] = value
+        else:
+            setattr(self, key, value)
 
-        setattr(self, key, value)
         if not self.valid_box_type():
             # TODO(CJ): make a custom error for this part
             raise TypeError()
-
-        if is_path and self.parent_:
-            self.parent_.update_paths()
 
     def get_engine(self, mode: str) -> str:
         """Getter that returns the path to either the CPU or GPU engine configured for Amber.

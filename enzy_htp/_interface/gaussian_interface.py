@@ -14,9 +14,9 @@ from typing import List, Tuple
 
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import env_manager as em
-from enzy_htp.molecular_mechanics import Frame
+#from enzy_htp.molecular_mechanics import Frame
 from enzy_htp.structure import Structure, structure_from_pdb
-from .gaussian_config import GaussianConfig, default_gaussian_config
+#from .gaussian_config import GaussianConfig, default_gaussian_config
 
 # TODO(CJ): add .config() getter
 
@@ -478,9 +478,9 @@ class GaussianInterface:
                 outs.append(out)
             return outs
 
-    def gjf_from_frame(self, outfile: str, route: str, frame: Frame) -> Tuple[str, str]:
+    def gjf_from_frame(self, outfile: str, route: str, frame) -> Tuple[str, str]:
         """TODO"""
-        # TODO(CJ): incorporate overall memory settings somehow
+        # TODO(CJ): incorporate memory from enzy_htp.config
         chk = str(Path(outfile).with_suffix(".chk"))
         contents: List[str] = [
             f"%chk={chk}",

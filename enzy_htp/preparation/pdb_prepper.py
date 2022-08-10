@@ -52,7 +52,9 @@ class PDBPrepper:
             "work_dir", f"{fs.get_current_time()}_{self.base_pdb_name}"
         )
         fs.safe_mkdir(self.work_dir)
-        if not Path(f"{self.work_dir}/{self.base_pdb_name}.pdb").exists(): #TODO(CJ): Do we need a safe_cpy function?
+        if not Path(
+            f"{self.work_dir}/{self.base_pdb_name}.pdb"
+        ).exists():  # TODO(CJ): Do we need a safe_cpy function?
             shutil.copy(self.pdb_path, f"{self.work_dir}/{self.base_pdb_name}.pdb")
         self.path_name = f"{self.work_dir}/{self.base_pdb_name}.pdb"
         self.pqr_path = str()
@@ -433,7 +435,7 @@ class PDBPrepper:
 
         return self.current_path_
 
-    def rm_allH(self, ff:str="Amber", ligand:bool=False):
+    def rm_allH(self, ff: str = "Amber", ligand: bool = False):
         # TODO: CJ: should this get called by mutation method?
         """
         remove wrong hydrogens added by leap after mutation. (In the case that the input file was a H-less one from crystal.)
@@ -443,7 +445,7 @@ class PDBPrepper:
         1 - remove all Hs base on the nomenclature. (start with H and not in the non_H_list)
         """
         # out path
-        o_path = self.path_name.replace('.pdb','') + "_rmH.pdb"
+        o_path = self.path_name.replace(".pdb", "") + "_rmH.pdb"
         pdb_lines: List[PDBLine] = read_pdb_lines(self.current_path_)
         mask = [True] * len(pdb_lines)
         # crude judgement of H including customized H
@@ -462,7 +464,7 @@ class PDBPrepper:
             for idx, pl in enumerate(pdb_lines):
                 if pl.atom_name in H_aliases and pl.is_residue_line():
                     mask[idx] = False
-                #print(pl.line, mask[idx])
+                # print(pl.line, mask[idx])
 
         pdb_lines = np.array(pdb_lines)[mask]
         fs.write_lines(o_path, list(map(str, pdb_lines)))

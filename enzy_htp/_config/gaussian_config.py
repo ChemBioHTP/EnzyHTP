@@ -83,16 +83,18 @@ class GaussianConfig:
         return []
 
     def __getitem__(self, key: str) -> Any:
-        return getattr(self, key)
+        if key.count('.'):
+            key1, key2 = key.split('.')
+            return getattr(self, key1)[key2]
+        else:
+            return getattr(self, key)
 
     def __setitem__(self, key: str, value: Any) -> None:
-        is_path = False
-        if key in {"G09_EXE", "G16_EXE"}:
-            is_path = True
-
-        setattr(self, key, value)
-        if is_path:
-            self._parent.update_paths()
+        if key.count('.'):
+            key1, key2 = key.split('.')
+            GaussianConfig.__dict__[key1][key2] = value 
+        else:
+            setattr(self, key, value)
 
 
 def default_gaussian_config() -> GaussianConfig:

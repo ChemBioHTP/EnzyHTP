@@ -29,7 +29,6 @@ def check_valid_ph(ph: float) -> None:
     if ph < 0 or ph > 14:
         raise core.InvalidPH(f"{ph:.2f} must be on range: [0.00,14.00]")
 
-
 def protonate_pdb(
     pdb_path: str, pqr_path: str, ph: float = 7.0, ffout: str = "AMBER"
 ) -> None:
@@ -220,21 +219,28 @@ def _protonate_ligand_PYBEL(path: str, ph: float, out_path: str) -> Ligand:
                 pdb_atoms[idx].resi_name = a.resi_name
             # exit( 0 )
         fs.write_lines(out_path, list(map(lambda aa: aa.build(), pdb_atoms)))
-    def fix_atom_naming( out_path ):
-        lig_name = Path(out_path).stem.split('_')[1].strip()
+
+    def fix_atom_naming(out_path):
+        lig_name = Path(out_path).stem.split("_")[1].strip()
         lines = read_pdb_lines(out_path)
-        lines = list(filter(lambda ll: ll.is_ATOM() or ll.is_HETATM() or ll.line.startswith('END'), lines))                
+        lines = list(
+            filter(
+                lambda ll: ll.is_ATOM() or ll.is_HETATM() or ll.line.startswith("END"),
+                lines,
+            )
+        )
         for ll in lines:
-            if ll.line.startswith('END'):
+            if ll.line.startswith("END"):
                 continue
             rawline = ll.line
-            aname = rawline[76:78].strip() 
-            ll.line = rawline[0:13] + f"{aname: <4}{lig_name: >3}"+rawline[20:]
+            aname = rawline[76:78].strip()
+            ll.line = rawline[0:13] + f"{aname: <4}{lig_name: >3}" + rawline[20:]
         fs.write_lines(out_path, list(map(lambda ll: ll.line, lines)))
+
     pybel.ob.obErrorLog.SetOutputLevel(0)
     mol = next(pybel.readfile("pdb", path))
     mol.OBMol.AddHydrogens(False, True, ph)
     mol.write("pdb", out_path, overwrite=True)
-    #_fix_ob_output(out_path, out_path, path)
+    # _fix_ob_output(out_path, out_path, path)
     fix_atom_naming(out_path)
     return ligand_from_pdb(out_path, _ob_pdb_charge(out_path))
