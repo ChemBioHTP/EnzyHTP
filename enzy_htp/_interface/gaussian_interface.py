@@ -478,7 +478,7 @@ class GaussianInterface:
                 outs.append(out)
             return outs
 
-    def gjf_from_frame(self, outfile: str, route: str, frame: Frame) -> Tuple[str, str]:
+    def gjf_from_frame(self, outfile: str, route: str, frame) -> Tuple[str, str]:
         """TODO"""
         # TODO(CJ): incorporate memory from enzy_htp.config
         chk = str(Path(outfile).with_suffix(".chk"))

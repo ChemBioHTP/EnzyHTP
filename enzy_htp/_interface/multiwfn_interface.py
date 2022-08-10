@@ -17,7 +17,7 @@ import numpy as np
 from enzy_htp.core import env_manager as em
 from enzy_htp.core import file_system as fs
 
-from .multiwfn_config import MultiwfnConfig, default_multiwfn_config
+#from .multiwfn_config import MultiwfnConfig, default_multiwfn_config
 
 
 # TODO(CJ): add .config() getter

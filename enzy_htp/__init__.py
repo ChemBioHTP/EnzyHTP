@@ -18,7 +18,7 @@ from .core import (
     _LOGGER,
 	write_data
 )
-from .preparation import PDBLine, PDBPrepper, read_pdb_lines, prepare_for_mutation
+from .preparation import PDBLine, PDBPrepper, read_pdb_lines, prepare_from_pdb
 from .chemical import ResidueType
 
 
@@ -28,7 +28,9 @@ from ._interface import Interface
 interface = Interface(config)
 
 
-from .mutation import mutate_pdb
+from .mutation import mutate_pdb, restriction_object, MutationRestrictions
+
+from .geometry import sample_geometries
 
 #from .molecular_mechanics import AmberInterface
 #from .quantum_mechanics import GaussianInterface, MultiwfnInterface

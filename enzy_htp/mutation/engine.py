@@ -275,7 +275,7 @@ def _mutate_tleap(pdb: str, outfile: str, mutations: List[Mutation]) -> None:
                     mask[pidx] = False
 
     fs.write_lines(outfile, np.array(list(map(lambda pl: pl.line, pdb_lines)))[mask])
-    #ai = mm.AmberInterface()
+
     interface.amber.mutate(outfile)
     if backup:
         structure:struct.Structure = struct.structure_from_pdb(outfile)
