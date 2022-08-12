@@ -176,16 +176,16 @@ class AmberConfig:
 
     def __getitem__(self, key: str) -> Any:
         """Getter that enables [] accession of AmberConfig() attributes."""
-        if key.count('.'):
-            key1, key2 = key.split('.',1)
+        if key.count("."):
+            key1, key2 = key.split(".", 1)
             return getattr(self, key1)[key2]
         else:
             return getattr(self, key)
 
     def __setitem__(self, key: str, value: Any) -> None:
         """Setter that enables [] accession of AmberConfig() attributes with value validation."""
-        if key.count('.'):
-            key1, key2 = key.split('.')
+        if key.count("."):
+            key1, key2 = key.split(".")
             AmberConfig.__dict__[key1][key2] = value
         else:
             setattr(self, key, value)

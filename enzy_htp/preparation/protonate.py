@@ -29,6 +29,7 @@ def check_valid_ph(ph: float) -> None:
     if ph < 0 or ph > 14:
         raise core.InvalidPH(f"{ph:.2f} must be on range: [0.00,14.00]")
 
+
 def protonate_pdb(
     pdb_path: str, pqr_path: str, ph: float = 7.0, ffout: str = "AMBER"
 ) -> None:
@@ -91,10 +92,7 @@ def protonate_missing_elements(
         # print("-asdgasdgasg")
         old_keys = list(map(lambda l: l.residue_key, ligand_list))
         new_ligands = list(
-            map(
-                lambda ll: protonate_ligand(ll, dirname=lig_dir, ph=7),
-                ligand_list,
-            )
+            map(lambda ll: protonate_ligand(ll, dirname=lig_dir, ph=7), ligand_list,)
         )
         # print(new_ligands)
         for lig, ok in zip(new_ligands, old_keys):

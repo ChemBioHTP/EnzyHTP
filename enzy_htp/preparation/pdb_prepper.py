@@ -271,13 +271,7 @@ class PDBPrepper:
                         # Deal with missing residue, fill with "NAN"
                         missing_length = pdb_l.resi_id - last_resi_index - 1
                         if missing_length > 0:
-                            Chain_sequence = (
-                                Chain_sequence
-                                + [
-                                    "NAN",
-                                ]
-                                * missing_length
-                            )
+                            Chain_sequence = Chain_sequence + ["NAN",] * missing_length
 
                         # Store the new resi
                         Chain_sequence.append(pdb_l.resi_name)
@@ -408,11 +402,7 @@ class PDBPrepper:
 
         pass
 
-    def get_protonation(
-        self,
-        ph: float = 7.0,
-        ffout: str = "AMBER",
-    ) -> str:
+    def get_protonation(self, ph: float = 7.0, ffout: str = "AMBER",) -> str:
         """Uses PDB2PQR to get the protonation state for a PDB file, saving the protonated .pdb file.
         Separately runs PDB2PQR on the ligand and metal and combines the output. Returns path to the protonated
         PDB file."""

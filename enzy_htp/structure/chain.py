@@ -11,7 +11,9 @@ from enzy_htp.core import _LOGGER
 from typing import List
 
 from .residue import Residue
-#TODO(CJ): add a method for changing/accessing a specific residue
+
+# TODO(CJ): add a method for changing/accessing a specific residue
+
 
 class Chain:
     """Class that represents a Chain of residues in a PDB file. Serves as a manager to the

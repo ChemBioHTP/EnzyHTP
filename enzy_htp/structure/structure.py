@@ -72,7 +72,7 @@ Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-04-03
 """
-#TODO(CJ): add a method for changing/accessing a specific residue
+# TODO(CJ): add a method for changing/accessing a specific residue
 from __future__ import annotations
 
 import string

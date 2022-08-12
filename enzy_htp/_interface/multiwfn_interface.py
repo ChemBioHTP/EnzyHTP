@@ -17,7 +17,7 @@ import numpy as np
 from enzy_htp.core import env_manager as em
 from enzy_htp.core import file_system as fs
 
-#from .multiwfn_config import MultiwfnConfig, default_multiwfn_config
+# from .multiwfn_config import MultiwfnConfig, default_multiwfn_config
 
 
 # TODO(CJ): add .config() getter
@@ -109,9 +109,7 @@ class MultiwfnInterface:
 
         # self.init_Multiwfn()
         infile = f"{Path(fchks[0]).parent}/dipole_settings.in"
-        settings: List[
-            str
-        ] = (
+        settings: List[str] = (
             "19 -8 1 y q".split()
         )  # TODO(CJ): paramterize this so that it is controlled by MultiwfnConfig
         fs.write_lines(infile, settings)

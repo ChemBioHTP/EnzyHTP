@@ -2,7 +2,6 @@
 """
 
 
-
 from pathlib import Path
 from typing import Any, List, Union
 
@@ -22,8 +21,6 @@ from enzy_htp.structure import (
     Chain,
     Structure,
 )
-
-
 
 
 def remove_water(start_pdb: str, end_pdb: str = None) -> str:
@@ -49,38 +46,40 @@ def remove_water(start_pdb: str, end_pdb: str = None) -> str:
     return outfile
 
 
-def protonate(start_pdb: str, end_pdb: str = None, ph: float = 7.0, ffout: str = "AMBER") -> str:
+def protonate(
+    start_pdb: str, end_pdb: str = None, ph: float = 7.0, ffout: str = "AMBER"
+) -> str:
     # steps
     # 1. protonate the .pdb file
     # 2. protonate non  elements
-    # 3. merge them back in 
-    files_to_delete:List[str] = list()
-    pqr = str(Path(start_pdb).with_suffix('.pqr.pdb'))
-    pqr_log = str(Path(start_pdb).with_suffix('.pqr.log'))
-    files_to_delete.append( pqr )
-    files_to_delete.append( pqr_log )
+    # 3. merge them back in
+    files_to_delete: List[str] = list()
+    pqr = str(Path(start_pdb).with_suffix(".pqr.pdb"))
+    pqr_log = str(Path(start_pdb).with_suffix(".pqr.log"))
+    files_to_delete.append(pqr)
+    files_to_delete.append(pqr_log)
     protonate_pdb(start_pdb, pqr)
-    new_structure: Structure = protonate_missing_elements(start_pdb, pqr, str(Path(start_pdb).parent) )
+    new_structure: Structure = protonate_missing_elements(
+        start_pdb, pqr, str(Path(start_pdb).parent)
+    )
 
-    outfile:str = start_pdb
+    outfile: str = start_pdb
     if end_pdb:
-        outfile = end_pdb 
+        outfile = end_pdb
 
     new_structure.to_pdb(outfile)
-    
+
     _ = list(map(fs.safe_rm, files_to_delete))
 
     return outfile
 
 
-def prepare_from_pdb(start_pdb:str,  outdir:str, ph:float = 7.0) -> str:
+def prepare_from_pdb(start_pdb: str, outdir: str, ph: float = 7.0) -> str:
     """
     """
-    fs.safe_mkdir( outdir )
-    outfile:str = f"{outdir}/{Path(start_pdb).stem}_prepared.pdb"
+    fs.safe_mkdir(outdir)
+    outfile: str = f"{outdir}/{Path(start_pdb).stem}_prepared.pdb"
     remove_water(start_pdb, outfile)
     protonate(outfile, outfile, ph)
-    
+
     return outfile
-
-

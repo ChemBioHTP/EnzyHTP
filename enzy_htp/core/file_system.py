@@ -75,15 +75,16 @@ def write_lines(fname: str, lines: List[str]) -> None:
     fh.write("\n".join(lines))
     fh.close()
 
-def write_data(outfile:str, tag:Any, data:Dict) -> str:
-    #TODO(CJ): add the doc-string and also unittests
-    tag:str = repr(tag)
-    fh = open(outfile,'a')
+
+def write_data(outfile: str, tag: Any, data: Dict) -> str:
+    # TODO(CJ): add the doc-string and also unittests
+    tag: str = repr(tag)
+    fh = open(outfile, "a")
     fh.write("===TAG===\n")
     fh.write(f"{tag}\n")
     for key, value in data.items():
         fh.write(f"---{key}---\n")
         fh.write(f"{repr(value)}\n")
     fh.close()
-    
+
     return outfile

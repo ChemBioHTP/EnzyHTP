@@ -142,7 +142,7 @@ class Atom:
             z = "{:>8.3f}".format(self.z_coord)
         # TODO(CJ) figure out a less janky way to do all of this
         a_type = "".join(list(filter(lambda c: not c.isdigit(), a_name))).strip()[0]
-        charge = '  ' 
+        charge = "  "
         if not np.isnan(self.charge):
             charge = str(self.charge)
             if self.charge < 0:
@@ -208,5 +208,5 @@ class Atom:
         x = "{:<14.8f}".format(self.coord[0])
         y = "{:<14.8f}".format(self.coord[1])
         z = "{:<14.8f}".format(self.coord[2])
-        
+
         return f"{atom_label} {fz_flag}   {x} {y} {z} {ly_flag}{cnt_flag}{line_feed}"

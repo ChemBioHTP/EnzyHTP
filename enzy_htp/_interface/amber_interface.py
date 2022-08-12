@@ -1,5 +1,5 @@
 """Defines an AmberInterface class that serves as a bridge for enzy_htp to utilize AmberMD software. Uses the AmberConfig class
-found in enzy_htp/molecular_mechanics/amber_config.py. Supported operations include minimization, 
+found in enzy_htp/_config/amber_config.py. Supported operations include minimization, 
 heating, constant pressure production, and constant pressure equilibration.
 
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
@@ -678,8 +678,8 @@ class AmberInterface:
             self.env_manager_.run_command(
                 "cpptraj", ["-i", cpptraj_in, ">", cpptraj_out]
             )
-            #fs.safe_rm(cpptraj_in)
-            #fs.safe_rm(cpptraj_out)
+            # fs.safe_rm(cpptraj_in)
+            # fs.safe_rm(cpptraj_out)
         else:
             raise UnsupportedMethod(
                 f"'{engine}' is not a supported method for AmberInteface.nc2mdcrd(). Allowed methods are: 'cpptraj'."
@@ -709,28 +709,25 @@ class AmberInterface:
         contents: List[str] = [
             f"parm {prmtop}",
             f"trajin {nc_in} {start} {end} {step}",
-             "strip :WAT",
-             "strip :Na+,Cl-",
+            "strip :WAT",
+            "strip :Na+,Cl-",
             f"trajout {outfile} conect",
             "run",
             "quit",
         ]
         fs.write_lines(cpptraj_in, contents)
-        self.env_manager_.run_command(
-            "cpptraj", ["-i", cpptraj_in, ">", cpptraj_out]
-        )
-        #fs.safe_rm(cpptraj_in)
+        self.env_manager_.run_command("cpptraj", ["-i", cpptraj_in, ">", cpptraj_out])
+        # fs.safe_rm(cpptraj_in)
         fs.safe_rm(cpptraj_out)
         charges = read_charge_list(prmtop)
-        result = frames_from_pdb( outfile )
-        
+        result = frames_from_pdb(outfile)
+
         if not len(result):
             return result
-		
+
         num_atoms = len(result[0].atoms)
         charges = charges[0:num_atoms]
         for fidx, frame in enumerate(result):
-            result[fidx].update_charges( charges )
+            result[fidx].update_charges(charges)
 
         return result
-

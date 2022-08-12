@@ -15,7 +15,7 @@ import hashlib
 from string import ascii_uppercase
 from collections import defaultdict
 from typing import List, Dict, Union, Any
-from pathlib import Path 
+from pathlib import Path
 from copy import deepcopy
 
 import numpy as np
@@ -25,7 +25,8 @@ from biopandas.pdb import PandasPdb
 import enzy_htp.chemical as chem
 import enzy_htp.structure as struct
 import enzy_htp.preparation as prep
-#import enzy_htp.molecular_mechanics as mm
+
+# import enzy_htp.molecular_mechanics as mm
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import _LOGGER, UnsupportedMethod
 
@@ -139,7 +140,8 @@ def get_mutations(
     Returns:
         A list() of Mutation() namedtuples compatible with the supplied enzyme system and constraints.
     """
-    def random_list_elem(ll:list) -> Any:
+
+    def random_list_elem(ll: list) -> Any:
         """Helper method that randomly chooses an element from a list. numpy.random.choice() doesn't 
         like to take elements from list()'s of tuples so this is the work around.
         """
@@ -229,15 +231,16 @@ def _mutate_tleap(pdb: str, outfile: str, mutations: List[Mutation]) -> None:
     Returns:
         Nothing.
     """
-    def get_backup( fname: str ):
-        lines = prep.read_pdb_lines(fname) 
+
+    def get_backup(fname: str):
+        lines = prep.read_pdb_lines(fname)
         lines = list(filter(lambda ll: ll.is_ATOM() or ll.is_HETATM(), lines))
         holder = defaultdict(list)
         for ll in lines:
-            holder[f"{ll.chain_id}.{ll.resi_name}.{ll.resi_id}"].append( ll )    
+            holder[f"{ll.chain_id}.{ll.resi_name}.{ll.resi_id}"].append(ll)
         to_remove = list()
         for key in holder.keys():
-            if key.split('.')[1] in chem.THREE_LETTER_AA_MAPPER:
+            if key.split(".")[1] in chem.THREE_LETTER_AA_MAPPER:
                 to_remove.append(key)
         for tr in to_remove:
             del holder[tr]
@@ -278,16 +281,18 @@ def _mutate_tleap(pdb: str, outfile: str, mutations: List[Mutation]) -> None:
 
     interface.amber.mutate(outfile)
     if backup:
-        structure:struct.Structure = struct.structure_from_pdb(outfile)
+        structure: struct.Structure = struct.structure_from_pdb(outfile)
         for rkey in structure.residue_keys():
             if rkey not in backup:
                 continue
             tmp_file = f"/tmp/ligand.{rkey}.tmp.pdb"
-            fs.write_lines(tmp_file, list(map(lambda ll: ll.line, backup[rkey])) + ['END'])
-            lig:struct.Ligand = struct.ligand_from_pdb(tmp_file)
-            (cname,rname,rnum) = rkey.split('.')
+            fs.write_lines(
+                tmp_file, list(map(lambda ll: ll.line, backup[rkey])) + ["END"]
+            )
+            lig: struct.Ligand = struct.ligand_from_pdb(tmp_file)
+            (cname, rname, rnum) = rkey.split(".")
             rnum = int(rnum)
-            structure.chain_mapper[cname].residues_[rnum-1] = lig
+            structure.chain_mapper[cname].residues_[rnum - 1] = lig
             fs.safe_rm(tmp_file)
 
         structure.to_pdb(outfile)

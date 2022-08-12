@@ -14,9 +14,11 @@ from typing import List, Tuple
 
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import env_manager as em
-#from enzy_htp.molecular_mechanics import Frame
+
+# from enzy_htp.molecular_mechanics import Frame
 from enzy_htp.structure import Structure, structure_from_pdb
-#from .gaussian_config import GaussianConfig, default_gaussian_config
+
+# from .gaussian_config import GaussianConfig, default_gaussian_config
 
 # TODO(CJ): add .config() getter
 
@@ -212,12 +214,7 @@ class GaussianInterface:
         if type(key_words) == str and key_words != "":
             keyword_line = (
                 "# "
-                + " ".join(
-                    Config.Gaussian.keywords[work_type]
-                    + [
-                        key_words,
-                    ]
-                )
+                + " ".join(Config.Gaussian.keywords[work_type] + [key_words,])
                 + line_feed
             )
         if type(key_words) == list:

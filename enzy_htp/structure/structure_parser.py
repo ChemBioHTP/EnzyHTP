@@ -143,23 +143,24 @@ def check_valid_pdb(pdbname: str) -> None:
 
 def ligand_from_pdb(fname: str, net_charge: float = None) -> Ligand:
     """Creates a Ligand() object from a supplied .pdb file. Checks that the input file both exists and is ASCII format."""
-    def get_charge_mapper(fname:str) -> dict:
+
+    def get_charge_mapper(fname: str) -> dict:
         """Helper method that gets charges"""
-        lines = fs.lines_from_file(fname) 
+        lines = fs.lines_from_file(fname)
         result = dict()
         for ll in lines:
             raw_charge = ll[78:80].strip()
             if not raw_charge:
                 continue
-            mult = 1 
-            temp = ''
+            mult = 1
+            temp = ""
             for ch in raw_charge:
-                if ch != '-':
+                if ch != "-":
                     temp += ch
                 else:
                     mult = -1
-            result[(ll[21].strip(), int(ll[6:11]))] = mult*int( temp )
-        return result 
+            result[(ll[21].strip(), int(ll[6:11]))] = mult * int(temp)
+        return result
 
     check_valid_pdb(fname)
     warnings.filterwarnings("ignore")
@@ -167,19 +168,14 @@ def ligand_from_pdb(fname: str, net_charge: float = None) -> Ligand:
     parser = PandasPdb()
     parser.read_pdb(fname)
     temp_df = pd.concat((parser.df["ATOM"], parser.df["HETATM"]))
-    charge_mapper = get_charge_mapper( fname )
-    #TODO(CJ): put this into its own function
+    charge_mapper = get_charge_mapper(fname)
+    # TODO(CJ): put this into its own function
     for (cname, a_id), charge in charge_mapper.items():
-        #print(cname, a_id, charge)
-        mask = ((temp_df.chain_id==cname)&(temp_df.atom_number==a_id)).to_numpy()
+        # print(cname, a_id, charge)
+        mask = ((temp_df.chain_id == cname) & (temp_df.atom_number == a_id)).to_numpy()
         idx = np.where(mask)[0][0]
-        temp_df.at[idx, 'charge'] = charge
-    atoms = list(
-        map(
-            lambda pr: Atom(**pr[1]),
-            temp_df.iterrows(),
-        )
-    )
+        temp_df.at[idx, "charge"] = charge
+    atoms = list(map(lambda pr: Atom(**pr[1]), temp_df.iterrows(),))
     residue_name = set(list(map(lambda a: a.residue_name, atoms)))
     residue_number = set(list(map(lambda a: a.residue_number, atoms)))
     chain_id = set(list(map(lambda a: a.chain_id, atoms)))
