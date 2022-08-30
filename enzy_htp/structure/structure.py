@@ -23,9 +23,11 @@ Generation:
 Selection:
     Selection of Structural regions are handled by the Selection module.
 Operation:
-    Changes of the Structure data are handled by functions in main EnzyHTP modules: Preparation, Mutation, Geom Variation.
-    And structure based descriptors are derived by functions in the Energy Engine module.
+    Changes of the Structure data are handled by functions in the operation module. These commonly used operations of Structure 
+    will than be used in scientific APIs: Preparation, Mutation, Geom Variation. And structure based descriptors are derived by 
+    functions in the Energy Engine module.
 
+### TO BE UPDATE ###
     Sub-module also contains two utility free functions for comparing and merging structural elements.
     compare_structures() and merge_right() are used for comparing and merging structural components for Structure()
     objects, respectively.
