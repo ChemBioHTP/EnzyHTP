@@ -17,7 +17,7 @@ def mutant_design_workflow(stru_parser: StructureParser):
     #prepared_stru = prepare_structure(raw_stru)
     stru_prepare_problems: List[StruProblem] = eh.detect_stru_problems(raw_stru) # register preparer with required preparation steps (like a builder pattern)
     preparer = eh.preparation.StructurePreparer(stru_prepare_problems) # configure preparer to avoid massive function parameters ? should we use an object here? 
-    preparer.add_problem(MissingLigand('path-to-ligand', information_of_docking)) # the Problem classes have a common interface called solve that preparer do not need to know what kind of problem it is dealing. This design is because structural problem is easily expanding in type. In this design the problem carry the information of how to solve it in itself.
+    preparer.add_problem(MissingLigand('path-to-ligand', information_of_docking, solver=eh.external_interface.Rosetta())) # the Problem classes have a common interface called solve that preparer do not need to know what kind of problem it is dealing. This design is because structural problem is easily expanding in type. In this design the problem carry the information of how to solve it in itself.
     preparer.delete_problem('stoichiometry') # one can edit the method of dealing with different problems
     preparer.problems['protonation'].set_ph(7.0) # currently preparer is nothing more than a special dictionary to contain problems
 
@@ -34,17 +34,30 @@ def mutant_design_workflow(stru_parser: StructureParser):
     
     stru_ensemble = sampler.run(mutant_stru)
 
-    e_engine = eh.energy_engine.QMEngine(eh.external_interface.Gaussian())
-    e_engine.software.scf_fail_solver.add_keyword('scf=qc') # these inteface objects can be configured with their specific problems
-    e_engine.set_qm_region('byres. (resn. LIG around 5)')
-    e_engine.set_qm_method('pbe1pbe', 'def2svp')
+    for stru in stru_ensemble:
+        ele_stru_engine = eh.electronic.QMEngine(eh.external_interface.Gaussian())
+        ele_stru_engine.software.scf_fail_solver.add_keyword('scf=qc') # these inteface objects can be configured with their specific problems
+        ele_stru_engine.set_qm_region('byres. (resn. LIG around 5)')
+        ele_stru_engine.set_qm_method('pbe1pbe', 'def2svp')
+        ele_stru_data = e_engine.run(stru) # need to think more
+
+def mutant_design_lambda_dynamic():
+    '''
+    planing about workflows that contain external processes that cover more than one htp level
+    In this lambda dynamic case mutations are generated along the MD in the alchemical way.
+    '''
+    raw_stru = stru_parser.get_structure('a-path-to-file-or-a-object')
+    stru_prepare_problems: List[StruProblem] = eh.detect_stru_problems(raw_stru)
+    preparer = eh.preparation.StructurePreparer(stru_prepare_problems)
+    prepared_stru = preparer.run(raw_stru)
+
+    muta_flag = eh.mutation.assign_mutation('pattern', prepared_stru)
+    alchemical_mutator = eh.mutation.alchemical.LambdaDynamicMutator() # alchemical mutator gives free energy differences of defined start/end state
+    alchemical_mutator.set_mutation(muta_flag) # alchemical mutator also have mutator interfaces
+    end_wt_stru = eh.structure.operation.undock(prepared_stru)
     
-    energy_data = e_engine.run() # is it really good to design things into energy engine?
+    mutant_stru, ddG_mut_start_end = alchemical_mutator.run(prepared_stru, end_wt_stru)
 
-
-
-
-    
 def mutant_design_workflow_w_object(parser, preparer, muta_flags, mutator, sampler, energy_engine, ranker):
     '''
     the use of objectized protocols decouples the workflow with its building blockings
@@ -60,6 +73,12 @@ def mutant_design_workflow_w_object(parser, preparer, muta_flags, mutator, sampl
     optimized_mutant = ranker.rank().get_best()
 
     return optimized_mutant
+
+def mutant_ts_barrier_workflow():
+    '''
+    using free energy methods to calculate TS handles sampling and energy calculation the same time?
+    '''
+    pass
 
 def mutant_design_workflow_wo_object():
     raw_stru = eh.structure.structure_io.parser_struture('a-path-to-file-or-a-object', 'pdb') # this way supporting a new format or changing an existing format will cause multiple code changes across layers
