@@ -87,6 +87,7 @@ def mutant_design_workflow_wo_object():
     eh.preparation.prepare_stru(raw_stru, problems, docking_ligand_path='path-to-ligand', protonation_ph=7.0) # too many arguments are required. And it is coupled with the detect_stru_problem since it has to know which problem to provide information with
     pass
 
+# a good idea in the avoid over engineering and use function as much as possible instead of classes. And those loosely defined interfaces can be made up by a well curated document.
 
 
 
