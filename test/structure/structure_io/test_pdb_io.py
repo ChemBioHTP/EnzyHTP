@@ -110,6 +110,73 @@ def test_get_target_model():
     assert len(target_model_ter_df['record_name']) == 2
     assert list(target_model_df['atom_number']) == mdl_1_answer_atom
 
+def test_resolve_missing_chain_id_complete_missing():
+    test_mdl = f'{DATA_DIR}3EZB_nmr_no_chain_id.pdb'
+    test_mdl_pdb = PandasPdb()
+    test_mdl_pdb.read_pdb(test_mdl)
+    target_df = test_mdl_pdb.df['ATOM']
+    target_ter_df = test_mdl_pdb.df['OTHERS'].query('record_name == "TER"')
+    # answer
+    answer_mdl = f'{DATA_DIR}3EZB_nmr_no_chain_id_answer.pdb'
+    answer_mdl_pdb = PandasPdb()
+    answer_mdl_pdb.read_pdb(answer_mdl)
+    answer_df_chain_ids = list(answer_mdl_pdb.df['ATOM']['chain_id'])
+
+    sp._resolve_missing_chain_id(target_df, target_ter_df)
+
+    assert list(target_df['chain_id']) == answer_df_chain_ids
+
+def test_resolve_missing_chain_id_partial_missing():
+    test_mdl = f'{DATA_DIR}3EZB_nmr_no_chain_id_part.pdb'
+    test_mdl_pdb = PandasPdb()
+    test_mdl_pdb.read_pdb(test_mdl)
+    target_df = test_mdl_pdb.df['ATOM']
+    target_ter_df = test_mdl_pdb.df['OTHERS'].query('record_name == "TER"')
+    # answer
+    answer_mdl = f'{DATA_DIR}3EZB_nmr_no_chain_id_answer.pdb'
+    answer_mdl_pdb = PandasPdb()
+    answer_mdl_pdb.read_pdb(answer_mdl)
+    answer_df_chain_ids = list(answer_mdl_pdb.df['ATOM']['chain_id'])
+
+    sp._resolve_missing_chain_id(target_df, target_ter_df)
+
+    assert list(target_df['chain_id']) == answer_df_chain_ids
+
+def test_resolve_missing_chain_id_partial_atom_missing():
+    test_mdl = f'{DATA_DIR}3EZB_nmr_no_chain_id_part_atom.pdb'
+    test_mdl_pdb = PandasPdb()
+    test_mdl_pdb.read_pdb(test_mdl)
+    target_df = test_mdl_pdb.df['ATOM']
+    target_ter_df = test_mdl_pdb.df['OTHERS'].query('record_name == "TER"')
+    # answer
+    answer_mdl = f'{DATA_DIR}3EZB_nmr_no_chain_id_answer.pdb'
+    answer_mdl_pdb = PandasPdb()
+    answer_mdl_pdb.read_pdb(answer_mdl)
+    answer_df_chain_ids = list(answer_mdl_pdb.df['ATOM']['chain_id'])
+
+    sp._resolve_missing_chain_id(target_df, target_ter_df)
+
+    assert list(target_df['chain_id']) == answer_df_chain_ids
+
+def test_resolve_missing_chain_id_redundant_ter():
+    '''
+    in this case there are one redundant ter
+    '''
+    test_mdl = f'{DATA_DIR}3EZB_nmr_no_chain_red_ter.pdb'
+    test_mdl_pdb = PandasPdb()
+    test_mdl_pdb.read_pdb(test_mdl)
+    target_df = test_mdl_pdb.df['ATOM']
+    target_ter_df = test_mdl_pdb.df['OTHERS'].query('record_name == "TER"')
+    # answer
+    answer_mdl = f'{DATA_DIR}3EZB_nmr_no_chain_id_answer.pdb'
+    answer_mdl_pdb = PandasPdb()
+    answer_mdl_pdb.read_pdb(answer_mdl)
+    answer_df_chain_ids = list(answer_mdl_pdb.df['ATOM']['chain_id'])
+
+    sp._resolve_missing_chain_id(target_df, target_ter_df)
+
+    assert list(target_df['chain_id']) == answer_df_chain_ids
+
 # def test_legal_chain_names():
 #     '''Making sure all legal chains are created given a starting Residue() mapper.'''
 #     ALL_NAMES = list(string.ascii_uppercase)
