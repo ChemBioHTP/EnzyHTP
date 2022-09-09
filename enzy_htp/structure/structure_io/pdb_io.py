@@ -49,23 +49,29 @@ class PDBParser(StructureParserInterface):
         cls._check_valid_pdb(path)
         # covert to dataframe with biopanda (maybe write our own in the future)
         input_pdb = PandasPdb()
-        input_pdb.read_pdb(path) # this add a dataframe to the obj
-        # build Structure object
+        input_pdb.read_pdb(path)
         
+        #region (PDB conundrums)
         # deal with multiple model
         target_model_df, target_model_ter_df = cls._get_target_model(input_pdb.df, model=model)
-        
-        用对应的model建造atom 然后用ter df补全链标
-        # atom_mapper: Dict[str, Atom] = build_atom(
-        #     pass
-        # )
-        # res_mapper: Dict[str, Residue] = build_residues(
-        #     pd.concat((input_pdb.df["ATOM"], input_pdb.df["HETATM"])), keep #@shaoqz: so it works with multichains w/o chain id? I saw that four chains in test file
-        # )
-        # chain_mapper: Dict[str, Chain] = build_chains(res_mapper)
-        # stru_obj = Structure(list(chain_mapper.values()))
-        # return stru_obj
 
+        # # TODO address when atom/residue/chain id is disordered respect to the line index
+        # # this is important to be aligned since Amber will force them to align and erase the chain id
+        # # a workaround is to add them back after Amber process
+        # cls._resolve_missing_chain_id(target_model_df, target_model_ter_df) # add missing chain id in place
+        # cls._resolve_alt_loc(target_model_df) # resolve alt loc record in place
+        # #end region (Add here to address more problem related to the PDB file format here)
+        # # target_model_df below should be 'standard':
+
+        # # mapper is for indicate superior information of the current level: e.g.: indicate
+        # # which residue and chain the atom belongs to in atom_mapper. Another workaround in
+        # # old enzyhtp is build iteratively chain frist and residues are build in the chain
+        # # builder and so on for atom. But current methods is used for better readability
+        # atom_mapper: Dict[str, Atom] = cls._build_atoms(target_model_df) 
+        # res_mapper: Dict[str, Residue] = cls._build_residues(atom_mapper)
+        # chain_list: Dict[str, Chain] = cls._build_chains(res_mapper)
+
+        # return Structure(chain_list)
 
     @classmethod
     def get_file_str(cls, stru: Structure) -> str:
@@ -74,7 +80,7 @@ class PDBParser(StructureParserInterface):
         '''
         pass
 
-    #region === PDB -> Stru ===
+    # region === PDB -> Stru ===
     @staticmethod
     def _check_valid_pdb(pdb_path: str) -> None:
         """Helper function that ensures the supplied pdb_path contain a valid pdb file.
@@ -108,6 +114,11 @@ class PDBParser(StructureParserInterface):
             model: the index of target model
                 (start from 0)
                 (assume MODEL appears in order in the file)
+        Return: (target_mdl_df, target_mdl_ter_df)
+            target_mdl_df: return a copy of Atom and HETATM records from the input
+                           dataframe correponding to the target model
+            target_mdl_ter_df: return a copy of TER records from the input
+                           dataframe correponding to the target model
         '''
         if not 'MODEL' in df['OTHERS']['record_name'].values:
             return
@@ -130,157 +141,83 @@ class PDBParser(StructureParserInterface):
         mdl_end_lines = list(df['OTHERS'][df['OTHERS'].record_name == 'ENDMDL']['line_idx'])
         mdl_range = list(zip(mdl_start_lines, mdl_end_lines))
         target_mdl_range = mdl_range[model]
-        # get model dataframe section
-        target_mdl_df = pd.concat((df['ATOM'], df['HETATM'])).query(f'line_idx > {target_mdl_range[0]} & line_idx < {target_mdl_range[1]}')
-        target_mdl_ter_df = df['OTHERS'][df['OTHERS'].record_name == 'TER'].query(f'line_idx > {target_mdl_range[0]} & line_idx < {target_mdl_range[1]}')
+        # get model dataframe section as a copy
+        target_mdl_df = pd.concat((df['ATOM'], df['HETATM'])).query(
+            f'line_idx > {target_mdl_range[0]} & line_idx < {target_mdl_range[1]}'
+            ).copy()
+        target_mdl_ter_df = df['OTHERS'][df['OTHERS'].record_name == 'TER'].query(
+            f'line_idx > {target_mdl_range[0]} & line_idx < {target_mdl_range[1]}'
+            ).copy()
         return target_mdl_df, target_mdl_ter_df
 
-    # def legal_chain_names(mapper: Dict[str, List[Residue]]) -> List[str]:
-    #     """Small helper method that determines the legal chain names given a Residue() mapper.
-    #     Uses all of the available 26 capitalized letters and returns in reverse order. Returns an empty list when all are occupied."""
-    #     result = list(string.ascii_uppercase)
-    #     taken = set(list(mapper.keys()))
-    #     result = list(filter(lambda s: s not in taken, result))
-    #     return list(reversed(result))
+    @staticmethod
+    def _resolve_missing_chain_id(df: pd.DataFrame, ter_df: pd.DataFrame):
+        '''
+        add missing chain id into the Atomic 'df' when there is none
+        according to the TER record provide by 'ter_df'
+        * ter df should share the same line index references as df (from same file)
+        '''
+        # no problem case
+        chain_ids = set(list(map(lambda c_id: c_id.strip(), df['chain_id'])))
+        if '' not in chain_ids:
+            return df
+        # problem case
+        ter_line_ids = list(ter_df['line_idx'])
+        chain_dfs = split_df_base_on_column_value(df, 'line_idx', ter_line_ids)
+        每个chain id内记录没有id的原子如果存在有则复制 如果都没有则配发剩余的id
 
+    @staticmethod
+    def _resolve_alt_loc():
+        pass
 
-    # def name_chains(mapper: Dict[str, List[Residue]]) -> None:
-    #     """Function takes a defaultdict(list) of Residues and ensures consistent naming of chains with no blanks."""
-    #     key_names = set(list(map(lambda kk: kk.strip(), mapper.keys())))
-    #     if "" not in key_names:
-    #         return mapper
-    #     unnamed = list(mapper[""])
-    #     del mapper[""]
+    @staticmethod
+    def _build_atom(df: pd.DataFrame):
+        '''
+        create atom objects from a dataframe
+        '''
+        pass
 
-    #     names = legal_chain_names(mapper)
-    #     unnamed = sorted(unnamed, key=lambda r: r.min_line())
-    #     new_chain: List[Residue] = []
+    @staticmethod
+    def _build_residues():
+        pass
 
-    #     for res in unnamed:
-    #         if not new_chain:
-    #             new_chain.append(res)
-    #         elif new_chain[-1].neighbors(res):
-    #             new_chain.append(res)
-    #         else:
-    #             mapper[names.pop()] = deepcopy(new_chain)
-    #             new_chain = [res]
-    #     if new_chain:
-    #         mapper[names.pop()] = deepcopy(new_chain)
-    #     return mapper
+    @staticmethod
+    def _build_chains():
+        pass
+    # endregion
 
+class PDBAtom():
+    '''
+    class for accessing atom records in the PDB file
+    contructed with a pandas.Series
+    '''
+    pass
 
-    # def categorize_residue(residue: Residue) -> Union[Residue, Ligand, Solvent, MetalAtom]:
-    #     """Method that takes a default Residue() and converts it into its specialized Residue() inherited class."""
-    #     # TODO(CJ): I need to add in stuff here for the solvent types.
-    #     if residue.is_canonical():
-    #         residue.set_rtype(chem.ResidueType.CANONICAL)
-    #         return residue
+# TODO go to core helper
+def split_df_base_on_column_value(df: pd.DataFrame, column_name: str, split_values: list, copy: bool=False):
+    '''
+    split a dataframe base on the value of a column
+    Arg:
+        df: the target dataframe
+        column_name: the reference column's name
+        split_value: the value mark for spliting
+    '''
+    split_values = sorted(split_values)
+    frist = 1
+    result_dfs = []
+    for this_value in split_values:
+        if frist:
+            frist_df = df[df[column_name] < this_value]
+            result_dfs.append(frist_df)
+            frist = 0
+            last_value = this_value
+            continue
+        result_df = df[(df[column_name] < this_value) & (df[column_name] > last_value)]
+        result_dfs.append(result_df)
+        last_value = this_value
 
-    #     if (
-    #         residue.name in chem.METAL_MAPPER
-    #     ):  # TODO(CJ): implement more OOP method for this
-    #         return residue_to_metal(residue)
+    if copy:
+        for i, df in enumerate(result_dfs):
+            result_dfs[i] = df.copy()
 
-    #     if residue.is_rd_solvent():  # TODO(CJ): make sure this logic is 100% right
-    #         return residue_to_solvent(residue)
-
-    #     return residue_to_ligand(residue)
-
-
-    # def build_residues(
-    #     df: pd.DataFrame, keep: str = "first"
-    # ) -> Dict[str, Union[Residue, Ligand, Solvent, MetalAtom]]:
-    #     """Helper method that builds Residue() or derived Residue() objects from a dataframe generated by BioPandas.
-    #     Returns as a dict() with (key, value) pairs of (residue_key, Union[Residue,Ligand,Solvent,MetalAtom]).""" #@shaoqz: should we also explain the keep here?
-    #     mapper = defaultdict(list)
-    #     for i, row in df.iterrows():
-    #         aa = Atom(**row)
-    #         mapper[aa.residue_key()].append(aa)
-    #     # for k,v in mapper.items():
-    #     # print(k,len(v))
-    #     result: Dict[str, Residue] = dict()
-    #     for res_key, atoms in mapper.items():
-    #         result[res_key] = Residue(
-    #             residue_key=res_key, atoms=sorted(atoms, key=lambda a: a.atom_number)
-    #         )
-    #     for (res_key, res) in result.items():
-    #         result[res_key] = categorize_residue(res)
-    #         if keep != "all":
-    #             result[res_key].resolve_alt_loc(keep)
-    #             result[res_key].remove_alt_loc()
-    #             # result[res_key].remove_occupancy() #@shaoqz: what happened here?
-    #     return result
-
-
-    # def build_chains(mapper: Dict[str, Residue]) -> Dict[str, Chain]:
-    #     """Helper method that builds the Chain() objects from a dict() of (residue_key, Residue()) pairs generated by build_residues()."""
-    #     chain_mapper = defaultdict(list)
-    #     for res in mapper.values():
-    #         chain_mapper[res.chain()].append(res)
-    #     chain_mapper = name_chains(chain_mapper)
-    #     result: Dict[str, Chain] = dict()
-    #     # ok this is where we handle missing chain ids
-    #     for chain_name, residues in chain_mapper.items():
-    #         result[chain_name] = Chain(chain_name, sorted(residues, key=lambda r: r.num()))
-    #     return result
-
-    # def ligand_from_pdb(fname: str, net_charge: float = None) -> Ligand:
-    #     """Creates a Ligand() object from a supplied .pdb file. Checks that the input file both exists and is ASCII format."""
-    #     def get_charge_mapper(fname:str) -> dict:
-    #         """Helper method that gets charges"""
-    #         lines = fs.lines_from_file(fname) 
-    #         result = dict()
-    #         for ll in lines:
-    #             raw_charge = ll[78:80].strip()
-    #             if not raw_charge:
-    #                 continue
-    #             mult = 1 
-    #             temp = ''
-    #             for ch in raw_charge:
-    #                 if ch != '-':
-    #                     temp += ch
-    #                 else:
-    #                     mult = -1
-    #             result[(ll[21].strip(), int(ll[6:11]))] = mult*int( temp )
-    #         return result 
-
-    #     check_valid_pdb(fname)
-    #     warnings.filterwarnings("ignore")
-    #     # adapt general input // converge to a list of PDB_line (resi_lines)
-    #     parser = PandasPdb()
-    #     parser.read_pdb(fname)
-    #     temp_df = pd.concat((parser.df["ATOM"], parser.df["HETATM"]))
-    #     charge_mapper = get_charge_mapper( fname )
-    #     #TODO(CJ): put this into its own function
-    #     for (cname, a_id), charge in charge_mapper.items():
-    #         #print(cname, a_id, charge)
-    #         mask = ((temp_df.chain_id==cname)&(temp_df.atom_number==a_id)).to_numpy()
-    #         idx = np.where(mask)[0][0]
-    #         temp_df.at[idx, 'charge'] = charge
-    #     atoms = list(
-    #         map(
-    #             lambda pr: Atom(**pr[1]),
-    #             temp_df.iterrows(),
-    #         )
-    #     )
-    #     residue_name = set(list(map(lambda a: a.residue_name, atoms)))
-    #     residue_number = set(list(map(lambda a: a.residue_number, atoms)))
-    #     chain_id = set(list(map(lambda a: a.chain_id, atoms)))
-    #     assert len(residue_name) == 1
-    #     assert len(residue_number) == 1
-    #     assert len(chain_id) == 1
-    #     # TODO(CJ): should I set the chain for this if it is blank?
-    #     key = f"{list(chain_id)[0]}.{list(residue_name)[0]}.{list(residue_number)[0]}"
-    #     result = Residue(key, atoms)
-    #     result = residue_to_ligand(result)
-    #     result.net_charge = net_charge  # TODO(CJ): make net_charge a getter/setter
-    #     return result
-
-    # def get_ligand_name(fname: str) -> str:
-    #     # TODO(CJ): add the documentation herej
-    #     # TODO(CJ): make this more efficient
-    #     # TODO(CJ): add testing for this
-    #     ligand: Ligand = ligand_from_pdb(fname)
-    #     return deepcopy(ligand.get_name())
-        
-    #endregion
+    return result_dfs
