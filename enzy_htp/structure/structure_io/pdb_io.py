@@ -61,11 +61,11 @@ class PDBParser(StructureParserInterface):
         # this is important to be aligned since Amber will force them to align and erase the chain id
         # a workaround is to add them back after Amber process
         cls._resolve_missing_chain_id(target_model_df, target_model_ter_df) # add missing chain id in place
-        # TODO -> cls._resolve_alt_loc(target_model_df) # resolve alt loc record in place
+        cls._resolve_alt_loc(target_model_df) # resolve alt loc record in place
         #end region (Add here to address more problem related to the PDB file format here)
-        # target_model_df below should be 'standard':
+        # target_model_df below should be 'standard'
 
-        # # mapper is for indicate superior information of the current level: e.g.: indicate
+        # # mapper is for indicating superior information of the current level: e.g.: indicate
         # # which residue and chain the atom belongs to in atom_mapper. Another workaround in
         # # old enzyhtp is build iteratively chain frist and residues are build in the chain
         # # builder and so on for atom. But current methods is used for better readability
@@ -122,34 +122,34 @@ class PDBParser(StructureParserInterface):
             target_mdl_ter_df: return a copy of TER records from the input
                            dataframe correponding to the target model
         '''
-        if not 'MODEL' in df['OTHERS']['record_name'].values:
-            return
-
-        # san check for start/end indicator
-        mdl_ind_sorted_w_lines = df['OTHERS'][(df['OTHERS'].record_name == 'MODEL') | (df['OTHERS'].record_name == 'ENDMDL')].sort_values(by='line_idx', inplace=False)
-        # check if they appear alternately
-        first = 1
-        for ind in mdl_ind_sorted_w_lines.values:
-            if first:
+        if 'MODEL' in df['OTHERS']['record_name'].values:
+            # san check for start/end indicator
+            mdl_ind_sorted_w_lines = df['OTHERS'][(df['OTHERS'].record_name == 'MODEL') | (df['OTHERS'].record_name == 'ENDMDL')].sort_values(by='line_idx', inplace=False)
+            # check if they appear alternately
+            first = 1
+            for ind in mdl_ind_sorted_w_lines.values:
+                if first:
+                    last_ind = ind
+                    first = 0
+                    continue
+                if ind[0] == last_ind[0]:
+                    _LOGGER.error(f'Unclosed MODEL section is detected in pdb file. line: {last_ind[-1]}')
+                    sys.exit(1)
                 last_ind = ind
-                first = 0
-                continue
-            if ind[0] == last_ind[0]:
-                _LOGGER.error(f'Unclosed MODEL section is detected in pdb file. line: {last_ind[-1]}')
-                sys.exit(1)
-            last_ind = ind
-        # get target model unit range
-        mdl_start_lines = list(df['OTHERS'][df['OTHERS'].record_name == 'MODEL']['line_idx'])
-        mdl_end_lines = list(df['OTHERS'][df['OTHERS'].record_name == 'ENDMDL']['line_idx'])
-        mdl_range = list(zip(mdl_start_lines, mdl_end_lines))
-        target_mdl_range = mdl_range[model]
-        # get model dataframe section as a copy
-        target_mdl_df = pd.concat((df['ATOM'], df['HETATM'])).query(
-            f'line_idx > {target_mdl_range[0]} & line_idx < {target_mdl_range[1]}'
-            ).copy()
-        target_mdl_ter_df = df['OTHERS'][df['OTHERS'].record_name == 'TER'].query(
-            f'line_idx > {target_mdl_range[0]} & line_idx < {target_mdl_range[1]}'
-            ).copy()
+            # get target model unit range
+            mdl_start_lines = list(df['OTHERS'][df['OTHERS'].record_name == 'MODEL']['line_idx'])
+            mdl_end_lines = list(df['OTHERS'][df['OTHERS'].record_name == 'ENDMDL']['line_idx'])
+            mdl_range = list(zip(mdl_start_lines, mdl_end_lines))
+            target_mdl_range = mdl_range[model]
+            mdl_query_pattern = f'line_idx > {target_mdl_range[0]} & line_idx < {target_mdl_range[1]}'
+            # get model dataframe section as a copy
+            target_mdl_df = pd.concat((df['ATOM'], df['HETATM'])).query(mdl_query_pattern).copy()
+            target_mdl_ter_df = df['OTHERS'][df['OTHERS'].record_name == 'TER'].query(mdl_query_pattern).copy()
+        else:
+            # get all dataframe as a copy if there's no MODEL record
+            target_mdl_df = pd.concat((df['ATOM'], df['HETATM'])).copy()
+            target_mdl_ter_df = df['OTHERS'][df['OTHERS'].record_name == 'TER'].copy()
+
         return target_mdl_df, target_mdl_ter_df
 
     @classmethod

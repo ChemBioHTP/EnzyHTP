@@ -6,6 +6,7 @@ Date: 2022-09-08
 '''
 import os
 import string
+from typing import Dict
 import pytest
 from biopandas.pdb import PandasPdb
 
@@ -191,39 +192,38 @@ def test_get_legal_pdb_chain_ids():
     assert result3 == ['A']
 
 
-# def test_name_chains():
-#     '''Ensuring that the name_chains() correctly names new chains.'''
+def test_name_chains():
+    '''Ensuring that the _resolve_missing_chain_id() correctly names new chains.'''
 
-#     def get_chains(fname) -> Dict[str, Chain]:
-#         '''Helper testing method to get the chains from a PDB file.'''
-#         reader = PandasPdb()
-#         reader.read_pdb(fname)
-#         res_mapper: Dict[str, Residue] = sp.build_residues(reader.df['ATOM'])
-#         chain_mapper: Dict[str, Chain] = sp.build_chains(res_mapper)
-#         return chain_mapper
+    def get_chains(fname) -> Dict[str, Chain]:
+        '''Helper testing method to get the chains from a PDB file.'''
+        input_pdb = PandasPdb()
+        input_pdb.read_pdb(fname)
+        target_model_df, target_model_ter_df = sp._get_target_model(input_pdb.df, 0)
+        return target_model_df, target_model_ter_df
 
-#     two_chain = f'{DATA_DIR}/two_chain.pdb'
-#     three_chain = f'{DATA_DIR}/three_chain.pdb'
-#     four_chain = f'{DATA_DIR}/four_chain.pdb'
-#     two_mapper: Dict[str, Chain] = get_chains(two_chain)
-#     three_mapper: Dict[str, Chain] = get_chains(three_chain)
-#     four_mapper: Dict[str, Chain] = get_chains(four_chain)
-#     two_mapper = sp.name_chains(two_mapper)
-#     three_mapper = sp.name_chains(three_mapper)
-#     four_mapper = sp.name_chains(four_mapper)
+    two_chain = f'{DATA_DIR}/two_chain.pdb'
+    three_chain = f'{DATA_DIR}/three_chain.pdb'
+    four_chain = f'{DATA_DIR}/four_chain.pdb'
+    two_df, two_ter_df  = get_chains(two_chain)
+    three_df, three_ter_df = get_chains(three_chain)
+    four_df, four_ter_df = get_chains(four_chain)
+    sp._resolve_missing_chain_id(two_df, two_ter_df)
+    sp._resolve_missing_chain_id(three_df, three_ter_df)
+    sp._resolve_missing_chain_id(four_df, four_ter_df)
 
-#     assert set(two_mapper.keys()) == {'A', 'B'}
-#     assert len(two_mapper['A']) == 2
-#     assert len(two_mapper['B']) == 5
-#     assert set(three_mapper.keys()) == {'A', 'B', 'C'}
-#     assert len(two_mapper['A']) == 2
-#     assert len(three_mapper['B']) == 3
-#     assert len(three_mapper['C']) == 2
-#     assert set(four_mapper.keys()) == {'A', 'B', 'C', 'D'}
-#     assert len(four_mapper['A']) == 2
-#     assert len(four_mapper['B']) == 3
-#     assert len(four_mapper['C']) == 1
-#     assert len(four_mapper['D']) == 1
+    assert set(two_df['chain_id'].values) == {'A', 'B'}
+    assert len(two_df[two_df['chain_id'] == 'A']) == 12
+    assert len(two_df[two_df['chain_id'] == 'B']) == 30
+    assert set(three_df['chain_id'].values) == {'A', 'B', 'C'}
+    assert len(three_df[three_df['chain_id'] == 'A']) == 12
+    assert len(three_df[three_df['chain_id'] == 'B']) == 15
+    assert len(three_df[three_df['chain_id'] == 'C']) == 14
+    assert set(four_df['chain_id'].values) == {'A', 'B', 'C', 'D'}
+    assert len(four_df[four_df['chain_id'] == 'A']) == 12
+    assert len(four_df[four_df['chain_id'] == 'B']) == 15
+    assert len(four_df[four_df['chain_id'] == 'C']) == 7
+    assert len(four_df[four_df['chain_id'] == 'D']) == 6
 
 
 # def test_name_chains_already_named():
