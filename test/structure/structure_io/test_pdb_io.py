@@ -4,12 +4,15 @@ This class is for parsing in and out from PDB to Structure
 Author: QZ Shao <shaoqz@icloud.com>
 Date: 2022-09-08
 '''
+import logging
 import os
 import string
+import pandas as pd
 from typing import Dict
 import pytest
 from biopandas.pdb import PandasPdb
 
+from enzy_htp.core import _LOGGER
 from enzy_htp.structure.structure_io.pdb_io import PDBParser
 from enzy_htp.structure.structure_io._interface import StructureParserInterface
 from enzy_htp.core import file_system as fs
@@ -24,7 +27,8 @@ from enzy_htp.structure import (
     Solvent,
 )
 
-# pylint: disable=protected-access
+# pylint: disable=protected-access, invalid-name
+_LOGGER.setLevel(logging.DEBUG)
 CURRDIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = f'{CURRDIR}/../data/'
 sp = PDBParser()
@@ -179,20 +183,7 @@ def test_resolve_missing_chain_id_redundant_ter():
 
     assert list(target_df['chain_id']) == answer_df_chain_ids
 
-def test_get_legal_pdb_chain_ids():
-    ALL_NAMES = list(string.ascii_uppercase)
-    result1 = sp._get_legal_pdb_chain_ids([])
-    assert set(result1) == set(ALL_NAMES)
-
-    result2 = sp._get_legal_pdb_chain_ids(ALL_NAMES)
-    assert not result2
-
-    ALL_NAMES.remove('A')
-    result3 = sp._get_legal_pdb_chain_ids(ALL_NAMES)
-    assert result3 == ['A']
-
-
-def test_name_chains():
+def test_resolve_missing_chain_id_simple():
     '''Ensuring that the _resolve_missing_chain_id() correctly names new chains.'''
 
     def get_chains(fname) -> Dict[str, Chain]:
@@ -225,13 +216,51 @@ def test_name_chains():
     assert len(four_df[four_df['chain_id'] == 'C']) == 7
     assert len(four_df[four_df['chain_id'] == 'D']) == 6
 
+def test_get_legal_pdb_chain_ids():
+    ALL_NAMES = list(string.ascii_uppercase)
+    result1 = sp._get_legal_pdb_chain_ids([])
+    assert set(result1) == set(ALL_NAMES)
 
-# def test_name_chains_already_named():
-#     '''Ensuring that the name_chains() does not changed already named chains.'''
-#     already_named = {'A': [], 'B': []}
-#     already_named = sp.name_chains(already_named)
-#     assert set(already_named.keys()) == {'A', 'B'}
+    result2 = sp._get_legal_pdb_chain_ids(ALL_NAMES)
+    assert not result2
 
+    ALL_NAMES.remove('A')
+    result3 = sp._get_legal_pdb_chain_ids(ALL_NAMES)
+    assert result3 == ['A']
+
+def test_resolve_alt_loc_first():
+    '''test resolve alt loc recored demoed in 3NIR'''
+    test_mdl = f'{DATA_DIR}3NIR_alt_loc_test.pdb'
+    test_mdl_pdb = PandasPdb()
+    test_mdl_pdb.read_pdb(test_mdl)
+    target_df = pd.concat((test_mdl_pdb.df['ATOM'],test_mdl_pdb.df['HETATM']), ignore_index=True)
+    print(target_df)
+    # answer
+    answer_mdl = f'{DATA_DIR}3NIR_alt_loc_answer_A.pdb'
+    answer_mdl_pdb = PandasPdb()
+    answer_mdl_pdb.read_pdb(answer_mdl)
+    answer_df = pd.concat((answer_mdl_pdb.df['ATOM'],answer_mdl_pdb.df['HETATM']), ignore_index=True)
+
+    sp._resolve_alt_loc(target_df)
+
+    assert list(target_df['atom_number']) == list(answer_df['atom_number'])
+
+def test_resolve_alt_loc_keep_B():
+    '''test resolve alt loc recored demoed in 3NIR'''
+    test_mdl = f'{DATA_DIR}3NIR_alt_loc_test.pdb'
+    test_mdl_pdb = PandasPdb()
+    test_mdl_pdb.read_pdb(test_mdl)
+    target_df = pd.concat((test_mdl_pdb.df['ATOM'],test_mdl_pdb.df['HETATM']), ignore_index=True)
+    print(target_df)
+    # answer
+    answer_mdl = f'{DATA_DIR}3NIR_alt_loc_answer_B.pdb'
+    answer_mdl_pdb = PandasPdb()
+    answer_mdl_pdb.read_pdb(answer_mdl)
+    answer_df = pd.concat((answer_mdl_pdb.df['ATOM'],answer_mdl_pdb.df['HETATM']), ignore_index=True)
+
+    sp._resolve_alt_loc(target_df, keep='B')
+
+    assert list(target_df['atom_number']) == list(answer_df['atom_number'])
 
 # def test_categorize_residue_all_canonical():
 #     '''Checking that the structure_parser.categorize_residue() works for only canonical Residues().'''
