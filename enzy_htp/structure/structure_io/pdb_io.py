@@ -5,7 +5,9 @@ Author: shaoqz, <shaoqz@icloud.com>
 Date: 2022-08-01
 """
 import os
-from typing import Dict, Union
+import string
+import sys
+from typing import Dict, List, Tuple, Union
 from biopandas.pdb import PandasPdb
 import pandas as pd
 
@@ -55,13 +57,13 @@ class PDBParser(StructureParserInterface):
         # deal with multiple model
         target_model_df, target_model_ter_df = cls._get_target_model(input_pdb.df, model=model)
 
-        # # TODO address when atom/residue/chain id is disordered respect to the line index
-        # # this is important to be aligned since Amber will force them to align and erase the chain id
-        # # a workaround is to add them back after Amber process
-        # cls._resolve_missing_chain_id(target_model_df, target_model_ter_df) # add missing chain id in place
-        # cls._resolve_alt_loc(target_model_df) # resolve alt loc record in place
-        # #end region (Add here to address more problem related to the PDB file format here)
-        # # target_model_df below should be 'standard':
+        # TODO address when atom/residue/chain id is disordered respect to the line index
+        # this is important to be aligned since Amber will force them to align and erase the chain id
+        # a workaround is to add them back after Amber process
+        cls._resolve_missing_chain_id(target_model_df, target_model_ter_df) # add missing chain id in place
+        # TODO -> cls._resolve_alt_loc(target_model_df) # resolve alt loc record in place
+        #end region (Add here to address more problem related to the PDB file format here)
+        # target_model_df below should be 'standard':
 
         # # mapper is for indicate superior information of the current level: e.g.: indicate
         # # which residue and chain the atom belongs to in atom_mapper. Another workaround in
@@ -90,18 +92,18 @@ class PDBParser(StructureParserInterface):
         ext: str = fs.get_file_ext(pdb_path)
         if ext.lower() != ".pdb":
             _LOGGER.error(f"Supplied file '{pdb_path}' is NOT a PDB file. Exiting...")
-            exit(1)
+            sys.exit(1)
         #check for file existance
         if not os.path.exists(pdb_path):
             _LOGGER.error(f"Supplied file '{pdb_path}' does NOT exist. Exiting...")
-            exit(1)
+            sys.exit(1)
         # check for character encoding
         for idx, ll in enumerate(fs.lines_from_file(pdb_path)):
             if not ll.isascii():
                 _LOGGER.error(
                     f"The PDB '{pdb_path}' contains non-ASCII text and is invalid in line {idx}: '{ll}'. Exiting..."
                 )
-                exit(1)
+                sys.exit(1)
     
     @staticmethod
     def _get_target_model(df: pd.DataFrame, model: int) -> Union[pd.DataFrame, None]:
@@ -134,7 +136,7 @@ class PDBParser(StructureParserInterface):
                 continue
             if ind[0] == last_ind[0]:
                 _LOGGER.error(f'Unclosed MODEL section is detected in pdb file. line: {last_ind[-1]}')
-                exit(1)
+                sys.exit(1)
             last_ind = ind
         # get target model unit range
         mdl_start_lines = list(df['OTHERS'][df['OTHERS'].record_name == 'MODEL']['line_idx'])
@@ -150,21 +152,64 @@ class PDBParser(StructureParserInterface):
             ).copy()
         return target_mdl_df, target_mdl_ter_df
 
-    @staticmethod
-    def _resolve_missing_chain_id(df: pd.DataFrame, ter_df: pd.DataFrame):
+    @classmethod
+    def _resolve_missing_chain_id(cls, df: pd.DataFrame, ter_df: pd.DataFrame) -> None:
         '''
+        Function takes the dataframes of chains and ensures consistent naming
+        of chains with no blanks.
+
         add missing chain id into the Atomic 'df' when there is none
         according to the TER record provide by 'ter_df'
         * ter df should share the same line index references as df (from same file)
+        [edit df in place]
         '''
         # no problem case
         chain_ids = set(list(map(lambda c_id: c_id.strip(), df['chain_id'])))
         if '' not in chain_ids:
             return df
+
         # problem case
+        chain_ids.remove('')
+        legal_ids = cls._get_legal_pdb_chain_ids(chain_ids)
+        ## split the df into chain dfs
         ter_line_ids = list(ter_df['line_idx'])
         chain_dfs = split_df_base_on_column_value(df, 'line_idx', ter_line_ids)
-        每个chain id内记录没有id的原子如果存在有则复制 如果都没有则配发剩余的id
+        ## get a list of (loc, value) part for editing in the original df
+        result_loc_map = [] 
+        for chain in chain_dfs:
+            atom_missing_c_id = chain[chain.chain_id.str.strip() == '']
+            # check if not missing any chain_id
+            if len(atom_missing_c_id) == 0:
+                continue
+            # check existing chain ids in the chain
+            existing_chain_ids = set(list(map(lambda c_id: c_id.strip(), chain['chain_id'])))
+            existing_chain_ids.discard('')
+            if len(existing_chain_ids) > 1:
+                _LOGGER.error('Found multiple chain id in 1 chain. Check your PDB.')
+                sys.exit(1)
+            # case: all atoms are missing chain id
+            if len(existing_chain_ids) == 0:
+                result_loc_map.extend(list(zip(atom_missing_c_id.index, [legal_ids.pop()]*len(atom_missing_c_id))))
+            # case: only some atoms are missing chain id
+            else:
+                current_chain_id = list(existing_chain_ids)[0]
+                result_loc_map.extend(list(zip(atom_missing_c_id.index, [current_chain_id]*len(atom_missing_c_id))))
+        # add missing chain id
+        batch_edit_df_loc_value(df, result_loc_map, 'chain_id')
+
+    @staticmethod
+    def _get_legal_pdb_chain_ids(taken_ids: List[str]) -> List[str]:
+        """
+        Small helper method that determines the legal PDB chain names given a list of taken ids.
+        Uses all of the available 26 capitalized letters and returns in reverse order. Returns an 
+        empty list when all are occupied.
+        TODO check how PDB defines 26+ chains (maybe AA AB etc.)
+        Return:
+            the legal chain name list in a reversed order (for doing .pop())
+        """
+        result = list(string.ascii_uppercase)
+        result = list(filter(lambda s: s not in taken_ids, result))
+        return list(reversed(result))
 
     @staticmethod
     def _resolve_alt_loc():
@@ -221,3 +266,10 @@ def split_df_base_on_column_value(df: pd.DataFrame, column_name: str, split_valu
             result_dfs[i] = df.copy()
 
     return result_dfs
+
+def batch_edit_df_loc_value(df: pd.DataFrame, loc_value_list: List[tuple], column: str):
+    '''
+    batch edit 'column' of 'df' with the 'loc_value_list'
+    '''
+    for loc, value in loc_value_list:
+        df.loc[loc, column] = value

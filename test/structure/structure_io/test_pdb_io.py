@@ -5,6 +5,7 @@ Author: QZ Shao <shaoqz@icloud.com>
 Date: 2022-09-08
 '''
 import os
+import string
 import pytest
 from biopandas.pdb import PandasPdb
 
@@ -162,7 +163,7 @@ def test_resolve_missing_chain_id_redundant_ter():
     '''
     in this case there are one redundant ter
     '''
-    test_mdl = f'{DATA_DIR}3EZB_nmr_no_chain_red_ter.pdb'
+    test_mdl = f'{DATA_DIR}3EZB_nmr_no_chain_id_red_ter.pdb'
     test_mdl_pdb = PandasPdb()
     test_mdl_pdb.read_pdb(test_mdl)
     target_df = test_mdl_pdb.df['ATOM']
@@ -177,20 +178,17 @@ def test_resolve_missing_chain_id_redundant_ter():
 
     assert list(target_df['chain_id']) == answer_df_chain_ids
 
-# def test_legal_chain_names():
-#     '''Making sure all legal chains are created given a starting Residue() mapper.'''
-#     ALL_NAMES = list(string.ascii_uppercase)
-#     result1 = sp.legal_chain_names(dict())
-#     assert set(result1) == set(ALL_NAMES)
+def test_get_legal_pdb_chain_ids():
+    ALL_NAMES = list(string.ascii_uppercase)
+    result1 = sp._get_legal_pdb_chain_ids([])
+    assert set(result1) == set(ALL_NAMES)
 
-#     dummy_mapper = dict(zip(ALL_NAMES, range(len(ALL_NAMES))))
-#     result2 = sp.legal_chain_names(dummy_mapper)
-#     assert not result2
+    result2 = sp._get_legal_pdb_chain_ids(ALL_NAMES)
+    assert not result2
 
-#     ALL_NAMES.remove('A')
-#     dummy_mapper = dict(zip(ALL_NAMES, range(len(ALL_NAMES))))
-#     result3 = sp.legal_chain_names(dummy_mapper)
-#     assert result3 == ['A']
+    ALL_NAMES.remove('A')
+    result3 = sp._get_legal_pdb_chain_ids(ALL_NAMES)
+    assert result3 == ['A']
 
 
 # def test_name_chains():
