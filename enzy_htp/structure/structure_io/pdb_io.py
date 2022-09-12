@@ -174,11 +174,12 @@ class PDBParser(StructureParserInterface):
         ## split the df into chain dfs
         ter_line_ids = list(ter_df['line_idx'])
         chain_dfs = split_df_base_on_column_value(df, 'line_idx', ter_line_ids)
-        ## get a list of (loc, value) part for editing in the original df
+        ## get a list of (loc, value) for editing in the original df
         result_loc_map = [] 
         for chain in chain_dfs:
             atom_missing_c_id = chain[chain.chain_id.str.strip() == '']
             # check if not missing any chain_id
+            # ** This also dealt with the empty chain problem! ** -> atom_miss_c_id will be an empty df
             if len(atom_missing_c_id) == 0:
                 continue
             # check existing chain ids in the chain
@@ -212,8 +213,47 @@ class PDBParser(StructureParserInterface):
         return list(reversed(result))
 
     @staticmethod
-    def _resolve_alt_loc():
-        pass
+    def _resolve_alt_loc(df: pd.DataFrame, keep: str = 'frist'):
+        '''
+        Resolves atoms with the alt_loc records
+        Optional argument "keep" specifies the resolution method. Default
+        is "first" which forces keeping atoms in the frist residue (earlist 
+        in the file) out of multiple ones. Otherwise, keeps the specific 
+        alt_loc identifier (e.g.: B), assuming it exists.
+
+        Only one record out of multiple alt_loc is allowed. Delete rest 
+        df lines in place. 
+        TODO support residue specific keep strageties
+        '''
+        alt_loc_atoms_df = df[df['alt_loc'].str.strip() != '']
+        # san check
+        if len(alt_loc_atoms_df) == 0:
+            _LOGGER.debug('No alt_loc to resolve.')
+            return
+        # solve
+        # get a list of 'loc' for deleting in the original df
+        delete_loc_list = []
+        # treat in residues
+        alt_loc_residues = alt_loc_atoms_df.groupby('residue_number', sort=False)
+        for r_id, res_df in alt_loc_residues:
+            alt_res_dfs = res_df.groupby('alt_loc', sort=False)
+            if len(alt_res_dfs) == 1:
+                _LOGGER.debug(f'Only 1 alt_loc id found in residue {list(res_df["residue_number"])[0]}. No need to resolve')
+                continue
+            if keep == "first":
+                delele_res_dfs = list(alt_res_dfs.groups.values())
+                del delele_res_dfs[0]
+                for delete_lines in delele_res_dfs:
+                    delete_loc_list.extend(list(delete_lines))
+            else:
+                delele_res_dfs_mapper = alt_res_dfs.groups
+                assert keep in delele_res_dfs_mapper
+                del delele_res_dfs_mapper[keep]
+                for delete_lines in list(delele_res_dfs_mapper.values()):
+                    delete_loc_list.extend(list(delete_lines))
+
+        # delete in original df
+        df.drop(df.index(delete_loc_list))
 
     @staticmethod
     def _build_atom(df: pd.DataFrame):
@@ -242,6 +282,7 @@ class PDBAtom():
 def split_df_base_on_column_value(df: pd.DataFrame, column_name: str, split_values: list, copy: bool=False):
     '''
     split a dataframe base on the value of a column
+    ** the line in the split values will not be included **
     Arg:
         df: the target dataframe
         column_name: the reference column's name
@@ -260,6 +301,8 @@ def split_df_base_on_column_value(df: pd.DataFrame, column_name: str, split_valu
         result_df = df[(df[column_name] < this_value) & (df[column_name] > last_value)]
         result_dfs.append(result_df)
         last_value = this_value
+    # deal with the last portion
+    result_dfs.append(df[df[column_name] > split_values[-1]])
 
     if copy:
         for i, df in enumerate(result_dfs):
