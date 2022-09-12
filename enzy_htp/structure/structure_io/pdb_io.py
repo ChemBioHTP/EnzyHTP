@@ -61,17 +61,17 @@ class PDBParser(StructureParserInterface):
         # this is important to be aligned since Amber will force them to align and erase the chain id
         # a workaround is to add them back after Amber process
         cls._resolve_missing_chain_id(target_model_df, target_model_ter_df) # add missing chain id in place
-        cls._resolve_alt_loc(target_model_df) # resolve alt loc record in place
+        cls._resolve_alt_loc(target_model_df) # resolve alt loc record in place by delele redundant df rows
         #end region (Add here to address more problem related to the PDB file format here)
-        # target_model_df below should be 'standard'
-
-        # # mapper is for indicating superior information of the current level: e.g.: indicate
-        # # which residue and chain the atom belongs to in atom_mapper. Another workaround in
-        # # old enzyhtp is build iteratively chain frist and residues are build in the chain
-        # # builder and so on for atom. But current methods is used for better readability
-        # atom_mapper: Dict[str, Atom] = cls._build_atoms(target_model_df) 
-        # res_mapper: Dict[str, Residue] = cls._build_residues(atom_mapper)
-        # chain_list: Dict[str, Chain] = cls._build_chains(res_mapper)
+        
+        # target_model_df below should be 'standard' --> start building
+        # mapper is for indicating superior information of the current level: e.g.: indicate
+        # which residue and chain the atom belongs to in atom_mapper. Another workaround in
+        # old enzyhtp is build iteratively chain frist and residues are build in the chain
+        # builder and so on for atom. But current methods is used for better readability
+        atom_mapper: Dict[str, Atom] = cls._build_atoms(target_model_df) 
+        res_mapper: Dict[str, Residue] = cls._build_residues(atom_mapper)
+        chain_list: Dict[str, Chain] = cls._build_chains(res_mapper)
 
         # return Structure(chain_list)
 
@@ -147,7 +147,7 @@ class PDBParser(StructureParserInterface):
             target_mdl_ter_df = df['OTHERS'][df['OTHERS'].record_name == 'TER'].query(mdl_query_pattern).copy()
         else:
             # get all dataframe as a copy if there's no MODEL record
-            target_mdl_df = pd.concat((df['ATOM'], df['HETATM'])).copy()
+            target_mdl_df = pd.concat((df['ATOM'], df['HETATM']), ignore_index=True).copy() # insure unique df id
             target_mdl_ter_df = df['OTHERS'][df['OTHERS'].record_name == 'TER'].copy()
 
         return target_mdl_df, target_mdl_ter_df
@@ -213,7 +213,7 @@ class PDBParser(StructureParserInterface):
         return list(reversed(result))
 
     @staticmethod
-    def _resolve_alt_loc(df: pd.DataFrame, keep: str = 'frist'):
+    def _resolve_alt_loc(df: pd.DataFrame, keep: str = 'first'):
         '''
         Resolves atoms with the alt_loc records
         Optional argument "keep" specifies the resolution method. Default
@@ -238,12 +238,13 @@ class PDBParser(StructureParserInterface):
         for r_id, res_df in alt_loc_residues:
             alt_res_dfs = res_df.groupby('alt_loc', sort=False)
             if len(alt_res_dfs) == 1:
-                _LOGGER.debug(f'Only 1 alt_loc id found in residue {list(res_df["residue_number"])[0]}. No need to resolve')
+                _LOGGER.debug(f'Only 1 alt_loc id found in residue {r_id}. No need to resolve')
                 continue
-            if keep == "first":
-                delele_res_dfs = list(alt_res_dfs.groups.values())
-                del delele_res_dfs[0]
-                for delete_lines in delele_res_dfs:
+            if keep == 'first':
+                delele_res_df_locs = list(alt_res_dfs.groups.values())
+                del delele_res_df_locs[0]
+                for delete_lines in delele_res_df_locs:
+                    print(r_id, list(delete_lines))
                     delete_loc_list.extend(list(delete_lines))
             else:
                 delele_res_dfs_mapper = alt_res_dfs.groups
@@ -253,7 +254,8 @@ class PDBParser(StructureParserInterface):
                     delete_loc_list.extend(list(delete_lines))
 
         # delete in original df
-        df.drop(df.index(delete_loc_list))
+        _LOGGER.debug(f'deleting df row: {delete_loc_list}')
+        df.drop(index = delete_loc_list, inplace=True)
 
     @staticmethod
     def _build_atom(df: pd.DataFrame):
