@@ -73,7 +73,7 @@ class PDBParser(StructureParserInterface):
         # old enzyhtp is build iteratively chain frist and residues are build in the chain
         # builder and so on for atom. But current methods is used for better readability
         atom_mapper: Dict[str, Atom] = cls._build_atoms(target_model_df)
-        res_mapper: Dict[str, Residue] = cls._build_residues(atom_mapper)
+        res_mapper, idx_change_mapper = cls._build_residues(atom_mapper)
         chain_list: Dict[str, Chain] = cls._build_chains(res_mapper)
 
         return Structure(chain_list)
@@ -283,7 +283,7 @@ class PDBParser(StructureParserInterface):
         return atom_mapper
 
     @classmethod
-    def _build_residues(cls, atom_mapper: Dict[str, Atom]) -> Dict[str, Residue]:
+    def _build_residues(cls, atom_mapper: Dict[str, Atom]) -> Dict[str, Residue]: #TODO add test for this
         '''
         build Residue() objects from atom_mapper
         Return:
@@ -291,6 +291,7 @@ class PDBParser(StructureParserInterface):
         '''
         build_mapper = defaultdict(lambda: defaultdict(list))
         result_mapper = defaultdict(list)
+        idx_change_mapper = {}
         for res_key, atoms in atom_mapper.items():
             res_obj = Residue(int(res_key[1]), res_key[2] ,atoms)
             build_mapper[res_key[0]][res_key[3]].append(res_obj)
@@ -299,25 +300,27 @@ class PDBParser(StructureParserInterface):
         for chain_id, record_residues in build_mapper.items():
             if len(record_residues) > 1:
                 new_chain_id = legal_chain_ids.pop()
-                _LOGGER.debug(f'found HETATM in a ATOM chain: making a new chain {new_chain_id}')
+                _LOGGER.debug(f'found HETATM in a ATOM chain: making a new chain {new_chain_id}') #TODO add a recorder for the index change
                 result_mapper[new_chain_id] = record_residues['HETATM']
+                for i in record_residues['HETATM']:
+                    idx_change_mapper[(chain_id, i.idx)] = (new_chain_id, i.idx)
             else:
-                result_mapper[chain_id] = record_residues['ATOM']
+                result_mapper[chain_id] = record_residues.values()[0]
         # categorize_residue
         cls.categorize_residue(result_mapper)
 
-        return result_mapper
+        return result_mapper, idx_change_mapper
 
     @staticmethod
-    def categorize_residue(residue_mapper: Dict[str, List[Residue]], add_solvent_list: list = None, add_ligand_list: list = None) -> Union[Residue, Ligand, Solvent, MetalAtom]:
+    def categorize_residue(residue_mapper: Dict[str, List[Residue]], add_solvent_list: list = None, add_ligand_list: list = None) -> Union[Residue, Ligand, Solvent, MetalAtom]: #TODO add test for this
         """
         Categorize Residue base on it 3-letter name and chain info in PDB format
         Takes a mapper of {chain_id, [Residue, ...]} and converts
         them into its specialized Residue() inherited class.
         """
-        if add_solvent_list == None:
+        if add_solvent_list is None:
             add_solvent_list = []
-        if add_ligand_list == None:
+        if add_ligand_list is None:
             add_ligand_list = []
         for chain_id, residues in residue_mapper.items():
             peptide_chain = 0
