@@ -71,11 +71,11 @@ def test_residue_key_information():
 
 
 def test_check_all_canonical():
-    """Checking that all the loaded Residue()'s are canonical amino acids and not metals, rd_solvents of rd_non_ligands"""
+    """Checking that all the loaded Residue()'s are canonical amino acids and not metals, solvents of rd_non_ligands"""
     for rr in RESIDUES:
         assert rr.is_canonical()
         assert not rr.is_metal()
-        assert not rr.is_rd_solvent()
+        assert not rr.is_solvent()
     assert not rr.is_rd_non_ligand()
 
 

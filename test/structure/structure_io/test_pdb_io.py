@@ -413,7 +413,7 @@ def test_categorize_residue_noncanonical():
 #     assert all_residues[3].is_canonical()
 #     assert all_residues[4].is_ligand()
 #     assert all_residues[5].is_metal()
-#     assert all_residues[6].is_rd_solvent()
+#     assert all_residues[6].is_solvent()
 
 #     assert isinstance(all_residues[0], Residue)
 #     assert isinstance(all_residues[1], Residue)

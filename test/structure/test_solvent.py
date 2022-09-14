@@ -9,7 +9,7 @@ from enzy_htp.structure import Solvent, residue_to_solvent, Atom, Residue
 def test_constant_data():
     """Ensuring the constant data for the Solvent() class is encoded properly."""
     solvent = Solvent("A.HOH.1", list())
-    assert solvent.is_rd_solvent()
+    assert solvent.is_solvent()
     assert not solvent.is_metal()
     assert not solvent.is_ligand()
     assert not solvent.is_canonical()

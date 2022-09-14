@@ -18,7 +18,7 @@ from enzy_htp.chemical import enum as renum
 class Solvent(Residue):
     """Represents a specific Solvent in a .pdb file. Typically created from a base Residue() object using the
     residue_to_solvent() method found in enzy_htp.structure.solvent.py. Has no additional attributes vs
-    the parent Residue() class. The value is_rd_solvent() has been hardcoded to True and the the value
+    the parent Residue() class. The value is_solvent() has been hardcoded to True and the the value
     for Solvent.rtype_ is set to ResidueType.SOLVENT. Meant to be stored alongside other Residue() and
     Residue()-derived classes (MetalUnit() and Ligand()) in Chain() objects.
 
