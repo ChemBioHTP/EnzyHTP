@@ -64,7 +64,7 @@ def test_residue_key_information():
     assert local_res.residue_key == "A.THR.1"
     local_res.set_chain("B")
     assert local_res.residue_key == "B.THR.1"
-    assert local_res.num() == 1
+    assert local_res.idx() == 1
 
     for aa in local_res.atoms:
         assert aa.chain_id == "B"
@@ -127,7 +127,7 @@ def test_num_atoms():
     assert not empty_residue.num_atoms()
     assert RESIDUES[0].num_atoms() == 32
     res_cpy = deepcopy(RESIDUES[0])
-    res_cpy.atoms_ = []
+    res_cpy._atoms = []
     assert not empty_residue.num_atoms()
 
 
@@ -136,11 +136,11 @@ def test_renumber_atoms():
 
     res_cpy = deepcopy(RESIDUES[0])
     assert res_cpy.renumber_atoms(1) == 32
-    assert [aa.atom_number for aa in res_cpy.atoms_] == list(range(1, 33))
+    assert [aa.atom_number for aa in res_cpy._atoms] == list(range(1, 33))
 
     res_cpy = deepcopy(RESIDUES[1])
     assert res_cpy.renumber_atoms(10) == 37
-    assert [aa.atom_number for aa in res_cpy.atoms_] == list(range(10, 38))
+    assert [aa.atom_number for aa in res_cpy._atoms] == list(range(10, 38))
 
 
 def test_renumber_atoms_bad_input():

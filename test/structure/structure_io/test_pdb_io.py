@@ -39,7 +39,7 @@ def test_get_structure():
     just make sure it wont crash now
     maybe convert back to file and assert
     '''
-    pdb_file_path = f'{DATA_DIR}3EZB_nmr.pdb'
+    pdb_file_path = f'{DATA_DIR}1Q4T_ligand_test.pdb'
 
     stru = sp.get_structure(pdb_file_path)
 
@@ -183,6 +183,25 @@ def test_resolve_missing_chain_id_redundant_ter():
 
     assert list(target_df['chain_id']) == answer_df_chain_ids
 
+def test_resolve_missing_chain_id_duplicated_id():
+    '''
+    in this case chain id A and B are used again in the HETATM chain
+    '''
+    test_mdl = f'{DATA_DIR}3EZB_nmr_no_chain_id_red_ter.pdb'
+    test_mdl_pdb = PandasPdb()
+    test_mdl_pdb.read_pdb(test_mdl)
+    target_df = test_mdl_pdb.df['ATOM']
+    target_ter_df = test_mdl_pdb.df['OTHERS'].query('record_name == "TER"')
+    # answer
+    answer_mdl = f'{DATA_DIR}3EZB_nmr_no_chain_id_answer.pdb'
+    answer_mdl_pdb = PandasPdb()
+    answer_mdl_pdb.read_pdb(answer_mdl)
+    answer_df_chain_ids = list(answer_mdl_pdb.df['ATOM']['chain_id'])
+
+    sp._resolve_missing_chain_id(target_df, target_ter_df)
+
+    assert list(target_df['chain_id']) == answer_df_chain_ids
+
 def test_resolve_missing_chain_id_simple():
     '''Ensuring that the _resolve_missing_chain_id() correctly names new chains.'''
 
@@ -216,8 +235,9 @@ def test_resolve_missing_chain_id_simple():
     assert len(four_df[four_df['chain_id'] == 'C']) == 7
     assert len(four_df[four_df['chain_id'] == 'D']) == 6
 
+@pytest.mark.long
 def test_get_legal_pdb_chain_ids():
-    ALL_NAMES = list(string.ascii_uppercase)
+    ALL_NAMES = list(string.ascii_uppercase) + list(map(lambda x: str(x), range(50000)))
     result1 = sp._get_legal_pdb_chain_ids([])
     assert set(result1) == set(ALL_NAMES)
 
@@ -262,6 +282,8 @@ def test_resolve_alt_loc_keep_B():
 
     assert list(target_df['atom_number']) == list(answer_df['atom_number'])
 
+def test_build_atom():
+    pass
 # def test_categorize_residue_all_canonical():
 #     '''Checking that the structure_parser.categorize_residue() works for only canonical Residues().'''
 #     pdb_file = f'{DATA_DIR}/two_chain.pdb'
