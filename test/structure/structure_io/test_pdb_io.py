@@ -183,25 +183,6 @@ def test_resolve_missing_chain_id_redundant_ter():
 
     assert list(target_df['chain_id']) == answer_df_chain_ids
 
-def test_resolve_missing_chain_id_duplicated_id():
-    '''
-    in this case chain id A and B are used again in the HETATM chain
-    '''
-    test_mdl = f'{DATA_DIR}3EZB_nmr_no_chain_id_red_ter.pdb'
-    test_mdl_pdb = PandasPdb()
-    test_mdl_pdb.read_pdb(test_mdl)
-    target_df = test_mdl_pdb.df['ATOM']
-    target_ter_df = test_mdl_pdb.df['OTHERS'].query('record_name == "TER"')
-    # answer
-    answer_mdl = f'{DATA_DIR}3EZB_nmr_no_chain_id_answer.pdb'
-    answer_mdl_pdb = PandasPdb()
-    answer_mdl_pdb.read_pdb(answer_mdl)
-    answer_df_chain_ids = list(answer_mdl_pdb.df['ATOM']['chain_id'])
-
-    sp._resolve_missing_chain_id(target_df, target_ter_df)
-
-    assert list(target_df['chain_id']) == answer_df_chain_ids
-
 def test_resolve_missing_chain_id_simple():
     '''Ensuring that the _resolve_missing_chain_id() correctly names new chains.'''
 
