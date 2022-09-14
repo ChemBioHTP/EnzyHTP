@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Union, Any
 
 import numpy as np
+import pandas as pd
 
 
 class Atom:
@@ -19,7 +20,7 @@ class Atom:
     Attributes:
         (nessessary)
         name : The name of the atom as a string. often refer to a specific connectivity.
-        index: An integer number for the atomic index.
+        idx: An integer number for the atomic index.
         coord: (x,y,z) for cartesian coordinate of the atom.
         parent/residue: the parent residue that this atom belongs to.
         (optional)
@@ -28,11 +29,15 @@ class Atom:
         element : Character representing element.
     '''
 
-    def __init__(self, **kwargs): #@shaoqz: @imp we should have a seperate IO module parsing PDB and have functions there as constructor and exportor of a structure object.
-        '''Constructor meant to be called as Atom(**row), where row is of type pandas.Series'''
-
-        for k, v in kwargs.items():
-            setattr(self, k, v)
-
-        if not np.isnan(self.charge):
-            self.charge = int(self.charge) #@shaoqz: charge should be float.
+    def __init__(self, ds: pd.Series, parent = None):
+        '''Constructor of Atom(), where ds is of type pandas.Series'''
+        # nessessary
+        self._name = ds['atom_name'].strip()
+        self._idx = ds['atom_number']
+        self._coord = (ds['x_coord'], ds['y_coord'], ds['z_coord'])
+        self._parent = parent # could to be add later
+        # optional
+        self._b_factor = ds['b_factor']
+        self._element = ds['element_symbol'].strip()
+        if not np.isnan(ds['charge']):
+            self._charge = float(ds['charge'])
