@@ -24,57 +24,68 @@ class Residue:
         canonical, non-canonical, solvent or a metal center.
 
     Attributes:
-        atoms_ : A list of Atom() objects that make up the Residue().
-        residue_key : Unique string identifier with format "chain.name.num".
-        chain_ : Parent chain name.
+        (nessessary)
+        atoms : A list of Atom() objects that make up the Residue().
         name : Residue name.
-        num_ : The index of the Residue within the chain.
+        idx : The index of the Residue within the chain.
+        parent/chain : Parent chain name.
         rtype_ : The ResidueType of the Residue().
-        min_line_ : The lowest one-indexed line of the children atoms.
-        max_line_ : The highest one-indexed line of the children atoms.
     """
 
-    def __init__(self, residue_key: str, atoms: List[Atom]):
-        """Constructor for the Residue() object. Takes residue_key in format of "chain_name.resdue_name.residue_id" and a list of Atom() objects."""
-        self.atoms_ = atoms
-        self.residue_key = residue_key #@shaoqz: @imp to identify a residue only chain_id and residue_id inside of the chain is enough. The residue name seem redundant especially when using it to aquire a residue. After reading more code i see you are using the key for 1) select the residue 2) comparing the residue 3) identifying the residue
-        (chain, name, num) = self.residue_key.split(".")
-        self.chain_ = chain
-        self.name = name
-        self.num_ = int(num)
-        self.rtype_ = chem.ResidueType.UNKNOWN
-        line_idxs = np.array(list(map(lambda aa: aa.line_idx, self.atoms_)))
-
-        if line_idxs.any():
-            self.min_line_ = np.min(line_idxs)
-            self.max_line_ = np.max(line_idxs)
-
-    # === Getter-Attr (ref) ===
+    def __init__(self, residue_idx: int, residue_name: str, atoms: List[Atom], parent=None):
+        """Constructor for the Residue() object"""
+        self._atoms = atoms
+        self._name = residue_name
+        self._idx = residue_idx
+        self._rtype = chem.ResidueType.UNKNOWN
+        self._parent = parent
+        
+    #region === Getter-Attr (ref) ===
     @property
     def atoms(self) -> List[Atom]:
         """Returns a list of all Atom() objects that the Residue() "owns" """
-        return self.atoms_
+        return self._atoms
+    @atoms.setter
+    def atoms(self, val):
+        self._atoms = val
 
-    def chain(self) -> str:
+    @property
+    def chain(self):
         """Getter for the Residue()'s parent chain id."""
-        return self.chain_
+        return self._parent
+    @chain.setter
+    def chain(self, val):
+        self._chain = val
 
-    def num(self) -> int:
-        """Getter for the Residue()'s number."""
-        return self.num_
+    @property
+    def idx(self) -> int:
+        """Getter for the Residue()'s index."""
+        return self._idx
+    @idx.setter
+    def idx(self, val):
+        self._idx = val
 
+    @property
     def rtype(self) -> chem.ResidueType:
         """Getter for the Residue()'s chem.ResidueType value."""
-        return self.rtype_
+        return self._rtype
+    @rtype.setter
+    def rtype(self, val):
+        self._rtype = val
 
-    def get_name(self) -> str:
+    @property
+    def name(self) -> str:
         """Getter for the Residue()'s name."""
-        return self.name
-
+        return self._name
+    @name.setter
+    def name(self, val):
+        self._name = val
+    #endregion
+    
     # === Getter-Prop (cpy/new) ===
     def num_atoms(self) -> int:
         """Number of atoms in the Residue."""
-        return len(self.atoms_)
+        return len(self._atoms)
 
     def clone(self) -> Residue:
         """Creates a deepcopy of self."""
@@ -95,7 +106,7 @@ class Residue:
 
     def is_canonical(self) -> bool:
         """Checks if Residue() is canonical. Inherited by children."""
-        return self.name in chem.THREE_LETTER_AA_MAPPER #@shaoqz: @imp2 why dont we have anything related to canonical in the name
+        return self.name in chem.THREE_LETTER_AA_MAPPER
 
     def is_rd_solvent(self) -> bool: #@shaoqz: @imp2 move to the IO class. This is PDB related.
         """Checks if the Residue() is an rd_sovlent as defined by enzy_htp.chemical.solvent.RD_SOLVENT"""
@@ -113,8 +124,8 @@ class Residue:
     def set_chain(self, val: str) -> None:
         """Sets chain and all child atoms to new value. Re-generates the self.residue_key attribute."""
         chain = val #@shaoqz: Refine this line
-        for idx in range(len(self.atoms_)):
-            self.atoms_[idx].chain_id = val
+        for idx in range(len(self._atoms)):
+            self._atoms[idx].chain_id = val
         self.chain_ = val
         self.residue_key = f"{self.chain_}.{self.name}.{self.num_}"
 
@@ -128,15 +139,15 @@ class Residue:
             )
             exit(1)
         aa: Atom
-        self.atoms_ = sorted(self.atoms_, key=lambda aa: aa.atom_number) #@shaoqz: maybe use .sort to keep the reference.
+        self._atoms = sorted(self._atoms, key=lambda aa: aa.atom_number) #@shaoqz: maybe use .sort to keep the reference.
 
-        for idx, aa in enumerate(self.atoms_):
-            self.atoms_[idx].atom_number = idx + start #@shaoqz: why dont use aa?
+        for idx, aa in enumerate(self._atoms):
+            self._atoms[idx].atom_number = idx + start #@shaoqz: why dont use aa?
         return idx + start
 
     def set_rtype(self, new_rtype: chem.ResidueType) -> None:
         """Setter for the Residue()'s chem.ResidueType value."""
-        self.rtype_ = new_rtype
+        self._rtype = new_rtype
 
     def sort_key(self) -> Tuple[str, int]:
         """Generates the sorting key for the Residue(). Specifically, a tuple of [chain_id, res_num]."""
@@ -155,7 +166,7 @@ class Residue:
     def has_alt_loc(self) -> bool:
         """Checks if any of the child Atom() objects have non-emptry alt_loc values."""
         result: bool = False
-        for aa in self.atoms_:
+        for aa in self._atoms:
             result |= aa.has_alt_loc() #@shaoqz: cool!
         return result
 
@@ -168,33 +179,33 @@ class Residue:
         if keep == "all":
             return
         mapper: Dict[str, List[Atom]] = defaultdict(list)
-        for aa in self.atoms_:
+        for aa in self._atoms:
             mapper[aa.alt_loc.strip()].append(aa)
 
         if len(mapper.keys()) == 1:
             return
 
-        self.atoms_ = mapper[""]
+        self._atoms = mapper[""]
         del mapper[""]
 
         if keep == "first":
             keys: List[str] = sorted(list(mapper.keys()))
-            self.atoms_.extend(mapper[keys[0]])
+            self._atoms.extend(mapper[keys[0]])
         else:
             assert keep in mapper
-            self.atoms_.extend(mapper[keep])
+            self._atoms.extend(mapper[keep])
 
-        self.atoms_.sort(key=lambda aa: aa.atom_number)
+        self._atoms.sort(key=lambda aa: aa.atom_number)
 
     def remove_alt_loc(self) -> None:
         """Makes the alt_loc for each of the child Atom() objects blank."""
-        for idx in range(len(self.atoms_)):
-            self.atoms_[idx].alt_loc = ""
+        for idx in range(len(self._atoms)):
+            self._atoms[idx].alt_loc = ""
 
     def remove_occupancy(self) -> None: #@shaoqz: @imp2 really curious about the reason of putting all fundmental methods that edit data in residue instead of atom, which the later is more intuative to me.
         """Makes the occupancy for each of the child Atom() objects blank."""
-        for idx in range(len(self.atoms_)):
-            self.atoms_[idx].occupancy = ""
+        for idx in range(len(self._atoms)):
+            self._atoms[idx].occupancy = ""
 
     def min_line(self) -> int: #@shaoqz: @imp2 move to the pdb IO class
         """The lowest one-indexed line one of the Residue()'s atoms come from."""
@@ -217,7 +228,7 @@ class Residue:
     def get_pdb_lines(self, terminal: bool = False) -> List[str]:
         """Method that gets the PDB lines for all of the Atom() objects in the Residue() object."""
         result = list()
-        for aa in self.atoms_:
+        for aa in self._atoms:
             result.append(aa.to_pdb_line())
         if terminal:
             num = int(result[-1][6:11])
