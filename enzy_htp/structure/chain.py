@@ -122,7 +122,7 @@ class Chain:
         self.rename(self.name_) #@shaoqz: maybe better to change this residue attribute only?
 
         if sort_after:
-            self.residues_.sort(key=lambda r: r.num()) #@shaoqz: @imp this does not work when two different residue have the same index which often happens when you want to add a ligand to the structure.
+            self.residues_.sort(key=lambda r: r.idx()) #@shaoqz: @imp this does not work when two different residue have the same index which often happens when you want to add a ligand to the structure.
 
     def remove_residue(self, target_key: str) -> None: #@shaoqz: @imp2 target key should not require the name. We should minimize the prerequisite of any input since its for HTP.
         """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format,
@@ -151,7 +151,7 @@ class Chain:
                 f"Illegal start number '{start}'. Value must be >= 0. Exiting..."
             )
             exit(1)
-        self.residues_ = sorted(self.residues_, key=lambda r: r.num())
+        self.residues_ = sorted(self.residues_, key=lambda r: r.idx())
         idx = start
         num_residues: int = self.num_residues()
         for ridx, res in enumerate(self.residues_):

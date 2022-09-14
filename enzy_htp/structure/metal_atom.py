@@ -32,7 +32,7 @@ class MetalAtom(Residue):
     # === Getter-Attr (ref) ===
     def location(self) -> np.array: #@shaoqz: maybe unify as coord etc. TODO
         """Gets the location of the MetalAtom."""
-        return self.atoms_[0]
+        return self._atoms[0]
 
     # === Getter-Prop (cpy/new) ===
     def get_radii(self, method: str = "ionic") -> Union[float, None]:
@@ -332,4 +332,4 @@ def residue_to_metal(residue: Residue) -> MetalAtom:
         raw_name[0] = raw_name[0].upper()
         atom_name = "".join(raw_name)
 
-    return MetalAtom(residue.residue_key, residue.atoms_, atom_name=atom_name)
+    return MetalAtom(residue.residue_key, residue._atoms, atom_name=atom_name)

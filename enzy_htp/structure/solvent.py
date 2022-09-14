@@ -43,4 +43,4 @@ class Solvent(Residue):
 
 def residue_to_solvent(ptr: Residue) -> Solvent:
     """Conversion method that creates a deepcopied Solvent() instance from a base Residue()."""
-    return deepcopy(Solvent(ptr.residue_key, ptr.atoms_))
+    return deepcopy(Solvent(ptr.residue_key, ptr._atoms))

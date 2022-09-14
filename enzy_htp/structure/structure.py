@@ -569,7 +569,7 @@ class Structure:
 
         for lidx, lig in enumerate(ligands):
             # TODO(CJ): add some kind of formatting for lidx
-            lig_name: str = lig.get_name()
+            lig_name: str = lig.name()
             out_pdb: str = f"{out_dir}/ligand_{lig_name}_{lidx}.pdb"
 
             if unique and lig_name in existing:

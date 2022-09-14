@@ -117,7 +117,7 @@ def build_chains(mapper: Dict[str, Residue]) -> Dict[str, Chain]:
     result: Dict[str, Chain] = dict()
     # ok this is where we handle missing chain ids
     for chain_name, residues in chain_mapper.items():
-        result[chain_name] = Chain(chain_name, sorted(residues, key=lambda r: r.num()))
+        result[chain_name] = Chain(chain_name, sorted(residues, key=lambda r: r.idx()))
     return result
 
 
@@ -212,4 +212,4 @@ def get_ligand_name(fname: str) -> str:
     # TODO(CJ): make this more efficient
     # TODO(CJ): add testing for this
     ligand: Ligand = ligand_from_pdb(fname)
-    return deepcopy(ligand.get_name())
+    return deepcopy(ligand.name())

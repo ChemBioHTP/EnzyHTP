@@ -56,7 +56,7 @@ def create_selection(struct: Structure, atom_mask: str, fix_end: str = None):
         resi_id = int(re.match("[0-9]+", resi).group(0))
         if chain_id == None:
             for resi in all_resi_list:
-                if resi_id == resi.num():
+                if resi_id == resi.idx():
                     resi_obj = resi
         else:
             chain_id = chain_id.group(0)

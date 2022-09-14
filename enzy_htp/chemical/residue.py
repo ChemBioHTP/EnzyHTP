@@ -13,7 +13,7 @@ from ..core import InvalidResidueCode, _LOGGER
 AA_LIST: List[str] = load_from_db("AA_LIST")
 """Capitalized list of all one-letter amino acid names."""
 
-THREE_LETTER_AA_MAPPER: Dict[str, str] = load_from_db("THREE_LETTER_AA_MAPPER")
+THREE_LETTER_AA_MAPPER: Dict[str, str] = load_from_db("THREE_LETTER_AA_MAPPER") #@shaoqz: @imp2 add related to canonical in the name
 """Contains mapping of all amino acids codes, with key value pairs of (three letter code, one letter code). Should NOT be called directly for code conversion. Instead used enzy_htp.chemical.residue.convert_to_three_letter()"""
 
 ONE_LETTER_AA_MAPPER: Dict[str, str] = load_from_db("ONE_LETTER_AA_MAPPER")
