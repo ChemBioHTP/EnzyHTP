@@ -112,13 +112,13 @@ from enzy_htp.chemical import convert_to_one_letter
 from .atom import Atom
 from . import Chain
 from .residue import Residue
-from .metal_atom import MetalAtom
+from .metal_atom import MetalUnit
 from .ligand import Ligand, residue_to_ligand
 from .solvent import Solvent, residue_to_solvent
-from .metal_atom import MetalAtom
+from .metal_atom import MetalUnit
 
 
-class Structure:
+class Structure: # TODO implement different copy methods for the doubly linked ds; by default are all shollow copy and references
     """Enzyme structure.
     Designed for direct interfacing by users.
     Composed of child Chain() objects and their subsequent child Residue() objects and so on Atom() objects.

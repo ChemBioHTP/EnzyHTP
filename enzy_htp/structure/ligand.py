@@ -1,6 +1,6 @@
 """Specialization of the Residue() class for a Ligand. Primarly used to interface with PDB2PQR for ONLY the ligand
 as it is removed from the full structure during protonation. In addition to Residue() object, has net_charge attribute.
-Meant to be stored alongside other Residue() and Residue() derived objets (MetalAtom() and Solvent()) inside of the
+Meant to be stored alongside other Residue() and Residue() derived objets (MetalUnit() and Solvent()) inside of the
 Chain() object. Ligand() objects SHOULD NOT exist on their own.
 
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
@@ -17,7 +17,7 @@ import numpy as np
 from .atom import Atom
 from typing import List
 from .residue import Residue
-from enzy_htp.chemical import enum as renum
+import enzy_htp.chemical as chem
 
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import (
@@ -32,19 +32,19 @@ class Ligand(Residue):
         the residue_to_ligand() method found in enzy_htp.structure.ligand.py. In addition to base attributes, has
         net_charge attribute which is Union[float,None]. The value is_ligand() has been hard-coded to True and
         Ligand.rtype_ is set to ResidueType.LIGAND. Meant to be stored alongside other Residue() and Residue()-derived
-        classes (MetalAtom() and Solvent()) in Chain() objects.
+        classes (MetalUnit() and Solvent()) in Chain() objects.
 
     Attributes:
-                net_charge : The net charge of the molecule as a float.
+        net_charge : The net charge of the molecule as an int.
     """
 
-    def __init__(self, residue_key: str, atoms: List[Atom], **kwargs):
-        """Constructor for Ligand. Identical to Residue() ctor but also takes net_charge value.
-        SHOULD NOT be called directly by users. Instead use enzy_htp.structure.ligand.residue_to_ligand()
+    def __init__(self, residue_idx: int, residue_name: str, atoms: List[Atom], parent=None, **kwargs):
+        """
+        Constructor for Ligand. Identical to Residue() ctor but also takes net_charge value.
         """
         self.net_charge = kwargs.get("net_charge", None)
-        Residue.__init__(self, residue_key, atoms)
-        self.set_rtype(renum.ResidueType.LIGAND)
+        Residue.__init__(self, residue_idx, residue_name, atoms, parent)
+        self.set_rtype(chem.ResidueType.LIGAND)
 
     # === Getter-Attr (ref) ===
     # === Getter-Prop (cpy/new) ===
@@ -88,6 +88,6 @@ class Ligand(Residue):
     #endregion
 
 
-def residue_to_ligand(ptr: Residue, net_charge: float = None) -> Ligand:
+def residue_to_ligand(residue: Residue, net_charge: float = None) -> Ligand:
     """Convenience function that converts Residue to ligand."""
-    return Ligand(ptr.residue_key, ptr._atoms, net_charge=net_charge)
+    return Ligand(residue.idx, residue.name, residue.atoms, residue.parent, net_charge=net_charge)

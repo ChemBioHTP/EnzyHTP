@@ -4,6 +4,8 @@ This class is for parsing in and out from PDB to Structure
 Author: QZ Shao <shaoqz@icloud.com>
 Date: 2022-09-08
 '''
+from collections import defaultdict
+import itertools
 import logging
 import os
 import string
@@ -16,13 +18,14 @@ from enzy_htp.core import _LOGGER
 from enzy_htp.structure.structure_io.pdb_io import PDBParser
 from enzy_htp.structure.structure_io._interface import StructureParserInterface
 from enzy_htp.core import file_system as fs
+import enzy_htp.chemical as chem
 from enzy_htp.structure import (
     Structure,
     Residue,
     Chain,
     structure_from_pdb,
     Atom,
-    MetalAtom,
+    MetalUnit,
     Ligand,
     Solvent,
 )
@@ -222,12 +225,9 @@ def test_get_legal_pdb_chain_ids():
     result1 = sp._get_legal_pdb_chain_ids([])
     assert set(result1) == set(ALL_NAMES)
 
-    result2 = sp._get_legal_pdb_chain_ids(ALL_NAMES)
-    assert not result2
-
     ALL_NAMES.remove('A')
-    result3 = sp._get_legal_pdb_chain_ids(ALL_NAMES)
-    assert result3 == ['A']
+    result3 = sp._get_legal_pdb_chain_ids(['A'])
+    assert set(result3) == set(ALL_NAMES)
 
 def test_resolve_alt_loc_first():
     '''test resolve alt loc recored demoed in 3NIR'''
@@ -264,68 +264,83 @@ def test_resolve_alt_loc_keep_B():
     assert list(target_df['atom_number']) == list(answer_df['atom_number'])
 
 def test_build_atom():
-    pass
-# def test_categorize_residue_all_canonical():
-#     '''Checking that the structure_parser.categorize_residue() works for only canonical Residues().'''
-#     pdb_file = f'{DATA_DIR}/two_chain.pdb'
-#     structure: Structure = structure_from_pdb(pdb_file)
-#     assert structure.num_chains == 2
-#     # TODO(CJ): maybe make this a function for the Structure() class
-#     residues: List[Residue] = structure.residues
-#     for rr in residues:
-#         new_rr = sp.categorize_residue(rr)
-#         assert isinstance(new_rr, Residue)
-#         assert new_rr.is_canonical()
-#         assert not new_rr.is_metal()
-#         assert not new_rr.is_ligand()
-#         assert new_rr.rtype() == chem.ResidueType.CANONICAL
+    '''
+    a weak teat of _build_atom that insure no missing residue
+    '''
+    pdb_file_path = f'{DATA_DIR}1Q4T_atom_res_ch_build_test.pdb'
+    input_pdb = PandasPdb()
+    input_pdb.read_pdb(pdb_file_path)
+    target_df = pd.concat((input_pdb.df['ATOM'], input_pdb.df['HETATM']), ignore_index=True)
 
+    atom_mapper: Dict[tuple, Atom] = sp._build_atoms(target_df)
+    df_residue = target_df.groupby(['residue_number', 'chain_id'])
+    assert len(atom_mapper) == len(df_residue)
 
-# def test_categorize_residue_metal():
-#     '''Checking that the structure_parser.categorize_residue() works for something that should become a MetalAtom().'''
-#     warnings.filterwarnings('ignore')
-#     pdb_file = f'{DATA_DIR}/just_metal.pdb'
-#     reader = PandasPdb()
-#     reader.read_pdb(pdb_file)
-#     zn_atom = Atom(**reader.df['HETATM'].iloc[0])
-#     base_residue = Residue('A.ZN.500', [zn_atom])
-#     metal: MetalAtom = sp.categorize_residue(base_residue)
-#     assert isinstance(metal, MetalAtom)
-#     assert not metal.is_canonical()
-#     assert metal.is_metal()
-#     assert not metal.is_ligand()
-#     assert metal.rtype() == chem.ResidueType.METAL
+def test_build_residue():
+    '''
+    a weak teat of _build_atom that insure no missing residue
+    just make sure the number of chains and the idx_change_mapper is correct
+    and ligand is found
+    also test for _categorize_residue ligand case
+    '''
+    pdb_file_path = f'{DATA_DIR}1Q4T_atom_res_ch_build_test.pdb'
+    input_pdb = PandasPdb()
+    input_pdb.read_pdb(pdb_file_path)
+    target_df = pd.concat((input_pdb.df['ATOM'], input_pdb.df['HETATM']), ignore_index=True)
+    atom_mapper: Dict[tuple, Atom] = sp._build_atoms(target_df)
 
+    res_mapper, idx_change_mapper = sp._build_residues(atom_mapper)
+    assert set(res_mapper.keys()) == set(['A','B','C','D'])
+    assert idx_change_mapper == {('A', 152): ('C', 152), ('A', 153): ('C', 153), ('A', 370): ('C', 370), 
+         ('A', 371): ('C', 371), ('A', 372): ('C', 372), ('A', 373): ('C', 373), ('A', 374): ('C', 374), 
+         ('A', 375): ('C', 375), ('A', 376): ('C', 376), ('B', 152): ('D', 152), ('B', 153): ('D', 153), 
+         ('B', 371): ('D', 371), ('B', 372): ('D', 372), ('B', 373): ('D', 373), ('B', 374): ('D', 374), 
+         ('B', 375): ('D', 375), ('B', 376): ('D', 376), ('B', 377): ('D', 377), ('B', 378): ('D', 378)}
+    all_residue = list(itertools.chain.from_iterable(res_mapper.values()))
+    assert len(all_residue) == len(atom_mapper)
+    assert len(list(filter(lambda x: x.rtype is chem.ResidueType.LIGAND, all_residue))) == 2
 
-# def test_categorize_residue_ligand():
-#     '''Checking that the structure_parser.categorize_residue() works for something that should become a Ligand().'''
+def test_categorize_residue_canonical():
+    pdb_file_path = f'{DATA_DIR}/two_chain.pdb'
+    input_pdb = PandasPdb()
+    input_pdb.read_pdb(pdb_file_path)
+    target_df = input_pdb.df['ATOM']
+    atom_mapper = sp._build_atoms(target_df)
+    res_mapper = defaultdict(list)
+    for res_key, atoms in atom_mapper.items():
+        res_mapper[res_key[0]].append(Residue(int(res_key[1]), res_key[2] ,atoms))
 
-#     pdb_file = f'{DATA_DIR}/just_ligand.pdb'
-#     reader = PandasPdb()
-#     reader.read_pdb(pdb_file)
-#     atoms: List[Residue] = list(
-#         map(lambda pr: Atom(**pr[-1]), reader.df['ATOM'].iterrows())
-#     )
-#     base_residue = Residue('.FAH.1', atoms)
-#     ligand: Ligand = sp.categorize_residue(base_residue)
-#     assert isinstance(ligand, Ligand)
-#     assert not ligand.is_canonical()
-#     assert not ligand.is_metal()
-#     assert ligand.is_ligand()
-#     assert ligand.rtype() == chem.ResidueType.LIGAND
+    sp._categorize_pdb_residue(res_mapper)
+    all_residue = list(itertools.chain.from_iterable(res_mapper.values()))
+    assert len(list(filter(lambda x: x.rtype is not chem.ResidueType.CANONICAL, all_residue))) == 0
 
+def test_categorize_residue_metal():
+    pdb_file_path = f'{DATA_DIR}/just_metal.pdb'
+    input_pdb = PandasPdb()
+    input_pdb.read_pdb(pdb_file_path)
+    row = input_pdb.df['HETATM'].iloc[0]
+    zn_atom = Atom(row)
+    res_mapper = defaultdict(list)
+    res_key = (row['chain_id'].strip(), row['residue_number'], row['residue_name'].strip(), row['record_name'].strip())
+    res_mapper[res_key[0]].append(Residue(int(res_key[1]), res_key[2] ,[zn_atom]))
 
-# def test_categorize_residue_solvent():
-#     '''Checking that the structure_parser.categorize_residue() works for something that should become a Solvent().'''
-#     base_residue = Residue('A.HOH.1', [Atom(line_idx=1), Atom(line_idx=2)])
-#     solvent: Solvent = sp.categorize_residue(base_residue)
-#     assert isinstance(solvent, Solvent)
-#     assert id(base_residue) != id(solvent)
-#     for a1, a2 in zip(base_residue.atoms, solvent.atoms):
-#         assert id(a1) != id(a2)
-#     assert solvent.is_rd_solvent()
-#     assert solvent.rtype() == chem.ResidueType.SOLVENT
+    sp._categorize_pdb_residue(res_mapper)
+    all_residue = list(res_mapper.values())[0]
+    assert all_residue[0].rtype is chem.ResidueType.METAL
 
+def test_categorize_residue_noncanonical():
+    pdb_file_path = f'{DATA_DIR}/5JT3_noncanonical_test.pdb'
+    input_pdb = PandasPdb()
+    input_pdb.read_pdb(pdb_file_path)
+    target_df = pd.concat((input_pdb.df['ATOM'], input_pdb.df['HETATM']), ignore_index=True)
+    atom_mapper = sp._build_atoms(target_df)
+    res_mapper = defaultdict(list)
+    for res_key, atoms in atom_mapper.items():
+        res_mapper[res_key[0]].append(Residue(int(res_key[1]), res_key[2] ,atoms))
+
+    sp._categorize_pdb_residue(res_mapper)
+    all_residue = list(itertools.chain.from_iterable(res_mapper.values()))
+    assert len(list(filter(lambda x: x.rtype is chem.ResidueType.NONCANONICAL, all_residue))) == 1
 
 # def test_build_chains():
 #     '''Ensuring the structure_parser.build_chains() method correctly aggregates Residue() objects into Chain() objects.'''
@@ -405,7 +420,7 @@ def test_build_atom():
 #     assert isinstance(all_residues[2], Residue)
 #     assert isinstance(all_residues[3], Residue)
 #     assert isinstance(all_residues[4], Ligand)
-#     assert isinstance(all_residues[5], MetalAtom)
+#     assert isinstance(all_residues[5], MetalUnit)
 #     assert isinstance(all_residues[6], Solvent)
 
 

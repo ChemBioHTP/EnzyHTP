@@ -39,6 +39,9 @@ class Residue:
         self._idx = residue_idx
         self._rtype = chem.ResidueType.UNKNOWN
         self._parent = parent
+        # add self as atoms' parent
+        for atom in self._atoms:
+            atom.parent = self
         
     #region === Getter-Attr (ref) ===
     @property
@@ -55,7 +58,15 @@ class Residue:
         return self._parent
     @chain.setter
     def chain(self, val):
-        self._chain = val
+        self._parent = val
+
+    @property
+    def parent(self):
+        """Getter for the Residue()'s parent chain id."""
+        return self._parent
+    @parent.setter
+    def parent(self, val):
+        self._parent = val
 
     @property
     def idx(self) -> int:
@@ -108,7 +119,7 @@ class Residue:
         """Checks if Residue() is canonical. Inherited by children."""
         return self.name in chem.THREE_LETTER_AA_MAPPER
 
-    def is_rd_solvent(self) -> bool: #@shaoqz: @imp2 move to the IO class. This is PDB related.
+    def is_solvent(self) -> bool: #@shaoqz: @imp2 move to the IO class. This is PDB related.
         """Checks if the Residue() is an rd_sovlent as defined by enzy_htp.chemical.solvent.RD_SOLVENT"""
         return self.name in chem.RD_SOLVENT_LIST
 
@@ -156,75 +167,13 @@ class Residue:
     # === Special ===
     def __str__(self) -> str:
         """String representation that just shows residue key in format "chain_id.residue_name.residue_num" """
-        return self.residue_key
+        return f'Residue({self.idx}, {self.name}, Atoms:{len(self.atoms)}, {self.parent})'
 
     def __repr__(self) -> str:
         """String representationt that just shows residue key in format "chain_id.residue_name.residue_num" """
         return str(self)
 
     #region === TODO/TOMOVE ===
-    def has_alt_loc(self) -> bool:
-        """Checks if any of the child Atom() objects have non-emptry alt_loc values."""
-        result: bool = False
-        for aa in self._atoms:
-            result |= aa.has_alt_loc() #@shaoqz: cool!
-        return result
-
-    def resolve_alt_loc(self, keep: str = "first") -> None: #@shaoqz: nice we have this now!
-        """Resolves the alt_loc atoms owned by the current Residue().
-        Optional argument "keep" specifies the resolution method. Default
-        is "first" which forces Residue() to keep lowest location. Otherwise,
-        keeps the specific alt_loc identifier, assuming it exists.
-        """
-        if keep == "all":
-            return
-        mapper: Dict[str, List[Atom]] = defaultdict(list)
-        for aa in self._atoms:
-            mapper[aa.alt_loc.strip()].append(aa)
-
-        if len(mapper.keys()) == 1:
-            return
-
-        self._atoms = mapper[""]
-        del mapper[""]
-
-        if keep == "first":
-            keys: List[str] = sorted(list(mapper.keys()))
-            self._atoms.extend(mapper[keys[0]])
-        else:
-            assert keep in mapper
-            self._atoms.extend(mapper[keep])
-
-        self._atoms.sort(key=lambda aa: aa.atom_number)
-
-    def remove_alt_loc(self) -> None:
-        """Makes the alt_loc for each of the child Atom() objects blank."""
-        for idx in range(len(self._atoms)):
-            self._atoms[idx].alt_loc = ""
-
-    def remove_occupancy(self) -> None: #@shaoqz: @imp2 really curious about the reason of putting all fundmental methods that edit data in residue instead of atom, which the later is more intuative to me.
-        """Makes the occupancy for each of the child Atom() objects blank."""
-        for idx in range(len(self._atoms)):
-            self._atoms[idx].occupancy = ""
-
-    def min_line(self) -> int: #@shaoqz: @imp2 move to the pdb IO class
-        """The lowest one-indexed line one of the Residue()'s atoms come from."""
-        return self.min_line_
-
-    def max_line(self) -> int:
-        """The highest one-indexed line one of the Residue()'s atoms come from."""
-        return self.max_line_
-
-    def line_range(self) -> Tuple[int, int]:
-        """A tuple of the he lowest and highest one-indexed lines that the Residue()'s atoms come from."""
-        return (self.min_line(), self.max_line())
-
-    def neighbors(self, other: Residue) -> bool: #@shaoqz: @imp2 move to IO class / change to is_neighbors
-        """Checks if two residues from the same PDB are neighbors."""
-        return (abs(self.min_line() - other.max_line()) == 1) or (
-            abs(self.max_line() - other.min_line()) == 1
-        )
-
     def get_pdb_lines(self, terminal: bool = False) -> List[str]:
         """Method that gets the PDB lines for all of the Atom() objects in the Residue() object."""
         result = list()
