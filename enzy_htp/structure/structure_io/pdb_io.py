@@ -4,12 +4,14 @@ Definition of PDB file format (http://www.wwpdb.org/documentation/file-format-co
 Author: shaoqz, <shaoqz@icloud.com>
 Date: 2022-08-01
 """
+from collections import defaultdict
 import os
 import string
 import sys
 from typing import Dict, List, Tuple, Union
 from biopandas.pdb import PandasPdb
 import pandas as pd
+
 
 from ._interface import StructureParserInterface
 from ..atom import Atom
@@ -21,6 +23,7 @@ from ..chain import Chain
 from ..structure import Structure
 from enzy_htp.core import _LOGGER
 import enzy_htp.core.file_system as fs
+import enzy_htp.chemical as chem
 
 class PDBParser(StructureParserInterface):
     '''
@@ -69,11 +72,11 @@ class PDBParser(StructureParserInterface):
         # which residue and chain the atom belongs to in atom_mapper. Another workaround in
         # old enzyhtp is build iteratively chain frist and residues are build in the chain
         # builder and so on for atom. But current methods is used for better readability
-        atom_mapper: Dict[str, Atom] = cls._build_atoms(target_model_df) 
+        atom_mapper: Dict[str, Atom] = cls._build_atoms(target_model_df)
         res_mapper: Dict[str, Residue] = cls._build_residues(atom_mapper)
         chain_list: Dict[str, Chain] = cls._build_chains(res_mapper)
 
-        # return Structure(chain_list)
+        return Structure(chain_list)
 
     @classmethod
     def get_file_str(cls, stru: Structure) -> str:
@@ -104,7 +107,7 @@ class PDBParser(StructureParserInterface):
                     f"The PDB '{pdb_path}' contains non-ASCII text and is invalid in line {idx}: '{ll}'. Exiting..."
                 )
                 sys.exit(1)
-    
+  
     @staticmethod
     def _get_target_model(df: pd.DataFrame, model: int) -> Union[pd.DataFrame, None]:
         '''
@@ -175,13 +178,16 @@ class PDBParser(StructureParserInterface):
         ter_line_ids = list(ter_df['line_idx'])
         chain_dfs = split_df_base_on_column_value(df, 'line_idx', ter_line_ids)
         ## get a list of (loc, value) for editing in the original df
-        result_loc_map = [] 
+        result_loc_map = []
         for chain in chain_dfs:
+            # check for redundant chains
+            if len(chain) == 0:
+                _LOGGER.debug('Found empty chain. ')
+                continue
             atom_missing_c_id = chain[chain.chain_id.str.strip() == '']
             # check if not missing any chain_id
-            # ** This also dealt with the empty chain problem! ** -> atom_miss_c_id will be an empty df
             if len(atom_missing_c_id) == 0:
-                continue
+                    continue
             # check existing chain ids in the chain
             existing_chain_ids = set(list(map(lambda c_id: c_id.strip(), chain['chain_id'])))
             existing_chain_ids.discard('')
@@ -199,21 +205,24 @@ class PDBParser(StructureParserInterface):
         batch_edit_df_loc_value(df, result_loc_map, 'chain_id')
 
     @staticmethod
-    def _get_legal_pdb_chain_ids(taken_ids: List[str]) -> List[str]:
+    def _get_legal_pdb_chain_ids(taken_ids) -> List[str]:
         """
         Small helper method that determines the legal PDB chain names given a list of taken ids.
         Uses all of the available 26 capitalized letters and returns in reverse order. Returns an 
         empty list when all are occupied.
-        TODO check how PDB defines 26+ chains (maybe AA AB etc.)
+        TODO in the case parsing MD results there will be 10000+ water as individual chains but still not enough for water case
+             use numbers as place holders, but its making things slower, need a better solution
+        Arg:
+            taken_ids: iterable that contain all taken chain ids as str
         Return:
             the legal chain name list in a reversed order (for doing .pop())
         """
-        result = list(string.ascii_uppercase)
+        result = list(string.ascii_uppercase) + list(map(lambda x: str(x), range(50000)))
         result = list(filter(lambda s: s not in taken_ids, result))
         return list(reversed(result))
 
     @staticmethod
-    def _resolve_alt_loc(df: pd.DataFrame, keep: str = 'first'):
+    def _resolve_alt_loc(df: pd.DataFrame, keep: str = 'first') -> None:
         '''
         Resolves atoms with the alt_loc records
         Optional argument "keep" specifies the resolution method. Default
@@ -234,17 +243,17 @@ class PDBParser(StructureParserInterface):
         # get a list of 'loc' for deleting in the original df
         delete_loc_list = []
         # treat in residues
-        alt_loc_residues = alt_loc_atoms_df.groupby('residue_number', sort=False)
-        for r_id, res_df in alt_loc_residues:
+        alt_loc_residues = alt_loc_atoms_df.groupby(['residue_number','chain_id'], sort=False)
+        for r_id_c_id, res_df in alt_loc_residues:
             alt_res_dfs = res_df.groupby('alt_loc', sort=False)
             if len(alt_res_dfs) == 1:
-                _LOGGER.debug(f'Only 1 alt_loc id found in residue {r_id}. No need to resolve')
+                _LOGGER.debug(f'Only 1 alt_loc id found in residue {r_id_c_id[1], r_id_c_id[0]}. No need to resolve')
                 continue
+            _LOGGER.debug(f'Dealing with alt_loc residue: {r_id_c_id[1], r_id_c_id[0]}')
             if keep == 'first':
                 delele_res_df_locs = list(alt_res_dfs.groups.values())
                 del delele_res_df_locs[0]
                 for delete_lines in delele_res_df_locs:
-                    print(r_id, list(delete_lines))
                     delete_loc_list.extend(list(delete_lines))
             else:
                 delele_res_dfs_mapper = alt_res_dfs.groups
@@ -258,27 +267,110 @@ class PDBParser(StructureParserInterface):
         df.drop(index = delete_loc_list, inplace=True)
 
     @staticmethod
-    def _build_atom(df: pd.DataFrame):
+    def _build_atoms(df: pd.DataFrame) -> Dict[str, Atom]:
         '''
-        create atom objects from a dataframe
+        build atom objects from a 'standard' dataframe
+        * HETATM should be in seperate chains! HETATM was meant for atoms in the small molecule
+          so they cannot be in the same chain as the ATOM atom https://files.wwpdb.org/pub/pdb/doc/format_descriptions/Format_v33_Letter.pdf
+        Return:
+            {('chain_id','residue_idx', 'residue_name', 'record_name') : [Atom_obj, ...], ...}
         '''
-        pass
+        atom_mapper = defaultdict(list)
+        for i, row in df.iterrows():
+            atom_obj = Atom(row)
+            residue_key = (row['chain_id'].strip(), row['residue_number'], row['residue_name'].strip(), row['record_name'].strip())
+            atom_mapper[residue_key].append(atom_obj)
+        return atom_mapper
+
+    @classmethod
+    def _build_residues(cls, atom_mapper: Dict[str, Atom]) -> Dict[str, Residue]:
+        '''
+        build Residue() objects from atom_mapper
+        Return:
+            {'chain_id' : [Residue, ...]}
+        '''
+        build_mapper = defaultdict(lambda: defaultdict(list))
+        result_mapper = defaultdict(list)
+        for res_key, atoms in atom_mapper.items():
+            res_obj = Residue(int(res_key[1]), res_key[2] ,atoms)
+            build_mapper[res_key[0]][res_key[3]].append(res_obj)
+        # give HETATM residue individual chain
+        legal_chain_ids = cls._get_legal_pdb_chain_ids(build_mapper.keys())
+        for chain_id, record_residues in build_mapper.items():
+            if len(record_residues) > 1:
+                new_chain_id = legal_chain_ids.pop()
+                _LOGGER.debug(f'found HETATM in a ATOM chain: making a new chain {new_chain_id}')
+                result_mapper[new_chain_id] = record_residues['HETATM']
+            else:
+                result_mapper[chain_id] = record_residues['ATOM']
+        # categorize_residue
+        cls.categorize_residue(result_mapper)
+
+        return result_mapper
 
     @staticmethod
-    def _build_residues():
-        pass
+    def categorize_residue(residue_mapper: Dict[str, List[Residue]], add_solvent_list: list = None, add_ligand_list: list = None) -> Union[Residue, Ligand, Solvent, MetalAtom]:
+        """
+        Categorize Residue base on it 3-letter name and chain info in PDB format
+        Takes a mapper of {chain_id, [Residue, ...]} and converts
+        them into its specialized Residue() inherited class.
+        """
+        if add_solvent_list == None:
+            add_solvent_list = []
+        if add_ligand_list == None:
+            add_ligand_list = []
+        for chain_id, residues in residue_mapper.items():
+            peptide_chain = 0
+            for residue in residues:
+            # start from unknown type: canonical, non-canonical, metal, ligand, solvent
+            # if canonical
+                if residue.name in chem.THREE_LETTER_AA_MAPPER:
+                    residue.rtype = chem.ResidueType.CANONICAL
+                    peptide_chain = 1
+            # non-canonical and ligand: they are only differet by if they appears 
+            # in a chain with canonical aa or a individual chain
+            if peptide_chain:
+                # only non-canonical aa can be in a peptide chain
+                for residue in residues:
+                    if residue.rtype == chem.ResidueType.UNKNOWN:
+                        if residue.name in chem.METAL_MAPPER + chem.RD_SOLVENT_LIST + add_solvent_list:
+                            _LOGGER.error(f'a metal or solvent residue name is found in an peptide chain {chain_id}: {residue.idx} {residue.name}')
+                            sys.exit(1)
+                        # TODO maybe a class for non-canonical aa in the future
+                        _LOGGER.debug(f'found noncanonical AA {chain_id} {residue.idx}')
+                        residue.rtype = chem.ResidueType.NONCANONICAL
+                continue
+            # non-peptide chain
+            for i, residue in enumerate(residues):
+                # if metal
+                if residue.name in chem.METAL_MAPPER:
+                    _LOGGER.debug(f'found metal {chain_id} {residue.idx}')
+                    residue_mapper[chain_id][i] = residue_to_metal(residue)
+                    continue
+                # if solvent
+                if residue.name in chem.RD_SOLVENT_LIST + add_solvent_list:
+                    _LOGGER.debug(f'found solvent {chain_id} {residue.idx}')
+                    residue_mapper[chain_id][i] = residue_to_solvent(residue)
+                    continue
+                if residue.name in (set(chem.RD_NON_LIGAND_LIST) - set(add_ligand_list)):
+                    _LOGGER.debug(f'found trash {chain_id} {residue.idx}')
+                    residue.rtype = chem.ResidueType.TRASH
+                    continue
+                # the left cases are ligands
+                _LOGGER.debug(f'found ligand {chain_id} {residue.idx}')
+                residue_mapper[chain_id][i] = residue_to_ligand(residue)
 
     @staticmethod
-    def _build_chains():
-        pass
+    def _build_chains(res_mapper: Dict[str, Residue]) -> Dict[str, Chain]:
+        '''
+        build Chain() objects from residue_mapper
+        '''
+        chain_list = []
+        for chain_id, residues in res_mapper.items():
+            ch_obj = Chain(chain_id ,residues)
+            chain_list.append(ch_obj)
+        return chain_list
     # endregion
-
-class PDBAtom():
-    '''
-    class for accessing atom records in the PDB file
-    contructed with a pandas.Series
-    '''
-    pass
 
 # TODO go to core helper
 def split_df_base_on_column_value(df: pd.DataFrame, column_name: str, split_values: list, copy: bool=False):
