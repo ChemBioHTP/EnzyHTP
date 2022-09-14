@@ -15,7 +15,7 @@ import pandas as pd
 
 from ._interface import StructureParserInterface
 from ..atom import Atom
-from ..metal_atom import MetalAtom, residue_to_metal
+from ..metal_atom import MetalUnit, residue_to_metal
 from ..residue import Residue
 from ..solvent import Solvent, residue_to_solvent
 from ..ligand import Ligand, residue_to_ligand
@@ -25,6 +25,7 @@ from enzy_htp.core import _LOGGER
 import enzy_htp.core.file_system as fs
 import enzy_htp.chemical as chem
 
+# pylint: disable=logging-fstring-interpolation
 class PDBParser(StructureParserInterface):
     '''
     Parser for covert PDB into Structure and vice versa
@@ -51,6 +52,7 @@ class PDBParser(StructureParserInterface):
                     (start from 0 default: 0)
                     (assume MODEL appears in order in the file)
         '''
+        _LOGGER.debug(f'working on {path}')
         cls._check_valid_pdb(path)
         # covert to dataframe with biopanda (maybe write our own in the future)
         input_pdb = PandasPdb()
@@ -72,7 +74,7 @@ class PDBParser(StructureParserInterface):
         # which residue and chain the atom belongs to in atom_mapper. Another workaround in
         # old enzyhtp is build iteratively chain frist and residues are build in the chain
         # builder and so on for atom. But current methods is used for better readability
-        atom_mapper: Dict[str, Atom] = cls._build_atoms(target_model_df)
+        atom_mapper: Dict[tuple, Atom] = cls._build_atoms(target_model_df)
         res_mapper, idx_change_mapper = cls._build_residues(atom_mapper)
         chain_list: Dict[str, Chain] = cls._build_chains(res_mapper)
 
@@ -90,7 +92,6 @@ class PDBParser(StructureParserInterface):
     def _check_valid_pdb(pdb_path: str) -> None:
         """Helper function that ensures the supplied pdb_path contain a valid pdb file.
         Private to structure.structure_io.pdb_io.py. Should NOT be called externally."""
-        # pylint: disable=logging-fstring-interpolation, consider-using-sys-exit
         # check for right extension
         ext: str = fs.get_file_ext(pdb_path)
         if ext.lower() != ".pdb":
@@ -304,15 +305,15 @@ class PDBParser(StructureParserInterface):
                 result_mapper[new_chain_id] = record_residues['HETATM']
                 for i in record_residues['HETATM']:
                     idx_change_mapper[(chain_id, i.idx)] = (new_chain_id, i.idx)
-            else:
-                result_mapper[chain_id] = record_residues.values()[0]
+            # in all cases keep the ATOM chain
+            result_mapper[chain_id] = list(record_residues.values())[0]
         # categorize_residue
-        cls.categorize_residue(result_mapper)
+        cls._categorize_pdb_residue(result_mapper)
 
         return result_mapper, idx_change_mapper
 
     @staticmethod
-    def categorize_residue(residue_mapper: Dict[str, List[Residue]], add_solvent_list: list = None, add_ligand_list: list = None) -> Union[Residue, Ligand, Solvent, MetalAtom]: #TODO add test for this
+    def _categorize_pdb_residue(residue_mapper: Dict[str, List[Residue]], add_solvent_list: list = None, add_ligand_list: list = None) -> Union[Residue, Ligand, Solvent, MetalUnit]: #TODO add test for this
         """
         Categorize Residue base on it 3-letter name and chain info in PDB format
         Takes a mapper of {chain_id, [Residue, ...]} and converts
@@ -336,11 +337,11 @@ class PDBParser(StructureParserInterface):
                 # only non-canonical aa can be in a peptide chain
                 for residue in residues:
                     if residue.rtype == chem.ResidueType.UNKNOWN:
-                        if residue.name in chem.METAL_MAPPER + chem.RD_SOLVENT_LIST + add_solvent_list:
+                        if residue.name in list(chem.METAL_MAPPER.keys()) + chem.RD_SOLVENT_LIST + add_solvent_list:
                             _LOGGER.error(f'a metal or solvent residue name is found in an peptide chain {chain_id}: {residue.idx} {residue.name}')
                             sys.exit(1)
                         # TODO maybe a class for non-canonical aa in the future
-                        _LOGGER.debug(f'found noncanonical AA {chain_id} {residue.idx}')
+                        _LOGGER.debug(f'found noncanonical {chain_id} {residue.idx}')
                         residue.rtype = chem.ResidueType.NONCANONICAL
                 continue
             # non-peptide chain
