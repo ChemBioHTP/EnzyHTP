@@ -1,4 +1,4 @@
-"""Definition for the MetalAtom class. This is a specialization of the Residue() obejct that is
+"""Definition for the MetalUnit class. This is a specialization of the Residue() obejct that is
 stored alongside other Residue() children types in the Chain() class.
 
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
@@ -8,30 +8,52 @@ Date: 2022-04-03
 from __future__ import annotations
 
 from copy import deepcopy
+import sys
+import numpy as np
 from typing import List, Union
 import enzy_htp.chemical as chem
+from enzy_htp.core.logger import _LOGGER
 from enzy_htp.structure import Residue, Atom
 
-# TODO(CJ): Figure out if this can only ever be one atom (I think so?) #@shaoqz: no. even though there is only data of one atom the structural level is residue level.
-
-
-class MetalAtom(Residue):
-    """Class representing a metal atom in a protein/enzyme structure or system. Typically a single Atom but usually
-
+class MetalUnit(Residue):
+    """Class representing a residue unit that contains a meetal atom in a protein/enzyme
+    structure or system. Only a single atom is allowed since atoms are assumed to have connectivity
+    in the residue
 
     Attributes:
-    atom_name_ : The name of the metal atom as a string. Compatible with methods in enzy_htp.chemical.
+        (same as residue)
+    Derived properties:
+        (same as residue)
+        atom : the only one atom in this MetalUnit unit
+        atom_name : the name of the atom of the MetalUnit unit
     """
 
-    def __init__(self, residue_key: str, atoms: List[Atom], atom_name: str = None):
-        """Constructor for MetalAtom. Identical to Residue() constructor."""
-        Residue.__init__(self, residue_key, atoms)
+    def __init__(self, residue_idx: int, residue_name: str, atoms: List[Atom], parent=None):
+        """Constructor for MetalUnit. Identical to Residue() constructor."""
+        Residue.__init__(self, residue_idx, residue_name, atoms, parent)
         self.set_rtype(chem.ResidueType.METAL)
-        self.atom_name_ = atom_name
 
     # === Getter-Attr (ref) ===
+    @property
+    def atom(self):
+        """Getter for the only one atom in this MetalUnit unit"""
+        return self._atoms[0]
+    @atom.setter
+    def atom(self, val):
+        self._atoms[0] = val
+
+    @property
+    def atom_name(self):
+        """Getter for the only one atom in this MetalUnit unit"""
+        return self._atom[0].name
+    @atom_name.setter
+    def atom_name(self, val):
+        self._atom[0].name = val
+
+    # TODO below to change
+
     def location(self) -> np.array: #@shaoqz: maybe unify as coord etc. TODO
-        """Gets the location of the MetalAtom."""
+        """Gets the location of the MetalUnit."""
         return self._atoms[0]
 
     # === Getter-Prop (cpy/new) ===
@@ -42,7 +64,7 @@ class MetalAtom(Residue):
         """
         return chem.get_metal_radii(self.atom_name_, method)
 
-    def clone(self) -> MetalAtom:
+    def clone(self) -> MetalUnit:
         """Creates deepcopy of self."""
         return deepcopy(self)
 
@@ -324,12 +346,9 @@ class MetalAtom(Residue):
 
     #endregion
 
-def residue_to_metal(residue: Residue) -> MetalAtom:
-    """Convenience function that converts Residue() to MetalAtom() object."""
-    atom_name = None
-    if len(residue.atoms):
-        raw_name = list(residue.atoms[0].atom_name.lower())
-        raw_name[0] = raw_name[0].upper()
-        atom_name = "".join(raw_name)
-
-    return MetalAtom(residue.residue_key, residue._atoms, atom_name=atom_name)
+def residue_to_metal(residue: Residue) -> MetalUnit:
+    '''Convenience function that converts Residue() to MetalUnit() object.'''
+    if len(residue.atoms) > 1:
+        _LOGGER.error(f'Found more than 1 atom in a metal residue unit: {residue.idx} {residue.name}')
+        sys.exit(1)
+    return MetalUnit(residue.idx, residue.name, residue.atoms, residue.parent)

@@ -6,7 +6,7 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-19
 '''
 from __future__ import annotations
-from typing import Union, Any
+from typing import Tuple
 
 import numpy as np
 import pandas as pd
@@ -41,3 +41,70 @@ class Atom:
         self._element = ds['element_symbol'].strip()
         if not np.isnan(ds['charge']):
             self._charge = float(ds['charge'])
+
+    #region === Getter-Attr (ref) ===
+    @property
+    def name(self) -> str:
+        """Getter for the Atom()'s name."""
+        return self._name
+    @name.setter
+    def name(self, val):
+        self._name = val
+
+    @property
+    def idx(self) -> int:
+        """Getter for the Atom()'s index."""
+        return self._idx
+    @idx.setter
+    def idx(self, val):
+        self._idx = val
+
+    @property
+    def coord(self) -> Tuple[float, float, float]:
+        """Getter for coordinate of current atom"""
+        return self._coord
+    @coord.setter
+    def coord(self, val):
+        self._coord = val
+
+    @property
+    def parent(self):
+        """Getter for the Atom()'s parent chain id."""
+        return self._parent
+    @parent.setter
+    def parent(self, val):
+        self._parent = val
+
+    @property
+    def residue(self):
+        """synonym for parent"""
+        return self._parent
+    @residue.setter
+    def residue(self, val):
+        self._parent = val
+
+    @property
+    def b_factor(self):
+        """synonym for parent"""
+        return self._b_factor
+    @b_factor.setter
+    def b_factor(self, val):
+        self._b_factor = val
+
+    @property
+    def element(self):
+        """synonym for parent"""
+        return self._element
+    @element.setter
+    def element(self, val):
+        self._element = val
+
+    @property
+    def charge(self):
+        """synonym for parent"""
+        return self._charge
+    @charge.setter
+    def charge(self, val):
+        self._charge = val
+
+    #endregion

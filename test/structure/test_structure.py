@@ -229,7 +229,7 @@ def test_merge_right_with_ligand():
 
 
 def test_merge_right_with_metal_atom():
-    """Merges differences between two Structure() objects containing a MetalAtom() object."""
+    """Merges differences between two Structure() objects containing a MetalUnit() object."""
     TEST_FILE = f"{DATA_DIR}/1NVG.pdb"
     structure1: Structure = structure_from_pdb(TEST_FILE)
     structure2: Structure = structure_from_pdb(TEST_FILE)

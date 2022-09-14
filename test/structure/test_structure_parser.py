@@ -21,7 +21,7 @@ from enzy_htp.structure import (
     Chain,
     structure_from_pdb,
     Atom,
-    MetalAtom,
+    MetalUnit,
     Ligand,
     Solvent,
 )
@@ -153,15 +153,15 @@ def test_categorize_residue_all_canonical():
 
 
 def test_categorize_residue_metal():
-    """Checking that the structure_parser.categorize_residue() works for something that should become a MetalAtom()."""
+    """Checking that the structure_parser.categorize_residue() works for something that should become a MetalUnit()."""
     warnings.filterwarnings("ignore")
     pdb_file = f"{DATA_DIR}/just_metal.pdb"
     reader = PandasPdb()
     reader.read_pdb(pdb_file)
     zn_atom = Atom(**reader.df["HETATM"].iloc[0])
     base_residue = Residue("A.ZN.500", [zn_atom])
-    metal: MetalAtom = sp.categorize_residue(base_residue)
-    assert isinstance(metal, MetalAtom)
+    metal: MetalUnit = sp.categorize_residue(base_residue)
+    assert isinstance(metal, MetalUnit)
     assert not metal.is_canonical()
     assert metal.is_metal()
     assert not metal.is_ligand()
@@ -194,7 +194,7 @@ def test_categorize_residue_solvent():
     assert id(base_residue) != id(solvent)
     for a1, a2 in zip(base_residue.atoms, solvent.atoms):
         assert id(a1) != id(a2)
-    assert solvent.is_rd_solvent()
+    assert solvent.is_solvent()
     assert solvent.rtype() == chem.ResidueType.SOLVENT
 
 
@@ -269,14 +269,14 @@ def test_structure_from_pdb_mixed_case():
     assert all_residues[3].is_canonical()
     assert all_residues[4].is_ligand()
     assert all_residues[5].is_metal()
-    assert all_residues[6].is_rd_solvent()
+    assert all_residues[6].is_solvent()
 
     assert isinstance(all_residues[0], Residue)
     assert isinstance(all_residues[1], Residue)
     assert isinstance(all_residues[2], Residue)
     assert isinstance(all_residues[3], Residue)
     assert isinstance(all_residues[4], Ligand)
-    assert isinstance(all_residues[5], MetalAtom)
+    assert isinstance(all_residues[5], MetalUnit)
     assert isinstance(all_residues[6], Solvent)
 
 

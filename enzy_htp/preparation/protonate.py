@@ -1,4 +1,4 @@
-"""Defines functions for protonating Structure(), Ligand() and MetalAtom() objects as well as raw PDB files.
+"""Defines functions for protonating Structure(), Ligand() and MetalUnit() objects as well as raw PDB files.
 
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
