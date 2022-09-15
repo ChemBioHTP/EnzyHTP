@@ -10,9 +10,10 @@ from typing import Tuple
 
 import numpy as np
 import pandas as pd
+from enzy_htp.core.doubly_linked_tree import DoubleLinkNode
 
 
-class Atom:
+class Atom(DoubleLinkNode):
     '''Base unit of structure in enzy_htp. Store coordinate and topology information
     in a Structure() object. Serve solely for storing and accessing data.
     * not specific to any file format that store a structure
@@ -35,7 +36,8 @@ class Atom:
         self._name = ds['atom_name'].strip()
         self._idx = ds['atom_number']
         self._coord = (ds['x_coord'], ds['y_coord'], ds['z_coord'])
-        self._parent = parent # could to be add later
+        self.set_parent(parent)
+        self.set_ghost_children()
         # optional
         self._b_factor = ds['b_factor']
         self._element = ds['element_symbol'].strip()
@@ -68,20 +70,12 @@ class Atom:
         self._coord = val
 
     @property
-    def parent(self):
-        """Getter for the Atom()'s parent chain id."""
-        return self._parent
-    @parent.setter
-    def parent(self, val):
-        self._parent = val
-
-    @property
     def residue(self):
         """synonym for parent"""
-        return self._parent
+        return self.get_parent()
     @residue.setter
     def residue(self, val):
-        self._parent = val
+        self.set_parent(val)
 
     @property
     def b_factor(self):

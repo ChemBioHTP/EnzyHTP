@@ -108,6 +108,7 @@ from collections import defaultdict
 from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp.chemical import convert_to_one_letter
+from enzy_htp.core.doubly_linked_tree import DoubleLinkNode
 
 from .atom import Atom
 from . import Chain
@@ -118,15 +119,14 @@ from .solvent import Solvent, residue_to_solvent
 from .metal_atom import MetalUnit
 
 
-class Structure: # TODO implement different copy methods for the doubly linked ds; by default are all shollow copy and references
+class Structure(DoubleLinkNode): # TODO implement different copy methods for the doubly linked ds; by default are all shollow copy and references
     """Enzyme structure.
     Designed for direct interfacing by users.
     Composed of child Chain() objects and their subsequent child Residue() objects and so on Atom() objects.
     Note: This class SHOULD NOT be created directly by users. It should be created with methods from the StructureIO module.
 
     Attributes:
-        + chains_: List[Chain]
-        + chain_mapper: Dict[]
+        _children/_chains: List[Chain]
 
     Derived properties:
         + residue_state : List[Tuple[str, str, int]]
@@ -142,7 +142,9 @@ class Structure: # TODO implement different copy methods for the doubly linked d
 
     def __init__(self, chains: List[Chain]):
         """Constructor that takes just a list of Chain() objects as input."""
-        self.chains_ = chains #@shaoqz: why tailing _ #@shaoqz: @imp2 why do we need this instead of just a mapper and the getter of chains TODO change it to only one and make another one a getter
+        self.set_children(chains)
+        self._chains = self._children
+        self.set_ghost_parent()
         if self.has_duplicate_chain_name():
             self.resolve_duplicated_chain_name()
 
@@ -150,22 +152,20 @@ class Structure: # TODO implement different copy methods for the doubly linked d
     @property
     def chains(self) -> List[Chain]:
         """Getter for the list of Chain() objects contained within the Structure() object."""
-        self.chains_.sort(key=lambda c: c.name())
-        return self.chains_
-
+        return self.get_children()
     @chains.setter
     def chains(self, val) -> None:
         '''setter for _chains'''
-        self.chains_ = val
+        self.set_children(val)
 
     @property
     def chain_mapper(self) -> Dict[str, Chain]:
-        mapper = dict()
+        mapper = {}
         if self.has_duplicate_chain_name():
             self.resolve_duplicated_chain_name()
         ch: Chain
         for ch in self.chains:
-            mapper[ch.name()] = ch
+            mapper[ch.name] = ch
         return mapper
 
     def get_chain(self, chain_name: str) -> Union[Chain, None]:
@@ -280,34 +280,35 @@ class Structure: # TODO implement different copy methods for the doubly linked d
     def has_duplicate_chain_name(self) -> bool: #TODO add test
         '''check if self._chain have duplicated chain name
         give warning if do.'''
-        mapper = dict()
+        existing_c_id = []
         ch: Chain
-        for ch in self.chains_:
-            if ch.name() in mapper:
+        for ch in self._chains:
+            if ch.name in existing_c_id:
                 _LOGGER.warning(
                     f"Duplicate chain names detected in Structure obj during {sys._getframe().f_back.f_code.co_name}()! "
                 )
                 return True
-            mapper[ch.name()] = ch
+            existing_c_id.append(ch.name)
         return False
     
-    def resolve_duplicated_chain_name(self, keep: bool = 0) -> None: #TODO add test
+    def resolve_duplicated_chain_name(self) -> None: #TODO add test
         '''resolve for duplicated chain name in self.chains_
-        A. rename the chain to be one character after the same one if they are different 
+        A. insert the chain to be one character after the same one if they are different
+           and move the rest chain accordingly
         B. give error if they are the same (in coordinate)'''        
-        mapper = dict()
+        mapper = {}
         if_rename = 0
         for ch in self.chains:
-            if ch.name() in mapper:
-                if ch.is_same_coord(mapper[ch.name()]):
+            if ch.name in mapper:
+                if ch.is_same_coord(mapper[ch.name]):
                     _LOGGER.error(
                         "Duplicate chain (same coordinate) detected in Structure obj! Exiting... "
                     )
-                    exit(1)
-                new_name = chr(ord(ch.name()) + 1)
-                ch.rename(new_name)
+                    sys.exit(1)
+                new_name = chr(ord(ch.name) + 1) # TODO find a way
+                ch.name = new_name
                 if_rename = 1
-            mapper[ch.name()] = ch
+            mapper[ch.name] = ch
         if if_rename:
             _LOGGER.warning(
                 'Resolved duplicated chain (different ones) name by renaming.'

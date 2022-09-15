@@ -14,59 +14,52 @@ from plum import dispatch
 from copy import deepcopy
 from typing import Tuple, List, Dict
 
+from enzy_htp.core.doubly_linked_tree import DoubleLinkNode
+
 from .atom import Atom
 from enzy_htp.core import _LOGGER
 import enzy_htp.chemical as chem
 
 
-class Residue:
+class Residue(DoubleLinkNode):
     """Most common functional unit in enzy_htp. Made up of Atom() objects and can be either
         canonical, non-canonical, solvent or a metal center.
 
     Attributes:
         (nessessary)
-        atoms : A list of Atom() objects that make up the Residue().
-        name : Residue name.
-        idx : The index of the Residue within the chain.
-        parent/chain : Parent chain name.
-        rtype_ : The ResidueType of the Residue().
+        _children/_atoms : A list of Atom() objects that make up the Residue().
+        _name : Residue name.
+        _idx : The index of the Residue within the chain.
+        _parent/chain : Parent chain name.
+        _rtype : The ResidueType of the Residue().
     """
 
     def __init__(self, residue_idx: int, residue_name: str, atoms: List[Atom], parent=None):
         """Constructor for the Residue() object"""
-        self._atoms = atoms
         self._name = residue_name
         self._idx = residue_idx
         self._rtype = chem.ResidueType.UNKNOWN
-        self._parent = parent
-        # add self as atoms' parent
-        for atom in self._atoms:
-            atom.parent = self
+        self.set_parent(parent)
+        self.set_children(atoms)
+
+        self._atoms = self._children # add an alias
         
     #region === Getter-Attr (ref) ===
     @property
     def atoms(self) -> List[Atom]:
         """Returns a list of all Atom() objects that the Residue() "owns" """
-        return self._atoms
+        return self.get_children()
     @atoms.setter
     def atoms(self, val):
-        self._atoms = val
+        self.set_children(val)
 
     @property
     def chain(self):
         """Getter for the Residue()'s parent chain id."""
-        return self._parent
+        return self.get_parent()
     @chain.setter
     def chain(self, val):
-        self._parent = val
-
-    @property
-    def parent(self):
-        """Getter for the Residue()'s parent chain id."""
-        return self._parent
-    @parent.setter
-    def parent(self, val):
-        self._parent = val
+        self.set_parent(val)
 
     @property
     def idx(self) -> int:
@@ -93,7 +86,16 @@ class Residue:
         self._name = val
     #endregion
     
-    # === Getter-Prop (cpy/new) ===
+    #region === Getter-Prop (cpy/new) ===
+    @property
+    def key(self, if_name: bool = False):
+        '''
+        an unique tuple to indicate a specific residue in the enzyme
+        '''
+        if if_name:
+            return (self.chain.id, self._idx, self._name)
+        return (self.chain.id, self._idx)
+
     def num_atoms(self) -> int:
         """Number of atoms in the Residue."""
         return len(self._atoms)
@@ -101,8 +103,9 @@ class Residue:
     def clone(self) -> Residue:
         """Creates a deepcopy of self."""
         return deepcopy(self)
+    #endregion
 
-    # === Checker === 
+    #region === Checker === 
     def is_empty_chain(self) -> bool:
         """Whether the Residue() lacks a chain identitifer. NOT a chain object accessor."""
         return not len(self.chain_.strip())
@@ -127,9 +130,10 @@ class Residue:
         """Checks if the Residue() is an rd_non_ligand as defined by enzy_htp.chemical.solvent.RD_NON_LIGAND_LIST"""
         return self.name in chem.RD_NON_LIGAND_LIST
 
-    def is_sequence_equivalent(self, other: Residue) -> bool: #@shaoqz: @imp2 why do we need to compare this? Because in the comparsion of residues there often some information exist and want to compare the rest.
+    def is_sequence_eq(self, other: Residue) -> bool: #@shaoqz: @imp2 why do we need to compare this? Because in the comparsion of residues there often some information exist and want to compare the rest.
         """Comparator that checks for sequence same-ness."""
-        return self.residue_key == other.residue_key
+        return self.key == other.key
+    #endregion
 
     # === Editor ===
     def set_chain(self, val: str) -> None:
@@ -167,7 +171,7 @@ class Residue:
     # === Special ===
     def __str__(self) -> str:
         """String representation that just shows residue key in format "chain_id.residue_name.residue_num" """
-        return f'Residue({self.idx}, {self.name}, Atoms:{len(self.atoms)}, {self.parent})'
+        return f'Residue({self.idx}, {self.name}, Atoms:{len(self.atoms)}, {self._parent})'
 
     def __repr__(self) -> str:
         """String representationt that just shows residue key in format "chain_id.residue_name.residue_num" """
