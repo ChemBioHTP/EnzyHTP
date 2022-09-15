@@ -186,6 +186,22 @@ def test_resolve_missing_chain_id_redundant_ter():
 
     assert list(target_df['chain_id']) == answer_df_chain_ids
 
+def test_resolve_missing_chain_id_wANISOU():
+    '''
+    in this case there are one redundant ter
+    '''
+    test_mdl = f'{DATA_DIR}four_chain_no_id_ANISOU.pdb'
+    test_mdl_pdb = PandasPdb()
+    test_mdl_pdb.read_pdb(test_mdl)
+    target_df = test_mdl_pdb.df['ATOM']
+    target_ter_df = test_mdl_pdb.df['OTHERS'].query('record_name == "TER"')
+
+    sp._resolve_missing_chain_id(target_df, target_ter_df)
+
+    assert list(target_df['chain_id']) == [ 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 
+    'A', 'A', 'A', 'B', 'B', 'B', 'B', 'B', 'B', 'B', 'B', 'B', 'B', 'B', 'B', 'B', 'B', 
+    'B', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'D', 'D', 'D', 'D', 'D', 'D']
+
 def test_resolve_missing_chain_id_simple():
     '''Ensuring that the _resolve_missing_chain_id() correctly names new chains.'''
 
@@ -302,7 +318,6 @@ def test_build_residue():
     sample = all_residue[0]
     # test if parent and children are will set
     assert filter(lambda x: (x.residue.idx, x.residue.name) == (sample.idx, sample.name), sample.atoms)
-        
 
 def test_categorize_residue_canonical():
     pdb_file_path = f'{DATA_DIR}/two_chain.pdb'
@@ -345,41 +360,6 @@ def test_categorize_residue_noncanonical():
     sp._categorize_pdb_residue(res_mapper)
     all_residue = list(itertools.chain.from_iterable(res_mapper.values()))
     assert len(list(filter(lambda x: x.rtype is chem.ResidueType.NONCANONICAL, all_residue))) == 1
-
-# def test_build_chains():
-#     '''Ensuring the structure_parser.build_chains() method correctly aggregates Residue() objects into Chain() objects.'''
-#     pdb_file = f'{DATA_DIR}/four_chain.pdb'
-#     reader = PandasPdb()
-#     reader.read_pdb(pdb_file)
-#     res_mapper: Dict[str, Residue] = sp.build_residues(
-#         pd.concat((reader.df['ATOM'], reader.df['HETATM']))
-#     )
-#     chain_mapper: Dict[str, Chain] = sp.build_chains(res_mapper)
-
-#     assert set(chain_mapper.keys()) == {'A', 'B', 'C', 'D'}
-#     assert len(chain_mapper['A']) == 2
-#     print(chain_mapper['B'].residues())
-#     assert len(chain_mapper['B']) == 3
-#     assert len(chain_mapper['C']) == 1
-#     assert len(chain_mapper['D']) == 1
-
-#     atom_counts = [12, 15, 7, 6]
-#     for ac, chain in zip(atom_counts, chain_mapper.values()):
-#         assert chain.num_atoms() == ac
-#         for res in chain.residues():
-#             assert isinstance(res, Residue)
-
-# def test_build_chains_wANISOU(): # TODO(shaoqz): fix this by fixing missing chain id
-#     '''test if works well with PDB that contain ANISOU records'''
-#     pdb_file = f'{DATA_DIR}/four_chain_no_id_ANISOU.pdb'
-#     reader = PandasPdb()
-#     reader.read_pdb(pdb_file)
-#     res_mapper: Dict[str, Residue] = sp.build_residues(
-#         pd.concat((reader.df['ATOM'], reader.df['HETATM']))
-#     )
-#     chain_mapper: Dict[str, Chain] = sp.build_chains(res_mapper)
-#     for key in chain_mapper:
-#         print(key)
 
 # def test_structure_from_pdb_bad_input():
 #     '''Checking that the main method structure_parser.structure_from_pdb() fails for bad input.'''
