@@ -43,7 +43,7 @@ class PDBParser(StructureParserInterface):
 
     # interface
     @classmethod
-    def get_structure(cls, path: str, model: int=0) -> Structure:
+    def get_structure(cls, path: str, model: int=0, add_solvent_list: List=None, add_ligand_list: List=None) -> Structure:
         '''
         Converting a PDB file (as its path) into the Structure()
         Arg:
@@ -51,6 +51,13 @@ class PDBParser(StructureParserInterface):
             model: The selected model index if there are multiple models in the file
                     (start from 0 default: 0)
                     (assume MODEL appears in order in the file)
+        
+            add_solvent_list: (used for categorize residues) additional names for solvent
+            add_ligand_list: (used for categorize residues) additional names for ligands
+            * solvent list have higher pirority
+        Return:
+            Structure()
+            idx_change_mapper: a dict with {(old_chain_id, old_residue_id): (new_chain_id, new_residue_id), ... }
         '''
         _LOGGER.debug(f'working on {path}')
         cls._check_valid_pdb(path)
@@ -75,10 +82,10 @@ class PDBParser(StructureParserInterface):
         # old enzyhtp is build iteratively chain frist and residues are build in the chain
         # builder and so on for atom. But current methods is used for better readability
         atom_mapper: Dict[tuple, Atom] = cls._build_atoms(target_model_df)
-        res_mapper, idx_change_mapper = cls._build_residues(atom_mapper)
+        res_mapper, idx_change_mapper = cls._build_residues(atom_mapper, add_solvent_list, add_ligand_list)
         chain_list: Dict[str, Chain] = cls._build_chains(res_mapper)
 
-        return Structure(chain_list)
+        return Structure(chain_list), idx_change_mapper
 
     @classmethod
     def get_file_str(cls, stru: Structure) -> str:
@@ -284,9 +291,14 @@ class PDBParser(StructureParserInterface):
         return atom_mapper
 
     @classmethod
-    def _build_residues(cls, atom_mapper: Dict[str, Atom]) -> Dict[str, Residue]: #TODO add test for this
+    def _build_residues(cls, atom_mapper: Dict[str, Atom], add_solvent_list: List, add_ligand_list: List) -> Dict[str, Residue]: #TODO add test for this
         '''
         build Residue() objects from atom_mapper
+        Arg:
+            atom_mapper
+            add_solvent_list: (used for categorize residues) additional names for solvent
+            add_ligand_list: (used for categorize residues) additional names for ligands
+            * solvent list have higher pirority
         Return:
             {'chain_id' : [Residue, ...]}
         '''
@@ -308,7 +320,7 @@ class PDBParser(StructureParserInterface):
             # in all cases keep the ATOM chain
             result_mapper[chain_id] = list(record_residues.values())[0]
         # categorize_residue
-        cls._categorize_pdb_residue(result_mapper)
+        cls._categorize_pdb_residue(result_mapper, add_solvent_list, add_ligand_list)
 
         return result_mapper, idx_change_mapper
 
@@ -367,11 +379,11 @@ class PDBParser(StructureParserInterface):
     @staticmethod
     def _build_chains(res_mapper: Dict[str, Residue]) -> Dict[str, Chain]:
         '''
-        build Chain() objects from residue_mapper
+        build Chain() objects from residue mapper
         '''
         chain_list = []
         for chain_id, residues in res_mapper.items():
-            ch_obj = Chain(chain_id ,residues)
+            ch_obj = Chain(chain_id ,residues) # TODO decouple chain name with pdb chain id? How to solve too many water chain
             chain_list.append(ch_obj)
         return chain_list
     # endregion

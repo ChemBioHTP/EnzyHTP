@@ -299,6 +299,10 @@ def test_build_residue():
     all_residue = list(itertools.chain.from_iterable(res_mapper.values()))
     assert len(all_residue) == len(atom_mapper)
     assert len(list(filter(lambda x: x.rtype is chem.ResidueType.LIGAND, all_residue))) == 2
+    sample = all_residue[0]
+    # test if parent and children are will set
+    assert filter(lambda x: (x.residue.idx, x.residue.name) == (sample.idx, sample.name), sample.atoms)
+        
 
 def test_categorize_residue_canonical():
     pdb_file_path = f'{DATA_DIR}/two_chain.pdb'
