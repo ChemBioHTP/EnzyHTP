@@ -83,24 +83,24 @@ def test_sequence_equivalent_return_true():
     """Testing that the Residue.is_sequence_equivalent() method returns True when desired."""
     r1 = Residue("A.A.1", list())
     r2 = Residue("A.A.1", list())
-    assert r1.is_sequence_equivalent(r2)
-    assert r1.is_sequence_equivalent(deepcopy(r1))
+    assert r1.is_sequence_eq(r2)
+    assert r1.is_sequence_eq(deepcopy(r1))
     r3 = Residue("A.A.1", list())
     r3.set_chain("B")
-    assert not r1.is_sequence_equivalent(r3)
+    assert not r1.is_sequence_eq(r3)
     r3.set_chain("A")
-    assert r1.is_sequence_equivalent(r3)
+    assert r1.is_sequence_eq(r3)
 
 
 def test_sequence_equivalent_return_false():
     """Testing that the Residue.is_sequence_equivalent() method returns False when desired."""
     r1 = Residue("A.A.1", list())
     r2 = Residue("A.A.3", list())
-    assert not r1.is_sequence_equivalent(r2)
+    assert not r1.is_sequence_eq(r2)
     r3 = Residue("A.B.1", list())
-    assert not r1.is_sequence_equivalent(r3)
+    assert not r1.is_sequence_eq(r3)
     r4 = Residue("B.A.1", list())
-    assert not r1.is_sequence_equivalent(r4)
+    assert not r1.is_sequence_eq(r4)
 
 
 # TODO(CJ) add in some tests for other types of residues

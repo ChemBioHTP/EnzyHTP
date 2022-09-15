@@ -234,9 +234,9 @@ def test_merge_right_with_metal_atom():
     structure1: Structure = structure_from_pdb(TEST_FILE)
     structure2: Structure = structure_from_pdb(TEST_FILE)
     # NOTE(CJ): Below is NOT the recommended way to manipulate this stuff
-    del structure2.chains_[0].residues_[-1]
-    print(structure1.chains_[0].residues_)
-    print(structure2.chains_[0].residues_)
+    del structure2._chains[0]._residues[-1]
+    print(structure1._chains[0]._residues)
+    print(structure2._chains[0]._residues)
     assert structure1 != structure2
     structure2: Structure = merge_right(structure1, structure2)
     assert structure1 == structure2
