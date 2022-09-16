@@ -90,7 +90,7 @@ class Chain(DoubleLinkNode):
         """Finds the total number of Atom() objects contained in the Residue() children objects."""
         total = 0
         for res in self._residues:
-            total += res.num_atoms()
+            total += res.num_atoms
         return total
 
     def num_residues(self) -> int:

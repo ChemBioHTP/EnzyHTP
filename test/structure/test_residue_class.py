@@ -122,13 +122,13 @@ def test_chain_getters_and_setters():
 
 
 def test_num_atoms():
-    """Making sure the Residue.num_atoms() method works correctly."""
+    """Making sure the Residuenum_atoms method works correctly."""
     empty_residue = Residue("A.A.1", list())
-    assert not empty_residue.num_atoms()
-    assert RESIDUES[0].num_atoms() == 32
+    assert not empty_residuenum_atoms
+    assert RESIDUES[0]num_atoms == 32
     res_cpy = deepcopy(RESIDUES[0])
     res_cpy._atoms = []
-    assert not empty_residue.num_atoms()
+    assert not empty_residuenum_atoms
 
 
 def test_renumber_atoms():

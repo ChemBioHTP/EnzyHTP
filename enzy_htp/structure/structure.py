@@ -217,7 +217,7 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
                 'Resolved duplicated chain (different ones) name by renaming.'
             )
     #endregion
-    #region === Editor ===   
+    #region === Editor ===
     #endregion
     #region === Special ===
     def __str__(self):

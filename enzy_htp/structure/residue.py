@@ -11,7 +11,6 @@ from __future__ import annotations
 import numpy as np
 from collections import defaultdict
 from plum import dispatch
-from copy import deepcopy
 from typing import Tuple, List, Dict
 
 from enzy_htp.core.doubly_linked_tree import DoubleLinkNode
@@ -27,11 +26,15 @@ class Residue(DoubleLinkNode):
 
     Attributes:
         (nessessary)
-        _children/_atoms : A list of Atom() objects that make up the Residue().
-        _name : Residue name.
-        _idx : The index of the Residue within the chain.
-        _parent/chain : Parent chain name.
-        _rtype : The ResidueType of the Residue().
+        children/atoms : A list of Atom() objects that make up the Residue().
+        name : Residue name.
+        idx : The index of the Residue within the chain.
+        parent/chain : Parent chain name.
+        rtype : The ResidueType of the Residue().
+
+    Derived properties:
+        key(if_name) : the tuple key of residue's sequential identity e.g.: ('A', 1)
+        num_atoms: number of belonging Atom()s
     """
 
     def __init__(self, residue_idx: int, residue_name: str, atoms: List[Atom], parent=None):
@@ -95,31 +98,17 @@ class Residue(DoubleLinkNode):
             return (self.chain.name, self._idx, self._name)
         return (self.chain.name, self._idx)
 
+    @property
     def num_atoms(self) -> int:
         """Number of atoms in the Residue."""
         return len(self._atoms)
 
-    def sort_key(self) -> Tuple[str, int]:
-        """Generates the sorting key for the Residue(). Specifically, a tuple of [chain_id, res_num]."""
-        return (self._chain.name, self._idx)
-    # def clone(self) -> Residue:
+    # def clone(self) -> Residue: #TODO
     #     """Creates a deepcopy of self."""
     #     return deepcopy(self)
     #endregion
 
-    #region === Checker === 
-    def is_missing_chain(self) -> bool:
-        """Whether the Residue() lacks a chain parent"""
-        return self._parent is None
-
-    def is_ligand(self) -> bool:
-        """Checks if Residue() is a ligand. Inherited by children."""
-        return self._rtype == chem.ResidueType.LIGAND
-
-    def is_metal(self) -> bool:
-        """Checks if Residue() is a metal. Inherited by children."""
-        return self._rtype == chem.ResidueType.METAL
-
+    #region === Checker ===
     def is_canonical(self) -> bool:
         """Checks if Residue() is canonical. Inherited by children."""
         return self._rtype == chem.ResidueType.CANONICAL
@@ -128,13 +117,25 @@ class Residue(DoubleLinkNode):
         """Checks if Residue() is canonical. Inherited by children."""
         return self._rtype == chem.ResidueType.NONCANONICAL
 
-    def is_solvent(self) -> bool: #@shaoqz: @imp2 move to the IO class. This is PDB related.
+    def is_ligand(self) -> bool:
+        """Checks if Residue() is a ligand. Inherited by children."""
+        return self._rtype == chem.ResidueType.LIGAND
+
+    def is_solvent(self) -> bool:
         """Checks if the Residue() is an rd_sovlent as defined by enzy_htp.chemical.solvent.RD_SOLVENT"""
         return self._rtype == chem.ResidueType.SOLVENT
+
+    def is_metal(self) -> bool:
+        """Checks if Residue() is a metal. Inherited by children."""
+        return self._rtype == chem.ResidueType.METAL
 
     def is_trash(self) -> bool:
         """Checks if the Residue() is an rd_non_ligand as defined by enzy_htp.chemical.solvent.RD_NON_LIGAND_LIST"""
         return self._rtype == chem.ResidueType.TRASH
+
+    def is_missing_chain(self) -> bool:
+        """Whether the Residue() lacks a chain parent"""
+        return self._parent is None
 
     def is_sequence_eq(self, other: Residue) -> bool:
         """Comparator that checks for sequence same-ness."""
