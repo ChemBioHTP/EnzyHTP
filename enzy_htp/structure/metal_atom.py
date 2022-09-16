@@ -83,17 +83,8 @@ class MetalUnit(Residue):
 
     # === Editor ===
     # === Special ===
-    def __getitem__(self, key: int):
-        """
-        Metalatom_obj[0]: self
-        -----
-        return self when iter. Allow metalatom to be iterate like a residue that return a atom level obj.
-        """
-        if key == 0:
-            return self
-        if key > 0:
-            raise StopIteration
-
+    def __str__(self) -> str:
+        return f'MetalUnit({self._idx}, {self._name}, atom:{len(self._atoms)}, {self._parent})'
     #region === TODO/TOMOVE ===
     # fix related
     def get_donor_atom(self, method: str = "INC", check_radius=4.0): # @nu

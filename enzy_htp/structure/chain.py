@@ -256,17 +256,11 @@ class Chain(DoubleLinkNode):
         return idx - 1 
 
     #region === Special ===
-    def __getitem__(self, key: int) -> Residue:
-        """Allows indexing into the child Residue() objects."""
-        return self._residues[key]
-
-    def __delitem__(self, key: int) -> None:
-        """Allows deleting of the child Residue() objects."""
-        del self._residues[key]
-
-    def __len__(self) -> int:
-        """Returns number of Residue() or Residue()-dervied objects belonging to the Chain."""
-        return len(self._residues)
+    def __str__(self):
+        '''
+        concise string representation of the chain
+        '''
+        return f'Chain({self._name}, residue: {self.residue_idx_interval()})'
     #endregion
 
     #region === TODO/TOMOVE ===

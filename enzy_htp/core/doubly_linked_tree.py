@@ -74,3 +74,14 @@ class DoubleLinkNode():
         support deepcopy of the object
         '''
         pass
+
+    # ==special==
+    def __getitem__(self, key: int):
+        return self._children[key]
+
+    def __delitem__(self, key: int):
+        del self._children[key]
+
+    def __len__(self) -> int:
+        return len(self._children)        
+
