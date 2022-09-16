@@ -1,4 +1,4 @@
-"""This class define the core data structure of EnzyHTP: Structure. Structure stands for the single enzyme structure.
+'''This class define the core data structure of EnzyHTP: Structure. Structure stands for the single enzyme structure.
 As the core data class, Structure will be solely designed for **storing, accessing and editing** structural data.
 
 For the data point of view, the enzyme structure is composed by two parts of data:
@@ -37,7 +37,7 @@ Operation:
 
     Loading a structure from PDB:
         >>> import enzy_htp
-        >>> structure : enzy_htp.Structure = enzy_htp.structure_from_pdb("/path/to/pdb")
+        >>> structure : enzy_htp.Structure = enzy_htp.structure_from_pdb('/path/to/pdb')
 
     Surveying basic information:
         >>> structure.num_chains()
@@ -90,12 +90,12 @@ Operation:
         4
 
     Saving the structure:
-        >>> structure.to_pdb( "/path/to/copy/of/pdb" )
+        >>> structure.to_pdb( '/path/to/copy/of/pdb' )
 
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-04-03
-"""
+'''
 #TODO(CJ): add a method for changing/accessing a specific residue
 from __future__ import annotations
 import os
@@ -121,7 +121,7 @@ from .metal_atom import MetalUnit
 
 
 class Structure(DoubleLinkNode): # TODO implement different copy methods for the doubly linked ds; by default are all shollow copy and references
-    """Enzyme structure.
+    '''Enzyme structure.
     Designed for direct interfacing by users.
     Composed of child Chain() objects and their subsequent child Residue() objects and so on Atom() objects.
     Note: This class SHOULD NOT be created directly by users. It should be created with methods from the StructureIO module.
@@ -139,10 +139,10 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
         num_chains
         num_residues
         chain_names
-    """
+    '''
 
     def __init__(self, chains: List[Chain]):
-        """Constructor that takes just a list of Chain() objects as input."""
+        '''Constructor that takes just a list of Chain() objects as input.'''
         self.set_children(chains)
         self._chains = self._children
         self.set_ghost_parent()
@@ -151,7 +151,7 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
     #region === Getters-attr ===
     @property
     def chains(self) -> List[Chain]:
-        """Getter for the list of Chain() objects contained within the Structure() object."""
+        '''Getter for the list of Chain() objects contained within the Structure() object.'''
         return self.get_children()
     @chains.setter
     def chains(self, val) -> None:
@@ -169,7 +169,7 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
         return mapper
 
     def get_chain(self, chain_name: str) -> Union[Chain, None]:
-        """Gets a chain of the given name. Returns None if the Chain() is not present."""
+        '''Gets a chain of the given name. Returns None if the Chain() is not present.'''
         return self.chain_mapper.get(chain_name, None)
 
     #endregion
@@ -177,7 +177,7 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
     #region === Getter-Prop ===
     @property
     def num_chains(self) -> int:
-        """Returns the number of Chain() objects in the current Structure()."""
+        '''Returns the number of Chain() objects in the current Structure().'''
         return len(self._chains)
     #endregion
 
@@ -190,7 +190,7 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
         for ch in self._chains:
             if ch.name in existing_c_id:
                 _LOGGER.warning(
-                    f"Duplicate chain names detected in Structure obj during {sys._getframe().f_back.f_code.co_name}()! "
+                    f'Duplicate chain names detected in Structure obj during {sys._getframe().f_back.f_code.co_name}()! '
                 )
                 return True
             existing_c_id.append(ch.name)
@@ -207,7 +207,7 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
             if ch.name in mapper:
                 if ch.is_same_coord(mapper[ch.name]):
                     _LOGGER.error(
-                        "Duplicate chain (same coordinate) detected in Structure obj! Exiting... "
+                        'Duplicate chain (same coordinate) detected in Structure obj! Exiting... '
                     )
                     sys.exit(1)
                 new_name = chr(ord(ch.name) + 1) # TODO find a way
@@ -250,7 +250,7 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
     #region === Getters === (Attributes - accessing Structure data -  references)
     @property
     def residues(self) -> List[Residue]:
-        """Return a list of the residues in the Structure() object sorted by (chain_id, residue_id)"""
+        '''Return a list of the residues in the Structure() object sorted by (chain_id, residue_id)'''
         result = []
         ch: Chain
         for ch in self.chains:
@@ -259,8 +259,8 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
         return result
 
     def get_residue(self, target_key: str) -> Union[None, Residue]: #@shaoqz: we need to that gives a reference. In the case of editing the structure.
-        """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format,
-        a deepcopy of the corresponding Residue() is returned, if it exists. None is returned if it cannot be found."""
+        '''Given a target_key str of the Residue() residue_key ( 'chain_id.residue_name.residue_number' ) format,
+        a deepcopy of the corresponding Residue() is returned, if it exists. None is returned if it cannot be found.'''
         for chain in self.chains:
             for res in chain.residues():
                 if res.residue_key == target_key:
@@ -269,7 +269,7 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
 
     @property
     def metals(self) -> List[Residue]:
-        """Filters out the metal Residue()'s from the chains in the Structure()."""
+        '''Filters out the metal Residue()'s from the chains in the Structure().'''
         result: List[Residue] = list()
         for chain in self.chains:
             result.extend(list(filter(lambda r: r.is_metal(), chain.residues())))
@@ -277,7 +277,7 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
 
     @property
     def ligands(self) -> List[Residue]:
-        """Filters out the ligand Residue()'s from the chains in the Structure()."""
+        '''Filters out the ligand Residue()'s from the chains in the Structure().'''
         result: List[Residue] = list()
         for chain in self.chains:
             result.extend(list(filter(lambda r: r.is_ligand(), chain.residues())))
@@ -306,12 +306,12 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
     #region === Getter === (Properities - derived data; wont affect Structure data - copy)
     @property
     def residue_state(self) -> List[Tuple[str, str, int]]: #@shaoqz: @residue_key
-        """Generates a list of tuples of all residues in the Structure. Format for each tuple is (one_letter_res_name, chain_id, res_index).
-        This method is designed for debuging purpose"""
+        '''Generates a list of tuples of all residues in the Structure. Format for each tuple is (one_letter_res_name, chain_id, res_index).
+        This method is designed for debuging purpose'''
         result = list()
         for cname, chain in self.chain_mapper.items():
             for residue in chain.residues():
-                (chain, res_name, index) = residue.residue_key.split(".")
+                (chain, res_name, index) = residue.residue_key.split('.')
                 if residue.is_canonical():
                     result.append((chain, convert_to_one_letter(res_name), int(index)))
                 elif residue.is_metal(): #@shaoqz: @imp2 any non-canonical should be using 3-letter name
@@ -320,7 +320,7 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
 
     @property
     def residue_keys(self) -> List[str]:
-        """Generates a list of strings containing all residue_key values for all child Residue()'s"""
+        '''Generates a list of strings containing all residue_key values for all child Residue()'s'''
         result = list()
         for chain in self.chains:
             for res in chain.residues():
@@ -329,7 +329,7 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
 
     @property # @shaoqz: @imp2 do we really need this here? residue key is nessessary since we are operating acrossing levels
     def num_residues(self) -> int:
-        """Returns the number of Residue() objects contained within the current Structure()."""
+        '''Returns the number of Residue() objects contained within the current Structure().'''
         total: int = 0
         ch: Chain
         for ch in self.chains:
@@ -338,22 +338,22 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
 
     @property
     def chain_names(self) -> List[str]:
-        """Returns a list of all the chain names for the Structure()"""
+        '''Returns a list of all the chain names for the Structure()'''
         return list(self.chain_mapper.keys())
 
     #endregion
 
     #region === Checker ===
     def has_chain(self, chain_name: str) -> bool:
-        """Checks if the Structure() has a chain with the specified chain_name."""
+        '''Checks if the Structure() has a chain with the specified chain_name.'''
         return chain_name in self.chain_mapper
     #endregion
 
     #region === Editor ===     
     def add_chain(self, new_chain: Chain, overwrite: bool = False) -> None: #TODO add logic for overwriting
-        """Method that inserts a new chain and then sorts the chains based on name.
+        '''Method that inserts a new chain and then sorts the chains based on name.
         Will overwrite if Chain() with existing name already in object. #@shaoqz: add + sort = insert
-        """
+        '''
         new_chain_name: str = new_chain.name()
         if new_chain_name in self.chain_mapper:
             self.remove_chain(new_chain_name) #@shaoqz: give a warning. @imp should not overwrite. Since want to add a chain to a structure with a same-naming chain is very common. (like I want to merge 2 single chain object to a dimer) A better default strategy is to insert after the chain with the same name and also record a index map.
@@ -363,7 +363,7 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
         self.chains.sort(key=lambda c: c.name())
 
     def remove_chain(self, chain_name: str) -> None:
-        """Given a chain name, removes the Chain() object form both self.chains_ and self.chain_mapper."""
+        '''Given a chain name, removes the Chain() object form both self.chains_ and self.chain_mapper.'''
         del self.chain_mapper[chain_name]
         to_remove = -1
         for idx, chain in enumerate(self.chains):
@@ -375,9 +375,9 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
             del self.chains[to_remove]
 
     def add_residue(self, new_res: Residue) -> None:
-        """Inserts a new Residue() object into the Structure(). If the exact Residue (chain_id, name, residue_id) already
+        '''Inserts a new Residue() object into the Structure(). If the exact Residue (chain_id, name, residue_id) already
         exists, the new Residue overwrites it. If the new Residue specifies a Chain() that does not exist, a new chain is made.
-        """
+        '''
         chain_name: str = new_res.chain()
         if not self.has_chain(chain_name):
             new_chain: Chain = Chain(chain_name, [new_res]) #@shaoqz: give a warning
@@ -390,10 +390,10 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
         self.chains.sort(key=lambda c: c.name()) #@shaoqz: should this be in the 1st if block?
 
     def remove_residue(self, target_key: str) -> None:
-        """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format,
+        '''Given a target_key str of the Residue() residue_key ( 'chain_id.residue_name.residue_number' ) format,
         the Residue() is removed if it currently exists in one of the child Chain()'s. If the Chain() is empty after this
-        removal, the chain is deleted."""
-        (chain_name, _, _) = target_key.split(".") #@shaoqz: why not use this in get lolll
+        removal, the chain is deleted.'''
+        (chain_name, _, _) = target_key.split('.') #@shaoqz: why not use this in get lolll
         if self.has_chain(chain_name):
             self.chain_mapper[chain_name].remove_residue(target_key)
             if self.chain_mapper[chain_name].empty():
@@ -402,11 +402,11 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
 
     #region === Special === 
     def __bool__(self) -> bool:
-        """Enables running assert Structure(). Checks if there is anything in the structure."""
+        '''Enables running assert Structure(). Checks if there is anything in the structure.'''
         return bool(len(self.chains))
 
     def __eq__(self, other: Structure) -> bool:
-        """Comparison operator for other Structure() objects. Checks first if both have same chain names and then if each named chain is identical."""
+        '''Comparison operator for other Structure() objects. Checks first if both have same chain names and then if each named chain is identical.'''
         if set(self.chain_mapper.keys()) != set(other.chain_mapper.keys()):
             return False
 
@@ -425,14 +425,14 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
                     #              residues are relatively conserved, but there are exceptions, e.g. different ligand both name LIG)
 
     def __ne__(self, other: Structure) -> bool:
-        """Negation operator for other Structure() objects. Inverstion of Structure.__eq__()."""
+        '''Negation operator for other Structure() objects. Inverstion of Structure.__eq__().'''
         return not (self == other)
     #endregion
 
     #region (TODO+OLD)
     # === TODO ===
     def get_connect(self, metal_fix=1, ligand_fix=1, prepi_path=None): #@shaoqz: @nu ### TODO rewrite doc # also change a name this is not a getter but to generate sth.
-        """
+        '''
         get connectivity 
         -----------------
         TREATMENT
@@ -441,10 +441,10 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
                     fix2: connect to donor atom (MCPB?)
         ligand: fix1: use antechamber generated prepin file to get connectivity.
                       according to https://ambermd.org/doc/prep.html the coordniate line will always start at the 11th line after 3 DUMM.
-        """
+        '''
         # san check
         if ligand_fix == 1 and prepi_path == None:
-            raise Exception("Ligand fix 1 requires prepin_path.")
+            raise Exception('Ligand fix 1 requires prepin_path.')
         # chain part
         for chain in self.chains:
             for res in chain:
@@ -459,7 +459,7 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
         if metal_fix == 1:
             pass
         if metal_fix == 2:
-            raise Exception("TODO: Still working on 2 right now")
+            raise Exception('TODO: Still working on 2 right now')
 
         # ligand
         # init
@@ -475,7 +475,7 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
                     if_loop = 0
                     for line in f:
                         line_id += 1
-                        if line.strip() == "":
+                        if line.strip() == '':
                             if if_loop == 1:
                                 # switch off loop and break if first blank after LOOP encountered
                                 if_loop = 0
@@ -488,7 +488,7 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
                             )
                             continue
                         # loop connect starts at LOOP
-                        if line.strip() == "LOOP":
+                        if line.strip() == 'LOOP':
                             if_loop = 1
                             continue
                         # coord starts at 11th
@@ -501,9 +501,9 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
                                 lig[atom_cnt - 1].connect.append(lig[atom_id - 1])
 
     def get_connectivty_table( #@shaoqz: ok seems not using
-        self, ff="GAUSSIAN", metal_fix=1, ligand_fix=1, prepi_path=None
+        self, ff='GAUSSIAN', metal_fix=1, ligand_fix=1, prepi_path=None
     ):
-        """
+        '''
         get connectivity table with atom index based on 'ff' settings:
         ff = GAUSSIAN  -- continuous atom index start from 1, do not seperate by chain
         -------------------
@@ -516,8 +516,8 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
         Use 1.0 for all connection.
             Amber force field in gaussian do not account in bond order. (Only UFF does.)
             Note that bond order less than 0.1 do not count in MM but only in opt redundant coordinate.
-        """
-        connectivty_table = ""
+        '''
+        connectivty_table = ''
         # get connect for every atom in stru
         self.get_connect(metal_fix, ligand_fix, prepi_path)
 
@@ -528,67 +528,67 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
             for res in chain:
                 for atom in res:
                     a_id += 1
-                    cnt_line = " " + str(atom.id)
+                    cnt_line = ' ' + str(atom.id)
                     # san check
                     if atom.id != a_id:
-                        raise Exception("atom id error.")
+                        raise Exception('atom id error.')
                     for cnt_atom in atom.connect:
                         if cnt_atom.id > atom.id:
-                            cnt_line += " " + str(cnt_atom.id) + " " + "1.0"
+                            cnt_line += ' ' + str(cnt_atom.id) + ' ' + '1.0'
                     connectivty_table += cnt_line + line_feed
 
         for lig in self.ligands:
             for atom in lig:
                 a_id += 1
-                cnt_line = " " + str(atom.id)
+                cnt_line = ' ' + str(atom.id)
                 # san check
                 if atom.id != a_id:
-                    raise Exception("atom id error.")
+                    raise Exception('atom id error.')
                 for cnt_atom in atom.connect:
                     if cnt_atom.id > atom.id:
-                        cnt_line += " " + str(cnt_atom.id) + " " + "1.0"
+                        cnt_line += ' ' + str(cnt_atom.id) + ' ' + '1.0'
                 connectivty_table += cnt_line + line_feed
 
         for atom in self.metalatoms:
             a_id += 1
-            cnt_line = " " + str(atom.id)
+            cnt_line = ' ' + str(atom.id)
             # san check
             if atom.id != a_id:
-                raise Exception("atom id error.")
+                raise Exception('atom id error.')
             for cnt_atom in atom.connect:
                 if cnt_atom.id > atom.id:
-                    cnt_line += " " + str(cnt_atom.id) + " " + "1.0"
+                    cnt_line += ' ' + str(cnt_atom.id) + ' ' + '1.0'
             connectivty_table += cnt_line + line_feed
 
         for sol in self.solvents:
             for atom in sol:
                 a_id += 1
-                cnt_line = " " + str(atom.id)
+                cnt_line = ' ' + str(atom.id)
                 # san check
                 if atom.id != a_id:
-                    raise Exception("atom id error.")
+                    raise Exception('atom id error.')
                 for cnt_atom in atom.connect:
                     if cnt_atom.id > atom.id:
-                        cnt_line += " " + str(cnt_atom.id) + " " + "1.0"
+                        cnt_line += ' ' + str(cnt_atom.id) + ' ' + '1.0'
                 connectivty_table += cnt_line + line_feed
 
         return connectivty_table
     
     # === TO BE MOVE ===
     def to_pdb(self, out_path: str) -> None: #@shaoqz: @imp2 move to the PDB interface in the future
-        """Saves the structure to the specified file in the PDB file format."""
+        '''Saves the structure to the specified file in the PDB file format.'''
         lines = list()
         a_idx = 1 #@shaoqz: not nessessary need to number from 1 everytime. It's better to leave a few options to meet different need.
         for cname, chain in self.chain_mapper.items():
             a_idx = chain.renumber_atoms(a_idx)
             lines.extend(chain.get_pdb_lines())
             a_idx += 1
-        lines.append("END")
+        lines.append('END')
         fs.write_lines(out_path, lines) #@shaoqz: @imp2 need to return a mapping of new indexes and old indexes
 
 
     def build_ligands(self, out_dir: str, unique: bool = False) -> List[str]: #@shaoqz: @imp2 add more file format option
-        """Exports all the Ligand() objects in the Structure() to .pdb files.
+        '''Exports all the Ligand() objects in the Structure() to .pdb files.
 
         Args:
                 out_dir: The base directory to save the .pdb files to.
@@ -596,7 +596,7 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
 
         Returns:
                 A list of str() with paths to the exported ligand .pdb files.
-        """
+        '''
         result: List[str] = []
         existing: List[str] = []
         ligands: List[Ligand] = self.ligands
@@ -604,7 +604,7 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
         for lidx, lig in enumerate(ligands):
             # TODO(CJ): add some kind of formatting for lidx
             lig_name: str = lig.name()
-            out_pdb: str = f"{out_dir}/ligand_{lig_name}_{lidx}.pdb"
+            out_pdb: str = f'{out_dir}/ligand_{lig_name}_{lidx}.pdb'
 
             if unique and lig_name in existing:
                 continue
@@ -615,21 +615,21 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
 
         return result
 
-    def build_protein(self, dir, ft="PDB"): #@shaoqz: maybe unify these to a build sele option like pymol did? Support a grammer to indicate what should be contained in each file. But having these presets are also good.
-        """
+    def build_protein(self, dir, ft='PDB'): #@shaoqz: maybe unify these to a build sele option like pymol did? Support a grammer to indicate what should be contained in each file. But having these presets are also good.
+        '''
         build only protein and output under the dir
         -------
         dir: out put dir ($dir/protein.pdb)
         ft : file type / now support: PDB(default)
-        """
+        '''
         # make path
-        if dir[-1] == "/":
+        if dir[-1] == '/':
             dir = dir[:-1]
-        out_path = dir + "/protein.pdb"
+        out_path = dir + '/protein.pdb'
 
         # write
-        if ft == "PDB":
-            with open(out_path, "w") as of: #@shaoqz: same as build ligand use IO interface class
+        if ft == 'PDB':
+            with open(out_path, 'w') as of: #@shaoqz: same as build ligand use IO interface class
                 a_id = 0
                 r_id = 0
                 for chain in self.chains:
@@ -641,73 +641,73 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
                             line = atom.build(a_id=a_id, r_id=r_id)
                             of.write(line)
                     # write TER after each chain
-                    of.write("TER" + line_feed) #@shaoqz: @imp2 how do you solve these
-                of.write("END" + line_feed)
+                    of.write('TER' + line_feed) #@shaoqz: @imp2 how do you solve these
+                of.write('END' + line_feed)
         else:
-            raise Exception("Support only PDB output now.")
+            raise Exception('Support only PDB output now.')
 
         return out_path
 
-    def build_metalcenters(self, dir, ft="PDB"):
-        """
+    def build_metalcenters(self, dir, ft='PDB'):
+        '''
         build metalcenters only. Use for MCPB parameterization. Deal with donor residue with different protonation states.        ----------
         TODO
-        """
+        '''
         out_paths = []
         return out_paths
 
     # def get_atom_id(self): #@shaoqz: @nu
-    #     """
+    #     '''
     #     return a list of id of all atoms in the structure
-    #     """
+    #     '''
     #     atom_id_list = []
     #     for chain in self.chains_:
     #         for res in chain:
     #             for atom in res:
     #                 if atom.id == None:
     #                     raise Exception(
-    #                         "Detected None in chain "
+    #                         'Detected None in chain '
     #                         + str(chain.id)
     #                         + str(res.id)
-    #                         + " "
+    #                         + ' '
     #                         + atom.name
     #                     )
     #                 atom_id_list.append(atom.id)
     #     for metal in self.metalatoms:
     #         if metal.id == None:
-    #             raise Exception("Detected None in metal " + metal.name)
+    #             raise Exception('Detected None in metal ' + metal.name)
     #         atom_id_list.append(metal.id)
     #     for lig in self.ligands:
     #         for atom in lig:
     #             if atom.id == None:
-    #                 raise Exception("Detected None in ligands", res.id, atom.name)
+    #                 raise Exception('Detected None in ligands', res.id, atom.name)
     #             atom_id_list.append(atom.id)
     #     for sol in self.solvents:
     #         for atom in sol:
     #             if atom.id == None:
-    #                 raise Exception("Detected None in solvent", res.id, atom.name)
+    #                 raise Exception('Detected None in solvent', res.id, atom.name)
     #             atom_id_list.append(atom.id)
     #     return atom_id_list
 
     # def get_atom_type(self, prmtop_path): #@shaoqz: @nu
-    #     """
+    #     '''
     #     requires generate the stru using !SAME! PDB as one that generate the prmtop.
-    #     """
+    #     '''
     #     # get type list
     #     with open(prmtop_path) as f:
     #         type_list = []
     #         line_index = 0
     #         for line in f:
     #             line_index = line_index + 1  # current line
-    #             if line.strip() == r"%FLAG POINTERS":
+    #             if line.strip() == r'%FLAG POINTERS':
     #                 format_flag = line_index
-    #             if line.strip() == r"%FLAG AMBER_ATOM_TYPE":
+    #             if line.strip() == r'%FLAG AMBER_ATOM_TYPE':
     #                 type_flag = line_index
-    #             if "format_flag" in dir():
+    #             if 'format_flag' in dir():
     #                 if line_index == format_flag + 2:
     #                     N_atom = int(line.split()[0])
     #                     del format_flag
-    #             if "type_flag" in dir():
+    #             if 'type_flag' in dir():
     #                 if (
     #                     line_index >= type_flag + 2
     #                     and line_index <= type_flag + 1 + ceil(N_atom / 5)
@@ -721,28 +721,28 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
     #                 atom.type = type_list[atom.id - 1]
     #     for atom in self.metalatoms:
     #         if atom.id == None:
-    #             raise Exception("Detected None in metal " + atom.name)
+    #             raise Exception('Detected None in metal ' + atom.name)
     #         atom.type = type_list[atom.id - 1]
     #     for lig in self.ligands:
     #         for atom in lig:
     #             if atom.id == None:
-    #                 raise Exception("Detected None in ligands", res.id, atom.name)
+    #                 raise Exception('Detected None in ligands', res.id, atom.name)
     #             atom.type = type_list[atom.id - 1]
     #     for sol in self.solvents:
     #         for atom in sol:
     #             if atom.id == None:
-    #                 raise Exception("Detected None in solvent", res.id, atom.name)
+    #                 raise Exception('Detected None in solvent', res.id, atom.name)
     #             atom.type = type_list[atom.id - 1]
 
-    # def get_resi_dist(self, r1, r2, method="mass_center"): #@shaoqz: @nu
-    #     """
+    # def get_resi_dist(self, r1, r2, method='mass_center'): #@shaoqz: @nu
+    #     '''
     #     r1: residue 1. (residue_obj)
     #     r2: residue 2. (residue_obj)
     #     method: The method to narrow the residue down to a point.
     #             - mass_center
     #             - ...
-    #     """
-    #     if method == "mass_center":
+    #     '''
+    #     if method == 'mass_center':
     #         p1 = r1.get_mass_center()
     #         p2 = r2.get_mass_center()
     #     D = get_distance(p1, p2)
@@ -751,29 +751,29 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
     #endregion
 
 def compare_structures(left: Structure, right: Structure) -> Dict[str, List[str]]:
-    """Compares two Structure() objects and returns a dict() of missing Residues with format:
+    '''Compares two Structure() objects and returns a dict() of missing Residues with format:
 
     {'left': ['residue_key1','residue_key1',..],
      'right': ['residue_key1','residue_key1',..]
          }
-    """
-    result = {"left": [], "right": []}
+    '''
+    result = {'left': [], 'right': []}
     left_keys: Set[str] = set(left.residue_keys)
     right_keys: Set[str] = set(right.residue_keys)
 
-    result["left"] = list(filter(lambda ll: ll not in right_keys, left_keys))
-    result["right"] = list(filter(lambda rr: rr not in left_keys, right_keys))
+    result['left'] = list(filter(lambda ll: ll not in right_keys, left_keys))
+    result['right'] = list(filter(lambda rr: rr not in left_keys, right_keys))
     return result
 
 
 def merge_right(left: Structure, right: Structure) -> Structure: #@shaoqz: I believe there will be a bug due to the treatment of insert with same id
-    """Merges Residue() and derived objects from left Structure() to right Structure(), making sure that ALL Residue() and
+    '''Merges Residue() and derived objects from left Structure() to right Structure(), making sure that ALL Residue() and
         Residue() derived objects from the left are in the right. Note that the reverse is not applied and that elements initially found only in right are NOT
         merged back over to left. Also not the resulting Structure() is a deepcopy and no changes are made to the original left or right objects.
 
     Example:
             #TODO(CJ): add this in
-    """
+    '''
     struct_cpy: Structure = deepcopy(right)
     # TODO(CJ): make this a method
     left.chains = sorted(left.chains, key=lambda c: c.name())
