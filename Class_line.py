@@ -84,7 +84,7 @@ class PDB_line(object):
             occupancy = '{:>6.2f}'.format(self.occupancy)
             temp_factor = '{:>6.2f}'.format(self.temp_factor)
             seg_id = '{:<4}'.format(self.seg_id)
-            element = '{:1}'.format(self.element)
+            element = '{:>2}'.format(self.element)
             charge = '{:2}'.format(self.charge)
 
         #example: ATOM   5350  HB2 PRO   347      32.611  15.301  24.034  1.00  0.00
