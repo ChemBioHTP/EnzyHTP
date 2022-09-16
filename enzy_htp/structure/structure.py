@@ -127,18 +127,18 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
     Note: This class SHOULD NOT be created directly by users. It should be created with methods from the StructureIO module.
 
     Attributes:
-        _children/_chains: List[Chain]
+        children/chains: List[Chain]
 
     Derived properties:
-        + residue_state : List[Tuple[str, str, int]]
-        + residue_keys() : List[str]
-        + residues : List
-        + metals : List[Residue]
-        + ligands : List[Residue]
-        + solvents : List
-        + num_chains
-        + num_residues
-        + chain_names
+        residue_state : List[Tuple[str, str, int]]
+        residue_keys() : List[str]
+        residues : List
+        metals : List[Residue]
+        ligands : List[Residue]
+        solvents : List
+        num_chains
+        num_residues
+        chain_names
     """
 
     def __init__(self, chains: List[Chain]):
@@ -148,7 +148,7 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
         self.set_ghost_parent()
         if self.has_duplicate_chain_name():
             self.resolve_duplicated_chain_name()
-    #region === Getters === (Attributes - accessing Structure data -  references)
+    #region === Getters-attr ===
     @property
     def chains(self) -> List[Chain]:
         """Getter for the list of Chain() objects contained within the Structure() object."""
@@ -173,12 +173,14 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
         return self.chain_mapper.get(chain_name, None)
 
     #endregion
-    #region === Getter === (Properities - derived data; wont affect Structure data - copy)
+
+    #region === Getter-Prop ===
     @property
     def num_chains(self) -> int:
         """Returns the number of Chain() objects in the current Structure()."""
         return len(self._chains)
     #endregion
+
     #region === Checker ===
     def has_duplicate_chain_name(self) -> bool: #TODO add test
         '''check if self._chain have duplicated chain name
@@ -217,8 +219,10 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
                 'Resolved duplicated chain (different ones) name by renaming.'
             )
     #endregion
+
     #region === Editor ===
     #endregion
+
     #region === Special ===
     def __str__(self):
         '''

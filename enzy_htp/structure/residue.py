@@ -47,7 +47,7 @@ class Residue(DoubleLinkNode):
 
         self._atoms = self._children # add an alias
         
-    #region === Getter-Attr (ref) ===
+    #region === Getter-Attr ===
     @property
     def atoms(self) -> List[Atom]:
         """Returns a list of all Atom() objects that the Residue() "owns" """
@@ -89,7 +89,7 @@ class Residue(DoubleLinkNode):
         self._name = val
     #endregion
     
-    #region === Getter-Prop (cpy/new) ===
+    #region === Getter-Prop ===
     def key(self, if_name: bool = False) -> Tuple[str, int]:
         '''
         an unique tuple to indicate a specific residue in the enzyme
