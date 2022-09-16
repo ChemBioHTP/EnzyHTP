@@ -170,7 +170,7 @@ class Residue(DoubleLinkNode):
 
     # === Special ===
     def __str__(self) -> str:
-        return f'Residue({self.idx}, {self.name}, Atoms:{len(self.atoms)}, {self._parent})'
+        return f'Residue({self._idx}, {self._name}, atom:{len(self._atoms)}, {self._parent})'
 
     def __repr__(self) -> str: # TODO
         return str(self)

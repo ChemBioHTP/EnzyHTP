@@ -43,7 +43,9 @@ class PDBParser(StructureParserInterface):
 
     # interface
     @classmethod
-    def get_structure(cls, path: str, model: int=0, add_solvent_list: List=None, add_ligand_list: List=None, remove_trash: bool=True, give_idx_map: bool = False) -> Union[Structure, tuple]:
+    def get_structure(cls, path: str, model: int=0,
+                           add_solvent_list: List=None, add_ligand_list: List=None, 
+                           remove_trash: bool=True, give_idx_map: bool = False) -> Union[Structure, tuple]:
         '''
         Converting a PDB file (as its path) into the Structure()
         Arg:
@@ -295,7 +297,7 @@ class PDBParser(StructureParserInterface):
         return atom_mapper
 
     @classmethod
-    def _build_residues(cls, atom_mapper: Dict[str, Atom], add_solvent_list: List, add_ligand_list: List) -> Dict[str, Residue]: #TODO add test for this
+    def _build_residues(cls, atom_mapper: Dict[str, Atom], add_solvent_list: List =None, add_ligand_list: List=None) -> Dict[str, Residue]: #TODO add test for this
         '''
         build Residue() objects from atom_mapper
         Arg:

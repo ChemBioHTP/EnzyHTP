@@ -238,7 +238,7 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
             out_line.append(f'    {ch.name}({ch.chain_type}): residue: {ch.residue_idx_interval()} atom_count: {ch.num_atoms}')
         out_line.append(')')
         return os.linesep.join(out_line)
-    #endregion
+        #endregion
 
 
 
