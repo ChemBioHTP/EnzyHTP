@@ -100,5 +100,4 @@ class Atom(DoubleLinkNode):
     @charge.setter
     def charge(self, val):
         self._charge = val
-
     #endregion
