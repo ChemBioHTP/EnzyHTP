@@ -198,6 +198,13 @@ class Chain(DoubleLinkNode):
                 _LOGGER.debug(f'removing TRASH: {self._residues[i]}')
                 del self._residues[i]
 
+    def sort_residues(self):
+        '''
+        sort children chains with their residue idx
+        sorted is always better than not but Chain() is being lazy here
+        '''
+        self._children.sort(key=lambda x: x.idx)
+
     def add_residue(self, new_res: Residue, sort_after: bool = True, overwrite: bool = False) -> None: # TODO#@shaoqz: @imp overwriting a residue is rarely a demand but instead inserting one with same name and index but different stru is.
         """Allows for insertion of a new Residue() object into the Chain. If the new Residue() is an exact # TODO work on overwriting
         copy, it fully overwrites the existing value. The sort_after flag specifies if the Residue()'s should
@@ -261,20 +268,6 @@ class Chain(DoubleLinkNode):
         concise string representation of the chain
         '''
         return f'Chain({self._name}, residue: {self.residue_idx_interval()})'
-    #endregion
-
-    #region === TODO/TOMOVE ===
-    def get_pdb_lines(self) -> List[str]: #@shaoqz: @imp move to the IO class
-        """Generates a list of PDB lines for the Atom() objects inside the Chain(). Last line is a TER."""
-        result = list()
-        num_residues: int = self.num_residues
-        for idx, res in enumerate(self._residues):
-            terminal = (idx < (num_residues - 1)) and (
-                res.is_canonical() and not self._residues[idx + 1].is_canonical()
-            )
-            result.extend(res.get_pdb_lines(terminal)) #@shaoqz: why terminal?
-        result.append("TER")
-        return result
     #endregion
 
 # TODO go to core

@@ -43,6 +43,8 @@ class Atom(DoubleLinkNode):
         self._element = ds['element_symbol'].strip()
         if not np.isnan(ds['charge']):
             self._charge = float(ds['charge'])
+        else:
+            self._charge = None
 
     #region === Getter-Attr (ref) ===
     @property

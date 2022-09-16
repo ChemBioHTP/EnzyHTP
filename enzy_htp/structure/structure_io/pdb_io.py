@@ -96,9 +96,23 @@ class PDBParser(StructureParserInterface):
     @classmethod
     def get_file_str(cls, stru: Structure) -> str:
         '''
-        Convert Structure() into PDB file string
+        Convert Structure() into PDB file string. Only the simplest function is need for 
+        enzyme modeling.
+
+        TODO do we need to add a mode where all ligand,metal,solvent are written into seperate 
+        chains? we if encounter any need
+            A better way to do this is to make derivate Parser classes and overwrite this as needed
+            or use things like pdb4amber to accommodate software as needed.
+        Return:
+            a string of the PDB file
         '''
-        pass
+        stru.sort_chains()
+        result_str = ''
+        for chain in stru:
+            chain: Chain
+            result_str += cls._write_pdb_chain(chain)
+        result_str += f'END{os.linesep}'
+        return result_str
 
     #region == pdb -> Stru ==
     @staticmethod
@@ -396,9 +410,70 @@ class PDBParser(StructureParserInterface):
         return chain_list
     #endregion
 
+    @classmethod
+    def _write_pdb_chain(cls, chain: Chain) -> str:
+        '''
+        make the file string for a pdb chain record
+        '''
+        result = ''
+        chain.sort_residues()
+        for res in chain:
+            res: Residue
+            result += cls._write_pdb_residue(res)
+        result += f'TER{os.linesep}'
+        return result
+
+    @classmethod
+    def _write_pdb_residue(cls, res: Residue) -> str:
+        '''
+        make the file string for a pdb residue record
+        '''
+        result = ''
+        res.sort_atoms()
+        for atom in res:
+            atom: Atom
+            result += cls._write_pdb_atom(atom)
+        return result
+
     @staticmethod
-    def _make_pdb_atom():
-        pass
+    def _write_pdb_atom(atom: Atom) -> str:
+        '''
+        make the file string for a pdb ATOM record
+        the function intepret information from
+        https://www.wwpdb.org/documentation/file-format
+        '''
+        #build an amber style line here
+        l_type = f'{"ATOM":<6}'
+        a_index = f'{atom.idx:>5d}'
+
+        if len(atom.name) > 3:
+            a_name = f'{atom.name:<4}'
+        else:
+            a_name = f'{atom.name:<3}'
+            a_name = ' '+a_name
+        r_name = f'{atom.residue.name:>3}'
+
+        c_index = atom.residue.chain.name
+        r_index = f'{atom.residue.idx:>4d}'
+        x = f'{atom.coord[0]:>8.3f}'
+        y = f'{atom.coord[1]:>8.3f}'
+        z = f'{atom.coord[2]:>8.3f}'
+        
+        alt_loc_id = f'{"":1}'
+        insert_code = f'{"":1}'
+        occupancy = f'{1.00:>6.2f}'
+
+        temp_factor = f'{atom.b_factor:>6.2f}'
+        seg_id = f'{"":<4}'
+        element = f'{atom.element:1}'
+        if atom.charge is None:
+            charge = f'{"":2}'
+        else:
+            charge = f'{atom.charge:2}'
+
+        #example: ATOM   5350  HB2 PRO   347      32.611  15.301  24.034  1.00  0.00
+        line = f'{l_type}{a_index} {a_name}{alt_loc_id}{r_name} {c_index}{r_index}{insert_code}   {x}{y}{z}{occupancy}{temp_factor}      {seg_id}{element}{charge}{os.linesep}'
+        return line
 
 
 # TODO go to core helper

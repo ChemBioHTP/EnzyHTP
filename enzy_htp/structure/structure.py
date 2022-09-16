@@ -221,6 +221,12 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
     #endregion
 
     #region === Editor ===
+    def sort_chains(self):
+        '''
+        sort children chains with their chain name
+        sorted is always better than not but Structure() is being lazy here
+        '''
+        self._chains.sort(key=lambda x: x.name)
     #endregion
 
     #region === Special ===
@@ -238,7 +244,7 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
             out_line.append(f'    {ch.name}({ch.chain_type}): residue: {ch.residue_idx_interval()} atom_count: {ch.num_atoms}')
         out_line.append(')')
         return os.linesep.join(out_line)
-        #endregion
+    #endregion
 
 
 
@@ -575,18 +581,6 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
         return connectivty_table
     
     # === TO BE MOVE ===
-    def to_pdb(self, out_path: str) -> None: #@shaoqz: @imp2 move to the PDB interface in the future
-        '''Saves the structure to the specified file in the PDB file format.'''
-        lines = list()
-        a_idx = 1 #@shaoqz: not nessessary need to number from 1 everytime. It's better to leave a few options to meet different need.
-        for cname, chain in self.chain_mapper.items():
-            a_idx = chain.renumber_atoms(a_idx)
-            lines.extend(chain.get_pdb_lines())
-            a_idx += 1
-        lines.append('END')
-        fs.write_lines(out_path, lines) #@shaoqz: @imp2 need to return a mapping of new indexes and old indexes
-
-
     def build_ligands(self, out_dir: str, unique: bool = False) -> List[str]: #@shaoqz: @imp2 add more file format option
         '''Exports all the Ligand() objects in the Structure() to .pdb files.
 

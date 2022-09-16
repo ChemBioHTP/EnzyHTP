@@ -142,8 +142,15 @@ class Residue(DoubleLinkNode):
         return self.key() == other.key()
     #endregion
 
-    #region === Editor === # TODO
-    def set_chain(self, val: str) -> None:
+    #region === Editor === 
+    def sort_atoms(self):
+        '''
+        sort children chains with their residue idx
+        sorted is always better than not but Residue() is being lazy here
+        '''
+        self._children.sort(key=lambda x: x.idx)
+
+    def set_chain(self, val: str) -> None: # TODO
         """Sets chain and all child atoms to new value. Re-generates the self.residue_key attribute."""
         chain = val #@shaoqz: Refine this line
         for idx in range(len(self._atoms)):
@@ -151,7 +158,7 @@ class Residue(DoubleLinkNode):
         self.chain_ = val
         self.residue_key = f"{self.chain_}.{self.name}.{self.num_}"
 
-    def renumber_atoms(self, start: int = 1) -> int:
+    def renumber_atoms(self, start: int = 1) -> int: # TODO
         """Renumbers the Residue()'s Atom()'s beginning with "start" paramter, defaulted to 1. Returns the index of the last Atom().
         NOTE: errors if "start" is <= 0.
         """
@@ -168,28 +175,10 @@ class Residue(DoubleLinkNode):
         return idx + start
     #endregion
 
-    # === Special ===
+    #region === Special ===
     def __str__(self) -> str:
         return f'Residue({self._idx}, {self._name}, atom:{len(self._atoms)}, {self._parent})'
 
     def __repr__(self) -> str: # TODO
         return str(self)
-
-    #region === TODO/TOMOVE ===
-    def get_pdb_lines(self, terminal: bool = False) -> List[str]:
-        """Method that gets the PDB lines for all of the Atom() objects in the Residue() object."""
-        result = list()
-        for aa in self._atoms:
-            result.append(aa.to_pdb_line())
-        if terminal:
-            num = int(result[-1][6:11])
-            ter_line = result[-1]
-            ter_line = ter_line[:26] + " " * (len(ter_line) - 26)
-            ter_line = "TER   " + ter_line[6:]
-            print(result[-1][6:12])
-            num = int(result[-1][6:12])
-            ter_line = ter_line[0:6] + f"{num+1: >5d}     " + ter_line[16:]
-            result.append(ter_line)
-        return result
-
     #endregion

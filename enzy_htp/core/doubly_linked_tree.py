@@ -75,7 +75,7 @@ class DoubleLinkNode():
         '''
         pass
 
-    # ==special==
+    # === special ===
     def __getitem__(self, key: int):
         return self._children[key]
 

@@ -360,7 +360,6 @@ def test_get_structure():
     pdb_file_path = f'{DATA_DIR}1Q4T_ligand_test.pdb'
 
     stru: Structure = sp.get_structure(pdb_file_path)
-    print(stru)
 
 @pytest.mark.interface
 def test_get_structure_bad_input():
@@ -417,3 +416,14 @@ def test_get_structure_ligand():
     assert ligand.is_ligand()
     assert len(ligand.atoms) == 7
     assert ligand.name == 'FAH'
+
+@pytest.mark.interface
+def test_get_file_str():
+    '''
+    test for the getting pdb file from Structure()
+    '''
+    pdb_file_path = f'{DATA_DIR}1Q4T_ligand_test.pdb'
+
+    stru: Structure = sp.get_structure(pdb_file_path)
+    print(sp.get_file_str(stru))
+    
