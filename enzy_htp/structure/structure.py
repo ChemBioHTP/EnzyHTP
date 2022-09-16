@@ -98,11 +98,12 @@ Date: 2022-04-03
 """
 #TODO(CJ): add a method for changing/accessing a specific residue
 from __future__ import annotations
+import os
 
 import string
 from copy import deepcopy
 import sys
-from typing import List, Set, Dict, Tuple
+from typing import List, Set, Dict, Tuple, Union
 from collections import defaultdict
 
 from enzy_htp.core import _LOGGER
@@ -147,7 +148,6 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
         self.set_ghost_parent()
         if self.has_duplicate_chain_name():
             self.resolve_duplicated_chain_name()
-
     #region === Getters === (Attributes - accessing Structure data -  references)
     @property
     def chains(self) -> List[Chain]:
@@ -164,7 +164,7 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
         if self.has_duplicate_chain_name():
             self.resolve_duplicated_chain_name()
         ch: Chain
-        for ch in self.chains:
+        for ch in self._chains:
             mapper[ch.name] = ch
         return mapper
 
@@ -172,13 +172,86 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
         """Gets a chain of the given name. Returns None if the Chain() is not present."""
         return self.chain_mapper.get(chain_name, None)
 
+    #endregion
+    #region === Getter === (Properities - derived data; wont affect Structure data - copy)
+    @property
+    def num_chains(self) -> int:
+        """Returns the number of Chain() objects in the current Structure()."""
+        return len(self._chains)
+    #endregion
+    #region === Checker ===
+    def has_duplicate_chain_name(self) -> bool: #TODO add test
+        '''check if self._chain have duplicated chain name
+        give warning if do.'''
+        existing_c_id = []
+        ch: Chain
+        for ch in self._chains:
+            if ch.name in existing_c_id:
+                _LOGGER.warning(
+                    f"Duplicate chain names detected in Structure obj during {sys._getframe().f_back.f_code.co_name}()! "
+                )
+                return True
+            existing_c_id.append(ch.name)
+        return False
+    
+    def resolve_duplicated_chain_name(self) -> None: #TODO add test
+        '''resolve for duplicated chain name in self.chains_
+        A. insert the chain to be one character after the same one if they are different
+           and move the rest chain accordingly
+        B. give error if they are the same (in coordinate)'''        
+        mapper = {}
+        if_rename = 0
+        for ch in self.chains:
+            if ch.name in mapper:
+                if ch.is_same_coord(mapper[ch.name]):
+                    _LOGGER.error(
+                        "Duplicate chain (same coordinate) detected in Structure obj! Exiting... "
+                    )
+                    sys.exit(1)
+                new_name = chr(ord(ch.name) + 1) # TODO find a way
+                ch.name = new_name
+                if_rename = 1
+            mapper[ch.name] = ch
+        if if_rename:
+            _LOGGER.warning(
+                'Resolved duplicated chain (different ones) name by renaming.'
+            )
+    #endregion
+    #region === Editor ===   
+    #endregion
+    #region === Special ===
+    def __str__(self):
+        '''
+        a string representation of Structure()
+        Goal:
+            show it is a Structure obj
+            show the data in current instance
+        '''
+        out_line = [f'<Structure object at {hex(id(self))}>',]
+        out_line.append('Structure(')
+        out_line.append('chains:')
+        for ch in sorted(self._chains,key=lambda x: x.name):
+            out_line.append(f'    {ch.name}({ch.chain_type()}): residue: {ch.residue_idx_interval()} atom_count: {ch.num_atoms()}')
+        out_line.append(')')
+        return os.linesep.join(out_line)
+    #endregion
+
+
+
+
+
+
+
+    # ============= TODO below =================
+    #region === Getters === (Attributes - accessing Structure data -  references)
     @property
     def residues(self) -> List[Residue]:
         """Return a list of the residues in the Structure() object sorted by (chain_id, residue_id)"""
-        result = list()
+        result = []
+        ch: Chain
         for ch in self.chains:
-            result.extend(ch.residues())
-        result.sort(key=lambda r: r.sort_key())
+            result.extend(ch.residues)
+        result.sort(key=lambda r: r.key())
         return result
 
     def get_residue(self, target_key: str) -> Union[None, Residue]: #@shaoqz: we need to that gives a reference. In the case of editing the structure.
@@ -224,9 +297,8 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
         maybe just use python objects to access is a better idea.
         And these APIs are just for developers, users will have selector in the future to do selection'''
         pass
-    
     #endregion
-
+    
     #region === Getter === (Properities - derived data; wont affect Structure data - copy)
     @property
     def residue_state(self) -> List[Tuple[str, str, int]]: #@shaoqz: @residue_key
@@ -261,58 +333,16 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
         return total
 
     @property
-    def num_chains(self) -> int:
-        """Returns the number of Chain() objects in the current Structure()."""
-        return len(self.chains)
-
-    @property
     def chain_names(self) -> List[str]:
         """Returns a list of all the chain names for the Structure()"""
         return list(self.chain_mapper.keys())
 
     #endregion
 
-    #region === Checker === 
+    #region === Checker ===
     def has_chain(self, chain_name: str) -> bool:
         """Checks if the Structure() has a chain with the specified chain_name."""
         return chain_name in self.chain_mapper
-
-    def has_duplicate_chain_name(self) -> bool: #TODO add test
-        '''check if self._chain have duplicated chain name
-        give warning if do.'''
-        existing_c_id = []
-        ch: Chain
-        for ch in self._chains:
-            if ch.name in existing_c_id:
-                _LOGGER.warning(
-                    f"Duplicate chain names detected in Structure obj during {sys._getframe().f_back.f_code.co_name}()! "
-                )
-                return True
-            existing_c_id.append(ch.name)
-        return False
-    
-    def resolve_duplicated_chain_name(self) -> None: #TODO add test
-        '''resolve for duplicated chain name in self.chains_
-        A. insert the chain to be one character after the same one if they are different
-           and move the rest chain accordingly
-        B. give error if they are the same (in coordinate)'''        
-        mapper = {}
-        if_rename = 0
-        for ch in self.chains:
-            if ch.name in mapper:
-                if ch.is_same_coord(mapper[ch.name]):
-                    _LOGGER.error(
-                        "Duplicate chain (same coordinate) detected in Structure obj! Exiting... "
-                    )
-                    sys.exit(1)
-                new_name = chr(ord(ch.name) + 1) # TODO find a way
-                ch.name = new_name
-                if_rename = 1
-            mapper[ch.name] = ch
-        if if_rename:
-            _LOGGER.warning(
-                'Resolved duplicated chain (different ones) name by renaming.'
-            )
     #endregion
 
     #region === Editor ===     
@@ -364,7 +394,6 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
             self.chain_mapper[chain_name].remove_residue(target_key)
             if self.chain_mapper[chain_name].empty():
                 self.remove_chain(chain_name)
-
     #endregion
 
     #region === Special === 

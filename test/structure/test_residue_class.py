@@ -76,7 +76,7 @@ def test_check_all_canonical():
         assert rr.is_canonical()
         assert not rr.is_metal()
         assert not rr.is_solvent()
-    assert not rr.is_rd_non_ligand()
+    assert not rr.is_trash()
 
 
 def test_sequence_equivalent_return_true():
@@ -110,13 +110,13 @@ def test_chain_getters_and_setters():
     """Testing the chain accession methods."""
     test_res = Residue("A.A.1", list())
     assert test_res.chain() == "A"
-    assert not test_res.is_empty_chain()
+    assert not test_res.is_missing_chain()
     test_res.set_chain("")
     assert test_res.residue_key == ".A.1"
-    assert test_res.is_empty_chain()
+    assert test_res.is_missing_chain()
     assert test_res.chain() == ""
     test_res.set_chain("B")
-    assert not test_res.is_empty_chain()
+    assert not test_res.is_missing_chain()
     assert test_res.chain() == "B"
     assert test_res.residue_key == "B.A.1"
 

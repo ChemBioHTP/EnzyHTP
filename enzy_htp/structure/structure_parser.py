@@ -69,7 +69,7 @@ def categorize_residue(residue: Residue) -> Union[Residue, Ligand, Solvent, Meta
     """Method that takes a default Residue() and converts it into its specialized Residue() inherited class."""
     # TODO(CJ): I need to add in stuff here for the solvent types.
     if residue.is_canonical():
-        residue.set_rtype(chem.ResidueType.CANONICAL)
+        residue.rtype = chem.ResidueType.CANONICAL
         return residue
 
     if (

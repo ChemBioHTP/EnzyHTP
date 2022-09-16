@@ -5,6 +5,7 @@ Date: 2022-08-30
 """
 
 from abc import ABC, abstractmethod
+from typing import Union
 from ..structure import Structure
 
 
@@ -23,7 +24,7 @@ class StructureParserInterface(ABC):
 
     @classmethod
     @abstractmethod
-    def get_structure(cls, path: str) -> Structure:
+    def get_structure(cls, path: str) -> Union[Structure, tuple]:
         '''
         interface for converting file into the Structure().
 

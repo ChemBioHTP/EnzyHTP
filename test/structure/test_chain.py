@@ -141,12 +141,12 @@ def test_num_atoms():
     assert empty_chain.num_atoms() == 0
 
 
-def test_is_metal():
-    """Checks if the Chain.is_metal() returns correct answers for both True and False cases."""
+def test_has_metal():
+    """Checks if the Chain.has_metal() returns correct answers for both True and False cases."""
     pdb_file = f"{DATA_DIR}/1NVG.pdb"
     structure: Structure = structure_from_pdb(pdb_file)
     chain: Chain = structure.chains[0]
-    assert chain.is_metal()
+    assert chain.has_metal()
     del chain[-1]
     del chain[-1]
-    assert not chain.is_metal()
+    assert not chain.has_metal()

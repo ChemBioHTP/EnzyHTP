@@ -87,55 +87,61 @@ class Residue(DoubleLinkNode):
     #endregion
     
     #region === Getter-Prop (cpy/new) ===
-    @property
-    def key(self, if_name: bool = False):
+    def key(self, if_name: bool = False) -> Tuple[str, int]:
         '''
         an unique tuple to indicate a specific residue in the enzyme
         '''
         if if_name:
-            return (self.chain.id, self._idx, self._name)
-        return (self.chain.id, self._idx)
+            return (self.chain.name, self._idx, self._name)
+        return (self.chain.name, self._idx)
 
     def num_atoms(self) -> int:
         """Number of atoms in the Residue."""
         return len(self._atoms)
 
-    def clone(self) -> Residue:
-        """Creates a deepcopy of self."""
-        return deepcopy(self)
+    def sort_key(self) -> Tuple[str, int]:
+        """Generates the sorting key for the Residue(). Specifically, a tuple of [chain_id, res_num]."""
+        return (self._chain.name, self._idx)
+    # def clone(self) -> Residue:
+    #     """Creates a deepcopy of self."""
+    #     return deepcopy(self)
     #endregion
 
     #region === Checker === 
-    def is_empty_chain(self) -> bool:
-        """Whether the Residue() lacks a chain identitifer. NOT a chain object accessor."""
-        return not len(self.chain_.strip())
+    def is_missing_chain(self) -> bool:
+        """Whether the Residue() lacks a chain parent"""
+        return self._parent is None
 
     def is_ligand(self) -> bool:
         """Checks if Residue() is a ligand. Inherited by children."""
-        return False
+        return self._rtype == chem.ResidueType.LIGAND
 
     def is_metal(self) -> bool:
         """Checks if Residue() is a metal. Inherited by children."""
-        return False
+        return self._rtype == chem.ResidueType.METAL
 
     def is_canonical(self) -> bool:
         """Checks if Residue() is canonical. Inherited by children."""
-        return self.name in chem.THREE_LETTER_AA_MAPPER
+        return self._rtype == chem.ResidueType.CANONICAL
+
+    def is_noncanonical(self) -> bool:
+        """Checks if Residue() is canonical. Inherited by children."""
+        return self._rtype == chem.ResidueType.NONCANONICAL
 
     def is_solvent(self) -> bool: #@shaoqz: @imp2 move to the IO class. This is PDB related.
         """Checks if the Residue() is an rd_sovlent as defined by enzy_htp.chemical.solvent.RD_SOLVENT"""
-        return self.name in chem.RD_SOLVENT_LIST
+        return self._rtype == chem.ResidueType.SOLVENT
 
-    def is_rd_non_ligand(self) -> bool:
+    def is_trash(self) -> bool:
         """Checks if the Residue() is an rd_non_ligand as defined by enzy_htp.chemical.solvent.RD_NON_LIGAND_LIST"""
-        return self.name in chem.RD_NON_LIGAND_LIST
+        return self._rtype == chem.ResidueType.TRASH
 
-    def is_sequence_eq(self, other: Residue) -> bool: #@shaoqz: @imp2 why do we need to compare this? Because in the comparsion of residues there often some information exist and want to compare the rest.
+    def is_sequence_eq(self, other: Residue) -> bool:
         """Comparator that checks for sequence same-ness."""
-        return self.key == other.key
+        return self.key() == other.key()
     #endregion
 
-    # === Editor ===
+    #region === Editor === # TODO
     def set_chain(self, val: str) -> None:
         """Sets chain and all child atoms to new value. Re-generates the self.residue_key attribute."""
         chain = val #@shaoqz: Refine this line
@@ -159,22 +165,13 @@ class Residue(DoubleLinkNode):
         for idx, aa in enumerate(self._atoms):
             self._atoms[idx].atom_number = idx + start #@shaoqz: why dont use aa?
         return idx + start
-
-    def set_rtype(self, new_rtype: chem.ResidueType) -> None:
-        """Setter for the Residue()'s chem.ResidueType value."""
-        self._rtype = new_rtype
-
-    def sort_key(self) -> Tuple[str, int]:
-        """Generates the sorting key for the Residue(). Specifically, a tuple of [chain_id, res_num]."""
-        return (self.chain_, self.num_)
+    #endregion
 
     # === Special ===
     def __str__(self) -> str:
-        """String representation that just shows residue key in format "chain_id.residue_name.residue_num" """
         return f'Residue({self.idx}, {self.name}, Atoms:{len(self.atoms)}, {self._parent})'
 
-    def __repr__(self) -> str:
-        """String representationt that just shows residue key in format "chain_id.residue_name.residue_num" """
+    def __repr__(self) -> str: # TODO
         return str(self)
 
     #region === TODO/TOMOVE ===

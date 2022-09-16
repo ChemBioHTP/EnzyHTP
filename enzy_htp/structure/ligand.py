@@ -44,7 +44,7 @@ class Ligand(Residue):
         """
         self.net_charge = kwargs.get("net_charge", None)
         Residue.__init__(self, residue_idx, residue_name, atoms, parent)
-        self.set_rtype(chem.ResidueType.LIGAND)
+        self.rtype = chem.ResidueType.LIGAND
 
     # === Getter-Attr (ref) ===
     # === Getter-Prop (cpy/new) ===

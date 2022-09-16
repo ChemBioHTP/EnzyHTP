@@ -36,16 +36,6 @@ CURRDIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = f'{CURRDIR}/../data/'
 sp = PDBParser()
 
-@pytest.mark.interface
-def test_get_structure():
-    '''
-    just make sure it wont crash now
-    maybe convert back to file and assert
-    '''
-    pdb_file_path = f'{DATA_DIR}1Q4T_ligand_test.pdb'
-
-    stru = sp.get_structure(pdb_file_path)
-
 def test_check_valid_pdb_good_input():
     '''Good input for the check_valid_pdb() helper method.'''
     # make dummy file
@@ -361,51 +351,62 @@ def test_categorize_residue_noncanonical():
     all_residue = list(itertools.chain.from_iterable(res_mapper.values()))
     assert len(list(filter(lambda x: x.rtype is chem.ResidueType.NONCANONICAL, all_residue))) == 1
 
-# def test_structure_from_pdb_bad_input():
-#     '''Checking that the main method structure_parser.structure_from_pdb() fails for bad input.'''
-#     with pytest.raises(SystemExit) as exe:
-#         sp.structure_from_pdb('dne.pdb')
+@pytest.mark.interface  # TODO recover some test / check the structure
+def test_get_structure():
+    '''
+    just make sure it wont crash now
+    maybe convert back to file and assert
+    '''
+    pdb_file_path = f'{DATA_DIR}1Q4T_ligand_test.pdb'
 
-#     assert exe
-#     assert exe.type == SystemExit
-#     assert exe.value.code == 1
+    stru: Structure = sp.get_structure(pdb_file_path)
+    print(stru)
 
+@pytest.mark.interface
+def test_get_structure_bad_input():
+    with pytest.raises(SystemExit) as exe:
+        sp.get_structure('dne.pdb')
 
-# def test_structure_from_pdb_simple():
-#     '''Checking that the main method structure_parser.structure_from_pdb() works for simple cases.'''
-#     pdb_name = f'{DATA_DIR}/two_chain.pdb'
-#     structure: Structure = structure_from_pdb(pdb_name)
+    assert exe
+    assert exe.type == SystemExit
+    assert exe.value.code == 1
 
-#     chain_A_target = ['A.ALA.10', 'A.THR.11']
-#     chain_B_target = ['B.GLY.12', 'B.GLY.13', 'B.ASN.14', 'B.LEU.15', 'B.PRO.16']
-#     assert structure.num_chains == 2
-#     (chain_A, chain_B) = structure.chains
-#     assert chain_A_target == list(map(str, chain_A))
-#     assert chain_B_target == list(map(str, chain_B))
+@pytest.mark.interface
+def test_structure_from_pdb_simple():
+    '''Checking that the main method get_structure() works for simple cases.'''
+    pdb_name = f'{DATA_DIR}/two_chain.pdb'
+    structure: Structure = sp.get_structure(pdb_name)
 
+    chain_A_target = ['A.ALA.10', 'A.THR.11']
+    chain_B_target = ['B.GLY.12', 'B.GLY.13', 'B.ASN.14', 'B.LEU.15', 'B.PRO.16']
+    assert structure.num_chains == 2
+    (chain_A, chain_B) = structure.chains
+    assert chain_A_target == list(map(lambda r: f'{r.chain.name}.{r.name}.{r.idx}', chain_A))
+    assert chain_B_target == list(map(lambda r: f'{r.chain.name}.{r.name}.{r.idx}', chain_B))
 
-# def test_structure_from_pdb_mixed_case():
-#     '''Checking that the main method structure_parser.structure_from_pdb() works for cases with mixed Residue() types..'''
-#     mixed_pdb = f'{DATA_DIR}/mixed_residues.pdb'
-#     structure: Structure = structure_from_pdb(mixed_pdb)
-#     assert structure.num_chains == 5
-#     all_residues = structure.residues
+@pytest.mark.interface
+def test_structure_from_pdb_mixed_case():
+    '''Checking that the main method get_structure() works for simple cases.'''
+    mixed_pdb = f'{DATA_DIR}/mixed_residues.pdb'
+    structure: Structure = sp.get_structure(mixed_pdb)
+    assert structure.num_chains == 5
+    all_residues = structure.residues
 
-#     assert all_residues[0].is_canonical()
-#     assert all_residues[1].is_canonical()
-#     assert all_residues[2].is_canonical()
-#     assert all_residues[3].is_canonical()
-#     assert all_residues[4].is_ligand()
-#     assert all_residues[5].is_metal()
-#     assert all_residues[6].is_solvent()
+    assert all_residues[0].is_canonical()
+    assert all_residues[1].is_canonical()
+    assert all_residues[2].is_canonical()
+    assert all_residues[3].is_canonical()
+    assert all_residues[4].is_ligand()
+    assert all_residues[5].is_metal()
+    assert all_residues[6].is_solvent()
 
-#     assert isinstance(all_residues[0], Residue)
-#     assert isinstance(all_residues[1], Residue)
-#     assert isinstance(all_residues[2], Residue)
-#     assert isinstance(all_residues[3], Residue)
-#     assert isinstance(all_residues[4], Ligand)
-#     assert isinstance(all_residues[5], MetalUnit)
-#     assert isinstance(all_residues[6], Solvent)
+    assert isinstance(all_residues[0], Residue)
+    assert isinstance(all_residues[1], Residue)
+    assert isinstance(all_residues[2], Residue)
+    assert isinstance(all_residues[3], Residue)
+    assert isinstance(all_residues[4], Ligand)
+    assert isinstance(all_residues[5], MetalUnit)
+    assert isinstance(all_residues[6], Solvent)
 
 
 # def test_ligand_from_pdb():

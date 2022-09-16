@@ -43,7 +43,7 @@ class PDBParser(StructureParserInterface):
 
     # interface
     @classmethod
-    def get_structure(cls, path: str, model: int=0, add_solvent_list: List=None, add_ligand_list: List=None) -> Structure:
+    def get_structure(cls, path: str, model: int=0, add_solvent_list: List=None, add_ligand_list: List=None, remove_trash: bool=True, give_idx_map: bool = False) -> Union[Structure, tuple]:
         '''
         Converting a PDB file (as its path) into the Structure()
         Arg:
@@ -51,13 +51,15 @@ class PDBParser(StructureParserInterface):
             model: The selected model index if there are multiple models in the file
                     (start from 0 default: 0)
                     (assume MODEL appears in order in the file)
-        
             add_solvent_list: (used for categorize residues) additional names for solvent
             add_ligand_list: (used for categorize residues) additional names for ligands
-            * solvent list have higher pirority
+                * solvent list have higher pirority
+            remove_trash: if remove trash ligands
+            give_idx_map: if return a tuple of (Structure, idx_change_mapper) - which is a dict 
+                          with {(old_chain_id, old_residue_id): (new_chain_id, new_residue_id), ... }
+
         Return:
             Structure()
-            idx_change_mapper: a dict with {(old_chain_id, old_residue_id): (new_chain_id, new_residue_id), ... }
         '''
         _LOGGER.debug(f'working on {path}')
         cls._check_valid_pdb(path)
@@ -83,9 +85,11 @@ class PDBParser(StructureParserInterface):
         # builder and so on for atom. But current methods is used for better readability
         atom_mapper: Dict[tuple, Atom] = cls._build_atoms(target_model_df)
         res_mapper, idx_change_mapper = cls._build_residues(atom_mapper, add_solvent_list, add_ligand_list)
-        chain_list: Dict[str, Chain] = cls._build_chains(res_mapper)
+        chain_list: Dict[str, Chain] = cls._build_chains(res_mapper, remove_trash)
 
-        return Structure(chain_list), idx_change_mapper
+        if give_idx_map:
+            return Structure(chain_list), idx_change_mapper
+        return Structure(chain_list)
 
     @classmethod
     def get_file_str(cls, stru: Structure) -> str:
@@ -94,7 +98,7 @@ class PDBParser(StructureParserInterface):
         '''
         pass
 
-    # region === PDB -> Stru ===
+    #region == pdb -> Stru ==
     @staticmethod
     def _check_valid_pdb(pdb_path: str) -> None:
         """Helper function that ensures the supplied pdb_path contain a valid pdb file.
@@ -115,7 +119,7 @@ class PDBParser(StructureParserInterface):
                     f"The PDB '{pdb_path}' contains non-ASCII text and is invalid in line {idx}: '{ll}'. Exiting..."
                 )
                 sys.exit(1)
-  
+   
     @staticmethod
     def _get_target_model(df: pd.DataFrame, model: int) -> Union[pd.DataFrame, None]:
         '''
@@ -326,11 +330,11 @@ class PDBParser(StructureParserInterface):
 
     @staticmethod
     def _categorize_pdb_residue(residue_mapper: Dict[str, List[Residue]], add_solvent_list: list = None, add_ligand_list: list = None) -> Union[Residue, Ligand, Solvent, MetalUnit]: #TODO add test for this
-        """
+        '''
         Categorize Residue base on it 3-letter name and chain info in PDB format
         Takes a mapper of {chain_id, [Residue, ...]} and converts
         them into its specialized Residue() inherited class.
-        """
+        '''
         if add_solvent_list is None:
             add_solvent_list = []
         if add_ligand_list is None:
@@ -377,16 +381,23 @@ class PDBParser(StructureParserInterface):
                 residue_mapper[chain_id][i] = residue_to_ligand(residue)
 
     @staticmethod
-    def _build_chains(res_mapper: Dict[str, Residue]) -> Dict[str, Chain]:
+    def _build_chains(res_mapper: Dict[str, Residue], remove_trash: bool) -> Dict[str, Chain]:
         '''
         build Chain() objects from residue mapper
         '''
         chain_list = []
         for chain_id, residues in res_mapper.items():
             ch_obj = Chain(chain_id ,residues) # TODO decouple chain name with pdb chain id? How to solve too many water chain
+            if remove_trash:
+                ch_obj.remove_trash()
             chain_list.append(ch_obj)
         return chain_list
-    # endregion
+    #endregion
+
+    @staticmethod
+    def _make_pdb_atom():
+        pass
+
 
 # TODO go to core helper
 def split_df_base_on_column_value(df: pd.DataFrame, column_name: str, split_values: list, copy: bool=False):

@@ -30,7 +30,7 @@ class Solvent(Residue):
         """Constructor for Solvent. Identical to Residue() ctor. SHOULD NOT be called directly by users.
         Instead use enzy_htp.structure.solvent.residue_to_solvent()."""
         Residue.__init__(self, residue_idx, residue_name, atoms, parent)
-        self.set_rtype(renum.ResidueType.SOLVENT)
+        self.rtype = renum.ResidueType.SOLVENT
 
     def is_solvent(self) -> bool:
         """Checks if the Solvent() is an solvent. Hard-coded to True for this derived class."""

@@ -31,7 +31,7 @@ class MetalUnit(Residue):
     def __init__(self, residue_idx: int, residue_name: str, atoms: List[Atom], parent=None):
         """Constructor for MetalUnit. Identical to Residue() constructor."""
         Residue.__init__(self, residue_idx, residue_name, atoms, parent)
-        self.set_rtype(chem.ResidueType.METAL)
+        self.rtype = chem.ResidueType.METAL
 
     # === Getter-Attr (ref) ===
     @property
