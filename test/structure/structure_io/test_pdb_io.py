@@ -372,7 +372,7 @@ def test_get_structure_bad_input():
     assert exe.value.code == 1
 
 @pytest.mark.interface
-def test_structure_from_pdb_simple():
+def test_get_structure_simple():
     '''Checking that the main method get_structure() works for simple cases.'''
     pdb_name = f'{DATA_DIR}/two_chain.pdb'
     structure: Structure = sp.get_structure(pdb_name)
@@ -385,7 +385,7 @@ def test_structure_from_pdb_simple():
     assert chain_B_target == list(map(lambda r: f'{r.chain.name}.{r.name}.{r.idx}', chain_B))
 
 @pytest.mark.interface
-def test_structure_from_pdb_mixed_case():
+def test_get_structure_mixed_case():
     '''Checking that the main method get_structure() works for simple cases.'''
     mixed_pdb = f'{DATA_DIR}/mixed_residues.pdb'
     structure: Structure = sp.get_structure(mixed_pdb)
@@ -408,23 +408,12 @@ def test_structure_from_pdb_mixed_case():
     assert isinstance(all_residues[5], MetalUnit)
     assert isinstance(all_residues[6], Solvent)
 
-
-# def test_ligand_from_pdb():
-#     '''Checking that the method structure_parser.ligand_from_pdb() works for a simple case and returns a Ligand().'''
-#     ligand_pdb = f'{DATA_DIR}/just_ligand.pdb'
-#     ligand = sp.ligand_from_pdb(ligand_pdb)
-#     assert ligand.is_ligand()
-#     assert len(ligand.atoms) == 7
-#     assert ligand.name == 'FAH'
-
-
-# def test_ligand_from_pdb_bad_input():
-#     '''Checking that the method structure_parser.ligand_from_pdb() fails for a bad input.'''
-#     with pytest.raises(SystemExit) as exe:
-#         sp.ligand_from_pdb('dne.pdb')
-
-#     assert exe
-#     assert exe.type == SystemExit
-#     assert exe.value.code == 1
-
-# #TODO(CJ): add tests for structure_parser.get_ligand_name()
+@pytest.mark.interface
+def test_get_structure_ligand():
+    '''Checking that the method structure_parser.ligand_from_pdb() works for a simple case and returns a Ligand().'''
+    ligand_pdb = f'{DATA_DIR}/just_ligand.pdb'
+    stru: Structure = sp.get_structure(ligand_pdb)
+    ligand = stru[0][0]
+    assert ligand.is_ligand()
+    assert len(ligand.atoms) == 7
+    assert ligand.name == 'FAH'
