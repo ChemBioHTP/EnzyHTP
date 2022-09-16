@@ -33,7 +33,7 @@ class MetalUnit(Residue):
         Residue.__init__(self, residue_idx, residue_name, atoms, parent)
         self.rtype = chem.ResidueType.METAL
 
-    # === Getter-Attr (ref) ===
+    # === Getter-Attr ===
     @property
     def atom(self):
         """Getter for the only one atom in this MetalUnit unit"""
@@ -56,7 +56,7 @@ class MetalUnit(Residue):
         """Gets the location of the MetalUnit."""
         return self._atoms[0]
 
-    # === Getter-Prop (cpy/new) ===
+    # === Getter-Prop ===
     def get_radii(self, method: str = "ionic") -> Union[float, None]:
         """Gets the atomic radii for the metal using specified method.
         Allowed values are 'ionic' or 'vdw' for ionic and van-der waals, respectively.

@@ -46,8 +46,8 @@ class Ligand(Residue):
         Residue.__init__(self, residue_idx, residue_name, atoms, parent)
         self.rtype = chem.ResidueType.LIGAND
 
-    # === Getter-Attr (ref) ===
-    # === Getter-Prop (cpy/new) ===
+    # === Getter-Attr ===
+    # === Getter-Prop ===
     def get_net_charge(self) -> int:
         """Getter for the net_charge attribute."""
         return self.net_charge
