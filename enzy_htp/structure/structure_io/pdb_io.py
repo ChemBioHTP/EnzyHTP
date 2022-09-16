@@ -458,14 +458,14 @@ class PDBParser(StructureParserInterface):
         x = f'{atom.coord[0]:>8.3f}'
         y = f'{atom.coord[1]:>8.3f}'
         z = f'{atom.coord[2]:>8.3f}'
-        
+
         alt_loc_id = f'{"":1}'
         insert_code = f'{"":1}'
         occupancy = f'{1.00:>6.2f}'
 
         temp_factor = f'{atom.b_factor:>6.2f}'
         seg_id = f'{"":<4}'
-        element = f'{atom.element:1}'
+        element = f'{atom.element:>2}'
         if atom.charge is None:
             charge = f'{"":2}'
         else:
