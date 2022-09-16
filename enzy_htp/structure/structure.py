@@ -231,7 +231,7 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
         out_line.append('Structure(')
         out_line.append('chains:')
         for ch in sorted(self._chains,key=lambda x: x.name):
-            out_line.append(f'    {ch.name}({ch.chain_type()}): residue: {ch.residue_idx_interval()} atom_count: {ch.num_atoms()}')
+            out_line.append(f'    {ch.name}({ch.chain_type}): residue: {ch.residue_idx_interval()} atom_count: {ch.num_atoms}')
         out_line.append(')')
         return os.linesep.join(out_line)
     #endregion
@@ -329,7 +329,7 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
         total: int = 0
         ch: Chain
         for ch in self.chains:
-            total += ch.num_residues()
+            total += ch.num_residues
         return total
 
     @property

@@ -16,7 +16,6 @@ from enzy_htp.structure.atom import Atom
 import enzy_htp.chemical as chem
 
 from .residue import Residue
-#TODO(CJ): add a method for changing/accessing a specific residue
 
 class Chain(DoubleLinkNode):
     """Class that represents a Chain of residues in a PDB file.
@@ -70,7 +69,7 @@ class Chain(DoubleLinkNode):
         return result
     #endregion
 
-    # === Getter-Prop (cpy/new) ===
+    #region === Getter-Prop (cpy/new) ===
     def residue_idx_interval(self, if_str: bool = True) -> Union[str, Iterable[Tuple[int,int]]]:
         '''
         a range representation of containing residue indexes
@@ -86,6 +85,7 @@ class Chain(DoubleLinkNode):
             return ','.join(range_strs)
         return interval_list
     
+    @property
     def num_atoms(self) -> int:
         """Finds the total number of Atom() objects contained in the Residue() children objects."""
         total = 0
@@ -93,10 +93,12 @@ class Chain(DoubleLinkNode):
             total += res.num_atoms
         return total
 
+    @property
     def num_residues(self) -> int:
         """Returns number of Residue() or Residue()-dervied objects belonging to the Chain."""
         return len(self)
 
+    @property
     def chain_type(self) -> str:
         '''
         return the chain type in:
@@ -118,8 +120,9 @@ class Chain(DoubleLinkNode):
         if self.has_solvent():
             chain_type.append('solvent')
         return ','.join(chain_type)  
+    #endregion
 
-    # === Checker === 
+    #region === Checker === 
     def is_peptide(self) -> bool:
         '''
         if there is any residue not canonical
@@ -176,8 +179,9 @@ class Chain(DoubleLinkNode):
             if s != o:
                 return False
         return True    
-        
-    # === Editor === 
+    #endregion
+    
+    # === Editor ===
     def remove_trash(self):
         '''
         remove trash ligands in the chain
@@ -233,7 +237,7 @@ class Chain(DoubleLinkNode):
             exit(1)
         self._residues = sorted(self._residues, key=lambda r: r.idx())
         idx = start
-        num_residues: int = self.num_residues()
+        num_residues: int = self.num_residues
         for ridx, res in enumerate(self._residues):
             idx = self._residues[ridx].renumber_atoms(idx)
             idx += 1
@@ -244,7 +248,7 @@ class Chain(DoubleLinkNode):
                 idx += 1
         return idx - 1 
 
-    # === Special ===
+    #region === Special ===
     def __getitem__(self, key: int) -> Residue:
         """Allows indexing into the child Residue() objects."""
         return self._residues[key]
@@ -256,12 +260,13 @@ class Chain(DoubleLinkNode):
     def __len__(self) -> int:
         """Returns number of Residue() or Residue()-dervied objects belonging to the Chain."""
         return len(self._residues)
+    #endregion
 
     #region === TODO/TOMOVE ===
     def get_pdb_lines(self) -> List[str]: #@shaoqz: @imp move to the IO class
         """Generates a list of PDB lines for the Atom() objects inside the Chain(). Last line is a TER."""
         result = list()
-        num_residues: int = self.num_residues()
+        num_residues: int = self.num_residues
         for idx, res in enumerate(self._residues):
             terminal = (idx < (num_residues - 1)) and (
                 res.is_canonical() and not self._residues[idx + 1].is_canonical()

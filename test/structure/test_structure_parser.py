@@ -217,7 +217,7 @@ def test_build_chains():
 
     atom_counts = [12, 15, 7, 6]
     for ac, chain in zip(atom_counts, chain_mapper.values()):
-        assert chain.num_atoms() == ac
+        assert chain.num_atoms == ac
         for res in chain.residues():
             assert isinstance(res, Residue)
 

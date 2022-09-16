@@ -138,7 +138,7 @@ def test_num_atoms():
     res_keys = ["A.A.1", "A.A.2", "A.B.3", "A.D.5"]
     residues = list(map(lambda k: Residue(k, list()), res_keys))
     empty_chain = Chain("A", residues)
-    assert empty_chain.num_atoms() == 0
+    assert empty_chain.num_atoms == 0
 
 
 def test_has_metal():
