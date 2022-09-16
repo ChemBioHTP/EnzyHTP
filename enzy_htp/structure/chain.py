@@ -21,9 +21,16 @@ class Chain(DoubleLinkNode):
     """Class that represents a Chain of residues in a PDB file.
 
     Attributes:
-        _name : The name of the chain as a string.
-        _children/_residues : A list of Residue() objects or derived types.
-        _parent/protein : the parent protein
+        name : The name of the chain as a string.
+        children/residues : A list of Residue() objects or derived types.
+        parent/protein : the parent protein
+
+    Derived properties:
+        atoms : composing atoms
+        num_atoms
+        num_residues
+        chain_type
+        residue_idx_interval : the containing residue index range
     """
 
     def __init__(self, name: str, residues: List[Residue], parent=None):
@@ -33,7 +40,7 @@ class Chain(DoubleLinkNode):
         self.set_children(residues)
 
         self._residues: List[Residue] = self._children # alias
-    #region === Getter-Attr (ref) ===
+    #region === Getter-Attr ===
     @property
     def name(self) -> str:
         return self._name
@@ -59,17 +66,9 @@ class Chain(DoubleLinkNode):
     def get_residue(self, traget_key: str) -> Residue:
         '''TODO: is there alt option for the key?'''
         pass
-
-    @property
-    def atoms(self) -> List[Atom]:
-        '''get all children Atoms'''
-        result = []
-        for res in self:
-            result.extend(res.atoms)
-        return result
     #endregion
 
-    #region === Getter-Prop (cpy/new) ===
+    #region === Getter-Prop ===
     def residue_idx_interval(self, if_str: bool = True) -> Union[str, Iterable[Tuple[int,int]]]:
         '''
         a range representation of containing residue indexes
@@ -85,6 +84,14 @@ class Chain(DoubleLinkNode):
             return ','.join(range_strs)
         return interval_list
     
+    @property
+    def atoms(self) -> List[Atom]:
+        '''get all children Atoms'''
+        result = []
+        for res in self:
+            result.extend(res.atoms)
+        return result
+
     @property
     def num_atoms(self) -> int:
         """Finds the total number of Atom() objects contained in the Residue() children objects."""
