@@ -433,6 +433,7 @@ def test_get_file_str():
 def test_get_file_str_just_ligand():
     '''
     test for the getting pdb file from Structure() without b factor etc record
+    and just a ligand
     '''
     pdb_file_path = f'{DATA_DIR}just_ligand.pdb'
     answer_file_path = f'{DATA_DIR}just_ligand_write_answer.pdb'
@@ -441,4 +442,18 @@ def test_get_file_str_just_ligand():
     with open(answer_file_path) as f:
         assert sp.get_file_str(stru) == f.read()
 
-    
+@pytest.mark.interface
+def test_get_file_str_build_ligand():
+    '''
+    test for the getting pdb file from Ligand(). dispatch.
+    '''
+    pdb_file_path = f'{DATA_DIR}1Q4T_atom_res_ch_build_test.pdb'
+    answer_file_path = f'{DATA_DIR}1Q4T_ligand_0_answer.pdb'
+
+    stru: Structure = sp.get_structure(pdb_file_path)
+    with open(answer_file_path) as f:
+        assert sp.get_file_str(stru.ligands[0]) == f.read()
+
+
+
+

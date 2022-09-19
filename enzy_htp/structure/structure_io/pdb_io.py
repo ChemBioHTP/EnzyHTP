@@ -9,6 +9,7 @@ import os
 import string
 import sys
 from typing import Dict, List, Tuple, Union
+from plum import dispatch
 from biopandas.pdb import PandasPdb
 import pandas as pd
 
@@ -94,6 +95,7 @@ class PDBParser(StructureParserInterface):
         return Structure(chain_list)
 
     @classmethod
+    @dispatch
     def get_file_str(cls, stru: Structure) -> str:
         '''
         Convert Structure() into PDB file string. Only the simplest function is need for 
@@ -112,6 +114,36 @@ class PDBParser(StructureParserInterface):
             chain: Chain
             result_str += cls._write_pdb_chain(chain)
         result_str += f'END{os.linesep}'
+        return result_str
+
+    @classmethod
+    @dispatch
+    def get_file_str(cls, stru: Chain) -> str: # pylint: disable=function-redefined
+        '''
+        dispatch for supporting get pdb file str with Chain only
+        '''
+        result_str = cls._write_pdb_chain(stru)
+        result_str += f'END{os.linesep}'
+        return result_str
+
+    @classmethod
+    @dispatch
+    def get_file_str(cls, stru: Residue) -> str: # pylint: disable=function-redefined
+        '''
+        dispatch for supporting get pdb file str with Residue only
+        '''
+        result_str = cls._write_pdb_residue(stru)
+        result_str += f'TER{os.linesep}END{os.linesep}'
+        return result_str
+
+    @classmethod
+    @dispatch
+    def get_file_str(cls, stru: Atom) -> str: # pylint: disable=function-redefined
+        '''
+        dispatch for supporting get pdb file str with Atom only
+        '''
+        result_str = cls._write_pdb_atom(stru)
+        result_str += f'TER{os.linesep}END{os.linesep}'
         return result_str
 
     #region == pdb -> Stru ==
@@ -475,6 +507,12 @@ class PDBParser(StructureParserInterface):
         line = f'{l_type}{a_index} {a_name}{alt_loc_id}{r_name} {c_index}{r_index}{insert_code}   {x}{y}{z}{occupancy}{temp_factor}      {seg_id}{element}{charge}{os.linesep}'
         return line
 
+    @dispatch
+    def _(self):
+        '''
+        dummy method for dispatch
+        '''
+        pass
 
 # TODO go to core helper
 def split_df_base_on_column_value(df: pd.DataFrame, column_name: str, split_values: list, copy: bool=False):

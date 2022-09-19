@@ -98,6 +98,7 @@ Date: 2022-04-03
 '''
 #TODO(CJ): add a method for changing/accessing a specific residue
 from __future__ import annotations
+import itertools
 import os
 
 import string
@@ -108,7 +109,7 @@ from collections import defaultdict
 
 from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
-from enzy_htp.chemical import convert_to_one_letter
+from enzy_htp.chemical import convert_to_one_letter, ResidueType
 from enzy_htp.core.doubly_linked_tree import DoubleLinkNode
 
 from .atom import Atom
@@ -179,10 +180,25 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
     def num_chains(self) -> int:
         '''Returns the number of Chain() objects in the current Structure().'''
         return len(self._chains)
+
+    @property 
+    def residues(self) -> List[Residue]:
+        '''Return a list of the residues in the Structure() object sorted by (chain_id, residue_id)'''
+        result = list(itertools.chain.from_iterable(self._chains))
+        result.sort(key=lambda r: r.key())
+        return result
+
+    @property
+    def ligands(self) -> List[Residue]:
+        '''Filters out the ligand Residue()'s from the chains in the Structure().'''
+        result: List[Residue] = list()
+        for chain in self.chains:
+            result.extend(list(filter(lambda r: r.is_ligand(), chain)))
+        return result
     #endregion
 
     #region === Checker ===
-    def has_duplicate_chain_name(self) -> bool: #TODO add test
+    def has_duplicate_chain_name(self) -> bool:
         '''check if self._chain have duplicated chain name
         give warning if do.'''
         existing_c_id = []
@@ -196,7 +212,7 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
             existing_c_id.append(ch.name)
         return False
     
-    def resolve_duplicated_chain_name(self) -> None: #TODO add test
+    def resolve_duplicated_chain_name(self) -> None:
         '''resolve for duplicated chain name in self.chains_
         A. insert the chain to be one character after the same one if they are different
            and move the rest chain accordingly
@@ -254,16 +270,6 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
 
     # ============= TODO below =================
     #region === Getters === (Attributes - accessing Structure data -  references)
-    @property
-    def residues(self) -> List[Residue]:
-        '''Return a list of the residues in the Structure() object sorted by (chain_id, residue_id)'''
-        result = []
-        ch: Chain
-        for ch in self.chains:
-            result.extend(ch.residues)
-        result.sort(key=lambda r: r.key())
-        return result
-
     def get_residue(self, target_key: str) -> Union[None, Residue]: #@shaoqz: we need to that gives a reference. In the case of editing the structure.
         '''Given a target_key str of the Residue() residue_key ( 'chain_id.residue_name.residue_number' ) format,
         a deepcopy of the corresponding Residue() is returned, if it exists. None is returned if it cannot be found.'''
@@ -279,14 +285,6 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
         result: List[Residue] = list()
         for chain in self.chains:
             result.extend(list(filter(lambda r: r.is_metal(), chain.residues())))
-        return result
-
-    @property
-    def ligands(self) -> List[Residue]:
-        '''Filters out the ligand Residue()'s from the chains in the Structure().'''
-        result: List[Residue] = list()
-        for chain in self.chains:
-            result.extend(list(filter(lambda r: r.is_ligand(), chain.residues())))
         return result
 
     @property
@@ -581,7 +579,7 @@ class Structure(DoubleLinkNode): # TODO implement different copy methods for the
         return connectivty_table
     
     # === TO BE MOVE ===
-    def build_ligands(self, out_dir: str, unique: bool = False) -> List[str]: #@shaoqz: @imp2 add more file format option
+    def build_ligands(self, out_dir: str, unique: bool = False) -> List[str]: # TODO(qz): change reference of this this to get_file_str(stru.ligands[i])
         '''Exports all the Ligand() objects in the Structure() to .pdb files.
 
         Args:

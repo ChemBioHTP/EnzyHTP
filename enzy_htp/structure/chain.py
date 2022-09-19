@@ -174,13 +174,13 @@ class Chain(DoubleLinkNode):
                 return False
         return True
 
-    def is_same_coord(self, other: Chain) -> bool: # TODO
+    def is_same_coord(self, other: Chain) -> bool:
         '''check if self is same as other in coordinate of every atom'''
         self_atoms = self.atoms
-        self_atoms.sort(key=lambda a: a.num)
+        self_atoms.sort(key=lambda a: a.idx)
         self_coord = map(lambda x:x.coord, self_atoms)
         other_atoms = other.atoms
-        other_atoms.sort(key=lambda a: a.num)
+        other_atoms.sort(key=lambda a: a.idx)
         other_coord = map(lambda x:x.coord, other_atoms)
         for s, o in zip(self_coord, other_coord):
             if s != o:
