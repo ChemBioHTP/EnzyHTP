@@ -21,10 +21,10 @@ class Atom(DoubleLinkNode):
     Attributes:
         (nessessary)
         name : The name of the atom as a string. often refer to a specific connectivity.
-        idx: An integer number for the atomic index.
         coord: (x,y,z) for cartesian coordinate of the atom.
         parent/residue: the parent residue that this atom belongs to.
         (optional)
+        idx: An integer number for the atomic index.
         b_factor : A float representing the temperature factor (b factor).
         charge : Charge of the atom.
         element : Character representing element.
@@ -34,17 +34,24 @@ class Atom(DoubleLinkNode):
         '''Constructor of Atom(), where ds is of type pandas.Series'''
         # nessessary
         self._name = ds['atom_name'].strip()
-        self._idx = ds['atom_number']
         self._coord = (ds['x_coord'], ds['y_coord'], ds['z_coord'])
         self.set_parent(parent)
         self.set_ghost_children()
         # optional
-        self._b_factor = ds['b_factor']
-        self._element = ds['element_symbol'].strip()
-        if not np.isnan(ds['charge']):
+        self._idx = None
+        self._b_factor = None
+        self._element = None
+        self._charge = None
+
+        ds_items = ds.items()
+        if 'atom_number' in ds_items:
+            self._idx = ds['atom_number']
+        if 'b_factor' in ds_items:        
+            self._b_factor = ds['b_factor']
+        if 'element_symbol' in ds_items:
+            self._element = ds['element_symbol'].strip()
+        if 'charge' in ds_items and not np.isnan(ds['charge']):
             self._charge = float(ds['charge'])
-        else:
-            self._charge = None
 
     #region === Getter-Attr (ref) ===
     @property
