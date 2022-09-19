@@ -4,5 +4,5 @@ Author: shaoqz, <shaoqz@icloud.com>
 Date: 2022-08-01
 """
 
-class CIFIO:
+class CIFParser:
 	pass
