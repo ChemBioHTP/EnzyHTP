@@ -18,8 +18,8 @@ with setter methods. Also Structure() supports common editing methods such as ad
 Application of Structure objects - Binding modules:
 Generation:
     Note that Structure() objects SHOULD NOT be created by the user directly and instead created through different generation 
-    methods from the binding StructureIO classes (e.g.: enzy_htp.structure_from_pdb()) from different file types and different 
-    external data structures.
+    methods from the binding StructureIO classes (e.g.: enzy_htp.structure_io.PDBParser().get_structure()) from different file 
+    types and different external data structures.
 Selection:
     Selection of Structural regions are handled by the Selection module.
 Operation:
