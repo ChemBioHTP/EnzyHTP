@@ -1,5 +1,5 @@
 """Definition for the Atom class. Meant to be the base unit of structural information: coordinate and
-topology (atom type & connectivity). Serve solely for storing and accessing data. 
+topology (atom type & connectivity). Serve solely for storing and accessing data.
 
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
@@ -67,8 +67,8 @@ class Atom(DoubleLinkNode):
     @property
     def idx(self) -> int:
         """Getter for the Atom()'s index."""
-        if self._idx == None:
-            _LOGGER.warning(f"{sys._getframe().f_back.f_back.f_code.co_name}:{sys._getframe().f_back.f_code.co_name} is using index of an non-indexing atom: {self}")
+        if self._idx is None:
+            _LOGGER.warning(f"{sys._getframe().f_back.f_back.f_code.co_name}:{sys._getframe().f_back.f_code.co_name} is using index of an non-indexing atom: {self}") # pylint: disable=logging-fstring-interpolation,line-too-long
         return self._idx
     @idx.setter
     def idx(self, val):

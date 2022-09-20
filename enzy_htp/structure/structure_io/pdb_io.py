@@ -8,7 +8,7 @@ from collections import defaultdict
 import os
 import string
 import sys
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Union
 from plum import dispatch
 from biopandas.pdb import PandasPdb
 import pandas as pd
