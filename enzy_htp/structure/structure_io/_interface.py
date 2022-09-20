@@ -1,6 +1,6 @@
 """the module for interface definition of strutcure file I/O classes
 
-Author: shaoqz, <shaoqz@icloud.com>
+Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
 Date: 2022-08-30
 """
 

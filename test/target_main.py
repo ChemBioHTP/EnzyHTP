@@ -2,7 +2,7 @@
 '''
 Scratch for what we want the final EnzyHTP API to be. (Use for design)
 
-Author: shaoqz, <shaoqz@icloud.com>
+Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
 Date: 2022-08-30
 '''
 
