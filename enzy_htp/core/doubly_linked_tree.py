@@ -77,7 +77,6 @@ class DoubleLinkNode():
     def parent(self, val):
         self.set_parent(val)
 
-
     # === copy ===
     def __deepcopy__(self, memo: Union[Dict[int, Any], None]):
         """
