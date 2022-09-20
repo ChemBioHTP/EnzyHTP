@@ -9,6 +9,7 @@ import numpy as np
 from copy import deepcopy
 import enzy_htp.chemical as chem
 from enzy_htp.core import file_system as fs
+from enzy_htp.structure.structure_io.pdb_io import PDBParser
 from enzy_htp.structure import (
     Structure,
     structure_from_pdb,
@@ -23,8 +24,36 @@ from enzy_htp.structure import (
 CURR_DIR = os.path.dirname(os.path.abspath(__file__))
 TEST_DIR = os.path.dirname(CURR_DIR)
 DATA_DIR = f"{CURR_DIR}/data/"
+sp = PDBParser()
 
+def test_structure_ctor_bad_input():
+    """Testing that the Structure() ctor fails when given duplicate chains."""
+    Atom_1 = Atom({"atom_name":"X", "x_coord":1,"y_coord":2,"z_coord":3})
+    Atom_2 = Atom({"atom_name":"X", "x_coord":3,"y_coord":2,"z_coord":1})
+    chain1 = Chain("A", [Residue(1, "XXX", [Atom_1])])
+    chain2 = Chain("B", [Residue(2, "XXX",  [Atom_2])])
+    chain3 = Chain("A", [Residue(3, "XXX",  [Atom_1])])
 
+    with pytest.raises(SystemExit) as exe:
+        struct = Structure([chain1, chain2, chain3])
+
+    assert exe
+    assert exe.type == SystemExit
+    assert exe.value.code == 1
+
+def test_residues():
+    pdb_file_path = f"{DATA_DIR}1Q4T_ligand_test.pdb"
+    stru: Structure = sp.get_structure(pdb_file_path)
+
+    assert len(stru.residues) == 580
+
+def test_ligands():
+    pdb_file_path = f"{DATA_DIR}1Q4T_ligand_test.pdb"
+    stru: Structure = sp.get_structure(pdb_file_path)
+    assert len(stru.ligands) == 2
+    assert stru.ligands[0].name == "4CO"
+
+@pytest.mark.TODO
 def equiv_files(fname1: str, fname2: str, width: int = None) -> bool:
     """Helper method to check if two files are exactly equivalent."""
     def find_first_diff( l1, l2 ):
@@ -38,98 +67,23 @@ def equiv_files(fname1: str, fname2: str, width: int = None) -> bool:
             l1 = l1[:width]
             l2 = l2[:width]
             if len(l2) < width:
-                l2 += ' '*(width-len(l2))
+                l2 += " "*(width-len(l2))
             if len(l1) < width:
-                l1 += ' '*(width-len(l1))
+                l1 += " "*(width-len(l1))
 
         first_diff = find_first_diff(l1,l2)
         if first_diff != -1:
-            diff = [' ']*min(len(l1),len(l2))
-            diff[first_diff] = '^'
+            diff = [" "]*min(len(l1),len(l2))
+            diff[first_diff] = "^"
             
             print(f"'{l1}'")
             print(f"'{l2}'")
-            print(''.join(diff))
+            print("".join(diff))
             print(f"Difference encountered on line {line_idx}. '{fname1}' and '{fname2}' are NOT equivalent")
             return False
     return True
 
-
-def test_load_structure():
-    """Testing that the structure_from_pdb() method works for a basic example."""
-    raw_answer = [
-        ("A", "THR", 1),
-        ("A", "THR", 2),
-        ("A", "CYS", 3),
-        ("A", "CYS", 4),
-        ("A", "PRO", 5),
-        ("A", "SER", 6),
-        ("A", "ILE", 7),
-        ("A", "VAL", 8),
-        ("A", "ALA", 9),
-        ("A", "ARG", 10),
-        ("A", "SER", 11),
-        ("A", "ASN", 12),
-        ("A", "PHE", 13),
-        ("A", "ASN", 14),
-        ("A", "VAL", 15),
-        ("A", "CYS", 16),
-        ("A", "ARG", 17),
-        ("A", "LEU", 18),
-        ("A", "PRO", 19),
-        ("A", "GLY", 20),
-        ("A", "THR", 21),
-        ("A", "PRO", 22),
-        ("A", "SER", 22),
-        ("A", "GLU", 23),
-        ("A", "ALA", 24),
-        ("A", "LEU", 25),
-        ("A", "ILE", 25),
-        ("A", "CYS", 26),
-        ("A", "ALA", 27),
-        ("A", "THR", 28),
-        ("A", "TYR", 29),
-        ("A", "THR", 30),
-        ("A", "GLY", 31),
-        ("A", "CYS", 32),
-        ("A", "ILE", 33),
-        ("A", "ILE", 34),
-        ("A", "ILE", 35),
-        ("A", "PRO", 36),
-        ("A", "GLY", 37),
-        ("A", "ALA", 38),
-        ("A", "THR", 39),
-        ("A", "CYS", 40),
-        ("A", "PRO", 41),
-        ("A", "GLY", 42),
-        ("A", "ASP", 43),
-        ("A", "TYR", 44),
-        ("A", "ALA", 45),
-        ("A", "ASN", 46),
-    ]
-    fixed_answer = list(
-        map(lambda pr: (pr[0], chem.convert_to_one_letter(pr[1]), pr[2]), raw_answer)
-    )
-    TEST_FILE = f"{TEST_DIR}/preparation/data/3NIR.pdb"
-    struct: Structure = structure_from_pdb(TEST_FILE)
-    assert struct
-    assert struct.residue_state == fixed_answer
-
-
-def test_structure_ctor_bad_input():
-    """Testing that the Structure() ctor fails when given duplicate chains."""
-    chain1 = Chain("A", [Residue('A.XXX.1', [Atom(x_coord=1, y_coord=2, z_coord=3)])])
-    chain2 = Chain("B", [Residue('B.XXX.1', [Atom(x_coord=2, y_coord=2, z_coord=3)])])
-    chain3 = Chain("A", [Residue('A.XXX.1', [Atom(x_coord=1, y_coord=2, z_coord=3)])])
-
-    with pytest.raises(SystemExit) as exe:
-        struct = Structure([chain1, chain2, chain3])
-
-    assert exe
-    assert exe.type == SystemExit
-    assert exe.value.code == 1
-
-
+@pytest.mark.TODO
 def test_residue_state():
     """Checking that the Structureresidue_state method properly returns the residue state for the Structure()."""
     start = [("A", "ARG", 1), ("A", "HIS", 2), ("A", "ARG", 3), ("A", "HIS", 4)]
@@ -141,7 +95,7 @@ def test_residue_state():
     )  # TODO(CJ): need error in Structure() ctor if NOT a list of chains
     assert ss.residue_state == answer
 
-
+@pytest.mark.TODO
 def test_structure_same_sequence():
     """Ensuring that the Chain.is_same_sequence() method works."""
     start1 = [("A", "ARG", 1), ("A", "HIS", 2), ("A", "ARG", 3), ("A", "HIS", 4)]
@@ -170,7 +124,7 @@ def test_structure_same_sequence():
     assert not chain1.is_same_sequence(chain2)
     assert not chain2.is_same_sequence(chain1)
 
-
+@pytest.mark.TODO
 def test_compare_structures_equiv():
     """Ensuring the enzy_htp.structure.compare_structures() free function identifies two identical structures."""
     TEST_FILE = f"{TEST_DIR}/preparation/data/3NIR.pdb"
@@ -179,7 +133,7 @@ def test_compare_structures_equiv():
     result = compare_structures(structure1, structure2)
     assert result == {"left": [], "right": []}
 
-
+@pytest.mark.TODO
 def test_compare_structures_not_equiv():
     """Ensuring the enzy_htp.structure.compare_structures() free functions identifies differences between functions."""
     # TODO(CJ): include non-canonical residues in here
@@ -200,7 +154,7 @@ def test_compare_structures_not_equiv():
         "right": [res_to_remove1.residue_key],
     }
 
-
+@pytest.mark.TODO
 def test_merge_right_canonical_only(): #@shaoqz: @imp a better idea is to merge 2 different protein.
     """Merges differences between two Structure() objects containing only canonical residues."""
     # TODO(CJ): include non-canonical residues in here
@@ -214,7 +168,7 @@ def test_merge_right_canonical_only(): #@shaoqz: @imp a better idea is to merge 
     result = merge_right(structure1, structure2)
     assert structure1 == result
 
-
+@pytest.mark.TODO
 def test_merge_right_with_ligand():
     """Merges differences between two Structure() objects containing a Ligand() object."""
     TEST_FILE = f"{DATA_DIR}/FAcD-FA-ASP_rmW.pdb"
@@ -227,28 +181,28 @@ def test_merge_right_with_ligand():
     print(DATA_DIR)
     # assert False
 
-
+@pytest.mark.TODO
 def test_merge_right_with_metal_atom():
-    """Merges differences between two Structure() objects containing a MetalAtom() object."""
+    """Merges differences between two Structure() objects containing a MetalUnit() object."""
     TEST_FILE = f"{DATA_DIR}/1NVG.pdb"
     structure1: Structure = structure_from_pdb(TEST_FILE)
     structure2: Structure = structure_from_pdb(TEST_FILE)
     # NOTE(CJ): Below is NOT the recommended way to manipulate this stuff
-    del structure2.chains_[0].residues_[-1]
-    print(structure1.chains_[0].residues_)
-    print(structure2.chains_[0].residues_)
+    del structure2._chains[0]._residues[-1]
+    print(structure1._chains[0]._residues)
+    print(structure2._chains[0]._residues)
     assert structure1 != structure2
     structure2: Structure = merge_right(structure1, structure2)
     assert structure1 == structure2
 
-
+@pytest.mark.TODO
 def test_round_trip_pdb():
     """Ensuring that the Structure() class be loaded into a .pdb and saved back in a round trip without error."""
-    # FIXME(CJ): This test doesn't currently work for 1NVG: figure out the PDBline stuff
+    # FIXME(CJ): This test doesn"t currently work for 1NVG: figure out the PDBline stuff
     # that will make this work
     TEST_FILE = f"{DATA_DIR}/1NVG.pdb"
     actual_file = f"{DATA_DIR}/1NVG_cpy.pdb"
-    structure1: Structure = structure_from_pdb(TEST_FILE, 'all')
+    structure1: Structure = structure_from_pdb(TEST_FILE, "all")
     fs.safe_rm(actual_file)
     assert not os.path.exists(actual_file)
     structure1.to_pdb(actual_file)
@@ -257,7 +211,7 @@ def test_round_trip_pdb():
     fs.safe_rm(actual_file)
     assert not os.path.exists(actual_file)
 
-
+@pytest.mark.TODO
 def test_atoms(): # TODO(shaoqz) wait for test
     TEST_FILE = f"{TEST_DIR}/preparation/data/3NIR.pdb"
     struct: Structure = structure_from_pdb(TEST_FILE)

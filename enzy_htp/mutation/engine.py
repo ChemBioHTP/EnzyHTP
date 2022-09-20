@@ -286,7 +286,7 @@ def _mutate_tleap(pdb: str, outfile: str, mutations: List[Mutation]) -> None:
             lig:struct.Ligand = struct.ligand_from_pdb(tmp_file)
             (cname,rname,rnum) = rkey.split('.')
             rnum = int(rnum)
-            structure.chain_mapper[cname].residues_[rnum-1] = lig
+            structure.chain_mapper[cname]._residues[rnum-1] = lig
             fs.safe_rm(tmp_file)
 
         structure.to_pdb(outfile)

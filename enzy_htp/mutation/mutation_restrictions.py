@@ -215,5 +215,5 @@ def restriction_object(pdb: str) -> MutationRestrictions:
     for res in struct.residues:
         if not res.is_canonical():
             continue
-        mapper[(res.chain(), res.num())] = default_restriction_dict()
+        mapper[(res.chain(), res.idx())] = default_restriction_dict()
     return MutationRestrictions(mapper, pdb)

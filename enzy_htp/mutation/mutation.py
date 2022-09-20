@@ -85,11 +85,11 @@ def generate_all_mutations(
     residues: List[es.Residue] = structure.residues
     residues = list(filter(lambda rr: rr.is_canonical(), residues))
     for res in residues:
-        (chain_id, num) = res.sort_key()
+        (chain_id, num) = res.key()
         orig: str = res.name
         if len(orig) != 1:
             orig = chem.convert_to_one_letter(orig)
-        result[res.sort_key()] = list(
+        result[res.key()] = list(
             map(
                 lambda ch: Mutation(
                     orig=orig, target=ch, chain_id=chain_id, res_num=num

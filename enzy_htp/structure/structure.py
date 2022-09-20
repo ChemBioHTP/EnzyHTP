@@ -18,14 +18,16 @@ with setter methods. Also Structure() supports common editing methods such as ad
 Application of Structure objects - Binding modules:
 Generation:
     Note that Structure() objects SHOULD NOT be created by the user directly and instead created through different generation 
-    methods from the binding StructureIO classes (e.g.: enzy_htp.structure_from_pdb()) from different file types and different 
-    external data structures.
+    methods from the binding StructureIO classes (e.g.: enzy_htp.structure_io.PDBParser().get_structure()) from different file 
+    types and different external data structures.
 Selection:
     Selection of Structural regions are handled by the Selection module.
 Operation:
-    Changes of the Structure data are handled by functions in main EnzyHTP modules: Preparation, Mutation, Geom Variation.
-    And structure based descriptors are derived by functions in the Energy Engine module.
+    Changes of the Structure data are handled by functions in the operation module. These commonly used operations of Structure 
+    will than be used in scientific APIs: Preparation, Mutation, Geom Variation. And structure based descriptors are derived by 
+    functions in the Energy Engine module.
 
+### TO BE UPDATE ###
     Sub-module also contains two utility free functions for comparing and merging structural elements.
     compare_structures() and merge_right() are used for comparing and merging structural components for Structure()
     objects, respectively.
@@ -41,7 +43,7 @@ Operation:
         >>> structure.num_chains()
         2
         >>> structure.residue_state
-        [('A','ASP',1),('A','ASP',2),('A','ASP',3),('B','ASP',1)] #@shaoqz:shouldn't it be 1-letter name?
+        [("A","ASP",1),("A","ASP",2),("A","ASP",3),("B","ASP",1)] #@shaoqz:shouldn"t it be 1-letter name?
         >>> structure.num_residues
         4
 
@@ -50,9 +52,9 @@ Operation:
         [<enzy_htp.structure.chain.Chain object at 0x7fdc680ac670>, 
             <enzy_htp.structure.chain.Chain object at 0x7fdc680855b0>]
         >>> structure.chain_names
-        ['A', 'B']
-        >>> chain_cpy : enzy_htp.Chain = structure.get_chain( 'B' )
-        >>> structure.remove_chain( 'B' )
+        ["A", "B"]
+        >>> chain_cpy : enzy_htp.Chain = structure.get_chain( "B" )
+        >>> structure.remove_chain( "B" )
         >>> structure.chains
         [<enzy_htp.structure.chain.Chain object at 0x7fdc680ac670>]
         >>> structure.num_chains()
@@ -64,26 +66,26 @@ Operation:
         [<enzy_htp.structure.chain.Chain object at 0x7fdc680ac670>, 
             <enzy_htp.structure.chain.Chain object at 0x7fdc680855b0>] # @shaoqz: why chain.Chain?
         >>> structure.chain_names
-        ['A', 'B']
+        ["A", "B"]
         >>> structure.num_chains()
         2	
         >>> structure.num_residues
         4	
 
-    Interfacing with Residue()'s:
+    Interfacing with Residue()"s:
         >>> structure.residues()
-        ['A.ASP.1','A.ASP.2','A.ASP.3','B.ASP.1']   # @shaoqz: shouldn't this be Residue objects?
+        ["A.ASP.1","A.ASP.2","A.ASP.3","B.ASP.1"]   # @shaoqz: shouldn"t this be Residue objects?
         >>> structure.num_residues
         4
-        >>> res_cpy : enzy_htp.Residue = structure.get_residue( 'B.ASP.1' ) # @shaoqz: @imp we should not use residue name and id together as the identifier. Either id only to pinpoint or name only to batch select
-        >>> structure.remove_residue( 'B.ASP.1' )
+        >>> res_cpy : enzy_htp.Residue = structure.get_residue( "B.ASP.1" ) # @shaoqz: @imp we should not use residue name and id together as the identifier. Either id only to pinpoint or name only to batch select
+        >>> structure.remove_residue( "B.ASP.1" )
         >>> structure.residues()
-        ['A.ASP.1','A.ASP.2','A.ASP.3']
+        ["A.ASP.1","A.ASP.2","A.ASP.3"]
         >>> structure.num_residues
         3
         >>> structure.add_residue( res_cpy )
         >>> structure.residues()
-        ['A.ASP.1','A.ASP.2','A.ASP.3','B.ASP.1']
+        ["A.ASP.1","A.ASP.2","A.ASP.3","B.ASP.1"]
         >>> structure.num_residues
         4
 
@@ -96,89 +98,178 @@ Date: 2022-04-03
 """
 #TODO(CJ): add a method for changing/accessing a specific residue
 from __future__ import annotations
+import itertools
+import os
 
 import string
 from copy import deepcopy
 import sys
-from typing import List, Set, Dict, Tuple
+from typing import List, Set, Dict, Tuple, Union
 from collections import defaultdict
 
 from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
-from enzy_htp.chemical import convert_to_one_letter
+from enzy_htp.chemical import convert_to_one_letter, ResidueType
+from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
 
 from .atom import Atom
 from . import Chain
 from .residue import Residue
-from .metal_atom import MetalAtom
+from .metal_atom import MetalUnit
 from .ligand import Ligand, residue_to_ligand
 from .solvent import Solvent, residue_to_solvent
-from .metal_atom import MetalAtom
+from .metal_atom import MetalUnit
 
 
-class Structure:
-    """Enzyme structure.
+class Structure(DoubleLinkedNode): # TODO implement different copy methods for the doubly linked ds; by default are all shollow copy and references
+    """Protein structure.
     Designed for direct interfacing by users.
     Composed of child Chain() objects and their subsequent child Residue() objects and so on Atom() objects.
     Note: This class SHOULD NOT be created directly by users. It should be created with methods from the StructureIO module.
 
     Attributes:
-        + chains_: List[Chain]
-        + chain_mapper: Dict[]
+        children/chains: List[Chain]
 
     Derived properties:
-        + residue_state : List[Tuple[str, str, int]]
-        + residue_keys() : List[str]
-        + residues : List
-        + metals : List[Residue]
-        + ligands : List[Residue]
-        + solvents : List
-        + num_chains
-        + num_residues
-        + chain_names
+        residue_state : List[Tuple[str, str, int]]
+        residue_keys() : List[str]
+        residues : List
+        metals : List[Residue]
+        ligands : List[Residue]
+        solvents : List
+        num_chains
+        num_residues
+        chain_names
     """
 
     def __init__(self, chains: List[Chain]):
         """Constructor that takes just a list of Chain() objects as input."""
-        self.chains_ = chains #@shaoqz: why tailing _ #@shaoqz: @imp2 why do we need this instead of just a mapper and the getter of chains TODO change it to only one and make another one a getter
+        self.set_children(chains)
+        self._chains = self._children
+        self.set_ghost_parent()
         if self.has_duplicate_chain_name():
             self.resolve_duplicated_chain_name()
-
-    #region === Getters === (Attributes - accessing Structure data -  references)
+    #region === Getters-attr ===
     @property
     def chains(self) -> List[Chain]:
         """Getter for the list of Chain() objects contained within the Structure() object."""
-        self.chains_.sort(key=lambda c: c.name())
-        return self.chains_
-
+        return self.get_children()
     @chains.setter
     def chains(self, val) -> None:
-        '''setter for _chains'''
-        self.chains_ = val
+        """setter for _chains"""
+        self.set_children(val)
 
     @property
     def chain_mapper(self) -> Dict[str, Chain]:
-        mapper = dict()
+        mapper = {}
         if self.has_duplicate_chain_name():
             self.resolve_duplicated_chain_name()
         ch: Chain
-        for ch in self.chains:
-            mapper[ch.name()] = ch
+        for ch in self._chains:
+            mapper[ch.name] = ch
         return mapper
 
     def get_chain(self, chain_name: str) -> Union[Chain, None]:
         """Gets a chain of the given name. Returns None if the Chain() is not present."""
         return self.chain_mapper.get(chain_name, None)
 
+    #endregion
+
+    #region === Getter-Prop ===
     @property
+    def num_chains(self) -> int:
+        """Returns the number of Chain() objects in the current Structure()."""
+        return len(self._chains)
+
+    @property 
     def residues(self) -> List[Residue]:
         """Return a list of the residues in the Structure() object sorted by (chain_id, residue_id)"""
-        result = list()
-        for ch in self.chains:
-            result.extend(ch.residues())
-        result.sort(key=lambda r: r.sort_key())
+        result = list(itertools.chain.from_iterable(self._chains))
+        result.sort(key=lambda r: r.key())
         return result
 
+    @property
+    def ligands(self) -> List[Residue]:
+        """Filters out the ligand Residue()"s from the chains in the Structure()."""
+        result: List[Residue] = list()
+        for chain in self.chains:
+            result.extend(list(filter(lambda r: r.is_ligand(), chain)))
+        return result
+    #endregion
+
+    #region === Checker ===
+    def has_duplicate_chain_name(self) -> bool:
+        """check if self._chain have duplicated chain name
+        give warning if do."""
+        existing_c_id = []
+        ch: Chain
+        for ch in self._chains:
+            if ch.name in existing_c_id:
+                _LOGGER.warning(
+                    f"Duplicate chain names detected in Structure obj during {sys._getframe().f_back.f_code.co_name}()! "
+                )
+                return True
+            existing_c_id.append(ch.name)
+        return False
+    
+    def resolve_duplicated_chain_name(self) -> None:
+        """resolve for duplicated chain name in self.chains_
+        A. insert the chain to be one character after the same one if they are different
+           and move the rest chain accordingly
+        B. give error if they are the same (in coordinate)"""        
+        mapper = {}
+        if_rename = 0
+        for ch in self.chains:
+            if ch.name in mapper:
+                if ch.is_same_coord(mapper[ch.name]):
+                    _LOGGER.error(
+                        "Duplicate chain (same coordinate) detected in Structure obj! Exiting... "
+                    )
+                    sys.exit(1)
+                new_name = chr(ord(ch.name) + 1) # TODO find a way
+                ch.name = new_name
+                if_rename = 1
+            mapper[ch.name] = ch
+        if if_rename:
+            _LOGGER.warning(
+                "Resolved duplicated chain (different ones) name by renaming."
+            )
+    #endregion
+
+    #region === Editor ===
+    def sort_chains(self):
+        """
+        sort children chains with their chain name
+        sorted is always better than not but Structure() is being lazy here
+        """
+        self._chains.sort(key=lambda x: x.name)
+    #endregion
+
+    #region === Special ===
+    def __str__(self):
+        """
+        a string representation of Structure()
+        Goal:
+            show it is a Structure obj
+            show the data in current instance
+        """
+        out_line = [f"<Structure object at {hex(id(self))}>",]
+        out_line.append("Structure(")
+        out_line.append("chains:")
+        for ch in sorted(self._chains,key=lambda x: x.name):
+            out_line.append(f"    {ch.name}({ch.chain_type}): residue: {ch.residue_idx_interval()} atom_count: {ch.num_atoms}")
+        out_line.append(")")
+        return os.linesep.join(out_line)
+    #endregion
+
+
+
+
+
+
+
+    # ============= TODO below =================
+    #region === Getters === (Attributes - accessing Structure data -  references)
     def get_residue(self, target_key: str) -> Union[None, Residue]: #@shaoqz: we need to that gives a reference. In the case of editing the structure.
         """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format,
         a deepcopy of the corresponding Residue() is returned, if it exists. None is returned if it cannot be found."""
@@ -190,18 +281,10 @@ class Structure:
 
     @property
     def metals(self) -> List[Residue]:
-        """Filters out the metal Residue()'s from the chains in the Structure()."""
+        """Filters out the metal Residue()"s from the chains in the Structure()."""
         result: List[Residue] = list()
         for chain in self.chains:
             result.extend(list(filter(lambda r: r.is_metal(), chain.residues())))
-        return result
-
-    @property
-    def ligands(self) -> List[Residue]:
-        """Filters out the ligand Residue()'s from the chains in the Structure()."""
-        result: List[Residue] = list()
-        for chain in self.chains:
-            result.extend(list(filter(lambda r: r.is_ligand(), chain.residues())))
         return result
 
     @property
@@ -218,13 +301,12 @@ class Structure:
         return result
 
     def get_atom(self) -> Atom:
-        '''TODO do we really need this? Providing access of deeper layer requires a key to select
+        """TODO do we really need this? Providing access of deeper layer requires a key to select
         maybe just use python objects to access is a better idea.
-        And these APIs are just for developers, users will have selector in the future to do selection'''
+        And these APIs are just for developers, users will have selector in the future to do selection"""
         pass
-    
     #endregion
-
+    
     #region === Getter === (Properities - derived data; wont affect Structure data - copy)
     @property
     def residue_state(self) -> List[Tuple[str, str, int]]: #@shaoqz: @residue_key
@@ -242,7 +324,7 @@ class Structure:
 
     @property
     def residue_keys(self) -> List[str]:
-        """Generates a list of strings containing all residue_key values for all child Residue()'s"""
+        """Generates a list of strings containing all residue_key values for all child Residue()"s"""
         result = list()
         for chain in self.chains:
             for res in chain.residues():
@@ -255,13 +337,8 @@ class Structure:
         total: int = 0
         ch: Chain
         for ch in self.chains:
-            total += ch.num_residues()
+            total += ch.num_residues
         return total
-
-    @property
-    def num_chains(self) -> int:
-        """Returns the number of Chain() objects in the current Structure()."""
-        return len(self.chains)
 
     @property
     def chain_names(self) -> List[str]:
@@ -270,46 +347,10 @@ class Structure:
 
     #endregion
 
-    #region === Checker === 
+    #region === Checker ===
     def has_chain(self, chain_name: str) -> bool:
         """Checks if the Structure() has a chain with the specified chain_name."""
         return chain_name in self.chain_mapper
-
-    def has_duplicate_chain_name(self) -> bool: #TODO add test
-        '''check if self._chain have duplicated chain name
-        give warning if do.'''
-        mapper = dict()
-        ch: Chain
-        for ch in self.chains_:
-            if ch.name() in mapper:
-                _LOGGER.warning(
-                    f"Duplicate chain names detected in Structure obj during {sys._getframe().f_back.f_code.co_name}()! "
-                )
-                return True
-            mapper[ch.name()] = ch
-        return False
-    
-    def resolve_duplicated_chain_name(self, keep: bool = 0) -> None: #TODO add test
-        '''resolve for duplicated chain name in self.chains_
-        A. rename the chain to be one character after the same one if they are different 
-        B. give error if they are the same (in coordinate)'''        
-        mapper = dict()
-        if_rename = 0
-        for ch in self.chains:
-            if ch.name() in mapper:
-                if ch.is_same_coord(mapper[ch.name()]):
-                    _LOGGER.error(
-                        "Duplicate chain (same coordinate) detected in Structure obj! Exiting... "
-                    )
-                    exit(1)
-                new_name = chr(ord(ch.name()) + 1)
-                ch.rename(new_name)
-                if_rename = 1
-            mapper[ch.name()] = ch
-        if if_rename:
-            _LOGGER.warning(
-                'Resolved duplicated chain (different ones) name by renaming.'
-            )
     #endregion
 
     #region === Editor ===     
@@ -354,14 +395,13 @@ class Structure:
 
     def remove_residue(self, target_key: str) -> None:
         """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format,
-        the Residue() is removed if it currently exists in one of the child Chain()'s. If the Chain() is empty after this
+        the Residue() is removed if it currently exists in one of the child Chain()"s. If the Chain() is empty after this
         removal, the chain is deleted."""
         (chain_name, _, _) = target_key.split(".") #@shaoqz: why not use this in get lolll
         if self.has_chain(chain_name):
             self.chain_mapper[chain_name].remove_residue(target_key)
             if self.chain_mapper[chain_name].empty():
                 self.remove_chain(chain_name)
-
     #endregion
 
     #region === Special === 
@@ -468,7 +508,7 @@ class Structure:
         self, ff="GAUSSIAN", metal_fix=1, ligand_fix=1, prepi_path=None
     ):
         """
-        get connectivity table with atom index based on 'ff' settings:
+        get connectivity table with atom index based on "ff" settings:
         ff = GAUSSIAN  -- continuous atom index start from 1, do not seperate by chain
         -------------------
         TREATMENT
@@ -539,19 +579,7 @@ class Structure:
         return connectivty_table
     
     # === TO BE MOVE ===
-    def to_pdb(self, out_path: str) -> None: #@shaoqz: @imp2 move to the PDB interface in the future
-        """Saves the structure to the specified file in the PDB file format."""
-        lines = list()
-        a_idx = 1 #@shaoqz: not nessessary need to number from 1 everytime. It's better to leave a few options to meet different need.
-        for cname, chain in self.chain_mapper.items():
-            a_idx = chain.renumber_atoms(a_idx)
-            lines.extend(chain.get_pdb_lines())
-            a_idx += 1
-        lines.append("END")
-        fs.write_lines(out_path, lines) #@shaoqz: @imp2 need to return a mapping of new indexes and old indexes
-
-
-    def build_ligands(self, out_dir: str, unique: bool = False) -> List[str]: #@shaoqz: @imp2 add more file format option
+    def build_ligands(self, out_dir: str, unique: bool = False) -> List[str]: # TODO(qz): change reference of this this to get_file_str(stru.ligands[i])
         """Exports all the Ligand() objects in the Structure() to .pdb files.
 
         Args:
@@ -567,7 +595,7 @@ class Structure:
 
         for lidx, lig in enumerate(ligands):
             # TODO(CJ): add some kind of formatting for lidx
-            lig_name: str = lig.get_name()
+            lig_name: str = lig.name()
             out_pdb: str = f"{out_dir}/ligand_{lig_name}_{lidx}.pdb"
 
             if unique and lig_name in existing:
@@ -717,8 +745,8 @@ class Structure:
 def compare_structures(left: Structure, right: Structure) -> Dict[str, List[str]]:
     """Compares two Structure() objects and returns a dict() of missing Residues with format:
 
-    {'left': ['residue_key1','residue_key1',..],
-     'right': ['residue_key1','residue_key1',..]
+    {"left": ["residue_key1","residue_key1",..],
+     "right": ["residue_key1","residue_key1",..]
          }
     """
     result = {"left": [], "right": []}

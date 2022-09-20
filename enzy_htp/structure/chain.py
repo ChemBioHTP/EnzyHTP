@@ -7,143 +7,239 @@ Date: 2022-03-20
 """
 from __future__ import annotations
 from copy import deepcopy
+import itertools
 from enzy_htp.core import _LOGGER
-from typing import List
+from typing import Iterable, List, Tuple, Union
+from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
 
 from enzy_htp.structure.atom import Atom
+import enzy_htp.chemical as chem
 
 from .residue import Residue
-#TODO(CJ): add a method for changing/accessing a specific residue
 
-class Chain:
-    """Class that represents a Chain of residues in a PDB file. Serves as a manager to the
-    Residue() objects that it owns.
+class Chain(DoubleLinkedNode):
+    """Class that represents a Chain of residues in a PDB file.
 
     Attributes:
-        name_ : The name of the chain as a string.
-        residues_ : A list of Residue() objects or derived types.
+        name : The name of the chain as a string.
+        children/residues : A list of Residue() objects or derived types.
+        parent/protein : the parent protein
+
+    Derived properties:
+        atoms : composing atoms
+        num_atoms
+        num_residues
+        chain_type
+        residue_idx_interval : the containing residue index range
     """
 
-    def __init__(self, name: str, residues: List[Residue]):
+    def __init__(self, name: str, residues: List[Residue], parent=None):
         """Initiation of a Chain with a name and list of residues."""
-        self.name_ = name
-        self.residues_: List[Residue] = deepcopy(residues)
-        self.rename(self.name_)
-   
-    # === Getter-Attr (ref) ===
+        self._name = name
+        self.set_parent(parent)
+        self.set_children(residues)
+
+        self._residues: List[Residue] = self._children # alias
+    #region === Getter-Attr ===
+    @property
+    def name(self) -> str:
+        return self._name
+    @name.setter
+    def name(self, val: str):
+        self._name = val
+
+    @property
+    def protein(self):
+        return self.get_parent()
+    @protein.setter
+    def protein(self, val):
+        self.set_parent(val)
+
+    @property
     def residues(self) -> List[Residue]:
         """Access the child Residue() objects."""
-        return self.residues_
+        return self.get_children()
+    @residues.setter
+    def residues(self, val: List[Residue]):
+        self.set_children(val)
 
     def get_residue(self, traget_key: str) -> Residue:
-        '''TODO: is there alt option for the key?'''
+        """TODO: is there alt option for the key?"""
         pass
+    #endregion
 
-    def name(self) -> str:
-        """Getter for the Chain's name."""
-        return self.name_
+    #region === Getter-Prop ===
+    def residue_idx_interval(self, if_str: bool = True) -> Union[str, Iterable[Tuple[int,int]]]:
+        """
+        a range representation of containing residue indexes
+        Args & Returns:
+            if_str:
+                0: return a iterable of Tuples [(1,20),(25,30)]
+                1: return a str "1-20,25-30"
+        """
+        res_idx_list = map(lambda x: x.idx, self._residues)
+        interval_list = get_interval_from_list(res_idx_list)
+        if if_str:
+            range_strs = map(lambda x: f"{x[0]}-{x[1]}", interval_list)
+            return ",".join(range_strs)
+        return interval_list
 
     @property
     def atoms(self) -> List[Atom]:
-        '''get all children Atoms'''
-        result = list()
+        """get all children Atoms"""
+        result = []
         for res in self:
             result.extend(res.atoms)
         return result
 
-    # === Getter-Prop (cpy/new) ===
+    @property
     def num_atoms(self) -> int:
         """Finds the total number of Atom() objects contained in the Residue() children objects."""
         total = 0
-        for res in self.residues():
-            total += res.num_atoms()
+        for res in self._residues:
+            total += res.num_atoms
         return total
 
+    @property
     def num_residues(self) -> int:
         """Returns number of Residue() or Residue()-dervied objects belonging to the Chain."""
         return len(self)
 
-    # === Checker === 
-    def is_metal(self) -> bool:
+    @property
+    def chain_type(self) -> str:
+        """
+        Returns:
+            return the chain type. Possible chain types are:
+                peptide
+                Any composition from metal, ligand, solvent, trash
+        """
+        chain_type = []
+        if self.is_peptide():
+            return "peptide"
+        if self.has_metal():
+            chain_type.append("metal")
+        if self.has_ligand():
+            chain_type.append("ligand")
+        if self.has_trash():
+            chain_type.append("trash")
+        if self.has_solvent():
+            chain_type.append("solvent")
+        return ",".join(chain_type)
+    #endregion
+
+    #region === Checker ===
+    def is_peptide(self) -> bool:
+        """
+        if there is any residue not canonical
+        """
+        return not sum(list(map(lambda rr: (not rr.is_canonical()) and (not rr.is_noncanonical()), self._residues)))
+
+    def has_metal(self) -> bool:
         """Checks if any metals are contained within the current chain."""
-        return sum(list(map(lambda rr: rr.is_metal(), self.residues_)))
+        return sum(list(map(lambda rr: rr.is_metal(), self._residues)))
+
+    def has_ligand(self) -> bool:
+        return sum(list(map(lambda rr: rr.is_ligand(), self._residues)))
+
+    def has_solvent(self) -> bool:
+        return sum(list(map(lambda rr: rr.is_solvent(), self._residues)))
+
+    def has_trash(self) -> bool:
+        return sum(list(map(lambda rr: rr.is_trash(), self._residues)))
 
     def is_HET(self) -> bool:
-        for rr in self.residues_:
+        for rr in self._residues:
             if not rr.is_canonical():
                 return False
-        return True #@shaoqz: why not use sum like above lol
+        return True
 
-    def is_empty(self) -> bool: #@shaoqz: @imp2 maybe name it is_empty?
-        """Does the chain have any Residue()'s."""
-        return len(self.residues_) == 0
+    def is_empty(self) -> bool:
+        """Does the chain have any Residue()"s."""
+        return len(self._residues) == 0
 
-    def is_same_sequence(self, other: Chain) -> bool:
+    def is_same_sequence(self, other: Chain) -> bool: # TODO
         """Comparison operator for use with other Chain() objects. Checks if residue list is identical in terms of residue name only."""
-        self_residues: List[Residue] = self.residues_
-        other_residues: List[Residue] = other.residues_
-        # print(len(self_residues),'\t',len(other_residues))
+        self_residues: List[Residue] = self._residues
+        other_residues: List[Residue] = other.residues
+        # print(len(self_residues),"\t",len(other_residues))
         if len(self_residues) != len(other_residues):
             return False
 
         for s, o in zip(self_residues, other_residues):
             s: Residue
             o: Residue
-            if not s.is_sequence_equivalent(o): #@shaoqz: this is a good idea of having different levels of comparsion @imp2 after reading this method I found here it already comparing residues in the same position we only need to compare the name but not the key
+            if not s.is_sequence_eq(o): #@shaoqz: this is a good idea of having different levels of comparsion @imp2 after reading this method I found here it already comparing residues in the same position we only need to compare the name but not the key
                 return False
         return True
 
     def is_same_coord(self, other: Chain) -> bool:
-        '''check if self is same as other in coordinate of every atom'''
+        """check if self is same as other in coordinate of every atom"""
         self_atoms = self.atoms
-        self_atoms.sort(key=lambda a: a.num)
+        self_atoms.sort(key=lambda a: a.idx)
         self_coord = map(lambda x:x.coord, self_atoms)
         other_atoms = other.atoms
-        other_atoms.sort(key=lambda a: a.num)
+        other_atoms.sort(key=lambda a: a.idx)
         other_coord = map(lambda x:x.coord, other_atoms)
         for s, o in zip(self_coord, other_coord):
             if s != o:
                 return False
-        return True    
-        
+        return True
+    #endregion
+
     # === Editor ===
-    def add_residue(self, new_res: Residue, sort_after: bool = True, overwrite: bool = False) -> None: #@shaoqz: @imp overwriting a residue is rarely a demand but instead inserting one with same name and index but different stru is.
+    def remove_trash(self):
+        """
+        remove trash ligands in the chain
+        """
+        for i in range(len(self._residues)-1,-1,-1):
+            if self._residues[i].rtype == chem.ResidueType.TRASH:
+                _LOGGER.debug(f"removing TRASH: {self._residues[i]}") # pylint: disable=logging-fstring-interpolation
+                del self._residues[i]
+
+    def sort_residues(self):
+        """
+        sort children chains with their residue idx
+        sorted is always better than not but Chain() is being lazy here
+        """
+        self._children.sort(key=lambda x: x.idx)
+
+    def add_residue(self, new_res: Residue, sort_after: bool = True, overwrite: bool = False) -> None: # TODO#@shaoqz: @imp overwriting a residue is rarely a demand but instead inserting one with same name and index but different stru is.
         """Allows for insertion of a new Residue() object into the Chain. If the new Residue() is an exact # TODO work on overwriting
-        copy, it fully overwrites the existing value. The sort_after flag specifies if the Residue()'s should
+        copy, it fully overwrites the existing value. The sort_after flag specifies if the Residue()"s should
         be sorted by residue_number after the insertion.
         """
-        for ridx, res in enumerate(self.residues_):
+        for ridx, res in enumerate(self._residues):
             if new_res.name == res.name and new_res.num_ == res.num_: #@shaoqz: @imp should not work like this. Imaging the case where both residue is called LIG but they are different ligands. They are neither the same nor should be overwritten.
-                self.residues_[ridx] = deepcopy(new_res)
+                self._residues[ridx] = deepcopy(new_res)
                 break
         else:
-            self.residues_.append(new_res)
+            self._residues.append(new_res)
 
-        self.rename(self.name_) #@shaoqz: maybe better to change this residue attribute only?
+        self.rename(self._name) #@shaoqz: maybe better to change this residue attribute only?
 
         if sort_after:
-            self.residues_.sort(key=lambda r: r.num()) #@shaoqz: @imp this does not work when two different residue have the same index which often happens when you want to add a ligand to the structure.
+            self._residues.sort(key=lambda r: r.idx()) #@shaoqz: @imp this does not work when two different residue have the same index which often happens when you want to add a ligand to the structure.
 
-    def remove_residue(self, target_key: str) -> None: #@shaoqz: @imp2 target key should not require the name. We should minimize the prerequisite of any input since its for HTP.
+    def remove_residue(self, target_key: str) -> None: # TODO#@shaoqz: @imp2 target key should not require the name. We should minimize the prerequisite of any input since its for HTP.
         """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format,
         the Residue() is removed if it currently exists in the Chain() object."""
-        for ridx, res in enumerate(self.residues_):
+        for ridx, res in enumerate(self._residues):
             if res.residue_key == target_key:
                 break
         else:
             return
 
-        del self.residues_[ridx] #@shaoqz: why not move this line inside the loop?
-    
-    def rename(self, new_name: str) -> None: #@shaoqz: using the 2-way link sheet will get rid of functions like this but both works.
-        """Renames the chain and propagates the new chain name to all child Residue()'s."""
-        self.name_ = new_name
-        res: Residue
-        for ridx, res in enumerate(self.residues_):
-            self.residues_[ridx].set_chain(new_name) #@shaoqz: why not just use res?
+        del self._residues[ridx] #@shaoqz: why not move this line inside the loop?
 
-    def renumber_atoms(self, start: int = 1) -> int: #@shaoqz: @imp need to record the mapping of the index  #@shaoqz: also need one for residues
-        """Renumbers the Atom()'s inside the chain beginning with "start" value and returns index of the last atom.
+    def rename(self, new_name: str) -> None: # TODO#@shaoqz: using the 2-way link sheet will get rid of functions like this but both works.
+        """Renames the chain and propagates the new chain name to all child Residue()"s."""
+        self._name = new_name
+        res: Residue
+        for ridx, res in enumerate(self._residues):
+            self._residues[ridx].set_chain(new_name) #@shaoqz: why not just use res?
+
+    def renumber_atoms(self, start: int = 1) -> int: # TODO#@shaoqz: @imp need to record the mapping of the index  #@shaoqz: also need one for residues
+        """Renumbers the Atom()"s inside the chain beginning with "start" value and returns index of the last atom.
         Exits if start index <= 0.
         """
         if start <= 0:
@@ -151,42 +247,43 @@ class Chain:
                 f"Illegal start number '{start}'. Value must be >= 0. Exiting..."
             )
             exit(1)
-        self.residues_ = sorted(self.residues_, key=lambda r: r.num())
+        self._residues = sorted(self._residues, key=lambda r: r.idx())
         idx = start
-        num_residues: int = self.num_residues()
-        for ridx, res in enumerate(self.residues_):
-            idx = self.residues_[ridx].renumber_atoms(idx)
+        num_residues: int = self.num_residues
+        for ridx, res in enumerate(self._residues):
+            idx = self._residues[ridx].renumber_atoms(idx)
             idx += 1
             terminal = (ridx < (num_residues - 1)) and (
-                res.is_canonical() and not self.residues_[ridx + 1].is_canonical() #@shaoqz: @imp what does this mean? the TER line?
+                res.is_canonical() and not self._residues[ridx + 1].is_canonical() #@shaoqz: @imp what does this mean? the TER line?
             )
             if terminal:
                 idx += 1
-        return idx - 1 
+        return idx - 1
 
-    # === Special ===
-    def __getitem__(self, key: int) -> Residue:
-        """Allows indexing into the child Residue() objects."""
-        return self.residues_[key]
-
-    def __delitem__(self, key: int) -> None:
-        """Allows deleting of the child Residue() objects."""
-        del self.residues_[key]
-
-    def __len__(self) -> int:
-        """Returns number of Residue() or Residue()-dervied objects belonging to the Chain."""
-        return len(self.residues_)
-
-    #region === TODO/TOMOVE ===
-    def get_pdb_lines(self) -> List[str]: #@shaoqz: @imp move to the IO class
-        """Generates a list of PDB lines for the Atom() objects inside the Chain(). Last line is a TER."""
-        result = list()
-        num_residues: int = self.num_residues()
-        for idx, res in enumerate(self.residues_):
-            terminal = (idx < (num_residues - 1)) and (
-                res.is_canonical() and not self.residues_[idx + 1].is_canonical()
-            )
-            result.extend(res.get_pdb_lines(terminal)) #@shaoqz: why terminal?
-        result.append("TER")
-        return result
+    #region === Special ===
+    def __str__(self):
+        """
+        concise string representation of the chain
+        """
+        return f"Chain({self._name}, residue: {self.residue_idx_interval()})"
     #endregion
+
+# TODO go to core
+def get_interval_from_list(target_list: List[int]) -> Iterable[Tuple[int, int]]:
+    """
+    convert a list of int to the interval/range representation
+    Returns:
+        a generater of tuples with each indicating the start/end of the interval
+    Example:
+        >>> list(get_interval_from_list([1,2,3,6,7,8]))
+        [(1,3),(6,8)]
+
+    reference: https://stackoverflow.com/questions/4628333
+    """
+    # clean input
+    target_list = sorted(set(target_list))
+    # here use enum id as a ref sequence and group by the deviation
+    for i, j in itertools.groupby(enumerate(target_list), lambda ref_vs_target: ref_vs_target[1] - ref_vs_target[0]):
+        j = list(j)
+        yield j[0][1], j[-1][1]
+
