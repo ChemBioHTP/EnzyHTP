@@ -33,33 +33,33 @@ def test_constant_data():
     assert not ma.is_canonical()
     assert ma.rtype == chem.ResidueType.METAL
 
+@pytest.mark.TODO
+def test_get_radii_method_good_input():
+    """Ensuring the MetalUnit.get_radii() method works correctly."""
+    pdb_file = f"{DATA_DIR}/1NVG.pdb"
+    metals: List[MetalUnit] = structure_from_pdb(pdb_file).metals
+    assert np.isclose(metals[0].get_radii(), 0.88)
+    assert np.isclose(metals[0].get_radii("vdw"), 1.39)
 
-# def test_get_radii_method_good_input():
-#     """Ensuring the MetalUnit.get_radii() method works correctly."""
-#     pdb_file = f"{DATA_DIR}/1NVG.pdb"
-#     metals: List[MetalUnit] = structure_from_pdb(pdb_file).metals
-#     assert np.isclose(metals[0].get_radii(), 0.88)
-#     assert np.isclose(metals[0].get_radii("vdw"), 1.39)
+    assert np.isclose(metals[0].get_radii(), metals[1].get_radii())
+    assert np.isclose(metals[0].get_radii("vdw"), metals[1].get_radii("vdw"))
 
-#     assert np.isclose(metals[0].get_radii(), metals[1].get_radii())
-#     assert np.isclose(metals[0].get_radii("vdw"), metals[1].get_radii("vdw"))
+@pytest.mark.TODO
+def test_residue_to_metal():
+    """Ensuring the residue_to_metal() method works."""
+    residue = Residue("A.ZN.1", [Atom(line_idx=1, atom_name="Zn")])
+    metal: MetalUnit = residue_to_metal(residue)
+    assert isinstance(metal, MetalUnit)
+    assert metal.atom_name_ == "Zn"
 
-
-# def test_residue_to_metal():
-#     """Ensuring the residue_to_metal() method works."""
-#     residue = Residue("A.ZN.1", [Atom(line_idx=1, atom_name="Zn")])
-#     metal: MetalUnit = residue_to_metal(residue)
-#     assert isinstance(metal, MetalUnit)
-#     assert metal.atom_name_ == "Zn"
-
-
-# def test_clone():
-#     """Checking that the Ligand.clone() method returns a deepcopy of the current MetalUnit()."""
-#     pdb_file = f"{DATA_DIR}/1NVG.pdb"
-#     metals: List[MetalUnit] = structure_from_pdb(pdb_file).metals
-#     metal: MetalUnit = metals[0]
-#     metal_cpy: MetalUnit = metal.clone()
-#     assert isinstance(metal_cpy, MetalUnit)
-#     assert id(metal) != id(metal_cpy)
-#     for a1, a2 in zip(metal.atoms, metal_cpy.atoms):
-#         assert id(a1) != id(a2)
+@pytest.mark.TODO
+def test_clone():
+    """Checking that the Ligand.clone() method returns a deepcopy of the current MetalUnit()."""
+    pdb_file = f"{DATA_DIR}/1NVG.pdb"
+    metals: List[MetalUnit] = structure_from_pdb(pdb_file).metals
+    metal: MetalUnit = metals[0]
+    metal_cpy: MetalUnit = metal.clone()
+    assert isinstance(metal_cpy, MetalUnit)
+    assert id(metal) != id(metal_cpy)
+    for a1, a2 in zip(metal.atoms, metal_cpy.atoms):
+        assert id(a1) != id(a2)
