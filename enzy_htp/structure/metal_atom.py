@@ -59,7 +59,7 @@ class MetalUnit(Residue):
     # === Getter-Prop ===
     def get_radii(self, method: str = "ionic") -> Union[float, None]:
         """Gets the atomic radii for the metal using specified method.
-        Allowed values are 'ionic' or 'vdw' for ionic and van-der waals, respectively.
+        Allowed values are "ionic" or "vdw" for ionic and van-der waals, respectively.
         Returns a float or None if the metal does not have a distance.
         """
         return chem.get_metal_radii(self.atom_name_, method)
@@ -84,7 +84,7 @@ class MetalUnit(Residue):
     # === Editor ===
     # === Special ===
     def __str__(self) -> str:
-        return f'MetalUnit({self._idx}, {self._name}, atom:{len(self._atoms)}, {self._parent})'
+        return f"MetalUnit({self._idx}, {self._name}, atom:{len(self._atoms)}, {self._parent})"
     #region === TODO/TOMOVE ===
     # fix related
     def get_donor_atom(self, method: str = "INC", check_radius=4.0): # @nu
@@ -188,7 +188,7 @@ class MetalUnit(Residue):
 
     def _metal_fix_2(self): # @nu
         """
-        Fix2: rotate if there're still lone pair left
+        Fix2: rotate if there"re still lone pair left
         """
         for resi in self.donor_resi:
             resi.rot_proton(resi.d_atom)
@@ -268,7 +268,7 @@ class MetalUnit(Residue):
         """
         cnt_flag = ""
         if layer not in ["h", "l"]:
-            raise Exception('build_oniom: please use: "h" or "l" for layer')
+            raise Exception("build_oniom: please use: 'h' or 'l' for layer")
         if layer == "h":
             fz_flag = "0"
             ly_flag = "H"
@@ -338,8 +338,8 @@ class MetalUnit(Residue):
     #endregion
 
 def residue_to_metal(residue: Residue) -> MetalUnit:
-    '''Convenience function that converts Residue() to MetalUnit() object.'''
+    """Convenience function that converts Residue() to MetalUnit() object."""
     if len(residue.atoms) > 1:
-        _LOGGER.error(f'Found more than 1 atom in a metal residue unit: {residue.idx} {residue.name}')
+        _LOGGER.error(f"Found more than 1 atom in a metal residue unit: {residue.idx} {residue.name}")
         sys.exit(1)
     return MetalUnit(residue.idx, residue.name, residue.atoms, residue.parent)

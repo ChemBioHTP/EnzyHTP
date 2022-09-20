@@ -1,5 +1,5 @@
 """Specialization of the Residue() class for a Solvent. Has no additional attributes vs Residue() parent class.
-Meant to be stored alongside other Residue() and Residue() derived objects (Ligand() and MetalUnit()) insdie of 
+Meant to be stored alongside other Residue() and Residue() derived objects (Ligand() and MetalUnit()) inside of 
 the Chain() object. Solvent() objects SHOULD NOT exist on their own.
 
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>

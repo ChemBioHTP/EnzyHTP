@@ -122,7 +122,7 @@ from .metal_atom import MetalUnit
 
 
 class Structure(DoubleLinkedNode): # TODO implement different copy methods for the doubly linked ds; by default are all shollow copy and references
-    '''Enzyme structure.
+    '''Protein structure.
     Designed for direct interfacing by users.
     Composed of child Chain() objects and their subsequent child Residue() objects and so on Atom() objects.
     Note: This class SHOULD NOT be created directly by users. It should be created with methods from the StructureIO module.
