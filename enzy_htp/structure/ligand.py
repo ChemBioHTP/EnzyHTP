@@ -69,7 +69,7 @@ class Ligand(Residue):
 
     # === Special ===
     def __str__(self) -> str:
-        return f'Ligand({self._idx}, {self._name}, atom:{len(self._atoms)}, {self._parent})'
+        return f"Ligand({self._idx}, {self._name}, atom:{len(self._atoms)}, {self._parent})"
 
     #region === TODO/TOMOVE ===
     def build(self, out_path: str) -> None: #@shaoqz: to IO ; also it should be the same as for residue

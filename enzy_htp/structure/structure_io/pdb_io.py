@@ -28,26 +28,26 @@ import enzy_htp.chemical as chem
 
 # pylint: disable=logging-fstring-interpolation
 class PDBParser(StructureParserInterface):
-    '''
+    """
     Parser for covert PDB into Structure and vice versa
-    '''
+    """
     def __init__(self) -> None: # pylint: disable=super-init-not-called
-        '''
+        """
         not sure what can be init here. Maybe some configuration?
-        '''
+        """
         pass
 
     # knowledge
-    PDB_NONSTRU_INFO_LINE_NAME = ['HEADER','TITLE','COMPND','SOURCE','KEYWDS','EXPDTA',
-    'NUMMDL','AUTHOR','REVDAT','SPRSDE','JRNL','REMARK','DBREF','SEQADV','SEQRES','HELIX'
-    ,'SHEET','CRYST1','ORIGX1','ORIGX2','ORIGX3','SCALE1','SCALE2','SCALE3'] #these keywords are for general information in the PDB database
+    PDB_NONSTRU_INFO_LINE_NAME = ["HEADER","TITLE","COMPND","SOURCE","KEYWDS","EXPDTA",
+    "NUMMDL","AUTHOR","REVDAT","SPRSDE","JRNL","REMARK","DBREF","SEQADV","SEQRES","HELIX"
+    ,"SHEET","CRYST1","ORIGX1","ORIGX2","ORIGX3","SCALE1","SCALE2","SCALE3"] #these keywords are for general information in the PDB database
 
     # interface
     @classmethod
     def get_structure(cls, path: str, model: int=0,
                            add_solvent_list: List=None, add_ligand_list: List=None, 
                            remove_trash: bool=True, give_idx_map: bool = False) -> Union[Structure, tuple]:
-        '''
+        """
         Converting a PDB file (as its path) into the Structure()
         Arg:
             path: the file path of the PDB file
@@ -63,8 +63,8 @@ class PDBParser(StructureParserInterface):
 
         Return:
             Structure()
-        '''
-        _LOGGER.debug(f'working on {path}')
+        """
+        _LOGGER.debug(f"working on {path}")
         cls._check_valid_pdb(path)
         # covert to dataframe with biopanda (maybe write our own in the future)
         input_pdb = PandasPdb()
@@ -81,7 +81,7 @@ class PDBParser(StructureParserInterface):
         cls._resolve_alt_loc(target_model_df) # resolve alt loc record in place by delele redundant df rows
         #end region (Add here to address more problem related to the PDB file format here)
         
-        # target_model_df below should be 'standard' --> start building
+        # target_model_df below should be "standard" --> start building
         # mapper is for indicating superior information of the current level: e.g.: indicate
         # which residue and chain the atom belongs to in atom_mapper. Another workaround in
         # old enzyhtp is build iteratively chain frist and residues are build in the chain
@@ -97,7 +97,7 @@ class PDBParser(StructureParserInterface):
     @classmethod
     @dispatch
     def get_file_str(cls, stru: Structure) -> str:
-        '''
+        """
         Convert Structure() into PDB file string. Only the simplest function is need for 
         enzyme modeling.
 
@@ -107,43 +107,43 @@ class PDBParser(StructureParserInterface):
             or use things like pdb4amber to accommodate software as needed.
         Return:
             a string of the PDB file
-        '''
+        """
         stru.sort_chains()
-        result_str = ''
+        result_str = ""
         for chain in stru:
             chain: Chain
             result_str += cls._write_pdb_chain(chain)
-        result_str += f'END{os.linesep}'
+        result_str += f"END{os.linesep}"
         return result_str
 
     @classmethod
     @dispatch
     def get_file_str(cls, stru: Chain) -> str: # pylint: disable=function-redefined
-        '''
+        """
         dispatch for supporting get pdb file str with Chain only
-        '''
+        """
         result_str = cls._write_pdb_chain(stru)
-        result_str += f'END{os.linesep}'
+        result_str += f"END{os.linesep}"
         return result_str
 
     @classmethod
     @dispatch
     def get_file_str(cls, stru: Residue) -> str: # pylint: disable=function-redefined
-        '''
+        """
         dispatch for supporting get pdb file str with Residue only
-        '''
+        """
         result_str = cls._write_pdb_residue(stru)
-        result_str += f'TER{os.linesep}END{os.linesep}'
+        result_str += f"TER{os.linesep}END{os.linesep}"
         return result_str
 
     @classmethod
     @dispatch
     def get_file_str(cls, stru: Atom) -> str: # pylint: disable=function-redefined
-        '''
+        """
         dispatch for supporting get pdb file str with Atom only
-        '''
+        """
         result_str = cls._write_pdb_atom(stru)
-        result_str += f'TER{os.linesep}END{os.linesep}'
+        result_str += f"TER{os.linesep}END{os.linesep}"
         return result_str
 
     #region == pdb -> Stru ==
@@ -170,7 +170,7 @@ class PDBParser(StructureParserInterface):
    
     @staticmethod
     def _get_target_model(df: pd.DataFrame, model: int) -> Union[pd.DataFrame, None]:
-        '''
+        """
         do nothing when there is only one model in the pdb file (not MODEL line)
         get the #model model part of the dataframe when there are multiple models
         in the pdb file.
@@ -184,10 +184,10 @@ class PDBParser(StructureParserInterface):
                            dataframe correponding to the target model
             target_mdl_ter_df: return a copy of TER records from the input
                            dataframe correponding to the target model
-        '''
-        if 'MODEL' in df['OTHERS']['record_name'].values:
+        """
+        if "MODEL" in df["OTHERS"]["record_name"].values:
             # san check for start/end indicator
-            mdl_ind_sorted_w_lines = df['OTHERS'][(df['OTHERS'].record_name == 'MODEL') | (df['OTHERS'].record_name == 'ENDMDL')].sort_values(by='line_idx', inplace=False)
+            mdl_ind_sorted_w_lines = df["OTHERS"][(df["OTHERS"].record_name == "MODEL") | (df["OTHERS"].record_name == "ENDMDL")].sort_values(by="line_idx", inplace=False)
             # check if they appear alternately
             first = 1
             for ind in mdl_ind_sorted_w_lines.values:
@@ -196,63 +196,63 @@ class PDBParser(StructureParserInterface):
                     first = 0
                     continue
                 if ind[0] == last_ind[0]:
-                    _LOGGER.error(f'Unclosed MODEL section is detected in pdb file. line: {last_ind[-1]}')
+                    _LOGGER.error(f"Unclosed MODEL section is detected in pdb file. line: {last_ind[-1]}")
                     sys.exit(1)
                 last_ind = ind
             # get target model unit range
-            mdl_start_lines = list(df['OTHERS'][df['OTHERS'].record_name == 'MODEL']['line_idx'])
-            mdl_end_lines = list(df['OTHERS'][df['OTHERS'].record_name == 'ENDMDL']['line_idx'])
+            mdl_start_lines = list(df["OTHERS"][df["OTHERS"].record_name == "MODEL"]["line_idx"])
+            mdl_end_lines = list(df["OTHERS"][df["OTHERS"].record_name == "ENDMDL"]["line_idx"])
             mdl_range = list(zip(mdl_start_lines, mdl_end_lines))
             target_mdl_range = mdl_range[model]
-            mdl_query_pattern = f'line_idx > {target_mdl_range[0]} & line_idx < {target_mdl_range[1]}'
+            mdl_query_pattern = f"line_idx > {target_mdl_range[0]} & line_idx < {target_mdl_range[1]}"
             # get model dataframe section as a copy
-            target_mdl_df = pd.concat((df['ATOM'], df['HETATM'])).query(mdl_query_pattern).copy()
-            target_mdl_ter_df = df['OTHERS'][df['OTHERS'].record_name == 'TER'].query(mdl_query_pattern).copy()
+            target_mdl_df = pd.concat((df["ATOM"], df["HETATM"])).query(mdl_query_pattern).copy()
+            target_mdl_ter_df = df["OTHERS"][df["OTHERS"].record_name == "TER"].query(mdl_query_pattern).copy()
         else:
-            # get all dataframe as a copy if there's no MODEL record
-            target_mdl_df = pd.concat((df['ATOM'], df['HETATM']), ignore_index=True).copy() # insure unique df id
-            target_mdl_ter_df = df['OTHERS'][df['OTHERS'].record_name == 'TER'].copy()
+            # get all dataframe as a copy if there"s no MODEL record
+            target_mdl_df = pd.concat((df["ATOM"], df["HETATM"]), ignore_index=True).copy() # insure unique df id
+            target_mdl_ter_df = df["OTHERS"][df["OTHERS"].record_name == "TER"].copy()
 
         return target_mdl_df, target_mdl_ter_df
 
     @classmethod
     def _resolve_missing_chain_id(cls, df: pd.DataFrame, ter_df: pd.DataFrame) -> None:
-        '''
+        """
         Function takes the dataframes of chains and ensures consistent naming
         of chains with no blanks.
 
-        add missing chain id into the Atomic 'df' when there is none
-        according to the TER record provide by 'ter_df'
+        add missing chain id into the Atomic "df" when there is none
+        according to the TER record provide by "ter_df"
         * ter df should share the same line index references as df (from same file)
         [edit df in place]
-        '''
+        """
         # no problem case
-        chain_ids = set(list(map(lambda c_id: c_id.strip(), df['chain_id'])))
-        if '' not in chain_ids:
+        chain_ids = set(list(map(lambda c_id: c_id.strip(), df["chain_id"])))
+        if "" not in chain_ids:
             return df
 
         # problem case
-        chain_ids.remove('')
+        chain_ids.remove("")
         legal_ids = cls._get_legal_pdb_chain_ids(chain_ids)
         ## split the df into chain dfs
-        ter_line_ids = list(ter_df['line_idx'])
-        chain_dfs = split_df_base_on_column_value(df, 'line_idx', ter_line_ids)
+        ter_line_ids = list(ter_df["line_idx"])
+        chain_dfs = split_df_base_on_column_value(df, "line_idx", ter_line_ids)
         ## get a list of (loc, value) for editing in the original df
         result_loc_map = []
         for chain in chain_dfs:
             # check for redundant chains
             if len(chain) == 0:
-                _LOGGER.debug('Found empty chain. ')
+                _LOGGER.debug("Found empty chain. ")
                 continue
-            atom_missing_c_id = chain[chain.chain_id.str.strip() == '']
+            atom_missing_c_id = chain[chain.chain_id.str.strip() == ""]
             # check if not missing any chain_id
             if len(atom_missing_c_id) == 0:
                     continue
             # check existing chain ids in the chain
-            existing_chain_ids = set(list(map(lambda c_id: c_id.strip(), chain['chain_id'])))
-            existing_chain_ids.discard('')
+            existing_chain_ids = set(list(map(lambda c_id: c_id.strip(), chain["chain_id"])))
+            existing_chain_ids.discard("")
             if len(existing_chain_ids) > 1:
-                _LOGGER.error('Found multiple chain id in 1 chain. Check your PDB.')
+                _LOGGER.error("Found multiple chain id in 1 chain. Check your PDB.")
                 sys.exit(1)
             # case: all atoms are missing chain id
             if len(existing_chain_ids) == 0:
@@ -262,7 +262,7 @@ class PDBParser(StructureParserInterface):
                 current_chain_id = list(existing_chain_ids)[0]
                 result_loc_map.extend(list(zip(atom_missing_c_id.index, [current_chain_id]*len(atom_missing_c_id))))
         # add missing chain id
-        batch_edit_df_loc_value(df, result_loc_map, 'chain_id')
+        batch_edit_df_loc_value(df, result_loc_map, "chain_id")
 
     @staticmethod
     def _get_legal_pdb_chain_ids(taken_ids) -> List[str]:
@@ -282,8 +282,8 @@ class PDBParser(StructureParserInterface):
         return list(reversed(result))
 
     @staticmethod
-    def _resolve_alt_loc(df: pd.DataFrame, keep: str = 'first') -> None:
-        '''
+    def _resolve_alt_loc(df: pd.DataFrame, keep: str = "first") -> None:
+        """
         Resolves atoms with the alt_loc records
         Optional argument "keep" specifies the resolution method. Default
         is "first" which forces keeping atoms in the frist residue (earlist 
@@ -293,24 +293,24 @@ class PDBParser(StructureParserInterface):
         Only one record out of multiple alt_loc is allowed. Delete rest 
         df lines in place. 
         TODO support residue specific keep strageties
-        '''
-        alt_loc_atoms_df = df[df['alt_loc'].str.strip() != '']
+        """
+        alt_loc_atoms_df = df[df["alt_loc"].str.strip() != ""]
         # san check
         if len(alt_loc_atoms_df) == 0:
-            _LOGGER.debug('No alt_loc to resolve.')
+            _LOGGER.debug("No alt_loc to resolve.")
             return
         # solve
-        # get a list of 'loc' for deleting in the original df
+        # get a list of "loc" for deleting in the original df
         delete_loc_list = []
         # treat in residues
-        alt_loc_residues = alt_loc_atoms_df.groupby(['residue_number','chain_id'], sort=False)
+        alt_loc_residues = alt_loc_atoms_df.groupby(["residue_number","chain_id"], sort=False)
         for r_id_c_id, res_df in alt_loc_residues:
-            alt_res_dfs = res_df.groupby('alt_loc', sort=False)
+            alt_res_dfs = res_df.groupby("alt_loc", sort=False)
             if len(alt_res_dfs) == 1:
-                _LOGGER.debug(f'Only 1 alt_loc id found in residue {r_id_c_id[1], r_id_c_id[0]}. No need to resolve')
+                _LOGGER.debug(f"Only 1 alt_loc id found in residue {r_id_c_id[1], r_id_c_id[0]}. No need to resolve")
                 continue
-            _LOGGER.debug(f'Dealing with alt_loc residue: {r_id_c_id[1], r_id_c_id[0]}')
-            if keep == 'first':
+            _LOGGER.debug(f"Dealing with alt_loc residue: {r_id_c_id[1], r_id_c_id[0]}")
+            if keep == "first":
                 delele_res_df_locs = list(alt_res_dfs.groups.values())
                 del delele_res_df_locs[0]
                 for delete_lines in delele_res_df_locs:
@@ -323,28 +323,28 @@ class PDBParser(StructureParserInterface):
                     delete_loc_list.extend(list(delete_lines))
 
         # delete in original df
-        _LOGGER.debug(f'deleting df row: {delete_loc_list}')
+        _LOGGER.debug(f"deleting df row: {delete_loc_list}")
         df.drop(index = delete_loc_list, inplace=True)
 
     @staticmethod
     def _build_atoms(df: pd.DataFrame) -> Dict[str, Atom]:
-        '''
-        build atom objects from a 'standard' dataframe
+        """
+        build atom objects from a "standard" dataframe
         * HETATM should be in seperate chains! HETATM was meant for atoms in the small molecule
           so they cannot be in the same chain as the ATOM atom https://files.wwpdb.org/pub/pdb/doc/format_descriptions/Format_v33_Letter.pdf
         Return:
-            {('chain_id','residue_idx', 'residue_name', 'record_name') : [Atom_obj, ...], ...}
-        '''
+            {("chain_id","residue_idx", "residue_name", "record_name") : [Atom_obj, ...], ...}
+        """
         atom_mapper = defaultdict(list)
         for i, row in df.iterrows():
             atom_obj = Atom(row)
-            residue_key = (row['chain_id'].strip(), row['residue_number'], row['residue_name'].strip(), row['record_name'].strip())
+            residue_key = (row["chain_id"].strip(), row["residue_number"], row["residue_name"].strip(), row["record_name"].strip())
             atom_mapper[residue_key].append(atom_obj)
         return atom_mapper
 
     @classmethod
     def _build_residues(cls, atom_mapper: Dict[str, Atom], add_solvent_list: List =None, add_ligand_list: List=None) -> Dict[str, Residue]: #TODO add test for this
-        '''
+        """
         build Residue() objects from atom_mapper
         Arg:
             atom_mapper
@@ -352,8 +352,8 @@ class PDBParser(StructureParserInterface):
             add_ligand_list: (used for categorize residues) additional names for ligands
             * solvent list have higher pirority
         Return:
-            {'chain_id' : [Residue, ...]}
-        '''
+            {"chain_id" : [Residue, ...]}
+        """
         build_mapper = defaultdict(lambda: defaultdict(list))
         result_mapper = defaultdict(list)
         idx_change_mapper = {}
@@ -365,9 +365,9 @@ class PDBParser(StructureParserInterface):
         for chain_id, record_residues in build_mapper.items():
             if len(record_residues) > 1:
                 new_chain_id = legal_chain_ids.pop()
-                _LOGGER.debug(f'found HETATM in a ATOM chain: making a new chain {new_chain_id}') #TODO add a recorder for the index change
-                result_mapper[new_chain_id] = record_residues['HETATM']
-                for i in record_residues['HETATM']:
+                _LOGGER.debug(f"found HETATM in a ATOM chain: making a new chain {new_chain_id}") #TODO add a recorder for the index change
+                result_mapper[new_chain_id] = record_residues["HETATM"]
+                for i in record_residues["HETATM"]:
                     idx_change_mapper[(chain_id, i.idx)] = (new_chain_id, i.idx)
             # in all cases keep the ATOM chain
             result_mapper[chain_id] = list(record_residues.values())[0]
@@ -378,11 +378,11 @@ class PDBParser(StructureParserInterface):
 
     @staticmethod
     def _categorize_pdb_residue(residue_mapper: Dict[str, List[Residue]], add_solvent_list: list = None, add_ligand_list: list = None) -> Union[Residue, Ligand, Solvent, MetalUnit]: #TODO add test for this
-        '''
+        """
         Categorize Residue base on it 3-letter name and chain info in PDB format
         Takes a mapper of {chain_id, [Residue, ...]} and converts
         them into its specialized Residue() inherited class.
-        '''
+        """
         if add_solvent_list is None:
             add_solvent_list = []
         if add_ligand_list is None:
@@ -402,37 +402,37 @@ class PDBParser(StructureParserInterface):
                 for residue in residues:
                     if residue.rtype == chem.ResidueType.UNKNOWN:
                         if residue.name in list(chem.METAL_MAPPER.keys()) + chem.RD_SOLVENT_LIST + add_solvent_list:
-                            _LOGGER.error(f'a metal or solvent residue name is found in an peptide chain {chain_id}: {residue.idx} {residue.name}')
+                            _LOGGER.error(f"a metal or solvent residue name is found in an peptide chain {chain_id}: {residue.idx} {residue.name}")
                             sys.exit(1)
                         # TODO maybe a class for non-canonical aa in the future
-                        _LOGGER.debug(f'found noncanonical {chain_id} {residue.idx}')
+                        _LOGGER.debug(f"found noncanonical {chain_id} {residue.idx}")
                         residue.rtype = chem.ResidueType.NONCANONICAL
                 continue
             # non-peptide chain
             for i, residue in enumerate(residues):
                 # if metal
                 if residue.name in chem.METAL_MAPPER:
-                    _LOGGER.debug(f'found metal {chain_id} {residue.idx}')
+                    _LOGGER.debug(f"found metal {chain_id} {residue.idx}")
                     residue_mapper[chain_id][i] = residue_to_metal(residue)
                     continue
                 # if solvent
                 if residue.name in chem.RD_SOLVENT_LIST + add_solvent_list:
-                    _LOGGER.debug(f'found solvent {chain_id} {residue.idx}')
+                    _LOGGER.debug(f"found solvent {chain_id} {residue.idx}")
                     residue_mapper[chain_id][i] = residue_to_solvent(residue)
                     continue
                 if residue.name in (set(chem.RD_NON_LIGAND_LIST) - set(add_ligand_list)):
-                    _LOGGER.debug(f'found trash {chain_id} {residue.idx}')
+                    _LOGGER.debug(f"found trash {chain_id} {residue.idx}")
                     residue.rtype = chem.ResidueType.TRASH
                     continue
                 # the left cases are ligands
-                _LOGGER.debug(f'found ligand {chain_id} {residue.idx}')
+                _LOGGER.debug(f"found ligand {chain_id} {residue.idx}")
                 residue_mapper[chain_id][i] = residue_to_ligand(residue)
 
     @staticmethod
     def _build_chains(res_mapper: Dict[str, Residue], remove_trash: bool) -> Dict[str, Chain]:
-        '''
+        """
         build Chain() objects from residue mapper
-        '''
+        """
         chain_list = []
         for chain_id, residues in res_mapper.items():
             ch_obj = Chain(chain_id ,residues) # TODO decouple chain name with pdb chain id? How to solve too many water chain
@@ -444,23 +444,23 @@ class PDBParser(StructureParserInterface):
 
     @classmethod
     def _write_pdb_chain(cls, chain: Chain) -> str:
-        '''
+        """
         make the file string for a pdb chain record
-        '''
-        result = ''
+        """
+        result = ""
         chain.sort_residues()
         for res in chain:
             res: Residue
             result += cls._write_pdb_residue(res)
-        result += f'TER{os.linesep}'
+        result += f"TER{os.linesep}"
         return result
 
     @classmethod
     def _write_pdb_residue(cls, res: Residue) -> str:
-        '''
+        """
         make the file string for a pdb residue record
-        '''
-        result = ''
+        """
+        result = ""
         res.sort_atoms()
         for atom in res:
             atom: Atom
@@ -469,61 +469,61 @@ class PDBParser(StructureParserInterface):
 
     @staticmethod
     def _write_pdb_atom(atom: Atom) -> str:
-        '''
+        """
         make the file string for a pdb ATOM record
         the function intepret information from
         https://www.wwpdb.org/documentation/file-format
-        '''
+        """
         #build an amber style line here
-        l_type = f'{"ATOM":<6}'
-        a_index = f'{atom.idx:>5d}'
+        l_type = f"{'ATOM':<6}"
+        a_index = f"{atom.idx:>5d}"
 
         if len(atom.name) > 3:
-            a_name = f'{atom.name:<4}'
+            a_name = f"{atom.name:<4}"
         else:
-            a_name = f'{atom.name:<3}'
-            a_name = ' '+a_name
-        r_name = f'{atom.residue.name:>3}'
+            a_name = f"{atom.name:<3}"
+            a_name = " "+a_name
+        r_name = f"{atom.residue.name:>3}"
 
         c_index = atom.residue.chain.name
-        r_index = f'{atom.residue.idx:>4d}'
-        x = f'{atom.coord[0]:>8.3f}'
-        y = f'{atom.coord[1]:>8.3f}'
-        z = f'{atom.coord[2]:>8.3f}'
+        r_index = f"{atom.residue.idx:>4d}"
+        x = f"{atom.coord[0]:>8.3f}"
+        y = f"{atom.coord[1]:>8.3f}"
+        z = f"{atom.coord[2]:>8.3f}"
 
-        alt_loc_id = f'{"":1}'
-        insert_code = f'{"":1}'
-        occupancy = f'{1.00:>6.2f}'
+        alt_loc_id = f"{'':1}"
+        insert_code = f"{'':1}"
+        occupancy = f"{1.00:>6.2f}"
 
-        temp_factor = f'{atom.b_factor:>6.2f}'
-        seg_id = f'{"":<4}'
-        element = f'{atom.element:>2}'
+        temp_factor = f"{atom.b_factor:>6.2f}"
+        seg_id = f"{'':<4}"
+        element = f"{atom.element:>2}"
         if atom.charge is None:
-            charge = f'{"":2}'
+            charge = f"{'':2}"
         else:
-            charge = f'{atom.charge:2}'
+            charge = f"{atom.charge:2}"
 
         #example: ATOM   5350  HB2 PRO   347      32.611  15.301  24.034  1.00  0.00
-        line = f'{l_type}{a_index} {a_name}{alt_loc_id}{r_name} {c_index}{r_index}{insert_code}   {x}{y}{z}{occupancy}{temp_factor}      {seg_id}{element}{charge}{os.linesep}'
+        line = f"{l_type}{a_index} {a_name}{alt_loc_id}{r_name} {c_index}{r_index}{insert_code}   {x}{y}{z}{occupancy}{temp_factor}      {seg_id}{element}{charge}{os.linesep}"
         return line
 
     @dispatch
     def _(self):
-        '''
+        """
         dummy method for dispatch
-        '''
+        """
         pass
 
 # TODO go to core helper
 def split_df_base_on_column_value(df: pd.DataFrame, column_name: str, split_values: list, copy: bool=False):
-    '''
+    """
     split a dataframe base on the value of a column
     ** the line in the split values will not be included **
     Arg:
         df: the target dataframe
-        column_name: the reference column's name
+        column_name: the reference column"s name
         split_value: the value mark for spliting
-    '''
+    """
     split_values = sorted(split_values)
     frist = 1
     result_dfs = []
@@ -547,8 +547,8 @@ def split_df_base_on_column_value(df: pd.DataFrame, column_name: str, split_valu
     return result_dfs
 
 def batch_edit_df_loc_value(df: pd.DataFrame, loc_value_list: List[tuple], column: str):
-    '''
-    batch edit 'column' of 'df' with the 'loc_value_list'
-    '''
+    """
+    batch edit "column" of "df" with the "loc_value_list"
+    """
     for loc, value in loc_value_list:
         df.loc[loc, column] = value

@@ -33,7 +33,7 @@ class Residue(DoubleLinkedNode):
         rtype : The ResidueType of the Residue().
 
     Derived properties:
-        key(if_name) : the tuple key of residue's sequential identity e.g.: ('A', 1)
+        key(if_name) : the tuple key of residue's sequential identity e.g.: ("A", 1)
         num_atoms: number of belonging Atom()s
     """
 
@@ -91,9 +91,9 @@ class Residue(DoubleLinkedNode):
     
     #region === Getter-Prop ===
     def key(self, if_name: bool = False) -> Tuple[str, int]:
-        '''
+        """
         an unique tuple to indicate a specific residue in the enzyme
-        '''
+        """
         if if_name:
             return (self.chain.name, self._idx, self._name)
         return (self.chain.name, self._idx)
@@ -144,10 +144,10 @@ class Residue(DoubleLinkedNode):
 
     #region === Editor === 
     def sort_atoms(self):
-        '''
+        """
         sort children chains with their residue idx
         sorted is always better than not but Residue() is being lazy here
-        '''
+        """
         self._children.sort(key=lambda x: x.idx)
 
     def set_chain(self, val: str) -> None: # TODO
@@ -177,7 +177,7 @@ class Residue(DoubleLinkedNode):
 
     #region === Special ===
     def __str__(self) -> str:
-        return f'Residue({self._idx}, {self._name}, atom:{len(self._atoms)}, {self._parent})'
+        return f"Residue({self._idx}, {self._name}, atom:{len(self._atoms)}, {self._parent})"
 
     def __repr__(self) -> str: # TODO
         return str(self)

@@ -41,7 +41,7 @@ class Solvent(Residue):
     #     return deepcopy(self)
     
     def __str__(self) -> str:
-        return f'Solvent({self._idx}, {self._name}, atom:{len(self._atoms)}, {self._parent})'
+        return f"Solvent({self._idx}, {self._name}, atom:{len(self._atoms)}, {self._parent})"
 
 
 def residue_to_solvent(residue: Residue) -> Solvent:
