@@ -28,11 +28,11 @@ sp = PDBParser()
 
 def test_structure_ctor_bad_input():
     """Testing that the Structure() ctor fails when given duplicate chains."""
-    Atom_1 = Atom({'atom_name':'X', 'x_coord':1,'y_coord':2,'z_coord':3})
-    Atom_2 = Atom({'atom_name':'X', 'x_coord':3,'y_coord':2,'z_coord':1})
-    chain1 = Chain("A", [Residue(1, 'XXX', [Atom_1])])
-    chain2 = Chain("B", [Residue(2, 'XXX',  [Atom_2])])
-    chain3 = Chain("A", [Residue(3, 'XXX',  [Atom_1])])
+    Atom_1 = Atom({"atom_name":"X", "x_coord":1,"y_coord":2,"z_coord":3})
+    Atom_2 = Atom({"atom_name":"X", "x_coord":3,"y_coord":2,"z_coord":1})
+    chain1 = Chain("A", [Residue(1, "XXX", [Atom_1])])
+    chain2 = Chain("B", [Residue(2, "XXX",  [Atom_2])])
+    chain3 = Chain("A", [Residue(3, "XXX",  [Atom_1])])
 
     with pytest.raises(SystemExit) as exe:
         struct = Structure([chain1, chain2, chain3])
@@ -42,16 +42,16 @@ def test_structure_ctor_bad_input():
     assert exe.value.code == 1
 
 def test_residues():
-    pdb_file_path = f'{DATA_DIR}1Q4T_ligand_test.pdb'
+    pdb_file_path = f"{DATA_DIR}1Q4T_ligand_test.pdb"
     stru: Structure = sp.get_structure(pdb_file_path)
 
     assert len(stru.residues) == 580
 
 def test_ligands():
-    pdb_file_path = f'{DATA_DIR}1Q4T_ligand_test.pdb'
+    pdb_file_path = f"{DATA_DIR}1Q4T_ligand_test.pdb"
     stru: Structure = sp.get_structure(pdb_file_path)
     assert len(stru.ligands) == 2
-    assert stru.ligands[0].name == '4CO'
+    assert stru.ligands[0].name == "4CO"
 
 @pytest.mark.TODO
 def equiv_files(fname1: str, fname2: str, width: int = None) -> bool:
@@ -67,18 +67,18 @@ def equiv_files(fname1: str, fname2: str, width: int = None) -> bool:
             l1 = l1[:width]
             l2 = l2[:width]
             if len(l2) < width:
-                l2 += ' '*(width-len(l2))
+                l2 += " "*(width-len(l2))
             if len(l1) < width:
-                l1 += ' '*(width-len(l1))
+                l1 += " "*(width-len(l1))
 
         first_diff = find_first_diff(l1,l2)
         if first_diff != -1:
-            diff = [' ']*min(len(l1),len(l2))
-            diff[first_diff] = '^'
+            diff = [" "]*min(len(l1),len(l2))
+            diff[first_diff] = "^"
             
             print(f"'{l1}'")
             print(f"'{l2}'")
-            print(''.join(diff))
+            print("".join(diff))
             print(f"Difference encountered on line {line_idx}. '{fname1}' and '{fname2}' are NOT equivalent")
             return False
     return True
@@ -198,11 +198,11 @@ def test_merge_right_with_metal_atom():
 @pytest.mark.TODO
 def test_round_trip_pdb():
     """Ensuring that the Structure() class be loaded into a .pdb and saved back in a round trip without error."""
-    # FIXME(CJ): This test doesn't currently work for 1NVG: figure out the PDBline stuff
+    # FIXME(CJ): This test doesn"t currently work for 1NVG: figure out the PDBline stuff
     # that will make this work
     TEST_FILE = f"{DATA_DIR}/1NVG.pdb"
     actual_file = f"{DATA_DIR}/1NVG_cpy.pdb"
-    structure1: Structure = structure_from_pdb(TEST_FILE, 'all')
+    structure1: Structure = structure_from_pdb(TEST_FILE, "all")
     fs.safe_rm(actual_file)
     assert not os.path.exists(actual_file)
     structure1.to_pdb(actual_file)
