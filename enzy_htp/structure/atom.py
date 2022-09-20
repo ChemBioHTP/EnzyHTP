@@ -1,10 +1,10 @@
-'''Definition for the Atom class. Meant to be the base unit of structural information: coordinate and
+"""Definition for the Atom class. Meant to be the base unit of structural information: coordinate and
 topology (atom type & connectivity). Serve solely for storing and accessing data. 
 
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-19
-'''
+"""
 from __future__ import annotations
 import sys
 from typing import Tuple
@@ -16,7 +16,7 @@ from enzy_htp.core.logger import _LOGGER
 
 
 class Atom(DoubleLinkNode):
-    '''Base unit of structure in enzy_htp. Store coordinate and topology information
+    """Base unit of structure in enzy_htp. Store coordinate and topology information
     in a Structure() object. Serve solely for storing and accessing data.
     * not specific to any file format that store a structure
 
@@ -30,13 +30,13 @@ class Atom(DoubleLinkNode):
         b_factor : A float representing the temperature factor (b factor).
         charge : Charge of the atom.
         element : Character representing element.
-    '''
+    """
 
     def __init__(self, ds: pd.Series, parent = None):
-        '''Constructor of Atom(), where ds is of type pandas.Series'''
+        """Constructor of Atom(), where ds is of type pandas.Series"""
         # nessessary
-        self._name = ds['atom_name'].strip()
-        self._coord = (ds['x_coord'], ds['y_coord'], ds['z_coord'])
+        self._name = ds["atom_name"].strip()
+        self._coord = (ds["x_coord"], ds["y_coord"], ds["z_coord"])
         self.set_parent(parent)
         self.set_ghost_children()
         # optional
@@ -45,14 +45,14 @@ class Atom(DoubleLinkNode):
         self._element = None
         self._charge = None
         ds_keys = ds.keys()
-        if 'atom_number' in ds_keys:
-            self._idx = ds['atom_number']
-        if 'b_factor' in ds_keys:
-            self._b_factor = ds['b_factor']
-        if 'element_symbol' in ds_keys:
-            self._element = ds['element_symbol'].strip()
-        if 'charge' in ds_keys and not np.isnan(ds['charge']):
-            self._charge = float(ds['charge'])
+        if "atom_number" in ds_keys:
+            self._idx = ds["atom_number"]
+        if "b_factor" in ds_keys:
+            self._b_factor = ds["b_factor"]
+        if "element_symbol" in ds_keys:
+            self._element = ds["element_symbol"].strip()
+        if "charge" in ds_keys and not np.isnan(ds["charge"]):
+            self._charge = float(ds["charge"])
 
 
     #region === Getter-Attr (ref) ===
@@ -68,7 +68,7 @@ class Atom(DoubleLinkNode):
     def idx(self) -> int:
         """Getter for the Atom()'s index."""
         if self._idx == None:
-            _LOGGER.warning(f'{sys._getframe().f_back.f_back.f_code.co_name}:{sys._getframe().f_back.f_code.co_name} is using index of an non-indexing atom: {self}')
+            _LOGGER.warning(f"{sys._getframe().f_back.f_back.f_code.co_name}:{sys._getframe().f_back.f_code.co_name} is using index of an non-indexing atom: {self}")
         return self._idx
     @idx.setter
     def idx(self, val):
@@ -92,7 +92,7 @@ class Atom(DoubleLinkNode):
 
     @property
     def b_factor(self):
-        """synonym for parent"""
+        """getter for b_factor"""
         return self._b_factor
     @b_factor.setter
     def b_factor(self, val):
@@ -100,7 +100,7 @@ class Atom(DoubleLinkNode):
 
     @property
     def element(self):
-        """synonym for parent"""
+        """synonym for element"""
         return self._element
     @element.setter
     def element(self, val):
@@ -108,7 +108,7 @@ class Atom(DoubleLinkNode):
 
     @property
     def charge(self):
-        """synonym for parent"""
+        """synonym for charge"""
         return self._charge
     @charge.setter
     def charge(self, val):
@@ -117,6 +117,6 @@ class Atom(DoubleLinkNode):
 
     #region == Special ==
     def __str__(self):
-        return f'Atom({self._name}, {self._idx}, {self._coord}, {self._parent}, {self._b_factor}, {self._element}, {self._charge} )'
+        return f"Atom({self._name}, {self._idx}, {self._coord}, {self._parent}, {self._b_factor}, {self._element}, {self._charge} )"
     #endregion
 
