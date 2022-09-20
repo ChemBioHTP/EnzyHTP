@@ -11,11 +11,11 @@ from typing import Tuple
 
 import numpy as np
 import pandas as pd
-from enzy_htp.core.doubly_linked_tree import DoubleLinkNode
+from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
 from enzy_htp.core.logger import _LOGGER
 
 
-class Atom(DoubleLinkNode):
+class Atom(DoubleLinkedNode):
     """Base unit of structure in enzy_htp. Store coordinate and topology information
     in a Structure() object. Serve solely for storing and accessing data.
     * not specific to any file format that store a structure

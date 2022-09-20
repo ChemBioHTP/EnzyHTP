@@ -19,7 +19,7 @@ Date: 2022-09-14
 from typing import Any, Dict, List, Union
 
 
-class DoubleLinkNode():
+class DoubleLinkedNode():
     """
     class for parent objects of the doubly linked tree
     """

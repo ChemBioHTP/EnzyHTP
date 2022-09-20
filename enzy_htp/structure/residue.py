@@ -13,14 +13,14 @@ from collections import defaultdict
 from plum import dispatch
 from typing import Tuple, List, Dict
 
-from enzy_htp.core.doubly_linked_tree import DoubleLinkNode
+from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
 
 from .atom import Atom
 from enzy_htp.core import _LOGGER
 import enzy_htp.chemical as chem
 
 
-class Residue(DoubleLinkNode):
+class Residue(DoubleLinkedNode):
     """Most common functional unit in enzy_htp. Made up of Atom() objects and can be either
         canonical, non-canonical, solvent or a metal center.
 

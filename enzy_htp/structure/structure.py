@@ -110,7 +110,7 @@ from collections import defaultdict
 from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp.chemical import convert_to_one_letter, ResidueType
-from enzy_htp.core.doubly_linked_tree import DoubleLinkNode
+from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
 
 from .atom import Atom
 from . import Chain
@@ -121,7 +121,7 @@ from .solvent import Solvent, residue_to_solvent
 from .metal_atom import MetalUnit
 
 
-class Structure(DoubleLinkNode): # TODO implement different copy methods for the doubly linked ds; by default are all shollow copy and references
+class Structure(DoubleLinkedNode): # TODO implement different copy methods for the doubly linked ds; by default are all shollow copy and references
     '''Enzyme structure.
     Designed for direct interfacing by users.
     Composed of child Chain() objects and their subsequent child Residue() objects and so on Atom() objects.

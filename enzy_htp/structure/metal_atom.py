@@ -35,19 +35,19 @@ class MetalUnit(Residue):
 
     # === Getter-Attr ===
     @property
-    def atom(self):
+    def atom(self) -> Atom:
         """Getter for the only one atom in this MetalUnit unit"""
         return self._atoms[0]
     @atom.setter
-    def atom(self, val):
+    def atom(self, val: Atom):
         self._atoms[0] = val
 
     @property
-    def atom_name(self):
+    def atom_name(self) -> str:
         """Getter for the only one atom in this MetalUnit unit"""
         return self._atom[0].name
     @atom_name.setter
-    def atom_name(self, val):
+    def atom_name(self, val: str):
         self._atom[0].name = val
 
     # TODO below to change

@@ -10,14 +10,14 @@ from copy import deepcopy
 import itertools
 from enzy_htp.core import _LOGGER
 from typing import Iterable, List, Tuple, Union
-from enzy_htp.core.doubly_linked_tree import DoubleLinkNode
+from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
 
 from enzy_htp.structure.atom import Atom
 import enzy_htp.chemical as chem
 
 from .residue import Residue
 
-class Chain(DoubleLinkNode):
+class Chain(DoubleLinkedNode):
     """Class that represents a Chain of residues in a PDB file.
 
     Attributes:
