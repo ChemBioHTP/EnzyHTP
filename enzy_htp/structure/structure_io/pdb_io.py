@@ -333,7 +333,7 @@ class PDBParser(StructureParserInterface):
         * HETATM should be in seperate chains! HETATM was meant for atoms in the small molecule
           so they cannot be in the same chain as the ATOM atom https://files.wwpdb.org/pub/pdb/doc/format_descriptions/Format_v33_Letter.pdf
         Return:
-            {("chain_id","residue_idx", "residue_name", "record_name") : [Atom_obj, ...], ...}
+            {("chain_id", "residue_idx", "residue_name", "record_name") : [Atom_obj, ...], ...}
         """
         atom_mapper = defaultdict(list)
         for i, row in df.iterrows():
@@ -359,13 +359,13 @@ class PDBParser(StructureParserInterface):
         idx_change_mapper = {}
         for res_key, atoms in atom_mapper.items():
             res_obj = Residue(int(res_key[1]), res_key[2] ,atoms)
-            build_mapper[res_key[0]][res_key[3]].append(res_obj)
+            build_mapper[res_key[0]][res_key[3]].append(res_obj) # here it is {"chain_id":{"record_name": Residue()}}
         # give HETATM residue individual chain
         legal_chain_ids = cls._get_legal_pdb_chain_ids(build_mapper.keys())
         for chain_id, record_residues in build_mapper.items():
             if len(record_residues) > 1:
                 new_chain_id = legal_chain_ids.pop()
-                _LOGGER.debug(f"found HETATM in a ATOM chain: making a new chain {new_chain_id}") #TODO add a recorder for the index change
+                _LOGGER.debug(f"found HETATM in a ATOM chain: making a new chain {new_chain_id}")
                 result_mapper[new_chain_id] = record_residues["HETATM"]
                 for i in record_residues["HETATM"]:
                     idx_change_mapper[(chain_id, i.idx)] = (new_chain_id, i.idx)
