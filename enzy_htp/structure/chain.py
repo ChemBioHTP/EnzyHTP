@@ -39,7 +39,6 @@ class Chain(DoubleLinkedNode):
         self.set_parent(parent)
         self.set_children(residues)
 
-        self._residues: List[Residue] = self._children # alias
     #region === Getter-Attr ===
     @property
     def name(self) -> str:
@@ -62,6 +61,11 @@ class Chain(DoubleLinkedNode):
     @residues.setter
     def residues(self, val: List[Residue]):
         self.set_children(val)
+    
+    @property
+    def _residues(self) -> List[Residue]:
+        """alias for _children. prevent changing _children but _residues holds the same"""
+        return self._children
 
     def get_residue(self, traget_key: str) -> Residue:
         """TODO: is there alt option for the key?"""
