@@ -53,6 +53,12 @@ def test_ligands():
     assert len(stru.ligands) == 2
     assert stru.ligands[0].name == "4CO"
 
+def test_solvents():
+    pdb_file_path = f"{DATA_DIR}1Q4T_ligand_test.pdb"
+    stru: Structure = sp.get_structure(pdb_file_path)
+    assert len(stru.solvents) == 296
+    assert stru.solvents[0].name == "HOH"
+
 @pytest.mark.TODO
 def equiv_files(fname1: str, fname2: str, width: int = None) -> bool:
     """Helper method to check if two files are exactly equivalent."""

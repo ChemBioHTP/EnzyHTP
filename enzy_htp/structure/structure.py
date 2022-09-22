@@ -189,11 +189,19 @@ class Structure(DoubleLinkedNode): # TODO implement different copy methods for t
         return result
 
     @property
-    def ligands(self) -> List[Residue]:
+    def ligands(self) -> List[Ligand]:
         """Filters out the ligand Residue()"s from the chains in the Structure()."""
-        result: List[Residue] = list()
+        result: List[Ligand] = list()
         for chain in self.chains:
             result.extend(list(filter(lambda r: r.is_ligand(), chain)))
+        return result
+
+    @property
+    def solvents(self) -> List[Solvent]:
+        """return all solvents hold by current Structure()"""
+        result: List[Solvent] = []
+        for chain in self.chains:
+            result.extend(list(filter(lambda r: r.is_solvent(), chain)))
         return result
     #endregion
 
@@ -286,11 +294,6 @@ class Structure(DoubleLinkedNode): # TODO implement different copy methods for t
         for chain in self.chains:
             result.extend(list(filter(lambda r: r.is_metal(), chain.residues())))
         return result
-
-    @property
-    def solvents(self):
-        # TODO(CJ)
-        return []
 
     @ property
     def atoms(self) -> List[Atom]:
