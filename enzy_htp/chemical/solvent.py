@@ -5,7 +5,7 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 """
 from typing import List
 
-RD_NON_LIGAND_LIST: List[str] = ["CL", "EDO", "GOL"] #@shaoqz: these are PDB related map
+RD_NON_LIGAND_LIST: List[str] = ["CL", "EDO", "GOL", "EOH"] #@shaoqz: these are PDB related map
 """Common co-crystallized ligands in solvents."""
 
 RD_SOLVENT_LIST: List[str] = ["HOH", "WAT"]
