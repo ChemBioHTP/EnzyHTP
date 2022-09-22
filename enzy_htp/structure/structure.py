@@ -263,11 +263,18 @@ class Structure(DoubleLinkedNode): # TODO implement different copy methods for t
         """
         out_line = [f"<Structure object at {hex(id(self))}>",]
         out_line.append("Structure(")
-        out_line.append("chains:")
+        out_line.append(f"chains: (sorted, original {self.chain_mapper.keys()})")
         for ch in sorted(self._chains,key=lambda x: x.name):
             out_line.append(f"    {ch.name}({ch.chain_type}): residue: {ch.residue_idx_interval()} atom_count: {ch.num_atoms}")
         out_line.append(")")
         return os.linesep.join(out_line)
+
+    def __getitem__(self, key: Union[int, str]):
+        if isinstance(key, int):
+            return super().__getitem__(key)
+        if isinstance(key, str):
+            return self.chain_mapper[key]
+        raise KeyError("Structure() getitem only take int or str as key")
     #endregion
 
 
