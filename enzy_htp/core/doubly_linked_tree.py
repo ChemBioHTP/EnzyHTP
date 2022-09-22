@@ -23,7 +23,7 @@ class DoubleLinkedNode():
     """
     class for parent objects of the doubly linked tree
     """
-    # === Attr ===
+    #region === Attr ===
     # parent use
     def set_children(self, children: List):
         """
@@ -76,8 +76,18 @@ class DoubleLinkedNode():
     @parent.setter
     def parent(self, val):
         self.set_parent(val)
+    #endregion
 
-    # === copy ===
+    #region === edit ===
+    def delete_from_parent(self) -> None:
+        """
+        delete self from parent's children list
+        delete base on object's id()
+        Returns:
+            None. changes are made to the .children list in self.parent
+        """
+        delete_base_on_id(self.parent.children, id(self))
+
     def __deepcopy__(self, memo: Union[Dict[int, Any], None]):
         """
         support deepcopy of the object
@@ -85,6 +95,7 @@ class DoubleLinkedNode():
         https://docs.python.org/3.10/library/copy.html?highlight=deepcopy
         """
         pass
+    #endregion
 
     # === special ===
     def __getitem__(self, key: int):
@@ -96,3 +107,11 @@ class DoubleLinkedNode():
     def __len__(self) -> int:
         return len(self._children)
 
+# TODO go to other core
+def delete_base_on_id(target_list: list, target_id: int):
+    """
+    delete an element from a list base on its id() value
+    """
+    for i in range(len(target_list)-1,-1,-1):
+        if id(target_list[i]) == target_id:
+            del target_list[i]
