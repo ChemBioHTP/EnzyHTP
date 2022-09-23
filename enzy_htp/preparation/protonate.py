@@ -6,6 +6,7 @@ Date: 2022-04-05
 """
 # TODO(CJ): add more documentation
 from pathlib import Path
+from typing import Union,Tuple, Dict
 
 import enzy_htp.core as core
 from enzy_htp.core import file_system as fs
@@ -22,6 +23,95 @@ from pdb2pqr.main import build_main_parser as build_pdb2pqr_parser
 import openbabel
 import openbabel.pybel as pybel
 from .pdb_line import read_pdb_lines
+
+def protonate_stru(stru: Structure,
+                   ph: float = 7.0, protonate_ligand: bool = False,
+                   engine: str = "pdb2pqr", ligand_engine: str = "pybel",
+                   **kwargs) -> Structure:
+    """
+    This science API solves the protein protonation problem.
+    that add missing H atoms to the {stru}. Protonation states are determined 
+    for residues with multiple ones.
+    Args:
+        stru: the input structure
+        ph: the pH value for determining the protonation state
+        protonate_ligand: if also protonate ligand
+        engine: engine for determining the pKa and adding hydrogens to the protein peptide part
+            (current available keywords):
+            pdb2pqr
+        ligand_engine: engine for adding hydrogens to ligands
+            (current available keywords):
+            pybel
+
+    Returns:
+        the reference of the in-place changed {stru}
+
+    Details:
+        Approximately 88% of the structures in the protein data bank (PDB) are determined
+    by X-ray crystallography, which can not, in general, resolve positions of most hydrogen
+    atoms. The same problem appear in structures obtained from structure prediction tools
+    too, AlphaFold2 also cannot give accurate position for hydrogens.
+    (https://github.com/deepmind/alphafold/issues/598) Thus accuately determine protonation
+    state is a vital part of structural preparation in EnzyHTP to ensure the accuracy of the
+    modeling result.
+    In short, the challenge is to predicting the protonation states of titratable groups such
+    as the side chains of ASP, GLU, ARG, LYS, TYR, HIS, CYS, and ligands.
+
+    Avaible strageties of protonation in the field are: (TODO do more search on this)
+    Protein Protonation:
+        Emperical pKa Prediction:
+        - PROPKA3 (https://pubs.acs.org/doi/10.1021/ct100578z, https://github.com/jensengroup/propka)
+            PROPKA3 trained parameters for a complex energy function. Commonly used in the field.
+            Consider H-bonding network optimization.
+            Consider considering H-bond with ligand.
+            Not consider coordination to metal (https://github.com/jensengroup/propka/issues/135)
+        - Rosetta-pH (https://www.sciencedirect.com/science/article/pii/S0006349512007333)
+            a augmented scoring function from REF was created for pKa prediction.
+
+        Poisson Boltzman (PB) model
+        - H++ (https://academic.oup.com/nar/article/40/W1/W537/1072301, http://newbiophysics.cs.vt.edu/H++/)
+            The only software that can consider the coordination to metal. Most commonly used in the field
+            Consider coordination to metal.
+            Unknow TODO H-bonding network optimization.
+            Unknow TODO considering H-bond with ligand.
+        - PypKa (https://pubs.acs.org/doi/full/10.1021/acs.jcim.0c00718, https://github.com/mms-fcul/PypKa)
+            TODO add a summary
+            Not consider coordination to metal (https://github.com/mms-fcul/PypKa/issues/6)
+
+        Constant pH MD (believe to be most accurate but considering slow)
+        - Amber (http://ambermd.org/tutorials/advanced/tutorial18/index.htm)
+
+        There is also a experimently determined database: 
+        - PKAD https://academic.oup.com/database/article/doi/10.1093/database/baz024/5359213
+    Ligand Protonation:
+        TODO need to figure out the algrothim #12
+        - OpenBable/PyBel (Default)
+            often have poor accuracy. 
+        - reduce (http://kinemage.biochem.duke.edu/software/README.reduce.html) TODO
+        - Dimorphite (from https://durrantlab.pitt.edu/dimorphite-dl/) TODO
+        - Protons from OpenMM (https://protons.readthedocs.io/en/latest/) TODO
+        - MCCE2 (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2735604/) TODO
+        - Protonate3D (http://www.ccl.net/cca/documents/proton/proton.htm) TODO
+    """
+    PEPTIDE_PROTONATION_METHODS[engine](stru, ph, **kwargs)
+    if protonate_ligand:
+        LIGAND_PROTONATION_METHODS[ligand_engine](stru, ph, **kwargs)
+
+def protonate_peptide_with_pdb2pqr(stru: Structure, ph: float = 7.0, 
+                                   int_pqr_path: Union[str, None] = None, 
+                                   int_pdb_path: Union[str, None] = None):
+    pass # TODO work from here!
+
+def protonate_ligand_with_pybel():
+    pass
+
+PEPTIDE_PROTONATION_METHODS = {
+    "pdb2pqr" : protonate_peptide_with_pdb2pqr
+}
+
+LIGAND_PROTONATION_METHODS = {
+    "pybel" : protonate_ligand_with_pybel
+}
 
 # TODO(CJ): this probably needs to go to core so that structure.Structure can use it
 def check_valid_ph(ph: float) -> None:
@@ -238,3 +328,11 @@ def _protonate_ligand_PYBEL(path: str, ph: float, out_path: str) -> Ligand:
     #_fix_ob_output(out_path, out_path, path)
     fix_atom_naming(out_path)
     return ligand_from_pdb(out_path, _ob_pdb_charge(out_path))
+
+PEPTIDE_PROTONATION_METHODS = {
+    "pdb2pqr" : protonate_peptide_with_pdb2pqr
+}
+
+LIGAND_PROTONATION_METHODS = {
+    "pybel" : protonate_ligand_with_pybel
+}
