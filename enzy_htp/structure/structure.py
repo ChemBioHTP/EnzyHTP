@@ -145,19 +145,27 @@ class Structure(DoubleLinkedNode): # TODO implement different copy methods for t
     def __init__(self, chains: List[Chain]):
         """Constructor that takes just a list of Chain() objects as input."""
         self.set_children(chains)
-        self._chains = self._children
         self.set_ghost_parent()
         if self.has_duplicate_chain_name():
             self.resolve_duplicated_chain_name()
     #region === Getters-attr ===
     @property
     def chains(self) -> List[Chain]:
-        """Getter for the list of Chain() objects contained within the Structure() object."""
+        """alias for _children. prevent changing _children but _residues holds the same"""
         return self.get_children()
     @chains.setter
     def chains(self, val) -> None:
-        """setter for _chains"""
+        """setter for chains"""
         self.set_children(val)
+    
+    @property
+    def _chains(self) -> List[Chain]:
+        """alias for _children. prevent changing _children but _chains holds the same"""
+        return self._children
+    @_chains.setter
+    def _chains(self, val) -> None:
+        """setter for _chains"""
+        self._children = val
 
     @property
     def chain_mapper(self) -> Dict[str, Chain]:
@@ -202,6 +210,12 @@ class Structure(DoubleLinkedNode): # TODO implement different copy methods for t
         result: List[Solvent] = []
         for chain in self.chains:
             result.extend(list(filter(lambda r: r.is_solvent(), chain)))
+        return result
+
+    @property
+    def peptides(self) -> List[Chain]:
+        """return the peptide part of current Structure() as a list of chains"""
+        result: List[Chain] = list(filter(lambda c: c.is_peptide(), self._chains))
         return result
     #endregion
 
