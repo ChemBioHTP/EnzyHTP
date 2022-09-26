@@ -9,3 +9,8 @@ Date: 2022-07-12
 """
 
 from .config import Config
+
+config = Config()
+"""
+singleton object for accessing all configurations
+"""

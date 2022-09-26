@@ -28,17 +28,14 @@ from .core import (
     _LOGGER,
     write_data,
 )
+from ._config import config
 from .preparation import PDBLine, PDBPrepper, read_pdb_lines
 from .chemical import ResidueType
-from ._config import Config
+
 # from ._interface import Interface
 # from .mutation import mutate_pdb, restriction_object, MutationRestrictions
 # from .geometry import sample_geometries
 
-config = Config()
-"""
-the singleton Config() object for accessing all configurations in EnzyHTP
-"""
 
 # interface = Interface(config)
 # """
