@@ -87,3 +87,13 @@ def write_data(outfile:str, tag:Any, data:Dict) -> str:
     fh.close()
     
     return outfile
+
+def get_valid_temp_name(fname: str) -> None:
+    """find a vaild name for a temp file"""
+    idx = 0
+    suffix = ''.join(Path(fname).suffixes)
+    result_fname = fname
+    while os.path.isfile(result_fname):
+        idx += 1
+        result_fname = f"{fname[:-len(suffix)]}_{str(idx)}{suffix}"
+    return result_fname
