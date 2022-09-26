@@ -58,7 +58,10 @@ class Residue(DoubleLinkedNode):
     def _atoms(self) -> List[Atom]:
         """alias for _children. Prevent change children but _atoms dont change"""
         return self._children
-
+    @_atoms.setter
+    def _atoms(self, val):
+        self._children = val
+    
     @property
     def chain(self):
         """Getter for the Residue()'s parent chain id."""

@@ -66,6 +66,9 @@ class Chain(DoubleLinkedNode):
     def _residues(self) -> List[Residue]:
         """alias for _children. prevent changing _children but _residues holds the same"""
         return self._children
+    @_residues.setter
+    def _residues(self, val: List[Residue]):
+        self._children = val
 
     def get_residue(self, traget_key: str) -> Residue:
         """TODO: is there alt option for the key?"""
