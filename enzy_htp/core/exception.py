@@ -22,13 +22,6 @@ class UnsupportedFileType(Exception):
 
     pass
 
-
-class InvalidPH(Exception):
-    """Exception corresponding to an invalid pH not in the range 0-14."""
-
-    pass
-
-
 class UnsupportedMethod(Exception):
     """Exception corresponding to a method that is NOT implemented and/or supported."""
 
