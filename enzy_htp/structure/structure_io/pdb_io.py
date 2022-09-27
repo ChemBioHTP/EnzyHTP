@@ -77,7 +77,7 @@ class PDBParser(StructureParserInterface):
         # TODO address when atom/residue/chain id is disordered respect to the line index
         # this is important to be aligned since Amber will force them to align and erase the chain id
         # a workaround is to add them back after Amber process
-        cls._resolve_missing_chain_id(target_model_df, target_model_ter_df) # add missing chain id in place
+        idx_change_mapper = cls._resolve_missing_chain_id(target_model_df, target_model_ter_df) # add missing chain id in place
         cls._resolve_alt_loc(target_model_df) # resolve alt loc record in place by delele redundant df rows
         #end region (Add here to address more problem related to the PDB file format here)
         
@@ -87,7 +87,7 @@ class PDBParser(StructureParserInterface):
         # old enzyhtp is build iteratively chain frist and residues are build in the chain
         # builder and so on for atom. But current methods is used for better readability
         atom_mapper: Dict[tuple, Atom] = cls._build_atoms(target_model_df)
-        res_mapper, idx_change_mapper = cls._build_residues(atom_mapper, add_solvent_list, add_ligand_list)
+        res_mapper = cls._build_residues(atom_mapper, add_solvent_list, add_ligand_list)
         chain_list: Dict[str, Chain] = cls._build_chains(res_mapper, remove_trash)
 
         if give_idx_map:
@@ -221,48 +221,110 @@ class PDBParser(StructureParserInterface):
         Function takes the dataframes of chains and ensures consistent naming
         of chains with no blanks.
 
-        add missing chain id into the Atomic "df" when there is none
+        1. add missing chain id into the Atomic "df" when there is none
+        2. update repeating chain id when it is seperated by "TER" 
+        (e.g. chain A TER chain A -(update)-> chain A TER chain B. see 1Q4T.)
         according to the TER record provide by "ter_df"
         * ter df should share the same line index references as df (from same file)
-        [edit df in place]
+        Returns:
+            [edit df in place]
+            idx_change_mapper: the mapper recording index change when repeating chain id
+            is updated
         """
-        # no problem case
+        idx_change_mapper = {}
+        # get legal chain id
         chain_ids = set(list(map(lambda c_id: c_id.strip(), df["chain_id"])))
-        if "" not in chain_ids:
-            return df
-
-        # problem case
-        chain_ids.remove("")
+        if "" in chain_ids:
+            chain_ids.remove("")
         legal_ids = cls._get_legal_pdb_chain_ids(chain_ids)
         ## split the df into chain dfs
         ter_line_ids = list(ter_df["line_idx"])
         chain_dfs = split_df_base_on_column_value(df, "line_idx", ter_line_ids)
         ## get a list of (loc, value) for editing in the original df
         result_loc_map = []
+        recorded_chain_ids = []
+        chain: pd.DataFrame
         for chain in chain_dfs:
             # check for redundant chains
             if len(chain) == 0:
                 _LOGGER.debug("Found empty chain. ")
                 continue
-            atom_missing_c_id = chain[chain.chain_id.str.strip() == ""]
-            # check if not missing any chain_id
-            if len(atom_missing_c_id) == 0:
-                    continue
-            # check existing chain ids in the chain
+            # check existing chain ids in this chain
             existing_chain_ids = set(list(map(lambda c_id: c_id.strip(), chain["chain_id"])))
             existing_chain_ids.discard("")
-            if len(existing_chain_ids) > 1:
-                _LOGGER.error("Found multiple chain id in 1 chain. Check your PDB.")
-                sys.exit(1)
-            # case: all atoms are missing chain id
-            if len(existing_chain_ids) == 0:
-                result_loc_map.extend(list(zip(atom_missing_c_id.index, [legal_ids.pop()]*len(atom_missing_c_id))))
-            # case: only some atoms are missing chain id
+            atom_missing_c_id = chain[chain.chain_id.str.strip() == ""]
+            if len(atom_missing_c_id) == 0:
+                # case: no missing chain id (but potentially repeating chain id)
+                # divid into ATOM and HET chain
+                current_chain_records = set(list(map(lambda c_id: c_id.strip(), chain["record_name"])))
+
+                if len(existing_chain_ids) == 1:
+                    # case: only 1 chain id
+                    current_chain_id = list(existing_chain_ids)[0]
+                    if "ATOM" in current_chain_records:
+                        # case: no missing chain id; single chain id; ATOM chain
+                        if current_chain_id in recorded_chain_ids:
+                            _LOGGER.error("Found the same chain id in 2 different ATOM chains. Check your PDB.")
+                            sys.exit(1)
+                        recorded_chain_ids.append(current_chain_id)
+                    else:
+                        # case: no missing chain id; single chain id; HET chain
+                        if current_chain_id in recorded_chain_ids:
+                            new_chain_id = legal_ids.pop()
+                            _LOGGER.debug(f"Found repeating chain id in a HETATM chain: assigning a new chain: {new_chain_id}")
+                            result_loc_map.extend(list(zip(chain.index, [new_chain_id]*len(chain))))
+                            cls._write_idx_change_when_resolve_chain_id(idx_change_mapper, chain, new_chain_id)
+                        else:
+                            recorded_chain_ids.append(current_chain_id)
+                    continue
+                else:
+                    # case: more than 1 chain id (since it cannot be 0)
+                    if "ATOM" in current_chain_records:
+                        # ATOM chain: multiple chain id not allowed
+                        _LOGGER.error("Found multiple chain id together with missing chain id in 1 chain. Impossible to solve.")
+                        sys.exit(1)
+                    else:
+                        # HETATM chain: multiple chain id allowed and should be treated as individual chains
+                        _LOGGER.warning("Found multiple chain id in 1 HETATM chain. Be careful. Treating them as individual chains")
+                        # case: no missing chain ids; multiple chain id; HET chain
+                        chains_in_chain = chain.groupby("chain_id", sort=False)
+                        for chain_id_in_chain, chain_in_chain in chains_in_chain:
+                            if chain_id_in_chain in recorded_chain_ids:
+                                new_chain_id = legal_ids.pop()
+                                _LOGGER.debug(f"Found repeating chain id in a HETATM chain: assigning a new chain: {new_chain_id}")
+                                result_loc_map.extend(list(zip(chain_in_chain.index, [new_chain_id]*len(chain_in_chain))))
+                                cls._write_idx_change_when_resolve_chain_id(idx_change_mapper, chain_in_chain, new_chain_id)
+                                # no need to record since it cant be the same as any existing or new ones
+                            else:
+                                recorded_chain_ids.append(chain_id_in_chain)
+                        continue
             else:
-                current_chain_id = list(existing_chain_ids)[0]
-                result_loc_map.extend(list(zip(atom_missing_c_id.index, [current_chain_id]*len(atom_missing_c_id))))
+                if len(existing_chain_ids) == 0:
+                # case: all atoms are missing chain id
+                    result_loc_map.extend(list(zip(atom_missing_c_id.index, [legal_ids.pop()]*len(atom_missing_c_id))))
+                elif len(existing_chain_ids) == 1:
+                # case: only some atoms are missing chain id
+                    current_chain_id = list(existing_chain_ids)[0]
+                    if current_chain_id in recorded_chain_ids:
+                        # divid into ATOM and HET chain
+                        current_chain_records = set(list(map(lambda c_id: c_id.strip(), chain["record_name"])))
+                        if "ATOM" in current_chain_records:
+                            _LOGGER.error("Found the same chain id in 2 different ATOM chains. Check your PDB.")
+                            sys.exit(1)
+                        else:
+                            new_chain_id = legal_ids.pop()
+                            _LOGGER.debug(f"Found repeating chain id in a HETATM chain: assigning a new chain: {new_chain_id}")
+                            result_loc_map.extend(list(zip(chain.index, [new_chain_id]*len(chain))))
+                            cls._write_idx_change_when_resolve_chain_id(idx_change_mapper, chain, new_chain_id)
+                    else:
+                        result_loc_map.extend(list(zip(atom_missing_c_id.index, [current_chain_id]*len(atom_missing_c_id))))
+                else:
+                # case: more than 1 chain id in chain
+                    _LOGGER.error("Found multiple chain id together with missing chain id in 1 chain. Impossible to solve.")
+                    sys.exit(1)
         # add missing chain id
         batch_edit_df_loc_value(df, result_loc_map, "chain_id")
+        return idx_change_mapper
 
     @staticmethod
     def _get_legal_pdb_chain_ids(taken_ids) -> List[str]:
@@ -280,6 +342,13 @@ class PDBParser(StructureParserInterface):
         result = list(string.ascii_uppercase) + list(map(lambda x: str(x), range(50000)))
         result = list(filter(lambda s: s not in taken_ids, result))
         return list(reversed(result))
+
+    @staticmethod
+    def _write_idx_change_when_resolve_chain_id(idx_change_mapper: dict, df: pd.DataFrame, new_chain_id: str):
+        """specialize function for _resolve_missing_chain_id. write idx changes
+        in the dataframe to a mapper"""
+        for c_r_id, res in df.groupby(["chain_id","residue_number"]):
+            idx_change_mapper[c_r_id] = (new_chain_id, c_r_id[1])
 
     @staticmethod
     def _resolve_alt_loc(df: pd.DataFrame, keep: str = "first") -> None:
@@ -338,7 +407,7 @@ class PDBParser(StructureParserInterface):
         atom_mapper = defaultdict(list)
         for i, row in df.iterrows():
             atom_obj = Atom(row)
-            residue_key = (row["chain_id"].strip(), row["residue_number"], row["residue_name"].strip(), row["record_name"].strip())
+            residue_key = (row["chain_id"].strip(), row["residue_number"], row["residue_name"].strip())
             atom_mapper[residue_key].append(atom_obj)
         return atom_mapper
 
@@ -354,27 +423,14 @@ class PDBParser(StructureParserInterface):
         Return:
             {"chain_id" : [Residue, ...]}
         """
-        build_mapper = defaultdict(lambda: defaultdict(list))
         result_mapper = defaultdict(list)
-        idx_change_mapper = {}
         for res_key, atoms in atom_mapper.items():
             res_obj = Residue(int(res_key[1]), res_key[2] ,atoms)
-            build_mapper[res_key[0]][res_key[3]].append(res_obj) # here it is {"chain_id":{"record_name": Residue()}}
-        # give HETATM residue individual chain
-        legal_chain_ids = cls._get_legal_pdb_chain_ids(build_mapper.keys())
-        for chain_id, record_residues in build_mapper.items():
-            if len(record_residues) > 1:
-                new_chain_id = legal_chain_ids.pop()
-                _LOGGER.debug(f"found HETATM in a ATOM chain: making a new chain {new_chain_id}")
-                result_mapper[new_chain_id] = record_residues["HETATM"]
-                for i in record_residues["HETATM"]:
-                    idx_change_mapper[(chain_id, i.idx)] = (new_chain_id, i.idx)
-            # in all cases keep the ATOM chain
-            result_mapper[chain_id] = list(record_residues.values())[0]
+            result_mapper[res_key[0]].append(res_obj) # here it is {"chain_id": Residue()}
         # categorize_residue
         cls._categorize_pdb_residue(result_mapper, add_solvent_list, add_ligand_list)
 
-        return result_mapper, idx_change_mapper
+        return result_mapper
 
     @staticmethod
     def _categorize_pdb_residue(residue_mapper: Dict[str, List[Residue]], add_solvent_list: list = None, add_ligand_list: list = None) -> Union[Residue, Ligand, Solvent, MetalUnit]: #TODO add test for this

@@ -225,6 +225,57 @@ def test_resolve_missing_chain_id_simple():
     assert len(four_df[four_df['chain_id'] == 'C']) == 7
     assert len(four_df[four_df['chain_id'] == 'D']) == 6
 
+def test_resolve_missing_chain_id_repeat_with_multi_in_HET():
+    """test the case when there are repeating chain id in HET chains & multiple chain id in HET chains"""
+    test_mdl = f'{DATA_DIR}1Q4T_atom_res_ch_build_test.pdb'
+    test_mdl_pdb = PandasPdb()
+    test_mdl_pdb.read_pdb(test_mdl)
+    target_df = pd.concat((test_mdl_pdb.df['ATOM'], test_mdl_pdb.df['HETATM']), ignore_index=True)
+    target_ter_df = test_mdl_pdb.df['OTHERS'].query('record_name == "TER"')
+    # answer
+    answer_mdl = f'{DATA_DIR}1Q4T_test_update_chain_id_answer.pdb'
+    answer_mdl_pdb = PandasPdb()
+    answer_mdl_pdb.read_pdb(answer_mdl)
+    answer_df_chain_ids = list(pd.concat((answer_mdl_pdb.df['ATOM'], answer_mdl_pdb.df['HETATM']), ignore_index=True)['chain_id'])
+
+    idx_change_mapper = sp._resolve_missing_chain_id(target_df, target_ter_df)
+    assert idx_change_mapper == {('A', 152): ('C', 152), ('A', 153): ('C', 153), ('A', 370): ('C', 370),
+         ('A', 371): ('C', 371), ('A', 372): ('C', 372), ('A', 373): ('C', 373), ('A', 374): ('C', 374),
+         ('A', 375): ('C', 375), ('A', 376): ('C', 376), ('B', 152): ('D', 152), ('B', 153): ('D', 153),
+         ('B', 371): ('D', 371), ('B', 372): ('D', 372), ('B', 373): ('D', 373), ('B', 374): ('D', 374),
+         ('B', 375): ('D', 375), ('B', 376): ('D', 376), ('B', 377): ('D', 377), ('B', 378): ('D', 378)}
+    assert list(target_df['chain_id']) == answer_df_chain_ids
+
+def test_resolve_missing_chain_id_missing_with_multi_chainid():
+    """test the case when there are missing chain id and multi chain id in the same chain"""
+    test_mdl = f'{DATA_DIR}1Q4T_missing_in_het_chain.pdb'
+    test_mdl_pdb = PandasPdb()
+    test_mdl_pdb.read_pdb(test_mdl)
+    target_df = pd.concat((test_mdl_pdb.df['ATOM'], test_mdl_pdb.df['HETATM']), ignore_index=True)
+    target_ter_df = test_mdl_pdb.df['OTHERS'].query('record_name == "TER"')
+
+    with pytest.raises(SystemExit) as exe:
+        sp._resolve_missing_chain_id(target_df, target_ter_df)
+    assert exe
+    assert exe.type == SystemExit
+    assert exe.value.code == 1
+
+def test_resolve_missing_chain_id_repeat():
+    """test the case when there are repeating chain id in HET chains"""
+    test_mdl = f'{DATA_DIR}1Q4T_no_missing_repeat_het_chain_id.pdb'
+    test_mdl_pdb = PandasPdb()
+    test_mdl_pdb.read_pdb(test_mdl)
+    target_df = pd.concat((test_mdl_pdb.df['ATOM'], test_mdl_pdb.df['HETATM']), ignore_index=True)
+    target_ter_df = test_mdl_pdb.df['OTHERS'].query('record_name == "TER"')
+    # answer
+    answer_mdl = f'{DATA_DIR}1Q4T_no_missing_repeat_het_chain_id_answer.pdb'
+    answer_mdl_pdb = PandasPdb()
+    answer_mdl_pdb.read_pdb(answer_mdl)
+    answer_df_chain_ids = list(pd.concat((answer_mdl_pdb.df['ATOM'], answer_mdl_pdb.df['HETATM']), ignore_index=True)['chain_id'])
+
+    sp._resolve_missing_chain_id(target_df, target_ter_df)
+    assert list(target_df['chain_id']) == answer_df_chain_ids
+
 @pytest.mark.long
 def test_get_legal_pdb_chain_ids():
     ALL_NAMES = list(string.ascii_uppercase) + list(map(lambda x: str(x), range(50000)))
@@ -273,7 +324,7 @@ def test_build_atom():
     '''
     a weak teat of _build_atom that insure no missing residue
     '''
-    pdb_file_path = f'{DATA_DIR}1Q4T_atom_res_ch_build_test.pdb'
+    pdb_file_path = f'{DATA_DIR}1Q4T_test_update_chain_id_answer.pdb'
     input_pdb = PandasPdb()
     input_pdb.read_pdb(pdb_file_path)
     target_df = pd.concat((input_pdb.df['ATOM'], input_pdb.df['HETATM']), ignore_index=True)
@@ -289,19 +340,15 @@ def test_build_residue():
     and ligand is found
     also test for _categorize_residue ligand case
     '''
-    pdb_file_path = f'{DATA_DIR}1Q4T_atom_res_ch_build_test.pdb'
+    pdb_file_path = f'{DATA_DIR}1Q4T_test_update_chain_id_answer.pdb'
     input_pdb = PandasPdb()
     input_pdb.read_pdb(pdb_file_path)
     target_df = pd.concat((input_pdb.df['ATOM'], input_pdb.df['HETATM']), ignore_index=True)
     atom_mapper: Dict[tuple, Atom] = sp._build_atoms(target_df)
+    # print(*list(atom_mapper.keys()), sep='\n')
 
-    res_mapper, idx_change_mapper = sp._build_residues(atom_mapper)
+    res_mapper = sp._build_residues(atom_mapper)
     assert set(res_mapper.keys()) == set(['A','B','C','D'])
-    assert idx_change_mapper == {('A', 152): ('C', 152), ('A', 153): ('C', 153), ('A', 370): ('C', 370), 
-         ('A', 371): ('C', 371), ('A', 372): ('C', 372), ('A', 373): ('C', 373), ('A', 374): ('C', 374), 
-         ('A', 375): ('C', 375), ('A', 376): ('C', 376), ('B', 152): ('D', 152), ('B', 153): ('D', 153), 
-         ('B', 371): ('D', 371), ('B', 372): ('D', 372), ('B', 373): ('D', 373), ('B', 374): ('D', 374), 
-         ('B', 375): ('D', 375), ('B', 376): ('D', 376), ('B', 377): ('D', 377), ('B', 378): ('D', 378)}
     all_residue = list(itertools.chain.from_iterable(res_mapper.values()))
     assert len(all_residue) == len(atom_mapper)
     assert len(list(filter(lambda x: x.rtype is chem.ResidueType.LIGAND, all_residue))) == 2
@@ -338,6 +385,7 @@ def test_categorize_residue_metal():
     assert all_residue[0].rtype is chem.ResidueType.METAL
 
 def test_categorize_residue_noncanonical():
+    """make a clean df manually and build atoms upon that. test if categorize_residue works for noncanonical"""
     pdb_file_path = f'{DATA_DIR}/5JT3_noncanonical_test.pdb'
     input_pdb = PandasPdb()
     input_pdb.read_pdb(pdb_file_path)
