@@ -132,6 +132,16 @@ class Chain(DoubleLinkedNode):
         if self.has_solvent():
             chain_type.append("solvent")
         return ",".join(chain_type)
+
+    @property
+    def sequence(self) -> str:
+        """return the sequence of current chain in string"""
+        result = ""
+        self.sort_residues()
+        res: Residue
+        for res in self._residues:
+            result += res.sequence_name
+        return result.strip()
     #endregion
 
     #region === Checker ===
