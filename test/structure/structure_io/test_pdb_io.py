@@ -260,6 +260,20 @@ def test_resolve_missing_chain_id_missing_with_multi_chainid():
     assert exe.type == SystemExit
     assert exe.value.code == 1
 
+def test_resolve_missing_chain_id_with_same_chainid_in_2_ATOM():
+    """test the case when there are same chain id in 2 ATOM chains"""
+    test_mdl = f'{DATA_DIR}two_chain_same_id.pdb'
+    test_mdl_pdb = PandasPdb()
+    test_mdl_pdb.read_pdb(test_mdl)
+    target_df = pd.concat((test_mdl_pdb.df['ATOM'], test_mdl_pdb.df['HETATM']), ignore_index=True)
+    target_ter_df = test_mdl_pdb.df['OTHERS'].query('record_name == "TER"')
+
+    with pytest.raises(SystemExit) as exe:
+        sp._resolve_missing_chain_id(target_df, target_ter_df)
+    assert exe
+    assert exe.type == SystemExit
+    assert exe.value.code == 1
+
 def test_resolve_missing_chain_id_repeat():
     """test the case when there are repeating chain id in HET chains"""
     test_mdl = f'{DATA_DIR}1Q4T_no_missing_repeat_het_chain_id.pdb'
