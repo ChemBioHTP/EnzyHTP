@@ -244,6 +244,30 @@ class Structure(DoubleLinkedNode): # TODO implement different copy methods for t
             existing_c_id.append(ch.name)
         return False
     
+    def contain_sequence(self, target_stru: Structure) -> bool:
+        """
+        check if the sequence of the target_stru is a subset of self
+        """
+        trgt_ch: Chain
+        for trgt_ch in target_stru:
+            if trgt_ch.name not in self.chain_mapper:
+                _LOGGER.info(f"current stru {list(self.chain_mapper.keys())} doesnt contain chain: {trgt_ch} from the target stru")
+                return False
+            self_ch = self.chain_mapper[trgt_ch.name]
+            if trgt_ch.sequence not in self_ch.sequence:
+                _LOGGER.info(f"current stru chain {self_ch} doesnt contain sequence {trgt_ch.sequence} from chain: {trgt_ch} of the target stru")
+                return False
+        return True
+    #endregion
+
+    #region === Editor ===
+    def sort_chains(self) -> None:
+        """
+        sort children chains with their chain name
+        sorted is always better than not but Structure() is being lazy here
+        """
+        self._chains.sort(key=lambda x: x.name)
+
     def resolve_duplicated_chain_name(self) -> None:
         """resolve for duplicated chain name in self.chains_
         A. insert the chain to be one character after the same one if they are different
@@ -266,15 +290,6 @@ class Structure(DoubleLinkedNode): # TODO implement different copy methods for t
             _LOGGER.warning(
                 "Resolved duplicated chain (different ones) name by renaming."
             )
-    #endregion
-
-    #region === Editor ===
-    def sort_chains(self) -> None:
-        """
-        sort children chains with their chain name
-        sorted is always better than not but Structure() is being lazy here
-        """
-        self._chains.sort(key=lambda x: x.name)
     #endregion
 
     #region === Special ===

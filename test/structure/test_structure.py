@@ -70,6 +70,33 @@ def test_sequence():
     stru: Structure = sp.get_structure(pdb_file_path)
     assert stru.sequence["A"] == "ATGGNLPDVASHYPVAYEQTLDGTVGFVIDEMTPERATASVEVTDTLRQRWGLVHGGAYCALAEMLATEATVAVVHEKGMMAVGQSNHTSFFRPVKEGHVRAEAVRIHAGSTTWFWDVSLRDDAGRLCAVSSMSIAVRPRRD"
 
+def test_contain_sequence_subset():
+    """test the checker for sequence subset with a handmade subset stru"""
+    pdb_file_path = f"{DATA_DIR}12E8_small_four_chain.pdb"
+    subset_pdb_file_path = f"{DATA_DIR}12E8_small_four_chain_subset.pdb"
+    
+    stru: Structure = sp.get_structure(pdb_file_path)
+    target_stru: Structure = sp.get_structure(subset_pdb_file_path)
+    assert stru.contain_sequence(target_stru)
+
+def test_contain_sequence_non_seq_subset():
+    """test the checker for sequence subset with a handmade non-subset (sequence) stru"""
+    pdb_file_path = f"{DATA_DIR}12E8_small_four_chain.pdb"
+    non_subset_pdb_file_path = f"{DATA_DIR}12E8_small_four_chain_non_seq_subset.pdb"
+    
+    stru: Structure = sp.get_structure(pdb_file_path)
+    target_stru: Structure = sp.get_structure(non_subset_pdb_file_path)
+    assert not stru.contain_sequence(target_stru)
+
+def test_contain_sequence_non_ch_subset():
+    """test the checker for sequence subset with a handmade non-subset (chain id) stru"""
+    pdb_file_path = f"{DATA_DIR}12E8_small_four_chain.pdb"
+    non_subset_pdb_file_path = f"{DATA_DIR}12E8_small_four_chain_non_chain_subset.pdb"
+    
+    stru: Structure = sp.get_structure(pdb_file_path)
+    target_stru: Structure = sp.get_structure(non_subset_pdb_file_path)
+    assert not stru.contain_sequence(target_stru)
+
 @pytest.mark.TODO
 def equiv_files(fname1: str, fname2: str, width: int = None) -> bool:
     """Helper method to check if two files are exactly equivalent."""
