@@ -17,6 +17,7 @@ CURR_FILE = os.path.abspath(__file__)
 CURR_DIR = os.path.dirname(CURR_FILE)
 DATA_DIR = f"{CURR_DIR}/data/" 
 WORK_DIR = f"{CURR_DIR}/work_dir/"
+sp = struct.PDBParser()
 
 # TODO(CJ): make testing utility files.
 def equiv_files(fname1: str, fname2: str, width: int = None) -> bool:
@@ -32,37 +33,36 @@ def equiv_files(fname1: str, fname2: str, width: int = None) -> bool:
             return False
     return True
 
+def test_protonate_stru():
+    assert False
 
-def test_check_valid_ph_good_input():
-    """Testing that the check_valid_ph() functio works for good input."""
-    phValues = np.linspace(0, 14, 100)
-    for ph in phValues:
-        assert not prot.check_valid_ph(ph)
+def test_protonate_peptide_with_pdb2pqr_no_metal():
+    """test that protonate_peptide_with_pdb2pqr() works without exceptions"""
+    test_pdb = f"{DATA_DIR}/1Q4T_cofactor_2chain_not_from_1.pdb"
+    int_pdb = f"{WORK_DIR}/1Q4T_cofactor_2chain_not_from_1.pdb"
+    int_pqr = f"{WORK_DIR}/1Q4T_cofactor_2chain_not_from_1.pqr"
+    assert not os.path.exists(int_pdb)
+    assert not os.path.exists(int_pqr)
 
+    stru = sp.get_structure(test_pdb)
+    prot.protonate_peptide_with_pdb2pqr(stru, 7.0, int_pdb, int_pqr)
 
-def test_check_valid_ph_bad_input():
-    """Testing that the check_valid_ph() functio fails for bad input."""
-    with pytest.raises(cc.InvalidPH) as iph:
-        prot.check_valid_ph(-1)
-
-    assert iph
-    assert iph.type == cc.InvalidPH
-
-    with pytest.raises(cc.InvalidPH) as iph:
-        prot.check_valid_ph(15)
-
-    assert iph
-    assert iph.type == cc.InvalidPH
-
+    fs.safe_rm(int_pqr)
+    fs.safe_rm(int_pdb)
+    assert not os.path.exists(int_pqr)
+    assert not os.path.exists(int_pdb)
 
 def test_protonate_pdb_FAcD():
     """Making sure the protonate_pdb() method works for the FAcD enzyme system."""
-    test_pdb = f"{DATA_DIR}/4NKK_clean.pdb"
-    target_pqr = f"{DATA_DIR}/4NKK_clean.pqr"
-    assert False
-    # print(DATA_DIR)
-    # assert False
-
+    test_pdb = f"{DATA_DIR}/FAcD-FA-ASP_rmW.pdb"
+    answer_pqr = f"{DATA_DIR}/FAcD-FA-ASP_rmW.pqr"
+    work_pqr = f"{WORK_DIR}/FAcD-FA-ASP_rmW.pqr"
+    assert not os.path.exists(work_pqr)
+    prot.protonate_pdb_with_pdb2pqr(test_pdb, work_pqr)
+    assert os.path.exists(work_pqr)
+    assert equiv_files(answer_pqr, work_pqr)
+    fs.safe_rm(work_pqr)
+    assert not os.path.exists(work_pqr)
 
 def test_protonate_pdb_4NKK():
     """Making sure the protonate_pdb() method works for the 4NKK enzyme system."""
@@ -70,12 +70,11 @@ def test_protonate_pdb_4NKK():
     target_pqr = f"{DATA_DIR}/4NKK_clean.pqr"
     actual_pqr = f"{WORK_DIR}/4NKK_clean.pqr"
     assert not os.path.exists(actual_pqr)
-    prot.protonate_pdb(test_pdb, actual_pqr)
+    prot.protonate_pdb_with_pdb2pqr(test_pdb, actual_pqr)
     assert os.path.exists(actual_pqr)
     assert equiv_files(target_pqr, actual_pqr)
     fs.safe_rm(actual_pqr)
     assert not os.path.exists(actual_pqr)
-
 
 def test_protonate_ligand():
     """Ensuring that the protonate_ligand() method works."""
