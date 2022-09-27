@@ -405,6 +405,7 @@ class PDBParser(StructureParserInterface):
             {("chain_id", "residue_idx", "residue_name", "record_name") : [Atom_obj, ...], ...}
         """
         atom_mapper = defaultdict(list)
+        df.sort_values("line_idx", inplace=True)
         for i, row in df.iterrows():
             atom_obj = Atom(row)
             residue_key = (row["chain_id"].strip(), row["residue_number"], row["residue_name"].strip())
