@@ -217,6 +217,16 @@ class Structure(DoubleLinkedNode): # TODO implement different copy methods for t
         """return the peptide part of current Structure() as a list of chains"""
         result: List[Chain] = list(filter(lambda c: c.is_peptide(), self._chains))
         return result
+
+    @property
+    def sequence(self) -> Dict[str, str]:
+        """return a dictionary of {'chain_id':'chain_sequence'}"""
+        result = {}
+        self.sort_chains()
+        ch: Chain
+        for ch in self._chains:
+            result[ch.name] = ch.sequence
+        return result
     #endregion
 
     #region === Checker ===
@@ -259,7 +269,7 @@ class Structure(DoubleLinkedNode): # TODO implement different copy methods for t
     #endregion
 
     #region === Editor ===
-    def sort_chains(self):
+    def sort_chains(self) -> None:
         """
         sort children chains with their chain name
         sorted is always better than not but Structure() is being lazy here

@@ -65,6 +65,10 @@ def test_peptides():
     assert len(stru.peptides) == 2
     assert tuple(map(lambda x: x.name, stru.peptides)) == ("A","B")
 
+def test_sequence():
+    pdb_file_path = f"{DATA_DIR}1Q4T_ligand_test.pdb"
+    stru: Structure = sp.get_structure(pdb_file_path)
+    assert stru.sequence[0] == "ATGGNLPDVASHYPVAYEQTLDGTVGFVIDEMTPERATASVEVTDTLRQRWGLVHGGAYCALAEMLATEATVAVVHEKGMMAVGQSNHTSFFRPVKEGHVRAEAVRIHAGSTTWFWDVSLRDDAGRLCAVSSMSIAVRPRRD"
 
 @pytest.mark.TODO
 def equiv_files(fname1: str, fname2: str, width: int = None) -> bool:
