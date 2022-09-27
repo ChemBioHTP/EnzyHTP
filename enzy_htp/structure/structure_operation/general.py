@@ -34,3 +34,25 @@ def remove_empty_chain(stru: Structure) -> Structure:
             _LOGGER.debug(f"removing {ch}")
             ch.delete_from_parent()
     return stru
+
+def remove_non_peptide(stru: Structure) -> Structure:
+    """remove the non-peptide parts of the structure. 
+    Make changes in-place and return a reference of the changed original object."""
+    non_peptides = filter(lambda c: not c.is_peptide(), stru.chains)
+    ch: Chain
+    for ch in non_peptides:
+        ch.delete_from_parent()
+    return stru
+
+def update_residues(stru: Structure, ref_stru: Structure) -> None:
+    """
+    Update additional atoms and residue names to residues in the stru
+    The sequence should holds constant since it serves as reference
+    Args:
+        stru: the target structure
+        ref_stru: the reference structure
+    Returns:
+        stru: the changed original structure
+    """
+    stru.contain_sequence(ref_stru.sequence)
+    
