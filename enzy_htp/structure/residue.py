@@ -14,10 +14,10 @@ from plum import dispatch
 from typing import Tuple, List, Dict
 
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
-
-from .atom import Atom
 from enzy_htp.core import _LOGGER
 import enzy_htp.chemical as chem
+
+from .atom import Atom
 
 
 class Residue(DoubleLinkedNode):
@@ -108,6 +108,13 @@ class Residue(DoubleLinkedNode):
     def num_atoms(self) -> int:
         """Number of atoms in the Residue."""
         return len(self._atoms)
+
+    @property
+    def sequence_name(self) -> str:
+        """get the sequence name of the residue. 1-letter if canonical. 3-letter if non"""
+        if self.is_canonical():
+            return chem.convert_to_one_letter(self.name)
+        return f" {self.name} "
 
     # def clone(self) -> Residue: #TODO
     #     """Creates a deepcopy of self."""
