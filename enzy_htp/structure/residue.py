@@ -60,7 +60,7 @@ class Residue(DoubleLinkedNode):
         return self._children
     @_atoms.setter
     def _atoms(self, val):
-        self._children = val
+        self.set_children(val)
     
     @property
     def chain(self):

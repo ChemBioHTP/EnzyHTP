@@ -165,7 +165,7 @@ class Structure(DoubleLinkedNode): # TODO implement different copy methods for t
     @_chains.setter
     def _chains(self, val) -> None:
         """setter for _chains"""
-        self._children = val
+        self.set_children(val)
 
     @property
     def chain_mapper(self) -> Dict[str, Chain]:
@@ -189,11 +189,19 @@ class Structure(DoubleLinkedNode): # TODO implement different copy methods for t
         """Returns the number of Chain() objects in the current Structure()."""
         return len(self._chains)
 
-    @property 
+    @property
     def residues(self) -> List[Residue]:
         """Return a list of the residues in the Structure() object sorted by (chain_id, residue_id)"""
         result = list(itertools.chain.from_iterable(self._chains))
         result.sort(key=lambda r: r.key())
+        return result
+    
+    @property
+    def residue_mapper(self) -> Dict[Tuple[str, int], Residue]:
+        """return a mapper of {(chain_id, residue_idx): Residue (reference)}"""
+        result = {}
+        for residue in self.residues:
+            result[residue.key] = residue
         return result
 
     @property
@@ -244,19 +252,27 @@ class Structure(DoubleLinkedNode): # TODO implement different copy methods for t
             existing_c_id.append(ch.name)
         return False
     
-    def contain_sequence(self, target_stru: Structure) -> bool:
+    def is_idx_subset(self, target_stru: Structure) -> bool:
         """
-        check if the sequence of the target_stru is a subset of self
+        check if residue idxes of the target_stru is a subset of self
+        by subset it means:
+        1. name of chains in target_stru is contain in self
+        2. for each chain, residue indexes in target chain is contained in correponding
+           chain from self.
         """
         trgt_ch: Chain
         for trgt_ch in target_stru:
             if trgt_ch.name not in self.chain_mapper:
                 _LOGGER.info(f"current stru {list(self.chain_mapper.keys())} doesnt contain chain: {trgt_ch} from the target stru")
                 return False
+
             self_ch = self.chain_mapper[trgt_ch.name]
-            if trgt_ch.sequence not in self_ch.sequence:
-                _LOGGER.info(f"current stru chain {self_ch} doesnt contain sequence {trgt_ch.sequence} from chain: {trgt_ch} of the target stru")
-                return False
+            self_ch_resi_idxes = self_ch.residue_idxes
+            res: Residue
+            for res in trgt_ch:
+                if res.idx not in self_ch_resi_idxes:
+                    _LOGGER.info(f"current stru chain {self_ch} doesnt contain residue: {res} of the target stru")
+                    return False
         return True
     #endregion
 
