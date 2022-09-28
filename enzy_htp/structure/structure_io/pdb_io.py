@@ -153,7 +153,7 @@ class PDBParser(StructureParserInterface):
         Private to structure.structure_io.pdb_io.py. Should NOT be called externally."""
         # check for right extension
         ext: str = fs.get_file_ext(pdb_path)
-        if ext.lower() not in [".pdb", ".pqr"]:
+        if ext.lower() != ".pdb":
             _LOGGER.error(f"Supplied file '{pdb_path}' is NOT a PDB file. Exiting...")
             sys.exit(1)
         #check for file existance
