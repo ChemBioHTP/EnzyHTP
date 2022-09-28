@@ -201,7 +201,7 @@ class Structure(DoubleLinkedNode): # TODO implement different copy methods for t
         """return a mapper of {(chain_id, residue_idx): Residue (reference)}"""
         result = {}
         for residue in self.residues:
-            result[residue.key] = residue
+            result[residue.key()] = residue
         return result
 
     @property
