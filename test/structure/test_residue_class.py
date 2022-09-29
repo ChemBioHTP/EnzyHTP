@@ -3,6 +3,7 @@
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-19
 """
+import itertools
 import os
 import pytest
 import pandas as pd
@@ -12,10 +13,49 @@ from collections import defaultdict
 from biopandas.pdb import PandasPdb
 
 from enzy_htp.structure import Atom, Residue
+from enzy_htp.structure.structure_io import PDBParser
 
 CURR_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = f"{CURR_DIR}/data/"
 
 TEST_PDB_FILE = f"{CURR_DIR}/data/3NIR.pdb"
+
+def test_deepcopy():
+    """test the hehavior of copy.deepcopy on Residue() under a Structure()
+    context"""
+    stru = PDBParser().get_structure(f"{DATA_DIR}12E8_small_four_chain.pdb")
+    res_list = stru[0][2:6] + stru[1][2:6] # target for deepcopy
+    new_list = deepcopy(res_list)
+    # ensure the list is new
+    assert id(res_list) != id(new_list)
+    # ensure every atom is new
+    for i, j in zip(res_list, new_list):
+        assert id(i) != id(j)
+    # ensure every parents is new
+    assert id(res_list[0].parent) != id(new_list[0].parent) # chain 
+    assert id(res_list[0].parent.parent) != id(new_list[0].parent.parent) # stru
+    # ensure every atom in the stru is new
+    for i, j in zip(stru.atoms, new_list[0].parent.parent.atoms):
+        assert i.idx == j.idx
+        assert id(i) != id(j)
+    # ensure children that sharing the same parent do not have different parents
+    parent_group = itertools.groupby(new_list, lambda x: x.parent.name)
+    for i, j in parent_group:
+        ref_j = list(j)[0]
+        assert all(id(k.parent) == id(ref_j.parent) for k in j) # all same and eq to first
+    # ensure parent is containing the same new children
+    for i in new_list:
+        assert i in i.parent.children
+
+def test_deepcopy_without_parent():
+    """test copy_without_parent action on Residue()"""
+    stru = PDBParser().get_structure(f"{DATA_DIR}12E8_small_four_chain.pdb")
+    res_obj = stru[0][0] # target for deepcopy
+    new_res = res_obj.deepcopy_without_parent()
+
+    assert new_res.parent is None
+    assert id(new_res) != id(res_obj)
+    assert all(id(i) != id(j) for i, j in zip(new_res.atoms, res_obj.atoms))
 
 #TODO recover tests
 #TODO(CJ): add tests for the name getter
@@ -35,7 +75,7 @@ def make_residues(pdbname: str) -> List[Residue]:
     return residues
 
 
-RESIDUES: List[Residue] = make_residues(TEST_PDB_FILE)
+# RESIDUES: List[Residue] = make_residues(TEST_PDB_FILE)
 @pytest.mark.TODO
 def test_residue_key_information():
     """Ensuring that general getting and setting of residue key information works."""

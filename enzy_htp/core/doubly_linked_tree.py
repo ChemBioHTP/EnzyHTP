@@ -16,6 +16,7 @@ Author: QZ Shao, <shaoqz@icloud.com>
 Date: 2022-09-14
 """
 
+import copy
 from typing import Any, Dict, List, Union
 
 
@@ -88,13 +89,29 @@ class DoubleLinkedNode():
         """
         delete_base_on_id(self.parent.children, id(self))
 
-    def __deepcopy__(self, memo: Union[Dict[int, Any], None]):
+    # def __deepcopy__(self, memo: Union[Dict[int, Any], None]):
+    #     """
+    #     support deepcopy of the object
+    #     shallow copy wont cause any problem but deepcopy do as explained on:
+    #     https://docs.python.org/3.10/library/copy.html?highlight=deepcopy
+    #     Deepcopy of the Node returns a new Node with empty parent and full children copies
+    #     This behavior is mimicing copy part of the structure given any structure parts identifier
+    #     (e.g.: copy chain A will give all residues, atoms in chain A but dont need chain B, C, etc.)
+    #     """
+    #     result = copy.copy(self)
+    #     result.set_ghost_parent()
+    #     #TODO
+    #     # it seems built-in deepcopy handle this pretty well
+
+    def deepcopy_without_parent(self):
         """
-        support deepcopy of the object
-        shallow copy wont cause any problem but deepcopy do as explained on:
-        https://docs.python.org/3.10/library/copy.html?highlight=deepcopy
+        support another version of deepcopy that donot copy any parent and siblings TODO maybe make this default
         """
-        pass
+        parent_holder = self.parent
+        self.parent = None
+        result = copy.deepcopy(self)
+        self.parent = parent_holder
+        return result
     #endregion
 
     # === special ===
