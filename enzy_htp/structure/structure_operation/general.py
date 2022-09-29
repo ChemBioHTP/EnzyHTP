@@ -5,8 +5,9 @@ Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
 Date: 2022-09-19
 """
 
+import copy
 from enzy_htp.core.logger import _LOGGER
-from ..structure import Structure, Solvent, Chain
+from ..structure import Structure, Solvent, Chain, Residue
 
 
 def remove_solvent(stru: Structure) -> Structure:
@@ -54,5 +55,16 @@ def update_residues(stru: Structure, ref_stru: Structure) -> None:
     Returns:
         stru: the changed original structure
     """
-    stru.contain_sequence(ref_stru.sequence)
-    
+    #san check for ref_stru
+    stru.is_idx_subset(ref_stru)
+
+    # update residues in stru with correponding residue idxes in ref_stru
+    self_res_mapper = stru.residue_mapper
+    ref_res: Residue
+    for ref_res in ref_stru.residues:
+        self_res = self_res_mapper[ref_res.key()]
+        if self_res.name != ref_res.name:
+            _LOGGER.info(f"updating {self_res.key()} {self_res.name} to {ref_res.name}")
+            self_res.name = ref_res.name
+        self_res.atoms = copy.deepcopy(ref_res.atoms) # this will also set self_res as parent
+    return stru

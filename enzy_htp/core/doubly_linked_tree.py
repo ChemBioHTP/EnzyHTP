@@ -98,10 +98,10 @@ class DoubleLinkedNode():
     #     This behavior is mimicing copy part of the structure given any structure parts identifier
     #     (e.g.: copy chain A will give all residues, atoms in chain A but dont need chain B, C, etc.)
     #     """
-    #     result = copy.copy(self)
-    #     result.set_ghost_parent()
-    #     #TODO
     #     # it seems built-in deepcopy handle this pretty well
+    #     result = copy.deepcopy(self, memo)
+    #     print(f"copying {self.__class__.__name__}")
+    #     return result TODO current default deepcopy is pretty slow. learn and rewrite.
 
     def deepcopy_without_parent(self):
         """
