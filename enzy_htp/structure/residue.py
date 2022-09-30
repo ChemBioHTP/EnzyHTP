@@ -142,6 +142,11 @@ class Residue(DoubleLinkedNode):
         """Checks if Residue() is a metal. Inherited by children."""
         return self._rtype == chem.ResidueType.METAL
 
+    def is_metal_center(self):
+        """determine if current metal is a coordination center.
+        TODO more consistant way to determine for 'boundary' metals like Mg2+"""
+        return self.name in chem.METAL_CENTER_MAP
+
     def is_trash(self) -> bool:
         """Checks if the Residue() is an rd_non_ligand as defined by enzy_htp.chemical.solvent.RD_NON_LIGAND_LIST"""
         return self._rtype == chem.ResidueType.TRASH
@@ -158,18 +163,11 @@ class Residue(DoubleLinkedNode):
     #region === Editor === 
     def sort_atoms(self):
         """
-        sort children chains with their residue idx
+        sort children atoms with their atom idx
         sorted is always better than not but Residue() is being lazy here
+        so only this function is called will it sorted
         """
         self._children.sort(key=lambda x: x.idx)
-
-    def set_chain(self, val: str) -> None: # TODO
-        """Sets chain and all child atoms to new value. Re-generates the self.residue_key attribute."""
-        chain = val #@shaoqz: Refine this line
-        for idx in range(len(self._atoms)):
-            self._atoms[idx].chain_id = val
-        self.chain_ = val
-        self.residue_key = f"{self.chain_}.{self.name}.{self.num_}"
 
     def renumber_atoms(self, start: int = 1) -> int: # TODO
         """Renumbers the Residue()'s Atom()'s beginning with "start" paramter, defaulted to 1. Returns the index of the last Atom().

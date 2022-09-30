@@ -33,15 +33,6 @@ def test_deepcopy():
     # ensure parent of every atom is None
     assert all(i.parent is None for i in new_list)
 
-def test_deepcopy_without_parent():
-    """test copy_without_parent action on Atom()"""
-    stru = PDBParser().get_structure(f"{DATA_DIR}12E8_small_four_chain.pdb")
-    atom_obj = stru[0][0][1] # target for deepcopy
-    new_atom = atom_obj.deepcopy_without_parent()
-
-    assert new_atom.parent is None
-    assert id(new_atom) != id(atom_obj)
-
 # TODO recover when need
 @pytest.mark.TODO
 def test_distance():

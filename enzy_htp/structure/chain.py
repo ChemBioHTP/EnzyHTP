@@ -219,8 +219,9 @@ class Chain(DoubleLinkedNode):
 
     def sort_residues(self):
         """
-        sort children chains with their residue idx
+        sort children residues with their residue idx
         sorted is always better than not but Chain() is being lazy here
+        so only when sort is nessessary will it sort
         """
         self._children.sort(key=lambda x: x.idx)
 

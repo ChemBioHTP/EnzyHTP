@@ -43,16 +43,6 @@ def test_deepcopy():
     for i in new_list:
         assert all(j.parent is i for j in i)
 
-def test_deepcopy_without_parent():
-    """test copy_without_parent action on Residue()"""
-    stru = PDBParser().get_structure(f"{DATA_DIR}12E8_small_four_chain.pdb")
-    res_obj = stru[0][0] # target for deepcopy
-    new_res = res_obj.deepcopy_without_parent()
-
-    assert new_res.parent is None
-    assert id(new_res) != id(res_obj)
-    assert all(id(i) != id(j) for i, j in zip(new_res.atoms, res_obj.atoms))
-
 #TODO recover tests
 #TODO(CJ): add tests for the name getter
 @pytest.mark.TODO

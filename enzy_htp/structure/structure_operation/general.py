@@ -67,4 +67,5 @@ def update_residues(stru: Structure, ref_stru: Structure) -> None:
             _LOGGER.info(f"updating {self_res.key()} {self_res.name} to {ref_res.name}")
             self_res.name = ref_res.name
         self_res.atoms = copy.deepcopy(ref_res.atoms) # this will also set self_res as parent
+    stru.renumber_atoms()
     return stru
