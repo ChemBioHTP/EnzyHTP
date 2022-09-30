@@ -23,29 +23,15 @@ def test_deepcopy():
     """test the hehavior of copy.deepcopy on Atom() under a Structure()
     context"""
     stru = PDBParser().get_structure(f"{DATA_DIR}12E8_small_four_chain.pdb")
-    atom_list = stru[0][0][2:6] + stru[0][1][2:6] # target for deepcopy
+    atom_list = stru[0][0][1:3] + stru[0][1][1:2] # target for deepcopy
     new_list = deepcopy(atom_list)
     # ensure the list is new
     assert id(atom_list) != id(new_list)
     # ensure every atom is new
     for i, j in zip(atom_list, new_list):
         assert id(i) != id(j)
-    # ensure every parents of atom is new
-    assert id(atom_list[0].parent) != id(new_list[0].parent) # residue 
-    assert id(atom_list[0].parent.parent) != id(new_list[0].parent.parent) # chain
-    assert id(atom_list[0].parent.parent.parent) != id(new_list[0].parent.parent.parent) # stru
-    # ensure every atom in the stru is new
-    for i, j in zip(stru.atoms, new_list[0].parent.parent.parent.atoms):
-        assert i.idx == j.idx
-        assert id(i) != id(j)
-    # ensure children that sharing the same parent do not have different parents
-    parent_group = itertools.groupby(new_list, lambda x: x.parent.key())
-    for i, j in parent_group:
-        ref_j = list(j)[0]
-        assert all(id(k.parent) == id(ref_j.parent) for k in j) # all same and eq to first
-    # ensure parent is containing the same new children
-    for i in new_list:
-        assert i in i.parent.atoms
+    # ensure parent of every atom is None
+    assert all(i.parent is None for i in new_list)
 
 def test_deepcopy_without_parent():
     """test copy_without_parent action on Atom()"""

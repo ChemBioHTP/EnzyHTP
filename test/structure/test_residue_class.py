@@ -28,24 +28,20 @@ def test_deepcopy():
     new_list = deepcopy(res_list)
     # ensure the list is new
     assert id(res_list) != id(new_list)
-    # ensure every atom is new
+    # ensure every residue is new
     for i, j in zip(res_list, new_list):
         assert id(i) != id(j)
-    # ensure every parents is new
-    assert id(res_list[0].parent) != id(new_list[0].parent) # chain 
-    assert id(res_list[0].parent.parent) != id(new_list[0].parent.parent) # stru
-    # ensure every atom in the stru is new
-    for i, j in zip(stru.atoms, new_list[0].parent.parent.atoms):
+    # ensure every parents is None
+    assert all(i.parent is None for i in new_list)
+    # ensure every atom in the stru is new and pointing to correct residue
+    old_atom_list = itertools.chain.from_iterable(i.atoms for i in res_list)
+    new_atom_list = itertools.chain.from_iterable(i.atoms for i in new_list)
+    for i, j in zip(old_atom_list, new_atom_list):
         assert i.idx == j.idx
         assert id(i) != id(j)
-    # ensure children that sharing the same parent do not have different parents
-    parent_group = itertools.groupby(new_list, lambda x: x.parent.name)
-    for i, j in parent_group:
-        ref_j = list(j)[0]
-        assert all(id(k.parent) == id(ref_j.parent) for k in j) # all same and eq to first
     # ensure parent is containing the same new children
     for i in new_list:
-        assert i in i.parent.children
+        assert all(j.parent is i for j in i)
 
 def test_deepcopy_without_parent():
     """test copy_without_parent action on Residue()"""
