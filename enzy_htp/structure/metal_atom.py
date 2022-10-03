@@ -69,8 +69,11 @@ class MetalUnit(Residue):
         """
         get a mapper of {donor_residue : donor_atom_in_this_residue, ...} for a metal center
         """
+        donor_mapper = {}
         donor_atoms = self.get_donor_atoms(method, check_radius)
-        donor_mapper =dict(list(itertools.groupby(donor_atoms, lambda a: a.residue)))
+        atoms_groupby_residue = itertools.groupby(donor_atoms, lambda a: a.residue) # be careful if you want to turn this into a list. groupitem may lose
+        for i, j in atoms_groupby_residue:
+            donor_mapper[i] = list(j)
         # san check
         for k, v in donor_mapper.items():
             if len(v) > 1:

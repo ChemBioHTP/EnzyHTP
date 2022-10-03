@@ -47,6 +47,12 @@ def test_get_donor_atoms():
     assert len(metalcenter1.get_donor_atoms()) == 4
     assert len(metalcenter2.get_donor_atoms()) == 4
 
+def test_get_donor_mapper():
+    stru = PDBParser().get_structure(f"{DATA_DIR}1NVG.pdb")
+    metalcenter1: MetalUnit = stru.metalcenters[0]
+    donor_mapper = metalcenter1.get_donor_mapper()
+    assert len(donor_mapper) == 4
+    assert list(donor_mapper.values())[0][0].name == "OE2"
 
 @pytest.mark.TODO
 def test_get_radii_method_good_input():
