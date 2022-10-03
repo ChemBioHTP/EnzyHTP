@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 import sys
 from typing import Tuple
+from plum import dispatch
 
 import numpy as np
 import pandas as pd
@@ -145,9 +146,15 @@ class Atom(DoubleLinkedNode):
         radius = chem.get_atom_radii(self.element, method)
         return radius
 
-    def distance_to(self, other_atom) -> float:
-        """Get the distance with the other atom."""
-        return mh.get_distance(self.coord, other_atom.coord)
+    @dispatch
+    def distance_to(self, point: Atom) -> float:
+        """Get the distance to the other atom or a point."""
+        return mh.get_distance(self.coord, point.coord)
+
+    @dispatch
+    def distance_to(self, point: tuple) -> float: # pylint: disable=function-redefined
+        """Get the distance to the other atom or a point."""
+        return mh.get_distance(self.coord, point)
     #endregion
 
     #region === Check ===
@@ -160,4 +167,11 @@ class Atom(DoubleLinkedNode):
     def __str__(self):
         return f"Atom({self._name}, {self._idx}, {self._coord}, {self._parent}, {self._b_factor}, {self._element}, {self._charge} )"
     #endregion
+
+    @dispatch
+    def _(self):
+        """
+        dummy method for dispatch
+        """
+        pass
 
