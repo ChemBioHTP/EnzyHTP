@@ -33,6 +33,16 @@ def test_deepcopy():
     # ensure parent of every atom is None
     assert all(i.parent is None for i in new_list)
 
+def test_no_optional_data():
+    """test the case pdb dont have atom number"""
+    stru = PDBParser().get_structure(f"{DATA_DIR}two_chain_no_optional_data.pdb")
+    atom = stru["A"][0][0]
+    assert atom.element == "N"
+    assert atom.idx is None
+    assert atom.b_factor is None
+    assert atom.charge is None
+
+
 def test_element_canonical():
     """test get atom element for C from 1NVG"""
     stru = PDBParser().get_structure(f"{DATA_DIR}1NVG.pdb")

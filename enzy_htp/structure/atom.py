@@ -52,11 +52,11 @@ class Atom(DoubleLinkedNode):
         self._element = None
         self._charge = None
         ds_keys = ds.keys()
-        if "atom_number" in ds_keys:
+        if "atom_number" in ds_keys and not np.isnan(ds["atom_number"]):
             self._idx = ds["atom_number"]
-        if "b_factor" in ds_keys:
+        if "b_factor" in ds_keys and not np.isnan(ds["b_factor"]):
             self._b_factor = ds["b_factor"]
-        if "element_symbol" in ds_keys:
+        if "element_symbol" in ds_keys and ds["element_symbol"].strip() != "":
             self._element = ds["element_symbol"].strip()
         if "charge" in ds_keys and not np.isnan(ds["charge"]):
             self._charge = float(ds["charge"])
