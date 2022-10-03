@@ -6,11 +6,15 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-19
 """
 from __future__ import annotations
+import re
 import sys
 from typing import Tuple
 
 import numpy as np
 import pandas as pd
+
+import enzy_htp.chemical as chem
+import enzy_htp.core.math_helper as mh
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
 from enzy_htp.core.logger import _LOGGER
 
@@ -23,6 +27,8 @@ class Atom(DoubleLinkedNode):
     Attributes:
         (nessessary)
         name : The name of the atom as a string. often refer to a specific connectivity.
+                TODO the name should be decouple with specific parsing logic. Current method is
+                     use names in PDB format and covert every other format into this.
         coord: (x,y,z) for cartesian coordinate of the atom.
         parent/residue: the parent residue that this atom belongs to.
         (optional)
@@ -100,7 +106,17 @@ class Atom(DoubleLinkedNode):
 
     @property
     def element(self):
-        """synonym for element"""
+        """getter for _element"""
+        if self._element is None:
+            if self.name in chem.residue.RESIDUE_ELEMENT_MAP["Amber"].keys():
+                return chem.residue.RESIDUE_ELEMENT_MAP["Amber"][self.name]
+            elif self.parent.is_metal():
+                return self.parent.element
+            else:
+                # case: in ligand atoms are named like this H1
+                return re.match("^[A-Z][a-z]?",self.name).group()
+        elif self.parent.is_metal(): # in pdb some metal's element name is wrong
+            return self.parent.element
         return self._element
     @element.setter
     def element(self, val):
@@ -108,11 +124,36 @@ class Atom(DoubleLinkedNode):
 
     @property
     def charge(self):
-        """synonym for charge"""
+        """getter for _charge"""
         return self._charge
     @charge.setter
     def charge(self, val):
         self._charge = val
+    #endregion
+
+    #region === Getter-Property (ref) ===
+    def radius(self, method: str = "ionic") -> float:
+        """Gets the atomic radii with specified definition.
+        Args:
+            method: the method to determine radius the atom.
+            (current available keywords)
+                ionic: (ionic radius) for both metal and donor atom
+                vdw: (Van Der Waals radius) for both metal and donor atom
+        Returns:
+            a float of the radius
+        """
+        radius = chem.get_atom_radii(self.element, method)
+        return radius
+
+    def distance_to(self, other_atom) -> float:
+        """Get the distance with the other atom."""
+        return mh.get_distance(self.coord, other_atom.coord)
+    #endregion
+
+    #region === Check ===
+    def is_donor_atom(self) -> bool:
+        """check if the atom is a donor atom to a coordination center"""
+        return self.name in chem.metal.DONOR_ATOM_LIST
     #endregion
 
     #region == Special ==

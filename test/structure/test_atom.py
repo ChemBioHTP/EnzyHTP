@@ -33,6 +33,31 @@ def test_deepcopy():
     # ensure parent of every atom is None
     assert all(i.parent is None for i in new_list)
 
+def test_element_canonical():
+    """test get atom element for C from 1NVG"""
+    stru = PDBParser().get_structure(f"{DATA_DIR}1NVG.pdb")
+    atom = stru["A"][0][0]
+    assert atom.element == "N"
+
+def test_element_non_canonical():
+    """test get atom element for first atom of the ligand 4CO from 1Q4T"""
+    stru = PDBParser().get_structure(f"{DATA_DIR}1Q4T_ligand_test.pdb")
+    atom = stru.ligands[0][0]
+    assert atom.element == "N"
+
+def test_element_metal():
+    """test get atom element for Zn from 1NVG"""
+    stru = PDBParser().get_structure(f"{DATA_DIR}1NVG.pdb")
+    atom = stru.metalcenters[0][0]
+    assert atom.element == "Zn"
+
+def test_radius():
+    stru = PDBParser().get_structure(f"{DATA_DIR}1NVG.pdb")
+    atom1 = stru.metalcenters[0][0] #Zn
+    atom2 = stru["A"][0][0] #N
+    assert atom1.radius() == 0.88
+    assert atom2.radius() == 1.32
+
 # TODO recover when need
 @pytest.mark.TODO
 def test_distance():
