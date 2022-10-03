@@ -8,10 +8,13 @@ Date: 2022-04-03
 from __future__ import annotations
 
 from copy import deepcopy
+import itertools
 import sys
 import numpy as np
-from typing import List, Union
+from typing import List, Tuple, Union, Dict
+
 import enzy_htp.chemical as chem
+import enzy_htp.core.math_helper as mh
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.structure import Residue, Atom
 
@@ -33,7 +36,7 @@ class MetalUnit(Residue):
         Residue.__init__(self, residue_idx, residue_name, atoms, parent)
         self.rtype = chem.ResidueType.METAL
 
-    # === Getter-Attr ===
+    #region === Getter-Attr ===
     @property
     def atom(self) -> Atom:
         """Getter for the only one atom in this MetalUnit unit"""
@@ -49,20 +52,91 @@ class MetalUnit(Residue):
     @atom_name.setter
     def atom_name(self, val: str):
         self._atom[0].name = val
+    #endregion
 
+    #region === Getter-Prop ===
+    @property
+    def element(self) -> str:
+        """determine the element name of current metalunit"""
+        return chem.metal.METAL_MAPPER[self.name]
+
+    @property
+    def coord(self) -> Tuple[int, int, int]:
+        """return the coordinate of the atom in the unit"""
+        return self.atom.coord
+
+    def get_donor_mapper(self, method: str = "ionic", check_radius: int = 4.0) -> Dict[Residue, List[Atom]]:
+        """
+        get a mapper of {donor_residue : donor_atom_in_this_residue, ...} for a metal center
+        """
+        donor_atoms = self.get_donor_atoms(method, check_radius)
+        donor_mapper =dict(list(itertools.groupby(donor_atoms, lambda a: a.residue)))
+        # san check
+        for k, v in donor_mapper.items():
+            if len(v) > 1:
+                _LOGGER.warning(f"More than 1 donor atom in residue {k} to center {self}: {v}")
+        return donor_mapper
+
+    def get_donor_atoms(self, method: str = "ionic", check_radius=4.0) -> List[Atom]:
+        """
+        Get coordinated donor atom for a metal center.
+        1. check all atoms by type, consider those in the "donor_map"
+        (only those atoms from residues are considered. So atoms from ligand and ion will be ignored)
+        2. check if atoms are within the check_radius
+        3. check distance for every atoms left.
+
+        Args:
+            method: the method to determine radius of the metal and the donor atom.
+            (current available keywords)
+                ionic: (ionic radius) for both metal and donor atom
+                vdw: (Van Der Waals radius) for both metal and donor atom
+            check_radius: the radius that contains all considered potential donor atoms. set for reducing the complexity.
+        Returns:
+            a list of found donor atoms (in their reference)
+        """
+        result = []
+        # find radius for matal
+        r_metal = self.atom.radius(method)
+        # get target with in check_radius (default: 4A)
+        range_atoms = self.chain.parent.find_atoms_in_range(self.coord, range_distance=check_radius)
+        atom: Atom
+        for atom in range_atoms:
+            # only check donor atom (by atom name)
+            if atom.is_donor_atom():
+                r_donor = atom.radius(method)
+                if atom.distance_to(self.atom) - (r_metal + r_donor) <= 0.01: # TODO refine this approximation
+                    result.append(atom)
+                    _LOGGER.info(f"found donor atom of {self}: {atom}")
+        return result
+
+    def get_donor_residue(self, method: str = "ionic", check_radius: int = 4.0):
+        """
+        get donor residue based on donor atoms. See get_donor_mapper for detail
+        """
+        return list(self.get_donor_mapper(method, check_radius).keys())
+    #endregion
+
+    #region === Checker ===
+    def is_metal_center(self):
+        """determine if current metal is a coordination center.
+        (place holder for override)
+        TODO dispatch and make more consistant way to determine for 'boundary' metals like Mg2+"""
+        return self.name in chem.METAL_CENTER_MAP
+    #endregion
+    
     # TODO below to change
 
     def location(self) -> np.array: #@shaoqz: maybe unify as coord etc. TODO
         """Gets the location of the MetalUnit."""
         return self._atoms[0]
 
-    # === Getter-Prop ===
+
     def get_radii(self, method: str = "ionic") -> Union[float, None]:
         """Gets the atomic radii for the metal using specified method.
         Allowed values are "ionic" or "vdw" for ionic and van-der waals, respectively.
         Returns a float or None if the metal does not have a distance.
         """
-        return chem.get_metal_radii(self.atom_name_, method)
+        return chem.get_atom_radii(self.atom_name_, method)
 
     def clone(self) -> MetalUnit:
         """Creates deepcopy of self."""
@@ -87,85 +161,6 @@ class MetalUnit(Residue):
         return f"MetalUnit({self._idx}, {self._name}, atom:{len(self._atoms)}, {self._parent})"
     #region === TODO/TOMOVE ===
     # fix related
-    def get_donor_atom(self, method: str = "INC", check_radius=4.0): # @nu
-        # TODO(CJ): move this higher up in the structural hierarchy.
-        """
-        Get coordinated donor atom for a metal center.
-        1. check all atoms by type, consider those in the "donor_map"
-        (only those atoms from residues are considered. So atoms from ligand and ion will be ignored)
-        2. check if atoms are within the check_radius
-        3. check distance for every atoms left.
-        -----------------------
-        Base on a certain type of radius of this metal:
-        method = INC ------ {ionic radius} for both metal and donor atom
-               = VDW ------ {Van Der Waals radius} for both metal and donor atom
-        check_radius ------ the radius that contains all considered potential donor atoms. set for reducing the complexity.
-        -----------------------
-        save found atom list to self.donor_atoms
-        """
-
-        # find radius for matal
-        if method == "INC":
-            R_m = Ionic_radius_map[self.ele]
-        if method == "VDW":
-            R_m = VDW_radius_map[self.ele]
-
-        # get target with in check_radius (default: 4A)
-        coord_m = np.array(self.coord)
-        protein_atoms = self.parent.get_all_protein_atom()
-        for atom in protein_atoms:
-
-            # only check donor atom (by atom name)
-            if atom.name in Donor_atom_list[atom.ff]:
-
-                # cut by check_radius
-                dist = np.linalg.norm(np.array(atom.coord) - coord_m)
-                if dist <= check_radius:
-                    # determine coordination
-                    atom.get_ele()
-                    if method == "INC":
-                        R_d = Ionic_radius_map[atom.ele]
-                    if method == "VDW":
-                        R_d = VDW_radius_map[atom.ele]
-
-                    if dist <= (R_d + R_m):
-                        self.donor_atoms.append(atom)
-                        if Config.debug > 1:
-                            print(
-                                "Metalatom.get_donor_atom: "
-                                + self.name
-                                + " find donor atom:"
-                                + atom.resi.name
-                                + " "
-                                + str(atom.resi.id)
-                                + " "
-                                + atom.name
-                            )
-
-    def get_donor_residue(self, method="INC"): # @nu
-        """
-        get donor residue based on donor atoms
-        """
-        self.donor_resi = []
-        self.get_donor_atom(method=method)
-        # add d_atom and save donor_resi
-        for atom in self.donor_atoms:
-            resi = atom.resi
-            resi.d_atom = atom
-            resi.a_metal = self
-            self.donor_resi.append(resi)
-
-        # warn if more than one atom are from a same residue
-        for index in range(len(self.donor_resi)):
-            for index2 in range(len(self.donor_resi)):
-                if index2 > index:
-                    if self.donor_resi[index2].id == self.donor_resi[index].id:
-                        print(
-                            "\033[1;31;40m!WARNING! found more than 1 donor atom from residue: "
-                            + self.donor_resi[index].name
-                            + str(self.donor_resi[index].id)
-                            + "\033[m"
-                        )
 
     def _metal_fix_1(self): # @nu
         """
