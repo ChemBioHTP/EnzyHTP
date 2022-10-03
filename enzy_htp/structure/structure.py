@@ -107,10 +107,11 @@ import sys
 from typing import List, Set, Dict, Tuple, Union
 from collections import defaultdict
 
+import enzy_htp.core.math_helper as mh
 from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
-from enzy_htp.chemical import convert_to_one_letter, ResidueType
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
+from enzy_htp.chemical import convert_to_one_letter, ResidueType
 
 from .atom import Atom
 from . import Chain
@@ -204,6 +205,27 @@ class Structure(DoubleLinkedNode): # TODO implement different copy methods for t
             result[residue.key()] = residue
         return result
 
+    def find_residue_name(self, name) -> List[Residue]:
+        """find residues base on its name. Return a list of matching residues"""
+        result = list(filter(lambda r: r.name == name, self.residues))
+        return result
+
+    @ property
+    def atoms(self) -> List[Atom]:
+        result = []
+        for chain in self.chains:
+            for residue in chain:
+                result.extend(residue.atoms)
+        return result
+
+    def find_atoms_in_range(self, center: Union[Atom, Tuple[int, int, int]], range_distance: float) -> List[Atom]:
+        """find atoms in {range} of {center}. return a list of atoms found"""
+        result = []
+        for atom in self.atoms:
+            if atom.distance_to(center) <= range_distance:
+                result.append(atom)
+        return result
+
     @property
     def ligands(self) -> List[Ligand]:
         """Filters out the ligand Residue()"s from the chains in the Structure()."""
@@ -218,6 +240,23 @@ class Structure(DoubleLinkedNode): # TODO implement different copy methods for t
         result: List[Solvent] = []
         for chain in self.chains:
             result.extend(list(filter(lambda r: r.is_solvent(), chain)))
+        return result
+
+    @property
+    def metals(self) -> List[Residue]:
+        """Filters out the metal Residue()"s from the chains in the Structure()."""
+        result: List[Residue] = []
+        for chain in self.chains:
+            result.extend(list(filter(lambda r: r.is_metal(), chain.residues)))
+        return result
+
+    @property
+    def metalcenters(self) -> List[Residue]:
+        """Filters out the metal coordination center Residue()"s from the chains 
+        in the Structure()."""
+        result: List[Residue] = []
+        for chain in self.chains:
+            result.extend(list(filter(lambda r: r.is_metal_center(), chain.residues)))
         return result
 
     @property
@@ -284,6 +323,27 @@ class Structure(DoubleLinkedNode): # TODO implement different copy methods for t
         """
         self._chains.sort(key=lambda x: x.name)
 
+    def sort_everything(self) -> None:
+        """sort all object in structure"""
+        self.sort_chains()
+        for ch in self._chains:
+            ch.sort_residues()
+            for res in ch:
+                res.sort_atoms()
+
+    def renumber_atoms(self, sort_first: bool = True) -> None:
+        """give all atoms in current structure a new index start from 1.
+        Will not give a idx_change_map since idx only matter in Residue level"""
+        if sort_first:
+            self.sort_everything()
+        _LOGGER.info("renumbering atoms")
+        a_id = 1
+        for atom in self.atoms:
+            if atom.idx != a_id:
+                _LOGGER.debug(f"changing atom {atom.idx} -> {a_id}")
+            atom.idx = a_id
+            a_id += 1
+
     def resolve_duplicated_chain_name(self) -> None:
         """resolve for duplicated chain name in self.chains_
         A. insert the chain to be one character after the same one if they are different
@@ -349,31 +409,6 @@ class Structure(DoubleLinkedNode): # TODO implement different copy methods for t
 
     # ============= TODO below =================
     #region === Getters === (Attributes - accessing Structure data -  references)
-    def get_residue(self, target_key: str) -> Union[None, Residue]: #@shaoqz: we need to that gives a reference. In the case of editing the structure.
-        """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format,
-        a deepcopy of the corresponding Residue() is returned, if it exists. None is returned if it cannot be found."""
-        for chain in self.chains:
-            for res in chain.residues():
-                if res.residue_key == target_key:
-                    return deepcopy(res)
-        return None
-
-    @property
-    def metals(self) -> List[Residue]:
-        """Filters out the metal Residue()"s from the chains in the Structure()."""
-        result: List[Residue] = list()
-        for chain in self.chains:
-            result.extend(list(filter(lambda r: r.is_metal(), chain.residues())))
-        return result
-
-    @ property
-    def atoms(self) -> List[Atom]:
-        result = list()
-        for chain in self.chains:
-            for residue in chain:
-                result.extend(residue.atoms)
-        return result
-
     def get_atom(self) -> Atom:
         """TODO do we really need this? Providing access of deeper layer requires a key to select
         maybe just use python objects to access is a better idea.
