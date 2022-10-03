@@ -115,6 +115,13 @@ class Residue(DoubleLinkedNode):
         if self.is_canonical():
             return chem.convert_to_one_letter(self.name)
         return f" {self.name} "
+    
+    def find_atom_name(self, name: str) -> List[Atom]:
+        """find child Atom base on its name"""
+        result = list(filter(lambda a: a.name == name, self.atoms))
+        if len(result) > 1:
+            _LOGGER.warn(f"residue {self} have more than 1 {name}")
+        return result
 
     # def clone(self) -> Residue: #TODO
     #     """Creates a deepcopy of self."""
@@ -158,6 +165,18 @@ class Residue(DoubleLinkedNode):
     def is_sequence_eq(self, other: Residue) -> bool:
         """Comparator that checks for sequence same-ness."""
         return self.key() == other.key()
+
+    def is_deprotonatable(self) -> bool:
+        """
+        check if this residue can minus a proton in a pH range of 1-14.
+        (ambiguous protonation state, potential deprotonation)
+        Base on the residue.
+        """
+        return self.name in chem.residue.DEPROTONATION_MAPPER
+    
+    def is_hetatom_noproton(self) -> bool:
+        """check if the residue contain no acidic proton on side chain hetero atoms"""
+        return self.name in chem.residue.NOPROTON_LIST
     #endregion
 
     #region === Editor === 
