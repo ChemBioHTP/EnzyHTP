@@ -25,13 +25,28 @@ DATA_DIR = f"{CURR_DIR}/data/"
 
 def test_constant_data():
     """Making sure the constant data specialization for MetalUnit() is correct."""
-    ma = MetalUnit(1, 'A', list())
+    ma = MetalUnit(1, "A", [])
 
     assert not ma.is_ligand()
     assert ma.is_metal()
     assert ma.is_metal_center()
     assert not ma.is_canonical()
     assert ma.rtype == chem.ResidueType.METAL
+
+def test_element():
+    stru = PDBParser().get_structure(f"{DATA_DIR}1NVG.pdb")
+    metalcenter: MetalUnit = stru.metalcenters[0]
+    assert metalcenter.element == "Zn"
+
+def test_get_donor_atoms():
+    """test get donor atoms for a metal center from a stru"""
+    stru = PDBParser().get_structure(f"{DATA_DIR}1NVG.pdb")
+    metalcenter1: MetalUnit = stru.metalcenters[0]
+    metalcenter2: MetalUnit = stru.metalcenters[1]
+
+    assert len(metalcenter1.get_donor_atoms()) == 4
+    assert len(metalcenter2.get_donor_atoms()) == 4
+
 
 @pytest.mark.TODO
 def test_get_radii_method_good_input():
