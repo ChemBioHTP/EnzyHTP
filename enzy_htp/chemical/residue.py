@@ -5,7 +5,7 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-19
 """
 
-from typing import List, Set, Dict
+from typing import List, Set, Dict, Union
 from .db import load_from_db
 from ..core import InvalidResidueCode, _LOGGER
 
@@ -26,7 +26,7 @@ mapper that maps altered atom names to base atom names. Currently only defined f
 Example usage:
 
 >>> initial_atom_name = "CA"
->>> RESIDUE_ELEMENT_MAP["Amber"][initial_atom_name]
+>>> RESIDUE_ELEMENT_MAP["Amber"][initial_atom_name] TODO also remove those ff keys
 "C"
 
 """
@@ -78,6 +78,27 @@ RESIDUE_VOLUME_MAPPER: Dict[str, float] = load_from_db("RESIDUE_VOLUME_MAPPER")
 """dict() that maps one-letter amino-acid codes to their volume in cubic angstroms. 
 source: https://www.imgt.org/IMGTeducation/Aide-memoire/_UK/aminoacids/abbreviation.html
 """
+
+DEPROTONATION_MAPPER: Dict[str, Union[tuple, None]] = { "ASH" : {"OD2" : ("ASP","HD2")},
+                                                        "CYS" : {"SG" : ("CYM","HG" )},
+                                                        "GLH" : {"OE2" : ("GLU","HE2")},
+                                                "HIP" :{"ND1" : ("HIE", "HD1"),
+                                                        "NE2" : ("HID", "HE2")},
+                                                "HID" : {"ND1" : ("HIE", "HD1")}, # note these are just switching
+                                                "HIE" : {"NE2" : ("HID", "HE2")}, # note these are just switching
+                                                "LYS" : {"NZ" : ("LYN","HZ1")},
+                                                        "TYR" : {"OH" : ("TYM","HH")},
+                                                "ARG" : {"NH2" : ("AR0","HH22"),
+                                                         "NH1" : ("AR0","HH12")}} # note this need to switch name after depro
+"""a map of residue name of deprotonatable residues. This means the residue have ambiguous protonation state with a pH
+around 7.0. The map is presented in the way that the deprotonatable residue is the key and its
+target_atom : (deprotoned state, deprotoned atom) is the value. In the file, these residue name are arranged with each
+charge state as an indent from +1 to -1.
+{resi_name : {deprotonated_atom_name : (depro_resi_name, depro_proton_name), ...}
+See /resource/ProtonationState.cdx for more detail"""
+
+NOPROTON_LIST = ["ASP", "GLU", "MET"]
+"""a list of residue name with no acidic proton"""
 
 
 def convert_to_three_letter(one_letter: str) -> str:

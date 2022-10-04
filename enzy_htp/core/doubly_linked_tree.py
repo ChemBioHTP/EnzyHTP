@@ -72,7 +72,7 @@ class DoubleLinkedNode():
 
     # api out of class use
     @property
-    def parent(self) -> List:
+    def parent(self):
         return self.get_parent()
     @parent.setter
     def parent(self, val):

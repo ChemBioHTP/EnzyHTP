@@ -89,6 +89,12 @@ def test_get_connect_w_h():
     assert len(atom2.get_connect()) == 3
     assert len(atom3.get_connect()) == 3
 
+def test_attached_protons():
+    """test if the function gives correct attached protons"""
+    stru = PDBParser().get_structure(f"{DATA_DIR}1Q4T_peptide_protonated.pdb")
+    atom1 = stru["A"][0][0] #N (Nter)
+    assert list(map(lambda a: a.name, atom1.attached_protons())) == ['H1', 'H2', 'H3']
+
 # TODO recover when need
 @pytest.mark.TODO
 def test_distance():

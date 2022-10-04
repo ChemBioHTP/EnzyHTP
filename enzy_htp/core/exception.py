@@ -32,3 +32,11 @@ class InvalidMutationRestriction(Exception):
     """Exception corresponding to an invalid mutation restriction in enzy_htp.mutation.mutation_restrictions.py."""
 
     pass
+
+class ResidueDontHaveAtom(Exception):
+    """Exception corresponding to asking a residue for an atom that it doesn't contain
+    takes the residue and the query atom name to constuct"""
+    def __init__(self, residue, atom_name, *args) -> None:
+        super().__init__(*args)
+        self.residue = residue
+        self.atom_name = atom_name

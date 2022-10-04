@@ -8,7 +8,7 @@ Date: 2022-03-19
 from __future__ import annotations
 import re
 import sys
-from typing import Tuple
+from typing import List, Tuple
 from plum import dispatch
 
 import numpy as np
@@ -134,16 +134,16 @@ class Atom(DoubleLinkedNode):
         self._charge = val
 
     @property
-    def connect(self):
+    def connect(self) -> List[Atom]:
         """getter for _connect, the list for atoms it connects"""
         if self.is_connected():
             return self._connect
         return self.get_connect()
-    @charge.setter
+    @connect.setter
     def connect(self, val):
         self._connect = val
 
-    def get_connect(self):
+    def get_connect(self) -> List[Atom]:
         """
         Use this to generate/update connectivity for atom.
         find connect atom base on:
@@ -212,6 +212,12 @@ class Atom(DoubleLinkedNode):
     def distance_to(self, point: tuple) -> float: # pylint: disable=function-redefined
         """Get the distance to the other atom or a point."""
         return mh.get_distance(self.coord, point)
+
+    def attached_protons(self) -> List[Atom]:
+        """find all protons attached to self"""
+        result = list(filter(lambda a: a.element == "H", self.connect))
+        return result
+
     #endregion
 
     #region === Check ===
