@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 
 import enzy_htp.chemical as chem
+from enzy_htp.core.exception import ResidueDontHaveAtom
 import enzy_htp.core.math_helper as mh
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
 from enzy_htp.core.logger import _LOGGER
@@ -51,6 +52,7 @@ class Atom(DoubleLinkedNode):
         self._b_factor = None
         self._element = None
         self._charge = None
+        self._connect = None
         ds_keys = ds.keys()
         if "atom_number" in ds_keys and not np.isnan(ds["atom_number"]):
             self._idx = ds["atom_number"]
@@ -130,6 +132,61 @@ class Atom(DoubleLinkedNode):
     @charge.setter
     def charge(self, val):
         self._charge = val
+
+    @property
+    def connect(self):
+        """getter for _connect, the list for atoms it connects"""
+        if self.is_connected():
+            return self._connect
+        return self.get_connect()
+    @charge.setter
+    def connect(self, val):
+        self._connect = val
+
+    def get_connect(self):
+        """
+        Use this to generate/update connectivity for atom.
+        find connect atom base on:
+        1. chem.residue.RESIDUE_CONNECTIVITY_MAP
+        2. parent residue name
+        * Using standard Amber atom names and C/N terminal name. TODO make this a standard or change to another
+        save found list of Atom object to self.connect (make the object to a connected state)
+        """
+        connect = []
+        parent_residue = self.parent
+        if parent_residue.name in chem.solvent.RD_SOLVENT_LIST:
+            cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP[parent_residue.name][self.name]
+        elif parent_residue.is_canonical():
+            r = parent_residue
+            r1 = parent_residue.chain[0]
+            rm1 = parent_residue.chain[-1]
+            if r is r1:
+                # N terminal
+                cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP_NTERMINAL[parent_residue.name][self.name]
+            else:
+                if r == rm1:
+                    # C terminal
+                    cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP_CTERMINAL[parent_residue.name][self.name]
+                else:
+                    cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP[parent_residue.name][self.name]
+        else:
+            _LOGGER.error(f"getting connectivity of non-canonical residue {self.parent}")
+            sys.exit(1)
+        for name in cnt_atomnames:
+            try:
+                if name not in ["-1C", "+1N"]:
+                    cnt_atom = parent_residue.find_atom_name(name)
+                if name == "-1C":
+                    cnt_resi = parent_residue.chain.find_residue_idx(parent_residue.idx-1)
+                    cnt_atom = cnt_resi.find_atom_name("C")
+                if name == "+1N":
+                    cnt_resi = parent_residue.chain.find_residue_idx(parent_residue.idx+1)
+                    cnt_atom = cnt_resi.find_atom_name("N")
+                connect.append(cnt_atom)
+            except ResidueDontHaveAtom as e:
+                _LOGGER.warning(f"missing connecting atom {e.atom_name} of {self}. Structure maybe incomplete.")
+        self._connect = connect
+        return self._connect
     #endregion
 
     #region === Getter-Property (ref) ===
@@ -161,6 +218,10 @@ class Atom(DoubleLinkedNode):
     def is_donor_atom(self) -> bool:
         """check if the atom is a donor atom to a coordination center"""
         return self.name in chem.metal.DONOR_ATOM_LIST
+    
+    def is_connected(self) -> bool:
+        """check if self is in the connected state"""
+        return self._connect is not None
     #endregion
 
     #region == Special ==

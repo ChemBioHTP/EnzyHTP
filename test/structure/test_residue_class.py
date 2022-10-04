@@ -11,6 +11,7 @@ from typing import List
 from copy import deepcopy
 from collections import defaultdict
 from biopandas.pdb import PandasPdb
+from enzy_htp.core.exception import ResidueDontHaveAtom
 
 from enzy_htp.structure import Atom, Residue
 from enzy_htp.structure.structure_io import PDBParser
@@ -42,6 +43,15 @@ def test_deepcopy():
     # ensure parent is containing the same new children
     for i in new_list:
         assert all(j.parent is i for j in i)
+
+def test_find_atom_name():
+    stru = PDBParser().get_structure(f"{DATA_DIR}12E8_small_four_chain.pdb")
+    residue = stru["H"][0]
+    assert residue.find_atom_name("N").name == "N"
+    with pytest.raises(ResidueDontHaveAtom) as exe:
+        residue.find_atom_name("X")
+        assert exe.residue is residue
+        assert exe.atom_name == "X"
 
 #TODO recover tests
 #TODO(CJ): add tests for the name getter

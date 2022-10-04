@@ -8,6 +8,7 @@ Date: 2022-03-20
 from __future__ import annotations
 from copy import deepcopy
 import itertools
+import sys
 from enzy_htp.core import _LOGGER
 from typing import Iterable, List, Tuple, Union
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
@@ -70,9 +71,17 @@ class Chain(DoubleLinkedNode):
     def _residues(self, val: List[Residue]):
         self.set_children(val)
 
-    def get_residue(self, traget_key: str) -> Residue:
-        """TODO: is there alt option for the key?"""
-        pass
+    def find_residue_idx(self, idx: int) -> Union[Residue, None]:
+        """find the residue with correponding index"""
+        result = list(filter(lambda r: r.idx == idx, self.children))
+        if len(result) > 1:
+            _LOGGER.error(f"chain {self} have more than 1 residue on {idx}")
+            sys.exit(1)
+        if len(result) == 0:
+            _LOGGER.warning(f"residue idx {idx} out of chain's range {self}") #TODO may be make this an error
+            return None
+        return result[0]
+        
     #endregion
 
     #region === Getter-Prop ===

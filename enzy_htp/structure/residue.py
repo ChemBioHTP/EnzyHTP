@@ -8,6 +8,7 @@ Date: 2022-03-19
 """
 # TODO(CJ): figure out how to inherit docstrings to the children classes.
 from __future__ import annotations
+import sys
 import numpy as np
 from collections import defaultdict
 from plum import dispatch
@@ -15,6 +16,7 @@ from typing import Tuple, List, Dict
 
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
 from enzy_htp.core import _LOGGER
+from enzy_htp.core.exception import ResidueDontHaveAtom
 import enzy_htp.chemical as chem
 
 from .atom import Atom
@@ -115,13 +117,16 @@ class Residue(DoubleLinkedNode):
         if self.is_canonical():
             return chem.convert_to_one_letter(self.name)
         return f" {self.name} "
-    
+
     def find_atom_name(self, name: str) -> List[Atom]:
         """find child Atom base on its name"""
         result = list(filter(lambda a: a.name == name, self.atoms))
         if len(result) > 1:
-            _LOGGER.warn(f"residue {self} have more than 1 {name}")
-        return result
+            _LOGGER.error(f"residue {self} have more than 1 {name}")
+            sys.exit(1)
+        if len(result) == 0:
+            raise ResidueDontHaveAtom(self, name, f"residue {self} dont have {name}")
+        return result[0]
 
     # def clone(self) -> Residue: #TODO
     #     """Creates a deepcopy of self."""

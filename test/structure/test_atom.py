@@ -68,6 +68,27 @@ def test_radius():
     assert atom1.radius() == 0.88
     assert atom2.radius() == 1.32
 
+def test_get_connect_no_h(caplog):
+    """get connect with missing H atoms"""
+    stru = PDBParser().get_structure(f"{DATA_DIR}1NVG.pdb")
+    atom1 = stru["A"][0][0] #N (Nter)
+    atom2 = stru["A"][1][0] #N
+    atom3 = stru["A"][-1].find_atom_name("C") #C (Cter)
+    assert len(atom1.get_connect()) == 1
+    assert len(atom2.get_connect()) == 2
+    assert len(atom3.get_connect()) == 3
+    assert "missing connecting atom " in caplog.text
+
+def test_get_connect_w_h():
+    """get connect with no missing H atoms"""
+    stru = PDBParser().get_structure(f"{DATA_DIR}1Q4T_peptide_protonated.pdb")
+    atom1 = stru["A"][0][0] #N (Nter)
+    atom2 = stru["A"][1][0] #N
+    atom3 = stru["A"][-1].find_atom_name("C")#N (Cter)
+    assert len(atom1.get_connect()) == 4
+    assert len(atom2.get_connect()) == 3
+    assert len(atom3.get_connect()) == 3
+
 # TODO recover when need
 @pytest.mark.TODO
 def test_distance():
