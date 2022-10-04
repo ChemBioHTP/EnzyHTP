@@ -96,28 +96,6 @@ class PDBParser(StructureParserInterface):
 
     @classmethod
     @dispatch
-    def get_file_str(cls, stru: Structure) -> str:
-        """
-        Convert Structure() into PDB file string. Only the simplest function is need for 
-        enzyme modeling.
-
-        TODO do we need to add a mode where all ligand,metal,solvent are written into seperate 
-        chains? we if encounter any need
-            A better way to do this is to make derivate Parser classes and overwrite this as needed
-            or use things like pdb4amber to accommodate software as needed.
-        Return:
-            a string of the PDB file
-        """
-        stru.sort_chains()
-        result_str = ""
-        for chain in stru:
-            chain: Chain
-            result_str += cls._write_pdb_chain(chain)
-        result_str += f"END{os.linesep}"
-        return result_str
-
-    @classmethod
-    @dispatch
     def get_file_str(cls, stru: Chain) -> str: # pylint: disable=function-redefined
         """
         dispatch for supporting get pdb file str with Chain only
@@ -144,6 +122,28 @@ class PDBParser(StructureParserInterface):
         """
         result_str = cls._write_pdb_atom(stru)
         result_str += f"TER{os.linesep}END{os.linesep}"
+        return result_str
+
+    @classmethod
+    @dispatch
+    def get_file_str(cls, stru: Structure) -> str: # pylint: disable=function-redefined
+        """
+        Convert Structure() into PDB file string. Only the simplest function is need for 
+        enzyme modeling.
+
+        TODO do we need to add a mode where all ligand,metal,solvent are written into seperate 
+        chains? we if encounter any need
+            A better way to do this is to make derivate Parser classes and overwrite this as needed
+            or use things like pdb4amber to accommodate software as needed.
+        Return:
+            a string of the PDB file
+        """
+        stru.sort_chains()
+        result_str = ""
+        for chain in stru:
+            chain: Chain
+            result_str += cls._write_pdb_chain(chain)
+        result_str += f"END{os.linesep}"
         return result_str
 
     #region == pdb -> Stru ==
