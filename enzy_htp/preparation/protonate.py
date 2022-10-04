@@ -10,13 +10,18 @@ from typing import Union,Tuple, Dict
 
 import enzy_htp.core as core
 from enzy_htp.core import file_system as fs
+from enzy_htp import config
+from enzy_htp.core.logger import _LOGGER
 from enzy_htp.structure import (
     Structure,
     Ligand,
     structure_from_pdb,
     ligand_from_pdb,
     Chain,
+    PDBParser
 )
+from enzy_htp.structure.metal_atom import MetalUnit
+import enzy_htp.structure.structure_operation as stru_oper
 
 from pdb2pqr.main import main_driver as run_pdb2pqr
 from pdb2pqr.main import build_main_parser as build_pdb2pqr_parser
@@ -42,7 +47,7 @@ def protonate_stru(stru: Structure,
         ligand_engine: engine for adding hydrogens to ligands
             (current available keywords):
             pybel
-
+        **kwarg: setting/option related to specific engine. TODO figure out a better way to doc this
     Returns:
         the reference of the in-place changed {stru}
 
@@ -97,39 +102,61 @@ def protonate_stru(stru: Structure,
     if protonate_ligand:
         LIGAND_PROTONATION_METHODS[ligand_engine](stru, ph, **kwargs)
 
-def protonate_peptide_with_pdb2pqr(stru: Structure, ph: float = 7.0, 
-                                   int_pqr_path: Union[str, None] = None, 
-                                   int_pdb_path: Union[str, None] = None):
-    pass # TODO work from here!
+def protonate_peptide_with_pdb2pqr(stru: Structure, ph: float = 7.0,
+                                   int_pdb_path: Union[str, None] = None,
+                                   int_pqr_path: Union[str, None] = None,
+                                   metal_fix_method: str = "deprotonate_all"):
+    """
+    Add missing hydrogens and determine protonation state of the peptide part of protein
+    using [PDB2PQR](https://www.poissonboltzmann.org/) via the pdb2pqr python [package](https://pdb2pqr.readthedocs.io/en/latest/).
+    Change the stru in place. (alignment of PDB2PQR result and original stru is based on residue keys)
+    TODO(qz): support in-python implemtation of this
+    Args:
+        stru: the target Structure()
+        ph: the target pH
+        int_pqr_path: path for intermediate pqr file (not this will be changed to pdb extension)
+        int_pdb_path: path for intermediate pdb file
+    Returns:
+        stru: a reference of the changed original structure
+    """
+    sp = PDBParser()
+    if int_pdb_path is None:
+        fs.safe_mkdir(config["system.SCRATCH_DIR"]) # make them together into make_temp_file
+        int_pdb_path = fs.get_valid_temp_name(f"{config['system.SCRATCH_DIR']}/protonate_peptide_with_pdb2pqr_input.pdb")
+    if int_pqr_path is None:
+        fs.safe_mkdir("./temp")
+        int_pqr_path = fs.get_valid_temp_name(f"{config['system.SCRATCH_DIR']}/protonate_peptide_with_pdb2pqr_output.pdb")
+    if fs.get_file_ext(int_pqr_path) == ".pqr":
+        _LOGGER.warning(f"changing {int_pqr_path} extension to pdb. This filename now changes.")
+        int_pqr_path = fs.get_valid_temp_name(int_pqr_path.removesuffix("pqr")+"pdb")
+        if int_pqr_path == int_pdb_path:
+            _LOGGER.warning("int_pqr_path and int_pdb_path is the same after extension change. Adding an index.")
+            int_pqr_path = fs.get_valid_temp_name(int_pqr_path.removesuffix(".pdb")+"_1.pdb")
 
-def protonate_ligand_with_pybel():
-    pass
+    with open(int_pdb_path, "w") as of:
+        of.write(sp.get_file_str(stru)) # give the whole structure as input here as PropKa can use ligand
+    pdb2pqr_protonate_pdb(int_pdb_path, int_pqr_path, ph)
+    peptide_protonated_stru = sp.get_structure(int_pqr_path)
+    stru_oper.remove_non_peptide(peptide_protonated_stru) # keep the peptide only (sometime it has solvent)
+    stru_oper.update_residues(stru, peptide_protonated_stru)
+    protonate_peptide_fix_metal_donor(stru, method=metal_fix_method)
+    if _LOGGER.level > 10: # not DEBUG or below
+        fs.safe_rm(int_pdb_path)
+        fs.safe_rm(int_pqr_path)
+    return stru
 
-PEPTIDE_PROTONATION_METHODS = {
-    "pdb2pqr" : protonate_peptide_with_pdb2pqr
-}
-
-LIGAND_PROTONATION_METHODS = {
-    "pybel" : protonate_ligand_with_pybel
-}
-
-# TODO(CJ): this probably needs to go to core so that structure.Structure can use it
-def check_valid_ph(ph: float) -> None:
-    """Helper function that checks the pH is on the range: [0.00, 14.00]. Throws core.InvalidPH() if not."""
-    if ph < 0 or ph > 14:
-        raise core.InvalidPH(f"{ph:.2f} must be on range: [0.00,14.00]")
-
-
-def protonate_pdb(
+def pdb2pqr_protonate_pdb(
     pdb_path: str, pqr_path: str, ph: float = 7.0, ffout: str = "AMBER"
 ) -> None:
-    """Runs PDB2PQR on a specified pdb file and saves it to the specified pqr path. This preparation step
+    """
+    This is warpper function of pdb2pqr.
+    Runs PDB2PQR on a specified pdb file and saves it to the specified pqr path. This preparation step
     makes use of [PDB2PQR](https://www.poissonboltzmann.org/) via the pdb2pqr python [package](https://pdb2pqr.readthedocs.io/en/latest/).
     Adds in missing atoms and finds the protonation state of the pdb file.
     """
     # TODO(CJ): check if ffout is valid.
     # TODO(CJ): maybe improve the documentation here?
-    check_valid_ph(ph)
+    core.check_valid_ph(ph)
     pdb2pqr_parser = build_pdb2pqr_parser()
     args = pdb2pqr_parser.parse_args(
         [
@@ -145,6 +172,72 @@ def protonate_pdb(
     run_pdb2pqr(args)
     core._LOGGER.info(f"Finished running pdb2pqr! Output saved to '{pqr_path}'")
 
+def protonate_peptide_fix_metal_donor(stru: Structure, method="deprotonate_all"):
+    """
+    fix protonation state around the metal coordination center
+    Args:
+        stru: target structure. Should be after peptide protonation first
+        method: method for determine the protonation state of donor residues
+            (current available keywords)
+            deprotonate_all: 
+    Return:
+        (change stru in place)
+        a reference of the changed stru
+    """
+    center: MetalUnit
+    for center in stru.metalcenters:
+        METAL_FIX_METHODS[method](center)
+
+def deprotonate_metal_donors(center: MetalUnit):
+    """
+    deprotonate all donor atoms from donor residues away from neutral.
+    apply change to the parent structure of this metal {center}
+    """
+    donor_mapper = center.get_donor_mapper(method = "ionic")
+    for d_resi, d_atoms in donor_mapper.items():
+        if d_resi.is_deprotonatable(): # the donor atom selection guarantees the atom is deprotonable
+            # find_closest_h_to_center(d_atom, center)
+            stru_oper.deprotonate_residue(d_resi, d_atoms[0]) # TODO(qz): refine this by also determine the closest proton
+        elif d_resi.is_hetatom_noproton():
+            _LOGGER.info(f"donor residue {d_resi} already have no proton in center {center}")
+        else:
+            _LOGGER.warn(f"uncommon donor residue {d_resi} found in center {center}")
+
+def protonate_metal_donors_with_pka_recalc(center: MetalUnit):
+    """place holder for most accurate metal fix method"""
+    pass
+
+METAL_FIX_METHODS = {
+    "deprotonate_all": deprotonate_metal_donors
+}
+
+def protonate_ligand_with_pybel(stru: Structure, ph: float = 7.0, int_ligand_file_path = None):
+    """
+    the inteface for using PYBEL to protonate all ligands in {stru} with a given ph
+    Args:
+        stru: the target stru to protonate
+        """
+
+def pybel_protonate_pdb_ligand(in_path: str, out_path: str, ph: float = 7.0):
+    """
+    This is a wrapper of [PYBEL](https://openbabel.org/docs/dev/UseTheLibrary/Python_Pybel.html)
+    that takes a ligand in PDB format and add missing H atoms with the given pH in the output file
+    """
+    outp1_path = path[:-4]+'_badname_aH.pdb'
+    out_path = path[:-4]+'_aH.pdb'
+
+    pybel.ob.obErrorLog.SetOutputLevel(0)
+    mol = next(pybel.readfile('pdb', in_path))
+    mol.OBMol.AddHydrogens(False, True, ph)
+    mol.write('pdb', outp1_path, overwrite=True)
+    # fix atom label abd determing net charge
+    if keep_name:
+        cls._fix_ob_output(outp1_path, out_path, ref_name_path=in_path)
+    else:
+        cls._fix_ob_output(outp1_path, out_path)
+    return out_path
+
+
 
 def protonate_missing_elements(
     old_pdb_path: str, new_pdb_path: str, work_dir: str
@@ -157,18 +250,6 @@ def protonate_missing_elements(
     if old_stru == new_stru:  # CHECK(CJ): Only sequence elements.
         return new_stru
         new_stru = self.merge_structure_elements(old_stru, new_stru)
-
-    # print(compare_structures(old_stru,new_stru))
-    metal_list = old_stru.metals
-    if len(metal_list):
-        core._LOGGER.info(f"Merging {len(metal_list)} metal centers in old structure!")
-        core._LOGGER.info(f"Adding metal centers to new structure...")
-        new_stru.add(metal_list, sort=0)
-        core._LOGGER.info(f"Metal centers added!")
-        # fix metal environment
-        core._LOGGER.info(f"Protonating newly added metals...")
-        new_stru.protonation_metal_fxi(Fix=1)
-        core._LOGGER.info(f"Protonation complete!")
 
     # protonate ligands and combine with the pqr file
     ligand_list = old_stru.ligands
@@ -226,34 +307,6 @@ def protonate_ligand(
         base_name = fs.base_file_name(path)
         out_path = f"{dirname}/{base_name}_aH.pdb"
         return _MAPPER[method](path, ph, out_path)
-
-
-def protonation_metal_fix(self, Fix):  # TODO(CJ): change to protonate_metal()
-    """
-    return a bool: if there's any metal center
-    """
-    # try once if not exist
-    if self.metal_centers == []:
-        self.get_metal_center()
-    if self.metal_centers == []:
-        print("No meNontal center is found. Exit Fix.")
-        return False
-
-    # start fix
-    # get donor atoms and residues
-    for metal in self.metal_centers:
-        metal.get_donor_residue(method="INC")
-
-        if Fix == 1:
-            metal._metal_fix_1()
-
-        if Fix == 2:
-            metal._metal_fix_2()
-
-        if Fix == 3:
-            metal._metal_fix_3()
-    return True
-
 
 def _protonate_ligand_OPENBABEL(path: str, ph: float, out_path: str) -> None:
     raise Exception(f"Method: __protonate_OPENBABEL is not implemented yet!")
@@ -336,3 +389,4 @@ PEPTIDE_PROTONATION_METHODS = {
 LIGAND_PROTONATION_METHODS = {
     "pybel" : protonate_ligand_with_pybel
 }
+
