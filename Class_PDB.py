@@ -1186,10 +1186,14 @@ class PDB():
                     for line in f:
                         if line.startswith('ATOM'):
                             atom_name = line[12:16].strip()
+                            resi_name = line[17:20].strip()
                             if atom_name[0] == 'H':
                                 if len(atom_name) >= 2:
                                     if atom_name[:2] not in not_H_list:
                                         continue
+                                    elif resi_name != atom_name[:2]: # non-metal
+                                        continue
+
                                 else:
                                     continue
                         of.write(line)
