@@ -15,10 +15,10 @@ import pytest
 from biopandas.pdb import PandasPdb
 
 from enzy_htp.core import _LOGGER
-from enzy_htp.structure.structure_io.pdb_io import PDBParser
-from enzy_htp.structure.structure_io._interface import StructureParserInterface
 from enzy_htp.core import file_system as fs
 import enzy_htp.chemical as chem
+from enzy_htp.structure.structure_io.pdb_io import PDBParser
+from enzy_htp.structure.structure_io._interface import StructureParserInterface
 from enzy_htp.structure import (
     Structure,
     Residue,
@@ -490,6 +490,18 @@ def test_get_file_str():
     stru: Structure = sp.get_structure(pdb_file_path)
     with open(answer_file_path) as f:
         assert sp.get_file_str(stru) == f.read()
+
+@pytest.mark.interface
+def test_get_file_str_not_renumber_atom():
+    '''
+    test for the getting pdb file from Structure()
+    '''
+    pdb_file_path = f'{DATA_DIR}1Q4T_atom_res_ch_build_test.pdb'
+    answer_file_path = f'{DATA_DIR}1Q4T_simple_write_answer_not_renumber_atom.pdb'
+
+    stru: Structure = sp.get_structure(pdb_file_path)
+    with open(answer_file_path) as f:
+        assert sp.get_file_str(stru, if_renumber=False) == f.read()
 
 @pytest.mark.interface
 def test_get_file_str_just_ligand():

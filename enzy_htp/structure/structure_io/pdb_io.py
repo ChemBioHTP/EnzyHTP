@@ -96,20 +96,24 @@ class PDBParser(StructureParserInterface):
 
     @classmethod
     @dispatch
-    def get_file_str(cls, stru: Chain) -> str: # pylint: disable=function-redefined
+    def get_file_str(cls, stru: Chain, if_renumber : bool = True, if_fix_atomname : bool = True) -> str: # pylint: disable=function-redefined
         """
         dispatch for supporting get pdb file str with Chain only
         """
+        if if_renumber:
+            stru.parent.renumber_atoms()
         result_str = cls._write_pdb_chain(stru)
         result_str += f"END{os.linesep}"
         return result_str
 
     @classmethod
     @dispatch
-    def get_file_str(cls, stru: Residue) -> str: # pylint: disable=function-redefined
+    def get_file_str(cls, stru: Residue, if_renumber : bool = True, if_fix_atomname : bool = True) -> str: # pylint: disable=function-redefined
         """
         dispatch for supporting get pdb file str with Residue only
         """
+        if if_renumber:
+            stru.parent.parent.renumber_atoms()
         result_str = cls._write_pdb_residue(stru)
         result_str += f"TER{os.linesep}END{os.linesep}"
         return result_str
@@ -126,11 +130,12 @@ class PDBParser(StructureParserInterface):
 
     @classmethod
     @dispatch
-    def get_file_str(cls, stru: Structure) -> str: # pylint: disable=function-redefined
+    def get_file_str(cls, stru: Structure, # pylint: disable=function-redefined
+                     if_renumber : bool = True, if_fix_atomname : bool = True) -> str:
         """
-        Convert Structure() into PDB file string. Only the simplest function is need for 
+        Convert Structure() into PDB file string. Only the simplest function is need for
         enzyme modeling.
-
+        TODO support fixing all atom names before writing
         TODO do we need to add a mode where all ligand,metal,solvent are written into seperate 
         chains? we if encounter any need
             A better way to do this is to make derivate Parser classes and overwrite this as needed
@@ -139,6 +144,8 @@ class PDBParser(StructureParserInterface):
             a string of the PDB file
         """
         stru.sort_chains()
+        if if_renumber:
+            stru.renumber_atoms()
         result_str = ""
         for chain in stru:
             chain: Chain
@@ -206,7 +213,7 @@ class PDBParser(StructureParserInterface):
             target_mdl_range = mdl_range[model]
             mdl_query_pattern = f"line_idx > {target_mdl_range[0]} & line_idx < {target_mdl_range[1]}"
             # get model dataframe section as a copy
-            target_mdl_df = pd.concat((df["ATOM"], df["HETATM"])).query(mdl_query_pattern).copy()
+            target_mdl_df = pd.concat((df["ATOM"], df["HETATM"]), ignore_index=True).query(mdl_query_pattern).copy()
             target_mdl_ter_df = df["OTHERS"][df["OTHERS"].record_name == "TER"].query(mdl_query_pattern).copy()
         else:
             # get all dataframe as a copy if there"s no MODEL record
