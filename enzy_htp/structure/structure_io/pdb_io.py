@@ -579,7 +579,7 @@ class PDBParser(StructureParserInterface):
         pass
 
 # TODO go to core helper
-def split_df_base_on_column_value(df: pd.DataFrame, column_name: str, split_values: list, copy: bool=False):
+def split_df_base_on_column_value(df: pd.DataFrame, column_name: str, split_values: list, copy: bool=False) -> List[pd.DataFrame]:
     """
     split a dataframe base on the value of a column
     ** the line in the split values will not be included **
@@ -588,6 +588,12 @@ def split_df_base_on_column_value(df: pd.DataFrame, column_name: str, split_valu
         column_name: the reference column"s name
         split_value: the value mark for spliting
     """
+    # empty list
+    if not split_values:
+        if copy:
+            return [df.copy()]
+        return [df]
+
     split_values = sorted(split_values)
     frist = 1
     result_dfs = []
@@ -605,8 +611,8 @@ def split_df_base_on_column_value(df: pd.DataFrame, column_name: str, split_valu
     result_dfs.append(df[df[column_name] > split_values[-1]])
 
     if copy:
-        for i, df in enumerate(result_dfs):
-            result_dfs[i] = df.copy()
+        for i, df_i in enumerate(result_dfs):
+            result_dfs[i] = df_i.copy()
 
     return result_dfs
 
