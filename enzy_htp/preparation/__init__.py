@@ -7,5 +7,5 @@ Date: 2022-03-19
 """
 
 from .pdb_line import PDBLine, read_pdb_lines
-from .protonate import pdb2pqr_protonate_pdb, protonate_missing_elements
+from .protonate import pdb2pqr_protonate_pdb
 from .pdb_prepper import PDBPrepper

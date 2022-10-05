@@ -13,7 +13,7 @@ import pdb2pqr
 from typing import Set, Union, List, Tuple
 from enzy_htp.core import _LOGGER
 
-from .protonate import pdb2pqr_protonate_pdb, protonate_missing_elements
+from .protonate import pdb2pqr_protonate_pdb
 
 import enzy_htp.core as core
 

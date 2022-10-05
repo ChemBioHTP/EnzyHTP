@@ -20,7 +20,16 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-26
 """
 
-from .structure import Structure, Residue
+from .structure import (
+    Structure,
+    Chain,
+    Residue,
+    Atom,
+    Ligand,
+    MetalUnit,
+    Solvent,
+    PDBParser,
+)
 from .core import (
     EnvironmentManager,
     MissingEnvironmentElement,

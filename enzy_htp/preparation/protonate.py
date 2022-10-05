@@ -93,8 +93,8 @@ def protonate_stru(stru: Structure,
         - PKAD https://academic.oup.com/database/article/doi/10.1093/database/baz024/5359213
     Ligand Protonation:
         TODO need to figure out the algrothim #12
-        - OpenBable/PyBel (Default)
-            often have poor accuracy. 
+        - OpenBable/PyBel (Default) (http://openbabel.org/wiki/Main_Page)
+            often have poor accuracy.
         - reduce (http://kinemage.biochem.duke.edu/software/README.reduce.html) TODO
         - Dimorphite (from https://durrantlab.pitt.edu/dimorphite-dl/) TODO
         - Protons from OpenMM (https://protons.readthedocs.io/en/latest/) TODO
@@ -216,6 +216,10 @@ METAL_FIX_METHODS = {
     "deprotonate_all": deprotonate_metal_donors
 }
 
+PEPTIDE_PROTONATION_METHODS = {
+    "pdb2pqr" : protonate_peptide_with_pdb2pqr
+}
+
 def protonate_ligand_with_pybel(stru: Structure, ph: float = 7.0,
                                 int_ligand_file_dir = None):
     """
@@ -312,80 +316,11 @@ def _fix_pybel_output(pdb_path: str, out_path: str, ref_name_path: str = None) -
     target_ligand_df["atom_name"] = pd.DataFrame(new_atom_names)
     target_ligand.to_pdb(out_path, records=["HETATM", "OTHERS"])
 
+LIGAND_PROTONATION_METHODS = {
+    "pybel" : protonate_ligand_with_pybel
+}
 
-def protonate_missing_elements(
-    old_pdb_path: str, new_pdb_path: str, work_dir: str
-) -> Structure:
-    """Method that compares two Structure() objects and combines missin elements from old_str to new_stru"""
-    # TODO(CJ) Maybe this should be part of the structure.structure.py file
-    old_stru = structure_from_pdb(old_pdb_path)
-    new_stru = structure_from_pdb(new_pdb_path)
-
-    if old_stru == new_stru:  # CHECK(CJ): Only sequence elements.
-        return new_stru
-        new_stru = self.merge_structure_elements(old_stru, new_stru)
-
-    # protonate ligands and combine with the pqr file
-    ligand_list = old_stru.ligands
-    if len(ligand_list):
-        # print('lig-list',ligand_list)
-        core._LOGGER.info(f"Merging {len(ligand_list)} ligands in old structure!")
-        lig_dir = work_dir + "/ligands/"
-        fs.safe_mkdir(lig_dir)
-        # TODO: logging
-        # print(lig_dir)
-        # print("-asdgasdgasg")
-        old_keys = list(map(lambda l: l.residue_key, ligand_list))
-        new_ligands = list(
-            map(
-                lambda ll: protonate_ligand(ll, dirname=lig_dir, ph=7),
-                ligand_list,
-            )
-        )
-        # print(new_ligands)
-        for lig, ok in zip(new_ligands, old_keys):
-            (c_id, r_name, r_id) = ok.split(".")
-            lig.set_chain(c_id)
-            lig.name = r_name
-            lig.num_ = int(r_id)  # TODO(CJ). make this a method for the Ligand() class
-            lig.residue_key = ok
-            # print(lig)
-            new_stru.add_chain(Chain(lig.chain(), [lig]))
-        # new_stru.add(new_ligands, sort=0)
-    return new_stru
-
-
-def protonate_ligand(
-    ligand: Ligand,
-    dirname: str = ".",
-    method: str = "PYBEL",
-    ph: float = 7.0,
-    keep_name: bool = True,
-) -> Ligand:
-    """Helper method that protonates a given ligand and returns the modified version."""
-
-    _MAPPER = {
-        "OPENBABEL": _protonate_ligand_OPENBABEL,
-        "PYBEL": _protonate_ligand_PYBEL,
-    }
-
-    if method not in _MAPPER:
-        error_msg = f"{method} is not supported for protonate_ligand()."
-        error_msg += f"Allowed are '{', '.join(list(_MAPPER.keys()))}'"
-        raise core.exception.UnsupportedMethod(error_msg)
-    else:
-        # TODO(CJ): Do we want to delete the temporary files?
-        path = f"{dirname}/ligand_{ligand.name}.pdb"
-        fs.safe_mkdir(dirname)
-        ligand.build(path)
-        base_name = fs.base_file_name(path)
-        out_path = f"{dirname}/{base_name}_aH.pdb"
-        return _MAPPER[method](path, ph, out_path)
-
-def _protonate_ligand_OPENBABEL(path: str, ph: float, out_path: str) -> None:
-    raise Exception(f"Method: __protonate_OPENBABEL is not implemented yet!")
-
-
+# below TODO
 def _ob_pdb_charge(pdb_path: str) -> int:
     # TODO(CJ): add tests for this function
     """
@@ -405,62 +340,3 @@ def _ob_pdb_charge(pdb_path: str) -> int:
             )  # TODO make this more intuitive/make sense
             net_charge += int(charge)
     return net_charge
-
-
-def _protonate_ligand_PYBEL(path: str, ph: float, out_path: str) -> Ligand:
-    """Impelemntation of protonate_ligand() using the pybel method. SHOULD NOT be called directly by users."""
-
-    def _fix_ob_output(pdb_path, out_path, ref_name_path=None) -> None:
-        """
-        fix atom label in pdb_pat write to out_path
-        ---------
-        ref_name_path: if use original atom names from pdb
-        - default: None
-            according to tleap output, the name could be just *counting* the element start from ' ' to number
-        - : not None
-            check if there're duplicated names originally, add suffix if there are.
-        """
-        if ref_name_path:
-            ref_a_atoms = read_pdb_lines(ref_name_path)
-            pdb_atoms = read_pdb_lines(pdb_path)
-            ref_a_atoms = list(
-                filter(lambda aa: aa.is_ATOM() or aa.is_HETATM(), ref_a_atoms)
-            )
-            pdb_atoms = list(
-                filter(lambda aa: aa.is_ATOM() or aa.is_HETATM(), pdb_atoms)
-            )
-            assert len(pdb_atoms) == len(ref_a_atoms)
-            for idx, (p, a) in enumerate(zip(pdb_atoms, ref_a_atoms)):
-                pdb_atoms[idx].atom_name = a.atom_name
-                pdb_atoms[idx].atom_id = a.atom_id
-                pdb_atoms[idx].resi_id = a.resi_id
-                pdb_atoms[idx].resi_name = a.resi_name
-            # exit( 0 )
-        fs.write_lines(out_path, list(map(lambda aa: aa.build(), pdb_atoms)))
-    def fix_atom_naming( out_path ):
-        lig_name = Path(out_path).stem.split('_')[1].strip()
-        lines = read_pdb_lines(out_path)
-        lines = list(filter(lambda ll: ll.is_ATOM() or ll.is_HETATM() or ll.line.startswith('END'), lines))                
-        for ll in lines:
-            if ll.line.startswith('END'):
-                continue
-            rawline = ll.line
-            aname = rawline[76:78].strip() 
-            ll.line = rawline[0:13] + f"{aname: <4}{lig_name: >3}"+rawline[20:]
-        fs.write_lines(out_path, list(map(lambda ll: ll.line, lines)))
-    pybel.ob.obErrorLog.SetOutputLevel(0)
-    mol = next(pybel.readfile("pdb", path))
-    mol.OBMol.AddHydrogens(False, True, ph)
-    mol.write("pdb", out_path, overwrite=True)
-    #_fix_ob_output(out_path, out_path, path)
-    fix_atom_naming(out_path)
-    return ligand_from_pdb(out_path, _ob_pdb_charge(out_path))
-
-PEPTIDE_PROTONATION_METHODS = {
-    "pdb2pqr" : protonate_peptide_with_pdb2pqr
-}
-
-LIGAND_PROTONATION_METHODS = {
-    "pybel" : protonate_ligand_with_pybel
-}
-
