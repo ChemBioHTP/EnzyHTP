@@ -7,8 +7,11 @@ Date: 2022-04-05
 # TODO(CJ): add more documentation
 from pathlib import Path
 from typing import Union,Tuple, Dict
+from biopandas.pdb import PandasPdb
+import pandas as pd
 
 import enzy_htp.core as core
+import enzy_htp.chemical as chem
 from enzy_htp.core import file_system as fs
 from enzy_htp import config
 from enzy_htp.core.logger import _LOGGER
@@ -120,6 +123,7 @@ def protonate_peptide_with_pdb2pqr(stru: Structure, ph: float = 7.0,
         stru: a reference of the changed original structure
     """
     sp = PDBParser()
+    # manage the path
     if int_pdb_path is None:
         fs.safe_mkdir(config["system.SCRATCH_DIR"]) # make them together into make_temp_file
         int_pdb_path = fs.get_valid_temp_name(f"{config['system.SCRATCH_DIR']}/protonate_peptide_with_pdb2pqr_input.pdb")
@@ -132,7 +136,7 @@ def protonate_peptide_with_pdb2pqr(stru: Structure, ph: float = 7.0,
         if int_pqr_path == int_pdb_path:
             _LOGGER.warning("int_pqr_path and int_pdb_path is the same after extension change. Adding an index.")
             int_pqr_path = fs.get_valid_temp_name(int_pqr_path.removesuffix(".pdb")+"_1.pdb")
-
+    # run pqr interface
     with open(int_pdb_path, "w") as of:
         of.write(sp.get_file_str(stru)) # give the whole structure as input here as PropKa can use ligand
     pdb2pqr_protonate_pdb(int_pdb_path, int_pqr_path, ph)
@@ -179,7 +183,8 @@ def protonate_peptide_fix_metal_donor(stru: Structure, method="deprotonate_all")
         stru: target structure. Should be after peptide protonation first
         method: method for determine the protonation state of donor residues
             (current available keywords)
-            deprotonate_all: 
+            deprotonate_all: deprotonate all donor residues of the metal center
+                             on the donor atom
     Return:
         (change stru in place)
         a reference of the changed stru
@@ -211,32 +216,101 @@ METAL_FIX_METHODS = {
     "deprotonate_all": deprotonate_metal_donors
 }
 
-def protonate_ligand_with_pybel(stru: Structure, ph: float = 7.0, int_ligand_file_path = None):
+def protonate_ligand_with_pybel(stru: Structure, ph: float = 7.0,
+                                int_ligand_file_dir = None):
     """
     the inteface for using PYBEL to protonate all ligands in {stru} with a given ph
     Args:
         stru: the target stru to protonate
-        """
+        ph: the target pH value
+        int_ligand_file_dir: directory for intermediate ligand file for pybel I/O.
+                             ligand files will be named as ligand_{ligand.key()}_{ligand.name}.pdb
+                             pybel output file will be {ligand_file_name}_pybel.pdb
+    Returns:
+        stru (a reference to the changed structure)
+    """
+    sp = PDBParser()
+    #work on the path
+    if int_ligand_file_dir is None:
+        int_ligand_file_dir = config["system.SCRATCH_DIR"]
+    fs.safe_mkdir(int_ligand_file_dir)
 
-def pybel_protonate_pdb_ligand(in_path: str, out_path: str, ph: float = 7.0):
+    for ligand in stru.ligands:
+        # path for each ligand
+        int_ligand_file_path = fs.get_valid_temp_name(f"{int_ligand_file_dir}/ligand_{ligand.chain.name}_{ligand.idx}_{ligand.name}.pdb")
+        int_pybel_file_path = fs.get_valid_temp_name(f"{int_ligand_file_path.removesuffix('.pdb')}_pybel.pdb")
+        # file interface with pybel
+        ligand.fix_atom_names() # make sure original ligand have all unique names
+        with open(int_ligand_file_path, "w") as of:
+            of.write(sp.get_file_str(ligand))
+        pybel_protonate_pdb_ligand(int_ligand_file_path, int_pybel_file_path, ph=ph)
+        ref_ligand = sp.get_structure(int_pybel_file_path).ligands[0]
+        stru_oper.update_residues(ligand, ref_ligand)
+        # clean up temp files
+        if _LOGGER.level > 10: # not DEBUG or below
+            fs.safe_rm(int_ligand_file_path)
+            fs.safe_rm(int_pybel_file_path)
+
+    if _LOGGER.level > 10: # not DEBUG or below     
+        fs.safe_rmdir(int_ligand_file_dir, empty_only=True) #prevent remove the entire scratch
+    return stru
+
+def pybel_protonate_pdb_ligand(in_path: str, out_path: str, ph: float = 7.0) -> str:
     """
     This is a wrapper of [PYBEL](https://openbabel.org/docs/dev/UseTheLibrary/Python_Pybel.html)
     that takes a ligand in PDB format and add missing H atoms with the given pH in the output file
+    The requirement for this interface is ligand outputed in the out_path keeps the original residue
+    name as well as all exisiting atom names. Not nessessarilty the residue/atom index nor the chain
+    name.
+    Args:
+        in_path: path of input ligand pdb for protonation
+        out_path: path of output result protonated ligand pdb
+        ph: target pH
+    Return:
+        (write file to out_path)
+        return the {out_path} from input
     """
-    outp1_path = path[:-4]+'_badname_aH.pdb'
-    out_path = path[:-4]+'_aH.pdb'
+    int_path = fs.get_valid_temp_name(out_path.removesuffix(".pdb")+"_badname.pdb")
 
     pybel.ob.obErrorLog.SetOutputLevel(0)
-    mol = next(pybel.readfile('pdb', in_path))
+    mol = next(pybel.readfile("pdb", in_path))
     mol.OBMol.AddHydrogens(False, True, ph)
-    mol.write('pdb', outp1_path, overwrite=True)
-    # fix atom label abd determing net charge
-    if keep_name:
-        cls._fix_ob_output(outp1_path, out_path, ref_name_path=in_path)
-    else:
-        cls._fix_ob_output(outp1_path, out_path)
+    mol.write("pdb", int_path, overwrite=True)
+    # fix atom label and residue name
+    _fix_pybel_output(int_path, out_path, in_path)
+
+    if _LOGGER.level > 10: # not DEBUG or below
+        fs.safe_rm(int_path)
     return out_path
 
+def _fix_pybel_output(pdb_path: str, out_path: str, ref_name_path: str = None) -> None:
+    """
+    pybel will mess up atom names and residue names. This function fix those names
+    fix atom label in {pdb_path} and write fixed to {out_path}
+    use {ref_name_path} as reference for atom names and residue name (if provided)
+    * this fix is based on all newly added atoms from pybel will be under original ones
+    """
+    if ref_name_path is not None:
+        ref_atom_names = []
+        ref_ligand = PandasPdb()
+        ref_ligand.read_pdb(ref_name_path)
+        ref_ligand_df: pd.DataFrame = pd.concat((ref_ligand.df["ATOM"], ref_ligand.df["HETATM"]), ignore_index=True)
+        ref_resi_name = ref_ligand_df.iloc[0]["residue_name"].strip()
+        for i, atom_df in ref_ligand_df.iterrows():
+            ref_atom_names.append(atom_df["atom_name"].strip())
+
+    target_ligand = PandasPdb()
+    target_ligand.read_pdb(pdb_path)
+    target_ligand_df = target_ligand.df["HETATM"]
+    atom_names = list((target_ligand_df["atom_name"]))
+    if ref_name_path is not None:
+        # restore resi name and atom name
+        target_ligand_df["residue_name"] = ref_resi_name
+        for i, name in enumerate(ref_atom_names):
+            atom_names[i] = name
+    new_atom_names = chem.get_valid_generic_atom_name(atom_names)
+    target_ligand_df["atom_name"] = pd.DataFrame(new_atom_names)
+    target_ligand.to_pdb(out_path, records=["HETATM", "OTHERS"])
 
 
 def protonate_missing_elements(

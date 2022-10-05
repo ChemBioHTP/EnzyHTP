@@ -3,11 +3,15 @@
 Author: Chris Jurich <cjurich2@huskers.unl.edu>
 Date: 2022-04-03
 """
+import os
 import pytest
 import numpy as np
 
 from enzy_htp.chemical import enum as renum
-from enzy_htp.structure import Ligand, Atom
+from enzy_htp.structure import Ligand, Atom, PDBParser
+
+CURR_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = f"{CURR_DIR}/data/"
 
 def test_constat_data():
     """Testing a variety of constant data methods that should work."""
@@ -16,6 +20,13 @@ def test_constat_data():
     assert not lig.is_canonical()
     assert not lig.is_metal()
     assert lig.rtype == renum.ResidueType.LIGAND
+
+def test_fix_atom_names():
+    """test using a ligand with element symbol as atom names"""
+    stru = PDBParser().get_structure(f"{DATA_DIR}just_ligand_badname.pdb")
+    ligand = stru.ligands[0]
+    ligand.fix_atom_names()
+    assert ligand.atom_name_list == ['C', 'F', 'O', 'C1', 'O1', 'H', 'H1']
 
 # TODO recover these test
 @pytest.mark.TODO

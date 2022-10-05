@@ -128,6 +128,11 @@ class Residue(DoubleLinkedNode):
             raise ResidueDontHaveAtom(self, name, f"residue {self} dont have {name}")
         return result[0]
 
+    @property
+    def atom_name_list(self) -> List[str]:
+        """get a list of atom names in the residue"""
+        return list(map(lambda a:a.name, self.atoms))
+
     # def clone(self) -> Residue: #TODO
     #     """Creates a deepcopy of self."""
     #     return deepcopy(self)
@@ -192,6 +197,16 @@ class Residue(DoubleLinkedNode):
         so only this function is called will it sorted
         """
         self._children.sort(key=lambda x: x.idx)
+    
+    def fix_atom_names(self):
+        """
+        Atom names should be unique in a residue to represent its connectivity.
+        This method check the overall topology of the residue and assign atoms with
+        valid names.
+        For canonical AA, its should follow those CONNECTIVITY_MAPPER
+        For non-canonical, every name should be at least unique
+        """
+        raise Exception #TODO need to figure out how to determine the connectivity without the name
 
     def renumber_atoms(self, start: int = 1) -> int: # TODO
         """Renumbers the Residue()'s Atom()'s beginning with "start" paramter, defaulted to 1. Returns the index of the last Atom().

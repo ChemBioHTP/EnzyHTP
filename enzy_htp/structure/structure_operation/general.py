@@ -7,6 +7,7 @@ Date: 2022-09-19
 
 import copy
 from typing import Tuple, Union
+from plum import dispatch
 
 from enzy_htp.core.logger import _LOGGER
 import enzy_htp.chemical as chem
@@ -48,9 +49,10 @@ def remove_non_peptide(stru: Structure) -> Structure:
         ch.delete_from_parent()
     return stru
 
-def update_residues(stru: Structure, ref_stru: Structure) -> None:
+@dispatch
+def update_residues(stru: Structure, ref_stru: Structure) -> Structure:
     """
-    Update additional atoms and residue names to residues in the stru
+    Update atoms and residue names to residues in the stru
     The sequence should holds constant since it serves as reference
     Args:
         stru: the target structure
@@ -72,6 +74,23 @@ def update_residues(stru: Structure, ref_stru: Structure) -> None:
         self_res.atoms = copy.deepcopy(ref_res.atoms) # this will also set self_res as parent
     stru.renumber_atoms()
     return stru
+
+@dispatch
+def update_residues(resi: Residue, ref_resi: Residue) -> Residue: # pylint: disable=function-redefined
+    """
+    Update atoms and residue names to the single residue
+    (it doesnt matter if there are same in sequence)
+    Args:
+        resi: the target residue
+        ref_resi: the reference residue
+    Return:
+        the changed original residue
+    """
+    if resi.name != ref_resi.name:
+        _LOGGER.info(f"updating {resi.key()} {resi.name} to {ref_resi.name}")
+        resi.name = ref_resi.name
+    resi.atoms = copy.deepcopy(ref_resi.atoms) # this will also set resi as parent
+    return resi
 
 def deprotonate_residue(residue: Residue, target_atom: Union[None, Atom] = None) -> None:
     """
