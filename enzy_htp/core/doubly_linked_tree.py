@@ -16,6 +16,7 @@ Author: QZ Shao, <shaoqz@icloud.com>
 Date: 2022-09-14
 """
 
+import copy
 from typing import Any, Dict, List, Union
 
 
@@ -23,7 +24,7 @@ class DoubleLinkedNode():
     """
     class for parent objects of the doubly linked tree
     """
-    # === Attr ===
+    #region === Attr ===
     # parent use
     def set_children(self, children: List):
         """
@@ -71,20 +72,101 @@ class DoubleLinkedNode():
 
     # api out of class use
     @property
-    def parent(self) -> List:
+    def parent(self):
         return self.get_parent()
     @parent.setter
     def parent(self, val):
         self.set_parent(val)
+    #endregion
 
-    # === copy ===
-    def __deepcopy__(self, memo: Union[Dict[int, Any], None]):
+    #region === edit ===
+    def delete_from_parent(self) -> None:
         """
-        support deepcopy of the object
-        shallow copy wont cause any problem but deepcopy do as explained on:
-        https://docs.python.org/3.10/library/copy.html?highlight=deepcopy
+        delete self from parent's children list
+        delete base on object's id()
+        Returns:
+            None. changes are made to the .children list in self.parent
         """
-        pass
+        delete_base_on_id(self.parent.children, id(self))
+
+    def __deepcopy__(self, memo: Union[Dict[int, Any], None] = None, _nil=[]):
+        """
+        Support deepcopy of DoublyLinkedNode that donot copy any parent and siblings.
+        (Implemtation inspired by https://stackoverflow.com/a/40484215)
+        The default deepcopy method copies every object in the tree. (e.g.: copying 3
+        atoms one by one will generate 3 new complete structure, which will be much slower
+        and redundant.) Following the suggestion of the doc string of the copy module,
+        here re-define the deepcopy behavior by not copying the parent object and set it
+        to None. (copying of the entrie tree should be done by copying the root.)
+
+        Returns:
+            a deepcopy of a DoubleLinkedNode with parent = None.
+        """
+        # in case this is the first copied item
+        if memo is None:
+            memo = {}
+        # treat copying action on parent
+        if self.parent is not None:
+            # not the root.
+            parent_id = id(self.parent)
+            #print(f"parent_id: {parent_id}")
+            y = memo.get(parent_id, _nil)
+            if y is _nil:
+                # parent not in memo -> this is the first copied DoublyLinkNode: set parent to None in memo
+                memo[id(self.parent)] = None
+            # parent in memo -> this is part of the recursive copying initiated from the parent: default
+
+        # mask current method to use original deepcopy
+        deepcopy_method = self.__deepcopy__
+        self.__deepcopy__ = None
+
+        new_self = copy.deepcopy(self, memo)
+
+        # recover current method for future use
+        self.__deepcopy__ = deepcopy_method
+        new_self.__deepcopy__ = deepcopy_method
+
+        return new_self
+
+    # def deepcopy_complete_tree(self, memo=None, _nil=[]):
+    #     """this reproduct the default deepcopy behavior. Not working though. Since it will not be called recursively"""
+    #     # Start memo from the first item
+    #     if memo is None:
+    #         memo = {}
+    #     # give reference of the correponding new self when a self is already copied once.
+    #     d = id(self)
+    #     y = memo.get(d, _nil)
+    #     if y is not _nil:
+    #         return y
+    #     # actually copy self if never copied before
+    #     reductor = getattr(self, "__reduce_ex__", None)
+    #     func, args, listiter, dictiter = reductor(4)
+    #     # _reconstruct
+    #     if args:
+    #         args = (copy.deepcopy(arg, memo) for arg in args)
+    #     y = func(*args)
+    #     memo[id(self)] = y
+
+    #     if state is not None:
+    #         state = copy.deepcopy(state, memo)
+    #         if isinstance(state, tuple) and len(state) == 2:
+    #             state, slotstate = state
+    #         else:
+    #             slotstate = None
+    #         if state is not None:
+    #             y.__dict__.update(state)
+    #         if slotstate is not None:
+    #             for key, value in slotstate.items():
+    #                 setattr(y, key, value)
+    #     memo[d] = y
+    #     # _keep_alive
+    #     try:
+    #         memo[id(memo)].append(self)
+    #     except KeyError:
+    #         # aha, this is the first one :-)
+    #         memo[id(memo)]=[self]
+    #     return y
+    #endregion
 
     # === special ===
     def __getitem__(self, key: int):
@@ -96,3 +178,11 @@ class DoubleLinkedNode():
     def __len__(self) -> int:
         return len(self._children)
 
+# TODO go to other core
+def delete_base_on_id(target_list: list, target_id: int):
+    """
+    delete an element from a list base on its id() value
+    """
+    for i in range(len(target_list)-1,-1,-1):
+        if id(target_list[i]) == target_id:
+            del target_list[i]

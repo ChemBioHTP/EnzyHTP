@@ -11,7 +11,6 @@ from .exception import (
     InvalidResidueCode,
     UnsupportedFileType,
     UnsupportedMethod,
-    InvalidPH,
     InvalidMutationRestriction,
 )
 from .file_system import (
@@ -24,4 +23,7 @@ from .file_system import (
     write_lines,
     get_file_ext,
 	write_data,
+)
+from .math_helper import (
+    check_valid_ph
 )

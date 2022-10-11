@@ -66,14 +66,14 @@ def test_get_metal_radii_vdw():
     """Making sure the get_metal_radii() method works for all values in the original VDW_RADII dict()."""
 
     for aname in VDW_ATOM_NAMES:
-        assert mm.get_metal_radii(aname, "vdw") is not None
+        assert mm.get_atom_radii(aname, "vdw") is not None
 
 
 def test_get_metal_radii_ionic():
     """Making sure the get_metal_radii() method works for all values in the original IONIC_RADII dict()."""
 
     for aname in IONIC_ATOM_NAMES:
-        assert mm.get_metal_radii(aname, "ionic") is not None
+        assert mm.get_atom_radii(aname, "ionic") is not None
 
 
 def test_get_metal_radii_bad_inputs():
@@ -82,22 +82,22 @@ def test_get_metal_radii_bad_inputs():
     for aname in VDW_ATOM_NAMES:
         if len(aname) < 2:
             continue
-        assert mm.get_metal_radii(aname.upper(), "vdw") is None
+        assert mm.get_atom_radii(aname.upper(), "vdw") is None
 
     for aname in IONIC_ATOM_NAMES:
         if len(aname) < 2:
             continue
-        assert mm.get_metal_radii(aname.upper(), "ionic") is None
+        assert mm.get_atom_radii(aname.upper(), "ionic") is None
 
-    assert mm.get_metal_radii("DNE") is None
-    assert mm.get_metal_radii("C") is None
-    assert mm.get_metal_radii("H") is None
+    assert mm.get_atom_radii("DNE") is None
+    assert mm.get_atom_radii("C") is None
+    assert mm.get_atom_radii("H") is None
 
 
 def test_get_metal_radii_bad_input():
     """Ensuring that get_metal_radii() exits for an invalid input."""
     with pytest.raises(SystemExit) as exe:
-        mm.get_metal_radii("Li", "not-real")
+        mm.get_atom_radii("Li", "not-real")
 
     assert exe.type == SystemExit
     assert exe.value.code == 1

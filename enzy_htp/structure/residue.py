@@ -8,16 +8,18 @@ Date: 2022-03-19
 """
 # TODO(CJ): figure out how to inherit docstrings to the children classes.
 from __future__ import annotations
+import sys
 import numpy as np
 from collections import defaultdict
 from plum import dispatch
 from typing import Tuple, List, Dict
 
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
+from enzy_htp.core import _LOGGER
+from enzy_htp.core.exception import ResidueDontHaveAtom
+import enzy_htp.chemical as chem
 
 from .atom import Atom
-from enzy_htp.core import _LOGGER
-import enzy_htp.chemical as chem
 
 
 class Residue(DoubleLinkedNode):
@@ -45,8 +47,6 @@ class Residue(DoubleLinkedNode):
         self.set_parent(parent)
         self.set_children(atoms)
 
-        self._atoms = self._children # add an alias
-        
     #region === Getter-Attr ===
     @property
     def atoms(self) -> List[Atom]:
@@ -54,6 +54,14 @@ class Residue(DoubleLinkedNode):
         return self.get_children()
     @atoms.setter
     def atoms(self, val):
+        self.set_children(val)
+
+    @property
+    def _atoms(self) -> List[Atom]:
+        """alias for _children. Prevent change children but _atoms dont change"""
+        return self._children
+    @_atoms.setter
+    def _atoms(self, val):
         self.set_children(val)
 
     @property
@@ -103,6 +111,28 @@ class Residue(DoubleLinkedNode):
         """Number of atoms in the Residue."""
         return len(self._atoms)
 
+    @property
+    def sequence_name(self) -> str:
+        """get the sequence name of the residue. 1-letter if canonical. 3-letter if non"""
+        if self.is_canonical():
+            return chem.convert_to_one_letter(self.name)
+        return f" {self.name} "
+
+    def find_atom_name(self, name: str) -> List[Atom]:
+        """find child Atom base on its name"""
+        result = list(filter(lambda a: a.name == name, self.atoms))
+        if len(result) > 1:
+            _LOGGER.error(f"residue {self} have more than 1 {name}")
+            sys.exit(1)
+        if len(result) == 0:
+            raise ResidueDontHaveAtom(self, name, f"residue {self} dont have {name}")
+        return result[0]
+
+    @property
+    def atom_name_list(self) -> List[str]:
+        """get a list of atom names in the residue"""
+        return list(map(lambda a:a.name, self.atoms))
+
     # def clone(self) -> Residue: #TODO
     #     """Creates a deepcopy of self."""
     #     return deepcopy(self)
@@ -129,6 +159,11 @@ class Residue(DoubleLinkedNode):
         """Checks if Residue() is a metal. Inherited by children."""
         return self._rtype == chem.ResidueType.METAL
 
+    def is_metal_center(self):
+        """determine if current metal is a coordination center.
+        TODO more consistant way to determine for 'boundary' metals like Mg2+"""
+        return self.name in chem.METAL_CENTER_MAP
+
     def is_trash(self) -> bool:
         """Checks if the Residue() is an rd_non_ligand as defined by enzy_htp.chemical.solvent.RD_NON_LIGAND_LIST"""
         return self._rtype == chem.ResidueType.TRASH
@@ -140,23 +175,38 @@ class Residue(DoubleLinkedNode):
     def is_sequence_eq(self, other: Residue) -> bool:
         """Comparator that checks for sequence same-ness."""
         return self.key() == other.key()
+
+    def is_deprotonatable(self) -> bool:
+        """
+        check if this residue can minus a proton in a pH range of 1-14.
+        (ambiguous protonation state, potential deprotonation)
+        Base on the residue.
+        """
+        return self.name in chem.residue.DEPROTONATION_MAPPER
+    
+    def is_hetatom_noproton(self) -> bool:
+        """check if the residue contain no acidic proton on side chain hetero atoms"""
+        return self.name in chem.residue.NOPROTON_LIST
     #endregion
 
     #region === Editor === 
     def sort_atoms(self):
         """
-        sort children chains with their residue idx
+        sort children atoms with their atom idx
         sorted is always better than not but Residue() is being lazy here
+        so only this function is called will it sorted
         """
         self._children.sort(key=lambda x: x.idx)
-
-    def set_chain(self, val: str) -> None: # TODO
-        """Sets chain and all child atoms to new value. Re-generates the self.residue_key attribute."""
-        chain = val #@shaoqz: Refine this line
-        for idx in range(len(self._atoms)):
-            self._atoms[idx].chain_id = val
-        self.chain_ = val
-        self.residue_key = f"{self.chain_}.{self.name}.{self.num_}"
+    
+    def fix_atom_names(self):
+        """
+        Atom names should be unique in a residue to represent its connectivity.
+        This method check the overall topology of the residue and assign atoms with
+        valid names.
+        For canonical AA, its should follow those CONNECTIVITY_MAPPER
+        For non-canonical, every name should be at least unique
+        """
+        raise Exception #TODO need to figure out how to determine the connectivity without the name
 
     def renumber_atoms(self, start: int = 1) -> int: # TODO
         """Renumbers the Residue()'s Atom()'s beginning with "start" paramter, defaulted to 1. Returns the index of the last Atom().

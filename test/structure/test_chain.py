@@ -3,18 +3,35 @@
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-20
 """
+import logging
 import os
 import pytest
+from enzy_htp.core.logger import _LOGGER
+from enzy_htp.structure import Chain, Residue, PDBParser, Structure
 
+_LOGGER.setLevel(logging.DEBUG)
 CURR_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = f"{CURR_DIR}/data/"
+sp = PDBParser()
 
 
-from enzy_htp.structure import Chain, Residue, structure_from_pdb
 
+def test_sequence():
+    """test getting the sequence of the chain"""
+    pdb_file_path = f"{DATA_DIR}two_chain.pdb"
+    stru: Structure = sp.get_structure(pdb_file_path)
+
+    assert stru[0].sequence == "AT"
+    assert stru[1].sequence == "GGNLP"
+
+def test_sequence_noncanonical():
+    """test getting the sequence of the chain"""
+    pdb_file_path = f"{DATA_DIR}5JT3_noncanonical_test.pdb"
+    stru: Structure = sp.get_structure(pdb_file_path)
+    assert stru[0].sequence == "KRMLNTGYSLNNVHIDYVPTV TPO A"
 
 def test_is_same_coord():
-    pass
+    assert False
 
 @pytest.mark.TODO
 def test_proper_ctor_behavior():

@@ -6,9 +6,9 @@ as well as providing infrastructure to store relevanta chemical information in a
 Author: Chris Jurich <chris.jurich@vanerbilt.edu>
 Date: 2022-03-19
 """
-from .atoms import get_h_bond_length
+from .atoms import get_h_bond_length, get_valid_generic_atom_name
 from .enum import ResidueType
-from .metal import METAL_MAPPER, METAL_CENTER_MAP, get_metal_radii
+from .metal import METAL_MAPPER, METAL_CENTER_MAP, get_atom_radii
 from .solvent import RD_SOLVENT_LIST, RD_NON_LIGAND_LIST
 from .residue import (
     THREE_LETTER_AA_MAPPER,

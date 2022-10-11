@@ -19,12 +19,23 @@ def safe_rm(fname: str) -> None:
     if os.path.exists(fname):
         os.remove(fname)
 
+def is_empty_dir(dir_path: str) -> bool:
+    """
+    check if the dir_path is an empty dir
+    """
+    if os.path.isdir(dir_path):
+        return not os.listdir(dir_path)
+    else:
+        _LOGGER.debug(f"No such directory: {dir_path}")
+        return False
 
-def safe_rmdir(dirname: str) -> None:
+def safe_rmdir(dirname: str, empty_only: bool = False) -> None:
     """Removes a directory if and only if the directory already exists."""
     if os.path.isdir(dirname):
-        shutil.rmtree(dirname)
-
+        if empty_only and not is_empty_dir(dirname):
+            _LOGGER.debug(f"{dirname} is not empty. turn empty_only off to force remove it.")
+        else:
+            shutil.rmtree(dirname)
 
 def safe_mkdir(dirname: str) -> None:
     """Makes a directory if and only if the directory does not already exist. Creates parents as needed."""
@@ -87,3 +98,13 @@ def write_data(outfile:str, tag:Any, data:Dict) -> str:
     fh.close()
     
     return outfile
+
+def get_valid_temp_name(fname: str) -> None:
+    """find a vaild name for a temp file"""
+    idx = 0
+    suffix = ''.join(Path(fname).suffixes)
+    result_fname = fname
+    while os.path.isfile(result_fname):
+        idx += 1
+        result_fname = f"{fname[:-len(suffix)]}_{str(idx)}{suffix}"
+    return result_fname

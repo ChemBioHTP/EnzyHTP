@@ -53,6 +53,50 @@ def test_ligands():
     assert len(stru.ligands) == 2
     assert stru.ligands[0].name == "4CO"
 
+def test_solvents():
+    pdb_file_path = f"{DATA_DIR}1Q4T_ligand_test.pdb"
+    stru: Structure = sp.get_structure(pdb_file_path)
+    assert len(stru.solvents) == 296
+    assert stru.solvents[0].name == "HOH"
+
+def test_peptides():
+    pdb_file_path = f"{DATA_DIR}1Q4T_ligand_test.pdb"
+    stru: Structure = sp.get_structure(pdb_file_path)
+    assert len(stru.peptides) == 2
+    assert tuple(map(lambda x: x.name, stru.peptides)) == ("A","B")
+
+def test_sequence():
+    pdb_file_path = f"{DATA_DIR}1Q4T_ligand_test.pdb"
+    stru: Structure = sp.get_structure(pdb_file_path)
+    assert stru.sequence["A"] == "ATGGNLPDVASHYPVAYEQTLDGTVGFVIDEMTPERATASVEVTDTLRQRWGLVHGGAYCALAEMLATEATVAVVHEKGMMAVGQSNHTSFFRPVKEGHVRAEAVRIHAGSTTWFWDVSLRDDAGRLCAVSSMSIAVRPRRD"
+
+def test_is_idx_subset_subset():
+    """test the checker for idx subset with a handmade subset stru"""
+    pdb_file_path = f"{DATA_DIR}12E8_small_four_chain.pdb"
+    subset_pdb_file_path = f"{DATA_DIR}12E8_small_four_chain_subset.pdb"
+
+    stru: Structure = sp.get_structure(pdb_file_path)
+    target_stru: Structure = sp.get_structure(subset_pdb_file_path)
+    assert stru.is_idx_subset(target_stru)
+
+def test_is_idx_subset_non_res_subset():
+    """test the checker for idx subset with a handmade non-subset (residue) stru"""
+    pdb_file_path = f"{DATA_DIR}12E8_small_four_chain.pdb"
+    non_subset_pdb_file_path = f"{DATA_DIR}12E8_small_four_chain_non_seq_subset.pdb"
+
+    stru: Structure = sp.get_structure(pdb_file_path)
+    target_stru: Structure = sp.get_structure(non_subset_pdb_file_path)
+    assert not stru.is_idx_subset(target_stru)
+
+def test_is_idx_subset_non_ch_subset():
+    """test the checker for idx subset with a handmade non-subset (chain id) stru"""
+    pdb_file_path = f"{DATA_DIR}12E8_small_four_chain.pdb"
+    non_subset_pdb_file_path = f"{DATA_DIR}12E8_small_four_chain_non_chain_subset.pdb"
+
+    stru: Structure = sp.get_structure(pdb_file_path)
+    target_stru: Structure = sp.get_structure(non_subset_pdb_file_path)
+    assert not stru.is_idx_subset(target_stru)
+
 @pytest.mark.TODO
 def equiv_files(fname1: str, fname2: str, width: int = None) -> bool:
     """Helper method to check if two files are exactly equivalent."""

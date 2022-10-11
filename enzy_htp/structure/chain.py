@@ -8,6 +8,7 @@ Date: 2022-03-20
 from __future__ import annotations
 from copy import deepcopy
 import itertools
+import sys
 from enzy_htp.core import _LOGGER
 from typing import Iterable, List, Tuple, Union
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
@@ -39,7 +40,6 @@ class Chain(DoubleLinkedNode):
         self.set_parent(parent)
         self.set_children(residues)
 
-        self._residues: List[Residue] = self._children # alias
     #region === Getter-Attr ===
     @property
     def name(self) -> str:
@@ -62,10 +62,26 @@ class Chain(DoubleLinkedNode):
     @residues.setter
     def residues(self, val: List[Residue]):
         self.set_children(val)
+    
+    @property
+    def _residues(self) -> List[Residue]:
+        """alias for _children. prevent changing _children but _residues holds the same"""
+        return self._children
+    @_residues.setter
+    def _residues(self, val: List[Residue]):
+        self.set_children(val)
 
-    def get_residue(self, traget_key: str) -> Residue:
-        """TODO: is there alt option for the key?"""
-        pass
+    def find_residue_idx(self, idx: int) -> Union[Residue, None]:
+        """find the residue with correponding index"""
+        result = list(filter(lambda r: r.idx == idx, self.children))
+        if len(result) > 1:
+            _LOGGER.error(f"chain {self} have more than 1 residue on {idx}")
+            sys.exit(1)
+        if len(result) == 0:
+            _LOGGER.warning(f"residue idx {idx} out of chain's range {self}") #TODO may be make this an error
+            return None
+        return result[0]
+        
     #endregion
 
     #region === Getter-Prop ===
@@ -77,8 +93,7 @@ class Chain(DoubleLinkedNode):
                 0: return a iterable of Tuples [(1,20),(25,30)]
                 1: return a str "1-20,25-30"
         """
-        res_idx_list = map(lambda x: x.idx, self._residues)
-        interval_list = get_interval_from_list(res_idx_list)
+        interval_list = get_interval_from_list(self.residue_idxs)
         if if_str:
             range_strs = map(lambda x: f"{x[0]}-{x[1]}", interval_list)
             return ",".join(range_strs)
@@ -106,6 +121,11 @@ class Chain(DoubleLinkedNode):
         return len(self)
 
     @property
+    def residue_idxs(self) -> List[int]:
+        """return a list of indexes of containing residues"""
+        return list(map(lambda x: x.idx, self._residues))
+
+    @property
     def chain_type(self) -> str:
         """
         Returns:
@@ -125,6 +145,16 @@ class Chain(DoubleLinkedNode):
         if self.has_solvent():
             chain_type.append("solvent")
         return ",".join(chain_type)
+
+    @property
+    def sequence(self) -> str:
+        """return the sequence of current chain in string"""
+        result = ""
+        self.sort_residues()
+        res: Residue
+        for res in self._residues:
+            result += res.sequence_name
+        return result.strip()
     #endregion
 
     #region === Checker ===
@@ -198,8 +228,9 @@ class Chain(DoubleLinkedNode):
 
     def sort_residues(self):
         """
-        sort children chains with their residue idx
+        sort children residues with their residue idx
         sorted is always better than not but Chain() is being lazy here
+        so only when sort is nessessary will it sort
         """
         self._children.sort(key=lambda x: x.idx)
 

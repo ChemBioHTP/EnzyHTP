@@ -62,33 +62,21 @@ class Ligand(Residue):
         return True
 
     # === Editor ===
-    def set_residue_number(self, num: int) -> None:
-        """Changes the resdiue number for all of the substituent atoms."""  #@shaoqz: also set for itself?
-        for idx, aa in enumerate(self._atoms):
-            self._atoms[idx].residue_number = num
+    def fix_atom_names(self) -> None:
+        """
+        Atom names should be unique in a ligand.
+        This method assign atoms with valid names.
+        """
+        name_list = self.atom_name_list
+        new_name_list = chem.get_valid_generic_atom_name(name_list)
+        for name, atom in zip(new_name_list, self.atoms):
+            if atom.name != name:
+                _LOGGER.info(f"found atom with invalid name {atom}. changing it to {name}")
+                atom.name = name
 
     # === Special ===
     def __str__(self) -> str:
         return f"Ligand({self._idx}, {self._name}, atom:{len(self._atoms)}, {self._parent})"
-
-    #region === TODO/TOMOVE ===
-    def build(self, out_path: str) -> None: #@shaoqz: to IO ; also it should be the same as for residue
-        """Method that builds the given ligand to the specified path, making sure it is a pdb filepath."""
-        ext = fs.get_file_ext(out_path).lower()
-        if ext != ".pdb":
-            _LOGGER.error(
-                f"The supplied file path '{out_path}' does not ahve a '.pdb' extension. Exiting..."
-            )
-            exit(1)
-        lines = list(
-            map(
-                lambda pr: pr[1].to_pdb_line(a_id=pr[0] + 1, c_id=" "),
-                enumerate(self._atoms),
-            )
-        ) + ["TER", "END"]
-        fs.write_lines(out_path, lines)
-    #endregion
-
 
 def residue_to_ligand(residue: Residue, net_charge: float = None) -> Ligand:
     """Convenience function that converts Residue to ligand."""

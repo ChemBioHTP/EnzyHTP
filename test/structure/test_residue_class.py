@@ -3,6 +3,7 @@
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-19
 """
+import itertools
 import os
 import pytest
 import pandas as pd
@@ -10,12 +11,47 @@ from typing import List
 from copy import deepcopy
 from collections import defaultdict
 from biopandas.pdb import PandasPdb
+from enzy_htp.core.exception import ResidueDontHaveAtom
 
 from enzy_htp.structure import Atom, Residue
+from enzy_htp.structure.structure_io import PDBParser
 
 CURR_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = f"{CURR_DIR}/data/"
 
 TEST_PDB_FILE = f"{CURR_DIR}/data/3NIR.pdb"
+
+def test_deepcopy():
+    """test the hehavior of copy.deepcopy on Residue() under a Structure()
+    context"""
+    stru = PDBParser().get_structure(f"{DATA_DIR}12E8_small_four_chain.pdb")
+    res_list = stru[0][2:6] + stru[1][2:6] # target for deepcopy
+    new_list = deepcopy(res_list)
+    # ensure the list is new
+    assert id(res_list) != id(new_list)
+    # ensure every residue is new
+    for i, j in zip(res_list, new_list):
+        assert id(i) != id(j)
+    # ensure every parents is None
+    assert all(i.parent is None for i in new_list)
+    # ensure every atom in the stru is new and pointing to correct residue
+    old_atom_list = itertools.chain.from_iterable(i.atoms for i in res_list)
+    new_atom_list = itertools.chain.from_iterable(i.atoms for i in new_list)
+    for i, j in zip(old_atom_list, new_atom_list):
+        assert i.idx == j.idx
+        assert id(i) != id(j)
+    # ensure parent is containing the same new children
+    for i in new_list:
+        assert all(j.parent is i for j in i)
+
+def test_find_atom_name():
+    stru = PDBParser().get_structure(f"{DATA_DIR}12E8_small_four_chain.pdb")
+    residue = stru["H"][0]
+    assert residue.find_atom_name("N").name == "N"
+    with pytest.raises(ResidueDontHaveAtom) as exe:
+        residue.find_atom_name("X")
+        assert exe.residue is residue
+        assert exe.atom_name == "X"
 
 #TODO recover tests
 #TODO(CJ): add tests for the name getter
@@ -35,7 +71,7 @@ def make_residues(pdbname: str) -> List[Residue]:
     return residues
 
 
-RESIDUES: List[Residue] = make_residues(TEST_PDB_FILE)
+# RESIDUES: List[Residue] = make_residues(TEST_PDB_FILE)
 @pytest.mark.TODO
 def test_residue_key_information():
     """Ensuring that general getting and setting of residue key information works."""

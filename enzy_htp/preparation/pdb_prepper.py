@@ -13,7 +13,7 @@ import pdb2pqr
 from typing import Set, Union, List, Tuple
 from enzy_htp.core import _LOGGER
 
-from .protonate import protonate_pdb, protonate_missing_elements, check_valid_ph
+from .protonate import pdb2pqr_protonate_pdb
 
 import enzy_htp.core as core
 
@@ -415,10 +415,10 @@ class PDBPrepper:
         Separately runs PDB2PQR on the ligand and metal and combines the output. Returns path to the protonated
         PDB file."""
         # input of PDB2PQR
-        check_valid_ph(ph)
+        core.check_valid_ph(ph)
         self.pqr_path = f"{fs.remove_ext(self.current_path_)}.pqr.pdb"
         self.all_paths.append(self.pqr_path)
-        protonate_pdb(self.path_name, self.pqr_path)
+        pdb2pqr_protonate_pdb(self.path_name, self.pqr_path)
         # Add missing atom (from the PDB2PQR step. Update to func result after update the _get_protonation_pdb2pqr func)
         # Now metal and ligand
         new_structure: Structure = protonate_missing_elements(

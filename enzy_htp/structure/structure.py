@@ -107,10 +107,11 @@ import sys
 from typing import List, Set, Dict, Tuple, Union
 from collections import defaultdict
 
+import enzy_htp.core.math_helper as mh
 from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
-from enzy_htp.chemical import convert_to_one_letter, ResidueType
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
+from enzy_htp.chemical import convert_to_one_letter, ResidueType
 
 from .atom import Atom
 from . import Chain
@@ -145,17 +146,25 @@ class Structure(DoubleLinkedNode): # TODO implement different copy methods for t
     def __init__(self, chains: List[Chain]):
         """Constructor that takes just a list of Chain() objects as input."""
         self.set_children(chains)
-        self._chains = self._children
         self.set_ghost_parent()
         if self.has_duplicate_chain_name():
             self.resolve_duplicated_chain_name()
     #region === Getters-attr ===
     @property
     def chains(self) -> List[Chain]:
-        """Getter for the list of Chain() objects contained within the Structure() object."""
+        """alias for _children. prevent changing _children but _residues holds the same"""
         return self.get_children()
     @chains.setter
     def chains(self, val) -> None:
+        """setter for chains"""
+        self.set_children(val)
+    
+    @property
+    def _chains(self) -> List[Chain]:
+        """alias for _children. prevent changing _children but _chains holds the same"""
+        return self._children
+    @_chains.setter
+    def _chains(self, val) -> None:
         """setter for _chains"""
         self.set_children(val)
 
@@ -181,19 +190,89 @@ class Structure(DoubleLinkedNode): # TODO implement different copy methods for t
         """Returns the number of Chain() objects in the current Structure()."""
         return len(self._chains)
 
-    @property 
+    @property
     def residues(self) -> List[Residue]:
         """Return a list of the residues in the Structure() object sorted by (chain_id, residue_id)"""
         result = list(itertools.chain.from_iterable(self._chains))
         result.sort(key=lambda r: r.key())
         return result
+    
+    @property
+    def residue_mapper(self) -> Dict[Tuple[str, int], Residue]:
+        """return a mapper of {(chain_id, residue_idx): Residue (reference)}"""
+        result = {}
+        for residue in self.residues:
+            result[residue.key()] = residue
+        return result
+
+    def find_residue_name(self, name) -> List[Residue]:
+        """find residues base on its name. Return a list of matching residues"""
+        result = list(filter(lambda r: r.name == name, self.residues))
+        return result
+
+    @ property
+    def atoms(self) -> List[Atom]:
+        result = []
+        for chain in self.chains:
+            for residue in chain:
+                result.extend(residue.atoms)
+        return result
+
+    def find_atoms_in_range(self, center: Union[Atom, Tuple[int, int, int]], range_distance: float) -> List[Atom]:
+        """find atoms in {range} of {center}. return a list of atoms found"""
+        result = []
+        for atom in self.atoms:
+            if atom.distance_to(center) <= range_distance:
+                result.append(atom)
+        return result
 
     @property
-    def ligands(self) -> List[Residue]:
+    def ligands(self) -> List[Ligand]:
         """Filters out the ligand Residue()"s from the chains in the Structure()."""
-        result: List[Residue] = list()
+        result: List[Ligand] = list()
         for chain in self.chains:
             result.extend(list(filter(lambda r: r.is_ligand(), chain)))
+        return result
+
+    @property
+    def solvents(self) -> List[Solvent]:
+        """return all solvents hold by current Structure()"""
+        result: List[Solvent] = []
+        for chain in self.chains:
+            result.extend(list(filter(lambda r: r.is_solvent(), chain)))
+        return result
+
+    @property
+    def metals(self) -> List[Residue]:
+        """Filters out the metal Residue()"s from the chains in the Structure()."""
+        result: List[Residue] = []
+        for chain in self.chains:
+            result.extend(list(filter(lambda r: r.is_metal(), chain.residues)))
+        return result
+
+    @property
+    def metalcenters(self) -> List[Residue]:
+        """Filters out the metal coordination center Residue()"s from the chains 
+        in the Structure()."""
+        result: List[Residue] = []
+        for chain in self.chains:
+            result.extend(list(filter(lambda r: r.is_metal_center(), chain.residues)))
+        return result
+
+    @property
+    def peptides(self) -> List[Chain]:
+        """return the peptide part of current Structure() as a list of chains"""
+        result: List[Chain] = list(filter(lambda c: c.is_peptide(), self._chains))
+        return result
+
+    @property
+    def sequence(self) -> Dict[str, str]:
+        """return a dictionary of {'chain_id':'chain_sequence'}"""
+        result = {}
+        self.sort_chains()
+        ch: Chain
+        for ch in self._chains:
+            result[ch.name] = ch.sequence
         return result
     #endregion
 
@@ -212,6 +291,63 @@ class Structure(DoubleLinkedNode): # TODO implement different copy methods for t
             existing_c_id.append(ch.name)
         return False
     
+    def is_idx_subset(self, target_stru: Structure) -> bool:
+        """
+        check if residue indexes of the target_stru is a subset of self
+        by subset it means:
+        1. name of chains in target_stru is contain in self
+        2. for each chain, residue indexes in target chain is contained in correponding
+           chain from self.
+        Args:
+            target_stru: the target structure to compare with self
+        Returns:
+            Boolean reflect if the target structure is a index subset of self
+        """
+        trgt_ch: Chain
+        for trgt_ch in target_stru:
+            if trgt_ch.name not in self.chain_mapper:
+                _LOGGER.info(f"current stru {list(self.chain_mapper.keys())} doesnt contain chain: {trgt_ch} from the target stru")
+                return False
+
+            self_ch = self.chain_mapper[trgt_ch.name]
+            self_ch_resi_idxes = self_ch.residue_idxs
+            res: Residue
+            for res in trgt_ch:
+                if res.idx not in self_ch_resi_idxes:
+                    _LOGGER.info(f"current stru chain {self_ch} doesnt contain residue: {res} of the target stru")
+                    return False
+        return True
+    #endregion
+
+    #region === Editor ===
+    def sort_chains(self) -> None:
+        """
+        sort children chains with their chain name
+        sorted is always better than not but Structure() is being lazy here
+        """
+        self._chains.sort(key=lambda x: x.name)
+
+    def sort_everything(self) -> None:
+        """sort all object in structure"""
+        self.sort_chains()
+        for ch in self._chains:
+            ch.sort_residues()
+            for res in ch:
+                res.sort_atoms()
+
+    def renumber_atoms(self, sort_first: bool = True) -> None:
+        """give all atoms in current structure a new index start from 1.
+        Will not give a idx_change_map since idx only matter in Residue level"""
+        if sort_first:
+            self.sort_everything()
+        _LOGGER.info("renumbering atoms")
+        a_id = 1
+        for atom in self.atoms:
+            if atom.idx != a_id:
+                _LOGGER.debug(f"changing atom {atom.idx} -> {a_id}")
+            atom.idx = a_id
+            a_id += 1
+
     def resolve_duplicated_chain_name(self) -> None:
         """resolve for duplicated chain name in self.chains_
         A. insert the chain to be one character after the same one if they are different
@@ -236,15 +372,6 @@ class Structure(DoubleLinkedNode): # TODO implement different copy methods for t
             )
     #endregion
 
-    #region === Editor ===
-    def sort_chains(self):
-        """
-        sort children chains with their chain name
-        sorted is always better than not but Structure() is being lazy here
-        """
-        self._chains.sort(key=lambda x: x.name)
-    #endregion
-
     #region === Special ===
     def __str__(self):
         """
@@ -255,11 +382,27 @@ class Structure(DoubleLinkedNode): # TODO implement different copy methods for t
         """
         out_line = [f"<Structure object at {hex(id(self))}>",]
         out_line.append("Structure(")
-        out_line.append("chains:")
+        out_line.append(f"chains: (sorted, original {list(self.chain_mapper.keys())})")
         for ch in sorted(self._chains,key=lambda x: x.name):
             out_line.append(f"    {ch.name}({ch.chain_type}): residue: {ch.residue_idx_interval()} atom_count: {ch.num_atoms}")
         out_line.append(")")
         return os.linesep.join(out_line)
+
+    def __getitem__(self, key: Union[int, str]):
+        """support dictionary like access"""
+        if isinstance(key, int):
+            return super().__getitem__(key)
+        if isinstance(key, str):
+            return self.chain_mapper[key]
+        raise KeyError("Structure() getitem only take int or str as key")
+    
+    def __delitem__(self, key: Union[int, str]):
+        """support dictionary like delete"""
+        if isinstance(key, int):
+            super().__delitem__(key)
+        if isinstance(key, str):
+            self.chain_mapper[key].delete_from_parent()
+        raise KeyError("Structure() delitem only take int or str as key")
     #endregion
 
 
@@ -270,36 +413,6 @@ class Structure(DoubleLinkedNode): # TODO implement different copy methods for t
 
     # ============= TODO below =================
     #region === Getters === (Attributes - accessing Structure data -  references)
-    def get_residue(self, target_key: str) -> Union[None, Residue]: #@shaoqz: we need to that gives a reference. In the case of editing the structure.
-        """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format,
-        a deepcopy of the corresponding Residue() is returned, if it exists. None is returned if it cannot be found."""
-        for chain in self.chains:
-            for res in chain.residues():
-                if res.residue_key == target_key:
-                    return deepcopy(res)
-        return None
-
-    @property
-    def metals(self) -> List[Residue]:
-        """Filters out the metal Residue()"s from the chains in the Structure()."""
-        result: List[Residue] = list()
-        for chain in self.chains:
-            result.extend(list(filter(lambda r: r.is_metal(), chain.residues())))
-        return result
-
-    @property
-    def solvents(self):
-        # TODO(CJ)
-        return []
-
-    @ property
-    def atoms(self) -> List[Atom]:
-        result = list()
-        for chain in self.chains:
-            for residue in chain:
-                result.extend(residue.atoms)
-        return result
-
     def get_atom(self) -> Atom:
         """TODO do we really need this? Providing access of deeper layer requires a key to select
         maybe just use python objects to access is a better idea.
