@@ -20,9 +20,9 @@ def safe_rm(fname: str) -> None:
         os.remove(fname)
 
 def is_empty_dir(dir_path: str) -> bool:
-    '''
+    """
     check if the dir_path is an empty dir
-    '''
+    """
     if os.path.isdir(dir_path):
         return not os.listdir(dir_path)
     else:

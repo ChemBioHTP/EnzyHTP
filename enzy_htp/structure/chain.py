@@ -93,7 +93,7 @@ class Chain(DoubleLinkedNode):
                 0: return a iterable of Tuples [(1,20),(25,30)]
                 1: return a str "1-20,25-30"
         """
-        interval_list = get_interval_from_list(self.residue_idxes)
+        interval_list = get_interval_from_list(self.residue_idxs)
         if if_str:
             range_strs = map(lambda x: f"{x[0]}-{x[1]}", interval_list)
             return ",".join(range_strs)
@@ -121,8 +121,8 @@ class Chain(DoubleLinkedNode):
         return len(self)
 
     @property
-    def residue_idxes(self) -> List[int]:
-        """return a list of idexes of containing residues"""
+    def residue_idxs(self) -> List[int]:
+        """return a list of indexes of containing residues"""
         return list(map(lambda x: x.idx, self._residues))
 
     @property

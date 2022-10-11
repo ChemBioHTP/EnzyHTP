@@ -46,7 +46,7 @@ class Residue(DoubleLinkedNode):
         self._rtype = chem.ResidueType.UNKNOWN
         self.set_parent(parent)
         self.set_children(atoms)
-        
+
     #region === Getter-Attr ===
     @property
     def atoms(self) -> List[Atom]:
@@ -55,7 +55,7 @@ class Residue(DoubleLinkedNode):
     @atoms.setter
     def atoms(self, val):
         self.set_children(val)
-    
+
     @property
     def _atoms(self) -> List[Atom]:
         """alias for _children. Prevent change children but _atoms dont change"""
@@ -63,7 +63,7 @@ class Residue(DoubleLinkedNode):
     @_atoms.setter
     def _atoms(self, val):
         self.set_children(val)
-    
+
     @property
     def chain(self):
         """Getter for the Residue()'s parent chain id."""

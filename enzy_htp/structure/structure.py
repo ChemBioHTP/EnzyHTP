@@ -293,11 +293,15 @@ class Structure(DoubleLinkedNode): # TODO implement different copy methods for t
     
     def is_idx_subset(self, target_stru: Structure) -> bool:
         """
-        check if residue idxes of the target_stru is a subset of self
+        check if residue indexes of the target_stru is a subset of self
         by subset it means:
         1. name of chains in target_stru is contain in self
         2. for each chain, residue indexes in target chain is contained in correponding
            chain from self.
+        Args:
+            target_stru: the target structure to compare with self
+        Returns:
+            Boolean reflect if the target structure is a index subset of self
         """
         trgt_ch: Chain
         for trgt_ch in target_stru:
@@ -306,7 +310,7 @@ class Structure(DoubleLinkedNode): # TODO implement different copy methods for t
                 return False
 
             self_ch = self.chain_mapper[trgt_ch.name]
-            self_ch_resi_idxes = self_ch.residue_idxes
+            self_ch_resi_idxes = self_ch.residue_idxs
             res: Residue
             for res in trgt_ch:
                 if res.idx not in self_ch_resi_idxes:
