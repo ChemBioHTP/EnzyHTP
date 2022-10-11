@@ -37,7 +37,7 @@ def main():
 		# use minimization to relax each mutated PDB
 		pdb_obj.PDB2FF()													# Generate parameter files for MD simulation 
 		pdb_obj.PDBMin(engine='Amber_pmemd_gpu')							# Minimization 																				(self.path) 
-
+		exit( 0 )
 		# --- Sample with MD ---
 		pdb_obj.rm_wat()													# Remove water from the minimization 														(self.path) 												
 		pdb_obj.PDB2FF(ifsavepdb=1) 										# Generate parameter files *savepdb save the exact structure use in MD for future analysis 	(self.path) 

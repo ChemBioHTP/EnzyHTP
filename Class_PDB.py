@@ -232,8 +232,6 @@ class PDB():
                     return pdbl.atom_id
     '''
     =========
-    Sequence TODO: reform(most of it has been moved to class Chain，only judgement of art residue and overlook of whole structure remains)
-    =========
     '''
 
     def get_seq(self, Oneletter=0):
@@ -890,7 +888,6 @@ class PDB():
                 Muta_c_id = ''
                 Muta_r_id = ''
 
-                # Flag Generation：
                 # Random over the self.stru. Strictly correponding residue indexes in the original file. (no sort applied)
                 self.get_stru()
                 # random over the structure "protein" part.
@@ -1580,7 +1577,7 @@ class PDB():
     QM/MM
     ========
     '''
-    def PDB2QMMM(self, o_dir='',tag='', work_type='spe', qm='g16', keywords='', prmtop_path=None, prepi_path:dict=None, spin_list=[1,1], ifchk=1):
+    def PDB2QMMM(self, o_dir='',tag='', work_type='spe', qm='g16', keywords='', prmtop_path=None, prepi_path=None, spin_list=[1,1], ifchk=1):
         '''
         generate QMMM input template based on [connectivity, atom order, work type, layer/freeze settings, charge settings]
         * NEED TO SET LAYER BY ATOM INDEX OR SELECT A LAYER PRESET (use Config.Gaussian.layer_preset and Config.Gaussian.layer_atoms)
@@ -1615,7 +1612,6 @@ class PDB():
         n_cores     : Cores for gaussian job (higher pirority)
         max_core    : Per core memory in MB for gaussian job (higher pirority)
         keywords    : a list of keywords that joined together when build
-        layer_preset：default preset id copied to self.layer_preset
         layer_atoms : default layer_atoms copied to self.layer_atoms
         
         *om_lvl     : *(can only be edit manually before loading the module) oniom method level
