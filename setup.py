@@ -13,7 +13,7 @@ with open('requirements.txt', 'r') as f:
 
 #TODO add entry points for executables
 setup(name='enzy_htp',
-        version='0.1.0',
+        version='0.1.1',
         description='TODO',
         author='EnzyHTP Authors',
         author_email='zhongyue.yang@vanderbilt.edu',
@@ -28,8 +28,8 @@ setup(name='enzy_htp',
 		'enzy_htp.structure.structure_operation',
 		'enzy_htp.preparation',
 		'enzy_htp.mutation',
-		'enzy_htp.molecular_mechanics',
-		'enzy_htp.quantum_mechanics',
+		#'enzy_htp.molecular_mechanics',
+		#'enzy_htp.quantum_mechanics',
 		],
 		install_requires=requirements,
         )

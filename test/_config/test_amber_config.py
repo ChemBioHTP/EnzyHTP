@@ -4,13 +4,17 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-03
 """
 import pytest
-
 from pathlib import Path
 import enzy_htp
 from enzy_htp.core import file_system as fs
 from enzy_htp import interface
 from enzy_htp import molecular_mechanics as mm
 from pathlib import Path
+
+def test_tw():
+    print('hereeare')
+    print(mm)
+    assert False 
 
 def test_default_amber_config():
     """Ensuring the default_amber_config() method returns deepcopied AmberConfig() objects."""
@@ -52,7 +56,7 @@ def test_valid_box_type():
 def test_required_executables():
     """Checking that the AmberConfig.required_executables() has the correct values."""
     ac : mm.AmberConfig = mm.default_amber_config()
-    assert ac.required_executables() == ["$AMBERHOME/bin/sander.MPI","$AMBERHOME/bin/pmemd.cuda", "tleap", "ampdb", "parmchk2", "antechamber"]
+    assert ac.required_executables() == ["sander","pmemd.cuda", "tleap", "ampdb", "parmchk2", "antechamber", "cpptraj"]
 
 def test_required_env_vars():
     """Checking that the AmberConfig.required_env_vars() contains the correct values."""
@@ -63,8 +67,8 @@ def test_required_env_vars():
 def test_get_engine_valid():
     """Checking that AmberConfig.get_engine() works for valid inputs of "CPU" and "GPU"."""
     ac : mm.AmberConfig = mm.default_amber_config()
-    assert ac.get_engine("CPU") == "$AMBERHOME/bin/sander.MPI"
-    assert ac.get_engine("GPU") == "$AMBERHOME/bin/pmemd.cuda"
+    assert ac.get_engine("CPU") == "sander"
+    assert ac.get_engine("GPU") == "pmemd.cuda"
 
 def test_get_engine_invalid():
     """Checking that AmberConfig.get_engine() fails for an invalid input"""
