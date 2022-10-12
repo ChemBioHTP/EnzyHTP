@@ -1,0 +1,2 @@
+def food():
+    pass
