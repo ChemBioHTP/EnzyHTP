@@ -4,3 +4,5 @@ plum-dispatch
 numpy
 # openbabel
 pandas
+
+#TODO(CJ): we need to make these requirements more specific
