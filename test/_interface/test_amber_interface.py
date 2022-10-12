@@ -8,7 +8,7 @@ import shutil
 from pathlib import Path
 
 from enzy_htp.core import file_system as fs
-from enzy_htp import AmberInterface
+from enzy_htp import interface
 
 MM_BASE_DIR = Path(__file__).absolute().parent
 MM_DATA_DIR = f"{MM_BASE_DIR}/data/"
@@ -57,7 +57,7 @@ def test_minimize_structure():
 
 def test_build_param_files():
     """Testing that the AmberInterface.build_param_files() method works correctly."""
-    ai = AmberInterface()
+    ai = interface.amber
     assert True 
 
 def test_build_ligand_param_files():
