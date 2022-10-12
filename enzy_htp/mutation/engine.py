@@ -52,7 +52,7 @@ def mutate_pdb(
         <original one-letter name><residue number><mutated one-letter name>
     A commandline example:
 
-        >>> mutated_pdb:str = mutate_pdb("enzy.pdb")
+    >>> mutated_pdb:str = mutate_pdb("enzy.pdb")
     >>> mutated_pdb
     "enzy_A10G.pdb"
 
@@ -147,12 +147,13 @@ def get_mutations(
     if restrictions is None:
         restrictions = restriction_object(pdb)
 
-    structure: struct.Structure = struct.structure_from_pdb(pdb)
+    structure: struct.Structure = struct.PDBParser.get_structure(pdb)
     mut_dict: Dict[Tuple[Str, int],
                    List[Mutation]] = generate_all_mutations(structure)
 
     for mut in mutations:
         restrictions.lock_residue((mut.chain_id, mut.res_num))
+
 
     mut_dict = restrictions.apply(mut_dict)
 

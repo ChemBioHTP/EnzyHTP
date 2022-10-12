@@ -208,10 +208,15 @@ def restriction_object(pdb: str) -> MutationRestrictions:
     Returns:
         An initialized MutationRestrictions() object.
     """
-    struct: es.Structure = es.structure_from_pdb(pdb)
+    struct: es.Structure = es.PDBParser.get_structure(pdb)
     mapper: Dict[Tuple[str, int], Dict] = dict()
     for res in struct.residues:
         if not res.is_canonical():
             continue
-        mapper[(res.chain(), res.idx())] = default_restriction_dict()
+        
+        cname:str = ''
+        if res.chain:
+            cname = res.chain.name
+
+        mapper[(cname, res.idx)] = default_restriction_dict()
     return MutationRestrictions(mapper, pdb)

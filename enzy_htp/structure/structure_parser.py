@@ -90,20 +90,22 @@ def build_residues(
     Returns as a dict() with (key, value) pairs of (residue_key, Union[Residue,Ligand,Solvent,MetalUnit]).""" #@shaoqz: should we also explain the keep here?
     mapper = defaultdict(list)
     for i, row in df.iterrows():
-        aa = Atom(**row)
-        mapper[aa.residue_key()].append(aa)
-    # for k,v in mapper.items():
-    # print(k,len(v))
+        aa = Atom(row)
+        key = f"{row.chain_id}.{row.residue_number}.{row.residue_name}"
+        mapper[key].append(aa)
+
     result: Dict[str, Residue] = dict()
     for res_key, atoms in mapper.items():
-        result[res_key] = Residue(residue_key=res_key,
-                                  atoms=sorted(atoms,
-                                               key=lambda a: a.atom_number))
+        _, rnum, rname = res_key.split('.')
+        result[res_key] = Residue(residue_idx=int(rnum),
+                                    residue_name=rname,
+                                    atoms=sorted(atoms,
+                                               key=lambda a: a.idx))
     for (res_key, res) in result.items():
         result[res_key] = categorize_residue(res)
-        if keep != "all":
-            result[res_key].resolve_alt_loc(keep)
-            result[res_key].remove_alt_loc()
+        #if keep != "all":
+        #    result[res_key].resolve_alt_loc(keep)
+        #    result[res_key].remove_alt_loc()
             # result[res_key].remove_occupancy() #@shaoqz: what happened here?
     return result
 

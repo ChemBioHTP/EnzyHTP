@@ -56,6 +56,9 @@ def test_mutate_pdb_one_letter_tleap():
     Note to developers: This should be replicated for each and every new package added."""
     ONE_RES:str=f"{DATA_DIR}/one_res.pdb"
     target = f"{DATA_DIR}/one_res_P1K.pdb"
+
+    fs.safe_rm(target)
+
     assert not os.path.exists(target)
     mutated = mut.mutate_pdb(ONE_RES, 1, list(), None, "tleap", None, 100)
     assert os.path.exists(target)
@@ -76,6 +79,7 @@ def test_mutate_pdb_specified_mutation_tleap():
 
     ONE_RES:str=f"{DATA_DIR}/one_res.pdb"
     target = f"{DATA_DIR}/one_res_P1G.pdb"
+    fs.safe_rm(target)
     assert not os.path.exists(target)
     mutated = mut.mutate_pdb(ONE_RES, 1, [mut.Mutation(orig='P', target='G', chain_id='A', res_num=1)], None, "tleap", None, 100)
     assert os.path.exists(target)
