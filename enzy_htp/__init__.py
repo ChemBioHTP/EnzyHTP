@@ -38,14 +38,15 @@ from .core import (
     write_data,
 )
 from ._config import config
+
 from .preparation import PDBLine, PDBPrepper, read_pdb_lines
 from .chemical import ResidueType
+from ._config import Config
 
-# from ._interface import Interface
-# from .mutation import mutate_pdb, restriction_object, MutationRestrictions
-# from .geometry import sample_geometries
+config = Config()
+from ._interface import Interface
 
-# interface = Interface(config)
-# """
-# the singleton interface object that provide access to all singleton interface objects
-# """
+interface = Interface(config)
+
+
+#TODO(CJ): add docstrings for global variables

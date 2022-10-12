@@ -8,7 +8,7 @@ import pytest
 from pathlib import Path
 import enzy_htp
 from enzy_htp.core import file_system as fs
-from enzy_htp import AmberInterface
+from enzy_htp._interface import AmberInterface
 from enzy_htp import molecular_mechanics as mm
 from pathlib import Path
 

@@ -13,4 +13,5 @@ from .config import Config
 config = Config()
 """
 Singleton object for accessing all configurations.
+TODO(CJ): Update this and make more verbose
 """
