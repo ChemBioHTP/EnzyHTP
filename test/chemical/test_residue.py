@@ -16,12 +16,12 @@ def test_variable_checks():
     assert len(res.AA_LIST) == 21
     assert all_caps(res.AA_LIST)
 
-    assert len(res.THREE_LETTER_AA_MAPPER) == 24
+    assert len(res.THREE_LETTER_AA_MAPPER) == 29
 
     three_mapper_keys = list(res.THREE_LETTER_AA_MAPPER.keys())
     three_mapper_values = list(set(list(res.THREE_LETTER_AA_MAPPER.values())))
 
-    assert len(three_mapper_keys) == 24
+    assert len(three_mapper_keys) == 29
     assert len(three_mapper_values) == 21
 
     assert all_caps(three_mapper_keys)
@@ -216,3 +216,6 @@ def test_polar():
     """Because polar() is just the opposite of non_polar()"""
     for olc in res.ONE_LETTER_AA_MAPPER.keys():
         assert res.non_polar(olc) == (not res.polar(olc))
+
+
+#TODO(CJ): add tests for the big mappers
