@@ -48,5 +48,4 @@ from ._interface import Interface
 
 interface = Interface(config)
 
-
 #TODO(CJ): add docstrings for global variables

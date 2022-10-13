@@ -20,7 +20,7 @@ from enzy_htp.core import env_manager as em
 from enzy_htp.core.exception import UnsupportedMethod
 import enzy_htp.structure as struct
 import enzy_htp.preparation as prep
-from .amber_config import AmberConfig, default_amber_config
+from enzy_htp._config.amber_config import AmberConfig, default_amber_config
 # from .frame import Frame, frames_from_pdb, read_charge_list
 
 
@@ -220,7 +220,8 @@ class AmberInterface:
         result: List[Tuple[str, str]] = list()
         assert len(paths) == len(charges)
         for lig_pdb, net_charge in zip(paths, charges):
-            lig_name: str = struct.structure_parser.get_ligand_name(lig_pdb)
+            lig_name: str = struct.PDBParser.get_structure(lig_pdb)
+            print(lig_name)
             lig_pdb = Path(lig_pdb)
             prepin: str = str(lig_pdb.with_suffix(".prepin"))
             frcmod: str = str(lig_pdb.with_suffix(".frcmod"))

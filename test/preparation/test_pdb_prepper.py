@@ -63,5 +63,3 @@ def test_prepper_rm_water():
 
     assert os.path.exists(target_no_water)
     assert equiv_files(target_no_water, actual_no_water)
-
-

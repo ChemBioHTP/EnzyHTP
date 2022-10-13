@@ -65,8 +65,8 @@ def test_convert_to_three_letter():
 def test_convert_to_one_letter():
     """Checking proper behavior and throwing of convert_to_one_letter()"""
     for (
-        three,
-        one,
+            three,
+            one,
     ) in res.THREE_LETTER_AA_MAPPER.items():
         assert res.convert_to_one_letter(three) == one
         assert res.convert_to_one_letter(three.lower()) == one

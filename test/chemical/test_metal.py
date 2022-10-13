@@ -82,39 +82,34 @@ def test_get_metal_radii_bad_inputs():
     for aname in VDW_ATOM_NAMES:
         if len(aname) < 2:
             continue
-        
+
         with pytest.raises(SystemExit) as exe:
             mm.get_atom_radii(aname.upper(), "vdw")
 
         assert exe.type == SystemExit
         assert exe.value.code == 1
 
-
     for aname in IONIC_ATOM_NAMES:
         if len(aname) < 2:
             continue
-        
+
         with pytest.raises(SystemExit) as exe:
             mm.get_atom_radii(aname.upper(), "ionic")
 
         assert exe.type == SystemExit
         assert exe.value.code == 1
 
-    
-
     with pytest.raises(SystemExit) as exe:
         mm.get_atom_radii("DNE")
-    
+
     assert exe.type == SystemExit
     assert exe.value.code == 1
-
 
     with pytest.raises(SystemExit) as exe:
         mm.get_atom_radii("C")
 
     assert exe.type == SystemExit
     assert exe.value.code == 1
-
 
     with pytest.raises(SystemExit) as exe:
         mm.get_atom_radii("H")

@@ -19,8 +19,6 @@ import enzy_htp.core as core
 
 from enzy_htp.core import file_system as fs
 from enzy_htp.structure import (
-    compare_structures,
-    merge_right,
     structure_from_pdb,
     Ligand,
     ligand_from_pdb,

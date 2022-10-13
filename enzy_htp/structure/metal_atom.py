@@ -8,6 +8,7 @@ Date: 2022-04-03
 from __future__ import annotations
 
 from copy import deepcopy
+from curses.ascii import isupper
 import itertools
 import sys
 import numpy as np
@@ -159,7 +160,9 @@ class MetalUnit(Residue):
         Allowed values are "ionic" or "vdw" for ionic and van-der waals, respectively.
         Returns a float or None if the metal does not have a distance.
         """
-        return chem.get_atom_radii(self.atom_name_, method)
+        tks = list(self._name.lower())
+        tks[0] = tks[0].upper()
+        return chem.get_atom_radii(''.join(tks), method)
 
     def clone(self) -> MetalUnit:
         """Creates deepcopy of self."""

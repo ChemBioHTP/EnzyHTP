@@ -217,8 +217,16 @@ class Chain(DoubleLinkedNode):
                 return False
         return True
 
-    def is_same_coord(self, other: Chain) -> bool:
-        """check if self is same as other in coordinate of every atom"""
+    def is_same_coord(self, other: Chain, tol: float = 0.01) -> bool:
+        """Checks if this Chain() and another Chain() have the same atoms and respective coordinates.
+
+        Args:
+            other: A different Chain() object to compare to.
+            tol: Numeric tolerance for difference in each xyz value. Default is 0.01.
+
+        Returns:
+            If the Atom()'s owned by each Chain() are equivalent.
+        """
         self_atoms = self.atoms
         self_atoms.sort(key=lambda a: a.idx)
         self_coord = map(lambda x: x.coord, self_atoms)
@@ -226,7 +234,9 @@ class Chain(DoubleLinkedNode):
         other_atoms.sort(key=lambda a: a.idx)
         other_coord = map(lambda x: x.coord, other_atoms)
         for s, o in zip(self_coord, other_coord):
-            if s != o:
+            if abs(s[0] - o[0]) > tol or abs(s[1] -
+                                             o[1]) > tol or abs(s[2] -
+                                                                o[2]) > tol:
                 return False
         return True
 

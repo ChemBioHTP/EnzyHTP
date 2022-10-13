@@ -154,7 +154,6 @@ def get_mutations(
     for mut in mutations:
         restrictions.lock_residue((mut.chain_id, mut.res_num))
 
-
     mut_dict = restrictions.apply(mut_dict)
 
     result: List[Mutation] = list()

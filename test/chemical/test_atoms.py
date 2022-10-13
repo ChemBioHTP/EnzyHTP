@@ -32,7 +32,12 @@ def test_get_h_bond_length_invalid_inputs():
     for ch in list("ABDEFHGIJKLMOPQRSTUVWXYZ"):
         assert is_close(chem.get_h_bond_length(ch), -1.0)
 
+
 def test_get_valid_generic_atom_name():
     """Test using a made up atom list. make sure unique names are generated and orders are not changed"""
-    test_atom_names = ["N", "H", "O", "C", "N", "H", "O", "C", "N", "H", "O", "C", "P"]
-    assert chem.get_valid_generic_atom_name(test_atom_names) == ['N', 'H', 'O', 'C', 'N1', 'H1', 'O1', 'C1', 'N2', 'H2', 'O2', 'C2', 'P']
+    test_atom_names = [
+        "N", "H", "O", "C", "N", "H", "O", "C", "N", "H", "O", "C", "P"
+    ]
+    assert chem.get_valid_generic_atom_name(test_atom_names) == [
+        'N', 'H', 'O', 'C', 'N1', 'H1', 'O1', 'C1', 'N2', 'H2', 'O2', 'C2', 'P'
+    ]

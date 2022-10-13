@@ -436,22 +436,6 @@ class Structure(
     #endregion
 
     #region === Getter === (Properities - derived data; wont affect Structure data - copy)
-    @property
-    def residue_state(
-            self) -> List[Tuple[str, str, int]]:  #@shaoqz: @residue_key
-        """Generates a list of tuples of all residues in the Structure. Format for each tuple is (one_letter_res_name, chain_id, res_index).
-        This method is designed for debuging purpose"""
-        result = list()
-        for cname, chain in self.chain_mapper.items():
-            for residue in chain.residues():
-                (chain, res_name, index) = residue.residue_key.split(".")
-                if residue.is_canonical():
-                    result.append(
-                        (chain, convert_to_one_letter(res_name), int(index)))
-                elif residue.is_metal(
-                ):  #@shaoqz: @imp2 any non-canonical should be using 3-letter name
-                    result.append((chain, res_name, int(index)))
-        return result
 
     @property
     def residue_keys(self) -> List[str]:
@@ -905,23 +889,6 @@ class Structure(
     #     return D
 
     #endregion
-
-
-def compare_structures(left: Structure,
-                       right: Structure) -> Dict[str, List[str]]:
-    """Compares two Structure() objects and returns a dict() of missing Residues with format:
-
-    {"left": ["residue_key1","residue_key1",..],
-     "right": ["residue_key1","residue_key1",..]
-         }
-    """
-    result = {"left": [], "right": []}
-    left_keys: Set[str] = set(left.residue_keys)
-    right_keys: Set[str] = set(right.residue_keys)
-
-    result["left"] = list(filter(lambda ll: ll not in right_keys, left_keys))
-    result["right"] = list(filter(lambda rr: rr not in left_keys, right_keys))
-    return result
 
 
 def merge_right(

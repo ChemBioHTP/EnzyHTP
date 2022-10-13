@@ -16,6 +16,7 @@ from .multiwfn_interface import MultiwfnInterface
 
 from enzy_htp._config import Config
 
+
 class Interface:
     """Wrapper class that houses access to individual <Package>Interface classes that exist in EnzyHTP.
     Each <Package>Interface is available as the attribute Interface.<package> (all lower case). Each instance
@@ -26,7 +27,7 @@ class Interface:
         multiwfn: Corresponds to instance of MultiwfnInterface().
     """
 
-    def __init__(self, config : Config):
+    def __init__(self, config: Config):
         self.amber = AmberInterface(config._amber)
         self.gaussian = GaussianInterface(config._gaussian)
         self.multiwfn = MultiwfnInterface(config._multiwfn)

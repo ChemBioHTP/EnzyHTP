@@ -98,15 +98,14 @@ def build_residues(
     for res_key, atoms in mapper.items():
         _, rnum, rname = res_key.split('.')
         result[res_key] = Residue(residue_idx=int(rnum),
-                                    residue_name=rname,
-                                    atoms=sorted(atoms,
-                                               key=lambda a: a.idx))
+                                  residue_name=rname,
+                                  atoms=sorted(atoms, key=lambda a: a.idx))
     for (res_key, res) in result.items():
         result[res_key] = categorize_residue(res)
         #if keep != "all":
         #    result[res_key].resolve_alt_loc(keep)
         #    result[res_key].remove_alt_loc()
-            # result[res_key].remove_occupancy() #@shaoqz: what happened here?
+        # result[res_key].remove_occupancy() #@shaoqz: what happened here?
     return result
 
 

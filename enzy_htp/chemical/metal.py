@@ -109,7 +109,6 @@ METAL_CENTER_MAP: Dict[str, str] = {
 }
 """Contains mapping of metal types. Used to check if a residue atom name from a PDB is a metal."""
 
-
 IONIC_RADII: Dict[str, Union[int, None]] = {
     "N": 1.32,
     "O": 1.26,
@@ -118,7 +117,8 @@ IONIC_RADII: Dict[str, Union[int, None]] = {
     "Li": 0.90,
     "Zn": 0.88,
     "Co": 0.68,  # +3 ls
-    "Fe": 0.92,  # +2 hs / PDB disctance based (5HIO) / can not handel really well
+    "Fe":
+        0.92,  # +2 hs / PDB disctance based (5HIO) / can not handel really well
     "Mn": 0.90,  # +2 / modified based on PDB (1K20)
     "Ca": 1.14,
 }
@@ -151,25 +151,17 @@ VDW_RADII = {
 }
 """Mapping of metal elements to Van-Der Waals (VDW) radii. Value is 'None' if non-existent."""
 
-DONOR_ATOM_LIST=["NH2", "NE", "NH1",
-                 "ND1", "NE2",
-                 "NZ",
-                 "OD1", 'OD2',
-                 "OE1", 'OE2',
-                 "OG",
-                 "OG1",
-                 "ND2", "OD1",
-                 "OE1", "NE2",
-                 "SG",
-                 "SD",
-                 "OH",
-                 "NE1"]
+DONOR_ATOM_LIST = [
+    "NH2", "NE", "NH1", "ND1", "NE2", "NZ", "OD1", 'OD2', "OE1", 'OE2', "OG",
+    "OG1", "ND2", "OD1", "OE1", "NE2", "SG", "SD", "OH", "NE1"
+]
 """List for atom names that can be a qaulify electron donor atom to a coordination center
 The dictionary key here was for the parsing logic of atom names. Current the PDB format
 TODO see if there are more format and the way to decouple this from atom.name. (maybe just
 use the most popular one parse the rest into it. In that way there's no need for these dict
 keys)
 See /resource/AtomName.cdx for more detail"""
+
 
 def get_atom_radii(element: str, method: str = "ionic") -> float:
     """Given a element name and a method, returns the radii for that element. Allowed methods are 'ionic' and 'vdw'.
@@ -183,8 +175,11 @@ def get_atom_radii(element: str, method: str = "ionic") -> float:
             f"The radii method '{method}' is not allowed. Only 'ionic' and 'vdw' are supported. Exiting..."
         )
         sys.exit(1)
+
     if result is None:
-        _LOGGER.error(f"query element {element} not in {method} mapper. Consider add it in.")
+        _LOGGER.error(
+            f"query element {element} not in {method} mapper. Consider adding it in enzy_htp.chemical.metal"
+        )
         sys.exit(1)
     return result
 

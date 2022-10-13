@@ -186,7 +186,7 @@ class Residue(DoubleLinkedNode):
 
     def is_sequence_eq(self, other: Residue) -> bool:
         """Comparator that checks for sequence same-ness."""
-        return self.key() == other.key()
+        return self.name == other.name
 
     def is_deprotonatable(self) -> bool:
         """
@@ -231,8 +231,8 @@ class Residue(DoubleLinkedNode):
             )
             exit(1)
         aa: Atom
-        self._atoms = sorted(self._atoms, key=lambda aa: aa.atom_number
-                            )  #@shaoqz: maybe use .sort to keep the reference.
+        self._atoms.sort(key=lambda aa: aa.idx
+                        )  #@shaoqz: maybe use .sort to keep the reference.
 
         for idx, aa in enumerate(self._atoms):
             self._atoms[

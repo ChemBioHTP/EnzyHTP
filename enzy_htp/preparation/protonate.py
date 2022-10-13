@@ -260,6 +260,7 @@ def protonate_ligand_with_pybel(stru: Structure,
     #work on the path
     if int_ligand_file_dir is None:
         int_ligand_file_dir = config["system.SCRATCH_DIR"]
+
     fs.safe_mkdir(int_ligand_file_dir)
 
     for ligand in stru.ligands:

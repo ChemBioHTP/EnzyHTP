@@ -213,8 +213,8 @@ def restriction_object(pdb: str) -> MutationRestrictions:
     for res in struct.residues:
         if not res.is_canonical():
             continue
-        
-        cname:str = ''
+
+        cname: str = ''
         if res.chain:
             cname = res.chain.name
 

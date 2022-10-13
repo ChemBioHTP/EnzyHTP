@@ -7,17 +7,10 @@ import os
 import pytest
 import numpy as np
 from typing import List
-from biopandas.pdb import PandasPdb
 
 import enzy_htp.chemical as chem
-from enzy_htp.structure import (
-    MetalUnit,
-    PDBParser,
-    Residue,
-    Atom,
-    residue_to_metal,
-)
-
+from enzy_htp.structure import (MetalUnit, PDBParser, Residue, Atom,
+                                residue_to_metal, PDBParser)
 
 CURR_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = f"{CURR_DIR}/data/"
@@ -33,10 +26,12 @@ def test_constant_data():
     assert not ma.is_canonical()
     assert ma.rtype == chem.ResidueType.METAL
 
+
 def test_element():
-    stru = PDBParser().get_structure(f"{DATA_DIR}1NVG.pdb")
+    stru = PDBParser.get_structure(f"{DATA_DIR}1NVG.pdb")
     metalcenter: MetalUnit = stru.metalcenters[0]
     assert metalcenter.element == "Zn"
+
 
 def test_get_donor_atoms():
     """test get donor atoms for a metal center from a stru"""
@@ -47,37 +42,38 @@ def test_get_donor_atoms():
     assert len(metalcenter1.get_donor_atoms()) == 4
     assert len(metalcenter2.get_donor_atoms()) == 4
 
+
 def test_get_donor_mapper():
-    stru = PDBParser().get_structure(f"{DATA_DIR}1NVG.pdb")
+    stru = PDBParser.get_structure(f"{DATA_DIR}1NVG.pdb")
     metalcenter1: MetalUnit = stru.metalcenters[0]
     donor_mapper = metalcenter1.get_donor_mapper()
     assert len(donor_mapper) == 4
     assert list(donor_mapper.values())[0][0].name == "OE2"
 
-@pytest.mark.TODO
+
 def test_get_radii_method_good_input():
     """Ensuring the MetalUnit.get_radii() method works correctly."""
     pdb_file = f"{DATA_DIR}/1NVG.pdb"
-    metals: List[MetalUnit] = structure_from_pdb(pdb_file).metals
+    metals: List[MetalUnit] = PDBParser.get_structure(pdb_file).metals
     assert np.isclose(metals[0].get_radii(), 0.88)
     assert np.isclose(metals[0].get_radii("vdw"), 1.39)
 
     assert np.isclose(metals[0].get_radii(), metals[1].get_radii())
     assert np.isclose(metals[0].get_radii("vdw"), metals[1].get_radii("vdw"))
 
-@pytest.mark.TODO
+
 def test_residue_to_metal():
     """Ensuring the residue_to_metal() method works."""
-    residue = Residue("A.ZN.1", [Atom(line_idx=1, atom_name="Zn")])
+    residue = Residue(5, "Zn", list())
     metal: MetalUnit = residue_to_metal(residue)
     assert isinstance(metal, MetalUnit)
-    assert metal.atom_name_ == "Zn"
+    assert metal.name == "Zn"
 
-@pytest.mark.TODO
+
 def test_clone():
     """Checking that the Ligand.clone() method returns a deepcopy of the current MetalUnit()."""
     pdb_file = f"{DATA_DIR}/1NVG.pdb"
-    metals: List[MetalUnit] = structure_from_pdb(pdb_file).metals
+    metals: List[MetalUnit] = PDBParser.get_structure(pdb_file).metals
     metal: MetalUnit = metals[0]
     metal_cpy: MetalUnit = metal.clone()
     assert isinstance(metal_cpy, MetalUnit)
