@@ -109,8 +109,8 @@ def test_same_sequence_not_equal():
     assert not chain1.is_same_sequence(chain5)
 
 
-def test_rename():
-    """Testing the Chain.rename() method that gives the Chain() a new name."""
+def test_name_setter():
+    """Testing the Chain.name setter method that gives the Chain() a new name."""
     residues = [
         Residue(1, "A", list()),
         Residue(2, "A", list()),
