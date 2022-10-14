@@ -1,5 +1,4 @@
 """Testing the enumerated types found in enzy_htp.chemical.enum
-
 Author: Chris Jurich <chris.jurich@vanderbilt.edu
 Date: 2022-04-03
 """
@@ -13,7 +12,8 @@ def test_enum_value_comparisons():
     assert renum.ResidueType.NONCANONICAL < renum.ResidueType.SOLVENT
     assert renum.ResidueType.SOLVENT < renum.ResidueType.METAL
     assert renum.ResidueType.METAL < renum.ResidueType.LIGAND
-    assert renum.ResidueType.LIGAND < renum.ResidueType.UNKNOWN
+    assert renum.ResidueType.LIGAND < renum.ResidueType.TRASH
+    assert renum.ResidueType.TRASH < renum.ResidueType.UNKNOWN
 
 
 def test_converstion_to_integer():
@@ -23,7 +23,8 @@ def test_converstion_to_integer():
     assert int(renum.ResidueType.SOLVENT) == 2
     assert int(renum.ResidueType.METAL) == 3
     assert int(renum.ResidueType.LIGAND) == 4
-    assert int(renum.ResidueType.UNKNOWN) == 5
+    assert int(renum.ResidueType.TRASH) == 5
+    assert int(renum.ResidueType.UNKNOWN) == 6
 
 
 def test_conversion_from_integer():
@@ -33,7 +34,8 @@ def test_conversion_from_integer():
     assert renum.ResidueType(2) == renum.ResidueType.SOLVENT
     assert renum.ResidueType(3) == renum.ResidueType.METAL
     assert renum.ResidueType(4) == renum.ResidueType.LIGAND
-    assert renum.ResidueType(5) == renum.ResidueType.UNKNOWN
+    assert renum.ResidueType(5) == renum.ResidueType.TRASH
+    assert renum.ResidueType(6) == renum.ResidueType.UNKNOWN
 
 
 def test_residue_type_mapper():
@@ -43,4 +45,6 @@ def test_residue_type_mapper():
     assert renum.RESIDUE_TYPE_MAPPER[renum.ResidueType(2)] == "SOLVENT"
     assert renum.RESIDUE_TYPE_MAPPER[renum.ResidueType(3)] == "METAL"
     assert renum.RESIDUE_TYPE_MAPPER[renum.ResidueType(4)] == "LIGAND"
-    assert renum.RESIDUE_TYPE_MAPPER[renum.ResidueType(5)] == "UNKNOWN"
+    assert renum.RESIDUE_TYPE_MAPPER[renum.ResidueType(5)] == "TRASH"
+    assert renum.RESIDUE_TYPE_MAPPER[renum.ResidueType(6)] == "UNKNOWN"
+

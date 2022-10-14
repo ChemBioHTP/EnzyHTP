@@ -2,10 +2,8 @@
 serves as a wrapper for all associated Multiwfin functionality though this behavior is also partially controlled
 by the MultiwfnConfig class owned by the interface. Supported operations include:
     + bond dipole calculations
-
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
-
 Date: 2022-07-01
 """
 import re
@@ -17,8 +15,7 @@ import numpy as np
 from enzy_htp.core import env_manager as em
 from enzy_htp.core import file_system as fs
 
-from .multiwfn_config import MultiwfnConfig, default_multiwfn_config
-
+# from .multiwfn_config import MultiwfnConfig, default_multiwfn_config
 
 # TODO(CJ): add .config() getter
 
@@ -43,6 +40,7 @@ class MultiwfnInterface:
         self.compatible_env_ = self.env_manager_.is_missing()
 
     def parse_two_center_dp_moments(self, fname) -> List[Tuple[Tuple, Tuple]]:
+
         def digits_only(raw: str) -> str:
             return re.sub(r"[a-z:/]", "", raw.lower())
 
@@ -58,7 +56,8 @@ class MultiwfnInterface:
         result = list()
         for ll in lines[idx:end]:
             tks = digits_only(ll).split()
-            result.append(((int(tks[2]), int(tks[4])), tuple(map(float, tks[-4:]))))
+            result.append(
+                ((int(tks[2]), int(tks[4])), tuple(map(float, tks[-4:]))))
 
         return result
 
@@ -72,7 +71,8 @@ class MultiwfnInterface:
         while lines[end].find("-------------------------") == -1:
             end += 1
         atom_lines: List[str] = lines[idx:end]
-        raw_coords = np.array(list(map(lambda ll: ll.split()[-3:], lines[idx:end])))
+        raw_coords = np.array(
+            list(map(lambda ll: ll.split()[-3:], lines[idx:end])))
         return np.asfarray(raw_coords, dtype=float)
 
     def get_bond_dipole(self, fchks: List[str], a1, a2) -> List[float]:
@@ -102,30 +102,28 @@ class MultiwfnInterface:
         2-center LMO dipole is defined by the deviation of the eletronic mass center relative to the bond center.
         Dipole positive Direction: negative(-) to positive(+).
         Result direction: a1 -> a2
-
         REF: Lu, T.; Chen, F., Multiwfn: A multifunctional wavefunction analyzer. J. Comput. Chem. 2012, 33 (5), 580-592.
         """
         dipoles = []
 
         # self.init_Multiwfn()
         infile = f"{Path(fchks[0]).parent}/dipole_settings.in"
-        settings: List[
-            str
-        ] = (
+        settings: List[str] = (
             "19 -8 1 y q".split()
         )  # TODO(CJ): paramterize this so that it is controlled by MultiwfnConfig
         fs.write_lines(infile, settings)
 
         for fchk in fchks:
             # get a1->a2 vector from .out (update to using fchk TODO)
-            coords = self.parse_gaussian_coords(str(Path(fchk).with_suffix(".out")))
+            coords = self.parse_gaussian_coords(
+                str(Path(fchk).with_suffix(".out")))
             bond_vec = coords[a2] - coords[a1]
 
             # Run Multiwfn
             outfile = str(Path(fchk).with_suffix(".dip"))
             self.env_manager_.run_command(
-                self.config_.EXE, [fchk, "<", infile, "&&", "mv", "LMOdip.txt", outfile]
-            )
+                self.config_.EXE,
+                [fchk, "<", infile, "&&", "mv", "LMOdip.txt", outfile])
             fs.safe_rm("LMOcen.txt")
             fs.safe_rm("new.fch")
             dp_moments = self.parse_two_center_dp_moments(outfile)
