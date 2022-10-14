@@ -5,6 +5,7 @@ from distutils.command.config import config
 from AmberMaps import Resi_list
 import os
 import numpy as np
+
 """
 ====
 Tree
@@ -13,7 +14,6 @@ Tree
 
 
 class Child:
-
     def __init__(self):
         self.parent = None
 
@@ -124,12 +124,9 @@ def get_distance(p1, p2):
 """
 
 
-def generate_Rosetta_params(input_file,
-                            out_dir,
-                            resn,
-                            out_pdb_name,
-                            if_conformer=0,
-                            overwrite=0):
+def generate_Rosetta_params(
+    input_file, out_dir, resn, out_pdb_name, if_conformer=0, overwrite=0
+):
     """
     generate rosetta params file using molfile_to_params.py
     The command will be:

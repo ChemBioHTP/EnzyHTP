@@ -13,7 +13,6 @@ from pprint import pprint
 from copy import deepcopy
 from typing import Any, List, Dict
 
-
 class AmberConfig:
     """Class that holds default values for running Amber within enzy_htp and also creates
     input files for minimzation, heating, constant pressure production, and constant

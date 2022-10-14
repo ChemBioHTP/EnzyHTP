@@ -4,12 +4,16 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 2022-04-03
 """
 
+
 # TODO(CJ): Define a named tuple ( https://realpython.com/python-namedtuple/ ) with the following information:
 # Major Version, Minor version, Patch
 
+
 # TODO(CJ): Create function that returns the Version Tuple of the current version of enzy_htp
 
+
 # TODO(CJ): Create test file in test/core/test_settings.py and test all functions.
+
 
 # TODO fill out the below functions
 

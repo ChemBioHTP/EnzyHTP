@@ -5,7 +5,6 @@ import os
 from typing import Any
 from copy import deepcopy
 
-
 # TODO(CJ): need documentation here
 class SystemConfig:
 

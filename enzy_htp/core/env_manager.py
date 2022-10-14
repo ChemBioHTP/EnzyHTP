@@ -111,7 +111,8 @@ class EnvironmentManager:
         try:
             result = run(cmd, shell=True, capture_output=True, check=True)
             res_lines = list(
-                map(lambda ss: ss.decode("utf-8"), result.stdout.splitlines()))
+                map(lambda ss: ss.decode("utf-8"), result.stdout.splitlines())
+            )
             _LOGGER.info(f"Command run!")
         except Exception as e:
             _LOGGER.error(

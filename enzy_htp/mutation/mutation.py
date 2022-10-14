@@ -39,8 +39,11 @@ def valid_mutation(mut: Mutation) -> bool:
     Returns:
         True if the Mutation() passes all checks, False if not.
     """
-    if (not isinstance(mut.orig, str) or not isinstance(mut.target, str) or
-            not isinstance(mut.chain_id, str)):
+    if (
+        not isinstance(mut.orig, str)
+        or not isinstance(mut.target, str)
+        or not isinstance(mut.chain_id, str)
+    ):
         return False
 
     if mut.orig not in ONE_LETTER_AA_MAPPER and mut.orig != "X":
@@ -53,7 +56,8 @@ def valid_mutation(mut: Mutation) -> bool:
         return False
 
     if (mut.chain_id.upper() not in string.ascii_uppercase) and len(
-            mut.chain_id.strip()):
+        mut.chain_id.strip()
+    ):
         return False
 
     if not isinstance(mut.res_num, int) or mut.res_num < 1:
@@ -63,7 +67,8 @@ def valid_mutation(mut: Mutation) -> bool:
 
 
 def generate_all_mutations(
-    structure: es.Structure,) -> Dict[Tuple[str, int], List[Mutation]]:
+    structure: es.Structure,
+) -> Dict[Tuple[str, int], List[Mutation]]:
     """Creates all possible mutations for a given Structure() object. Puts all the mutations into a dict()
     where the (key, value) pairs are ((chain_id, residue), List[Mutation]). The List[Mutation] is all mutations
     from the existing residue to the other 20 residues. For a given enzyme with N residues, there will be a total
@@ -87,9 +92,11 @@ def generate_all_mutations(
         result[res.key()] = list(
             map(
                 lambda ch: Mutation(
-                    orig=orig, target=ch, chain_id=chain_id, res_num=num),
+                    orig=orig, target=ch, chain_id=chain_id, res_num=num
+                ),
                 chem.one_letters_except(orig),
-            ))
+            )
+        )
 
     # a last check
     for mut_list in result.values():
@@ -109,8 +116,7 @@ def size_increase(mut: Mutation) -> bool:
         If the described mutation leads to an increase in size.
     """
 
-    return chem.RESIDUE_VOLUME_MAPPER[mut.target] > chem.RESIDUE_VOLUME_MAPPER[
-        mut.orig]
+    return chem.RESIDUE_VOLUME_MAPPER[mut.target] > chem.RESIDUE_VOLUME_MAPPER[mut.orig]
 
 
 def size_decrease(mut: Mutation) -> bool:
@@ -124,8 +130,7 @@ def size_decrease(mut: Mutation) -> bool:
         If the described mutation leads to a decrease in size.
     """
 
-    return chem.RESIDUE_VOLUME_MAPPER[mut.target] < chem.RESIDUE_VOLUME_MAPPER[
-        mut.orig]
+    return chem.RESIDUE_VOLUME_MAPPER[mut.target] < chem.RESIDUE_VOLUME_MAPPER[mut.orig]
 
 
 def polarity_change(mut: Mutation) -> bool:
@@ -138,8 +143,9 @@ def polarity_change(mut: Mutation) -> bool:
     Returns:
         If the described mutation leads to a change in polarity.
     """
-    return chem.residue.residue_polarity(
-        mut.orig) != chem.residue.residue_polarity(mut.target)
+    return chem.residue.residue_polarity(mut.orig) != chem.residue.residue_polarity(
+        mut.target
+    )
 
 
 def same_polarity(mut: Mutation) -> bool:

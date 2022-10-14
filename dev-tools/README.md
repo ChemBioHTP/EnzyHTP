@@ -17,5 +17,3 @@ from .logger import _LOGGER
 from .exception import MissingEnvironmentElement
 
 ```
-
-

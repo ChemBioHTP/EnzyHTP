@@ -24,7 +24,6 @@ class DoubleLinkedNode():
     """
     class for parent objects of the doubly linked tree
     """
-
     #region === Attr ===
     # parent use
     def set_children(self, children: List):
@@ -49,7 +48,6 @@ class DoubleLinkedNode():
     @property
     def children(self) -> List:
         return self.get_children()
-
     @children.setter
     def children(self, val):
         self.set_children(val)
@@ -76,11 +74,9 @@ class DoubleLinkedNode():
     @property
     def parent(self):
         return self.get_parent()
-
     @parent.setter
     def parent(self, val):
         self.set_parent(val)
-
     #endregion
 
     #region === edit ===
@@ -182,12 +178,11 @@ class DoubleLinkedNode():
     def __len__(self) -> int:
         return len(self._children)
 
-
 # TODO go to other core
 def delete_base_on_id(target_list: list, target_id: int):
     """
     delete an element from a list base on its id() value
     """
-    for i in range(len(target_list) - 1, -1, -1):
+    for i in range(len(target_list)-1,-1,-1):
         if id(target_list[i]) == target_id:
             del target_list[i]

@@ -19,7 +19,6 @@ sp = PDBParser()
 
 def test_remove_solvent():
     pdb_file_path = f"{DATA_DIR}1Q4T_ligand_test.pdb"
-    print(pdb_file_path)
     stru: Structure = sp.get_structure(pdb_file_path)
     cl.remove_solvent(stru)
     assert len(stru.residues) == 284
