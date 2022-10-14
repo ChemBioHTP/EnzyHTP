@@ -22,7 +22,7 @@ from biopandas.pdb import PandasPdb
 import enzy_htp.chemical as chem
 import enzy_htp.structure as struct
 import enzy_htp.preparation as prep
-import enzy_htp.molecular_mechanics as mm
+from enzy_htp import interface 
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import _LOGGER, UnsupportedMethod
 
@@ -263,8 +263,8 @@ def _mutate_tleap(pdb: str, outfile: str, mutations: List[Mutation]) -> None:
 
     fs.write_lines(outfile,
                    np.array(list(map(lambda pl: pl.line, pdb_lines)))[mask])
-    ai = mm.AmberInterface()
-    ai.mutate(outfile)
+    
+    interface.amber.mutate(outfile)
     if backup:
         structure: struct.Structure = struct.structure_from_pdb(outfile)
         for rkey in structure.residue_keys:

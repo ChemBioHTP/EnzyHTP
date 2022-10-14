@@ -13,6 +13,8 @@ import enzy_htp.structure as es
 from enzy_htp.core import file_system as fs
 from enzy_htp.core.exception import UnsupportedMethod
 
+from enzy_htp import interface
+
 DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/data/"
 
 

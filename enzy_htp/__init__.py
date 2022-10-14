@@ -33,13 +33,13 @@ from .core import (
     _LOGGER,
     write_data,
 )
+
 from ._config import config
 
 from .preparation import PDBLine, PDBPrepper, read_pdb_lines
 from .chemical import ResidueType
 from ._config import Config
 
-config = Config()
 from ._interface import Interface
 
 interface = Interface(config)
