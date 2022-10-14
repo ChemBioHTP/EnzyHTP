@@ -32,7 +32,7 @@ def test_sequence_noncanonical():
 
 
 def test_is_same_coord():
-    """Testing that the Chain.is_same_coord() method workds correctly"""
+    """Testing that the Chain.is_same_coord() method works correctly"""
     pdb_file_path = f"{DATA_DIR}two_chain.pdb"
     stru: Structure = sp.get_structure(pdb_file_path)
     ch1, ch2 = deepcopy(stru.chains[0]), deepcopy(stru.chains[0])
