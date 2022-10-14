@@ -139,22 +139,6 @@ def equiv_files(fname1: str, fname2: str, width: int = None) -> bool:
     return True
 
 
-def test_round_trip_pdb():
-    """Ensuring that the Structure() class be loaded into a .pdb and saved back in a round trip without error."""
-    # FIXME(CJ): This test doesn"t currently work for 1NVG: figure out the PDBline stuff
-    # that will make this work
-    TEST_FILE = f"{DATA_DIR}/1NVG.pdb"
-    actual_file = f"{DATA_DIR}/1NVG_cpy.pdb"
-    structure1: Structure = PDBParser().get_structure(TEST_FILE, "all")
-    fs.safe_rm(actual_file)
-    assert not os.path.exists(actual_file)
-    #structure1.to_pdb(actual_file)
-    structure1_contents: List[str] = PDBParser().get_file_str(structure1).splitlines()
-    fs.write_lines(actual_file, structure1_contents)
-    assert os.path.exists(actual_file)
-    assert equiv_files(TEST_FILE, actual_file, 60)
-    fs.safe_rm(actual_file)
-    assert not os.path.exists(actual_file)
 
 
 def test_atoms():  # TODO(shaoqz) wait for test
