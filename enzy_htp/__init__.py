@@ -38,7 +38,6 @@ from ._config import config
 
 from .preparation import PDBLine, PDBPrepper, read_pdb_lines
 from .chemical import ResidueType
-from ._config import Config
 
 from ._interface import Interface
 
