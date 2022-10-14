@@ -100,7 +100,11 @@ class Frame:
                 if key == l2:
                     self.coord.append(l1_coord)
 
-    def write_to_template(self, t_file_path, out_path=None, index: str = None, ifchk=1):
+    def write_to_template(self,
+                          t_file_path,
+                          out_path=None,
+                          index: str = None,
+                          ifchk=1):
         """
         1. find the beginning and ending of the coordinate section.
         2. replace coordinate based on the same atom sequence.
@@ -150,17 +154,8 @@ class Frame:
                         z = "{:>15.8f}".format(line_coord[2])
                         layer_mark = lp[5]
 
-                        new_line = (
-                            " "
-                            + label
-                            + " "
-                            + freeze_mark
-                            + x
-                            + y
-                            + z
-                            + " "
-                            + layer_mark
-                        )
+                        new_line = (" " + label + " " + freeze_mark + x + y +
+                                    z + " " + layer_mark)
 
                         if len(lp) > 6:
                             new_line = new_line + " " + lp[6] + " " + lp[7]
@@ -177,9 +172,13 @@ class Frame:
 
         return out_path
 
-    def write_sele_lines(
-        self, sele_list, out_path=None, ff="gjf", g_route=None, chrgspin=None, ifchk=0
-    ):
+    def write_sele_lines(self,
+                         sele_list,
+                         out_path=None,
+                         ff="gjf",
+                         g_route=None,
+                         chrgspin=None,
+                         ifchk=0):
         """
         the sele list should be a map like: {'int':'atom_name', '1':'H', ....}
         --------
@@ -189,7 +188,7 @@ class Frame:
         if out_path == None:
             out_path = "sele_coord." + ff
         if ifchk:
-            chk_path = out_path[: -len(ff)] + "chk"
+            chk_path = out_path[:-len(ff)] + "chk"
 
         sele_lines = []
         for sele in sele_list.keys():
@@ -197,9 +196,9 @@ class Frame:
             if "-" in sele:
                 ele_name = sele_list[sele]
                 fix_info = sele.split("-")
-                fix_val_coord = self._get_fix_val_coord(
-                    fix_info[0], fix_info[1], fix_info[2]
-                )
+                fix_val_coord = self._get_fix_val_coord(fix_info[0],
+                                                        fix_info[1],
+                                                        fix_info[2])
                 sele_lines.append((ele_name, fix_val_coord))
                 continue
 
@@ -220,9 +219,8 @@ class Frame:
             if ff == "gjf":
                 if ifchk:
                     of.write(r"%chk=" + chk_path + line_feed)
-                of.write(
-                    "%mem=" + str(Config.max_core * Config.n_cores) + "MB" + line_feed
-                )
+                of.write("%mem=" + str(Config.max_core * Config.n_cores) +
+                         "MB" + line_feed)
                 of.write("%nprocshared=" + str(Config.n_cores) + line_feed)
                 if g_route == None:
                     of.write("# hf/3-21g" + line_feed)
@@ -465,10 +463,9 @@ def __from_gauss_out(cls, g_out_file):
                     skip4 = skip4 + 1
                     continue
                 # detect end of the coord section
-                if (
-                    line.strip()
-                    == "---------------------------------------------------------------------"
-                ):
+                if (line.strip(
+                ) == "---------------------------------------------------------------------"
+                   ):
                     coord_flag = 0
                     break
 
@@ -499,7 +496,8 @@ def load_frames(fname: str) -> List[Frame]:
     elif striped_name.endswith(".out"):
         ftype = "gauss_out"
     else:
-        raise UnsupportedFileType(f"{fname} is not a valid mdcrd or Gaussian .out file")
+        raise UnsupportedFileType(
+            f"{fname} is not a valid mdcrd or Gaussian .out file")
 
     implementation = {
         "mdcrd": __from_mdcrd,

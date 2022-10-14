@@ -59,8 +59,7 @@ class Layer:
             if len(atom_lists) not in [2, 3]:
                 raise Exception(
                     "Layer.__init__: only support 2 or 3 layers. Input layers: "
-                    + str(len(atom_lists))
-                )
+                    + str(len(atom_lists)))
 
             for layer in atom_lists:
                 atoms = []
@@ -108,9 +107,8 @@ class Layer:
         stru = PDB_obj.stru
 
         if set_id not in [1, 2, 3, 4, 5]:
-            raise Exception(
-                "Only support 1-5 set_id now. You are entering: " + str(set_id)
-            )
+            raise Exception("Only support 1-5 set_id now. You are entering: " +
+                            str(set_id))
 
         if set_id == 1:
             # TODO: connect with the database and recognize the substrate in the future

@@ -40,7 +40,7 @@ class Atom(DoubleLinkedNode):
         element : Character representing element.
     """
 
-    def __init__(self, ds: pd.Series, parent = None):
+    def __init__(self, ds: pd.Series, parent=None):
         """Constructor of Atom(), where ds is of type pandas.Series"""
         # nessessary
         self._name = ds["atom_name"].strip()
@@ -63,12 +63,12 @@ class Atom(DoubleLinkedNode):
         if "charge" in ds_keys and not np.isnan(ds["charge"]):
             self._charge = float(ds["charge"])
 
-
     #region === Getter-Attr (ref) ===
     @property
     def name(self) -> str:
         """Getter for the Atom()'s name."""
         return self._name
+
     @name.setter
     def name(self, val):
         self._name = val
@@ -77,8 +77,11 @@ class Atom(DoubleLinkedNode):
     def idx(self) -> int:
         """Getter for the Atom()'s index."""
         if self._idx is None:
-            _LOGGER.warning(f"{sys._getframe().f_back.f_back.f_code.co_name}:{sys._getframe().f_back.f_code.co_name} is using index of an non-indexing atom: {self}") # pylint: disable=logging-fstring-interpolation,line-too-long
+            _LOGGER.warning(
+                f"{sys._getframe().f_back.f_back.f_code.co_name}:{sys._getframe().f_back.f_code.co_name} is using index of an non-indexing atom: {self}"
+            )  # pylint: disable=logging-fstring-interpolation,line-too-long
         return self._idx
+
     @idx.setter
     def idx(self, val):
         self._idx = val
@@ -87,6 +90,7 @@ class Atom(DoubleLinkedNode):
     def coord(self) -> Tuple[float, float, float]:
         """Getter for coordinate of current atom"""
         return self._coord
+
     @coord.setter
     def coord(self, val):
         self._coord = val
@@ -95,6 +99,7 @@ class Atom(DoubleLinkedNode):
     def residue(self):
         """synonym for parent"""
         return self.get_parent()
+
     @residue.setter
     def residue(self, val):
         self.set_parent(val)
@@ -103,6 +108,7 @@ class Atom(DoubleLinkedNode):
     def b_factor(self):
         """getter for b_factor"""
         return self._b_factor
+
     @b_factor.setter
     def b_factor(self, val):
         self._b_factor = val
@@ -117,10 +123,12 @@ class Atom(DoubleLinkedNode):
                 return self.parent.element
             else:
                 # case: in ligand atoms are named like this H1
-                return re.match("^[A-Z][a-z]?",self.name).group()
-        elif self.parent.is_metal(): # in pdb some metal's element name is wrong
+                return re.match("^[A-Z][a-z]?", self.name).group()
+        elif self.parent.is_metal(
+        ):  # in pdb some metal's element name is wrong
             return self.parent.element
         return self._element
+
     @element.setter
     def element(self, val):
         self._element = val
@@ -129,6 +137,7 @@ class Atom(DoubleLinkedNode):
     def charge(self):
         """getter for _charge"""
         return self._charge
+
     @charge.setter
     def charge(self, val):
         self._charge = val
@@ -139,6 +148,7 @@ class Atom(DoubleLinkedNode):
         if self.is_connected():
             return self._connect
         return self.get_connect()
+
     @connect.setter
     def connect(self, val):
         self._connect = val
@@ -155,38 +165,48 @@ class Atom(DoubleLinkedNode):
         connect = []
         parent_residue = self.parent
         if parent_residue.name in chem.solvent.RD_SOLVENT_LIST:
-            cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP[parent_residue.name][self.name]
+            cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP[
+                parent_residue.name][self.name]
         elif parent_residue.is_canonical():
             r = parent_residue
             r1 = parent_residue.chain[0]
             rm1 = parent_residue.chain[-1]
             if r is r1:
                 # N terminal
-                cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP_NTERMINAL[parent_residue.name][self.name]
+                cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP_NTERMINAL[
+                    parent_residue.name][self.name]
             else:
                 if r == rm1:
                     # C terminal
-                    cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP_CTERMINAL[parent_residue.name][self.name]
+                    cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP_CTERMINAL[
+                        parent_residue.name][self.name]
                 else:
-                    cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP[parent_residue.name][self.name]
+                    cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP[
+                        parent_residue.name][self.name]
         else:
-            _LOGGER.error(f"getting connectivity of non-canonical residue {self.parent}")
+            _LOGGER.error(
+                f"getting connectivity of non-canonical residue {self.parent}")
             sys.exit(1)
         for name in cnt_atomnames:
             try:
                 if name not in ["-1C", "+1N"]:
                     cnt_atom = parent_residue.find_atom_name(name)
                 if name == "-1C":
-                    cnt_resi = parent_residue.chain.find_residue_idx(parent_residue.idx-1)
+                    cnt_resi = parent_residue.chain.find_residue_idx(
+                        parent_residue.idx - 1)
                     cnt_atom = cnt_resi.find_atom_name("C")
                 if name == "+1N":
-                    cnt_resi = parent_residue.chain.find_residue_idx(parent_residue.idx+1)
+                    cnt_resi = parent_residue.chain.find_residue_idx(
+                        parent_residue.idx + 1)
                     cnt_atom = cnt_resi.find_atom_name("N")
                 connect.append(cnt_atom)
             except ResidueDontHaveAtom as e:
-                _LOGGER.warning(f"missing connecting atom {e.atom_name} of {self}. Structure maybe incomplete.")
+                _LOGGER.warning(
+                    f"missing connecting atom {e.atom_name} of {self}. Structure maybe incomplete."
+                )
         self._connect = connect
         return self._connect
+
     #endregion
 
     #region === Getter-Property (ref) ===
@@ -209,7 +229,7 @@ class Atom(DoubleLinkedNode):
         return mh.get_distance(self.coord, point.coord)
 
     @dispatch
-    def distance_to(self, point: tuple) -> float: # pylint: disable=function-redefined
+    def distance_to(self, point: tuple) -> float:  # pylint: disable=function-redefined
         """Get the distance to the other atom or a point."""
         return mh.get_distance(self.coord, point)
 
@@ -224,15 +244,17 @@ class Atom(DoubleLinkedNode):
     def is_donor_atom(self) -> bool:
         """check if the atom is a donor atom to a coordination center"""
         return self.name in chem.metal.DONOR_ATOM_LIST
-    
+
     def is_connected(self) -> bool:
         """check if self is in the connected state"""
         return self._connect is not None
+
     #endregion
 
     #region == Special ==
     def __str__(self):
         return f"Atom({self._name}, {self._idx}, {self._coord}, {self._parent}, {self._b_factor}, {self._element}, {self._charge} )"
+
     #endregion
 
     @dispatch
@@ -241,4 +263,3 @@ class Atom(DoubleLinkedNode):
         dummy method for dispatch
         """
         pass
-

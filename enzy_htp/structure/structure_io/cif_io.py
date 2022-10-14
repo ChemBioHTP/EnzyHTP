@@ -4,5 +4,6 @@ Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
 Date: 2022-08-01
 """
 
+
 class CIFParser:
-	pass
+    pass

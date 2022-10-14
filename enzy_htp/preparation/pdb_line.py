@@ -239,7 +239,6 @@ def read_pdb_lines(fname: str) -> List[PDBLine]:
     ending = fs.get_file_ext(fname).lower()
     if not ending == ".pdb":
         raise core.UnsupportedFileType(
-            f"read_pdb_lines() requires a .pdb file. Could not read '{fname}'"
-        )
+            f"read_pdb_lines() requires a .pdb file. Could not read '{fname}'")
     non_empty = list(filter(len, fs.lines_from_file(fname)))
     return list(map(PDBLine, non_empty))

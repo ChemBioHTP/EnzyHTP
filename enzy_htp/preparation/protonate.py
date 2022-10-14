@@ -6,7 +6,7 @@ Date: 2022-04-05
 """
 # TODO(CJ): add more documentation
 from pathlib import Path
-from typing import Union,Tuple, Dict
+from typing import Union, Tuple, Dict
 from biopandas.pdb import PandasPdb
 import pandas as pd
 
@@ -15,14 +15,8 @@ import enzy_htp.chemical as chem
 from enzy_htp.core import file_system as fs
 from enzy_htp import config
 from enzy_htp.core.logger import _LOGGER
-from enzy_htp.structure import (
-    Structure,
-    Ligand,
-    structure_from_pdb,
-    ligand_from_pdb,
-    Chain,
-    PDBParser
-)
+from enzy_htp.structure import (Structure, Ligand, structure_from_pdb,
+                                ligand_from_pdb, Chain, PDBParser)
 from enzy_htp.structure.metal_atom import MetalUnit
 import enzy_htp.structure.structure_operation as stru_oper
 
@@ -32,9 +26,12 @@ import openbabel
 import openbabel.pybel as pybel
 from .pdb_line import read_pdb_lines
 
+
 def protonate_stru(stru: Structure,
-                   ph: float = 7.0, protonate_ligand: bool = False,
-                   engine: str = "pdb2pqr", ligand_engine: str = "pybel",
+                   ph: float = 7.0,
+                   protonate_ligand: bool = False,
+                   engine: str = "pdb2pqr",
+                   ligand_engine: str = "pybel",
                    **kwargs) -> Structure:
     """
     This science API solves the protein protonation problem.
@@ -105,7 +102,9 @@ def protonate_stru(stru: Structure,
     if protonate_ligand:
         LIGAND_PROTONATION_METHODS[ligand_engine](stru, ph, **kwargs)
 
-def protonate_peptide_with_pdb2pqr(stru: Structure, ph: float = 7.0,
+
+def protonate_peptide_with_pdb2pqr(stru: Structure,
+                                   ph: float = 7.0,
                                    int_pdb_path: Union[str, None] = None,
                                    int_pqr_path: Union[str, None] = None,
                                    metal_fix_method: str = "deprotonate_all"):
@@ -125,33 +124,50 @@ def protonate_peptide_with_pdb2pqr(stru: Structure, ph: float = 7.0,
     sp = PDBParser()
     # manage the path
     if int_pdb_path is None:
-        fs.safe_mkdir(config["system.SCRATCH_DIR"]) # make them together into make_temp_file
-        int_pdb_path = fs.get_valid_temp_name(f"{config['system.SCRATCH_DIR']}/protonate_peptide_with_pdb2pqr_input.pdb")
+        fs.safe_mkdir(config["system.SCRATCH_DIR"]
+                     )  # make them together into make_temp_file
+        int_pdb_path = fs.get_valid_temp_name(
+            f"{config['system.SCRATCH_DIR']}/protonate_peptide_with_pdb2pqr_input.pdb"
+        )
     if int_pqr_path is None:
         fs.safe_mkdir("./temp")
-        int_pqr_path = fs.get_valid_temp_name(f"{config['system.SCRATCH_DIR']}/protonate_peptide_with_pdb2pqr_output.pdb")
+        int_pqr_path = fs.get_valid_temp_name(
+            f"{config['system.SCRATCH_DIR']}/protonate_peptide_with_pdb2pqr_output.pdb"
+        )
     if fs.get_file_ext(int_pqr_path) == ".pqr":
-        _LOGGER.warning(f"changing {int_pqr_path} extension to pdb. This filename now changes.")
-        int_pqr_path = fs.get_valid_temp_name(int_pqr_path.removesuffix("pqr")+"pdb")
+        _LOGGER.warning(
+            f"changing {int_pqr_path} extension to pdb. This filename now changes."
+        )
+        int_pqr_path = fs.get_valid_temp_name(
+            int_pqr_path.removesuffix("pqr") + "pdb")
         if int_pqr_path == int_pdb_path:
-            _LOGGER.warning("int_pqr_path and int_pdb_path is the same after extension change. Adding an index.")
-            int_pqr_path = fs.get_valid_temp_name(int_pqr_path.removesuffix(".pdb")+"_1.pdb")
+            _LOGGER.warning(
+                "int_pqr_path and int_pdb_path is the same after extension change. Adding an index."
+            )
+            int_pqr_path = fs.get_valid_temp_name(
+                int_pqr_path.removesuffix(".pdb") + "_1.pdb")
     # run pqr interface
     with open(int_pdb_path, "w") as of:
-        of.write(sp.get_file_str(stru)) # give the whole structure as input here as PropKa can use ligand
+        of.write(
+            sp.get_file_str(stru)
+        )  # give the whole structure as input here as PropKa can use ligand
     pdb2pqr_protonate_pdb(int_pdb_path, int_pqr_path, ph)
     peptide_protonated_stru = sp.get_structure(int_pqr_path)
-    stru_oper.remove_non_peptide(peptide_protonated_stru) # keep the peptide only (sometime it has solvent)
+    stru_oper.remove_non_peptide(
+        peptide_protonated_stru
+    )  # keep the peptide only (sometime it has solvent)
     stru_oper.update_residues(stru, peptide_protonated_stru)
     protonate_peptide_fix_metal_donor(stru, method=metal_fix_method)
-    if _LOGGER.level > 10: # not DEBUG or below
+    if _LOGGER.level > 10:  # not DEBUG or below
         fs.safe_rm(int_pdb_path)
         fs.safe_rm(int_pqr_path)
     return stru
 
-def pdb2pqr_protonate_pdb(
-    pdb_path: str, pqr_path: str, ph: float = 7.0, ffout: str = "AMBER"
-) -> None:
+
+def pdb2pqr_protonate_pdb(pdb_path: str,
+                          pqr_path: str,
+                          ph: float = 7.0,
+                          ffout: str = "AMBER") -> None:
     """
     This is warpper function of pdb2pqr.
     Runs PDB2PQR on a specified pdb file and saves it to the specified pqr path. This preparation step
@@ -162,21 +178,21 @@ def pdb2pqr_protonate_pdb(
     # TODO(CJ): maybe improve the documentation here?
     core.check_valid_ph(ph)
     pdb2pqr_parser = build_pdb2pqr_parser()
-    args = pdb2pqr_parser.parse_args(
-        [
-            "--ff=PARSE",
-            "--ffout=" + ffout,
-            "--with-ph=" + str(ph),
-            "--log-level=CRITICAL",
-            pdb_path,
-            pqr_path,
-        ]
-    )
+    args = pdb2pqr_parser.parse_args([
+        "--ff=PARSE",
+        "--ffout=" + ffout,
+        "--with-ph=" + str(ph),
+        "--log-level=CRITICAL",
+        pdb_path,
+        pqr_path,
+    ])
     core._LOGGER.info(f"Running pdb2pqr on '{pdb_path}'...")
     run_pdb2pqr(args)
     core._LOGGER.info(f"Finished running pdb2pqr! Output saved to '{pqr_path}'")
 
-def protonate_peptide_fix_metal_donor(stru: Structure, method="deprotonate_all"):
+
+def protonate_peptide_fix_metal_donor(stru: Structure,
+                                      method="deprotonate_all"):
     """
     fix protonation state around the metal coordination center
     Args:
@@ -193,35 +209,42 @@ def protonate_peptide_fix_metal_donor(stru: Structure, method="deprotonate_all")
     for center in stru.metalcenters:
         METAL_FIX_METHODS[method](center)
 
+
 def deprotonate_metal_donors(center: MetalUnit):
     """
     deprotonate all donor atoms from donor residues away from neutral.
     apply change to the parent structure of this metal {center}
     """
-    donor_mapper = center.get_donor_mapper(method = "ionic")
+    donor_mapper = center.get_donor_mapper(method="ionic")
     for d_resi, d_atoms in donor_mapper.items():
-        if d_resi.is_deprotonatable(): # the donor atom selection guarantees the atom is deprotonable
+        if d_resi.is_deprotonatable(
+        ):  # the donor atom selection guarantees the atom is deprotonable
             # find_closest_h_to_center(d_atom, center)
-            stru_oper.deprotonate_residue(d_resi, d_atoms[0]) # TODO(qz): refine this by also determine the closest proton
+            stru_oper.deprotonate_residue(
+                d_resi, d_atoms[0]
+            )  # TODO(qz): refine this by also determine the closest proton
         elif d_resi.is_hetatom_noproton():
-            _LOGGER.info(f"donor residue {d_resi} already have no proton in center {center}")
+            _LOGGER.info(
+                f"donor residue {d_resi} already have no proton in center {center}"
+            )
         else:
-            _LOGGER.warn(f"uncommon donor residue {d_resi} found in center {center}")
+            _LOGGER.warn(
+                f"uncommon donor residue {d_resi} found in center {center}")
+
 
 def protonate_metal_donors_with_pka_recalc(center: MetalUnit):
     """place holder for most accurate metal fix method"""
     pass
 
-METAL_FIX_METHODS = {
-    "deprotonate_all": deprotonate_metal_donors
-}
 
-PEPTIDE_PROTONATION_METHODS = {
-    "pdb2pqr" : protonate_peptide_with_pdb2pqr
-}
+METAL_FIX_METHODS = {"deprotonate_all": deprotonate_metal_donors}
 
-def protonate_ligand_with_pybel(stru: Structure, ph: float = 7.0,
-                                int_ligand_file_dir = None):
+PEPTIDE_PROTONATION_METHODS = {"pdb2pqr": protonate_peptide_with_pdb2pqr}
+
+
+def protonate_ligand_with_pybel(stru: Structure,
+                                ph: float = 7.0,
+                                int_ligand_file_dir=None):
     """
     the inteface for using PYBEL to protonate all ligands in {stru} with a given ph
     Args:
@@ -241,25 +264,35 @@ def protonate_ligand_with_pybel(stru: Structure, ph: float = 7.0,
 
     for ligand in stru.ligands:
         # path for each ligand
-        int_ligand_file_path = fs.get_valid_temp_name(f"{int_ligand_file_dir}/ligand_{ligand.chain.name}_{ligand.idx}_{ligand.name}.pdb")
-        int_pybel_file_path = fs.get_valid_temp_name(f"{int_ligand_file_path.removesuffix('.pdb')}_pybel.pdb")
+        int_ligand_file_path = fs.get_valid_temp_name(
+            f"{int_ligand_file_dir}/ligand_{ligand.chain.name}_{ligand.idx}_{ligand.name}.pdb"
+        )
+        int_pybel_file_path = fs.get_valid_temp_name(
+            f"{int_ligand_file_path.removesuffix('.pdb')}_pybel.pdb")
         # file interface with pybel
-        ligand.fix_atom_names() # make sure original ligand have all unique names
+        ligand.fix_atom_names(
+        )  # make sure original ligand have all unique names
         with open(int_ligand_file_path, "w") as of:
             of.write(sp.get_file_str(ligand))
-        pybel_protonate_pdb_ligand(int_ligand_file_path, int_pybel_file_path, ph=ph)
+        pybel_protonate_pdb_ligand(int_ligand_file_path,
+                                   int_pybel_file_path,
+                                   ph=ph)
         ref_ligand = sp.get_structure(int_pybel_file_path).ligands[0]
         stru_oper.update_residues(ligand, ref_ligand)
         # clean up temp files
-        if _LOGGER.level > 10: # not DEBUG or below
+        if _LOGGER.level > 10:  # not DEBUG or below
             fs.safe_rm(int_ligand_file_path)
             fs.safe_rm(int_pybel_file_path)
 
-    if _LOGGER.level > 10: # not DEBUG or below     
-        fs.safe_rmdir(int_ligand_file_dir, empty_only=True) #prevent remove the entire scratch
+    if _LOGGER.level > 10:  # not DEBUG or below
+        fs.safe_rmdir(int_ligand_file_dir,
+                      empty_only=True)  #prevent remove the entire scratch
     return stru
 
-def pybel_protonate_pdb_ligand(in_path: str, out_path: str, ph: float = 7.0) -> str:
+
+def pybel_protonate_pdb_ligand(in_path: str,
+                               out_path: str,
+                               ph: float = 7.0) -> str:
     """
     This is a wrapper of [PYBEL](https://openbabel.org/docs/dev/UseTheLibrary/Python_Pybel.html)
     that takes a ligand in PDB format and add missing H atoms with the given pH in the output file
@@ -274,7 +307,8 @@ def pybel_protonate_pdb_ligand(in_path: str, out_path: str, ph: float = 7.0) -> 
         (write file to out_path)
         return the {out_path} from input
     """
-    int_path = fs.get_valid_temp_name(out_path.removesuffix(".pdb")+"_badname.pdb")
+    int_path = fs.get_valid_temp_name(
+        out_path.removesuffix(".pdb") + "_badname.pdb")
 
     pybel.ob.obErrorLog.SetOutputLevel(0)
     mol = next(pybel.readfile("pdb", in_path))
@@ -283,11 +317,14 @@ def pybel_protonate_pdb_ligand(in_path: str, out_path: str, ph: float = 7.0) -> 
     # fix atom label and residue name
     _fix_pybel_output(int_path, out_path, in_path)
 
-    if _LOGGER.level > 10: # not DEBUG or below
+    if _LOGGER.level > 10:  # not DEBUG or below
         fs.safe_rm(int_path)
     return out_path
 
-def _fix_pybel_output(pdb_path: str, out_path: str, ref_name_path: str = None) -> None:
+
+def _fix_pybel_output(pdb_path: str,
+                      out_path: str,
+                      ref_name_path: str = None) -> None:
     """
     pybel will mess up atom names and residue names. This function fix those names
     fix atom label in {pdb_path} and write fixed to {out_path}
@@ -298,7 +335,8 @@ def _fix_pybel_output(pdb_path: str, out_path: str, ref_name_path: str = None) -
         ref_atom_names = []
         ref_ligand = PandasPdb()
         ref_ligand.read_pdb(ref_name_path)
-        ref_ligand_df: pd.DataFrame = pd.concat((ref_ligand.df["ATOM"], ref_ligand.df["HETATM"]), ignore_index=True)
+        ref_ligand_df: pd.DataFrame = pd.concat(
+            (ref_ligand.df["ATOM"], ref_ligand.df["HETATM"]), ignore_index=True)
         ref_resi_name = ref_ligand_df.iloc[0]["residue_name"].strip()
         for i, atom_df in ref_ligand_df.iterrows():
             ref_atom_names.append(atom_df["atom_name"].strip())
@@ -316,9 +354,9 @@ def _fix_pybel_output(pdb_path: str, out_path: str, ref_name_path: str = None) -
     target_ligand_df["atom_name"] = pd.DataFrame(new_atom_names)
     target_ligand.to_pdb(out_path, records=["HETATM", "OTHERS"])
 
-LIGAND_PROTONATION_METHODS = {
-    "pybel" : protonate_ligand_with_pybel
-}
+
+LIGAND_PROTONATION_METHODS = {"pybel": protonate_ligand_with_pybel}
+
 
 # below TODO
 def _ob_pdb_charge(pdb_path: str) -> int:
@@ -335,8 +373,7 @@ def _ob_pdb_charge(pdb_path: str) -> int:
             if not len(raw):
                 continue
             charge = pdb_l.charge[::-1]
-            core._LOGGER.info(
-                f"Found formal charge: {pdb_l.atom_name} {charge}"
-            )  # TODO make this more intuitive/make sense
+            core._LOGGER.info(f"Found formal charge: {pdb_l.atom_name} {charge}"
+                             )  # TODO make this more intuitive/make sense
             net_charge += int(charge)
     return net_charge
