@@ -149,8 +149,7 @@ def test_round_trip_pdb():
     fs.safe_rm(actual_file)
     assert not os.path.exists(actual_file)
     #structure1.to_pdb(actual_file)
-    structure1_contents: List[str] = PDBParser.get_file_str(
-        structure1).splitlines()
+    structure1_contents: List[str] = PDBParser.get_file_str(structure1).splitlines()
     fs.write_lines(actual_file, structure1_contents)
     assert os.path.exists(actual_file)
     assert equiv_files(TEST_FILE, actual_file, 60)

@@ -6,6 +6,7 @@ Date: 2022-09-22
 
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
 
+
 def test_delete_from_parent():
     # model objects
     child_1 = DoubleLinkedNode()

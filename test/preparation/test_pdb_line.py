@@ -9,7 +9,6 @@ import pytest
 from enzy_htp.preparation import PDBLine, read_pdb_lines
 from enzy_htp.core import UnsupportedFileType, lines_from_file
 
-
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 
 

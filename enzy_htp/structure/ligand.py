@@ -76,8 +76,7 @@ class Ligand(Residue):
         for name, atom in zip(new_name_list, self.atoms):
             if atom.name != name:
                 _LOGGER.info(
-                    f"found atom with invalid name {atom}. changing it to {name}"
-                )
+                    f"found atom with invalid name {atom}. changing it to {name}")
                 atom.name = name
 
     # === Special ===

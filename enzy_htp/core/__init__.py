@@ -22,8 +22,6 @@ from .file_system import (
     lines_from_file,
     write_lines,
     get_file_ext,
-	write_data,
+    write_data,
 )
-from .math_helper import (
-    check_valid_ph
-)
+from .math_helper import (check_valid_ph)

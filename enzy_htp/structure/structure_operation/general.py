@@ -72,8 +72,7 @@ def update_residues(stru: Structure, ref_stru: Structure) -> Structure:
     for ref_res in ref_stru.residues:
         self_res = self_res_mapper[ref_res.key()]
         if self_res.name != ref_res.name:
-            _LOGGER.info(
-                f"updating {self_res.key()} {self_res.name} to {ref_res.name}")
+            _LOGGER.info(f"updating {self_res.key()} {self_res.name} to {ref_res.name}")
             self_res.name = ref_res.name
         self_res.atoms = copy.deepcopy(
             ref_res.atoms)  # this will also set self_res as parent
@@ -95,24 +94,20 @@ def update_residues(resi: Residue, ref_resi: Residue) -> Residue:  # pylint: dis
     if resi.name != ref_resi.name:
         _LOGGER.info(f"updating {resi.key()} {resi.name} to {ref_resi.name}")
         resi.name = ref_resi.name
-    resi.atoms = copy.deepcopy(
-        ref_resi.atoms)  # this will also set resi as parent
+    resi.atoms = copy.deepcopy(ref_resi.atoms)  # this will also set resi as parent
     return resi
 
 
-def deprotonate_residue(residue: Residue,
-                        target_atom: Union[None, Atom] = None) -> None:
+def deprotonate_residue(residue: Residue, target_atom: Union[None, Atom] = None) -> None:
     """
     deprotonate the {residue} on the {target_atom} (if provided).
     remove the acidic hydrogen attached to the {target_atom} and change the residue name
     correponding to chem.residue.DEPROTONATION_MAPPER or /resource/ProtonationState.cdx
     """
-    new_resi_name, target_proton = get_default_deproton_info(
-        residue, target_atom)
+    new_resi_name, target_proton = get_default_deproton_info(residue, target_atom)
     if new_resi_name is None:
         if len(target_atom.attached_protons()) == 0:
-            _LOGGER.info(
-                f"target atom {target_atom} already have no H. keep original")
+            _LOGGER.info(f"target atom {target_atom} already have no H. keep original")
         else:
             _LOGGER.warning(
                 f"cannot deprotonate {residue} on {target_atom}. keep original")
@@ -132,21 +127,18 @@ def get_default_deproton_info(residue: Residue,
     r_name = residue.name
     # default target atom
     if target_atom is None:
-        target_atom_name = list(
-            chem.residue.DEPROTONATION_MAPPER[r_name].keys())[0]
+        target_atom_name = list(chem.residue.DEPROTONATION_MAPPER[r_name].keys())[0]
     else:
         target_atom_name = target_atom.name
 
     depro_info = chem.residue.DEPROTONATION_MAPPER.get(r_name, None)
     if depro_info is None:
         _LOGGER.warn(
-            f"no default protonation info for {r_name}. Consider make a standard for it"
-        )
+            f"no default protonation info for {r_name}. Consider make a standard for it")
         return None, None
     if r_name in ["HIE", "HID"]:
         _LOGGER.warn(
-            f"deprotonation info for {residue} is actually a switching between HID/HIE"
-        )
+            f"deprotonation info for {residue} is actually a switching between HID/HIE")
     target_atom_depro_info = depro_info.get(target_atom_name, None)
     if target_atom_depro_info is None:
         _LOGGER.warn(

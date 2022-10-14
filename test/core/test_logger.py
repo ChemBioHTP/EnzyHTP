@@ -7,9 +7,8 @@ import os
 import pytest
 import logging
 
-from enzy_htp.core import file_system as fs 
+from enzy_htp.core import file_system as fs
 from enzy_htp.core import logger as lg
-
 
 CURR_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_FILE = f"{CURR_DIR}/__log.test"

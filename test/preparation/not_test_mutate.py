@@ -9,9 +9,10 @@ from enzy_htp.preparation import mutate as mm
 
 def test_mutation_attributes():
     """Checks that the Mutation namedtuple has the proper attributes"""
-    mut = mm.Mutation(
-        orig_residue="A", chain_index="B", residue_index=2, target_residue="Z"
-    )
+    mut = mm.Mutation(orig_residue="A",
+                      chain_index="B",
+                      residue_index=2,
+                      target_residue="Z")
     assert mut.orig_residue == "A"
     assert mut.chain_index == "B"
     assert mut.residue_index == 2
@@ -20,9 +21,10 @@ def test_mutation_attributes():
 
 def test_mutation_to_str():
     """Ensuring that the mutation_to_str() method works correctly."""
-    mut = mm.Mutation(
-        orig_residue="A", chain_index="B", residue_index=2, target_residue="Z"
-    )
+    mut = mm.Mutation(orig_residue="A",
+                      chain_index="B",
+                      residue_index=2,
+                      target_residue="Z")
     mut_str = mm.mutation_to_str(mut)
     assert mut_str == "AB2Z"
 
@@ -30,9 +32,10 @@ def test_mutation_to_str():
 def test_decode_mutaflags_good_input():
     """Testing for the decode_mutaflags() method for well formed inputs."""
     result = mm.decode_mutaflags("XA12H")
-    mut = mm.Mutation(
-        orig_residue="X", chain_index="A", residue_index=12, target_residue="H"
-    )
+    mut = mm.Mutation(orig_residue="X",
+                      chain_index="A",
+                      residue_index=12,
+                      target_residue="H")
     assert result == [mut]
     result = mm.decode_mutaflags(["XA12H"])
     assert result == [mut]

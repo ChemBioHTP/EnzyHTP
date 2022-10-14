@@ -133,8 +133,7 @@ class Residue(DoubleLinkedNode):
             _LOGGER.error(f"residue {self} have more than 1 {name}")
             sys.exit(1)
         if len(result) == 0:
-            raise ResidueDontHaveAtom(self, name,
-                                      f"residue {self} dont have {name}")
+            raise ResidueDontHaveAtom(self, name, f"residue {self} dont have {name}")
         return result[0]
 
     @property
@@ -224,16 +223,14 @@ class Residue(DoubleLinkedNode):
         """
         if start <= 0:
             _LOGGER.error(
-                f"Illegal start number '{start}'. Value must be >= 0. Exiting..."
-            )
+                f"Illegal start number '{start}'. Value must be >= 0. Exiting...")
             exit(1)
         aa: Atom
-        self._atoms.sort(key=lambda aa: aa.idx
-                        )  #@shaoqz: maybe use .sort to keep the reference.
+        self._atoms.sort(
+            key=lambda aa: aa.idx)  #@shaoqz: maybe use .sort to keep the reference.
 
         for idx, aa in enumerate(self._atoms):
-            self._atoms[
-                idx].atom_number = idx + start  #@shaoqz: why dont use aa?
+            self._atoms[idx].atom_number = idx + start  #@shaoqz: why dont use aa?
         return idx + start
 
     #endregion

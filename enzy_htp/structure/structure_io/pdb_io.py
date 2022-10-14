@@ -40,10 +40,9 @@ class PDBParser(StructureParserInterface):
 
     # knowledge
     PDB_NONSTRU_INFO_LINE_NAME = [
-        "HEADER", "TITLE", "COMPND", "SOURCE", "KEYWDS", "EXPDTA", "NUMMDL",
-        "AUTHOR", "REVDAT", "SPRSDE", "JRNL", "REMARK", "DBREF", "SEQADV",
-        "SEQRES", "HELIX", "SHEET", "CRYST1", "ORIGX1", "ORIGX2", "ORIGX3",
-        "SCALE1", "SCALE2", "SCALE3"
+        "HEADER", "TITLE", "COMPND", "SOURCE", "KEYWDS", "EXPDTA", "NUMMDL", "AUTHOR",
+        "REVDAT", "SPRSDE", "JRNL", "REMARK", "DBREF", "SEQADV", "SEQRES", "HELIX",
+        "SHEET", "CRYST1", "ORIGX1", "ORIGX2", "ORIGX3", "SCALE1", "SCALE2", "SCALE3"
     ]  #these keywords are for general information in the PDB database
 
     # interface
@@ -80,15 +79,14 @@ class PDBParser(StructureParserInterface):
 
         #region (PDB conundrums)
         # deal with multiple model
-        target_model_df, target_model_ter_df = cls._get_target_model(
-            input_pdb.df, model=model)
+        target_model_df, target_model_ter_df = cls._get_target_model(input_pdb.df,
+                                                                     model=model)
 
         # TODO address when atom/residue/chain id is disordered respect to the line index
         # this is important to be aligned since Amber will force them to align and erase the chain id
         # a workaround is to add them back after Amber process
         idx_change_mapper = cls._resolve_missing_chain_id(
-            target_model_df,
-            target_model_ter_df)  # add missing chain id in place
+            target_model_df, target_model_ter_df)  # add missing chain id in place
         cls._resolve_alt_loc(
             target_model_df
         )  # resolve alt loc record in place by delele redundant df rows
@@ -100,10 +98,8 @@ class PDBParser(StructureParserInterface):
         # old enzyhtp is build iteratively chain frist and residues are build in the chain
         # builder and so on for atom. But current methods is used for better readability
         atom_mapper: Dict[tuple, Atom] = cls._build_atoms(target_model_df)
-        res_mapper = cls._build_residues(atom_mapper, add_solvent_list,
-                                         add_ligand_list)
-        chain_list: Dict[str,
-                         Chain] = cls._build_chains(res_mapper, remove_trash)
+        res_mapper = cls._build_residues(atom_mapper, add_solvent_list, add_ligand_list)
+        chain_list: Dict[str, Chain] = cls._build_chains(res_mapper, remove_trash)
 
         if give_idx_map:
             return Structure(chain_list), idx_change_mapper
@@ -111,11 +107,10 @@ class PDBParser(StructureParserInterface):
 
     @classmethod
     @dispatch
-    def get_file_str(
-        cls,
-        stru: Chain,
-        if_renumber: bool = True,
-        if_fix_atomname: bool = True) -> str:  # pylint: disable=function-redefined
+    def get_file_str(cls,
+                     stru: Chain,
+                     if_renumber: bool = True,
+                     if_fix_atomname: bool = True) -> str:  # pylint: disable=function-redefined
         """
         dispatch for supporting get pdb file str with Chain only
         """
@@ -127,11 +122,10 @@ class PDBParser(StructureParserInterface):
 
     @classmethod
     @dispatch
-    def get_file_str(
-        cls,
-        stru: Residue,
-        if_renumber: bool = True,
-        if_fix_atomname: bool = True) -> str:  # pylint: disable=function-redefined
+    def get_file_str(cls,
+                     stru: Residue,
+                     if_renumber: bool = True,
+                     if_fix_atomname: bool = True) -> str:  # pylint: disable=function-redefined
         """
         dispatch for supporting get pdb file str with Residue only
         """
@@ -187,13 +181,11 @@ class PDBParser(StructureParserInterface):
         # check for right extension
         ext: str = fs.get_file_ext(pdb_path)
         if ext.lower() != ".pdb":
-            _LOGGER.error(
-                f"Supplied file '{pdb_path}' is NOT a PDB file. Exiting...")
+            _LOGGER.error(f"Supplied file '{pdb_path}' is NOT a PDB file. Exiting...")
             sys.exit(1)
         #check for file existance
         if not os.path.exists(pdb_path):
-            _LOGGER.error(
-                f"Supplied file '{pdb_path}' does NOT exist. Exiting...")
+            _LOGGER.error(f"Supplied file '{pdb_path}' does NOT exist. Exiting...")
             sys.exit(1)
         # check for character encoding
         for idx, ll in enumerate(fs.lines_from_file(pdb_path)):
@@ -204,8 +196,7 @@ class PDBParser(StructureParserInterface):
                 sys.exit(1)
 
     @staticmethod
-    def _get_target_model(df: pd.DataFrame,
-                          model: int) -> Union[pd.DataFrame, None]:
+    def _get_target_model(df: pd.DataFrame, model: int) -> Union[pd.DataFrame, None]:
         """
         do nothing when there is only one model in the pdb file (not MODEL line)
         get the #model model part of the dataframe when there are multiple models
@@ -225,8 +216,8 @@ class PDBParser(StructureParserInterface):
             # san check for start/end indicator
             mdl_ind_sorted_w_lines = df["OTHERS"][
                 (df["OTHERS"].record_name == "MODEL") |
-                (df["OTHERS"].record_name == "ENDMDL")].sort_values(
-                    by="line_idx", inplace=False)
+                (df["OTHERS"].record_name == "ENDMDL")].sort_values(by="line_idx",
+                                                                    inplace=False)
             # check if they appear alternately
             first = 1
             for ind in mdl_ind_sorted_w_lines.values:
@@ -249,25 +240,20 @@ class PDBParser(StructureParserInterface):
             target_mdl_range = mdl_range[model]
             mdl_query_pattern = f"line_idx > {target_mdl_range[0]} & line_idx < {target_mdl_range[1]}"
             # get model dataframe section as a copy
-            target_mdl_df = pd.concat(
-                (df["ATOM"], df["HETATM"]),
-                ignore_index=True).query(mdl_query_pattern).copy()
-            target_mdl_ter_df = df["OTHERS"][df["OTHERS"].record_name ==
-                                             "TER"].query(
-                                                 mdl_query_pattern).copy()
+            target_mdl_df = pd.concat((df["ATOM"], df["HETATM"]),
+                                      ignore_index=True).query(mdl_query_pattern).copy()
+            target_mdl_ter_df = df["OTHERS"][df["OTHERS"].record_name == "TER"].query(
+                mdl_query_pattern).copy()
         else:
             # get all dataframe as a copy if there"s no MODEL record
-            target_mdl_df = pd.concat(
-                (df["ATOM"], df["HETATM"]),
-                ignore_index=True).copy()  # insure unique df id
-            target_mdl_ter_df = df["OTHERS"][df["OTHERS"].record_name ==
-                                             "TER"].copy()
+            target_mdl_df = pd.concat((df["ATOM"], df["HETATM"]),
+                                      ignore_index=True).copy()  # insure unique df id
+            target_mdl_ter_df = df["OTHERS"][df["OTHERS"].record_name == "TER"].copy()
 
         return target_mdl_df, target_mdl_ter_df
 
     @classmethod
-    def _resolve_missing_chain_id(cls, df: pd.DataFrame,
-                                  ter_df: pd.DataFrame) -> None:
+    def _resolve_missing_chain_id(cls, df: pd.DataFrame, ter_df: pd.DataFrame) -> None:
         """
         Function takes the dataframes of chains and ensures consistent naming
         of chains with no blanks.
@@ -330,9 +316,7 @@ class PDBParser(StructureParserInterface):
                                 f"Found repeating chain id in a HETATM chain: assigning a new chain: {new_chain_id}"
                             )
                             result_loc_map.extend(
-                                list(
-                                    zip(chain.index,
-                                        [new_chain_id] * len(chain))))
+                                list(zip(chain.index, [new_chain_id] * len(chain))))
                             cls._write_idx_change_when_resolve_chain_id(
                                 idx_change_mapper, chain, new_chain_id)
                         else:
@@ -362,11 +346,9 @@ class PDBParser(StructureParserInterface):
                                 result_loc_map.extend(
                                     list(
                                         zip(chain_in_chain.index,
-                                            [new_chain_id] *
-                                            len(chain_in_chain))))
+                                            [new_chain_id] * len(chain_in_chain))))
                                 cls._write_idx_change_when_resolve_chain_id(
-                                    idx_change_mapper, chain_in_chain,
-                                    new_chain_id)
+                                    idx_change_mapper, chain_in_chain, new_chain_id)
                                 # no need to record since it cant be the same as any existing or new ones
                             else:
                                 recorded_chain_ids.append(chain_id_in_chain)
@@ -384,9 +366,7 @@ class PDBParser(StructureParserInterface):
                     if current_chain_id in recorded_chain_ids:
                         # divid into ATOM and HET chain
                         current_chain_records = set(
-                            list(
-                                map(lambda c_id: c_id.strip(),
-                                    chain["record_name"])))
+                            list(map(lambda c_id: c_id.strip(), chain["record_name"])))
                         if "ATOM" in current_chain_records:
                             _LOGGER.error(
                                 "Found the same chain id in 2 different ATOM chains. Check your PDB."
@@ -398,17 +378,14 @@ class PDBParser(StructureParserInterface):
                                 f"Found repeating chain id in a HETATM chain: assigning a new chain: {new_chain_id}"
                             )
                             result_loc_map.extend(
-                                list(
-                                    zip(chain.index,
-                                        [new_chain_id] * len(chain))))
+                                list(zip(chain.index, [new_chain_id] * len(chain))))
                             cls._write_idx_change_when_resolve_chain_id(
                                 idx_change_mapper, chain, new_chain_id)
                     else:
                         result_loc_map.extend(
                             list(
                                 zip(atom_missing_c_id.index,
-                                    [current_chain_id] *
-                                    len(atom_missing_c_id))))
+                                    [current_chain_id] * len(atom_missing_c_id))))
                 else:
                     # case: more than 1 chain id in chain
                     _LOGGER.error(
@@ -432,14 +409,12 @@ class PDBParser(StructureParserInterface):
         Return:
             the legal chain name list in a reversed order (for doing .pop())
         """
-        result = list(string.ascii_uppercase) + list(
-            map(lambda x: str(x), range(50000)))
+        result = list(string.ascii_uppercase) + list(map(lambda x: str(x), range(50000)))
         result = list(filter(lambda s: s not in taken_ids, result))
         return list(reversed(result))
 
     @staticmethod
-    def _write_idx_change_when_resolve_chain_id(idx_change_mapper: dict,
-                                                df: pd.DataFrame,
+    def _write_idx_change_when_resolve_chain_id(idx_change_mapper: dict, df: pd.DataFrame,
                                                 new_chain_id: str):
         """specialize function for _resolve_missing_chain_id. write idx changes
         in the dataframe to a mapper"""
@@ -468,8 +443,8 @@ class PDBParser(StructureParserInterface):
         # get a list of "loc" for deleting in the original df
         delete_loc_list = []
         # treat in residues
-        alt_loc_residues = alt_loc_atoms_df.groupby(
-            ["residue_number", "chain_id"], sort=False)
+        alt_loc_residues = alt_loc_atoms_df.groupby(["residue_number", "chain_id"],
+                                                    sort=False)
         for r_id_c_id, res_df in alt_loc_residues:
             alt_res_dfs = res_df.groupby("alt_loc", sort=False)
             if len(alt_res_dfs) == 1:
@@ -477,8 +452,7 @@ class PDBParser(StructureParserInterface):
                     f"Only 1 alt_loc id found in residue {r_id_c_id[1], r_id_c_id[0]}. No need to resolve"
                 )
                 continue
-            _LOGGER.debug(
-                f"Dealing with alt_loc residue: {r_id_c_id[1], r_id_c_id[0]}")
+            _LOGGER.debug(f"Dealing with alt_loc residue: {r_id_c_id[1], r_id_c_id[0]}")
             if keep == "first":
                 delele_res_df_locs = list(alt_res_dfs.groups.values())
                 del delele_res_df_locs[0]
@@ -515,11 +489,10 @@ class PDBParser(StructureParserInterface):
 
     @classmethod
     def _build_residues(
-        cls,
-        atom_mapper: Dict[str, Atom],
-        add_solvent_list: List = None,
-        add_ligand_list: List = None
-    ) -> Dict[str, Residue]:  #TODO add test for this
+            cls,
+            atom_mapper: Dict[str, Atom],
+            add_solvent_list: List = None,
+            add_ligand_list: List = None) -> Dict[str, Residue]:  #TODO add test for this
         """
         build Residue() objects from atom_mapper
         Arg:
@@ -536,8 +509,7 @@ class PDBParser(StructureParserInterface):
             result_mapper[res_key[0]].append(
                 res_obj)  # here it is {"chain_id": Residue()}
         # categorize_residue
-        cls._categorize_pdb_residue(result_mapper, add_solvent_list,
-                                    add_ligand_list)
+        cls._categorize_pdb_residue(result_mapper, add_solvent_list, add_ligand_list)
 
         return result_mapper
 
@@ -577,8 +549,7 @@ class PDBParser(StructureParserInterface):
                             )
                             sys.exit(1)
                         # TODO maybe a class for non-canonical aa in the future
-                        _LOGGER.debug(
-                            f"found noncanonical {chain_id} {residue.idx}")
+                        _LOGGER.debug(f"found noncanonical {chain_id} {residue.idx}")
                         residue.rtype = chem.ResidueType.NONCANONICAL
                 continue
             # non-peptide chain
@@ -593,8 +564,7 @@ class PDBParser(StructureParserInterface):
                     _LOGGER.debug(f"found solvent {chain_id} {residue.idx}")
                     residue_mapper[chain_id][i] = residue_to_solvent(residue)
                     continue
-                if residue.name in (set(chem.RD_NON_LIGAND_LIST) -
-                                    set(add_ligand_list)):
+                if residue.name in (set(chem.RD_NON_LIGAND_LIST) - set(add_ligand_list)):
                     _LOGGER.debug(f"found trash {chain_id} {residue.idx}")
                     residue.rtype = chem.ResidueType.TRASH
                     continue
@@ -722,8 +692,7 @@ def split_df_base_on_column_value(df: pd.DataFrame,
             frist = 0
             last_value = this_value
             continue
-        result_df = df[(df[column_name] < this_value) &
-                       (df[column_name] > last_value)]
+        result_df = df[(df[column_name] < this_value) & (df[column_name] > last_value)]
         result_dfs.append(result_df)
         last_value = this_value
     # deal with the last portion
@@ -736,8 +705,7 @@ def split_df_base_on_column_value(df: pd.DataFrame,
     return result_dfs
 
 
-def batch_edit_df_loc_value(df: pd.DataFrame, loc_value_list: List[tuple],
-                            column: str):
+def batch_edit_df_loc_value(df: pd.DataFrame, loc_value_list: List[tuple], column: str):
     """
     batch edit "column" of "df" with the "loc_value_list"
     """

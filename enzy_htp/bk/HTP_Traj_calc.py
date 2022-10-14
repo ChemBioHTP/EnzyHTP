@@ -52,11 +52,8 @@ class Traj_calc:
         """
         traj_list = []
         cmd = " ".join(["find", path, "-name", "'" + keyword + "'", "-type d"])
-        p_path_list = (
-            run(cmd, check=True, text=True, shell=True, capture_output=True)
-            .stdout.strip()
-            .split("\n")
-        )
+        p_path_list = (run(cmd, check=True, text=True, shell=True,
+                           capture_output=True).stdout.strip().split("\n"))
         for p_path in p_path_list:
             # --name--
             p_name = p_path.split("/")[-1]
@@ -185,9 +182,8 @@ class Traj_calc:
                 del stru1.chains[i]
         # san check
         if len(stru1.chains) == 0:
-            raise TrajCalcERROR(
-                "ERROR: PDB" + self.pdb + " do not contain chain: " + repr(frag1_chains)
-            )
+            raise TrajCalcERROR("ERROR: PDB" + self.pdb + " do not contain chain: " +
+                                repr(frag1_chains))
         stru1.build(frag1_path)
         stru2 = Structure.fromPDB(self.pdb)
         for i in range(len(stru2.chains) - 1, -1, -1):
@@ -195,24 +191,20 @@ class Traj_calc:
                 del stru2.chains[i]
         # san check
         if len(stru2.chains) == 0:
-            raise TrajCalcERROR(
-                "ERROR: PDB "
-                + self.pdb
-                + " do not contain chain: "
-                + repr(frag2_chains)
-            )
+            raise TrajCalcERROR("ERROR: PDB " + self.pdb + " do not contain chain: " +
+                                repr(frag2_chains))
         stru2.build(frag2_path)
 
         # convert frag pdbs to prmtop files
         self.dr_prmtop = self._pdb2prmtop_mmpbsa(frag1_path, igb=igb)
         self.dl_prmtop = self._pdb2prmtop_mmpbsa(frag2_path, igb=igb)
-        self.dc_prmtop = self._pdb2prmtop_mmpbsa(
-            self.pdb, igb=igb, out_path=self.pdb[:-4] + "_dc.prmtop"
-        )
+        self.dc_prmtop = self._pdb2prmtop_mmpbsa(self.pdb,
+                                                 igb=igb,
+                                                 out_path=self.pdb[:-4] + "_dc.prmtop")
         if if_sol:
-            self.prmtop = PDB(self.pdb).PDB2FF(
-                igb=igb, prm_out_path=self.pdb[:-4] + "_sc.prmtop", if_prm_only=1
-            )[0]
+            self.prmtop = PDB(self.pdb).PDB2FF(igb=igb,
+                                               prm_out_path=self.pdb[:-4] + "_sc.prmtop",
+                                               if_prm_only=1)[0]
 
     @staticmethod
     def _pdb2prmtop_mmpbsa(pdb_path, igb, out_path=None):
@@ -277,25 +269,10 @@ class Traj_calc:
         if out_dir == "":
             out_dir = "./"
 
-        cmd = (
-            Config.get_PC_cmd()
-            + " python2 "
-            + Config.Amber.MMPBSA.get_MMPBSA_engine()
-            + " -O -i "
-            + in_file
-            + " -o "
-            + out_path
-            + " -sp "
-            + self.prmtop
-            + " -cp "
-            + self.dc_prmtop
-            + " -rp "
-            + self.dr_prmtop
-            + " -lp "
-            + self.dl_prmtop
-            + " -y "
-            + self.nc
-        )
+        cmd = (Config.get_PC_cmd() + " python2 " +
+               Config.Amber.MMPBSA.get_MMPBSA_engine() + " -O -i " + in_file + " -o " +
+               out_path + " -sp " + self.prmtop + " -cp " + self.dc_prmtop + " -rp " +
+               self.dr_prmtop + " -lp " + self.dl_prmtop + " -y " + self.nc)
         if Config.debug >= 1:
             print("running:   ", cmd)
         try:
@@ -360,21 +337,18 @@ class Traj_calc:
                 else:
                     traj.make_dry_frags(frag_str, igb=igb, if_sol=1)
                 if not prepare_only:
-                    data_file = traj.run_MMPBSA(
-                        in_file=in_file, out_path=out_dir + traj.name + ".dat"
-                    )
+                    data_file = traj.run_MMPBSA(in_file=in_file,
+                                                out_path=out_dir + traj.name + ".dat")
                     data_files.append(data_file)
                 else:
-                    data_files.append(
-                        (
-                            traj.name,
-                            traj.nc,
-                            traj.prmtop,
-                            traj.dl_prmtop,
-                            traj.dr_prmtop,
-                            traj.dc_prmtop,
-                        )
-                    )
+                    data_files.append((
+                        traj.name,
+                        traj.nc,
+                        traj.prmtop,
+                        traj.dl_prmtop,
+                        traj.dr_prmtop,
+                        traj.dc_prmtop,
+                    ))
             except TrajCalcERROR as err:
                 print("ERROR:", err)
         return data_files

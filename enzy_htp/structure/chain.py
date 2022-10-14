@@ -81,7 +81,7 @@ class Chain(DoubleLinkedNode):
             sys.exit(1)
         if len(result) == 0:
             _LOGGER.warning(f"residue idx {idx} out of chain's range {self}"
-                           )  #TODO may be make this an error
+                            )  #TODO may be make this an error
             return None
         return result[0]
 
@@ -90,7 +90,7 @@ class Chain(DoubleLinkedNode):
     #region === Getter-Prop ===
     def residue_idx_interval(self,
                              if_str: bool = True
-                            ) -> Union[str, Iterable[Tuple[int, int]]]:
+                             ) -> Union[str, Iterable[Tuple[int, int]]]:
         """
         a range representation of containing residue indexes
         Args & Returns:
@@ -170,8 +170,7 @@ class Chain(DoubleLinkedNode):
         """
         return not sum(
             list(
-                map(
-                    lambda rr: (not rr.is_canonical()) and
+                map(lambda rr: (not rr.is_canonical()) and
                     (not rr.is_noncanonical()), self._residues)))
 
     def has_metal(self) -> bool:
@@ -229,9 +228,7 @@ class Chain(DoubleLinkedNode):
         other_atoms.sort(key=lambda a: a.idx)
         other_coord = map(lambda x: x.coord, other_atoms)
         for s, o in zip(self_coord, other_coord):
-            if abs(s[0] - o[0]) > tol or abs(s[1] -
-                                             o[1]) > tol or abs(s[2] -
-                                                                o[2]) > tol:
+            if abs(s[0] - o[0]) > tol or abs(s[1] - o[1]) > tol or abs(s[2] - o[2]) > tol:
                 return False
         return True
 
@@ -273,8 +270,7 @@ class Chain(DoubleLinkedNode):
             self._residues.append(new_res)
 
         self.rename(
-            self._name
-        )  #@shaoqz: maybe better to change this residue attribute only?
+            self._name)  #@shaoqz: maybe better to change this residue attribute only?
 
         if sort_after:
             self._residues.sort(
@@ -292,8 +288,7 @@ class Chain(DoubleLinkedNode):
         else:
             return
 
-        del self._residues[
-            ridx]  #@shaoqz: why not move this line inside the loop?
+        del self._residues[ridx]  #@shaoqz: why not move this line inside the loop?
 
     def rename(
         self, new_name: str
@@ -302,8 +297,7 @@ class Chain(DoubleLinkedNode):
         self._name = new_name
         res: Residue
         for ridx, res in enumerate(self._residues):
-            self._residues[ridx].set_chain(
-                new_name)  #@shaoqz: why not just use res?
+            self._residues[ridx].set_chain(new_name)  #@shaoqz: why not just use res?
 
     def renumber_atoms(
         self,
@@ -314,8 +308,7 @@ class Chain(DoubleLinkedNode):
         """
         if start <= 0:
             _LOGGER.error(
-                f"Illegal start number '{start}'. Value must be >= 0. Exiting..."
-            )
+                f"Illegal start number '{start}'. Value must be >= 0. Exiting...")
             exit(1)
         self._residues = sorted(self._residues, key=lambda r: r.idx())
         idx = start
@@ -324,8 +317,7 @@ class Chain(DoubleLinkedNode):
             idx = self._residues[ridx].renumber_atoms(idx)
             idx += 1
             terminal = (ridx < (num_residues - 1)) and (
-                res.is_canonical() and
-                not self._residues[ridx + 1].is_canonical(
+                res.is_canonical() and not self._residues[ridx + 1].is_canonical(
                 )  #@shaoqz: @imp what does this mean? the TER line?
             )
             if terminal:

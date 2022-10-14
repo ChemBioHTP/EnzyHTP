@@ -262,15 +262,13 @@ class Structure(
         in the Structure()."""
         result: List[Residue] = []
         for chain in self.chains:
-            result.extend(
-                list(filter(lambda r: r.is_metal_center(), chain.residues)))
+            result.extend(list(filter(lambda r: r.is_metal_center(), chain.residues)))
         return result
 
     @property
     def peptides(self) -> List[Chain]:
         """return the peptide part of current Structure() as a list of chains"""
-        result: List[Chain] = list(
-            filter(lambda c: c.is_peptide(), self._chains))
+        result: List[Chain] = list(filter(lambda c: c.is_peptide(), self._chains))
         return result
 
     @property
@@ -398,8 +396,7 @@ class Structure(
             f"<Structure object at {hex(id(self))}>",
         ]
         out_line.append("Structure(")
-        out_line.append(
-            f"chains: (sorted, original {list(self.chain_mapper.keys())})")
+        out_line.append(f"chains: (sorted, original {list(self.chain_mapper.keys())})")
         for ch in sorted(self._chains, key=lambda x: x.name):
             out_line.append(
                 f"    {ch.name}({ch.chain_type}): residue: {ch.residue_idx_interval()} atom_count: {ch.num_atoms}"
@@ -437,8 +434,7 @@ class Structure(
 
     #region === Getter === (Properities - derived data; wont affect Structure data - copy)
     @property
-    def residue_state(
-            self) -> List[Tuple[str, str, int]]:  #@shaoqz: @residue_key
+    def residue_state(self) -> List[Tuple[str, str, int]]:  #@shaoqz: @residue_key
         """Generates a list of tuples of all residues in the Structure. Format for each tuple is (one_letter_res_name, chain_id, res_index).
         This method is designed for debuging purpose"""
         result = list()
@@ -446,8 +442,7 @@ class Structure(
             for residue in chain.residues():
                 (chain, res_name, index) = residue.residue_key.split(".")
                 if residue.is_canonical():
-                    result.append(
-                        (chain, convert_to_one_letter(res_name), int(index)))
+                    result.append((chain, convert_to_one_letter(res_name), int(index)))
                 elif residue.is_metal(
                 ):  #@shaoqz: @imp2 any non-canonical should be using 3-letter name
                     result.append((chain, res_name, int(index)))
@@ -486,10 +481,9 @@ class Structure(
     #endregion
 
     #region === Editor ===
-    def add_chain(
-            self,
-            new_chain: Chain,
-            overwrite: bool = False) -> None:  #TODO add logic for overwriting
+    def add_chain(self,
+                  new_chain: Chain,
+                  overwrite: bool = False) -> None:  #TODO add logic for overwriting
         """Method that inserts a new chain and then sorts the chains based on name.
         Will overwrite if Chain() with existing name already in object. #@shaoqz: add + sort = insert
         """
@@ -521,16 +515,15 @@ class Structure(
         """
         chain_name: str = new_res.chain()
         if not self.has_chain(chain_name):
-            new_chain: Chain = Chain(chain_name,
-                                     [new_res])  #@shaoqz: give a warning
+            new_chain: Chain = Chain(chain_name, [new_res])  #@shaoqz: give a warning
             self.chains.apppend(new_chain)
             self.chain_mapper[chain_name] = new_chain
         else:
             self.chain_mapper[chain_name].add_residue(new_res)
 
         self.chains = list(self.chain_mapper.values())  #@shaoqz: why need this
-        self.chains.sort(key=lambda c: c.name()
-                        )  #@shaoqz: should this be in the 1st if block?
+        self.chains.sort(
+            key=lambda c: c.name())  #@shaoqz: should this be in the 1st if block?
 
     def remove_residue(self, target_key: str) -> None:
         """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format,
@@ -647,10 +640,8 @@ class Structure(
                             atom_id = int(lp[0]) - 3
                             atom_cnt = int(lp[4]) - 3
                             if atom_cnt != 0:
-                                lig[atom_id - 1].connect.append(lig[atom_cnt -
-                                                                    1])
-                                lig[atom_cnt - 1].connect.append(lig[atom_id -
-                                                                     1])
+                                lig[atom_id - 1].connect.append(lig[atom_cnt - 1])
+                                lig[atom_cnt - 1].connect.append(lig[atom_id - 1])
 
     def get_connectivty_table(  #@shaoqz: ok seems not using
             self,
@@ -757,8 +748,7 @@ class Structure(
             if unique and lig_name in existing:
                 continue
 
-            lig.build(out_pdb
-                     )  #@shaoqz: use IO interface with different format instead
+            lig.build(out_pdb)  #@shaoqz: use IO interface with different format instead
             result.append(out_pdb)
             existing.append(lig_name)
 
@@ -782,9 +772,8 @@ class Structure(
 
         # write
         if ft == "PDB":
-            with open(
-                    out_path, "w"
-            ) as of:  #@shaoqz: same as build ligand use IO interface class
+            with open(out_path,
+                      "w") as of:  #@shaoqz: same as build ligand use IO interface class
                 a_id = 0
                 r_id = 0
                 for chain in self.chains:
@@ -796,8 +785,7 @@ class Structure(
                             line = atom.build(a_id=a_id, r_id=r_id)
                             of.write(line)
                     # write TER after each chain
-                    of.write("TER" +
-                             line_feed)  #@shaoqz: @imp2 how do you solve these
+                    of.write("TER" + line_feed)  #@shaoqz: @imp2 how do you solve these
                 of.write("END" + line_feed)
         else:
             raise Exception("Support only PDB output now.")
@@ -907,8 +895,7 @@ class Structure(
     #endregion
 
 
-def compare_structures(left: Structure,
-                       right: Structure) -> Dict[str, List[str]]:
+def compare_structures(left: Structure, right: Structure) -> Dict[str, List[str]]:
     """Compares two Structure() objects and returns a dict() of missing Residues with format:
 
     {"left": ["residue_key1","residue_key1",..],

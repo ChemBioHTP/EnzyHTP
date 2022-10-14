@@ -22,7 +22,7 @@ from biopandas.pdb import PandasPdb
 import enzy_htp.chemical as chem
 import enzy_htp.structure as struct
 import enzy_htp.preparation as prep
-from enzy_htp import interface 
+from enzy_htp import interface
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import _LOGGER, UnsupportedMethod
 
@@ -78,8 +78,8 @@ def mutate_pdb(
     mutations = unique_by_pos(mutations)
     needed: int = n_mutations - len(mutations)
     if needed > 0:
-        mutations.extend(
-            get_mutations(pdb, needed, mutations, random_state, restrictions))
+        mutations.extend(get_mutations(pdb, needed, mutations, random_state,
+                                       restrictions))
     else:
         _LOGGER.warning(
             f"{len(mutations)} unique mutations were provided but only {n_mutations} were requested."
@@ -138,8 +138,7 @@ def get_mutations(
         restrictions = restriction_object(pdb)
 
     structure: struct.Structure = struct.PDBParser.get_structure(pdb)
-    mut_dict: Dict[Tuple[Str, int],
-                   List[Mutation]] = generate_all_mutations(structure)
+    mut_dict: Dict[Tuple[Str, int], List[Mutation]] = generate_all_mutations(structure)
 
     for mut in mutations:
         restrictions.lock_residue((mut.chain_id, mut.res_num))
@@ -261,9 +260,8 @@ def _mutate_tleap(pdb: str, outfile: str, mutations: List[Mutation]) -> None:
                 else:
                     mask[pidx] = False
 
-    fs.write_lines(outfile,
-                   np.array(list(map(lambda pl: pl.line, pdb_lines)))[mask])
-    
+    fs.write_lines(outfile, np.array(list(map(lambda pl: pl.line, pdb_lines)))[mask])
+
     interface.amber.mutate(outfile)
     if backup:
         structure: struct.Structure = struct.structure_from_pdb(outfile)
@@ -271,9 +269,8 @@ def _mutate_tleap(pdb: str, outfile: str, mutations: List[Mutation]) -> None:
             if rkey not in backup:
                 continue
             tmp_file = f"/tmp/ligand.{rkey}.tmp.pdb"
-            fs.write_lines(
-                tmp_file,
-                list(map(lambda ll: ll.line, backup[rkey])) + ['END'])
+            fs.write_lines(tmp_file,
+                           list(map(lambda ll: ll.line, backup[rkey])) + ['END'])
             lig: struct.Ligand = struct.ligand_from_pdb(tmp_file)
             (cname, rname, rnum) = rkey.split('.')
             rnum = int(rnum)

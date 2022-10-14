@@ -38,8 +38,7 @@ def test_deepcopy():
 
 def test_no_optional_data():
     """test the case pdb dont have atom number"""
-    stru = PDBParser().get_structure(
-        f"{DATA_DIR}two_chain_no_optional_data.pdb")
+    stru = PDBParser().get_structure(f"{DATA_DIR}two_chain_no_optional_data.pdb")
     atom = stru["A"][0][0]
     assert atom.element == "N"
     assert atom.idx is None
@@ -109,78 +108,37 @@ def test_attached_protons():
     """test if the function gives correct attached protons"""
     stru = PDBParser().get_structure(f"{DATA_DIR}1Q4T_peptide_protonated.pdb")
     atom1 = stru["A"][0][0]  #N (Nter)
-    assert list(map(lambda a: a.name,
-                    atom1.attached_protons())) == ['H1', 'H2', 'H3']
+    assert list(map(lambda a: a.name, atom1.attached_protons())) == ['H1', 'H2', 'H3']
 
 
 def test_distance():
     """Making sure that the .distance_to() method works."""
-    atom1 = Atom({
-        'x_coord': 0,
-        'y_coord': 0,
-        'z_coord': 0,
-        'atom_name': 'DUMMY'
-    })
+    atom1 = Atom({'x_coord': 0, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'DUMMY'})
 
-    atom2 = Atom({
-        'x_coord': 0,
-        'y_coord': 0,
-        'z_coord': 1,
-        'atom_name': 'DUMMY'
-    })
+    atom2 = Atom({'x_coord': 0, 'y_coord': 0, 'z_coord': 1, 'atom_name': 'DUMMY'})
     assert np.isclose(atom1.distance_to(atom2), 1)
     assert np.isclose(atom2.distance_to(atom1), 1)
 
-    atom2 = Atom({
-        'x_coord': 0,
-        'y_coord': 1,
-        'z_coord': 0,
-        'atom_name': 'DUMMY'
-    })
+    atom2 = Atom({'x_coord': 0, 'y_coord': 1, 'z_coord': 0, 'atom_name': 'DUMMY'})
     assert np.isclose(atom1.distance_to(atom2), 1)
     assert np.isclose(atom2.distance_to(atom1), 1)
 
-    atom2 = Atom({
-        'x_coord': 1,
-        'y_coord': 0,
-        'z_coord': 0,
-        'atom_name': 'DUMMY'
-    })
+    atom2 = Atom({'x_coord': 1, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'DUMMY'})
     assert np.isclose(atom1.distance_to(atom2), 1)
     assert np.isclose(atom2.distance_to(atom1), 1)
 
-    atom2 = Atom({
-        'x_coord': -1,
-        'y_coord': 0,
-        'z_coord': 0,
-        'atom_name': 'DUMMY'
-    })
+    atom2 = Atom({'x_coord': -1, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'DUMMY'})
     assert np.isclose(atom1.distance_to(atom2), 1)
     assert np.isclose(atom2.distance_to(atom1), 1)
 
-    atom2 = Atom({
-        'x_coord': 0,
-        'y_coord': -1,
-        'z_coord': 0,
-        'atom_name': 'DUMMY'
-    })
+    atom2 = Atom({'x_coord': 0, 'y_coord': -1, 'z_coord': 0, 'atom_name': 'DUMMY'})
     assert np.isclose(atom1.distance_to(atom2), 1)
     assert np.isclose(atom2.distance_to(atom1), 1)
 
-    atom2 = Atom({
-        'x_coord': 0,
-        'y_coord': 0,
-        'z_coord': -1,
-        'atom_name': 'DUMMY'
-    })
+    atom2 = Atom({'x_coord': 0, 'y_coord': 0, 'z_coord': -1, 'atom_name': 'DUMMY'})
     assert np.isclose(atom1.distance_to(atom2), 1)
     assert np.isclose(atom2.distance_to(atom1), 1)
 
-    atom2 = Atom({
-        'x_coord': 0,
-        'y_coord': 0,
-        'z_coord': 0,
-        'atom_name': 'DUMMY'
-    })
+    atom2 = Atom({'x_coord': 0, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'DUMMY'})
     assert np.isclose(atom1.distance_to(atom2), 0)
     assert np.isclose(atom2.distance_to(atom1), 0)

@@ -19,6 +19,7 @@ def safe_rm(fname: str) -> None:
     if os.path.exists(fname):
         os.remove(fname)
 
+
 def is_empty_dir(dir_path: str) -> bool:
     """
     check if the dir_path is an empty dir
@@ -29,13 +30,16 @@ def is_empty_dir(dir_path: str) -> bool:
         _LOGGER.debug(f"No such directory: {dir_path}")
         return False
 
+
 def safe_rmdir(dirname: str, empty_only: bool = False) -> None:
     """Removes a directory if and only if the directory already exists."""
     if os.path.isdir(dirname):
         if empty_only and not is_empty_dir(dirname):
-            _LOGGER.debug(f"{dirname} is not empty. turn empty_only off to force remove it.")
+            _LOGGER.debug(
+                f"{dirname} is not empty. turn empty_only off to force remove it.")
         else:
             shutil.rmtree(dirname)
+
 
 def safe_mkdir(dirname: str) -> None:
     """Makes a directory if and only if the directory does not already exist. Creates parents as needed."""
@@ -86,18 +90,20 @@ def write_lines(fname: str, lines: List[str]) -> None:
     fh.write("\n".join(lines))
     fh.close()
 
-def write_data(outfile:str, tag:Any, data:Dict) -> str:
+
+def write_data(outfile: str, tag: Any, data: Dict) -> str:
     #TODO(CJ): add the doc-string and also unittests
-    tag:str = repr(tag)
-    fh = open(outfile,'a')
+    tag: str = repr(tag)
+    fh = open(outfile, 'a')
     fh.write("===TAG===\n")
     fh.write(f"{tag}\n")
     for key, value in data.items():
         fh.write(f"---{key}---\n")
         fh.write(f"{repr(value)}\n")
     fh.close()
-    
+
     return outfile
+
 
 def get_valid_temp_name(fname: str) -> None:
     """find a vaild name for a temp file"""

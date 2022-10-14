@@ -56,8 +56,7 @@ class MultiwfnInterface:
         result = list()
         for ll in lines[idx:end]:
             tks = digits_only(ll).split()
-            result.append(
-                ((int(tks[2]), int(tks[4])), tuple(map(float, tks[-4:]))))
+            result.append(((int(tks[2]), int(tks[4])), tuple(map(float, tks[-4:]))))
 
         return result
 
@@ -71,8 +70,7 @@ class MultiwfnInterface:
         while lines[end].find("-------------------------") == -1:
             end += 1
         atom_lines: List[str] = lines[idx:end]
-        raw_coords = np.array(
-            list(map(lambda ll: ll.split()[-3:], lines[idx:end])))
+        raw_coords = np.array(list(map(lambda ll: ll.split()[-3:], lines[idx:end])))
         return np.asfarray(raw_coords, dtype=float)
 
     def get_bond_dipole(self, fchks: List[str], a1, a2) -> List[float]:
@@ -115,15 +113,13 @@ class MultiwfnInterface:
 
         for fchk in fchks:
             # get a1->a2 vector from .out (update to using fchk TODO)
-            coords = self.parse_gaussian_coords(
-                str(Path(fchk).with_suffix(".out")))
+            coords = self.parse_gaussian_coords(str(Path(fchk).with_suffix(".out")))
             bond_vec = coords[a2] - coords[a1]
 
             # Run Multiwfn
             outfile = str(Path(fchk).with_suffix(".dip"))
             self.env_manager_.run_command(
-                self.config_.EXE,
-                [fchk, "<", infile, "&&", "mv", "LMOdip.txt", outfile])
+                self.config_.EXE, [fchk, "<", infile, "&&", "mv", "LMOdip.txt", outfile])
             fs.safe_rm("LMOcen.txt")
             fs.safe_rm("new.fch")
             dp_moments = self.parse_two_center_dp_moments(outfile)

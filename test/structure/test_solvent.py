@@ -25,4 +25,3 @@ def test_residue_to_solvent():
     assert id(residue) != id(solvent)
     for a1, a2 in zip(solvent.atoms, residue.atoms):
         assert id(a1) != id(a2)
-

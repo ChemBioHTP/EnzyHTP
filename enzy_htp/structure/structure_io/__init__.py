@@ -12,4 +12,3 @@ from .pdb_io import PDBParser
 #         __all__.append(module_name)
 #         import_module("."+module_name, package="core.clusters")
 # del f # pylint: disable=undefined-loop-variable
-

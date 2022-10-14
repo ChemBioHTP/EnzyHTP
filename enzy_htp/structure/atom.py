@@ -124,8 +124,7 @@ class Atom(DoubleLinkedNode):
             else:
                 # case: in ligand atoms are named like this H1
                 return re.match("^[A-Z][a-z]?", self.name).group()
-        elif self.parent.is_metal(
-        ):  # in pdb some metal's element name is wrong
+        elif self.parent.is_metal():  # in pdb some metal's element name is wrong
             return self.parent.element
         return self._element
 
@@ -165,8 +164,8 @@ class Atom(DoubleLinkedNode):
         connect = []
         parent_residue = self.parent
         if parent_residue.name in chem.solvent.RD_SOLVENT_LIST:
-            cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP[
-                parent_residue.name][self.name]
+            cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP[parent_residue.name][
+                self.name]
         elif parent_residue.is_canonical():
             r = parent_residue
             r1 = parent_residue.chain[0]
@@ -184,20 +183,19 @@ class Atom(DoubleLinkedNode):
                     cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP[
                         parent_residue.name][self.name]
         else:
-            _LOGGER.error(
-                f"getting connectivity of non-canonical residue {self.parent}")
+            _LOGGER.error(f"getting connectivity of non-canonical residue {self.parent}")
             sys.exit(1)
         for name in cnt_atomnames:
             try:
                 if name not in ["-1C", "+1N"]:
                     cnt_atom = parent_residue.find_atom_name(name)
                 if name == "-1C":
-                    cnt_resi = parent_residue.chain.find_residue_idx(
-                        parent_residue.idx - 1)
+                    cnt_resi = parent_residue.chain.find_residue_idx(parent_residue.idx -
+                                                                     1)
                     cnt_atom = cnt_resi.find_atom_name("C")
                 if name == "+1N":
-                    cnt_resi = parent_residue.chain.find_residue_idx(
-                        parent_residue.idx + 1)
+                    cnt_resi = parent_residue.chain.find_residue_idx(parent_residue.idx +
+                                                                     1)
                     cnt_atom = cnt_resi.find_atom_name("N")
                 connect.append(cnt_atom)
             except ResidueDontHaveAtom as e:

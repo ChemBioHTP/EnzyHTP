@@ -47,4 +47,3 @@ def test_residue_type_mapper():
     assert renum.RESIDUE_TYPE_MAPPER[renum.ResidueType(4)] == "LIGAND"
     assert renum.RESIDUE_TYPE_MAPPER[renum.ResidueType(5)] == "TRASH"
     assert renum.RESIDUE_TYPE_MAPPER[renum.ResidueType(6)] == "UNKNOWN"
-

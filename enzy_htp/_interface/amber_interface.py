@@ -128,8 +128,8 @@ class AmberInterface:
             ],
         )
 
-        self.env_manager_.run_command(
-            "ambpdb", [f"-p", prmtop, "-c", min_rst, ">", outfile])
+        self.env_manager_.run_command("ambpdb",
+                                      [f"-p", prmtop, "-c", min_rst, ">", outfile])
         # shutil.move(prmtop, min_dir )
         # shutil.move(inpcrd, min_dir )
         return outfile
@@ -166,30 +166,25 @@ class AmberInterface:
             "source leaprc.water.tip3p",
         ]
         for (prepin, frcmod) in ligand_params:
-            leap_contents.extend(
-                [f"loadAmberPrep {prepin}", f"loadAmberParams {frcmod}"])
+            leap_contents.extend([f"loadAmberPrep {prepin}", f"loadAmberParams {frcmod}"])
         leap_contents.append(f"a = loadpdb {in_pdb}")
         # TODO(CJ): Include igb
         leap_contents.append("center a")
         # TODO(CJ): include solvation stuff as a separate function
         leap_contents.extend(["addions a Na+ 0", "addions a Cl- 0"])
         if self.config_.BOX_TYPE == "oct":
-            leap_contents.append(
-                f"solvateOct a TIP3PBOX {self.config_.BOX_SIZE}")
+            leap_contents.append(f"solvateOct a TIP3PBOX {self.config_.BOX_SIZE}")
         else:
-            leap_contents.append(
-                f"solvatebox a TIP3PBOX {self.config_.BOX_SIZE}")
+            leap_contents.append(f"solvatebox a TIP3PBOX {self.config_.BOX_SIZE}")
         pdb_path: Path = Path(in_pdb)
         prmtop: str = f"{build_dir}/{pdb_path.stem}.prmtop"
         inpcrd: str = f"{build_dir}/{pdb_path.stem}.inpcrd"
         pdb_ff: str = f"{build_dir}/{pdb_path.stem}_ff.pdb"
-        leap_contents.extend([
-            f"saveamberparm a {prmtop} {inpcrd}", f"savepdb a {pdb_ff}", "quit"
-        ])
+        leap_contents.extend(
+            [f"saveamberparm a {prmtop} {inpcrd}", f"savepdb a {pdb_ff}", "quit"])
         fs.write_lines(leap_path, leap_contents)
         # TODO(CJ): Check that this actually works before returning
-        self.env_manager_.run_command("tleap",
-                                      ["-s", "-f", leap_path, ">", leap_log])
+        self.env_manager_.run_command("tleap", ["-s", "-f", leap_path, ">", leap_log])
         return (prmtop, inpcrd)
 
     def build_ligand_param_files(self, paths: List[str],
@@ -239,16 +234,13 @@ class AmberInterface:
                 ],
             )
             files_to_remove: List[
-                str] = "ATOMTYPE.INF NEWPDB.PDB PREP.INF sqm.pdb sqm.in sqm.out".split(
-                )
-            files_to_remove.extend(
-                list(map(str,
-                         Path(".").glob("ANTECHAMBER*"))))
+                str] = "ATOMTYPE.INF NEWPDB.PDB PREP.INF sqm.pdb sqm.in sqm.out".split()
+            files_to_remove.extend(list(map(str, Path(".").glob("ANTECHAMBER*"))))
             _ = list(map(lambda fname: fs.safe_rm(fname), files_to_remove))
             # gen frcmod
             # TODO(CJ): add some kind of check that this all actually runs correctly w/o errors
-            self.env_manager_.run_command(
-                "parmchk2", ["-i", prepin, "-f", "prepi", "-o", frcmod])
+            self.env_manager_.run_command("parmchk2",
+                                          ["-i", prepin, "-f", "prepi", "-o", frcmod])
             # record
             result.append((prepin, frcmod))
         return result
@@ -437,11 +429,7 @@ class AmberInterface:
         fs.write_lines(outfile, contents)
         return outfile
 
-    def md_run(self,
-               prmtop: str,
-               inpcrd: str,
-               work_dir: str,
-               mode: str = "CPU") -> str:
+    def md_run(self, prmtop: str, inpcrd: str, work_dir: str, mode: str = "CPU") -> str:
         """Runs a full MD simulation using the suplied prmtop and inpcrd files. Simulation is composed
         of four steps:
                 1. minimization
@@ -578,8 +566,7 @@ class AmberInterface:
 
             def get_all_keys(pdb: str) -> List[Tuple[str, str]]:
                 df: pd.DataFrame = PandasPdb().read_pdb(pdb).df["ATOM"]
-                return sorted(
-                    list(set(list(zip(df.chain_id, df.residue_number)))))
+                return sorted(list(set(list(zip(df.chain_id, df.residue_number)))))
 
             okeys, nkeys = get_all_keys(opdb), get_all_keys(npdb)
             assert len(okeys) == len(nkeys)
@@ -588,8 +575,7 @@ class AmberInterface:
             for nl in nlines:
                 if not nl.is_ATOM():
                     continue
-                (n_chain, n_rid) = mapper[(nl.chain_id.strip(),
-                                           int(nl.resi_id))]
+                (n_chain, n_rid) = mapper[(nl.chain_id.strip(), int(nl.resi_id))]
                 # TODO(CJ): this should be done in the oop part of the PDBLine;
                 raw = nl.line
                 nl.line = f"{raw[0:21]}{n_chain}{n_rid: >4}{raw[26:]}"
@@ -608,8 +594,7 @@ class AmberInterface:
             "quit",
         ]
         fs.write_lines(leap_in, leap_lines)
-        self.env_manager_.run_command("tleap",
-                                      ["-s", "-f", leap_in, ">", leap_out])
+        self.env_manager_.run_command("tleap", ["-s", "-f", leap_in, ">", leap_out])
         renumber_pdb(outfile, pdb_temp)
         shutil.move(pdb_temp, outfile)
         fs.safe_rm("leap.log")
@@ -639,8 +624,7 @@ class AmberInterface:
         mdcrd: str = str(Path(nc_in).with_suffix(".mdcrd"))
         config = self.config_.CONF_PROD
         if point is not None:
-            step: int = int(
-                (int(config["nstlim"]) / int(config["ntwx"])) / point)
+            step: int = int((int(config["nstlim"]) / int(config["ntwx"])) / point)
 
         if engine == "cpptraj":
             cpptraj_in = "./cpptraj_nc2mdcrd.in"
@@ -653,8 +637,7 @@ class AmberInterface:
                 "quit",
             ]
             fs.write_lines(cpptraj_in, contents)
-            self.env_manager_.run_command("cpptraj",
-                                          ["-i", cpptraj_in, ">", cpptraj_out])
+            self.env_manager_.run_command("cpptraj", ["-i", cpptraj_in, ">", cpptraj_out])
             #fs.safe_rm(cpptraj_in)
             #fs.safe_rm(cpptraj_out)
         else:
@@ -679,8 +662,7 @@ class AmberInterface:
         outfile: str = f"{Path(prmtop).parent}/cpptraj_frames.pdb"
         config = self.config_.CONF_PROD
         if point is not None:
-            step: int = int(
-                (int(config["nstlim"]) / int(config["ntwx"])) / point)
+            step: int = int((int(config["nstlim"]) / int(config["ntwx"])) / point)
 
         cpptraj_in = "./cpptraj_nc2mdcrd.in"
         cpptraj_out = "./cpptraj_nc2mdcrd.out"
@@ -694,8 +676,7 @@ class AmberInterface:
             "quit",
         ]
         fs.write_lines(cpptraj_in, contents)
-        self.env_manager_.run_command("cpptraj",
-                                      ["-i", cpptraj_in, ">", cpptraj_out])
+        self.env_manager_.run_command("cpptraj", ["-i", cpptraj_in, ">", cpptraj_out])
         #fs.safe_rm(cpptraj_in)
         fs.safe_rm(cpptraj_out)
         charges = read_charge_list(prmtop)

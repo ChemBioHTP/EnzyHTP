@@ -174,7 +174,6 @@ def test_protonate_ligand_with_pybel():
     assert stru.ligands[0].idx == 298
     assert stru.ligands[0].name == "FAH"
 
-
     assert not os.path.isdir(int_lig_dir)
 
 

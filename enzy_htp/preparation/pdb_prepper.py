@@ -48,13 +48,12 @@ class PDBPrepper:
         self.no_water_path = None
         self.pdb_path = pdb_name
         self.base_pdb_name = fs.base_file_name(pdb_name)
-        self.work_dir = kwargs.get(
-            "work_dir", f"{fs.get_current_time()}_{self.base_pdb_name}")
+        self.work_dir = kwargs.get("work_dir",
+                                   f"{fs.get_current_time()}_{self.base_pdb_name}")
         fs.safe_mkdir(self.work_dir)
         if not Path(f"{self.work_dir}/{self.base_pdb_name}.pdb").exists(
         ):  #TODO(CJ): Do we need a safe_cpy function?
-            shutil.copy(self.pdb_path,
-                        f"{self.work_dir}/{self.base_pdb_name}.pdb")
+            shutil.copy(self.pdb_path, f"{self.work_dir}/{self.base_pdb_name}.pdb")
         self.path_name = f"{self.work_dir}/{self.base_pdb_name}.pdb"
         self.pqr_path = str()
         # self.mutations = []
@@ -109,8 +108,7 @@ class PDBPrepper:
                 get_flag = 1
                 # warn if possible wrong self.stru
                 if Config.debug >= 1:
-                    print(
-                        "PDB.get_stru: WARNING: self.stru has a different name")
+                    print("PDB.get_stru: WARNING: self.stru has a different name")
                     print("     -self.name: " + self.name)
                     print("     -self.stru.name: " + self.stru.name)
                     print("Getting new stru")
@@ -418,8 +416,9 @@ class PDBPrepper:
         pdb2pqr_protonate_pdb(self.path_name, self.pqr_path)
         # Add missing atom (from the PDB2PQR step. Update to func result after update the _get_protonation_pdb2pqr func)
         # Now metal and ligand
-        new_structure: Structure = protonate_missing_elements(
-            self.no_water_path, self.pqr_path, self.work_dir)
+        new_structure: Structure = protonate_missing_elements(self.no_water_path,
+                                                              self.pqr_path,
+                                                              self.work_dir)
 
         self.current_path_ = f"{fs.remove_ext(fs.remove_ext(self.pqr_path))}_aH.pdb"
         self.all_paths.append(self.current_path_)
@@ -444,13 +443,12 @@ class PDBPrepper:
         mask = [True] * len(pdb_lines)
         # crude judgement of H including customized H
         if ligand:
-            not_H_list = ["HG", "HF",
-                          "HS"]  # non-H elements that start with "H"
+            not_H_list = ["HG", "HF", "HS"]  # non-H elements that start with "H"
             for idx, pl in enumerate(pdb_lines):
                 if pl.is_ATOM():
                     atom_name = line[12:16].strip()
-                    if (pl.atom_name.startswith("H") and
-                            pl.atom_name[:2] not in not_H_list):
+                    if (pl.atom_name.startswith("H")
+                            and pl.atom_name[:2] not in not_H_list):
                         mask[idx] = False
         else:
             H_aliases = get_element_aliases(ff, "H")
@@ -496,8 +494,8 @@ class PDBPrepper:
                         del format_flag
 
                 if "charge_flag" in dir():
-                    if (line_index >= charge_flag + 2 and
-                            line_index <= charge_flag + 1 + ceil(N_atom / 5)):
+                    if (line_index >= charge_flag + 2
+                            and line_index <= charge_flag + 1 + ceil(N_atom / 5)):
                         for i in line.strip().split():
                             charge_list.append(float(i) / 18.2223)
         return charge_list
@@ -542,8 +540,8 @@ class PDBPrepper:
             for gjf in inp:
                 out = gjf[:-3] + "out"
                 if Config.debug > 1:
-                    print("running: " + Config.Gaussian.g16_exe + " < " + gjf +
-                          " > " + out)
+                    print("running: " + Config.Gaussian.g16_exe + " < " + gjf + " > " +
+                          out)
                 os.system(Config.Gaussian.g16_exe + " < " + gjf + " > " + out)
                 outs.append(out)
             return outs
@@ -553,8 +551,8 @@ class PDBPrepper:
             for gjf in inp:
                 out = gjf[:-3] + "out"
                 if Config.debug > 1:
-                    print("running: " + Config.Gaussian.g09_exe + " < " + gjf +
-                          " > " + out)
+                    print("running: " + Config.Gaussian.g09_exe + " < " + gjf + " > " +
+                          out)
                 os.system(Config.Gaussian.g09_exe + " < " + gjf + " > " + out)
                 outs.append(out)
             return outs

@@ -40,8 +40,7 @@ class MutationRestrictions:
         self.mapper_ = deepcopy(mapper)
         self.pdb_ = pdb
 
-    def add_restriction(self, rkey: Tuple[str, int], ukey: str,
-                        uval: Any) -> None:
+    def add_restriction(self, rkey: Tuple[str, int], ukey: str, uval: Any) -> None:
         """Method that adds a new restriction to a given residue specified by an rkey. Checks if the new
         restriction is valid and raises an error if not.
         Args:
@@ -80,8 +79,8 @@ class MutationRestrictions:
         self.add_restriction(rkey, "locked", True)
 
     def apply(
-        self, muts: Dict[Tuple[str, int], List[Mutation]]
-    ) -> Dict[Tuple[str, int], List[Mutation]]:
+        self, muts: Dict[Tuple[str, int],
+                         List[Mutation]]) -> Dict[Tuple[str, int], List[Mutation]]:
         """Applies the restrictions specified from the object to the supplied mutations.
         Args:
             mut: A dict() containing all possible mutations for each of the residue positions. Should be generated from enzy_htp.mutation.generate_all_mutations()
@@ -98,9 +97,8 @@ class MutationRestrictions:
             mlist: List[Mutation] = muts[rkey]
             if restrict["illegal_targets"]:
                 mlist = list(
-                    filter(
-                        lambda mm: mm.target not in restrict["illegal_targets"],
-                        mlist))
+                    filter(lambda mm: mm.target not in restrict["illegal_targets"],
+                           mlist))
 
             if restrict["no_size_increase"]:
                 mlist = list(filter(lambda mm: not size_increase(mm), mlist))

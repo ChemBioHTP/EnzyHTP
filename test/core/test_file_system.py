@@ -147,11 +147,13 @@ def test_write_lines():
     fs.safe_rm(fname1)
     assert not os.path.exists(fname1)
 
+
 def test_get_valid_temp_name():
     fname1 = f"{CURR_DIR}/test.test.test.py"
     make_test_file(fname1, "")
     assert fs.get_valid_temp_name(fname1) == f"{CURR_DIR}/test_1.test.test.py"
     fs.safe_rm(fname1)
     assert not os.path.exists(fname1)
+
 
 # TODO(CJ) add tests for remove_ext

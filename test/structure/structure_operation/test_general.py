@@ -8,8 +8,6 @@ import os
 from enzy_htp.structure import PDBParser, Structure
 import enzy_htp.structure.structure_operation as stru_oper
 
-import enzy_htp
-
 enzy_htp.core._LOGGER.setLevel(logging.CRITICAL)
 
 #_LOGGER.setLevel(logging.DEBUG)
@@ -50,14 +48,13 @@ def test_update_residues():
     ref_stru: Structure = sp.get_structure(new_pdb_file_path)
     stru_oper.update_residues(stru, ref_stru)
     # this truncated the part with mem id
-    assert str(stru)[37:] == (
-        "Structure(\n"
-        "chains: (sorted, original [\'A\', \'B\', \'C\', \'D\'])\n"
-        "    A(peptide): residue: 10-151 atom_count: 2127\n"
-        "    B(peptide): residue: 12-151 atom_count: 2103\n"
-        "    C(ligand): residue: 370-370 atom_count: 58\n"
-        "    D(ligand): residue: 371-371 atom_count: 58\n"
-        ")")
+    assert str(stru)[37:] == ("Structure(\n"
+                              "chains: (sorted, original [\'A\', \'B\', \'C\', \'D\'])\n"
+                              "    A(peptide): residue: 10-151 atom_count: 2127\n"
+                              "    B(peptide): residue: 12-151 atom_count: 2103\n"
+                              "    C(ligand): residue: 370-370 atom_count: 58\n"
+                              "    D(ligand): residue: 371-371 atom_count: 58\n"
+                              ")")
 
 
 def test_deprotonate_residue():

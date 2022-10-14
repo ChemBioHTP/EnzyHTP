@@ -91,8 +91,7 @@ def create_selection(struct: Structure, atom_mask: str, fix_end: str = None):
                 if not cnt_atom in sele_atoms:
                     if fix_end == "H":
                         d_XH = X_H_bond_length[atom.name]
-                        label = "-".join(
-                            (str(atom.id), str(cnt_atom.id), str(d_XH)))
+                        label = "-".join((str(atom.id), str(cnt_atom.id), str(d_XH)))
                         fix_atom = "H"
                     if fix_end == "Me":
                         # TODO
