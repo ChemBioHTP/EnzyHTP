@@ -63,10 +63,10 @@ def test_get_radii_method_good_input():
 
 def test_residue_to_metal():
     """Ensuring the residue_to_metal() method works."""
-    residue = Residue(5, "Zn", list())
+    residue = Residue(5, "ZN", list())
     metal: MetalUnit = residue_to_metal(residue)
     assert isinstance(metal, MetalUnit)
-    assert metal.name == "Zn"
+    assert metal.name == "ZN"
 
 
 def test_clone():
