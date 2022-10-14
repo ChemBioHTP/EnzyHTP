@@ -53,11 +53,11 @@ class MetalUnit(Residue):
     @property
     def atom_name(self) -> str:
         """Getter for the only one atom in this MetalUnit unit"""
-        return self._atom[0].name
+        return self._atoms[0].name
 
     @atom_name.setter
     def atom_name(self, val: str):
-        self._atom[0].name = val
+        self._atoms[0].name = val
 
     #endregion
 
@@ -153,9 +153,7 @@ class MetalUnit(Residue):
         Allowed values are "ionic" or "vdw" for ionic and van-der waals, respectively.
         Returns a float or None if the metal does not have a distance.
         """
-        tks = list(self._name.lower())
-        tks[0] = tks[0].upper()
-        return chem.get_atom_radii(''.join(tks), method)
+        return chem.get_atom_radii(self.element, method)
 
     def clone(self) -> MetalUnit:
         """Creates deepcopy of self."""
