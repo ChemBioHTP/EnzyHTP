@@ -8,7 +8,6 @@ import shutil
 from pathlib import Path
 
 from enzy_htp.core import file_system as fs
-from enzy_htp import AmberInterface
 
 MM_BASE_DIR = Path(__file__).absolute().parent
 MM_DATA_DIR = f"{MM_BASE_DIR}/data/"

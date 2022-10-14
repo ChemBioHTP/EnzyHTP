@@ -7,7 +7,6 @@ Date: 2022-03-19
 import os
 import pytest
 
-from enzy_htp.core import InvalidPH
 from enzy_htp.core import file_system as fs
 from enzy_htp.preparation import PDBPrepper
 
