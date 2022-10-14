@@ -161,11 +161,3 @@ def test_renumber_atoms_bad_input():
     assert exe.value.code == 1
 
 
-def test_deepcopy():
-    """Making sure the Residue.__deepcopy__() method returns a deepcopy of the current Residue."""
-    res: Residue = deepcopy(RESIDUES[0])
-    res_cpy: Residue = deepcopy(res)
-
-    assert id(res) != id(res_cpy)
-    for a1, a2 in zip(res.atoms, res_cpy.atoms):
-        assert id(a1) != id(a2)
