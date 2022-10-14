@@ -617,4 +617,3 @@ def test_round_trip_pdb():
     assert equiv_files(TEST_FILE, actual_file, 60)
     fs.safe_rm(actual_file)
     assert not os.path.exists(actual_file)
-
