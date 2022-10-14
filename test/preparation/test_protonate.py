@@ -11,6 +11,7 @@ from enzy_htp import core as cc
 from enzy_htp.core import file_system as fs
 from enzy_htp import config
 import enzy_htp.structure as struct
+from enzy_htp.structure.structure_io.pdb_io import PDBParser
 import enzy_htp.structure.structure_operation as stru_oper
 from enzy_htp.preparation import protonate as prot
 
@@ -198,3 +199,14 @@ def test_pybel_protonate_pdb_ligand_4CO():
     fs.safe_rm(out_ligand_path)
     assert not os.path.isdir(out_ligand_path)
 
+def test_pybel_protonate_pdb_ligand_SAM():
+    """test if pybel can protonate SAM correctly. With a non-strict check of the total atom number"""
+    ligand_path = f"{DATA_DIR}/ligand_test_SAM.pdb"
+    out_ligand_path = f"{WORK_DIR}/ligand_test_SAM_pybel.pdb"
+    assert not os.path.isdir(out_ligand_path)
+    
+    prot.pybel_protonate_pdb_ligand(ligand_path, out_ligand_path)
+
+    assert len(PDBParser().get_structure(out_ligand_path).atoms) == 50
+    fs.safe_rm(out_ligand_path)
+    assert not os.path.isdir(out_ligand_path)
