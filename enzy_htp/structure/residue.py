@@ -182,7 +182,7 @@ class Residue(DoubleLinkedNode):
 
     def is_sequence_eq(self, other: Residue) -> bool:
         """Comparator that checks for sequence same-ness."""
-        return self.name == other.name
+        return self.key() == other.key()
 
     def is_deprotonatable(self) -> bool:
         """
