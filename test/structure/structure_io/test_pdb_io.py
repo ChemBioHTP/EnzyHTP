@@ -31,7 +31,7 @@ from enzy_htp.structure import (
 )
 
 # pylint: disable=protected-access, invalid-name
-_LOGGER.setLevel(logging.DEBUG)
+_LOGGER.setLevel(logging.CRITICAL)
 CURRDIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = f'{CURRDIR}/../data/'
 sp = PDBParser()
