@@ -89,13 +89,10 @@ class MetalUnit(Residue):
         for k, v in donor_mapper.items():
             if len(v) > 1:
                 _LOGGER.warning(
-                    f"More than 1 donor atom in residue {k} to center {self}: {v}"
-                )
+                    f"More than 1 donor atom in residue {k} to center {self}: {v}")
         return donor_mapper
 
-    def get_donor_atoms(self,
-                        method: str = "ionic",
-                        check_radius=4.0) -> List[Atom]:
+    def get_donor_atoms(self, method: str = "ionic", check_radius=4.0) -> List[Atom]:
         """
         Get coordinated donor atom for a metal center.
         1. check all atoms by type, consider those in the "donor_map"
@@ -115,16 +112,15 @@ class MetalUnit(Residue):
         # find radius for matal
         r_metal = self.atom.radius(method)
         # get target with in check_radius (default: 4A)
-        range_atoms = self.chain.parent.find_atoms_in_range(
-            self.coord, range_distance=check_radius)
+        range_atoms = self.chain.parent.find_atoms_in_range(self.coord,
+                                                            range_distance=check_radius)
         atom: Atom
         for atom in range_atoms:
             # only check donor atom (by atom name)
             if atom.is_donor_atom():
                 r_donor = atom.radius(method)
                 if atom.distance_to(self.atom) - (
-                        r_metal +
-                        r_donor) <= 0.01:  # TODO refine this approximation
+                        r_metal + r_donor) <= 0.01:  # TODO refine this approximation
                     result.append(atom)
                     _LOGGER.info(f"found donor atom of {self}: {atom}")
         return result
@@ -196,8 +192,8 @@ class MetalUnit(Residue):
                 resi.deprotonate(resi.d_atom)
             else:
                 if resi.name not in NoProton_list:
-                    print("!WARNING!: uncommon donor residue -- " +
-                          resi.chain.id + " " + resi.name + str(resi.id))
+                    print("!WARNING!: uncommon donor residue -- " + resi.chain.id + " " +
+                          resi.name + str(resi.id))
                     # resi.rot_proton(resi.d_atom)
 
     def _metal_fix_2(self):  # @nu
@@ -254,9 +250,8 @@ class MetalUnit(Residue):
             z = "{:>8.3f}".format(self.coord[2])
 
         # example: ATOM   5350  HB2 PRO   347      32.611  15.301  24.034  1.00  0.00
-        line = (l_type + a_index + " " + a_name + "   " + r_name + " " +
-                c_index + r_index + "    " + x + y + z + "  1.00  0.00" +
-                line_feed)
+        line = (l_type + a_index + " " + a_name + "   " + r_name + " " + c_index +
+                r_index + "    " + x + y + z + "  1.00  0.00" + line_feed)
 
         return line
 
@@ -288,8 +283,7 @@ class MetalUnit(Residue):
             G16_label = G16_label_map[self.resi_name][self.name]
         else:
             if Config.debug >= 1:
-                print("Metal: " + self.name +
-                      " not in build-in atom type of ff96.")
+                print("Metal: " + self.name + " not in build-in atom type of ff96.")
                 print(
                     "Use parameters and atom types from TIP3P (frcmod.ionsjc_tip3p & frcmod.ions234lm_126_tip3p)"
                 )
@@ -313,8 +307,8 @@ class MetalUnit(Residue):
         y = "{:<14.8f}".format(self.coord[1])
         z = "{:<14.8f}".format(self.coord[2])
 
-        line = (atom_label + " " + fz_flag + "   " + x + " " + y + " " + z +
-                " " + ly_flag + cnt_flag + line_feed)
+        line = (atom_label + " " + fz_flag + "   " + x + " " + y + " " + z + " " +
+                ly_flag + cnt_flag + line_feed)
 
         return line
 
