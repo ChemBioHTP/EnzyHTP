@@ -27,7 +27,7 @@ def test_constant_data():
 
 
 def test_element():
-    stru = PDBParser.get_structure(f"{DATA_DIR}1NVG.pdb")
+    stru = PDBParser().get_structure(f"{DATA_DIR}1NVG.pdb")
     metalcenter: MetalUnit = stru.metalcenters[0]
     assert metalcenter.element == "Zn"
 
@@ -43,7 +43,7 @@ def test_get_donor_atoms():
 
 
 def test_get_donor_mapper():
-    stru = PDBParser.get_structure(f"{DATA_DIR}1NVG.pdb")
+    stru = PDBParser().get_structure(f"{DATA_DIR}1NVG.pdb")
     metalcenter1: MetalUnit = stru.metalcenters[0]
     donor_mapper = metalcenter1.get_donor_mapper()
     assert len(donor_mapper) == 4
@@ -53,7 +53,7 @@ def test_get_donor_mapper():
 def test_get_radii_method_good_input():
     """Ensuring the MetalUnit.get_radii() method works correctly."""
     pdb_file = f"{DATA_DIR}/1NVG.pdb"
-    metals: List[MetalUnit] = PDBParser.get_structure(pdb_file).metals
+    metals: List[MetalUnit] = PDBParser().get_structure(pdb_file).metals
     assert np.isclose(metals[0].get_radii(), 0.88)
     assert np.isclose(metals[0].get_radii("vdw"), 1.39)
 
@@ -72,7 +72,7 @@ def test_residue_to_metal():
 def test_clone():
     """Checking that the Ligand.clone() method returns a deepcopy of the current MetalUnit()."""
     pdb_file = f"{DATA_DIR}/1NVG.pdb"
-    metals: List[MetalUnit] = PDBParser.get_structure(pdb_file).metals
+    metals: List[MetalUnit] = PDBParser().get_structure(pdb_file).metals
     metal: MetalUnit = metals[0]
     metal_cpy: MetalUnit = metal.clone()
     assert isinstance(metal_cpy, MetalUnit)

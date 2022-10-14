@@ -49,7 +49,7 @@ def test_valid_mutation_fails():
 def test_generate_all_mutations():
     """Testing that all possible mutations work for a simple, 1-residue structure."""
     ONE_RES: str = f"{DATA_DIR}/one_res.pdb"
-    structure: es.Structure = es.PDBParser.get_structure(ONE_RES)
+    structure: es.Structure = es.PDBParser().get_structure(ONE_RES)
     all_muts = mut.generate_all_mutations(structure)
 
     assert len(all_muts[('A', 1)]) == 20

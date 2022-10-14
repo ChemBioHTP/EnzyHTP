@@ -24,7 +24,7 @@ def test_constat_data():
 
 def test_fix_atom_names():
     """test using a ligand with element symbol as atom names"""
-    stru = PDBParser.get_structure(f"{DATA_DIR}just_ligand_badname.pdb")
+    stru = PDBParser().get_structure(f"{DATA_DIR}just_ligand_badname.pdb")
     ligand = stru.ligands[0]
     ligand.fix_atom_names()
     assert ligand.atom_name_list == ['C', 'F', 'O', 'C1', 'O1', 'H', 'H1']

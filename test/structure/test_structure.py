@@ -145,11 +145,11 @@ def test_round_trip_pdb():
     # that will make this work
     TEST_FILE = f"{DATA_DIR}/1NVG.pdb"
     actual_file = f"{DATA_DIR}/1NVG_cpy.pdb"
-    structure1: Structure = PDBParser.get_structure(TEST_FILE, "all")
+    structure1: Structure = PDBParser().get_structure(TEST_FILE, "all")
     fs.safe_rm(actual_file)
     assert not os.path.exists(actual_file)
     #structure1.to_pdb(actual_file)
-    structure1_contents: List[str] = PDBParser.get_file_str(structure1).splitlines()
+    structure1_contents: List[str] = PDBParser().get_file_str(structure1).splitlines()
     fs.write_lines(actual_file, structure1_contents)
     assert os.path.exists(actual_file)
     assert equiv_files(TEST_FILE, actual_file, 60)
@@ -159,5 +159,5 @@ def test_round_trip_pdb():
 
 def test_atoms():  # TODO(shaoqz) wait for test
     TEST_FILE = f"{TEST_DIR}/preparation/data/3NIR.pdb"
-    struct: Structure = PDBParser.get_structure(TEST_FILE)
+    struct: Structure = PDBParser().get_structure(TEST_FILE)
     assert struct

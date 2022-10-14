@@ -20,7 +20,7 @@ CURR_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = f"{CURR_DIR}/data/"
 
 TEST_PDB_FILE = f"{CURR_DIR}/data/3NIR.pdb"
-RESIDUES = so.remove_solvent(PDBParser.get_structure(TEST_PDB_FILE)).residues
+RESIDUES = so.remove_solvent(PDBParser().get_structure(TEST_PDB_FILE)).residues
 
 
 def test_deepcopy():

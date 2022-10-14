@@ -7,10 +7,10 @@ import logging
 import os
 from enzy_htp.structure import PDBParser, Structure
 import enzy_htp.structure.structure_operation as stru_oper
+from enzy_htp.core import _LOGGER
 
-enzy_htp.core._LOGGER.setLevel(logging.CRITICAL)
+_LOGGER.setLevel(logging.CRITICAL)
 
-#_LOGGER.setLevel(logging.DEBUG)
 CURRDIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = f"{CURRDIR}/../data/"
 sp = PDBParser()

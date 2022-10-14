@@ -147,6 +147,6 @@ def test_num_atoms():
 def test_has_metal():
     """Checks if the Chain.has_metal() returns correct answers for both True and False cases."""
     pdb_file = f"{DATA_DIR}/1NVG.pdb"
-    structure: Structure = PDBParser.get_structure(pdb_file)
+    structure: Structure = sp.get_structure(pdb_file)
     assert not structure.chains[0].has_metal()
     assert structure.chains[1].has_metal()
