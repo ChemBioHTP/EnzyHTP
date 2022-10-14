@@ -160,4 +160,4 @@ def test_round_trip_pdb():
 def test_atoms():  # TODO(shaoqz) wait for test
     TEST_FILE = f"{TEST_DIR}/preparation/data/3NIR.pdb"
     struct: Structure = PDBParser().get_structure(TEST_FILE)
-    assert struct
+    assert struct.atoms
