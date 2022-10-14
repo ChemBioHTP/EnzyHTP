@@ -111,7 +111,7 @@ def test_attached_protons():
     assert list(map(lambda a: a.name, atom1.attached_protons())) == ['H1', 'H2', 'H3']
 
 
-def test_distance():
+def test_distance_to():
     """Making sure that the .distance_to() method works."""
     atom1 = Atom({'x_coord': 0, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'DUMMY'})
 
