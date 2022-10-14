@@ -1,7 +1,6 @@
 """Definition for the Residue class. Residues are the most common unit of function within 
 enzy_htp. A Residue() can be canonincal, non-canonical, solvent, or ligand. It is essentially
 the catch all for PDB objects.
-
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-19
@@ -25,7 +24,6 @@ from .atom import Atom
 class Residue(DoubleLinkedNode):
     """Most common functional unit in enzy_htp. Made up of Atom() objects and can be either
         canonical, non-canonical, solvent or a metal center.
-
     Attributes:
         (nessessary)
         children/atoms : A list of Atom() objects that make up the Residue().
@@ -33,13 +31,16 @@ class Residue(DoubleLinkedNode):
         idx : The index of the Residue within the chain.
         parent/chain : Parent chain name.
         rtype : The ResidueType of the Residue().
-
     Derived properties:
         key(if_name) : the tuple key of residue's sequential identity e.g.: ("A", 1)
         num_atoms: number of belonging Atom()s
     """
 
-    def __init__(self, residue_idx: int, residue_name: str, atoms: List[Atom], parent=None):
+    def __init__(self,
+                 residue_idx: int,
+                 residue_name: str,
+                 atoms: List[Atom],
+                 parent=None):
         """Constructor for the Residue() object"""
         self._name = residue_name
         self._idx = residue_idx
@@ -52,6 +53,7 @@ class Residue(DoubleLinkedNode):
     def atoms(self) -> List[Atom]:
         """Returns a list of all Atom() objects that the Residue() "owns" """
         return self.get_children()
+
     @atoms.setter
     def atoms(self, val):
         self.set_children(val)
@@ -60,6 +62,7 @@ class Residue(DoubleLinkedNode):
     def _atoms(self) -> List[Atom]:
         """alias for _children. Prevent change children but _atoms dont change"""
         return self._children
+
     @_atoms.setter
     def _atoms(self, val):
         self.set_children(val)
@@ -68,6 +71,7 @@ class Residue(DoubleLinkedNode):
     def chain(self):
         """Getter for the Residue()'s parent chain id."""
         return self.get_parent()
+
     @chain.setter
     def chain(self, val):
         self.set_parent(val)
@@ -76,6 +80,7 @@ class Residue(DoubleLinkedNode):
     def idx(self) -> int:
         """Getter for the Residue()'s index."""
         return self._idx
+
     @idx.setter
     def idx(self, val):
         self._idx = val
@@ -84,6 +89,7 @@ class Residue(DoubleLinkedNode):
     def rtype(self) -> chem.ResidueType:
         """Getter for the Residue()'s chem.ResidueType value."""
         return self._rtype
+
     @rtype.setter
     def rtype(self, val):
         self._rtype = val
@@ -92,11 +98,13 @@ class Residue(DoubleLinkedNode):
     def name(self) -> str:
         """Getter for the Residue()'s name."""
         return self._name
+
     @name.setter
     def name(self, val):
         self._name = val
+
     #endregion
-    
+
     #region === Getter-Prop ===
     def key(self, if_name: bool = False) -> Tuple[str, int]:
         """
@@ -125,13 +133,14 @@ class Residue(DoubleLinkedNode):
             _LOGGER.error(f"residue {self} have more than 1 {name}")
             sys.exit(1)
         if len(result) == 0:
-            raise ResidueDontHaveAtom(self, name, f"residue {self} dont have {name}")
+            raise ResidueDontHaveAtom(self, name,
+                                      f"residue {self} dont have {name}")
         return result[0]
 
     @property
     def atom_name_list(self) -> List[str]:
         """get a list of atom names in the residue"""
-        return list(map(lambda a:a.name, self.atoms))
+        return list(map(lambda a: a.name, self.atoms))
 
     # def clone(self) -> Residue: #TODO
     #     """Creates a deepcopy of self."""
@@ -174,7 +183,7 @@ class Residue(DoubleLinkedNode):
 
     def is_sequence_eq(self, other: Residue) -> bool:
         """Comparator that checks for sequence same-ness."""
-        return self.key() == other.key()
+        return self.name == other.name
 
     def is_deprotonatable(self) -> bool:
         """
@@ -183,13 +192,14 @@ class Residue(DoubleLinkedNode):
         Base on the residue.
         """
         return self.name in chem.residue.DEPROTONATION_MAPPER
-    
+
     def is_hetatom_noproton(self) -> bool:
         """check if the residue contain no acidic proton on side chain hetero atoms"""
         return self.name in chem.residue.NOPROTON_LIST
+
     #endregion
 
-    #region === Editor === 
+    #region === Editor ===
     def sort_atoms(self):
         """
         sort children atoms with their atom idx
@@ -197,7 +207,7 @@ class Residue(DoubleLinkedNode):
         so only this function is called will it sorted
         """
         self._children.sort(key=lambda x: x.idx)
-    
+
     def fix_atom_names(self):
         """
         Atom names should be unique in a residue to represent its connectivity.
@@ -206,9 +216,9 @@ class Residue(DoubleLinkedNode):
         For canonical AA, its should follow those CONNECTIVITY_MAPPER
         For non-canonical, every name should be at least unique
         """
-        raise Exception #TODO need to figure out how to determine the connectivity without the name
+        raise Exception  #TODO need to figure out how to determine the connectivity without the name
 
-    def renumber_atoms(self, start: int = 1) -> int: # TODO
+    def renumber_atoms(self, start: int = 1) -> int:  # TODO
         """Renumbers the Residue()'s Atom()'s beginning with "start" paramter, defaulted to 1. Returns the index of the last Atom().
         NOTE: errors if "start" is <= 0.
         """
@@ -218,17 +228,21 @@ class Residue(DoubleLinkedNode):
             )
             exit(1)
         aa: Atom
-        self._atoms = sorted(self._atoms, key=lambda aa: aa.atom_number) #@shaoqz: maybe use .sort to keep the reference.
+        self._atoms.sort(key=lambda aa: aa.idx
+                        )  #@shaoqz: maybe use .sort to keep the reference.
 
         for idx, aa in enumerate(self._atoms):
-            self._atoms[idx].atom_number = idx + start #@shaoqz: why dont use aa?
+            self._atoms[
+                idx].atom_number = idx + start  #@shaoqz: why dont use aa?
         return idx + start
+
     #endregion
 
     #region === Special ===
     def __str__(self) -> str:
         return f"Residue({self._idx}, {self._name}, atom:{len(self._atoms)}, {self._parent})"
 
-    def __repr__(self) -> str: # TODO
+    def __repr__(self) -> str:  # TODO
         return str(self)
+
     #endregion
