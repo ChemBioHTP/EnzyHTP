@@ -6,17 +6,60 @@ Date: 2022-03-19
 """
 
 from typing import List, Set, Dict, Union
-from .db import load_from_db
 from ..core import InvalidResidueCode, _LOGGER
 
-AA_LIST: List[str] = load_from_db("AA_LIST")
+AA_LIST: List[str] = [
+        "R",
+        "H",
+        "K",
+        "D",
+        "E",
+        "S",
+        "T",
+        "N",
+        "Q",
+        "C",
+        "G",
+        "P",
+        "A",
+        "V",
+        "I",
+        "L",
+        "M",
+        "F",
+        "Y",
+        "W",
+        "U"
+
 """Capitalized list of all one-letter amino acid names."""
 
 THREE_LETTER_AA_MAPPER: Dict[str, str] = load_from_db(
-    "THREE_LETTER_AA_MAPPER")  #@shaoqz: @imp2 add related to canonical in the name
+    "THREE_LETTER_AA_MAPPER")  #TODO(shaoqz): @imp2 add related to canonical in the name
 """Contains mapping of all amino acids codes, with key value pairs of (three letter code, one letter code). Should NOT be called directly for code conversion. Instead used enzy_htp.chemical.residue.convert_to_three_letter()"""
 
-ONE_LETTER_AA_MAPPER: Dict[str, str] = load_from_db("ONE_LETTER_AA_MAPPER")
+ONE_LETTER_AA_MAPPER: Dict[str, str] = {
+        "A": "ALA",
+        "C": "CYS",
+        "D": "ASP",
+        "E": "GLU",
+        "F": "PHE",
+        "G": "GLY",
+        "H": "HIS",
+        "I": "ILE",
+        "K": "LYS",
+        "L": "LEU",
+        "M": "MET",
+        "N": "ASN",
+        "P": "PRO",
+        "Q": "GLN",
+        "R": "ARG",
+        "S": "SER",
+        "T": "THR",
+        "U": "SEC",
+        "V": "VAL",
+        "W": "TRP",
+        "Y": "TYR"
+}
 """Contains mapping of all amino acids codes, with key value pairs of (one letter code, three letter code). Should NOT be called directly for code conversion. Instead used enzy_htp.chemical.residue.convert_to_one_letter()"""
 
 RESIDUE_ELEMENT_MAP: Dict[str, Dict[str, str]] = load_from_db("RESIDUE_ELEMENT_MAP")
@@ -64,12 +107,91 @@ RESIDUE_CONNECTIVITY_MAP_NTERMINAL: Dict[str, Dict[str, List[str]]] = load_from_
 (key, value) pairs of (atom name, list of connected atoms). Similar to RESIDUE_CONNECTIVITY_MAP
 except has the mappings for the N-terminal version of each residue."""
 
-RESIDUE_CATEGORIES: Dict[str, List[str]] = load_from_db("RESIDUE_CATEGORIES")
+RESIDUE_CATEGORIES: Dict[str, List[str]] = {
+        "charged": [
+            "R",
+            "H",
+            "K",
+            "D",
+            "E"
+        ],
+        "negative": [
+            "D",
+            "E"
+        ],
+        "neutral": [
+            "S",
+            "T",
+            "N",
+            "Q",
+            "C",
+            "Y",
+            "A",
+            "V",
+            "I",
+            "L",
+            "P",
+            "M",
+            "F",
+            "W",
+            "G"
+        ],
+        "nonpolar": [
+            "A",
+            "V",
+            "I",
+            "L",
+            "P",
+            "M",
+            "F",
+            "W",
+            "G"
+        ],
+        "polar": [
+            "R",
+            "H",
+            "K",
+            "D",
+            "E",
+            "S",
+            "T",
+            "N",
+            "Q",
+            "C",
+            "Y"
+        ],
+        "positive": [
+            "R",
+            "H",
+            "K"
+        ]
+}
 """dict() that describes basic characteristics of amino acids. Has (key,value) pairs
 of ('characteric', list() of one-letter amino-acid codes). Covered characteristics are:
 polar, nonpolar, charged, positive, negative, neutral."""
 
-RESIDUE_VOLUME_MAPPER: Dict[str, float] = load_from_db("RESIDUE_VOLUME_MAPPER")
+RESIDUE_VOLUME_MAPPER: Dict[str, float] = {
+        "A": 88.6,
+        "C": 108.5,
+        "D": 111.1,
+        "E": 138.4,
+        "F": 189.9,
+        "G": 60.1,
+        "H": 153.2,
+        "I": 166.7,
+        "K": 168.6,
+        "L": 166.7,
+        "M": 162.9,
+        "N": 114.1,
+        "P": 112.7,
+        "Q": 143.8,
+        "R": 173.4,
+        "S": 89.0,
+        "T": 116.1,
+        "V": 140.0,
+        "W": 227.8,
+        "Y": 193.6
+}
 """dict() that maps one-letter amino-acid codes to their volume in cubic angstroms. 
 source: https://www.imgt.org/IMGTeducation/Aide-memoire/_UK/aminoacids/abbreviation.html
 """

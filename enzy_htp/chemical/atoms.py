@@ -4,11 +4,12 @@
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-16
 """
-from .db import load_from_db
-
 from typing import Dict, List
 
-X_H_BOND_LENGTH: Dict[str, float] = load_from_db("X_H_BOND_LENGTH")
+X_H_BOND_LENGTH: Dict[str, float] = {
+        "C": 1.07,
+        "N": 1.0
+}
 """dict() storing bond lengths between an arbitrary atom X and a Hydrogen (H)."""
 
 
