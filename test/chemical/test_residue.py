@@ -15,7 +15,7 @@ def test_variable_checks():
     assert len(res.AA_LIST) == 21
     assert all_caps(res.AA_LIST)
 
-    assert len(res.THREE_LETTER_AA_MAPPER) == 24
+    assert len(res.THREE_LETTER_AA_MAPPER) == 29
 
     three_mapper_keys = list(res.THREE_LETTER_AA_MAPPER.keys())
     three_mapper_values = list(set(list(res.THREE_LETTER_AA_MAPPER.values())))
