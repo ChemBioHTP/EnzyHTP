@@ -30,11 +30,35 @@ AA_LIST: List[str] = [
         "Y",
         "W",
         "U"
-
+]
 """Capitalized list of all one-letter amino acid names."""
 
-THREE_LETTER_AA_MAPPER: Dict[str, str] = load_from_db(
-    "THREE_LETTER_AA_MAPPER")  #TODO(shaoqz): @imp2 add related to canonical in the name
+THREE_LETTER_AA_MAPPER: Dict[str, str] = {
+        "ALA": "A",
+        "ARG": "R",
+        "ASN": "N",
+        "ASP": "D",
+        "CYS": "C",
+        "GLN": "Q",
+        "GLU": "E",
+        "GLY": "G",
+        "HID": "H",
+        "HIE": "H",
+        "HIP": "H",
+        "HIS": "H",
+        "ILE": "I",
+        "LEU": "L",
+        "LYS": "K",
+        "MET": "M",
+        "PHE": "F",
+        "PRO": "P",
+        "SEC": "U",
+        "SER": "S",
+        "THR": "T",
+        "TRP": "W",
+        "TYR": "Y",
+        "VAL": "V"
+} #TODO(shaoqz): @imp2 add related to canonical in the name
 """Contains mapping of all amino acids codes, with key value pairs of (three letter code, one letter code). Should NOT be called directly for code conversion. Instead used enzy_htp.chemical.residue.convert_to_three_letter()"""
 
 ONE_LETTER_AA_MAPPER: Dict[str, str] = {
@@ -62,7 +86,137 @@ ONE_LETTER_AA_MAPPER: Dict[str, str] = {
 }
 """Contains mapping of all amino acids codes, with key value pairs of (one letter code, three letter code). Should NOT be called directly for code conversion. Instead used enzy_htp.chemical.residue.convert_to_one_letter()"""
 
-RESIDUE_ELEMENT_MAP: Dict[str, Dict[str, str]] = load_from_db("RESIDUE_ELEMENT_MAP")
+RESIDUE_ELEMENT_MAP: Dict[str, Dict[str, str]] = {
+        "Amber": {
+            "AG": "Ag",
+            "AL": "Al",
+            "BA": "Ba",
+            "BE": "Be",
+            "C": "C",
+            "CA": "C",
+            "CB": "C",
+            "CD": "C",
+            "CD1": "C",
+            "CD2": "C",
+            "CE": "C",
+            "CE1": "C",
+            "CE2": "C",
+            "CE3": "C",
+            "CG": "C",
+            "CG1": "C",
+            "CG2": "C",
+            "CH2": "C",
+            "CO": "Co",
+            "CR": "Cr",
+            "CS": "Cs",
+            "CU": "Cu",
+            "CZ": "C",
+            "CZ2": "C",
+            "CZ3": "C",
+            "DY": "Dy",
+            "ER": "Er",
+            "EU": "Eu",
+            "FE": "Fe",
+            "GD": "Gd",
+            "H": "H",
+            "H1": "H",
+            "H2": "H",
+            "H3": "H",
+            "HA": "H",
+            "HA2": "H",
+            "HA3": "H",
+            "HB": "H",
+            "HB1": "H",
+            "HB2": "H",
+            "HB3": "H",
+            "HD1": "H",
+            "HD11": "H",
+            "HD12": "H",
+            "HD13": "H",
+            "HD2": "H",
+            "HD21": "H",
+            "HD22": "H",
+            "HD23": "H",
+            "HD3": "H",
+            "HE": "H",
+            "HE1": "H",
+            "HE2": "H",
+            "HE21": "H",
+            "HE22": "H",
+            "HE3": "H",
+            "HF": "Hf",
+            "HG": "H",
+            "HG1": "H",
+            "HG11": "H",
+            "HG12": "H",
+            "HG13": "H",
+            "HG2": "H",
+            "HG21": "H",
+            "HG22": "H",
+            "HG23": "H",
+            "HG3": "H",
+            "HH": "H",
+            "HH11": "H",
+            "HH12": "H",
+            "HH2": "H",
+            "HH21": "H",
+            "HH22": "H",
+            "HZ": "H",
+            "HZ1": "H",
+            "HZ2": "H",
+            "HZ3": "H",
+            "IN": "In",
+            "K": "K",
+            "LA": "La",
+            "LI": "Li",
+            "LU": "Lu",
+            "MG": "Mg",
+            "MN": "Mn",
+            "N": "N",
+            "NA": "Na",
+            "ND": "Nd",
+            "ND1": "N",
+            "ND2": "N",
+            "NE": "N",
+            "NE1": "N",
+            "NE2": "N",
+            "NH1": "N",
+            "NH2": "N",
+            "NI": "Ni",
+            "NZ": "N",
+            "O": "O",
+            "OD1": "O",
+            "OD2": "O",
+            "OE1": "O",
+            "OE2": "O",
+            "OG": "O",
+            "OG1": "O",
+            "OH": "O",
+            "OXT": "O",
+            "PB": "Pb",
+            "PD": "Pd",
+            "PR": "Pr",
+            "PT": "Pt",
+            "PU": "Pu",
+            "RA": "Ra",
+            "RB": "Rb",
+            "SD": "S",
+            "SG": "S",
+            "SM": "Sm",
+            "SN": "Sn",
+            "SR": "Sr",
+            "TB": "Tb",
+            "TH": "Th",
+            "TL": "Tl",
+            "TM": "Tm",
+            "U": "U",
+            "V": "V",
+            "Y": "Y",
+            "YB": "Yb",
+            "ZN": "Zn",
+            "ZR": "Zr"
+        }
+}
 """Mapper that shows element names for alternative names of atoms. Key value structure is (force field name, (atom mapper)), where atom mapper is an additional
 mapper that maps altered atom names to base atom names. Currently only defined for "Amber".
 
@@ -76,32 +230,5824 @@ Example usage:
 
 RESIDUE_CONNECTIVITY_MAP: Dict[str,
                                Dict[str,
-                                    List[str]]] = load_from_db("RESIDUE_CONNECTIVITY_MAP")
+                                    List[str]]] = {
+        "ALA": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB1",
+                "HB2",
+                "HB3"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB1": [
+                "CB"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ]
+        },
+        "ARG": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD": [
+                "CG",
+                "HD2",
+                "HD3",
+                "NE"
+            ],
+            "CG": [
+                "CB",
+                "HG2",
+                "HG3",
+                "CD"
+            ],
+            "CZ": [
+                "NE",
+                "NH1",
+                "NH2"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD2": [
+                "CD"
+            ],
+            "HD3": [
+                "CD"
+            ],
+            "HE": [
+                "NE"
+            ],
+            "HG2": [
+                "CG"
+            ],
+            "HG3": [
+                "CG"
+            ],
+            "HH11": [
+                "NH1"
+            ],
+            "HH12": [
+                "NH1"
+            ],
+            "HH21": [
+                "NH2"
+            ],
+            "HH22": [
+                "NH2"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "NE": [
+                "CD",
+                "HE",
+                "CZ"
+            ],
+            "NH1": [
+                "CZ",
+                "HH11",
+                "HH12"
+            ],
+            "NH2": [
+                "CZ",
+                "HH21",
+                "HH22"
+            ],
+            "O": [
+                "C"
+            ]
+        },
+        "ASH": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CG": [
+                "CB",
+                "OD1",
+                "OD2"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD2": [
+                "OD2"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ],
+            "OD1": [
+                "CG"
+            ],
+            "OD2": [
+                "CG",
+                "HD2"
+            ]
+        },
+        "ASN": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CG": [
+                "CB",
+                "OD1",
+                "ND2"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD21": [
+                "ND2"
+            ],
+            "HD22": [
+                "ND2"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "ND2": [
+                "CG",
+                "HD21",
+                "HD22"
+            ],
+            "O": [
+                "C"
+            ],
+            "OD1": [
+                "CG"
+            ]
+        },
+        "ASP": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CG": [
+                "CB",
+                "OD1",
+                "OD2"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ],
+            "OD1": [
+                "CG"
+            ],
+            "OD2": [
+                "CG"
+            ]
+        },
+        "CYM": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB3",
+                "HB2",
+                "SG"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ],
+            "SG": [
+                "CB"
+            ]
+        },
+        "CYS": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "SG"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HG": [
+                "SG"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ],
+            "SG": [
+                "CB",
+                "HG"
+            ]
+        },
+        "CYX": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "SG"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ],
+            "SG": [
+                "CB"
+            ]
+        },
+        "GLH": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD": [
+                "CG",
+                "OE1",
+                "OE2"
+            ],
+            "CG": [
+                "CB",
+                "HG2",
+                "HG3",
+                "CD"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HE2": [
+                "OE2"
+            ],
+            "HG2": [
+                "CG"
+            ],
+            "HG3": [
+                "CG"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ],
+            "OE1": [
+                "CD"
+            ],
+            "OE2": [
+                "CD",
+                "HE2"
+            ]
+        },
+        "GLN": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD": [
+                "CG",
+                "OE1",
+                "NE2"
+            ],
+            "CG": [
+                "CB",
+                "HG2",
+                "HG3",
+                "CD"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HE21": [
+                "NE2"
+            ],
+            "HE22": [
+                "NE2"
+            ],
+            "HG2": [
+                "CG"
+            ],
+            "HG3": [
+                "CG"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "NE2": [
+                "CD",
+                "HE21",
+                "HE22"
+            ],
+            "O": [
+                "C"
+            ],
+            "OE1": [
+                "CD"
+            ]
+        },
+        "GLU": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD": [
+                "CG",
+                "OE1",
+                "OE2"
+            ],
+            "CG": [
+                "CB",
+                "HG2",
+                "HG3",
+                "CD"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HG2": [
+                "CG"
+            ],
+            "HG3": [
+                "CG"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ],
+            "OE1": [
+                "CD"
+            ],
+            "OE2": [
+                "CD"
+            ]
+        },
+        "GLY": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA2",
+                "HA3",
+                "C"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA2": [
+                "CA"
+            ],
+            "HA3": [
+                "CA"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ]
+        },
+        "HID": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD2": [
+                "CG",
+                "NE2",
+                "HD2"
+            ],
+            "CE1": [
+                "ND1",
+                "HE1",
+                "NE2"
+            ],
+            "CG": [
+                "CB",
+                "ND1",
+                "CD2"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD1": [
+                "ND1"
+            ],
+            "HD2": [
+                "CD2"
+            ],
+            "HE1": [
+                "CE1"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "ND1": [
+                "CG",
+                "HD1",
+                "CE1"
+            ],
+            "NE2": [
+                "CE1",
+                "CD2"
+            ],
+            "O": [
+                "C"
+            ]
+        },
+        "HIE": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD2": [
+                "CG",
+                "NE2",
+                "HD2"
+            ],
+            "CE1": [
+                "ND1",
+                "HE1",
+                "NE2"
+            ],
+            "CG": [
+                "CB",
+                "ND1",
+                "CD2"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD2": [
+                "CD2"
+            ],
+            "HE1": [
+                "CE1"
+            ],
+            "HE2": [
+                "NE2"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "ND1": [
+                "CG",
+                "CE1"
+            ],
+            "NE2": [
+                "CE1",
+                "HE2",
+                "CD2"
+            ],
+            "O": [
+                "C"
+            ]
+        },
+        "HIP": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD2": [
+                "CG",
+                "NE2",
+                "HD2"
+            ],
+            "CE1": [
+                "ND1",
+                "HE1",
+                "NE2"
+            ],
+            "CG": [
+                "CB",
+                "ND1",
+                "CD2"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD1": [
+                "ND1"
+            ],
+            "HD2": [
+                "CD2"
+            ],
+            "HE1": [
+                "CE1"
+            ],
+            "HE2": [
+                "NE2"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "ND1": [
+                "CG",
+                "HD1",
+                "CE1"
+            ],
+            "NE2": [
+                "CE1",
+                "HE2",
+                "CD2"
+            ],
+            "O": [
+                "C"
+            ]
+        },
+        "HYP": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "CB",
+                "HA",
+                "C"
+            ],
+            "CB": [
+                "CG",
+                "HB2",
+                "HB3",
+                "CA"
+            ],
+            "CD": [
+                "N",
+                "HD22",
+                "HD23",
+                "CG"
+            ],
+            "CG": [
+                "CD",
+                "HG",
+                "OD1",
+                "CB"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD1": [
+                "OD1"
+            ],
+            "HD22": [
+                "CD"
+            ],
+            "HD23": [
+                "CD"
+            ],
+            "HG": [
+                "CG"
+            ],
+            "N": [
+                "CD",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ],
+            "OD1": [
+                "CG",
+                "HD1"
+            ]
+        },
+        "ILE": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB",
+                "CG2",
+                "CG1"
+            ],
+            "CD1": [
+                "CG1",
+                "HD11",
+                "HD12",
+                "HD13"
+            ],
+            "CG1": [
+                "CB",
+                "HG12",
+                "HG13",
+                "CD1"
+            ],
+            "CG2": [
+                "CB",
+                "HG21",
+                "HG22",
+                "HG23"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB": [
+                "CB"
+            ],
+            "HD11": [
+                "CD1"
+            ],
+            "HD12": [
+                "CD1"
+            ],
+            "HD13": [
+                "CD1"
+            ],
+            "HG12": [
+                "CG1"
+            ],
+            "HG13": [
+                "CG1"
+            ],
+            "HG21": [
+                "CG2"
+            ],
+            "HG22": [
+                "CG2"
+            ],
+            "HG23": [
+                "CG2"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ]
+        },
+        "LEU": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD1": [
+                "CG",
+                "HD11",
+                "HD12",
+                "HD13"
+            ],
+            "CD2": [
+                "CG",
+                "HD21",
+                "HD22",
+                "HD23"
+            ],
+            "CG": [
+                "CB",
+                "HG",
+                "CD1",
+                "CD2"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD11": [
+                "CD1"
+            ],
+            "HD12": [
+                "CD1"
+            ],
+            "HD13": [
+                "CD1"
+            ],
+            "HD21": [
+                "CD2"
+            ],
+            "HD22": [
+                "CD2"
+            ],
+            "HD23": [
+                "CD2"
+            ],
+            "HG": [
+                "CG"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ]
+        },
+        "LYN": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD": [
+                "CG",
+                "HD2",
+                "HD3",
+                "CE"
+            ],
+            "CE": [
+                "CD",
+                "HE2",
+                "HE3",
+                "NZ"
+            ],
+            "CG": [
+                "CB",
+                "HG2",
+                "HG3",
+                "CD"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD2": [
+                "CD"
+            ],
+            "HD3": [
+                "CD"
+            ],
+            "HE2": [
+                "CE"
+            ],
+            "HE3": [
+                "CE"
+            ],
+            "HG2": [
+                "CG"
+            ],
+            "HG3": [
+                "CG"
+            ],
+            "HZ2": [
+                "NZ"
+            ],
+            "HZ3": [
+                "NZ"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "NZ": [
+                "CE",
+                "HZ2",
+                "HZ3"
+            ],
+            "O": [
+                "C"
+            ]
+        },
+        "LYS": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD": [
+                "CG",
+                "HD2",
+                "HD3",
+                "CE"
+            ],
+            "CE": [
+                "CD",
+                "HE2",
+                "HE3",
+                "NZ"
+            ],
+            "CG": [
+                "CB",
+                "HG2",
+                "HG3",
+                "CD"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD2": [
+                "CD"
+            ],
+            "HD3": [
+                "CD"
+            ],
+            "HE2": [
+                "CE"
+            ],
+            "HE3": [
+                "CE"
+            ],
+            "HG2": [
+                "CG"
+            ],
+            "HG3": [
+                "CG"
+            ],
+            "HZ1": [
+                "NZ"
+            ],
+            "HZ2": [
+                "NZ"
+            ],
+            "HZ3": [
+                "NZ"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "NZ": [
+                "CE",
+                "HZ1",
+                "HZ2",
+                "HZ3"
+            ],
+            "O": [
+                "C"
+            ]
+        },
+        "MET": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CE": [
+                "SD",
+                "HE1",
+                "HE2",
+                "HE3"
+            ],
+            "CG": [
+                "CB",
+                "HG2",
+                "HG3",
+                "SD"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HE1": [
+                "CE"
+            ],
+            "HE2": [
+                "CE"
+            ],
+            "HE3": [
+                "CE"
+            ],
+            "HG2": [
+                "CG"
+            ],
+            "HG3": [
+                "CG"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ],
+            "SD": [
+                "CG",
+                "CE"
+            ]
+        },
+        "PHE": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD1": [
+                "CG",
+                "HD1",
+                "CE1"
+            ],
+            "CD2": [
+                "CG",
+                "CE2",
+                "HD2"
+            ],
+            "CE1": [
+                "CD1",
+                "HE1",
+                "CZ"
+            ],
+            "CE2": [
+                "CZ",
+                "HE2",
+                "CD2"
+            ],
+            "CG": [
+                "CB",
+                "CD1",
+                "CD2"
+            ],
+            "CZ": [
+                "CE1",
+                "HZ",
+                "CE2"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD1": [
+                "CD1"
+            ],
+            "HD2": [
+                "CD2"
+            ],
+            "HE1": [
+                "CE1"
+            ],
+            "HE2": [
+                "CE2"
+            ],
+            "HZ": [
+                "CZ"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ]
+        },
+        "PRO": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "CB",
+                "HA",
+                "C"
+            ],
+            "CB": [
+                "CG",
+                "HB2",
+                "HB3",
+                "CA"
+            ],
+            "CD": [
+                "N",
+                "HD2",
+                "HD3",
+                "CG"
+            ],
+            "CG": [
+                "CD",
+                "HG2",
+                "HG3",
+                "CB"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD2": [
+                "CD"
+            ],
+            "HD3": [
+                "CD"
+            ],
+            "HG2": [
+                "CG"
+            ],
+            "HG3": [
+                "CG"
+            ],
+            "N": [
+                "CD",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ]
+        },
+        "SER": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "OG"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HG": [
+                "OG"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ],
+            "OG": [
+                "CB",
+                "HG"
+            ]
+        },
+        "THR": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB",
+                "CG2",
+                "OG1"
+            ],
+            "CG2": [
+                "CB",
+                "HG21",
+                "HG22",
+                "HG23"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB": [
+                "CB"
+            ],
+            "HG1": [
+                "OG1"
+            ],
+            "HG21": [
+                "CG2"
+            ],
+            "HG22": [
+                "CG2"
+            ],
+            "HG23": [
+                "CG2"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ],
+            "OG1": [
+                "CB",
+                "HG1"
+            ]
+        },
+        "TRP": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD1": [
+                "CG",
+                "HD1",
+                "NE1"
+            ],
+            "CD2": [
+                "CG",
+                "CE2",
+                "CE3"
+            ],
+            "CE2": [
+                "NE1",
+                "CZ2",
+                "CD2"
+            ],
+            "CE3": [
+                "CZ3",
+                "HE3",
+                "CD2"
+            ],
+            "CG": [
+                "CB",
+                "CD1",
+                "CD2"
+            ],
+            "CH2": [
+                "CZ2",
+                "HH2",
+                "CZ3"
+            ],
+            "CZ2": [
+                "CE2",
+                "HZ2",
+                "CH2"
+            ],
+            "CZ3": [
+                "CH2",
+                "HZ3",
+                "CE3"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD1": [
+                "CD1"
+            ],
+            "HE1": [
+                "NE1"
+            ],
+            "HE3": [
+                "CE3"
+            ],
+            "HH2": [
+                "CH2"
+            ],
+            "HZ2": [
+                "CZ2"
+            ],
+            "HZ3": [
+                "CZ3"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "NE1": [
+                "CD1",
+                "HE1",
+                "CE2"
+            ],
+            "O": [
+                "C"
+            ]
+        },
+        "TYR": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD1": [
+                "CG",
+                "HD1",
+                "CE1"
+            ],
+            "CD2": [
+                "CG",
+                "CE2",
+                "HD2"
+            ],
+            "CE1": [
+                "CD1",
+                "HE1",
+                "CZ"
+            ],
+            "CE2": [
+                "CZ",
+                "HE2",
+                "CD2"
+            ],
+            "CG": [
+                "CB",
+                "CD1",
+                "CD2"
+            ],
+            "CZ": [
+                "CE1",
+                "OH",
+                "CE2"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD1": [
+                "CD1"
+            ],
+            "HD2": [
+                "CD2"
+            ],
+            "HE1": [
+                "CE1"
+            ],
+            "HE2": [
+                "CE2"
+            ],
+            "HH": [
+                "OH"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ],
+            "OH": [
+                "CZ",
+                "HH"
+            ]
+        },
+        "VAL": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB",
+                "CG1",
+                "CG2"
+            ],
+            "CG1": [
+                "CB",
+                "HG11",
+                "HG12",
+                "HG13"
+            ],
+            "CG2": [
+                "CB",
+                "HG21",
+                "HG22",
+                "HG23"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB": [
+                "CB"
+            ],
+            "HG11": [
+                "CG1"
+            ],
+            "HG12": [
+                "CG1"
+            ],
+            "HG13": [
+                "CG1"
+            ],
+            "HG21": [
+                "CG2"
+            ],
+            "HG22": [
+                "CG2"
+            ],
+            "HG23": [
+                "CG2"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ]
+        },
+        "WAT": {
+            "H1": [
+                "O"
+            ],
+            "H2": [
+                "O"
+            ],
+            "O": [
+                "H1",
+                "H2"
+            ]
+        }
+}
 """dict() that maps the connectivity of atom's based on their parent residue and atom identity.
 (key, value) pairs are (3-letter AA name, connector), where connector is another dict() with 
 (key, value) pairs of (atom name, list of connected atoms)."""
 
-RESIDUE_CONNECTIVITY_MAP_CTERMINAL: Dict[str, Dict[str, List[str]]] = load_from_db(
-    "RESIDUE_CONNECTIVITY_MAP_CTERMINAL")
+RESIDUE_CONNECTIVITY_MAP_CTERMINAL: Dict[str, Dict[str, List[str]]] = {
+        "ALA": {
+            "C": [
+                "CA",
+                "O",
+                "OXT"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB1",
+                "HB2",
+                "HB3"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB1": [
+                "CB"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ],
+            "OXT": [
+                "C"
+            ]
+        },
+        "ARG": {
+            "C": [
+                "CA",
+                "O",
+                "OXT"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD": [
+                "CG",
+                "HD2",
+                "HD3",
+                "NE"
+            ],
+            "CG": [
+                "CB",
+                "HG2",
+                "HG3",
+                "CD"
+            ],
+            "CZ": [
+                "NE",
+                "NH1",
+                "NH2"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD2": [
+                "CD"
+            ],
+            "HD3": [
+                "CD"
+            ],
+            "HE": [
+                "NE"
+            ],
+            "HG2": [
+                "CG"
+            ],
+            "HG3": [
+                "CG"
+            ],
+            "HH11": [
+                "NH1"
+            ],
+            "HH12": [
+                "NH1"
+            ],
+            "HH21": [
+                "NH2"
+            ],
+            "HH22": [
+                "NH2"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "NE": [
+                "CD",
+                "HE",
+                "CZ"
+            ],
+            "NH1": [
+                "CZ",
+                "HH11",
+                "HH12"
+            ],
+            "NH2": [
+                "CZ",
+                "HH21",
+                "HH22"
+            ],
+            "O": [
+                "C"
+            ],
+            "OXT": [
+                "C"
+            ]
+        },
+        "ASN": {
+            "C": [
+                "CA",
+                "O",
+                "OXT"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CG": [
+                "CB",
+                "OD1",
+                "ND2"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD21": [
+                "ND2"
+            ],
+            "HD22": [
+                "ND2"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "ND2": [
+                "CG",
+                "HD21",
+                "HD22"
+            ],
+            "O": [
+                "C"
+            ],
+            "OD1": [
+                "CG"
+            ],
+            "OXT": [
+                "C"
+            ]
+        },
+        "ASP": {
+            "C": [
+                "CA",
+                "O",
+                "OXT"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CG": [
+                "CB",
+                "OD1",
+                "OD2"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ],
+            "OD1": [
+                "CG"
+            ],
+            "OD2": [
+                "CG"
+            ],
+            "OXT": [
+                "C"
+            ]
+        },
+        "CYS": {
+            "C": [
+                "CA",
+                "O",
+                "OXT"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "SG"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HG": [
+                "SG"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ],
+            "OXT": [
+                "C"
+            ],
+            "SG": [
+                "CB",
+                "HG"
+            ]
+        },
+        "CYX": {
+            "C": [
+                "CA",
+                "O",
+                "OXT"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "SG"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ],
+            "OXT": [
+                "C"
+            ],
+            "SG": [
+                "CB"
+            ]
+        },
+        "GLN": {
+            "C": [
+                "CA",
+                "O",
+                "OXT"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD": [
+                "CG",
+                "OE1",
+                "NE2"
+            ],
+            "CG": [
+                "CB",
+                "HG2",
+                "HG3",
+                "CD"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HE21": [
+                "NE2"
+            ],
+            "HE22": [
+                "NE2"
+            ],
+            "HG2": [
+                "CG"
+            ],
+            "HG3": [
+                "CG"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "NE2": [
+                "CD",
+                "HE21",
+                "HE22"
+            ],
+            "O": [
+                "C"
+            ],
+            "OE1": [
+                "CD"
+            ],
+            "OXT": [
+                "C"
+            ]
+        },
+        "GLU": {
+            "C": [
+                "CA",
+                "O",
+                "OXT"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD": [
+                "CG",
+                "OE1",
+                "OE2"
+            ],
+            "CG": [
+                "CB",
+                "HG2",
+                "HG3",
+                "CD"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HG2": [
+                "CG"
+            ],
+            "HG3": [
+                "CG"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ],
+            "OE1": [
+                "CD"
+            ],
+            "OE2": [
+                "CD"
+            ],
+            "OXT": [
+                "C"
+            ]
+        },
+        "GLY": {
+            "C": [
+                "CA",
+                "O",
+                "OXT"
+            ],
+            "CA": [
+                "N",
+                "HA2",
+                "HA3",
+                "C"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA2": [
+                "CA"
+            ],
+            "HA3": [
+                "CA"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ],
+            "OXT": [
+                "C"
+            ]
+        },
+        "HID": {
+            "C": [
+                "CA",
+                "O",
+                "OXT"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD2": [
+                "CG",
+                "NE2",
+                "HD2"
+            ],
+            "CE1": [
+                "ND1",
+                "HE1",
+                "NE2"
+            ],
+            "CG": [
+                "CB",
+                "ND1",
+                "CD2"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD1": [
+                "ND1"
+            ],
+            "HD2": [
+                "CD2"
+            ],
+            "HE1": [
+                "CE1"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "ND1": [
+                "CG",
+                "HD1",
+                "CE1"
+            ],
+            "NE2": [
+                "CE1",
+                "CD2"
+            ],
+            "O": [
+                "C"
+            ],
+            "OXT": [
+                "C"
+            ]
+        },
+        "HIE": {
+            "C": [
+                "CA",
+                "O",
+                "OXT"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD2": [
+                "CG",
+                "NE2",
+                "HD2"
+            ],
+            "CE1": [
+                "ND1",
+                "HE1",
+                "NE2"
+            ],
+            "CG": [
+                "CB",
+                "ND1",
+                "CD2"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD2": [
+                "CD2"
+            ],
+            "HE1": [
+                "CE1"
+            ],
+            "HE2": [
+                "NE2"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "ND1": [
+                "CG",
+                "CE1"
+            ],
+            "NE2": [
+                "CE1",
+                "HE2",
+                "CD2"
+            ],
+            "O": [
+                "C"
+            ],
+            "OXT": [
+                "C"
+            ]
+        },
+        "HIP": {
+            "C": [
+                "CA",
+                "O",
+                "OXT"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD2": [
+                "CG",
+                "NE2",
+                "HD2"
+            ],
+            "CE1": [
+                "ND1",
+                "HE1",
+                "NE2"
+            ],
+            "CG": [
+                "CB",
+                "ND1",
+                "CD2"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD1": [
+                "ND1"
+            ],
+            "HD2": [
+                "CD2"
+            ],
+            "HE1": [
+                "CE1"
+            ],
+            "HE2": [
+                "NE2"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "ND1": [
+                "CG",
+                "HD1",
+                "CE1"
+            ],
+            "NE2": [
+                "CE1",
+                "HE2",
+                "CD2"
+            ],
+            "O": [
+                "C"
+            ],
+            "OXT": [
+                "C"
+            ]
+        },
+        "HYP": {
+            "C": [
+                "CA",
+                "O",
+                "OXT"
+            ],
+            "CA": [
+                "N",
+                "CB",
+                "HA",
+                "C"
+            ],
+            "CB": [
+                "CG",
+                "HB2",
+                "HB3",
+                "CA"
+            ],
+            "CD": [
+                "N",
+                "HD22",
+                "HD23",
+                "CG"
+            ],
+            "CG": [
+                "CD",
+                "HG",
+                "OD1",
+                "CB"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD1": [
+                "OD1"
+            ],
+            "HD22": [
+                "CD"
+            ],
+            "HD23": [
+                "CD"
+            ],
+            "HG": [
+                "CG"
+            ],
+            "N": [
+                "CD",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ],
+            "OD1": [
+                "CG",
+                "HD1"
+            ],
+            "OXT": [
+                "C"
+            ]
+        },
+        "ILE": {
+            "C": [
+                "CA",
+                "O",
+                "OXT"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB",
+                "CG2",
+                "CG1"
+            ],
+            "CD1": [
+                "CG1",
+                "HD11",
+                "HD12",
+                "HD13"
+            ],
+            "CG1": [
+                "CB",
+                "HG12",
+                "HG13",
+                "CD1"
+            ],
+            "CG2": [
+                "CB",
+                "HG21",
+                "HG22",
+                "HG23"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB": [
+                "CB"
+            ],
+            "HD11": [
+                "CD1"
+            ],
+            "HD12": [
+                "CD1"
+            ],
+            "HD13": [
+                "CD1"
+            ],
+            "HG12": [
+                "CG1"
+            ],
+            "HG13": [
+                "CG1"
+            ],
+            "HG21": [
+                "CG2"
+            ],
+            "HG22": [
+                "CG2"
+            ],
+            "HG23": [
+                "CG2"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ],
+            "OXT": [
+                "C"
+            ]
+        },
+        "LEU": {
+            "C": [
+                "CA",
+                "O",
+                "OXT"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD1": [
+                "CG",
+                "HD11",
+                "HD12",
+                "HD13"
+            ],
+            "CD2": [
+                "CG",
+                "HD21",
+                "HD22",
+                "HD23"
+            ],
+            "CG": [
+                "CB",
+                "HG",
+                "CD1",
+                "CD2"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD11": [
+                "CD1"
+            ],
+            "HD12": [
+                "CD1"
+            ],
+            "HD13": [
+                "CD1"
+            ],
+            "HD21": [
+                "CD2"
+            ],
+            "HD22": [
+                "CD2"
+            ],
+            "HD23": [
+                "CD2"
+            ],
+            "HG": [
+                "CG"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ],
+            "OXT": [
+                "C"
+            ]
+        },
+        "LYS": {
+            "C": [
+                "CA",
+                "O",
+                "OXT"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD": [
+                "CG",
+                "HD2",
+                "HD3",
+                "CE"
+            ],
+            "CE": [
+                "CD",
+                "HE2",
+                "HE3",
+                "NZ"
+            ],
+            "CG": [
+                "CB",
+                "HG2",
+                "HG3",
+                "CD"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD2": [
+                "CD"
+            ],
+            "HD3": [
+                "CD"
+            ],
+            "HE2": [
+                "CE"
+            ],
+            "HE3": [
+                "CE"
+            ],
+            "HG2": [
+                "CG"
+            ],
+            "HG3": [
+                "CG"
+            ],
+            "HZ1": [
+                "NZ"
+            ],
+            "HZ2": [
+                "NZ"
+            ],
+            "HZ3": [
+                "NZ"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "NZ": [
+                "CE",
+                "HZ1",
+                "HZ2",
+                "HZ3"
+            ],
+            "O": [
+                "C"
+            ],
+            "OXT": [
+                "C"
+            ]
+        },
+        "MET": {
+            "C": [
+                "CA",
+                "O",
+                "OXT"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CE": [
+                "SD",
+                "HE1",
+                "HE2",
+                "HE3"
+            ],
+            "CG": [
+                "CB",
+                "HG2",
+                "HG3",
+                "SD"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HE1": [
+                "CE"
+            ],
+            "HE2": [
+                "CE"
+            ],
+            "HE3": [
+                "CE"
+            ],
+            "HG2": [
+                "CG"
+            ],
+            "HG3": [
+                "CG"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ],
+            "OXT": [
+                "C"
+            ],
+            "SD": [
+                "CG",
+                "CE"
+            ]
+        },
+        "NHE": {
+            "HN1": [
+                "N"
+            ],
+            "HN2": [
+                "N"
+            ],
+            "N": [
+                "HN1",
+                "HN2",
+                "-1C"
+            ]
+        },
+        "NME": {
+            "CH3": [
+                "N",
+                "HH31",
+                "HH32",
+                "HH33"
+            ],
+            "H": [
+                "N"
+            ],
+            "HH31": [
+                "CH3"
+            ],
+            "HH32": [
+                "CH3"
+            ],
+            "HH33": [
+                "CH3"
+            ],
+            "N": [
+                "H",
+                "CH3",
+                "-1C"
+            ]
+        },
+        "PHE": {
+            "C": [
+                "CA",
+                "O",
+                "OXT"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD1": [
+                "CG",
+                "HD1",
+                "CE1"
+            ],
+            "CD2": [
+                "CG",
+                "CE2",
+                "HD2"
+            ],
+            "CE1": [
+                "CD1",
+                "HE1",
+                "CZ"
+            ],
+            "CE2": [
+                "CZ",
+                "HE2",
+                "CD2"
+            ],
+            "CG": [
+                "CB",
+                "CD1",
+                "CD2"
+            ],
+            "CZ": [
+                "CE1",
+                "HZ",
+                "CE2"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD1": [
+                "CD1"
+            ],
+            "HD2": [
+                "CD2"
+            ],
+            "HE1": [
+                "CE1"
+            ],
+            "HE2": [
+                "CE2"
+            ],
+            "HZ": [
+                "CZ"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ],
+            "OXT": [
+                "C"
+            ]
+        },
+        "PRO": {
+            "C": [
+                "CA",
+                "O",
+                "OXT"
+            ],
+            "CA": [
+                "N",
+                "CB",
+                "HA",
+                "C"
+            ],
+            "CB": [
+                "CG",
+                "HB2",
+                "HB3",
+                "CA"
+            ],
+            "CD": [
+                "N",
+                "HD2",
+                "HD3",
+                "CG"
+            ],
+            "CG": [
+                "CD",
+                "HG2",
+                "HG3",
+                "CB"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD2": [
+                "CD"
+            ],
+            "HD3": [
+                "CD"
+            ],
+            "HG2": [
+                "CG"
+            ],
+            "HG3": [
+                "CG"
+            ],
+            "N": [
+                "CD",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ],
+            "OXT": [
+                "C"
+            ]
+        },
+        "SER": {
+            "C": [
+                "CA",
+                "O",
+                "OXT"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "OG"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HG": [
+                "OG"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ],
+            "OG": [
+                "CB",
+                "HG"
+            ],
+            "OXT": [
+                "C"
+            ]
+        },
+        "THR": {
+            "C": [
+                "CA",
+                "O",
+                "OXT"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB",
+                "CG2",
+                "OG1"
+            ],
+            "CG2": [
+                "CB",
+                "HG21",
+                "HG22",
+                "HG23"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB": [
+                "CB"
+            ],
+            "HG1": [
+                "OG1"
+            ],
+            "HG21": [
+                "CG2"
+            ],
+            "HG22": [
+                "CG2"
+            ],
+            "HG23": [
+                "CG2"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ],
+            "OG1": [
+                "CB",
+                "HG1"
+            ],
+            "OXT": [
+                "C"
+            ]
+        },
+        "TRP": {
+            "C": [
+                "CA",
+                "O",
+                "OXT"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD1": [
+                "CG",
+                "HD1",
+                "NE1"
+            ],
+            "CD2": [
+                "CG",
+                "CE2",
+                "CE3"
+            ],
+            "CE2": [
+                "NE1",
+                "CZ2",
+                "CD2"
+            ],
+            "CE3": [
+                "CZ3",
+                "HE3",
+                "CD2"
+            ],
+            "CG": [
+                "CB",
+                "CD1",
+                "CD2"
+            ],
+            "CH2": [
+                "CZ2",
+                "HH2",
+                "CZ3"
+            ],
+            "CZ2": [
+                "CE2",
+                "HZ2",
+                "CH2"
+            ],
+            "CZ3": [
+                "CH2",
+                "HZ3",
+                "CE3"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD1": [
+                "CD1"
+            ],
+            "HE1": [
+                "NE1"
+            ],
+            "HE3": [
+                "CE3"
+            ],
+            "HH2": [
+                "CH2"
+            ],
+            "HZ2": [
+                "CZ2"
+            ],
+            "HZ3": [
+                "CZ3"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "NE1": [
+                "CD1",
+                "HE1",
+                "CE2"
+            ],
+            "O": [
+                "C"
+            ],
+            "OXT": [
+                "C"
+            ]
+        },
+        "TYR": {
+            "C": [
+                "CA",
+                "O",
+                "OXT"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD1": [
+                "CG",
+                "HD1",
+                "CE1"
+            ],
+            "CD2": [
+                "CG",
+                "CE2",
+                "HD2"
+            ],
+            "CE1": [
+                "CD1",
+                "HE1",
+                "CZ"
+            ],
+            "CE2": [
+                "CZ",
+                "HE2",
+                "CD2"
+            ],
+            "CG": [
+                "CB",
+                "CD1",
+                "CD2"
+            ],
+            "CZ": [
+                "CE1",
+                "OH",
+                "CE2"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD1": [
+                "CD1"
+            ],
+            "HD2": [
+                "CD2"
+            ],
+            "HE1": [
+                "CE1"
+            ],
+            "HE2": [
+                "CE2"
+            ],
+            "HH": [
+                "OH"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ],
+            "OH": [
+                "CZ",
+                "HH"
+            ],
+            "OXT": [
+                "C"
+            ]
+        },
+        "VAL": {
+            "C": [
+                "CA",
+                "O",
+                "OXT"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB",
+                "CG1",
+                "CG2"
+            ],
+            "CG1": [
+                "CB",
+                "HG11",
+                "HG12",
+                "HG13"
+            ],
+            "CG2": [
+                "CB",
+                "HG21",
+                "HG22",
+                "HG23"
+            ],
+            "H": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB": [
+                "CB"
+            ],
+            "HG11": [
+                "CG1"
+            ],
+            "HG12": [
+                "CG1"
+            ],
+            "HG13": [
+                "CG1"
+            ],
+            "HG21": [
+                "CG2"
+            ],
+            "HG22": [
+                "CG2"
+            ],
+            "HG23": [
+                "CG2"
+            ],
+            "N": [
+                "H",
+                "CA",
+                "-1C"
+            ],
+            "O": [
+                "C"
+            ],
+            "OXT": [
+                "C"
+            ]
+        }
+}
 """dict() that maps the connectivity of atom's based on their parent residue and atom identity.
 (key, value) pairs are (3-letter AA name, connector), where connector is another dict() with 
 (key, value) pairs of (atom name, list of connected atoms). Similar to RESIDUE_CONNECTIVITY_MAP
 except has the mappings for the C-terminal version of each residue."""
 
 RESIDUE_CTERMINAL_ATOM_LIST: Dict[str,
-                                  List[str]] = load_from_db("RESIDUE_CTERMINAL_ATOM_LIST")
+                                  List[str]] = {
+        "ACE": [
+            "H1",
+            "CH3",
+            "H2",
+            "H3",
+            "C",
+            "O"
+        ],
+        "ALA": [
+            "N",
+            "H1",
+            "H2",
+            "H3",
+            "CA",
+            "HA",
+            "CB",
+            "HB1",
+            "HB2",
+            "HB3",
+            "C",
+            "O"
+        ],
+        "ARG": [
+            "N",
+            "H1",
+            "H2",
+            "H3",
+            "CA",
+            "HA",
+            "CB",
+            "HB2",
+            "HB3",
+            "CG",
+            "HG2",
+            "HG3",
+            "CD",
+            "HD2",
+            "HD3",
+            "NE",
+            "HE",
+            "CZ",
+            "NH1",
+            "HH11",
+            "HH12",
+            "NH2",
+            "HH21",
+            "HH22",
+            "C",
+            "O"
+        ],
+        "ASN": [
+            "N",
+            "H1",
+            "H2",
+            "H3",
+            "CA",
+            "HA",
+            "CB",
+            "HB2",
+            "HB3",
+            "CG",
+            "OD1",
+            "ND2",
+            "HD21",
+            "HD22",
+            "C",
+            "O"
+        ],
+        "ASP": [
+            "N",
+            "H1",
+            "H2",
+            "H3",
+            "CA",
+            "HA",
+            "CB",
+            "HB2",
+            "HB3",
+            "CG",
+            "OD1",
+            "OD2",
+            "C",
+            "O"
+        ],
+        "CYS": [
+            "N",
+            "H1",
+            "H2",
+            "H3",
+            "CA",
+            "HA",
+            "CB",
+            "HB2",
+            "HB3",
+            "SG",
+            "HG",
+            "C",
+            "O"
+        ],
+        "CYX": [
+            "N",
+            "H1",
+            "H2",
+            "H3",
+            "CA",
+            "HA",
+            "CB",
+            "HB2",
+            "HB3",
+            "SG",
+            "C",
+            "O"
+        ],
+        "GLN": [
+            "N",
+            "H1",
+            "H2",
+            "H3",
+            "CA",
+            "HA",
+            "CB",
+            "HB2",
+            "HB3",
+            "CG",
+            "HG2",
+            "HG3",
+            "CD",
+            "OE1",
+            "NE2",
+            "HE21",
+            "HE22",
+            "C",
+            "O"
+        ],
+        "GLU": [
+            "N",
+            "H1",
+            "H2",
+            "H3",
+            "CA",
+            "HA",
+            "CB",
+            "HB2",
+            "HB3",
+            "CG",
+            "HG2",
+            "HG3",
+            "CD",
+            "OE1",
+            "OE2",
+            "C",
+            "O"
+        ],
+        "GLY": [
+            "N",
+            "H1",
+            "H2",
+            "H3",
+            "CA",
+            "HA2",
+            "HA3",
+            "C",
+            "O"
+        ],
+        "HID": [
+            "N",
+            "H1",
+            "H2",
+            "H3",
+            "CA",
+            "HA",
+            "CB",
+            "HB2",
+            "HB3",
+            "CG",
+            "ND1",
+            "HD1",
+            "CE1",
+            "HE1",
+            "NE2",
+            "CD2",
+            "HD2",
+            "C",
+            "O"
+        ],
+        "HIE": [
+            "N",
+            "H1",
+            "H2",
+            "H3",
+            "CA",
+            "HA",
+            "CB",
+            "HB2",
+            "HB3",
+            "CG",
+            "ND1",
+            "CE1",
+            "HE1",
+            "NE2",
+            "HE2",
+            "CD2",
+            "HD2",
+            "C",
+            "O"
+        ],
+        "HIP": [
+            "N",
+            "H1",
+            "H2",
+            "H3",
+            "CA",
+            "HA",
+            "CB",
+            "HB2",
+            "HB3",
+            "CG",
+            "ND1",
+            "HD1",
+            "CE1",
+            "HE1",
+            "NE2",
+            "HE2",
+            "CD2",
+            "HD2",
+            "C",
+            "O"
+        ],
+        "ILE": [
+            "N",
+            "H1",
+            "H2",
+            "H3",
+            "CA",
+            "HA",
+            "CB",
+            "HB",
+            "CG2",
+            "HG21",
+            "HG22",
+            "HG23",
+            "CG1",
+            "HG12",
+            "HG13",
+            "CD1",
+            "HD11",
+            "HD12",
+            "HD13",
+            "C",
+            "O"
+        ],
+        "LEU": [
+            "N",
+            "H1",
+            "H2",
+            "H3",
+            "CA",
+            "HA",
+            "CB",
+            "HB2",
+            "HB3",
+            "CG",
+            "HG",
+            "CD1",
+            "HD11",
+            "HD12",
+            "HD13",
+            "CD2",
+            "HD21",
+            "HD22",
+            "HD23",
+            "C",
+            "O"
+        ],
+        "LYS": [
+            "N",
+            "H1",
+            "H2",
+            "H3",
+            "CA",
+            "HA",
+            "CB",
+            "HB2",
+            "HB3",
+            "CG",
+            "HG2",
+            "HG3",
+            "CD",
+            "HD2",
+            "HD3",
+            "CE",
+            "HE2",
+            "HE3",
+            "NZ",
+            "HZ1",
+            "HZ2",
+            "HZ3",
+            "C",
+            "O"
+        ],
+        "MET": [
+            "N",
+            "H1",
+            "H2",
+            "H3",
+            "CA",
+            "HA",
+            "CB",
+            "HB2",
+            "HB3",
+            "CG",
+            "HG2",
+            "HG3",
+            "SD",
+            "CE",
+            "HE1",
+            "HE2",
+            "HE3",
+            "C",
+            "O"
+        ],
+        "PHE": [
+            "N",
+            "H1",
+            "H2",
+            "H3",
+            "CA",
+            "HA",
+            "CB",
+            "HB2",
+            "HB3",
+            "CG",
+            "CD1",
+            "HD1",
+            "CE1",
+            "HE1",
+            "CZ",
+            "HZ",
+            "CE2",
+            "HE2",
+            "CD2",
+            "HD2",
+            "C",
+            "O"
+        ],
+        "PRO": [
+            "N",
+            "H2",
+            "H3",
+            "CD",
+            "HD2",
+            "HD3",
+            "CG",
+            "HG2",
+            "HG3",
+            "CB",
+            "HB2",
+            "HB3",
+            "CA",
+            "HA",
+            "C",
+            "O"
+        ],
+        "SER": [
+            "N",
+            "H1",
+            "H2",
+            "H3",
+            "CA",
+            "HA",
+            "CB",
+            "HB2",
+            "HB3",
+            "OG",
+            "HG",
+            "C",
+            "O"
+        ],
+        "THR": [
+            "N",
+            "H1",
+            "H2",
+            "H3",
+            "CA",
+            "HA",
+            "CB",
+            "HB",
+            "CG2",
+            "HG21",
+            "HG22",
+            "HG23",
+            "OG1",
+            "HG1",
+            "C",
+            "O"
+        ],
+        "TRP": [
+            "N",
+            "H1",
+            "H2",
+            "H3",
+            "CA",
+            "HA",
+            "CB",
+            "HB2",
+            "HB3",
+            "CG",
+            "CD1",
+            "HD1",
+            "NE1",
+            "HE1",
+            "CE2",
+            "CZ2",
+            "HZ2",
+            "CH2",
+            "HH2",
+            "CZ3",
+            "HZ3",
+            "CE3",
+            "HE3",
+            "CD2",
+            "C",
+            "O"
+        ],
+        "TYR": [
+            "N",
+            "H1",
+            "H2",
+            "H3",
+            "CA",
+            "HA",
+            "CB",
+            "HB2",
+            "HB3",
+            "CG",
+            "CD1",
+            "HD1",
+            "CE1",
+            "HE1",
+            "CZ",
+            "OH",
+            "HH",
+            "CE2",
+            "HE2",
+            "CD2",
+            "HD2",
+            "C",
+            "O"
+        ],
+        "VAL": [
+            "N",
+            "H1",
+            "H2",
+            "H3",
+            "CA",
+            "HA",
+            "CB",
+            "HB",
+            "CG1",
+            "HG11",
+            "HG12",
+            "HG13",
+            "CG2",
+            "HG21",
+            "HG22",
+            "HG23",
+            "C",
+            "O"
+        ]
+}
 """dict() that lists the atoms in the C-terminal version of a residue. (key, value) pairs are
 (3-letter AA name, list of atom names) where the list of atom names are the modified list of 
 atom names for the C-terminal version of that residue."""
 
-RESIDUE_CTERMINAL_ATOM_LIST: Dict[str,
-                                  List[str]] = load_from_db("RESIDUE_CTERMINAL_ATOM_LIST")
+RESIDUE_NTERMINAL_ATOM_LIST: Dict[str,
+                                  List[str]] = {
+     'ACE': {'H1': ['CH3'], 'CH3': ['H1', 'H2', 'H3', 'C'], 'H2': ['CH3'], 'H3': ['CH3'], 'C': ['CH3', 'O'], 'O': ['C']},
+                        'ALA': {'N': ['H1', 'H2', 'H3', 'CA'], 'H1': ['N'], 'H2': ['N'], 'H3': ['N'], 'CA': ['N', 'HA', 'CB', 'C'], 'HA': ['CA'], 'CB': ['CA', 'HB1', 'HB2', 'HB3'], 'HB1': ['CB'], 'HB2': ['CB'], 'HB3': ['CB'], 'C': ['CA', 'O', '+1N'], 'O': ['C']},
+                        'ARG': {'N': ['H1', 'H2', 'H3', 'CA'], 'H1': ['N'], 'H2': ['N'], 'H3': ['N'], 'CA': ['N', 'HA', 'CB', 'C'], 'HA': ['CA'], 'CB': ['CA', 'HB2', 'HB3', 'CG'], 'HB2': ['CB'], 'HB3': ['CB'], 'CG': ['CB', 'HG2', 'HG3', 'CD'], 'HG2': ['CG'], 'HG3': ['CG'], 'CD': ['CG', 'HD2', 'HD3', 'NE'], 'HD2': ['CD'], 'HD3': ['CD'], 'NE': ['CD', 'HE', 'CZ'], 'HE': ['NE'], 'CZ': ['NE', 'NH1', 'NH2'], 'NH1': ['CZ', 'HH11', 'HH12'], 'HH11': ['NH1'], 'HH12': ['NH1'], 'NH2': ['CZ', 'HH21', 'HH22'], 'HH21': ['NH2'], 'HH22': ['NH2'], 'C': ['CA', 'O', '+1N'], 'O': ['C']},
+                        'ASN': {'N': ['H1', 'H2', 'H3', 'CA'], 'H1': ['N'], 'H2': ['N'], 'H3': ['N'], 'CA': ['N', 'HA', 'CB', 'C'], 'HA': ['CA'], 'CB': ['CA', 'HB2', 'HB3', 'CG'], 'HB2': ['CB'], 'HB3': ['CB'], 'CG': ['CB', 'OD1', 'ND2'], 'OD1': ['CG'], 'ND2': ['CG', 'HD21', 'HD22'], 'HD21': ['ND2'], 'HD22': ['ND2'], 'C': ['CA', 'O', '+1N'], 'O': ['C']},
+                        'ASP': {'N': ['H1', 'H2', 'H3', 'CA'], 'H1': ['N'], 'H2': ['N'], 'H3': ['N'], 'CA': ['N', 'HA', 'CB', 'C'], 'HA': ['CA'], 'CB': ['CA', 'HB2', 'HB3', 'CG'], 'HB2': ['CB'], 'HB3': ['CB'], 'CG': ['CB', 'OD1', 'OD2'], 'OD1': ['CG'], 'OD2': ['CG'], 'C': ['CA', 'O', '+1N'], 'O': ['C']},
+                        'CYS': {'N': ['H1', 'H2', 'H3', 'CA'], 'H1': ['N'], 'H2': ['N'], 'H3': ['N'], 'CA': ['N', 'HA', 'CB', 'C'], 'HA': ['CA'], 'CB': ['CA', 'HB2', 'HB3', 'SG'], 'HB2': ['CB'], 'HB3': ['CB'], 'SG': ['CB', 'HG'], 'HG': ['SG'], 'C': ['CA', 'O', '+1N'], 'O': ['C']},
+                        'CYX': {'N': ['H1', 'H2', 'H3', 'CA'], 'H1': ['N'], 'H2': ['N'], 'H3': ['N'], 'CA': ['N', 'HA', 'CB', 'C'], 'HA': ['CA'], 'CB': ['CA', 'HB2', 'HB3', 'SG'], 'HB2': ['CB'], 'HB3': ['CB'], 'SG': ['CB'], 'C': ['CA', 'O', '+1N'], 'O': ['C']},
+                        'GLN': {'N': ['H1', 'H2', 'H3', 'CA'], 'H1': ['N'], 'H2': ['N'], 'H3': ['N'], 'CA': ['N', 'HA', 'CB', 'C'], 'HA': ['CA'], 'CB': ['CA', 'HB2', 'HB3', 'CG'], 'HB2': ['CB'], 'HB3': ['CB'], 'CG': ['CB', 'HG2', 'HG3', 'CD'], 'HG2': ['CG'], 'HG3': ['CG'], 'CD': ['CG', 'OE1', 'NE2'], 'OE1': ['CD'], 'NE2': ['CD', 'HE21', 'HE22'], 'HE21': ['NE2'], 'HE22': ['NE2'], 'C': ['CA', 'O', '+1N'], 'O': ['C']},
+                        'GLU': {'N': ['H1', 'H2', 'H3', 'CA'], 'H1': ['N'], 'H2': ['N'], 'H3': ['N'], 'CA': ['N', 'HA', 'CB', 'C'], 'HA': ['CA'], 'CB': ['CA', 'HB2', 'HB3', 'CG'], 'HB2': ['CB'], 'HB3': ['CB'], 'CG': ['CB', 'HG2', 'HG3', 'CD'], 'HG2': ['CG'], 'HG3': ['CG'], 'CD': ['CG', 'OE1', 'OE2'], 'OE1': ['CD'], 'OE2': ['CD'], 'C': ['CA', 'O', '+1N'], 'O': ['C']},
+                        'GLY': {'N': ['H1', 'H2', 'H3', 'CA'], 'H1': ['N'], 'H2': ['N'], 'H3': ['N'], 'CA': ['N', 'HA2', 'HA3', 'C'], 'HA2': ['CA'], 'HA3': ['CA'], 'C': ['CA', 'O', '+1N'], 'O': ['C']},
+                        'HID': {'N': ['H1', 'H2', 'H3', 'CA'], 'H1': ['N'], 'H2': ['N'], 'H3': ['N'], 'CA': ['N', 'HA', 'CB', 'C'], 'HA': ['CA'], 'CB': ['CA', 'HB2', 'HB3', 'CG'], 'HB2': ['CB'], 'HB3': ['CB'], 'CG': ['CB', 'ND1', 'CD2'], 'ND1': ['CG', 'HD1', 'CE1'], 'HD1': ['ND1'], 'CE1': ['ND1', 'HE1', 'NE2'], 'HE1': ['CE1'], 'NE2': ['CE1', 'CD2'], 'CD2': ['CG', 'NE2', 'HD2'], 'HD2': ['CD2'], 'C': ['CA', 'O', '+1N'], 'O': ['C']},
+                        'HIE': {'N': ['H1', 'H2', 'H3', 'CA'], 'H1': ['N'], 'H2': ['N'], 'H3': ['N'], 'CA': ['N', 'HA', 'CB', 'C'], 'HA': ['CA'], 'CB': ['CA', 'HB2', 'HB3', 'CG'], 'HB2': ['CB'], 'HB3': ['CB'], 'CG': ['CB', 'ND1', 'CD2'], 'ND1': ['CG', 'CE1'], 'CE1': ['ND1', 'HE1', 'NE2'], 'HE1': ['CE1'], 'NE2': ['CE1', 'HE2', 'CD2'], 'HE2': ['NE2'], 'CD2': ['CG', 'NE2', 'HD2'], 'HD2': ['CD2'], 'C': ['CA', 'O', '+1N'], 'O': ['C']},
+                        'HIP': {'N': ['H1', 'H2', 'H3', 'CA'], 'H1': ['N'], 'H2': ['N'], 'H3': ['N'], 'CA': ['N', 'HA', 'CB', 'C'], 'HA': ['CA'], 'CB': ['CA', 'HB2', 'HB3', 'CG'], 'HB2': ['CB'], 'HB3': ['CB'], 'CG': ['CB', 'ND1', 'CD2'], 'ND1': ['CG', 'HD1', 'CE1'], 'HD1': ['ND1'], 'CE1': ['ND1', 'HE1', 'NE2'], 'HE1': ['CE1'], 'NE2': ['CE1', 'HE2', 'CD2'], 'HE2': ['NE2'], 'CD2': ['CG', 'NE2', 'HD2'], 'HD2': ['CD2'], 'C': ['CA', 'O', '+1N'], 'O': ['C']},
+                        'ILE': {'N': ['H1', 'H2', 'H3', 'CA'], 'H1': ['N'], 'H2': ['N'], 'H3': ['N'], 'CA': ['N', 'HA', 'CB', 'C'], 'HA': ['CA'], 'CB': ['CA', 'HB', 'CG2', 'CG1'], 'HB': ['CB'], 'CG2': ['CB', 'HG21', 'HG22', 'HG23'], 'HG21': ['CG2'], 'HG22': ['CG2'], 'HG23': ['CG2'], 'CG1': ['CB', 'HG12', 'HG13', 'CD1'], 'HG12': ['CG1'], 'HG13': ['CG1'], 'CD1': ['CG1', 'HD11', 'HD12', 'HD13'], 'HD11': ['CD1'], 'HD12': ['CD1'], 'HD13': ['CD1'], 'C': ['CA', 'O', '+1N'], 'O': ['C']},
+                        'LEU': {'N': ['H1', 'H2', 'H3', 'CA'], 'H1': ['N'], 'H2': ['N'], 'H3': ['N'], 'CA': ['N', 'HA', 'CB', 'C'], 'HA': ['CA'], 'CB': ['CA', 'HB2', 'HB3', 'CG'], 'HB2': ['CB'], 'HB3': ['CB'], 'CG': ['CB', 'HG', 'CD1', 'CD2'], 'HG': ['CG'], 'CD1': ['CG', 'HD11', 'HD12', 'HD13'], 'HD11': ['CD1'], 'HD12': ['CD1'], 'HD13': ['CD1'], 'CD2': ['CG', 'HD21', 'HD22', 'HD23'], 'HD21': ['CD2'], 'HD22': ['CD2'], 'HD23': ['CD2'], 'C': ['CA', 'O', '+1N'], 'O': ['C']},
+                        'LYS': {'N': ['H1', 'H2', 'H3', 'CA'], 'H1': ['N'], 'H2': ['N'], 'H3': ['N'], 'CA': ['N', 'HA', 'CB', 'C'], 'HA': ['CA'], 'CB': ['CA', 'HB2', 'HB3', 'CG'], 'HB2': ['CB'], 'HB3': ['CB'], 'CG': ['CB', 'HG2', 'HG3', 'CD'], 'HG2': ['CG'], 'HG3': ['CG'], 'CD': ['CG', 'HD2', 'HD3', 'CE'], 'HD2': ['CD'], 'HD3': ['CD'], 'CE': ['CD', 'HE2', 'HE3', 'NZ'], 'HE2': ['CE'], 'HE3': ['CE'], 'NZ': ['CE', 'HZ1', 'HZ2', 'HZ3'], 'HZ1': ['NZ'], 'HZ2': ['NZ'], 'HZ3': ['NZ'], 'C': ['CA', 'O', '+1N'], 'O': ['C']},
+                        'MET': {'N': ['H1', 'H2', 'H3', 'CA'], 'H1': ['N'], 'H2': ['N'], 'H3': ['N'], 'CA': ['N', 'HA', 'CB', 'C'], 'HA': ['CA'], 'CB': ['CA', 'HB2', 'HB3', 'CG'], 'HB2': ['CB'], 'HB3': ['CB'], 'CG': ['CB', 'HG2', 'HG3', 'SD'], 'HG2': ['CG'], 'HG3': ['CG'], 'SD': ['CG', 'CE'], 'CE': ['SD', 'HE1', 'HE2', 'HE3'], 'HE1': ['CE'], 'HE2': ['CE'], 'HE3': ['CE'], 'C': ['CA', 'O', '+1N'], 'O': ['C']},
+                        'PHE': {'N': ['H1', 'H2', 'H3', 'CA'], 'H1': ['N'], 'H2': ['N'], 'H3': ['N'], 'CA': ['N', 'HA', 'CB', 'C'], 'HA': ['CA'], 'CB': ['CA', 'HB2', 'HB3', 'CG'], 'HB2': ['CB'], 'HB3': ['CB'], 'CG': ['CB', 'CD1', 'CD2'], 'CD1': ['CG', 'HD1', 'CE1'], 'HD1': ['CD1'], 'CE1': ['CD1', 'HE1', 'CZ'], 'HE1': ['CE1'], 'CZ': ['CE1', 'HZ', 'CE2'], 'HZ': ['CZ'], 'CE2': ['CZ', 'HE2', 'CD2'], 'HE2': ['CE2'], 'CD2': ['CG', 'CE2', 'HD2'], 'HD2': ['CD2'], 'C': ['CA', 'O', '+1N'], 'O': ['C']},
+                        'PRO': {'N': ['H2', 'H3', 'CD', 'CA'], 'H2': ['N'], 'H3': ['N'], 'CD': ['N', 'HD2', 'HD3', 'CG'], 'HD2': ['CD'], 'HD3': ['CD'], 'CG': ['CD', 'HG2', 'HG3', 'CB'], 'HG2': ['CG'], 'HG3': ['CG'], 'CB': ['CG', 'HB2', 'HB3', 'CA'], 'HB2': ['CB'], 'HB3': ['CB'], 'CA': ['N', 'CB', 'HA', 'C'], 'HA': ['CA'], 'C': ['CA', 'O', '+1N'], 'O': ['C']},
+                        'SER': {'N': ['H1', 'H2', 'H3', 'CA'], 'H1': ['N'], 'H2': ['N'], 'H3': ['N'], 'CA': ['N', 'HA', 'CB', 'C'], 'HA': ['CA'], 'CB': ['CA', 'HB2', 'HB3', 'OG'], 'HB2': ['CB'], 'HB3': ['CB'], 'OG': ['CB', 'HG'], 'HG': ['OG'], 'C': ['CA', 'O', '+1N'], 'O': ['C']},
+                        'THR': {'N': ['H1', 'H2', 'H3', 'CA'], 'H1': ['N'], 'H2': ['N'], 'H3': ['N'], 'CA': ['N', 'HA', 'CB', 'C'], 'HA': ['CA'], 'CB': ['CA', 'HB', 'CG2', 'OG1'], 'HB': ['CB'], 'CG2': ['CB', 'HG21', 'HG22', 'HG23'], 'HG21': ['CG2'], 'HG22': ['CG2'], 'HG23': ['CG2'], 'OG1': ['CB', 'HG1'], 'HG1': ['OG1'], 'C': ['CA', 'O', '+1N'], 'O': ['C']},
+                        'TRP': {'N': ['H1', 'H2', 'H3', 'CA'], 'H1': ['N'], 'H2': ['N'], 'H3': ['N'], 'CA': ['N', 'HA', 'CB', 'C'], 'HA': ['CA'], 'CB': ['CA', 'HB2', 'HB3', 'CG'], 'HB2': ['CB'], 'HB3': ['CB'], 'CG': ['CB', 'CD1', 'CD2'], 'CD1': ['CG', 'HD1', 'NE1'], 'HD1': ['CD1'], 'NE1': ['CD1', 'HE1', 'CE2'], 'HE1': ['NE1'], 'CE2': ['NE1', 'CZ2', 'CD2'], 'CZ2': ['CE2', 'HZ2', 'CH2'], 'HZ2': ['CZ2'], 'CH2': ['CZ2', 'HH2', 'CZ3'], 'HH2': ['CH2'], 'CZ3': ['CH2', 'HZ3', 'CE3'], 'HZ3': ['CZ3'], 'CE3': ['CZ3', 'HE3', 'CD2'], 'HE3': ['CE3'], 'CD2': ['CG', 'CE2', 'CE3'], 'C': ['CA', 'O', '+1N'], 'O': ['C']},
+                        'TYR': {'N': ['H1', 'H2', 'H3', 'CA'], 'H1': ['N'], 'H2': ['N'], 'H3': ['N'], 'CA': ['N', 'HA', 'CB', 'C'], 'HA': ['CA'], 'CB': ['CA', 'HB2', 'HB3', 'CG'], 'HB2': ['CB'], 'HB3': ['CB'], 'CG': ['CB', 'CD1', 'CD2'], 'CD1': ['CG', 'HD1', 'CE1'], 'HD1': ['CD1'], 'CE1': ['CD1', 'HE1', 'CZ'], 'HE1': ['CE1'], 'CZ': ['CE1', 'OH', 'CE2'], 'OH': ['CZ', 'HH'], 'HH': ['OH'], 'CE2': ['CZ', 'HE2', 'CD2'], 'HE2': ['CE2'], 'CD2': ['CG', 'CE2', 'HD2'], 'HD2': ['CD2'], 'C': ['CA', 'O', '+1N'], 'O': ['C']},
+                        'VAL': {'N': ['H1', 'H2', 'H3', 'CA'], 'H1': ['N'], 'H2': ['N'], 'H3': ['N'], 'CA': ['N', 'HA', 'CB', 'C'], 'HA': ['CA'], 'CB': ['CA', 'HB', 'CG1', 'CG2'], 'HB': ['CB'], 'CG1': ['CB', 'HG11', 'HG12', 'HG13'], 'HG11': ['CG1'], 'HG12': ['CG1'], 'HG13': ['CG1'], 'CG2': ['CB', 'HG21', 'HG22', 'HG23'], 'HG21': ['CG2'], 'HG22': ['CG2'], 'HG23': ['CG2'], 'C': ['CA', 'O', '+1N'], 'O': ['C']} }
 """dict() that lists the atoms in the N-terminal version of a residue. (key, value) pairs are
 (3-letter AA name, list of atom names) where the list of atom names are the modified list of 
 atom names for the N-terminal version of that residue."""
 
-RESIDUE_CONNECTIVITY_MAP_NTERMINAL: Dict[str, Dict[str, List[str]]] = load_from_db(
-    "RESIDUE_CONNECTIVITY_MAP_NTERMINAL")
+RESIDUE_CONNECTIVITY_MAP_NTERMINAL: Dict[str, Dict[str, List[str]]] = {
+        "ACE": {
+            "C": [
+                "CH3",
+                "O"
+            ],
+            "CH3": [
+                "H1",
+                "H2",
+                "H3",
+                "C"
+            ],
+            "H1": [
+                "CH3"
+            ],
+            "H2": [
+                "CH3"
+            ],
+            "H3": [
+                "CH3"
+            ],
+            "O": [
+                "C"
+            ]
+        },
+        "ALA": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB1",
+                "HB2",
+                "HB3"
+            ],
+            "H1": [
+                "N"
+            ],
+            "H2": [
+                "N"
+            ],
+            "H3": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB1": [
+                "CB"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "N": [
+                "H1",
+                "H2",
+                "H3",
+                "CA"
+            ],
+            "O": [
+                "C"
+            ]
+        },
+        "ARG": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD": [
+                "CG",
+                "HD2",
+                "HD3",
+                "NE"
+            ],
+            "CG": [
+                "CB",
+                "HG2",
+                "HG3",
+                "CD"
+            ],
+            "CZ": [
+                "NE",
+                "NH1",
+                "NH2"
+            ],
+            "H1": [
+                "N"
+            ],
+            "H2": [
+                "N"
+            ],
+            "H3": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD2": [
+                "CD"
+            ],
+            "HD3": [
+                "CD"
+            ],
+            "HE": [
+                "NE"
+            ],
+            "HG2": [
+                "CG"
+            ],
+            "HG3": [
+                "CG"
+            ],
+            "HH11": [
+                "NH1"
+            ],
+            "HH12": [
+                "NH1"
+            ],
+            "HH21": [
+                "NH2"
+            ],
+            "HH22": [
+                "NH2"
+            ],
+            "N": [
+                "H1",
+                "H2",
+                "H3",
+                "CA"
+            ],
+            "NE": [
+                "CD",
+                "HE",
+                "CZ"
+            ],
+            "NH1": [
+                "CZ",
+                "HH11",
+                "HH12"
+            ],
+            "NH2": [
+                "CZ",
+                "HH21",
+                "HH22"
+            ],
+            "O": [
+                "C"
+            ]
+        },
+        "ASN": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CG": [
+                "CB",
+                "OD1",
+                "ND2"
+            ],
+            "H1": [
+                "N"
+            ],
+            "H2": [
+                "N"
+            ],
+            "H3": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD21": [
+                "ND2"
+            ],
+            "HD22": [
+                "ND2"
+            ],
+            "N": [
+                "H1",
+                "H2",
+                "H3",
+                "CA"
+            ],
+            "ND2": [
+                "CG",
+                "HD21",
+                "HD22"
+            ],
+            "O": [
+                "C"
+            ],
+            "OD1": [
+                "CG"
+            ]
+        },
+        "ASP": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CG": [
+                "CB",
+                "OD1",
+                "OD2"
+            ],
+            "H1": [
+                "N"
+            ],
+            "H2": [
+                "N"
+            ],
+            "H3": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "N": [
+                "H1",
+                "H2",
+                "H3",
+                "CA"
+            ],
+            "O": [
+                "C"
+            ],
+            "OD1": [
+                "CG"
+            ],
+            "OD2": [
+                "CG"
+            ]
+        },
+        "CYS": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "SG"
+            ],
+            "H1": [
+                "N"
+            ],
+            "H2": [
+                "N"
+            ],
+            "H3": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HG": [
+                "SG"
+            ],
+            "N": [
+                "H1",
+                "H2",
+                "H3",
+                "CA"
+            ],
+            "O": [
+                "C"
+            ],
+            "SG": [
+                "CB",
+                "HG"
+            ]
+        },
+        "CYX": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "SG"
+            ],
+            "H1": [
+                "N"
+            ],
+            "H2": [
+                "N"
+            ],
+            "H3": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "N": [
+                "H1",
+                "H2",
+                "H3",
+                "CA"
+            ],
+            "O": [
+                "C"
+            ],
+            "SG": [
+                "CB"
+            ]
+        },
+        "GLN": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD": [
+                "CG",
+                "OE1",
+                "NE2"
+            ],
+            "CG": [
+                "CB",
+                "HG2",
+                "HG3",
+                "CD"
+            ],
+            "H1": [
+                "N"
+            ],
+            "H2": [
+                "N"
+            ],
+            "H3": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HE21": [
+                "NE2"
+            ],
+            "HE22": [
+                "NE2"
+            ],
+            "HG2": [
+                "CG"
+            ],
+            "HG3": [
+                "CG"
+            ],
+            "N": [
+                "H1",
+                "H2",
+                "H3",
+                "CA"
+            ],
+            "NE2": [
+                "CD",
+                "HE21",
+                "HE22"
+            ],
+            "O": [
+                "C"
+            ],
+            "OE1": [
+                "CD"
+            ]
+        },
+        "GLU": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD": [
+                "CG",
+                "OE1",
+                "OE2"
+            ],
+            "CG": [
+                "CB",
+                "HG2",
+                "HG3",
+                "CD"
+            ],
+            "H1": [
+                "N"
+            ],
+            "H2": [
+                "N"
+            ],
+            "H3": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HG2": [
+                "CG"
+            ],
+            "HG3": [
+                "CG"
+            ],
+            "N": [
+                "H1",
+                "H2",
+                "H3",
+                "CA"
+            ],
+            "O": [
+                "C"
+            ],
+            "OE1": [
+                "CD"
+            ],
+            "OE2": [
+                "CD"
+            ]
+        },
+        "GLY": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA2",
+                "HA3",
+                "C"
+            ],
+            "H1": [
+                "N"
+            ],
+            "H2": [
+                "N"
+            ],
+            "H3": [
+                "N"
+            ],
+            "HA2": [
+                "CA"
+            ],
+            "HA3": [
+                "CA"
+            ],
+            "N": [
+                "H1",
+                "H2",
+                "H3",
+                "CA"
+            ],
+            "O": [
+                "C"
+            ]
+        },
+        "HID": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD2": [
+                "CG",
+                "NE2",
+                "HD2"
+            ],
+            "CE1": [
+                "ND1",
+                "HE1",
+                "NE2"
+            ],
+            "CG": [
+                "CB",
+                "ND1",
+                "CD2"
+            ],
+            "H1": [
+                "N"
+            ],
+            "H2": [
+                "N"
+            ],
+            "H3": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD1": [
+                "ND1"
+            ],
+            "HD2": [
+                "CD2"
+            ],
+            "HE1": [
+                "CE1"
+            ],
+            "N": [
+                "H1",
+                "H2",
+                "H3",
+                "CA"
+            ],
+            "ND1": [
+                "CG",
+                "HD1",
+                "CE1"
+            ],
+            "NE2": [
+                "CE1",
+                "CD2"
+            ],
+            "O": [
+                "C"
+            ]
+        },
+        "HIE": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD2": [
+                "CG",
+                "NE2",
+                "HD2"
+            ],
+            "CE1": [
+                "ND1",
+                "HE1",
+                "NE2"
+            ],
+            "CG": [
+                "CB",
+                "ND1",
+                "CD2"
+            ],
+            "H1": [
+                "N"
+            ],
+            "H2": [
+                "N"
+            ],
+            "H3": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD2": [
+                "CD2"
+            ],
+            "HE1": [
+                "CE1"
+            ],
+            "HE2": [
+                "NE2"
+            ],
+            "N": [
+                "H1",
+                "H2",
+                "H3",
+                "CA"
+            ],
+            "ND1": [
+                "CG",
+                "CE1"
+            ],
+            "NE2": [
+                "CE1",
+                "HE2",
+                "CD2"
+            ],
+            "O": [
+                "C"
+            ]
+        },
+        "HIP": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD2": [
+                "CG",
+                "NE2",
+                "HD2"
+            ],
+            "CE1": [
+                "ND1",
+                "HE1",
+                "NE2"
+            ],
+            "CG": [
+                "CB",
+                "ND1",
+                "CD2"
+            ],
+            "H1": [
+                "N"
+            ],
+            "H2": [
+                "N"
+            ],
+            "H3": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD1": [
+                "ND1"
+            ],
+            "HD2": [
+                "CD2"
+            ],
+            "HE1": [
+                "CE1"
+            ],
+            "HE2": [
+                "NE2"
+            ],
+            "N": [
+                "H1",
+                "H2",
+                "H3",
+                "CA"
+            ],
+            "ND1": [
+                "CG",
+                "HD1",
+                "CE1"
+            ],
+            "NE2": [
+                "CE1",
+                "HE2",
+                "CD2"
+            ],
+            "O": [
+                "C"
+            ]
+        },
+        "ILE": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB",
+                "CG2",
+                "CG1"
+            ],
+            "CD1": [
+                "CG1",
+                "HD11",
+                "HD12",
+                "HD13"
+            ],
+            "CG1": [
+                "CB",
+                "HG12",
+                "HG13",
+                "CD1"
+            ],
+            "CG2": [
+                "CB",
+                "HG21",
+                "HG22",
+                "HG23"
+            ],
+            "H1": [
+                "N"
+            ],
+            "H2": [
+                "N"
+            ],
+            "H3": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB": [
+                "CB"
+            ],
+            "HD11": [
+                "CD1"
+            ],
+            "HD12": [
+                "CD1"
+            ],
+            "HD13": [
+                "CD1"
+            ],
+            "HG12": [
+                "CG1"
+            ],
+            "HG13": [
+                "CG1"
+            ],
+            "HG21": [
+                "CG2"
+            ],
+            "HG22": [
+                "CG2"
+            ],
+            "HG23": [
+                "CG2"
+            ],
+            "N": [
+                "H1",
+                "H2",
+                "H3",
+                "CA"
+            ],
+            "O": [
+                "C"
+            ]
+        },
+        "LEU": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD1": [
+                "CG",
+                "HD11",
+                "HD12",
+                "HD13"
+            ],
+            "CD2": [
+                "CG",
+                "HD21",
+                "HD22",
+                "HD23"
+            ],
+            "CG": [
+                "CB",
+                "HG",
+                "CD1",
+                "CD2"
+            ],
+            "H1": [
+                "N"
+            ],
+            "H2": [
+                "N"
+            ],
+            "H3": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD11": [
+                "CD1"
+            ],
+            "HD12": [
+                "CD1"
+            ],
+            "HD13": [
+                "CD1"
+            ],
+            "HD21": [
+                "CD2"
+            ],
+            "HD22": [
+                "CD2"
+            ],
+            "HD23": [
+                "CD2"
+            ],
+            "HG": [
+                "CG"
+            ],
+            "N": [
+                "H1",
+                "H2",
+                "H3",
+                "CA"
+            ],
+            "O": [
+                "C"
+            ]
+        },
+        "LYS": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD": [
+                "CG",
+                "HD2",
+                "HD3",
+                "CE"
+            ],
+            "CE": [
+                "CD",
+                "HE2",
+                "HE3",
+                "NZ"
+            ],
+            "CG": [
+                "CB",
+                "HG2",
+                "HG3",
+                "CD"
+            ],
+            "H1": [
+                "N"
+            ],
+            "H2": [
+                "N"
+            ],
+            "H3": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD2": [
+                "CD"
+            ],
+            "HD3": [
+                "CD"
+            ],
+            "HE2": [
+                "CE"
+            ],
+            "HE3": [
+                "CE"
+            ],
+            "HG2": [
+                "CG"
+            ],
+            "HG3": [
+                "CG"
+            ],
+            "HZ1": [
+                "NZ"
+            ],
+            "HZ2": [
+                "NZ"
+            ],
+            "HZ3": [
+                "NZ"
+            ],
+            "N": [
+                "H1",
+                "H2",
+                "H3",
+                "CA"
+            ],
+            "NZ": [
+                "CE",
+                "HZ1",
+                "HZ2",
+                "HZ3"
+            ],
+            "O": [
+                "C"
+            ]
+        },
+        "MET": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CE": [
+                "SD",
+                "HE1",
+                "HE2",
+                "HE3"
+            ],
+            "CG": [
+                "CB",
+                "HG2",
+                "HG3",
+                "SD"
+            ],
+            "H1": [
+                "N"
+            ],
+            "H2": [
+                "N"
+            ],
+            "H3": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HE1": [
+                "CE"
+            ],
+            "HE2": [
+                "CE"
+            ],
+            "HE3": [
+                "CE"
+            ],
+            "HG2": [
+                "CG"
+            ],
+            "HG3": [
+                "CG"
+            ],
+            "N": [
+                "H1",
+                "H2",
+                "H3",
+                "CA"
+            ],
+            "O": [
+                "C"
+            ],
+            "SD": [
+                "CG",
+                "CE"
+            ]
+        },
+        "PHE": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD1": [
+                "CG",
+                "HD1",
+                "CE1"
+            ],
+            "CD2": [
+                "CG",
+                "CE2",
+                "HD2"
+            ],
+            "CE1": [
+                "CD1",
+                "HE1",
+                "CZ"
+            ],
+            "CE2": [
+                "CZ",
+                "HE2",
+                "CD2"
+            ],
+            "CG": [
+                "CB",
+                "CD1",
+                "CD2"
+            ],
+            "CZ": [
+                "CE1",
+                "HZ",
+                "CE2"
+            ],
+            "H1": [
+                "N"
+            ],
+            "H2": [
+                "N"
+            ],
+            "H3": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD1": [
+                "CD1"
+            ],
+            "HD2": [
+                "CD2"
+            ],
+            "HE1": [
+                "CE1"
+            ],
+            "HE2": [
+                "CE2"
+            ],
+            "HZ": [
+                "CZ"
+            ],
+            "N": [
+                "H1",
+                "H2",
+                "H3",
+                "CA"
+            ],
+            "O": [
+                "C"
+            ]
+        },
+        "PRO": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "CB",
+                "HA",
+                "C"
+            ],
+            "CB": [
+                "CG",
+                "HB2",
+                "HB3",
+                "CA"
+            ],
+            "CD": [
+                "N",
+                "HD2",
+                "HD3",
+                "CG"
+            ],
+            "CG": [
+                "CD",
+                "HG2",
+                "HG3",
+                "CB"
+            ],
+            "H2": [
+                "N"
+            ],
+            "H3": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD2": [
+                "CD"
+            ],
+            "HD3": [
+                "CD"
+            ],
+            "HG2": [
+                "CG"
+            ],
+            "HG3": [
+                "CG"
+            ],
+            "N": [
+                "H2",
+                "H3",
+                "CD",
+                "CA"
+            ],
+            "O": [
+                "C"
+            ]
+        },
+        "SER": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "OG"
+            ],
+            "H1": [
+                "N"
+            ],
+            "H2": [
+                "N"
+            ],
+            "H3": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HG": [
+                "OG"
+            ],
+            "N": [
+                "H1",
+                "H2",
+                "H3",
+                "CA"
+            ],
+            "O": [
+                "C"
+            ],
+            "OG": [
+                "CB",
+                "HG"
+            ]
+        },
+        "THR": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB",
+                "CG2",
+                "OG1"
+            ],
+            "CG2": [
+                "CB",
+                "HG21",
+                "HG22",
+                "HG23"
+            ],
+            "H1": [
+                "N"
+            ],
+            "H2": [
+                "N"
+            ],
+            "H3": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB": [
+                "CB"
+            ],
+            "HG1": [
+                "OG1"
+            ],
+            "HG21": [
+                "CG2"
+            ],
+            "HG22": [
+                "CG2"
+            ],
+            "HG23": [
+                "CG2"
+            ],
+            "N": [
+                "H1",
+                "H2",
+                "H3",
+                "CA"
+            ],
+            "O": [
+                "C"
+            ],
+            "OG1": [
+                "CB",
+                "HG1"
+            ]
+        },
+        "TRP": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD1": [
+                "CG",
+                "HD1",
+                "NE1"
+            ],
+            "CD2": [
+                "CG",
+                "CE2",
+                "CE3"
+            ],
+            "CE2": [
+                "NE1",
+                "CZ2",
+                "CD2"
+            ],
+            "CE3": [
+                "CZ3",
+                "HE3",
+                "CD2"
+            ],
+            "CG": [
+                "CB",
+                "CD1",
+                "CD2"
+            ],
+            "CH2": [
+                "CZ2",
+                "HH2",
+                "CZ3"
+            ],
+            "CZ2": [
+                "CE2",
+                "HZ2",
+                "CH2"
+            ],
+            "CZ3": [
+                "CH2",
+                "HZ3",
+                "CE3"
+            ],
+            "H1": [
+                "N"
+            ],
+            "H2": [
+                "N"
+            ],
+            "H3": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD1": [
+                "CD1"
+            ],
+            "HE1": [
+                "NE1"
+            ],
+            "HE3": [
+                "CE3"
+            ],
+            "HH2": [
+                "CH2"
+            ],
+            "HZ2": [
+                "CZ2"
+            ],
+            "HZ3": [
+                "CZ3"
+            ],
+            "N": [
+                "H1",
+                "H2",
+                "H3",
+                "CA"
+            ],
+            "NE1": [
+                "CD1",
+                "HE1",
+                "CE2"
+            ],
+            "O": [
+                "C"
+            ]
+        },
+        "TYR": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB2",
+                "HB3",
+                "CG"
+            ],
+            "CD1": [
+                "CG",
+                "HD1",
+                "CE1"
+            ],
+            "CD2": [
+                "CG",
+                "CE2",
+                "HD2"
+            ],
+            "CE1": [
+                "CD1",
+                "HE1",
+                "CZ"
+            ],
+            "CE2": [
+                "CZ",
+                "HE2",
+                "CD2"
+            ],
+            "CG": [
+                "CB",
+                "CD1",
+                "CD2"
+            ],
+            "CZ": [
+                "CE1",
+                "OH",
+                "CE2"
+            ],
+            "H1": [
+                "N"
+            ],
+            "H2": [
+                "N"
+            ],
+            "H3": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB2": [
+                "CB"
+            ],
+            "HB3": [
+                "CB"
+            ],
+            "HD1": [
+                "CD1"
+            ],
+            "HD2": [
+                "CD2"
+            ],
+            "HE1": [
+                "CE1"
+            ],
+            "HE2": [
+                "CE2"
+            ],
+            "HH": [
+                "OH"
+            ],
+            "N": [
+                "H1",
+                "H2",
+                "H3",
+                "CA"
+            ],
+            "O": [
+                "C"
+            ],
+            "OH": [
+                "CZ",
+                "HH"
+            ]
+        },
+        "VAL": {
+            "C": [
+                "CA",
+                "O",
+                "+1N"
+            ],
+            "CA": [
+                "N",
+                "HA",
+                "CB",
+                "C"
+            ],
+            "CB": [
+                "CA",
+                "HB",
+                "CG1",
+                "CG2"
+            ],
+            "CG1": [
+                "CB",
+                "HG11",
+                "HG12",
+                "HG13"
+            ],
+            "CG2": [
+                "CB",
+                "HG21",
+                "HG22",
+                "HG23"
+            ],
+            "H1": [
+                "N"
+            ],
+            "H2": [
+                "N"
+            ],
+            "H3": [
+                "N"
+            ],
+            "HA": [
+                "CA"
+            ],
+            "HB": [
+                "CB"
+            ],
+            "HG11": [
+                "CG1"
+            ],
+            "HG12": [
+                "CG1"
+            ],
+            "HG13": [
+                "CG1"
+            ],
+            "HG21": [
+                "CG2"
+            ],
+            "HG22": [
+                "CG2"
+            ],
+            "HG23": [
+                "CG2"
+            ],
+            "N": [
+                "H1",
+                "H2",
+                "H3",
+                "CA"
+            ],
+            "O": [
+                "C"
+            ]
+        }
+}
 """dict() that maps the connectivity of atom's based on their parent residue and atom identity.
 (key, value) pairs are (3-letter AA name, connector), where connector is another dict() with 
 (key, value) pairs of (atom name, list of connected atoms). Similar to RESIDUE_CONNECTIVITY_MAP
@@ -193,8 +6139,7 @@ RESIDUE_VOLUME_MAPPER: Dict[str, float] = {
         "Y": 193.6
 }
 """dict() that maps one-letter amino-acid codes to their volume in cubic angstroms. 
-source: https://www.imgt.org/IMGTeducation/Aide-memoire/_UK/aminoacids/abbreviation.html
-"""
+source: https://www.imgt.org/IMGTeducation/Aide-memoire/_UK/aminoacids/abbreviation.html"""
 
 DEPROTONATION_MAPPER: Dict[str, Union[tuple, None]] = {
     "ASH": {
