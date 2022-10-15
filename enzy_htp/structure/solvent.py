@@ -26,7 +26,11 @@ class Solvent(Residue):
         (same as residue)
     """
 
-    def __init__(self, residue_idx: int, residue_name: str, atoms: List[Atom], parent=None):
+    def __init__(self,
+                 residue_idx: int,
+                 residue_name: str,
+                 atoms: List[Atom],
+                 parent=None):
         """Constructor for Solvent. Identical to Residue() ctor. SHOULD NOT be called directly by users.
         Instead use enzy_htp.structure.solvent.residue_to_solvent()."""
         Residue.__init__(self, residue_idx, residue_name, atoms, parent)
@@ -39,7 +43,7 @@ class Solvent(Residue):
     # def clone(self) -> Solvent:
     #     """Creates deepcopy of self."""
     #     return deepcopy(self)
-    
+
     def __str__(self) -> str:
         return f"Solvent({self._idx}, {self._name}, atom:{len(self._atoms)}, {self._parent})"
 

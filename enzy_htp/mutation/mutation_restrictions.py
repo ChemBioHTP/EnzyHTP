@@ -3,14 +3,11 @@ mutations on a given structure. This class is capable of restricting all mutatio
 residues or entire chains and additionally restricting size increase/decreases on specific 
 residues due to mutation identity as well as restricting or forcing polarity changes due to 
 mutation identity. 
-
-
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-19
 """
 from copy import deepcopy
 from typing import Dict, List, Set, Tuple, Any
-
 
 from enzy_htp.core import InvalidMutationRestriction
 import enzy_htp.structure as es
@@ -33,7 +30,6 @@ class MutationRestrictions:
         + locking specific mutation targets in residues
         + locking mutation-based volume changes in residues
         + locking mutation-based polarity changes in residues
-
     Attributes:
         mapper_: A dict() with (key, value) pairs of (chain_name, res_num) and dict()'s from default_restriction_dict().
         pdb_: A str() to the structure file the object was generated from.
@@ -47,31 +43,26 @@ class MutationRestrictions:
     def add_restriction(self, rkey: Tuple[str, int], ukey: str, uval: Any) -> None:
         """Method that adds a new restriction to a given residue specified by an rkey. Checks if the new
         restriction is valid and raises an error if not.
-
         Args:
             rkey: A tuple of form (chain_id, residue number) specifying the residue's restrictions to update.
             ukey: The restriction key to update. See `default_restriction_dict()` for more detail.
             uvalue: The value to update the restriction key with. See `default_restriction_dict()` for more detail.
-
         Raises:
             An InvalidMutationRestriction if the proposed new restriction is invalid or the proposed residue does not exist.
         """
         if rkey not in self.mapper_:
             raise InvalidMutationRestriction(
-                f"{rkey} not in structure found at '{self.pdb_}'."
-            )
+                f"{rkey} not in structure found at '{self.pdb_}'.")
 
         self.mapper_[rkey][ukey] = uval
 
         if not valid_restriction_dict(self.mapper_[rkey]):
             raise InvalidMutationRestriction(
-                f"Restriction (key,value) pair ({ukey}, {uval}) is invalid"
-            )
+                f"Restriction (key,value) pair ({ukey}, {uval}) is invalid")
 
     def lock_chain(self, cname: str) -> None:
         """Method that locks mutations in all residues within the specified chain. Note that no error is raised
         if the specified chain does not exist.
-
         Args:
             cname: Name of the chain to lock as a str().
         """
@@ -82,20 +73,17 @@ class MutationRestrictions:
     def lock_residue(self, rkey: Tuple[str, int]) -> None:
         """Method that locks mutations for a specific residue in the structure. Wrapper on MutationRestrictions.add_restriction
         where rkey is the specified rkey and the (key, value) pair of (ukey, uvalue) is ('locked', True).
-
         Args:
             rkey: A Tuple of the form (chain_id, res_num) specifying the residue to lock.
         """
         self.add_restriction(rkey, "locked", True)
 
     def apply(
-        self, muts: Dict[Tuple[str, int], List[Mutation]]
-    ) -> Dict[Tuple[str, int], List[Mutation]]:
+        self, muts: Dict[Tuple[str, int],
+                         List[Mutation]]) -> Dict[Tuple[str, int], List[Mutation]]:
         """Applies the restrictions specified from the object to the supplied mutations.
-
         Args:
             mut: A dict() containing all possible mutations for each of the residue positions. Should be generated from enzy_htp.mutation.generate_all_mutations()
-
                 Returns:
             A dict() with the same layout as the supplied one, but only with Mutation()'s satisfying the restrictions.
         """
@@ -109,10 +97,8 @@ class MutationRestrictions:
             mlist: List[Mutation] = muts[rkey]
             if restrict["illegal_targets"]:
                 mlist = list(
-                    filter(
-                        lambda mm: mm.target not in restrict["illegal_targets"], mlist
-                    )
-                )
+                    filter(lambda mm: mm.target not in restrict["illegal_targets"],
+                           mlist))
 
             if restrict["no_size_increase"]:
                 mlist = list(filter(lambda mm: not size_increase(mm), mlist))
@@ -144,13 +130,12 @@ def default_restriction_dict() -> Dict:
         + no_size_decrease: Bool: Bans mutations that lead to an decrease in residue volume. CANNOT BE TRUE WHEN 'no_size_increase' IS TRUE.
         + no_polarity_change: Bool: Bans mutations that lead to changes in polarity. CANNOT BE TRUE WHEN 'force_polarity_change' IS TRUE.
         + force_polarity_change: Bool: Bans mutations that do not lead to changes in polarity. CANNOT BE TRUE WHEN 'no_polarity_change' IS TRUE.
-
     Returns:
         A dict() with the above attributes and all keys set to False except 'illegal_targets' which is an empty, deepcopied list.
     """
     keys: List[
-        str
-    ] = "locked illegal_targets no_size_increase no_size_decrease no_polarity_change force_polarity_change".split()
+        str] = "locked illegal_targets no_size_increase no_size_decrease no_polarity_change force_polarity_change".split(
+        )
     result: Dict = dict(zip(keys, [False] * len(keys)))
     result["illegal_targets"] = deepcopy([])
     return deepcopy(result)
@@ -162,24 +147,23 @@ def valid_restriction_dict(rdict: Dict) -> bool:
         + all values are bool() except 'illegal_targets' which is a list() of str()'s
         + 'no_size_increase' and 'no_size_decrease' are not simultaneously True
         + 'no_polarity_change' and 'force_polarity_change' are not simultaneously True
-
     Args:
         rdict: A dict() from enzy_htp.mutation.mutation_restrictions.default_restriction_dict().
-
     Returns:
         Whether the supplied dict() satisfies all requirements.
     """
     target_keys: Set[str] = set(
-        "locked illegal_targets no_size_increase no_size_decrease no_polarity_change force_polarity_change".split()
-    )
+        "locked illegal_targets no_size_increase no_size_decrease no_polarity_change force_polarity_change"
+        .split())
     actual_keys: Set[str] = set(list(rdict.keys()))
 
     if target_keys != actual_keys:
         return False
 
     for (
-        key
-    ) in "locked no_size_increase no_size_decrease no_polarity_change force_polarity_change".split():
+            key
+    ) in "locked no_size_increase no_size_decrease no_polarity_change force_polarity_change".split(
+    ):
         if not isinstance(rdict[key], bool):
             return False
 
@@ -203,17 +187,20 @@ def valid_restriction_dict(rdict: Dict) -> bool:
 def restriction_object(pdb: str) -> MutationRestrictions:
     """Method for creating a MutationRestrictions() object for a given .pdb structure. Recommended
     way for users to generate MutationRestrctions() objects.
-
     Args:
         pdb: A str() with the path to a .pdb structure.
-
     Returns:
         An initialized MutationRestrictions() object.
     """
-    struct: es.Structure = es.structure_from_pdb(pdb)
+    struct: es.Structure = es.PDBParser.get_structure(pdb)
     mapper: Dict[Tuple[str, int], Dict] = dict()
     for res in struct.residues:
         if not res.is_canonical():
             continue
-        mapper[(res.chain(), res.idx())] = default_restriction_dict()
+
+        cname: str = ''
+        if res.chain:
+            cname = res.chain.name
+
+        mapper[(cname, res.idx)] = default_restriction_dict()
     return MutationRestrictions(mapper, pdb)

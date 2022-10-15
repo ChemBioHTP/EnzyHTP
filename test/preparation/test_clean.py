@@ -13,15 +13,17 @@ from enzy_htp.preparation import clean as cl
 # _LOGGER.setLevel(logging.DEBUG)
 CURR_FILE = os.path.abspath(__file__)
 CURR_DIR = os.path.dirname(CURR_FILE)
-DATA_DIR = f"{CURR_DIR}/data/" 
+DATA_DIR = f"{CURR_DIR}/data/"
 WORK_DIR = f"{CURR_DIR}/work_dir/"
 sp = PDBParser()
 
+
 def test_remove_solvent():
-    pdb_file_path = f"{DATA_DIR}1Q4T_solvent_cofactor_2chain.pdb"
+    pdb_file_path = f"{DATA_DIR}1Q4T_ligand_test.pdb"
     stru: Structure = sp.get_structure(pdb_file_path)
     cl.remove_solvent(stru)
     assert len(stru.residues) == 284
+
 
 def test_remove_solvent_empty_chain():
     """
@@ -31,5 +33,3 @@ def test_remove_solvent_empty_chain():
     stru: Structure = sp.get_structure(pdb_file_path)
     cl.remove_solvent(stru)
     assert len(stru) == 1
-
-

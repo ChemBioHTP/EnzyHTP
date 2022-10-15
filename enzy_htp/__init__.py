@@ -11,12 +11,8 @@ state, addition of missing residues, performing an amino acid substitution, and 
 Most enzyme modeling practices use similar structural operations but rely on manual curation, which is 
 highly inefficient and hampers reproducibility. EnzyHTP, a high-throughput enzyme simulation tool, bypasses 
 these issues through automation of molecular model construction, mutation, sampling and energy calculation.
-
-
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+uthor: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
-
-
 Date: 2022-06-26
 """
 
@@ -37,17 +33,14 @@ from .core import (
     _LOGGER,
     write_data,
 )
+
 from ._config import config
+
 from .preparation import PDBLine, PDBPrepper, read_pdb_lines
 from .chemical import ResidueType
 
-# from ._interface import Interface
-# from .mutation import mutate_pdb, restriction_object, MutationRestrictions
-# from .geometry import sample_geometries
+from ._interface import Interface
 
+interface = Interface(config)
 
-# interface = Interface(config)
-# """
-# the singleton interface object that provide access to all singleton interface objects
-# """
-
+#TODO(CJ): add docstrings for global variables

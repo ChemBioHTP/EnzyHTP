@@ -1,10 +1,8 @@
 """Defines an AmberInterface class that serves as a bridge for enzy_htp to utilize AmberMD software. Uses the AmberConfig class
 found in enzy_htp/molecular_mechanics/amber_config.py. Supported operations include minimization, 
 heating, constant pressure production, and constant pressure equilibration.
-
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
-
 Date: 2022-06-02
 """
 import shutil
@@ -20,7 +18,7 @@ from enzy_htp.core import env_manager as em
 from enzy_htp.core.exception import UnsupportedMethod
 import enzy_htp.structure as struct
 import enzy_htp.preparation as prep
-from .amber_config import AmberConfig, default_amber_config
+from enzy_htp._config.amber_config import AmberConfig, default_amber_config
 # from .frame import Frame, frames_from_pdb, read_charge_list
 
 
@@ -29,7 +27,6 @@ class AmberInterface:
     minimization, heating constant pressure production, constant pressure equilibration, trajectory file
     conversion and mutation. Users should use this class as the only way to interact with any functionality
     in Amber or associated tools like tleap.
-
     Atributes:
         config_	: The AmberConfig() class which provides settings for both running Amber and maintaining a compatible environment.
         env_manager_ : The EnvironmentManager() class which ensure all required environment elements exist.
@@ -60,7 +57,6 @@ class AmberInterface:
 
     def compatible_environment(self) -> bool:
         """Checks if the current environment is compatible with all possible needs for the AmberInterface.
-
         Returns:
                 Whether the current environment is suitable for the AmberInterface().
         """
@@ -87,18 +83,18 @@ class AmberInterface:
         ]
         fs.write_lines(fname, minimize_lines)
 
-    def minimize_structure(
-        self, pdb: str, min_dir: str = "./", mode: str = "CPU", cycle: int = 2000
-    ) -> str:
+    def minimize_structure(self,
+                           pdb: str,
+                           min_dir: str = "./",
+                           mode: str = "CPU",
+                           cycle: int = 2000) -> str:
         """Class method that minimizes the structure found in a supplied .pdb file, returning
         the path to the minimized file.
-
         Args:
             pdb: The .pdb file with the structure to be minimized.
             mode: Which version of Amber to use. Allowed values are "CPU" and "GPU".
             min_dir: Work directory where the paramter files and output are saved.
             cycle: Number of steps in the steepest descent of the cycle.
-
         Returns:
             Path to the minimized structure in a .pdb file.
         """
@@ -132,9 +128,8 @@ class AmberInterface:
             ],
         )
 
-        self.env_manager_.run_command(
-            "ambpdb", [f"-p", prmtop, "-c", min_rst, ">", outfile]
-        )
+        self.env_manager_.run_command("ambpdb",
+                                      [f"-p", prmtop, "-c", min_rst, ">", outfile])
         # shutil.move(prmtop, min_dir )
         # shutil.move(inpcrd, min_dir )
         return outfile
@@ -142,11 +137,9 @@ class AmberInterface:
     def build_param_files(self, in_pdb: str, build_dir: str) -> Tuple[str, str]:
         """Creates the .prmtop and .inpcrd files for the supplied .pdb file. Handles
         processing of the Ligand() and MetalCenter() objects in the structure.
-
         Args:
             in_pdb: The .pdb file to build parameter files for.
             buld_dir: The directory to build the parameter files in.
-
         Returns:
             A Tuple[str,str] with the containing (.prmtop path, .inpcrd path).
         """
@@ -161,11 +154,9 @@ class AmberInterface:
         for lig in ligand_paths:
             _ = prep.protonate._protonate_ligand_PYBEL(lig, 7.0, lig)
         ligand_charges: List[int] = list(
-            map(lambda pp: prep.protonate._ob_pdb_charge(pp), ligand_paths)
-        )
+            map(lambda pp: prep.protonate._ob_pdb_charge(pp), ligand_paths))
         ligand_params: List[Tuple[str, str]] = self.build_ligand_param_files(
-            ligand_paths, ligand_charges
-        )
+            ligand_paths, ligand_charges)
         leap_path: str = f"{build_dir}/leap.in"
         leap_log: str = f"{build_dir}/leap.out"
         # sol_path: str = f"{build_dir}/leap.in"
@@ -175,9 +166,7 @@ class AmberInterface:
             "source leaprc.water.tip3p",
         ]
         for (prepin, frcmod) in ligand_params:
-            leap_contents.extend(
-                [f"loadAmberPrep {prepin}", f"loadAmberParams {frcmod}"]
-            )
+            leap_contents.extend([f"loadAmberPrep {prepin}", f"loadAmberParams {frcmod}"])
         leap_contents.append(f"a = loadpdb {in_pdb}")
         # TODO(CJ): Include igb
         leap_contents.append("center a")
@@ -192,35 +181,31 @@ class AmberInterface:
         inpcrd: str = f"{build_dir}/{pdb_path.stem}.inpcrd"
         pdb_ff: str = f"{build_dir}/{pdb_path.stem}_ff.pdb"
         leap_contents.extend(
-            [f"saveamberparm a {prmtop} {inpcrd}", f"savepdb a {pdb_ff}", "quit"]
-        )
+            [f"saveamberparm a {prmtop} {inpcrd}", f"savepdb a {pdb_ff}", "quit"])
         fs.write_lines(leap_path, leap_contents)
         # TODO(CJ): Check that this actually works before returning
         self.env_manager_.run_command("tleap", ["-s", "-f", leap_path, ">", leap_log])
         return (prmtop, inpcrd)
 
-    def build_ligand_param_files(
-        self, paths: List[str], charges: List[int]
-    ) -> List[Tuple[str, str]]:
+    def build_ligand_param_files(self, paths: List[str],
+                                 charges: List[int]) -> List[Tuple[str, str]]:
         # TODO(CJ): add the method flag?
         """Creates .prepin and .frcmod files for all the supplied .pdb files. Saves files to
         same directory as the supplied .pdb files. Removes intermediate files. Should not
         be called directly by the user. Instead use AmberInterface.build_param_files()
-
         Args:
             paths: A list() of ligand .pdb files to prepare. MUST BE SAME LENGHT AS charges.
             charges: A list() of charges accompanying the paths. MUST BE SAME LENGTH AS paths.
-
         Returns:
             A list() of filename pairs with with the .prepin and .frcmod files for each supplied .pdb file.
-
         Raises:
             AssertionErrors: When various input sanitization checks fail.
         """
         result: List[Tuple[str, str]] = list()
         assert len(paths) == len(charges)
         for lig_pdb, net_charge in zip(paths, charges):
-            lig_name: str = struct.structure_parser.get_ligand_name(lig_pdb)
+            lig_name: str = struct.PDBParser.get_structure(lig_pdb)
+            print(lig_name)
             lig_pdb = Path(lig_pdb)
             prepin: str = str(lig_pdb.with_suffix(".prepin"))
             frcmod: str = str(lig_pdb.with_suffix(".frcmod"))
@@ -249,15 +234,13 @@ class AmberInterface:
                 ],
             )
             files_to_remove: List[
-                str
-            ] = "ATOMTYPE.INF NEWPDB.PDB PREP.INF sqm.pdb sqm.in sqm.out".split()
+                str] = "ATOMTYPE.INF NEWPDB.PDB PREP.INF sqm.pdb sqm.in sqm.out".split()
             files_to_remove.extend(list(map(str, Path(".").glob("ANTECHAMBER*"))))
             _ = list(map(lambda fname: fs.safe_rm(fname), files_to_remove))
             # gen frcmod
             # TODO(CJ): add some kind of check that this all actually runs correctly w/o errors
-            self.env_manager_.run_command(
-                "parmchk2", ["-i", prepin, "-f", "prepi", "-o", frcmod]
-            )
+            self.env_manager_.run_command("parmchk2",
+                                          ["-i", prepin, "-f", "prepi", "-o", frcmod])
             # record
             result.append((prepin, frcmod))
         return result
@@ -265,10 +248,8 @@ class AmberInterface:
     def md_min_file(self, outfile: str) -> str:
         """Using the settings specified by AmberConfig.CONF_MIN, creates a min.in file for an Amber minimization run.
         These settings are updated by accessing the owned AmberConfig object through AmberInterface.config().
-
         Args:
             outfile: The name of the file to save the minimization input file to..
-
         Returns:
             Path to the minimization file.
         """
@@ -301,10 +282,8 @@ class AmberInterface:
     def md_heat_file(self, outfile: str) -> str:
         """Using the settings specified by AmberConfig.CONF_HEAT, creates a heat.in file for an Amber heating run.
         These settings are updated by accessing the owned AmberConfig object through AmberInterface.config().
-
         Args:
             outfile: The name of the file to save the heating input file to.
-
         Returns:
             Path to the heating input file.
         """
@@ -339,29 +318,27 @@ class AmberInterface:
             contents.append(f"  restraint_wt = {config['restraint_wt']},")
             contents.append(f"  restraintmask = {config['restraintmask']},")
         contents[-1] = contents[-1][0:-1]
-        contents.extend(
-            [
-                " /",
-                " &wt",
-                "  type = 'TEMP0',",
-                "  istep1 = 0,",
-                f"  istep2 = {int(config['A_istep2']*config['nstlim'])},",
-                f"  value1 = {config['tempi']},",
-                f"  value2 = {config['temp0']},",
-                " /",
-                f" &wt",
-                "  type = 'TEMP0',",
-                f"  istep1 = {int(config['A_istep2']*config['nstlim'])+1},",
-                f"  istep2 = {config['nstlim']},",
-                f"  value1 = {config['temp0']},",
-                f"  value2 = {config['temp0']},",
-                " /",
-                " &wt",
-                "  type = 'END',",
-                " /",
-                "",
-            ]
-        )
+        contents.extend([
+            " /",
+            " &wt",
+            "  type = 'TEMP0',",
+            "  istep1 = 0,",
+            f"  istep2 = {int(config['A_istep2']*config['nstlim'])},",
+            f"  value1 = {config['tempi']},",
+            f"  value2 = {config['temp0']},",
+            " /",
+            f" &wt",
+            "  type = 'TEMP0',",
+            f"  istep1 = {int(config['A_istep2']*config['nstlim'])+1},",
+            f"  istep2 = {config['nstlim']},",
+            f"  value1 = {config['temp0']},",
+            f"  value2 = {config['temp0']},",
+            " /",
+            " &wt",
+            "  type = 'END',",
+            " /",
+            "",
+        ])
 
         fs.write_lines(outfile, contents)
         return outfile
@@ -370,10 +347,8 @@ class AmberInterface:
         """Using the settings specified by AmberConfig.CONF_EQUI, creates an input file for an Amber constant
         equilibration run. These settings are updated by accessing the owned AmberConfig object through
         AmberInterface.config().
-
         Args:
             outfile: The name of the file to save the constant pressure equilibration input.
-
         Returns:
             Path to the constant pressure equilibration input file.
         """
@@ -401,13 +376,11 @@ class AmberInterface:
         ]
 
         if config["ntr"] == 1:
-            contents.extend(
-                [
-                    f"  ntr   = {config['ntr']},",
-                    f"  restraint_wt = {config['restraint_wt']},",
-                    f"  restraintmask = {config['restraintmask']},",
-                ]
-            )
+            contents.extend([
+                f"  ntr   = {config['ntr']},",
+                f"  restraint_wt = {config['restraint_wt']},",
+                f"  restraintmask = {config['restraintmask']},",
+            ])
 
         contents.extend(["/", ""])
 
@@ -418,10 +391,8 @@ class AmberInterface:
         """Using the settings specified by AmberConfig.CONF_PROD, creates an input file for an Amber production
         md run. These settings are updated by accessing the owned AmberConfig object through
         AmberInterface.config().
-
         Args:
             outfile: The name of the file to save the production md input.
-
         Returns:
             Path to the production md input file.
         """
@@ -448,13 +419,11 @@ class AmberInterface:
         ]
 
         if config["ntr"] == 1:
-            contents.extend(
-                [
-                    f"  ntr = {config['ntr']},",
-                    f"  restraint_wt = {config['restraint_wt']},",
-                    f"  restraintmask = {config['restraintmask']}",
-                ]
-            )
+            contents.extend([
+                f"  ntr = {config['ntr']},",
+                f"  restraint_wt = {config['restraint_wt']},",
+                f"  restraintmask = {config['restraintmask']}",
+            ])
 
         contents.extend(["/", ""])
         fs.write_lines(outfile, contents)
@@ -470,16 +439,13 @@ class AmberInterface:
         The parameter files for these steps are created by AmberInterface.md_min_file(), AmberInterface.md_heat_file(),
         AmberInterface.md_equi_file() and AmberInterface.md_prod_file(), respectively. All work is done in the supplied
         work_dir location.
-
         Args:
             prmtop: str() with a path to a .prmtop file generated by AmberInterface.build_param_files().
             inpcrd: str() with a path to a .inpcrd file generated by AmberInterface.build_param_files().
             work_dir: Directory where the temporary files should be stored.
             mode: The mode to use for calculations. Only "CPU" and "GPU" are allowed.
-
         Returns:
             Path to the production .nc file.
-
         """
         fs.safe_mkdir(work_dir)
         min_in: str = self.md_min_file(f"{work_dir}/min.in")
@@ -585,7 +551,6 @@ class AmberInterface:
         to that file. Because tleap writes the modified version to another file, the destination
         file with name 'outfile.tmp.pdb' is copied over the outfile name. As a result there
         may be additional files in the local directory when problems occur.
-
         Args:
             outfile: The name of the modified .pdb file that needs to be treated with tleap.
         """
@@ -594,7 +559,6 @@ class AmberInterface:
             """Helper method that renumbers the residue chain id's and residue numbers in the
             new structure found in npdb to the original values found in the opdb structure file.
             TODO(CJ): This may need to get moved elsewhere since it has use elsewhere.
-
             Args:
                 opdb: The name of the original .pdb file.
                 npdb: The name of the new .pdb file.
@@ -647,7 +611,6 @@ class AmberInterface:
     ) -> str:
         """Converts the supplied .nc file to an .mdcrd file. Scope of trajectory conversion can be
         specified though by default all available frames are selected.
-
         Args:
             nc_in: The path to the .nc file as a str().
             prmtop: The path to the prmtop file as  str().
@@ -655,7 +618,6 @@ class AmberInterface:
             start: 1-indexed starting point. Default value is 1.
             end: 1-indexed ending point. By default uses "last"
             engine: The engine to convert the .nc file. Default value is "cpptraj".
-
         Returns:
             The name of the converted .mdcrd file.
         """
@@ -675,9 +637,7 @@ class AmberInterface:
                 "quit",
             ]
             fs.write_lines(cpptraj_in, contents)
-            self.env_manager_.run_command(
-                "cpptraj", ["-i", cpptraj_in, ">", cpptraj_out]
-            )
+            self.env_manager_.run_command("cpptraj", ["-i", cpptraj_in, ">", cpptraj_out])
             #fs.safe_rm(cpptraj_in)
             #fs.safe_rm(cpptraj_out)
         else:
@@ -709,28 +669,25 @@ class AmberInterface:
         contents: List[str] = [
             f"parm {prmtop}",
             f"trajin {nc_in} {start} {end} {step}",
-             "strip :WAT",
-             "strip :Na+,Cl-",
+            "strip :WAT",
+            "strip :Na+,Cl-",
             f"trajout {outfile} conect",
             "run",
             "quit",
         ]
         fs.write_lines(cpptraj_in, contents)
-        self.env_manager_.run_command(
-            "cpptraj", ["-i", cpptraj_in, ">", cpptraj_out]
-        )
+        self.env_manager_.run_command("cpptraj", ["-i", cpptraj_in, ">", cpptraj_out])
         #fs.safe_rm(cpptraj_in)
         fs.safe_rm(cpptraj_out)
         charges = read_charge_list(prmtop)
-        result = frames_from_pdb( outfile )
-        
+        result = frames_from_pdb(outfile)
+
         if not len(result):
             return result
-		
+
         num_atoms = len(result[0].atoms)
         charges = charges[0:num_atoms]
         for fidx, frame in enumerate(result):
-            result[fidx].update_charges( charges )
+            result[fidx].update_charges(charges)
 
         return result
-

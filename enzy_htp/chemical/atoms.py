@@ -23,6 +23,7 @@ def get_h_bond_length(aname: str) -> float:
     """
     return X_H_BOND_LENGTH.get(aname, -1.0)
 
+
 def get_valid_generic_atom_name(atom_names: List[str]) -> List[str]:
     """
     Get valid generic atom names for a list of atom names. Normally this list of atom names

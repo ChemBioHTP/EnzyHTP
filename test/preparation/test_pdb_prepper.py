@@ -1,13 +1,11 @@
 """Testing for the enzy_htp.preparation.PDBPrepper() class. This is a borderline intergration test, comparing results to previous 
 enzy_htp outputs.
-
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-19
 """
 import os
 import pytest
 
-from enzy_htp.core import InvalidPH
 from enzy_htp.core import file_system as fs
 from enzy_htp.preparation import PDBPrepper
 
@@ -64,57 +62,3 @@ def test_prepper_rm_water():
 
     assert os.path.exists(target_no_water)
     assert equiv_files(target_no_water, actual_no_water)
-
-
-def test_prepper_get_protonation_FAcD():
-    """Making sure that the get_protonation() method works for the FAcD enzyme that has a ligand.."""
-    global PREPPER
-    pqr_name = "FAcD-FA-ASP_rmW.pqr.pdb"
-    target_pqr = f"{DATA_DIR}/FAcD-FA-ASP_rmW.pqr"
-    actual_pqr = f"{WORK_DIR}/{pqr_name}"
-    actual_pqr_pdb_file = f"{WORK_DIR}/FAcD-FA-ASP_rmW_aH.pdb"
-    target_pqr_pdb_file = f"{DATA_DIR}/FAcD-FA-ASP_rmW_aH.pdb"
-
-    assert not os.path.exists(actual_pqr)
-    assert not os.path.exists(actual_pqr_pdb_file)
-    assert PREPPER.get_protonation() == actual_pqr_pdb_file
-    assert os.path.exists(actual_pqr_pdb_file)
-    assert os.path.isdir(LIGAND_DIR)
-    assert PREPPER.current_path() == actual_pqr_pdb_file
-
-    assert equiv_files(target_pqr, actual_pqr)
-    assert equiv_files(target_pqr_pdb_file, actual_pqr_pdb_file, 66)
-
-
-def test_prepper_get_protonation_invalid_pH():
-    """Making sure that the get_protonation() method throws with an invalid pH value."""
-
-    with pytest.raises(InvalidPH) as exe:
-        PREPPER.get_protonation(ph=-1.0)
-
-    assert exe
-    assert exe.type == InvalidPH
-
-    with pytest.raises(InvalidPH) as exe:
-        PREPPER.get_protonation(ph=15)
-
-    assert exe
-    assert exe.type == InvalidPH
-
-
-def test_generate_mutations():
-    """Making sure the generate_mutations() method works correctly."""
-
-    PREPPER.generate_mutations(n=1)
-    assert len(PREPPER.mutations) == 1
-    first_run = PREPPER.mutations[0]
-    PREPPER.generate_mutations(n=1)
-    assert len(PREPPER.mutations) == 1
-    second_run = PREPPER.mutations[0]
-
-    assert first_run == second_run
-
-
-def test_apply_mutations():
-    """Checking that the PDBPrepper() can apply the mutation using tleap."""
-    assert False

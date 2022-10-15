@@ -58,9 +58,8 @@ class Layer:
 
             if len(atom_lists) not in [2, 3]:
                 raise Exception(
-                    "Layer.__init__: only support 2 or 3 layers. Input layers: "
-                    + str(len(atom_lists))
-                )
+                    "Layer.__init__: only support 2 or 3 layers. Input layers: " +
+                    str(len(atom_lists)))
 
             for layer in atom_lists:
                 atoms = []
@@ -68,8 +67,7 @@ class Layer:
                     if "-" in atom_str:
                         if re.match(r"[0-9]+-(?:[0-9]+|L)", atom_str) == None:
                             raise Exception(
-                                "Wrong layer syntax of atom indexes. e.g.: 1,2,3-5"
-                            )
+                                "Wrong layer syntax of atom indexes. e.g.: 1,2,3-5")
                         ID = atom_str.split("-")
                         for i, j in enumerate(ID):
                             if j == "L":
@@ -108,9 +106,8 @@ class Layer:
         stru = PDB_obj.stru
 
         if set_id not in [1, 2, 3, 4, 5]:
-            raise Exception(
-                "Only support 1-5 set_id now. You are entering: " + str(set_id)
-            )
+            raise Exception("Only support 1-5 set_id now. You are entering: " +
+                            str(set_id))
 
         if set_id == 1:
             # TODO: connect with the database and recognize the substrate in the future

@@ -20,8 +20,7 @@ def main():
         PDB1.rm_wat()
         PDB1.PDB2FF()
         PDB1.conf_prod[
-            "nstlim"
-        ] = 100000000  # Edit MD configuration (see default in Class_Conf.py - Config.Amber)
+            "nstlim"] = 100000000  # Edit MD configuration (see default in Class_Conf.py - Config.Amber)
         PDB1.PDBMD(tag="XA12G")
 
         # demo: reset_MD_conf

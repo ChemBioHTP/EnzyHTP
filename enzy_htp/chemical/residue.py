@@ -9,11 +9,11 @@ from typing import List, Set, Dict, Union
 from .db import load_from_db
 from ..core import InvalidResidueCode, _LOGGER
 
-
 AA_LIST: List[str] = load_from_db("AA_LIST")
 """Capitalized list of all one-letter amino acid names."""
 
-THREE_LETTER_AA_MAPPER: Dict[str, str] = load_from_db("THREE_LETTER_AA_MAPPER") #@shaoqz: @imp2 add related to canonical in the name
+THREE_LETTER_AA_MAPPER: Dict[str, str] = load_from_db(
+    "THREE_LETTER_AA_MAPPER")  #@shaoqz: @imp2 add related to canonical in the name
 """Contains mapping of all amino acids codes, with key value pairs of (three letter code, one letter code). Should NOT be called directly for code conversion. Instead used enzy_htp.chemical.residue.convert_to_three_letter()"""
 
 ONE_LETTER_AA_MAPPER: Dict[str, str] = load_from_db("ONE_LETTER_AA_MAPPER")
@@ -31,43 +31,38 @@ Example usage:
 
 """
 
-RESIDUE_CONNECTIVITY_MAP: Dict[str, Dict[str, List[str]]] = load_from_db(
-    "RESIDUE_CONNECTIVITY_MAP"
-)
+RESIDUE_CONNECTIVITY_MAP: Dict[str,
+                               Dict[str,
+                                    List[str]]] = load_from_db("RESIDUE_CONNECTIVITY_MAP")
 """dict() that maps the connectivity of atom's based on their parent residue and atom identity.
 (key, value) pairs are (3-letter AA name, connector), where connector is another dict() with 
 (key, value) pairs of (atom name, list of connected atoms)."""
 
 RESIDUE_CONNECTIVITY_MAP_CTERMINAL: Dict[str, Dict[str, List[str]]] = load_from_db(
-    "RESIDUE_CONNECTIVITY_MAP_CTERMINAL"
-)
+    "RESIDUE_CONNECTIVITY_MAP_CTERMINAL")
 """dict() that maps the connectivity of atom's based on their parent residue and atom identity.
 (key, value) pairs are (3-letter AA name, connector), where connector is another dict() with 
 (key, value) pairs of (atom name, list of connected atoms). Similar to RESIDUE_CONNECTIVITY_MAP
 except has the mappings for the C-terminal version of each residue."""
 
-RESIDUE_CTERMINAL_ATOM_LIST: Dict[str, List[str]] = load_from_db(
-    "RESIDUE_CTERMINAL_ATOM_LIST"
-)
+RESIDUE_CTERMINAL_ATOM_LIST: Dict[str,
+                                  List[str]] = load_from_db("RESIDUE_CTERMINAL_ATOM_LIST")
 """dict() that lists the atoms in the C-terminal version of a residue. (key, value) pairs are
 (3-letter AA name, list of atom names) where the list of atom names are the modified list of 
 atom names for the C-terminal version of that residue."""
 
-RESIDUE_CTERMINAL_ATOM_LIST: Dict[str, List[str]] = load_from_db(
-    "RESIDUE_CTERMINAL_ATOM_LIST"
-)
+RESIDUE_CTERMINAL_ATOM_LIST: Dict[str,
+                                  List[str]] = load_from_db("RESIDUE_CTERMINAL_ATOM_LIST")
 """dict() that lists the atoms in the N-terminal version of a residue. (key, value) pairs are
 (3-letter AA name, list of atom names) where the list of atom names are the modified list of 
 atom names for the N-terminal version of that residue."""
 
 RESIDUE_CONNECTIVITY_MAP_NTERMINAL: Dict[str, Dict[str, List[str]]] = load_from_db(
-    "RESIDUE_CONNECTIVITY_MAP_NTERMINAL"
-)
+    "RESIDUE_CONNECTIVITY_MAP_NTERMINAL")
 """dict() that maps the connectivity of atom's based on their parent residue and atom identity.
 (key, value) pairs are (3-letter AA name, connector), where connector is another dict() with 
 (key, value) pairs of (atom name, list of connected atoms). Similar to RESIDUE_CONNECTIVITY_MAP
 except has the mappings for the N-terminal version of each residue."""
-
 
 RESIDUE_CATEGORIES: Dict[str, List[str]] = load_from_db("RESIDUE_CATEGORIES")
 """dict() that describes basic characteristics of amino acids. Has (key,value) pairs
@@ -79,17 +74,37 @@ RESIDUE_VOLUME_MAPPER: Dict[str, float] = load_from_db("RESIDUE_VOLUME_MAPPER")
 source: https://www.imgt.org/IMGTeducation/Aide-memoire/_UK/aminoacids/abbreviation.html
 """
 
-DEPROTONATION_MAPPER: Dict[str, Union[tuple, None]] = { "ASH" : {"OD2" : ("ASP","HD2")},
-                                                        "CYS" : {"SG" : ("CYM","HG" )},
-                                                        "GLH" : {"OE2" : ("GLU","HE2")},
-                                                "HIP" :{"ND1" : ("HIE", "HD1"),
-                                                        "NE2" : ("HID", "HE2")},
-                                                "HID" : {"ND1" : ("HIE", "HD1")}, # note these are just switching
-                                                "HIE" : {"NE2" : ("HID", "HE2")}, # note these are just switching
-                                                "LYS" : {"NZ" : ("LYN","HZ1")},
-                                                        "TYR" : {"OH" : ("TYM","HH")},
-                                                "ARG" : {"NH2" : ("AR0","HH22"),
-                                                         "NH1" : ("AR0","HH12")}} # note this need to switch name after depro
+DEPROTONATION_MAPPER: Dict[str, Union[tuple, None]] = {
+    "ASH": {
+        "OD2": ("ASP", "HD2")
+    },
+    "CYS": {
+        "SG": ("CYM", "HG")
+    },
+    "GLH": {
+        "OE2": ("GLU", "HE2")
+    },
+    "HIP": {
+        "ND1": ("HIE", "HD1"),
+        "NE2": ("HID", "HE2")
+    },
+    "HID": {
+        "ND1": ("HIE", "HD1")
+    },  # note these are just switching
+    "HIE": {
+        "NE2": ("HID", "HE2")
+    },  # note these are just switching
+    "LYS": {
+        "NZ": ("LYN", "HZ1")
+    },
+    "TYR": {
+        "OH": ("TYM", "HH")
+    },
+    "ARG": {
+        "NH2": ("AR0", "HH22"),
+        "NH1": ("AR0", "HH12")
+    }
+}  # note this need to switch name after depro
 """a map of residue name of deprotonatable residues. This means the residue have ambiguous protonation state with a pH
 around 7.0. The map is presented in the way that the deprotonatable residue is the key and its
 target_atom : (deprotoned state, deprotoned atom) is the value. In the file, these residue name are arranged with each
@@ -105,8 +120,7 @@ def convert_to_three_letter(one_letter: str) -> str:
     """Converts a one letter amino acid name to a three letter. If supplied code is invalid, raises an enzy_htp.core.InvalidResidueCode() exception."""
     if len(one_letter) != 1:
         raise InvalidResidueCode(
-            f"expecting one letter residue code. '{one_letter}' is invalid"
-        )
+            f"expecting one letter residue code. '{one_letter}' is invalid")
     one_letter = one_letter.upper()
     result = ONE_LETTER_AA_MAPPER.get(one_letter, None)
     if not result:
@@ -118,8 +132,7 @@ def convert_to_one_letter(three_letter: str) -> str:
     """Converts a threee letter amino acid name to a one letter. If supplied code is invalid, raises an enzy_htp.core.InvalidResidueCode() exception."""
     if len(three_letter) != 3:
         raise InvalidResidueCode(
-            f"expecting three letter residue code. '{three_letter}' is invalid"
-        )
+            f"expecting three letter residue code. '{three_letter}' is invalid")
     three_letter = three_letter.upper()
     result = THREE_LETTER_AA_MAPPER.get(three_letter, None)
     if not result:
@@ -156,8 +169,7 @@ def residue_polarity(code: str) -> str:
     """Determines the polarity of a one-letter nucleotide, being 'negative', 'neutral' or 'positive."""
     if len(code) != 1:
         raise InvalidResidueCode(
-            f"expecting one letter residue code. '{code}' is invalid"
-        )
+            f"expecting one letter residue code. '{code}' is invalid")
 
     result: str() = "unknown"
     for ptype in "positive negative neutral".split():
@@ -171,8 +183,7 @@ def non_polar(code: str) -> bool:
     """Determines if a one-letter nucleotide amino acid is non-polar. Returns True if it is non-polar."""
     if len(code) != 1:
         raise InvalidResidueCode(
-            f"expecting one letter residue code. '{code}' is invalid"
-        )
+            f"expecting one letter residue code. '{code}' is invalid")
 
     return code in RESIDUE_CATEGORIES["nonpolar"]
 

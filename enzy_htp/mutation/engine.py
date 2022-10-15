@@ -2,20 +2,17 @@
 method which gives users the ability to mutate a .pdb file and specify all relevant aspects of this process.
 Mutation is carried out by an underlying engine and the supported engines currently include:
     + Amber/tleap
-
 Note that the current implementation will mutate the .pdb file and keep the residue indicies and chain names 
 consistent.
-
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
-
 Date: 2022-06-15
 """
 import hashlib
 from string import ascii_uppercase
 from collections import defaultdict
 from typing import List, Dict, Union, Any
-from pathlib import Path 
+from pathlib import Path
 from copy import deepcopy
 
 import numpy as np
@@ -25,7 +22,7 @@ from biopandas.pdb import PandasPdb
 import enzy_htp.chemical as chem
 import enzy_htp.structure as struct
 import enzy_htp.preparation as prep
-import enzy_htp.molecular_mechanics as mm
+from enzy_htp import interface
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import _LOGGER, UnsupportedMethod
 
@@ -51,11 +48,9 @@ def mutate_pdb(
     Where <mutN> has the format:
         <original one-letter name><residue number><mutated one-letter name>
     A commandline example:
-
-        >>> mutated_pdb:str = mutate_pdb("enzy.pdb")
+    >>> mutated_pdb:str = mutate_pdb("enzy.pdb")
     >>> mutated_pdb
     "enzy_A10G.pdb"
-
     Args:
         pdb: The name of the base .pdb file. Only required value.
         n_mutations: The number of desired mutations as an int(). Default value is 1.
@@ -65,10 +60,8 @@ def mutate_pdb(
         out_dir: The directory to save the mutated .pdb to. Default value is None, in which case
             the file is saved to the current directory. When it doesn't exist, out_dir is created.
         random_state: The int() seed for the random number generator. Default value is 100.
-
     Raises:
         enzy_htp.core.exception.UnsupportedMethod if the supplied engine is not supported.
-
     Returns:
         The name of the .pdb file with the mutated structure.
     """
@@ -85,9 +78,8 @@ def mutate_pdb(
     mutations = unique_by_pos(mutations)
     needed: int = n_mutations - len(mutations)
     if needed > 0:
-        mutations.extend(
-            get_mutations(pdb, needed, mutations, random_state, restrictions)
-        )
+        mutations.extend(get_mutations(pdb, needed, mutations, random_state,
+                                       restrictions))
     else:
         _LOGGER.warning(
             f"{len(mutations)} unique mutations were provided but only {n_mutations} were requested."
@@ -124,21 +116,19 @@ def get_mutations(
     """Method that curates Mutation() namedtuples given a number of restrictions including
     a target number of mutations to get, the existing mutations and the MutationRestrictions() object.
     Note that this method SHOULD NOT be called directly by the user.
-
     Args:
         pdb: A str() with the file corresponding to the original structure.
         needed: The number of desired Mutation() objects as an int().
         mutations: A list() of existing Mutation() namedtuples.
         random_state: The int() rng seed for the rng engine.
         restrictions: The MutationRestrictions() object. Can be None.
-
     Raises:
         A base Exception() if not enough Mutation namedtuple()'s can be generated.
-
     Returns:
         A list() of Mutation() namedtuples compatible with the supplied enzyme system and constraints.
     """
-    def random_list_elem(ll:list) -> Any:
+
+    def random_list_elem(ll: list) -> Any:
         """Helper method that randomly chooses an element from a list. numpy.random.choice() doesn't 
         like to take elements from list()'s of tuples so this is the work around.
         """
@@ -147,7 +137,7 @@ def get_mutations(
     if restrictions is None:
         restrictions = restriction_object(pdb)
 
-    structure: struct.Structure = struct.structure_from_pdb(pdb)
+    structure: struct.Structure = struct.PDBParser.get_structure(pdb)
     mut_dict: Dict[Tuple[Str, int], List[Mutation]] = generate_all_mutations(structure)
 
     for mut in mutations:
@@ -179,12 +169,10 @@ def mutated_name(pdb: str, outdir: str, mutations: List[Mutation]) -> str:
     """Helper method that generates a PDB file name which encodes information about the
     mutations which will be applied to the structure in the file. In the case that the original residue
     is listed as 'X' for unknown, the identity will be determined from the input .pdb file.
-
     Args:
         pdb: Filename for the .pdb as a str().
         outdir: The directory to output the mutated .pdb. If None, uses the same base directory as the pdb parameter.
         mutations: A list() of the Mutation() namedtuples to be applied to the structure.
-
     Returns:
         The filename that the mutated structure should be saved to.
     """
@@ -219,21 +207,20 @@ def _mutate_tleap(pdb: str, outfile: str, mutations: List[Mutation]) -> None:
     the oufile to save the mutated version to and a list() of mutations. Function assumes that the
     supplied mutations are valid. Procedure is to replace backbone atoms and their names in the .pdb
     file and then apply the changes with Amber's tleap tool.
-
     Args:
         pdb: The name of the original .pdb file as a str().
         outfile: Name of the file to save the mutated structure to.
         mutations: A list() of Mutation namedtuple()'s to apply.
-
     Returns:
         Nothing.
     """
-    def get_backup( fname: str ):
-        lines = prep.read_pdb_lines(fname) 
+
+    def get_backup(fname: str):
+        lines = prep.read_pdb_lines(fname)
         lines = list(filter(lambda ll: ll.is_ATOM() or ll.is_HETATM(), lines))
         holder = defaultdict(list)
         for ll in lines:
-            holder[f"{ll.chain_id}.{ll.resi_name}.{ll.resi_id}"].append( ll )    
+            holder[f"{ll.chain_id}.{ll.resi_name}.{ll.resi_id}"].append(ll)
         to_remove = list()
         for key in holder.keys():
             if key.split('.')[1] in chem.THREE_LETTER_AA_MAPPER:
@@ -274,19 +261,20 @@ def _mutate_tleap(pdb: str, outfile: str, mutations: List[Mutation]) -> None:
                     mask[pidx] = False
 
     fs.write_lines(outfile, np.array(list(map(lambda pl: pl.line, pdb_lines)))[mask])
-    ai = mm.AmberInterface()
-    ai.mutate(outfile)
+
+    interface.amber.mutate(outfile)
     if backup:
-        structure:struct.Structure = struct.structure_from_pdb(outfile)
+        structure: struct.Structure = struct.structure_from_pdb(outfile)
         for rkey in structure.residue_keys:
             if rkey not in backup:
                 continue
             tmp_file = f"/tmp/ligand.{rkey}.tmp.pdb"
-            fs.write_lines(tmp_file, list(map(lambda ll: ll.line, backup[rkey])) + ['END'])
-            lig:struct.Ligand = struct.ligand_from_pdb(tmp_file)
-            (cname,rname,rnum) = rkey.split('.')
+            fs.write_lines(tmp_file,
+                           list(map(lambda ll: ll.line, backup[rkey])) + ['END'])
+            lig: struct.Ligand = struct.ligand_from_pdb(tmp_file)
+            (cname, rname, rnum) = rkey.split('.')
             rnum = int(rnum)
-            structure.chain_mapper[cname]._residues[rnum-1] = lig
+            structure.chain_mapper[cname]._residues[rnum - 1] = lig
             fs.safe_rm(tmp_file)
 
         structure.to_pdb(outfile)

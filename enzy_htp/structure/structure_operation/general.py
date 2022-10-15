@@ -27,6 +27,7 @@ def remove_solvent(stru: Structure) -> Structure:
 
     return stru
 
+
 def remove_empty_chain(stru: Structure) -> Structure:
     """
     remove empty chains
@@ -40,6 +41,7 @@ def remove_empty_chain(stru: Structure) -> Structure:
             ch.delete_from_parent()
     return stru
 
+
 def remove_non_peptide(stru: Structure) -> Structure:
     """remove the non-peptide parts of the structure. 
     Make changes in-place and return a reference of the changed original object."""
@@ -48,6 +50,7 @@ def remove_non_peptide(stru: Structure) -> Structure:
     for ch in non_peptides:
         ch.delete_from_parent()
     return stru
+
 
 @dispatch
 def update_residues(stru: Structure, ref_stru: Structure) -> Structure:
@@ -71,12 +74,14 @@ def update_residues(stru: Structure, ref_stru: Structure) -> Structure:
         if self_res.name != ref_res.name:
             _LOGGER.info(f"updating {self_res.key()} {self_res.name} to {ref_res.name}")
             self_res.name = ref_res.name
-        self_res.atoms = copy.deepcopy(ref_res.atoms) # this will also set self_res as parent
+        self_res.atoms = copy.deepcopy(
+            ref_res.atoms)  # this will also set self_res as parent
     stru.renumber_atoms()
     return stru
 
+
 @dispatch
-def update_residues(resi: Residue, ref_resi: Residue) -> Residue: # pylint: disable=function-redefined
+def update_residues(resi: Residue, ref_resi: Residue) -> Residue:  # pylint: disable=function-redefined
     """
     Update atoms and residue names to the single residue
     (it doesnt matter if there are same in sequence)
@@ -89,8 +94,9 @@ def update_residues(resi: Residue, ref_resi: Residue) -> Residue: # pylint: disa
     if resi.name != ref_resi.name:
         _LOGGER.info(f"updating {resi.key()} {resi.name} to {ref_resi.name}")
         resi.name = ref_resi.name
-    resi.atoms = copy.deepcopy(ref_resi.atoms) # this will also set resi as parent
+    resi.atoms = copy.deepcopy(ref_resi.atoms)  # this will also set resi as parent
     return resi
+
 
 def deprotonate_residue(residue: Residue, target_atom: Union[None, Atom] = None) -> None:
     """
@@ -103,14 +109,17 @@ def deprotonate_residue(residue: Residue, target_atom: Union[None, Atom] = None)
         if len(target_atom.attached_protons()) == 0:
             _LOGGER.info(f"target atom {target_atom} already have no H. keep original")
         else:
-            _LOGGER.warning(f"cannot deprotonate {residue} on {target_atom}. keep original")
+            _LOGGER.warning(
+                f"cannot deprotonate {residue} on {target_atom}. keep original")
         return None
     _LOGGER.info(f"deprotonate {target_proton} from {residue}")
     residue.name = new_resi_name
     residue.find_atom_name(target_proton).delete_from_parent()
     #TODO rename/complete atoms after this (e.g.: ARG:NH1 case, HID -> HIE case)
 
-def get_default_deproton_info(residue: Residue, target_atom : Union[None, Atom] = None) -> Tuple:
+
+def get_default_deproton_info(residue: Residue,
+                              target_atom: Union[None, Atom] = None) -> Tuple:
     """
     return the default proton in the residue on the target_atom (if provided) to deprotonate
     Default HIP target is set to resulting HIE
@@ -124,12 +133,16 @@ def get_default_deproton_info(residue: Residue, target_atom : Union[None, Atom] 
 
     depro_info = chem.residue.DEPROTONATION_MAPPER.get(r_name, None)
     if depro_info is None:
-        _LOGGER.warn(f"no default protonation info for {r_name}. Consider make a standard for it")
+        _LOGGER.warn(
+            f"no default protonation info for {r_name}. Consider make a standard for it")
         return None, None
     if r_name in ["HIE", "HID"]:
-        _LOGGER.warn(f"deprotonation info for {residue} is actually a switching between HID/HIE")
+        _LOGGER.warn(
+            f"deprotonation info for {residue} is actually a switching between HID/HIE")
     target_atom_depro_info = depro_info.get(target_atom_name, None)
     if target_atom_depro_info is None:
-        _LOGGER.warn(f"no default protonation info for {target_atom_name} in {r_name}. Could be no proton on it. Consider make a standard for it if do")
+        _LOGGER.warn(
+            f"no default protonation info for {target_atom_name} in {r_name}. Could be no proton on it. Consider make a standard for it if do"
+        )
         return None, None
     return target_atom_depro_info

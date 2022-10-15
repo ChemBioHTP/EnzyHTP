@@ -22,6 +22,7 @@ class UnsupportedFileType(Exception):
 
     pass
 
+
 class UnsupportedMethod(Exception):
     """Exception corresponding to a method that is NOT implemented and/or supported."""
 
@@ -33,9 +34,11 @@ class InvalidMutationRestriction(Exception):
 
     pass
 
+
 class ResidueDontHaveAtom(Exception):
     """Exception corresponding to asking a residue for an atom that it doesn't contain
     takes the residue and the query atom name to constuct"""
+
     def __init__(self, residue, atom_name, *args) -> None:
         super().__init__(*args)
         self.residue = residue

@@ -1,0 +1,35 @@
+-I: Adding /dors/csb/apps/amber19/dat/leap/prep to search path.
+-I: Adding /dors/csb/apps/amber19/dat/leap/lib to search path.
+-I: Adding /dors/csb/apps/amber19/dat/leap/parm to search path.
+-I: Adding /dors/csb/apps/amber19/dat/leap/cmd to search path.
+-s: Ignoring startup file: leaprc
+-f: Source /gpfs52/home/jurichc/EnzyHTP/test/mutation/data/leap_mutate.in.
+
+Welcome to LEaP!
+Sourcing: /gpfs52/home/jurichc/EnzyHTP/test/mutation/data/leap_mutate.in
+----- Source: /dors/csb/apps/amber19/dat/leap/cmd/leaprc.protein.ff14SB
+----- Source of /dors/csb/apps/amber19/dat/leap/cmd/leaprc.protein.ff14SB done
+Log file: ./leap.log
+Loading parameters: /dors/csb/apps/amber19/dat/leap/parm/parm10.dat
+Reading title:
+PARM99 + frcmod.ff99SB + frcmod.parmbsc0 + OL3 for RNA
+Loading parameters: /dors/csb/apps/amber19/dat/leap/parm/frcmod.ff14SB
+Reading force field modification type file (frcmod)
+Reading title:
+ff14SB protein backbone and sidechain parameters
+Loading library: /dors/csb/apps/amber19/dat/leap/lib/amino12.lib
+Loading library: /dors/csb/apps/amber19/dat/leap/lib/aminoct12.lib
+Loading library: /dors/csb/apps/amber19/dat/leap/lib/aminont12.lib
+Loading PDB file: /gpfs52/home/jurichc/EnzyHTP/test/mutation/data/one_res_P1G.pdb
+  Added missing heavy atom: .R<CGLY 1>.A<OXT 8>
+  total atoms in file: 4
+  Leap added 4 missing atoms according to residue templates:
+       1 Heavy
+       3 H / lone pairs
+Writing pdb file: /gpfs52/home/jurichc/EnzyHTP/test/mutation/data/one_res_P1G.tmp.pdb
+
+/dors/csb/apps/amber19/bin/teLeap: Warning!
+ Converting C-terminal residue name to PDB format: CGLY -> GLY
+	Quit
+
+Exiting LEaP: Errors = 0; Warnings = 1; Notes = 0.
