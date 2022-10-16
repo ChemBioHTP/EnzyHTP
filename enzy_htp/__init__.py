@@ -26,6 +26,7 @@ from .structure import (
     Solvent,
     PDBParser,
 )
+
 from .core import (
     EnvironmentManager,
     MissingEnvironmentElement,

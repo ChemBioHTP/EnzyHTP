@@ -20,16 +20,16 @@ class AmberConfig:
     pressure equilibration.
 
     Attributes:
-            parent_ : Points to parent config object. Optional and defaults to None.
-            HOME : str() corresponding to Amber home directory on the system.
-            CPU_ENGINE : str() corresponding to Amber cpu sander.
-            GPU_ENGINE : str() corresponding to Amber gpu sander.
-            BOX_TYPE : str() corresponding to type of water box.
-            BOX_SIZE : str() corresponding to the size of the water box.
-            CONF_MIN : dict() holding settings for Amber minimization.
-            CONF_HEAT : dict() holding settings for Amber heating.
-            CONF_EQUI : dict() holding settings for Amber constant pressure equilibration run.
-            CONF_PROD : dict() holding settings for Amber constant pressure production run.
+        parent_ : Points to parent config object. Optional and defaults to None.
+        HOME : str() corresponding to Amber home directory on the system.
+        CPU_ENGINE : str() corresponding to Amber cpu sander.
+        GPU_ENGINE : str() corresponding to Amber gpu sander.
+        BOX_TYPE : str() corresponding to type of water box.
+        BOX_SIZE : str() corresponding to the size of the water box.
+        CONF_MIN : dict() holding settings for Amber minimization.
+        CONF_HEAT : dict() holding settings for Amber heating.
+        CONF_EQUI : dict() holding settings for Amber constant pressure equilibration run.
+        CONF_PROD : dict() holding settings for Amber constant pressure production run.
     """
 
     HOME: str = "AMBERHOME"

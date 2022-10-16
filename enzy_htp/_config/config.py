@@ -20,7 +20,6 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-07-15
 """
 from typing import Any, Dict
-
 from .amber_config import AmberConfig, default_amber_config
 from .gaussian_config import GaussianConfig, default_gaussian_config
 from .multiwfn_config import MultiwfnConfig, default_multiwfn_config
