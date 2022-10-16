@@ -1,5 +1,6 @@
 """Testing the enumerated types found in enzy_htp.chemical.enum
 Author: Chris Jurich <chris.jurich@vanderbilt.edu
+
 Date: 2022-04-03
 """
 import pytest

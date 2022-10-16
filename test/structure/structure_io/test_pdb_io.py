@@ -36,6 +36,19 @@ CURRDIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = f'{CURRDIR}/../data/'
 sp = PDBParser()
 
+def equiv_files(fname1: str, fname2: str, width: int = None) -> bool:
+    """Helper method to check if two files are exactly equivalent."""
+    for l1, l2 in zip(fs.lines_from_file(fname1), fs.lines_from_file(fname2)):
+        if width:
+            l1 = l1[:width]
+            l2 = l2[:width]
+
+        if l1 != l2:
+            print(f"'{l1}'")
+            print(f"'{l2}'")
+            return False
+    return True
+
 
 def test_check_valid_pdb_good_input():
     '''Good input for the check_valid_pdb() helper method.'''

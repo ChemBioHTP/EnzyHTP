@@ -104,7 +104,6 @@ def test_is_idx_subset_non_ch_subset():
     assert not stru.is_idx_subset(target_stru)
 
 
-@pytest.mark.TODO
 def equiv_files(fname1: str, fname2: str, width: int = None) -> bool:
     """Helper method to check if two files are exactly equivalent."""
 

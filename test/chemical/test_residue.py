@@ -20,7 +20,7 @@ def test_variable_checks():
     three_mapper_keys = list(res.THREE_LETTER_AA_MAPPER.keys())
     three_mapper_values = list(set(list(res.THREE_LETTER_AA_MAPPER.values())))
 
-    assert len(three_mapper_keys) == 29
+    assert len(three_mapper_keys) == 24
     assert len(three_mapper_values) == 21
 
     assert all_caps(three_mapper_keys)
@@ -42,6 +42,7 @@ def test_variable_checks():
 
     assert len(res.RESIDUE_ELEMENT_MAP) == 1
     assert "Amber" in res.RESIDUE_ELEMENT_MAP
+
 
 
 def test_convert_to_three_letter():
