@@ -1,6 +1,7 @@
 """Defines an AmberInterface class that serves as a bridge for enzy_htp to utilize AmberMD software. Uses the AmberConfig class
 found in enzy_htp/molecular_mechanics/amber_config.py. Supported operations include minimization, 
 heating, constant pressure production, and constant pressure equilibration.
+
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-02
@@ -27,7 +28,8 @@ class AmberInterface:
     minimization, heating constant pressure production, constant pressure equilibration, trajectory file
     conversion and mutation. Users should use this class as the only way to interact with any functionality
     in Amber or associated tools like tleap.
-    Atributes:
+
+    Attributes:
         config_	: The AmberConfig() class which provides settings for both running Amber and maintaining a compatible environment.
         env_manager_ : The EnvironmentManager() class which ensure all required environment elements exist.
         compatible_env_ : A bool() indicating if the current environment is compatible with the object itself.
@@ -102,6 +104,7 @@ class AmberInterface:
         inpath = Path(pdb)
         if min_dir == "./":
             min_dir = f"{inpath.parent}/pdb_min/"
+        
         fs.safe_mkdir(min_dir)
         outfile = f"{min_dir}/{inpath.stem}_min.pdb"
         min_in = f"{min_dir}/min.in"
@@ -112,47 +115,38 @@ class AmberInterface:
         engine = self.config_.get_engine(mode)
 
         self.env_manager_.run_command(
-            engine,
-            [
-                "-O",
-                "-i",
-                min_in,
-                "-o",
-                min_out,
-                "-p",
-                prmtop,
-                "-c",
-                inpcrd,
-                "-r",
-                min_rst,
-            ],
+            engine, ["-O", "-i", min_in, "-o", min_out, "-p", prmtop, "-c", inpcrd, "-r", min_rst],
+            
         )
 
-        self.env_manager_.run_command("ambpdb",
-                                      [f"-p", prmtop, "-c", min_rst, ">", outfile])
-        # shutil.move(prmtop, min_dir )
-        # shutil.move(inpcrd, min_dir )
+        self.env_manager_.run_command(
+            "ambpdb",[f"-p", prmtop, "-c", min_rst, ">", outfile]
+        )
+        
         return outfile
 
-    def build_param_files(self, in_pdb: str, build_dir: str) -> Tuple[str, str]:
+    def build_param_files(self, in_pdb: str, build_dir: str, pH:float = 7.0) -> Tuple[str, str]:
         """Creates the .prmtop and .inpcrd files for the supplied .pdb file. Handles
-        processing of the Ligand() and MetalCenter() objects in the structure.
+        processing of the Ligand() and MetalCenter() objects in the structure. Note that the supplied
+        pdb file is assumed to be protonated.
         Args:
             in_pdb: The .pdb file to build parameter files for.
             buld_dir: The directory to build the parameter files in.
+            pH: A float() representing the pH the parameter files should be made at. Default value is 7.0.
         Returns:
             A Tuple[str,str] with the containing (.prmtop path, .inpcrd path).
         """
-        # TODO(CJ): add in the pH as a parameter
         ligand_dir: str = f"{build_dir}/ligands/"
         metalcenter_dir: str = f"{build_dir}/metalcenter/"
+        
         fs.safe_mkdir(ligand_dir)
         fs.safe_mkdir(metalcenter_dir)
-        structure: struct.Structure = struct.structure_from_pdb(in_pdb)
+        
+        structure: struct.Structure = struct.PDBParser().get_structure(in_pdb)
         ligand_paths: List[str] = structure.build_ligands(ligand_dir, True)
         # TODO(CJ): we have to protonate this first. not sure if this id documented elsewhere
         for lig in ligand_paths:
-            _ = prep.protonate._protonate_ligand_PYBEL(lig, 7.0, lig)
+            _ = prep.protonate._protonate_ligand_PYBEL(lig, pH, lig)
         ligand_charges: List[int] = list(
             map(lambda pp: prep.protonate._ob_pdb_charge(pp), ligand_paths))
         ligand_params: List[Tuple[str, str]] = self.build_ligand_param_files(

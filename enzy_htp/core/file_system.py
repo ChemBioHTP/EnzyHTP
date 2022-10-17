@@ -14,16 +14,18 @@ from .logger import _LOGGER
 
 
 def safe_rm(fname: str) -> None:
-    """Removes a file if and only if the directory already exists."""
-    # TODO(CJ): need to check if it is a directory. maybe re-direct if so?
+    """Removes a file if and only if the directory already exists. Provides a warning if the 
+    supplied path is a directory."""
+    if os.path.isdir(fname):
+        _LOGGER.warning(f"The supplied path '{fname}' is a directory and cannot be removed by enzy_htp.core.file_system.safe_rm()")
+        return
+
     if os.path.exists(fname):
         os.remove(fname)
 
 
 def is_empty_dir(dir_path: str) -> bool:
-    """
-    check if the dir_path is an empty dir
-    """
+    """Is the supplied directory empty?"""
     if os.path.isdir(dir_path):
         return not os.listdir(dir_path)
     else:

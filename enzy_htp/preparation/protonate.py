@@ -15,8 +15,8 @@ import enzy_htp.chemical as chem
 from enzy_htp.core import file_system as fs
 from enzy_htp import config
 from enzy_htp.core.logger import _LOGGER
-from enzy_htp.structure import (Structure, Ligand, structure_from_pdb, ligand_from_pdb,
-                                Chain, PDBParser)
+from enzy_htp.structure import (Structure, Ligand, Chain, PDBParser)
+                                
 from enzy_htp.structure.metal_atom import MetalUnit
 import enzy_htp.structure.structure_operation as stru_oper
 
