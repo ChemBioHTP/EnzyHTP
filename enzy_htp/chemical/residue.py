@@ -10,7 +10,7 @@ from ..core import InvalidResidueCode, _LOGGER
 
 # yapf: disable
 
-AA_LIST: List[str] = ["R","H","K","D","E","S","T","N',"Q","C","G","P","A","V","I","L","M","F","Y","W","U"]
+AA_LIST: List[str] = ["R","H","K","D","E","S","T","N","Q","C","G","P","A","V","I","L","M","F","Y","W","U"]
 """Capitalized list of all one-letter amino acid names."""
 
 THREE_LETTER_AA_MAPPER: Dict[str, str] = {
@@ -280,7 +280,7 @@ RESIDUE_CONNECTIVITY_MAP_CTERMINAL: Dict[str, Dict[str, List[str]]] = {
 except has the mappings for the C-terminal version of each residue."""
 
 RESIDUE_CTERMINAL_ATOM_LIST: Dict[str, List[str]] = {
-                        ALA": ["N", "H", "CA", "HA", "CB", "HB1", "HB2", "HB3", "C", "O", "OXT"],
+                        "ALA": ["N", "H", "CA", "HA", "CB", "HB1", "HB2", "HB3", "C", "O", "OXT"],
                         "ARG": ["N", "H", "CA", "HA", "CB", "HB2", "HB3", "CG", "HG2", "HG3", "CD", "HD2", "HD3", "NE", "HE", "CZ", "NH1", "HH11", "HH12", "NH2", "HH21", "HH22", "C", "O", "OXT"],
                         "ASN": ["N", "H", "CA", "HA", "CB", "HB2", "HB3", "CG", "OD1", "ND2", "HD21", "HD22", "C", "O", "OXT"],
                         "ASP": ["N", "H", "CA", "HA", "CB", "HB2", "HB3", "CG", "OD1", "OD2", "C", "O", "OXT"],
