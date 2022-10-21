@@ -146,7 +146,8 @@ def test_pdb2pqr_protonate_pdb_FAcD():
 
 
 def test_pdb2pqr_protonate_pdb_4NKK():
-    """Making sure the protonate_pdb() method works for the 4NKK enzyme system."""
+    """Making sure the protonate_pdb() method works for the 4NKK enzyme system.
+    Note: there could be errors of this related to different PDB2PQR version"""
     test_pdb = f"{DATA_DIR}/4NKK_clean.pdb"
     target_pqr = f"{DATA_DIR}/4NKK_clean.pqr"
     actual_pqr = f"{WORK_DIR}/4NKK_clean.pqr"

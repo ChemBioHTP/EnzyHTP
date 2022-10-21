@@ -611,7 +611,7 @@ def test_get_file_str_build_ligand():
 
     stru: Structure = sp.get_structure(pdb_file_path)
     with open(answer_file_path) as f:
-        assert sp.get_file_str(stru.ligands[0]) == f.read()
+        assert sp.get_file_str(stru.ligands[0], if_renumber=False) == f.read()
 
 
 def test_round_trip_pdb():

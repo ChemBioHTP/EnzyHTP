@@ -122,9 +122,7 @@ from .solvent import Solvent, residue_to_solvent
 from .metal_atom import MetalUnit
 
 
-class Structure(
-        DoubleLinkedNode
-):  # TODO implement different copy methods for the doubly linked ds; by default are all shollow copy and references
+class Structure(DoubleLinkedNode):
     """Protein structure.
     Designed for direct interfacing by users.
     Composed of child Chain() objects and their subsequent child Residue() objects and so on Atom() objects.
