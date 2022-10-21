@@ -1,4 +1,7 @@
 """Module for remove irrelevant structure parts (such as solvents).
+Science API:
++ remove_solvent
+
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Date: 2022-09-22
 """

@@ -1,4 +1,6 @@
 """Defines functions for protonating Structure(), Ligand() and MetalUnit() objects as well as raw PDB files.
+Science API:
++ protonate_stru
 
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
