@@ -1,4 +1,4 @@
 source leaprc.protein.ff14SB
-a = loadpdb /gpfs52/home/jurichc/EnzyHTP/test/mutation/data/one_res_P1G.pdb
-savepdb a /gpfs52/home/jurichc/EnzyHTP/test/mutation/data/one_res_P1G.tmp.pdb
+a = loadpdb /gpfs52/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/mutation/data/one_res_P1G.pdb
+savepdb a /gpfs52/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/mutation/data/one_res_P1G.tmp.pdb
 quit

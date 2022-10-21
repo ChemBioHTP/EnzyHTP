@@ -6,11 +6,12 @@ Date: 2022-03-20
 """
 from __future__ import annotations
 from copy import deepcopy
-import itertools
 import sys
-from enzy_htp.core import _LOGGER
 from typing import Iterable, List, Tuple, Union
+
+from enzy_htp.core import _LOGGER
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
+from enzy_htp.core.general import get_interval_from_list
 
 from enzy_htp.structure.atom import Atom
 import enzy_htp.chemical as chem
@@ -330,24 +331,3 @@ class Chain(DoubleLinkedNode):
         return f"Chain({self._name}, residue: {self.residue_idx_interval()})"
 
     #endregion
-
-
-# TODO go to core
-def get_interval_from_list(target_list: List[int]) -> Iterable[Tuple[int, int]]:
-    """
-    convert a list of int to the interval/range representation
-    Returns:
-        a generater of tuples with each indicating the start/end of the interval
-    Example:
-        >>> list(get_interval_from_list([1,2,3,6,7,8]))
-        [(1,3),(6,8)]
-    reference: https://stackoverflow.com/questions/4628333
-    """
-    # clean input
-    target_list = sorted(set(target_list))
-    # here use enum id as a ref sequence and group by the deviation
-    for i, j in itertools.groupby(
-            enumerate(target_list),
-            lambda ref_vs_target: ref_vs_target[1] - ref_vs_target[0]):
-        j = list(j)
-        yield j[0][1], j[-1][1]
