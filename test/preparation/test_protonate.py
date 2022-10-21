@@ -150,11 +150,12 @@ def test_pdb2pqr_protonate_pdb_4NKK():
     Note: there could be errors of this related to different PDB2PQR version"""
     test_pdb = f"{DATA_DIR}/4NKK_clean.pdb"
     target_pqr = f"{DATA_DIR}/4NKK_clean.pqr"
+    target_pqr_old = f"{DATA_DIR}/4NKK_clean_old.pqr"
     actual_pqr = f"{WORK_DIR}/4NKK_clean.pqr"
     assert not os.path.exists(actual_pqr)
     prot.pdb2pqr_protonate_pdb(test_pdb, actual_pqr)
     assert os.path.exists(actual_pqr)
-    assert equiv_files(target_pqr, actual_pqr)
+    assert equiv_files(target_pqr, actual_pqr) or equiv_files(target_pqr_old, actual_pqr)
     fs.safe_rm(actual_pqr)
     assert not os.path.exists(actual_pqr)
 
