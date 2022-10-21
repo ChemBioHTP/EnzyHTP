@@ -5,6 +5,8 @@ Date: 2022-09-22
 
 import logging
 import os
+
+import pytest
 from enzy_htp.structure import PDBParser, Structure
 import enzy_htp.structure.structure_operation as stru_oper
 from enzy_htp.core import _LOGGER
@@ -29,8 +31,9 @@ def test_remove_empty_chain():
     stru: Structure = sp.get_structure(pdb_file_path)
 
     stru[1].residues = []
+    stru[2].residues = [] # be careful when delete element from a iterable
     stru_oper.remove_empty_chain(stru)
-    assert len(stru) == 3
+    assert len(stru) == 2
 
 
 def test_remove_non_peptide():
@@ -75,15 +78,16 @@ def test_deprotonate_residue():
     assert residue.name == "HID"
     assert len(residue) == 17
 
-
+@pytest.mark.TODO # need add a method to complete atoms
 def test_deprotonate_residue_switch():
     """test deprotonate_residue considered CYS on SG and HID on NE2 and ND1"""
     pdb_file_path = f"{DATA_DIR}1Q4T_peptide_protonated.pdb"
     stru: Structure = sp.get_structure(pdb_file_path)
-    ## case where it is a switch
-    residue = stru["A"].find_residue_idx(21)
+    # manually select the case where it is a switch
+    residue = stru["A"].find_residue_idx(21) # HID 21
     target_atom = residue.find_atom_name("ND1")
     stru_oper.deprotonate_residue(residue, target_atom)
+
     assert residue.name == "HIE"
     assert len(residue) == 17
     # TODO add test with completion of LYS treatment etc.

@@ -35,7 +35,7 @@ def remove_empty_chain(stru: Structure) -> Structure:
     original object.
     """
     ch: Chain
-    for ch in stru:
+    for ch in copy.copy(stru.chains):
         if ch.is_empty():
             _LOGGER.debug(f"removing {ch}")
             ch.delete_from_parent()
@@ -45,7 +45,7 @@ def remove_empty_chain(stru: Structure) -> Structure:
 def remove_non_peptide(stru: Structure) -> Structure:
     """remove the non-peptide parts of the structure. 
     Make changes in-place and return a reference of the changed original object."""
-    non_peptides = filter(lambda c: not c.is_peptide(), stru.chains)
+    non_peptides = list(filter(lambda c: not c.is_peptide(), stru.chains))
     ch: Chain
     for ch in non_peptides:
         ch.delete_from_parent()
