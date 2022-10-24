@@ -19,12 +19,12 @@ import numpy as np
 import pandas as pd
 from biopandas.pdb import PandasPdb
 
-import enzy_htp.chemical as chem
-import enzy_htp.structure as struct
-import enzy_htp.preparation as prep
-from enzy_htp import interface
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import _LOGGER, UnsupportedMethod
+import enzy_htp.chemical as chem
+import enzy_htp.structure as struct
+from enzy_htp import interface
+import enzy_htp.preparation as prep
 
 from .mutation_restrictions import MutationRestrictions, restriction_object
 from .mutation import generate_all_mutations, Mutation
