@@ -1,6 +1,10 @@
 # Notes about development
 
 
+## Helper Scripts
+
+We have developed a few helper scripts to aid developers when contributing to EnzyHTP.
+
 ## python imports
 
 When importing at the top of python files, put the non-`enzy_htp` imports at the top of and then the

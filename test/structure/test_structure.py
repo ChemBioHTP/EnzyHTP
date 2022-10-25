@@ -138,8 +138,6 @@ def equiv_files(fname1: str, fname2: str, width: int = None) -> bool:
     return True
 
 
-
-
 def test_atoms():  # TODO(shaoqz) wait for test
     TEST_FILE = f"{TEST_DIR}/preparation/data/3NIR.pdb"
     struct: Structure = PDBParser().get_structure(TEST_FILE)
