@@ -44,7 +44,6 @@ def test_variable_checks():
     assert "Amber" in res.RESIDUE_ELEMENT_MAP
 
 
-
 def test_convert_to_three_letter():
     """Checking proper behavior and throwing of convert_to_three_letter()"""
     for one, three in res.ONE_LETTER_AA_MAPPER.items():

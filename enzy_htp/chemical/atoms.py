@@ -6,10 +6,7 @@ Date: 2022-06-16
 """
 from typing import Dict, List
 
-X_H_BOND_LENGTH: Dict[str, float] = {
-        "C": 1.07,
-        "N": 1.0
-}
+X_H_BOND_LENGTH: Dict[str, float] = {"C": 1.07, "N": 1.0}
 """dict() storing bond lengths between an arbitrary atom X and a Hydrogen (H)."""
 
 
