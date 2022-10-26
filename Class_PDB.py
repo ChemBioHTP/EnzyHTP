@@ -687,7 +687,7 @@ class PDB():
     Docking
     ========
     '''
-    def Dock_Reactive_Substrate(self, substrate, reactive_define, local_lig = 0):
+    def dock_reactive_substrate(self, substrate, reactive_define, local_lig = 0):
         '''
         Dock substrates into the apo enzyme in a reactive conformation
         Update self.path after docking. Will not update self.path in the middle of the docking
@@ -1091,19 +1091,7 @@ class PDB():
         minout_path = min_dir + '/min.out'
         minrst_path = min_dir + '/min.ncrst' # change to ncrst seeking for solution of rst error
         mkdir(min_dir)
-        min_input=open(minin_path,'w')
-        min_input.write('Minimize'+line_feed)
-        min_input.write(' &cntrl'+line_feed)
-        min_input.write('  imin=1,'+line_feed)
-        min_input.write('  ntx=1,'+line_feed)
-        min_input.write('  irest=0,'+line_feed)
-        min_input.write('  maxcyc='+str(cycle)+','+line_feed)
-        min_input.write('  ncyc='+str(int(0.5*cycle))+','+line_feed)
-        min_input.write('  ntpr='+str(int(0.2*cycle))+','+line_feed)
-        min_input.write('  ntwx=0,'+line_feed)
-        min_input.write('  cut=8.0,'+line_feed)
-        min_input.write(' /'+line_feed)
-        min_input.close()
+        self._build_MD_min(min_dir)
 
         # determine cluster rescources
         if if_cluster_job:
@@ -1122,7 +1110,7 @@ class PDB():
         PC_cmd, engine_path = Config.Amber.get_Amber_engine(engine=engine, n_cores=cpu_cores)
 
         # make cmd
-        cmd = f'{PC_cmd} {engine_path} -O -i {minin_path} -o {minout_path} -p {self.prmtop_path} -c {self.inpcrd_path} -r {minrst_path}'
+        cmd = f'{PC_cmd} {engine_path} -O -i {minin_path} -o {minout_path} -p {self.prmtop_path} -c {self.inpcrd_path} -r {minrst_path} -ref {self.inpcrd_path}'
         
         # run
         if if_cluster_job:
@@ -1146,7 +1134,8 @@ class PDB():
             if Config.debug >= 1:
                 print(f'running: {cmd}')
             os.system(cmd)
-        #rst2pdb
+        
+        # rst2pdb
         try:
             run('ambpdb -p '+self.prmtop_path+' -c '+minrst_path+' > '+out4_PDB_path, check=True, text=True, shell=True, capture_output=True)
         except CalledProcessError:
@@ -1157,13 +1146,14 @@ class PDB():
                 self.inpcrd_path=min_dir+'/'+self.inpcrd_path
                 return 1
         
+        # clean
         os.system('mv '+self.prmtop_path+' '+self.inpcrd_path+' '+min_dir)
 
+        # update
         self.path = out4_PDB_path
         self._update_name()
-        self.prmtop_path=min_dir+'/'+self.prmtop_path
-        self.inpcrd_path=min_dir+'/'+self.inpcrd_path
-
+        self.prmtop_path=min_dir+'/'+self.prmtop_path.split('/')[-1]
+        self.inpcrd_path=min_dir+'/'+self.inpcrd_path.split('/')[-1]
         return self.path
 
 

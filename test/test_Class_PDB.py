@@ -332,6 +332,73 @@ def test_make_single_g16_job_loop():
     for job in jobs:
         pass# assert len(job.sub_script_str.splitlines()) == len(jobs[0].sub_script_str.splitlines())
 
+@pytest.mark.md
+def test_pdbmin_local():
+    """
+    test for PDBMin running normally.
+    need to apply an interactive shell to test
+    """
+    test_dir = 'test/testfile_Class_PDB/Min_test/'
+    # interface to PDBMD
+    pdb_obj = PDB(f'{test_dir}KE-07_ff.pdb', wk_dir=test_dir)
+    pdb_obj.prmtop_path = f'{test_dir}KE-07.prmtop'
+    pdb_obj.inpcrd_path = f'{test_dir}KE-07.inpcrd'
+    # run MD
+    pdb_obj.PDBMin(cycle=20000, engine='Amber_GPU', if_cluster_job=0)
+    assert os.path.getsize(f'{test_dir}/cache/PDBMin/min.ncrst') != 0
+    assert os.path.getsize(pdb_obj.path) != 0
+    # clean up
+    test_file_paths.extend([f'{test_dir}/cache/PDBMin/min.in',
+                            f'{test_dir}/cache/PDBMin/min.out',
+                            f'{test_dir}/cache/PDBMin/min.ncrst',
+                            f'{test_dir}/KE-07_ff_min.pdb'])
+    os.system(f"mv {pdb_obj.prmtop_path} {test_dir}KE-07.prmtop")
+    os.system(f"mv {pdb_obj.inpcrd_path} {test_dir}KE-07.inpcrd")
+    test_file_dirs.append(f'{test_dir}/cache/PDBMin')
+    test_file_dirs.append(f'{test_dir}/cache')
+
+@pytest.mark.md
+def test_pdbmin_local_w_constrain():
+    """
+    test for PDBMin running with constrain applied. 
+    need to apply an interactive shell to test
+    """
+    test_dir = 'test/testfile_Class_PDB/Min_test/'
+    # interface to PDBMD
+    pdb_obj = PDB(f'{test_dir}KE-07_ff.pdb', wk_dir=test_dir)
+    pdb_obj.prmtop_path = f'{test_dir}KE-07.prmtop'
+    pdb_obj.inpcrd_path = f'{test_dir}KE-07.inpcrd'
+    # run MD
+    # set up constrain
+    pdb_obj.conf_min['DISANG']=pdb_obj.cache_path+'/PDBMin/0.rs'
+    pdb_obj.conf_min['nmropt_rest'] = '1'
+    pdb_obj.get_stru()
+    a1=str(pdb_obj.stru.ligands[0].CAE.id)
+    a2=str(pdb_obj.stru.ligands[0].H2.id)
+    a3=str(pdb_obj.stru.chains[0].i101.OE2.id)
+    pdb_obj.conf_min['rs_constraints']=[
+                            {
+                            'iat':[a2,a3],'r1': '0.50','r2': '0.96','r3': '2.50','r4': '3.50',
+                            'rk2':'0.0','rk3':'100.0','ir6':'1','ialtd':'0'
+                            },
+                            {
+                            'iat':[a1,a2,a3],'r1': '90.0','r2': '130.0','r3': '230.0','r4': '270.0',
+                            'rk2':'100.0','rk3':'100.0','ir6':'1','ialtd':'0'
+                            },
+                        ]
+    pdb_obj.PDBMin(cycle=20000, engine='Amber_GPU', if_cluster_job=0)
+    assert os.path.getsize(f'{test_dir}/cache/PDBMin/min.ncrst') != 0
+    assert os.path.getsize(pdb_obj.path) != 0
+    # clean up
+    test_file_paths.extend([f'{test_dir}/cache/PDBMin/min.in',
+                            f'{test_dir}/cache/PDBMin/min.out',
+                            f'{test_dir}/cache/PDBMin/min.ncrst',
+                            f'{test_dir}/cache/PDBMin/0.rs'])
+    test_file_paths.append(f'{test_dir}/KE-07_ff_min.pdb')
+    os.system(f"mv {pdb_obj.prmtop_path} {test_dir}KE-07.prmtop")
+    os.system(f"mv {pdb_obj.inpcrd_path} {test_dir}KE-07.inpcrd")
+    test_file_dirs.append(f'{test_dir}/cache/PDBMin')
+    test_file_dirs.append(f'{test_dir}/cache')
 
 ### utilities ###
 @pytest.mark.clean
