@@ -73,7 +73,7 @@ def get_current_time() -> str:
 
 
 def lines_from_file(fname: str) -> List[str]:
-    """Extracts and returns lines from supplied filename. Returns empty list() if file odes not exist."""
+    """Extracts and returns lines from supplied filename. Returns empty list() if file does not exist."""
     if not os.path.exists(fname):
         _LOGGER.error(f"The file {fname} does not exist.")
         return list()
@@ -81,6 +81,18 @@ def lines_from_file(fname: str) -> List[str]:
     result = fh.read().splitlines()
     fh.close()
     return result
+
+def content_from_file(fname: str) -> str:
+    """Extracts and returns the content from supplied filename. Returns empty str() if file does not exist."""
+    #TODO(CJ): make unit tests for this
+    if not os.path.exists(fname):
+        _LOGGER.error(f"The file {fname} does not exist.")
+        return str() 
+    fh = open(fname, "r")
+    result = fh.read()
+    fh.close()
+    return result
+
 
 
 def write_lines(fname: str, lines: List[str]) -> None:

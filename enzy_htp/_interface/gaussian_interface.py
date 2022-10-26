@@ -13,7 +13,8 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core import env_manager as em
 
 # from enzy_htp.molecular_mechanics import Frame
-from enzy_htp.structure import Structure, structure_from_pdb
+from enzy_htp.structure import Structure, PDBParser
+#structure_from_pdb
 
 # from .gaussian_config import GaussianConfig, default_gaussian_config
 
