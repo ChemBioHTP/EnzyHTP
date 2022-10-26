@@ -159,5 +159,3 @@ def test_renumber_atoms_bad_input():
 
     assert exe.type == SystemExit
     assert exe.value.code == 1
-
-

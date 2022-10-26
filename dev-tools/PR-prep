@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+
+
+
+echo "Running linter on code ...";
+
+./dev-tools/lint 
+
+if [[ $? != 0 ]]; then
+    
+    echo "Error during linting. Exiting...";
+    exit 1;
+
+fi
+
+
+echo "Finished running linter on code!";
+
+echo "Re-installing locally with pip...";
+
+./dev-tools/install
+
+if [[ $? != 0 ]]; then
+    
+    echo "Error during installation with pip. Exiting...";
+    exit 1;
+
+fi
+
+
+echo "Checking for correct installation...";
+
+pushd &> /dev/null ..  
+
+python -c "import enzy_htp as eh";
+
+check_rc=$?;
+
+popd   
+
+if [[ $check_rc != 0 ]]; then
+
+    echo "enzy_htp is not properly installd. Exiting...";
+    exit 1;
+fi
+
+
+command -v pytest &> /dev/null;
+
+if [[ $? != 0 ]]; then
+    echo "pytest no found. Install with command $ pip install pytest";
+    exit 1;
+fi
+
+echo "Running unit tests...";
+
+pytest 
+
+if [[ $? == 1 ]]; then
+    
+    echo "Some of the unit tests failed. Code may or may not be ready to merged.";
+
+fi
+
+if [[ $? == 3 ]]; then
+
+    echo "An internal error occurred while running unit tests. Code IS NOT ready to be merged. Exiting...";
+    exit 1;
+
+fi
+
+
+echo "Current commit is likely ready to be merged. Submit a PR at: https://github.com/ChemBioHTP/EnzyHTP/pulls";
+
+
+
+

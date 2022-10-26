@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+
+
+CMD_RESULT=0
+
+function check_yapf_exists( ) {
+   
+    command -v yapf &> /dev/null;
+
+    if [[ $? != 0 ]]; then
+        echo "yapf formatter not found. Install with commmand $ pip install yapf";
+        exit 1;
+    fi
+}
+
+function run_cmd() {
+    echo "Running: $@"
+    eval $@;
+    if [[ $? != 0 ]]; then
+        CMD_RESULT=1;
+        echo "ERROR IN COMMAND!";
+    fi
+}
+
+check_yapf_exists
+
+
+eh_mods=$(python -c "from setup import SUB_MODULES as sm;import re;print(re.sub('\.','/',' '.join(sm[1:])))")
+
+echo "Running linter on enzy_htp/ code ...";
+
+run_cmd yapf --in-place --recursive $eh_mods
+
+echo "Running linter on unit test code ...";
+
+run_cmd yapf --in-place --recursive test/
+
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+
+if [[ $CMD_RESULT != 0 ]]; then
+    printf "${RED}Error during linting...${NC}\n";
+else
+    printf "${GREEN}Linting complete${NC}\n";
+fi

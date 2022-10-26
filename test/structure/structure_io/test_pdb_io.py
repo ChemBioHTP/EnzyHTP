@@ -36,6 +36,7 @@ CURRDIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = f'{CURRDIR}/../data/'
 sp = PDBParser()
 
+
 def equiv_files(fname1: str, fname2: str, width: int = None) -> bool:
     """Helper method to check if two files are exactly equivalent."""
     for l1, l2 in zip(fs.lines_from_file(fname1), fs.lines_from_file(fname2)):
@@ -630,4 +631,3 @@ def test_round_trip_pdb():
     assert equiv_files(TEST_FILE, actual_file, 60)
     fs.safe_rm(actual_file)
     assert not os.path.exists(actual_file)
-
