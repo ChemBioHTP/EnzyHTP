@@ -4,12 +4,12 @@ from numpy.core.fromnumeric import repeat
 from scipy.stats import probplot
 
 #SEt project path here
-ProjPath='./'
-Data_file=ProjPath+'Mutation-E-BD-100.dat'
-csv_file = ProjPath+'Mutation-E-BD-100.csv'
-analysis_list = ['mean','SD','max','min','med']
+ProjPath = './'
+Data_file = ProjPath + 'Mutation-E-BD-100.dat'
+csv_file = ProjPath + 'Mutation-E-BD-100.csv'
+analysis_list = ['mean', 'SD', 'max', 'min', 'med']
 terms = ['BD_norm', 'E', 'G']
-Data=[]
+Data = []
 
 #extract data with eval()
 with open(Data_file) as f:
@@ -21,7 +21,7 @@ with open(Data_file) as f:
             m_flag = 1
             m_data = {}
             continue
-        if i+1 == len(lines):
+        if i + 1 == len(lines):
             if d_flag:
                 line_data = eval(line.strip())
                 m_data[Term] = line_data
@@ -39,8 +39,8 @@ with open(Data_file) as f:
             m_flag = 0
             continue
 
-        if line.strip()[:3]+line.strip()[-3:] == '------':
-            Term=line.strip().strip('-')
+        if line.strip()[:3] + line.strip()[-3:] == '------':
+            Term = line.strip().strip('-')
             d_flag = 1
             continue
         if d_flag:
@@ -55,8 +55,8 @@ for m_data in Data:
     #BD
     BD_norm = np.array(m_data['BD_norm']).astype(float)
     #Unit transfer (e*A0 -> C*cm)
-    A0 = 5.291*10**-9 #cm
-    e = 1.602*10**-19 #C     
+    A0 = 5.291 * 10**-9  #cm
+    e = 1.602 * 10**-19  #C
     #BD_norm = BD_norm * A0 * e
 
     m_data['BD_norm_mean'] = BD_norm.mean()
@@ -64,13 +64,13 @@ for m_data in Data:
     m_data['BD_norm_max'] = BD_norm.max()
     m_data['BD_norm_min'] = BD_norm.min()
     m_data['BD_norm_med'] = np.median(BD_norm)
-    
+
     #E
     E = np.array(m_data['E']).astype(float)
     # Unit transfer (kcal/(mol*e*A) -> MV/cm)
-    A = 10**-8 #cm
-    Na = 6.02*10**23
-    kcal = 4184 #J 
+    A = 10**-8  #cm
+    Na = 6.02 * 10**23
+    kcal = 4184  #J
     #E = E * kcal/(A*e*Na*10**6)
 
     m_data['E_mean'] = E.mean()
@@ -80,7 +80,7 @@ for m_data in Data:
     m_data['E_med'] = np.median(E)
 
     #G
-    G = -BD_norm * E * A0/A  # G = -BD_norm * E * A0/A # add minus except for the tests before 2021.7.30.
+    G = -BD_norm * E * A0 / A  # G = -BD_norm * E * A0/A # add minus except for the tests before 2021.7.30.
 
     m_data['G_mean'] = G.mean()
     m_data['G_SD'] = G.std()
@@ -90,7 +90,6 @@ for m_data in Data:
     m_data['G_min'] = G.min()
     m_data['G_med'] = np.median(G)
 
-    
 # Output
 #=========
 #---csv---
@@ -117,98 +116,98 @@ for m_data in Data:
 #         of.write(line)
 
 #---plt---E
-    # TAG = [i['TAG'][0]+i['TAG'][2]+i['TAG'][3] for i in Data]
-    # dist = [i['Distance'] for i in Data]
-    # E_mean = [i['E_mean'] for i in Data]
-    # BD_mean = [i['BD_norm_mean'] for i in Data]
-    # p_data = E_mean
+# TAG = [i['TAG'][0]+i['TAG'][2]+i['TAG'][3] for i in Data]
+# dist = [i['Distance'] for i in Data]
+# E_mean = [i['E_mean'] for i in Data]
+# BD_mean = [i['BD_norm_mean'] for i in Data]
+# p_data = E_mean
 
-    # # E settings
-    # plt.xlabel('Distance ()', fontsize=15)
-    # plt.ylabel('Field Strength (MV/cm)', fontsize=15)
-    # plt.xlim(10,30)
+# # E settings
+# plt.xlabel('Distance ()', fontsize=15)
+# plt.ylabel('Field Strength (MV/cm)', fontsize=15)
+# plt.xlim(10,30)
 
-    # plt.scatter(dist, p_data, s=5, c='b')
-    # for i, text in enumerate(TAG):
-    #     # if text == 'F9A':
-    #     #     plt.annotate(text, xy = (dist[i], p_data[i]), xytext = (dist[i]-0.3, p_data[i]+0.1))
-    #         # continue
+# plt.scatter(dist, p_data, s=5, c='b')
+# for i, text in enumerate(TAG):
+#     # if text == 'F9A':
+#     #     plt.annotate(text, xy = (dist[i], p_data[i]), xytext = (dist[i]-0.3, p_data[i]+0.1))
+#         # continue
 
-    #     plt.annotate(text, xy = (dist[i], p_data[i]), xytext = (dist[i]+0.1, p_data[i]+0.1))
-    # plt.show()
+#     plt.annotate(text, xy = (dist[i], p_data[i]), xytext = (dist[i]+0.1, p_data[i]+0.1))
+# plt.show()
 
 #---plt---BD
-    # TAG = [i['TAG'][0]+i['TAG'][2]+i['TAG'][3] for i in Data]
-    # dist = [i['Distance'] for i in Data]
-    # E_mean = [i['E_mean'] for i in Data]
-    # BD_mean = [i['BD_norm_mean'] for i in Data]
-    # p_data = BD_mean
+# TAG = [i['TAG'][0]+i['TAG'][2]+i['TAG'][3] for i in Data]
+# dist = [i['Distance'] for i in Data]
+# E_mean = [i['E_mean'] for i in Data]
+# BD_mean = [i['BD_norm_mean'] for i in Data]
+# p_data = BD_mean
 
-    # # E settings
-    # plt.xlabel('Distance ()', fontsize=15)
-    # plt.ylabel('Bond Dipole (a.u.)', fontsize=15)
-    # plt.xlim(10,30)
+# # E settings
+# plt.xlabel('Distance ()', fontsize=15)
+# plt.ylabel('Bond Dipole (a.u.)', fontsize=15)
+# plt.xlim(10,30)
 
-    # plt.scatter(dist, p_data, s=5, c='b')
-    # for i, text in enumerate(TAG):
-    #     # if text == 'F9A':
-    #     #     plt.annotate(text, xy = (dist[i], p_data[i]), xytext = (dist[i]-0.3, p_data[i]+0.1))
-    #         # continue
+# plt.scatter(dist, p_data, s=5, c='b')
+# for i, text in enumerate(TAG):
+#     # if text == 'F9A':
+#     #     plt.annotate(text, xy = (dist[i], p_data[i]), xytext = (dist[i]-0.3, p_data[i]+0.1))
+#         # continue
 
-    #     plt.annotate(text, xy = (dist[i], p_data[i]), xytext = (dist[i]+0.1, p_data[i]))
-    # plt.show()
+#     plt.annotate(text, xy = (dist[i], p_data[i]), xytext = (dist[i]+0.1, p_data[i]))
+# plt.show()
 
 #---plt---G
-    # for i in range(len(Data)-1,-1,-1):
-    #     if Data[i]['TAG'] == ('M','A','44','M'):
-    #         wt_G_mean = Data[i]['G_mean']
-    #         del Data[i]
+# for i in range(len(Data)-1,-1,-1):
+#     if Data[i]['TAG'] == ('M','A','44','M'):
+#         wt_G_mean = Data[i]['G_mean']
+#         del Data[i]
 
-    # TAG = [i['TAG'][0]+i['TAG'][2]+i['TAG'][3] for i in Data]
-    # dist = [i['Distance'] for i in Data]
-    # G_mean = [i['G_mean'] for i in Data]
-    # p_data = G_mean
+# TAG = [i['TAG'][0]+i['TAG'][2]+i['TAG'][3] for i in Data]
+# dist = [i['Distance'] for i in Data]
+# G_mean = [i['G_mean'] for i in Data]
+# p_data = G_mean
 
-    # # E settings
-    # plt.xlabel('Distance ()', fontsize=15)
-    # plt.ylabel(r'$\bar G$ (kcal/mol)', fontsize=15)
-    # plt.xlim(10,30)
+# # E settings
+# plt.xlabel('Distance ()', fontsize=15)
+# plt.ylabel(r'$\bar G$ (kcal/mol)', fontsize=15)
+# plt.xlim(10,30)
 
-    # plt.scatter(dist, p_data, s=5, c='b')
-    # for i, text in enumerate(TAG):
-    #     # if text == 'F9A':
-    #     #     plt.annotate(text, xy = (dist[i], p_data[i]), xytext = (dist[i]-0.3, p_data[i]+0.1))
-    #         # continue
+# plt.scatter(dist, p_data, s=5, c='b')
+# for i, text in enumerate(TAG):
+#     # if text == 'F9A':
+#     #     plt.annotate(text, xy = (dist[i], p_data[i]), xytext = (dist[i]-0.3, p_data[i]+0.1))
+#         # continue
 
-    #     plt.annotate(text, xy = (dist[i], p_data[i]), xytext = (dist[i]+0.1, p_data[i]+0.1))
-    #     plt.plot([10,30], [wt_G_mean, wt_G_mean], c='r')
-    # plt.savefig(fname='./Figure_G.svg', format='svg')
+#     plt.annotate(text, xy = (dist[i], p_data[i]), xytext = (dist[i]+0.1, p_data[i]+0.1))
+#     plt.plot([10,30], [wt_G_mean, wt_G_mean], c='r')
+# plt.savefig(fname='./Figure_G.svg', format='svg')
 
 #---plt---G-100-hist
-    # # TAG = [i['TAG'][0]+i['TAG'][2]+i['TAG'][3] for i in Data]
-    # dist = [i['Distance'] for i in Data]
-    # G_mean = [i['G_mean'] for i in Data]
-    # p_data = G_mean
+# # TAG = [i['TAG'][0]+i['TAG'][2]+i['TAG'][3] for i in Data]
+# dist = [i['Distance'] for i in Data]
+# G_mean = [i['G_mean'] for i in Data]
+# p_data = G_mean
 
-    # # settings
-    # plt.xlabel(r'$\bar G$ (kcal/mol)', fontsize=15)
-    # plt.ylabel('Frequency', fontsize=15)
-    # plt.xlim(-1.5,9)
-    # plt.hist(p_data, bins=21, density=0, facecolor='blue', edgecolor='black', alpha=0.7)
-    # plt.savefig(fname='./Figure_G_hist.pdf', format='pdf')
+# # settings
+# plt.xlabel(r'$\bar G$ (kcal/mol)', fontsize=15)
+# plt.ylabel('Frequency', fontsize=15)
+# plt.xlim(-1.5,9)
+# plt.hist(p_data, bins=21, density=0, facecolor='blue', edgecolor='black', alpha=0.7)
+# plt.savefig(fname='./Figure_G_hist.pdf', format='pdf')
 
-    # # probplot(p_data, dist='norm', plot=plt)
-    # # plt.savefig(fname='./Figure_G_QQ.png', format='png')
+# # probplot(p_data, dist='norm', plot=plt)
+# # plt.savefig(fname='./Figure_G_QQ.png', format='png')
 
 #--xmg-plot---G-100-hist
-    # dist = [i['Distance'] for i in Data]
-    # G_mean = [i['G_mean'] for i in Data]
-    # p_data = list(G_mean)
+# dist = [i['Distance'] for i in Data]
+# G_mean = [i['G_mean'] for i in Data]
+# p_data = list(G_mean)
 
-    # with open('./G_mean1.dat', 'w') as of:
-    #     of.write('#n g_mean\n')
-    #     for i, G in enumerate(G_mean):
-    #         of.write(str(G)+'\n')
+# with open('./G_mean1.dat', 'w') as of:
+#     of.write('#n g_mean\n')
+#     for i, G in enumerate(G_mean):
+#         of.write(str(G)+'\n')
 
 #--pymol-plot--G-100-cartoon
 # Index = [i['TAG'][2] for i in Data]
@@ -237,20 +236,20 @@ for m_data in Data:
 #--group by mutation type--
 from AmberMaps import *
 
-with open('Mutant_group.csv','w') as of:
+with open('Mutant_group.csv', 'w') as of:
     type_list = ['netural', 'charged']
     # init
-    table9={}
+    table9 = {}
     for i in type_list:
         for j in type_list:
-            table9[i+'-'+j] = []
+            table9[i + '-' + j] = []
     # classify
     for m_data in Data:
         TAG = m_data['TAG']
         for i in type_list:
             for j in type_list:
                 if TAG[0] in resi_subgrp[i] and TAG[3] in resi_subgrp[j]:
-                    table9[i+'-'+j].append(''.join((TAG[0],TAG[2],TAG[3])))
+                    table9[i + '-' + j].append(''.join((TAG[0], TAG[2], TAG[3])))
     # write
     for i in table9:
-        print(i,','.join(table9[i]),sep=',',end='\n',file=of)
+        print(i, ','.join(table9[i]), sep=',', end='\n', file=of)
