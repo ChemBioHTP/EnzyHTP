@@ -29,3 +29,10 @@ class PyMOLInterface:
         """Getter for the PyMOLConfig() instance belonging to the class."""
         return self.config_
 
+
+
+    def get_charge(self, fname : str, sele: str = 'all' ) -> int:
+        
+
+        #TODO(CJ): check that the correct file type is being used.
+        pass

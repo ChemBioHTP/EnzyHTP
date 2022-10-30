@@ -14,6 +14,15 @@ class PyMOLConfig:
     #TODO(CJ): finish this class and update documentation
     pass
 
+    def __init__(self ):
+    
+
+        from pymol import cmd, stored
+
+        self.cmd = cmd
+        self.stored = stored
+
+
     def __getitem__(self, key: str) -> Any:
         """Getter that enables [] accession of PyMOLConfig() attributes."""
         if key.count("."):
