@@ -9,7 +9,7 @@ Date: 2022-06-02
 import re
 import shutil
 from pathlib import Path
-from typing import List, Tuple, Union, Dict
+from typing import List, Tuple, Union, Dict, Any
 
 import pandas as pd
 from biopandas.pdb import PandasPdb
@@ -745,7 +745,8 @@ class AmberInterface:
 
         # 1. get the contents
         raw:str = fs.content_from_file( prmtop )
-
+        
+        result = dict()
 
         for chunk in raw.split('%FLAG'):
             if chunk.find('%VERSION') != -1:
