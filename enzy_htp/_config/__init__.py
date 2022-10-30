@@ -12,5 +12,5 @@ from .config import Config
 
 config = Config()
 """
-singleton object for accessing all configurations
+Singleton object for accessing all configurations.
 """
