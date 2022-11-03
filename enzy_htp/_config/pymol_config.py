@@ -13,14 +13,11 @@ from copy import deepcopy
 class PyMOLConfig:
     #TODO(CJ): finish this class and update documentation
     pass
+    #Info to store... which pymol version we are using
 
-    def __init__(self ):
-    
 
-        from pymol import cmd, stored
-
-        self.cmd = cmd
-        self.stored = stored
+    IO_EXTENSIONS:List[str] = [".pdb", ".mol2", ".cif"]
+    """"""
 
 
     def __getitem__(self, key: str) -> Any:
