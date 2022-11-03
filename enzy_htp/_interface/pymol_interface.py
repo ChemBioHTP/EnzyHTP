@@ -16,7 +16,8 @@ from enzy_htp.core import _LOGGER
 from enzy_htp._config.pymol_config import PyMOLConfig, default_pymol_config
 
 class PyMOLInterface:
-
+    """
+    """
 
     def __init__(self, config: PyMOLConfig = None ) -> None:
         from pymol import cmd
@@ -91,7 +92,8 @@ class PyMOLInterface:
         specified file. File must be a supported file type as listed in 
         PyMOLConfig. Checks if file exists and is supported type. If either 
         are not true then an error is logged and the program exits. DOES
-        NOT check if the sele is valid. 
+        NOT check if the sele is valid. Note that non-canonical residues will
+        be represented by a '?' in the sequence.
 
         Args:
             fname: The str() path to the file in question.
@@ -110,9 +112,8 @@ class PyMOLInterface:
        
         self.cmd.delete('all')
         self.cmd.load( fname )
-        lines:List[str] = self.cmd.get_fastastr( sele )
+        lines:List[str] = self.cmd.get_fastastr( sele ).splitlines()
         self.cmd.delete('all')
 
         lines = list(filter( lambda ll: ll[0] != '>', lines))
-
-        return ''.join(lines.split())
+        return ''.join(lines)

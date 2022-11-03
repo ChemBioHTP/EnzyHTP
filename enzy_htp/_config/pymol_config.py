@@ -11,13 +11,16 @@ from copy import deepcopy
 
 
 class PyMOLConfig:
-    #TODO(CJ): finish this class and update documentation
-    pass
-    #Info to store... which pymol version we are using
+    """Class that holds values for accessing the PyMOL API within enzy_htp. 
+        
+    Attributes:
+        IO_EXTENSIONS: list() of str()'s with supported input/output file types.
+    """
+    #TODO(CJ): Info to store... which pymol version we are using
 
 
-    IO_EXTENSIONS:List[str] = [".pdb", ".mol2", ".cif"]
-    """"""
+    IO_EXTENSIONS:List[str] = [".pdb", ".mol2", ".cif", ".pdb1"]
+    """A list of the supported file extensions, including the leading dot. This is only a subset of pymol's supported filetypes."""
 
 
     def __getitem__(self, key: str) -> Any:
@@ -38,10 +41,12 @@ class PyMOLConfig:
 
     
     def required_env_vars(self) -> List[str]:
+        """There are no required environment variables for PyMOL at this time."""
         return list()
 
 
     def required_executables(self) -> List[str]:
+        """There are no required executables for PyMOL at this time."""
         return list()
 
 def default_pymol_config() -> PyMOLConfig:
