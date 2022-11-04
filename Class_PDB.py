@@ -2,6 +2,8 @@ import copy
 from math import ceil
 import os
 import re
+import pandas as pd
+import itertools
 from subprocess import SubprocessError, run, CalledProcessError
 from random import choice
 from typing import Union
@@ -1659,6 +1661,7 @@ class PDB():
                 raise Exception(f'Amber Terminated Abnormally! Here is the output ({amber_job.job_cluster_log}):{line_feed} {f_str}') 
                 # TODO make a workflow exception that can show some more step releted info
                 # So that can use try except to do some special action when dont want one fail ruin the HTP
+                # this may also catch unnessessay error like MPI ones
 
     @staticmethod
     def _get_default_res_setting_pdbmd(res_setting, core_type):
@@ -1982,7 +1985,7 @@ class PDB():
         n_cores     : Cores for gaussian job (higher pirority)
         max_core    : Per core memory in MB for gaussian job (higher pirority)
         keywords    : a list of keywords that joined together when build
-        layer_preset：default preset id copied to self.layer_preset
+        layer_preset: default preset id copied to self.layer_preset
         layer_atoms : default layer_atoms copied to self.layer_atoms
         
         *om_lvl     : *(can only be edit manually before loading the module) oniom method level
@@ -2682,7 +2685,7 @@ class PDB():
         pass
     '''
     ========
-    QM Analysis 
+    Analysis 
     ========
     '''
     def get_field_strength(self, atom_mask, a1=None, a2=None, bond_p1='center', p1=None, p2=None, d1=None):
@@ -2860,7 +2863,151 @@ class PDB():
             print("Running: "+"sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  "+n_cores+"/' "+Config.Multiwfn.DIR+"/settings.ini")
         run("sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  "+n_cores+"/' "+Config.Multiwfn.DIR+"/settings.ini", check=True, text=True, shell=True, capture_output=True)
 
+    def get_rosetta_ddg(self, rosetta_home: str, muta_groups: list, relaxed_pdb: str,
+                        niter: int = 10,
+                        in_place: bool = False, 
+                        if_cluster_job: bool = True,
+                        cluster: ClusterInterface = None,
+                        period: int = 120,
+                        job_array_size: int = 100,
+                        res_setting: Union[dict, None] = None,
+                        cluster_debug: bool = 0 ) -> float:
+        '''
+        MVP function to obtain Rosetta ddG stability score for current structure in PDB()
+        ref: https://www.rosettacommons.org/docs/latest/cartesian-ddG
+        due to the fact that cartesian_ddg can only benefit from 1 cpu core, we will parallel
+        multi-mutants with ARMer job array to speed up.
+        '''
+        TEMP_ROSETTA_RES = {    'core_type' : 'cpu',
+                                'nodes':'1',
+                                'node_cores' : '1',
+                                'job_name' : 'EnzyHTP_ddG',
+                                'partition' : 'production',
+                                'mem_per_core' : '2G',
+                                'walltime' : '1-00:00:00',
+                                'account' : 'yang_lab_csb'}
+
+        ddg_dir = f'{self.dir}/ddg/'
+        mkdir(ddg_dir)
+        ddg_jobs = []
+        ddg_result_files = {}
+
+        for i, mut_group in enumerate(muta_groups):
+            group_dir = f'{ddg_dir}group_{i}/'
+            mkdir(group_dir)
+            flag_file_path = f'{group_dir}/ddg_options.txt'
+            muta_file_path = f'{group_dir}/mutation.txt'
+            # make option file
+            with open(flag_file_path, 'w') as of:
+                of.write(f'''-in:file:s {os.path.abspath(relaxed_pdb)}
+-ddg::mut_file ./{os.path.relpath(muta_file_path, group_dir)}
+-ddg:iterations {niter}
+-force_iterations false
+-ddg::score_cutoff 1.0
+-ddg::cartesian
+-ddg::dump_pdbs false
+-fa_max_dis 9.0
+-score:weights talaris2014_cart
+-ddg::legacy false
+-mute all''')
+            # make mutant file
+            with open(muta_file_path, 'w') as of: # make this into different jobs (different folder containing options mutations submission)
+                of.write(f'total {len(mut_group)}{line_feed}')
+                of.write(f'{len(mut_group)}{line_feed}')
+                for r_mutaflag in mut_group:
+                    of.write(f'{r_mutaflag}{line_feed}')
+            # make job
+            ddg_cmd = f'{rosetta_home}/source/bin/cartesian_ddg.static.linuxgccrelease @ ./{os.path.relpath(flag_file_path, group_dir)}'
+            ddg_job = job_manager.ClusterJob.config_job(
+                        commands = ddg_cmd,
+                        cluster = cluster,
+                        env_settings = '',
+                        res_keywords = TEMP_ROSETTA_RES,
+                        sub_dir = group_dir,
+                        sub_script_path = f'{group_dir}/submit_ddg.cmd')
+            ddg_jobs.append(ddg_job)
+            ddg_result_files[mut_group] = f'{group_dir}/mutation.ddg'
+        
+        job_manager.ClusterJob.wait_to_array_end(ddg_jobs, period, job_array_size)
+        # support multi groups?
+        result = {}
+        for mutants, ddg_file in ddg_result_files.items():
+            ddg_value = type(self).get_rosetta_ddg_result(ddg_file, niter)
+            result[mutants] = ddg_value
+        return result
     
+    def relax_with_rosetta(self, rosetta_home: str, nstruct_relax: int = 20,
+                            in_place: bool = False, if_clean: bool = True,
+                            if_cluster_job: bool = True,
+                            cluster: ClusterInterface = None,
+                            period: int = 120,
+                            res_setting: Union[dict, None] = None,
+                            cluster_debug: bool = 0 ) -> str:
+        '''
+        MVP function to relax the structure with Rosetta
+        only can work with ddG calculation right now
+        ref: https://www.rosettacommons.org/docs/latest/application_documentation/structure_prediction/relax
+        '''
+        TEMP_ROSETTA_RES = {    'core_type' : 'cpu',
+                                'nodes':'1',
+                                'node_cores' : '24',
+                                'job_name' : 'EnzyHTP_r_relax',
+                                'partition' : 'production',
+                                'mem_per_core' : '2G',
+                                'walltime' : '1-00:00:00',
+                                'account' : 'yang_lab_csb'}
+
+        int_pdb_path_1 = f'{self.path.removesuffix(".pdb")}_rosetta.pdb'
+        int_pdb_path_2 = f'{self.path.removesuffix(".pdb")}_relaxed.pdb'
+        # remove ligands & clean for rosetta (tmp)
+        run(f'{rosetta_home}/tools/protein_tools/scripts/clean_pdb.py --allchains {self.path} ignorechain',
+            check=True, text=True, shell=True, capture_output=True)
+        run(f'mv {self.path.split("/")[-1].removesuffix(".pdb")}_ignorechain.pdb {int_pdb_path_1}',
+            check=True, text=True, shell=True, capture_output=True)        
+        run(f'rm {self.path.split("/")[-1].removesuffix(".pdb")}_ignorechain.fasta',
+            check=True, text=True, shell=True, capture_output=True)        
+        # relax
+        relax_cmd = f'mpiexec -np {TEMP_ROSETTA_RES["node_cores"]} {rosetta_home}/source/bin/relax.mpi.linuxgccrelease -s .{int_pdb_path_1.removeprefix(self.dir)} -use_input_sc -ignore_unrecognized_res -nstruct {nstruct_relax} -fa_max_dis 9.0'
+        relax_job = job_manager.ClusterJob.config_job(
+                    commands = relax_cmd,
+                    cluster = cluster,
+                    env_settings = ['module load GCC/5.4.0-2.26', 'module load OpenMPI'],
+                    res_keywords = TEMP_ROSETTA_RES,
+                    sub_dir = self.dir,
+                    sub_script_path = f'{self.dir}/submit_relax.cmd')
+        relax_job.submit()
+        relax_job.wait_to_end(period=period)
+        # get relaxed pdb
+        # get the lowest score
+        target_idx = type(self).get_rosetta_lowest_score(self.dir+'/score.sc')
+        relaxed_pdb = f'{self.path.removesuffix(".pdb")}_rosetta_{target_idx:0>4}.pdb'
+        run(f'cp {relaxed_pdb} {int_pdb_path_2}',
+            check=True, text=True, shell=True, capture_output=True)
+        
+        if if_clean:
+            for f_p in map(lambda x: f'{self.path.removesuffix(".pdb")}_rosetta_{x:0>4}.pdb', range(1,nstruct_relax+1)):
+                os.remove(f_p)
+            os.remove(self.dir+'/score.sc')
+        return int_pdb_path_2
+    
+    @classmethod
+    def get_rosetta_lowest_score(cls, score_file):
+        '''
+        get the structure index with the lowest score in the score.sc file
+        '''
+        score_df = pd.read_csv(score_file, delim_whitespace=True, header=1)
+        min_sc_idx = score_df['total_score'].idxmin() + 1
+        return min_sc_idx
+
+    @classmethod
+    def get_rosetta_ddg_result(cls, ddg_file: str, niter: int):
+        '''
+        get the result ddg from the .ddg file
+        '''
+        score_df = pd.read_csv(ddg_file, delim_whitespace=True, header=None)
+        wt_sc_mean = score_df[3][:niter].mean()
+        mut_sc_mean = score_df[3][niter:].mean()
+        return mut_sc_mean - wt_sc_mean
 
 def get_PDB(name):
     '''

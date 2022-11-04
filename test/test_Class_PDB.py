@@ -400,6 +400,47 @@ def test_pdbmin_local_w_constrain():
     test_file_dirs.append(f'{test_dir}/cache/PDBMin')
     test_file_dirs.append(f'{test_dir}/cache')
 
+def test_relax_with_rosetta():
+    '''
+    test relax_with_rosetta functions normally TODO
+    '''
+    test_dir = 'test/testfile_Class_PDB/ddg_test/'
+    pdb_obj = PDB(f'{test_dir}KE-07.pdb', wk_dir=test_dir)
+    pdb_obj.relax_with_rosetta(
+        rosetta_home='/data/yang_lab/shaoqz/software/Rosetta313/main/',
+        cluster=accre.Accre(),
+        period=5)
+
+def test_get_rosetta_lowest_score():
+    '''
+    test function works without abort TODO
+    '''
+    test_dir = 'test/testfile_Class_PDB/ddg_test/'
+    target_idx = PDB.get_rosetta_lowest_score(f'{test_dir}score.sc')
+
+def test_get_rosetta_ddg():
+    '''
+    test get_rosetta_ddg works without abort
+    '''
+    test_dir = 'test/testfile_Class_PDB/ddg_test/'
+    pdb_obj = PDB(f'{test_dir}KE-07.pdb', wk_dir=test_dir)
+    ddg_results = pdb_obj.get_rosetta_ddg(
+        rosetta_home='/data/yang_lab/Common_Software/Rosetta3.9/main/',
+        muta_groups=[('D 7 I', 'L 2 I'), ('D 7 A')],
+        relaxed_pdb=f'{test_dir}KE-07_relaxed.pdb',
+        cluster=accre.Accre(),
+        period=10)
+    print(ddg_results)
+
+def test_get_rosetta_ddg_result():
+    '''
+    test function works without abort
+    '''
+    test_dir = 'test/testfile_Class_PDB/ddg_test/'
+    ddg = PDB.get_rosetta_ddg_result(f'{test_dir}example.ddg', 10)
+    assert ddg.round(4) == 2.8953
+
+
 ### utilities ###
 @pytest.mark.clean
 def test_clean_files():
