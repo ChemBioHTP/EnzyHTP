@@ -2871,7 +2871,7 @@ class PDB():
                         period: int = 120,
                         job_array_size: int = 100,
                         res_setting: Union[dict, None] = None,
-                        cluster_debug: bool = 0 ) -> float:
+                        cluster_debug: bool = 0 ) -> dict:
         '''
         MVP function to obtain Rosetta ddG stability score for current structure in PDB()
         ref: https://www.rosettacommons.org/docs/latest/cartesian-ddG

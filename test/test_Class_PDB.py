@@ -400,6 +400,7 @@ def test_pdbmin_local_w_constrain():
     test_file_dirs.append(f'{test_dir}/cache/PDBMin')
     test_file_dirs.append(f'{test_dir}/cache')
 
+@pytest.mark.accre
 def test_relax_with_rosetta():
     '''
     test relax_with_rosetta functions normally TODO
@@ -418,6 +419,7 @@ def test_get_rosetta_lowest_score():
     test_dir = 'test/testfile_Class_PDB/ddg_test/'
     target_idx = PDB.get_rosetta_lowest_score(f'{test_dir}score.sc')
 
+@pytest.mark.accre
 def test_get_rosetta_ddg():
     '''
     test get_rosetta_ddg works without abort
@@ -430,7 +432,6 @@ def test_get_rosetta_ddg():
         relaxed_pdb=f'{test_dir}KE-07_relaxed.pdb',
         cluster=accre.Accre(),
         period=10)
-    print(ddg_results)
 
 def test_get_rosetta_ddg_result():
     '''
