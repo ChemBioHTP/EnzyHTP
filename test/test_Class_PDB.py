@@ -439,8 +439,13 @@ def test_get_rosetta_ddg_result():
     '''
     test_dir = 'test/testfile_Class_PDB/ddg_test/'
     ddg = PDB.get_rosetta_ddg_result(f'{test_dir}example.ddg', 10)
-    assert ddg.round(4) == 2.8953
+    assert ddg.round(4) == 2.8953   
 
+def test_get_cpptraj_rmsd_result():
+    '''test function works without abort'''
+    test_dir = 'test/testfile_Class_PDB/traj_ana_test/'
+    result = PDB.get_cpptraj_rmsd_result(f'{test_dir}/rmsd.dat')
+    assert result.round(4) == 0.3746
 
 ### utilities ###
 @pytest.mark.clean

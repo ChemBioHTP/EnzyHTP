@@ -3,10 +3,9 @@ from math import ceil
 import os
 import re
 import pandas as pd
-import itertools
 from subprocess import SubprocessError, run, CalledProcessError
 from random import choice
-from typing import Union
+from typing import Union, List
 from AmberMaps import *
 from wrapper import *
 from Class_Structure import *
@@ -2863,7 +2862,7 @@ class PDB():
             print("Running: "+"sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  "+n_cores+"/' "+Config.Multiwfn.DIR+"/settings.ini")
         run("sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  "+n_cores+"/' "+Config.Multiwfn.DIR+"/settings.ini", check=True, text=True, shell=True, capture_output=True)
 
-    def get_rosetta_ddg(self, rosetta_home: str, muta_groups: list, relaxed_pdb: str,
+    def get_rosetta_ddg(self, rosetta_home: str, muta_groups: List[tuple], relaxed_pdb: str,
                         niter: int = 10,
                         in_place: bool = False, 
                         if_cluster_job: bool = True,
@@ -3008,6 +3007,41 @@ class PDB():
         wt_sc_mean = score_df[3][:niter].mean()
         mut_sc_mean = score_df[3][niter:].mean()
         return mut_sc_mean - wt_sc_mean
+
+    @classmethod
+    def get_rmsd(cls, prmtop_path: str, traj_path: str, mask: str) -> float:
+        """
+        mvp function for RMSD calculation
+        """
+        tmp_rmsd_in = "./cpptraj_rmsd.in"
+        tmp_rmsd_out = "./rmsd.dat"
+
+        with open(tmp_rmsd_in, "w") as of:
+            of.write(f"""parm {prmtop_path}
+trajin {traj_path}
+autoimage
+rmsd {mask} first mass
+average crdset AVE {mask}
+run
+autoimage
+rmsd {mask} ref AVE * out {tmp_rmsd_out} mass
+run
+    """)
+        run(f"cpptraj -i {tmp_rmsd_in}",
+            check=True, text=True, shell=True, capture_output=True)
+        result = cls.get_cpptraj_rmsd_result(tmp_rmsd_out)
+        os.remove(tmp_rmsd_in)
+        os.remove(tmp_rmsd_out)
+        return result
+
+    @classmethod
+    def get_cpptraj_rmsd_result(cls, result_path: str) -> float:
+        """
+        mvp function for RMSD calculation
+        """
+        result_df = pd.read_csv(result_path, delim_whitespace=True)
+        return result_df.iloc[:, 1].mean()
+   
 
 def get_PDB(name):
     '''
