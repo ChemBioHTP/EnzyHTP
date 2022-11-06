@@ -75,16 +75,16 @@ class PyMOLInterface:
             _LOGGER.error(f"The supplied file '{fname}' has an unsupported extension. Exiting...")
             exit( 1 )
 
-        _eh_local : Dict[str, Any] = { 'fc': 0 }
+        _eh_local : Dict[str, Any] = { 'fc': [] }
 
 
         self.cmd.delete('all')
         self.cmd.load( fname )
-        self.cmd.iterate( sele, 'fc += formal_charge', space=_eh_local )
+        self.cmd.iterate( sele, 'fc.append(formal_charge)', space=_eh_local )
         self.cmd.delete('all')
 
 
-        return _eh_local['fc']
+        return sum(_eh_local['fc'])
         
 
     def get_sequence(self, fname : str, sele: str = '(all)' ) -> str:
