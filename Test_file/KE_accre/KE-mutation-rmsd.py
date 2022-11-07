@@ -16,6 +16,7 @@ def main():
             target_groups += glob(f"/data/yang_lab/shaoqz/KE-DE/R5/group_sele*")
         for mut_group in target_groups:
             if not os.path.exists(f"{mut_group}/Mutation.dat"):
+                print(f"no data file under {mut_group}")
                 continue
             with open(f"{mut_group}/Mutation.dat") as f:
                 lines = f.readlines()
@@ -37,9 +38,6 @@ def main():
                     lines.insert(li+add_line, value)
                     add_line += len(value.strip().split("\n"))
                 of.writelines(lines)
-            break
-        break
-
 
 if __name__ == "__main__":
     main()
