@@ -3043,7 +3043,7 @@ run
         return result_df.iloc[:, 1].mean()
     
     @classmethod
-    def get_sasa(cls, 
+    def get_sasa_ratio(cls, 
                  prmtop_path: str, traj_path: str,
                  mask_pro: str, mask_pro_target: str, mask_sub: str,
                  tmp_dir: str = '.') -> float:
