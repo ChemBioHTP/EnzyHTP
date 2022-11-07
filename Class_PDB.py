@@ -3026,7 +3026,7 @@ run
 autoimage
 rmsd {mask} ref AVE * out {tmp_rmsd_out} mass
 run
-    """)
+""")
         run(f"cpptraj -i {tmp_rmsd_in}",
             check=True, text=True, shell=True, capture_output=True)
         result = cls.get_cpptraj_rmsd_result(tmp_rmsd_out)
@@ -3041,7 +3041,80 @@ run
         """
         result_df = pd.read_csv(result_path, delim_whitespace=True)
         return result_df.iloc[:, 1].mean()
-   
+    
+    @classmethod
+    def get_sasa(cls, 
+                 prmtop_path: str, traj_path: str,
+                 mask_pro: str, mask_pro_target: str, mask_sub: str,
+                 tmp_dir: str = '.') -> float:
+        """
+        mvp function for SASA calculation
+        Args:
+            prmtop_path
+            traj_path
+            mask_pro: mask selection for the protein
+            mask_pro_target: mask selection for the subsection in the protein as the SASA target
+            mask_sub: mask selection for the substrate
+            tmp_dir: temporary dir for divided traj files
+        Return:
+            sasa_sub/sasa_pro
+        """
+        import mdtraj as mt
+        # divide traj
+        traj_parm_1, traj_parm_2 = cls.divide_traj(prmtop_path, traj_path, mask_pro, mask_sub, tmp_dir)
+        # protein sasa
+        traj_1 = mt.load(traj_parm_1[0], top=traj_parm_1[1])
+        sasa_df_pro = mt.shrake_rupley(traj_1, n_sphere_points=5000, mode='residue')
+        target_resi_idx = map(lambda x: int(x.strip()), mask_pro_target[1:].split(','))
+        holder = np.zeros(len(sasa_df_pro)) # holder for sasa_pro of each frame
+        test = 0
+        for idx in target_resi_idx:
+            test +=  sasa_df_pro[0][idx-1]
+            holder += sasa_df_pro[:, idx-1]
+        sasa_pro = holder.mean()*100
+        # substrate sasa
+        traj_2 = mt.load(traj_parm_2[0], top=traj_parm_2[1])
+        sasa_df_sub = mt.shrake_rupley(traj_2, n_sphere_points=5000, mode='residue')
+        sasa_sub = sasa_df_sub[:, 0].mean()*100
+
+        # clean up
+        os.remove(traj_parm_1[0])
+        os.remove(traj_parm_1[1])
+        os.remove(traj_parm_2[0])
+        os.remove(traj_parm_2[1])
+
+        return sasa_sub/sasa_pro
+
+    @classmethod
+    def divide_traj(cls, prmtop_path: str, traj_path: str, mask1: str, mask2: str, tmp_dir: str = '.') -> tuple:
+        """
+        divide traj into 2 trajs defined by mask1 and mask2
+        """
+        tmp_cpptraj_in = f'{tmp_dir}/cpptraj_divide.in'
+        tmp_traj_1 = f'{tmp_dir}/traj_1.nc'
+        tmp_traj_2 = f'{tmp_dir}/traj_2.nc'
+        prmtop_name = prmtop_path.split('/')[-1]
+        tmp_prmtop_1 = f'{tmp_dir}/traj_1.{prmtop_name}'
+        tmp_prmtop_2 = f'{tmp_dir}/traj_2.{prmtop_name}'
+
+        with open(tmp_cpptraj_in, 'w') as of:
+            of.write(f'''parm {prmtop_path}
+trajin {traj_path}
+autoimage
+strip !({mask1}) nobox outprefix {tmp_dir}/traj_1
+outtraj {tmp_traj_1}
+unstrip
+strip !({mask2}) nobox outprefix {tmp_dir}/traj_2
+outtraj {tmp_traj_2}
+''')
+        try:
+            run(f"cpptraj -i {tmp_cpptraj_in}",
+                check=True, text=True, shell=True, capture_output=True)
+        except CalledProcessError as e:
+            print(e.stdout, e.stderr, sep=os.linesep)
+            sys.exit(1)
+        os.remove(tmp_cpptraj_in)
+        return (tmp_traj_1, tmp_prmtop_1), (tmp_traj_2, tmp_prmtop_2)
 
 def get_PDB(name):
     '''

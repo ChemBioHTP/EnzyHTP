@@ -447,6 +447,12 @@ def test_get_cpptraj_rmsd_result():
     result = PDB.get_cpptraj_rmsd_result(f'{test_dir}/rmsd.dat')
     assert result.round(4) == 0.3746
 
+def test_get_sasa():
+    '''test function works without abort'''
+    test_dir = 'test/testfile_Class_PDB/traj_ana_test/'
+    result = PDB.get_sasa(f'{test_dir}/FAcD_RA124M_ff.prmtop', f'{test_dir}/prod.mdcrd',':1-297', ':108,109,112,133,139,153,154,217,251,278' , ':298', tmp_dir = test_dir)
+    assert round(result, 4) == 5.9638
+
 ### utilities ###
 @pytest.mark.clean
 def test_clean_files():
