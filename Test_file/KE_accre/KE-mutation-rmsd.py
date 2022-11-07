@@ -1,6 +1,5 @@
 import pathlib
 from glob import glob
-from subprocess import run
 import os
 
 from Class_PDB import PDB
@@ -13,8 +12,11 @@ mask_sub = ":254"
 def main():
     for i in range(6):
         target_groups = glob(f"/data/yang_lab/shaoqz/KE-DE/R5/group_{i}*")
+        if i == 2:
+            target_groups += glob(f"/data/yang_lab/shaoqz/KE-DE/R5/group_sele*")
         for mut_group in target_groups:
-
+            if not os.path.exists(f"{mut_group}/Mutation.dat"):
+                continue
             with open(f"{mut_group}/Mutation.dat") as f:
                 lines = f.readlines()
                 insert_mapper = {}
