@@ -49,7 +49,6 @@ def data_extraction_multiple_initial(inital_mutant_list: list, data_dir: str) ->
                 for metric_data in metric_data_list:
                     metric_data_mapper[metric_data[0]] = eval(metric_data[1])
                 data.append((muta_flag, metric_data_mapper))
-        break
     return data
 
 data = data_extraction_multiple_initial(initial_mutant_list, proj_path)
@@ -57,19 +56,22 @@ data = data_extraction_multiple_initial(initial_mutant_list, proj_path)
 #process
 for m_flag, m_data in data:
     m_data['BD_norm'] = [i[0] for i in m_data['Bond Dipole']]
-    #Unit transfer (e*A0 -> C*cm) & (kcal/(mol*e*A) -> MV/cm) -> * A0/A
+    #Unit transfer (e*A0 -> C*cm) & (kcal/(mol*e*A) -> MV/cm) -> (kcal/mol)
     A0 = 5.291*10**-9 #cm
     A = 10**-8 #cm
+    Na = 6.02*10**23
+    kcal = 4184 #J 
+    e = 1.602*10**-19 #C     
     #BD
     #BD_norm = BD_norm (* A0 * e)
     BD_norm = np.array(m_data['BD_norm']).astype(float)
     #E
     #E = E * kcal/(A*e*Na*10**6)
     E = np.array(m_data['E']).astype(float)
-    m_data['E_mean'] = E.mean()
+    m_data['E_mean'] = E.mean() * kcal/(A*e*Na*10**6) # MV/cm
     #G
     G = -BD_norm * E * A0/A
-    m_data['G_mean'] = G.mean()
+    m_data['G_mean'] = G.mean() # kcal/mol
     del m_data['BD_norm']
     del m_data['Bond Dipole']
     del m_data['E']

@@ -3027,8 +3027,12 @@ autoimage
 rmsd {mask} ref AVE * out {tmp_rmsd_out} mass
 run
 """)
-        run(f"cpptraj -i {tmp_rmsd_in}",
+        try:
+            run(f"cpptraj -i {tmp_rmsd_in}",
             check=True, text=True, shell=True, capture_output=True)
+        except CalledProcessError as e:
+            print(e.stdout, e.stderr, sep=os.linesep)
+            sys.exit(1)
         result = cls.get_cpptraj_rmsd_result(tmp_rmsd_out)
         os.remove(tmp_rmsd_in)
         os.remove(tmp_rmsd_out)
