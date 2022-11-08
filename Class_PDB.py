@@ -2332,6 +2332,7 @@ class PDB():
                 with open(cpp_in_path,'w') as of:
                     of.write('parm '+self.prmtop_path+line_feed)
                     of.write('trajin '+self.nc+' '+str(start)+' '+end+' '+str(step)+line_feed)
+                    of.write(f'autoimage{line_feed}') # this is important
                     of.write('trajout '+o_path+line_feed)
                     of.write('run'+line_feed)
                     of.write('quit'+line_feed)
