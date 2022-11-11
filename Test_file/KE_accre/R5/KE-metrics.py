@@ -16,14 +16,11 @@ data_output_path = './Mutation.dat'
 
 def main():
     # Mutation
-    start_variant = 'XXX'
-    for i in range(YYY):
+    start_variant = "KE-07_aH_IA7D_KA146E_GA202R_NA224D.pdb"
+    selected_mutants = [["V12M", "E146K"], "L47I"]
+    for i, mutaflags in enumerate(selected_mutants):
         pdb_obj = PDB(start_variant, wk_dir=f"./mutation_{i}")
-        # restrict 101
-        while len(pdb_obj.MutaFlags) == 0:
-            pdb_obj.Add_MutaFlag("r")
-            if pdb_obj.MutaFlags[0][2] == '101':
-                pdb_obj.MutaFlags = []
+        pdb_obj.Add_MutaFlag(mutaflags)
         pdb_obj.PDB2PDBwLeap()
         # use minimization to relax each mutated PDB
         pdb_obj.PDB2FF(local_lig=0, ifsavepdb=1)

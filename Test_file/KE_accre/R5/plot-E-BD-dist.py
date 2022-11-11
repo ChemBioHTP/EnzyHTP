@@ -10,9 +10,12 @@ from scipy.stats import probplot
 proj_path='./'
 csv_file = f'{proj_path}R5.csv'
 initial_mutant_list = [
-    "I7Q K146E I199V N224D F227L", "I7Q K146E G202R N224D F229S",
-    "I7D K146E G202R N224D", "I7T K146T I199Q F86L I173V L176D F227L",
-    "I7V K146E I199Q N224D L162P I173A L176I F229S", "I7S K19E G202R N224D"]
+    "I7D K146E G202R N224D",
+    "I7T K146T I199Q F86L I173V L176D F227L",
+    "I7S K19E G202R N224D",
+    "I7V K146E I199Q N224D L162P I173A L176I F229S", 
+    "I7Q K146E I199V N224D F227L", 
+    "I7Q K146E G202R N224D F229S"]
 
 
 def get_unique_mutant(mutaflag_str: list) -> list:
@@ -23,7 +26,16 @@ def get_unique_mutant(mutaflag_str: list) -> list:
     for mutaflag in mutaflag_str.split(" "):
         position = int(mutaflag[1:-1])
         if position in unique_mutation.keys():
-            print(f"found duplicated mutation in {position}, using {mutaflag}")
+            existing_mutaflag = unique_mutation[position]
+            if existing_mutaflag[0] == mutaflag[0]:
+                print(f"found duplicated mutation in {position} from {mutaflag_str}, using {mutaflag}")
+            elif (existing_mutaflag[0], existing_mutaflag[-1]) == (mutaflag[-1], mutaflag[0]):
+                print(f"found mutation back in {position} from {mutaflag_str}, deleting both")
+                del unique_mutation[position]
+                continue
+            else:
+                print(f"found wrong mutation in {position} from {mutaflag_str}, check it again")
+
         unique_mutation[position] = mutaflag
     return " ".join(list(unique_mutation.values()))
 

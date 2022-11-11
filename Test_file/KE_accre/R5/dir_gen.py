@@ -19,9 +19,6 @@ for i, stru_path in enumerate(start_stru):
         run(f'sed -i "s/YYY/{2}/" {script_path}', check=True, text=True, shell=True, capture_output=True)
         # move submission script
         shutil.copy("./sub_enzy_htp.cmd", dir_name)
-        mkdir(f"{dir_name}/ligands")
-        shutil.copy("./ligands/ligand_H5J.frcmod", f"{dir_name}/ligands/")
-        shutil.copy("./ligands/ligand_H5J.prepin", f"{dir_name}/ligands/")
 
 
 
