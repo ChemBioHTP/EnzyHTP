@@ -1,6 +1,6 @@
 from glob import glob
 import pathlib
-from subprocess import run
+from subprocess import run, CalledProcessError
 import shutil
 
 from helper import mkdir
@@ -34,8 +34,23 @@ def read_group_mapper():
         muta_flags = pathlib.Path(stru_path).stem.removeprefix("KE-07_").split("_")
         muta_flags = [flag[:1]+flag[2:] for flag in muta_flags]
         print(muta_flags)
+
+def gather_output(num_group):
+    for i in range(num_group):
+        result_path = f"./Mutation_{i}.dat"
+        data_group = glob(f"./group_{i}_*/")
+        if i == 6:
+            data_group.append("./group_sele")
+        for subgroup_dir in data_group:
+            try:
+                run(f"cat {subgroup_dir}/Mutation.dat >> {result_path}",
+                    check=True, text=True, shell=True, capture_output=True)
+            except CalledProcessError as e:
+                print(e.stderr, e.stdout)
+                raise e
+
 def main():
-    read_group_mapper()
+    gather_output(12)
 
 if __name__ == "__main__":
     main()
