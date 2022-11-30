@@ -3062,7 +3062,7 @@ run
             mask_sub: mask selection for the substrate
             tmp_dir: temporary dir for divided traj files
         Return:
-            sasa_sub/sasa_pro
+            (sasa_sub/sasa_pro).mean() average sasa ratio from each frame
         """
         import mdtraj as mt
         # divide traj
@@ -3076,11 +3076,11 @@ run
         for idx in target_resi_idx:
             test +=  sasa_df_pro[0][idx-1]
             holder += sasa_df_pro[:, idx-1]
-        sasa_pro = holder.mean()*100
+        sasa_pro_by_frame = holder*100
         # substrate sasa
         traj_2 = mt.load(traj_parm_2[0], top=traj_parm_2[1])
         sasa_df_sub = mt.shrake_rupley(traj_2, n_sphere_points=5000, mode='residue')
-        sasa_sub = sasa_df_sub[:, 0].mean()*100
+        sasa_sub_by_frame = sasa_df_sub[:, 0]*100
 
         # clean up
         os.remove(traj_parm_1[0])
@@ -3088,7 +3088,74 @@ run
         os.remove(traj_parm_2[0])
         os.remove(traj_parm_2[1])
 
-        return sasa_sub/sasa_pro
+        return (sasa_sub_by_frame/sasa_pro_by_frame).mean()
+
+    @classmethod
+    def get_ses_ratio(cls, 
+                 prmtop_path: str, traj_path: str,
+                 mask_pro: str, mask_pro_target: str, mask_sub: str,
+                 dot_density: int = 2,  
+                 tmp_dir: str = '.') -> float:
+        """
+        mvp function for SES calculation
+        Args:
+            prmtop_path
+            traj_path
+            mask_pro: mask selection for the protein
+            mask_pro_target: mask selection for the subsection in the protein as the SASA target
+            mask_sub: mask selection for the substrate
+            tmp_dir: temporary dir for divided traj files
+        Return:
+            avg(ses_sub)/avg(ses_pro)
+        """
+        import pymol2
+        # divide traj
+        traj_parm_1, traj_parm_2 = cls.divide_traj(prmtop_path, traj_path, mask_pro, mask_sub, tmp_dir)
+        # protein ses
+        ## start pymol
+        p_session = pymol2.PyMOL()
+        p_session.start()
+        p_session.cmd.set("dot_density", dot_density)
+        if Config.debug < 2:
+            p_session.cmd.feedback("disable","all","everything")
+        ## load traj protein
+        pro_traj_obj = p_session.cmd.get_unused_name("pro_traj")
+        p_session.cmd.load(traj_parm_1[1], pro_traj_obj)
+        p_session.cmd.load_traj(traj_parm_1[0], pro_traj_obj)
+        ## define selection
+        if mask_pro_target.startswith(":"):
+            target_resi_idx = map(lambda x: str(x.strip()), mask_pro_target[1:].split(','))
+            pymol_sele_pattern = f"resi {'+'.join(target_resi_idx)}"
+        else:
+            pymol_sele_pattern = mask_pro_target
+        ## calculate SES
+        num_frames = p_session.cmd.count_states(pro_traj_obj)
+        ses_pro_by_frame = []
+        for i in range(num_frames):
+            ses_pro_by_frame.append(
+                p_session.cmd.get_area(selection=f"{pymol_sele_pattern} & {pro_traj_obj}", state=i+1)
+            )
+        p_session.cmd.delete(pro_traj_obj)
+        # substrate sasa
+        ## load traj substrate
+        sub_traj_obj = p_session.cmd.get_unused_name("sub_traj")
+        p_session.cmd.load(traj_parm_2[1], sub_traj_obj)
+        p_session.cmd.load_traj(traj_parm_2[0], sub_traj_obj)
+        ## calculate SES
+        num_frames = p_session.cmd.count_states(sub_traj_obj)
+        ses_sub_by_frame = []
+        for i in range(num_frames):
+            ses_sub_by_frame.append(
+                p_session.cmd.get_area(selection=sub_traj_obj, state=i+1)
+            )
+        p_session.cmd.delete(sub_traj_obj)
+        # clean up
+        os.remove(traj_parm_1[0])
+        os.remove(traj_parm_1[1])
+        os.remove(traj_parm_2[0])
+        os.remove(traj_parm_2[1])
+
+        return (np.array(ses_sub_by_frame)/np.array(ses_pro_by_frame)).mean()
 
     @classmethod
     def divide_traj(cls, prmtop_path: str, traj_path: str, mask1: str, mask2: str, tmp_dir: str = '.') -> tuple:

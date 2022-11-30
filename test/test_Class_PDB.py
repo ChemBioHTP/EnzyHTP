@@ -453,10 +453,22 @@ def test_get_sasa_ratio():
     result = PDB.get_sasa_ratio(
         f'{test_dir}/FAcD_RA124M_ff.prmtop', 
         f'{test_dir}/prod.mdcrd',':1-297', 
-        ':108,109,112,133,139,153,154,217,251,278' , 
+        ':108,109,112,133,139,153,154,217,251,278', 
         ':298', 
         tmp_dir = test_dir)
-    assert round(result, 4) == 5.9638
+    assert round(result, 4) == 6.2885
+
+def test_get_ses_ratio():
+    '''test function works without abort'''
+    Config.debug = 1
+    test_dir = 'test/testfile_Class_PDB/traj_ana_test/'
+    result = PDB.get_ses_ratio(
+        f'{test_dir}/FAcD_RA124M_ff.prmtop', 
+        f'{test_dir}/prod.mdcrd',':1-297', 
+        ':108,109,112,133,139,153,154,217,251,278', 
+        ':298', 
+        tmp_dir = test_dir)
+    assert round(result, 4) == 0.0595
 
 ### utilities ###
 @pytest.mark.clean
