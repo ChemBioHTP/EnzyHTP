@@ -322,14 +322,17 @@ def _fix_pybel_output(pdb_path: str, out_path: str, ref_name_path: str = None) -
         ref_ligand.read_pdb(ref_name_path)
         ref_ligand_df: pd.DataFrame = pd.concat(
             (ref_ligand.df["ATOM"], ref_ligand.df["HETATM"]), ignore_index=True)
+        ref_ligand_df.sort_values("line_idx", inplace=True) # make sure lines are aligned
         ref_resi_name = ref_ligand_df.iloc[0]["residue_name"].strip()
         for i, atom_df in ref_ligand_df.iterrows():
             ref_atom_names.append(atom_df["atom_name"].strip())
 
     target_ligand = PandasPdb()
     target_ligand.read_pdb(pdb_path)
-    target_ligand_df = target_ligand.df["HETATM"]
-    atom_names = list((target_ligand_df["atom_name"]))
+    target_ligand_df: pd.DataFrame = pd.concat(
+        (target_ligand.df["ATOM"], target_ligand.df["HETATM"]), ignore_index=True)
+    target_ligand_df.sort_values("line_idx", inplace=True) # make sure lines are aligned
+    atom_names = list(target_ligand_df["atom_name"])
     if ref_name_path is not None:
         # restore resi name and atom name
         target_ligand_df["residue_name"] = ref_resi_name
@@ -337,7 +340,8 @@ def _fix_pybel_output(pdb_path: str, out_path: str, ref_name_path: str = None) -
             atom_names[i] = name
     new_atom_names = chem.get_valid_generic_atom_name(atom_names)
     target_ligand_df["atom_name"] = pd.DataFrame(new_atom_names)
-    target_ligand.to_pdb(out_path, records=["HETATM", "OTHERS"])
+    target_ligand.df["ATOM"] = target_ligand_df
+    target_ligand.to_pdb(out_path, records=["ATOM", "OTHERS"])
 
 
 LIGAND_PROTONATION_METHODS = {"pybel": protonate_ligand_with_pybel}

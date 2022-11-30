@@ -224,6 +224,21 @@ def test_pybel_protonate_pdb_ligand_4CO():
 
     prot.pybel_protonate_pdb_ligand(ligand_path, out_ligand_path)
 
+    # assert equiv_files(out_ligand_path, answer_ligand_path, skip_frist=True)
+    # fs.safe_rm(out_ligand_path)
+    # assert not os.path.isdir(out_ligand_path)
+
+def test_fix_pybel_output():
+    """test an exception case for fixing pybel output"""
+    ligand_path = f"{DATA_DIR}/ligand_test_HEZ_pybel_badname.pdb"
+    ref_ligand_path = f"{DATA_DIR}/ligand_test_HEZ.pdb"
+    out_ligand_path = f"{WORK_DIR}/ligand_test_HEZ_pybel.pdb"
+    answer_ligand_path = f"{DATA_DIR}/ligand_test_HEZ_pybel.pdb"
+    assert not os.path.isdir(out_ligand_path)
+
+    prot._fix_pybel_output(ligand_path, out_ligand_path, ref_ligand_path)
+
     assert equiv_files(out_ligand_path, answer_ligand_path, skip_frist=True)
     fs.safe_rm(out_ligand_path)
     assert not os.path.isdir(out_ligand_path)
+
