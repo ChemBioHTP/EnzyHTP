@@ -117,3 +117,4 @@ class PyMOLInterface:
 
         lines = list(filter( lambda ll: ll[0] != '>', lines))
         return ''.join(lines)
+

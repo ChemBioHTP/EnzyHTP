@@ -30,3 +30,9 @@ def remove_solvent(stru: Structure, protect: str = None) -> Structure:
     stru_oper.remove_empty_chain(stru)
 
     return stru
+
+
+def remove_H(stru: Structure ) -> Structure:
+    """
+
+    """

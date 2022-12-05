@@ -114,6 +114,7 @@ class AmberInterface:
         self.write_minimize_input_file(min_in, cycle)
         engine = self.config_.get_engine(mode)
 
+# yapf: disable
         self.env_manager_.run_command(
             engine, ["-O", "-i", min_in, "-o", min_out, "-p", prmtop, "-c", inpcrd, "-r", min_rst],
             
@@ -122,7 +123,8 @@ class AmberInterface:
         self.env_manager_.run_command(
             "ambpdb",[f"-p", prmtop, "-c", min_rst, ">", outfile]
         )
-        
+# yapf: enable
+
         return outfile
 
     def build_param_files(self, in_pdb: str, build_dir: str, pH:float = 7.0) -> Tuple[str, str]:
@@ -178,7 +180,12 @@ class AmberInterface:
             [f"saveamberparm a {prmtop} {inpcrd}", f"savepdb a {pdb_ff}", "quit"])
         fs.write_lines(leap_path, leap_contents)
         # TODO(CJ): Check that this actually works before returning
-        self.env_manager_.run_command("tleap", ["-s", "-f", leap_path, ">", leap_log])
+# yapf: disable
+        self.env_manager_.run_command(
+            "tleap", 
+            ["-s", "-f", leap_path, ">", leap_log]
+        )
+# yapf: enable
         return (prmtop, inpcrd)
 
     def build_ligand_param_files(self, paths: List[str],
@@ -208,33 +215,19 @@ class AmberInterface:
             # .pdb filename alone... I think this may be possible
             # if renew
             # TODO(CJ): figure out how to implement the environment manager here
+# yapf: disable 
             self.env_manager_.run_command(
                 "antechamber",
-                [
-                    "-i",
-                    lig_pdb,
-                    "-fi",
-                    "pdb",
-                    "-o",
-                    prepin,
-                    "-fo",
-                    "prepi",
-                    "-c",
-                    "bcc",
-                    "-s",
-                    "0",
-                    "-nc",
-                    str(net_charge),
-                ],
+                ["-i", lig_pdb, "-fi", "pdb", "-o", prepin, "-fo", "prepi", "-c", "bcc", "-s", "0", "-nc", str(net_charge), ],
             )
-            files_to_remove: List[
-                str] = "ATOMTYPE.INF NEWPDB.PDB PREP.INF sqm.pdb sqm.in sqm.out".split()
-            files_to_remove.extend(list(map(str, Path(".").glob("ANTECHAMBER*"))))
-            _ = list(map(lambda fname: fs.safe_rm(fname), files_to_remove))
-            # gen frcmod
-            # TODO(CJ): add some kind of check that this all actually runs correctly w/o errors
-            self.env_manager_.run_command("parmchk2",
-                                          ["-i", prepin, "-f", "prepi", "-o", frcmod])
+# yapf: enable 
+            self.remove_antechamber_temp_files()
+            self.env_manager_.run_command(
+# yapf: disable 
+                    "parmchk2",
+                     ["-i", prepin, "-f", "prepi", "-o", frcmod]
+            )
+# yapf: enable 
             # record
             result.append((prepin, frcmod))
         return result
@@ -442,6 +435,7 @@ class AmberInterface:
             Path to the production .nc file.
         """
         fs.safe_mkdir(work_dir)
+        
         min_in: str = self.md_min_file(f"{work_dir}/min.in")
         heat_in: str = self.md_heat_file(f"{work_dir}/heat.in")
         equi_in: str = self.md_equi_file(f"{work_dir}/equi.in")
@@ -450,93 +444,45 @@ class AmberInterface:
 
         min_out: str = f"{work_dir}/min.out"
         min_rst: str = f"{work_dir}/min.rst"
+
+#yapf: disable
         self.env_manager_.run_command(
             engine,
-            [
-                "-O",
-                "-i",
-                min_in,
-                "-o",
-                min_out,
-                "-p",
-                prmtop,
-                "-c",
-                inpcrd,
-                "-r",
-                min_rst,
-                "-ref",
-                inpcrd,
-            ],
+            ["-O", "-i", min_in, "-o", min_out, "-p", prmtop, "-c", inpcrd, "-r", min_rst, "-ref", inpcrd, ], 
         )
+#yapf: enable 
 
         heat_out: str = f"{work_dir}/heat.out"
         heat_rst: str = f"{work_dir}/heat.rst"
+
+#yapf: disable
         self.env_manager_.run_command(
-            engine,
-            [
-                "-O",
-                "-i",
-                heat_in,
-                "-o",
-                heat_out,
-                "-p",
-                prmtop,
-                "-c",
-                min_rst,
-                "-ref",
-                min_rst,
-                "-r",
-                heat_rst,
-            ],
+            engine, 
+            ["-O", "-i", heat_in, "-o", heat_out, "-p", prmtop, "-c", min_rst, "-ref", min_rst, "-r", heat_rst, ], 
         )
+#yapf: enable 
 
         equi_out: str = f"{work_dir}/equi.out"
         equi_rst: str = f"{work_dir}/equi.rst"
         equi_nc: str = f"{work_dir}/equi.nc"
+
+# yapf: disable
         self.env_manager_.run_command(
             engine,
-            [
-                "-O",
-                "-i",
-                equi_in,
-                "-o",
-                equi_out,
-                "-p",
-                prmtop,
-                "-c",
-                heat_rst,
-                "-ref",
-                heat_rst,
-                "-r",
-                equi_rst,
-                "-x",
-                equi_nc,
-            ],
+            ["-O", "-i", equi_in, "-o", equi_out, "-p", prmtop, "-c", heat_rst, "-ref", heat_rst, "-r", equi_rst, "-x", equi_nc, ], 
         )
+# yapf: enable
 
         prod_out: str = f"{work_dir}/prod.out"
         prod_rst: str = f"{work_dir}/prod.rst"
         prod_nc: str = f"{work_dir}/prod.nc"
+
+# yapf: disable
         self.env_manager_.run_command(
             engine,
-            [
-                "-O",
-                "-i",
-                prod_in,
-                "-o",
-                prod_out,
-                "-p",
-                prmtop,
-                "-c",
-                equi_rst,
-                "-ref",
-                equi_rst,
-                "-r",
-                prod_rst,
-                "-x",
-                prod_nc,
-            ],
+            ["-O",  "-i",  prod_in,  "-o",  prod_out,  "-p",  prmtop,  "-c",  equi_rst,  "-ref",  equi_rst,  "-r",  prod_rst,  "-x",  prod_nc, ], 
         )
+# yapf: enable 
 
         return prod_nc
 
@@ -686,6 +632,46 @@ class AmberInterface:
 
         return result
 
+    def parse_fmt(self, fmt : str ) -> Tuple[Any,int]:
+        """Private helper function that parses a %FORMAT() string from an amber .prmtop file.
+        Identifies both the type and width of the format. Supplied string can contain whitespace.
+        In the case that the supplied format string does not contain the pattern '%FORMAT(<>)',
+        the result (None, -1) is returned.
+
+        Args:
+            fmt: the %FORMAT() line from a .prmtop as a str().
+
+        Returns:
+            A tuple() of length 2 containing the (type ctor, width as an int()).
+        """
+        
+        if fmt.find('%FORMAT(') == -1 or fmt.find(')') == -1:
+            return (None, -1)
+
+
+        fmt = fmt.strip().replace('%FORMAT(','').replace(')','')
+
+        idx = 0 
+
+        while fmt[idx].isnumeric():
+            idx += 1
+
+        dtype = None
+        
+        type_string = fmt[idx].upper()
+
+        if type_string == 'A':
+            dtype = str
+        elif type_string == 'I':
+            dtype = int
+        elif type_string == 'E':
+            dtype = float
+
+        width = int(fmt[idx+1:].split('.')[0])
+
+        return (dtype, width)
+
+
 
     def parse_prmtop(self, prmtop : str) -> Dict:
         """Parses a .prmtop file into a dict() with the pattern of (key, value) being (keyword after %FLAG, following values). 
@@ -700,47 +686,14 @@ class AmberInterface:
 
         """
         #TODO(CJ): unit tests
-        def parse_fmt( fmt : str ) -> Tuple[Any,int]:
-            """Private helper function that parses a %FORMAT() string from an amber .prmtop file.
-            Identifies both the type and width of the format. Supplied string can contain whitespace.
-
-            Args:
-                fmt: the %FORMAT() line from a .prmtop as a str().
-
-            Returns:
-                A tuple() of length 2 containing the (type ctor, width as an int()).
-            """
-            #TODO(CJ): unit tests. maybe put this as a private function?
-            
-            fmt = fmt.strip().replace('%FORMAT(','')[:-1]
-
-            idx = 0 
-
-            while fmt[idx].isnumeric():
-                idx += 1
-
-            dtype = None
-            
-            type_string = fmt[idx].upper()
-
-            if type_string == 'A':
-                dtype = str
-            elif type_string == 'I':
-                dtype = int
-            elif type_string == 'E':
-                dtype = float
-
-            width = int(fmt[idx+1:].split('.')[0])
-
-            return (dtype, width)
 
 
         if not Path(prmtop).exists():
             _LOGGER.error(f"The file '{prmtop}' does not exist. Exiting...")
             exit( 1 )
 
-        if fs.get_file_ext( prmtop ) != '.prmtop':
-            _LOGGER.error("AmberInterface.parse_prmtop() expects the supplied path to have extension '.prmtop'. Exiting...")
+        if fs.get_file_ext( prmtop ) != '.prmtop' and Path(prmtop).stem.find('prmtop') == -1:
+            _LOGGER.error("AmberInterface.parse_prmtop() expects the supplied path to have extension '.prmtop' or be named 'prmtop' . Exiting...")
             exit( 1 )
 
         # 1. get the contents
@@ -755,7 +708,7 @@ class AmberInterface:
             
             (key,fmt,body) = chunk.split('\n',2)
             body = re.sub('\n','',body)
-            (dtype, width) = parse_fmt( fmt ) 
+            (dtype, width) = self.parse_fmt( fmt ) 
             
             raw: List[str] = list()
             for idx in range(0, len(body), width):
@@ -766,13 +719,13 @@ class AmberInterface:
         return result
 
 
-    def remove_antechamber_temp_files(self, dname : str  ) -> None:
+    def remove_antechamber_temp_files(self, dname : str ='./' ) -> None:
         """Helper method that removes temporary files generated by antechamber from a given directory.
         Removes the files "ATOMTYPE.INF", "NEWPDB.PDB", "PREP.INF" and those with the patterns "ANTECHAMBER*"
         and "sqm.*".
 
         Args:
-            dname: str() with the path to the directory to clean out
+            dname: str() with the path to the directory to clean out. Uses current directory as default.
 
         Returns:
             Nothing.
@@ -786,4 +739,5 @@ class AmberInterface:
         _ = list(map(fs.safe_rm, files_to_remove))
 
 
-
+    def mask(self, structure, mask ):
+        assert False

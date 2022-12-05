@@ -2,6 +2,8 @@
 method which gives users the ability to mutate a .pdb file and specify all relevant aspects of this process.
 Mutation is carried out by an underlying engine and the supported engines currently include:
     + Amber/tleap
+    + PyMOL
+
 Note that the current implementation will mutate the .pdb file and keep the residue indicies and chain names 
 consistent.
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
@@ -9,20 +11,20 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-15
 """
 import hashlib
+from pathlib import Path
+from copy import deepcopy
 from string import ascii_uppercase
 from collections import defaultdict
 from typing import List, Dict, Union, Any
-from pathlib import Path
-from copy import deepcopy
 
 import numpy as np
 import pandas as pd
 from biopandas.pdb import PandasPdb
 
+from enzy_htp import interface
 import enzy_htp.chemical as chem
 import enzy_htp.structure as struct
 import enzy_htp.preparation as prep
-from enzy_htp import interface
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import _LOGGER, UnsupportedMethod
 
@@ -51,6 +53,7 @@ def mutate_pdb(
     >>> mutated_pdb:str = mutate_pdb("enzy.pdb")
     >>> mutated_pdb
     "enzy_A10G.pdb"
+
     Args:
         pdb: The name of the base .pdb file. Only required value.
         n_mutations: The number of desired mutations as an int(). Default value is 1.
@@ -94,7 +97,7 @@ def mutate_pdb(
 
     outfile: str = mutated_name(pdb, out_dir, mutations)
 
-    IMPLEMENTATION: Dict = {"tleap": _mutate_tleap}
+    IMPLEMENTATION: Dict = {"tleap": _mutate_tleap, "pymol": _mutate_pymol}
 
     if engine not in IMPLEMENTATION:
         raise UnsupportedMethod(
@@ -201,8 +204,27 @@ def mutated_name(pdb: str, outdir: str, mutations: List[Mutation]) -> str:
     return f"{outdir}/{name_stem}.pdb"
 
 
+def _mutate_pymol(pdb: str, outfile: str, mutations: List[Mutation]) -> None:
+    """Underlying implementation of mutation with pymol. Serves as implementation only, SHOULD NOT
+    BE CALLED BY USERS DIRECTLY. Follows generalized function signature taking the name of the .pdb,
+    the outfile to save the mutated version to and a list() of mutations. Function assumes that the 
+    supplied mutations are valid. Procedure utilizes the cmd.wizard() api exposed by the pymol python 
+    package.
+    
+    Args:
+        pdb: The name of the original .pdb file as a str().
+        outfile: Name of the file to save the mutated structure to.
+        mutations: A list() of Mutation namedtuple()'s to apply.
+    Returns:
+        Nothing.
+
+    """
+    #TODO(CJ): finish this       
+    pass
+
+
 def _mutate_tleap(pdb: str, outfile: str, mutations: List[Mutation]) -> None:
-    """Underlying implementation of mutation with tleap. Serves as impelementation only, SHOULD NOT
+    """Underlying implementation of mutation with tleap. Serves as implementation only, SHOULD NOT
     BE CALLED BY USERS DIRECTLY. Follows generalized function signature taking the name of the .pdb,
     the oufile to save the mutated version to and a list() of mutations. Function assumes that the
     supplied mutations are valid. Procedure is to replace backbone atoms and their names in the .pdb
