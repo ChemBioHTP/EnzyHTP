@@ -470,6 +470,15 @@ def test_get_ses_ratio():
         tmp_dir = test_dir)
     assert round(result, 4) == 0.0595
 
+def test_get_residue_pka():
+    '''test function works without abort. 
+    Test getting pka for E101 of KE07R7'''
+    test_pdb = 'test/testfile_Class_PDB/KE07R7.pdb'
+
+    pdb_obj = PDB(test_pdb)
+    result = pdb_obj.get_residue_pka(':101,222')
+    assert result == [6.866247921750009, 9.868125271097515]
+
 ### utilities ###
 @pytest.mark.clean
 def test_clean_files():

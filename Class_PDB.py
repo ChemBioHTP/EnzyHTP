@@ -3095,7 +3095,7 @@ run
                  prmtop_path: str, traj_path: str,
                  mask_pro: str, mask_pro_target: str, mask_sub: str,
                  dot_density: int = 2,  
-                 tmp_dir: str = '.') -> float:
+                 tmp_dir: str = '.', traj_start: str=None, traj_end: str=None) -> float:
         """
         mvp function for SES calculation
         Args:
@@ -3110,7 +3110,9 @@ run
         """
         import pymol2
         # divide traj
-        traj_parm_1, traj_parm_2 = cls.divide_traj(prmtop_path, traj_path, mask_pro, mask_sub, tmp_dir)
+        traj_parm_1, traj_parm_2 = cls.divide_traj(
+            prmtop_path, traj_path, mask_pro, mask_sub, 
+            tmp_dir, traj_start, traj_end)
         # protein ses
         ## start pymol
         p_session = pymol2.PyMOL()
@@ -3158,7 +3160,9 @@ run
         return (np.array(ses_sub_by_frame)/np.array(ses_pro_by_frame)).mean()
 
     @classmethod
-    def divide_traj(cls, prmtop_path: str, traj_path: str, mask1: str, mask2: str, tmp_dir: str = '.') -> tuple:
+    def divide_traj(cls, prmtop_path: str, traj_path: str, mask1: str, mask2: str,
+                    tmp_dir: str = '.', 
+                    traj_start: str=None, traj_end: str=None) -> tuple:
         """
         divide traj into 2 trajs defined by mask1 and mask2
         """
@@ -3168,10 +3172,13 @@ run
         prmtop_name = prmtop_path.split('/')[-1]
         tmp_prmtop_1 = f'{tmp_dir}/traj_1.{prmtop_name}'
         tmp_prmtop_2 = f'{tmp_dir}/traj_2.{prmtop_name}'
+        start_end_pattern = ''
+        if traj_start and traj_end is not None:
+            start_end_pattern = f' {traj_start} {traj_end}'
 
         with open(tmp_cpptraj_in, 'w') as of:
             of.write(f'''parm {prmtop_path}
-trajin {traj_path}
+trajin {traj_path}{start_end_pattern}
 autoimage
 strip !({mask1}) nobox outprefix {tmp_dir}/traj_1
 outtraj {tmp_traj_1}
@@ -3187,6 +3194,46 @@ outtraj {tmp_traj_2}
             sys.exit(1)
         os.remove(tmp_cpptraj_in)
         return (tmp_traj_1, tmp_prmtop_1), (tmp_traj_2, tmp_prmtop_2)
+
+    def get_residue_pka(self, target_mask: str) -> float:
+        '''
+        mvp function for pka calculation for a specific residue using PROPKA
+        Args:
+            target_mask: pseudo AMBER style. e.g: ':1,2,3'
+        '''
+        target_resis = map(lambda x: int(x.strip()), 
+            target_mask.removeprefix(':').split(','))
+        # run propka (TODO go to interface)
+        from propka.lib import loadOptions
+        from propka.input import read_parameter_file, read_molecule_file
+        from propka.parameters import Parameters
+        from propka.molecular_container import MolecularContainer
+        options = loadOptions([self.path]) # use default in mvp
+        pdbfile = options.filenames[0]
+        parameters = read_parameter_file(options.parameters, Parameters())
+        my_molecule = MolecularContainer(parameters, options)
+        my_molecule = read_molecule_file(pdbfile, my_molecule)
+        my_molecule.calculate_pka()
+        conformation = my_molecule.conformations['AVR']
+        residues_pka = {}
+        for group in conformation.groups:
+            row_dict = {}
+            atom = group.atom
+            row_dict["res_num"] = atom.res_num
+            row_dict["ins_code"] = atom.icode
+            row_dict["res_name"] = atom.res_name
+            row_dict["chain_id"] = atom.chain_id
+            row_dict["group_label"] = group.label
+            row_dict["group_type"] = getattr(group, "type", None)
+            row_dict["pKa"] = group.pka_value
+            row_dict["model_pKa"] = group.model_pka
+            row_dict["buried"] = group.buried
+            if group.coupled_titrating_group:
+                row_dict["coupled_group"] = group.coupled_titrating_group.label
+            else:
+                row_dict["coupled_group"] = None
+            residues_pka[atom.res_num] = row_dict
+        return list(map(lambda y: residues_pka[y]['pKa'], target_resis))
 
 def get_PDB(name):
     '''
