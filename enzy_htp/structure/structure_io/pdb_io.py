@@ -264,6 +264,44 @@ class PDBParser(StructureParserInterface):
         (e.g. chain A TER chain A -(update)-> chain A TER chain B. see 1Q4T.)
         according to the TER record provide by "ter_df"
         * ter df should share the same line index references as df (from same file)
+        3. allow different ligand in the same chain
+        ==details==
+        There are in total 12 cases
+            for each chain:
+            contain atom missing chain id:
+                have 0 chain id total:
+                    add chain id
+                have 1 chain id total:
+                    repeat:
+                        HET chain:
+                            update to a new chain id for whole chain
+                        ATOM chain:
+                            abort
+                    not repeat:
+                        add the same chain id to atoms that missing
+                have more than 1 chain id total:
+                    abort
+            contain no atom missing chain id:
+                have 1 chain id total:
+                    HET:
+                        repeat:
+                            update to a new chain id
+                        not repeat:
+                            record
+                    ATOM:
+                        repeat:
+                            abort
+                        not repeat:
+                            record
+                have more than 1 chain id total:
+                    HET:
+                        treat as individual chain. for each:
+                        repeat:
+                            update
+                        not repeat:
+                            record
+                    ATOM:
+                        abort
         Returns:
             [edit df in place]
             idx_change_mapper: the mapper recording index change when repeating chain id
