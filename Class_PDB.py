@@ -3063,6 +3063,7 @@ run
             tmp_dir: temporary dir for divided traj files
         Return:
             (sasa_sub/sasa_pro).mean() average sasa ratio from each frame
+        # WARNING: @biopaul919 reported mt.load have a bug that make the result wrong.
         """
         import mdtraj as mt
         # divide traj
@@ -3091,11 +3092,12 @@ run
         return (sasa_sub_by_frame/sasa_pro_by_frame).mean()
 
     @classmethod
-    def get_ses_ratio(cls, 
+    def get_surface_ratio(cls, 
                  prmtop_path: str, traj_path: str,
                  mask_pro: str, mask_pro_target: str, mask_sub: str,
-                 dot_density: int = 2,  
-                 tmp_dir: str = '.', traj_start: str=None, traj_end: str=None) -> float:
+                 dot_solvent: int = 0, dot_density: int = 2,  
+                 tmp_dir: str = '.', traj_start: str=None, traj_end: str=None,
+                 if_complete_data: bool=False) -> float:
         """
         mvp function for SES calculation
         Args:
@@ -3117,6 +3119,7 @@ run
         ## start pymol
         p_session = pymol2.PyMOL()
         p_session.start()
+        p_session.cmd.set("dot_solvent", dot_solvent)
         p_session.cmd.set("dot_density", dot_density)
         if Config.debug < 2:
             p_session.cmd.feedback("disable","all","everything")
@@ -3156,7 +3159,8 @@ run
         os.remove(traj_parm_1[1])
         os.remove(traj_parm_2[0])
         os.remove(traj_parm_2[1])
-
+        if if_complete_data:
+            return np.array(ses_sub_by_frame).mean(), np.array(ses_pro_by_frame).mean()
         return (np.array(ses_sub_by_frame)/np.array(ses_pro_by_frame)).mean()
 
     @classmethod
