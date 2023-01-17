@@ -3094,7 +3094,7 @@ run
     @classmethod
     def get_surface_ratio(cls, 
                  prmtop_path: str, traj_path: str,
-                 mask_pro: str, mask_pro_target: str, mask_sub: str,
+                 mask_pro: str, mask_pro_target: str, mask_sub: str, dynamic_sele: bool=False,
                  dot_solvent: int = 0, dot_density: int = 2,  
                  tmp_dir: str = '.', traj_start: str=None, traj_end: str=None,
                  if_complete_data: bool=False) -> float:
@@ -3106,11 +3106,21 @@ run
             mask_pro: mask selection for the protein
             mask_pro_target: mask selection for the subsection in the protein as the SASA target
             mask_sub: mask selection for the substrate
+            dynamic_sele: if update selection every frame, must use if distance based pattern is used
+                          in mask_pro_target
+            dot_solvent: surface type (0: ses 1: sasa)
+            dot_density: surface qulity
             tmp_dir: temporary dir for divided traj files
         Return:
             avg(ses_sub)/avg(ses_pro)
         """
         import pymol2
+        if dynamic_sele:
+            # 1. split states frist
+            # 2. iterate using state names
+            # 3. use pattern like f"(br. (((({obj_name} & {mask}) around 4) and {obj_name}) and (not n. C+H+O+N) and (not elem H)) and (not resi 1449+1181)) & n. CA"
+            # ref https://github.com/shaoqx/CalcKit/tree/master/pymol_script/anchor_detect.py
+            sys.exit(1) # TODO place holder
         # divide traj
         traj_parm_1, traj_parm_2 = cls.divide_traj(
             prmtop_path, traj_path, mask_pro, mask_sub, 
@@ -3159,6 +3169,7 @@ run
         os.remove(traj_parm_1[1])
         os.remove(traj_parm_2[0])
         os.remove(traj_parm_2[1])
+        p_session.stop()
         if if_complete_data:
             return np.array(ses_sub_by_frame).mean(), np.array(ses_pro_by_frame).mean()
         return (np.array(ses_sub_by_frame)/np.array(ses_pro_by_frame)).mean()
