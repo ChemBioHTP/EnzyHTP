@@ -1,7 +1,7 @@
 """Module for general interface of preparation module. Aim for simply the use
 of this module for light users.
 
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2022-10-21
 """
 

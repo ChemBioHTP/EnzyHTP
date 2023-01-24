@@ -2,7 +2,7 @@
 serves as a wrapper for all associated Multiwfin functionality though this behavior is also partially controlled
 by the MultiwfnConfig class owned by the interface. Supported operations include:
     + bond dipole calculations
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-07-01
 """

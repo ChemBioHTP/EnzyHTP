@@ -2,7 +2,7 @@
 Setup as a single function. Users should only call the high level function structure_from_pdb(). Other functions that exist in the 
 file help to categorize Residue() objects and organize the Chain() id's in a consistent, repdocucible way.
 
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-29
 """

@@ -3,7 +3,7 @@ the required executables, environment variables and settings for using Multiwfn 
 features the default_multiwfn_config() method which provides a deep-copied MultiwfnConfig() object with default
 values for use in Multiwfn based calculations.
 
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 
 Date: 2022-07-01

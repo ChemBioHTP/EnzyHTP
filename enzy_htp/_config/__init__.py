@@ -3,7 +3,7 @@ software accesion in EnzyHTP. Works as a companion to the enzy_htp._interface.In
 class, supplying it with settings. SHOULD NOT be hanlded directly by users. There is 
 instead a singleton attribute enzy_htp.config with an instance.
 
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-07-12
 """

@@ -10,7 +10,7 @@ Supported packages include:
 	+ Gaussian 
 	+ Multiwfn
 
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-11
 """

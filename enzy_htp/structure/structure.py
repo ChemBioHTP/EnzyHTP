@@ -92,7 +92,7 @@ Operation:
     Saving the structure:
         >>> structure.to_pdb( "/path/to/copy/of/pdb" )
 
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-04-03
 """

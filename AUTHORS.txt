@@ -1,7 +1,7 @@
 # Thanks to all of the EnzyHTP Authors for their 
 # contributions!
 
-+ QZ Shao <qianzhen.shao@vanderbilt.edu>
++ QZ Shao <shaoqz@icloud.com>
 + Chris Jurich <chris.jurich@vanderbilt.edu>
 + Yaoyukun Jiang <biopaul919@gmail.com>
 + Reecan J. Juarez <reecan.j.juarez@vanderbilt.edu>

@@ -5,7 +5,7 @@ Science API:
 Mutation is carried out by an underlying engine and the supported engines currently include:
     + Amber/tleap
 
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2022-10-24
 """
 

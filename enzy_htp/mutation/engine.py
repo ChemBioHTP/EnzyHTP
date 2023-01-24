@@ -4,7 +4,7 @@ Mutation is carried out by an underlying engine and the supported engines curren
     + Amber/tleap
 Note that the current implementation will mutate the .pdb file and keep the residue indicies and chain names 
 consistent.
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-15
 """

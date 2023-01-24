@@ -21,7 +21,7 @@ Usage:
     - getFreq(g_out_file) // return a list of frequence numbers
 -----------------
 
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 
 Date: 2022-06-14

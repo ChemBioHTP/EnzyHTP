@@ -3,7 +3,7 @@ as it is removed from the full structure during protonation. In addition to Resi
 Meant to be stored alongside other Residue() and Residue() derived objets (MetalUnit() and Solvent()) inside of the
 Chain() object. Ligand() objects SHOULD NOT exist on their own.
 
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-04-03
 """

@@ -1,7 +1,7 @@
 """Definition for the Residue class. Residues are the most common unit of function within 
 enzy_htp. A Residue() can be canonincal, non-canonical, solvent, or ligand. It is essentially
 the catch all for PDB objects.
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-19
 """
