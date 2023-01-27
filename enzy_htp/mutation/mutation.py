@@ -26,13 +26,12 @@ Mutation.__doc__ = f"""Named tuple representing a single point mutation in an en
 """
 
 
-def valid_mutation(mut: Mutation) -> bool:
+def is_valid_mutation(mut: Mutation) -> bool: #TODO also need to check if the original residue is aligned.
     """Checks if the supplied Mutation() namedtuple is valid according to the below criteria:
     Mutation.orig: a one-letter amino-acid code.
     Mutation.target: a one-letter amino-acid code different thatn Mutation.orig.
     Mutation.chain_id: a single letter, can also be blank or whitespace.
     Mutation.res_num: a 1-indexed int().
-
     Args:
         mut: The Mutation() namedtuple to be judged.
 
@@ -92,7 +91,7 @@ def generate_all_mutations(
     # a last check
     for mut_list in result.values():
         for mt in mut_list:
-            assert valid_mutation(mt)
+            assert is_valid_mutation(mt)
     return result
 
 

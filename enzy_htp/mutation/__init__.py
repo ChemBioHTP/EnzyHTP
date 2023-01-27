@@ -9,7 +9,7 @@ Date: 2022-06-15
 from .engine import mutate_pdb
 from .mutation import (
     Mutation,
-    valid_mutation,
+    is_valid_mutation,
     generate_all_mutations,
     size_increase,
     size_decrease,

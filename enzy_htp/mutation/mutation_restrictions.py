@@ -133,9 +133,7 @@ def default_restriction_dict() -> Dict:
     Returns:
         A dict() with the above attributes and all keys set to False except 'illegal_targets' which is an empty, deepcopied list.
     """
-    keys: List[
-        str] = "locked illegal_targets no_size_increase no_size_decrease no_polarity_change force_polarity_change".split(
-        )
+    keys: List[str] = "locked illegal_targets no_size_increase no_size_decrease no_polarity_change force_polarity_change".split()
     result: Dict = dict(zip(keys, [False] * len(keys)))
     result["illegal_targets"] = deepcopy([])
     return deepcopy(result)

@@ -12,8 +12,8 @@ import enzy_htp.structure as es
 DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/data/"
 
 
-def test_valid_mutation_passes():
-    """Testing cases that should pass for enzy_htp.mutation.valid_mutation."""
+def test_is_valid_mutation_passes():
+    """Testing cases that should pass for enzy_htp.mutation.is_valid_mutation."""
     mutations: List[mut.Mutation] = [
         mut.Mutation(orig='R', target='D', chain_id='A', res_num=1),
         mut.Mutation(orig='X', target='D', chain_id='A', res_num=1),
@@ -23,11 +23,11 @@ def test_valid_mutation_passes():
     ]
 
     for mm in mutations:
-        assert mut.valid_mutation(mm)
+        assert mut.is_valid_mutation(mm)
 
 
-def test_valid_mutation_fails():
-    """Testing cases that should fail for enzy_htp.mutation.valid_mutation."""
+def test_is_valid_mutation_fails():
+    """Testing cases that should fail for enzy_htp.mutation.is_valid_mutation."""
     mutations: List[mut.Mutation] = [
         mut.Mutation(orig='R', target='R', chain_id='A', res_num=1),
         mut.Mutation(orig='R', target='D', chain_id='A', res_num=0),
@@ -43,7 +43,7 @@ def test_valid_mutation_fails():
     ]
 
     for mm in mutations:
-        assert not mut.valid_mutation(mm)
+        assert not mut.is_valid_mutation(mm)
 
 
 def test_generate_all_mutations():
