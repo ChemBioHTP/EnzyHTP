@@ -11,11 +11,17 @@ Date: 2022-10-24
 
 from typing import List
 from enzy_htp.structure import Structure
+from .mutation import Mutation, is_valid_mutation
+from .mutation_pattern import decode_mutation_pattern
 
-def mutate_stru(stru: Structure,
-                pattern: str, # because we need to support insertion or deletion
-                engine: str = "tleap_min",
-                in_place: bool=False) -> Structure:
+def mutate_stru(
+    stru: Structure,
+    pattern: str,
+    chain_sync_list: List[tuple],
+    engine: str = "tleap_min",
+    in_place: bool=False,
+    random_state: int = 100,
+) -> Structure:
     """
     This science API solves the problem of mutation assigning and protein structural
     prediction upon mutation.
@@ -25,6 +31,10 @@ def mutate_stru(stru: Structure,
     Args:
         stru: the target structure
         pattern: the pattern for describing a set of mutations to deploy
+        chain_sync_list: a list like [(A,C),(B,D)] to indicate homo-chains in enzyme ploymer
+            (like dimer). Mutations will be **copied** to the correponding homo-chains as it
+            is maybe experimentally impossible to only do mutations on one chain of a homo-dimer
+            enzyme.
         engine: the engine (method) used for determine the mutated structure
             (current available keywords):
             tleap_min
@@ -34,8 +44,10 @@ def mutate_stru(stru: Structure,
                   intact
                   (default is False since wild-type structure is expected to also available
                   in many applications)
+        random_state: The int() seed for the random number generator. Default value is 100.
     Raises:
         enzy_htp.core.exception.UnsupportedMethod if the supplied engine is not supported.
+        enzy_htp.core.exception.InvalidMutationPatternSyntax
     Returns:
         the reference/copy of the changed structure (depends on the in_place value)
 
@@ -61,8 +73,15 @@ def mutate_stru(stru: Structure,
 
     Details:
         The problem have two parts: 1. assigning the mutation 2. predict the mutant structure.
+
     Assigning the mutation
-        (find more in XXX TODO: use real name)
+        Which mutations should we study is a non-trivial question. Mutations could be assigned
+    from a database or a site-saturation requirement. It reflexs the scientific question defined
+    Assigning the mutation requires converting chemical/structural language to strict mutation
+    definitions. Some fast calculations can also be done during the selection of mutations. (e.g.:
+    calculating residues aligned with the projection line of the reacting bond [ref])
+        There are no existing software besides EnzyHTP addressing this challenge.
+        A language that helps user to assign mutations is defined above.
 
     Predicting the mutant structure
         Unlike predicting the whole protein structure from sequence and smiles, mutating a
@@ -132,22 +151,28 @@ def mutate_stru(stru: Structure,
 
     # assign mutation (where to mutant to what)
     # (pattern, stru) -> (MutaFlag)
-    mutation_flags = assign_mutation(stru, pattern)
+    mutation_objs = assign_mutation(stru, pattern, chain_sync_list)
 
     # deploy mutation (determine mutant structure)
     # stru -> stru
 
-def assign_mutation(stru: Structure, pattern: str) -> List[str]:
+def assign_mutation(stru: Structure, pattern: str, chain_sync_list: List[tuple]) -> List[Mutation]:
     """
     decode the user assigned {pattern} based on the {stru} and get a list of mutation flags
     that direct indicate the mutation
     Args:
         stru: the target structure
         pattern: the pattern that defines the mutation
+        chain_sync_list: indicates which chains should mutate synchronously.
     Return:
         a list of mutation_flag in the form of XA###Y. Where X and Y is the residue before and
     after mutation, A### is the chain id and the residue index.
     """
     # decode the pattern
-    # write a new module about mutation pattern?
+    mutation_objs = decode_mutation_pattern(stru, pattern)
+    # sync over polymers
+    mutation_objs = sync_mutation_over_chains(mutation_objs, chain_sync_list)
+    # san check of the mutation_flagss
+    assert is_valid_mutation(stru, mutation_flags)
 
+    return mutation_objs
