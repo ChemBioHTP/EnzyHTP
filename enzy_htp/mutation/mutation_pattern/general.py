@@ -45,7 +45,7 @@ def seperate_sections(pattern:str) -> List[str]:
     *Note that current method use re and do not support [] in a []
     (e.g. 1,2,3,a:[4,[5,6],7] does not work)"""
 
-    section_seperate_pattern = r"[^,[]+(?:\[[^\]]*\])*[^,]*"
+    section_seperate_pattern = r"(?:[^,[{]+|(?:\{[^\}]*\})+|(?:\[[^\]]*\])+)[^,]*"
     sections = re.findall(section_seperate_pattern, pattern.strip())
     sections = [i.strip() for i in sections]
 

@@ -36,8 +36,8 @@ def mutate_pdb(
     mutations: List[Mutation] = list(),
     restrictions: MutationRestrictions = None,
     engine: str = "tleap",
-    out_dir: str = None,
-    random_state: int = 100,
+    out_dir: str = None, #N/A
+    random_state: int = 100, 
 ) -> str:
     """Top level method that users should call to mutated a given .pdb file. Function gives the ability to
     specify the number of mutations, specific mutations to employ, the mutation engine and the random state
@@ -157,9 +157,9 @@ def get_mutations(
             )
 
         md_keys = list(mut_dict.keys())
-        chosen = random_list_elem(md_keys)
+        chosen = random_list_elem(md_keys) # random over position
         if len(mut_dict[chosen]):
-            result.append(random_list_elem(sorted(mut_dict[chosen])))
+            result.append(random_list_elem(sorted(mut_dict[chosen]))) # random over targets (why sorted)
         del mut_dict[chosen]
 
     return result
