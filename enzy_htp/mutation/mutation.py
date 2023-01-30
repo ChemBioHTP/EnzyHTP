@@ -11,10 +11,9 @@ from typing import List, Dict, Tuple
 
 import enzy_htp.structure as es
 import enzy_htp.chemical as chem
-import enzy_htp.preparation as prep
 from enzy_htp.chemical import ONE_LETTER_AA_MAPPER
 
-Mutation = namedtuple("Mutation", "orig target chain_id res_num")
+Mutation = namedtuple("Mutation", "orig target chain_id res_idx")
 Mutation.__doc__ = f"""Named tuple representing a single point mutation in an enzyme.
    
 
@@ -22,7 +21,7 @@ Mutation.__doc__ = f"""Named tuple representing a single point mutation in an en
    		orig: the one-letter code of the original amino acid. Can be in [ "{", ".join(ONE_LETTER_AA_MAPPER.keys())}"] or "X".
 		target: the one-letter code of the target mutation. Can be in [ "{", ".join(ONE_LETTER_AA_MAPPER.keys())}"] or "X".
 		chain_id: a single capital letter.
-		res_num: the 1-indexed int() of the residue to Mutate
+		res_idx: the 1-indexed int() of the residue to Mutate
 """
 
 
@@ -31,7 +30,7 @@ def is_valid_mutation(mut: Mutation) -> bool: #TODO also need to check if the or
     Mutation.orig: a one-letter amino-acid code.
     Mutation.target: a one-letter amino-acid code different thatn Mutation.orig.
     Mutation.chain_id: a single letter, can also be blank or whitespace.
-    Mutation.res_num: a 1-indexed int().
+    Mutation.res_idx: a 1-indexed int().
     Args:
         mut: The Mutation() namedtuple to be judged.
 
@@ -54,7 +53,7 @@ def is_valid_mutation(mut: Mutation) -> bool: #TODO also need to check if the or
     if (mut.chain_id.upper() not in string.ascii_uppercase) and len(mut.chain_id.strip()):
         return False
 
-    if not isinstance(mut.res_num, int) or mut.res_num < 1:
+    if not isinstance(mut.res_idx, int) or mut.res_idx < 1:
         return False
 
     return True
@@ -84,7 +83,7 @@ def generate_all_mutations(
             orig = chem.convert_to_one_letter(orig)
         result[res.key()] = list(
             map(
-                lambda ch: Mutation(orig=orig, target=ch, chain_id=chain_id, res_num=num),
+                lambda ch: Mutation(orig=orig, target=ch, chain_id=chain_id, res_idx=num),
                 chem.one_letters_except(orig),
             ))
 

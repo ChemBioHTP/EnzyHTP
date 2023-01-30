@@ -49,7 +49,7 @@ def test_mutated_name():
     ONE_RES: str = f"{DATA_DIR}/one_res.pdb"
     target = "dne/one_res_P1G.pdb"
     actual = mut.engine.mutated_name(
-        ONE_RES, "dne", [mut.Mutation(orig='P', target='G', chain_id='A', res_num=1)])
+        ONE_RES, "dne", [mut.Mutation(orig='P', target='G', chain_id='A', res_idx=1)])
     assert actual == target
 
 
@@ -58,7 +58,7 @@ def test_mutated_name_can_deduce():
     ONE_RES: str = f"{DATA_DIR}/one_res.pdb"
     target = "dne/one_res_P1G.pdb"
     actual = mut.engine.mutated_name(
-        ONE_RES, "dne", [mut.Mutation(orig='X', target='G', chain_id='A', res_num=1)])
+        ONE_RES, "dne", [mut.Mutation(orig='X', target='G', chain_id='A', res_idx=1)])
     assert actual == target
 
 
@@ -94,7 +94,7 @@ def test_mutate_pdb_specified_mutation_tleap():
     fs.safe_rm(target)
     assert not os.path.exists(target)
     mutated = mut.mutate_pdb(
-        ONE_RES, 1, [mut.Mutation(orig='P', target='G', chain_id='A', res_num=1)], None,
+        ONE_RES, 1, [mut.Mutation(orig='P', target='G', chain_id='A', res_idx=1)], None,
         "tleap", None, 100)
     assert os.path.exists(target)
 

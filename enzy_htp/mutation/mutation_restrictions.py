@@ -31,7 +31,7 @@ class MutationRestrictions:
         + locking mutation-based volume changes in residues
         + locking mutation-based polarity changes in residues
     Attributes:
-        mapper_: A dict() with (key, value) pairs of (chain_name, res_num) and dict()'s from default_restriction_dict().
+        mapper_: A dict() with (key, value) pairs of (chain_name, res_idx) and dict()'s from default_restriction_dict().
         pdb_: A str() to the structure file the object was generated from.
     """
 
@@ -74,7 +74,7 @@ class MutationRestrictions:
         """Method that locks mutations for a specific residue in the structure. Wrapper on MutationRestrictions.add_restriction
         where rkey is the specified rkey and the (key, value) pair of (ukey, uvalue) is ('locked', True).
         Args:
-            rkey: A Tuple of the form (chain_id, res_num) specifying the residue to lock.
+            rkey: A Tuple of the form (chain_id, res_idx) specifying the residue to lock.
         """
         self.add_restriction(rkey, "locked", True)
 

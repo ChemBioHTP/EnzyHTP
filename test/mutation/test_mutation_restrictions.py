@@ -159,13 +159,13 @@ def test_apply():
     mutations[('A', 3)] = list(range(10))
     mutations[('B', 1)] = list(range(10))
     mutations[('B', 2)] = [
-        mut.Mutation(orig='A', target='C', chain_id='B', res_num=10),
-        mut.Mutation(orig='C', target='A', chain_id='B', res_num=10)
+        mut.Mutation(orig='A', target='C', chain_id='B', res_idx=10),
+        mut.Mutation(orig='C', target='A', chain_id='B', res_idx=10)
     ]
     mutations[('B', 3)] = [
-        mut.Mutation(orig='R', target='H', chain_id='B', res_num=10),
-        mut.Mutation(orig='R', target='A', chain_id='B', res_num=10),
-        mut.Mutation(orig='A', target='R', chain_id='B', res_num=10)
+        mut.Mutation(orig='R', target='H', chain_id='B', res_idx=10),
+        mut.Mutation(orig='R', target='A', chain_id='B', res_idx=10),
+        mut.Mutation(orig='A', target='R', chain_id='B', res_idx=10)
     ]
     mr.lock_chain('A')
     mr.lock_residue(('B', 1))
@@ -178,8 +178,8 @@ def test_apply():
     assert not mutations[('A', 3)]
     assert not mutations[('B', 1)]
     assert mutations[('B', 2)] == [
-        mut.Mutation(orig='C', target='A', chain_id='B', res_num=10)
+        mut.Mutation(orig='C', target='A', chain_id='B', res_idx=10)
     ]
     assert mutations[('B', 3)] == [
-        mut.Mutation(orig='R', target='H', chain_id='B', res_num=10)
+        mut.Mutation(orig='R', target='H', chain_id='B', res_idx=10)
     ]
