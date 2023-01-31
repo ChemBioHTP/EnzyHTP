@@ -47,3 +47,7 @@ class ResidueDontHaveAtom(Exception):
 class InvalidMutationPatternSyntax(Exception):
     """Exception corresponding to an invalid mutation syntax in enzy_htp.mutation.mutation_pattern"""
     pass
+
+class InvalidMutationFlagSyntax(InvalidMutationPatternSyntax):
+    """Exception corresponding to an invalid mutation syntax in enzy_htp.mutation.mutation"""
+    pass

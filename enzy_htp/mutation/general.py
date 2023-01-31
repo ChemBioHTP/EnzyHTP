@@ -157,6 +157,9 @@ def assign_mutation(
         The two pattern are seperated by ":" and a mutation_set_patterns looks like:
         "position_pattern_0:target_aa_pattern_0, ..."
 
+        *In 2&3 the pattern may indicate a mutant collection, if more than one mutant collection
+        are indicated in the same {}, all combination of them is considered.
+
         Overall an example of pattern will be:
         "{RA154W, DA11G}, r:2[resi 289 around 4 and not resi 36:larger, proj(id 1000, id 2023, positive, 10):more_negative_charge]*100"
         * here proj() is a hypothetical selection function

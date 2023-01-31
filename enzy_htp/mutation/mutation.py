@@ -5,38 +5,80 @@ and if they satisfy certain change requirements.
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-15
 """
+import re
 import string
 from collections import namedtuple
 from typing import List, Dict, Tuple
 
-import enzy_htp.structure as es
-import enzy_htp.chemical as chem
+from enzy_htp.core.exception import InvalidMutationFlagSyntax
+from enzy_htp.core.logger import _LOGGER
 from enzy_htp.chemical import ONE_LETTER_AA_MAPPER
+import enzy_htp.chemical as chem
+import enzy_htp.structure as es
 
 Mutation = namedtuple("Mutation", "orig target chain_id res_idx")
 Mutation.__doc__ = f"""Named tuple representing a single point mutation in an enzyme.
    
 
 	Attributes:
-   		orig: the one-letter code of the original amino acid. Can be in [ "{", ".join(ONE_LETTER_AA_MAPPER.keys())}"] or "X".
-		target: the one-letter code of the target mutation. Can be in [ "{", ".join(ONE_LETTER_AA_MAPPER.keys())}"] or "X".
+   		orig: the one-letter code of the original amino acid. Can be in [ "{", ".join(ONE_LETTER_AA_MAPPER.keys())}"].
+		target: the one-letter code of the target mutation. Can be in [ "{", ".join(ONE_LETTER_AA_MAPPER.keys())}"].
 		chain_id: a single capital letter.
 		res_idx: the 1-indexed int() of the residue to Mutate
+
+        *In the case of WT, the tuple is defined as (None, "WT", None, None)
 """
 
+def decode_mutation_flag(mutation_flag: str) -> Mutation:
+    """XA##Y -> ("X", "Y", "A", ##)
+    WT -> (None, "WT", None, None)
+    XA##X -> (None, "WT", None, None)
+    *we may need to support 3-letter mutation in the future like: TYQA##TYP"""
 
-def is_valid_mutation(mut: Mutation) -> bool: #TODO also need to check if the original residue is aligned.
+    mutation_flag = mutation_flag.strip()
+    if mutation_flag == "WT":
+        return Mutation(None, "WT", None, None)
+    pattern = r'([A-Z])([A-Z])?([0-9]+)([A-Z])'
+    flag_match = re.match(pattern, mutation_flag)
+    if flag_match is None:
+        raise InvalidMutationFlagSyntax(
+            f"{mutation_flag} doesnt match ([A-Z])([A-Z])?([0-9]+)([A-Z])"
+            )
+
+    orig = flag_match.group(1)
+    chain_id = flag_match.group(2)
+    res_idx = flag_match.group(3)
+    target = flag_match.group(4)
+
+    if chain_id is None:
+        chain_id = "A"
+        _LOGGER.info(
+            f"No chain id is provided in: {mutation_flag}. Using A as default."
+        )
+    if orig == target:
+        _LOGGER.warning(f"equivalent mutation detected in {mutation_flag}. Making it WT.")
+        return Mutation(None, "WT", None, None)
+
+    return Mutation(orig, target, chain_id, res_idx)
+
+def is_valid_mutation(mut: Mutation, stru: es.Structure) -> bool:
     """Checks if the supplied Mutation() namedtuple is valid according to the below criteria:
-    Mutation.orig: a one-letter amino-acid code.
-    Mutation.target: a one-letter amino-acid code different thatn Mutation.orig.
-    Mutation.chain_id: a single letter, can also be blank or whitespace.
-    Mutation.res_idx: a 1-indexed int().
+    (Non-WT cases)
+    Mutation.orig: if match the original residue in the {stru}
+    Mutation.target: a one-letter amino-acid code in the allowed list & different from orig
+    Mutation.chain_id: a single letter, should exist in {stru}
+    Mutation.res_idx: a 1-indexed int(), should exist in {stru}
+
     Args:
         mut: The Mutation() namedtuple to be judged.
+        stru: the reference structure
 
+    Raise:
+        pass
     Returns:
         True if the Mutation() passes all checks, False if not.
     """
+    #TODO
     if (not isinstance(mut.orig, str) or not isinstance(mut.target, str)
             or not isinstance(mut.chain_id, str)):
         return False
@@ -57,6 +99,8 @@ def is_valid_mutation(mut: Mutation) -> bool: #TODO also need to check if the or
         return False
 
     return True
+
+
 
 
 def generate_all_mutations(
