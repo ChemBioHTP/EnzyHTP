@@ -28,7 +28,7 @@ def decode_mutation_pattern(stru: Structure, pattern: str) -> List[Mutation]:
             section_type = get_section_type(section_pattern)
             # here we decode it into a list of mutants each composed by a list of Mutation
             p_mutant_mapper[section_pattern] = TYPE_SECTION_DECODERS[section_type](stru, section_pattern)
-        pattern_mutants = combine_section_mutation(p_mutant_mapper)
+        pattern_mutants = combine_section_mutant(p_mutant_mapper)
         result_mutants.extend(pattern_mutants)
     return result_mutants
 
@@ -93,5 +93,5 @@ TYPE_SECTION_DECODERS = {
     "a" : decode_all_mutation,
 }
 
-def combine_section_mutation(mutation_mapper: Dict[str, Mutation]) -> List[List[Mutation]]:
+def combine_section_mutant(mutation_mapper: Dict[str, Mutation]) -> List[List[Mutation]]:
     """Combine mutations decoded from each section. Return a list of final mutants"""

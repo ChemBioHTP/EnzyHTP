@@ -1,16 +1,47 @@
 """Testing the Mutation() namedtuple and associated compatability functions in the enzy_htp.mutation.mutation
 submodule.
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+        QZ Shao <shaoqz@icloud.com>
 Date: 2022-06-15
 """
+import logging
 import os
 from typing import List
 
-import enzy_htp.mutation as mut
+from enzy_htp.core.logger import _LOGGER
 import enzy_htp.structure as es
+import enzy_htp.mutation as mut
 
 DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/data/"
 
+
+def test_decode_mutation_flag_wt(caplog):
+    """test if the function behave as expected on WT"""
+    assert mut.decode_mutation_flag("WT") == mut.Mutation(
+        orig=None, target='WT', chain_id=None, res_idx=None
+        )
+
+    original_level = _LOGGER.level
+    _LOGGER.setLevel(logging.DEBUG)
+
+    assert mut.decode_mutation_flag("RA154R") == mut.Mutation(
+        orig=None, target='WT', chain_id=None, res_idx=None
+        )
+    assert "equivalent mutation detected" in caplog.text
+
+    _LOGGER.setLevel(original_level)
+
+def test_decode_mutation_flag_default_chainid(caplog):
+    """test if the function behave as expected on default chain id"""
+    original_level = _LOGGER.level
+    _LOGGER.setLevel(logging.DEBUG)
+
+    assert mut.decode_mutation_flag("R154A") == mut.Mutation(
+        orig='R', target='A', chain_id='A', res_idx=154
+        )
+    assert " Using A as default." in caplog.text
+
+    _LOGGER.setLevel(original_level)
 
 def test_is_valid_mutation_passes():
     """Testing cases that should pass for enzy_htp.mutation.is_valid_mutation."""
