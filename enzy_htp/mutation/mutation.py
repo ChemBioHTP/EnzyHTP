@@ -7,7 +7,6 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-15
 """
 import re
-import string
 from collections import namedtuple
 from typing import List, Dict, Tuple
 
