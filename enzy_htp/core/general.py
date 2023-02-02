@@ -3,7 +3,8 @@
 Author: QZ Shao, <shaoqz@icloud.com>
 Date: 2022-10-21
 """
-from typing import List, Iterable, Tuple
+import copy
+from typing import List, Iterable, Tuple, Dict
 import itertools
 
 # == List related ==
@@ -34,3 +35,17 @@ def get_interval_from_list(target_list: List[int]) -> Iterable[Tuple[int, int]]:
         j = list(j)
         yield j[0][1], j[-1][1]
 
+# == Dict related ==
+def get_copy_of_deleted_dict(orig_dict: Dict, del_key) -> Dict:
+    """
+    get a copy of the orig_dict and delete an item base on the del_key
+    the del_key can be a list of keys
+    """
+    dict_copy = copy.deepcopy(orig_dict)
+    if isinstance(del_key, list):
+        for single_key in del_key:
+            del dict_copy[single_key]
+    else:
+        del dict_copy[del_key]
+
+    return dict_copy
