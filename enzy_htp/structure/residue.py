@@ -27,7 +27,7 @@ class Residue(DoubleLinkedNode):
     Attributes:
         (nessessary)
         children/atoms : A list of Atom() objects that make up the Residue().
-        name : Residue name.
+        name : Residue name. (3-letter code)
         idx : The index of the Residue within the chain.
         parent/chain : Parent chain name.
         rtype : The ResidueType of the Residue().
@@ -96,7 +96,7 @@ class Residue(DoubleLinkedNode):
 
     @property
     def name(self) -> str:
-        """Getter for the Residue()'s name."""
+        """Getter for the Residue()'s name. (3-letter code)"""
         return self._name
 
     @name.setter

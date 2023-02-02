@@ -403,7 +403,7 @@ class Structure(DoubleLinkedNode):
         return os.linesep.join(out_line)
 
     def __getitem__(self, key: Union[int, str]):
-        """support dictionary like access"""
+        """support dictionary/list-like access"""
         if isinstance(key, int):
             return super().__getitem__(key)
         if isinstance(key, str):

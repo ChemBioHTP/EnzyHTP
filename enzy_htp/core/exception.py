@@ -51,3 +51,7 @@ class InvalidMutationPatternSyntax(Exception):
 class InvalidMutationFlagSyntax(InvalidMutationPatternSyntax):
     """Exception corresponding to an invalid mutation syntax in enzy_htp.mutation.mutation"""
     pass
+
+class InvalidMutation(Exception):
+    """Exception corresponding to an invalid mutation in enzy_htp.mutation.mutation"""
+    pass

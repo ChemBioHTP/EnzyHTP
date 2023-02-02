@@ -10,9 +10,10 @@ import string
 from collections import namedtuple
 from typing import List, Dict, Tuple
 
-from enzy_htp.core.exception import InvalidMutationFlagSyntax
+from enzy_htp.core.exception import InvalidMutationFlagSyntax, InvalidMutation
+from enzy_htp.core.general import get_copy_of_deleted_dict
 from enzy_htp.core.logger import _LOGGER
-from enzy_htp.chemical import ONE_LETTER_AA_MAPPER
+from enzy_htp.chemical import ONE_LETTER_AA_MAPPER, THREE_LETTER_AA_MAPPER
 import enzy_htp.chemical as chem
 import enzy_htp.structure as es
 
@@ -29,6 +30,10 @@ Mutation.__doc__ = f"""Named tuple representing a single point mutation in an en
         *In the case of WT, the tuple is defined as (None, "WT", None, None)
 """
 
+SUPPORTED_MUTATION_TARGET_LIST = get_copy_of_deleted_dict(ONE_LETTER_AA_MAPPER, "U")
+"""The list of EnzyHTP supported mutation target-residue list.
+add upon supporting. will do ncaa in the future"""
+
 def decode_mutation_flag(mutation_flag: str) -> Mutation:
     """XA##Y -> ("X", "Y", "A", ##)
     WT -> (None, "WT", None, None)
@@ -38,7 +43,7 @@ def decode_mutation_flag(mutation_flag: str) -> Mutation:
     mutation_flag = mutation_flag.strip()
     if mutation_flag == "WT":
         return Mutation(None, "WT", None, None)
-    pattern = r'([A-Z])([A-Z])?([0-9]+)([A-Z])'
+    pattern = r"([A-Z])([A-Z])?([0-9]+)([A-Z])"
     flag_match = re.match(pattern, mutation_flag)
     if flag_match is None:
         raise InvalidMutationFlagSyntax(
@@ -47,7 +52,7 @@ def decode_mutation_flag(mutation_flag: str) -> Mutation:
 
     orig = flag_match.group(1)
     chain_id = flag_match.group(2)
-    res_idx = flag_match.group(3)
+    res_idx = int(flag_match.group(3))
     target = flag_match.group(4)
 
     if chain_id is None:
@@ -66,42 +71,53 @@ def is_valid_mutation(mut: Mutation, stru: es.Structure) -> bool:
     (Non-WT cases)
     Mutation.orig: if match the original residue in the {stru}
     Mutation.target: a one-letter amino-acid code in the allowed list & different from orig
-    Mutation.chain_id: a single letter, should exist in {stru}
-    Mutation.res_idx: a 1-indexed int(), should exist in {stru}
+    Mutation.chain_id: should exist in {stru}
+    Mutation.res_idx: should exist in {stru}
 
     Args:
         mut: The Mutation() namedtuple to be judged.
         stru: the reference structure
 
     Raise:
-        pass
+        enzy_htp.core.exception.InvalidMutation
     Returns:
-        True if the Mutation() passes all checks, False if not.
+        True if the Mutation() passes all checks.
     """
-    #TODO
+    # WT case
+    if mut == (None, "WT", None, None):
+        return True
+
+    # get data type right
     if (not isinstance(mut.orig, str) or not isinstance(mut.target, str)
-            or not isinstance(mut.chain_id, str)):
-        return False
+            or not isinstance(mut.chain_id, str)
+            or not isinstance(mut.res_idx, int)):
+        raise InvalidMutation(f"wrong data type in: {mut}")
 
-    if mut.orig not in ONE_LETTER_AA_MAPPER and mut.orig != "X":
-        return False
+    # Mutation.chain_id, Mutation.res_idx: should exist in {stru}, should not be empty
+    if mut.chain_id.strip() is "":
+        raise InvalidMutation(f"empty chain_id in: {mut}")
+    if mut.chain_id not in stru.chain_mapper:
+        raise InvalidMutation(
+            f"chain id in {mut} does not exist in structure (in-stru: {stru.chain_mapper.keys()})"
+        )
+    if mut.res_idx not in stru[mut.chain_id].residue_idxs:
+        raise InvalidMutation(
+            f"res_idx in {mut} does not exist in structure (in-stru: {stru[mut.chain_id].residue_idx_interval()})"
+        )
 
-    if mut.target not in ONE_LETTER_AA_MAPPER:
-        return False
+    # Mutation.orig: if match the original residue in the {stru}
+    real_orig = stru[mut.chain_id].find_residue_idx(mut.res_idx).name
+    real_orig = THREE_LETTER_AA_MAPPER.get(real_orig, real_orig) # 1 letter if in the map; 3 letter if not
+    if real_orig != mut.orig:
+        raise InvalidMutation(f"original residue does not match in: {mut} (real_orig: {real_orig})")
 
+    # Mutation.target: a one-letter amino-acid code in the allowed list & different from orig
+    if mut.target not in SUPPORTED_MUTATION_TARGET_LIST:
+        raise InvalidMutation(f"unsupported target residue in: {mut}")
     if mut.target == mut.orig:
-        return False
-
-    if (mut.chain_id.upper() not in string.ascii_uppercase) and len(mut.chain_id.strip()):
-        return False
-
-    if not isinstance(mut.res_idx, int) or mut.res_idx < 1:
-        return False
+        raise InvalidMutation(f"equivalent mutation detected in: {mut}. Should be (None, \"WT\", None, None).")
 
     return True
-
-
-
 
 def generate_all_mutations(
     structure: es.Structure, ) -> Dict[Tuple[str, int], List[Mutation]]:
