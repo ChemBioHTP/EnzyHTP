@@ -3,6 +3,7 @@ enzyme. Additionally provides utility functions for determnining if Mutation()'s
 and if they satisfy certain change requirements.
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+        QZ Shao <shaoqz@icloud.com>
 Date: 2022-06-15
 """
 import re
@@ -119,6 +120,8 @@ def is_valid_mutation(mut: Mutation, stru: es.Structure) -> bool:
 
     return True
 
+
+# == TODO ==
 def generate_all_mutations(
     structure: es.Structure, ) -> Dict[Tuple[str, int], List[Mutation]]:
     """Creates all possible mutations for a given Structure() object. Puts all the mutations into a dict()
