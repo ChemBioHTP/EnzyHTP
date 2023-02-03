@@ -18,7 +18,7 @@ Date: 2022-09-14
 
 import copy
 from typing import Any, Dict, List, Union
-from .general import delete_base_on_id
+from .general import delete_base_on_id_list
 
 
 class DoubleLinkedNode():
@@ -92,7 +92,7 @@ class DoubleLinkedNode():
         Returns:
             None. changes are made to the .children list in self.parent
         """
-        delete_base_on_id(self.parent.children, id(self))
+        delete_base_on_id_list(self.parent.children, id(self))
 
     def __deepcopy__(self, memo: Union[Dict[int, Any], None] = None, _nil=[]):
         """
