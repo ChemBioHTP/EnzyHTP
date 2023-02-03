@@ -11,6 +11,8 @@ Date: 2022-10-24
 """
 
 from typing import List
+import numpy as np
+
 from enzy_htp.structure import Structure
 from .mutation import Mutation, is_valid_mutation
 from .mutation_pattern import decode_mutation_pattern
@@ -146,15 +148,15 @@ def assign_mutation(
         "{section_a1,section_a2,section_a3},{section_b1,section_b2,section_b3},..."
         Each section can be one of the format below:
         1. direct indication                    : XA###Y
-        2. random M, N-point mutation in a set  : r:N[mutation_set_patterns]*M
-        3. all mutation in a set: a             : a:[mutation_set_patterns]
+        2. random M, N-point mutation in a set  : r:N[mutation_esm_patterns]*M
+        3. all mutation in a set: a             : a:[mutation_esm_patterns]
 
-        The mutation_set_patterns is seperated by comma and each describes 2 things:
+        The mutation_esm_patterns is seperated by comma and each describes 2 things:
         1. position_pattern: a set of positions
                             (using the selection syntax in the selection module)
         2. target_aa_pattern: a set of target mutations apply to all positions in the current set
                             (using syntax in the target_aa_pattern module)
-        The two pattern are seperated by ":" and a mutation_set_patterns looks like:
+        The two pattern are seperated by ":" and a mutation_esm_patterns looks like:
         "position_pattern_0:target_aa_pattern_0, ..."
 
         *In 2&3 the pattern may indicate a mutant collection, if more than one mutant collection
@@ -174,6 +176,7 @@ def assign_mutation(
         A language that helps user to assign mutations is defined above.
     """
     # decode the pattern
+    np.random.seed(random_state) # this changes globaly
     mutation_objs = decode_mutation_pattern(stru, pattern)
     # sync over polymers
     mutation_objs = sync_mutation_over_chains(mutation_objs, chain_sync_list)

@@ -4,6 +4,7 @@ Author: QZ Shao, <shaoqz@icloud.com>
 Date: 2022-10-21
 """
 import copy
+import numpy as np
 from typing import List, Iterable, Tuple, Dict
 import itertools
 
@@ -35,7 +36,16 @@ def get_interval_from_list(target_list: List[int]) -> Iterable[Tuple[int, int]]:
         j = list(j)
         yield j[0][1], j[-1][1]
 
+def get_random_list_elem(traget_list: list):
+    """Helper method that randomly chooses an element from a list. numpy.random.choice() doesn't 
+    like to take elements from list()'s of tuples so this is the work around."""
+    return traget_list[np.random.randint(len(traget_list))]
 
+def pop_random_list_elem(traget_list: list):
+    """Helper method that randomly pop an element from a list. (delete from original list)
+    numpy.random.choice() doesn't like to take elements from list()'s of tuples so
+    this is the work around."""
+    return traget_list.pop(np.random.randint(len(traget_list)))
 
 # == Dict related ==
 def get_copy_of_deleted_dict(orig_dict: Dict, del_key) -> Dict:
