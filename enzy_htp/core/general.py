@@ -8,7 +8,7 @@ from typing import List, Iterable, Tuple, Dict
 import itertools
 
 # == List related ==
-def delete_base_on_id_list(target_list: list, target_id: int):
+def delete_base_on_id(target_list: list, target_id: int):
     """
     delete an element from a list base on its id() value
     """
