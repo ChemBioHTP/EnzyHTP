@@ -1211,7 +1211,17 @@ class PDB():
     ========
     '''
 
-    def PDB2FF(self, prm_out_path='', o_dir='', lig_method='AM1BCC', renew_lig=0, local_lig=1, ifsavepdb=0, igb=None, if_prm_only=0):
+    def PDB2FF(self, 
+        prm_out_path='', 
+        o_dir='', 
+        lig_method='AM1BCC', 
+        renew_lig=0, 
+        local_lig=1, 
+        ifsavepdb=0, 
+        igb=None, 
+        if_prm_only=0,
+        lig_net_charge_mapper=None
+        ):
         '''
         PDB2FF(self, o_dir='')
         --------------------
@@ -1241,7 +1251,7 @@ class PDB():
 
         # metalcenters_path = self.stru.build_metalcenters(self.met_dir)
         # parm
-        ligand_parm_paths = self._ligand_parm(self.lig_dir, method=lig_method, renew=renew_lig)
+        ligand_parm_paths = self._ligand_parm(self.lig_dir, method=lig_method, renew=renew_lig, net_charge_mapper=lig_net_charge_mapper)
         # self._metal_parm(metalcenters_path)
         # combine
         if o_dir != '':
@@ -1254,7 +1264,7 @@ class PDB():
         return (self.prmtop_path,self.inpcrd_path)
 
     
-    def _ligand_parm(self, lig_dir, method='AM1BCC', lig_charge_method='PYBEL', lig_charge_ph=7.0, renew=0):
+    def _ligand_parm(self, lig_dir, method='AM1BCC', lig_charge_method='PYBEL', lig_charge_ph=7.0, renew=0, net_charge_mapper=None):
         '''
         Turn ligands to prepi (w/net charge), parameterize with parmchk
         return [(perpi_1, frcmod_1), ...]
@@ -1270,6 +1280,7 @@ class PDB():
         
         lig_list = self.stru.get_all_ligands(ifunique=1)
         for lig in lig_list:
+            lig: Ligand
             if Config.debug >= 1:
                 print( 'Working on: '+'_'.join((lig.name, str(lig.id))) )            
             # target files
@@ -1285,8 +1296,10 @@ class PDB():
                 lig_pdb_path = lig_dir+'ligand_'+lig.name+'.pdb'
                 lig.build(lig_pdb_path, ft='PDB')
                 # get net charge
-                net_charge = lig.get_net_charge(method=lig_charge_method, ph=lig_charge_ph, o_dir=lig_dir)
-
+                if not (net_charge_mapper or net_charge_mapper.get(lig.name, None)):
+                    net_charge = lig.get_net_charge(method=lig_charge_method, ph=lig_charge_ph, o_dir=lig_dir)
+                else:
+                    net_charge = net_charge_mapper[lig.name]
                 # get parameters
                 if method == 'AM1BCC':
                     #gen prepi (net charge and correct protonation state is important)
@@ -2967,7 +2980,7 @@ class PDB():
         run(f'rm {self.path.split("/")[-1].removesuffix(".pdb")}_ignorechain.fasta',
             check=True, text=True, shell=True, capture_output=True)        
         # relax
-        relax_cmd = f'mpiexec -np {TEMP_ROSETTA_RES["node_cores"]} {rosetta_home}/source/bin/relax.mpi.linuxgccrelease -s .{int_pdb_path_1.removeprefix(self.dir)} -use_input_sc -ignore_unrecognized_res -nstruct {nstruct_relax} -fa_max_dis 9.0'
+        relax_cmd = f'mpiexec -np {TEMP_ROSETTA_RES["node_cores"]} {rosetta_home}/source/bin/relax.mpi.linuxgccrelease -s {int_pdb_path_1} -use_input_sc -ignore_unrecognized_res -nstruct {nstruct_relax} -fa_max_dis 9.0'
         relax_job = job_manager.ClusterJob.config_job(
                     commands = relax_cmd,
                     cluster = cluster,
