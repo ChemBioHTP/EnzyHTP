@@ -2967,7 +2967,7 @@ class PDB():
         run(f'rm {self.path.split("/")[-1].removesuffix(".pdb")}_ignorechain.fasta',
             check=True, text=True, shell=True, capture_output=True)        
         # relax
-        relax_cmd = f'mpiexec -np {TEMP_ROSETTA_RES["node_cores"]} {rosetta_home}/source/bin/relax.mpi.linuxgccrelease -s .{int_pdb_path_1.removeprefix(self.dir)} -use_input_sc -ignore_unrecognized_res -nstruct {nstruct_relax} -fa_max_dis 9.0'
+        relax_cmd = f'mpiexec -np {TEMP_ROSETTA_RES["node_cores"]} {rosetta_home}/source/bin/relax.mpi.linuxgccrelease -s {int_pdb_path_1} -in:auto_setup_metals -use_input_sc -ignore_unrecognized_res -nstruct {nstruct_relax} -fa_max_dis 9.0'
         relax_job = job_manager.ClusterJob.config_job(
                     commands = relax_cmd,
                     cluster = cluster,
