@@ -37,7 +37,9 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''',
                 'tail' : '''rm -rf $TMPDIR/$SLURM_JOB_ID'''},
         'GPU': None
     }
-
+    BCL_ENV = {
+        'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/dors/meilerlab/apps//Linux2/x86_64/lib64/:/dors/meilerlab/apps/Linux2/x86_64/lib/'
+    }
     #############################
     ### Internal use constant ###
     #############################
