@@ -2973,7 +2973,7 @@ class PDB():
         int_pdb_path_1 = f'{self.path.removesuffix(".pdb")}_rosetta.pdb'
         int_pdb_path_2 = f'{self.path.removesuffix(".pdb")}_relaxed.pdb'
         # remove ligands & clean for rosetta (tmp)
-        run(f'{rosetta_home}/tools/protein_tools/scripts/clean_pdb.py --allchains {self.path} ignorechain',
+        run(f'{rosetta_home}/tools/protein_tools/scripts/clean_pdb.py --allchains {self.path} ignorechain', # TODO replace this as described in https://www.shaoqz.cn/2022/02/05/Rosetta-Notes/
             check=True, text=True, shell=True, capture_output=True)
         run(f'mv {self.path.split("/")[-1].removesuffix(".pdb")}_ignorechain.pdb {int_pdb_path_1}',
             check=True, text=True, shell=True, capture_output=True)        
