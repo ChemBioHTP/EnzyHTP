@@ -3407,6 +3407,8 @@ outtraj {tmp_traj_2}
         # clean
         if Config.debug < 2:
             run('rm reference.frc _MMPBSA_info', check=0, text=True, shell=True, capture_output=True)
+            os.remove("./tmp/MMPBSA.in")
+            os.remove(mmpbsa_job.sub_script_path)
 
         return mmpbsa_out_path
 

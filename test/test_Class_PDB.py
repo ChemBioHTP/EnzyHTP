@@ -532,14 +532,17 @@ def test_run_mmpbsa():
     dc_prmtop = f'{test_dir}data/dc.prmtop'
     sc_prmtop = f'{test_dir}data/sc.prmtop'
     traj_file = f'{test_dir}prod.mdcrd'
+    answer_file = f'{test_dir}data/mmpbsa.dat'
 
     Config.debug = 1
-    test_pdb.run_mmpbsa(
+    mmpbsa_out_file = test_pdb.run_mmpbsa(
         dr_prmtop, dl_prmtop, dc_prmtop, sc_prmtop, traj_file, 
         cluster=accre.Accre(),
         res_setting = {'account':'yang_lab'})
+    
+    assert os.path.getsize(mmpbsa_out_file) == os.path.getsize(answer_file)
 
-    test_file_paths.append('test/testfile_Class_PDB/mmpbsa_test/temp/dr.prmtop')
+    test_file_paths.append(mmpbsa_out_file)
 
 
 ### utilities ###
