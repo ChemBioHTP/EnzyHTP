@@ -11,4 +11,4 @@ source ~/bin/miniconda3/bin/activate
 conda activate MutaGen
 export PYTHONPATH=$PYTHONPATH:~/bin/EnzyHTP
 
-python -u -m pytest test/test_Class_PDB.py::test_run_mmpbsa -s > ./test/pytest.out
+python -u -m pytest test/test_Class_PDB.py::test_get_mmpbsa_binding -s > ./test/pytest.out

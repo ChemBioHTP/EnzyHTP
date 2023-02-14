@@ -3302,6 +3302,15 @@ outtraj {tmp_traj_2}
             if_cluster_job, cluster, period, res_setting, cluster_debug
             )
         result = type(self).extract_mmpbsa_out(mmpbsa_out_file)
+
+        #clean
+        if Config.debug < 2:
+            os.remove(dr_prmtop)
+            os.remove(dl_prmtop)
+            os.remove(dc_prmtop)
+            os.remove(sc_prmtop)
+            os.remove(mmpbsa_out_file)
+
         return result
 
     def make_mmpbsa_prmtops(self, ligand_mask: str, igb: int=5, use_ante_mmpbsa: bool=True):

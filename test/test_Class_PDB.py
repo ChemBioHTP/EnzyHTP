@@ -485,10 +485,6 @@ def test_make_mmpbsa_prmtops_use_ante_mmpbsa():
     ligand_mask = ':902'
     test_dir = 'test/testfile_Class_PDB/mmpbsa_test/'
     test_pdb = PDB(f"{test_dir}PuOrh_amber_aH_rmH_aH_ff.pdb", wk_dir=test_dir)
-    test_pdb.prepi_path["FAD"] = f"{test_dir}../ligands/ligand_FAD.prepin"
-    test_pdb.prepi_path["ACP"] = f"{test_dir}../ligands/ligand_ACP.prepin"
-    test_pdb.frcmod_path["FAD"] = f"{test_dir}../ligands/ligand_FAD.frcmod"
-    test_pdb.frcmod_path["ACP"] = f"{test_dir}../ligands/ligand_ACP.frcmod"
     test_pdb.prmtop = f'{test_dir}/PuOrh_amber_aH_rmH_aH.prmtop'
     Config.debug = 1
 
@@ -552,6 +548,29 @@ def test_extract_mmpbsa_out():
     Config.debug = 1
 
     mmpbsa_out_dict = PDB.extract_mmpbsa_out(data_file)
+    with open(f'{test_dir}data/mmpbsa_answer.df.pickle', "rb") as f:
+        answer = pickle.load(f)
+
+    for k in mmpbsa_out_dict:
+        assert mmpbsa_out_dict[k].equals(answer[k])
+
+def test_get_mmpbsa_binding():
+    '''test function works as expected'''
+    ligand_mask = ':902'
+    test_dir = 'test/testfile_Class_PDB/mmpbsa_test/'
+    test_pdb = PDB(f"{test_dir}PuOrh_amber_aH_rmH_aH_ff.pdb", wk_dir=test_dir)
+    test_pdb.prmtop = f'{test_dir}/PuOrh_amber_aH_rmH_aH.prmtop'
+    test_pdb.mdcrd = f'{test_dir}prod.mdcrd'
+    Config.debug = 1
+
+    with open(f'{test_dir}data/mmpbsa_answer.df.pickle', "rb") as f:
+        answer = pickle.load(f)
+
+    mmpbsa_out_dict = test_pdb.get_mmpbsa_binding(
+        ligand_mask,
+        cluster=accre.Accre(),
+        res_setting = {'account':'yang_lab'})
+
     with open(f'{test_dir}data/mmpbsa_answer.df.pickle', "rb") as f:
         answer = pickle.load(f)
 
