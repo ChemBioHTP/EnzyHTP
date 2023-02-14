@@ -3,6 +3,7 @@ from glob import glob
 from random import choice
 import os
 import pytest
+import pickle
 
 from Class_PDB import PDB
 from Class_Conf import Config
@@ -543,6 +544,19 @@ def test_run_mmpbsa():
     assert os.path.getsize(mmpbsa_out_file) == os.path.getsize(answer_file)
 
     test_file_paths.append(mmpbsa_out_file)
+
+def test_extract_mmpbsa_out():
+    '''test function works as expected. testing using manually confirmed answer'''
+    test_dir = 'test/testfile_Class_PDB/mmpbsa_test/'
+    data_file = f'{test_dir}data/mmpbsa.dat'
+    Config.debug = 1
+
+    mmpbsa_out_dict = PDB.extract_mmpbsa_out(data_file)
+    with open(f'{test_dir}data/mmpbsa_answer.df.pickle', "rb") as f:
+        answer = pickle.load(f)
+
+    for k in mmpbsa_out_dict:
+        assert mmpbsa_out_dict[k].equals(answer[k])
 
 
 ### utilities ###

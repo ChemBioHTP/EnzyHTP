@@ -291,3 +291,10 @@ def run_cmd(cmd, try_time=1, wait_time=3, timeout=120) -> CompletedProcess:
     # exceed the try time
     raise SubprocessError(f'Failed running `{cmd}` after {try_time} tries @{get_localtime()}')
     # TODO change to a custom error
+
+def delete_idx_line(target_line_str: str, idx: int) -> str:
+    """split the string by line feed and deleted the indexed line and put
+    them back to a string"""
+    lines = target_line_str.split(os.linesep)
+    lines.pop(idx)
+    return "\n".join(lines)

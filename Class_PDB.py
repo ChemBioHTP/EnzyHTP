@@ -1,12 +1,13 @@
 import copy
 from math import ceil
 import os
+import io
 import re
 import pandas as pd
 from shutil import rmtree
 from subprocess import SubprocessError, run, CalledProcessError
 from random import choice
-from typing import Union, List
+from typing import Dict, Union, List
 from AmberMaps import *
 from wrapper import *
 from Class_Structure import *
@@ -15,7 +16,16 @@ from Class_Conf import Config, Layer
 from Class_ONIOM_Frame import *
 from core import job_manager
 from core.clusters._interface import ClusterInterface
-from helper import Conformer_Gen_wRDKit, decode_atom_mask, get_center, get_field_strength_value, line_feed, mkdir, generate_Rosetta_params
+from helper import (
+    Conformer_Gen_wRDKit, 
+    delete_idx_line, 
+    decode_atom_mask, 
+    get_center, 
+    get_field_strength_value, 
+    line_feed, 
+    mkdir, 
+    generate_Rosetta_params
+    )
 try:
     from pdb2pqr.main import main_driver as run_pdb2pqr
     from pdb2pqr.main import build_main_parser as build_pdb2pqr_parser
@@ -3291,7 +3301,8 @@ outtraj {tmp_traj_2}
             in_file, overwrite_in, 
             if_cluster_job, cluster, period, res_setting, cluster_debug
             )
-        result = extract_mmpbsa_out(mmpbsa_out_file)
+        result = type(self).extract_mmpbsa_out(mmpbsa_out_file)
+        return result
 
     def make_mmpbsa_prmtops(self, ligand_mask: str, igb: int=5, use_ante_mmpbsa: bool=True):
         '''
@@ -3427,10 +3438,55 @@ outtraj {tmp_traj_2}
             return res_setting
 
     @staticmethod
-    def extract_mmpbsa_out(mmpbsa_out_file: str):
+    def extract_mmpbsa_out(mmpbsa_out_file: str) -> Dict[str, pd.DataFrame]:
         """mvp function extracting mmpbsa out file"""
-        pass
+        gb_pattern = r"GENERALIZED BORN:(?:.|\n)+?Differences \(Complex - Receptor - Ligand\):\n((?:.|\n)+?)-------------------------------------------------------------------------------\n-------------------------------------------------------------------------------"
+        pb_pattern = r"POISSON BOLTZMANN:(?:.|\n)+?Differences \(Complex - Receptor - Ligand\):\n((?:.|\n)+?)-------------------------------------------------------------------------------\n-------------------------------------------------------------------------------"
+        with open(mmpbsa_out_file) as f:
+            f_str = f.read()
+            gb_result_tb = re.search(gb_pattern, f_str).group(1).strip()
+            pb_result_tb = re.search(gb_pattern, f_str).group(1).strip()
+            gb_result = PDB._extract_pb_gb_table(gb_result_tb)
+            pb_result = PDB._extract_pb_gb_table(pb_result_tb)
+        return {"pb":pb_result, "gb":gb_result}
+    
+    @staticmethod
+    def _extract_pb_gb_table(table_str: str) -> pd.DataFrame:
+        """the table looks like this:
+        Energy Component            Average              Std. Dev.   Std. Err. of Mean
+        -------------------------------------------------------------------------------
+        VDWAALS                    -20.3834                3.1308              0.3131
+        EEL                        -19.1765                7.2973              0.7297
+        EGB                         20.8964                4.2728              0.4273
+        ESURF                       -3.8046                0.1256              0.0126
 
+        DELTA G gas                -39.5599                8.4658              0.8466
+        DELTA G solv                17.0918                4.2257              0.4226
+
+        DELTA TOTAL                -22.4680                5.2186              0.5219
+        Returns: (like this) pd.DataFrame
+                          mean      sd     sem
+            VDWAALS      -20.3834  3.1308  0.3131
+            EEL          -19.1765  7.2973  0.7297
+            EGB           20.8964  4.2728  0.4273
+            ESURF         -3.8046  0.1256  0.0126
+            DELTA G gas  -39.5599  8.4658  0.8466
+            DELTA G solv  17.0918  4.2257  0.4226
+            DELTA TOTAL  -22.4680  5.2186  0.5219"""
+
+        data_pattern = r"([A-z]+(?: [A-z]+)*)( *[0-9\-\.]+)( *[0-9\-\.]+)( *[0-9\-\.]+)"
+        data_lines = re.findall(data_pattern, table_str)
+        data_dict = {}
+        for line in data_lines:
+            data_dict[line[0].strip()] = [float(line[1].strip()), float(line[2].strip()), float(line[3].strip())]
+        
+        result_df = pd.DataFrame.from_dict(
+            data_dict, 
+            orient="index",
+            columns=["mean", "sd", "sem"])
+        
+        return result_df
+        
     @staticmethod
     def update_radii(prmtop_path, out_path, igb: int = 5):
         '''
