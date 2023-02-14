@@ -288,6 +288,18 @@ class Config:
             #
             MMPBSA_EXE = None
 
+            # -----------------------------
+            # Default computational resources for amber mmpbsa job for job submission on a cluster
+            # 
+            RES = {'core_type' : 'cpu',
+                    'nodes':'1',
+                    'node_cores' : '24',
+                    'job_name' : 'EH_MMPBSA',
+                    'partition' : 'production',
+                    'mem_per_core' : '3G', # in GB
+                    'walltime' : '1-00:00:00',
+                    'account' : 'xxx'}
+
             #==============================
             # Method to express MMPBSA EXE path
             #
@@ -351,17 +363,17 @@ class Config:
                 pb_line = '  istrng='+str(cls.conf_in['istrng'])+', fillratio='+str(cls.conf_in['fillratio'])
 
                 with open(out_path, 'w') as of:
-                    print('GB and PB calculation' , end=line_feed, file=of)
-                    print('&general' , end=line_feed, file=of)
-                    print(frame_line  , end=line_feed, file=of)
-                    print(output_line  , end=line_feed, file=of)
-                    print('/' , end=line_feed, file=of)
-                    print('&gb' , end=line_feed, file=of)
-                    print(gb_line  , end=line_feed, file=of)
-                    print('/' , end=line_feed, file=of)
-                    print('&pb' , end=line_feed, file=of)
-                    print(pb_line  , end=line_feed, file=of)
-                    print('/' , end=line_feed, file=of)
+                    print('GB and PB calculation' , end=os.linesep, file=of)
+                    print('&general' , end=os.linesep, file=of)
+                    print(frame_line  , end=os.linesep, file=of)
+                    print(output_line  , end=os.linesep, file=of)
+                    print('/' , end=os.linesep, file=of)
+                    print('&gb' , end=os.linesep, file=of)
+                    print(gb_line  , end=os.linesep, file=of)
+                    print('/' , end=os.linesep, file=of)
+                    print('&pb' , end=os.linesep, file=of)
+                    print(pb_line  , end=os.linesep, file=of)
+                    print('/' , end=os.linesep, file=of)
                 
                 return out_path
 

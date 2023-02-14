@@ -479,6 +479,39 @@ def test_get_residue_pka():
     result = pdb_obj.get_residue_pka(':101,222')
     assert result == [6.866247921750009, 9.868125271097515]
 
+def test_make_mmpbsa_prmtops():
+    '''test function works as expected'''
+    ligand_mask = ':902'
+    test_dir = 'test/testfile_Class_PDB/mmpbsa_test/'
+    test_pdb = PDB(f"{test_dir}PuOrh_amber_aH_rmH_aH_ff.pdb", wk_dir=test_dir)
+    test_pdb.prepi_path["FAD"] = f"{test_dir}../ligands/ligand_FAD.prepin"
+    test_pdb.prepi_path["ACP"] = f"{test_dir}../ligands/ligand_ACP.prepin"
+    test_pdb.frcmod_path["FAD"] = f"{test_dir}../ligands/ligand_FAD.frcmod"
+    test_pdb.frcmod_path["ACP"] = f"{test_dir}../ligands/ligand_ACP.frcmod"
+    Config.debug = 1
+
+    assert test_pdb.make_mmpbsa_prmtops(ligand_mask) == (
+        'test/testfile_Class_PDB/mmpbsa_test/temp/dr.prmtop', 
+        'test/testfile_Class_PDB/mmpbsa_test/temp/dl.prmtop', 
+        'test/testfile_Class_PDB/mmpbsa_test/temp/dc.prmtop', 
+        'test/testfile_Class_PDB/mmpbsa_test/temp/sc.prmtop')
+
+def test_run_mmpbsa():
+    '''test function works as expected'''
+    test_dir = 'test/testfile_Class_PDB/mmpbsa_test/'
+    test_pdb = PDB(f"{test_dir}PuOrh_amber_aH_rmH_aH_ff.pdb", wk_dir=test_dir)
+    dr_prmtop = f'{test_dir}temp/dr.prmtop'
+    dl_prmtop = f'{test_dir}temp/dl.prmtop'
+    dc_prmtop = f'{test_dir}temp/dc.prmtop'
+    sc_prmtop = f'{test_dir}temp/sc.prmtop'
+    traj_file = f'{test_dir}prod.mdcrd'
+
+    Config.debug = 1
+    test_pdb.run_mmpbsa(
+        dr_prmtop, dl_prmtop, dc_prmtop, sc_prmtop, traj_file, 
+        cluster=accre.Accre(),
+        res_setting = {'account':'yang_lab'})
+
 ### utilities ###
 @pytest.mark.clean
 def test_clean_files():

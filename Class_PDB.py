@@ -93,6 +93,8 @@ class PDB():
         self.MutaFlags = []
         self.nc=None
         self.frames=None
+        self.prepi_path = {}
+        self.frcmod_path = {}
         # default MD conf.
         self._init_MD_conf()
         # default ONIOM layer setting
@@ -1219,6 +1221,7 @@ class PDB():
         local_lig=1, 
         ifsavepdb=0, 
         igb=None, 
+        ifsolve=1,
         if_prm_only=0,
         lig_net_charge_mapper=None
         ):
@@ -1256,7 +1259,7 @@ class PDB():
         # combine
         if o_dir != '':
             mkdir(o_dir)
-        self._combine_parm(ligand_parm_paths, prm_out_path=prm_out_path, o_dir=o_dir, ifsavepdb=ifsavepdb, igb=igb, if_prm_only=if_prm_only)
+        self._combine_parm(ligand_parm_paths, prm_out_path=prm_out_path, o_dir=o_dir, ifsavepdb=ifsavepdb, igb=igb, ifsolve=ifsolve, if_prm_only=if_prm_only)
         if ifsavepdb:
             self.path = self.path_name+'_ff.pdb'
             self._update_name()
@@ -1277,6 +1280,7 @@ class PDB():
         '''
         parm_paths = []
         self.prepi_path = {}
+        self.frcmod_path = {}
         
         lig_list = self.stru.get_all_ligands(ifunique=1)
         for lig in lig_list:
@@ -1315,6 +1319,7 @@ class PDB():
             #record
             parm_paths.append((out_prepi, out_frcmod))
             self.prepi_path[lig.name] = out_prepi
+            self.frcmod_path[lig.name] = out_frcmod
 
         return parm_paths
 
@@ -1369,8 +1374,9 @@ class PDB():
             else:
                 if o_dir == '':
                     if if_prm_only:
-                        mkdir('./tmp')
-                        of.write('saveamberparm a '+prm_out_path+' ./tmp/tmp.inpcrd'+line_feed)
+                        temp_dir = f'{self.dir}/temp'
+                        mkdir(temp_dir)
+                        of.write('saveamberparm a '+prm_out_path+f' {temp_dir}/tmp.inpcrd'+line_feed)
                         self.prmtop_path=prm_out_path
                         self.inpcrd_path=None
                     else:
@@ -1379,8 +1385,9 @@ class PDB():
                         self.inpcrd_path=self.path_name+'.inpcrd'
                 else:
                     if if_prm_only:
-                        mkdir('./tmp')
-                        of.write('saveamberparm a '+prm_out_path+' ./tmp/tmp.inpcrd'+line_feed)
+                        temp_dir = f'{self.dir}/temp'
+                        mkdir(temp_dir)
+                        of.write('saveamberparm a '+prm_out_path+f' {temp_dir}/tmp.inpcrd'+line_feed)
                         self.prmtop_path=prm_out_path
                         self.inpcrd_path=None
                     else:
@@ -3262,6 +3269,146 @@ outtraj {tmp_traj_2}
                 row_dict["coupled_group"] = None
             residues_pka[atom.res_num] = row_dict
         return list(map(lambda y: residues_pka[y]['pKa'], target_resis))
+    
+    def get_mmpbsa_binding(
+        self, 
+        ligand_mask: str, 
+        igb: int = 5,
+        in_file: str = None,
+        overwrite_in: str = 0,
+        if_cluster_job: bool = True,
+        cluster: ClusterInterface = None,
+        period: int = 30,
+        res_setting: Union[dict, None] = None,
+        cluster_debug: bool = 0):
+        """mvp function for getting the MMPBSA binding assessment for
+        {ligand_mask} from the trajectory"""
+        traj_file = self.mdcrd
+        dr_prmtop, dl_prmtop, dc_prmtop, sc_prmtop = self.make_mmpbsa_prmtops(ligand_mask, igb)
+        mmpbsa_out_file = self.run_mmpbsa(
+            dr_prmtop, dl_prmtop, dc_prmtop, sc_prmtop, traj_file,
+            in_file, overwrite_in, 
+            if_cluster_job, cluster, period, res_setting, cluster_debug
+            )
+        result = extract_mmpbsa_out(mmpbsa_out_file)
+
+    def make_mmpbsa_prmtops(self, ligand_mask: str, igb: int=5):
+        '''
+        Make prmtop files for the MMPB(GB)SA calculation
+        1. make new pdbs
+        2. use tLeap to generate these from pdbs (use existing frcmod file)
+        Args:
+            frag_str:
+                A amber like str to define two fragments
+            igb:
+                gb method used
+        Returns:
+            dr_prmtop, dl_prmtop, dc_prmtop, sc_prmtop 
+            for dry receptor, dry ligand, dry complex, and solvate complex, respectively
+        '''
+        temp_dir = f"{self.dir}/temp/"
+        mkdir(temp_dir)
+        frag1_path = f"{temp_dir}frag1.pdb"
+        frag2_path = f"{temp_dir}frag2.pdb"
+
+        # decode ligand mask
+        ligand_idx = int(ligand_mask.strip()[1:])
+        print(f'working on binding of {ligand_idx}')
+
+        # make new pdb files 
+        stru1 = Structure.fromPDB(self.path).find_idx_residue(ligand_idx)
+        stru2 = Structure.fromPDB(self.path)
+        stru1.build(frag1_path)
+        stru2.solvents = []
+        stru2.metalatoms = list(filter(lambda x: x.resi_name not in ["Na+", "K+"], stru2.metalatoms))
+        stru2.delete_idx_ligand(ligand_idx)
+        stru2.build(frag2_path)
+
+        # convert frag pdbs to prmtop files
+        dr_prmtop = PDB(frag1_path, wk_dir=self.dir).PDB2FF(
+            local_lig = 0,
+            igb=igb, ifsolve=0,
+            prm_out_path=f'{temp_dir}dr.prmtop', if_prm_only=1)[0]
+        dl_prmtop = PDB(frag2_path, wk_dir=self.dir).PDB2FF(
+            local_lig = 0,
+            igb=igb, ifsolve=0, 
+            prm_out_path=f'{temp_dir}dl.prmtop', if_prm_only=1)[0]
+        dc_prmtop = self.PDB2FF(
+            local_lig = 0,
+            igb=igb, ifsolve=0, 
+            prm_out_path=f'{temp_dir}dc.prmtop', if_prm_only=1)[0]
+        sc_prmtop = self.PDB2FF(
+            local_lig = 0,
+            igb=igb, ifsolve=1, 
+            prm_out_path=f'{temp_dir}sc.prmtop', if_prm_only=1)[0]
+
+        # clean
+        if Config.debug < 2:
+            run('rm leap.log', check=0, text=True, shell=True, capture_output=True)
+ 
+        return dr_prmtop, dl_prmtop, dc_prmtop, sc_prmtop
+
+    def run_mmpbsa(
+        self,
+        dr_prmtop, dl_prmtop, dc_prmtop, sc_prmtop, traj_file,
+        in_file: str = None,
+        overwrite_in: str = 0,
+        if_cluster_job: bool = True,
+        cluster: ClusterInterface = None,
+        period: int = 30,
+        res_setting: Union[dict, None] = None,
+        cluster_debug: bool = 0):
+        """mvp function for running mmpbsa"""
+
+        if not in_file:
+            in_file = Config.Amber.MMPBSA.build_MMPBSA_in()
+        else:
+            if os.path.exists(in_file):
+                if overwrite_in:
+                    Config.Amber.MMPBSA.build_MMPBSA_in(in_file)
+            else:
+                Config.Amber.MMPBSA.build_MMPBSA_in(in_file)
+        temp_dir = f'{self.dir}/temp/'
+        mkdir(temp_dir)
+        mmpbsa_out_path = f'{temp_dir}mmpbsa.dat'
+        cmd = f'{Config.get_PC_cmd()} python2 {Config.Amber.MMPBSA.get_MMPBSA_engine()} -O -i {in_file} -o {mmpbsa_out_path} -sp {sc_prmtop} -cp {dc_prmtop} -rp {dr_prmtop} -lp {dl_prmtop} -y {traj_file}'
+
+        if if_cluster_job:
+            mmpbsa_job = job_manager.ClusterJob.config_job(
+                commands = cmd,
+                cluster = cluster,
+                env_settings = cluster.AMBER_ENV['CPU'],
+                res_keywords = type(self)._get_default_res_setting_mmpbsa(res_setting),
+                sub_dir = './', # because path are relative
+                sub_script_path = f'{temp_dir}/submit_MMPBSA.cmd')
+            mmpbsa_job.submit()
+            mmpbsa_job.wait_to_end(period=period)
+        else:
+            raise Exception("only support cluster job mode right now")
+        # clean
+        if Config.debug < 2:
+            run('rm reference.frc _MMPBSA_info', check=0, text=True, shell=True, capture_output=True)
+
+        return mmpbsa_out_path
+
+    @staticmethod
+    def _get_default_res_setting_mmpbsa(res_setting):
+        """TODO combine those repeating functions"""
+        if res_setting is None:
+            res_setting = dict()
+        if isinstance(res_setting, dict):
+            res_setting_holder = copy.deepcopy(Config.Amber.MMPBSA.RES)
+            # replace assigned key in default dict
+            for k, v in res_setting.items():
+                res_setting_holder[k] = v
+            return res_setting_holder
+        if isinstance(res_setting, str):
+            return res_setting
+
+    @staticmethod
+    def extract_mmpbsa_out(mmpbsa_out_file: str):
+        """mvp function extracting mmpbsa out file"""
+        pass
 
 def get_PDB(name):
     '''

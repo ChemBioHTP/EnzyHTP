@@ -829,6 +829,21 @@ class Structure():
 
         return all_r_list
 
+    def find_idx_residue(self, idx: int):
+        result = list(filter(lambda x: x.id == idx, self.get_all_residue_unit()))
+        if len(result) == 0:
+            print(f"No residue found with idx: {idx}")
+            return None
+        if len(result) > 1:
+            raise Exception(f"found more than one residue with idx: {idx}. check your structure")
+        return result[0]
+
+
+    def delete_idx_ligand(self, idx: int):
+        for i in range(len(self.ligands)-1,-1,-1):
+            if self.ligands[i].id == idx:
+                del self.ligands[i]
+        
 
     def get_residue(self, id):
         '''
