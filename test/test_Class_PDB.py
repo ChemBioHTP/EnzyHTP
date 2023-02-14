@@ -514,16 +514,23 @@ def test_make_mmpbsa_prmtops_no_ante_mmpbsa():
         'test/testfile_Class_PDB/mmpbsa_test/temp/dl.prmtop', 
         'test/testfile_Class_PDB/mmpbsa_test/temp/dc.prmtop', 
         'test/testfile_Class_PDB/mmpbsa_test/temp/sc.prmtop')
+    
+    test_file_paths.extend([
+        'test/testfile_Class_PDB/mmpbsa_test/temp/dr.prmtop', 
+        'test/testfile_Class_PDB/mmpbsa_test/temp/dl.prmtop', 
+        'test/testfile_Class_PDB/mmpbsa_test/temp/dc.prmtop', 
+        'test/testfile_Class_PDB/mmpbsa_test/temp/sc.prmtop'])
+    test_file_dirs.append(f"{test_dir}temp/")
 
 
 def test_run_mmpbsa():
     '''test function works as expected'''
     test_dir = 'test/testfile_Class_PDB/mmpbsa_test/'
     test_pdb = PDB(f"{test_dir}PuOrh_amber_aH_rmH_aH_ff.pdb", wk_dir=test_dir)
-    dr_prmtop = f'{test_dir}temp/dr.prmtop'
-    dl_prmtop = f'{test_dir}temp/dl.prmtop'
-    dc_prmtop = f'{test_dir}temp/dc.prmtop'
-    sc_prmtop = f'{test_dir}temp/sc.prmtop'
+    dr_prmtop = f'{test_dir}data/dr.prmtop'
+    dl_prmtop = f'{test_dir}data/dl.prmtop'
+    dc_prmtop = f'{test_dir}data/dc.prmtop'
+    sc_prmtop = f'{test_dir}data/sc.prmtop'
     traj_file = f'{test_dir}prod.mdcrd'
 
     Config.debug = 1
@@ -531,6 +538,9 @@ def test_run_mmpbsa():
         dr_prmtop, dl_prmtop, dc_prmtop, sc_prmtop, traj_file, 
         cluster=accre.Accre(),
         res_setting = {'account':'yang_lab'})
+
+    test_file_paths.append('test/testfile_Class_PDB/mmpbsa_test/temp/dr.prmtop')
+
 
 ### utilities ###
 @pytest.mark.clean
