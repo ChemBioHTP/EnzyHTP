@@ -342,7 +342,7 @@ class Config:
             }
 
             @classmethod
-            def build_MMPBSA_in(cls, out_path=''):
+            def build_MMPBSA_in(cls, out_path='', use_sander=1):
                 '''
                 build MMPBSA.in in out_path
                 '''
@@ -367,6 +367,7 @@ class Config:
                     print('&general' , end=os.linesep, file=of)
                     print(frame_line  , end=os.linesep, file=of)
                     print(output_line  , end=os.linesep, file=of)
+                    print(f'  use_sander={use_sander},'  , end=os.linesep, file=of)
                     print('/' , end=os.linesep, file=of)
                     print('&gb' , end=os.linesep, file=of)
                     print(gb_line  , end=os.linesep, file=of)

@@ -3,6 +3,7 @@ from math import ceil
 import os
 import re
 import pandas as pd
+from shutil import rmtree
 from subprocess import SubprocessError, run, CalledProcessError
 from random import choice
 from typing import Union, List
@@ -3292,7 +3293,7 @@ outtraj {tmp_traj_2}
             )
         result = extract_mmpbsa_out(mmpbsa_out_file)
 
-    def make_mmpbsa_prmtops(self, ligand_mask: str, igb: int=5):
+    def make_mmpbsa_prmtops(self, ligand_mask: str, igb: int=5, use_ante_mmpbsa: bool=True):
         '''
         Make prmtop files for the MMPB(GB)SA calculation
         1. make new pdbs
@@ -3308,43 +3309,61 @@ outtraj {tmp_traj_2}
         '''
         temp_dir = f"{self.dir}/temp/"
         mkdir(temp_dir)
-        frag1_path = f"{temp_dir}frag1.pdb"
-        frag2_path = f"{temp_dir}frag2.pdb"
 
-        # decode ligand mask
-        ligand_idx = int(ligand_mask.strip()[1:])
-        print(f'working on binding of {ligand_idx}')
+        if use_ante_mmpbsa:
+            radii = radii_map[str(igb)]
+            dr_prmtop = f"{temp_dir}dr.prmtop"
+            dl_prmtop = f"{temp_dir}dl.prmtop"
+            dc_prmtop = f"{temp_dir}dc.prmtop"
+            ante_cmd = f'ante-MMPBSA.py -p {self.prmtop} --radii {radii} -s ":WAT,Na+,Cl-" -c {dc_prmtop} -n "{ligand_mask}" -l {dl_prmtop} -r {dr_prmtop}'
+            try:
+                run(ante_cmd, check=0, text=True, shell=True, capture_output=True)
+            except CalledProcessError as err:
+                print(err.stdout, err.stderr)
+                raise err
 
-        # make new pdb files 
-        stru1 = Structure.fromPDB(self.path).find_idx_residue(ligand_idx)
-        stru2 = Structure.fromPDB(self.path)
-        stru1.build(frag1_path)
-        stru2.solvents = []
-        stru2.metalatoms = list(filter(lambda x: x.resi_name not in ["Na+", "K+"], stru2.metalatoms))
-        stru2.delete_idx_ligand(ligand_idx)
-        stru2.build(frag2_path)
+        else:
+            frag1_path = f"{temp_dir}frag1.pdb"
+            frag2_path = f"{temp_dir}frag2.pdb"
+            dc_path = f"{temp_dir}dry_complex.pdb"
+            # decode ligand mask
+            ligand_idx = int(ligand_mask.strip()[1:])
+            print(f'working on binding of {ligand_idx}')
 
-        # convert frag pdbs to prmtop files
-        dr_prmtop = PDB(frag1_path, wk_dir=self.dir).PDB2FF(
-            local_lig = 0,
-            igb=igb, ifsolve=0,
-            prm_out_path=f'{temp_dir}dr.prmtop', if_prm_only=1)[0]
-        dl_prmtop = PDB(frag2_path, wk_dir=self.dir).PDB2FF(
-            local_lig = 0,
-            igb=igb, ifsolve=0, 
-            prm_out_path=f'{temp_dir}dl.prmtop', if_prm_only=1)[0]
-        dc_prmtop = self.PDB2FF(
-            local_lig = 0,
-            igb=igb, ifsolve=0, 
-            prm_out_path=f'{temp_dir}dc.prmtop', if_prm_only=1)[0]
-        sc_prmtop = self.PDB2FF(
-            local_lig = 0,
-            igb=igb, ifsolve=1, 
-            prm_out_path=f'{temp_dir}sc.prmtop', if_prm_only=1)[0]
+            # make new pdb files 
+            stru1 = Structure.fromPDB(self.path).find_idx_residue(ligand_idx)
+            stru2 = Structure.fromPDB(self.path)
+            stru1.build(frag1_path)
+            stru2.solvents = []
+            stru2.metalatoms = list(filter(lambda x: x.resi_name not in ["Na+", "K+"], stru2.metalatoms))
+            stru2.delete_idx_ligand(ligand_idx)
+            stru2.build(frag2_path)
+            stru3 = Structure.fromPDB(self.path)
+            stru3.solvents = []
+            stru3.metalatoms = list(filter(lambda x: x.resi_name not in ["Na+", "K+"], stru2.metalatoms))
+            stru3.build(dc_path)
 
-        # clean
-        if Config.debug < 2:
-            run('rm leap.log', check=0, text=True, shell=True, capture_output=True)
+            # convert frag pdbs to prmtop files
+            dl_prmtop = PDB(frag1_path, wk_dir=self.dir).PDB2FF(
+                local_lig = 0,
+                igb=igb, ifsolve=0,
+                prm_out_path=f'{temp_dir}dl.prmtop', if_prm_only=1)[0]
+            dr_prmtop = PDB(frag2_path, wk_dir=self.dir).PDB2FF(
+                local_lig = 0,
+                igb=igb, ifsolve=0, 
+                prm_out_path=f'{temp_dir}dr.prmtop', if_prm_only=1)[0]
+            dc_prmtop = PDB(dc_path, wk_dir=self.dir).PDB2FF(
+                local_lig = 0,
+                igb=igb, ifsolve=0, 
+                prm_out_path=f'{temp_dir}dc.prmtop', if_prm_only=1)[0]
+            # clean
+            if Config.debug < 2:
+                run('rm leap.log', check=0, text=True, shell=True, capture_output=True)
+
+        sc_prmtop = type(self).update_radii(
+            self.prmtop,
+            out_path=f'{temp_dir}sc.prmtop', igb=igb)
+
  
         return dr_prmtop, dl_prmtop, dc_prmtop, sc_prmtop
 
@@ -3409,6 +3428,36 @@ outtraj {tmp_traj_2}
     def extract_mmpbsa_out(mmpbsa_out_file: str):
         """mvp function extracting mmpbsa out file"""
         pass
+
+    @staticmethod
+    def update_radii(prmtop_path, out_path, igb: int = 5):
+        '''
+        Update Radii for the MMGBSA calculation
+        '''
+        # get radii
+        radii = radii_map[str(igb)]
+
+        temp_dir = './parmed_tmp/'
+        mkdir(temp_dir)
+
+        new_prmtop_path = out_path
+        # change Radii
+        with open(f'{temp_dir}/parmed.in','w') as of:
+            of.write('changeRadii '+radii+line_feed)
+            of.write('parmout '+new_prmtop_path+line_feed)
+        try:
+            run(f'parmed -O -p {prmtop_path} -i {temp_dir}/parmed.in', 
+                check=True, text=True, shell=True, capture_output=True)
+        except CalledProcessError as err:
+            print(err.stdout, err.stderr)
+            raise err
+
+        # clean
+        if Config.debug < 2:
+            rmtree(temp_dir)
+
+        return out_path
+
 
 def get_PDB(name):
     '''

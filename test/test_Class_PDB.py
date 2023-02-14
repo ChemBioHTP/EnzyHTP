@@ -479,7 +479,7 @@ def test_get_residue_pka():
     result = pdb_obj.get_residue_pka(':101,222')
     assert result == [6.866247921750009, 9.868125271097515]
 
-def test_make_mmpbsa_prmtops():
+def test_make_mmpbsa_prmtops_use_ante_mmpbsa():
     '''test function works as expected'''
     ligand_mask = ':902'
     test_dir = 'test/testfile_Class_PDB/mmpbsa_test/'
@@ -488,6 +488,7 @@ def test_make_mmpbsa_prmtops():
     test_pdb.prepi_path["ACP"] = f"{test_dir}../ligands/ligand_ACP.prepin"
     test_pdb.frcmod_path["FAD"] = f"{test_dir}../ligands/ligand_FAD.frcmod"
     test_pdb.frcmod_path["ACP"] = f"{test_dir}../ligands/ligand_ACP.frcmod"
+    test_pdb.prmtop = f'{test_dir}/PuOrh_amber_aH_rmH_aH.prmtop'
     Config.debug = 1
 
     assert test_pdb.make_mmpbsa_prmtops(ligand_mask) == (
@@ -495,6 +496,25 @@ def test_make_mmpbsa_prmtops():
         'test/testfile_Class_PDB/mmpbsa_test/temp/dl.prmtop', 
         'test/testfile_Class_PDB/mmpbsa_test/temp/dc.prmtop', 
         'test/testfile_Class_PDB/mmpbsa_test/temp/sc.prmtop')
+
+def test_make_mmpbsa_prmtops_no_ante_mmpbsa():
+    '''test function works as expected'''
+    ligand_mask = ':902'
+    test_dir = 'test/testfile_Class_PDB/mmpbsa_test/'
+    test_pdb = PDB(f"{test_dir}PuOrh_amber_aH_rmH_aH_ff.pdb", wk_dir=test_dir)
+    test_pdb.prepi_path["FAD"] = f"{test_dir}../ligands/ligand_FAD.prepin"
+    test_pdb.prepi_path["ACP"] = f"{test_dir}../ligands/ligand_ACP.prepin"
+    test_pdb.frcmod_path["FAD"] = f"{test_dir}../ligands/ligand_FAD.frcmod"
+    test_pdb.frcmod_path["ACP"] = f"{test_dir}../ligands/ligand_ACP.frcmod"
+    test_pdb.prmtop = f'{test_dir}/PuOrh_amber_aH_rmH_aH.prmtop'
+    Config.debug = 1
+
+    assert test_pdb.make_mmpbsa_prmtops(ligand_mask, use_ante_mmpbsa=0) == (
+        'test/testfile_Class_PDB/mmpbsa_test/temp/dr.prmtop', 
+        'test/testfile_Class_PDB/mmpbsa_test/temp/dl.prmtop', 
+        'test/testfile_Class_PDB/mmpbsa_test/temp/dc.prmtop', 
+        'test/testfile_Class_PDB/mmpbsa_test/temp/sc.prmtop')
+
 
 def test_run_mmpbsa():
     '''test function works as expected'''
