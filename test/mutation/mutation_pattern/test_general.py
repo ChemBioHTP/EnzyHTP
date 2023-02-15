@@ -78,3 +78,10 @@ def test_decode_direct_mutation():
 
     assert m_p.decode_direct_mutation(test_stru, test_d_pattern) == answer
     assert m_p.decode_direct_mutation(test_stru, test_d_pattern_1) == answer
+
+def test_decode_mutation_esm_pattern():
+    "test function works as expected"
+    test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
+    test_stru = sp.get_structure(test_pdb)
+    test_pattern = "resi 289 around 4 and not resi 36:all, resi 2:larger, proj(resi 1,resi 2):all"
+    m_p.decode_mutation_esm_pattern(test_stru, test_pattern)
