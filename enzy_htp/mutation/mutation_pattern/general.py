@@ -14,6 +14,8 @@ from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.general import pop_random_list_elem
 from enzy_htp.structure import Structure
 from ..mutation import Mutation, decode_mutation_flag, is_valid_mutation
+from .position_pattern import decode_position_pattern
+from .target_aa_pattern import decode_target_aa_pattern
 
 
 def decode_mutation_pattern(stru: Structure, pattern: str) -> List[Mutation]:
@@ -97,15 +99,20 @@ def decode_random_mutation(stru: Structure, section_pattern: str) -> List[List[M
         # mutation_esm_copy = copy.deepcopy(mutation_esm)
         # while len(each_mutant) < mut_point_num:
         #     each_mutant.append(pop_random_list_elem(mutation_esm_copy)) #TODO but should we allow the same mutation? make it an option
-        # result.append(each_mutant)
-    # TODO clear and warn about repeating mutant (also make an option)
+        # result.append(each_mutant) #TODO allow R after N and M to specify
 
     return result
 
 def decode_all_mutation(stru: Structure, section_pattern: str) -> List[List[Mutation]]:
     """decode the mutation pattern section that mutate all in the mutation set.
-    Return a list of mutation objects.
-    pattern_example: a:[xxx:yyy]"""
+    There will be the maxium same number of mutations as the number of positions.
+    Non-mutation of each site will also be included. e.g.: 'a_site' : ILM, 'b_site' : ILM
+    will give you 16 mutants containing 2 point, 1 point and a WT.
+
+    Returns:
+        a list of mutation objects.
+    pattern_example: 
+        a:[xxx:yyy]"""
     result = ""
     return result
 
@@ -120,10 +127,17 @@ def decode_mutation_esm_pattern(stru: Structure, mutation_esm_patterns: str) -> 
     """decode mutation esm pattern into a list of mutation objects
     pattern_example: position_pattern_0:target_aa_pattern_0, ..."""
 
+    esm_result: Dict[tuple, List[Mutation]] = {}
     seperate_pattern = r"(?:[^,(]|(?:\([^\}]*\)))+[^,]*"
-    esm_pattern_list = re.findall(seperate_pattern, mutation_esm_patterns)
-    # TODO
-    return
+    esm_pattern_list = [i.strip() for i in re.findall(seperate_pattern, mutation_esm_patterns)]
+    for esm_pattern in esm_pattern_list:
+        position_pattern, target_aa_pattern = esm_pattern.split(":")
+        esm_positions = decode_position_pattern(stru, position_pattern, if_name=True)
+        for esm_position, orig_resi in esm_positions:
+            posi_target_aa = decode_target_aa_pattern(orig_resi, target_aa_pattern)
+            esm_result[esm_position] = posi_target_aa
+
+    return esm_result
 
 
 
