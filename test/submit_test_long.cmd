@@ -7,6 +7,7 @@
 #SBATCH --time=3-00:00:00
 #SBATCH --account=yang_lab_csb
 
+source /home/shaoq1/bin/amber_env/amber-accre.sh
 source ~/bin/miniconda3/bin/activate
 conda activate MutaGen
 export PYTHONPATH=$PYTHONPATH:~/bin/EnzyHTP

@@ -528,14 +528,15 @@ def test_run_mmpbsa():
     dl_prmtop = f'{test_dir}data/dl.prmtop'
     dc_prmtop = f'{test_dir}data/dc.prmtop'
     sc_prmtop = f'{test_dir}data/sc.prmtop'
-    traj_file = f'{test_dir}prod.mdcrd'
+    traj_file = f'{test_dir}prod_test.mdcrd'
     answer_file = f'{test_dir}data/mmpbsa.dat'
 
     Config.debug = 1
     mmpbsa_out_file = test_pdb.run_mmpbsa(
         dr_prmtop, dl_prmtop, dc_prmtop, sc_prmtop, traj_file, 
         cluster=accre.Accre(),
-        res_setting = {'account':'yang_lab'})
+        res_setting = {'node_cores' : '2',
+                       'account':'yang_lab'})
     
     assert os.path.getsize(mmpbsa_out_file) == os.path.getsize(answer_file)
 
@@ -560,7 +561,7 @@ def test_get_mmpbsa_binding():
     test_dir = 'test/testfile_Class_PDB/mmpbsa_test/'
     test_pdb = PDB(f"{test_dir}PuOrh_amber_aH_rmH_aH_ff.pdb", wk_dir=test_dir)
     test_pdb.prmtop = f'{test_dir}/PuOrh_amber_aH_rmH_aH.prmtop'
-    test_pdb.mdcrd = f'{test_dir}prod.mdcrd'
+    test_pdb.mdcrd = f'{test_dir}prod_test.mdcrd'
     Config.debug = 1
 
     with open(f'{test_dir}data/mmpbsa_answer.df.pickle', "rb") as f:
@@ -569,7 +570,8 @@ def test_get_mmpbsa_binding():
     mmpbsa_out_dict = test_pdb.get_mmpbsa_binding(
         ligand_mask,
         cluster=accre.Accre(),
-        res_setting = {'account':'yang_lab'})
+        res_setting = {'node_cores' : '2',
+                       'account':'yang_lab'})
 
     with open(f'{test_dir}data/mmpbsa_answer.df.pickle', "rb") as f:
         answer = pickle.load(f)
