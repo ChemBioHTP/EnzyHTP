@@ -1311,7 +1311,7 @@ class PDB():
                 lig_pdb_path = lig_dir+'ligand_'+lig.name+'.pdb'
                 lig.build(lig_pdb_path, ft='PDB')
                 # get net charge
-                if not (net_charge_mapper or net_charge_mapper.get(lig.name, None)):
+                if not (net_charge_mapper and net_charge_mapper.get(lig.name, None)):
                     net_charge = lig.get_net_charge(method=lig_charge_method, ph=lig_charge_ph, o_dir=lig_dir)
                 else:
                     net_charge = net_charge_mapper[lig.name]
@@ -3410,14 +3410,15 @@ outtraj {tmp_traj_2}
         temp_dir = f'{self.dir}/temp/'
         mkdir(temp_dir)
         mmpbsa_out_path = f'{temp_dir}mmpbsa.dat'
-        cmd = f'{Config.get_PC_cmd()} python2 {Config.Amber.MMPBSA.get_MMPBSA_engine()} -O -i {in_file} -o {mmpbsa_out_path} -sp {sc_prmtop} -cp {dc_prmtop} -rp {dr_prmtop} -lp {dl_prmtop} -y {traj_file}'
 
         if if_cluster_job:
+            res_keywords = type(self)._get_default_res_setting_mmpbsa(res_setting)
+            cmd = f'{Config.get_PC_cmd(res_keywords["node_cores"])} python2 {Config.Amber.MMPBSA.get_MMPBSA_engine()} -O -i {in_file} -o {mmpbsa_out_path} -sp {sc_prmtop} -cp {dc_prmtop} -rp {dr_prmtop} -lp {dl_prmtop} -y {traj_file}'
             mmpbsa_job = job_manager.ClusterJob.config_job(
                 commands = cmd,
                 cluster = cluster,
                 env_settings = cluster.AMBER_ENV['CPU'],
-                res_keywords = type(self)._get_default_res_setting_mmpbsa(res_setting),
+                res_keywords = res_keywords,
                 sub_dir = './', # because path are relative
                 sub_script_path = f'{temp_dir}/submit_MMPBSA.cmd')
             mmpbsa_job.submit()
