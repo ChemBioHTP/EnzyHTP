@@ -24,6 +24,7 @@ from typing import Any, Dict
 from .amber_config import AmberConfig, default_amber_config
 from .gaussian_config import GaussianConfig, default_gaussian_config
 from .multiwfn_config import MultiwfnConfig, default_multiwfn_config
+from .pymol_config import PyMolConfig, default_pymol_config
 from .system_config import SystemConfig, default_system_config
 
 from enzy_htp.core import _LOGGER
@@ -48,6 +49,7 @@ class Config:
         self._amber = default_amber_config()
         self._gaussian = default_gaussian_config()
         self._multiwfn = default_multiwfn_config()
+        self._pymol = default_pymol_config()
         self._system = default_system_config()
 
     def __getitem__(self, key: str) -> Any:
@@ -71,6 +73,8 @@ class Config:
                 ptr = self._gaussian
             elif app == "multiwfn":
                 ptr = self._multiwfn
+            elif app == "pymol":
+                ptr = self._pymol
             elif app == "system":
                 ptr = self._system
             else:
@@ -100,6 +104,8 @@ class Config:
                 ptr = self._gaussian
             elif app == "multiwfn":
                 ptr = self._multiwfn
+            elif app == "pymol":
+                ptr = self._pymol
             elif app == "system":
                 ptr = self._system
             else:

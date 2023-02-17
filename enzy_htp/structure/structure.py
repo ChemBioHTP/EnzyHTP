@@ -127,6 +127,8 @@ class Structure(DoubleLinkedNode):
     Designed for direct interfacing by users.
     Composed of child Chain() objects and their subsequent child Residue() objects and so on Atom() objects.
     Note: This class SHOULD NOT be created directly by users. It should be created with methods from the StructureIO module.
+    Note: regardless of index assigned to residues and atoms, there is an intrinsic indexing system based on the order of 
+    _children lists. This intrinsicc index can be compared with pymol's index (not id)
 
     Attributes:
         children/chains: List[Chain]
@@ -192,6 +194,21 @@ class Structure(DoubleLinkedNode):
     def num_chains(self) -> int:
         """Returns the number of Chain() objects in the current Structure()."""
         return len(self._chains)
+    
+    @property
+    def chain_names(self) -> List[str]:
+        """Returns a list of chain names"""
+        return list(map(lambda x: x.name, self._chains))
+
+    @property
+    def num_residues(self) -> int:
+        """Returns the number of Residue() objects in the current Structure()."""
+        return len(self.residues)
+
+    @property
+    def residue_indexes(self) -> int:
+        """Returns the number of Residue() objects in the current Structure()."""
+        return list(map(lambda x: x.idx, self.residues))
 
     @property
     def residues(self) -> List[Residue]:
@@ -228,6 +245,23 @@ class Structure(DoubleLinkedNode):
         for atom in self.atoms:
             if atom.distance_to(center) <= range_distance:
                 result.append(atom)
+        return result
+
+    def find_idx_atom(self, atom_idx: int) -> Atom:
+        """find atom base on its idx. return a reference of the atom."""
+        result = list(filter(lambda a: a.idx == atom_idx, self.atoms))
+        if not result:
+            _LOGGER.info(f"found 0 atom with index: {atom_idx}")
+        if len(result) > 1:
+            _LOGGER.warning(
+                f"found {len(result)} atoms with index: {atom_idx}! only the 1st one is used. consider sort_everything()")
+        return result[0]
+
+    def find_idxes_atom_list(self, atom_idx_list: int) -> List[Atom]:
+        """find atom base on its idx. return a list reference of the atoms."""
+        result = []
+        for idx in atom_idx_list:
+            result.append(self.find_idx_atom(idx))
         return result
 
     @property

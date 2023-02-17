@@ -39,7 +39,7 @@ from ._config import config
 from .preparation import PDBLine, read_pdb_lines
 from .chemical import ResidueType
 
-from ._interface import Interface
+from ._interface import Interface, OpenPyMolSession
 
 interface = Interface(config)
 

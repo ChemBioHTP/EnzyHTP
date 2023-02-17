@@ -141,6 +141,11 @@ class Residue(DoubleLinkedNode):
         """get a list of atom names in the residue"""
         return list(map(lambda a: a.name, self.atoms))
 
+    @property
+    def atom_idx_list(self) -> List[int]:
+        """get a list of atom indexes in the residue"""
+        return list(map(lambda a: a.idx, self.atoms))
+
     # def clone(self) -> Residue: #TODO
     #     """Creates a deepcopy of self."""
     #     return deepcopy(self)

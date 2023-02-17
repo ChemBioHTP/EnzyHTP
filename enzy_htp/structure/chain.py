@@ -101,7 +101,7 @@ class Chain(DoubleLinkedNode):
         """
         interval_list = get_interval_from_list(self.residue_idxs)
         if if_str:
-            range_strs = map(lambda x: f"{x[0]}-{x[1]}", interval_list)
+            range_strs = ",".join([f"{x[0]}-{x[1]}" if x[0] != x[1] else f"{x[0]}" for x in interval_list])
             return ",".join(range_strs)
         return interval_list
 
