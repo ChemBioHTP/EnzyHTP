@@ -22,7 +22,7 @@ def test_decode_mutation_pattern():
     test_mutation_pattern = (
         "KA162A, {RA154W, HA201A},"
         " r:2[resi 289 around 4 and not resi 36:larger,"
-            " proj(id 1000, id 2023, positive, 10):more_negative_charge]*100"
+            " proj(ID 1000, ID 2023, positive, 10):more_negative_charge]*100"
         )
     test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
     test_stru = sp.get_structure(test_pdb)
@@ -35,7 +35,7 @@ def test_seperate_mutants():
     test_mutation_pattern = (
         "KA162A, {RA154W, HA201A},"
         " r:2[resi 289 around 4 and not resi 36:larger,"
-            " proj(id 1000, id 2023, positive, 10):more_negative_charge]*100"
+            " proj(ID 1000, ID 2023, positive, 10):more_negative_charge]*100"
         )
     assert len(m_p.seperate_mutant_patterns(test_mutation_pattern)) == 3
 
@@ -45,7 +45,7 @@ def test_seperate_sections():
     test_mutation_pattern = (
         "KA162A,"
         " r:2[resi 289 around 4 and not resi 36:larger,"
-            " proj(id 1000, id 2023, positive, 10):more_negative_charge]*100,"
+            " proj(ID 1000, ID 2023, positive, 10):more_negative_charge]*100,"
         "RA154W"
         )
     assert len(m_p.seperate_section_patterns(test_mutation_pattern)) == 3
