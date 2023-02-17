@@ -19,5 +19,6 @@ def test_select_stru():
     "test function works as expected"
     test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
     test_stru = sp.get_structure(test_pdb)
-    test_pattern = "resi 289 around 4"
-    select_stru(test_stru, test_pattern)
+    test_pattern = "resi 254 around 4"
+    select_obj = select_stru(test_stru, test_pattern)
+    print(select_obj)
