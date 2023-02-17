@@ -36,6 +36,12 @@ def get_interval_from_list(target_list: List[int]) -> Iterable[Tuple[int, int]]:
         j = list(j)
         yield j[0][1], j[-1][1]
 
+def get_interval_str_from_list(target_list: List[int]) -> str:
+    """convert the result of get_interval_from_list() to a str"""
+    result = get_interval_from_list(target_list)
+    result = ",".join([f"{x[0]}-{x[1]}" if x[0] != x[1] else f"{x[0]}" for x in result])
+    return result
+
 def get_random_list_elem(traget_list: list):
     """Helper method that randomly chooses an element from a list. numpy.random.choice() doesn't 
     like to take elements from list()'s of tuples so this is the work around."""
