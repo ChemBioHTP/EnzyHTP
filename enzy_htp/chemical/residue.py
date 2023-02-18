@@ -71,6 +71,30 @@ ONE_LETTER_AA_MAPPER: Dict[str, str] = {
 }
 """Contains mapping of all amino acids codes, with key value pairs of (one letter code, three letter code). Should NOT be called directly for code conversion. Instead used enzy_htp.chemical.residue.convert_to_one_letter()"""
 
+ONE_LETTER_CAA_MAPPER: Dict[str, str] = {
+        "A": "ALA",
+        "C": "CYS",
+        "D": "ASP",
+        "E": "GLU",
+        "F": "PHE",
+        "G": "GLY",
+        "H": "HIS",
+        "I": "ILE",
+        "K": "LYS",
+        "L": "LEU",
+        "M": "MET",
+        "N": "ASN",
+        "P": "PRO",
+        "Q": "GLN",
+        "R": "ARG",
+        "S": "SER",
+        "T": "THR",
+        "V": "VAL",
+        "W": "TRP",
+        "Y": "TYR"
+}
+"""Contains mapping of all canonical amino acids codes, with key value pairs of (one letter code, three letter code). Should NOT be called directly for code conversion. Instead used enzy_htp.chemical.residue.convert_to_one_letter()"""
+
 RESIDUE_ELEMENT_MAP: Dict[str, Dict[str, str]] = {
                 "Amber": {    "C" : "C",
                               "CA" : "C",
