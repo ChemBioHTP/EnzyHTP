@@ -8,6 +8,7 @@ import pytest
 from pathlib import Path
 from typing import Union 
 
+import enzy_htp.structure as struct
 from enzy_htp.core import file_system as fs
 from enzy_htp import interface
 
@@ -236,3 +237,26 @@ def test_parse_prmtop_no_file():
         ai.parse_prmtop( dne )                    
 
     assert exe
+
+
+def test_add_charges():
+    """Checking that the AmberInterface.add_charges() method works correctly."""
+
+    ai = interface.amber
+    ss = struct.PDBParser.get_structure(f"{MM_BASE_DIR}/data/1h1d.pdb")
+    assert not ss.has_charges()
+    ai.add_charges( ss, f"{MM_BASE_DIR}/data/1h1d_prmtop" )
+    assert ss.has_charges()
+
+
+def test_add_charges_bad_file():
+    """Checking that the AmberInterface.add_charge() method throws an error for bad inputs."""
+
+    ai = interface.amber
+    ss = struct.PDBParser.get_structure(f"{MM_BASE_DIR}/data/1h1d.pdb")
+
+    with pytest.raises(SystemExit) as exe:
+        ai.add_charges( ss, f"{MM_BASE_DIR}/data/bad_label_prmtop" )
+
+    assert exe
+

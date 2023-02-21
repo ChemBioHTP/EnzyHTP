@@ -44,6 +44,9 @@ from ._interface import Interface
 
 
 interface = Interface(config)
+
+from .analysis import ( electric_field )
+
 """Singleton interface for all softwares enzy_htp is capable of interfacing with. SHOULD NOT be used by
 end users and instead exists for developers to access external software. See enzy_htp/_interface/interface.py
 for full class defintion."""
