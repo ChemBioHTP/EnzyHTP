@@ -128,3 +128,4 @@ def get_valid_temp_name(fname: str) -> None:
         idx += 1
         result_fname = f"{fname[:-len(suffix)]}_{str(idx)}{suffix}"
     return result_fname
+

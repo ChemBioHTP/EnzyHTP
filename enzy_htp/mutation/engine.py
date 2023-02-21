@@ -10,6 +10,9 @@ Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-15
 """
+
+#TODO(CJ): This doesn't currently work for tleap. Get it working
+
 import hashlib
 from pathlib import Path
 from copy import deepcopy

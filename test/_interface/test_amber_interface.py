@@ -4,6 +4,7 @@ Date: 2022-06-03
 """
 import os
 import shutil
+import pytest
 from pathlib import Path
 from typing import Union 
 
@@ -63,30 +64,39 @@ def test_write_minimize_input_file():
     assert not Path(MINIMIZE_INPUT_2).exists()
 
 
-def test_minimize_structure():
-    """Testing that a structure can be minimized with the AmberInterface.minimize_structure() method."""
-    assert False 
-
-
 def test_build_param_files():
-    """Testing that the AmberInterface.build_param_files() method works correctly."""
+    """Testing that the AmberInterface.build_param_files() method works correctly. Does not check that the 
+    actual output is correct, but only that the output is made.
+    """
     ai = interface.amber
-    assert False 
+    outdir = Path('demo/')
+    assert not outdir.is_dir()
+    test_file:str = f"{MM_BASE_DIR}/data/ff.pdb"
+    ai.build_param_files(test_file, str(outdir))
+    
+    fnames:List[str] = ["ff_ff.pdb", "ff.inpcrd", "ff.prmtop", "leap.in", "leap.out"]
+    
+    for fn in fnames:
+        assert (outdir / fn).exists()
+    
+    shutil.rmtree( outdir )
+
+def test_build_param_files_does_not_exist():
+    """Testing that the AmberInterface.build_param_files() method with throw an error when the supplied .pdb file does NOT exist."""     
 
 
-#def test_build_ligand_param_files():
-#    """Testing that the AmberInterface.build_ligand_param_files() method works correctly."""
-#    #TODO(CJ): at present this only checks if the files are made, not if they are correct
-#    lig_frcmod = f"{MM_DATA_DIR}/atp.frcmod"
-#    lig_prepin = f"{MM_DATA_DIR}/atp.prepin"
-#    fs.safe_rm(lig_frcmod)
-#    fs.safe_rm(lig_prepin)
-#    ai = interface.amber
-#    ai.build_ligand_param_files([str(f"{MM_BASE_DIR}/data/atp.pdb")], [0])
-#    assert os.path.exists(lig_frcmod)
-#    assert os.path.exists(lig_prepin)
-#    fs.safe_rm(lig_frcmod)
-#    fs.safe_rm(lig_prepin)
+    dne = Path('dne.pdb')
+    work_dir = Path('work/')
+
+    assert not dne.exists()
+
+    ai = interface.amber
+    with pytest.raises(SystemExit) as exe:
+        ai.build_param_files( dne, work_dir )                    
+
+    shutil.rmtree( work_dir ) 
+
+    assert exe
 
 
 def test_parse_fmt_uppercase():
@@ -154,3 +164,75 @@ def test_remove_antechamber_temp_files_non_cwd():
     
     dirname.rmdir()
 
+
+def test_parse_prmtop():
+    """Testing that AmberInterface.parse_prmtop() method works. It essentially loads the supplied
+    prmtop file and ensures that the correct number of items are extracted for the majority of keys.
+    """
+    ai = interface.amber
+    data = ai.parse_prmtop(f"{MM_DATA_DIR}/prmtop_1")
+    
+    assert data
+    
+    n_atoms:int = 23231
+    num_bond:int = 85
+    num_ang:int = 186
+    n_ptra:int = 190
+    n_types:int = 19
+    n_bond_h:int = 21805
+    n_bond_a:int = 1450
+    n_thet:int = 3319 
+    n_phi:int = 6138
+    n_phi_h:int = 6551
+    nnb:int = 43036
+    n_phb:int = 1
+    n_res:int = 6967
+    
+    assert len(data['ATOM_NAME']) == n_atoms
+    assert len(data['CHARGE']) == n_atoms
+    assert len(data['ATOMIC_NUMBER']) == n_atoms
+    assert len(data['MASS']) == n_atoms
+    assert len(data['ATOM_TYPE_INDEX']) == n_atoms
+    assert len(data['NUMBER_EXCLUDED_ATOMS']) == n_atoms
+    assert len(data['NONBONDED_PARM_INDEX']) == n_types**2
+    assert len(data['RESIDUE_LABEL']) == n_res
+    assert len(data['RESIDUE_POINTER']) == n_res
+    assert len(data['BOND_FORCE_CONSTANT']) == num_bond
+    assert len(data['BOND_EQUIL_VALUE']) == num_bond
+    assert len(data['ANGLE_FORCE_CONSTANT']) == num_ang
+    assert len(data['ANGLE_EQUIL_VALUE']) == num_ang
+    assert len(data['DIHEDRAL_FORCE_CONSTANT']) == n_ptra
+    assert len(data['DIHEDRAL_PERIODICITY']) == n_ptra
+    assert len(data['DIHEDRAL_PHASE']) == n_ptra
+    assert len(data['SCEE_SCALE_FACTOR']) == n_ptra
+    assert len(data['SOLTY']) == 52
+    assert len(data['LENNARD_JONES_ACOEF']) == (n_types*(n_types+1))/2
+    assert len(data['LENNARD_JONES_BCOEF']) == (n_types*(n_types+1))/2
+    assert len(data['BONDS_INC_HYDROGEN']) == 3*n_bond_h
+    assert len(data['BONDS_WITHOUT_HYDROGEN']) == 3*n_bond_a
+    assert len(data['ANGLES_INC_HYDROGEN']) == 4*n_thet
+    assert len(data['DIHEDRALS_INC_HYDROGEN']) == 5*n_phi_h
+    assert len(data['DIHEDRALS_WITHOUT_HYDROGEN']) == 5*n_phi
+    assert len(data['EXCLUDED_ATOMS_LIST']) == nnb
+    assert len(data['HBOND_ACOEF']) == n_phb
+    assert len(data['HBOND_BCOEF']) == n_phb
+    assert len(data['HBCUT']) == n_phb
+    assert len(data['AMBER_ATOM_TYPE']) == n_atoms
+    assert len(data['TREE_CHAIN_CLASSIFICATION']) == n_atoms
+    assert len(data['JOIN_ARRAY']) == n_atoms
+    assert len(data['IROTAT']) == n_atoms
+    assert len(data['RADII']) == n_atoms
+
+
+def test_parse_prmtop_no_file():
+    """Checking that AmberInteface.parse_prmtop() throws an error if the listed file does not exist."""
+    
+    dne = Path('./dne')
+   
+    assert not dne.exists()
+
+    ai = interface.amber
+    with pytest.raises(SystemExit) as exe:
+        ai.parse_prmtop( dne )                    
+
+    assert exe

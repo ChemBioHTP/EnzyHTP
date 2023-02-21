@@ -1,12 +1,11 @@
 """Defines an AmberInterface class that serves as a bridge for enzy_htp to utilize AmberMD software. Uses the AmberConfig class
 found in enzy_htp/molecular_mechanics/amber_config.py. Supported operations include minimization, 
 heating, constant pressure production, and constant pressure equilibration.
-
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-02
 """
-import re
+import re, os
 import shutil
 from pathlib import Path
 from typing import List, Tuple, Union, Dict, Any
@@ -127,7 +126,36 @@ class AmberInterface:
 
         return outfile
 
-    def build_param_files(self, in_pdb: str, build_dir: str, pH:float = 7.0) -> Tuple[str, str]:
+
+    def _setup_solvation(self, igb:Union[None,str]) -> List[str]:
+        """Method that creates solvation box settings for system paramterization.
+        Args:
+            igb: The Born solvation setting.
+        Returns:
+            A list() of the lines to be added to the leap.in. 
+        """
+        result:List[str] = list()
+        if igb:
+            igb_str:str = str(igb)
+            radii:str = self.config_.RADII_MAP.get(igb_val)
+            if radii:
+                result.append(f"set default PDBRadii {radii}")
+            else:
+                _LOGGGER.warning(f"The IGB value {igb} is NOT suppported. Continuing...")                
+
+        result.append("center a")
+        result.extend(["addions a Na+ 0", "addions a Cl- 0"])
+        
+        if self.config_.BOX_TYPE == "oct":
+            result.append(f"solvateOct a TIP3PBOX {self.config_.BOX_SIZE}")
+        elif self.config_.BOX_TYPE == "box":
+            result.append(f"solvatebox a TIP3PBOX {self.config_.BOX_SIZE}")
+        else:
+            _LOGGER.error(f"The supplied box type {self.config_.BOX_SIZE} is NOT supported. Exiting...")
+            exit( 1 )
+        return result 
+
+    def build_param_files(self, in_pdb: str, build_dir: str, pH:float = 7.0, igb:str=None) -> Tuple[str, str]:
         """Creates the .prmtop and .inpcrd files for the supplied .pdb file. Handles
         processing of the Ligand() and MetalCenter() objects in the structure. Note that the supplied
         pdb file is assumed to be protonated.
@@ -135,6 +163,7 @@ class AmberInterface:
             in_pdb: The .pdb file to build parameter files for.
             buld_dir: The directory to build the parameter files in.
             pH: A float() representing the pH the parameter files should be made at. Default value is 7.0.
+            igb: a str() representing Born sovlation radius settting. 
         Returns:
             A Tuple[str,str] with the containing (.prmtop path, .inpcrd path).
         """
@@ -146,7 +175,6 @@ class AmberInterface:
         
         structure: struct.Structure = struct.PDBParser().get_structure(in_pdb)
         ligand_paths: List[str] = structure.build_ligands(ligand_dir, True)
-        # TODO(CJ): we have to protonate this first. not sure if this id documented elsewhere
         for lig in ligand_paths:
             _ = prep.protonate._protonate_ligand_PYBEL(lig, pH, lig)
         ligand_charges: List[int] = list(
@@ -155,7 +183,7 @@ class AmberInterface:
             ligand_paths, ligand_charges)
         leap_path: str = f"{build_dir}/leap.in"
         leap_log: str = f"{build_dir}/leap.out"
-        # sol_path: str = f"{build_dir}/leap.in"
+        
         leap_contents: List[str] = [
             "source leaprc.protein.ff14SB",
             "source leaprc.gaff",
@@ -164,14 +192,8 @@ class AmberInterface:
         for (prepin, frcmod) in ligand_params:
             leap_contents.extend([f"loadAmberPrep {prepin}", f"loadAmberParams {frcmod}"])
         leap_contents.append(f"a = loadpdb {in_pdb}")
-        # TODO(CJ): Include igb
-        leap_contents.append("center a")
-        # TODO(CJ): include solvation stuff as a separate function
-        leap_contents.extend(["addions a Na+ 0", "addions a Cl- 0"])
-        if self.config_.BOX_TYPE == "oct":
-            leap_contents.append(f"solvateOct a TIP3PBOX {self.config_.BOX_SIZE}")
-        else:
-            leap_contents.append(f"solvatebox a TIP3PBOX {self.config_.BOX_SIZE}")
+        
+        leap_contents.extend( self._setup_solvation( igb ) )            
         pdb_path: Path = Path(in_pdb)
         prmtop: str = f"{build_dir}/{pdb_path.stem}.prmtop"
         inpcrd: str = f"{build_dir}/{pdb_path.stem}.inpcrd"
@@ -179,17 +201,29 @@ class AmberInterface:
         leap_contents.extend(
             [f"saveamberparm a {prmtop} {inpcrd}", f"savepdb a {pdb_ff}", "quit"])
         fs.write_lines(leap_path, leap_contents)
-        # TODO(CJ): Check that this actually works before returning
+
 # yapf: disable
         self.env_manager_.run_command(
             "tleap", 
             ["-s", "-f", leap_path, ">", leap_log]
         )
 # yapf: enable
+
+        good_output:bool = True
+
+        for pp in map(Path,[prmtop, inpcrd, pdb_ff]):
+            msg = str()
+            if not pp.exists():
+                good_output = False
+                msg = f"The file {pp} does not exist." 
+            else:
+                
+
         return (prmtop, inpcrd)
 
     def build_ligand_param_files(self, paths: List[str],
-                                 charges: List[int]) -> List[Tuple[str, str]]:
+                                 charges: List[int],
+                                 ) -> List[Tuple[str, str]]:
         # TODO(CJ): add the method flag?
         """Creates .prepin and .frcmod files for all the supplied .pdb files. Saves files to
         same directory as the supplied .pdb files. Removes intermediate files. Should not
@@ -214,7 +248,6 @@ class AmberInterface:
             # TODO(CJ): check if you can get the ligand name from the
             # .pdb filename alone... I think this may be possible
             # if renew
-            # TODO(CJ): figure out how to implement the environment manager here
 # yapf: disable 
             self.env_manager_.run_command(
                 "antechamber",
@@ -675,8 +708,7 @@ class AmberInterface:
 
     def parse_prmtop(self, prmtop : str) -> Dict:
         """Parses a .prmtop file into a dict() with the pattern of (key, value) being (keyword after %FLAG, following values). 
-        Takes the specified %FORMAT() into account. Checks if the supplied file exists and/or has the .prmtop extension, exiting
-        if either are not true.
+        Takes the specified %FORMAT() into account. Checks if the supplied file exists, exiting if it does not.
 
         Args:
             prmtop: str() holding the path to a .prmtop file.
@@ -687,16 +719,10 @@ class AmberInterface:
         """
         #TODO(CJ): unit tests
 
-
         if not Path(prmtop).exists():
             _LOGGER.error(f"The file '{prmtop}' does not exist. Exiting...")
             exit( 1 )
 
-        if fs.get_file_ext( prmtop ) != '.prmtop' and Path(prmtop).stem.find('prmtop') == -1:
-            _LOGGER.error("AmberInterface.parse_prmtop() expects the supplied path to have extension '.prmtop' or be named 'prmtop' . Exiting...")
-            exit( 1 )
-
-        # 1. get the contents
         raw:str = fs.content_from_file( prmtop )
         
         result = dict()
@@ -739,5 +765,3 @@ class AmberInterface:
         _ = list(map(fs.safe_rm, files_to_remove))
 
 
-    def mask(self, structure, mask ):
-        assert False
