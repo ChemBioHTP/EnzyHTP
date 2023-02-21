@@ -10,6 +10,7 @@ from enzy_htp.structure.structure_selection import select_stru
 
 def decode_position_pattern(stru: Structure, pattern: str, if_name: bool=False) -> List[tuple]:
     """decode pattern of residue position selection
+    TODO support customized position selector
     Args:
         stru: the Structure object of reference
         pattern: a pymol-like syntax to select residue positions

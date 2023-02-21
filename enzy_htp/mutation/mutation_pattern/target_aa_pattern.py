@@ -8,6 +8,7 @@ from typing import List
 
 from enzy_htp.chemical.residue import (
     ONE_LETTER_CAA_MAPPER,
+    ONE_LETTER_AA_MAPPER,
     RESIDUE_VOLUME_MAPPER,
     RESIDUE_CHARGE_MAPPER,
     THREE_LETTER_AA_MAPPER,
@@ -113,7 +114,13 @@ def decode_negative(orig_resi: str):
 
 def decode_self(orig_resi: str):
     """decoder for keyword: self"""
-    return [orig_resi]
+    # canonicalize the 3 letter name (mainly for different protonation state)
+    if orig_resi in THREE_LETTER_AA_MAPPER:
+        result = ONE_LETTER_AA_MAPPER[THREE_LETTER_AA_MAPPER[orig_resi]]
+    else:
+        result = orig_resi
+
+    return [result]
 
 KEYWORD_DECODER = {
     "all" : decode_all,
