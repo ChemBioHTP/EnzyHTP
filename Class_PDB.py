@@ -1105,7 +1105,7 @@ class PDB():
         minout_path = min_dir + '/min.out'
         minrst_path = min_dir + '/min.ncrst' # change to ncrst seeking for solution of rst error
         mkdir(min_dir)
-        self._build_MD_min(min_dir)
+        self._build_MD_min(min_dir, cycle=cycle)
 
         # determine cluster rescources
         if if_cluster_job:
@@ -1311,7 +1311,7 @@ class PDB():
                 lig_pdb_path = lig_dir+'ligand_'+lig.name+'.pdb'
                 lig.build(lig_pdb_path, ft='PDB')
                 # get net charge
-                if not (net_charge_mapper and net_charge_mapper.get(lig.name, None)):
+                if not (net_charge_mapper and net_charge_mapper.get(lig.name, None) != None):
                     net_charge = lig.get_net_charge(method=lig_charge_method, ph=lig_charge_ph, o_dir=lig_dir)
                 else:
                     net_charge = net_charge_mapper[lig.name]
@@ -1726,7 +1726,7 @@ class PDB():
         return res_setting, env_settings
 
 
-    def _build_MD_min(self, o_dir):
+    def _build_MD_min(self, o_dir, cycle=None):
         '''
         Build configuration file for a minimization job
         See default value Config.Amber.conf_min
@@ -1734,7 +1734,10 @@ class PDB():
         #path
         o_path=o_dir+'/min.in'
         #maxcyc related
-        maxcyc = self.conf_min['maxcyc']
+        if cycle:
+            maxcyc = cycle
+        else:
+            maxcyc = self.conf_min['maxcyc']
         if self.conf_min['ncyc'] == '0.5maxcyc':
             ncyc = str(int(0.5 * maxcyc))
         if self.conf_min['ntpr'] == '0.01maxcyc':
@@ -3309,6 +3312,7 @@ outtraj {tmp_traj_2}
             os.remove(dl_prmtop)
             os.remove(dc_prmtop)
             os.remove(sc_prmtop)
+        if Config.debug < 1:    
             os.remove(mmpbsa_out_file)
 
         return result
@@ -3335,7 +3339,7 @@ outtraj {tmp_traj_2}
             dr_prmtop = f"{temp_dir}dr.prmtop"
             dl_prmtop = f"{temp_dir}dl.prmtop"
             dc_prmtop = f"{temp_dir}dc.prmtop"
-            ante_cmd = f'ante-MMPBSA.py -p {self.prmtop} --radii {radii} -s ":WAT,Na+,Cl-" -c {dc_prmtop} -n "{ligand_mask}" -l {dl_prmtop} -r {dr_prmtop}'
+            ante_cmd = f'ante-MMPBSA.py -p {self.prmtop_path} --radii {radii} -s ":WAT,Na+,Cl-" -c {dc_prmtop} -n "{ligand_mask}" -l {dl_prmtop} -r {dr_prmtop}'
             try:
                 run(ante_cmd, check=0, text=True, shell=True, capture_output=True)
             except CalledProcessError as err:
@@ -3381,7 +3385,7 @@ outtraj {tmp_traj_2}
                 run('rm leap.log', check=0, text=True, shell=True, capture_output=True)
 
         sc_prmtop = type(self).update_radii(
-            self.prmtop,
+            self.prmtop_path,
             out_path=f'{temp_dir}sc.prmtop', igb=igb)
 
  
@@ -3455,7 +3459,7 @@ outtraj {tmp_traj_2}
         with open(mmpbsa_out_file) as f:
             f_str = f.read()
             gb_result_tb = re.search(gb_pattern, f_str).group(1).strip()
-            pb_result_tb = re.search(gb_pattern, f_str).group(1).strip()
+            pb_result_tb = re.search(pb_pattern, f_str).group(1).strip()
             gb_result = PDB._extract_pb_gb_table(gb_result_tb)
             pb_result = PDB._extract_pb_gb_table(pb_result_tb)
         return {"pb":pb_result, "gb":gb_result}
