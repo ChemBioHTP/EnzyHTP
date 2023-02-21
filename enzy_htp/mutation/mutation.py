@@ -34,7 +34,7 @@ SUPPORTED_MUTATION_TARGET_LIST = get_copy_of_deleted_dict(ONE_LETTER_AA_MAPPER, 
 """The list of EnzyHTP supported mutation target-residue list.
 add upon supporting. will do ncaa in the future"""
 
-def decode_mutation_flag(mutation_flag: str) -> Mutation:
+def generate_from_mutation_flag(mutation_flag: str) -> Mutation:
     """XA##Y -> ("X", "Y", "A", ##)
     WT -> (None, "WT", None, None)
     XA##X -> (None, "WT", None, None)
@@ -119,6 +119,17 @@ def is_valid_mutation(mut: Mutation, stru: es.Structure) -> bool:
 
     return True
 
+def generate_mutation_from_traget_list(position: Tuple[str, int], orig_resi: str, target_list: str) -> Mutation:
+    """generate a list of Mutation() objects from position and a list of target residues"""
+    result = []
+    for target in target_list:
+        result.append(Mutation(
+            orig=orig_resi,
+            target=target,
+            chain_id=position[0],
+            res_idx=position[1]
+            ))
+    return result
 
 # == TODO ==
 def generate_all_mutations(

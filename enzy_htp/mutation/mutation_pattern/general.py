@@ -5,7 +5,7 @@ Author: QZ Shao <shaoqz@icloud.com>
 Date: 2023-01-26
 """
 import copy
-from typing import Dict, List
+from typing import Dict, List, Tuple
 import re
 import numpy as np
 
@@ -13,7 +13,12 @@ from enzy_htp.core.exception import InvalidMutationPatternSyntax
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.general import pop_random_list_elem
 from enzy_htp.structure import Structure
-from ..mutation import Mutation, decode_mutation_flag, is_valid_mutation
+from ..mutation import (
+    Mutation,
+    generate_from_mutation_flag,
+    generate_mutation_from_traget_list,
+    is_valid_mutation
+)
 from .position_pattern import decode_position_pattern
 from .target_aa_pattern import decode_target_aa_pattern
 
@@ -76,7 +81,7 @@ def decode_direct_mutation(stru: Structure, section_pattern: str) -> List[Mutati
     """decode the mutation pattern section that directly indicate the mutation.
     Return a list of mutation objects.
     pattern_example: XA###Y"""
-    mutation_obj = decode_mutation_flag(section_pattern)
+    mutation_obj = generate_from_mutation_flag(section_pattern)
     is_valid_mutation(mutation_obj, stru)
     return [mutation_obj]
 
@@ -111,7 +116,7 @@ def decode_all_mutation(stru: Structure, section_pattern: str) -> List[List[Muta
 
     Returns:
         a list of mutation objects.
-    pattern_example: 
+    pattern_example:
         a:[xxx:yyy]"""
     result = ""
     return result
@@ -123,7 +128,7 @@ TYPE_SECTION_DECODERS = {
     "a" : decode_all_mutation,
 }
 
-def decode_mutation_esm_pattern(stru: Structure, mutation_esm_patterns: str) -> Dict[str, List[Mutation]]:
+def decode_mutation_esm_pattern(stru: Structure, mutation_esm_patterns: str) -> Dict[Tuple[str, int], List[Mutation]]:
     """decode mutation esm pattern into a list of mutation objects
     pattern_example: position_pattern_0:target_aa_pattern_0, ..."""
 
@@ -135,7 +140,7 @@ def decode_mutation_esm_pattern(stru: Structure, mutation_esm_patterns: str) -> 
         esm_positions = decode_position_pattern(stru, position_pattern, if_name=True)
         for esm_position, orig_resi in esm_positions:
             posi_target_aa = decode_target_aa_pattern(orig_resi, target_aa_pattern)
-            esm_result[esm_position] = posi_target_aa
+            esm_result[esm_position] = generate_mutation_from_traget_list(esm_position, orig_resi, posi_target_aa)
 
     return esm_result
 

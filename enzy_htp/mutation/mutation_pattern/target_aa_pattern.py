@@ -44,7 +44,7 @@ def decode_target_aa_pattern(orig_resi: str, pattern: str) -> List[str]:
     eval_pattern = re.sub(keyword_re_pattern, lambda x: f"set(KEYWORD_DECODER['{x.group(0)}'](orig_resi))", pattern)
     eval_pattern = eval_pattern.replace("not", "-")
     result = eval(eval_pattern)
-    return result
+    return sorted(list(result))
 
 def decode_all(orig_resi: str):
     """decoder for keyword: all"""
