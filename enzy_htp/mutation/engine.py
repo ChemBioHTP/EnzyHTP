@@ -222,7 +222,7 @@ def _mutate_pymol(pdb: str, outfile: str, mutations: List[Mutation]) -> None:
         Nothing.
 
     """
-    #TODO(CJ): finish this       
+    #TODO(CJ): finish this
     pass
 
 

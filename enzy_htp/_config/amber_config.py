@@ -122,13 +122,12 @@ class AmberConfig:
     }
     """dict() holding the settings for an Amber constant pressure production run."""
 
-
-    RADII_MAP:Dict = {
-        '1':'mbondi',
-        '2':'mbondi2',
-        '5':'mbondi2',
-        '7':'bondi',
-        '8':'mbondi3'
+    RADII_MAP: Dict = {
+        '1': 'mbondi',
+        '2': 'mbondi2',
+        '5': 'mbondi2',
+        '7': 'bondi',
+        '8': 'mbondi3'
     }
     """dict() holding the radii mapping for the IGB solvation model."""
 

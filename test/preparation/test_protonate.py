@@ -235,12 +235,8 @@ def test_protonate_stru():
 
     assert stru
 
-
     pdb_file = f"{DATA_DIR}/6lfe_imputed.pdb"
     stru = sp.get_structure(pdb_file)
     prot.protonate_stru(stru)
 
     assert stru
-
-
-

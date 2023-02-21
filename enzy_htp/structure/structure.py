@@ -295,7 +295,6 @@ class Structure(
                 return False
         return True
 
-
     #region === Checker ===
     def has_duplicate_chain_name(self) -> bool:
         """check if self._chain have duplicated chain name

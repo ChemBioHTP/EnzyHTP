@@ -642,8 +642,8 @@ class PDBParser(StructureParserInterface):
         alt_loc_id = f"{'':1}"
         insert_code = f"{'':1}"
         occupancy = f"{1.00:>6.2f}"
-        
-        temp_factor:str = ' '*6
+
+        temp_factor: str = ' ' * 6
         if atom.b_factor:
             temp_factor = f"{atom.b_factor:>6.2f}"
         seg_id = f"{'':<4}"

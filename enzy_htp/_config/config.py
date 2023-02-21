@@ -76,7 +76,7 @@ class Config:
             elif app == "multiwfn":
                 ptr = self._multiwfn
             elif app == "pymol":
-                ptr = self._pymol    
+                ptr = self._pymol
             elif app == "system":
                 ptr = self._system
             else:
@@ -107,7 +107,7 @@ class Config:
             elif app == "multiwfn":
                 ptr = self._multiwfn
             elif app == "pymol":
-                ptr = self._pymol    
+                ptr = self._pymol
             elif app == "system":
                 ptr = self._system
             else:

@@ -503,7 +503,7 @@ Date: 2022-03-12
 #    """
 #    ========
 #    QM Cluster
-#    ========    
+#    ========
 #    """
 #
 #    def _get_qmcluster_chrgspin(self, sele, spin=1):
@@ -559,7 +559,7 @@ Date: 2022-03-12
 #
 #    """
 #    ========
-#    QM Analysis 
+#    QM Analysis
 #    ========
 #    """
 #

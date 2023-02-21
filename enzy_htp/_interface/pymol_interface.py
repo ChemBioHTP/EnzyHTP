@@ -15,11 +15,12 @@ from enzy_htp.core import _LOGGER
 
 from enzy_htp._config.pymol_config import PyMOLConfig, default_pymol_config
 
+
 class PyMOLInterface:
     """
     """
 
-    def __init__(self, config: PyMOLConfig = None ) -> None:
+    def __init__(self, config: PyMOLConfig = None) -> None:
         from pymol import cmd
         self.cmd = cmd
         self.config_ = config
@@ -36,8 +37,7 @@ class PyMOLInterface:
         """Getter for the PyMOLConfig() instance belonging to the class."""
         return self.config_
 
-
-    def supported_file_type(self, fname : str ) -> bool:
+    def supported_file_type(self, fname: str) -> bool:
         """Convenience function that checks if a listed filetype is supported by 
         the PyMOLInterface. Currently supported filetypes include:
             + .pdb
@@ -50,10 +50,10 @@ class PyMOLInterface:
         Returns:
             Whether the file type is supported.
         """
-        extension:str = Path(fname).suffix
+        extension: str = Path(fname).suffix
         return extension in self.config().IO_EXTENSIONS
 
-    def get_charge(self, fname : str, sele: str = '(all)' ) -> int:
+    def get_charge(self, fname: str, sele: str = '(all)') -> int:
         """Method that gets the formal charge for the specified sele in the 
         specified file. File must be a supported file type as listed in 
         PyMOLConfig. Checks if file exists and is supported type. If either 
@@ -69,25 +69,23 @@ class PyMOLInterface:
         """
         if not Path(fname).exists():
             _LOGGER.error(f"The supplied file '{fname}' does not exist. Exiting...")
-            exit( 1 )
+            exit(1)
 
-        if not self.supported_file_type( fname ):
-            _LOGGER.error(f"The supplied file '{fname}' has an unsupported extension. Exiting...")
-            exit( 1 )
+        if not self.supported_file_type(fname):
+            _LOGGER.error(
+                f"The supplied file '{fname}' has an unsupported extension. Exiting...")
+            exit(1)
 
-        _eh_local : Dict[str, Any] = { 'fc': [] }
-
+        _eh_local: Dict[str, Any] = {'fc': []}
 
         self.cmd.delete('all')
-        self.cmd.load( fname )
-        self.cmd.iterate( sele, 'fc.append(formal_charge)', space=_eh_local )
+        self.cmd.load(fname)
+        self.cmd.iterate(sele, 'fc.append(formal_charge)', space=_eh_local)
         self.cmd.delete('all')
-
 
         return sum(_eh_local['fc'])
-        
 
-    def get_sequence(self, fname : str, sele: str = '(all)' ) -> str:
+    def get_sequence(self, fname: str, sele: str = '(all)') -> str:
         """Method that gets the sequence for the specified sele in the 
         specified file. File must be a supported file type as listed in 
         PyMOLConfig. Checks if file exists and is supported type. If either 
@@ -104,17 +102,17 @@ class PyMOLInterface:
         """
         if not Path(fname).exists():
             _LOGGER.error(f"The supplied file '{fname}' does not exist. Exiting...")
-            exit( 1 )
+            exit(1)
 
-        if not self.supported_file_type( fname ):
-            _LOGGER.error(f"The supplied file '{fname}' has an unsupported extension. Exiting...")
-            exit( 1 )
-       
+        if not self.supported_file_type(fname):
+            _LOGGER.error(
+                f"The supplied file '{fname}' has an unsupported extension. Exiting...")
+            exit(1)
+
         self.cmd.delete('all')
-        self.cmd.load( fname )
-        lines:List[str] = self.cmd.get_fastastr( sele ).splitlines()
+        self.cmd.load(fname)
+        lines: List[str] = self.cmd.get_fastastr(sele).splitlines()
         self.cmd.delete('all')
 
-        lines = list(filter( lambda ll: ll[0] != '>', lines))
+        lines = list(filter(lambda ll: ll[0] != '>', lines))
         return ''.join(lines)
-
