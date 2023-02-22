@@ -227,8 +227,8 @@ def test_pybel_protonate_pdb_ligand_4CO():
     assert not os.path.isdir(out_ligand_path)
 
 
-def test_protonate_stru():
-    """Testing the protonate_stru() method."""
+def test_protonate_stru_imputed():
+    """Testing the protonate_stru() method for a structure that has been imputed."""
     pdb_file = f"{DATA_DIR}/5k7u_imputed.pdb"
     stru = sp.get_structure(pdb_file)
     prot.protonate_stru(stru)
