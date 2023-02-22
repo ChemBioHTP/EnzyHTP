@@ -140,8 +140,8 @@ class Chain(DoubleLinkedNode):
                 Any composition from metal, ligand, solvent, trash
         """
         chain_type = []
-        if self.is_peptide():
-            return "peptide"
+        if self.is_polypeptide():
+            return "polypeptide"
         if self.has_metal():
             chain_type.append("metal")
         if self.has_ligand():
@@ -165,7 +165,7 @@ class Chain(DoubleLinkedNode):
     #endregion
 
     #region === Checker ===
-    def is_peptide(self) -> bool:
+    def is_polypeptide(self) -> bool:
         """
         if there is any residue not canonical
         """

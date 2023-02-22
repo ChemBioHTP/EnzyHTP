@@ -300,7 +300,7 @@ class Structure(DoubleLinkedNode):
     @property
     def peptides(self) -> List[Chain]:
         """return the peptide part of current Structure() as a list of chains"""
-        result: List[Chain] = list(filter(lambda c: c.is_peptide(), self._chains))
+        result: List[Chain] = list(filter(lambda c: c.is_polypeptide(), self._chains))
         return result
 
     @property
@@ -430,6 +430,7 @@ class Structure(DoubleLinkedNode):
         out_line.append("Structure(")
         out_line.append(f"chains: (sorted, original {list(self.chain_mapper.keys())})")
         for ch in sorted(self._chains, key=lambda x: x.name):
+            ch: Chain
             out_line.append(
                 f"    {ch.name}({ch.chain_type}): residue: {ch.residue_idx_interval()} atom_count: {ch.num_atoms}"
             )
