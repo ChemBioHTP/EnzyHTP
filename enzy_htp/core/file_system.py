@@ -14,16 +14,20 @@ from .logger import _LOGGER
 
 
 def safe_rm(fname: str) -> None:
-    """Removes a file if and only if the directory already exists."""
-    # TODO(CJ): need to check if it is a directory. maybe re-direct if so?
+    """Removes a file if and only if the directory already exists. Provides a warning if the 
+    supplied path is a directory."""
+    if os.path.isdir(fname):
+        _LOGGER.warning(
+            f"The supplied path '{fname}' is a directory and cannot be removed by enzy_htp.core.file_system.safe_rm()"
+        )
+        return
+
     if os.path.exists(fname):
         os.remove(fname)
 
 
 def is_empty_dir(dir_path: str) -> bool:
-    """
-    check if the dir_path is an empty dir
-    """
+    """Is the supplied directory empty?"""
     if os.path.isdir(dir_path):
         return not os.listdir(dir_path)
     else:
@@ -71,12 +75,24 @@ def get_current_time() -> str:
 
 
 def lines_from_file(fname: str) -> List[str]:
-    """Extracts and returns lines from supplied filename. Returns empty list() if file odes not exist."""
+    """Extracts and returns lines from supplied filename. Returns empty list() if file does not exist."""
     if not os.path.exists(fname):
         _LOGGER.error(f"The file {fname} does not exist.")
         return list()
     fh = open(fname, "r")
     result = fh.read().splitlines()
+    fh.close()
+    return result
+
+
+def content_from_file(fname: str) -> str:
+    """Extracts and returns the content from supplied filename. Returns empty str() if file does not exist."""
+    #TODO(CJ): make unit tests for this
+    if not os.path.exists(fname):
+        _LOGGER.error(f"The file {fname} does not exist.")
+        return str()
+    fh = open(fname, "r")
+    result = fh.read()
     fh.close()
     return result
 

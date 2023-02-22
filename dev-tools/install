@@ -3,6 +3,8 @@
 
 PIP_VERSION=$(pip --version | cut -d' ' -f2)
 
+echo $PIP_VERSION
+
 if [[ -d build ]]; then
     rm -rf build;
 

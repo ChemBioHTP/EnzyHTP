@@ -225,3 +225,18 @@ def test_pybel_protonate_pdb_ligand_4CO():
     assert equiv_files(out_ligand_path, answer_ligand_path, skip_frist=True)
     fs.safe_rm(out_ligand_path)
     assert not os.path.isdir(out_ligand_path)
+
+
+def test_protonate_stru_imputed():
+    """Testing the protonate_stru() method for a structure that has been imputed."""
+    pdb_file = f"{DATA_DIR}/5k7u_imputed.pdb"
+    stru = sp.get_structure(pdb_file)
+    prot.protonate_stru(stru)
+
+    assert stru
+
+    pdb_file = f"{DATA_DIR}/6lfe_imputed.pdb"
+    stru = sp.get_structure(pdb_file)
+    prot.protonate_stru(stru)
+
+    assert stru

@@ -19,4 +19,3 @@ from .metal_atom import MetalUnit, residue_to_metal
 from .chain import Chain
 from .structure import Structure, compare_structures, merge_right
 from .structure_io import PDBParser
-from .structure_parser import structure_from_pdb, ligand_from_pdb  # TODO remove later

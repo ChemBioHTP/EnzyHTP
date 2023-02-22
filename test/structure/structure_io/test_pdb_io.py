@@ -23,7 +23,6 @@ from enzy_htp.structure import (
     Structure,
     Residue,
     Chain,
-    structure_from_pdb,
     Atom,
     MetalUnit,
     Ligand,

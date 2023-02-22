@@ -5,9 +5,10 @@ Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-02
 """
+import re, os
 import shutil
 from pathlib import Path
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Dict, Any
 
 import pandas as pd
 from biopandas.pdb import PandasPdb
@@ -19,7 +20,6 @@ from enzy_htp.core.exception import UnsupportedMethod
 import enzy_htp.structure as struct
 import enzy_htp.preparation as prep
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
-# from .frame import Frame, frames_from_pdb, read_charge_list
 
 
 class AmberInterface:
@@ -27,7 +27,8 @@ class AmberInterface:
     minimization, heating constant pressure production, constant pressure equilibration, trajectory file
     conversion and mutation. Users should use this class as the only way to interact with any functionality
     in Amber or associated tools like tleap.
-    Atributes:
+
+    Attributes:
         config_	: The AmberConfig() class which provides settings for both running Amber and maintaining a compatible environment.
         env_manager_ : The EnvironmentManager() class which ensure all required environment elements exist.
         compatible_env_ : A bool() indicating if the current environment is compatible with the object itself.
@@ -102,6 +103,7 @@ class AmberInterface:
         inpath = Path(pdb)
         if min_dir == "./":
             min_dir = f"{inpath.parent}/pdb_min/"
+
         fs.safe_mkdir(min_dir)
         outfile = f"{min_dir}/{inpath.stem}_min.pdb"
         min_in = f"{min_dir}/min.in"
@@ -111,55 +113,82 @@ class AmberInterface:
         self.write_minimize_input_file(min_in, cycle)
         engine = self.config_.get_engine(mode)
 
+        # yapf: disable
         self.env_manager_.run_command(
-            engine,
-            [
-                "-O",
-                "-i",
-                min_in,
-                "-o",
-                min_out,
-                "-p",
-                prmtop,
-                "-c",
-                inpcrd,
-                "-r",
-                min_rst,
-            ],
+            engine, ["-O", "-i", min_in, "-o", min_out, "-p", prmtop, "-c", inpcrd, "-r", min_rst],
+
         )
 
-        self.env_manager_.run_command("ambpdb",
-                                      [f"-p", prmtop, "-c", min_rst, ">", outfile])
-        # shutil.move(prmtop, min_dir )
-        # shutil.move(inpcrd, min_dir )
+        self.env_manager_.run_command(
+            "ambpdb",[f"-p", prmtop, "-c", min_rst, ">", outfile]
+        )
+        # yapf: enable
+
         return outfile
 
-    def build_param_files(self, in_pdb: str, build_dir: str) -> Tuple[str, str]:
+    def _setup_solvation(self, igb: Union[None, str]) -> List[str]:
+        """Method that creates solvation box settings for system paramterization.
+        Args:
+            igb: The Born solvation setting.
+        Returns:
+            A list() of the lines to be added to the leap.in. 
+        """
+        result: List[str] = list()
+        if igb:
+            igb_str: str = str(igb)
+            radii: str = self.config_.RADII_MAP.get(igb_val)
+            if radii:
+                result.append(f"set default PDBRadii {radii}")
+            else:
+                _LOGGGER.warning(f"The IGB value {igb} is NOT suppported. Continuing...")
+
+        result.append("center a")
+        result.extend(["addions a Na+ 0", "addions a Cl- 0"])
+
+        if self.config_.BOX_TYPE == "oct":
+            result.append(f"solvateOct a TIP3PBOX {self.config_.BOX_SIZE}")
+        elif self.config_.BOX_TYPE == "box":
+            result.append(f"solvatebox a TIP3PBOX {self.config_.BOX_SIZE}")
+        else:
+            _LOGGER.error(
+                f"The supplied box type {self.config_.BOX_SIZE} is NOT supported. Exiting..."
+            )
+            exit(1)
+        return result
+
+    def build_param_files(self,
+                          in_pdb: str,
+                          build_dir: str,
+                          pH: float = 7.0,
+                          igb: str = None) -> Tuple[str, str]:
         """Creates the .prmtop and .inpcrd files for the supplied .pdb file. Handles
-        processing of the Ligand() and MetalCenter() objects in the structure.
+        processing of the Ligand() and MetalCenter() objects in the structure. Note that the supplied
+        pdb file is assumed to be protonated.
         Args:
             in_pdb: The .pdb file to build parameter files for.
             buld_dir: The directory to build the parameter files in.
+            pH: A float() representing the pH the parameter files should be made at. Default value is 7.0.
+            igb: a str() representing Born sovlation radius settting. 
         Returns:
             A Tuple[str,str] with the containing (.prmtop path, .inpcrd path).
         """
-        # TODO(CJ): add in the pH as a parameter
         ligand_dir: str = f"{build_dir}/ligands/"
         metalcenter_dir: str = f"{build_dir}/metalcenter/"
+
         fs.safe_mkdir(ligand_dir)
         fs.safe_mkdir(metalcenter_dir)
-        structure: struct.Structure = struct.structure_from_pdb(in_pdb)
+
+        structure: struct.Structure = struct.PDBParser().get_structure(in_pdb)
         ligand_paths: List[str] = structure.build_ligands(ligand_dir, True)
-        # TODO(CJ): we have to protonate this first. not sure if this id documented elsewhere
         for lig in ligand_paths:
-            _ = prep.protonate._protonate_ligand_PYBEL(lig, 7.0, lig)
+            _ = prep.protonate._protonate_ligand_PYBEL(lig, pH, lig)
         ligand_charges: List[int] = list(
             map(lambda pp: prep.protonate._ob_pdb_charge(pp), ligand_paths))
         ligand_params: List[Tuple[str, str]] = self.build_ligand_param_files(
             ligand_paths, ligand_charges)
         leap_path: str = f"{build_dir}/leap.in"
         leap_log: str = f"{build_dir}/leap.out"
-        # sol_path: str = f"{build_dir}/leap.in"
+
         leap_contents: List[str] = [
             "source leaprc.protein.ff14SB",
             "source leaprc.gaff",
@@ -168,14 +197,8 @@ class AmberInterface:
         for (prepin, frcmod) in ligand_params:
             leap_contents.extend([f"loadAmberPrep {prepin}", f"loadAmberParams {frcmod}"])
         leap_contents.append(f"a = loadpdb {in_pdb}")
-        # TODO(CJ): Include igb
-        leap_contents.append("center a")
-        # TODO(CJ): include solvation stuff as a separate function
-        leap_contents.extend(["addions a Na+ 0", "addions a Cl- 0"])
-        if self.config_.BOX_TYPE == "oct":
-            leap_contents.append(f"solvateOct a TIP3PBOX {self.config_.BOX_SIZE}")
-        else:
-            leap_contents.append(f"solvatebox a TIP3PBOX {self.config_.BOX_SIZE}")
+
+        leap_contents.extend(self._setup_solvation(igb))
         pdb_path: Path = Path(in_pdb)
         prmtop: str = f"{build_dir}/{pdb_path.stem}.prmtop"
         inpcrd: str = f"{build_dir}/{pdb_path.stem}.inpcrd"
@@ -183,12 +206,41 @@ class AmberInterface:
         leap_contents.extend(
             [f"saveamberparm a {prmtop} {inpcrd}", f"savepdb a {pdb_ff}", "quit"])
         fs.write_lines(leap_path, leap_contents)
-        # TODO(CJ): Check that this actually works before returning
-        self.env_manager_.run_command("tleap", ["-s", "-f", leap_path, ">", leap_log])
+
+        # yapf: disable
+        self.env_manager_.run_command(
+            "tleap",
+            ["-s", "-f", leap_path, ">", leap_log]
+        )
+        # yapf: enable
+
+        good_output: bool = True
+
+        for pp in map(Path, [prmtop, inpcrd, pdb_ff]):
+            msg = str()
+            if not pp.exists():
+                good_output = False
+                msg = f"The file {pp} does not exist."
+            else:
+                if pp.stat().st_size == 0:
+                    msg = f"The file {pp} exists but is empty."
+                    good_output = False
+            if msg:
+                _LOGGER.warn(msg)
+
+        if not good_output:
+            _LOGGER.error(
+                f"The output generated by AmberInterface.build_param_files() is incomplete. Exiting..."
+            )
+            exit(1)
+
         return (prmtop, inpcrd)
 
-    def build_ligand_param_files(self, paths: List[str],
-                                 charges: List[int]) -> List[Tuple[str, str]]:
+    def build_ligand_param_files(
+        self,
+        paths: List[str],
+        charges: List[int],
+    ) -> List[Tuple[str, str]]:
         # TODO(CJ): add the method flag?
         """Creates .prepin and .frcmod files for all the supplied .pdb files. Saves files to
         same directory as the supplied .pdb files. Removes intermediate files. Should not
@@ -213,34 +265,18 @@ class AmberInterface:
             # TODO(CJ): check if you can get the ligand name from the
             # .pdb filename alone... I think this may be possible
             # if renew
-            # TODO(CJ): figure out how to implement the environment manager here
+            # yapf: disable
             self.env_manager_.run_command(
                 "antechamber",
-                [
-                    "-i",
-                    lig_pdb,
-                    "-fi",
-                    "pdb",
-                    "-o",
-                    prepin,
-                    "-fo",
-                    "prepi",
-                    "-c",
-                    "bcc",
-                    "-s",
-                    "0",
-                    "-nc",
-                    str(net_charge),
-                ],
+                ["-i", lig_pdb, "-fi", "pdb", "-o", prepin, "-fo", "prepi", "-c", "bcc", "-s", "0", "-nc", str(net_charge), ],
             )
-            files_to_remove: List[
-                str] = "ATOMTYPE.INF NEWPDB.PDB PREP.INF sqm.pdb sqm.in sqm.out".split()
-            files_to_remove.extend(list(map(str, Path(".").glob("ANTECHAMBER*"))))
-            _ = list(map(lambda fname: fs.safe_rm(fname), files_to_remove))
-            # gen frcmod
-            # TODO(CJ): add some kind of check that this all actually runs correctly w/o errors
-            self.env_manager_.run_command("parmchk2",
-                                          ["-i", prepin, "-f", "prepi", "-o", frcmod])
+            # yapf: enable
+            self.remove_antechamber_temp_files()
+            self.env_manager_.run_command(
+                # yapf: disable
+                "parmchk2",
+                ["-i", prepin, "-f", "prepi", "-o", frcmod])
+            # yapf: enable
             # record
             result.append((prepin, frcmod))
         return result
@@ -448,6 +484,7 @@ class AmberInterface:
             Path to the production .nc file.
         """
         fs.safe_mkdir(work_dir)
+
         min_in: str = self.md_min_file(f"{work_dir}/min.in")
         heat_in: str = self.md_heat_file(f"{work_dir}/heat.in")
         equi_in: str = self.md_equi_file(f"{work_dir}/equi.in")
@@ -456,93 +493,45 @@ class AmberInterface:
 
         min_out: str = f"{work_dir}/min.out"
         min_rst: str = f"{work_dir}/min.rst"
+
+        #yapf: disable
         self.env_manager_.run_command(
             engine,
-            [
-                "-O",
-                "-i",
-                min_in,
-                "-o",
-                min_out,
-                "-p",
-                prmtop,
-                "-c",
-                inpcrd,
-                "-r",
-                min_rst,
-                "-ref",
-                inpcrd,
-            ],
+            ["-O", "-i", min_in, "-o", min_out, "-p", prmtop, "-c", inpcrd, "-r", min_rst, "-ref", inpcrd, ],
         )
+        #yapf: enable
 
         heat_out: str = f"{work_dir}/heat.out"
         heat_rst: str = f"{work_dir}/heat.rst"
+
+        #yapf: disable
         self.env_manager_.run_command(
             engine,
-            [
-                "-O",
-                "-i",
-                heat_in,
-                "-o",
-                heat_out,
-                "-p",
-                prmtop,
-                "-c",
-                min_rst,
-                "-ref",
-                min_rst,
-                "-r",
-                heat_rst,
-            ],
+            ["-O", "-i", heat_in, "-o", heat_out, "-p", prmtop, "-c", min_rst, "-ref", min_rst, "-r", heat_rst, ],
         )
+        #yapf: enable
 
         equi_out: str = f"{work_dir}/equi.out"
         equi_rst: str = f"{work_dir}/equi.rst"
         equi_nc: str = f"{work_dir}/equi.nc"
+
+        # yapf: disable
         self.env_manager_.run_command(
             engine,
-            [
-                "-O",
-                "-i",
-                equi_in,
-                "-o",
-                equi_out,
-                "-p",
-                prmtop,
-                "-c",
-                heat_rst,
-                "-ref",
-                heat_rst,
-                "-r",
-                equi_rst,
-                "-x",
-                equi_nc,
-            ],
+            ["-O", "-i", equi_in, "-o", equi_out, "-p", prmtop, "-c", heat_rst, "-ref", heat_rst, "-r", equi_rst, "-x", equi_nc, ],
         )
+        # yapf: enable
 
         prod_out: str = f"{work_dir}/prod.out"
         prod_rst: str = f"{work_dir}/prod.rst"
         prod_nc: str = f"{work_dir}/prod.nc"
+
+        # yapf: disable
         self.env_manager_.run_command(
             engine,
-            [
-                "-O",
-                "-i",
-                prod_in,
-                "-o",
-                prod_out,
-                "-p",
-                prmtop,
-                "-c",
-                equi_rst,
-                "-ref",
-                equi_rst,
-                "-r",
-                prod_rst,
-                "-x",
-                prod_nc,
-            ],
+            ["-O",  "-i",  prod_in,  "-o",  prod_out,  "-p",  prmtop,  "-c",  equi_rst,  "-ref",  equi_rst,  "-r",  prod_rst,  "-x",  prod_nc, ],
         )
+        # yapf: enable
 
         return prod_nc
 
@@ -691,3 +680,142 @@ class AmberInterface:
             result[fidx].update_charges(charges)
 
         return result
+
+    def parse_fmt(self, fmt: str) -> Tuple[Any, int]:
+        """Private helper function that parses a %FORMAT() string from an amber .prmtop file.
+        Identifies both the type and width of the format. Supplied string can contain whitespace.
+        In the case that the supplied format string does not contain the pattern '%FORMAT(<>)',
+        the result (None, -1) is returned.
+
+        Args:
+            fmt: the %FORMAT() line from a .prmtop as a str().
+
+        Returns:
+            A tuple() of length 2 containing the (type ctor, width as an int()).
+        """
+
+        if fmt.find('%FORMAT(') == -1 or fmt.find(')') == -1:
+            return (None, -1)
+
+        fmt = fmt.strip().replace('%FORMAT(', '').replace(')', '')
+
+        idx = 0
+
+        while fmt[idx].isnumeric():
+            idx += 1
+
+        dtype = None
+
+        type_string = fmt[idx].upper()
+
+        if type_string == 'A':
+            dtype = str
+        elif type_string == 'I':
+            dtype = int
+        elif type_string == 'E':
+            dtype = float
+
+        width = int(fmt[idx + 1:].split('.')[0])
+
+        return (dtype, width)
+
+    def parse_prmtop(self, prmtop: str) -> Dict:
+        """Parses a .prmtop file into a dict() with the pattern of (key, value) being (keyword after %FLAG, following values). 
+        Takes the specified %FORMAT() into account. Checks if the supplied file exists, exiting if it does not.
+
+        Args:
+            prmtop: str() holding the path to a .prmtop file.
+
+        Returns:
+            A dict() with (key, value) pairs of (keyword, formatted/typed values).
+
+        """
+        #TODO(CJ): unit tests
+
+        if not Path(prmtop).exists():
+            _LOGGER.error(f"The file '{prmtop}' does not exist. Exiting...")
+            exit(1)
+
+        raw: str = fs.content_from_file(prmtop)
+
+        result = dict()
+
+        for chunk in raw.split('%FLAG'):
+            if chunk.find('%VERSION') != -1:
+                #TODO(CJ): figure out what I want to do with version info
+                continue
+
+            (key, fmt, body) = chunk.split('\n', 2)
+            body = re.sub('\n', '', body)
+            (dtype, width) = self.parse_fmt(fmt)
+
+            raw: List[str] = list()
+            for idx in range(0, len(body), width):
+                raw.append(body[idx:idx + width].strip())
+
+            result[key.strip()] = list(map(dtype, raw))
+
+        return result
+
+    def remove_antechamber_temp_files(self, dname: str = './') -> None:
+        """Helper method that removes temporary files generated by antechamber from a given directory.
+        Removes the files "ATOMTYPE.INF", "NEWPDB.PDB", "PREP.INF" and those with the patterns "ANTECHAMBER*"
+        and "sqm.*".
+
+        Args:
+            dname: str() with the path to the directory to clean out. Uses current directory as default.
+
+        Returns:
+            Nothing.
+
+        """
+
+        files_to_remove: List[str] = [
+            f"{dname}/ATOMTYPE.INF", f"{dname}/PREP.INF", f"{dname}/NEWPDB.PDB"
+        ]
+        files_to_remove.extend(list(map(str, Path(f"{dname}").glob("ANTECHAMBER*"))))
+        files_to_remove.extend(list(map(str, Path(f"{dname}").glob("sqm*"))))
+
+        _ = list(map(fs.safe_rm, files_to_remove))
+
+    def add_charges(self, stru: struct.Structure, prmtop: str) -> None:
+        """Method that adds RESP charges from a .prmtop file to the supplied Structure object. If the supplied prmtop
+        file does not line up with the structure, an error is thrown. Performs operation in place.
+        Will also throw an error if some of the resulting atoms do not get assigned charges.
+
+        Args:
+            stru: The Structure object that charges will be added to.
+            prmtop: The str() path of an Amber paramter file.
+
+        Returns:
+            Nothing.
+        """
+        p_dict = self.parse_prmtop(prmtop)
+
+        charges: List[float] = p_dict['CHARGE']
+        anames: List[str] = p_dict['ATOM_NAME']
+        res_pointers: List[int] = p_dict['RESIDUE_POINTER']
+        res_names: List[int] = p_dict['RESIDUE_LABEL']
+
+        temp = []
+        for (ridx, rp), rn in zip(enumerate(res_pointers[:-1]), res_names):
+            temp.extend([rn] * (res_pointers[ridx + 1] - rp))
+
+        temp.extend((len(anames) - len(temp)) * [rn[-1]])
+        res_names = temp
+
+        for c, an, rn, aa in zip(charges, anames, res_names, stru.atoms):
+
+            if not (an == aa.name and aa.residue.name == rn):
+                _LOGGER.error(
+                    f"There is a mismatch in the atoms. Make sure the supplied prmtop file is correct. Exiting.."
+                )
+                exit(1)
+            aa.charge = c
+
+        if not stru.has_charges():
+            _LOGGER.error(
+                "Not all atoms in the supplied structure were assigned charges. Exiting..."
+            )
+            exit(1)
+            pass

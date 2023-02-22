@@ -217,6 +217,7 @@ class Structure(
 
     @property
     def atoms(self) -> List[Atom]:
+        """Accessor to get the atoms in the enzyme as a list of Atom objects."""
         result = []
         for chain in self.chains:
             for residue in chain:
@@ -282,6 +283,17 @@ class Structure(
         return result
 
     #endregion
+
+    def has_charges(self) -> bool:
+        """Checks if the current Structure has charges for all atoms.
+
+        Returns:
+            Whether the Structure object has non-None charges for all atoms.
+        """
+        for aa in self.atoms:
+            if aa.charge is None:
+                return False
+        return True
 
     #region === Checker ===
     def has_duplicate_chain_name(self) -> bool:

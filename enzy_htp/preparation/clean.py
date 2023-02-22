@@ -30,3 +30,15 @@ def remove_solvent(stru: Structure, protect: str = None) -> Structure:
     stru_oper.remove_empty_chain(stru)
 
     return stru
+
+
+def remove_H(stru: Structure) -> Structure:
+    """Method that removes hydrogens from the supplied structure.
+    
+    Args:
+        stru: the Structure object that the hydrogens need to be removed from.
+
+    Returns:
+        The Structure object with no hydrogens.
+    """
+    pass
