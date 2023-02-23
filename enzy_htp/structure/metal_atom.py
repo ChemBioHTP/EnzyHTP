@@ -119,7 +119,7 @@ class MetalUnit(Residue):
             # only check donor atom (by atom name)
             if atom.is_donor_atom():
                 r_donor = atom.radius(method)
-                if mh.get_distance(atom.coord, self.atom.coord) - (
+                if atom.distance_to(self.atom) - (
                         r_metal + r_donor) <= 0.01:  # TODO refine this approximation
                     result.append(atom)
                     _LOGGER.info(f"found donor atom of {self}: {atom}")
