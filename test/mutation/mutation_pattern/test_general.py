@@ -3,6 +3,7 @@ Author: QZ Shao <shaoqz@icloud.com>
 Date: 2023-01-26
 """
 
+import numpy as np
 import pytest
 import os
 import pickle
@@ -92,3 +93,27 @@ def test_decode_mutation_esm_pattern():
     with open(answer_path, "rb") as f:
         answer = pickle.load(f)
     assert answer == mutation_esm
+
+def test_decode_random_mutation(caplog):
+    """test the function works as expected using a made up pattern and manually
+    curated answer. test of non repeat case
+    Use a random seed to control the test to contain a repeating random result"""
+    test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
+    test_stru = sp.get_structure(test_pdb)
+    test_pattern = "r:2[resi 254 around 3:all not self]*10"
+    # find a seed that have repeating mutant
+    # i = True
+    # while i:
+    #     seed = np.random.randint(1, 10000)
+    #     print(f"seed: {seed}")
+    #     np.random.seed(seed)
+    #     mutants = m_p.decode_random_mutation(test_stru, test_pattern)
+    #     if "repeating" in caplog.text:
+    #         i=False
+    np.random.seed(457)
+    mutants = m_p.decode_random_mutation(test_stru, test_pattern)
+    print(*mutants, sep="\n")
+    assert len(mutants) == 10
+    for i in mutants:
+        assert len(i) == 2
+    assert "repeating MUTANT is generated" in caplog.text
