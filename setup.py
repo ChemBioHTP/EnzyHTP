@@ -14,7 +14,6 @@ with open('requirements.txt', 'r') as f:
 
 SUB_MODULES=[
         'enzy_htp',
-        'enzy_htp._apps',
         'enzy_htp._config',
         'enzy_htp._interface',
         'enzy_htp.analysis',
