@@ -149,6 +149,8 @@ def assign_mutation(
         Each section can be one of the format below:
         1. direct indication                    : XA###Y
         2. random M, N-point mutation in a set  : r:N[mutation_esm_patterns]*M
+                                                  or r:NR[mutation_esm_patterns]*MR
+                                                  (R stands for allowing repeating mutations in randomization)
         3. all mutation in a set: a             : a:[mutation_esm_patterns]
 
         The mutation_esm_patterns is seperated by comma and each describes 2 things:

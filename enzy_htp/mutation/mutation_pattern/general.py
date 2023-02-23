@@ -5,13 +5,13 @@ Author: QZ Shao <shaoqz@icloud.com>
 Date: 2023-01-26
 """
 import copy
-from typing import Dict, List, Tuple
+from typing import Dict, List, Set, Tuple
 import re
 import numpy as np
 
 from enzy_htp.core.exception import InvalidMutationPatternSyntax
 from enzy_htp.core.logger import _LOGGER
-from enzy_htp.core.general import pop_random_list_elem
+from enzy_htp.core.general import get_random_list_elem, pop_random_list_elem
 from enzy_htp.structure import Structure
 from ..mutation import (
     Mutation,
@@ -89,23 +89,51 @@ def decode_random_mutation(stru: Structure, section_pattern: str) -> List[List[M
     """decode the mutation pattern section that random over the mutation set.
     Return a list of mutation objects. (M number of N point mutants)
     pattern_example: r:N[xxx:yyy]*M"""
-    re_pattern = r"r:([0-9]*)\[(.+)\]\*([0-9]*)"
-    mut_point_num, mutation_esm_patterns, mutant_num = re.match(re_pattern, section_pattern).groups()
+    re_pattern = r"r:([0-9]*)(R?)\[(.+)\]\*([0-9]*)(R?)"
+    mut_point_num, point_allow_repeat, mutation_esm_patterns, mutant_num, mutant_allow_repeat = re.match(
+        re_pattern, section_pattern
+        ).groups()
+    mut_point_num = int(mut_point_num)
+    mutant_num = int(mutant_num)
     mutation_esm_mapper = decode_mutation_esm_pattern(stru, mutation_esm_patterns) # {mutation_site: Mutation}
 
+    _LOGGER.info(f"generating mutant in positions: {list(mutation_esm_mapper.keys())} ({len(mutation_esm_mapper)} sites total)")
     if len(mutation_esm_mapper) < mut_point_num:
         raise InvalidMutationPatternSyntax(
             f"number of desired point mutations are more than the total number of possible mutation sites in the ensemble, desired: {mut_point_num}, possible_sites: {len(mutation_esm_mapper)}"
             )
 
-    result: List[List[Mutation]] = []    
+    result: List[Set[Mutation]] = []
     while len(result) < mutant_num:
-        each_mutant: List[Mutation] = []
-        # mutation_esm_copy = copy.deepcopy(mutation_esm)
-        # while len(each_mutant) < mut_point_num:
-        #     each_mutant.append(pop_random_list_elem(mutation_esm_copy)) #TODO but should we allow the same mutation? make it an option
-        # result.append(each_mutant) #TODO allow R after N and M to specify
+        each_mutant: Dict[tuple, Mutation] = {} # point mutation of each mutant
 
+        if not point_allow_repeat:
+            non_repeat_points = list(mutation_esm_mapper.keys())
+
+        while len(each_mutant) < mut_point_num:
+            # determine positionn
+            if point_allow_repeat:
+                new_position = get_random_list_elem(list(mutation_esm_mapper.keys()))
+                if new_position in each_mutant:
+                    _LOGGER.warning(
+                        f"repeating mutation is generated for {new_position}, the later one is used. (point_allow_repeat: True)")
+            else: # point_allow_repeat is None
+                new_position = pop_random_list_elem(non_repeat_points)
+
+            new_mutation = get_random_list_elem(mutation_esm_mapper[new_position])
+            each_mutant[new_position] = new_mutation # use dict to make sure each point only have 1 mutation
+
+        if mutant_allow_repeat:
+            result.append(set(each_mutant.values()))
+        else: # do not allow repeat mutant -- check if repeat
+            each_mutant = set(each_mutant.values())
+            if each_mutant in result:
+                _LOGGER.info(
+                    f"repeating MUTANT is generated: {each_mutant}, regenerating it. (point_allow_repeat: False)")
+                continue
+            result.append(each_mutant)
+
+    result = [list(x) for x in result]
     return result
 
 def decode_all_mutation(stru: Structure, section_pattern: str) -> List[List[Mutation]]:
@@ -118,7 +146,13 @@ def decode_all_mutation(stru: Structure, section_pattern: str) -> List[List[Muta
         a list of mutation objects.
     pattern_example:
         a:[xxx:yyy]"""
-    result = ""
+    result: List[List[Mutation]] = []
+    re_pattern = r"a:\[(.+)\]"
+    mutation_esm_patterns = re.match(re_pattern, section_pattern).groups()[0]
+    mutation_esm_mapper = decode_mutation_esm_pattern(stru, mutation_esm_patterns)
+    
+    # TODO permutation
+
     return result
 
 
