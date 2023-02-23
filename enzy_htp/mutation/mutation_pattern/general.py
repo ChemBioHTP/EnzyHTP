@@ -110,13 +110,15 @@ def decode_random_mutation(stru: Structure, section_pattern: str) -> List[List[M
         if not point_allow_repeat:
             non_repeat_points = list(mutation_esm_mapper.keys())
 
-        while len(each_mutant) < mut_point_num:
+        temp_point_num = mut_point_num
+        while len(each_mutant) < temp_point_num:
             # determine positionn
             if point_allow_repeat:
                 new_position = get_random_list_elem(list(mutation_esm_mapper.keys()))
                 if new_position in each_mutant:
                     _LOGGER.warning(
-                        f"repeating mutation is generated for {new_position}, the later one is used. (point_allow_repeat: True)")
+                        f"repeating mutation is generated for {new_position}, the later one is used, also less num of mutations in this mutant (point_allow_repeat: True)")
+                    temp_point_num -= 1 # control the number of mutations
             else: # point_allow_repeat is None
                 new_position = pop_random_list_elem(non_repeat_points)
 

@@ -112,8 +112,22 @@ def test_decode_random_mutation(caplog):
     #         i=False
     np.random.seed(457)
     mutants = m_p.decode_random_mutation(test_stru, test_pattern)
-    print(*mutants, sep="\n")
     assert len(mutants) == 10
     for i in mutants:
         assert len(i) == 2
     assert "repeating MUTANT is generated" in caplog.text
+
+def test_decode_random_mutation_allow_repeat(caplog):
+    """test the function works as expected using a made up pattern and manually
+    curated answer. test of non repeat case
+    Use a random seed to control the test to contain a repeating random result"""
+    test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
+    test_stru = sp.get_structure(test_pdb)
+    test_pattern = "r:2R[resi 254 around 3:all not self]*10R"
+    np.random.seed(457) # seed that contains a repeating mutant
+
+    mutants = m_p.decode_random_mutation(test_stru, test_pattern)
+    assert len(mutants) == 10
+    for i in mutants:
+        assert len(i) > 0
+    assert "repeating mutation is generated" in caplog.text
