@@ -17,7 +17,9 @@ def safe_rm(fname: str) -> None:
     """Removes a file if and only if the directory already exists. Provides a warning if the 
     supplied path is a directory."""
     if os.path.isdir(fname):
-        _LOGGER.warning(f"The supplied path '{fname}' is a directory and cannot be removed by enzy_htp.core.file_system.safe_rm()")
+        _LOGGER.warning(
+            f"The supplied path '{fname}' is a directory and cannot be removed by enzy_htp.core.file_system.safe_rm()"
+        )
         return
 
     if os.path.exists(fname):
@@ -82,17 +84,17 @@ def lines_from_file(fname: str) -> List[str]:
     fh.close()
     return result
 
+
 def content_from_file(fname: str) -> str:
     """Extracts and returns the content from supplied filename. Returns empty str() if file does not exist."""
     #TODO(CJ): make unit tests for this
     if not os.path.exists(fname):
         _LOGGER.error(f"The file {fname} does not exist.")
-        return str() 
+        return str()
     fh = open(fname, "r")
     result = fh.read()
     fh.close()
     return result
-
 
 
 def write_lines(fname: str, lines: List[str]) -> None:

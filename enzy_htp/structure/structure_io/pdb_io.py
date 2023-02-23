@@ -642,10 +642,12 @@ class PDBParser(StructureParserInterface):
         alt_loc_id = f"{'':1}"
         insert_code = f"{'':1}"
         occupancy = f"{1.00:>6.2f}"
-        
-        temp_factor = ' '*6
-        if atom.b_factor:
+
+        if atom.b_factor is None:
+            temp_factor = f"{0.0:>6.2f}"
+        else:
             temp_factor = f"{atom.b_factor:>6.2f}"
+
         seg_id = f"{'':<4}"
         element = f"{atom.element:>2}"
         if atom.charge is None:

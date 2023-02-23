@@ -1,11 +1,12 @@
-"""Testing the enzy_htp.molecular_mechanics.AmberConfig class.
+"""Testing the enzy_htp._config.AmberConfig class.
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-03
 """
+
+from pathlib import Path
 from enzy_htp._config import amber_config
 import pytest
-from pathlib import Path
 import enzy_htp._config.amber_config as ac
 
 

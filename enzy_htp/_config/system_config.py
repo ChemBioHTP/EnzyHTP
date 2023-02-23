@@ -13,8 +13,8 @@ import os
 from typing import Any
 from copy import deepcopy
 
-
 from enzy_htp.core import _LOGGER
+
 
 class SystemConfig:
     """Class that holds system settings for enzy_htp. Similar to other classes in this
@@ -34,10 +34,10 @@ class SystemConfig:
     MEM_PER_CORE: int = 2000
     """Memory in megabytes that each enzy_htp process has."""
 
-    WORK_DIR:str = os.getcwd()
+    WORK_DIR: str = os.getcwd()
     """Directory work is being done in by enzy_htp."""
 
-    SCRATCH_DIR:str = f"{WORK_DIR}/scratch"
+    SCRATCH_DIR: str = f"{WORK_DIR}/scratch"
     """Default temp directory for enzy_htp. Defaults to WORK_DIR/scratch"""
 
     def __getitem__(self, key: str) -> Any:
@@ -49,11 +49,12 @@ class SystemConfig:
         Returns:
         """
         if key.count("."):
-            _LOGGER.error(f"No nested variables currently exist in the SystemConfig() class. Exiting...")
-            exit( 1 )
+            _LOGGER.error(
+                f"No nested variables currently exist in the SystemConfig() class. Exiting..."
+            )
+            exit(1)
         else:
             return getattr(self, key)
-
 
     def __setitem__(self, key: str, value: Any) -> None:
         """Setter for SystemConfig() that leverages [] operator syntax.
@@ -66,8 +67,10 @@ class SystemConfig:
             Nothing
         """
         if key.count("."):
-            _LOGGER.error(f"No nested variables currently exist in the SystemConfig() class. Exiting...")
-            exit( 1 )
+            _LOGGER.error(
+                f"No nested variables currently exist in the SystemConfig() class. Exiting..."
+            )
+            exit(1)
 
         else:
             setattr(self, key, value)

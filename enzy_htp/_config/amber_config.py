@@ -30,6 +30,7 @@ class AmberConfig:
         CONF_HEAT : dict() holding settings for Amber heating.
         CONF_EQUI : dict() holding settings for Amber constant pressure equilibration run.
         CONF_PROD : dict() holding settings for Amber constant pressure production run.
+        RADII_MAP: dict() containing settings for Amber's implementation of the Born solvation model. 
     """
 
     HOME: str = "AMBERHOME"
@@ -121,6 +122,15 @@ class AmberConfig:
     }
     """dict() holding the settings for an Amber constant pressure production run."""
 
+    RADII_MAP: Dict = {
+        '1': 'mbondi',
+        '2': 'mbondi2',
+        '5': 'mbondi2',
+        '7': 'bondi',
+        '8': 'mbondi3'
+    }
+    """dict() holding the radii mapping for the IGB solvation model."""
+
     def __init__(self, parent=None):
         """Trivial constructor that optionally sets parent_ dependency. parent_ is None by default."""
         self.parent_ = parent
@@ -146,7 +156,7 @@ class AmberConfig:
         return [self.HOME]
 
     def display(self) -> None:
-        """TODO(CJ)"""
+        """Method that prints out all settings for the AmberConfig() object to the stdout."""
         dash_line: str = "-" * 40
         print("AmberConfig() settings:")
         print(dash_line)

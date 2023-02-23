@@ -4,3 +4,6 @@ plum-dispatch
 numpy
 # openbabel
 pandas
+pymol
+colorlog
+modeller
