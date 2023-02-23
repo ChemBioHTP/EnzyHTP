@@ -8,7 +8,6 @@ there are configuration settings for the below packages by the given <Package>Co
     + AmberMD, AmberConfig
     + Gaussian, GaussianConfig
     + Multiwfn, MultiwfnConfig
-    + PyMOL, PyMOLConfig
 
 In addition to specific packages, settings for the system are specified with SystemConfig
 
@@ -24,7 +23,6 @@ from typing import Any, Dict
 from .amber_config import AmberConfig, default_amber_config
 from .gaussian_config import GaussianConfig, default_gaussian_config
 from .multiwfn_config import MultiwfnConfig, default_multiwfn_config
-from .pymol_config import PyMOLConfig, default_pymol_config
 from .system_config import SystemConfig, default_system_config
 
 from enzy_htp.core import _LOGGER
@@ -41,7 +39,6 @@ class Config:
         _amber: Private instance of AmberConfig() with default settings.
         _gaussian: Private instance of GaussianConfig() with default settings.
         _multiwfn: Private instance of MultiwfnConfig() with default settings.
-        _pymol: Private instance of PyMOLConfig() with default settings.
         _system: Private instance of SystemConfig() with default settings.
     """
 
@@ -50,7 +47,6 @@ class Config:
         self._amber = default_amber_config()
         self._gaussian = default_gaussian_config()
         self._multiwfn = default_multiwfn_config()
-        self._pymol = default_pymol_config()
         self._system = default_system_config()
 
     def __getitem__(self, key: str) -> Any:
@@ -75,8 +71,6 @@ class Config:
                 ptr = self._gaussian
             elif app == "multiwfn":
                 ptr = self._multiwfn
-            elif app == "pymol":
-                ptr = self._pymol
             elif app == "system":
                 ptr = self._system
             else:
@@ -106,8 +100,6 @@ class Config:
                 ptr = self._gaussian
             elif app == "multiwfn":
                 ptr = self._multiwfn
-            elif app == "pymol":
-                ptr = self._pymol
             elif app == "system":
                 ptr = self._system
             else:

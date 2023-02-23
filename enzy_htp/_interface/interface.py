@@ -14,7 +14,6 @@ from enzy_htp import core
 from .amber_interface import AmberInterface
 from .gaussian_interface import GaussianInterface
 from .multiwfn_interface import MultiwfnInterface
-from .pymol_interface import PyMOLInterface
 
 from enzy_htp._config import Config
 
@@ -27,11 +26,9 @@ class Interface:
         amber: Corresponds to instance of AmberInterface().
         gaussian: Corresponds to instnce of GaussianInterface().
         multiwfn: Corresponds to instance of MultiwfnInterface().
-        pymol: Corresponds to instance of PyMOLInteface().
     """
 
     def __init__(self, config: Config):
         self.amber = AmberInterface(config._amber)
         self.gaussian = GaussianInterface(config._gaussian)
         self.multiwfn = MultiwfnInterface(config._multiwfn)
-        self.pymol = PyMOLInterface(config._pymol)
