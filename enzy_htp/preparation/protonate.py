@@ -259,7 +259,7 @@ def protonate_ligand_with_pybel(stru: Structure,
             f"{int_ligand_file_dir}/ligand_{ligand.chain.name}_{ligand.idx}_{ligand.name}.pdb"
         )
         int_pybel_file_path = fs.get_valid_temp_name(
-            f"{int_ligand_file_path.removesuffix('.pdb')}_pybel.pdb")
+            f"{int_ligand_file_path.replace('.pdb', '')}_pybel.pdb")
         # file interface with pybel
         ligand.fix_atom_names()  # make sure original ligand have all unique names
         with open(int_ligand_file_path, "w") as of:
@@ -293,7 +293,7 @@ def pybel_protonate_pdb_ligand(in_path: str, out_path: str, ph: float = 7.0) -> 
         (write file to out_path)
         return the {out_path} from input
     """
-    int_path = fs.get_valid_temp_name(out_path.removesuffix(".pdb") + "_badname.pdb")
+    int_path = fs.get_valid_temp_name(out_path.replace(".pdb", "") + "_badname.pdb")
 
     pybel.ob.obErrorLog.SetOutputLevel(0)
     mol = next(pybel.readfile("pdb", in_path))

@@ -739,8 +739,8 @@ class AmberInterface:
             _LOGGER.error(f"The file '{prmtop}' does not exist. Exiting...")
             exit( 1 )
 
-        if fs.get_file_ext( prmtop ) != '.prmtop':
-            _LOGGER.error("AmberInterface.parse_prmtop() expects the supplied path to have extension '.prmtop'. Exiting...")
+        if fs.get_file_ext( prmtop ) != '.prmtop' and str(prmtop).find('prmtop') == -1:
+            _LOGGER.error("AmberInterface.parse_prmtop() expects the supplied path to have extension '.prmtop' or contain the name 'prmtop'. Exiting...")
             exit( 1 )
 
         # 1. get the contents

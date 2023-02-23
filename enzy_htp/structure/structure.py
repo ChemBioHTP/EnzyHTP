@@ -226,9 +226,15 @@ class Structure(
     def find_atoms_in_range(self, center: Union[Atom, Tuple[int, int, int]],
                             range_distance: float) -> List[Atom]:
         """find atoms in {range} of {center}. return a list of atoms found"""
+        if isinstance(center,Atom):
+            center = center.coord
+        
         result = []
         for atom in self.atoms:
-            if atom.distance_to(center) <= range_distance:
+            a_coord = atom.coord 
+            dist = ((center[0]-a_coord[0])**2 + (center[1]-a_coord[1])**2 + (center[2]-a_coord[2])**2)**0.5
+            
+            if dist <= range_distance:
                 result.append(atom)
         return result
 
