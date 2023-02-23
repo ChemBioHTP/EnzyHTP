@@ -37,9 +37,4 @@ if __name__ == '__main__':
         include_package_data=True,
         packages=SUB_MODULES,
         install_requires=requirements,
-        entry_points={
-            'console_scripts': [
-                'eh-prepare = enzy_htp._apps.prepare:main'
-            ]
-        }
-    )
+        )
