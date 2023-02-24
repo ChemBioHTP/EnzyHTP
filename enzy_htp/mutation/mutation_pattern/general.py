@@ -20,7 +20,7 @@ from ..mutation import (
     is_valid_mutation
 )
 from .position_pattern import decode_position_pattern
-from .target_aa_pattern import decode_target_aa_pattern
+from .target_aa_pattern import check_target_aa_pattern, decode_target_aa_pattern
 
 
 def decode_mutation_pattern(stru: Structure, pattern: str) -> List[Mutation]:
@@ -168,13 +168,16 @@ TYPE_SECTION_DECODERS = {
 
 def decode_mutation_esm_pattern(stru: Structure, mutation_esm_patterns: str) -> Dict[Tuple[str, int], List[Mutation]]:
     """decode mutation esm pattern into a list of mutation objects
-    pattern_example: position_pattern_0:target_aa_pattern_0, ..."""
+    pattern_example: position_pattern_0:target_aa_pattern_0, ...
+    TODO(qz): fix a bug that when there are shared positions in different pattern.
+    Make union in targets. Current: overwrite previous ones."""
 
     esm_result: Dict[tuple, List[Mutation]] = {}
     seperate_pattern = r"(?:[^,(]|(?:\([^\}]*\)))+[^,]*"
     esm_pattern_list = [i.strip() for i in re.findall(seperate_pattern, mutation_esm_patterns)]
     for esm_pattern in esm_pattern_list:
         position_pattern, target_aa_pattern = esm_pattern.split(":")
+        check_target_aa_pattern(target_aa_pattern) # give warning about pattern
         esm_positions = decode_position_pattern(stru, position_pattern, if_name=True)
         for esm_position, orig_resi in esm_positions:
             posi_target_aa = decode_target_aa_pattern(orig_resi, target_aa_pattern)

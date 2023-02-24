@@ -437,7 +437,7 @@ RESIDUE_VOLUME_MAPPER: Dict[str, float] = {
 """dict() that maps one-letter amino-acid codes to their volume in cubic angstroms. 
 source: https://www.imgt.org/IMGTeducation/Aide-memoire/_UK/aminoacids/abbreviation.html"""
 
-RESIDUE_CHARGE_MAPPER: Dict[str, int] = {
+CAA_CHARGE_MAPPER: Dict[str, int] = {
         "ALA": 0,
         "CYS": 0,
         "ASP": -1,
@@ -458,8 +458,39 @@ RESIDUE_CHARGE_MAPPER: Dict[str, int] = {
         "TRP": 0,
         "TYR": 0
 }
-"""dict() that maps three-letter amino-acid codes to their formal charge. Note that HIS is 
-temporarily removed from the map due to its potential 3 titration state """
+"""dict() that maps three-letter canonical amino-acid codes to their formal charge. 
+Note that HIS is temporarily removed from the map due to its potential 3 titration state.
+This is used as the pool for target mutation selection when charge related keyword for mutation
+is used"""
+
+AA_CHARGE_MAPPER: Dict[str, int] = {
+        "ALA": 0,
+        "CYS": 0,
+        "ASP": -1,
+        "GLU": -1,
+        "PHE": 0,
+        "GLY": 0,
+        "ILE": 0,
+        "LYS": 1,
+        "LEU": 0,
+        "MET": 0,
+        "ASN": 0,
+        "PRO": 0,
+        "GLN": 0,
+        "ARG": 1,
+        "SER": 0,
+        "THR": 0,
+        "VAL": 0,
+        "TRP": 0,
+        "TYR": 0,
+        "HIS": 0,
+        "HIE": 0,
+        "HID": 0,
+        "HIP": 1,
+}
+"""dict() that maps three-letter amino-acid codes to their formal charge. not limited to CAA.
+This map includes residues of different titration states. This is used in determine the charge
+of the original residue when charge related keyword for mutation is used"""
 
 DEPROTONATION_MAPPER: Dict[str, Union[tuple, None]] = {
     "ASH": {"OD2": ("ASP", "HD2")},

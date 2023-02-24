@@ -31,3 +31,10 @@ def test_decode_charge_p1():
     """test the function use a made up orig_resi"""
     test_orig_resi = "GLY"
     assert m_p.decode_charge_n1(test_orig_resi) == ['ASP', 'GLU']
+
+def test_check_target_aa_pattern_charge(caplog):
+    """test the function give correct warning about HIS"""
+    test_pattern = "charge+"
+    m_p.check_target_aa_pattern(test_pattern)
+    assert "HIS is not included" in caplog.text
+
