@@ -241,9 +241,14 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''',
         info_run = run_cmd(cmd, try_time=2880, wait_time=30, timeout=120)
         # if exist
         info_out_lines = info_run.stdout.strip().splitlines()
-        for info_line in info_out_lines:
+        for info_line in info_out_lines: 
+            info_line_parts = info_line.strip().split()
+            if len(info_line_parts) < 2:
+                if Config.debug > 1:
+                    print(f"field: {field} is not supported in squeue. Switch to sacct.")
+                break
             if job_id in info_line:
-                job_field_info = info_line.strip().split()[1].strip().strip('+')
+                job_field_info = info_line_parts[1].strip().strip('+')
                 return job_field_info
         # use sacct if squeue do not have info
         # wait a update gap

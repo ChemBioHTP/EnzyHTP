@@ -350,7 +350,8 @@ class ClusterJob():
         monitor the job in a specified frequency
         until it ends with 
         complete, error, or cancel
-
+        NOTE: this wont treat it as an end if hold or requeue your job
+              you should do that if other users in the cluster complain 
         Args:
             period: the time cycle for detect job state (Unit: s)
         '''
