@@ -105,6 +105,7 @@ def decode_random_mutation(stru: Structure, section_pattern: str) -> List[List[M
 
     result: List[Set[Mutation]] = []
     while len(result) < mutant_num:
+        # I. make mutations of each mutant
         each_mutant: Dict[tuple, Mutation] = {} # point mutation of each mutant
 
         if not point_allow_repeat:
@@ -112,7 +113,7 @@ def decode_random_mutation(stru: Structure, section_pattern: str) -> List[List[M
 
         temp_point_num = mut_point_num
         while len(each_mutant) < temp_point_num:
-            # determine positionn
+            # 1. determine positionn
             if point_allow_repeat:
                 new_position = get_random_list_elem(list(mutation_esm_mapper.keys()))
                 if new_position in each_mutant:
@@ -121,10 +122,11 @@ def decode_random_mutation(stru: Structure, section_pattern: str) -> List[List[M
                     temp_point_num -= 1 # control the number of mutations
             else: # point_allow_repeat is None
                 new_position = pop_random_list_elem(non_repeat_points)
-
+            # 2. determine target
             new_mutation = get_random_list_elem(mutation_esm_mapper[new_position])
             each_mutant[new_position] = new_mutation # use dict to make sure each point only have 1 mutation
 
+        # II. consider if repeating or not and add valid mutant
         if mutant_allow_repeat:
             result.append(set(each_mutant.values()))
         else: # do not allow repeat mutant -- check if repeat
