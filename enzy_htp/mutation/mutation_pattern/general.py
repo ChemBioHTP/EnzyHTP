@@ -169,8 +169,8 @@ TYPE_SECTION_DECODERS = {
 def decode_mutation_esm_pattern(stru: Structure, mutation_esm_patterns: str) -> Dict[Tuple[str, int], List[Mutation]]:
     """decode mutation esm pattern into a list of mutation objects
     pattern_example: position_pattern_0:target_aa_pattern_0, ...
-    TODO(qz): fix a bug that when there are shared positions in different pattern.
-    Make union in targets. Current: overwrite previous ones."""
+    NOTE: if different mutation_esm_pattern have shared points.
+          The target of the shared points with be the union of all"""
 
     esm_result: Dict[tuple, List[Mutation]] = {}
     seperate_pattern = r"(?:[^,(]|(?:\([^\}]*\)))+[^,]*"
@@ -181,7 +181,11 @@ def decode_mutation_esm_pattern(stru: Structure, mutation_esm_patterns: str) -> 
         esm_positions = decode_position_pattern(stru, position_pattern, if_name=True)
         for esm_position, orig_resi in esm_positions:
             posi_target_aa = decode_target_aa_pattern(orig_resi, target_aa_pattern)
-            esm_result[esm_position] = generate_mutation_from_traget_list(esm_position, orig_resi, posi_target_aa)
+            posi_mutation = generate_mutation_from_traget_list(esm_position, orig_resi, posi_target_aa)
+            if esm_position in esm_result: # shared position case
+                esm_result[esm_position] = list(set(esm_result[esm_position]) or set(posi_mutation))
+            else:
+                esm_result[esm_position] = posi_mutation
 
     return esm_result
 

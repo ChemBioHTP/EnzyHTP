@@ -119,7 +119,7 @@ def is_valid_mutation(mut: Mutation, stru: es.Structure) -> bool:
 
     return True
 
-def generate_mutation_from_traget_list(position: Tuple[str, int], orig_resi: str, target_list: str) -> Mutation:
+def generate_mutation_from_traget_list(position: Tuple[str, int], orig_resi: str, target_list: str) -> List[Mutation]:
     """generate a list of Mutation() objects from position and a list of target residues"""
     result = []
     for target in target_list:

@@ -82,7 +82,7 @@ def test_decode_direct_mutation():
     assert m_p.decode_direct_mutation(test_stru, test_d_pattern_1) == answer
 
 def test_decode_mutation_esm_pattern():
-    "test function works as expected, test using pickle obj of a confirmed run"
+    """test function works as expected, test using pickle obj of a confirmed run"""
     test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
     test_stru = sp.get_structure(test_pdb)
     test_pattern = "resi 254 around 5:all not self, resi 2:larger"
@@ -93,6 +93,15 @@ def test_decode_mutation_esm_pattern():
     with open(answer_path, "rb") as f:
         answer = pickle.load(f)
     assert answer == mutation_esm
+
+def test_decode_mutation_esm_pattern_share_point():
+    """test the case that there are shared positions from different
+    mutation_esm_pattern s"""
+    test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
+    test_stru = sp.get_structure(test_pdb)
+    test_pattern = "resi 9:all not self, resi 254 around 3:charge+"
+    mutation_esm = m_p.decode_mutation_esm_pattern(test_stru, test_pattern)
+    assert len(mutation_esm[('A', 9)]) == 19
 
 def test_decode_random_mutation(caplog):
     """test the function works as expected using a made up pattern and manually
