@@ -23,5 +23,5 @@ def test_check_complete_metric_run():
         ['EA323R', 'EB773R', 'GA171H', 'GB621H'],
         ['EA323R', 'EB773R', 'GA171K', 'GB621K'],
         ['EA323R', 'EB773R', 'GA171D', 'GB621D']]
-    for mutant in test_mutants:
-        print(helper.check_complete_metric_run(mutant, test_data_path))
+    result = [helper.check_complete_metric_run(mutant, test_data_path) for mutant in test_mutants]
+    assert result == [True, True, False, False]
