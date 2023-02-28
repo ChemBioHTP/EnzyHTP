@@ -22,7 +22,10 @@ from enzy_htp.structure import Structure, PDBParser
 try:
     import pymol2
 except ImportError:
-    _LOGGER.error("pymol package is missing. Install with `conda install -c conda-forge -c schrodinger pymol-bundle`")
+    _LOGGER.error(
+        "pymol package is missing. Install with `conda install -c conda-forge -c schrodinger pymol-bundle`"
+    )
+
 
 class PyMolInterface:
     """Class that provides a direct inteface for enzy_htp to utilize PyMol package. 
@@ -47,7 +50,8 @@ class PyMolInterface:
         return result
 
     # == intra-session modular functions == (requires a session and wont close it)
-    def load_enzy_htp_stru(self, stru: Structure, pymol_session: pymol2.PyMOL) -> Tuple[str, pymol2.PyMOL]:
+    def load_enzy_htp_stru(self, stru: Structure,
+                           pymol_session: pymol2.PyMOL) -> Tuple[str, pymol2.PyMOL]:
         """convert enzy_htp.Structure into a pymol object in a
         pymol2.PyMOL() session. 
         Using cmd.load and mediate by PDB format
@@ -75,7 +79,8 @@ class PyMolInterface:
 
         return (pymol_obj_name, pymol_session)
 
-    def select_pymol_obj(self, pattern: str, pymol_obj_name: str, pymol_session: pymol2.PyMOL) -> List[int]:
+    def select_pymol_obj(self, pattern: str, pymol_obj_name: str,
+                         pymol_session: pymol2.PyMOL) -> List[int]:
         """an internal function return atom indexes of a pymol selection of a pymol obj 
         in the pymol session
         NOTE: in distance related selection scheme, there should be only on object in the session
@@ -88,11 +93,13 @@ class PyMolInterface:
         # san check
         if len(pymol_session.cmd.get_object_list()) != 1:
             _LOGGER.warning(
-                "more than 1 object is found in current pymol session when doing select. May give absurd results if distance based selection is used. (It will use atoms from other objs)")
+                "more than 1 object is found in current pymol session when doing select. May give absurd results if distance based selection is used. (It will use atoms from other objs)"
+            )
         sele_pattern = f"{pymol_obj_name} & ({pattern})"
         sele_name = pymol_session.cmd.get_unused_name("enzy_htp_stru_sele")
         pymol_session.cmd.select(sele_name, sele_pattern)
-        pymol_session.cmd.iterate(sele_name, "result.append(ID)", space=locals()) # use ID instead of index here
+        pymol_session.cmd.iterate(sele_name, "result.append(ID)",
+                                  space=locals())  # use ID instead of index here
 
         return sorted(result)
 
@@ -111,11 +118,11 @@ class PyMolInterface:
 
     #TODO support pymol2 for these
     # def get_charge(self, fname: str, sele: str = '(all)') -> int:
-    #     """Method that gets the formal charge for the specified sele in the 
-    #     specified file. File must be a supported file type as listed in 
-    #     PyMOLConfig. Checks if file exists and is supported type. If either 
+    #     """Method that gets the formal charge for the specified sele in the
+    #     specified file. File must be a supported file type as listed in
+    #     PyMOLConfig. Checks if file exists and is supported type. If either
     #     are not true then an error is logged and the program exits. DOES
-    #     NOT check if the sele is valid. 
+    #     NOT check if the sele is valid.
     #     Args:
     #         fname: The str() path to the file in question.
     #         sele: The str() specifying the atom selection in PyMOL synatx. Default is '(all)'.
@@ -141,9 +148,9 @@ class PyMolInterface:
     #     return sum(_eh_local['fc'])
 
     # def get_sequence(self, fname: str, sele: str = '(all)') -> str:
-    #     """Method that gets the sequence for the specified sele in the 
-    #     specified file. File must be a supported file type as listed in 
-    #     PyMOLConfig. Checks if file exists and is supported type. If either 
+    #     """Method that gets the sequence for the specified sele in the
+    #     specified file. File must be a supported file type as listed in
+    #     PyMOLConfig. Checks if file exists and is supported type. If either
     #     are not true then an error is logged and the program exits. DOES
     #     NOT check if the sele is valid. Note that non-canonical residues will
     #     be represented by a '?' in the sequence.
@@ -170,8 +177,10 @@ class PyMolInterface:
     #     lines = list(filter(lambda ll: ll[0] != '>', lines))
     #     return ''.join(lines)
 
+
 class OpenPyMolSession:
     """a context manager that open a pymol session once enter and close once exit"""
+
     def __init__(self, pymol_interface: PyMolInterface) -> None:
         self.interface = pymol_interface
 

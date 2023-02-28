@@ -12,6 +12,7 @@ from enzy_htp.core import _LOGGER
 from enzy_htp.core.general import get_interval_str_from_list
 from enzy_htp.structure import Structure, Atom, Residue, Chain
 
+
 class StruSelection:
     """Structure selection result.
     Designed for access of the selection result because the result normally wont be a 
@@ -59,7 +60,8 @@ class StruSelection:
             result = get_interval_str_from_list(result)
         return result
 
-    def involved_residue_idx(self, if_interval_str: bool = False) -> Union[List[int], str]:
+    def involved_residue_idx(self,
+                             if_interval_str: bool = False) -> Union[List[int], str]:
         """return a list of residue idx involved in holding atoms"""
         result = list(map(lambda x: x.idx, self.involved_residues))
         if if_interval_str:
@@ -75,7 +77,8 @@ class StruSelection:
         """the string represetation of the selection"""
         result_line = []
         result_line.append(f"In atoms: {self.atom_idx(if_interval_str=True)}")
-        result_line.append(f"Involve residues: {self.involved_residue_idx(if_interval_str=True)}")
+        result_line.append(
+            f"Involve residues: {self.involved_residue_idx(if_interval_str=True)}")
         result_line.append(f"Involve chains: {','.join(self.involved_chain_name())}")
 
         return f"{os.linesep}".join(result_line)

@@ -19,31 +19,36 @@ DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/data/"
 
 def test_generate_from_mutation_flag_wt(caplog):
     """test if the function behave as expected on WT"""
-    assert mut.generate_from_mutation_flag("WT") == mut.Mutation(
-        orig=None, target='WT', chain_id=None, res_idx=None
-        )
+    assert mut.generate_from_mutation_flag("WT") == mut.Mutation(orig=None,
+                                                                 target='WT',
+                                                                 chain_id=None,
+                                                                 res_idx=None)
 
     original_level = _LOGGER.level
     _LOGGER.setLevel(logging.DEBUG)
 
-    assert mut.generate_from_mutation_flag("RA154R") == mut.Mutation(
-        orig=None, target='WT', chain_id=None, res_idx=None
-        )
+    assert mut.generate_from_mutation_flag("RA154R") == mut.Mutation(orig=None,
+                                                                     target='WT',
+                                                                     chain_id=None,
+                                                                     res_idx=None)
     assert "equivalent mutation detected" in caplog.text
 
     _LOGGER.setLevel(original_level)
+
 
 def test_generate_from_mutation_flag_default_chainid(caplog):
     """test if the function behave as expected on default chain id"""
     original_level = _LOGGER.level
     _LOGGER.setLevel(logging.DEBUG)
 
-    assert mut.generate_from_mutation_flag("R154A") == mut.Mutation(
-        orig='R', target='A', chain_id='A', res_idx=154
-        )
+    assert mut.generate_from_mutation_flag("R154A") == mut.Mutation(orig='R',
+                                                                    target='A',
+                                                                    chain_id='A',
+                                                                    res_idx=154)
     assert " Using A as default." in caplog.text
 
     _LOGGER.setLevel(original_level)
+
 
 def test_is_valid_mutation_passes():
     """Testing cases that should pass for enzy_htp.mutation.is_valid_mutation."""
@@ -58,20 +63,39 @@ def test_is_valid_mutation_passes():
     for mm in mutations:
         mut.is_valid_mutation(mm, stru)
 
+
 def test_is_valid_mutation_fails():
     """Testing cases that should fail for enzy_htp.mutation.is_valid_mutation."""
     ref_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
     stru = es.PDBParser().get_structure(ref_pdb)
     mutations: List[mut.Mutation] = {
-        "wrong data type" : mut.Mutation(orig=1, target='D', chain_id='A', res_idx=0),
-        "wrong data type" : mut.Mutation(orig="A", target='D', chain_id='A', res_idx="0"),
-        "empty chain_id" : mut.Mutation(orig='R', target='A', chain_id='', res_idx=1),
-        "does not exist in structure" : mut.Mutation(orig='R', target='D', chain_id='B', res_idx=154),
-        "does not exist in structure " : mut.Mutation(orig='R', target='D', chain_id='A', res_idx=300),
-        "original residue does not match" : mut.Mutation(orig='A', target='D', chain_id='A', res_idx=154),
-        "unsupported target residue" : mut.Mutation(orig='R', target='U', chain_id='A', res_idx=154),
-        "unsupported target residue" : mut.Mutation(orig='R', target='X', chain_id='A', res_idx=154),
-        "equivalent mutation detected" : mut.Mutation(orig='R', target='R', chain_id='A', res_idx=154),
+        "wrong data type": mut.Mutation(orig=1, target='D', chain_id='A', res_idx=0),
+        "wrong data type": mut.Mutation(orig="A", target='D', chain_id='A', res_idx="0"),
+        "empty chain_id": mut.Mutation(orig='R', target='A', chain_id='', res_idx=1),
+        "does not exist in structure": mut.Mutation(orig='R',
+                                                    target='D',
+                                                    chain_id='B',
+                                                    res_idx=154),
+        "does not exist in structure ": mut.Mutation(orig='R',
+                                                     target='D',
+                                                     chain_id='A',
+                                                     res_idx=300),
+        "original residue does not match": mut.Mutation(orig='A',
+                                                        target='D',
+                                                        chain_id='A',
+                                                        res_idx=154),
+        "unsupported target residue": mut.Mutation(orig='R',
+                                                   target='U',
+                                                   chain_id='A',
+                                                   res_idx=154),
+        "unsupported target residue": mut.Mutation(orig='R',
+                                                   target='X',
+                                                   chain_id='A',
+                                                   res_idx=154),
+        "equivalent mutation detected": mut.Mutation(orig='R',
+                                                     target='R',
+                                                     chain_id='A',
+                                                     res_idx=154),
     }
 
     for msg_finger_p, mm in mutations.items():

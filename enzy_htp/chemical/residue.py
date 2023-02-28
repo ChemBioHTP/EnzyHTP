@@ -299,13 +299,13 @@ RESIDUE_CONNECTIVITY_MAP: Dict[str, Dict[str, List[str]]] = {
                   "TRP": {"N": ["H", "CA", "-1C"], "H": ["N"], "CA": ["N", "HA", "CB", "C"], "HA": ["CA"], "CB": ["CA", "HB2", "HB3", "CG"], "HB2": ["CB"], "HB3": ["CB"], "CG": ["CB", "CD1", "CD2"], "CD1": ["CG", "HD1", "NE1"], "HD1": ["CD1"], "NE1": ["CD1", "HE1", "CE2"], "HE1": ["NE1"], "CE2": ["NE1", "CZ2", "CD2"], "CZ2": ["CE2", "HZ2", "CH2"], "HZ2": ["CZ2"], "CH2": ["CZ2", "HH2", "CZ3"], "HH2": ["CH2"], "CZ3": ["CH2", "HZ3", "CE3"], "HZ3": ["CZ3"], "CE3": ["CZ3", "HE3", "CD2"], "HE3": ["CE3"], "CD2": ["CG", "CE2", "CE3"], "C": ["CA", "O", "+1N"], "O": ["C"]},
                   "TYR": {"N": ["H", "CA", "-1C"], "H": ["N"], "CA": ["N", "HA", "CB", "C"], "HA": ["CA"], "CB": ["CA", "HB2", "HB3", "CG"], "HB2": ["CB"], "HB3": ["CB"], "CG": ["CB", "CD1", "CD2"], "CD1": ["CG", "HD1", "CE1"], "HD1": ["CD1"], "CE1": ["CD1", "HE1", "CZ"], "HE1": ["CE1"], "CZ": ["CE1", "OH", "CE2"], "OH": ["CZ", "HH"], "HH": ["OH"], "CE2": ["CZ", "HE2", "CD2"], "HE2": ["CE2"], "CD2": ["CG", "CE2", "HD2"], "HD2": ["CD2"], "C": ["CA", "O", "+1N"], "O": ["C"]},
                   "VAL": {"N": ["H", "CA", "-1C"], "H": ["N"], "CA": ["N", "HA", "CB", "C"], "HA": ["CA"], "CB": ["CA", "HB", "CG1", "CG2"], "HB": ["CB"], "CG1": ["CB", "HG11", "HG12", "HG13"], "HG11": ["CG1"], "HG12": ["CG1"], "HG13": ["CG1"], "CG2": ["CB", "HG21", "HG22", "HG23"], "HG21": ["CG2"], "HG22": ["CG2"], "HG23": ["CG2"], "C": ["CA", "O", "+1N"], "O": ["C"]},
-                  "WAT": {"O": ["H1", "H2"], "H1":["O"], "H2": ["O"]} 
+                  "WAT": {"O": ["H1", "H2"], "H1":["O"], "H2": ["O"]}
 }
 """dict() that maps the connectivity of atom's based on their parent residue and atom identity.
 (key, value) pairs are (3-letter AA name, connector), where connector is another dict() with 
 (key, value) pairs of (atom name, list of connected atoms)."""
 
-RESIDUE_CONNECTIVITY_MAP_CTERMINAL: Dict[str, Dict[str, List[str]]] = {     
+RESIDUE_CONNECTIVITY_MAP_CTERMINAL: Dict[str, Dict[str, List[str]]] = {
                         "ALA": {"N": ["H", "CA", "-1C"], "H": ["N"], "CA": ["N", "HA", "CB", "C"], "HA": ["CA"], "CB": ["CA", "HB1", "HB2", "HB3"], "HB1": ["CB"], "HB2": ["CB"], "HB3": ["CB"], "C": ["CA", "O", "OXT"], "O": ["C"], "OXT": ["C"]},
                         "ARG": {"N": ["H", "CA", "-1C"], "H": ["N"], "CA": ["N", "HA", "CB", "C"], "HA": ["CA"], "CB": ["CA", "HB2", "HB3", "CG"], "HB2": ["CB"], "HB3": ["CB"], "CG": ["CB", "HG2", "HG3", "CD"], "HG2": ["CG"], "HG3": ["CG"], "CD": ["CG", "HD2", "HD3", "NE"], "HD2": ["CD"], "HD3": ["CD"], "NE": ["CD", "HE", "CZ"], "HE": ["NE"], "CZ": ["NE", "NH1", "NH2"], "NH1": ["CZ", "HH11", "HH12"], "HH11": ["NH1"], "HH12": ["NH1"], "NH2": ["CZ", "HH21", "HH22"], "HH21": ["NH2"], "HH22": ["NH2"], "C": ["CA", "O", "OXT"], "O": ["C"], "OXT": ["C"]},
                         "ASN": {"N": ["H", "CA", "-1C"], "H": ["N"], "CA": ["N", "HA", "CB", "C"], "HA": ["CA"], "CB": ["CA", "HB2", "HB3", "CG"], "HB2": ["CB"], "HB3": ["CB"], "CG": ["CB", "OD1", "ND2"], "OD1": ["CG"], "ND2": ["CG", "HD21", "HD22"], "HD21": ["ND2"], "HD22": ["ND2"], "C": ["CA", "O", "OXT"], "O": ["C"], "OXT": ["C"]},
@@ -364,7 +364,7 @@ RESIDUE_CTERMINAL_ATOM_LIST: Dict[str, List[str]] = {
                         "TYR": ["N", "H", "CA", "HA", "CB", "HB2", "HB3", "CG", "CD1", "HD1", "CE1", "HE1", "CZ", "OH", "HH", "CE2", "HE2", "CD2", "HD2", "C", "O", "OXT"],
                         "VAL": ["N", "H", "CA", "HA", "CB", "HB", "CG1", "HG11", "HG12", "HG13", "CG2", "HG21", "HG22", "HG23", "C", "O", "OXT"],
                         "NHE": ["N", "HN1", "HN2"],
-                        "NME": ["N", "H", "CH3", "HH31", "HH32", "HH33"] 
+                        "NME": ["N", "H", "CH3", "HH31", "HH32", "HH33"]
 }
 """dict() that lists the atoms in the C-terminal version of a residue. (key, value) pairs are
 (3-letter AA name, list of atom names) where the list of atom names are the modified list of 
@@ -550,6 +550,7 @@ NOPROTON_LIST = ["ASP", "GLU", "MET"]
 
 # yapf: enable
 
+
 def convert_to_three_letter(one_letter: str) -> str:
     """Converts a one letter amino acid name to a three letter. If supplied code is invalid, raises an enzy_htp.core.InvalidResidueCode() exception."""
     if len(one_letter) != 1:
@@ -560,6 +561,7 @@ def convert_to_three_letter(one_letter: str) -> str:
     if not result:
         raise InvalidResidueCode(f"Invalid residue code {one_letter}")
     return result
+
 
 def convert_to_canonical_three_letter(three_letter: str) -> str:
     """Converts a one letter amino acid name to a three letter. If supplied code is invalid, raises an enzy_htp.core.InvalidResidueCode() exception."""

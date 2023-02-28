@@ -11,9 +11,11 @@ import itertools
 
 from .logger import _LOGGER
 
+
 # == List related ==
 class GhostListElement:
     _instance = None
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = object.__new__(cls)
@@ -22,8 +24,11 @@ class GhostListElement:
 
     def __eq__(self, other):
         return self is other
-GHOST_LIST_ELEMENT = GhostListElement()  
+
+
+GHOST_LIST_ELEMENT = GhostListElement()
 """singleton for a ghost list element used for product_lists_allow_empty"""
+
 
 def delete_base_on_id(target_list: list, target_id: int):
     """
@@ -32,6 +37,7 @@ def delete_base_on_id(target_list: list, target_id: int):
     for i in range(len(target_list) - 1, -1, -1):
         if id(target_list[i]) == target_id:
             del target_list[i]
+
 
 def get_interval_from_list(target_list: List[int]) -> Iterable[Tuple[int, int]]:
     """
@@ -52,16 +58,19 @@ def get_interval_from_list(target_list: List[int]) -> Iterable[Tuple[int, int]]:
         j = list(j)
         yield j[0][1], j[-1][1]
 
+
 def get_interval_str_from_list(target_list: List[int]) -> str:
     """convert the result of get_interval_from_list() to a str"""
     result = get_interval_from_list(target_list)
     result = ",".join([f"{x[0]}-{x[1]}" if x[0] != x[1] else f"{x[0]}" for x in result])
     return result
 
+
 def get_random_list_elem(traget_list: list):
     """Helper method that randomly chooses an element from a list. numpy.random.choice() doesn't 
     like to take elements from list()'s of tuples so this is the work around."""
     return traget_list[np.random.randint(len(traget_list))]
+
 
 def pop_random_list_elem(traget_list: list):
     """Helper method that randomly pop an element from a list. (delete from original list)
@@ -69,13 +78,17 @@ def pop_random_list_elem(traget_list: list):
     this is the work around."""
     return traget_list.pop(np.random.randint(len(traget_list)))
 
+
 def product_lists_allow_empty(list_of_lists: List[list]) -> List[list]:
     """product lists in a list and give all possible cases of one element from each.
     Different from itertool.product, not getting any element from a list is allowed.
     Note the result will include an empty list"""
     list_of_lists_copy = copy.deepcopy(list_of_lists)
-    list_of_lists_copy = [each_list + [GHOST_LIST_ELEMENT] for each_list in list_of_lists_copy]
+    list_of_lists_copy = [
+        each_list + [GHOST_LIST_ELEMENT] for each_list in list_of_lists_copy
+    ]
     return _product_lists_w_each_empty_ele(iter(list_of_lists_copy))
+
 
 def _product_lists_w_each_empty_ele(list_of_lists: Iterable[list]) -> List[list]:
     """a sub-function used for product_list_allow_empty"""
@@ -83,7 +96,9 @@ def _product_lists_w_each_empty_ele(list_of_lists: Iterable[list]) -> List[list]
     if not curr_list:
         return [[]]
     next_list = _product_lists_w_each_empty_ele(list_of_lists)
-    return [[x]+y if x != GHOST_LIST_ELEMENT else y for x in curr_list for y in next_list]
+    return [[x] + y if x != GHOST_LIST_ELEMENT else y for x in curr_list
+            for y in next_list]
+
 
 # == Dict related ==
 def get_copy_of_deleted_dict(orig_dict: Dict, del_key) -> Dict:
@@ -100,7 +115,9 @@ def get_copy_of_deleted_dict(orig_dict: Dict, del_key) -> Dict:
 
     return dict_copy
 
+
 # == misc ===
+
 
 def timer(fn):
     """decodator for timing the run of the function {fn}"""

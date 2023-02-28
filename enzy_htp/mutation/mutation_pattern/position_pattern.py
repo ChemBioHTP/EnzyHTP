@@ -8,7 +8,10 @@ from typing import List
 from enzy_htp.structure import Structure, Residue
 from enzy_htp.structure.structure_selection import select_stru
 
-def decode_position_pattern(stru: Structure, pattern: str, if_name: bool=False) -> List[tuple]:
+
+def decode_position_pattern(stru: Structure,
+                            pattern: str,
+                            if_name: bool = False) -> List[tuple]:
     """decode pattern of residue position selection
     TODO support customized position selector
     Args:

@@ -9,7 +9,7 @@ from typing import Dict, List
 X_H_BOND_LENGTH: Dict[str, float] = {
         "C": 1.07,
         "N": 1.0
-}
+} # yapf: disable
 """dict() storing bond lengths between an arbitrary atom X and a Hydrogen (H)."""
 
 

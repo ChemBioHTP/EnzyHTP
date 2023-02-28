@@ -18,13 +18,12 @@ CURR_DIR = os.path.dirname(CURR_FILE)
 DATA_DIR = f"{CURR_DIR}/../data/"
 sp = PDBParser()
 
+
 @pytest.mark.interface
 def test_decode_mutation_pattern():
     """dev run of the function"""
-    test_mutation_pattern = (
-        "KA162A, {RA154W, HA201A},"
-        " {L10A, r:2[resi 254 around 3:all not self]*5}"
-        )
+    test_mutation_pattern = ("KA162A, {RA154W, HA201A},"
+                             " {L10A, r:2[resi 254 around 3:all not self]*5}")
     test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
     test_stru = sp.get_structure(test_pdb)
 
@@ -34,15 +33,16 @@ def test_decode_mutation_pattern():
     assert len(mutants[1]) == 2
     assert len(mutants[2]) == 3
 
+
 def test_seperate_mutants():
     """test the function use a made up mutation_pattern for KE
     use the len of the seperation result as the fingerprint to assert"""
     test_mutation_pattern = (
         "KA162A, {RA154W, HA201A},"
         " r:2[resi 289 around 4 and not resi 36:larger,"
-            " proj(ID 1000, ID 2023, positive, 10):more_negative_charge]*100"
-        )
+        " proj(ID 1000, ID 2023, positive, 10):more_negative_charge]*100")
     assert len(m_p.seperate_mutant_patterns(test_mutation_pattern)) == 3
+
 
 def test_seperate_sections():
     """test the function use a made up mutation_pattern for KE
@@ -50,10 +50,10 @@ def test_seperate_sections():
     test_mutation_pattern = (
         "KA162A,"
         " r:2[resi 289 around 4 and not resi 36:larger,"
-            " proj(ID 1000, ID 2023, positive, 10):more_negative_charge]*100,"
-        "RA154W"
-        )
+        " proj(ID 1000, ID 2023, positive, 10):more_negative_charge]*100,"
+        "RA154W")
     assert len(m_p.seperate_section_patterns(test_mutation_pattern)) == 3
+
 
 def test_get_section_type():
     """test if the section type is correctly determined"""
@@ -65,12 +65,14 @@ def test_get_section_type():
     assert m_p.get_section_type(section_2) == "r"
     assert m_p.get_section_type(section_3) == "a"
 
+
 def test_get_section_type_bad():
     """test if the section type raise the execption as expected."""
     section_bad = "x:KA162A"
     with pytest.raises(Exception) as exe:
         m_p.get_section_type(section_bad)
     assert exe.type == InvalidMutationPatternSyntax
+
 
 def test_decode_direct_mutation():
     """test the function works as expected using a made up pattern and manually
@@ -83,6 +85,7 @@ def test_decode_direct_mutation():
 
     assert m_p.decode_direct_mutation(test_stru, test_d_pattern) == answer
     assert m_p.decode_direct_mutation(test_stru, test_d_pattern_1) == answer
+
 
 def test_decode_mutation_esm_pattern():
     """test function works as expected, test using pickle obj of a confirmed run"""
@@ -97,6 +100,7 @@ def test_decode_mutation_esm_pattern():
         answer = pickle.load(f)
     assert answer == mutation_esm
 
+
 def test_decode_mutation_esm_pattern_share_point():
     """test the case that there are shared positions from different
     mutation_esm_pattern s"""
@@ -105,6 +109,7 @@ def test_decode_mutation_esm_pattern_share_point():
     test_pattern = "resi 9:all not self, resi 254 around 3:charge+"
     mutation_esm = m_p.decode_mutation_esm_pattern(test_stru, test_pattern)
     assert len(mutation_esm[('A', 9)]) == 19
+
 
 def test_decode_random_mutation(caplog):
     """test the function works as expected using a made up pattern and manually
@@ -129,6 +134,7 @@ def test_decode_random_mutation(caplog):
         assert len(i) == 2
     assert "repeating MUTANT is generated" in caplog.text
 
+
 def test_decode_random_mutation_allow_repeat(caplog):
     """test the function works as expected using a made up pattern and manually
     curated answer. test of non repeat case
@@ -136,13 +142,14 @@ def test_decode_random_mutation_allow_repeat(caplog):
     test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
     test_stru = sp.get_structure(test_pdb)
     test_pattern = "r:2R[resi 254 around 3:all not self]*10R"
-    np.random.seed(457) # seed that contains a repeating mutant
+    np.random.seed(457)  # seed that contains a repeating mutant
 
     mutants = m_p.decode_random_mutation(test_stru, test_pattern)
     assert len(mutants) == 10
     for i in mutants:
         assert len(i) > 0
     assert "repeating mutation is generated" in caplog.text
+
 
 def test_decode_all_mutation():
     """test the function works as expected using a made up pattern and manually
@@ -154,6 +161,7 @@ def test_decode_all_mutation():
     mutants = m_p.decode_all_mutation(test_stru, test_pattern)
     assert len(mutants) == 400
 
+
 def test_decode_all_mutation_m_flag():
     """test the function with the flag M specificed
     works as expected using a made up pattern and manually
@@ -164,6 +172,7 @@ def test_decode_all_mutation_m_flag():
 
     mutants = m_p.decode_all_mutation(test_stru, test_pattern)
     assert len(mutants) == 361
+
 
 def test_combine_section_mutant_one_to_many():
     """test the function works as expected in the case that
@@ -180,6 +189,7 @@ def test_combine_section_mutant_one_to_many():
     assert len(mutants) == 400
     for mut in mutants:
         assert Mutation(orig='LEU', target='ALA', chain_id='A', res_idx=10) in mut
+
 
 def test_combine_section_mutant_many_to_many():
     """test the function works as expected"""

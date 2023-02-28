@@ -18,6 +18,7 @@ from enzy_htp import interface
 
 DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/data/"
 
+
 def test_get_mutations_random_state_works():
     """Checking that the random_state function parameter is effective for controlling output in the get_mutations() method."""
     ONE_RES: str = f"{DATA_DIR}/one_res.pdb"

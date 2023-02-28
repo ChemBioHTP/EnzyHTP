@@ -18,7 +18,7 @@ from typing import Any, List, Dict, Tuple
 class PyMolConfig:
     """Class that holds default values for running PyMol within enzy_htp."""
 
-    DEFAULT_OUTPUT_LV: Tuple[str] = ("disable","all","everything")
+    DEFAULT_OUTPUT_LV: Tuple[str] = ("disable", "all", "everything")
     """the default output level of a new pymol session in enzy_htp: mute everything.
     used in session.cmd.feedback() ref: https://pymolwiki.org/index.php/Feedback"""
 

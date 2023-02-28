@@ -19,6 +19,7 @@ from enzy_htp.chemical.residue import (
 )
 from enzy_htp.core.logger import _LOGGER
 
+
 def decode_target_aa_pattern(orig_resi: str, pattern: str) -> List[str]:
     """obtain a list of target mutation AA based on a {pattern} and the {orig_resi}
     Args:
@@ -45,77 +46,79 @@ def decode_target_aa_pattern(orig_resi: str, pattern: str) -> List[str]:
     # TODO work on logic expression for not self
     result = []
     keyword_re_pattern = r"\b(?!and|or|not|\(|\))[\d\w+-]+"
-    eval_pattern = re.sub(keyword_re_pattern, lambda x: f"set(KEYWORD_DECODER['{x.group(0)}'](orig_resi))", pattern)
+    eval_pattern = re.sub(keyword_re_pattern,
+                          lambda x: f"set(KEYWORD_DECODER['{x.group(0)}'](orig_resi))",
+                          pattern)
     eval_pattern = eval_pattern.replace("not", "-")
     result = eval(eval_pattern)
     return sorted(list(result))
+
 
 def decode_all(orig_resi: str):
     """decoder for keyword: all"""
     return list(ONE_LETTER_CAA_MAPPER.values())
 
+
 def decode_larger(orig_resi: str):
     """decoder for keyword: larger"""
     result = filter(
-        lambda x: RESIDUE_VOLUME_MAPPER[x] > RESIDUE_VOLUME_MAPPER[convert_to_one_letter(orig_resi)],
-        RESIDUE_VOLUME_MAPPER
-        )
+        lambda x: RESIDUE_VOLUME_MAPPER[x] > RESIDUE_VOLUME_MAPPER[convert_to_one_letter(
+            orig_resi)], RESIDUE_VOLUME_MAPPER)
     result = map(lambda x: ONE_LETTER_CAA_MAPPER[x], result)
     return list(result)
+
 
 def decode_smaller(orig_resi: str):
     """decoder for keyword: smaller"""
     result = filter(
-        lambda x: RESIDUE_VOLUME_MAPPER[x] < RESIDUE_VOLUME_MAPPER[convert_one_letter(orig_resi)],
-        RESIDUE_VOLUME_MAPPER
-        )
+        lambda x: RESIDUE_VOLUME_MAPPER[x] < RESIDUE_VOLUME_MAPPER[convert_one_letter(
+            orig_resi)], RESIDUE_VOLUME_MAPPER)
     result = map(lambda x: ONE_LETTER_CAA_MAPPER[x], result)
     return list(result)
+
 
 def decode_charge_p(orig_resi: str):
     """decoder for keyword: charge+"""
     orig_charge = AA_CHARGE_MAPPER[orig_resi]
-    result = filter(
-        lambda x: CAA_CHARGE_MAPPER[x] > orig_charge,
-        CAA_CHARGE_MAPPER
-        )
+    result = filter(lambda x: CAA_CHARGE_MAPPER[x] > orig_charge, CAA_CHARGE_MAPPER)
     return list(result)
+
 
 def decode_charge_n(orig_resi: str):
     """decoder for keyword: charge-"""
-    result = filter(
-        lambda x: CAA_CHARGE_MAPPER[x] < AA_CHARGE_MAPPER[orig_resi],
-        CAA_CHARGE_MAPPER
-        )
+    result = filter(lambda x: CAA_CHARGE_MAPPER[x] < AA_CHARGE_MAPPER[orig_resi],
+                    CAA_CHARGE_MAPPER)
     return list(result)
+
 
 def decode_charge_p1(orig_resi: str):
     """decoder for keyword: charge+1"""
-    result = filter(
-        lambda x: CAA_CHARGE_MAPPER[x] - AA_CHARGE_MAPPER[orig_resi] == 1,
-        CAA_CHARGE_MAPPER
-        )
+    result = filter(lambda x: CAA_CHARGE_MAPPER[x] - AA_CHARGE_MAPPER[orig_resi] == 1,
+                    CAA_CHARGE_MAPPER)
     return list(result)
+
 
 def decode_charge_n1(orig_resi: str):
     """decoder for keyword: charge-1"""
-    result = filter(
-        lambda x: CAA_CHARGE_MAPPER[x] - AA_CHARGE_MAPPER[orig_resi] == -1,
-        CAA_CHARGE_MAPPER
-        )
+    result = filter(lambda x: CAA_CHARGE_MAPPER[x] - AA_CHARGE_MAPPER[orig_resi] == -1,
+                    CAA_CHARGE_MAPPER)
     return list(result)
+
 
 def decode_neutral(orig_resi: str):
     """decoder for keyword: neutral"""
     return RESIDUE_CATEGORIES["neutral"]
 
+
 def decode_positive(orig_resi: str):
     """decoder for keyword: positive"""
     return RESIDUE_CATEGORIES["positive"]
 
+
 def decode_negative(orig_resi: str):
     """decoder for keyword: negative"""
     return RESIDUE_CATEGORIES["negative"]
+
 
 def decode_self(orig_resi: str):
     """decoder for keyword: self"""
@@ -127,20 +130,22 @@ def decode_self(orig_resi: str):
 
     return [result]
 
+
 KEYWORD_DECODER = {
-    "all" : decode_all,
-    "larger" : decode_larger,
-    "smaller" : decode_smaller,
-    "charge+" : decode_charge_p,
-    "charge-" : decode_charge_n,
-    "charge+1" : decode_charge_p1,
-    "charge-1" : decode_charge_n1,
-    "neutral" : decode_neutral,
-    "positive" : decode_positive,
-    "negative" : decode_negative,
-    "self" : decode_self,
+    "all": decode_all,
+    "larger": decode_larger,
+    "smaller": decode_smaller,
+    "charge+": decode_charge_p,
+    "charge-": decode_charge_n,
+    "charge+1": decode_charge_p1,
+    "charge-1": decode_charge_n1,
+    "neutral": decode_neutral,
+    "positive": decode_positive,
+    "negative": decode_negative,
+    "self": decode_self,
     # TODO: add upon need.
 }
+
 
 def check_target_aa_pattern(pattern: str) -> None:
     """check the target aa pattern and give warning as needed
@@ -152,7 +157,6 @@ def check_target_aa_pattern(pattern: str) -> None:
     for kw in keyword_list:
         if "charge" in kw:
             _LOGGER.warning(
-                f"(Keyword {kw} is used) Note that in keyword decode for target, HIS is not included in the pool due to its subtle titration states.")
+                f"(Keyword {kw} is used) Note that in keyword decode for target, HIS is not included in the pool due to its subtle titration states."
+            )
             return
-
-    

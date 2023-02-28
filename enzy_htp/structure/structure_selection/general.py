@@ -27,10 +27,7 @@ def select_stru(stru: Structure, pattern: str) -> StruSelection:
         3. get these atoms and construct a StruSelection object from them"""
     pi = interface.pymol
     with OpenPyMolSession(pi) as pms:
-        pymol_obj_name = pi.load_enzy_htp_stru(stru, pymol_session = pms)[0]
+        pymol_obj_name = pi.load_enzy_htp_stru(stru, pymol_session=pms)[0]
         atom_idx_list = pi.select_pymol_obj(pattern, pymol_obj_name, pms)
     # construct a selection object base on a list of atom indexes
     return StruSelection.from_atom_idx_list(stru, atom_idx_list)
-
-
-

@@ -17,11 +17,12 @@ from enzy_htp.structure import Structure
 from .mutation import Mutation, is_valid_mutation
 from .mutation_pattern import decode_mutation_pattern
 
+
 def mutate_stru(
     stru: Structure,
     mutation_list: List[Mutation],
     engine: str = "tleap_min",
-    in_place: bool=False,
+    in_place: bool = False,
 ) -> Structure:
     """
     This science API solves the problem of protein structural prediction upon mutation.
@@ -182,7 +183,7 @@ def assign_mutation(
         A language that helps user to assign mutations is defined above.
     """
     # decode the pattern
-    np.random.seed(random_state) # this changes globaly
+    np.random.seed(random_state)  # this changes globaly
     mutation_objs = decode_mutation_pattern(stru, pattern)
     # sync over polymers
     mutation_objs = sync_mutation_over_chains(mutation_objs, chain_sync_list)

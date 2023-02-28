@@ -322,7 +322,7 @@ def _fix_pybel_output(pdb_path: str, out_path: str, ref_name_path: str = None) -
         ref_ligand.read_pdb(ref_name_path)
         ref_ligand_df: pd.DataFrame = pd.concat(
             (ref_ligand.df["ATOM"], ref_ligand.df["HETATM"]), ignore_index=True)
-        ref_ligand_df.sort_values("line_idx", inplace=True) # make sure lines are aligned
+        ref_ligand_df.sort_values("line_idx", inplace=True)  # make sure lines are aligned
         ref_resi_name = ref_ligand_df.iloc[0]["residue_name"].strip()
         for i, atom_df in ref_ligand_df.iterrows():
             ref_atom_names.append(atom_df["atom_name"].strip())
@@ -331,7 +331,7 @@ def _fix_pybel_output(pdb_path: str, out_path: str, ref_name_path: str = None) -
     target_ligand.read_pdb(pdb_path)
     target_ligand_df: pd.DataFrame = pd.concat(
         (target_ligand.df["ATOM"], target_ligand.df["HETATM"]), ignore_index=True)
-    target_ligand_df.sort_values("line_idx", inplace=True) # make sure lines are aligned
+    target_ligand_df.sort_values("line_idx", inplace=True)  # make sure lines are aligned
     atom_names = list(target_ligand_df["atom_name"])
     if ref_name_path is not None:
         # restore resi name and atom name

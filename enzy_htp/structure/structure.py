@@ -194,7 +194,7 @@ class Structure(DoubleLinkedNode):
     def num_chains(self) -> int:
         """Returns the number of Chain() objects in the current Structure()."""
         return len(self._chains)
-    
+
     @property
     def chain_names(self) -> List[str]:
         """Returns a list of chain names"""
@@ -254,7 +254,8 @@ class Structure(DoubleLinkedNode):
             _LOGGER.info(f"found 0 atom with index: {atom_idx}")
         if len(result) > 1:
             _LOGGER.warning(
-                f"found {len(result)} atoms with index: {atom_idx}! only the 1st one is used. consider sort_everything()")
+                f"found {len(result)} atoms with index: {atom_idx}! only the 1st one is used. consider sort_everything()"
+            )
         return result[0]
 
     def find_idxes_atom_list(self, atom_idx_list: int) -> List[Atom]:

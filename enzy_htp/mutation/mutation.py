@@ -9,13 +9,9 @@ Date: 2022-06-15
 import re
 from collections import namedtuple
 from typing import List, Dict, Tuple
-from enzy_htp.chemical.residue import(
-    ONE_LETTER_AA_MAPPER,
-    THREE_LETTER_AA_MAPPER,
-    convert_to_canonical_three_letter,
-    convert_to_one_letter,
-    convert_to_three_letter
-)
+from enzy_htp.chemical.residue import (ONE_LETTER_AA_MAPPER, THREE_LETTER_AA_MAPPER,
+                                       convert_to_canonical_three_letter,
+                                       convert_to_one_letter, convert_to_three_letter)
 
 from enzy_htp.core.exception import InvalidMutationFlagSyntax, InvalidMutation
 from enzy_htp.core.general import get_copy_of_deleted_dict
@@ -42,6 +38,7 @@ SUPPORTED_MUTATION_TARGET_LIST = get_copy_of_deleted_dict(ONE_LETTER_AA_MAPPER, 
 add upon supporting. will do ncaa in the future
 TODO should be 3 letter list tho"""
 
+
 # == constructor
 def generate_from_mutation_flag(mutation_flag: str) -> Mutation:
     """XA##Y -> ("X", "Y", "A", ##)
@@ -56,8 +53,7 @@ def generate_from_mutation_flag(mutation_flag: str) -> Mutation:
     flag_match = re.match(pattern, mutation_flag)
     if flag_match is None:
         raise InvalidMutationFlagSyntax(
-            f"{mutation_flag} doesnt match ([A-Z])([A-Z])?([0-9]+)([A-Z])"
-            )
+            f"{mutation_flag} doesnt match ([A-Z])([A-Z])?([0-9]+)([A-Z])")
 
     orig = convert_to_three_letter(flag_match.group(1))
     chain_id = flag_match.group(2)
@@ -66,26 +62,26 @@ def generate_from_mutation_flag(mutation_flag: str) -> Mutation:
 
     if chain_id is None:
         chain_id = "A"
-        _LOGGER.info(
-            f"No chain id is provided in: {mutation_flag}. Using A as default."
-        )
+        _LOGGER.info(f"No chain id is provided in: {mutation_flag}. Using A as default.")
     if orig == target:
         _LOGGER.warning(f"equivalent mutation detected in {mutation_flag}. Making it WT.")
         return Mutation(None, "WT", None, None)
 
     return Mutation(orig, target, chain_id, res_idx)
 
-def generate_mutation_from_traget_list(position: Tuple[str, int], orig_resi: str, target_list: str) -> List[Mutation]:
+
+def generate_mutation_from_traget_list(position: Tuple[str, int], orig_resi: str,
+                                       target_list: str) -> List[Mutation]:
     """generate a list of Mutation() objects from position and a list of target residues"""
     result = []
     for target in target_list:
-        result.append(Mutation(
-            orig=convert_to_canonical_three_letter(orig_resi),
-            target=convert_to_canonical_three_letter(target),
-            chain_id=position[0],
-            res_idx=position[1]
-            ))
+        result.append(
+            Mutation(orig=convert_to_canonical_three_letter(orig_resi),
+                     target=convert_to_canonical_three_letter(target),
+                     chain_id=position[0],
+                     res_idx=position[1]))
     return result
+
 
 # == checker ==
 def is_valid_mutation(mut: Mutation, stru: es.Structure) -> bool:
@@ -109,12 +105,13 @@ def is_valid_mutation(mut: Mutation, stru: es.Structure) -> bool:
     if mut == (None, "WT", None, None):
         return True
 
-    # get data type right
+    # get data type right 
+    # yapf: disable
     if (not isinstance(mut.orig, str) or not isinstance(mut.target, str)
             or not isinstance(mut.chain_id, str)
             or not isinstance(mut.res_idx, int)):
         raise InvalidMutation(f"wrong data type in: {mut}")
-
+    # yapf: enable
     # Mutation.chain_id, Mutation.res_idx: should exist in {stru}, should not be empty
     if mut.chain_id.strip() is "":
         raise InvalidMutation(f"empty chain_id in: {mut}")
@@ -128,24 +125,31 @@ def is_valid_mutation(mut: Mutation, stru: es.Structure) -> bool:
         )
 
     # Mutation.orig: if match the original residue in the {stru}
-    real_orig = convert_to_canonical_three_letter(stru[mut.chain_id].find_residue_idx(mut.res_idx).name)
+    real_orig = convert_to_canonical_three_letter(stru[mut.chain_id].find_residue_idx(
+        mut.res_idx).name)
     if real_orig != mut.orig:
-        raise InvalidMutation(f"original residue does not match in: {mut} (real_orig: {real_orig})")
+        raise InvalidMutation(
+            f"original residue does not match in: {mut} (real_orig: {real_orig})")
 
     # Mutation.target: a one-letter amino-acid code in the allowed list & different from orig
     if get_target(mut, if_one_letter=True) not in SUPPORTED_MUTATION_TARGET_LIST:
         raise InvalidMutation(f"unsupported target residue in: {mut}")
     if mut.target == mut.orig:
-        raise InvalidMutation(f"equivalent mutation detected in: {mut}. Should be (None, \"WT\", None, None).")
+        raise InvalidMutation(
+            f"equivalent mutation detected in: {mut}. Should be (None, \"WT\", None, None)."
+        )
 
     return True
+
 
 # == property getter ==
 def get_target(mut: Mutation, if_one_letter: bool = False) -> str:
     """get the mutation target in 1/3-letter format"""
-    if if_one_letter and (mut.target in THREE_LETTER_AA_MAPPER): # for ncaa we want to use 3 letter
+    if if_one_letter and (mut.target
+                          in THREE_LETTER_AA_MAPPER):  # for ncaa we want to use 3 letter
         return convert_to_one_letter(mut.target)
     return mut.target
+
 
 # == TODO ==
 def generate_all_mutations(

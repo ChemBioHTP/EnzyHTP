@@ -693,7 +693,7 @@ class PDBParser(StructureParserInterface):
             element = f"{'':>2}"
         else:
             element = f"{atom.element:>2}"
-        
+
         if atom.charge is None:
             charge = f"{'':2}"
         else:

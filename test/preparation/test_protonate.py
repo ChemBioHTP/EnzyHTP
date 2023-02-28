@@ -228,6 +228,7 @@ def test_pybel_protonate_pdb_ligand_4CO():
     # fs.safe_rm(out_ligand_path)
     # assert not os.path.isdir(out_ligand_path)
 
+
 def test_fix_pybel_output():
     """test an exception case for fixing pybel output"""
     ligand_path = f"{DATA_DIR}/ligand_test_HEZ_pybel_badname.pdb"
