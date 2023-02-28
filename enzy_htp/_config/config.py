@@ -24,7 +24,7 @@ from typing import Any, Dict
 from .amber_config import AmberConfig, default_amber_config
 from .gaussian_config import GaussianConfig, default_gaussian_config
 from .multiwfn_config import MultiwfnConfig, default_multiwfn_config
-from .pymol_config import PyMOLConfig, default_pymol_config
+from .pymol_config import PyMolConfig, default_pymol_config
 from .system_config import SystemConfig, default_system_config
 
 from enzy_htp.core import _LOGGER
