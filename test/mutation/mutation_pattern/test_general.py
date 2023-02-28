@@ -23,13 +23,16 @@ def test_decode_mutation_pattern():
     """dev run of the function"""
     test_mutation_pattern = (
         "KA162A, {RA154W, HA201A},"
-        " r:2[resi 289 around 4 and not resi 36:larger,"
-            " proj(ID 1000, ID 2023, positive, 10):more_negative_charge]*100"
+        " {L10A, r:2[resi 254 around 3:all not self]*5}"
         )
     test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
     test_stru = sp.get_structure(test_pdb)
 
-    m_p.decode_mutation_pattern(test_stru, test_mutation_pattern)
+    mutants = m_p.decode_mutation_pattern(test_stru, test_mutation_pattern)
+    assert len(mutants) == 7
+    assert len(mutants[0]) == 1
+    assert len(mutants[1]) == 2
+    assert len(mutants[2]) == 3
 
 def test_seperate_mutants():
     """test the function use a made up mutation_pattern for KE
