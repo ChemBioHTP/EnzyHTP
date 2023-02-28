@@ -9,11 +9,17 @@ Date: 2022-06-15
 import re
 from collections import namedtuple
 from typing import List, Dict, Tuple
+from enzy_htp.chemical.residue import(
+    ONE_LETTER_AA_MAPPER,
+    THREE_LETTER_AA_MAPPER,
+    convert_to_canonical_three_letter,
+    convert_to_one_letter,
+    convert_to_three_letter
+)
 
 from enzy_htp.core.exception import InvalidMutationFlagSyntax, InvalidMutation
 from enzy_htp.core.general import get_copy_of_deleted_dict
 from enzy_htp.core.logger import _LOGGER
-from enzy_htp.chemical import ONE_LETTER_AA_MAPPER, THREE_LETTER_AA_MAPPER
 import enzy_htp.chemical as chem
 import enzy_htp.structure as es
 
@@ -53,10 +59,10 @@ def generate_from_mutation_flag(mutation_flag: str) -> Mutation:
             f"{mutation_flag} doesnt match ([A-Z])([A-Z])?([0-9]+)([A-Z])"
             )
 
-    orig = ONE_LETTER_AA_MAPPER[flag_match.group(1)]
+    orig = convert_to_three_letter(flag_match.group(1))
     chain_id = flag_match.group(2)
     res_idx = int(flag_match.group(3))
-    target = ONE_LETTER_AA_MAPPER[flag_match.group(4)]
+    target = convert_to_three_letter(flag_match.group(4))
 
     if chain_id is None:
         chain_id = "A"
@@ -74,8 +80,8 @@ def generate_mutation_from_traget_list(position: Tuple[str, int], orig_resi: str
     result = []
     for target in target_list:
         result.append(Mutation(
-            orig=orig_resi,
-            target=target,
+            orig=convert_to_canonical_three_letter(orig_resi),
+            target=convert_to_canonical_three_letter(target),
             chain_id=position[0],
             res_idx=position[1]
             ))
@@ -122,7 +128,7 @@ def is_valid_mutation(mut: Mutation, stru: es.Structure) -> bool:
         )
 
     # Mutation.orig: if match the original residue in the {stru}
-    real_orig = stru[mut.chain_id].find_residue_idx(mut.res_idx).name
+    real_orig = convert_to_canonical_three_letter(stru[mut.chain_id].find_residue_idx(mut.res_idx).name)
     if real_orig != mut.orig:
         raise InvalidMutation(f"original residue does not match in: {mut} (real_orig: {real_orig})")
 
@@ -138,7 +144,7 @@ def is_valid_mutation(mut: Mutation, stru: es.Structure) -> bool:
 def get_target(mut: Mutation, if_one_letter: bool = False) -> str:
     """get the mutation target in 1/3-letter format"""
     if if_one_letter and (mut.target in THREE_LETTER_AA_MAPPER): # for ncaa we want to use 3 letter
-        return THREE_LETTER_AA_MAPPER[mut.target]
+        return convert_to_one_letter(mut.target)
     return mut.target
 
 # == TODO ==

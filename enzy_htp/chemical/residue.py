@@ -44,7 +44,7 @@ THREE_LETTER_AA_MAPPER: Dict[str, str] = {
         "TYR": "Y",
         "VAL": "V"
 } #TODO(shaoqz): @imp2 add related to canonical in the name
-"""Contains mapping of all amino acids codes, with key value pairs of (three letter code, one letter code). Should NOT be called directly for code conversion. Instead used enzy_htp.chemical.residue.convert_to_three_letter()"""
+"""Contains mapping of all amino acids codes, with key value pairs of (three letter code, one letter code). Should NOT be called directly for code conversion. Instead used enzy_htp.chemical.residue.convert_to_one_letter()"""
 
 ONE_LETTER_AA_MAPPER: Dict[str, str] = {
         "A": "ALA",
@@ -69,7 +69,7 @@ ONE_LETTER_AA_MAPPER: Dict[str, str] = {
         "W": "TRP",
         "Y": "TYR"
 }
-"""Contains mapping of all amino acids codes, with key value pairs of (one letter code, three letter code). Should NOT be called directly for code conversion. Instead used enzy_htp.chemical.residue.convert_to_one_letter()"""
+"""Contains mapping of all amino acids codes, with key value pairs of (one letter code, three letter code). Should NOT be called directly for code conversion. Instead used enzy_htp.chemical.residue.convert_to_three_letter()"""
 
 ONE_LETTER_CAA_MAPPER: Dict[str, str] = {
         "A": "ALA",
@@ -94,6 +94,41 @@ ONE_LETTER_CAA_MAPPER: Dict[str, str] = {
         "Y": "TYR"
 }
 """Contains mapping of all canonical amino acids codes, with key value pairs of (one letter code, three letter code). Should NOT be called directly for code conversion. Instead used enzy_htp.chemical.residue.convert_to_one_letter()"""
+
+THREE_TO_THREE_LETTER_CAA_MAPPER: Dict[str, str] = {
+        "ALA": "ALA",
+        "ARG": "ARG",
+        "ASH": "ASN",
+        "ASN": "ASN",
+        "ASP": "ASP",
+        "CYS": "CYS",
+        "CYM": "CYS",
+        "CYX": "CYS",
+        "GLN": "GLN",
+        "GLH": "GLU",
+        "GLU": "GLU",
+        "GLY": "GLY",
+        "HID": "HIS",
+        "HIE": "HIS",
+        "HIP": "HIS",
+        "HIS": "HIS",
+        "ILE": "ILE",
+        "LEU": "LEU",
+        "LYN": "LYS",
+        "LYS": "LYS",
+        "MET": "MET",
+        "PHE": "PHE",
+        "PRO": "PRO",
+        "SEC": "SEC",
+        "SER": "SER",
+        "THR": "THR",
+        "TRP": "TRP",
+        "TYR": "TYR",
+        "VAL": "VAL"
+}
+"""Contains mapping of all canonical amino acids codes, with key value pairs of
+(three letter code, canonicalized three letter code). Should NOT be called directly
+for code conversion. Instead used enzy_htp.chemical.residue.convert_to_canoncial_three_letter()"""
 
 RESIDUE_ELEMENT_MAP: Dict[str, Dict[str, str]] = {
                 "Amber": {    "C" : "C",
@@ -524,6 +559,17 @@ def convert_to_three_letter(one_letter: str) -> str:
     result = ONE_LETTER_AA_MAPPER.get(one_letter, None)
     if not result:
         raise InvalidResidueCode(f"Invalid residue code {one_letter}")
+    return result
+
+def convert_to_canonical_three_letter(three_letter: str) -> str:
+    """Converts a one letter amino acid name to a three letter. If supplied code is invalid, raises an enzy_htp.core.InvalidResidueCode() exception."""
+    if len(three_letter) != 3:
+        raise InvalidResidueCode(
+            f"expecting one letter residue code. '{three_letter}' is invalid")
+    one_letter = three_letter.upper()
+    result = THREE_TO_THREE_LETTER_CAA_MAPPER.get(three_letter, None)
+    if not result:
+        raise InvalidResidueCode(f"Invalid residue code {three_letter}")
     return result
 
 

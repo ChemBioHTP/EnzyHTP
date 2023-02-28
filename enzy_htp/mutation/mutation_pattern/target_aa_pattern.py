@@ -14,6 +14,8 @@ from enzy_htp.chemical.residue import (
     AA_CHARGE_MAPPER,
     THREE_LETTER_AA_MAPPER,
     RESIDUE_CATEGORIES,
+    convert_to_canonical_three_letter,
+    convert_to_one_letter,
 )
 from enzy_htp.core.logger import _LOGGER
 
@@ -55,7 +57,7 @@ def decode_all(orig_resi: str):
 def decode_larger(orig_resi: str):
     """decoder for keyword: larger"""
     result = filter(
-        lambda x: RESIDUE_VOLUME_MAPPER[x] > RESIDUE_VOLUME_MAPPER[THREE_LETTER_AA_MAPPER[orig_resi]],
+        lambda x: RESIDUE_VOLUME_MAPPER[x] > RESIDUE_VOLUME_MAPPER[convert_to_one_letter(orig_resi)],
         RESIDUE_VOLUME_MAPPER
         )
     result = map(lambda x: ONE_LETTER_CAA_MAPPER[x], result)
@@ -64,7 +66,7 @@ def decode_larger(orig_resi: str):
 def decode_smaller(orig_resi: str):
     """decoder for keyword: smaller"""
     result = filter(
-        lambda x: RESIDUE_VOLUME_MAPPER[x] < RESIDUE_VOLUME_MAPPER[THREE_LETTER_AA_MAPPER[orig_resi]],
+        lambda x: RESIDUE_VOLUME_MAPPER[x] < RESIDUE_VOLUME_MAPPER[convert_one_letter(orig_resi)],
         RESIDUE_VOLUME_MAPPER
         )
     result = map(lambda x: ONE_LETTER_CAA_MAPPER[x], result)
@@ -119,7 +121,7 @@ def decode_self(orig_resi: str):
     """decoder for keyword: self"""
     # canonicalize the 3 letter name (mainly for different protonation state)
     if orig_resi in THREE_LETTER_AA_MAPPER:
-        result = ONE_LETTER_AA_MAPPER[THREE_LETTER_AA_MAPPER[orig_resi]]
+        result = convert_to_canonical_three_letter(orig_resi)
     else:
         result = orig_resi
 
