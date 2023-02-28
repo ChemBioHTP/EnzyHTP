@@ -1,4 +1,29 @@
 """This module contains helper functions related to general python/python library features
+that does not suit any existing modules under the .core 
+These functions will be grouped into specific modules in the future if they feel really
+aggragates.
+
+Current functions/classes in the file are:
+List related:
+    Class:
+        GhostListElement
+    Constant:
+        GHOST_LIST_ELEMENT
+    Functions:
+        delete_base_on_id
+        get_interval_from_list
+        get_interval_str_from_list
+        get_random_list_elem
+        pop_random_list_elem
+        product_lists_allow_empty
+
+Dict related:
+    Functions:
+        get_copy_of_deleted_dict
+
+Misc:
+    Decorator:
+        timer
 
 Author: QZ Shao, <shaoqz@icloud.com>
 Date: 2022-10-21
@@ -69,7 +94,7 @@ def get_interval_str_from_list(target_list: List[int]) -> str:
 def get_random_list_elem(traget_list: list):
     """Helper method that randomly chooses an element from a list. numpy.random.choice() doesn't 
     like to take elements from list()'s of tuples so this is the work around."""
-    return traget_list[np.random.randint(len(traget_list))]
+    return np.random.choice(traget_list)
 
 
 def pop_random_list_elem(traget_list: list):
