@@ -6,9 +6,25 @@ Date: 2022-10-21
 import copy
 import numpy as np
 from typing import List, Iterable, Tuple, Dict
+from time import perf_counter
 import itertools
 
+from .logger import _LOGGER
+
 # == List related ==
+class GhostListElement:
+    _instance = None
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = object.__new__(cls)
+            cls._instance._value = cls._instance
+        return cls._instance
+
+    def __eq__(self, other):
+        return self is other
+GHOST_LIST_ELEMENT = GhostListElement()  
+"""singleton for a ghost list element used for product_lists_allow_empty"""
+
 def delete_base_on_id(target_list: list, target_id: int):
     """
     delete an element from a list base on its id() value
@@ -53,6 +69,22 @@ def pop_random_list_elem(traget_list: list):
     this is the work around."""
     return traget_list.pop(np.random.randint(len(traget_list)))
 
+def product_lists_allow_empty(list_of_lists: List[list]) -> List[list]:
+    """product lists in a list and give all possible cases of one element from each.
+    Different from itertool.product, not getting any element from a list is allowed.
+    Note the result will include an empty list"""
+    list_of_lists_copy = copy.deepcopy(list_of_lists)
+    list_of_lists_copy = [each_list + [GHOST_LIST_ELEMENT] for each_list in list_of_lists_copy]
+    return _product_lists_w_each_empty_ele(iter(list_of_lists_copy))
+
+def _product_lists_w_each_empty_ele(list_of_lists: Iterable[list]) -> List[list]:
+    """a sub-function used for product_list_allow_empty"""
+    curr_list = next(list_of_lists, None)
+    if not curr_list:
+        return [[]]
+    next_list = _product_lists_w_each_empty_ele(list_of_lists)
+    return [[x]+y if x != GHOST_LIST_ELEMENT else y for x in curr_list for y in next_list]
+
 # == Dict related ==
 def get_copy_of_deleted_dict(orig_dict: Dict, del_key) -> Dict:
     """
@@ -67,3 +99,18 @@ def get_copy_of_deleted_dict(orig_dict: Dict, del_key) -> Dict:
         del dict_copy[del_key]
 
     return dict_copy
+
+# == misc ===
+
+def timer(fn):
+    """decodator for timing the run of the function {fn}"""
+
+    def inner(*args, **kwargs):
+        start_time = perf_counter()
+        to_execute = fn(*args, **kwargs)
+        end_time = perf_counter()
+        execution_time = end_time - start_time
+        _LOGGER.info("{0} took {1:.8f}s to execute".format(fn.__name__, execution_time))
+        return to_execute
+
+    return inner
