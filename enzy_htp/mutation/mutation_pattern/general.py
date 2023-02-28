@@ -83,13 +83,13 @@ def get_section_type(section_pattern: str) -> str:
         f"Mutation pattern section startswith unsupported letter {section_pattern[0]}. Cant determine type."
         )
 
-def decode_direct_mutation(stru: Structure, section_pattern: str) -> List[Mutation]:
+def decode_direct_mutation(stru: Structure, section_pattern: str) -> List[List[Mutation]]:
     """decode the mutation pattern section that directly indicate the mutation.
     Return a list of mutation objects.
     pattern_example: XA###Y"""
     mutation_obj = generate_from_mutation_flag(section_pattern)
     is_valid_mutation(mutation_obj, stru)
-    return [mutation_obj]
+    return [[mutation_obj]]
 
 def decode_random_mutation(stru: Structure, section_pattern: str) -> List[List[Mutation]]:
     """decode the mutation pattern section that random over the mutation set.
@@ -103,7 +103,7 @@ def decode_random_mutation(stru: Structure, section_pattern: str) -> List[List[M
     mutant_num = int(mutant_num)
     mutation_esm_mapper = decode_mutation_esm_pattern(stru, mutation_esm_patterns) # {mutation_site: Mutation}
 
-    _LOGGER.info(f"generating mutant in positions: {list(mutation_esm_mapper.keys())} ({len(mutation_esm_mapper)} sites total)")
+    _LOGGER.info(f"generating random mutants in positions: {list(mutation_esm_mapper.keys())} ({len(mutation_esm_mapper)} sites total)")
     if len(mutation_esm_mapper) < mut_point_num:
         raise InvalidMutationPatternSyntax(
             f"number of desired point mutations are more than the total number of possible mutation sites in the ensemble, desired: {mut_point_num}, possible_sites: {len(mutation_esm_mapper)}"
@@ -206,4 +206,7 @@ def decode_mutation_esm_pattern(stru: Structure, mutation_esm_patterns: str) -> 
     return esm_result
 
 def combine_section_mutant(mutation_mapper: Dict[str, Mutation]) -> List[List[Mutation]]:
-    """Combine mutations decoded from each section. Return a list of final mutants"""
+    """Combine mutations decoded from each section. Return a list of final mutants.
+    NOTE: merge repeating mutations into one and result permutation of combination
+          of each section"""
+    return [list(set(itertools.chain.from_iterable(x))) for x in itertools.product(*mutation_mapper.values())]

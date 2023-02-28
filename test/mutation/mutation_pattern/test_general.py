@@ -161,3 +161,35 @@ def test_decode_all_mutation_m_flag():
 
     mutants = m_p.decode_all_mutation(test_stru, test_pattern)
     assert len(mutants) == 361
+
+def test_combine_section_mutant_one_to_many():
+    """test the function works as expected in the case that
+    single mutant combine with many mutants"""
+    test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
+    test_stru = sp.get_structure(test_pdb)
+    test_sec_1 = "a:[resi 253:all not self, resi 252:larger]"
+    test_sec_3 = "L10A"
+    # build per-section mutant mapper
+    p_mutant_mapper = {}
+    p_mutant_mapper[test_sec_1] = m_p.decode_all_mutation(test_stru, test_sec_1)
+    p_mutant_mapper[test_sec_3] = m_p.decode_direct_mutation(test_stru, test_sec_3)
+    mutants = m_p.combine_section_mutant(p_mutant_mapper)
+    assert len(mutants) == 400
+    for mut in mutants:
+        assert Mutation(orig='LEU', target='ALA', chain_id='A', res_idx=10) in mut
+
+def test_combine_section_mutant_many_to_many():
+    """test the function works as expected"""
+    test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
+    test_stru = sp.get_structure(test_pdb)
+    test_sec_1 = "a:[resi 253:all not self, resi 252:larger]"
+    test_sec_2 = "r:2[resi 254 around 3:all not self]*5"
+    # build per-section mutant mapper
+    p_mutant_mapper = {}
+    p_mutant_mapper[test_sec_1] = m_p.decode_all_mutation(test_stru, test_sec_1)
+    p_mutant_mapper[test_sec_2] = m_p.decode_random_mutation(test_stru, test_sec_2)
+
+    mutants = m_p.combine_section_mutant(p_mutant_mapper)
+    assert len(mutants) == 2000
+    for mut in mutants:
+        assert len(mut) >= 2 and len(mut) <= 4
