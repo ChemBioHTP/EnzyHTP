@@ -121,6 +121,7 @@ IONIC_RADII: Dict[str, Union[int, None]] = {
     "Mn": 0.90,  # +2 / modified based on PDB (1K20)
     "Ca": 1.14,
     "Cu": 0.87,  # +2
+    "Hg": 1.10,
 }
 """Mapping of metal elements to ionic radii. Value is 'None' if non-existent. Reference: doi:10.1107/S0567739476001551 """
 
