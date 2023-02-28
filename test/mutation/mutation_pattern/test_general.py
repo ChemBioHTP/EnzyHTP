@@ -81,7 +81,7 @@ def test_decode_direct_mutation():
     test_stru = sp.get_structure(test_pdb)
     test_d_pattern = "RA154W"
     test_d_pattern_1 = "R154W"
-    answer = Mutation(orig="R", target="W", chain_id="A", res_idx=154)
+    answer = Mutation(orig="ARG", target="TRP", chain_id="A", res_idx=154)
 
     assert m_p.decode_direct_mutation(test_stru, test_d_pattern) == answer
     assert m_p.decode_direct_mutation(test_stru, test_d_pattern_1) == answer

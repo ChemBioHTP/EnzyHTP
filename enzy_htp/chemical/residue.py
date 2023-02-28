@@ -568,7 +568,7 @@ def convert_to_canonical_three_letter(three_letter: str) -> str:
     if len(three_letter) != 3:
         raise InvalidResidueCode(
             f"expecting one letter residue code. '{three_letter}' is invalid")
-    one_letter = three_letter.upper()
+    three_letter = three_letter.upper()
     result = THREE_TO_THREE_LETTER_CAA_MAPPER.get(three_letter, None)
     if not result:
         raise InvalidResidueCode(f"Invalid residue code {three_letter}")

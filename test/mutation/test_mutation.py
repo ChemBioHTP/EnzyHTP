@@ -41,8 +41,8 @@ def test_generate_from_mutation_flag_default_chainid(caplog):
     original_level = _LOGGER.level
     _LOGGER.setLevel(logging.DEBUG)
 
-    assert mut.generate_from_mutation_flag("R154A") == mut.Mutation(orig='R',
-                                                                    target='A',
+    assert mut.generate_from_mutation_flag("R154A") == mut.Mutation(orig='ARG',
+                                                                    target='ALA',
                                                                     chain_id='A',
                                                                     res_idx=154)
     assert " Using A as default." in caplog.text
@@ -55,8 +55,8 @@ def test_is_valid_mutation_passes():
     ref_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
     stru = es.PDBParser().get_structure(ref_pdb)
     mutations: List[mut.Mutation] = [
-        mut.Mutation(orig='R', target='W', chain_id='A', res_idx=154),
-        mut.Mutation(orig='H', target='A', chain_id='A', res_idx=201),
+        mut.Mutation(orig='ARG', target='TRP', chain_id='A', res_idx=154),
+        mut.Mutation(orig='HIS', target='ALA', chain_id='A', res_idx=201),
         mut.Mutation(orig=None, target='WT', chain_id=None, res_idx=None),
     ]
 
@@ -69,31 +69,31 @@ def test_is_valid_mutation_fails():
     ref_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
     stru = es.PDBParser().get_structure(ref_pdb)
     mutations: List[mut.Mutation] = {
-        "wrong data type": mut.Mutation(orig=1, target='D', chain_id='A', res_idx=0),
-        "wrong data type": mut.Mutation(orig="A", target='D', chain_id='A', res_idx="0"),
-        "empty chain_id": mut.Mutation(orig='R', target='A', chain_id='', res_idx=1),
-        "does not exist in structure": mut.Mutation(orig='R',
-                                                    target='D',
+        "wrong data type": mut.Mutation(orig=1, target='ASP', chain_id='A', res_idx=0),
+        "wrong data type": mut.Mutation(orig="ALA", target='ASP', chain_id='A', res_idx="0"),
+        "empty chain_id": mut.Mutation(orig='ARG', target='ALA', chain_id='', res_idx=1),
+        "does not exist in structure": mut.Mutation(orig='ARG',
+                                                    target='ASP',
                                                     chain_id='B',
                                                     res_idx=154),
-        "does not exist in structure ": mut.Mutation(orig='R',
-                                                     target='D',
+        "does not exist in structure ": mut.Mutation(orig='ARG',
+                                                     target='ASP',
                                                      chain_id='A',
                                                      res_idx=300),
-        "original residue does not match": mut.Mutation(orig='A',
-                                                        target='D',
+        "original residue does not match": mut.Mutation(orig='ALA',
+                                                        target='ASP',
                                                         chain_id='A',
                                                         res_idx=154),
-        "unsupported target residue": mut.Mutation(orig='R',
-                                                   target='U',
+        "unsupported target residue": mut.Mutation(orig='ARG',
+                                                   target='SEC',
                                                    chain_id='A',
                                                    res_idx=154),
-        "unsupported target residue": mut.Mutation(orig='R',
+        "unsupported target residue": mut.Mutation(orig='ARG',
                                                    target='X',
                                                    chain_id='A',
                                                    res_idx=154),
-        "equivalent mutation detected": mut.Mutation(orig='R',
-                                                     target='R',
+        "equivalent mutation detected": mut.Mutation(orig='ARG',
+                                                     target='ARG',
                                                      chain_id='A',
                                                      res_idx=154),
     }
@@ -124,7 +124,7 @@ def test_size_increase_true():
                                           res_idx=None))
     assert mut.size_increase(mut.Mutation(orig='G', target='S', chain_id='',
                                           res_idx=None))
-    assert mut.size_increase(mut.Mutation(orig='D', target='P', chain_id='',
+    assert mut.size_increase(mut.Mutation(orig='ASP', target='P', chain_id='',
                                           res_idx=None))
     assert mut.size_increase(mut.Mutation(orig='Y', target='W', chain_id='',
                                           res_idx=None))
@@ -137,7 +137,7 @@ def test_size_increase_false():
     assert not mut.size_increase(
         mut.Mutation(target='G', orig='S', chain_id='', res_idx=None))
     assert not mut.size_increase(
-        mut.Mutation(target='D', orig='P', chain_id='', res_idx=None))
+        mut.Mutation(target='ASP', orig='P', chain_id='', res_idx=None))
     assert not mut.size_increase(
         mut.Mutation(target='Y', orig='W', chain_id='', res_idx=None))
     assert not mut.size_increase(
@@ -150,7 +150,7 @@ def test_size_decrease_true():
                                           res_idx=None))
     assert mut.size_decrease(mut.Mutation(target='G', orig='S', chain_id='',
                                           res_idx=None))
-    assert mut.size_decrease(mut.Mutation(target='D', orig='P', chain_id='',
+    assert mut.size_decrease(mut.Mutation(target='ASP', orig='P', chain_id='',
                                           res_idx=None))
     assert mut.size_decrease(mut.Mutation(target='Y', orig='W', chain_id='',
                                           res_idx=None))
@@ -163,7 +163,7 @@ def test_size_decrease_false():
     assert not mut.size_decrease(
         mut.Mutation(orig='G', target='S', chain_id='', res_idx=None))
     assert not mut.size_decrease(
-        mut.Mutation(orig='D', target='P', chain_id='', res_idx=None))
+        mut.Mutation(orig='ASP', target='P', chain_id='', res_idx=None))
     assert not mut.size_decrease(
         mut.Mutation(orig='Y', target='W', chain_id='', res_idx=None))
     assert not mut.size_decrease(
@@ -174,47 +174,47 @@ def test_polarity_change_true():
     """Testing cases where polarity_change() should evaluate to 'True'"""
     # negative to positive
     assert mut.polarity_change(
-        mut.Mutation(orig='D', target='R', chain_id='', res_idx=None))
+        mut.Mutation(orig='ASP', target='ARG', chain_id='', res_idx=None))
     # positive to negative
     assert mut.polarity_change(
-        mut.Mutation(orig='R', target='D', chain_id='', res_idx=None))
+        mut.Mutation(orig='ARG', target='ASP', chain_id='', res_idx=None))
     # positive to neutral
     assert mut.polarity_change(
-        mut.Mutation(orig='R', target='S', chain_id='', res_idx=None))
+        mut.Mutation(orig='ARG', target='S', chain_id='', res_idx=None))
     # netural to postiive
     assert mut.polarity_change(
-        mut.Mutation(orig='S', target='R', chain_id='', res_idx=None))
+        mut.Mutation(orig='S', target='ARG', chain_id='', res_idx=None))
     # negative to neutral
     assert mut.polarity_change(
-        mut.Mutation(orig='D', target='S', chain_id='', res_idx=None))
+        mut.Mutation(orig='ASP', target='S', chain_id='', res_idx=None))
     # neutral to negative
     assert mut.polarity_change(
-        mut.Mutation(orig='S', target='D', chain_id='', res_idx=None))
+        mut.Mutation(orig='S', target='ASP', chain_id='', res_idx=None))
 
 
 def test_polarity_change_false():
     """Testing cases where polarity_change() should evaluate to 'False'"""
     # negative to negative
     assert not mut.polarity_change(
-        mut.Mutation(orig='E', target='D', chain_id='', res_idx=None))
+        mut.Mutation(orig='E', target='ASP', chain_id='', res_idx=None))
     # neutral to neutral
     assert not mut.polarity_change(
         mut.Mutation(orig='S', target='T', chain_id='', res_idx=None))
     # positive to positive
     assert not mut.polarity_change(
-        mut.Mutation(orig='H', target='R', chain_id='', res_idx=None))
+        mut.Mutation(orig='H', target='ARG', chain_id='', res_idx=None))
 
 
 def test_same_polarity_true():
     """Testing cases where same_polarity() should evaluate to 'True'"""
     # negative to negative
-    assert mut.same_polarity(mut.Mutation(orig='E', target='D', chain_id='',
+    assert mut.same_polarity(mut.Mutation(orig='E', target='ASP', chain_id='',
                                           res_idx=None))
     # neutral to neutral
     assert mut.same_polarity(mut.Mutation(orig='S', target='T', chain_id='',
                                           res_idx=None))
     # positive to positive
-    assert mut.same_polarity(mut.Mutation(orig='H', target='R', chain_id='',
+    assert mut.same_polarity(mut.Mutation(orig='H', target='ARG', chain_id='',
                                           res_idx=None))
 
 
@@ -222,19 +222,19 @@ def test_same_polarity_false():
     """Testing cases where same_polarity() should evaluate to 'False'"""
     # negative to positive
     assert not mut.same_polarity(
-        mut.Mutation(orig='D', target='R', chain_id='', res_idx=None))
+        mut.Mutation(orig='ASP', target='ARG', chain_id='', res_idx=None))
     # positive to negative
     assert not mut.same_polarity(
-        mut.Mutation(orig='R', target='D', chain_id='', res_idx=None))
+        mut.Mutation(orig='ARG', target='ASP', chain_id='', res_idx=None))
     # positive to neutral
     assert not mut.same_polarity(
-        mut.Mutation(orig='R', target='S', chain_id='', res_idx=None))
+        mut.Mutation(orig='ARG', target='S', chain_id='', res_idx=None))
     # netural to postiive
     assert not mut.same_polarity(
-        mut.Mutation(orig='S', target='R', chain_id='', res_idx=None))
+        mut.Mutation(orig='S', target='ARG', chain_id='', res_idx=None))
     # negative to neutral
     assert not mut.same_polarity(
-        mut.Mutation(orig='D', target='S', chain_id='', res_idx=None))
+        mut.Mutation(orig='ASP', target='S', chain_id='', res_idx=None))
     # neutral to negative
     assert not mut.same_polarity(
-        mut.Mutation(orig='S', target='D', chain_id='', res_idx=None))
+        mut.Mutation(orig='S', target='ASP', chain_id='', res_idx=None))

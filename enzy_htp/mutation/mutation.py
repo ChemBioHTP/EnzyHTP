@@ -24,8 +24,8 @@ Mutation.__doc__ = f"""Named tuple representing a single point mutation in an en
    
 
 	Attributes:
-   		orig: the three-letter code of the original amino acid. Can be in [ "{", ".join(ONE_LETTER_AA_MAPPER.keys())}"].
-		target: the three-letter code of the target mutation. Can be in [ "{", ".join(ONE_LETTER_AA_MAPPER.keys())}"].
+   		orig: the three-letter code of the original amino acid. (NCAA or canonical 3-letter name for CAA)
+		target: the three-letter code of the target mutation. (NCAA or canonical 3-letter name for CAA. e.g: HIS not HIE)
 		chain_id: a single capital letter.
 		res_idx: the 1-indexed int() of the residue to Mutate
 
@@ -112,6 +112,7 @@ def is_valid_mutation(mut: Mutation, stru: es.Structure) -> bool:
             or not isinstance(mut.res_idx, int)):
         raise InvalidMutation(f"wrong data type in: {mut}")
     # yapf: enable
+
     # Mutation.chain_id, Mutation.res_idx: should exist in {stru}, should not be empty
     if mut.chain_id.strip() is "":
         raise InvalidMutation(f"empty chain_id in: {mut}")
@@ -125,8 +126,8 @@ def is_valid_mutation(mut: Mutation, stru: es.Structure) -> bool:
         )
 
     # Mutation.orig: if match the original residue in the {stru}
-    real_orig = convert_to_canonical_three_letter(stru[mut.chain_id].find_residue_idx(
-        mut.res_idx).name)
+    real_orig = convert_to_canonical_three_letter(
+        stru[mut.chain_id].find_residue_idx(mut.res_idx).name)
     if real_orig != mut.orig:
         raise InvalidMutation(
             f"original residue does not match in: {mut} (real_orig: {real_orig})")
