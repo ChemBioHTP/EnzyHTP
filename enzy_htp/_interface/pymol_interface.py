@@ -109,6 +109,67 @@ class PyMolInterface:
         """Prints all settings for the object's PyMolConfig() inteface to stdout using PyMolConfig.display()."""
         self.config_.display()
 
+    #TODO support pymol2 for these
+    # def get_charge(self, fname: str, sele: str = '(all)') -> int:
+    #     """Method that gets the formal charge for the specified sele in the 
+    #     specified file. File must be a supported file type as listed in 
+    #     PyMOLConfig. Checks if file exists and is supported type. If either 
+    #     are not true then an error is logged and the program exits. DOES
+    #     NOT check if the sele is valid. 
+    #     Args:
+    #         fname: The str() path to the file in question.
+    #         sele: The str() specifying the atom selection in PyMOL synatx. Default is '(all)'.
+    #     Returns:
+    #         The formal charge of the sele as an int().
+    #     """
+    #     if not Path(fname).exists():
+    #         _LOGGER.error(f"The supplied file '{fname}' does not exist. Exiting...")
+    #         exit(1)
+
+    #     if not self.supported_file_type(fname):
+    #         _LOGGER.error(
+    #             f"The supplied file '{fname}' has an unsupported extension. Exiting...")
+    #         exit(1)
+
+    #     _eh_local: Dict[str, Any] = {'fc': []}
+
+    #     self.cmd.delete('all')
+    #     self.cmd.load(fname)
+    #     self.cmd.iterate(sele, 'fc.append(formal_charge)', space=_eh_local)
+    #     self.cmd.delete('all')
+
+    #     return sum(_eh_local['fc'])
+
+    # def get_sequence(self, fname: str, sele: str = '(all)') -> str:
+    #     """Method that gets the sequence for the specified sele in the 
+    #     specified file. File must be a supported file type as listed in 
+    #     PyMOLConfig. Checks if file exists and is supported type. If either 
+    #     are not true then an error is logged and the program exits. DOES
+    #     NOT check if the sele is valid. Note that non-canonical residues will
+    #     be represented by a '?' in the sequence.
+    #     Args:
+    #         fname: The str() path to the file in question.
+    #         sele: The str() specifying the atom selection in PyMOL synatx. Default is '(all)'.
+    #     Returns:
+    #         A str() with the sequence of the sele as it would appear in a .fasta file..
+    #     """
+    #     if not Path(fname).exists():
+    #         _LOGGER.error(f"The supplied file '{fname}' does not exist. Exiting...")
+    #         exit(1)
+
+    #     if not self.supported_file_type(fname):
+    #         _LOGGER.error(
+    #             f"The supplied file '{fname}' has an unsupported extension. Exiting...")
+    #         exit(1)
+
+    #     self.cmd.delete('all')
+    #     self.cmd.load(fname)
+    #     lines: List[str] = self.cmd.get_fastastr(sele).splitlines()
+    #     self.cmd.delete('all')
+
+    #     lines = list(filter(lambda ll: ll[0] != '>', lines))
+    #     return ''.join(lines)
+
 class OpenPyMolSession:
     """a context manager that open a pymol session once enter and close once exit"""
     def __init__(self, pymol_interface: PyMolInterface) -> None:

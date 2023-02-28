@@ -2,6 +2,7 @@
 Main API: decode_mutation_pattern
 
 Author: QZ Shao <shaoqz@icloud.com>
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-01-26
 """
 from typing import Dict, List, Set, Tuple
