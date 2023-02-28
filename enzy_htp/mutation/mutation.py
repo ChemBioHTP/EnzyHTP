@@ -22,18 +22,20 @@ Mutation.__doc__ = f"""Named tuple representing a single point mutation in an en
    
 
 	Attributes:
-   		orig: the one-letter code of the original amino acid. Can be in [ "{", ".join(ONE_LETTER_AA_MAPPER.keys())}"].
-		target: the one-letter code of the target mutation. Can be in [ "{", ".join(ONE_LETTER_AA_MAPPER.keys())}"].
+   		orig: the three-letter code of the original amino acid. Can be in [ "{", ".join(ONE_LETTER_AA_MAPPER.keys())}"].
+		target: the three-letter code of the target mutation. Can be in [ "{", ".join(ONE_LETTER_AA_MAPPER.keys())}"].
 		chain_id: a single capital letter.
 		res_idx: the 1-indexed int() of the residue to Mutate
 
         *In the case of WT, the tuple is defined as (None, "WT", None, None)
+    TODO(qz) feel more and more need to make it a class
 """
 
 SUPPORTED_MUTATION_TARGET_LIST = get_copy_of_deleted_dict(ONE_LETTER_AA_MAPPER, "U")
 """The list of EnzyHTP supported mutation target-residue list.
 add upon supporting. will do ncaa in the future"""
 
+# == constructor
 def generate_from_mutation_flag(mutation_flag: str) -> Mutation:
     """XA##Y -> ("X", "Y", "A", ##)
     WT -> (None, "WT", None, None)
@@ -66,6 +68,19 @@ def generate_from_mutation_flag(mutation_flag: str) -> Mutation:
 
     return Mutation(orig, target, chain_id, res_idx)
 
+def generate_mutation_from_traget_list(position: Tuple[str, int], orig_resi: str, target_list: str) -> List[Mutation]:
+    """generate a list of Mutation() objects from position and a list of target residues"""
+    result = []
+    for target in target_list:
+        result.append(Mutation(
+            orig=orig_resi,
+            target=target,
+            chain_id=position[0],
+            res_idx=position[1]
+            ))
+    return result
+
+# == checker ==
 def is_valid_mutation(mut: Mutation, stru: es.Structure) -> bool:
     """Checks if the supplied Mutation() namedtuple is valid according to the below criteria:
     (Non-WT cases)
@@ -119,17 +134,12 @@ def is_valid_mutation(mut: Mutation, stru: es.Structure) -> bool:
 
     return True
 
-def generate_mutation_from_traget_list(position: Tuple[str, int], orig_resi: str, target_list: str) -> List[Mutation]:
-    """generate a list of Mutation() objects from position and a list of target residues"""
-    result = []
-    for target in target_list:
-        result.append(Mutation(
-            orig=orig_resi,
-            target=target,
-            chain_id=position[0],
-            res_idx=position[1]
-            ))
-    return result
+# == property getter ==
+def get_target(mut: Mutation, if_one_letter: bool = False) -> str:
+    """get the mutation target in 1/3-letter format"""
+    if if_one_letter and (mut.target in THREE_LETTER_AA_MAPPER): # for ncaa we want to use 3 letter
+        return THREE_LETTER_AA_MAPPER[mut.target]
+    return mut.target
 
 # == TODO ==
 def generate_all_mutations(

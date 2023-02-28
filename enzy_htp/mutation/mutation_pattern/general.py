@@ -8,15 +8,21 @@ import copy
 from typing import Dict, List, Set, Tuple
 import re
 import numpy as np
+import itertools
 
 from enzy_htp.core.exception import InvalidMutationPatternSyntax
 from enzy_htp.core.logger import _LOGGER
-from enzy_htp.core.general import get_random_list_elem, pop_random_list_elem
+from enzy_htp.core.general import (
+    get_random_list_elem,
+    pop_random_list_elem,
+    product_lists_allow_empty
+)
 from enzy_htp.structure import Structure
 from ..mutation import (
     Mutation,
     generate_from_mutation_flag,
     generate_mutation_from_traget_list,
+    get_target,
     is_valid_mutation
 )
 from .position_pattern import decode_position_pattern
@@ -143,19 +149,24 @@ def decode_random_mutation(stru: Structure, section_pattern: str) -> List[List[M
 def decode_all_mutation(stru: Structure, section_pattern: str) -> List[List[Mutation]]:
     """decode the mutation pattern section that mutate all in the mutation set.
     There will be the maxium same number of mutations as the number of positions.
-    Non-mutation of each site will also be included. e.g.: 'a_site' : ILM, 'b_site' : ILM
-    will give you 16 mutants containing 2 point, 1 point and a WT.
+    If "M" is not specificed, non-mutation of each site will also be included.
+    e.g.: 'a_site' : ILM, 'b_site' : ILM will give you 16 mutants containing 2 point,
+    1 point and a WT.
+    If "M" is specificed, each point will be mutated and there will be the same number of
+    point mutations in each mutant as the number of positions in the mutation_esm_pattern.
 
     Returns:
         a list of mutation objects.
     pattern_example:
-        a:[xxx:yyy]"""
+        a:[xxx:yyy] or a:M[xxx:yyy]"""
     result: List[List[Mutation]] = []
-    re_pattern = r"a:\[(.+)\]"
-    mutation_esm_patterns = re.match(re_pattern, section_pattern).groups()[0]
-    mutation_esm_mapper = decode_mutation_esm_pattern(stru, mutation_esm_patterns)
-    
-    # TODO permutation
+    re_pattern = r"a:(M?)\[(.+)\]"
+    force_mutate_each_point, mutation_esm_patterns = re.match(re_pattern, section_pattern).groups()
+    mutation_esm_mapper = decode_mutation_esm_pattern(stru, mutation_esm_patterns) #{position: mutations}
+    if force_mutate_each_point:
+        result = list(itertools.product(*mutation_esm_mapper.values()))
+    else:
+        result = product_lists_allow_empty(list(mutation_esm_mapper.values()))
 
     return result
 
@@ -186,10 +197,13 @@ def decode_mutation_esm_pattern(stru: Structure, mutation_esm_patterns: str) -> 
                 esm_result[esm_position] = list(set(esm_result[esm_position]) or set(posi_mutation))
             else:
                 esm_result[esm_position] = posi_mutation
+    # logging
+    _LOGGER.info(f"Mutation ensemble of the section:")
+    for k,v in esm_result.items():
+        _LOGGER.info(f"    {k} : {[get_target(x, if_one_letter=True) for x in v]} (total: {len(v)})")
+    _LOGGER.info(f"(total: {len(esm_result)} position)")
 
     return esm_result
-
-
 
 def combine_section_mutant(mutation_mapper: Dict[str, Mutation]) -> List[List[Mutation]]:
     """Combine mutations decoded from each section. Return a list of final mutants"""

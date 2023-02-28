@@ -140,3 +140,24 @@ def test_decode_random_mutation_allow_repeat(caplog):
     for i in mutants:
         assert len(i) > 0
     assert "repeating mutation is generated" in caplog.text
+
+def test_decode_all_mutation():
+    """test the function works as expected using a made up pattern and manually
+    curated answer."""
+    test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
+    test_stru = sp.get_structure(test_pdb)
+    test_pattern = "a:[resi 253:all not self, resi 252:larger]"
+
+    mutants = m_p.decode_all_mutation(test_stru, test_pattern)
+    assert len(mutants) == 400
+
+def test_decode_all_mutation_m_flag():
+    """test the function with the flag M specificed
+    works as expected using a made up pattern and manually
+    curated answer."""
+    test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
+    test_stru = sp.get_structure(test_pdb)
+    test_pattern = "a:M[resi 253:all not self, resi 252:larger]"
+
+    mutants = m_p.decode_all_mutation(test_stru, test_pattern)
+    assert len(mutants) == 361
