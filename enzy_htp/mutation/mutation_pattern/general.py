@@ -4,10 +4,8 @@ Main API: decode_mutation_pattern
 Author: QZ Shao <shaoqz@icloud.com>
 Date: 2023-01-26
 """
-import copy
 from typing import Dict, List, Set, Tuple
 import re
-import numpy as np
 import itertools
 
 from enzy_htp.core.exception import InvalidMutationPatternSyntax
