@@ -33,7 +33,8 @@ Mutation.__doc__ = f"""Named tuple representing a single point mutation in an en
 
 SUPPORTED_MUTATION_TARGET_LIST = get_copy_of_deleted_dict(ONE_LETTER_AA_MAPPER, "U")
 """The list of EnzyHTP supported mutation target-residue list.
-add upon supporting. will do ncaa in the future"""
+add upon supporting. will do ncaa in the future
+TODO should be 3 letter list tho"""
 
 # == constructor
 def generate_from_mutation_flag(mutation_flag: str) -> Mutation:
@@ -52,10 +53,10 @@ def generate_from_mutation_flag(mutation_flag: str) -> Mutation:
             f"{mutation_flag} doesnt match ([A-Z])([A-Z])?([0-9]+)([A-Z])"
             )
 
-    orig = flag_match.group(1)
+    orig = ONE_LETTER_AA_MAPPER[flag_match.group(1)]
     chain_id = flag_match.group(2)
     res_idx = int(flag_match.group(3))
-    target = flag_match.group(4)
+    target = ONE_LETTER_AA_MAPPER[flag_match.group(4)]
 
     if chain_id is None:
         chain_id = "A"
@@ -122,12 +123,11 @@ def is_valid_mutation(mut: Mutation, stru: es.Structure) -> bool:
 
     # Mutation.orig: if match the original residue in the {stru}
     real_orig = stru[mut.chain_id].find_residue_idx(mut.res_idx).name
-    real_orig = THREE_LETTER_AA_MAPPER.get(real_orig, real_orig) # 1 letter if in the map; 3 letter if not
     if real_orig != mut.orig:
         raise InvalidMutation(f"original residue does not match in: {mut} (real_orig: {real_orig})")
 
     # Mutation.target: a one-letter amino-acid code in the allowed list & different from orig
-    if mut.target not in SUPPORTED_MUTATION_TARGET_LIST:
+    if get_target(mut, if_one_letter=True) not in SUPPORTED_MUTATION_TARGET_LIST:
         raise InvalidMutation(f"unsupported target residue in: {mut}")
     if mut.target == mut.orig:
         raise InvalidMutation(f"equivalent mutation detected in: {mut}. Should be (None, \"WT\", None, None).")
