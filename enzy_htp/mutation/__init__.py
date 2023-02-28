@@ -10,7 +10,8 @@ from .engine import mutate_pdb
 
 from .mutation import (
     Mutation,
-    valid_mutation,
+    generate_from_mutation_flag,
+    is_valid_mutation,
     generate_all_mutations,
     size_increase,
     size_decrease,

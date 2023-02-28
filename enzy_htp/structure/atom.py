@@ -1,7 +1,7 @@
 """Definition for the Atom class. Meant to be the base unit of structural information: coordinate and
 topology (atom type & connectivity). Serve solely for storing and accessing data.
 
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-19
 """

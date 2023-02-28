@@ -92,7 +92,7 @@ Operation:
     Saving the structure:
         >>> structure.to_pdb( "/path/to/copy/of/pdb" )
 
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-04-03
 """
@@ -122,13 +122,13 @@ from .solvent import Solvent, residue_to_solvent
 from .metal_atom import MetalUnit
 
 
-class Structure(
-        DoubleLinkedNode
-):  # TODO implement different copy methods for the doubly linked ds; by default are all shollow copy and references
+class Structure(DoubleLinkedNode):
     """Protein structure.
     Designed for direct interfacing by users.
     Composed of child Chain() objects and their subsequent child Residue() objects and so on Atom() objects.
     Note: This class SHOULD NOT be created directly by users. It should be created with methods from the StructureIO module.
+    Note: regardless of index assigned to residues and atoms, there is an intrinsic indexing system based on the order of 
+    _children lists. This intrinsicc index can be compared with pymol's index (not id)
 
     Attributes:
         children/chains: List[Chain]
@@ -196,6 +196,21 @@ class Structure(
         return len(self._chains)
 
     @property
+    def chain_names(self) -> List[str]:
+        """Returns a list of chain names"""
+        return list(map(lambda x: x.name, self._chains))
+
+    @property
+    def num_residues(self) -> int:
+        """Returns the number of Residue() objects in the current Structure()."""
+        return len(self.residues)
+
+    @property
+    def residue_indexes(self) -> int:
+        """Returns the number of Residue() objects in the current Structure()."""
+        return list(map(lambda x: x.idx, self.residues))
+
+    @property
     def residues(self) -> List[Residue]:
         """Return a list of the residues in the Structure() object sorted by (chain_id, residue_id)"""
         result = list(itertools.chain.from_iterable(self._chains))
@@ -231,6 +246,24 @@ class Structure(
         for atom in self.atoms:
             if atom.distance_to(center) <= range_distance:
                 result.append(atom)
+        return result
+
+    def find_idx_atom(self, atom_idx: int) -> Atom:
+        """find atom base on its idx. return a reference of the atom."""
+        result = list(filter(lambda a: a.idx == atom_idx, self.atoms))
+        if not result:
+            _LOGGER.info(f"found 0 atom with index: {atom_idx}")
+        if len(result) > 1:
+            _LOGGER.warning(
+                f"found {len(result)} atoms with index: {atom_idx}! only the 1st one is used. consider sort_everything()"
+            )
+        return result[0]
+
+    def find_idxes_atom_list(self, atom_idx_list: int) -> List[Atom]:
+        """find atom base on its idx. return a list reference of the atoms."""
+        result = []
+        for idx in atom_idx_list:
+            result.append(self.find_idx_atom(idx))
         return result
 
     @property
@@ -269,7 +302,7 @@ class Structure(
     @property
     def peptides(self) -> List[Chain]:
         """return the peptide part of current Structure() as a list of chains"""
-        result: List[Chain] = list(filter(lambda c: c.is_peptide(), self._chains))
+        result: List[Chain] = list(filter(lambda c: c.is_polypeptide(), self._chains))
         return result
 
     @property
@@ -410,6 +443,7 @@ class Structure(
         out_line.append("Structure(")
         out_line.append(f"chains: (sorted, original {list(self.chain_mapper.keys())})")
         for ch in sorted(self._chains, key=lambda x: x.name):
+            ch: Chain
             out_line.append(
                 f"    {ch.name}({ch.chain_type}): residue: {ch.residue_idx_interval()} atom_count: {ch.num_atoms}"
             )
@@ -417,7 +451,7 @@ class Structure(
         return os.linesep.join(out_line)
 
     def __getitem__(self, key: Union[int, str]):
-        """support dictionary like access"""
+        """support dictionary/list-like access"""
         if isinstance(key, int):
             return super().__getitem__(key)
         if isinstance(key, str):

@@ -2,7 +2,7 @@
 as a wrapper for all functionality provided by the Gaussian software package. Behavior is partially controlled by 
 the GaussianConfig class owned by the interface. Supported operations include:
 	+ QM Clustering
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-11
 """

@@ -18,6 +18,7 @@ Date: 2022-09-14
 
 import copy
 from typing import Any, Dict, List, Union
+from .general import delete_base_on_id
 
 
 class DoubleLinkedNode():
@@ -181,13 +182,3 @@ class DoubleLinkedNode():
 
     def __len__(self) -> int:
         return len(self._children)
-
-
-# TODO go to other core
-def delete_base_on_id(target_list: list, target_id: int):
-    """
-    delete an element from a list base on its id() value
-    """
-    for i in range(len(target_list) - 1, -1, -1):
-        if id(target_list[i]) == target_id:
-            del target_list[i]

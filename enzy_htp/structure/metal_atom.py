@@ -1,6 +1,6 @@
 """Definition for the MetalUnit class. This is a specialization of the Residue() obejct that is
 stored alongside other Residue() children types in the Chain() class.
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-04-03
 """

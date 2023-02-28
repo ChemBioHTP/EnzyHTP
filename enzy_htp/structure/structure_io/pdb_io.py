@@ -13,6 +13,10 @@ from plum import dispatch
 from biopandas.pdb import PandasPdb
 import pandas as pd
 
+from enzy_htp.core import _LOGGER
+import enzy_htp.core.file_system as fs
+from enzy_htp.core.pandas_helper import batch_edit_df_loc_value, split_df_base_on_column_value
+import enzy_htp.chemical as chem
 from ._interface import StructureParserInterface
 from ..atom import Atom
 from ..metal_atom import MetalUnit, residue_to_metal
@@ -21,9 +25,6 @@ from ..solvent import Solvent, residue_to_solvent
 from ..ligand import Ligand, residue_to_ligand
 from ..chain import Chain
 from ..structure import Structure
-from enzy_htp.core import _LOGGER
-import enzy_htp.core.file_system as fs
-import enzy_htp.chemical as chem
 
 
 # pylint: disable=logging-fstring-interpolation
@@ -263,6 +264,44 @@ class PDBParser(StructureParserInterface):
         (e.g. chain A TER chain A -(update)-> chain A TER chain B. see 1Q4T.)
         according to the TER record provide by "ter_df"
         * ter df should share the same line index references as df (from same file)
+        3. allow different ligand in the same chain
+        ==details==
+        There are in total 12 cases
+            for each chain:
+            contain atom missing chain id:
+                have 0 chain id total:
+                    add chain id
+                have 1 chain id total:
+                    repeat:
+                        HET chain:
+                            update to a new chain id for whole chain
+                        ATOM chain:
+                            abort
+                    not repeat:
+                        add the same chain id to atoms that missing
+                have more than 1 chain id total:
+                    abort
+            contain no atom missing chain id:
+                have 1 chain id total:
+                    HET:
+                        repeat:
+                            update to a new chain id
+                        not repeat:
+                            record
+                    ATOM:
+                        repeat:
+                            abort
+                        not repeat:
+                            record
+                have more than 1 chain id total:
+                    HET:
+                        treat as individual chain. for each:
+                        repeat:
+                            update
+                        not repeat:
+                            record
+                    ATOM:
+                        abort
         Returns:
             [edit df in place]
             idx_change_mapper: the mapper recording index change when repeating chain id
@@ -649,7 +688,12 @@ class PDBParser(StructureParserInterface):
             temp_factor = f"{atom.b_factor:>6.2f}"
 
         seg_id = f"{'':<4}"
-        element = f"{atom.element:>2}"
+
+        if atom.element is None:
+            element = f"{'':>2}"
+        else:
+            element = f"{atom.element:>2}"
+
         if atom.charge is None:
             charge = f"{'':2}"
         else:
@@ -665,53 +709,3 @@ class PDBParser(StructureParserInterface):
         dummy method for dispatch
         """
         pass
-
-
-# TODO go to core helper
-def split_df_base_on_column_value(df: pd.DataFrame,
-                                  column_name: str,
-                                  split_values: list,
-                                  copy: bool = False) -> List[pd.DataFrame]:
-    """
-    split a dataframe base on the value of a column
-    ** the line in the split values will not be included **
-    Arg:
-        df: the target dataframe
-        column_name: the reference column"s name
-        split_value: the value mark for spliting
-    """
-    # empty list
-    if not split_values:
-        if copy:
-            return [df.copy()]
-        return [df]
-
-    split_values = sorted(split_values)
-    frist = 1
-    result_dfs = []
-    for this_value in split_values:
-        if frist:
-            frist_df = df[df[column_name] < this_value]
-            result_dfs.append(frist_df)
-            frist = 0
-            last_value = this_value
-            continue
-        result_df = df[(df[column_name] < this_value) & (df[column_name] > last_value)]
-        result_dfs.append(result_df)
-        last_value = this_value
-    # deal with the last portion
-    result_dfs.append(df[df[column_name] > split_values[-1]])
-
-    if copy:
-        for i, df_i in enumerate(result_dfs):
-            result_dfs[i] = df_i.copy()
-
-    return result_dfs
-
-
-def batch_edit_df_loc_value(df: pd.DataFrame, loc_value_list: List[tuple], column: str):
-    """
-    batch edit "column" of "df" with the "loc_value_list"
-    """
-    for loc, value in loc_value_list:
-        df.loc[loc, column] = value

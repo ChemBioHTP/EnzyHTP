@@ -43,3 +43,18 @@ class ResidueDontHaveAtom(Exception):
         super().__init__(*args)
         self.residue = residue
         self.atom_name = atom_name
+
+
+class InvalidMutationPatternSyntax(Exception):
+    """Exception corresponding to an invalid mutation syntax in enzy_htp.mutation.mutation_pattern"""
+    pass
+
+
+class InvalidMutationFlagSyntax(InvalidMutationPatternSyntax):
+    """Exception corresponding to an invalid mutation syntax in enzy_htp.mutation.mutation"""
+    pass
+
+
+class InvalidMutation(Exception):
+    """Exception corresponding to an invalid mutation in enzy_htp.mutation.mutation"""
+    pass

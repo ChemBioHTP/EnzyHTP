@@ -4,7 +4,7 @@ for easy editing of raw files.
 PDBLine objects should not be handled by non-developer users and are primarily intended as a lighter
 weight representation of PDB objects when manipulating the files directly.
 
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-19
 """

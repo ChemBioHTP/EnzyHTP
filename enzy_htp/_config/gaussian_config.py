@@ -3,7 +3,7 @@ required executables, enviornment variables and settings for using Gaussian with
 features default_gaussian_config() which provides a deep-copied GaussianConfig() object for use in Gaussian based
 calculations.
 
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 
 Date: 2022-06-11

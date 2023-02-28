@@ -1,7 +1,7 @@
 """Definition for the Residue class. Residues are the most common unit of function within 
 enzy_htp. A Residue() can be canonincal, non-canonical, solvent, or ligand. It is essentially
 the catch all for PDB objects.
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-19
 """
@@ -27,7 +27,7 @@ class Residue(DoubleLinkedNode):
     Attributes:
         (nessessary)
         children/atoms : A list of Atom() objects that make up the Residue().
-        name : Residue name.
+        name : Residue name. (3-letter code)
         idx : The index of the Residue within the chain.
         parent/chain : Parent chain name.
         rtype : The ResidueType of the Residue().
@@ -96,7 +96,7 @@ class Residue(DoubleLinkedNode):
 
     @property
     def name(self) -> str:
-        """Getter for the Residue()'s name."""
+        """Getter for the Residue()'s name. (3-letter code)"""
         return self._name
 
     @name.setter
@@ -140,6 +140,11 @@ class Residue(DoubleLinkedNode):
     def atom_name_list(self) -> List[str]:
         """get a list of atom names in the residue"""
         return list(map(lambda a: a.name, self.atoms))
+
+    @property
+    def atom_idx_list(self) -> List[int]:
+        """get a list of atom indexes in the residue"""
+        return list(map(lambda a: a.idx, self.atoms))
 
     # def clone(self) -> Residue: #TODO
     #     """Creates a deepcopy of self."""
