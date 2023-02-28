@@ -15,14 +15,14 @@ def test_decode_target_aa_pattern():
     """test the function use a made up target_aa_pattern"""
     test_pattern = "self"
     test_orig_resi = "ARG"
-    assert m_p.decode_target_aa_pattern(test_orig_resi, test_pattern) == set(["ARG"])
+    assert set(m_p.decode_target_aa_pattern(test_orig_resi, test_pattern)) == set(["ARG"])
 
 
 def test_decode_target_aa_pattern_not_expr():
     """test the function use a made up target_aa_pattern"""
     test_pattern = "all not self"
     test_orig_resi = "ARG"
-    assert m_p.decode_target_aa_pattern(test_orig_resi, test_pattern) == set([
+    assert set(m_p.decode_target_aa_pattern(test_orig_resi, test_pattern)) == set([
         "GLU", "ASN", "HIS", "SER", "VAL", "GLN", "TYR", "PRO", "ASP", "CYS", "GLY",
         "ALA", "THR", "LYS", "LEU", "MET", "ILE", "TRP", "PHE"
     ])

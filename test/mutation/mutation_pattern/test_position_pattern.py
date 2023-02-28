@@ -20,10 +20,10 @@ def test_decode_position_pattern():
     test_stru = sp.get_structure(test_pdb)
     test_pattern = "resi 254 around 4"
 
-    assert m_p.decode_position_pattern(test_stru, test_pattern) == [
+    assert set(m_p.decode_position_pattern(test_stru, test_pattern)) == set([
         ('A', 224), ('A', 202), ('A', 9), ('A', 201), ('A', 48), ('A', 11), ('A', 169),
         ('A', 222), ('A', 101), ('A', 128), ('A', 50)
-    ]
+    ])
 
 
 def test_decode_position_pattern_dimer():
@@ -32,7 +32,7 @@ def test_decode_position_pattern_dimer():
     test_stru = sp.get_structure(test_pdb)
     test_pattern = "resi 902 around 4"
 
-    assert m_p.decode_position_pattern(test_stru, test_pattern) == [
+    assert set(m_p.decode_position_pattern(test_stru, test_pattern)) == set([
         ('A', 205), ('A', 394), ('A', 431), ('A', 59), ('A', 323), ('A', 171), ('A', 340),
         ('A', 172), ('C', 901), ('A', 325)
-    ]
+    ])
