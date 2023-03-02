@@ -11,11 +11,41 @@ import pytest
 
 from enzy_htp.core import file_system as fs
 from enzy_htp.core.exception import UnsupportedMethod
+from enzy_htp.structure import PDBParser
 import enzy_htp.mutation.general as mg
 from enzy_htp.mutation.mutation import Mutation
 
 DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/data/"
+sp=PDBParser()
 
+def test_assign_mutant():
+    """test function works as expected using KE07"""
+    test_mutation_pattern = ("KA162A, {RA154W, HA201A},"
+                             " {L10A, r:2[resi 254 around 3:all not self]*5}")
+    test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
+    test_stru = sp.get_structure(test_pdb)
+
+    mutants = mg.assign_mutant(
+        test_stru,
+        test_mutation_pattern)
+    # print(mutants)
+
+def test_assign_mutant_dimer():
+    """test function works as expected using PuO
+    TODO(qz): fix this by filtering polypeptide only"""
+    test_mutation_pattern = "r:2[resi 904 around 3:all not self]*5}"
+    test_pdb = f"{DATA_DIR}puo_put.pdb"
+    test_stru = sp.get_structure(test_pdb)
+
+    mutants = mg.assign_mutant(
+        test_stru,
+        test_mutation_pattern,
+        chain_sync_list=[("A","B")],
+        chain_index_mapper={
+            "A":0,
+            "B":450
+        })
+    print(mutants)
 
 def test_sync_mutation_over_chains():
     """test function works as expected"""

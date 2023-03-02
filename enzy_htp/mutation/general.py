@@ -117,10 +117,11 @@ def mutate_stru(
     assert is_valid_mutation(stru, mutation_list)
 
 
-def assign_mutation(
+def assign_mutant(
     stru: Structure,
     pattern: str,
-    chain_sync_list: List[tuple],
+    chain_sync_list: List[tuple] = None,
+    chain_index_mapper: Dict[str, int] = None,
     random_state: int = 100,
 ) -> List[List[Mutation]]:
     """
@@ -136,7 +137,14 @@ def assign_mutation(
             is maybe experimentally impossible to only do mutations on one chain of a homo-dimer
             enzyme.
         random_state: The int() seed for the random number generator. Default value is 100.
-
+        (temp)
+        chain_index_mapper: TODO(qz): add biopython pairwise2.align.globalxx
+            A temp solution for cases that residue index in each chain is not aligned. (e.g.:
+            for a pair of homo-dimer below:
+            "A": ABCDEFG (start from 7)
+            "B": BCDEFGH (start from 14)
+            the chain_sync_mapper should be {"A":0, "B":6} and index conversion is done by
+            A_res_idx - 0 + 6 = B_res_idx)
     Raises:
         enzy_htp.core.exception.InvalidMutationPatternSyntax
     Return:
@@ -187,12 +195,13 @@ def assign_mutation(
     np.random.seed(random_state)  # this changes globaly
     mutants = decode_mutation_pattern(stru, pattern)
     # sync over polymers
-    mutants = sync_mutation_over_chains(mutants, chain_sync_list)
+    if chain_sync_list:
+        mutants = sync_mutation_over_chains(mutants, chain_sync_list, chain_index_mapper)
     # san check of the mutation_flagss
     for mutant in mutants:
         for mutation in mutant:
-            assert is_valid_mutation(stru, mutation)
-    return mutant
+            assert is_valid_mutation(mutation, stru)
+    return mutants
 
 def sync_mutation_over_chains(mutants: List[List[Mutation]],
                               chain_sync_list: List[Tuple[str]],

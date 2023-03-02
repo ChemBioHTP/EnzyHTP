@@ -131,8 +131,7 @@ def decode_random_mutation(stru: Structure, section_pattern: str) -> List[List[M
                 new_position = pop_random_list_elem(non_repeat_points)
             # 2. determine target
             new_mutation = get_random_list_elem(mutation_esm_mapper[new_position])
-            each_mutant[
-                new_position] = new_mutation  # use dict to make sure each point only have 1 mutation
+            each_mutant[new_position] = new_mutation  # use dict to make sure each point only have 1 mutation #yapf: disable
 
         # II. consider if repeating or not and add valid mutant
         if mutant_allow_repeat:
