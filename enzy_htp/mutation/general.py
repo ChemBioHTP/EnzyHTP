@@ -10,7 +10,8 @@ Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2022-10-24
 """
 
-from typing import List
+import copy
+from typing import Dict, List, Tuple
 import numpy as np
 
 from enzy_htp.structure import Structure
@@ -184,10 +185,64 @@ def assign_mutation(
     """
     # decode the pattern
     np.random.seed(random_state)  # this changes globaly
-    mutation_objs = decode_mutation_pattern(stru, pattern)
+    mutants = decode_mutation_pattern(stru, pattern)
     # sync over polymers
-    mutation_objs = sync_mutation_over_chains(mutation_objs, chain_sync_list)
+    mutants = sync_mutation_over_chains(mutants, chain_sync_list)
     # san check of the mutation_flagss
-    assert is_valid_mutation(stru, mutation_objs)
+    for mutant in mutants:
+        for mutation in mutant:
+            assert is_valid_mutation(stru, mutation)
+    return mutant
 
-    return mutation_objs
+def sync_mutation_over_chains(mutants: List[List[Mutation]],
+                              chain_sync_list: List[Tuple[str]],
+                              chain_index_mapper: Dict[str, int] = None) -> List[List[Mutation]]:
+    """synchronize mutations of each mutant in {mutants} to correponding chains. Return a copy
+    of mutants with addition mutations in each mutant.
+    Args:
+        mutants: 
+            a list of target mutant
+        chain_sync_list: 
+            a list like [(A,C),(B,D)] to indicate homo-chains in enzyme ploymer
+            (like dimer). Mutations will be **copied** to the correponding homo-chains as it
+            is maybe experimentally impossible to only do mutations on one chain of a homo-dimer
+            enzyme.
+        chain_index_mapper: TODO(qz): add biopython pairwise2.align.globalxx
+            A temp solution for cases that residue index in each chain is not aligned. (e.g.:
+            for a pair of homo-dimer below:
+            "A": ABCDEFG (start from 7)
+            "B": BCDEFGH (start from 14)
+            the chain_sync_mapper should be {"A":0, "B":6} and index conversion is done by
+            A_res_idx - 0 + 6 = B_res_idx)
+
+    Return:
+        copy of the modified {mutants}
+
+    Example:
+        sync_mutation_over_chains([[mut_A1, mut_A2], [mut_B1]], chain_sync_list = ["A","B"])
+        >>> [[mut_A1, mut_A2, mut_B1, mut_B2], [mut_B3, mut_A3]]
+    """
+    result = []
+    if not chain_index_mapper:
+        chain_index_mapper = {}
+    mutants_copy = copy.deepcopy(mutants)
+    for mutant in mutants_copy:
+        new_mutant = []
+        for mut in mutant:
+            # 1. have the original mutation
+            new_mutant.append(mut)
+            # 2. check if the mutation needs sync
+            orig_chain_id = mut.chain_id
+            for chain_sync_group in chain_sync_list:
+                if orig_chain_id in chain_sync_group:
+                    sync_targets = filter(lambda x: x != orig_chain_id, chain_sync_group)
+                    for sync_target in sync_targets:
+                        new_res_idx = mut.res_idx - chain_index_mapper.get(orig_chain_id, 0) + chain_index_mapper.get(sync_target, 0)
+                        new_mut = mut._replace(chain_id=sync_target, res_idx=new_res_idx)
+                        # TODO(qz): this does not work in most of the cases.
+                        # The index of the corresponding residue needs to be find by *pair-wise align* of the target and origin sequence and
+                        # get the same aligned index.
+                        new_mutant.append(new_mut)
+                    break # one chain id can only be in one group
+        result.append(list(set(new_mutant)))
+    return result

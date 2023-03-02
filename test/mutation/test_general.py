@@ -9,16 +9,39 @@ from typing import List
 
 import pytest
 
-import enzy_htp.mutation as mut
-import enzy_htp.structure as es
 from enzy_htp.core import file_system as fs
 from enzy_htp.core.exception import UnsupportedMethod
-
-from enzy_htp import interface
+import enzy_htp.mutation.general as mg
+from enzy_htp.mutation.mutation import Mutation
 
 DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/data/"
 
 
+def test_sync_mutation_over_chains():
+    """test function works as expected"""
+    test_mutants = [
+        [Mutation(orig='ARG',target='ALA',chain_id='A',res_idx=3),
+         Mutation(orig='ARG',target='TRP',chain_id='A',res_idx=4)],
+        [Mutation(orig='TRP',target='GLY',chain_id='C',res_idx=1),
+         Mutation(orig='TRP',target='HIS',chain_id='C',res_idx=2)]]
+    test_chain_sync_list = [("A","B"), ("C","D")]
+    test_chain_index_mapper = {
+        "A": 0,
+        "B": 10,
+        "C": 20,
+        "D": 100
+    }
+    result = mg.sync_mutation_over_chains(
+        test_mutants,
+        test_chain_sync_list,
+        test_chain_index_mapper)
+    assert len(result) == 2
+    assert len(result[0]) == 4
+    assert Mutation(orig='ARG', target='TRP', chain_id='B', res_idx=14) in result[0]
+    assert len(result[1]) == 4
+    assert Mutation(orig='TRP', target='HIS', chain_id='D', res_idx=82) in result[1]
+
+# == TODO ==
 def test_get_mutations_random_state_works():
     """Checking that the random_state function parameter is effective for controlling output in the get_mutations() method."""
     ONE_RES: str = f"{DATA_DIR}/one_res.pdb"
