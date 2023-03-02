@@ -101,8 +101,10 @@ class Chain(DoubleLinkedNode):
         """
         interval_list = get_interval_from_list(self.residue_idxs)
         if if_str:
-            range_strs = ",".join(
-                [f"{x[0]}-{x[1]}" if x[0] != x[1] else f"{x[0]}" for x in interval_list])
+            contain_list = [f"{x[0]}-{x[1]}" if x[0] != x[1] else f"{x[0]}" for x in interval_list]
+            if len(contain_list) == 1:
+                return contain_list[0]
+            range_strs = ",".join(contain_list)
             return ",".join(range_strs)
         return interval_list
 
