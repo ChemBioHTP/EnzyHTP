@@ -91,17 +91,17 @@ def get_interval_str_from_list(target_list: List[int]) -> str:
     return result
 
 
-def get_random_list_elem(traget_list: list):
+def get_random_list_elem(target_list: list):
     """Helper method that randomly chooses an element from a list. numpy.random.choice() doesn't 
     like to take elements from list()'s of tuples so this is the work around."""
-    return np.random.choice(traget_list)
+    return target_list[np.random.randint(len(target_list))] #np.random.choice only works on 1d
 
 
-def pop_random_list_elem(traget_list: list):
+def pop_random_list_elem(target_list: list):
     """Helper method that randomly pop an element from a list. (delete from original list)
     numpy.random.choice() doesn't like to take elements from list()'s of tuples so
     this is the work around."""
-    return traget_list.pop(np.random.randint(len(traget_list)))
+    return target_list.pop(np.random.randint(len(target_list)))
 
 
 def product_lists_allow_empty(list_of_lists: List[list]) -> List[list]:
