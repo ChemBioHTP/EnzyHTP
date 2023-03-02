@@ -169,9 +169,10 @@ def assign_mutant(
 
         The mutation_esm_patterns is seperated by comma and each describes 2 things:
         1. position_pattern: a set of positions
-                            (using the selection syntax in the selection module)
+                            (check selection syntax in .mutation_pattern.position_pattern)
+                            NOTE: all non polypeptide part are filtered out.
         2. target_aa_pattern: a set of target mutations apply to all positions in the current set
-                            (using syntax in the target_aa_pattern module)
+                            (check syntax in .mutation_pattern.target_aa_pattern)
         The two pattern are seperated by ":" and a mutation_esm_patterns looks like:
         "position_pattern_0:target_aa_pattern_0, ..."
 

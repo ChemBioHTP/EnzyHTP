@@ -17,6 +17,8 @@ def decode_position_pattern(stru: Structure,
     Args:
         stru: the Structure object of reference
         pattern: a pymol-like syntax to select residue positions
+                 NOTE: the result is different from pymol's result
+                 that all non polypeptide part are filtered
     Returns:
         (chain_id, resi_idx) to indicate a mutation position
         ((chain_id, resi_idx), resi_name)  if_name=True"""
