@@ -1082,7 +1082,7 @@ class PDB():
         engine: str = 'Amber_GPU',
         if_cluster_job: bool = 1, 
         cluster: ClusterInterface = None, 
-        period: int = 10,
+        period: int = 180,
         res_setting: Union[dict, None] = None,
         cpu_cores: Union[str, None] = None,
         cluster_debug: bool = 0

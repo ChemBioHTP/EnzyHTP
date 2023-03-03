@@ -163,7 +163,7 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''',
         # cd to sub_path
         os.chdir(sub_dir)
         try:    
-            submit_cmd = run_cmd(cmd, try_time=1440, wait_time=30, timeout=120) # 12 hrs
+            submit_cmd = run_cmd(cmd, try_time=1440, wait_time=60, timeout=120) # 12 hrs
         finally:
             # TODO(shaoqz) timeout condition is hard to test
             os.chdir(cwd) # avoid messing up the dir
