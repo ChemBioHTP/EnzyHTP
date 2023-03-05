@@ -66,7 +66,7 @@ export GAUSS_SCRDIR=$TMPDIR''',
     RES_KEYWORDS_MAP = { 
         'core_type' : None,
         'nodes':'nodes=',
-        'node_cores' : {'cpu': 'ntasks-per-node=', 'gpu': 'gpu='},
+        'node_cores' : {'cpu': 'ntasks-per-node=', 'gpu': 'gpus='},
         'job_name' : 'job-name=',
         'partition' : 'partition=',
         'mem_per_core' : {'cpu': 'mem=', 'gpu': 'mem='}, # previously using mem-per-gpu= change to mem= (calculate the total memory) base on issue #57

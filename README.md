@@ -22,11 +22,12 @@ For now, you can check our paper (https://pubs.acs.org/doi/10.1021/acs.jcim.1c01
 0. Install conda & create an environment
 1. install numpy `conda install numpy`
 2. install plum `conda install -c conda-forge plum-dispatch`
-3. Install openbabel `conda install openbabel -c conda-forge`
-4. Install pdb2pqr 
+3. install pandas `conda install pandas`
+4. Install openbabel `conda install openbabel -c conda-forge`
+5. Install pdb2pqr 
 ```
 git clone https://github.com/Electrostatics/pdb2pqr.git
 cd pdb2pqr
 pip install .
 ```
-3. Install Multiwfn (install demo in author's blog: http://bbs.keinsci.com/thread-12020-1-1.html) (The LMO func seems not working for WSL) (Note that run Multiwfn on ACCRE requires loading the GCC module) 
+1. Install Multiwfn (install demo in author's blog: http://bbs.keinsci.com/thread-12020-1-1.html) (The LMO func seems not working for WSL) (Note that run Multiwfn on ACCRE requires loading the GCC module) 
