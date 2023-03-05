@@ -26,7 +26,7 @@ class Expanse(Accre):
     # environment presets #
     AMBER_ENV = { 
         'CPU': '''module load cpu/0.15.4  gcc/9.2.0  openmpi/3.1.6
-module load amber/20''', # only this version have MMPBSA.py.MPI
+module load amber/20''', # this version dont have MMPBSA.py.MPI TODO(non of them works, this one works for sander at least)
         'GPU': '''module load gpu/0.15.4 openmpi/4.0.4
 module load amber/20'''
     }
