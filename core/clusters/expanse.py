@@ -81,3 +81,47 @@ export GAUSS_SCRDIR=$TMPDIR''',
                   'gpu': 'gpu-debug'}
     } # TODO do we really want to make partition general and parse it for each cluster?
 
+    @staticmethod
+    def _format_res_str(parsered_res_dict):
+        '''
+        redefine the way to form res_str for expanse
+        - add no-requeue
+            SLURM will requeue jobs if there is a node failure.
+            However, in some cases this might be detrimental if files get overwritten.
+            So we use no-requeue here
+        '''
+        res_str = '#!/bin/bash\n'
+        for k, v in parsered_res_dict.items():
+            res_line = f'#SBATCH --{k}{v}\n'
+            res_str += res_line
+        res_str += '#SBATCH --no-requeue\n'
+        return res_str
+
+    @classmethod
+    def _parser_res_dict(cls, res_dict):
+        '''
+        parser keywords into Expanse style
+        '''
+        new_dict = {}
+        for k, v in res_dict.items():
+            # remove core type line
+            if k == 'core_type':
+                if v == "gpu":
+                    new_k = "ntasks-per-node="
+                    new_v = 1 # default cpu for the gpu
+                    new_dict[new_k] = new_v
+                continue
+            # select core type
+            if k in ('node_cores', 'mem_per_core'):
+                new_k = cls.RES_KEYWORDS_MAP[k][res_dict['core_type']]
+            else:
+                new_k = cls.RES_KEYWORDS_MAP[k]
+            new_dict[new_k] = v
+        # process total mem
+        for k in new_dict:
+            if k == 'mem=':
+                mem_per_core_n_gb = new_dict[k].rstrip('GB')
+                total_mem = round_by(float(mem_per_core_n_gb) * float(res_dict['node_cores']), 0.1) # round up
+                new_dict[k] = f'{total_mem}G'
+        return new_dict
+
