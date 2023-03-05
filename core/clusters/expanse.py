@@ -89,12 +89,15 @@ export GAUSS_SCRDIR=$TMPDIR''',
             SLURM will requeue jobs if there is a node failure.
             However, in some cases this might be detrimental if files get overwritten.
             So we use no-requeue here
+        - add export=NONE
+            it defaults to ALL
         '''
         res_str = '#!/bin/bash\n'
         for k, v in parsered_res_dict.items():
             res_line = f'#SBATCH --{k}{v}\n'
             res_str += res_line
         res_str += '#SBATCH --no-requeue\n'
+        res_str += '#SBATCH --export=NONE\n'
         return res_str
 
     @classmethod
