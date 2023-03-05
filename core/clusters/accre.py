@@ -131,11 +131,13 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''',
     def _format_res_str(parsered_res_dict):
         '''
         format parsered dictionary
+        NOTE export=NONE is necessary to keep env decoupled
         '''
         res_str = '#!/bin/bash\n'
         for k, v in parsered_res_dict.items():
             res_line = f'#SBATCH --{k}{v}\n'
             res_str += res_line
+        res_str += '#SBATCH --export=NONE\n'
         return res_str
     
     @classmethod
