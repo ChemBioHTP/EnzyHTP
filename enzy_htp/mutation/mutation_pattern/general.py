@@ -79,7 +79,7 @@ def get_section_type(section_pattern: str) -> str:
         f"Mutation pattern section startswith unsupported letter {section_pattern[0]}. Cant determine type."
     )
 
-
+# d:
 def decode_direct_mutation(stru: Structure, section_pattern: str) -> List[List[Mutation]]:
     """decode the mutation pattern section that directly indicate the mutation.
     Return a list of mutation objects.
@@ -88,7 +88,7 @@ def decode_direct_mutation(stru: Structure, section_pattern: str) -> List[List[M
     is_valid_mutation(mutation_obj, stru)
     return [[mutation_obj]]
 
-
+# r:
 def decode_random_mutation(stru: Structure, section_pattern: str) -> List[List[Mutation]]:
     """decode the mutation pattern section that random over the mutation set.
     Return a list of mutation objects. (M number of N point mutants)
@@ -98,8 +98,7 @@ def decode_random_mutation(stru: Structure, section_pattern: str) -> List[List[M
         re_pattern, section_pattern).groups()
     mut_point_num = int(mut_point_num)
     mutant_num = int(mutant_num)
-    mutation_esm_mapper = decode_mutation_esm_pattern(
-        stru, mutation_esm_patterns)  # {mutation_site: Mutation}
+    mutation_esm_mapper = decode_mutation_esm_pattern(stru, mutation_esm_patterns)  # {mutation_site: Mutation}
 
     _LOGGER.info(
         f"generating random mutants in positions: {list(mutation_esm_mapper.keys())} ({len(mutation_esm_mapper)} sites total)"
@@ -111,13 +110,13 @@ def decode_random_mutation(stru: Structure, section_pattern: str) -> List[List[M
 
     result: List[Set[Mutation]] = []
     while len(result) < mutant_num:
-        # I. make mutations of each mutant
+        # I. make mutations for each mutant
         each_mutant: Dict[tuple, Mutation] = {}  # point mutation of each mutant
 
         if not point_allow_repeat:
             non_repeat_points = list(mutation_esm_mapper.keys())
 
-        temp_point_num = mut_point_num
+        temp_point_num = mut_point_num # will only not eq to mut_point_num when repeat is allowed
         while len(each_mutant) < temp_point_num:
             # 1. determine positionn
             if point_allow_repeat:
@@ -148,7 +147,7 @@ def decode_random_mutation(stru: Structure, section_pattern: str) -> List[List[M
     result = [list(x) for x in result]
     return result
 
-
+# a:
 def decode_all_mutation(stru: Structure, section_pattern: str) -> List[List[Mutation]]:
     """decode the mutation pattern section that mutate all in the mutation set.
     There will be the maxium same number of mutations as the number of positions.
@@ -166,8 +165,7 @@ def decode_all_mutation(stru: Structure, section_pattern: str) -> List[List[Muta
     re_pattern = r"a:(M?)\[(.+)\]"
     force_mutate_each_point, mutation_esm_patterns = re.match(re_pattern,
                                                               section_pattern).groups()
-    mutation_esm_mapper = decode_mutation_esm_pattern(
-        stru, mutation_esm_patterns)  #{position: mutations}
+    mutation_esm_mapper = decode_mutation_esm_pattern(stru, mutation_esm_patterns)  #{position: mutations}
     if force_mutate_each_point:
         result = list(itertools.product(*mutation_esm_mapper.values()))
     else:
