@@ -13,10 +13,8 @@ from .mutation import (
     generate_from_mutation_flag,
     is_valid_mutation,
     generate_all_mutations,
-    size_increase,
-    size_decrease,
-    polarity_change,
-    same_polarity,
+    check_repeat_mutation,
+    remove_repeat_mutation,
 )
 
 from .mutation_restrictions import (

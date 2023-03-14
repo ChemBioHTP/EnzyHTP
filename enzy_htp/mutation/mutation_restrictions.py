@@ -14,10 +14,6 @@ import enzy_htp.structure as es
 
 from .mutation import (
     Mutation,
-    size_increase,
-    size_decrease,
-    polarity_change,
-    same_polarity,
 )
 
 

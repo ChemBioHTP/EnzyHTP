@@ -1,6 +1,7 @@
 """Submodule that defines the Mutation namedtuple() which describes a single point mutation in an 
 enzyme. Additionally provides utility functions for determnining if Mutation()'s are defined
 and if they satisfy certain change requirements.
+Also provide utilities for mutant, which is a list of Mutation()
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
         QZ Shao <shaoqz@icloud.com>
@@ -143,6 +144,38 @@ def is_valid_mutation(mut: Mutation, stru: es.Structure) -> bool:
     return True
 
 
+def check_repeat_mutation(mutant: List[Mutation]):
+    """check if there is any repeating mutation (position-wise)
+    in the mutant"""
+    mutation_posi = []
+    for mut in mutant:
+        position_key = get_position_key(mut)
+        if position_key in mutation_posi:
+            return True
+        mutation_posi.append(position_key)
+    return False
+
+# == editor ==
+def remove_repeat_mutation(mutant: List[Mutation], keep: str= "last") -> List[Mutation]:
+    """remove all mutations that have repeating position in the mutant
+    and keep only the {keep} specificed one.
+    Args:
+        mutant: the target mutant
+        keep: support only 'frist' and 'last' right now"""
+    # san check
+    if keep not in ["first", "last"]:
+        raise ValueError("Only support 'first' or 'last' right now")
+    mutation_mapper = {}
+    for mut in mutant:
+        position_key = get_position_key(mut)
+        if position_key in mutation_mapper:
+            if keep == "last":
+                mutation_mapper[position_key] = mut
+            if keep == "first":
+                continue
+        mutation_mapper[position_key] = mut
+    return list(mutation_mapper.values())
+
 # == property getter ==
 def get_target(mut: Mutation, if_one_letter: bool = False) -> str:
     """get the mutation target in 1/3-letter format"""
@@ -151,6 +184,10 @@ def get_target(mut: Mutation, if_one_letter: bool = False) -> str:
         return convert_to_one_letter(mut.target)
     return mut.target
 
+def get_position_key(mut: Mutation) -> Tuple[str, int]:
+    """get the position key in a form of (chain_id, res_idx)
+    from the Mutation"""
+    return (mut.chain_id, mut.res_idx)
 
 # == TODO ==
 def generate_all_mutations(
@@ -187,57 +224,3 @@ def generate_all_mutations(
             assert is_valid_mutation(mt)
     return result
 
-
-def size_increase(mut: Mutation) -> bool:
-    """Checks if the mutation described in the supplied namedtuple describes an increase in
-        size for the selected residue. DOES NOT check if the Mutation() is valid.
-
-    Args:
-        mut: The Mutation() namedtuple to be judged.
-
-    Returns:
-        If the described mutation leads to an increase in size.
-    """
-
-    return chem.RESIDUE_VOLUME_MAPPER[mut.target] > chem.RESIDUE_VOLUME_MAPPER[mut.orig]
-
-
-def size_decrease(mut: Mutation) -> bool:
-    """Checks if the mutation described in the supplied namedtuple describes an decrease in
-        size for the selected residue. DOES NOT check if the Mutation() is valid.
-
-    Args:
-        mut: The Mutation() namedtuple to be judged.
-
-    Returns:
-        If the described mutation leads to a decrease in size.
-    """
-
-    return chem.RESIDUE_VOLUME_MAPPER[mut.target] < chem.RESIDUE_VOLUME_MAPPER[mut.orig]
-
-
-def polarity_change(mut: Mutation) -> bool:
-    """Checks if the mutation described in the supplied namedtuple describes a change in polarity.
-    DOES NOT check if the Mutation() is valid.
-
-    Args:
-        mut: The Mutation() namedtuple to be judged.
-
-    Returns:
-        If the described mutation leads to a change in polarity.
-    """
-    return chem.residue.residue_polarity(mut.orig) != chem.residue.residue_polarity(
-        mut.target)
-
-
-def same_polarity(mut: Mutation) -> bool:
-    """Checks if the mutation described in the supplied namedtuple does not describe a change in
-    polarity. DOES NOT check if the Mutation() is valid.
-
-    Args:
-        mut: The Mutation() namedtuple to be judged.
-
-    Returns:
-        If the described mutation leads to no change in polarity.
-    """
-    return not polarity_change(mut)

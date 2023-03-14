@@ -105,6 +105,42 @@ def test_is_valid_mutation_fails():
         assert msg_finger_p in exe.value.args[0]
 
 
+def test_check_repeat_mutation():
+    """test to make sure function works as expected"""
+    test_mutant = [
+        mut.Mutation("ARG", "TRP", "A", 154),
+        mut.Mutation("ARG", "ILE", "A", 154),
+        mut.Mutation("ARG", "TRP", "B", 154),
+        mut.Mutation("LYS", "GLN", "A", 37),
+    ]
+    assert mut.check_repeat_mutation(test_mutant)
+    test_mutant = [
+        mut.Mutation("ARG", "TRP", "A", 154),
+        mut.Mutation("ARG", "TRP", "B", 154),
+        mut.Mutation("LYS", "GLN", "A", 37),
+    ]
+    assert not mut.check_repeat_mutation(test_mutant)
+
+def test_remove_repeat_mutation():
+    """test to make sure function works as expected"""
+    test_mutant = [
+        mut.Mutation("ARG", "TRP", "A", 154),
+        mut.Mutation("ARG", "ILE", "A", 154),
+        mut.Mutation("ARG", "TRP", "B", 154),
+        mut.Mutation("LYS", "GLN", "A", 37),
+    ]
+    assert mut.remove_repeat_mutation(test_mutant, "last") == [
+        mut.Mutation("ARG", "ILE", "A", 154),
+        mut.Mutation("ARG", "TRP", "B", 154),
+        mut.Mutation("LYS", "GLN", "A", 37),
+    ]
+    assert mut.remove_repeat_mutation(test_mutant, "first") == [
+        mut.Mutation("ARG", "TRP", "A", 154),
+        mut.Mutation("ARG", "TRP", "B", 154),
+        mut.Mutation("LYS", "GLN", "A", 37),
+    ]
+
+
 # == TODO ==
 def test_generate_all_mutations():
     """Testing that all possible mutations work for a simple, 1-residue structure."""

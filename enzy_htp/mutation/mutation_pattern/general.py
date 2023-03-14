@@ -220,6 +220,8 @@ def decode_mutation_esm_pattern(
 
 def combine_section_mutant(mutation_mapper: Dict[str, Mutation]) -> List[List[Mutation]]:
     """Combine mutations decoded from each section. Return a list of final mutants.
+    Args:
+        mutation_mapper: {section_str : list of mutant}
     NOTE: merge repeating mutations into one and result permutation of combination
           of each section"""
     return [
