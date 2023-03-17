@@ -2,6 +2,10 @@
 Science API:
 + protonate_stru
 
+The function naming format in the module:
+    Engine/Method:      {(sub_)science_api}_with_{engine/method}
+    Wrapper/Interface:  {ext_software}_{(sub_)science_api}
+
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-04-05
@@ -159,7 +163,7 @@ def protonate_peptide_with_pdb2pqr(stru: Structure,
         fs.safe_rm(int_pqr_path)
     return stru
 
-
+# PDB2PQR interface (NOTE: group to _interface when more PDB2PQR is needed)
 def pdb2pqr_protonate_pdb(pdb_path: str,
                           pqr_path: str,
                           ph: float = 7.0,
@@ -279,7 +283,7 @@ def protonate_ligand_with_pybel(stru: Structure,
                       empty_only=True)  #prevent remove the entire scratch
     return stru
 
-
+# PYBEL interface
 def pybel_protonate_pdb_ligand(in_path: str, out_path: str, ph: float = 7.0) -> str:
     """
     This is a wrapper of [PYBEL](https://openbabel.org/docs/dev/UseTheLibrary/Python_Pybel.html)
