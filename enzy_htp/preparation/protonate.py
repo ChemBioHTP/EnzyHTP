@@ -128,7 +128,7 @@ def protonate_peptide_with_pdb2pqr(stru: Structure,
         stru: a reference of the changed original structure
     """
     sp = PDBParser()
-    # manage the path
+    # manage the temp file path
     if int_pdb_path is None:
         fs.safe_mkdir(
             config["system.SCRATCH_DIR"])  # make them together into make_temp_file
@@ -148,16 +148,17 @@ def protonate_peptide_with_pdb2pqr(stru: Structure,
             )
             int_pqr_path = fs.get_valid_temp_name(
                 int_pqr_path.removesuffix(".pdb") + "_1.pdb")
+
     # run pqr interface
     with open(int_pdb_path, "w") as of:
-        of.write(sp.get_file_str(
-            stru))  # give the whole structure as input here as PropKa can use ligand
+        of.write(sp.get_file_str(stru))  # give the whole structure as input here as PropKa can use ligand
     pdb2pqr_protonate_pdb(int_pdb_path, int_pqr_path, ph)
     peptide_protonated_stru = sp.get_structure(int_pqr_path)
-    stru_oper.remove_non_peptide(
-        peptide_protonated_stru)  # keep the peptide only (sometime it has solvent)
+    stru_oper.remove_non_peptide(peptide_protonated_stru)  # keep the peptide only (sometime it has solvent)
     stru_oper.update_residues(stru, peptide_protonated_stru)
     protonate_peptide_fix_metal_donor(stru, method=metal_fix_method)
+
+    # clean up temp files
     if _LOGGER.level > 10:  # not DEBUG or below
         fs.safe_rm(int_pdb_path)
         fs.safe_rm(int_pqr_path)
