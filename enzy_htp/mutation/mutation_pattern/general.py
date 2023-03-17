@@ -30,7 +30,7 @@ def decode_mutation_pattern(stru: Structure, pattern: str) -> List[List[Mutation
     mutant_patterns = seperate_mutant_patterns(pattern)
     for mutant_pattern in mutant_patterns:
         mutant_pattern = mutant_pattern.strip("{}")
-        p_mutant_mapper = {}
+        p_mutant_mapper: Dict[str, List[List[Mutation]]] = {}
         section_patterns = seperate_section_patterns(mutant_pattern)
         for section_pattern in section_patterns:
             section_type = get_section_type(section_pattern)
@@ -200,8 +200,7 @@ def decode_mutation_esm_pattern(
         esm_positions = decode_position_pattern(stru, position_pattern, if_name=True)
         for esm_position, orig_resi in esm_positions:
             posi_target_aa = decode_target_aa_pattern(orig_resi, target_aa_pattern)
-            posi_mutation = generate_mutation_from_traget_list(esm_position, orig_resi,
-                                                               posi_target_aa)
+            posi_mutation = generate_mutation_from_traget_list(esm_position, orig_resi, posi_target_aa)
             if esm_position in esm_result:  # shared position case
                 esm_result[esm_position] = list(
                     set(esm_result[esm_position]) or set(posi_mutation))

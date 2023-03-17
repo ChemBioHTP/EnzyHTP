@@ -134,10 +134,10 @@ def test_hash_and_set():
     ]
 
     test_mutant_2 = [
+        mut.Mutation("LYS", "GLN", "A", 37),
         mut.Mutation("ARG", "TRP", "A", 154),
         mut.Mutation("ARG", "TRP", "B", 154),
         mut.Mutation("ARG", "TRP", "B", 154),
-        mut.Mutation("LYS", "GLN", "A", 37),
     ]
     assert len(set(test_mutant)) == 3
     assert test_mutant[0] == test_mutant[1] # same value
@@ -149,6 +149,20 @@ def test_changed_clone():
     test_mutation = mut.Mutation("ARG", "TRP", "A", 154)
     assert test_mutation.changed_clone(target= "LEU", res_idx= 10) == ("ARG", "LEU", "A", 10)
 
+def test_str_wt():
+    """test behavior of __str__ on WT"""
+    wt_mutation = mut.Mutation(None, "WT", None, None)
+    assert str(wt_mutation) == "WT"
+
+def test_repr_wt():
+    """test behavior of __repr__ on WT"""
+    wt_mutation = mut.Mutation(None, "WT", None, None)
+    assert repr(wt_mutation) == "(None,'WT',None,None)"
+
+def test_repr():
+    """test behavior of __repr__"""
+    mutation = mut.Mutation("ARG", "TRP", "A", 154)
+    assert repr(mutation) == "('ARG','TRP','A',154)"
 
 # == TODO ==
 def test_generate_all_mutations():

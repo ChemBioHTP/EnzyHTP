@@ -154,13 +154,18 @@ class Mutation:
         """support set()"""
         return hash(self.mutation_tuple)
 
+
     def __str__(self) -> str:
         """give a string representation of the mutation"""
+        if self.target == "WT":
+            return "WT"
         return f"{self.get_orig(if_one_letter=True)}{self.chain_id}{self.res_idx}{self.get_target(if_one_letter=True)}"
+
 
     def __repr__(self) -> str:
         """give a string representation of the mutation"""
-        return f"({self.get_orig()},{self.get_target()},{self.chain_id},{self.res_idx})"
+        return f"({repr(self.get_orig())},{repr(self.get_target())},{repr(self.chain_id)},{repr(self.res_idx)})"
+
 
 # == constructor ==
 def generate_from_mutation_flag(mutation_flag: str) -> Mutation:
@@ -206,6 +211,7 @@ def generate_mutation_from_traget_list(position: Tuple[str, int], orig_resi: str
     return result
 
 # --Mutant--
+# below utilities are for a list of Mutation()
 # == checker ==
 def check_repeat_mutation(mutant: List[Mutation]):
     """check if there is any repeating mutation (position-wise)
