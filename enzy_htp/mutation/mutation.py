@@ -7,9 +7,10 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
         QZ Shao <shaoqz@icloud.com>
 Date: 2022-06-15
 """
+import copy
 import re
 from collections import namedtuple
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Union
 from enzy_htp.chemical.residue import (ONE_LETTER_AA_MAPPER, THREE_LETTER_AA_MAPPER,
                                        convert_to_canonical_three_letter,
                                        convert_to_one_letter, convert_to_three_letter)
@@ -20,10 +21,8 @@ from enzy_htp.core.logger import _LOGGER
 import enzy_htp.chemical as chem
 import enzy_htp.structure as es
 
-Mutation = namedtuple("Mutation", "orig target chain_id res_idx")
-Mutation.__doc__ = f"""Named tuple representing a single point mutation in an enzyme.
-   
-
+class Mutation:
+    """representing a single point mutation in an enzyme.
 	Attributes:
    		orig: the three-letter code of the original amino acid. (NCAA or canonical 3-letter name for CAA)
 		target: the three-letter code of the target mutation. (NCAA or canonical 3-letter name for CAA. e.g: HIS not HIE)
@@ -31,16 +30,139 @@ Mutation.__doc__ = f"""Named tuple representing a single point mutation in an en
 		res_idx: the 1-indexed int() of the residue to Mutate
 
         *In the case of WT, the tuple is defined as (None, "WT", None, None)
-    TODO(qz) feel more and more need to make it a class
-"""
+    """
+    
+    SUPPORTED_MUTATION_TARGET_LIST = get_copy_of_deleted_dict(ONE_LETTER_AA_MAPPER, "U")
+    """The list of EnzyHTP supported mutation target-residue list.
+    add upon supporting. will do ncaa in the future
+    TODO should be 3 letter list tho"""
 
-SUPPORTED_MUTATION_TARGET_LIST = get_copy_of_deleted_dict(ONE_LETTER_AA_MAPPER, "U")
-"""The list of EnzyHTP supported mutation target-residue list.
-add upon supporting. will do ncaa in the future
-TODO should be 3 letter list tho"""
+    def __init__(self, orig, target, chain_id, res_idx):
+        self.orig = orig
+        self.target = target
+        self.chain_id = chain_id
+        self.res_idx = res_idx
+
+    @property
+    def mutation_tuple(self) -> tuple:
+        """return the tuple form of the mutation information"""
+        return (self.orig, self.target, self.chain_id, self.res_idx)
+
+    # == checker ==
+    def is_valid_mutation(self, stru: es.Structure) -> bool:
+        """Checks if the supplied Mutation() namedtuple is valid according to the below criteria:
+        (Non-WT cases)
+        Mutation.orig: if match the original residue in the {stru}
+        Mutation.target: a one-letter amino-acid code in the allowed list & different from orig
+        Mutation.chain_id: should exist in {stru}
+        Mutation.res_idx: should exist in {stru}
+
+        Args:
+            mut: The Mutation() namedtuple to be judged.
+            stru: the reference structure
+
+        Raise:
+            enzy_htp.core.exception.InvalidMutation
+        Returns:
+            True if the Mutation() passes all checks.
+        """
+        # WT case
+        if self == (None, "WT", None, None):
+            return True
+
+        # get data type right 
+        # yapf: disable
+        if (not isinstance(self.orig, str) or not isinstance(self.target, str)
+                or not isinstance(self.chain_id, str)
+                or not isinstance(self.res_idx, int)):
+            raise InvalidMutation(f"wrong data type in: {self}")
+        # yapf: enable
+
+        # Mutation.chain_id, Mutation.res_idx: should exist in {stru}, should not be empty
+        if self.chain_id.strip() is "":
+            raise InvalidMutation(f"empty chain_id in: {self}")
+        if self.chain_id not in stru.chain_mapper:
+            raise InvalidMutation(
+                f"chain id in {self} does not exist in structure (in-stru: {stru.chain_mapper.keys()})"
+            )
+        if self.res_idx not in stru[self.chain_id].residue_idxs:
+            raise InvalidMutation(
+                f"res_idx in {self} does not exist in structure (in-stru: {stru[self.chain_id].residue_idx_interval()})"
+            )
+
+        # Mutation.orig: if match the original residue in the {stru}
+        real_orig = convert_to_canonical_three_letter(
+            stru[self.chain_id].find_residue_idx(self.res_idx).name)
+        if real_orig != self.orig:
+            raise InvalidMutation(
+                f"original residue does not match in: {self} (real_orig: {real_orig})")
+
+        # Mutation.target: a one-letter amino-acid code in the allowed list & different from orig
+        if self.get_target(if_one_letter=True) not in self.SUPPORTED_MUTATION_TARGET_LIST:
+            raise InvalidMutation(f"unsupported target residue in: {self}")
+        if self.target == self.orig:
+            raise InvalidMutation(
+                f"equivalent mutation detected in: {self}. Should be (None, \"WT\", None, None)."
+            )
+
+        return True
+
+    # == property getter ==
+    def get_target(self, if_one_letter: bool = False) -> str:
+        """get the mutation target in 1/3-letter format"""
+        if if_one_letter and (self.target in THREE_LETTER_AA_MAPPER):  # for ncaa we want to use 3 letter
+            return convert_to_one_letter(self.target)
+        return self.target
 
 
-# == constructor
+    def get_orig(self, if_one_letter: bool = False) -> str:
+        """get the original residue in 1/3-letter format"""
+        if if_one_letter and (self.orig in THREE_LETTER_AA_MAPPER):  # for ncaa we want to use 3 letter
+            return convert_to_one_letter(self.orig)
+        return self.orig
+
+
+    def get_position_key(self) -> Tuple[str, int]:
+        """get the position key in a form of (chain_id, res_idx)
+        from the Mutation"""
+        return (self.chain_id, self.res_idx)
+
+    # == editor ==
+    def changed_clone(self, **kwarg):
+        """make a clone of self, values may chain"""
+        result = copy.deepcopy(self)
+        allowed_attr_names = ["orig", "target", "chain_id", "res_idx"]
+        for k, v in kwarg.items():
+            if k not in allowed_attr_names:
+                raise TypeError(f"Attribute {k} does not exist.")
+            setattr(result, k, v)
+        return result
+
+
+    # special
+    def __eq__(self, target) -> bool:
+        """mimik the nametuple behavior. historical reason."""
+        return self.mutation_tuple == target
+
+
+    def __getitem__(self, idx: int) -> Union[str, int]:
+        """mimik the nametuple behavior. historical reason."""
+        return self.mutation_tuple[idx]
+
+
+    def __hash__(self) -> int:
+        """support set()"""
+        return hash(self.mutation_tuple)
+
+    def __str__(self) -> str:
+        """give a string representation of the mutation"""
+        return f"{self.get_orig(if_one_letter=True)}{self.chain_id}{self.res_idx}{self.get_target(if_one_letter=True)}"
+
+    def __repr__(self) -> str:
+        """give a string representation of the mutation"""
+        return f"({self.get_orig()},{self.get_target()},{self.chain_id},{self.res_idx})"
+
+# == constructor ==
 def generate_from_mutation_flag(mutation_flag: str) -> Mutation:
     """XA##Y -> ("X", "Y", "A", ##)
     WT -> (None, "WT", None, None)
@@ -72,84 +194,25 @@ def generate_from_mutation_flag(mutation_flag: str) -> Mutation:
 
 
 def generate_mutation_from_traget_list(position: Tuple[str, int], orig_resi: str,
-                                       target_list: str) -> List[Mutation]:
+                                    target_list: str) -> List[Mutation]:
     """generate a list of Mutation() objects from position and a list of target residues"""
     result = []
     for target in target_list:
         result.append(
             Mutation(orig=convert_to_canonical_three_letter(orig_resi),
-                     target=convert_to_canonical_three_letter(target),
-                     chain_id=position[0],
-                     res_idx=position[1]))
+                    target=convert_to_canonical_three_letter(target),
+                    chain_id=position[0],
+                    res_idx=position[1]))
     return result
 
-
+# --Mutant--
 # == checker ==
-def is_valid_mutation(mut: Mutation, stru: es.Structure) -> bool:
-    """Checks if the supplied Mutation() namedtuple is valid according to the below criteria:
-    (Non-WT cases)
-    Mutation.orig: if match the original residue in the {stru}
-    Mutation.target: a one-letter amino-acid code in the allowed list & different from orig
-    Mutation.chain_id: should exist in {stru}
-    Mutation.res_idx: should exist in {stru}
-
-    Args:
-        mut: The Mutation() namedtuple to be judged.
-        stru: the reference structure
-
-    Raise:
-        enzy_htp.core.exception.InvalidMutation
-    Returns:
-        True if the Mutation() passes all checks.
-    """
-    # WT case
-    if mut == (None, "WT", None, None):
-        return True
-
-    # get data type right 
-    # yapf: disable
-    if (not isinstance(mut.orig, str) or not isinstance(mut.target, str)
-            or not isinstance(mut.chain_id, str)
-            or not isinstance(mut.res_idx, int)):
-        raise InvalidMutation(f"wrong data type in: {mut}")
-    # yapf: enable
-
-    # Mutation.chain_id, Mutation.res_idx: should exist in {stru}, should not be empty
-    if mut.chain_id.strip() is "":
-        raise InvalidMutation(f"empty chain_id in: {mut}")
-    if mut.chain_id not in stru.chain_mapper:
-        raise InvalidMutation(
-            f"chain id in {mut} does not exist in structure (in-stru: {stru.chain_mapper.keys()})"
-        )
-    if mut.res_idx not in stru[mut.chain_id].residue_idxs:
-        raise InvalidMutation(
-            f"res_idx in {mut} does not exist in structure (in-stru: {stru[mut.chain_id].residue_idx_interval()})"
-        )
-
-    # Mutation.orig: if match the original residue in the {stru}
-    real_orig = convert_to_canonical_three_letter(
-        stru[mut.chain_id].find_residue_idx(mut.res_idx).name)
-    if real_orig != mut.orig:
-        raise InvalidMutation(
-            f"original residue does not match in: {mut} (real_orig: {real_orig})")
-
-    # Mutation.target: a one-letter amino-acid code in the allowed list & different from orig
-    if get_target(mut, if_one_letter=True) not in SUPPORTED_MUTATION_TARGET_LIST:
-        raise InvalidMutation(f"unsupported target residue in: {mut}")
-    if mut.target == mut.orig:
-        raise InvalidMutation(
-            f"equivalent mutation detected in: {mut}. Should be (None, \"WT\", None, None)."
-        )
-
-    return True
-
-
 def check_repeat_mutation(mutant: List[Mutation]):
     """check if there is any repeating mutation (position-wise)
     in the mutant"""
     mutation_posi = []
     for mut in mutant:
-        position_key = get_position_key(mut)
+        position_key = mut.get_position_key()
         if position_key in mutation_posi:
             return True
         mutation_posi.append(position_key)
@@ -167,7 +230,7 @@ def remove_repeat_mutation(mutant: List[Mutation], keep: str= "last") -> List[Mu
         raise ValueError("Only support 'first' or 'last' right now")
     mutation_mapper = {}
     for mut in mutant:
-        position_key = get_position_key(mut)
+        position_key = mut.get_position_key()
         if position_key in mutation_mapper:
             if keep == "last":
                 mutation_mapper[position_key] = mut
@@ -176,18 +239,7 @@ def remove_repeat_mutation(mutant: List[Mutation], keep: str= "last") -> List[Mu
         mutation_mapper[position_key] = mut
     return list(mutation_mapper.values())
 
-# == property getter ==
-def get_target(mut: Mutation, if_one_letter: bool = False) -> str:
-    """get the mutation target in 1/3-letter format"""
-    if if_one_letter and (mut.target
-                          in THREE_LETTER_AA_MAPPER):  # for ncaa we want to use 3 letter
-        return convert_to_one_letter(mut.target)
-    return mut.target
 
-def get_position_key(mut: Mutation) -> Tuple[str, int]:
-    """get the position key in a form of (chain_id, res_idx)
-    from the Mutation"""
-    return (mut.chain_id, mut.res_idx)
 
 # == TODO ==
 def generate_all_mutations(

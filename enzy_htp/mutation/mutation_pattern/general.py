@@ -15,7 +15,7 @@ from enzy_htp.core.general import (get_random_list_elem, pop_random_list_elem,
                                    product_lists_allow_empty)
 from enzy_htp.structure import Structure
 from ..mutation import (Mutation, generate_from_mutation_flag,
-                        generate_mutation_from_traget_list, get_target, is_valid_mutation)
+                        generate_mutation_from_traget_list)
 from .position_pattern import decode_position_pattern
 from .target_aa_pattern import check_target_aa_pattern, decode_target_aa_pattern
 
@@ -85,7 +85,7 @@ def decode_direct_mutation(stru: Structure, section_pattern: str) -> List[List[M
     Return a list of mutation objects.
     pattern_example: XA###Y"""
     mutation_obj = generate_from_mutation_flag(section_pattern)
-    is_valid_mutation(mutation_obj, stru)
+    mutation_obj.is_valid_mutation(stru)
     return [[mutation_obj]]
 
 # r:
@@ -211,7 +211,7 @@ def decode_mutation_esm_pattern(
     _LOGGER.info(f"Mutation ensemble of the section:")
     for k, v in esm_result.items():
         _LOGGER.info(
-            f"    {k} : {[get_target(x, if_one_letter=True) for x in v]} (total: {len(v)})"
+            f"    {k} : {[x.get_target(if_one_letter=True) for x in v]} (total: {len(v)})"
         )
     _LOGGER.info(f"(total: {len(esm_result)} position)")
 

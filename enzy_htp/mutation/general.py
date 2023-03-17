@@ -19,7 +19,6 @@ from enzy_htp.structure import Structure
 from .mutation import (
     Mutation,
     check_repeat_mutation,
-    is_valid_mutation,
     remove_repeat_mutation)
 from .mutation_pattern import decode_mutation_pattern
 
@@ -108,7 +107,7 @@ def assign_mutant(
     # san check of the mutation_flagss
     for mutant in mutants:
         for mutation in mutant:
-            assert is_valid_mutation(mutation, stru)
+            assert mutation.is_valid_mutation(stru)
     return mutants
 
 def sync_mutation_over_chains(mutants: List[List[Mutation]],
@@ -155,7 +154,7 @@ def sync_mutation_over_chains(mutants: List[List[Mutation]],
                     sync_targets = filter(lambda x: x != orig_chain_id, chain_sync_group)
                     for sync_target in sync_targets:
                         new_res_idx = mut.res_idx - chain_index_mapper.get(orig_chain_id, 0) + chain_index_mapper.get(sync_target, 0)
-                        new_mut = mut._replace(chain_id=sync_target, res_idx=new_res_idx)
+                        new_mut = mut.changed_clone(chain_id=sync_target, res_idx=new_res_idx)
                         # TODO(qz): this does not work in most of the cases.
                         # The index of the corresponding residue needs to be find by *pair-wise align* of the target and origin sequence and
                         # get the same aligned index.

@@ -30,9 +30,9 @@ def test_decode_position_pattern_dimer():
     """test the function use a made up position_pattern for puo"""
     test_pdb = f"{DATA_DIR}puo_put.pdb"
     test_stru = sp.get_structure(test_pdb)
-    test_pattern = "resi 902 around 4"
-
+    test_pattern = "resi 267 around 5"
     assert set(m_p.decode_position_pattern(test_stru, test_pattern)) == set([
-        ('A', 205), ('A', 394), ('A', 431), ('A', 59), ('A', 323), ('A', 171), ('A', 340),
-        ('A', 172), ('C', 901), ('A', 325)
-    ])
+        ('A', 273), ('A', 268), ('A', 263), ('A', 389), ('A', 290), ('A', 269),
+        ('A', 264), ('A', 390), ('A', 270), ('A', 265), ('A', 391), ('A', 271),
+        ('A', 266), ('A', 388), ('B', 719)
+    ]) # note ligand wont be included

@@ -71,51 +71,8 @@ def test_sync_mutation_over_chains():
     assert len(result[1]) == 4
     assert Mutation(orig='TRP', target='HIS', chain_id='D', res_idx=82) in result[1]
 
-# == TODO ==
-def test_get_mutations_random_state_works():
-    """Checking that the random_state function parameter is effective for controlling output in the get_mutations() method."""
-    ONE_RES: str = f"{DATA_DIR}/one_res.pdb"
-    assert mut.engine.get_mutations(ONE_RES, 1, list(), 100,
-                                    None) == mut.engine.get_mutations(
-                                        ONE_RES, 1, list(), 100, None)
-    assert mut.engine.get_mutations(ONE_RES, 1, list(), 99,
-                                    None) != mut.engine.get_mutations(
-                                        ONE_RES, 1, list(), 100, None)
 
-
-def test_get_mutations_raises():
-    """Checking that the get_mutations() method throws when there are not enough valid mutations available."""
-    ONE_RES: str = f"{DATA_DIR}/one_res.pdb"
-
-    with pytest.raises(Exception) as exe:
-        mut.engine.get_mutations(ONE_RES, 2, list(), 100, None)
-    assert exe
-
-    restrict: mut.MutationRestrictions = mut.restriction_object(ONE_RES)
-    restrict.lock_residue(('A', 1))
-    with pytest.raises(Exception) as exe:
-        mut.engine.get_mutations(ONE_RES, 1, list(), 100, restrict)
-    assert exe
-
-
-def test_mutated_name():
-    """Method that tests that mutated_name() is working correctly."""
-    ONE_RES: str = f"{DATA_DIR}/one_res.pdb"
-    target = "dne/one_res_P1G.pdb"
-    actual = mut.engine.mutated_name(
-        ONE_RES, "dne", [mut.Mutation(orig='P', target='G', chain_id='A', res_idx=1)])
-    assert actual == target
-
-
-def test_mutated_name_can_deduce():
-    """Method that tests that mutated_name() is working correctly and can specifically deduce when no original residue code is given."""
-    ONE_RES: str = f"{DATA_DIR}/one_res.pdb"
-    target = "dne/one_res_P1G.pdb"
-    actual = mut.engine.mutated_name(
-        ONE_RES, "dne", [mut.Mutation(orig='X', target='G', chain_id='A', res_idx=1)])
-    assert actual == target
-
-
+# ==TODO==
 def test_mutate_pdb_one_letter_tleap():
     """Checking that mutate_pdb() works on a pdb structure with a single letter specifically for tleap's mutation.
     Note to developers: This should be replicated for each and every new package added."""

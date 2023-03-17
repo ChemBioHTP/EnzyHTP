@@ -11,7 +11,6 @@ from .engine import mutate_pdb
 from .mutation import (
     Mutation,
     generate_from_mutation_flag,
-    is_valid_mutation,
     generate_all_mutations,
     check_repeat_mutation,
     remove_repeat_mutation,
