@@ -245,6 +245,10 @@ def remove_repeat_mutation(mutant: List[Mutation], keep: str= "last") -> List[Mu
         mutation_mapper[position_key] = mut
     return list(mutation_mapper.values())
 
+# == property getter ==
+def get_mutant_name_tag(mutant: List[Mutation]) -> str:
+    """get a string tag for the mutant"""
+    return f"_{'_'.join(str(i) for i in mutant)}"
 
 
 # == TODO ==

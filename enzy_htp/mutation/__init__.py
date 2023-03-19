@@ -14,6 +14,7 @@ from .mutation import (
     generate_all_mutations,
     check_repeat_mutation,
     remove_repeat_mutation,
+    get_mutant_name_tag,
 )
 
 from .mutation_restrictions import (

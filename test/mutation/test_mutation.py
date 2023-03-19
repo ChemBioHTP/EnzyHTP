@@ -164,6 +164,18 @@ def test_repr():
     mutation = mut.Mutation("ARG", "TRP", "A", 154)
     assert repr(mutation) == "('ARG','TRP','A',154)"
 
+def test_get_name_tag():
+    """test behavior of the function"""
+    test_mutant = [
+        mut.Mutation("ARG", "TRP", "A", 154),
+        mut.Mutation("ARG", "TRP", "B", 154),
+        mut.Mutation("LYS", "GLN", "A", 37),
+    ]
+
+    print(mut.get_mutant_name_tag(test_mutant))
+
+
+
 # == TODO ==
 def test_generate_all_mutations():
     """Testing that all possible mutations work for a simple, 1-residue structure."""
