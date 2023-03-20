@@ -230,6 +230,19 @@ class Structure(DoubleLinkedNode):
         result = list(filter(lambda r: r.name == name, self.residues))
         return result
 
+    def find_residue_with_key(self, key: Tuple[str, int]) -> Union[Residue, None]:
+        """find residues base on its (chain_id, idx). Return the matching residues"""
+        result = list(filter(lambda r: r.key() == key, self.residues))
+        if len(result) == 0:
+            _LOGGER.info(f"Didn't find any residue with key: {key}")
+            return None
+        if len(result) > 1:
+            _LOGGER.warning(
+                f"More than 1 residue with key: {key}. Only the first one is used. Check those residues:")
+            for i in result:
+                _LOGGER.warning(f"    {i}")
+        return result[0]
+
     @property
     def atoms(self) -> List[Atom]:
         """Accessor to get the atoms in the enzyme as a list of Atom objects."""

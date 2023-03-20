@@ -157,3 +157,17 @@ def test_deepcopy():
             assert res.parent is ch
             for atom in res:
                 assert atom.parent is res
+
+def test_find_residue_with_key(caplog):
+    """test function works as expected"""
+    pdb_file_path = f"{DATA_DIR}1Q4T_ligand_test.pdb"
+    stru: Structure = sp.get_structure(pdb_file_path)
+    res_a47 = stru.find_residue_with_key(("A", 47))
+    assert res_a47.name == "THR"
+    # warning case
+    res_a47.idx = 48
+    stru.find_residue_with_key(("A", 48))
+    assert "More than 1 residue with key: ('A', 48)" in caplog.text
+    # non case
+    assert not stru.find_residue_with_key(("A", 448))
+    assert "Didn't find any residue with key: ('A', 448)" in caplog.text
