@@ -105,7 +105,7 @@ class Chain(DoubleLinkedNode):
             if len(contain_list) == 1:
                 return contain_list[0]
             range_strs = ",".join(contain_list)
-            return ",".join(range_strs)
+            return range_strs
         return interval_list
 
     @property
