@@ -1,4 +1,6 @@
 """Stores mappers and testing functions for residue information. Much of this functionality is later used in 
+NOTE: using PDB style atom names as official atom naming scheme in EnzyHTP. Make atom name convertor for other
+    naming scheme.
 
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
@@ -548,6 +550,13 @@ See /resource/ProtonationState.cdx for more detail"""
 NOPROTON_LIST = ["ASP", "GLU", "MET"]
 """a list of residue name with no acidic proton"""
 
+RESIDUE_NON_MUTATE_ATOM_MAPPER: Dict[str, List[str]] = {
+    "default" : ["N", "H", "CA", "HA", "CB", "C", "O"],
+    "PRO" : ['N','CA','HA','CB','C','O'],
+    "GLY" : ['N','H','CA','C','O'],
+}
+"""a dictionary of atom names that won't change in a subsitution-mutation. Bascially mainchain+CB."""
+
 # yapf: enable
 
 
@@ -567,7 +576,7 @@ def convert_to_canonical_three_letter(three_letter: str) -> str:
     """Converts a one letter amino acid name to a three letter. If supplied code is invalid, raises an enzy_htp.core.InvalidResidueCode() exception."""
     if len(three_letter) != 3:
         raise InvalidResidueCode(
-            f"expecting one letter residue code. '{three_letter}' is invalid")
+            f"expecting three letter residue code. '{three_letter}' is invalid")
     three_letter = three_letter.upper()
     result = THREE_TO_THREE_LETTER_CAA_MAPPER.get(three_letter, None)
     if not result:
@@ -639,3 +648,17 @@ def polar(code: str) -> bool:
     """Determines if a one-letter nucleotide amino acid is polar. Returns True if it is non-polar."""
     # TODO(CJ): should probably check if it is a valid one letter residue code
     return not non_polar(code)
+
+def get_non_mutate_atom_names(residue_name: str) -> List[str]:
+    """get non_mutating atom names of the residue of the three-letter name
+    {residue_name}"""
+    if len(residue_name) != 3:
+        raise InvalidResidueCode(
+            f"expecting three letter residue code. '{residue_name}' is invalid")
+    residue_name = residue_name.upper()
+    result = RESIDUE_NON_MUTATE_ATOM_MAPPER.get(
+        residue_name,
+        RESIDUE_NON_MUTATE_ATOM_MAPPER["default"])
+
+    return result
+    

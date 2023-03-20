@@ -60,3 +60,16 @@ def get_default_deproton_info(residue: Residue,
         )
         return None, None
     return target_atom_depro_info
+
+
+def remove_side_chain_atom(residue: Residue, remove_cb: bool= False) -> None:
+    """remove side chain atoms of the residue.
+    make changes in place"""
+    # atoms to keep
+    non_mutate_atom_names = chem.residue.get_non_mutate_atom_names(residue.name)
+    if "CB" in non_mutate_atom_names and remove_cb:
+        non_mutate_atom_names.remove("CB")
+    
+    # remove the rest atoms
+    residue.remove_atoms_not_in_list(non_mutate_atom_names)
+ 
