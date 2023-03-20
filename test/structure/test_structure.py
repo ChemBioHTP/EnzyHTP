@@ -142,3 +142,18 @@ def test_atoms():  # TODO(shaoqz) wait for test
     TEST_FILE = f"{TEST_DIR}/preparation/data/3NIR.pdb"
     struct: Structure = PDBParser().get_structure(TEST_FILE)
     assert struct.atoms
+
+def test_deepcopy():
+    """test the hehavior of copy.deepcopy on Structure()
+    context"""
+    stru = PDBParser().get_structure(f"{DATA_DIR}12E8_small_four_chain.pdb")
+    new_stru = deepcopy(stru)
+    # ensure the list is new
+    assert id(stru) != id(new_stru)
+    # ensure children are pointing to the parent
+    for ch in new_stru.chains:
+        assert ch.parent is new_stru
+        for res in ch:
+            assert res.parent is ch
+            for atom in res:
+                assert atom.parent is res
