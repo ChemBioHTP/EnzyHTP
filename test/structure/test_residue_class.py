@@ -2,6 +2,7 @@
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-19
 """
+import copy
 import itertools
 import os
 import pytest
@@ -158,3 +159,12 @@ def test_renumber_atoms_bad_input():
 
     assert exe.type == SystemExit
     assert exe.value.code == 1
+
+def test_remove_atoms_not_in_list():
+    """test function works as expected"""
+    test_residue = copy.deepcopy(RESIDUES[1])
+    test_keep_list = ["C", "H", "CA", "N", "O"]
+    assert test_residue.num_atoms == 14
+    test_residue.remove_atoms_not_in_list(test_keep_list)
+    assert test_residue.num_atoms == 5
+    assert set(test_residue.atom_name_list) == set(test_keep_list)

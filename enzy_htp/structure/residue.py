@@ -7,6 +7,7 @@ Date: 2022-03-19
 """
 # TODO(CJ): figure out how to inherit docstrings to the children classes.
 from __future__ import annotations
+import copy
 import sys
 import numpy as np
 from collections import defaultdict
@@ -237,6 +238,15 @@ class Residue(DoubleLinkedNode):
         for idx, aa in enumerate(self._atoms):
             self._atoms[idx].atom_number = idx + start  #@shaoqz: why dont use aa?
         return idx + start
+
+    def remove_atoms_not_in_list(self, keep_name_list: List[str]):
+        """remove atoms that do not in the name list of keeping.
+        Make change in place"""
+        ref_atom_list: List[Atom] = copy.copy(self.atoms)
+        for atom in ref_atom_list:
+            if atom.name not in keep_name_list:
+                _LOGGER.debug(f"deleting {atom}")
+                atom.delete_from_parent()
 
     #endregion
 
