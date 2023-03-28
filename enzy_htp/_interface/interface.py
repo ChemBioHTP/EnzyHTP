@@ -15,6 +15,7 @@ from .amber_interface import AmberInterface
 from .gaussian_interface import GaussianInterface
 from .multiwfn_interface import MultiwfnInterface
 from .pymol_interface import PyMOLInterface
+from .rosetta_interface import RosettaInterface
 
 from enzy_htp._config import Config
 
@@ -28,6 +29,7 @@ class Interface:
         gaussian: Corresponds to instnce of GaussianInterface().
         multiwfn: Corresponds to instance of MultiwfnInterface().
         pymol: Corresponds to instance of PyMOLInteface().
+        rosetta: Corresponds to instance of RosettaInterface().
     """
 
     def __init__(self, config: Config):
@@ -35,3 +37,4 @@ class Interface:
         self.gaussian = GaussianInterface(config._gaussian)
         self.multiwfn = MultiwfnInterface(config._multiwfn)
         self.pymol = PyMOLInterface(config._pymol)
+        self.rosetta = RosettaInterface(config._rosetta)

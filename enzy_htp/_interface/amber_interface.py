@@ -1,5 +1,5 @@
 """Defines an AmberInterface class that serves as a bridge for enzy_htp to utilize AmberMD software. Uses the AmberConfig class
-found in enzy_htp/molecular_mechanics/amber_config.py. Supported operations include minimization, 
+found in enzy_htp/_config/amber_config.py. Supported operations include minimization, 
 heating, constant pressure production, and constant pressure equilibration.
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
