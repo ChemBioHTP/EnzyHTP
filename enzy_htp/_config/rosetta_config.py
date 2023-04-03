@@ -13,10 +13,15 @@ from copy import deepcopy
 class RosettaConfig:
     """ """
 
-    pass
+
+
+    ROSETTA_SCRIPTS:str = "rosetta_scripts.default.linuxgccrelease"#TODO(CJ): I think I need to change this
+    """ """
+
     def required_executables(self) -> List[str]:
         """A hardcoded list of required executables for Rosetta."""
         return [
+            self.ROSETTA_SCRIPTS
         ]
 
     def required_env_vars(self) -> List[str]:
