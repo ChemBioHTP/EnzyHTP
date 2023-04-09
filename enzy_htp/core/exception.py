@@ -58,3 +58,8 @@ class InvalidMutationFlagSyntax(InvalidMutationPatternSyntax):
 class InvalidMutation(Exception):
     """Exception corresponding to an invalid mutation in enzy_htp.mutation.mutation"""
     pass
+
+class EnvMissingExecutable(Exception):
+    """Exception corresponding attempts of running a command with missing exe in the environment
+    in enzy_htp.core.env_manager.run_command()"""
+    pass

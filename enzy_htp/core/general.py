@@ -29,9 +29,9 @@ Author: QZ Shao, <shaoqz@icloud.com>
 Date: 2022-10-21
 """
 import copy
+import time
 import numpy as np
 from typing import List, Iterable, Tuple, Dict
-from time import perf_counter
 import itertools
 
 from .logger import _LOGGER
@@ -148,11 +148,19 @@ def timer(fn):
     """decodator for timing the run of the function {fn}"""
 
     def inner(*args, **kwargs):
-        start_time = perf_counter()
+        start_time = time.perf_counter()
         to_execute = fn(*args, **kwargs)
-        end_time = perf_counter()
+        end_time = time.perf_counter()
         execution_time = end_time - start_time
         _LOGGER.info("{0} took {1:.8f}s to execute".format(fn.__name__, execution_time))
         return to_execute
 
     return inner
+
+def get_localtime(time_stamp: float = None) -> str:
+    """function that default return current locat time as formatted string.
+    covert the {time_stamp} to localtime if provided"""
+    if time_stamp is None:
+        return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+    else:
+        return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time_stamp))

@@ -6,15 +6,18 @@ Date: 2022-02-12
 """
 import os
 import shutil
-from typing import List
-from subprocess import run
+import time
+from typing import List, Union
+from subprocess import CompletedProcess, SubprocessError, run
+
+from enzy_htp.core.general import get_localtime
 
 from .logger import _LOGGER
-from .exception import MissingEnvironmentElement
+from .exception import EnvMissingExecutable, MissingEnvironmentElement
 
 
 class EnvironmentManager:
-    """Serves as general interface between module and the current computer environment.
+    """Serves as general interface between module and the current computer environment (shell).
     Checks whether given applications and environment variables are set in the current environment.
     After check, stores names of executables.
     Serves as interfrace for running commands on system.
@@ -35,6 +38,7 @@ class EnvironmentManager:
         self.missing_env_vars_ = []
         self.missing_executables_ = []
 
+    #region ==environment related==
     def add_executable(self, exe_name: str) -> None:
         """Adds the name of an executable to check for."""
         self.executables_.append(exe_name)
@@ -97,27 +101,85 @@ class EnvironmentManager:
     def is_missing(self) -> bool:
         """Checks if any executables or environment variables are missing."""
         return len(self.missing_executables_) or len(self.missing_env_vars_)
+    #endregion
 
-    def run_command(self, exe: str, args: List[str]) -> List[str]:
-        """Interface to run a command with the exectuables specified by exe as well as a list of arguments."""
-        cmd = f"{self.mapper.get(exe,exe)} {' '.join(args)}"
+    #region ==shell command==
+    def run_command(self,
+                    exe: str,
+                    args: Union[str, List[str]],
+                    try_time: int= 1,
+                    wait_time: float= 3.0,
+                    timeout: Union[None, float]= None,
+                    stdout_return_only: bool= False) -> CompletedProcess:
+        """Interface to run a command with the exectuables specified by exe as well as a list of arguments.
+        Args:
+            exe:
+                the target exectuables of runnnig.
+                !NOTE! Need to register in the corresponding config.required_executables() first.
+            args:
+                the arguments used for the command. str or list of str
+            try_time:
+                how many time this command will try if fail with SubprocessExceptions.
+                This is useful when the command is run on a HPC which have time-dependent unrepeatable error.
+            wait_time:
+                the time interval between each retry (used when retry_num > 1)
+                (Unit: s)
+            timeout:
+                how long the command is allowed to run.
+                (do not set this if the command is supposed to take long like "pmemd",
+                use this when the command is supposed to be fast like "squeue" but may take long time if there
+                are some unrepeatable error thus allow taking next retry earlier.)
+                (Unit: s)
+
+        Returns:
+            return the CompletedProcess object
+
+        Raises:
+            EnvMissingExecutable
+            SystemExit
+            """
+        if isinstance(args, list):
+            args = " ".join(args)
+        cmd = f"{self.mapper.get(exe,exe)} {args}"
+
+        # handle missing exe
         if exe in self.missing_executables_ or not self.__exe_exists(exe):
             _LOGGER.error(
                 f"This environment is missing '{exe}' and cannot run the command '{cmd}'")
             _LOGGER.error(f"Exiting...")
-            exit(1)
+            raise EnvMissingExecutable
+        if exe not in self.mapper:
+            _LOGGER.warning(
+                f"(dev-only) Using unregistered executable: '{exe}'")
+            _LOGGER.warning(
+                f"    Please add it to corresponding config.required_executables if this is a long-term use")
+
+        # run the command
         _LOGGER.info(f"Running command: '{cmd}'...")
-        try:
-            result = run(cmd, shell=True, capture_output=True, check=True)
-            res_lines = list(
-                map(lambda ss: ss.decode("utf-8"), result.stdout.splitlines()))
-            _LOGGER.info(f"Command run!")
-        except Exception as e:
-            _LOGGER.error(
-                f"Following error was raised during command excecution: '{e}'. Exiting..."
-            )
-            exit(1)
-        return res_lines
+        for i in range(try_time):
+            try:
+                this_run = run(cmd, timeout=timeout, check=True,  text=True, shell=True, capture_output=True)
+                _LOGGER.debug("Command finished!")
+            except SubprocessError as e:
+                this_error = e
+                _LOGGER.warning(f"Error running {cmd}: {repr(e)}")
+                _LOGGER.warning(f"    stderr: {str(e.stderr).strip()}")
+                _LOGGER.warning(f"    stdout: {str(e.stdout).strip()}")
+                if try_time > 1:
+                    _LOGGER.warning(f"trying again... ({i+1}/{try_time})")
+            else: # untill there's no error
+                _LOGGER.info(f"finished {cmd} after {i+1} tries @{get_localtime()}")
+                if stdout_return_only:
+                    return str(this_run.stdout).strip()
+                else:
+                    return this_run
+            # wait before next try
+            time.sleep(wait_time)
+
+        # exceed the try time
+        _LOGGER.error(f"Failed running `{cmd}` after {try_time} tries @{get_localtime()}")
+        raise this_error
+    #endregion
 
     def __getattr__(self, key: str) -> str:
         """Allows accession into acquired executables."""
