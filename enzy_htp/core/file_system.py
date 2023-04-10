@@ -122,7 +122,7 @@ def write_data(outfile: str, tag: Any, data: Dict) -> str:
 
 
 def get_valid_temp_name(fname: str) -> None:
-    """find a vaild name for a temp file"""
+    """find a vaild name for a temp file. add a index if name exist"""
     idx = 0
     suffix = ''.join(Path(fname).suffixes)
     result_fname = fname
@@ -130,3 +130,14 @@ def get_valid_temp_name(fname: str) -> None:
         idx += 1
         result_fname = f"{fname[:-len(suffix)]}_{str(idx)}{suffix}"
     return result_fname
+
+def clean_temp_file_n_dir(temp_path_list: List[str]) -> None:
+    """clean temporary files created by EnzyHTP functions.
+    removes file first and then dirs"""
+    if _LOGGER.level > 10:  # not DEBUG or below
+        dir_list = filter(os.path.isdir, temp_path_list)
+        file_list = filter(os.path.isfile, temp_path_list)
+        for file_path in file_list:
+            safe_rm(file_path)
+        for dir_path in dir_list:
+            safe_rmdir(dir_path)
