@@ -128,14 +128,18 @@ def protonate_peptide_with_pdb2pqr(stru: Structure,
     """
     sp = PDBParser()
     # manage the temp file path
+    temp_path_list = []
+    scratch_dir = config["system.SCRATCH_DIR"]
     if int_pdb_path is None:
-        fs.safe_mkdir(config["system.SCRATCH_DIR"])  # make them together into make_temp_file
+        fs.safe_mkdir(scratch_dir)  # make them together into make_temp_file
         int_pdb_path = fs.get_valid_temp_name(
-            f"{config['system.SCRATCH_DIR']}/protonate_peptide_with_pdb2pqr_input.pdb")
+            f"{scratch_dir}/protonate_peptide_with_pdb2pqr_input.pdb")
+        temp_path_list.extend([scratch_dir, int_pdb_path])
     if int_pqr_path is None:
-        fs.safe_mkdir(config["system.SCRATCH_DIR"])
+        fs.safe_mkdir(scratch_dir)
         int_pqr_path = fs.get_valid_temp_name(
-            f"{config['system.SCRATCH_DIR']}/protonate_peptide_with_pdb2pqr_output.pdb")
+            f"{scratch_dir}/protonate_peptide_with_pdb2pqr_output.pdb")
+        temp_path_list.extend([scratch_dir, int_pqr_path])
     if fs.get_file_ext(int_pqr_path) == ".pqr":
         _LOGGER.warning(
             f"changing {int_pqr_path} extension to pdb. This filename now changes.")
@@ -157,9 +161,8 @@ def protonate_peptide_with_pdb2pqr(stru: Structure,
     protonate_peptide_fix_metal_donor(stru, method=metal_fix_method)
 
     # clean up temp files
-    if _LOGGER.level > 10:  # not DEBUG or below
-        fs.safe_rm(int_pdb_path)
-        fs.safe_rm(int_pqr_path)
+    fs.clean_temp_file_n_dir(list(set(temp_path_list)))
+
     return stru
 
 # PDB2PQR interface (NOTE: group to _interface when more PDB2PQR is needed)

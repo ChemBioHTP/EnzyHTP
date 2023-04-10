@@ -110,9 +110,28 @@ def test_protonate_peptide_with_pdb2pqr_no_metal():
     assert len(stru.find_residue_name("HIS")) == 0
     assert len(stru.find_residue_name("HID")) == 10
     assert len(stru.find_residue_name("HIE")) == 2
+    assert os.path.exists(int_pqr) # if specified, it should be preserved
+    assert os.path.exists(int_pdb)
+    fs.safe_rm(int_pqr)
+    fs.safe_rm(int_pdb)
+
+def test_protonate_peptide_with_pdb2pqr_remove_temp():
+    """test that protonate_peptide_with_pdb2pqr() works removing temp file"""
+    test_pdb = f"{DATA_DIR}/1Q4T_cofactor_2chain_not_from_1.pdb"
+    scratch_dir = config["system.SCRATCH_DIR"]
+    int_pdb = f"{scratch_dir}/protonate_peptide_with_pdb2pqr_input.pdb"
+    int_pqr = f"{scratch_dir}/protonate_peptide_with_pdb2pqr_output.pdb"
+
+    fs.safe_rm(int_pdb)
+    fs.safe_rm(int_pqr)
+
+    assert not os.path.exists(int_pdb)
+    assert not os.path.exists(int_pqr)
+
+    stru = sp.get_structure(test_pdb)
+    prot.protonate_peptide_with_pdb2pqr(stru, 7.0)
     assert not os.path.exists(int_pqr)
     assert not os.path.exists(int_pdb)
-
 
 def test_protonate_peptide_with_pdb2pqr_metal():
     """test that protonate_peptide_with_pdb2pqr() works without exceptions"""
@@ -128,9 +147,10 @@ def test_protonate_peptide_with_pdb2pqr_metal():
         map(lambda r: r.name,
             stru.metalcenters[0].get_donor_mapper())) == ["GLU", "CYM", "CYM", "CYM"]
     assert len(stru.atoms) == 5353  # removed 5 atoms
-    assert not os.path.exists(int_pqr)
-    assert not os.path.exists(int_pdb)
-
+    assert os.path.exists(int_pqr) # if specified, it should be preserved
+    assert os.path.exists(int_pdb)
+    fs.safe_rm(int_pqr)
+    fs.safe_rm(int_pdb)
 
 def test_pdb2pqr_protonate_pdb_FAcD():
     """Making sure the protonate_pdb() method works for the FAcD enzyme system."""
