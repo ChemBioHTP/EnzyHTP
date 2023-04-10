@@ -140,4 +140,4 @@ def clean_temp_file_n_dir(temp_path_list: List[str]) -> None:
         for file_path in file_list:
             safe_rm(file_path)
         for dir_path in dir_list:
-            safe_rmdir(dir_path)
+            safe_rmdir(dir_path, empty_only=True)

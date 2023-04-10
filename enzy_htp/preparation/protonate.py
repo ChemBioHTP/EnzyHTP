@@ -276,13 +276,9 @@ def protonate_ligand_with_pybel(stru: Structure,
         ref_ligand = sp.get_structure(int_pybel_file_path).ligands[0]
         stru_oper.update_residues(ligand, ref_ligand)
         # clean up temp files
-        if _LOGGER.level > 10:  # not DEBUG or below
-            fs.safe_rm(int_ligand_file_path)
-            fs.safe_rm(int_pybel_file_path)
+        fs.clean_temp_file_n_dir([int_ligand_file_path, int_pybel_file_path])
+    fs.clean_temp_file_n_dir([int_ligand_file_dir])
 
-    if _LOGGER.level > 10:  # not DEBUG or below
-        fs.safe_rmdir(int_ligand_file_dir,
-                      empty_only=True)  #prevent remove the entire scratch
     return stru
 
 # PYBEL interface
@@ -310,8 +306,7 @@ def pybel_protonate_pdb_ligand(in_path: str, out_path: str, ph: float = 7.0) -> 
     # fix atom label and residue name
     _fix_pybel_output(int_path, out_path, in_path)
 
-    if _LOGGER.level > 10:  # not DEBUG or below
-        fs.safe_rm(int_path)
+    fs.clean_temp_file_n_dir([int_path])
     return out_path
 
 

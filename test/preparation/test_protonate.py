@@ -9,6 +9,7 @@ import numpy as np
 from enzy_htp import core as cc
 from enzy_htp.core import file_system as fs
 from enzy_htp import config
+from enzy_htp.core.logger import _LOGGER
 import enzy_htp.structure as struct
 import enzy_htp.structure.structure_operation as stru_oper
 from enzy_htp.preparation import protonate as prot
@@ -97,6 +98,7 @@ def test_protonate_peptide_with_pdb2pqr_no_metal():
     test_pdb = f"{DATA_DIR}/1Q4T_cofactor_2chain_not_from_1.pdb"
     int_pdb = f"{WORK_DIR}/1Q4T_cofactor_2chain_not_from_1_in.pdb"
     int_pqr = f"{WORK_DIR}/1Q4T_cofactor_2chain_not_from_1_out.pdb"
+    fs.safe_mkdir(WORK_DIR)
 
     fs.safe_rm(int_pdb)
     fs.safe_rm(int_pqr)
@@ -130,14 +132,16 @@ def test_protonate_peptide_with_pdb2pqr_remove_temp():
 
     stru = sp.get_structure(test_pdb)
     prot.protonate_peptide_with_pdb2pqr(stru, 7.0)
-    assert not os.path.exists(int_pqr)
-    assert not os.path.exists(int_pdb)
+    if _LOGGER.level > 10:
+        assert not os.path.exists(int_pqr)
+        assert not os.path.exists(int_pdb)
 
 def test_protonate_peptide_with_pdb2pqr_metal():
     """test that protonate_peptide_with_pdb2pqr() works without exceptions"""
     test_pdb = f"{DATA_DIR}/1NVG_metalcenter_noligand.pdb"
     int_pdb = f"{WORK_DIR}/1NVG_metalcenter_noligand_in.pdb"
     int_pqr = f"{WORK_DIR}/1NVG_metalcenter_noligand_out.pdb"
+    fs.safe_mkdir(WORK_DIR)
     # assert not os.path.exists(int_pdb)
     # assert not os.path.exists(int_pqr)
 
@@ -265,7 +269,8 @@ def test_fix_pybel_output():
 
 
 def test_protonate_stru_imputed():
-    """Testing the protonate_stru() method for a structure that has been imputed."""
+    """Testing the protonate_stru() method for a structure that has been imputed.
+    TODO: those files are missing @CJ"""
     pdb_file = f"{DATA_DIR}/5k7u_imputed.pdb"
     stru = sp.get_structure(pdb_file)
     prot.protonate_stru(stru)

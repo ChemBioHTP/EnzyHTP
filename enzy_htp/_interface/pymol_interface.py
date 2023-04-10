@@ -11,7 +11,7 @@ Date: 2022-02-15
 
 from typing import Tuple, List
 
-from enzy_htp import config as project_config
+from enzy_htp import config as eh_config
 from enzy_htp.core import env_manager as em
 from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
@@ -63,7 +63,7 @@ class PyMolInterface:
 
         # create temp PDB
         pdb_str = PDBParser().get_file_str(stru, if_renumber=False)
-        temp_dir = project_config["system.SCRATCH_DIR"]
+        temp_dir = eh_config["system.SCRATCH_DIR"]
         temp_pdb_path = fs.get_valid_temp_name(f"{temp_dir}/temp_pymol_interface.pdb")
         fs.safe_mkdir(temp_dir)
         with open(temp_pdb_path, "w") as f:
@@ -73,9 +73,7 @@ class PyMolInterface:
         pymol_session.cmd.load(temp_pdb_path, pymol_obj_name)
 
         # clean up temp PDB
-        if _LOGGER.level > 10:  # not DEBUG or below
-            fs.safe_rm(temp_pdb_path)
-            fs.safe_rmdir(temp_dir, empty_only=True)
+        fs.clean_temp_file_n_dir([temp_dir, temp_pdb_path])
 
         return (pymol_obj_name, pymol_session)
 

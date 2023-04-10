@@ -8,6 +8,8 @@ from pathlib import Path
 
 from enzy_htp import interface
 from enzy_htp import PDBParser
+from enzy_htp import config as eh_config
+from enzy_htp.core.logger import _LOGGER
 
 BASE_DIR = Path(__file__).absolute().parent
 DATA_DIR = f"{BASE_DIR}/data/"
@@ -24,6 +26,9 @@ def test_load_enzy_htp_stru():
     assert test_stru.chain_names == session.cmd.get_chains(pymol_obj_name)
     assert len(
         session.cmd.get_model(pymol_obj_name).get_residues()) == test_stru.num_residues
+    #temp files
+    if _LOGGER.level > 10:
+        assert not os.path.exists(f"{eh_config['system.SCRATCH_DIR']}/temp_pymol_interface.pdb")
 
 
 def test_load_enzy_htp_stru_not_start_from_one():
