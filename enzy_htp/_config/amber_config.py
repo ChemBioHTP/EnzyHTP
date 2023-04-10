@@ -145,7 +145,7 @@ class AmberConfig:
             self.CPU_ENGINE,
             self.GPU_ENGINE,
             "tleap",
-            "ampdb",
+            "ambpdb",
             "parmchk2",
             "antechamber",
             "cpptraj",

@@ -54,7 +54,7 @@ def test_required_executables():
     """Checking that the AmberConfig.required_executables() has the correct values."""
     ac1: ac.AmberConfig = ac.default_amber_config()
     assert ac1.required_executables() == [
-        "sander", "pmemd.cuda", "tleap", "ampdb", "parmchk2", "antechamber", "cpptraj"
+        "sander", "pmemd.cuda", "tleap", "ambpdb", "parmchk2", "antechamber", "cpptraj"
     ]
 
 
