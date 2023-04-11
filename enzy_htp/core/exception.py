@@ -63,3 +63,14 @@ class EnvMissingExecutable(Exception):
     """Exception corresponding attempts of running a command with missing exe in the environment
     in enzy_htp.core.env_manager.run_command()"""
     pass
+
+class tLEaPError(Exception):
+    """Exception corresponding runtime error of tleap in enzy_htp._interface.amber_interface.run_tleap()
+    contains a list of error information"""
+    def __init__(self, error_info_list, *args) -> None:
+        super().__init__(*args)
+        self.error_info_list = error_info_list
+
+    @property
+    def error_info_str(self) -> str:
+        return "\n".join(self.error_info_list)

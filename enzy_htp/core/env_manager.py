@@ -155,7 +155,7 @@ class EnvironmentManager:
                 f"    Please add it to corresponding config.required_executables if this is a long-term use")
 
         # run the command
-        _LOGGER.info(f"Running command: '{cmd}'...")
+        _LOGGER.info(f"Running command: `{cmd}`...")
         for i in range(try_time):
             try:
                 this_run = run(cmd, timeout=timeout, check=True,  text=True, shell=True, capture_output=True)
@@ -168,7 +168,7 @@ class EnvironmentManager:
                 if try_time > 1:
                     _LOGGER.warning(f"trying again... ({i+1}/{try_time})")
             else: # untill there's no error
-                _LOGGER.info(f"finished {cmd} after {i+1} tries @{get_localtime()}")
+                _LOGGER.info(f"finished `{cmd}` after {i+1} tries @{get_localtime()}")
                 if stdout_return_only:
                     return str(this_run.stdout).strip()
                 else:

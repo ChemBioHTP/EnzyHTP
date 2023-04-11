@@ -8,6 +8,7 @@ Date: 2022-06-02
 import re, os
 import shutil
 from pathlib import Path
+from subprocess import CalledProcessError
 from typing import List, Tuple, Union, Dict, Any
 
 import pandas as pd
@@ -16,10 +17,11 @@ from biopandas.pdb import PandasPdb
 from ..core.logger import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import env_manager as em
-from enzy_htp.core.exception import UnsupportedMethod
+from enzy_htp.core.exception import UnsupportedMethod, tLEaPError
 import enzy_htp.structure as struct
 import enzy_htp.preparation as prep
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
+from enzy_htp import config as eh_config
 
 
 class AmberInterface:
@@ -43,11 +45,12 @@ class AmberInterface:
             self.config_ = default_amber_config()
         self.env_manager_ = em.EnvironmentManager(
             env_vars=self.config_.required_env_vars(),
-            exectubles=self.config_.required_executables(),
+            executables=self.config_.required_executables(),
         )
         self.env_manager_.check_environment()
         self.compatible_env_ = self.env_manager_.is_missing()
 
+    # == interface general == TODO: go to a class
     def config(self) -> AmberConfig:
         """Getter for the AmberConfig() instance belonging to the class."""
         return self.config_
@@ -63,6 +66,7 @@ class AmberInterface:
         """
         return self.compatible_env_
 
+    # == minimization-related? ==
     def write_minimize_input_file(self, fname: str, cycle: int) -> None:
         """Creates a minimization file to be used in an amber run. SHOULD NOT BE CALLED BY USERS DIRECTLY.
         All parameters in the &ctrl block are hardcoded except for ncyc and ntpr, which are 0.5*cycle
@@ -535,58 +539,79 @@ class AmberInterface:
 
         return prod_nc
 
-    def mutate(self, outfile: str) -> None:
-        """Method that uses tleap to apply the mutations described in the supplied outfile
-        to that file. Because tleap writes the modified version to another file, the destination
-        file with name 'outfile.tmp.pdb' is copied over the outfile name. As a result there
-        may be additional files in the local directory when problems occur.
+    def run_tleap(self,
+                  tleap_in_str: str,
+                  # cmd based
+                  if_ignore_start_up: bool= True,
+                  additional_search_path: List[str]= None,
+                  tleap_out_path: str = None,
+                  # addition operation
+                  if_align_index: bool= False,
+                  ) -> None:
+        """the python wrapper of running tleap
         Args:
-            outfile: The name of the modified .pdb file that needs to be treated with tleap.
-        """
+            tleap_in_str: the str content of leap.in file
+            if_ignore_start_up: if adding the '-s' flag to
+                ignore leaprc startup file.
+            additional_search_path: list of addition search path of
+                leaprc files. Each path in the list will be applied using
+                a '-I' flag
+            tleap_out_path: file path for stdout of the tleap command.
+                the _LOGGER level determines if delete the file
+            if_align_index: if or not align the residue index before and after
+                tleap process. (tleap will renumber the PDB from 1)"""
+        temp_path_list = []
+        # init file paths
+        fs.safe_mkdir(eh_config["system.SCRATCH_DIR"])
+        tleap_in_path = fs.get_valid_temp_name(
+            f"{eh_config['system.SCRATCH_DIR']}/tleap.in")
+        temp_path_list.extend([eh_config["system.SCRATCH_DIR"], tleap_in_path])
+        if tleap_out_path is None:
+            tleap_out_path = fs.get_valid_temp_name(
+                f"{eh_config['system.SCRATCH_DIR']}/tleap.out")
+            temp_path_list.append(tleap_out_path)
+        # write tleap.in
+        with open(tleap_in_path, "w") as of:
+            of.write(tleap_in_str)
+        # run tleap command
+        try:
+            self.env_manager_.run_command(
+                "tleap",
+                f"-s -f {tleap_in_path} > {tleap_out_path}")
+        except CalledProcessError as e:
+            if (not e.stderr.strip()) and (not e.stdout.strip()): # empty stderr & stdout
+                # find the error information in tleap.out
+                new_e = self._find_tleap_error(tleap_out_path)
+                # express the error
+                for e_info in new_e.error_info_list:
+                    _LOGGER.error(e_info)
+                raise new_e from e
 
-        def renumber_pdb(opdb: str, npdb: str) -> None:
-            """Helper method that renumbers the residue chain id's and residue numbers in the
-            new structure found in npdb to the original values found in the opdb structure file.
-            TODO(CJ): This may need to get moved elsewhere since it has use elsewhere.
-            Args:
-                opdb: The name of the original .pdb file.
-                npdb: The name of the new .pdb file.
-            """
+        # align index
+        
+        # clean up temp file if success
+        fs.clean_temp_file_n_dir(temp_path_list)
 
-            def get_all_keys(pdb: str) -> List[Tuple[str, str]]:
-                df: pd.DataFrame = PandasPdb().read_pdb(pdb).df["ATOM"]
-                return sorted(list(set(list(zip(df.chain_id, df.residue_number)))))
+    @staticmethod
+    def _find_tleap_error(tleap_out_path: str) -> tLEaPError:
+        """an internal used function that find the text describing the error
+        from a tleap output file
+        Return a tLEaPError containing all the error information"""
+        error_info_pattern = r"(.*(?:FATAL|Fatal).*\n(?:.*\n)+?)(?:(?:Exiting LEaP:)|/)"
+        with open(tleap_out_path) as f:
+            error_info_list = re.findall(error_info_pattern, f.read())
+            error_info_list = [i.strip() for i in error_info_list]
+            if not error_info_list:
+                _LOGGER.warning("did not found any error in tleap out file. Here is the complete output:")
+                _LOGGER.warning(f.read())
 
-            okeys, nkeys = get_all_keys(opdb), get_all_keys(npdb)
-            assert len(okeys) == len(nkeys)
-            mapper = dict(zip(nkeys, okeys))
-            nlines: List[prep.PDBLine] = prep.read_pdb_lines(npdb)
-            for nl in nlines:
-                if not nl.is_ATOM():
-                    continue
-                (n_chain, n_rid) = mapper[(nl.chain_id.strip(), int(nl.resi_id))]
-                # TODO(CJ): this should be done in the oop part of the PDBLine;
-                raw = nl.line
-                nl.line = f"{raw[0:21]}{n_chain}{n_rid: >4}{raw[26:]}"
-                # print(n_chain, n_rid)
-                # print(nl.__dict__);exit( 0 )
-            fs.write_lines(npdb, list(map(lambda pl: pl.line, nlines)))
+        return tLEaPError(error_info_list)
 
-        work_dir: str = str(Path(outfile).parent)
-        leap_in: str = f"{work_dir}/leap_mutate.in"
-        leap_out: str = f"{work_dir}/leap_mutate.out"
-        pdb_temp = str(Path(outfile).with_suffix(".tmp.pdb"))
-        leap_lines: List[str] = [
-            "source leaprc.protein.ff14SB",
-            f"a = loadpdb {outfile}",
-            f"savepdb a {pdb_temp}",
-            "quit",
-        ]
-        fs.write_lines(leap_in, leap_lines)
-        self.env_manager_.run_command("tleap", ["-s", "-f", leap_in, ">", leap_out])
-        renumber_pdb(outfile, pdb_temp)
-        shutil.move(pdb_temp, outfile)
-        fs.safe_rm("leap.log")
+    def _align_index_tleap_pdb(tleap_opdb: str, tleap_ipdb: str) -> None:
+        """align the residue and chain index for tleap output pdb from tleap input pdb.
+        used when run_tleap with if_align_index=True"""
+
+
 
     def nc2mdcrd(
         self,
@@ -819,3 +844,30 @@ class AmberInterface:
             )
             exit(1)
             pass
+
+    # == engines ==
+    # (engines for sciencs APIs)
+    def mutate(self, outfile: str) -> None: #TODO change name to canonicalize PDB
+        """Method that uses tleap to apply the mutations described in the supplied outfile
+        to that file. Because tleap writes the modified version to another file, the destination
+        file with name 'outfile.tmp.pdb' is copied over the outfile name. As a result there
+        may be additional files in the local directory when problems occur.
+        Args:
+            outfile: The name of the modified .pdb file that needs to be treated with tleap.
+        """
+
+        work_dir: str = str(Path(outfile).parent)
+        leap_in: str = f"{work_dir}/leap_mutate.in"
+        leap_out: str = f"{work_dir}/leap_mutate.out"
+        pdb_temp = str(Path(outfile).with_suffix(".tmp.pdb"))
+        leap_lines: List[str] = [
+            "source leaprc.protein.ff14SB",
+            f"a = loadpdb {outfile}",
+            f"savepdb a {pdb_temp}",
+            "quit",
+        ]
+        fs.write_lines(leap_in, leap_lines)
+        self.env_manager_.run_command("tleap", ["-s", "-f", leap_in, ">", leap_out])
+        renumber_pdb(outfile, pdb_temp)
+        shutil.move(pdb_temp, outfile)
+        fs.safe_rm("leap.log")
