@@ -1,5 +1,6 @@
 """Generation/construction of Structure objects from PDB files and exporting it vice versa
 Definition of PDB file format (http://www.wwpdb.org/documentation/file-format-content/format33/v3.3.html)
+Also contains util function that requires knoweledge of PDB format
 
 Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
 Date: 2022-08-01
@@ -8,7 +9,7 @@ from collections import defaultdict
 import os
 import string
 import sys
-from typing import Dict, List, Union
+from typing import Dict, List, Tuple, Union
 from plum import dispatch
 from biopandas.pdb import PandasPdb
 import pandas as pd
@@ -27,7 +28,6 @@ from ..chain import Chain
 from ..structure import Structure
 
 
-# pylint: disable=logging-fstring-interpolation
 class PDBParser(StructureParserInterface):
     """
     Parser for covert PDB into Structure and vice versa
@@ -709,3 +709,31 @@ class PDBParser(StructureParserInterface):
         dummy method for dispatch
         """
         pass
+
+# == util of PDB file handling ==
+def align_pdb_index(opdb: str, npdb: str) -> None:
+    """Helper method that renumbers the residue chain id's and residue numbers in the
+    new structure found in npdb to the original values found in the opdb structure file.
+    Args:
+        opdb: The name of the original .pdb file.
+        npdb: The name of the new .pdb file.
+    """
+
+    def get_all_keys(pdb: str) -> List[Tuple[str, str]]:
+        df: pd.DataFrame = PandasPdb().read_pdb(pdb).df["ATOM"]
+        return sorted(list(set(list(zip(df.chain_id, df.residue_number)))))
+
+    okeys, nkeys = get_all_keys(opdb), get_all_keys(npdb)
+    assert len(okeys) == len(nkeys)
+    mapper = dict(zip(nkeys, okeys))
+    nlines: List[prep.PDBLine] = prep.read_pdb_lines(npdb)
+    for nl in nlines:
+        if not nl.is_ATOM():
+            continue
+        (n_chain, n_rid) = mapper[(nl.chain_id.strip(), int(nl.resi_id))]
+        # TODO(CJ): this should be done in the oop part of the PDBLine;
+        raw = nl.line
+        nl.line = f"{raw[0:21]}{n_chain}{n_rid: >4}{raw[26:]}"
+        # print(n_chain, n_rid)
+        # print(nl.__dict__);exit( 0 )
+    fs.write_lines(npdb, list(map(lambda pl: pl.line, nlines)))

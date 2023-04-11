@@ -17,7 +17,7 @@ from biopandas.pdb import PandasPdb
 from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
 import enzy_htp.chemical as chem
-from enzy_htp.structure.structure_io.pdb_io import PDBParser
+from enzy_htp.structure.structure_io.pdb_io import PDBParser, align_pdb_index
 from enzy_htp.structure.structure_io._interface import StructureParserInterface
 from enzy_htp.structure import (
     Structure,
@@ -630,3 +630,12 @@ def test_round_trip_pdb():
     assert equiv_files(TEST_FILE, actual_file, 60)
     fs.safe_rm(actual_file)
     assert not os.path.exists(actual_file)
+
+
+def test_align_pdb_index():
+    """test function works as expected"""
+    test_opdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
+    test_npdb = f"{DATA_DIR}KE_07_R7_2_S_tleap.pdb"
+
+    align_pdb_index(test_opdb, test_npdb)
+    
