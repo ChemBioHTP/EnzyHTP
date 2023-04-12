@@ -19,7 +19,7 @@ class RosettaConfig:
     ROSETTA_SCRIPTS:str = "rosetta_scripts.default.linuxgccrelease"#TODO(CJ): I think I need to change this
     """ """
 
-    PARAMS_SCRIPT:str=f"ROSETTA3/source/scripts/python/public/molfile_to_params.py"
+    PARAMS_SCRIPT:str=f"$ROSETTA3/source/scripts/python/public/molfile_to_params.py"
 
 
     def required_executables(self) -> List[str]:

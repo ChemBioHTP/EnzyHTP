@@ -1,4 +1,6 @@
-"""TODO
+"""Define BCLConfig() which holds configuration settings for enzy_htp to interface with the BCL
+software package. File also contains default_bcl_config() which creates a default version of 
+the BCLConfig() class.
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 
@@ -10,6 +12,12 @@ from copy import deepcopy
 
 
 class BCLConfig:
+    """Class that holds default values for running BCL within enzy_htp.
+
+    Attributes:
+        BCL : str() corresponding to the main bcl.exe application.
+
+    """
 
     BCL_EXE:str = "bcl.exe"
     """The main bcl executable."""

@@ -89,11 +89,11 @@ class EnvironmentManager:
 
     def check_environment(self) -> None:
         """Preferred client method for validating environment. Performs checks and logs output."""
-        _LOGGER.info("Checking environment for required elements...")
+        #_LOGGER.info("Checking environment for required elements...")
         self.check_env_vars()
         self.check_executables()
-        self.display_missing()
-        _LOGGER.info("Environment check completed!")
+        #self.display_missing()
+        #_LOGGER.info("Environment check completed!")
 
     def reset(self) -> None:
         """Resets internal lists of env vars and executables."""
@@ -105,6 +105,14 @@ class EnvironmentManager:
     def is_missing(self) -> bool:
         """Checks if any executables or environment variables are missing."""
         return len(self.missing_executables_) or len(self.missing_env_vars_)
+
+    def missing_executables(self) -> List[str]:
+        """Getter for the missing executables in the environment."""
+        return self.missing_executables_
+
+    def missing_env_vars(self) -> List[str]:
+        """Getter for the missing environment variables in the environment."""
+        return self.missing_env_vars_
 
     def run_command(self, exe: str, args: List[str]) -> List[str]:
         """Interface to run a command with the exectuables specified by exe as well as a list of arguments."""

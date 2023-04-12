@@ -223,7 +223,6 @@ class AmberConfig:
             # TODO(CJ): add a custom error for this part
             raise TypeError()
 
-
 def default_amber_config() -> AmberConfig:
     """Creates a deep-copied default version of the AmberConfig() class."""
     return deepcopy(AmberConfig())

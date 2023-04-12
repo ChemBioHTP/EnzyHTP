@@ -9,15 +9,24 @@ from pathlib import Path
 
 from typing import List, Dict, Any
 
+from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import env_manager as em
-from enzy_htp.core import _LOGGER
 
 from enzy_htp._config.pymol_config import PyMOLConfig, default_pymol_config
 
 
+#TODO(CJ): add something to remove "PyMOL not running. Entering library mode (experimental" message on pymol running
+
 class PyMOLInterface:
     """
+
+
+    Attributes:
+        cmd : 
+        config_ : 
+        env_manager_ : 
+        compatible_env_ : 
     """
 
     def __init__(self, config: PyMOLConfig = None) -> None:
@@ -37,6 +46,50 @@ class PyMOLInterface:
         """Getter for the PyMOLConfig() instance belonging to the class."""
         return self.config_
 
+    def convert(self, file_1:str, file_2:str=None, new_ext:str=None) -> str:
+        """Method that converts a supplied file to a different format. Either a new filename or new file 
+        extension can be supplied. If neither or both are supplied, then the function will exist. Note
+        that the function does not check for valid file types and will catch any errors that are thrown
+        if an invalid file_1 or output file combination is supplied. Returns the new outfile.
+
+        Args:
+            file_1 : The name of the original file as a str().
+            file_2 : The name of the output file as a str(). Optional.
+            new_ext : The new extension to use. Optional.
+
+        Returns:
+            The name of the new file as a str().
+        """
+        
+        fs.check_file_exists( file_1 )
+
+        if (not file_2 and not new_ext) :
+            _LOGGER.error("Either a new file name or target extension must be supplied. Both are empty. Exiting...")
+            exit( 1 )
+
+        if file_2 and new_ext:
+            _LOGGER.error("Either a new file name or target extension must be supplied. Both were supplied. Exiting...")
+            exit( 1 )
+
+        if not file_2:
+            fpath = Path( file_1 )
+            file_2 = fpath.with_suffix( new_ext )
+
+
+        try:
+            self.cmd.delete('all')
+            self.cmd.load(file_1)
+            self.cmd.save(file_2)
+            self.cmd.delete('all')
+        except:
+            _LOGGER.error(f"Could not convert '{file_1}' to '{file_2}'. Exiting...")
+            exit( 1 )
+
+        return str( file_2 )
+
+
+
+
     def supported_file_type(self, fname: str) -> bool:
         """Convenience function that checks if a listed filetype is supported by 
         the PyMOLInterface. Currently supported filetypes include:
@@ -50,6 +103,7 @@ class PyMOLInterface:
         Returns:
             Whether the file type is supported.
         """
+        #TODO(CJ): need to check which file formats are actually supported
         extension: str = Path(fname).suffix
         return extension in self.config().IO_EXTENSIONS
 
@@ -116,3 +170,30 @@ class PyMOLInterface:
 
         lines = list(filter(lambda ll: ll[0] != '>', lines))
         return ''.join(lines)
+
+    def de_protonate(self, molfile : str, new_file:str=None) -> str:
+        """Method that deprotonates the structure supplied by molife, saving it to a new file. 
+        If no new_file is supplied, original file <name>.<ext> will be saved to <name>_deprotonated.<ext>
+
+        Args:
+            molfile: The name of the input file.
+            new_file: Where to save the deprotonated structure. Optional.
+    
+        Returns:
+            The name of the deprotonated structure.
+        """
+
+        fs.check_file_exists( molfile )
+        
+        if not new_file:
+            fpath = Path(molfile )
+            new_file = fpath.parent / f"{fpath.stem}_deprotonated{fpath.suffix}"
+
+        self.cmd.delete( 'all' )
+
+        self.cmd.remove( 'hydrogens' )
+        self.cmd.save( new_file )
+
+        self.cmd.delete('all')
+
+        return new_file

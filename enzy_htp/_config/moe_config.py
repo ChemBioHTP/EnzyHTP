@@ -10,7 +10,14 @@ from copy import deepcopy
 
 
 class MOEConfig:
-    """ """
+    """Class that holds default values and environment requirements for running MOE within
+    enzy_htp.
+
+    Attributes:
+        MOE : str() environment variable referencing the home directory of the package.
+        MOE_BATCH : str() of the name of the moebatch executable.
+
+    """
 
     MOE:str = "MOE"
     """MOE environment variable which points to the """
@@ -29,7 +36,6 @@ class MOEConfig:
         return [
             self.MOE
         ]
-
 
 
 

@@ -4,6 +4,7 @@ Uses the BCLConfig class found in enzy_htp/_config/_config.py. Supported operati
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-04-01
 """
+import pandas as pd
 from typing import List
 from pathlib import Path
 
@@ -53,11 +54,11 @@ class BCLInterface:
             flags: A list() of str() flags to pass to bcl.exe.
 
         Returns:
-            Nothing
+            Nothing.
 
         """
         flags = [protocol] + flags
-        self.env_mananger_.run_command(
+        self.env_manager_.run_command(
             self.config_.BCL_EXE, flags            
         )
 
@@ -90,11 +91,59 @@ class BCLInterface:
             "-conformation_comparer",
             "SymmetryRMSD", "0.25",
             "-ensemble_filenames", molfile,
+            "-top_models", f"{int(n_conformers)}",
             "-conformers_single_file", f"{outfile}",
-            "1>/dev/null 2>/dev/null" 
         ]
 
         self._run_bcl_cmd(
             "molecule:ConformerGenerator",
             flags
         )
+
+
+    def formal_charge(self, molfile:str) -> int:
+        """Find the formal charge of the supplied molfile using molecule:Properties routine. Supplied
+        file MUST be in format .sdf otherwise the script will exit.
+
+        Args:
+            molfile: A str() with the path of an .sdf file.
+
+        Returns:
+            Formal charge of the molecule as an int().
+        """
+    
+        fs.check_file_exists( molfile )
+
+        if not Path(molfile).suffix == '.sdf':
+            _LOGGER.error(f"Function expects .sdf file format. Exiting...")
+            exit( 1 )
+
+        temp_file:str = "__temp.csv"
+
+        flags:List[str] = [
+            "-input_filenames",  str(molfile),
+            "-output_table", temp_file,
+            "-tabulate", "TotalFormalCharge"
+        ]
+        
+        self._run_bcl_cmd(
+            "molecule:Properties",
+            flags
+        )
+        
+        df:pd.DataFrame = pd.read_csv(temp_file)
+
+        fs.safe_rm( temp_file )
+
+        return df.iloc[0].TotalFormalCharge
+
+
+
+
+
+
+
+
+
+
+
