@@ -11,14 +11,19 @@ Date: 2022-10-24
 """
 
 import copy
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union
 import numpy as np
 
 from enzy_htp.core.logger import _LOGGER
-from enzy_htp.structure import Structure
+from enzy_htp.core import file_system as fs
+from enzy_htp import config
+from enzy_htp.structure import Structure, PDBParser
+import enzy_htp.structure.structure_operation as stru_oper
+from enzy_htp import interface
 from .mutation import (
     Mutation,
     check_repeat_mutation,
+    get_mutant_name_tag,
     remove_repeat_mutation)
 from .mutation_pattern import decode_mutation_pattern
 
@@ -273,69 +278,47 @@ def mutate_stru_with_tleap(
         mutant: List[Mutation],
         in_place: bool,
         # tleap_specifics_below
+        int_leapin_pdb_path: Union[str, None] = None,
+        int_leapout_pdb_path: Union[str, None] = None,
         ) -> Structure:
     """mutate the {stru} to its {mutant} structure using tleap
-    from AmberMD package."""
+    from AmberMD package.
+    Args:
+        stru: the 'WT' structure
+        mutant: a list of Mutation() which describes a mutant to the 'WT'
+        in_place: if make the changes to the structure in-place
+        int_pdb_path: temp file path for PDB of {stru}, which original side chain
+            atoms are deleted and original residue name changed.
+        int_leap_pdb_path: temp file path for tleap generated mutant PDB"""
 
-    # # Prepare a label for the filename
-    # tot_Flag_name=''
-    # for Flag in self.MutaFlags:
-    #     Flag_name=self._build_MutaName(Flag)
-    #     tot_Flag_name=tot_Flag_name+'_'+Flag_name
+    sp = PDBParser()
+    # get name tag for the mutant
+    name_tag = get_mutant_name_tag(mutant)
 
-    # # Operate the PDB
-    # out_PDB_path1=self.cache_path+'/'+self.name+tot_Flag_name+'_tmp.pdb'
-    # out_PDB_path2=self.path_name+tot_Flag_name+'.pdb'
+    # manage temp file paths
+    if int_leapin_pdb_path is None:
+        fs.safe_mkdir(config["system.SCRATCH_DIR"])
+        int_leapin_pdb_path = fs.get_valid_temp_name(
+            f"{config['system.SCRATCH_DIR']}/mutate_stru_with_tleap_input{name_tag}.pdb")
 
-    # self._get_file_path()
-    # with open(self.path,'r') as f:
-    #     with open(out_PDB_path1,'w') as of:
-    #         chain_count = 1
-    #         for line in f:
-    #             pdb_l = PDB_line(line)
-                                    
-    #             TER_flag = 0
-    #             if pdb_l.line_type == 'TER':
-    #                 TER_flag = 1
-    #             # add chain count in next loop for next line
-    #             if TER_flag:
-    #                 chain_count += 1
-    #             match=0
-    #             # only match in the dataline and keep all non data lines
-    #             if pdb_l.line_type == 'ATOM':
-    #                 for Flag in self.MutaFlags:
-    #                     if 'WT' in Flag:
-    #                         continue
-    #                     # Test for every Flag for every lines
-    #                     t_chain_id=Flag[1]
-    #                     t_resi_id =Flag[2]
+    if int_leapout_pdb_path is None:
+        fs.safe_mkdir(config["system.SCRATCH_DIR"])
+        int_leapout_pdb_path = fs.get_valid_temp_name(
+            f"{config['system.SCRATCH_DIR']}/mutate_stru_with_tleap_output{name_tag}.pdb")
 
-    #                     if chr(64+chain_count) == t_chain_id:
-    #                         if pdb_l.resi_id == int(t_resi_id):
-                                
-    #                             # do not write old line if match a MutaFlag
-    #                             match=1
-    #                             # Keep OldAtoms of targeted old residue
-    #                             resi_2 = Flag[3]
-    #                             OldAtoms=['N','H','CA','HA','CB','C','O']
-    #                             #fix for mutations of Gly & Pro
-    #                             if resi_2 == 'G':
-    #                                 OldAtoms=['N','H','CA','C','O']
-    #                             if resi_2 == 'P':
-    #                                 OldAtoms=['N','CA','HA','CB','C','O']
+    # 1. make side-chain deleted & name mutated PDB
+    stru_cpy = copy.deepcopy(stru)
+    for mut in mutant:
+        target_res = stru_cpy.find_residue_with_key(
+            mut.get_position_key())
+        stru_oper.remove_side_chain_atom(target_res) # remove atom
+        target_res.name = mut.target # change name
+    with open(int_leapin_pdb_path) as of:
+        of.write(sp.get_file_str(stru_cpy))
 
-    #                             for i in OldAtoms:
-    #                                 if i == pdb_l.atom_name:
-    #                                     new_line=line[:17]+Resi_map[resi_2]+line[20:]                                        
-    #                                     of.write(new_line)
-    #                                     break                                
-    #                             #Dont run for other Flags after first Flag matches.
-    #                             break
-
-    #             if not match:               
-    #                 of.write(line)
-
-
+    # 2. run leap on it
+    amber_int = interface.amber
+    amber_int.mutate()
     # # Run tLeap 
     # #make input
     # leapin_path = self.cache_path+'/leap_P2PwL.in'

@@ -24,3 +24,9 @@ def test_product_lists_allow_empty():
     assert [1] in result_list
     assert [] in result_list
     assert test_list == [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+
+def test_list_remove_adjacent_duplicates():
+    """test function works as expected"""
+    test_list = [1,2,2,3,3,4,6,6,3,5,5]
+    result_list = eg.list_remove_adjacent_duplicates(test_list)
+    assert result_list == [1, 2, 3, 4, 6, 3, 5]
