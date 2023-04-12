@@ -35,7 +35,7 @@ class GaussianInterface:
             self.config_ = default_gaussian_config()
         self.env_manager_ = em.EnvironmentManager(
             env_vars=self.config_.required_env_vars(),
-            exectubles=self.config_.required_executables(),
+            executables=self.config_.required_executables(),
         )
         self.env_manager_.check_environment()
         self.compatible_env_ = self.env_manager_.is_missing()

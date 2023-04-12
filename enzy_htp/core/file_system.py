@@ -130,3 +130,29 @@ def get_valid_temp_name(fname: str) -> None:
         idx += 1
         result_fname = f"{fname[:-len(suffix)]}_{str(idx)}{suffix}"
     return result_fname
+
+
+def check_file_exists(fname: str, exit_script:bool=True) -> None:
+    """Function that checks if a file exists. Will either exit the script or raise
+    an error depending on the specified behavior.
+
+    Args:
+        fname: The str() name of the file to check.
+        exit_script: A bool() specifying if the script should exit or raise a FileNotFoundError().
+        
+    Returns:
+        Nothing
+
+    Raises:
+        FileNotFoundError if exit_script is set to False and the file does not exist.
+    """
+    
+    if Path(fname).exists():
+        return 
+    
+    if exit_script:
+        _LOGGER.error(f"The file '{fname}' does not exist. Exiting...")
+        exit( 1 )
+    else:
+        raise FileNotFoundError(f"The file '{fname}' does not exist.")
+

@@ -11,9 +11,13 @@ from copy import deepcopy
 
 class BCLConfig:
 
+    BCL_EXE:str = "bcl.exe"
+    """The main bcl executable."""
+
     def required_executables(self) -> List[str]:
         """A hardcoded list of required executables for the BCL."""
         return [
+            self.BCL_EXE
         ]
 
     def required_env_vars(self) -> List[str]:
