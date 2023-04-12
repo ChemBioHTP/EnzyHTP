@@ -12,7 +12,7 @@ from copy import deepcopy
 class MOEConfig:
     """ """
 
-    MOE:str = "$MOE"
+    MOE:str = "MOE"
     """MOE environment variable which points to the """
 
     MOE_BATCH:str="$MOE/bin/moebatch"
@@ -21,7 +21,7 @@ class MOEConfig:
     def required_executables(self) -> List[str]:
         """A hardcoded list of required executables for the MOE."""
         return [
-            return self.MOE_BATCH
+            self.MOE_BATCH
         ]
 
     def required_env_vars(self) -> List[str]:

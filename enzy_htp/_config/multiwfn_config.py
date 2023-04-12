@@ -25,7 +25,7 @@ class MultiwfnConfig:
     EXE: str = "Multiwfn"
     """Name of the """
 
-    DIR: str = "$Multiwfnpath"
+    DIR: str = "Multiwfnpath"
 
     def required_executables(self):
         return [self.EXE]

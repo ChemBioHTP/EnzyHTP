@@ -79,9 +79,7 @@ class BCLInterface:
 
         #TODO(CJ): add the ability to add more flags and that molfile is in the correct format
 
-        if not Path(molfile).exists():
-            _LOGGER.error(f"The supplied file '{molfile}' does not exist. Exiting...")
-            exit( 1 )
+        fs.check_file_exists( molfile )
 
         if not outfile:
             fpath = Path(molfile)

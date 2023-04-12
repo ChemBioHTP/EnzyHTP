@@ -7,6 +7,7 @@ Date: 2022-02-12
 import os
 import shutil
 from typing import List
+from pathlib import Path
 from subprocess import run
 
 from .logger import _LOGGER
@@ -52,6 +53,8 @@ class EnvironmentManager:
     def __exe_exists(self, exe_name: str) -> bool:
         """Helper method that checks if executable exists in current environment."""
         full_path = os.path.expandvars(exe_name)
+        if Path(full_path).exists():
+            return True
         return shutil.which(exe_name) is not None
 
     def check_executables(self) -> None:
@@ -59,6 +62,11 @@ class EnvironmentManager:
         for exe in self.executables_:
             if not self.__exe_exists(exe):
                 self.missing_executables_.append(exe)
+                continue
+
+            fpath = os.path.expandvars(exe)
+            if Path(fpath).exists():
+                self.mapper[exe] = fpath 
             else:
                 self.mapper[exe] = shutil.which(exe)
 
@@ -101,6 +109,7 @@ class EnvironmentManager:
     def run_command(self, exe: str, args: List[str]) -> List[str]:
         """Interface to run a command with the exectuables specified by exe as well as a list of arguments."""
         cmd = f"{self.mapper.get(exe,exe)} {' '.join(args)}"
+        
         if exe in self.missing_executables_ or not self.__exe_exists(exe):
             _LOGGER.error(
                 f"This environment is missing '{exe}' and cannot run the command '{cmd}'")

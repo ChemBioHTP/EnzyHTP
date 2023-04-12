@@ -23,7 +23,7 @@ from enzy_htp._config.amber_config import AmberConfig, default_amber_config
 
 
 class AmberInterface:
-    """Class that provides a direct interface for enzy_htp to utilize AmberMD software. Supported operations
+    """Class that provides a direct interface for enzy_htp to utilize AmberMD software. Supported operations include
     minimization, heating constant pressure production, constant pressure equilibration, trajectory file
     conversion and mutation. Users should use this class as the only way to interact with any functionality
     in Amber or associated tools like tleap.

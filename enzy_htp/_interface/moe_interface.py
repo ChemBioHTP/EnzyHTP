@@ -1,4 +1,5 @@
-"""TODO
+"""Defines an MOEInterface class that serves as a bridge for enzy_htp to utilize MOE software. Uses the MOEConfig class
+found in enzy_htp/_config/moe_config.py. Supported operations include protonation.
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-04-01
@@ -16,6 +17,15 @@ from enzy_htp._config.moe_config import MOEConfig, default_moe_config
 #TODO(CJ): need to add tests for this section
 
 class MOEInterface:
+    """Class that provides a direct interface for enzy_htp to utilize MOE software. Supported operations 
+    include protonation. Users should ue this class as the only way to interact with any functionality 
+    in MOE.
+
+    Attributes:
+        config_	: The MOEConfig() class which provides settings for both running MOE and maintaining a compatible environment.
+        env_manager_ : The EnvironmentManager() class which ensure all required environment elements exist.
+        compatible_env_ : A bool() indicating if the current environment is compatible with the object itself.
+    """
     
     def __init__(self, config: MOEConfig = None) -> None:
         """Simplistic constructor that optionally takes an MOEConfig object as its only argument.
@@ -45,7 +55,7 @@ class MOEInterface:
             input_svl: A str() with the path of the .svl file.
 
         Returns:
-            Nothing
+            Nothing.
         """
         
         fs.check_file_exists( input_svl )
@@ -57,11 +67,11 @@ class MOEInterface:
 
         self.env_manager_.run_command(
             self.config_.MOE_BATCH,
-            ["-s", "input_svl"]
+            ["-script", str(input_svl)]
         )
 
 
-    def protonate(self, molfile:str, outfile:None=str, pH:float=7.0) -> str:
+    def protonate(self, molfile:str, outfile:str=None, pH:float=7.0) -> str:
         """Protonates the structure in a supplied file at the specified pH. If nothing is supplied for the
         outfile, then it is set as <input_file>_protonated.<ext> for a given file of name <input_file>.<ext>.
         Checks that the supplied molfile exists and that it has one of the supported file types of .mol2,
@@ -82,7 +92,7 @@ class MOEInterface:
         FORMAT_MAPPER:Dict[str,str] = {
             '.mol2':'TriposMOL2',
             '.pdb':'PDB',
-            '.sdf':'SDF',
+            '.cif':'CIF',
         }
         
         ftype:str = FORMAT_MAPPER.get(Path(molfile).suffix, None)
@@ -92,16 +102,14 @@ class MOEInterface:
             outfile = tpath.parent / f"{tpath.stem}_protonated{tpath.suffix}"
 
         if not ftype:
-            _LOGGER.error(f"Supported file types for MOEInterface.protonate() only include .mol2, .pdb, and .sdf. Exiting...")
+            _LOGGER.error(f"Supported file types for MOEInterface.protonate() only include .mol2, .pdb, and .cif. Exiting...")
             exit( 1 )
-
-        #TODO(CJ): need to figure out where I modify the pH
-        #TODO(CJ): check that the pH value is valid/accurate
+        
         contents:List[str]=[
-            f"ReadTriposMOL2 '{molfile}';", 
+            f"Read{ftype} '{molfile}';", 
              "atoms = Atoms[];",
-             "Protonate3D [atoms,atoms,atoms,[],[],[]];",
-            f"WriteTriposMOL2 '{outfile}';",
+            f"Protonate3D [atoms,atoms,atoms,[],[],[pH:{pH:.2f}]];",
+            f"Write{ftype} '{outfile}';",
              "Close [];"
         ]
        
