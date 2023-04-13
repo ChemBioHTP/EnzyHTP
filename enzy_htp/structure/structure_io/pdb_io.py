@@ -15,7 +15,9 @@ from biopandas.pdb import PandasPdb
 import pandas as pd
 
 from enzy_htp.core import _LOGGER
+from enzy_htp.core.exception import IndexMappingError
 import enzy_htp.core.file_system as fs
+from enzy_htp.core.general import if_list_contain_repeating_element, list_remove_adjacent_duplicates
 from enzy_htp.core.pandas_helper import batch_edit_df_loc_value, split_df_base_on_column_value
 import enzy_htp.chemical as chem
 from ._interface import StructureParserInterface
@@ -91,7 +93,7 @@ class PDBParser(StructureParserInterface):
         cls._resolve_alt_loc(
             target_model_df
         )  # resolve alt loc record in place by delele redundant df rows
-        #end region (Add here to address more problem related to the PDB file format here)
+        #endregion (Add here to address more problem related to the PDB file format here)
 
         # target_model_df below should be "standard" --> start building
         # mapper is for indicating superior information of the current level: e.g.: indicate
@@ -710,30 +712,107 @@ class PDBParser(StructureParserInterface):
         """
         pass
 
-# == util of PDB file handling ==
-def align_pdb_index(opdb: str, npdb: str) -> None:
+#region == util of PDB file handling ==
+# these tools handles those tasks that dont worth converting to Structure
+
+# index related
+def restore_pdb_index(index_mapper: Dict[tuple, tuple],
+                      target_pdb: str,
+                      out_path: str) -> None:
     """Helper method that renumbers the residue chain id's and residue numbers in the
-    new structure found in npdb to the original values found in the opdb structure file.
+    new structure found in target_pdb according to the index mapper (go back to old index)
     Args:
-        opdb: The name of the original .pdb file.
-        npdb: The name of the new .pdb file.
+        index_mapper:
+            The mapper for replacing the index in target pdb
+            {(new_chain_id, new_residue_idx):(old_chain_id, old_residue_idx),
+            ...}
+        target_pdb: The path of the target .pdb file.
+        out_path: the path for the output pdb
     """
+    pdb_panda_obj = PandasPdb().read_pdb(target_pdb)
+    pdb_df = get_pdb_df(target_pdb) # also fix for chain id
+    for index, row in pdb_df.iterrows():
+        old_chain_id, old_resi_idx = index_mapper[(row["chain_id"], row["residue_number"])]
+        # edit index in place
+        pdb_df.loc[index, "chain_id"] = old_chain_id
+        pdb_df.loc[index, "residue_number"] = old_resi_idx
+    pdb_panda_obj.df["ATOM"] = pdb_df
+    pdb_panda_obj.to_pdb(out_path, records=["ATOM", "OTHERS"])
 
-    def get_all_keys(pdb: str) -> List[Tuple[str, str]]:
-        df: pd.DataFrame = PandasPdb().read_pdb(pdb).df["ATOM"]
-        return sorted(list(set(list(zip(df.chain_id, df.residue_number)))))
+def get_index_mapper_from_pdb(
+        npdb: str,
+        opdb: str,
+        method: Union[None, str] = None,
+        **kwargs) -> Dict[tuple, tuple]:
+    """get the index mapper from matching old pdb and new pdb
+    (new pdb -> old pdb)"""
+    npdb_df = get_pdb_df(npdb)
+    opdb_df = get_pdb_df(opdb)
+    if method is None:
+        method = "default"
+    result = INDEX_MAPPING_METHODS[method](npdb_df, opdb_df, **kwargs)
+    return result
 
-    okeys, nkeys = get_all_keys(opdb), get_all_keys(npdb)
-    assert len(okeys) == len(nkeys)
-    mapper = dict(zip(nkeys, okeys))
-    nlines: List[prep.PDBLine] = prep.read_pdb_lines(npdb)
-    for nl in nlines:
-        if not nl.is_ATOM():
-            continue
-        (n_chain, n_rid) = mapper[(nl.chain_id.strip(), int(nl.resi_id))]
-        # TODO(CJ): this should be done in the oop part of the PDBLine;
-        raw = nl.line
-        nl.line = f"{raw[0:21]}{n_chain}{n_rid: >4}{raw[26:]}"
-        # print(n_chain, n_rid)
-        # print(nl.__dict__);exit( 0 )
-    fs.write_lines(npdb, list(map(lambda pl: pl.line, nlines)))
+def pdb_index_mapping_by_order(npdb_df: pd.DataFrame, opdb_df: pd.DataFrame) -> Dict[tuple, tuple]:
+    """default method of mapping indexes (new pdb -> new pdb)
+    Just align the indexes by orders in the PDB file:
+        The residue of the same sequence appearing in the PDB file should be mapped
+        as the same residue and thus using the correponding opdb index.
+
+    WARNING: those do not consider the case that orders of residue sequence in the file
+    can be inverted after some process. (like pymol or enzyhtp they will invert the
+    order base on residue indexes)"""
+    nkeys, okeys = get_pdb_index_key(npdb_df), get_pdb_index_key(opdb_df)
+    if len(okeys) != len(nkeys):
+        _LOGGER.error(f"Residue key number does not match between old and new pdb. Index mapping is impossible")
+        raise IndexMappingError
+    if if_list_contain_repeating_element(okeys):
+        _LOGGER.error(f"Found repeating residue key in old pdb. Index mapping is impossible")
+        raise IndexMappingError
+    if if_list_contain_repeating_element(nkeys):
+        _LOGGER.error(f"Found repeating residue key in new pdb. Index mapping is impossible")
+        raise IndexMappingError
+    
+    idx_mapper = dict(zip(nkeys, okeys))
+    return idx_mapper
+
+@dispatch
+def get_pdb_index_key(pdb: str) -> List[Tuple[str, str]]:
+    """get a index key of every residue in the pdb in the form of
+    (chain_id, residue_number) with the same order in the PDB file"""
+    pdb_df = get_pdb_df(pdb)
+    result = list_remove_adjacent_duplicates(
+        list(zip(pdb_df.residue_name, pdb_df.chain_id, pdb_df.residue_number)))
+    result = [(i,j) for _, i, j in result]
+    return result
+
+@dispatch
+def get_pdb_index_key(pdb_df: pd.DataFrame) -> List[Tuple[str, str]]:
+    """get a index key of every residue in the pdb in the form of
+    (chain_id, residue_number) with the same order in the PDB file"""
+    result = list_remove_adjacent_duplicates(
+        list(zip(pdb_df.residue_name, pdb_df.chain_id, pdb_df.residue_number)))
+    result = [(i,j) for _, i, j in result]
+    return result
+
+INDEX_MAPPING_METHODS = {
+    "default" : pdb_index_mapping_by_order,
+}
+
+# general
+def get_pdb_df(pdb: str, fix_chain_id: bool = True) -> pd.DataFrame:
+    """get the df of pdb. Fix chain id by default.
+    The idea is chain id information is already implicitly defined by TER lines
+    Fixing it is just make it explicit"""
+    df: pd.DataFrame = PandasPdb().read_pdb(pdb).df
+    result = pd.concat(
+        (df["ATOM"], df["HETATM"]), ignore_index=True
+    )
+    result.sort_values("line_idx", inplace=True)
+    if fix_chain_id:
+        pdb_ter_df = df["OTHERS"][df["OTHERS"].record_name == "TER"]
+        PDBParser._resolve_missing_chain_id(result, pdb_ter_df)
+    return result
+
+#endregion
+
