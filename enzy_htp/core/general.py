@@ -124,6 +124,18 @@ def _product_lists_w_each_empty_ele(list_of_lists: Iterable[list]) -> List[list]
     return [[x] + y if x != GHOST_LIST_ELEMENT else y for x in curr_list
             for y in next_list]
 
+def if_list_contain_repeating_element(target_list: list) -> bool:
+    """check if the target list contains any repeating elements"""
+    return len(target_list) != len(set(target_list))
+
+def list_remove_adjacent_duplicates(target_list: list) -> list:
+    """turn a new list removing all adjacent_duplicates. keep the 1st one.
+    keep the order."""
+    result = [target_list[0]]
+    for i in range(1, len(target_list)):
+        if target_list[i] != target_list[i-1]:
+            result.append(target_list[i])
+    return result
 
 # == Dict related ==
 def get_copy_of_deleted_dict(orig_dict: Dict, del_key) -> Dict:

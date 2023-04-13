@@ -14,6 +14,8 @@ from typing import List, Tuple, Union, Dict, Any
 import pandas as pd
 from biopandas.pdb import PandasPdb
 
+from enzy_htp.structure.structure_io import pdb_io
+
 from ..core.logger import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import env_manager as em
@@ -587,8 +589,6 @@ class AmberInterface:
                     _LOGGER.error(e_info)
                 raise new_e from e
 
-        # align index
-        
         # clean up temp file if success
         fs.clean_temp_file_n_dir(temp_path_list)
 

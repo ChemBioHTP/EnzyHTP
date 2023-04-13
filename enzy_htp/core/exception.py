@@ -74,3 +74,7 @@ class tLEaPError(Exception):
     @property
     def error_info_str(self) -> str:
         return "\n".join(self.error_info_list)
+
+class IndexMappingError(Exception):
+    """Exception corresponding index mapping error for residue in enzymes or atoms in molecules"""
+    pass
