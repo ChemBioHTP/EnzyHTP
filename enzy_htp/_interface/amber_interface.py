@@ -547,21 +547,22 @@ class AmberInterface:
                   if_ignore_start_up: bool= True,
                   additional_search_path: List[str]= None,
                   tleap_out_path: str = None,
-                  # addition operation
-                  if_align_index: bool= False,
                   ) -> None:
         """the python wrapper of running tleap
         Args:
-            tleap_in_str: the str content of leap.in file
-            if_ignore_start_up: if adding the '-s' flag to
-                ignore leaprc startup file.
-            additional_search_path: list of addition search path of
-                leaprc files. Each path in the list will be applied using
-                a '-I' flag
-            tleap_out_path: file path for stdout of the tleap command.
-                the _LOGGER level determines if delete the file
-            if_align_index: if or not align the residue index before and after
-                tleap process. (tleap will renumber the PDB from 1)"""
+            tleap_in_str:
+                the str content of leap.in file
+            if_ignore_start_up:
+                if adding the '-s' flag to ignore leaprc startup file.
+            additional_search_path:
+                list of addition search path of leaprc files. Each path
+                in the list will be applied using a '-I' flag.
+            tleap_out_path:
+                file path for stdout of the tleap command. the _LOGGER level
+                determines if delete the file.
+
+        NOTE: run_tleap API should not handle the index alignment since it do
+        not carry information of the input pdb"""
         temp_path_list = []
         # init file paths
         fs.safe_mkdir(eh_config["system.SCRATCH_DIR"])
@@ -576,10 +577,14 @@ class AmberInterface:
         with open(tleap_in_path, "w") as of:
             of.write(tleap_in_str)
         # run tleap command
+        cmd_args = f"-f {tleap_in_path} > {tleap_out_path}"
+        if if_ignore_start_up:
+            cmd_args = f"-s {cmd_args}"
+        if additional_search_path:
+            for add_path in additional_search_path:
+                cmd_args = f"{cmd_args} -I {add_path}"
         try:
-            self.env_manager_.run_command(
-                "tleap",
-                f"-s -f {tleap_in_path} > {tleap_out_path}")
+            self.env_manager_.run_command("tleap", cmd_args)
         except CalledProcessError as e:
             if (not e.stderr.strip()) and (not e.stdout.strip()): # empty stderr & stdout
                 # find the error information in tleap.out
@@ -855,7 +860,7 @@ class AmberInterface:
         Args:
             outfile: The name of the modified .pdb file that needs to be treated with tleap.
         """
-
+        # TODO(eod): use run_tleap(). restore index after change.
         work_dir: str = str(Path(outfile).parent)
         leap_in: str = f"{work_dir}/leap_mutate.in"
         leap_out: str = f"{work_dir}/leap_mutate.out"

@@ -293,7 +293,7 @@ quit
 def test_run_tleap_dev():
     """develop use test function. Dont do any assert"""
     ai = interface.amber
-    test_input_pdb = f"{MM_DATA_DIR}KE_07_R7_2_S_reverse.pdb"
+    test_input_pdb = f"{MM_DATA_DIR}KE_07_R7_2_S.pdb"
     temp_test_file = f"{MM_BASE_DIR}/work_dir/test_run_tleap.pdb"
     tleap_in_str = f"""source leaprc.protein.ff14SB
 a = loadpdb {test_input_pdb}
@@ -301,8 +301,8 @@ savepdb a {temp_test_file}
 quit
 """
 
-    ai.run_tleap(tleap_in_str)
-    # fs.safe_rm(temp_test_file)
+    ai.run_tleap(tleap_in_str, additional_search_path=["./", "../"])
+    fs.safe_rm(temp_test_file)
 
 
 def test_run_tleap_w_error(caplog):
