@@ -127,7 +127,7 @@ class Residue(DoubleLinkedNode):
             return chem.convert_to_one_letter(self.name)
         return f" {self.name} "
 
-    def find_atom_name(self, name: str) -> List[Atom]:
+    def find_atom_name(self, name: str) -> Atom:
         """find child Atom base on its name"""
         result = list(filter(lambda a: a.name == name, self.atoms))
         if len(result) > 1:
