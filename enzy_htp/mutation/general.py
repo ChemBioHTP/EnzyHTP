@@ -276,7 +276,7 @@ def mutate_stru(
 def mutate_stru_with_tleap(
         stru: Structure,
         mutant: List[Mutation],
-        in_place: bool,
+        in_place: bool = False,
         # tleap_specifics_below
         int_leapin_pdb_path: Union[str, None] = None,
         int_leapout_pdb_path: Union[str, None] = None,
@@ -318,7 +318,9 @@ def mutate_stru_with_tleap(
 
     # 2. run leap on it
     amber_int = interface.amber
-    amber_int.mutate()
+    amber_int.tleap_clean_up_pdb(int_leapin_pdb_path, int_leapout_pdb_path)
+    # TODO do the top check
+
     # # Run tLeap 
     # #make input
     # leapin_path = self.cache_path+'/leap_P2PwL.in'

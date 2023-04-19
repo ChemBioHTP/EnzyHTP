@@ -612,12 +612,6 @@ class AmberInterface:
 
         return tLEaPError(error_info_list)
 
-    def _align_index_tleap_pdb(tleap_opdb: str, tleap_ipdb: str) -> None:
-        """align the residue and chain index for tleap output pdb from tleap input pdb.
-        used when run_tleap with if_align_index=True"""
-
-
-
     def nc2mdcrd(
         self,
         nc_in: str,
@@ -852,27 +846,52 @@ class AmberInterface:
 
     # == engines ==
     # (engines for sciencs APIs)
-    def mutate(self, outfile: str) -> None: #TODO change name to canonicalize PDB
-        """Method that uses tleap to apply the mutations described in the supplied outfile
-        to that file. Because tleap writes the modified version to another file, the destination
-        file with name 'outfile.tmp.pdb' is copied over the outfile name. As a result there
-        may be additional files in the local directory when problems occur.
+    def tleap_clean_up_stru(self,
+                            input_pdb: str,
+                            output_pdb: str,
+                            if_align_index: bool = True,
+                            amber_lib: str= "leaprc.protein.ff14SB",) -> None:
+        """Method that uses tleap to clean up PDB structure by loading and saving the PDB with
+        the {amber_lib}.
+        Typical changes are:
+            - complete missing atoms based on the AA defination in {amber_lib}
+            of the correponding residue name
+            - change terminal atom names
+            - (if_align_index = False)renumber residue index and atom index from 1 and
+            ignore chain index
+            - add TER around all residue unit that is not recognized or is a ligand.
+            (The might be harmful when a structure have a modified animo acid TODO)
+
         Args:
-            outfile: The name of the modified .pdb file that needs to be treated with tleap.
-        """
+            input_pdb:
+                the path of the input pdb for cleaning
+            output_pdb:
+                the path of the output pdb after cleaning
+            if_align_index:
+                whether or not align index back after cleaning.
+            amber_lib:
+                the amber library used for cleaning.
+
+        Application:
+            Used in mutation.general.mutate_stru_with_tleap()"""
+        
         # TODO(eod): use run_tleap(). restore index after change.
-        work_dir: str = str(Path(outfile).parent)
+        work_dir: str = str(Path(output_pdb).parent)
         leap_in: str = f"{work_dir}/leap_mutate.in"
         leap_out: str = f"{work_dir}/leap_mutate.out"
-        pdb_temp = str(Path(outfile).with_suffix(".tmp.pdb"))
+        pdb_temp = str(Path(output_pdb).with_suffix(".tmp.pdb"))
         leap_lines: List[str] = [
             "source leaprc.protein.ff14SB",
-            f"a = loadpdb {outfile}",
+            f"a = loadpdb {output_pdb}",
             f"savepdb a {pdb_temp}",
             "quit",
         ]
         fs.write_lines(leap_in, leap_lines)
         self.env_manager_.run_command("tleap", ["-s", "-f", leap_in, ">", leap_out])
-        renumber_pdb(outfile, pdb_temp)
-        shutil.move(pdb_temp, outfile)
+        renumber_pdb(output_pdb, pdb_temp)
+        shutil.move(pdb_temp, output_pdb)
         fs.safe_rm("leap.log")
+
+    def _align_index_tleap_pdb(tleap_opdb: str, tleap_ipdb: str) -> None:
+        """align the residue and chain index for tleap output pdb from tleap input pdb.
+        used when run_tleap with if_align_index=True"""
