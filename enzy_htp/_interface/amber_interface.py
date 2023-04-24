@@ -564,7 +564,7 @@ class AmberInterface:
         NOTE: run_tleap API should not handle the index alignment since it do
         not carry information of the input pdb"""
         temp_path_list = []
-        # init file paths
+        # init file paths (tleap_in_path, tleap_out_path)
         fs.safe_mkdir(eh_config["system.SCRATCH_DIR"])
         tleap_in_path = fs.get_valid_temp_name(
             f"{eh_config['system.SCRATCH_DIR']}/tleap.in")
@@ -848,10 +848,10 @@ class AmberInterface:
     # (engines for sciencs APIs)
     def tleap_clean_up_stru(self,
                             input_pdb: str,
-                            output_pdb: str,
+                            out_path: str,
                             if_align_index: bool = True,
                             amber_lib: str= "leaprc.protein.ff14SB",) -> None:
-        """Method that uses tleap to clean up PDB structure by loading and saving the PDB with
+        """Method that uses tleap to clean up {input_pdb} by loading and saving the PDB with
         the {amber_lib}.
         Typical changes are:
             - complete missing atoms based on the AA defination in {amber_lib}
@@ -865,7 +865,7 @@ class AmberInterface:
         Args:
             input_pdb:
                 the path of the input pdb for cleaning
-            output_pdb:
+            out_path:
                 the path of the output pdb after cleaning
             if_align_index:
                 whether or not align index back after cleaning.
@@ -874,24 +874,24 @@ class AmberInterface:
 
         Application:
             Used in mutation.general.mutate_stru_with_tleap()"""
-        
-        # TODO(eod): use run_tleap(). restore index after change.
-        work_dir: str = str(Path(output_pdb).parent)
-        leap_in: str = f"{work_dir}/leap_mutate.in"
-        leap_out: str = f"{work_dir}/leap_mutate.out"
-        pdb_temp = str(Path(output_pdb).with_suffix(".tmp.pdb"))
-        leap_lines: List[str] = [
-            "source leaprc.protein.ff14SB",
-            f"a = loadpdb {output_pdb}",
-            f"savepdb a {pdb_temp}",
+
+        tleap_in_lines: List[str] = [
+            f"source {amber_lib}",
+            f"a = loadpdb {input_pdb}",
+            f"savepdb a {out_path}",
             "quit",
         ]
-        fs.write_lines(leap_in, leap_lines)
-        self.env_manager_.run_command("tleap", ["-s", "-f", leap_in, ">", leap_out])
-        renumber_pdb(output_pdb, pdb_temp)
-        shutil.move(pdb_temp, output_pdb)
-        fs.safe_rm("leap.log")
-
-    def _align_index_tleap_pdb(tleap_opdb: str, tleap_ipdb: str) -> None:
-        """align the residue and chain index for tleap output pdb from tleap input pdb.
-        used when run_tleap with if_align_index=True"""
+        tleap_in_str = "\n".join(tleap_in_lines)
+        self.run_tleap(tleap_in_str)
+        if if_align_index:
+            # temp file
+            temp_dir = eh_config["system.SCRATCH_DIR"]
+            fs.safe_mkdir(temp_dir)
+            renumbered_pdb = fs.get_valid_temp_name(
+                f"{temp_dir}/tleap_out_renumbered.pdb")
+            # renumber
+            index_mapper = pdb_io.get_index_mapper_from_pdb(
+                out_path, input_pdb, method="by_order")
+            pdb_io.restore_pdb_index(index_mapper, out_path, renumbered_pdb)
+            shutil.move(renumbered_pdb, out_path)
+            fs.clean_temp_file_n_dir([temp_dir, renumbered_pdb])

@@ -1,6 +1,4 @@
-'''
-helper for check whats a pandas df looks like
-'''
+"""helper for check whats a pandas df looks like"""
 
 from biopandas.pdb import PandasPdb
 import sys

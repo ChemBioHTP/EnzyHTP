@@ -7,16 +7,17 @@ import shutil
 import pytest
 from pathlib import Path
 from typing import Union
+
 from enzy_htp.core.exception import tLEaPError
 from enzy_htp.core.logger import _LOGGER
-
-import enzy_htp.structure as struct
 from enzy_htp.core import file_system as fs
+import enzy_htp.structure as struct
 from enzy_htp import interface
 from enzy_htp import config as eh_config
 
 MM_BASE_DIR = Path(__file__).absolute().parent
 MM_DATA_DIR = f"{MM_BASE_DIR}/data/"
+MM_WORK_DIR = f"{MM_BASE_DIR}/work_dir/"
 MINIMIZE_INPUT_1 = f"{MM_DATA_DIR}/min_1.inp"
 TARGET_MINIMIZE_INPUT_1 = f"{MM_DATA_DIR}/target_min_1.inp"
 MINIMIZE_INPUT_2 = f"{MM_DATA_DIR}/min_2.inp"
@@ -357,3 +358,19 @@ def test_find_tleap_error():
         tleap_error = ai._find_tleap_error(error_file)
         for error_key in error_key_list:
             assert error_key in tleap_error.error_info_str
+
+def test_tleap_clean_up_stru(helpers):
+    """make sure the function correctly find all the errors in example files"""
+    ai = interface.amber
+    test_input_pdb = f"{MM_DATA_DIR}tleap_clean_up_test_KE.pdb"
+    test_out_path = f"{MM_WORK_DIR}tleap_clean_up_out.pdb"
+    test_answer_path = f"{MM_DATA_DIR}tleap_clean_up_answer_KE.pdb"
+
+    ai.tleap_clean_up_stru(test_input_pdb, test_out_path, if_align_index=True)
+
+    assert helpers.equiv_files(test_out_path, test_answer_path)
+    fs.safe_rm(test_out_path)
+
+    
+
+

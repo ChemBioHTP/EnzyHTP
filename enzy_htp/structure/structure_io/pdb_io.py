@@ -797,6 +797,7 @@ def get_pdb_index_key(pdb_df: pd.DataFrame) -> List[Tuple[str, str]]:
 
 INDEX_MAPPING_METHODS = {
     "default" : pdb_index_mapping_by_order,
+    "by_order" : pdb_index_mapping_by_order,
 }
 
 # general
