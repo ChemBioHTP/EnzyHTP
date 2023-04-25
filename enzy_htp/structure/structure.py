@@ -330,6 +330,7 @@ class Structure(DoubleLinkedNode):
 
     #endregion
 
+    #region === Checker ===
     def has_charges(self) -> bool:
         """Checks if the current Structure has charges for all atoms.
 
@@ -341,7 +342,6 @@ class Structure(DoubleLinkedNode):
                 return False
         return True
 
-    #region === Checker ===
     def has_duplicate_chain_name(self) -> bool:
         """check if self._chain have duplicated chain name
         give warning if do."""
@@ -481,6 +481,8 @@ class Structure(DoubleLinkedNode):
 
     #endregion
 
+
+
     # ============= TODO below =================
     #region === Getters === (Attributes - accessing Structure data -  references)
     def get_atom(self) -> Atom:
@@ -602,7 +604,7 @@ class Structure(DoubleLinkedNode):
         """Enables running assert Structure(). Checks if there is anything in the structure."""
         return bool(len(self.chains))
 
-    def __eq__(self, other: Structure) -> bool:
+    def __eq__(self, other: Structure) -> bool: # TODO
         """Comparison operator for other Structure() objects. Checks first if both have same chain names and then if each named chain is identical."""
         if set(self.chain_mapper.keys()) != set(other.chain_mapper.keys()):
             return False

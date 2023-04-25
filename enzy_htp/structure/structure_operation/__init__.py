@@ -5,3 +5,4 @@ Date: 2022-09-19
 """
 from .general import *
 from .residue import *
+from .checker import *

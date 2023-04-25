@@ -71,6 +71,30 @@ def test_sync_mutation_over_chains():
     assert len(result[1]) == 4
     assert Mutation(orig='TRP', target='HIS', chain_id='D', res_idx=82) in result[1]
 
+def test_mutate_stru_with_tleap():
+    """test function works as expected"""
+    test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
+    test_stru = sp.get_structure(test_pdb)
+    mutant = mg.assign_mutant(test_stru, "R154W")[0]
+    mutant_stru = mg.mutate_stru_with_tleap(test_stru, mutant)
+
+    for new_res, old_res in zip(mutant_stru.residues, test_stru.residues):
+        if new_res.idx == 154:
+            assert new_res.name == "TRP"
+            assert len(new_res.atoms) == 24
+        else:
+            for new_atom, old_atom in zip(new_res.atoms, old_res.atoms):
+                assert new_atom.coord == old_atom.coord
+                assert new_atom.name == old_atom.name
+
+def test_check_mutant_stru():
+    """test function works as expected"""
+    mutant_pdb = f"{DATA_DIR}puo_put_EA323Y_EB773Y_GA171N_GB621N.pdb"
+    mutant_stru = sp.get_structure(mutant_pdb)
+
+    mg.check_mutant_stru(mutant_stru)
+    #TODO(eod)
+
 
 # ==TODO==
 def test_mutate_pdb_one_letter_tleap():

@@ -11,6 +11,7 @@ Date: 2022-10-24
 """
 
 import copy
+import inspect
 from typing import Dict, List, Tuple, Union
 import numpy as np
 
@@ -292,19 +293,29 @@ def mutate_stru_with_tleap(
         int_leap_pdb_path: temp file path for tleap generated mutant PDB"""
 
     sp = PDBParser()
+    # san check
+    for mut in mutant:
+        if not isinstance(mut, Mutation):
+            _LOGGER.error(
+                f"mutant takes only a list of Mutation(). Current mutant is: {mutant}")
+            raise TypeError
+
     # get name tag for the mutant
     name_tag = get_mutant_name_tag(mutant)
 
     # manage temp file paths
+    temp_path_list = []
     if int_leapin_pdb_path is None:
         fs.safe_mkdir(config["system.SCRATCH_DIR"])
         int_leapin_pdb_path = fs.get_valid_temp_name(
             f"{config['system.SCRATCH_DIR']}/mutate_stru_with_tleap_input{name_tag}.pdb")
+        temp_path_list.append(int_leapin_pdb_path)
 
     if int_leapout_pdb_path is None:
         fs.safe_mkdir(config["system.SCRATCH_DIR"])
         int_leapout_pdb_path = fs.get_valid_temp_name(
             f"{config['system.SCRATCH_DIR']}/mutate_stru_with_tleap_output{name_tag}.pdb")
+        temp_path_list.append(int_leapout_pdb_path)
 
     # 1. make side-chain deleted & name mutated PDB
     stru_cpy = copy.deepcopy(stru)
@@ -313,33 +324,50 @@ def mutate_stru_with_tleap(
             mut.get_position_key())
         stru_oper.remove_side_chain_atom(target_res) # remove atom
         target_res.name = mut.target # change name
-    with open(int_leapin_pdb_path) as of:
+    with open(int_leapin_pdb_path, "w") as of:
         of.write(sp.get_file_str(stru_cpy))
 
     # 2. run leap on it
     amber_int = interface.amber
-    amber_int.tleap_clean_up_pdb(int_leapin_pdb_path, int_leapout_pdb_path)
-    # TODO do the top check
+    amber_int.tleap_clean_up_stru(int_leapin_pdb_path, int_leapout_pdb_path)
 
-    # # Run tLeap 
-    # #make input
-    # leapin_path = self.cache_path+'/leap_P2PwL.in'
-    # leap_input=open(leapin_path,'w')
-    # leap_input.write('source leaprc.protein.ff14SB\n')
-    # leap_input.write('a = loadpdb '+out_PDB_path1+'\n')
-    # leap_input.write('savepdb a '+out_PDB_path2+'\n')
-    # leap_input.write('quit\n')
-    # leap_input.close()
-    # #run
-    # os.system('tleap -s -f '+leapin_path+' > '+self.cache_path+'/leap_P2PwL.out')
-    # if Config.debug <= 1:
-    #     os.system('rm leap.log')
+    # 3. update residue
+    tleap_mutant_stru = sp.get_structure(int_leapout_pdb_path)
+    stru_oper.update_residues(stru_cpy, tleap_mutant_stru)
 
-    # #Update the file
-    # self.path = out_PDB_path2
-    # self._update_name()
+    # 4. check for topology error
+    # check_mutant_stru(stru_cpy)
 
+    # clean up temp files
+    fs.clean_temp_file_n_dir(temp_path_list)
+
+    if in_place:
+        stru_oper.update_residues(stru, stru_cpy)
+        return stru
+
+    return stru_cpy
+
+def check_mutant_stru(mutant_stru, **kwargs):
+    """check the generated mutant stru for following errors:
+    topology: rings in structure should not be circling on bonds.
+    Args:
+        mutant_stru"""
+    for error, checker in MUTANT_STRU_ERROR_CHECKER.items():
+        _LOGGER.debug(f"Checking {error}...")
+        this_kwargs = {}
+        param_names = [i.name for i in inspect.signature(checker).parameters.values()]
+        for param in param_names:
+            if param in kwargs:
+                this_kwargs[param] = kwargs[param]
+        #TODO(eod)
+        checker(mutant_stru, **this_kwargs)
 
 MUTATE_STRU_ENGINE = {
     "tleap" : mutate_stru_with_tleap
 }
+"""engines for mutate_stru()"""
+
+MUTANT_STRU_ERROR_CHECKER = {
+    "topology" : stru_oper.check_topology_error
+}
+"""checkers for check_mutant_stru()"""

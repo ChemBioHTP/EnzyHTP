@@ -360,7 +360,9 @@ def test_find_tleap_error():
             assert error_key in tleap_error.error_info_str
 
 def test_tleap_clean_up_stru(helpers):
-    """make sure the function correctly find all the errors in example files"""
+    """make sure the function correctly find all the errors in example files.
+    the test file is a truncated KE pdb also deleted the side chain atoms of residue 4
+    and changed its name to TRP mimiking a mutation sceniro."""
     ai = interface.amber
     test_input_pdb = f"{MM_DATA_DIR}tleap_clean_up_test_KE.pdb"
     test_out_path = f"{MM_WORK_DIR}tleap_clean_up_out.pdb"
