@@ -335,9 +335,6 @@ def mutate_stru_with_tleap(
     tleap_mutant_stru = sp.get_structure(int_leapout_pdb_path)
     stru_oper.update_residues(stru_cpy, tleap_mutant_stru)
 
-    # 4. check for topology error
-    # check_mutant_stru(stru_cpy)
-
     # clean up temp files
     fs.clean_temp_file_n_dir(temp_path_list)
 
