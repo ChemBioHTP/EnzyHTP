@@ -78,3 +78,8 @@ class tLEaPError(Exception):
 class IndexMappingError(Exception):
     """Exception corresponding index mapping error for residue in enzymes or atoms in molecules"""
     pass
+
+class BadMutantStructure(Exception):
+    """Exception corresponding to structure that didn't pass the check in
+    enzy_htp.mutation.general.check_mutant_stru"""
+    pass

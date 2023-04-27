@@ -90,10 +90,15 @@ def test_mutate_stru_with_tleap():
 def test_check_mutant_stru():
     """test function works as expected"""
     mutant_pdb = f"{DATA_DIR}puo_put_EA323Y_EB773Y_GA171N_GB621N.pdb"
+    mutant = [
+        Mutation("GLU", "TYR", "A", 323),
+        Mutation("GLU", "TYR", "B", 773),
+        Mutation("GLY", "ASN", "A", 171),
+        Mutation("GLY", "ASN", "B", 621),
+    ]
     mutant_stru = sp.get_structure(mutant_pdb)
 
-    mg.check_mutant_stru(mutant_stru)
-    #TODO(eod)
+    mg.check_mutant_stru(mutant_stru, mutant)
 
 
 # ==TODO==

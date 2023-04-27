@@ -152,12 +152,6 @@ def get_copy_of_deleted_dict(orig_dict: Dict, del_key) -> Dict:
 
     return dict_copy
 
-# == function related ==
-def run_function_list(func_list: List[callable], *args, **kwargs):
-    """run a list of functions that share args and have different kwargs"""
-    for func in func_list:
-        #TODO(eod)
-        pass
 # == misc ===
 
 

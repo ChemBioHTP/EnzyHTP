@@ -9,7 +9,7 @@ from typing import Tuple, Union
 
 from enzy_htp.core.logger import _LOGGER
 import enzy_htp.chemical as chem
-from ..structure import Residue, Atom
+from ..structure import Structure, Residue, Atom
 
 
 def deprotonate_residue(residue: Residue, target_atom: Union[None, Atom] = None) -> None:
@@ -72,4 +72,21 @@ def remove_side_chain_atom(residue: Residue, remove_cb: bool= False) -> None:
     
     # remove the rest atoms
     residue.remove_atoms_not_in_list(non_mutate_atom_names)
- 
+
+# == checker ==
+def check_res_topology_error(
+        stru: Structure,
+        residue_key: Tuple[str, int],
+        check_radius: float= 5.0,):
+    """check {stru} for topology error. (check for only the {residue_key} residue)
+    i.e.: rings in structure should not be circling on other bonds.
+    An example of this error is in https://github.com/ChemBioHTP/EnzyHTP/issues/110
+    Args:
+        stru: the target stru
+        residue_key: key of the target residue
+        check_radius: the radius of checking for the residue. (Unit: Ang)"""
+    # 1. get connectivity for the structure
+    # 2. convert all bond in each residue to ploylines. find rings in each residue.
+    # 3. check for any bond (polyline) from the target residue thread through any ring
+    # 4. check for any ring from the target residue is threaded by any bond
+    pass
