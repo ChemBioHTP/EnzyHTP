@@ -218,12 +218,11 @@ def deprotonate_metal_donors(center: MetalUnit):
     """
     donor_mapper = center.get_donor_mapper(method="ionic")
     for d_resi, d_atoms in donor_mapper.items():
-        if d_resi.is_deprotonatable(
-        ):  # the donor atom selection guarantees the atom is deprotonable
+        # the donor atom selection guarantees the atom is deprotonable
+        if d_resi.is_deprotonatable():
             # find_closest_h_to_center(d_atom, center)
-            stru_oper.deprotonate_residue(
-                d_resi,
-                d_atoms[0])  # TODO(qz): refine this by also determine the closest proton
+            stru_oper.deprotonate_residue(d_resi, d_atoms[0])
+            # TODO(qz): refine this by also determine the closest proton
         elif d_resi.is_hetatom_noproton():
             _LOGGER.info(
                 f"donor residue {d_resi} already have no proton in center {center}")

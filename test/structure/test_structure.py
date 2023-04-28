@@ -63,8 +63,8 @@ def test_solvents():
 def test_peptides():
     pdb_file_path = f"{DATA_DIR}1Q4T_ligand_test.pdb"
     stru: Structure = sp.get_structure(pdb_file_path)
-    assert len(stru.peptides) == 2
-    assert tuple(map(lambda x: x.name, stru.peptides)) == ("A", "B")
+    assert len(stru.polypeptides) == 2
+    assert tuple(map(lambda x: x.name, stru.polypeptides)) == ("A", "B")
 
 
 def test_sequence():
@@ -171,3 +171,7 @@ def test_find_residue_with_key(caplog):
     # non case
     assert not stru.find_residue_with_key(("A", 448))
     assert "Didn't find any residue with key: ('A', 448)" in caplog.text
+
+def test_init_connect():
+    """test function works as expected"""
+    pass
