@@ -15,6 +15,11 @@ mutation_section_puo = {
     "G172":"RHKDESTNQCPAVILMFYW0"
     }
 
+mutation_section_puo_2nd = {
+    "E324":"N",
+    "G172":"RHKDESTNQCPAVILMFYW0"
+    }
+
 def timer(fn):
     from time import perf_counter
     
@@ -122,10 +127,11 @@ def mutant_gen(mutation_mapper, chain_sync_list):
 
 def main():
     # print(*mutant_gen(mutation_section_tyna, ["A","B"]), sep='\n')
-    with open(f"{WORK_DIR}TynA/mutants.pickle", "wb") as of:
-        pickle.dump(mutant_gen(mutation_section_tyna, ["A", "B"]), of, 0)
-    with open(f"{WORK_DIR}PuO/mutants.pickle", "wb") as of:
-        pickle.dump(mutant_gen(mutation_section_puo, ["A", "B"]), of, 0)   
-
+    # with open(f"{WORK_DIR}TynA/mutants.pickle", "wb") as of:
+    #     pickle.dump(mutant_gen(mutation_section_tyna, ["A", "B"]), of, 0)
+    # with open(f"{WORK_DIR}PuO/mutants.pickle", "wb") as of:
+    #     pickle.dump(mutant_gen(mutation_section_puo, ["A", "B"]), of, 0)   
+    with open(f"{WORK_DIR}PuO/mutants_2nd.pickle", "wb") as of:
+        pickle.dump(mutant_gen(mutation_section_puo_2nd, ["A", "B"]), of, 0)   
 if __name__ == "__main__":
     main()

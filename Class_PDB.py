@@ -1813,7 +1813,7 @@ class PDB():
   tempi = '''+self.conf_heat['tempi']+''',  temp0='''+self.conf_heat['temp0']+''',  
   ntpr  = '''+ntpr+''',  ntwx='''+ntwx+''',
   ntt   = '''+self.conf_heat['ntt']+''', gamma_ln = '''+self.conf_heat['gamma_ln']+''',
-  ntb   = 1,  ntp = 0,
+  ntb   = '''+self.conf_heat['ntb']+''',  ntp = '''+self.conf_heat['ntp']+''',
   iwrap = '''+self.conf_heat['iwarp']+''',
   nmropt= 1,
   ig    = -1,
@@ -1879,7 +1879,7 @@ class PDB():
   temp0 = '''+self.conf_equi['temp0']+''',
   ntpr  = '''+ntpr+''', ntwx = '''+self.conf_equi['ntwx']+''',
   ntt   = '''+self.conf_equi['ntt']+''', gamma_ln = '''+self.conf_equi['gamma_ln']+''',
-  ntb   = 2,  ntp = 1,
+  ntb   = '''+self.conf_equi['ntb']+''',  ntp = '''+self.conf_equi['ntp']+''',
   iwrap = '''+self.conf_equi['iwarp']+''',
   ig    = -1,
 '''+ntr_line+nmropt_line+''' /
@@ -1921,7 +1921,7 @@ class PDB():
             nmropt_line = ''
             DISANG_tail = ''
 
-        conf_str='''Production: constant pressure
+        conf_str='''Production
  &cntrl
   imin  = 0, ntx = '''+self.conf_prod['ntx']+''', irest = '''+self.conf_prod['irest']+''',
   ntf   = '''+self.conf_prod['ntf']+''',  ntc = '''+self.conf_prod['ntc']+''',
@@ -1930,7 +1930,7 @@ class PDB():
   temp0 = '''+self.conf_prod['temp0']+''',
   ntpr  = '''+ntpr+''', ntwx = '''+self.conf_prod['ntwx']+''',
   ntt   = '''+self.conf_prod['ntt']+''', gamma_ln = '''+self.conf_prod['gamma_ln']+''',
-  ntb   = 2,  ntp = 1,
+  ntb   = '''+self.conf_prod['ntb']+''',  ntp = '''+self.conf_prod['ntp']+''',
   iwrap = '''+self.conf_prod['iwarp']+''',
   ig    = -1,
 '''+ntr_line+nmropt_line+''' /

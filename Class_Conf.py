@@ -143,12 +143,12 @@ class Config:
         #  &wt
         #   type  = 'TEMP0',
         #   istep1= 0, istep2={0.9nstlim},
-        #   value1= 0.0, value2=300.0,
+        #   value1= {tempi}, value2={temp0},
         #  /
         #  &wt
         #   type  = 'TEMP0',
         #   istep1= {A_istep2+1}, istep2={nstlim},
-        #   value1= 300.0, value2=300.0,
+        #   value1= {temp0}, value2={temp0},
         #  /
         #  &wt
         #   type  = 'END',
@@ -159,6 +159,7 @@ class Config:
                    'tempi': '0.0', 'temp0': '300.0',
                    'ntpr': '0.01nstlim', 'ntwx': 'nstlim',
                    'ntt': '3', 'gamma_ln': '5.0',
+                   'ntb': '1', 'ntp':'0',
                    'iwarp': '1',
                    'ntr': '1', 'restraintmask': "'@C,CA,N'", 'restraint_wt': '2.0',
                    'A_istep2':'0.9nstlim', 'B_istep1':'A_istep2+1',
@@ -197,6 +198,7 @@ class Config:
                    'temp0': '300.0',
                    'ntpr': '0.002nstlim', 'ntwx': '5000', # default 10ps (TODO support different power numbers)
                    'ntt': '3', 'gamma_ln': '5.0',
+                   'ntb': '2', 'ntp':'1',
                    'iwarp': '1',
                    'ntr': '1', 'restraintmask': "'@C,CA,N'", 'restraint_wt': '2.0', # the later two are only used when ntr = 1
                    'nmropt_rest': '0',
@@ -233,6 +235,7 @@ class Config:
                    'temp0': '300.0',
                    'ntpr': '0.001nstlim', 'ntwx': '5000', # default 10ps
                    'ntt': '3', 'gamma_ln': '5.0',
+                   'ntb': '2', 'ntp':'1',
                    'iwarp': '1',
                    'ntr': '0', 'restraintmask': None, 'restraint_wt': '2.0', # the later two are only used when ntr = 1
                    'nmropt_rest': '0',
