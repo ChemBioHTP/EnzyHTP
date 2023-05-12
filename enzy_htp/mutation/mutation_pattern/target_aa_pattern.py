@@ -28,6 +28,7 @@ def decode_target_aa_pattern(orig_resi: str, pattern: str) -> List[str]:
             syntax:
                 1. keywords
                     (current supported keywords)
+                    self:       the AA itself
                     all:        all 20 canonical amino acid (AA)
                     larger:     AA that is larger in size according to
                                 enzy_htp.chemical.residue.RESIDUE_VOLUME_MAPPER
@@ -40,16 +41,16 @@ def decode_target_aa_pattern(orig_resi: str, pattern: str) -> List[str]:
                     positive:   AA that have positive charge
                     negative:   AA that have negative charge
 
-                2. TODO support logic expression of keywords
     Returns:
         a list of 3-letter name of the target AAs"""
-    # TODO work on logic expression for not self
     result = []
     keyword_re_pattern = r"\b(?!and|or|not|\(|\))[\d\w+-]+"
     eval_pattern = re.sub(keyword_re_pattern,
                           lambda x: f"set(KEYWORD_DECODER['{x.group(0)}'](orig_resi))",
                           pattern)
-    eval_pattern = eval_pattern.replace("not", "-")
+    eval_pattern = eval_pattern.replace(" not ", "-")
+    eval_pattern = eval_pattern.replace(" or ", "|")
+    eval_pattern = eval_pattern.replace(" and ", "&")
     result = eval(eval_pattern)
     return sorted(list(result))
 
@@ -71,7 +72,7 @@ def decode_larger(orig_resi: str):
 def decode_smaller(orig_resi: str):
     """decoder for keyword: smaller"""
     result = filter(
-        lambda x: RESIDUE_VOLUME_MAPPER[x] < RESIDUE_VOLUME_MAPPER[convert_one_letter(
+        lambda x: RESIDUE_VOLUME_MAPPER[x] < RESIDUE_VOLUME_MAPPER[convert_to_one_letter(
             orig_resi)], RESIDUE_VOLUME_MAPPER)
     result = map(lambda x: ONE_LETTER_CAA_MAPPER[x], result)
     return list(result)
@@ -143,6 +144,28 @@ KEYWORD_DECODER = {
     "positive": decode_positive,
     "negative": decode_negative,
     "self": decode_self,
+    # all direct 3-letter name
+    "ALA" : lambda x: ["ALA"],
+    "CYS" : lambda x: ["CYS"],
+    "ASP" : lambda x: ["ASP"],
+    "GLU" : lambda x: ["GLU"],
+    "PHE" : lambda x: ["PHE"],
+    "GLY" : lambda x: ["GLY"],
+    "HIS" : lambda x: ["HIS"],
+    "ILE" : lambda x: ["ILE"],
+    "LYS" : lambda x: ["LYS"],
+    "LEU" : lambda x: ["LEU"],
+    "MET" : lambda x: ["MET"],
+    "ASN" : lambda x: ["ASN"],
+    "PRO" : lambda x: ["PRO"],
+    "GLN" : lambda x: ["GLN"],
+    "ARG" : lambda x: ["ARG"],
+    "SER" : lambda x: ["SER"],
+    "THR" : lambda x: ["THR"],
+    "SEC" : lambda x: ["SEC"],
+    "VAL" : lambda x: ["VAL"],
+    "TRP" : lambda x: ["TRP"],
+    "TYR" : lambda x: ["TYR"],
     # TODO: add upon need.
 }
 

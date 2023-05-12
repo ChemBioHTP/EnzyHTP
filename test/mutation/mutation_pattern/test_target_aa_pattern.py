@@ -27,6 +27,13 @@ def test_decode_target_aa_pattern_not_expr():
         "ALA", "THR", "LYS", "LEU", "MET", "ILE", "TRP", "PHE"
     ])
 
+def test_decode_target_aa_pattern_direct_residue_name():
+    """test the function use a made up orig_resi"""
+    test_pattern = "PHE or ALA"
+    test_orig_resi = "ARG"
+    assert set(m_p.decode_target_aa_pattern(test_orig_resi, test_pattern)) == set([
+        "PHE", "ALA"
+    ])
 
 def test_decode_larger():
     """test the function use a made up orig_resi"""
