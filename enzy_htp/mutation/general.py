@@ -34,6 +34,7 @@ def assign_mutant(
     chain_sync_list: List[tuple] = None,
     chain_index_mapper: Dict[str, int] = None,
     random_state: int = 100,
+    if_check: bool = True,
 ) -> List[List[Mutation]]:
     """
     This science API assigns mutants targeted in the study.
@@ -56,6 +57,8 @@ def assign_mutant(
             "B": BCDEFGH (start from 14)
             the chain_sync_mapper should be {"A":0, "B":6} and index conversion is done by
             A_res_idx - 0 + 6 = B_res_idx)
+        if_check: if or not checking if each mutation is valid. (This could be pretty slow if
+            the mutant is >10^7 level)
     Raises:
         enzy_htp.core.exception.InvalidMutationPatternSyntax
     Return:
@@ -110,9 +113,10 @@ def assign_mutant(
     if chain_sync_list:
         mutants = sync_mutation_over_chains(mutants, chain_sync_list, chain_index_mapper)
     # san check of the mutation_flagss
-    for mutant in mutants:
-        for mutation in mutant:
-            assert mutation.is_valid_mutation(stru)
+    if if_check:
+        for mutant in mutants:
+            for mutation in mutant:
+                assert mutation.is_valid_mutation(stru)
     return mutants
 
 def sync_mutation_over_chains(mutants: List[List[Mutation]],
