@@ -174,7 +174,10 @@ def test_get_name_tag():
 
     print(mut.get_mutant_name_tag(test_mutant))
 
-
+def test_get_charge_diff():
+    """test behavior of get_charge_diff"""
+    test_mutant = mut.Mutation("ARG", "TRP", "A", 154)
+    assert test_mutant.get_charge_diff() == -1
 
 # == TODO ==
 def test_generate_all_mutations():

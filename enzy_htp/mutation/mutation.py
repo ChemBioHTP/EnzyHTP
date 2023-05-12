@@ -11,7 +11,7 @@ import copy
 import re
 from collections import namedtuple
 from typing import List, Dict, Tuple, Union
-from enzy_htp.chemical.residue import (ONE_LETTER_AA_MAPPER, THREE_LETTER_AA_MAPPER,
+from enzy_htp.chemical.residue import (CAA_CHARGE_MAPPER, ONE_LETTER_AA_MAPPER, THREE_LETTER_AA_MAPPER,
                                        convert_to_canonical_three_letter,
                                        convert_to_one_letter, convert_to_three_letter)
 
@@ -126,6 +126,10 @@ class Mutation:
         """get the position key in a form of (chain_id, res_idx)
         from the Mutation"""
         return (self.chain_id, self.res_idx)
+
+    def get_charge_diff(self) -> int:
+        """get the charge difference before and after the mutation."""
+        return CAA_CHARGE_MAPPER[self.target] - CAA_CHARGE_MAPPER[self.orig]
 
     # == editor ==
     def changed_clone(self, **kwarg):
