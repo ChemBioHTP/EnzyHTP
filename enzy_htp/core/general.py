@@ -114,15 +114,31 @@ def product_lists_allow_empty(list_of_lists: List[list]) -> List[list]:
     ]
     return _product_lists_w_each_empty_ele(iter(list_of_lists_copy))
 
+# == Museum of Function ==
+# This is an old slow but insteresting function so it kept it here
+# def _product_lists_w_each_empty_ele(list_of_lists: Iterable[list]) -> List[list]:
+#     """a sub-function used for product_list_allow_empty"""
+#     curr_list = next(list_of_lists, None)
+#     if not curr_list:
+#         return [[]]
+#     next_list = _product_lists_w_each_empty_ele(list_of_lists)
+#     return [[x] + y if x != GHOST_LIST_ELEMENT else y for x in curr_list
+#             for y in next_list]
 
 def _product_lists_w_each_empty_ele(list_of_lists: Iterable[list]) -> List[list]:
     """a sub-function used for product_list_allow_empty"""
-    curr_list = next(list_of_lists, None)
-    if not curr_list:
-        return [[]]
-    next_list = _product_lists_w_each_empty_ele(list_of_lists)
-    return [[x] + y if x != GHOST_LIST_ELEMENT else y for x in curr_list
-            for y in next_list]
+    result_w_none = itertools.product(*list_of_lists)
+    result = []
+    count = 0
+    for sublists in result_w_none:
+        count += 1
+        result_sublist = []
+        for ele in sublists:
+            if ele is GHOST_LIST_ELEMENT:
+                continue
+            result_sublist.append(ele)
+        result.append(result_sublist)
+    return result
 
 def if_list_contain_repeating_element(target_list: list) -> bool:
     """check if the target list contains any repeating elements"""
@@ -158,7 +174,7 @@ def get_copy_of_deleted_dict(orig_dict: Dict, del_key) -> Dict:
 def timer(fn):
     """decodator for timing the run of the function {fn}"""
 
-    def inner(*args, **kwargs):
+    def timer_inner(*args, **kwargs):
         start_time = time.perf_counter()
         to_execute = fn(*args, **kwargs)
         end_time = time.perf_counter()
@@ -166,7 +182,7 @@ def timer(fn):
         _LOGGER.info("{0} took {1:.8f}s to execute".format(fn.__name__, execution_time))
         return to_execute
 
-    return inner
+    return timer_inner
 
 def get_localtime(time_stamp: float = None) -> str:
     """function that default return current locat time as formatted string.
