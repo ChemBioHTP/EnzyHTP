@@ -174,4 +174,7 @@ def test_find_residue_with_key(caplog):
 
 def test_init_connect():
     """test function works as expected"""
-    pass
+    pdb_file_path = f"{DATA_DIR}1Q4T_ligand_test.pdb"
+    stru: Structure = sp.get_structure(pdb_file_path)
+
+    stru.init_connect()

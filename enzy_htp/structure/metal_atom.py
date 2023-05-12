@@ -131,6 +131,14 @@ class MetalUnit(Residue):
         """
         return list(self.get_donor_mapper(method, check_radius).keys())
 
+    def init_connect(self, method: str) -> None:
+        """initiate connectivity for the atom"""
+        support_method_list = ["isolate"]
+        if method == "isolate":
+            self.atom.connect = []
+        if method not in support_method_list:
+            _LOGGER.error(f"Method {method} not in supported list: {support_method_list}")
+
     #endregion
 
     #region === Checker ===

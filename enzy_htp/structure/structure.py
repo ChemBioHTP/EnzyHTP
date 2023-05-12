@@ -296,7 +296,7 @@ class Structure(DoubleLinkedNode):
         return result
 
     @property
-    def metals(self) -> List[Residue]:
+    def metals(self) -> List[MetalUnit]:
         """Filters out the metal Residue()"s from the chains in the Structure()."""
         result: List[Residue] = []
         for chain in self.chains:
@@ -304,7 +304,7 @@ class Structure(DoubleLinkedNode):
         return result
 
     @property
-    def metalcenters(self) -> List[Residue]:
+    def metalcenters(self) -> List[MetalUnit]:
         """Filters out the metal coordination center Residue()"s from the chains 
         in the Structure()."""
         result: List[Residue] = []
@@ -330,56 +330,65 @@ class Structure(DoubleLinkedNode):
 
     def init_connect(
         self,
-        ligand_fix: int= 1,
-        metal_fix: int= 1,
-        ncaa_fix: int=1,) -> None:
+        ligand_fix: int= "antechamber",
+        metal_fix: int= "isolate",
+        ncaa_fix: int= "antechamber",
+        solvent_fix: int= "caa") -> None:
         """
         Initiate connectivity for the Structure.
         Save the connectivity to self._connect of each Atom().
         Args:
             ligand_fix:
-                the method that determines connectivity for ligand and ncAA. (see details below)
+                the method that determines connectivity for ligand. (see details below)
             metal_fix:
                 the method that determines connectivity for metal. (see details below)
+            ncaa_fix:
+                the method that determines connectivity for ncaa. (see details below)
+            solvent_fix:
+                the method that determines connectivity for solvent. (see details below)
 
         Details:
             polypeptide:
                 using documented connectivity for each canonical amino acid from Amber
                 library.
-            ligand/non-canonical residue:
-                fix = 1:
+            ligand:
+                fix = "antechamber":
                     use antechamber to generated connectivity and read from prepin file.
                     (according to https://ambermd.org/doc/prep.html the coordniate line will
                     always start at the 11th line after 3 DUMM.)
             metalatom:
-                fix = 1: treat as isolated atom
-                fix = 2: connect to donor atom (MCPB?)
+                fix = "isolate": treat as isolated atom
+                TODO fix = "mcpb": connect to donor atom (MCPB?)
+            non-canonical residues:
+                fix = "antechamber": same as above in ligand.
+            solvent:
+                fix = "caa": same as polypeptide part
         """
         self.init_connect_for_polypeptides(ncaa_fix=ncaa_fix)
         self.init_connect_for_ligands(method=ligand_fix)
         self.init_connect_for_metals(method=metal_fix)
+        self.init_connect_for_solvents(method=solvent_fix)
         # check if all atoms are connected
         for atm in self.atoms:
-            if not atm.has_init_connect():
+            if not atm.is_connected():
                 _LOGGER.error(f"Atom {atm} doesn't have connect record after initiation.")
                 sys.exit(1)
 
-
     def init_connect_for_polypeptides(self, ncaa_fix: str):
-        """"""
-        for chain in self.chains:
-            for res in chain:
-                for atom in res:  #@shaoqz: @imp this no longer works right?
-                    atom.get_connect()
-        for sol in self.solvents:
-            for atom in sol:
-                atom.get_connect()
+        """initiate connectivity for polypeptides."""
+        for chain in self.polypeptides:
+            for res in chain.residues:
+                if res.is_noncanonical():
+                    res.init_connect_ncaa(method=ncaa_fix)
+                else:
+                    for atom in res.atoms:
+                        atom.init_connect_in_caa()
 
     def init_connect_for_ligands(self, method: str):
         """"""
         # TODO generate prepi by itself and store it to a global database path so that other
         # process in the same workflow can share the generated file.
-        
+        support_method_list = ["caa"]
         # ligand
         # init
         for lig in self.ligands:
@@ -417,17 +426,18 @@ class Structure(DoubleLinkedNode):
                             if atom_cnt != 0:
                                 lig[atom_id - 1].connect.append(lig[atom_cnt - 1])
                                 lig[atom_cnt - 1].connect.append(lig[atom_id - 1])
+        if method not in support_method_list:
+            _LOGGER.error(f"Method {method} not in supported list: {support_method_list}")
 
     def init_connect_for_metals(self, method: str):
-        """"""
-        # metal
-        for metal in self.metalatoms:
-            metal.connect = []
-        if metal_fix == 1:
-            pass
-        if metal_fix == 2:
-            raise Exception("TODO: Still working on 2 right now")
+        """initiate connectivity for metals in the structure"""
+        for metal in self.metals:
+            metal.init_connect(method)
 
+    def init_connect_for_solvents(self, method: str):
+        """initiate connectivity for solvents in the structure"""
+        for sol in self.solvents:
+            sol.init_connect(method)
     #endregion
 
     #region === Checker ===

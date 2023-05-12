@@ -38,6 +38,7 @@ class Atom(DoubleLinkedNode):
         b_factor : A float representing the temperature factor (b factor).
         charge : Charge of the atom.
         element : Character representing element.
+        connect : the connectivity of this atom. (a list of reference of connected Atom objs)
     """
 
     def __init__(self, ds: pd.Series, parent=None):
@@ -146,20 +147,32 @@ class Atom(DoubleLinkedNode):
         """getter for _connect, the list for atoms it connects"""
         if self.is_connected():
             return self._connect
-        return self.get_connect()
+        _LOGGER.warning(f"There are no connection info for {self}, consider initiate it first.")
 
     @connect.setter
     def connect(self, val):
-        self._connect = val
+        """setter of connect is nessessary for residue level objects to set connectivity for atoms
+        raise an error if called by non residue objects"""
+        allowed_caller_class = ["Residue"]
+        # determine caller class
+        caller_locals = sys._getframe(1).f_locals
+        if "self" in caller_locals:
+            caller_class = caller_locals["self"].__class__.__name__
+            if caller_class in allowed_caller_class:
+                self._connect = val
+                return
+        _LOGGER.error(f"only calling from methods from {allowed_caller_class} is allowed")
+        sys.exit(1)
 
-    def get_connect(self) -> List[Atom]:
+    def init_connect_in_caa(self) -> None: # this should actually go the residue class
         """
-        Use this to generate/update connectivity for atom.
+        Initiate connectivity for this atom in a canonical amino acid. (and common solvents)
         find connect atom base on:
         1. chem.residue.RESIDUE_CONNECTIVITY_MAP
         2. parent residue name
-        * Using standard Amber atom names and C/N terminal name. TODO make this a standard or change to another
-        save found list of Atom object to self.connect (make the object to a connected state)
+        * Using standard Amber atom names and C/N terminal name.
+          (TODO make this a standard and convert other atom name formats)
+        save found list of Atom object to self._connect (make the object to a connected state)
         """
         connect = []
         parent_residue = self.parent
@@ -183,19 +196,19 @@ class Atom(DoubleLinkedNode):
                     cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP[
                         parent_residue.name][self.name]
         else:
-            _LOGGER.error(f"getting connectivity of non-canonical residue {self.parent}")
+            _LOGGER.error(
+                f"wrong method of getting connectivity of non-canonical residue {self.parent}. use Residue.init_connect_ncaa.")
             sys.exit(1)
+
         for name in cnt_atomnames:
             try:
                 if name not in ["-1C", "+1N"]:
                     cnt_atom = parent_residue.find_atom_name(name)
                 if name == "-1C":
-                    cnt_resi = parent_residue.chain.find_residue_idx(parent_residue.idx -
-                                                                     1)
+                    cnt_resi = parent_residue.chain.find_residue_idx(parent_residue.idx - 1)
                     cnt_atom = cnt_resi.find_atom_name("C")
                 if name == "+1N":
-                    cnt_resi = parent_residue.chain.find_residue_idx(parent_residue.idx +
-                                                                     1)
+                    cnt_resi = parent_residue.chain.find_residue_idx(parent_residue.idx + 1)
                     cnt_atom = cnt_resi.find_atom_name("N")
                 connect.append(cnt_atom)
             except ResidueDontHaveAtom as e:
@@ -203,7 +216,6 @@ class Atom(DoubleLinkedNode):
                     f"missing connecting atom {e.atom_name} of {self}. Structure maybe incomplete."
                 )
         self._connect = connect
-        return self._connect
 
     #endregion
 
