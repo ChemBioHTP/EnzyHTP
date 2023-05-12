@@ -16,6 +16,7 @@ from enzy_htp.chemical.residue import (
     RESIDUE_CATEGORIES,
     convert_to_canonical_three_letter,
     convert_to_one_letter,
+    convert_to_three_letter,
 )
 from enzy_htp.core.logger import _LOGGER
 
@@ -33,6 +34,7 @@ def decode_target_aa_pattern(orig_resi: str, pattern: str) -> List[str]:
                     larger:     AA that is larger in size according to
                                 enzy_htp.chemical.residue.RESIDUE_VOLUME_MAPPER
                     smaller:    AA that is smaller in size
+                    similar_size_20: AA that similar is size (cutoff: 20 Ang^3)
                     charge+:    AA that carry more formal positive charge
                     charge-:    AA that carry less formal positive charge
                     charge+1:   AA that carry 1 more positive charge
@@ -40,6 +42,7 @@ def decode_target_aa_pattern(orig_resi: str, pattern: str) -> List[str]:
                     neutral:    AA that is charge neutral
                     positive:   AA that have positive charge
                     negative:   AA that have negative charge
+                    {3-letter}: the AA of the 3-letter name
 
     Returns:
         a list of 3-letter name of the target AAs"""
@@ -63,20 +66,27 @@ def decode_all(orig_resi: str):
 def decode_larger(orig_resi: str):
     """decoder for keyword: larger"""
     result = filter(
-        lambda x: RESIDUE_VOLUME_MAPPER[x] > RESIDUE_VOLUME_MAPPER[convert_to_one_letter(
-            orig_resi)], RESIDUE_VOLUME_MAPPER)
-    result = map(lambda x: ONE_LETTER_CAA_MAPPER[x], result)
+        lambda x: RESIDUE_VOLUME_MAPPER[x] > RESIDUE_VOLUME_MAPPER[convert_to_one_letter(orig_resi)],
+        RESIDUE_VOLUME_MAPPER)
+    result = map(convert_to_three_letter, result)
     return list(result)
 
+
+def decode_similar_size_20(orig_resi: str):
+    """decoder for keyword: similar_size_20"""
+    result = filter(
+        lambda x: abs(RESIDUE_VOLUME_MAPPER[x] - RESIDUE_VOLUME_MAPPER[convert_to_one_letter(orig_resi)]) < 20,
+        RESIDUE_VOLUME_MAPPER)
+    result = map(convert_to_three_letter, result)
+    return list(result)
 
 def decode_smaller(orig_resi: str):
     """decoder for keyword: smaller"""
     result = filter(
-        lambda x: RESIDUE_VOLUME_MAPPER[x] < RESIDUE_VOLUME_MAPPER[convert_to_one_letter(
-            orig_resi)], RESIDUE_VOLUME_MAPPER)
-    result = map(lambda x: ONE_LETTER_CAA_MAPPER[x], result)
+        lambda x: RESIDUE_VOLUME_MAPPER[x] < RESIDUE_VOLUME_MAPPER[convert_to_one_letter(orig_resi)],
+        RESIDUE_VOLUME_MAPPER)
+    result = map(convert_to_three_letter, result)
     return list(result)
-
 
 def decode_charge_p(orig_resi: str):
     """decoder for keyword: charge+"""
@@ -108,17 +118,17 @@ def decode_charge_n1(orig_resi: str):
 
 def decode_neutral(orig_resi: str):
     """decoder for keyword: neutral"""
-    return RESIDUE_CATEGORIES["neutral"]
+    return [convert_to_three_letter(i) for i in RESIDUE_CATEGORIES["neutral"]]
 
 
 def decode_positive(orig_resi: str):
     """decoder for keyword: positive"""
-    return RESIDUE_CATEGORIES["positive"]
+    return [convert_to_three_letter(i) for i in RESIDUE_CATEGORIES["positive"] if i != "H"]
 
 
 def decode_negative(orig_resi: str):
     """decoder for keyword: negative"""
-    return RESIDUE_CATEGORIES["negative"]
+    return [convert_to_three_letter(i) for i in RESIDUE_CATEGORIES["negative"]]
 
 
 def decode_self(orig_resi: str):
@@ -144,6 +154,7 @@ KEYWORD_DECODER = {
     "positive": decode_positive,
     "negative": decode_negative,
     "self": decode_self,
+    "similar_size_20": decode_similar_size_20,
     # all direct 3-letter name
     "ALA" : lambda x: ["ALA"],
     "CYS" : lambda x: ["CYS"],

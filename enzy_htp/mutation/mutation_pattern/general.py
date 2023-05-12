@@ -163,8 +163,7 @@ def decode_all_mutation(stru: Structure, section_pattern: str) -> List[List[Muta
         a:[xxx:yyy] or a:M[xxx:yyy]"""
     result: List[List[Mutation]] = []
     re_pattern = r"a:(M?)\[(.+)\]"
-    force_mutate_each_point, mutation_esm_patterns = re.match(re_pattern,
-                                                              section_pattern).groups()
+    force_mutate_each_point, mutation_esm_patterns = re.match(re_pattern, section_pattern).groups()
     mutation_esm_mapper = decode_mutation_esm_pattern(stru, mutation_esm_patterns)  #{position: mutations}
     if force_mutate_each_point:
         result = list(itertools.product(*mutation_esm_mapper.values()))
@@ -202,12 +201,11 @@ def decode_mutation_esm_pattern(
             posi_target_aa = decode_target_aa_pattern(orig_resi, target_aa_pattern)
             posi_mutation = generate_mutation_from_traget_list(esm_position, orig_resi, posi_target_aa)
             if esm_position in esm_result:  # shared position case
-                esm_result[esm_position] = list(
-                    set(esm_result[esm_position]) or set(posi_mutation))
+                esm_result[esm_position] = list(set(esm_result[esm_position]) | set(posi_mutation))
             else:
                 esm_result[esm_position] = posi_mutation
     # logging
-    _LOGGER.info(f"Mutation ensemble of the section:")
+    _LOGGER.info("Mutation ensemble of the section:")
     for k, v in esm_result.items():
         _LOGGER.info(
             f"    {k} : {[x.get_target(if_one_letter=True) for x in v]} (total: {len(v)})"

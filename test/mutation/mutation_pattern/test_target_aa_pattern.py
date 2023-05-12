@@ -52,3 +52,8 @@ def test_check_target_aa_pattern_charge(caplog):
     test_pattern = "charge+"
     m_p.check_target_aa_pattern(test_pattern)
     assert "HIS is not included" in caplog.text
+
+def test_decode_positive():
+    """test the function use a made up orig_resi"""
+    test_orig_resi = "GLY"
+    assert m_p.decode_positive(test_orig_resi) == ['ARG', 'LYS']
