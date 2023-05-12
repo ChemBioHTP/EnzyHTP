@@ -147,6 +147,12 @@ class Residue(DoubleLinkedNode):
         """get a list of atom indexes in the residue"""
         return list(map(lambda a: a.idx, self.atoms))
 
+    @property
+    def ca_coord(self) -> Tuple[float, float, float]:
+        """get the C-Alpha coordinate of the residue"""
+        atom_ca = self.find_atom_name("CA")
+        return atom_ca.coord
+
     # def clone(self) -> Residue: #TODO
     #     """Creates a deepcopy of self."""
     #     return deepcopy(self)
