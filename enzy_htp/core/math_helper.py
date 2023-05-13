@@ -44,52 +44,8 @@ def get_distance(p1: Union[tuple, list], p2: Union[tuple, list]) -> float:
     return D
 
 
-def get_field_strength_value(p0: Union[tuple, list],
-                             c0: float,
-                             p1: Union[tuple, list],
-                             p2: Union[tuple, list] = None,
-                             d1: Union[tuple, list] = None) -> float:
-    """
-    calculate field strength E of *p0(c0)* at *p1* in direction of *p2-p1* or *d1*
-    E = kq/r^2 (Unit: kcal/mol)
-    point charge:   c0 in p0 
-    point:          p1
-    direction:      p2-p1 or d1
-    Args:
-        p0: position of charge of field source
-        c0: point charge in p0
-        p1: the query position to calculate the field strength
-        p2: the point that defines the direction of field strength projection by p2-p1
-        d1: the vector that defines the direction of field strength projection
-    Returns:
-        E: the field strength
-    """
-    # Unit
-    k = 332.4  # kcal*Ang/(mol*e^2) = (10^10)*(4.184^-1)*(Na)*(10^-3)*(1.602*10^-19)^2 * 9.0*10^-9 N*m^2/C^2
-    q = c0  # e
-    p0 = np.array(p0)  # Ang
-    p1 = np.array(p1)  # Ang
-    if d1 == None:
-        d1 = np.array(p2) - p1
-    else:
-        d1 = np.array(d1)
-    d1 = d1 / np.linalg.norm(d1)  # Ang
-
-    # Get r
-    r = p1 - p0
-    r_m = np.linalg.norm(r)
-    r_u = r / r_m
-
-    # Get E
-    E = (k * q / (r_m**2)) * r_u
-    # Get E in direction
-    Ed = np.dot(E, d1)  # kcal/(mol*e*Ang)
-
-    return Ed
-
-
-def get_center(p1: Union[tuple, list], p2: Union[tuple,
-                                                 list]) -> Tuple[float, float, float]:
+def get_center(p1: Union[tuple, list],
+               p2: Union[tuple, list]) -> Tuple[float, float, float]:
     """
     return the center of p1 and p2
     """
@@ -97,6 +53,9 @@ def get_center(p1: Union[tuple, list], p2: Union[tuple,
 
     return tuple(p3)
 
+def get_geom_center(list_of_p: list) -> Tuple[float, float, float]:
+    """get the geometric center of a list of points"""
+    return tuple(np.mean(np.array(list_of_p), axis=0))
 
 def round_by(num: float, cutnum: float) -> int:
     """

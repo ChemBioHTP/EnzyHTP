@@ -3,15 +3,28 @@
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2022-05-12
 """
+from typing import Union
 import numpy as np
 
-def get_ele_field_strength_value(p0, c0, p1, p2=None, d1=None):
+def get_ele_field_strength_value(p0: Union[tuple, list],
+                                 c0: float,
+                                 p1: Union[tuple, list],
+                                 p2: Union[tuple, list] = None,
+                                 d1: Union[tuple, list] = None) -> float:
     '''
     return field strength E of *p0(c0)* at *p1* in direction of *p2-p1* or *d1*
     -- E = kq/r^2 -- (Unit: kcal/(mol*e*Ang))
     point charge:   c0 in p0 
     point:          p1
     direction:      p2-p1 or d1
+    Args:
+        p0: position of charge of field source
+        c0: point charge in p0
+        p1: the query position to calculate the field strength
+        p2: the point that defines the direction of field strength projection by p2-p1
+        d1: the vector that defines the direction of field strength projection
+    Returns:
+        e_ele_d: the field strength on the direction
     '''
     # Unit
     k = 332.4   # kcal*Ang/(mol*e^2) = (10^10)*(4.184^-1)*(Na)*(10^-3)*(1.602*10^-19)^2 * 9.0*10^-9 N*m^2/C^2

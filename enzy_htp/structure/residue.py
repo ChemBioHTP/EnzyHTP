@@ -18,6 +18,7 @@ from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
 from enzy_htp.core import _LOGGER
 from enzy_htp.core.exception import ResidueDontHaveAtom
 import enzy_htp.chemical as chem
+from enzy_htp.core.math_helper import get_geom_center
 
 from .atom import Atom
 
@@ -152,6 +153,11 @@ class Residue(DoubleLinkedNode):
         """get the C-Alpha coordinate of the residue"""
         atom_ca = self.find_atom_name("CA")
         return atom_ca.coord
+
+    @property
+    def geom_center(self) -> Tuple[float, float, float]:
+        """get the geom_center coordinate of the residue"""
+        return get_geom_center([i.coord for i in self.atoms])
 
     # def clone(self) -> Residue: #TODO
     #     """Creates a deepcopy of self."""
