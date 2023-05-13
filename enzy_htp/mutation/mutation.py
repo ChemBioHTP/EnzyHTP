@@ -131,6 +131,10 @@ class Mutation:
         """get the charge difference before and after the mutation."""
         return CAA_CHARGE_MAPPER[self.target] - CAA_CHARGE_MAPPER[self.orig]
 
+    def str_wo_chain(self) -> str:
+        """return a string represntation without the chain id"""
+        return f"{self.get_orig(if_one_letter=True)}{self.res_idx}{self.get_target(if_one_letter=True)}"
+
     # == editor ==
     def changed_clone(self, **kwarg):
         """make a clone of self, values may chain"""
