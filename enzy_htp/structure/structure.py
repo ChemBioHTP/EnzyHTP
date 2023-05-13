@@ -230,7 +230,7 @@ class Structure(DoubleLinkedNode):
         result = list(filter(lambda r: r.name == name, self.residues))
         return result
 
-    def find_residue_with_key(self, key: Tuple[str, int]) -> Union[Residue, None]:
+    def find_residue_with_key(self, key: Tuple[str, int]) -> Residue:
         """find residues base on its (chain_id, idx). Return the matching residues"""
         result = list(filter(lambda r: r.key() == key, self.residues))
         if len(result) == 0:
