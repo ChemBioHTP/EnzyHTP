@@ -63,6 +63,8 @@ def assign_mutant(
         enzy_htp.core.exception.InvalidMutationPatternSyntax
     Return:
         a list of mutants defined each by a list of mutation objects.
+        *!NOTE!: this function generates WT as [] instead of a Mutation()
+                 unless directly indication. Act accordingly.
 
     *Pattern Syntax:*
         "mutant_1,mutant_2,mutant_3,..."
