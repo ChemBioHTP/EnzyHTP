@@ -3,7 +3,7 @@
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2022-09-26
 """
-from typing import Tuple, Union
+from typing import List, Tuple, Union
 from unittest.mock import NonCallableMock
 from .logger import _LOGGER
 import numpy as np
@@ -66,3 +66,13 @@ def round_by(num: float, cutnum: float) -> int:
     if dec_part > cutnum:
         int_part += 1
     return int(int_part)
+
+def calc_average_task_num(num_of_task: int, num_of_worker: int) -> List[int]:
+    """calculate task number for each worker based on {num_of_task} and
+    {num_of_worker}. Return a list of task numbers for each worker."""
+    task_each_worker = num_of_task // num_of_worker
+    remaining_tasks = num_of_task % num_of_worker
+    result = [task_each_worker for i in range(num_of_worker)]
+    for i in range(remaining_tasks):
+        result[i] += 1
+    return result
