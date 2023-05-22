@@ -1150,15 +1150,7 @@ class PDB():
             os.system(cmd)
         
         # rst2pdb
-        try:
-            run('ambpdb -p '+self.prmtop_path+' -c '+minrst_path+' > '+out4_PDB_path, check=True, text=True, shell=True, capture_output=True)
-        except CalledProcessError:
-            if Config.debug >= 1:
-                print('Error: ambpdb cannot read PDBMin result .rst')
-                os.system('mv '+self.prmtop_path+' '+self.inpcrd_path+' '+min_dir)
-                self.prmtop_path=min_dir+'/'+self.prmtop_path
-                self.inpcrd_path=min_dir+'/'+self.inpcrd_path
-                return 1
+        run('ambpdb -p '+self.prmtop_path+' -c '+minrst_path+' > '+out4_PDB_path, check=True, text=True, shell=True, capture_output=True)
         
         # clean
         os.system('mv '+self.prmtop_path+' '+self.inpcrd_path+' '+min_dir)
