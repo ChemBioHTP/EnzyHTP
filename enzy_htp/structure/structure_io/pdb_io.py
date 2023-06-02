@@ -9,6 +9,7 @@ import os
 import string
 import sys
 from typing import Dict, List, Union
+#from plum import dispatch, Dispatcher
 from plum import dispatch
 from biopandas.pdb import PandasPdb
 import pandas as pd
@@ -105,6 +106,8 @@ class PDBParser(StructureParserInterface):
             return Structure(chain_list), idx_change_mapper
         return Structure(chain_list)
 
+    
+
     @classmethod
     @dispatch
     def get_file_str(cls,
@@ -172,6 +175,8 @@ class PDBParser(StructureParserInterface):
             result_str += cls._write_pdb_chain(chain)
         result_str += f"END{os.linesep}"
         return result_str
+
+
 
     #region == pdb -> Stru ==
     @staticmethod
@@ -656,6 +661,8 @@ class PDBParser(StructureParserInterface):
         #example: ATOM   5350  HB2 PRO   347      32.611  15.301  24.034  1.00  0.00
         line = f"{l_type}{a_index} {a_name}{alt_loc_id}{r_name} {c_index}{r_index}{insert_code}   {x}{y}{z}{occupancy}{temp_factor}      {seg_id}{element}{charge}{os.linesep}"
         return line
+
+
 
     @dispatch
     def _(self):

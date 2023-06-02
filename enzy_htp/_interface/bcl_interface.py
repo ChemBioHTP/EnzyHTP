@@ -100,6 +100,8 @@ class BCLInterface:
             flags
         )
 
+        return outfile
+
 
     def formal_charge(self, molfile:str) -> int:
         """Find the formal charge of the supplied molfile using molecule:Properties routine. Supplied

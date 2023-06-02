@@ -221,15 +221,18 @@ class Atom(DoubleLinkedNode):
         radius = chem.get_atom_radii(self.element, method)
         return radius
 
-    @dispatch
-    def distance_to(self, point: Atom) -> float:
-        """Get the distance to the other atom or a point."""
-        return mh.get_distance(self.coord, point.coord)
+    #@dispatch
+    #def distance_to(self, point: Atom) -> float:
+    #    """Get the distance to the other atom or a point."""
+    #    return mh.get_distance(self.coord, point.coord)
 
-    @dispatch
+    #@dispatch
     def distance_to(self, point: tuple) -> float:  # pylint: disable=function-redefined
         """Get the distance to the other atom or a point."""
-        return mh.get_distance(self.coord, point)
+        if type(point) == tuple:
+            return mh.get_distance(self.coord, point)
+        else:
+            return mh.get_distance(self.coord, point.coord)
 
     def attached_protons(self) -> List[Atom]:
         """find all protons attached to self"""

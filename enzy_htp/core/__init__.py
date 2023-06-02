@@ -25,3 +25,5 @@ from .file_system import (
     write_data,
 )
 from .math_helper import (check_valid_ph)
+
+from .typing import (check_var_type)

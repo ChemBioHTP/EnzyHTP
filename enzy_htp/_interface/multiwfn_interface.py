@@ -7,6 +7,7 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-07-01
 """
 import re
+import pandas as pd
 from pathlib import Path
 from typing import List, Dict, Tuple
 
@@ -15,10 +16,9 @@ import numpy as np
 from enzy_htp.core import env_manager as em
 from enzy_htp.core import file_system as fs
 
-# from .multiwfn_config import MultiwfnConfig, default_multiwfn_config
+from enzy_htp._config.multiwfn_config import MultiwfnConfig, default_multiwfn_config
 
 # TODO(CJ): add .config() getter
-
 
 class MultiwfnInterface:
     """
@@ -39,7 +39,10 @@ class MultiwfnInterface:
         self.env_manager_.check_environment()
         self.compatible_env_ = self.env_manager_.is_missing()
 
-    def parse_two_center_dp_moments(self, fname) -> List[Tuple[Tuple, Tuple]]:
+    def get_dipoles(self, fname:str) -> pd.DataFrame:
+        """ """
+
+        fs.check_file_exists( fname )
 
         def digits_only(raw: str) -> str:
             return re.sub(r"[a-z:/]", "", raw.lower())

@@ -7,9 +7,11 @@ Date: 2022-10-29
 """
 from pathlib import Path
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 
-from enzy_htp.core import _LOGGER
+import pandas as pd
+
+from enzy_htp.core import _LOGGER, check_var_type
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import env_manager as em
 
@@ -19,17 +21,19 @@ from enzy_htp._config.pymol_config import PyMOLConfig, default_pymol_config
 #TODO(CJ): add something to remove "PyMOL not running. Entering library mode (experimental" message on pymol running
 
 class PyMOLInterface:
-    """
+    """Class that provides a direct interface for enzy_htp to utilize the PyMOL python package. Supported operations 
+    include (TODO(CJ))
 
 
     Attributes:
-        cmd : 
-        config_ : 
-        env_manager_ : 
-        compatible_env_ : 
+        cmd : The pymol module that enzy_htp as has ccess to.
+        config_ : The PyMOLConfig() class which provides settings for both running PyMOL and maintaining a compatible environment.
+        env_manager_ : The EnvironmentManager() class which ensures all required environment elements exist.
+        compatible_env_ : A bool() indicating if the current environment is compatible with the object itself.
     """
 
     def __init__(self, config: PyMOLConfig = None) -> None:
+        #TODO(CJ): try importing from pymol2 first, then fall back on pymol if errors
         from pymol import cmd
         self.cmd = cmd
         self.config_ = config
@@ -46,7 +50,7 @@ class PyMOLInterface:
         """Getter for the PyMOLConfig() instance belonging to the class."""
         return self.config_
 
-    def convert(self, file_1:str, file_2:str=None, new_ext:str=None) -> str:
+    def convert(self, file_1:str, file_2:str=None, new_ext:str=None, split_states:bool=False) -> Union[str, List[str]]:
         """Method that converts a supplied file to a different format. Either a new filename or new file 
         extension can be supplied. If neither or both are supplied, then the function will exist. Note
         that the function does not check for valid file types and will catch any errors that are thrown
@@ -60,6 +64,7 @@ class PyMOLInterface:
         Returns:
             The name of the new file as a str().
         """
+        #TODO(CJ): update split states. update return policy
         
         fs.check_file_exists( file_1 )
 
@@ -74,18 +79,38 @@ class PyMOLInterface:
         if not file_2:
             fpath = Path( file_1 )
             file_2 = fpath.with_suffix( new_ext )
-
+        
+        result:str = str(file_2)
 
         try:
             self.cmd.delete('all')
             self.cmd.load(file_1)
-            self.cmd.save(file_2)
-            self.cmd.delete('all')
-        except:
-            _LOGGER.error(f"Could not convert '{file_1}' to '{file_2}'. Exiting...")
+            
+            if split_states:
+                self.cmd.split_states('all')                
+                result = Path(result)
+                parent_dir = result.parent 
+                result_stem = result.stem
+                result = []
+                
+                for oidx, oname in enumerate(self.cmd.get_object_list()):
+                    
+                    if self.cmd.count_states(oname) != 1:
+                        self.cmd.delete(oname)
+                        continue
+                    
+                    fname = str( parent_dir / f"{result_stem}_{oidx}{new_ext}" )
+                    self.cmd.save( fname, oname )
+                    result.append( fname )
+            else:
+                self.cmd.save(result)
+                self.cmd.delete('all')
+        
+        except Exception as exe:
+            _LOGGER.error(f"Could not convert '{file_1}' to '{file_2}'. Encountered error: '{exe}'. Exiting...")
             exit( 1 )
 
-        return str( file_2 )
+        return result 
 
 
 
@@ -190,10 +215,79 @@ class PyMOLInterface:
             new_file = fpath.parent / f"{fpath.stem}_deprotonated{fpath.suffix}"
 
         self.cmd.delete( 'all' )
-
+        self.cmd.load( molfile )
         self.cmd.remove( 'hydrogens' )
         self.cmd.save( new_file )
 
         self.cmd.delete('all')
 
         return new_file
+
+    def rename_atoms(self, template: str, in_file: str) -> str:
+        """ """
+        _eh_local: Dict[str, Any] = {'template': [], 'in_stru':[]}
+
+        self.cmd.delete('all')
+        self.cmd.load(template)
+        self.cmd.iterate('all', 'template.append((name, elem, ID))', space=_eh_local)
+        self.cmd.delete('all')
+
+        self.cmd.load(in_file)
+        self.cmd.iterate('all', 'in_stru.append((name, elem, ID))', space=_eh_local)
+
+        if len(_eh_local['template']) != len(_eh_local['in_stru']):
+            _LOGGER.error(f"Atom number mismatch in template vs in_file structures. ({len(_eh_local['template'])} vs {len(_eh_local['in_stru'])}). Exiting...")
+            exit( 1 )
+        
+        for tidx, (tp1, tp2) in enumerate(zip(
+                sorted(_eh_local['template'], key=lambda tp: tp[-1]),
+                sorted( _eh_local['in_stru'], key=lambda tp: tp[-1])
+                 )):
+            if tp1[1] != tp2[1]:
+                _LOGGER.error(f"Atom type mismatch at atom number {tidx+1} template vs in_file structures. template: {tp1[1]}  in_stru: {tp2[1]}. Exiting...")
+                exit( 1 )
+
+        for (name, _, ID) in _eh_local['template']:
+            self.cmd.alter( f"ID {ID}", f'name="{name}"' )
+
+        self.cmd.save( in_file )
+        self.cmd.delete('all')
+
+        return in_file
+
+
+    def collect(self, molfile:str, variables:List[str], sele:str='all', state:int=-1) -> pd.DataFrame:
+        """Function that serves as a wrapper to the pymol cmd API's iterate_state() method. Checks if the supplied file exists prior to collecting data.
+        Data is returned in a pandas DataFrame() where each row is an atom and each column is a variable.
+
+        Args:
+            molfile: Name of the structure to sample. 
+            variables: A list() of str()'s with variable names to pull from in the structure.
+            sele: The pymol selection string to use. Defaults to 'all'
+            state: The state to use. Defaults to -1 (current state).
+
+        Returns:
+            A pandas DataFrame() where each row is an atom and each column is a variable.
+
+        """
+
+
+        check_var_type(variables, list)
+        for vv in variables:
+            check_var_type( vv, str )
+
+        fs.check_file_exists(molfile)    
+        self.cmd.delete('all')
+
+        _eh_local: Dict[str, Any] = {'data':[]}
+
+        self.cmd.delete('all')
+        self.cmd.load(molfile)
+        iter_stmt:str=f"data.append(({', '.join(variables)}))"
+        self.cmd.iterate_state(state,sele,iter_stmt,space=_eh_local)
+        self.cmd.delete('all')
+        
+        return pd.DataFrame(
+            data=_eh_local['data'],
+            columns=variables
+        )

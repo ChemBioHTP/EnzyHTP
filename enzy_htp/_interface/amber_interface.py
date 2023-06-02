@@ -30,7 +30,7 @@ class AmberInterface:
 
     Attributes:
         config_	: The AmberConfig() class which provides settings for both running Amber and maintaining a compatible environment.
-        env_manager_ : The EnvironmentManager() class which ensure all required environment elements exist.
+        env_manager_ : The EnvironmentManager() class which ensures all required environment elements exist.
         compatible_env_ : A bool() indicating if the current environment is compatible with the object itself.
     """
 

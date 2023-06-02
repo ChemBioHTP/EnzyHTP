@@ -11,16 +11,31 @@ from typing import List
 from copy import deepcopy
 
 class RosettaConfig:
-    """ """
+    """Class that holds default values for running Rosetta with enzy_htp and 
+    also keeps track of required environment variables and exectuables.
+
+    Attributes:
+        ROSETTA3 : str() of the environment variable needed for the quite.
+        ROSETTA_SCRIPTS : str() of the RosettaScripts executable.
+        PARAMS_SCRIPT: str() of the parameter generation file needed for RosettaLigand.
+    """
 
     ROSETTA3:str = "ROSETTA3"
-    """ """
+    """Path variable that points to the git installation of rosetta aka 'main'."""
 
-    ROSETTA_SCRIPTS:str = "rosetta_scripts.default.linuxgccrelease"#TODO(CJ): I think I need to change this
-    """ """
+    ROSETTA_SCRIPTS:str = "$ROSETTA3/source/bin/rosetta_scripts.linuxgccrelease"
+    """The name of the RosettaScripts executable."""
 
     PARAMS_SCRIPT:str=f"$ROSETTA3/source/scripts/python/public/molfile_to_params.py"
+    """Script used for paramterizing ligands for RosettaLigand protocol."""
 
+
+    RELAX:str=f"$ROSETTA3/source/bin/relax.default.linuxgccrelease"
+    """Executable used to relax a structure/pose."""
+
+    SCORE:str=f"$ROSETTA3/source/bin/score_jd2.default.linuxgccrelease"
+    """Executable used to score a specific structure/pose."""
+        
 
     def required_executables(self) -> List[str]:
         """A hardcoded list of required executables for Rosetta."""
@@ -37,7 +52,7 @@ class RosettaConfig:
 
 
 
-
 def default_rosetta_config() -> RosettaConfig:
     """Creates a deep-copied version of the RosettaConfig() class."""
     return deepcopy(RosettaConfig())
+
