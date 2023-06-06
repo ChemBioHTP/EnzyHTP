@@ -20,8 +20,9 @@ from enzy_htp.structure import Structure, PDBParser
 
 # TODO(CJ): add .config() getter
 
+from .base_interface import BaseInterface
 
-class GaussianInterface:
+class GaussianInterface(BaseInterface):
     """TODO(CJ)
     Attributes:
         config_:
@@ -29,16 +30,12 @@ class GaussianInterface:
         compatible_env_ : A bool() indicating if the current environment is compatible with the object itself.
     """
 
-    def __init__(self, config=None):
-        self.config_ = config
-        if not self.config_:
-            self.config_ = default_gaussian_config()
-        self.env_manager_ = em.EnvironmentManager(
-            env_vars=self.config_.required_env_vars(),
-            executables=self.config_.required_executables(),
-        )
-        self.env_manager_.check_environment()
-        self.compatible_env_ = self.env_manager_.is_missing()
+    def __init__(self, parent, config: GaussianConfig = None) -> None:
+        """Simplistic constructor that optionally takes a GaussianConfig object as its only argument.
+        Calls parent class.
+        """
+        super().__init__(parent, config, default_amber_config)
+
 
     def PDB2QMMM(
         self,

@@ -21,8 +21,9 @@ import enzy_htp.structure as struct
 import enzy_htp.preparation as prep
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
 
+from .base_interface import BaseInterface
 
-class AmberInterface:
+class AmberInterface(BaseInterface):
     """Class that provides a direct interface for enzy_htp to utilize AmberMD software. Supported operations include
     minimization, heating constant pressure production, constant pressure equilibration, trajectory file
     conversion and mutation. Users should use this class as the only way to interact with any functionality
@@ -34,34 +35,15 @@ class AmberInterface:
         compatible_env_ : A bool() indicating if the current environment is compatible with the object itself.
     """
 
-    def __init__(self, config: AmberConfig = None) -> None:
+    def __init__(self, parent, config: AmberConfig = None) -> None:
         """Simplistic constructor that optionally takes an AmberConfig object as its only argument.
-        Also checks if the current environment is compatible with the AmberInteface().
+        Calls parent class.
         """
-        self.config_ = config
-        if not self.config_:
-            self.config_ = default_amber_config()
-        self.env_manager_ = em.EnvironmentManager(
-            env_vars=self.config_.required_env_vars(),
-            executables=self.config_.required_executables(),
-        )
-        self.env_manager_.check_environment()
-        self.compatible_env_ = self.env_manager_.is_missing()
-
-    def config(self) -> AmberConfig:
-        """Getter for the AmberConfig() instance belonging to the class."""
-        return self.config_
+        super().__init__(parent, config, default_amber_config)
 
     def display_config(self) -> None:
         """Prints all settings for the object's AmberConfig() inteface to stdout using AmberConfig.display()."""
         self.config_.display()
-
-    def compatible_environment(self) -> bool:
-        """Checks if the current environment is compatible with all possible needs for the AmberInterface.
-        Returns:
-                Whether the current environment is suitable for the AmberInterface().
-        """
-        return self.compatible_env_
 
     def write_minimize_input_file(self, fname: str, cycle: int) -> None:
         """Creates a minimization file to be used in an amber run. SHOULD NOT BE CALLED BY USERS DIRECTLY.

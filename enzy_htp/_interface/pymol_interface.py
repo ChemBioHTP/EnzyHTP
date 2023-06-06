@@ -18,6 +18,8 @@ from enzy_htp.core import env_manager as em
 from enzy_htp._config.pymol_config import PyMOLConfig, default_pymol_config
 
 
+from .base_interface import BaseInterface
+
 #TODO(CJ): add something to remove "PyMOL not running. Entering library mode (experimental" message on pymol running
 
 class PyMOLInterface:
@@ -31,24 +33,11 @@ class PyMOLInterface:
         env_manager_ : The EnvironmentManager() class which ensures all required environment elements exist.
         compatible_env_ : A bool() indicating if the current environment is compatible with the object itself.
     """
-
-    def __init__(self, config: PyMOLConfig = None) -> None:
-        #TODO(CJ): try importing from pymol2 first, then fall back on pymol if errors
-        from pymol import cmd
-        self.cmd = cmd
-        self.config_ = config
-        if not self.config_:
-            self.config_ = default_amber_config()
-        self.env_manager_ = em.EnvironmentManager(
-            env_vars=self.config_.required_env_vars(),
-            executables=self.config_.required_executables(),
-        )
-        self.env_manager_.check_environment()
-        self.compatible_env_ = self.env_manager_.is_missing()
-
-    def config(self) -> PyMOLConfig:
-        """Getter for the PyMOLConfig() instance belonging to the class."""
-        return self.config_
+    def __init__(self, parent, config: PyMOLConfig = None) -> None:
+        """Simplistic constructor that optionally takes an PyMOLConfig object as its only argument.
+        Calls parent class.
+        """
+        super().__init__(parent, config, default_pymol_config)
 
     def convert(self, file_1:str, file_2:str=None, new_ext:str=None, split_states:bool=False) -> Union[str, List[str]]:
         """Method that converts a supplied file to a different format. Either a new filename or new file 

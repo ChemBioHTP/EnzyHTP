@@ -8,6 +8,7 @@ Date: 2023-03-28
 import shutil
 from pathlib import Path
 from typing import List, Tuple
+from collections import namedtuple
 
 import pandas as pd
 
@@ -22,29 +23,29 @@ from enzy_htp._config.rosetta_config import RosettaConfig, default_rosetta_confi
 
 #TODO(CJ): make sure the list() of str()'s are only strings
 
-class RosettaInterface:
+RosettaResult=namedtuple(
+    'RosettaResult',
+    'score_sc structures log_lines'
+)
+RosettaResult.__doc__='TODO(CJ)'
+
+
+from .base_interface import BaseInterface
+
+class RosettaInterface(BaseInterface):
     """Class that interfaces with the Rosetta software package.
 
+    Attributes:
+        
 
     """
 
-
-
-    def __init__(self, config: RosettaConfig = None ) -> None:
-        """Trivial constructor for the RosettaInterface class. Can take no arguments or a RosettaConfig object.
-
-        Args:
-            config: Optional. A RosettaConfig 
+    def __init__(self, parent, config: RosettaConfig = None) -> None:
+        """Simplistic constructor that optionally takes an RosettaConfig object as its only argument.
+        Calls parent class.
         """
-        self.config_ = config
-        if not self.config_:
-            self.config_ = default_amber_config()
-        self.env_manager_ = em.EnvironmentManager(
-            env_vars=self.config_.required_env_vars(),
-            executables=self.config_.required_executables(),
-        )
-        self.env_manager_.check_environment()
-        self.compatible_env_ = self.env_manager_.is_missing()
+        super().__init__(parent, config, default_rosetta_config)
+
 
 
     def run_rosetta_scripts(self, opts:List[str], logfile:str=None) -> None:
@@ -257,13 +258,17 @@ class RosettaInterface:
             overwrite:bool=True,
             extra_flags:List[str]=None
         ) -> float:
-        """Provides the total score in Rosetta Energy Units (REU) for a given structure. 
+        """Provides the total score in Rosetta Energy Units (REU) for a given structure. Uses default flags but can have behavior modified
+        via supplied extra_flags. Returns the total score in REU.
 
         Arguments:
-            
+            infile: The file to 
+            ignore_zero_occupancy: 
+            overwrite:
+            extra_flags:
 
         Returns:
-
+            Score of structure in file in REU.
 
         """
         fs.check_file_exists( infile )

@@ -18,26 +18,21 @@ from enzy_htp.core import file_system as fs
 
 from enzy_htp._config.multiwfn_config import MultiwfnConfig, default_multiwfn_config
 
-# TODO(CJ): add .config() getter
 
-class MultiwfnInterface:
+from .base_interface import BaseInterface
+
+class MultiwfnInterface(BaseInterface):
     """
     Attributes:
         env_manager_:
         compatible_env_:
     """
 
-    def __init__(self, config=None):
-        """ """
-        self.config_ = config
-        if not self.config_:
-            self.config_ = default_multiwfn_config()
-        self.env_manager_ = em.EnvironmentManager(
-            env_vars=self.config_.required_env_vars(),
-            executables=self.config_.required_executables(),
-        )
-        self.env_manager_.check_environment()
-        self.compatible_env_ = self.env_manager_.is_missing()
+    def __init__(self, parent, config: MultiwfnConfig = None) -> None:
+        """Simplistic constructor that optionally takes an MultiwfnConfig object as its only argument.
+        Calls parent class.
+        """
+        super().__init__(parent, config, default_multiwfn_config)
 
     def get_dipoles(self, fname:str) -> pd.DataFrame:
         """ """

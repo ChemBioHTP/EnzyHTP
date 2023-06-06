@@ -41,13 +41,13 @@ class Interface:
     """
 
     def __init__(self, config: Config):
-        self.amber = AmberInterface(config._amber)
-        self.bcl = BCLInterface(config._bcl)
-        self.gaussian = GaussianInterface(config._gaussian)
-        self.moe = MOEInterface(config._moe)
-        self.multiwfn = MultiwfnInterface(config._multiwfn)
-        self.pymol = PyMOLInterface(config._pymol)
-        self.rosetta = RosettaInterface(config._rosetta)
+        self.amber = AmberInterface(self, config._amber)
+        self.bcl = BCLInterface(self, config._bcl)
+        self.gaussian = GaussianInterface(self, config._gaussian)
+        self.moe = MOEInterface(self, config._moe)
+        self.multiwfn = MultiwfnInterface(self, config._multiwfn)
+        self.pymol = PyMOLInterface(self, config._pymol)
+        self.rosetta = RosettaInterface(self, config._rosetta)
 
         self.check_environment()
 
@@ -59,26 +59,26 @@ class Interface:
         missing_exes:List[str] = list()
         missing_env_vars:List[str] = list()
 
-        missing_exes.extend( self.amber.env_manager_.missing_executables() )
-        missing_env_vars.extend( self.amber.env_manager_.missing_env_vars() )
+        missing_exes.extend( self.amber.missing_executables() )
+        missing_env_vars.extend( self.amber.missing_env_vars() )
         
-        missing_exes.extend( self.bcl.env_manager_.missing_executables() )
-        missing_env_vars.extend( self.bcl.env_manager_.missing_env_vars() )
+        missing_exes.extend( self.bcl.missing_executables() )
+        missing_env_vars.extend( self.bcl.missing_env_vars() )
 
-        missing_exes.extend( self.gaussian.env_manager_.missing_executables() )
-        missing_env_vars.extend( self.gaussian.env_manager_.missing_env_vars() )
+        missing_exes.extend( self.gaussian.missing_executables() )
+        missing_env_vars.extend( self.gaussian.missing_env_vars() )
 
-        missing_exes.extend( self.moe.env_manager_.missing_executables() )
-        missing_env_vars.extend( self.moe.env_manager_.missing_env_vars() )
+        missing_exes.extend( self.moe.missing_executables() )
+        missing_env_vars.extend( self.moe.missing_env_vars() )
 
-        missing_exes.extend( self.multiwfn.env_manager_.missing_executables() )
-        missing_env_vars.extend( self.multiwfn.env_manager_.missing_env_vars() )
+        missing_exes.extend( self.multiwfn.missing_executables() )
+        missing_env_vars.extend( self.multiwfn.missing_env_vars() )
 
-        missing_exes.extend( self.pymol.env_manager_.missing_executables() )
-        missing_env_vars.extend( self.pymol.env_manager_.missing_env_vars() )
+        missing_exes.extend( self.pymol.missing_executables() )
+        missing_env_vars.extend( self.pymol.missing_env_vars() )
 
-        missing_exes.extend( self.rosetta.env_manager_.missing_executables() )
-        missing_env_vars.extend( self.rosetta.env_manager_.missing_env_vars() )
+        missing_exes.extend( self.rosetta.missing_executables() )
+        missing_env_vars.extend( self.rosetta.missing_env_vars() )
 
         _LOGGER.info("Beginning environment check...")
         _LOGGER.info("Environment check complete!")
@@ -101,3 +101,8 @@ class Interface:
             _LOGGER.warning("Some elements are missing in environment. Not all functionality will be possible.")
         else:
             _LOGGER.info("All elements are available in environment!")
+
+    def check_for_elements(self, keys : List[str] ) -> Dict[str,bool]:
+        """ TODO"""
+        #TODO(CJ)
+        pass

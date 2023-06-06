@@ -16,7 +16,10 @@ from enzy_htp._config.moe_config import MOEConfig, default_moe_config
 
 #TODO(CJ): need to add tests for this section
 
-class MOEInterface:
+
+from .base_interface import BaseInterface
+
+class MOEInterface(BaseInterface):
     """Class that provides a direct interface for enzy_htp to utilize MOE software. Supported operations 
     include protonation. Users should ue this class as the only way to interact with any functionality 
     in MOE.
@@ -26,22 +29,14 @@ class MOEInterface:
         env_manager_ : The EnvironmentManager() class which ensure all required environment elements exist.
         compatible_env_ : A bool() indicating if the current environment is compatible with the object itself.
     """
-    
-    def __init__(self, config: MOEConfig = None) -> None:
+
+    def __init__(self, parent, config: MOEConfig = None) -> None:
         """Simplistic constructor that optionally takes an MOEConfig object as its only argument.
-        Also checks if the current environment is compatible with the MOEInterface().
+        Calls parent class.
         """
-        self.config_ = config
-        if not self.config_:
-            self.config_ = default_moe_config()
-        self.env_manager_ = em.EnvironmentManager(
-            env_vars=self.config_.required_env_vars(),
-            executables=self.config_.required_executables(),
-        )
-        self.env_manager_.check_environment()
-        self.compatible_env_ = self.env_manager_.is_missing()
+        super().__init__(parent, config, default_amber_config)
 
-
+    
     def valid_license(self) -> bool:
         """MOE operates using a license based model. This function checks if a valid license is available in the system."""
         pass
