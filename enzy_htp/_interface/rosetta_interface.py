@@ -1,14 +1,13 @@
 """Defines a RosettaInterface class that serves as a bridge for enzy_htp to utilize the Rosetta modelling
-suite. Uses the RosettaConfig class found in enzy_htp/_config/rosetta_config.py. Supported operations include mutation
-
-
+suite. Uses the RosettaConfig class found in enzy_htp/_config/rosetta_config.py. Supported operations include mutation,
+relaxation (minimization), scoring, ligand parameterization, and the ability to use RosettaScripts.
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-03-28
 """
 import shutil
 from pathlib import Path
-from typing import List, Tuple
 from collections import namedtuple
+from typing import List, Tuple, Dict
 
 import pandas as pd
 
@@ -20,24 +19,16 @@ from enzy_htp.core import env_manager as em
 
 from enzy_htp._config.rosetta_config import RosettaConfig, default_rosetta_config
 
-
-#TODO(CJ): make sure the list() of str()'s are only strings
-
-RosettaResult=namedtuple(
-    'RosettaResult',
-    'score_sc structures log_lines'
-)
-RosettaResult.__doc__='TODO(CJ)'
-
-
 from .base_interface import BaseInterface
 
 class RosettaInterface(BaseInterface):
-    """Class that interfaces with the Rosetta software package.
+    """Class that provides an interface for enzy_htp to utilize the Rosetta molecular modelling software suite. Supported 
+    operations include relaxation (minimzation), scoring, ligand parameterization, and the ability to use RosettaScripts.
 
     Attributes:
-        
-
+        config_	: The RosettaConfig() class which provides settings for both running Rosetta and maintaining a compatible environment.
+        env_manager_ : The EnvironmentManager() class which ensures all required environment elements exist.
+        compatible_env_ : A bool() indicating if the current environment is compatible with the object itself.
     """
 
     def __init__(self, parent, config: RosettaConfig = None) -> None:
@@ -46,7 +37,30 @@ class RosettaInterface(BaseInterface):
         """
         super().__init__(parent, config, default_rosetta_config)
 
+    def _delete_score_file(self, working_dir:str='./') -> None:
+        """Helper method that deletes the score.sc file in the specified directory.
 
+        Args:
+            working_dir: The directory to look for the score.sc file in. Defaults to './'
+
+        Returns:
+            Nothing.
+        """
+        score_file = working_dir + "/score.sc"
+        fs.safe_rm( score_file )
+
+
+    def _delete_crash_log(self, working_dir:str='./') -> None:
+        """Helper method that deletes the ROSETTA_CRASH.log file in the specified directory.
+
+        Args:
+            working_dir: The directory to look for the ROSETTA_CRASH.log file in. Defaults to './'
+
+        Returns:
+            Nothing.
+        """
+        log_name = working_dir + "/ROSETTA_CRASH.log"
+        fs.safe_rm( log_name )
 
     def run_rosetta_scripts(self, opts:List[str], logfile:str=None) -> None:
         """Method that runs the rosettascripts executabl along with the supplied options. Optionally outputs
@@ -71,6 +85,9 @@ class RosettaInterface(BaseInterface):
             self.config_.ROSETTA_SCRIPTS,
             opts
         )
+
+        if logfile:
+            _LOGGER.info(f"Saved RosettaScripts log to '{Path(logfile).absolute}'.")
 
 
     def parse_score_file(self, fname : str) -> pd.DataFrame:
@@ -207,13 +224,48 @@ class RosettaInterface(BaseInterface):
         ramp_constraints:bool=True,
         prefix:str=None,
         overwrite:bool=True,
-        extra_flags:List[str]=None
-        #work_dir:str=None
-        ) -> str:
-        """ """
-        #TODO(CJ): need to add documentation; should also be able to take a Structure as input.
+        extra_flags:List[str]=None,
+        output_dir:str='./',
+        delete_scores:bool=True,
+        delete_crash:bool=True,
+        ) -> pd.DataFrame:
+        """Runs Rosetta's relax protocol on the supplied .pdb file, returning the path to the relaxaed structure as 
+        well as a dictionary with all characteristics found in the score.sc file. Function provides direct access to a 
+        number of commandline options and the ability to add arbitrary commandline options at the end. 
+
+        NOTE: The majority of crashes from this function are due to bad atom names.
+         
+
+        Args:
+            infile: A str() with the path to the .pdb file to relax. 
+            nstruct: Number of structures to create. 
+            ignore_zero_occupancy: If relax should ignore atoms with zero occupancy. True by default.
+            full_atom: If relax should do full atom relaxation. True by default.
+            detect_disulf: If Rosetta should detect disulfide bonds. True by default.
+            linmem_ig: Number of recent rotamers to store. 10 by default.
+            constrain_relax_to_start_coords: If the backbone atoms should be constrained. True by default.
+            coord_constrain_sidechains: If the sidechain heavy atoms should be constrained. True by default.
+            ramp_constraints: If the constraints should be ramped during initial relaxation stage. True by default.
+            prefix: str() with prefix for output file names. None and not used by default.
+            overwrite: If results should be overwritten. True by default.
+            extra_flags: A List[str] of extra flags to be added to the commandline. Empty by default. NOT CHECKED FOR CORRECTNESS. 
+            output_dir: The output directory where the files will be saved. './' by default.
+            delete_scores: Whether the score.sc file should be deleted after running. True by default.
+            delete_crash: Whether the ROSETTA_CRASH.log file should be deleted after running. True by default.
+
+
+        Returns:
+            pandas DataFrame containing the results and energies of the relaxed structures. Description column contains
+            full paths to relaxed files. 
+        """
+        #TODO(CJ):should also be able to take a Structure as input.
         fs.check_file_exists( infile )
 
+        if Path(infile).suffix != '.pdb':
+            _LOGGER.error(f"Expected input file format is .pdb. {infile} is an invalid entry. Exiting...")
+            exit( 1 )
+
+        fs.safe_rm( f'{output_dir}/score.sc')
             #/dors/meilerlab/apps/rosetta/rosetta-3.13/main/source/bin/relax.default.linuxgccrelease
             #-out:prefix $prefix
             #-out:file:scorefile ${prefix}.sc &
@@ -228,6 +280,7 @@ class RosettaInterface(BaseInterface):
         flags.append(f"-relax:constrain_relax_to_start_coords {'true' if constrain_relax_to_start_coords else 'false'}")
         flags.append(f"-coord_constrain_sidechains {'true' if coord_constrain_sidechains else 'false'}")
         flags.append(f"-ramp_constraints {'true' if ramp_constraints else 'false'}")
+        flags.append(f"-out:path:all {output_dir}")
 
 
         if full_atom:
@@ -242,30 +295,54 @@ class RosettaInterface(BaseInterface):
         if overwrite:
             flags.append("-overwrite")
 
+
         if extra_flags:
             flags.extend(extra_flags)
+
+        fs.safe_mkdir( output_dir )
 
         self.env_manager_.run_command(
             self.config_.RELAX,
             flags
         )
-        #TODO(CJ): what do I want to return from here?
+
+        df:pd.DataFrame = self.parse_score_file(f'{output_dir}/score.sc')
+
+        df['description'] = df.apply( lambda row: f"{output_dir}/{row.description}.pdb", axis=1 )
+
+
+        if delete_scores:
+            self._delete_score_file( output_dir )
+
+        if delete_crash:
+            self._delete_crash_log( output_dir )
+
+
+        return df
+            
 
 
     def score(self,
             infile:str,
             ignore_zero_occupancy:bool=True,
             overwrite:bool=True,
-            extra_flags:List[str]=None
+            extra_flags:List[str]=None,
+            output_dir:str='./',
+            delete_scores:bool=True,
+            delete_crash:bool=True,
+
         ) -> float:
         """Provides the total score in Rosetta Energy Units (REU) for a given structure. Uses default flags but can have behavior modified
         via supplied extra_flags. Returns the total score in REU.
 
         Arguments:
-            infile: The file to 
-            ignore_zero_occupancy: 
-            overwrite:
-            extra_flags:
+            infile: A str() with the path to the .pdb file to relax. 
+            ignore_zero_occupancy: If relax should ignore atoms with zero occupancy. True by default.
+            overwrite: If results should be overwritten. True by default.
+            extra_flags: A List[str] of extra flags to be added to the commandline. Empty by default. NOT CHECKED FOR CORRECTNESS. 
+            output_dir: The output directory where the files will be saved. './' by default.
+            delete_scores: Whether the score.sc file should be deleted after running. True by default.
+            delete_crash: Whether the ROSETTA_CRASH.log file should be deleted after running. True by default.
 
         Returns:
             Score of structure in file in REU.
@@ -279,6 +356,7 @@ class RosettaInterface(BaseInterface):
         ]
         
         flags.append(f"-ignore_zero_occupancy {'true' if ignore_zero_occupancy else 'false'}")
+        flags.append(f"-out:path:all {output_dir}")
 
         if overwrite:
             flags.append("-overwrite")
@@ -286,7 +364,9 @@ class RosettaInterface(BaseInterface):
         if extra_flags:
             flags.extend(extra_flags)
 
-        fs.safe_rm( "./score.sc" )
+        fs.safe_rm( f"{output_dir}/score.sc" )
+
+        fs.safe_mkdir( output_dir )
 
         self.env_manager_.run_command(
             self.config_.SCORE,
@@ -294,10 +374,17 @@ class RosettaInterface(BaseInterface):
         )
 
 
-        df:pd.DataFrame=self.parse_score_file("./score.sc")
-    
-        #TODO(CJ): figure this out/make it better
-        assert len(df) == 1
+        df:pd.DataFrame=self.parse_score_file(f"{output_dir}/score.sc")
+
+        if len(df) != 1:
+            _LOGGER.error("Found more than one entry in score.sc file. Exiting...")
+            exit( 1 )
+
+        if delete_scores:
+            self._delete_score_file( output_dir )
+
+        if delete_crash:
+            self._delete_crash_log( output_dir )
 
         return df.iloc[0].total_score
 

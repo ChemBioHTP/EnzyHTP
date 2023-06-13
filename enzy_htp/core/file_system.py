@@ -141,7 +141,7 @@ def check_file_exists(fname: str, exit_script:bool=True) -> None:
         exit_script: A bool() specifying if the script should exit or raise a FileNotFoundError().
         
     Returns:
-        Nothing
+        Nothing.
 
     Raises:
         FileNotFoundError if exit_script is set to False and the file does not exist.
@@ -156,3 +156,25 @@ def check_file_exists(fname: str, exit_script:bool=True) -> None:
     else:
         raise FileNotFoundError(f"The file '{fname}' does not exist.")
 
+
+def check_not_empty(fname:str) -> None:
+    """Function that checks if a file exists and is not empty. Will exit the script if either
+    of the two conditions are false.
+    
+    Args:
+        fname: The str() name of the file to check.
+
+    Returns:
+        Nothing.
+
+    """
+
+    check_file_exists(fname)
+
+    temp = Path(fname) 
+    if temp.stat().st_size > 0:
+        return
+
+    _LOGGER.error(f"The file '{fname}' is empty. Exiting...")
+
+    exit( 1 )

@@ -34,7 +34,7 @@ class MOEInterface(BaseInterface):
         """Simplistic constructor that optionally takes an MOEConfig object as its only argument.
         Calls parent class.
         """
-        super().__init__(parent, config, default_amber_config)
+        super().__init__(parent, config, default_moe_config)
 
     
     def valid_license(self) -> bool:

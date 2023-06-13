@@ -13,18 +13,19 @@ from subprocess import run
 from .logger import _LOGGER
 from .exception import MissingEnvironmentElement
 
-
 class EnvironmentManager:
     """Serves as general interface between module and the current computer environment.
-    Checks whether given applications and environment variables are set in the current environment.
+    Checks whether given applications, python modules, and environment variables are set in the current environment.
     After check, stores names of executables.
-    Serves as interfrace for running commands on system.
+    Serves as interface for running commands on system.
 
 
     Attributes:
             env_vars_: A list of strings containing environment variables to check for.
+            py_modules_: A list of strings correspond to python modules to check for.
             executables_: a list of strings containing executables to check for.
             missing_env_vars_: A list of strings corresponding to environment variables that are missing.
+            missing_py_modules_: A list of strings corresponding to python modules that are missing.
             missing_executables_: A list of strings corresponding to executables that are missing.
     """
 
@@ -32,8 +33,10 @@ class EnvironmentManager:
         """Initializes object, optionally with starting environment variables and executables."""
         self.env_vars_ = kwargs.get("env_vars", [])
         self.executables_ = kwargs.get("executables", [])
+        self.py_modules_ = kwargs.get("py_modules", [])
         self.mapper = dict()
         self.missing_env_vars_ = []
+        self.missing_py_modules_ = []
         self.missing_executables_ = []
 
     def add_executable(self, exe_name: str) -> None:
@@ -70,6 +73,14 @@ class EnvironmentManager:
             else:
                 self.mapper[exe] = shutil.which(exe)
 
+    def check_python_modules(self) -> None:
+        """Checks which python modules are availabe in the system, storing those that are missing."""
+        for pm in self.py_modules_:
+            try:
+                _ = importlib.import_module( pm )
+            except ModuleNotFoundError:
+                self.missing_py_modules.append( pm )
+
     def display_missing(self) -> None:
         """Displays a list of missing environment variables and exectuables to the logger. Should be called after .check_environment() and .check_env_vars()."""
         if not self.is_missing():
@@ -89,11 +100,10 @@ class EnvironmentManager:
 
     def check_environment(self) -> None:
         """Preferred client method for validating environment. Performs checks and logs output."""
-        #_LOGGER.info("Checking environment for required elements...")
+        
         self.check_env_vars()
         self.check_executables()
-        #self.display_missing()
-        #_LOGGER.info("Environment check completed!")
+        self.check_python_modules()
 
     def reset(self) -> None:
         """Resets internal lists of env vars and executables."""

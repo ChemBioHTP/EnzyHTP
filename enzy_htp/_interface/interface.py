@@ -8,10 +8,11 @@ class. Packages:
     + MOE, MOEInterface
     + Multiwfn, MultiwfnInterface
     + PyMOL, PyMOLInterface
+    + Rosetta, RosettaInterface
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-07-20
 """
-from typing import List
+from typing import List, Dict
 
 from enzy_htp import core
 from ..core.logger import _LOGGER

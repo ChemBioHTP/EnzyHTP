@@ -19,6 +19,7 @@ from enzy_htp.structure import Structure, PDBParser
 # from .gaussian_config import GaussianConfig, default_gaussian_config
 
 # TODO(CJ): add .config() getter
+from enzy_htp._config.gaussian_config import GaussianConfig, default_gaussian_config
 
 from .base_interface import BaseInterface
 
@@ -34,7 +35,7 @@ class GaussianInterface(BaseInterface):
         """Simplistic constructor that optionally takes a GaussianConfig object as its only argument.
         Calls parent class.
         """
-        super().__init__(parent, config, default_amber_config)
+        super().__init__(parent, config, default_gaussian_config)
 
 
     def PDB2QMMM(

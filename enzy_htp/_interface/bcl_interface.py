@@ -33,7 +33,7 @@ class BCLInterface(BaseInterface):
         """Simplistic constructor that optionally takes a BCLConfig object as its only argument.
         Calls parent class.
         """
-        super().__init__(parent, config, default_amber_config)
+        super().__init__(parent, config, default_bcl_config)
 
     def _run_bcl_cmd(self, protocol: str, flags:List[str]) -> None:
         """Underlying method to use the BCL. BCL has a format/calling convention of:

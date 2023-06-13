@@ -22,7 +22,7 @@ from .base_interface import BaseInterface
 
 #TODO(CJ): add something to remove "PyMOL not running. Entering library mode (experimental" message on pymol running
 
-class PyMOLInterface:
+class PyMOLInterface(BaseInterface):
     """Class that provides a direct interface for enzy_htp to utilize the PyMOL python package. Supported operations 
     include (TODO(CJ))
 
@@ -38,6 +38,9 @@ class PyMOLInterface:
         Calls parent class.
         """
         super().__init__(parent, config, default_pymol_config)
+        #TODO(CJ): set it up so I can import pymol OR pymol2
+        from pymol import cmd
+        self.cmd = cmd
 
     def convert(self, file_1:str, file_2:str=None, new_ext:str=None, split_states:bool=False) -> Union[str, List[str]]:
         """Method that converts a supplied file to a different format. Either a new filename or new file 
@@ -265,16 +268,21 @@ class PyMOLInterface:
         for vv in variables:
             check_var_type( vv, str )
 
-        fs.check_file_exists(molfile)    
-        self.cmd.delete('all')
+        if molfile  != 'memory':
+            fs.check_file_exists(molfile)    
+            self.cmd.delete('all')
 
         _eh_local: Dict[str, Any] = {'data':[]}
 
-        self.cmd.delete('all')
-        self.cmd.load(molfile)
+        if molfile != 'memory':
+            self.cmd.delete('all')
+            self.cmd.load(molfile)
+
         iter_stmt:str=f"data.append(({', '.join(variables)}))"
         self.cmd.iterate_state(state,sele,iter_stmt,space=_eh_local)
-        self.cmd.delete('all')
+
+        if molfile != 'memory':
+            self.cmd.delete('all')
         
         return pd.DataFrame(
             data=_eh_local['data'],

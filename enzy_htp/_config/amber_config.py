@@ -45,7 +45,7 @@ class AmberConfig:
     BOX_TYPE: str = "box"
     """Water Box type. Allowed values are 'box' and 'oct'"""
 
-    BOX_SIZE = "10"
+    BOX_SIZE: str = "10"
     """Water Box size."""
 
     CONF_MIN: Dict = {
