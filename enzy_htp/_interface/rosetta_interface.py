@@ -50,17 +50,17 @@ class RosettaInterface(BaseInterface):
         fs.safe_rm( score_file )
 
 
-    def _delete_crash_log(self, working_dir:str='./') -> None:
-        """Helper method that deletes the ROSETTA_CRASH.log file in the specified directory.
+    def _delete_crash_log(self) -> None:
+        """Helper method that deletes the ROSETTA_CRASH.log file in the current working directory. ROSETTA_CRASH.log
+        should always be in the current working directory.
 
         Args:
-            working_dir: The directory to look for the ROSETTA_CRASH.log file in. Defaults to './'
+            Nothing. 
 
         Returns:
             Nothing.
         """
-        log_name = working_dir + "/ROSETTA_CRASH.log"
-        fs.safe_rm( log_name )
+        fs.safe_rm( './ROSETTA_CRASH.log' )
 
     def run_rosetta_scripts(self, opts:List[str], logfile:str=None) -> None:
         """Method that runs the rosettascripts executabl along with the supplied options. Optionally outputs
@@ -315,8 +315,7 @@ class RosettaInterface(BaseInterface):
             self._delete_score_file( output_dir )
 
         if delete_crash:
-            self._delete_crash_log( output_dir )
-
+            self._delete_crash_log( )
 
         return df
             
@@ -384,7 +383,7 @@ class RosettaInterface(BaseInterface):
             self._delete_score_file( output_dir )
 
         if delete_crash:
-            self._delete_crash_log( output_dir )
+            self._delete_crash_log( )
 
         return df.iloc[0].total_score
 
