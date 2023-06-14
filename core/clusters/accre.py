@@ -1,6 +1,10 @@
 """Here is everything job manager need to know about ACCRE (Advanced Computing Center
 for Research and Education) of Vanderbilt
 
+NOTE: for SLURM based HPC, there will be a common problem with job manager that it creates large
+workload to the controller of slurm. You can use scancel -s SIGSTOP to pause the main script to relieve
+the workload and use scancel -s SIGCONT to resume the script.
+
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Date: 2022-04-13
 """
@@ -138,6 +142,7 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''',
             res_line = f'#SBATCH --{k}{v}\n'
             res_str += res_line
         res_str += '#SBATCH --export=NONE\n'
+        res_str += '#SBATCH --exclude=gpu0022,gpu0051,cn428\n'
         return res_str
     
     @classmethod
@@ -240,7 +245,7 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''',
         # get info
         # squeue
         cmd = f'{cls.INFO_CMD[0]} -u $USER -O JobID,{field}' # donot use the -j method to be more stable
-        info_run = run_cmd(cmd, try_time=2880, wait_time=30, timeout=120)
+        info_run = run_cmd(cmd, try_time=2880, wait_time=120, timeout=120)
         # if exist
         info_out_lines = info_run.stdout.strip().splitlines()
         for info_line in info_out_lines: 
@@ -258,7 +263,7 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID''',
             print('No info from squeue. Switch to sacct')
         time.sleep(wait_time)
         cmd = f'{cls.INFO_CMD[1]} -j {job_id} -o {field}'
-        info_run = run_cmd(cmd, try_time=2880, wait_time=30, timeout=120)            
+        info_run = run_cmd(cmd, try_time=2880, wait_time=120, timeout=120)            
         # if exist
         info_out = info_run.stdout.strip().splitlines()
         if len(info_out) >= 3:
