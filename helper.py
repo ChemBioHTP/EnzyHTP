@@ -24,6 +24,13 @@ class Child():
         return self
 
 '''
+Exception
+'''
+class AmberError(Exception):
+    '''exception for any error of Amber MD runs'''
+    pass
+
+'''
 Text
 '''
 line_feed = Config.line_feed
