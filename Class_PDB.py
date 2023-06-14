@@ -24,7 +24,8 @@ from helper import (
     get_field_strength_value, 
     line_feed, 
     mkdir, 
-    generate_Rosetta_params
+    generate_Rosetta_params,
+    AmberError,
     )
 try:
     from pdb2pqr.main import main_driver as run_pdb2pqr
@@ -1140,7 +1141,11 @@ class PDB():
             if Config.debug > 0:
                 print(f'''Running Min on {cluster.NAME}: job_id: {job.job_id} script: {job.sub_script_path} period: {period}''')
             job.wait_to_end(period=period)
-            type(self)._detect_amber_error(job)
+            try:
+                PDB._detect_amber_error(job)
+            except AmberError as e:
+                if not PDB._is_normal_amber_output(minout_path):
+                    raise e
             
             if cluster_debug:
                 self.pdbmin_job = job
@@ -1161,6 +1166,15 @@ class PDB():
         self.prmtop_path=min_dir+'/'+self.prmtop_path.split('/')[-1]
         self.inpcrd_path=min_dir+'/'+self.inpcrd_path.split('/')[-1]
         return self.path
+
+
+    @classmethod
+    def _is_normal_amber_output(cls, out_file):
+        '''check if the amber output file terminated normally'''
+        with open(out_file) as f:
+            if "5.  TIMINGS" in f.read():
+                return True
+            return False
 
 
     def rm_allH(self, ff='Amber', if_ligand=0):
@@ -1680,7 +1694,7 @@ class PDB():
         with open(amber_job.job_cluster_log) as f:
             f_str = f.read()
             if 'ERROR' in f_str or 'Error' in f_str:
-                raise Exception(f'Amber Terminated Abnormally! Here is the output ({amber_job.job_cluster_log}):{line_feed} {f_str}') 
+                raise AmberError(f'Amber Terminated Abnormally! Here is the output ({amber_job.job_cluster_log}):{line_feed} {f_str}') 
                 # TODO make a workflow exception that can show some more step releted info
                 # So that can use try except to do some special action when dont want one fail ruin the HTP
                 # this may also catch unnessessay error like MPI ones
@@ -2891,6 +2905,7 @@ class PDB():
 
     def get_rosetta_ddg(self, rosetta_home: str, muta_groups: List[tuple], relaxed_pdb: str,
                         niter: int = 10,
+                        ddg_dir: str = None,
                         in_place: bool = False, 
                         if_cluster_job: bool = True,
                         cluster: ClusterInterface = None,
@@ -2912,8 +2927,8 @@ class PDB():
                                 'mem_per_core' : '2G',
                                 'walltime' : '1-00:00:00',
                                 'account' : 'yang_lab_csb'}
-
-        ddg_dir = f'{self.dir}/ddg/'
+        if ddg_dir is None:
+            ddg_dir = f'{self.dir}/ddg/'
         mkdir(ddg_dir)
         ddg_jobs = []
         ddg_result_files = {}
