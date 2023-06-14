@@ -5,11 +5,12 @@ The general workflow is
     2) submit and monitor the job 
     3) record the completion of the job.
     (give files containing the stdout/stderr)
-In a dataflow point of view it should be analogous to subprocess.run()
+In a dataflow point of view it should be analogous to subprocess.run() that job_manager runs the command on
+computational nodes in a new shell session.
 
 Feature:
     - Allow users to add support for their own clusters. (By making new ClusterInterface classes)
-
+    
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Date: 2022-04-13
 """
@@ -451,7 +452,7 @@ class ClusterJob():
                         cls._action_end_with(job)
                     finished_job.append(job)
                     del current_active_job[j]
-            # 3. wait a period before next check
+            # 3. wait a period before next check TODO: add behavior that the more checking the longer time till a limit
             time.sleep(period)
         
         # summarize
