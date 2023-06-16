@@ -364,6 +364,7 @@ class Structure(DoubleLinkedNode):
             solvent:
                 fix = "caa": same as polypeptide part
         """
+        # TODO(qz)(high_prior) finish all the called functions
         self.init_connect_for_polypeptides(ncaa_fix=ncaa_fix)
         self.init_connect_for_ligands(method=ligand_fix)
         self.init_connect_for_metals(method=metal_fix)
@@ -386,6 +387,7 @@ class Structure(DoubleLinkedNode):
 
     def init_connect_for_ligands(self, method: str):
         """"""
+        # TODO(qz)(high_prior)
         # TODO generate prepi by itself and store it to a global database path so that other
         # process in the same workflow can share the generated file.
         support_method_list = ["caa"]

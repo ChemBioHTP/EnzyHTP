@@ -86,9 +86,10 @@ def check_res_topology_error(
         residue_key: key of the target residue
         check_radius: the radius of checking for the residue. (Unit: Ang)"""
     # 1. get connectivity for the structure
-    stru.init_connect()
-    # TODO(qz)
+    # stru.init_connect()
+    # TODO(qz)(high_prior)
     # 2. convert all bond in each residue to ploylines. find rings in each residue.
     # 3. check for any bond (polyline) from the target residue thread through any ring
     # 4. check for any ring from the target residue is threaded by any bond
+    pass
 
