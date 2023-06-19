@@ -1,5 +1,5 @@
-"""Opertion of Residue(). functions in this module take Residue() as input and do 
-operations on it.
+"""Operations on Residue(). Functions in this module take Residue()'s as input and perform 
+operations on them.
 
 Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
 Date: 2023-03-20
@@ -14,9 +14,15 @@ from ..structure import Structure, Residue, Atom
 
 def deprotonate_residue(residue: Residue, target_atom: Union[None, Atom] = None) -> None:
     """
-    deprotonate the {residue} on the {target_atom} (if provided).
-    remove the acidic hydrogen attached to the {target_atom} and change the residue name
-    correponding to chem.residue.DEPROTONATION_MAPPER or /resource/ProtonationState.cdx
+    Deprotonates the {residue} on the {target_atom} (if provided).
+    Removes the acidic hydrogen attached to the {target_atom} and changes the residue name
+    corresponding to chem.residue.DEPROTONATION_MAPPER or /resource/ProtonationState.cdx. Performs
+    changes in place.
+    Args:
+        residue: The Residue() to deprotonate.
+        target_atom: The atom to remove (optional).
+    Returns:
+        Nothing.
     """
     new_resi_name, target_proton = get_default_deproton_info(residue, target_atom)
     if new_resi_name is None:
@@ -34,8 +40,7 @@ def deprotonate_residue(residue: Residue, target_atom: Union[None, Atom] = None)
 
 def get_default_deproton_info(residue: Residue,
                               target_atom: Union[None, Atom] = None) -> Tuple:
-    """
-    return the default proton in the residue on the target_atom (if provided) to deprotonate
+    """Returns the default proton in the residue on the target_atom (if provided) to deprotonate.
     Default HIP target is set to resulting HIE
     """
     r_name = residue.name
