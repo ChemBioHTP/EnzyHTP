@@ -276,6 +276,8 @@ def mutate_stru(
         - SWISSMODEL
             Fully consider other side-chain change
             Not consider backbone change
+        - Rosetta
+            (TODO)
 
     Insertion/Deletion:
         - Phyre4
@@ -366,7 +368,7 @@ def mutate_stru_with_tleap(
     return stru_cpy
 
 MUTATE_STRU_ENGINE = {
-    "tleap" : mutate_stru_with_tleap
+    "tleap_min" : mutate_stru_with_tleap
 }
 """engines for mutate_stru()"""
 
