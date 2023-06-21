@@ -7,7 +7,7 @@ Date: 2022-10-29
 """
 from pathlib import Path
 
-from typing import List, Dict, Any, Union
+from typing import List, Dict, Any, Union, Tuple
 
 import pandas as pd
 
@@ -16,7 +16,6 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core import env_manager as em
 
 from enzy_htp._config.pymol_config import PyMOLConfig, default_pymol_config
-
 
 from .base_interface import BaseInterface
 
@@ -39,8 +38,12 @@ class PyMOLInterface(BaseInterface):
         """
         super().__init__(parent, config, default_pymol_config)
         #TODO(CJ): set it up so I can import pymol OR pymol2
+        import pymol 
+        pymol.invocation.parse_args(['pymol', '-q'])
+
         from pymol import cmd
         self.cmd = cmd
+        self.available_cmds_:List[str] = dir( self.cmd )
 
     def convert(self, file_1:str, file_2:str=None, new_ext:str=None, split_states:bool=False) -> Union[str, List[str]]:
         """Method that converts a supplied file to a different format. Either a new filename or new file 
@@ -281,10 +284,48 @@ class PyMOLInterface(BaseInterface):
         iter_stmt:str=f"data.append(({', '.join(variables)}))"
         self.cmd.iterate_state(state,sele,iter_stmt,space=_eh_local)
 
-        if molfile != 'memory':
-            self.cmd.delete('all')
-        
-        return pd.DataFrame(
+        result = pd.DataFrame(
             data=_eh_local['data'],
             columns=variables
         )
+
+        if molfile != 'memory':
+            self.cmd.delete('all')
+        
+        return result
+
+    def execute(self, args:List[Tuple]) -> None:
+        """Executes a series of commands through the PyMOL/PyMOL2 python module in use. Takes input as a list of Tuple()'s
+        where the first item in each tuple is a string specifying the function to use and the rest of the items are the
+        arguments for that function.
+    
+        Args:
+            args: A list() of tuple()'s of items where the first string names the pymol API command to use and the rest are arguments for that function.
+
+        Returns:
+            Nothing.
+        """
+        
+        for cmd_set in args:
+            if len(cmd_set) < 2:
+                _LOGGER.error(f"The supplied argument {cmd_set} is not long enough. Musst have at least two items. Exiting...")
+                exit( 1 )
+
+            cmd_name = cmd_set[0]
+            cmd_args = list(cmd_set[1:])
+            
+            if cmd_name not in self.available_cmds_:
+                _LOGGER.error(f"The command '{cmd_name}' is not supported in this version of pymol. Exiting...")
+                exit( 1 )
+           
+
+            cmd_str:str=f"{cmd_name}({','.join(map(str, cmd_args))})"
+            try:
+                self.cmd.__dict__[cmd_name](*cmd_args)
+            except:
+                _LOGGER.error(f"PyMOL function call '{cmd_str}' resuled in an error. Exiting...")
+                exit( 1 )
+
+
+
+

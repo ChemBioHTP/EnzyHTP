@@ -178,3 +178,17 @@ def check_not_empty(fname:str) -> None:
     _LOGGER.error(f"The file '{fname}' is empty. Exiting...")
 
     exit( 1 )
+
+def has_content(fname:str) -> bool:
+    """Method that checks if the supplied path exists and contains content. Returns bool with result
+
+    Args:
+        fname: The name of the file to check as a str().
+
+    Returns:
+        Whether the file has content.
+    """
+    fpath = Path(fname)
+
+    return fpath.exists() and fpath.stat().st_size > 0
+
