@@ -192,3 +192,18 @@ def has_content(fname:str) -> bool:
 
     return fpath.exists() and fpath.stat().st_size > 0
 
+
+def safe_mv(src:str, dest:str) -> str:
+    """TODO(CJ)
+    """
+    src = Path(src)
+    dest = Path(dest)
+
+    if dest.is_dir():
+        safe_mkdir( dest ) 
+        dest = dest / src.name
+
+    return str(shutil.move( src, dest ))
+
+
+
