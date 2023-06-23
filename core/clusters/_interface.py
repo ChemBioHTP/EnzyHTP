@@ -48,7 +48,7 @@ class ClusterInterface(ABC):
     @abstractmethod
     def parser_resource_str(cls, res_dict: dict) -> str:
         '''
-        1. parser general resource keywords to accre specified keywords
+        1. parser general resource keywords to HPC specified keywords
         2. format the head of the submission script
         res_dict: the dictionary with general keywords and value
            (Available keys & value format:

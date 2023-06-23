@@ -4,6 +4,7 @@ import os
 import io
 import re
 import pandas as pd
+import shutil
 from shutil import rmtree
 from subprocess import SubprocessError, run, CalledProcessError
 from random import choice
@@ -2593,6 +2594,7 @@ class PDB():
         job_array_size: int = 0,
         period: int = 600,
         res_setting: dict = None,
+        clean_job_cluster_log: bool = True,
         cluster_debug: bool = 0
     ):
         '''
@@ -2638,7 +2640,13 @@ class PDB():
                 if Config.debug > 0:
                     print(f'''Running QM array on {cluster.NAME}: number: {len(jobs)} size: {job_array_size} period: {period}''')
                 job_manager.ClusterJob.wait_to_array_end(jobs, period, job_array_size)
-
+                if clean_job_cluster_log:
+                    target_dir = f"{os.path.dirname(inp[0])}/cluster_log/"          
+                    mkdir(target_dir)
+                    for job in jobs:
+                        job: job_manager.ClusterJob
+                        new_path = shutil.move(job.job_cluster_log, target_dir)
+                        job.job_cluster_log = new_path
                 if cluster_debug:
                     return outs, jobs
                 return outs
