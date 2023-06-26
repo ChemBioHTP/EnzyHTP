@@ -156,13 +156,14 @@ class RosettaInterface(BaseInterface):
         #    exit( 1 )
         
         flags:List[str] = [
+            self.config_.PARAMS_SCRIPT,
             f"{molfile}",
             f"--name={res_name}",
             "--clobber"
         ]
 
         self.env_manager_.run_command(
-            self.config_.PARAMS_SCRIPT,
+            "python2.7",
             flags
         )
 
