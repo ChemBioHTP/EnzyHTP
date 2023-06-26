@@ -294,7 +294,7 @@ class PyMOLInterface(BaseInterface):
         
         return result
 
-    def execute(self, args:List[Tuple]) -> None:
+    def execute(self, args:List[Tuple]) -> List[Any]:
         """Executes a series of commands through the PyMOL/PyMOL2 python module in use. Takes input as a list of Tuple()'s
         where the first item in each tuple is a string specifying the function to use and the rest of the items are the
         arguments for that function.
@@ -303,9 +303,11 @@ class PyMOLInterface(BaseInterface):
             args: A list() of tuple()'s of items where the first string names the pymol API command to use and the rest are arguments for that function.
 
         Returns:
-            Nothing.
+            Each result for the respective command output.
         """
-        
+       
+        result:List[Any] = list() 
+
         for cmd_set in args:
             if len(cmd_set) < 2:
                 _LOGGER.error(f"The supplied argument {cmd_set} is not long enough. Musst have at least two items. Exiting...")
@@ -321,7 +323,9 @@ class PyMOLInterface(BaseInterface):
 
             cmd_str:str=f"{cmd_name}({','.join(map(str, cmd_args))})"
             try:
-                self.cmd.__dict__[cmd_name](*cmd_args)
+                result.append(
+                    self.cmd.__dict__[cmd_name](*cmd_args)
+                )
             except:
                 _LOGGER.error(f"PyMOL function call '{cmd_str}' resuled in an error. Exiting...")
                 exit( 1 )
