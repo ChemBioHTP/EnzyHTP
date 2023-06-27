@@ -522,6 +522,9 @@ class PDB():
             (TARGET: 1. what is deleted from the structure // metal, ligand)
         
         save the result to self.pqr_path
+
+        Return:
+            return disulfied_residue_pairs in a format of e.g.: [(('A', 496), ('A', 440)), ...]
         '''
         # set default value for output pqr path
         if len(out_path) == 0:
@@ -531,10 +534,23 @@ class PDB():
         
         # input of PDB2PQR
         pdb2pqr_parser = build_pdb2pqr_parser()
-        args = pdb2pqr_parser.parse_args(['--ff=PARSE','--ffout='+ffout,'--with-ph='+str(ph),self.path,self.pqr_path])
+        pdb2pqr_logging_level = 'INFO'
+        args = pdb2pqr_parser.parse_args(['--ff=PARSE',f'--log-level={pdb2pqr_logging_level}','--ffout='+ffout,'--with-ph='+str(ph),self.path,self.pqr_path])
         # use context manager to hide output
-        with HiddenPrints('./._get_protonation_pdb2pqr.log'):
-            run_pdb2pqr(args)
+        with HiddenPrints(f'{self.dir}/._get_protonation_pdb2pqr.log'):
+            missed_residues, pka_df, biomolecule = run_pdb2pqr(args)
+        disulfied_residue_pairs = []
+        for res in biomolecule.residues:
+            if getattr(res, 'ss_bonded', None):
+                res_key = (res.chain_id, res.res_seq)
+                for exist_pair in disulfied_residue_pairs:
+                    if res_key in exist_pair:
+                        break
+                else:
+                    disulfied_residue_pairs.append(
+                        (res_key,
+                        (res.ss_bonded_partner.chain_id, res.ss_bonded_partner.res_seq)))
+        return disulfied_residue_pairs
 
 
     def _protonation_Fix(self, out_path, Metal_Fix='1', ph = 7.0, keep_id=0, if_prt_ligand=1):

@@ -579,6 +579,15 @@ def test_get_mmpbsa_binding():
     for k in mmpbsa_out_dict:
         assert mmpbsa_out_dict[k].equals(answer[k])
 
+def test_get_protonation_pdb2pqr_disulfied():
+    """test if disulfied_residue_pairs correctly extracted from the PDB2PQR run"""
+    test_dir = 'test/testfile_Class_PDB/protonation_test/'
+    test_pdb = PDB(f'{test_dir}AMY03_WT_rmH.pdb', wk_dir=test_dir)
+    test_file_paths.append(f'{test_dir}AMY03_WT_rmH.pqr')
+    test_file_paths.append(f'{test_dir}._get_protonation_pdb2pqr.log')
+
+    disulfied_residue_pairs = test_pdb._get_protonation_pdb2pqr()
+    assert len(disulfied_residue_pairs) == 3
 
 ### utilities ###
 @pytest.mark.clean
