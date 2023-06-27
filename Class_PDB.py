@@ -108,6 +108,7 @@ class PDB():
         self.frames=None
         self.prepi_path = {}
         self.frcmod_path = {}
+        self.disulfied_residue_pairs = []
         # default MD conf.
         self._init_MD_conf()
         # default ONIOM layer setting
@@ -508,7 +509,8 @@ class PDB():
         '''
         out_path=self.path_name+'_aH.pdb'
         self._get_file_path()
-        self._get_protonation_pdb2pqr(ph=ph)
+        disulfied_residue_pairs = self._get_protonation_pdb2pqr(ph=ph)
+        self.disulfied_residue_pairs = disulfied_residue_pairs # TODO this is a temp solution. This requires runnning this function everytime after mutation which is also recommanded.
         self._protonation_Fix(out_path, ph=ph, keep_id=keep_id, if_prt_ligand=if_prt_ligand)
         self.path = out_path
         self._update_name()
@@ -539,6 +541,8 @@ class PDB():
         # use context manager to hide output
         with HiddenPrints(f'{self.dir}/._get_protonation_pdb2pqr.log'):
             missed_residues, pka_df, biomolecule = run_pdb2pqr(args)
+
+        # S-S bond
         disulfied_residue_pairs = []
         for res in biomolecule.residues:
             if getattr(res, 'ss_bonded', None):
@@ -550,6 +554,9 @@ class PDB():
                     disulfied_residue_pairs.append(
                         (res_key,
                         (res.ss_bonded_partner.chain_id, res.ss_bonded_partner.res_seq)))
+        for ss_bond in disulfied_residue_pairs:
+            print(f'INFO: detected disulfied bond by PDB2PQR: {ss_bond[0]} - {ss_bond[1]}')
+
         return disulfied_residue_pairs
 
 
@@ -1380,6 +1387,9 @@ class PDB():
                 of.write('loadAmberParams '+frcmod+line_feed)
                 of.write('loadAmberPrep '+prepi+line_feed)
             of.write('a = loadpdb '+self.path+line_feed)
+            if self.disulfied_residue_pairs:
+                for ss_bond_pairs in self.disulfied_residue_pairs:
+                    of.write(f'bond a.{ss_bond_pairs[0][1]}.SG a.{ss_bond_pairs[1][1]}.SG{line_feed}')
             # igb Radii
             if igb != None:
                 radii = radii_map[str(igb)]
