@@ -1522,7 +1522,8 @@ class PDB():
         cpu_cores: Union[str, int, None] = None,
         res_setting_equi_cpu: Union[dict, None] = None,
         equi_cpu_cores: Union[str, int, None] = None,
-        cluster_debug: bool = 0
+        cluster_debug: bool = 0,
+        check_out_put: bool = 1,
         ):
         '''
         Use self.prmtop_path and self.inpcrd_path to initilize a MD simulation.
@@ -1707,6 +1708,8 @@ class PDB():
             if Config.debug >= 1:
                 print(f'running: {cmd_prod}')
             os.system(cmd_prod)
+        if check_out_put and not PDB._is_normal_amber_output(f'{o_dir}/prod.out'):
+            raise Exception("Amber production did not terminate normally")
 
         # return value
         self.nc = o_dir+'/prod.nc'
