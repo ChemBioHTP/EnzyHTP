@@ -42,6 +42,11 @@ def get_default_deproton_info(residue: Residue,
                               target_atom: Union[None, Atom] = None) -> Tuple:
     """Returns the default proton in the residue on the target_atom (if provided) to deprotonate.
     Default HIP target is set to resulting HIE
+    Args:
+        residue: the target residue of deprotonation
+        target_atom: the atom of deprotonation
+    Return:
+        a tuple of (residue_name_after_deproton, atom_name_of_the_removing_proton)
     """
     r_name = residue.name
     # default target atom
@@ -52,15 +57,15 @@ def get_default_deproton_info(residue: Residue,
 
     depro_info = chem.residue.DEPROTONATION_MAPPER.get(r_name, None)
     if depro_info is None:
-        _LOGGER.warn(
+        _LOGGER.warning(
             f"no default protonation info for {r_name}. Consider make a standard for it")
         return None, None
     if r_name in ["HIE", "HID"]:
-        _LOGGER.warn(
+        _LOGGER.warning(
             f"deprotonation info for {residue} is actually a switching between HID/HIE")
     target_atom_depro_info = depro_info.get(target_atom_name, None)
     if target_atom_depro_info is None:
-        _LOGGER.warn(
+        _LOGGER.warning(
             f"no default protonation info for {target_atom_name} in {r_name}. Could be no proton on it. Consider make a standard for it if do"
         )
         return None, None

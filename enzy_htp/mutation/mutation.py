@@ -207,8 +207,15 @@ def generate_from_mutation_flag(mutation_flag: str) -> Mutation:
 
 
 def generate_mutation_from_traget_list(position: Tuple[str, int], orig_resi: str,
-                                    target_list: str) -> List[Mutation]:
-    """generate a list of Mutation() objects from position and a list of target residues"""
+                                       target_list: str) -> List[Mutation]:
+    """generate a list of Mutation() objects from position and a list of target residues
+    Args:
+        position: the sequence position of the mutation (e.g.: A 101)
+        orig_resi: the original residue on this position
+        target_list: a list of target residue names
+    Returns:
+        a list of Mutation objects that corresponds to substitution on this position
+        to each residues in the target list"""
     result = []
     for target in target_list:
         result.append(
