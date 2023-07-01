@@ -13,10 +13,12 @@ def get_ele_field_strength_value(p0: Union[tuple, list],
                                  d1: Union[tuple, list] = None) -> float:
     '''
     return field strength E of *p0(c0)* at *p1* in direction of *p2-p1* or *d1*
-    -- E = kq/r^2 -- (Unit: kcal/(mol*e*Ang))
-    point charge:   c0 in p0 
-    point:          p1
-    direction:      p2-p1 or d1
+    Details:
+        -- E = kq/r^2 -- (Unit: kcal/(mol*e*Ang))
+        point charge:   c0 in p0 
+        point:          p1
+        direction:      p2-p1 or d1
+
     Args:
         p0: position of charge of field source
         c0: point charge in p0

@@ -23,7 +23,7 @@ try:
     import pymol2
 except ImportError:
     _LOGGER.error(
-        "pymol package is missing. Install with `conda install -c conda-forge -c schrodinger pymol-bundle`"
+        "pymol package is missing. Install with `conda install -c conda-forge open-source-pymol`"
     )
 
 

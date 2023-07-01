@@ -133,7 +133,10 @@ def get_valid_temp_name(fname: str) -> None:
 
 def clean_temp_file_n_dir(temp_path_list: List[str]) -> None:
     """clean temporary files created by EnzyHTP functions.
-    removes file first and then dirs"""
+    removes file first and then dirs.
+    Args:
+        temp_path_list:
+            a list of temp_path that could be either file or dir"""
     if _LOGGER.level > 10:  # not DEBUG or below
         dir_list = filter(os.path.isdir, temp_path_list)
         file_list = filter(os.path.isfile, temp_path_list)
