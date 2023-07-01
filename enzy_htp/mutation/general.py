@@ -345,7 +345,7 @@ def mutate_stru_with_tleap(
     for mut in mutant:
         target_res = stru_cpy.find_residue_with_key(
             mut.get_position_key())
-        stru_oper.remove_side_chain_atom(target_res) # remove atom
+        stru_oper.remove_side_chain_mutating_atom(target_res, mut.target) # remove atom
         target_res.name = mut.target # change name
     with open(int_leapin_pdb_path, "w") as of:
         of.write(sp.get_file_str(stru_cpy))

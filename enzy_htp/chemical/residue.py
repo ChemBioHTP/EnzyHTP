@@ -555,7 +555,8 @@ RESIDUE_NON_MUTATE_ATOM_MAPPER: Dict[str, List[str]] = {
     "PRO" : ['N','CA','HA','CB','C','O'],
     "GLY" : ['N','H','CA','C','O'],
 }
-"""a dictionary of atom names that won't change in a subsitution-mutation. Bascially mainchain+CB."""
+"""a dictionary of atom names that won't change in a subsitution-mutation. Bascially mainchain+CB.
+The key is the residue after the mutation."""
 
 # yapf: enable
 
@@ -650,8 +651,13 @@ def polar(code: str) -> bool:
     return not non_polar(code)
 
 def get_non_mutate_atom_names(residue_name: str) -> List[str]:
-    """get non_mutating atom names of the residue of the three-letter name
-    {residue_name}"""
+    """get names of atoms that does not involve in a substitution mutation to
+    the residue ({residue_name}). For example: for mutating to most residues, the
+    main chain atoms and CB won't change and mutating to Gly will remove CB
+    Args:
+        residue_name: the 3-letter name for the target residue
+    Returns:
+        a list of atom names that remains the same before and after mutation"""
     if len(residue_name) != 3:
         raise InvalidResidueCode(
             f"expecting three letter residue code. '{residue_name}' is invalid")

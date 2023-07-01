@@ -56,5 +56,8 @@ def test_remove_side_chain_atom():
     stru: Structure = sp.get_structure(pdb_file_path)
     # manually select the case where it is a switch
     test_residue = stru.residues[5]
-    stru_oper.remove_side_chain_atom(test_residue)
+    stru_oper.remove_side_chain_mutating_atom(test_residue, "ASP")
     assert set(test_residue.atom_name_list) == set(["N", "CA", "C", "O", "CB", "H", "HA"])
+    test_residue = stru.residues[7]
+    stru_oper.remove_side_chain_mutating_atom(test_residue, "GLY")
+    assert set(test_residue.atom_name_list) == set(["N", "CA", "C", "O", "H"])

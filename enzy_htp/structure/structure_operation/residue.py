@@ -67,11 +67,21 @@ def get_default_deproton_info(residue: Residue,
     return target_atom_depro_info
 
 
-def remove_side_chain_atom(residue: Residue, remove_cb: bool= False) -> None:
-    """remove side chain atoms of the residue.
-    make changes in place"""
+def remove_side_chain_mutating_atom(residue: Residue, substitute_residue_name: str,
+                                    remove_cb: bool= False) -> None:
+    """remove mutating atoms of the side chain of the residue. The atoms are determined
+    by the 3-letter name of the {substitute_residue_name}. (e.g.: to GLY requires removing more
+    atoms)
+    make changes in place.
+    Args:
+        residue:
+            the target residue of change
+        substitute_residue_name: 
+            the 3-letter name of the residue after the subtitution mutation
+        remove_cb:
+            whether want to remove also CB when it is not removed"""
     # atoms to keep
-    non_mutate_atom_names = chem.residue.get_non_mutate_atom_names(residue.name)
+    non_mutate_atom_names = chem.residue.get_non_mutate_atom_names(substitute_residue_name)
     if "CB" in non_mutate_atom_names and remove_cb:
         non_mutate_atom_names.remove("CB")
     
