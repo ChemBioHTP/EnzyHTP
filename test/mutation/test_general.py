@@ -1,4 +1,4 @@
-"""Testing the enzy_htp.mutation.general.py submodule.
+"""Testing the enzy_htp.mutation.api.py submodule.
 Author: QZ Shao <shaoqz@icloud.com>
         Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-01-23
@@ -12,7 +12,7 @@ import pytest
 from enzy_htp.core import file_system as fs
 from enzy_htp.core.exception import UnsupportedMethod
 from enzy_htp.structure import PDBParser
-import enzy_htp.mutation.general as mg
+import enzy_htp.mutation.api as mapi
 from enzy_htp.mutation.mutation import Mutation
 
 DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/data/"
@@ -25,7 +25,7 @@ def test_assign_mutant():
     test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
     test_stru = sp.get_structure(test_pdb)
 
-    mutants = mg.assign_mutant(
+    mutants = mapi.assign_mutant(
         test_stru,
         test_mutation_pattern)
     # print(mutants)
@@ -37,7 +37,7 @@ def test_assign_mutant_dimer():
     test_pdb = f"{DATA_DIR}puo_put.pdb"
     test_stru = sp.get_structure(test_pdb)
 
-    mutants = mg.assign_mutant(
+    mutants = mapi.assign_mutant(
         test_stru,
         test_mutation_pattern,
         chain_sync_list=[("A","B")],
@@ -61,7 +61,7 @@ def test_sync_mutation_over_chains():
         "C": 20,
         "D": 100
     }
-    result = mg.sync_mutation_over_chains(
+    result = mapi.sync_mutation_over_chains(
         test_mutants,
         test_chain_sync_list,
         test_chain_index_mapper)
@@ -75,8 +75,8 @@ def test_mutate_stru_with_tleap():
     """test function works as expected"""
     test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
     test_stru = sp.get_structure(test_pdb)
-    mutant = mg.assign_mutant(test_stru, "R154W")[0]
-    mutant_stru = mg.mutate_stru_with_tleap(test_stru, mutant)
+    mutant = mapi.assign_mutant(test_stru, "R154W")[0]
+    mutant_stru = mapi.mutate_stru_with_tleap(test_stru, mutant)
 
     for new_res, old_res in zip(mutant_stru.residues, test_stru.residues):
         if new_res.idx == 154:
@@ -98,7 +98,7 @@ def test_check_mutant_stru():
     ]
     mutant_stru = sp.get_structure(mutant_pdb)
 
-    mg.check_mutant_stru(mutant_stru, mutant)
+    mapi.check_mutant_stru(mutant_stru, mutant)
 
 
 # ==TODO==

@@ -873,7 +873,7 @@ class AmberInterface:
                 the amber library used for cleaning.
 
         Application:
-            Used in mutation.general.mutate_stru_with_tleap()"""
+            Used in mutation.api.mutate_stru_with_tleap()"""
 
         tleap_in_lines: List[str] = [
             f"source {amber_lib}",

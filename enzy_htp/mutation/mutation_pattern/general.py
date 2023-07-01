@@ -24,7 +24,7 @@ def decode_mutation_pattern(stru: Structure, pattern: str) -> List[List[Mutation
     """
     decode the mutation {pattern} and return a list of mutants (list of mutation_obj)
     using {stru} as the reference. The syntax of the mutation pattern is defined in
-    `enzy_htp.mutation.general.assign_mutation`
+    `enzy_htp.mutation.api.assign_mutation`
     """
     result_mutants = []
     mutant_patterns = seperate_mutant_patterns(pattern)

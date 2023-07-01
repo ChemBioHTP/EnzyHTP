@@ -15,7 +15,7 @@ from .mutation import (
     get_mutant_name_tag,
 )
 
-from .general import (
+from .api import (
     assign_mutant,
     mutate_stru,
 )

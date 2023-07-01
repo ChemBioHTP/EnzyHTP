@@ -81,5 +81,5 @@ class IndexMappingError(Exception):
 
 class BadMutantStructure(Exception):
     """Exception corresponding to structure that didn't pass the check in
-    enzy_htp.mutation.general.check_mutant_stru"""
+    enzy_htp.mutation.api.check_mutant_stru"""
     pass
