@@ -1,4 +1,4 @@
-"""Testing the enzy_htp.mutation.mutation_pattern.general.py submodule.
+"""Testing the enzy_htp.mutation.mutation_pattern.api.py submodule.
 Author: QZ Shao <shaoqz@icloud.com>
 Date: 2023-01-26
 """
@@ -11,7 +11,7 @@ import pickle
 from enzy_htp.core.exception import InvalidMutationPatternSyntax
 from enzy_htp import PDBParser
 from enzy_htp.mutation.mutation import Mutation
-import enzy_htp.mutation.mutation_pattern.general as m_p
+import enzy_htp.mutation.mutation_pattern.api as m_p
 
 CURR_FILE = os.path.abspath(__file__)
 CURR_DIR = os.path.dirname(CURR_FILE)

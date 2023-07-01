@@ -6,7 +6,7 @@ Date: 2023-02-17
 import os
 
 from enzy_htp import PDBParser
-import enzy_htp.mutation.mutation_pattern.general as m_p
+import enzy_htp.mutation.mutation_pattern.api as m_p
 
 CURR_FILE = os.path.abspath(__file__)
 CURR_DIR = os.path.dirname(CURR_FILE)
