@@ -25,6 +25,11 @@ def decode_mutation_pattern(stru: Structure, pattern: str) -> List[List[Mutation
     decode the mutation {pattern} and return a list of mutants (list of mutation_obj)
     using {stru} as the reference. The syntax of the mutation pattern is defined in
     `enzy_htp.mutation.api.assign_mutation`
+    Args:
+        stru: the reference structure
+        pattern: the mutation pattern to be decode
+    Return:
+        A list of mutants, each is a list of Mutation()
     """
     result_mutants = []
     mutant_patterns = seperate_mutant_patterns(pattern)
@@ -92,7 +97,17 @@ def decode_direct_mutation(stru: Structure, section_pattern: str) -> List[List[M
 def decode_random_mutation(stru: Structure, section_pattern: str) -> List[List[Mutation]]:
     """decode the mutation pattern section that random over the mutation set.
     Return a list of mutation objects. (M number of N point mutants)
-    pattern_example: r:N[xxx:yyy]*M"""
+    Args:
+        stru: the reference structure
+        section_pattern: the section pattern to be decode
+    Return:
+        A list of mutants, each is a list of Mutation()
+
+    pattern_example:
+        r:N[xxx:yyy]*M or r:NR[xxx:yyy]*MR
+        (M number of N point mutants)
+        (R stands for whether repeating mutation is allowed for each mutant and
+        whether repeating mutant is allowed in the result, respectively)"""
     re_pattern = r"r:([0-9]*)(R?)\[(.+)\]\*([0-9]*)(R?)"
     mut_point_num, point_allow_repeat, mutation_esm_patterns, mutant_num, mutant_allow_repeat = re.match(
         re_pattern, section_pattern).groups()
@@ -108,7 +123,7 @@ def decode_random_mutation(stru: Structure, section_pattern: str) -> List[List[M
             f"number of desired point mutations are more than the total number of possible mutation sites in the ensemble, desired: {mut_point_num}, possible_sites: {len(mutation_esm_mapper)}"
         )
 
-    result: List[Set[Mutation]] = []
+    result: List[List[Mutation]] = []
     while len(result) < mutant_num:
         # I. make mutations for each mutant
         each_mutant: Dict[tuple, Mutation] = {}  # point mutation of each mutant
@@ -156,9 +171,12 @@ def decode_all_mutation(stru: Structure, section_pattern: str) -> List[List[Muta
     1 point and a WT.
     If "M" is specificed, each point will be mutated and there will be the same number of
     point mutations in each mutant as the number of positions in the mutation_esm_pattern.
+    Args:
+        stru: the reference structure
+        section_pattern: the section pattern to be decode
+    Return:
+        A list of mutants, each is a list of Mutation()
 
-    Returns:
-        a list of mutation objects.
     pattern_example:
         a:[xxx:yyy] or a:M[xxx:yyy]"""
     result: List[List[Mutation]] = []
@@ -186,7 +204,15 @@ def decode_mutation_esm_pattern(
     """decode mutation esm pattern into a list of mutation objects
     pattern_example: position_pattern_0:target_aa_pattern_0, ...
     NOTE: if different mutation_esm_pattern have shared points.
-          The target of the shared points with be the union of all"""
+          The target of the shared points with be the union of all
+    Args:
+        stru: the reference structure
+        mutation_esm_patterns: the mutation_esm_pattern to be decode
+    Return:
+        A dictionary of position : mutant (a list of Mutation()) pair
+
+    pattern_example:
+        position:target_aa"""
 
     esm_result: Dict[tuple, List[Mutation]] = {}
     seperate_pattern = r"(?:[^,(]|(?:\([^\}]*\)))+[^,]*"
