@@ -9,7 +9,6 @@ Date: 2022-06-15
 """
 import copy
 import re
-from collections import namedtuple
 from typing import List, Dict, Tuple, Union
 from enzy_htp.chemical.residue import (CAA_CHARGE_MAPPER, ONE_LETTER_AA_MAPPER, THREE_LETTER_AA_MAPPER,
                                        convert_to_canonical_three_letter,
@@ -264,40 +263,3 @@ def remove_repeat_mutation(mutant: List[Mutation], keep: str= "last") -> List[Mu
 def get_mutant_name_tag(mutant: List[Mutation]) -> str:
     """get a string tag for the mutant"""
     return f"_{'_'.join(str(i) for i in mutant)}"
-
-
-# == TODO ==
-def generate_all_mutations(
-    structure: es.Structure, ) -> Dict[Tuple[str, int], List[Mutation]]:
-    """Creates all possible mutations for a given Structure() object. Puts all the mutations into a dict()
-    where the (key, value) pairs are ((chain_id, residue), List[Mutation]). The List[Mutation] is all mutations
-    from the existing residue to the other 20 residues. For a given enzyme with N residues, there will be a total
-    of N*20 Mutation() objects in the dict().
-
-
-    Args:
-        structure: The Structure() object to build mutations from.
-
-    Returns:
-        A dict() with (key, value) pairs of ((chain_id, residue), List[Mutation]).
-    """
-    result = dict()
-    residues: List[es.Residue] = structure.residues
-    residues = list(filter(lambda rr: rr.is_canonical(), residues))
-    for res in residues:
-        (chain_id, num) = res.key()
-        orig: str = res.name
-        if len(orig) != 1:
-            orig = chem.convert_to_one_letter(orig)
-        result[res.key()] = list(
-            map(
-                lambda ch: Mutation(orig=orig, target=ch, chain_id=chain_id, res_idx=num),
-                chem.one_letters_except(orig),
-            ))
-
-    # a last check
-    for mut_list in result.values():
-        for mt in mut_list:
-            assert is_valid_mutation(mt)
-    return result
-

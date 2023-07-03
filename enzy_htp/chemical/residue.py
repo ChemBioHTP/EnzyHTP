@@ -651,11 +651,16 @@ def polar(code: str) -> bool:
     return not non_polar(code)
 
 def get_non_mutate_atom_names(residue_name: str) -> List[str]:
-    """get names of atoms that does not involve in a substitution mutation to
-    the residue ({residue_name}). For example: for mutating to most residues, the
-    main chain atoms and CB won't change and mutating to Gly will remove CB
+    """Get names of atoms that does not involve in a substitution mutation to
+    the residue ({residue_name}). 
+    For example: for mutating to most residues, all
+    the side chain atoms will be replaced whiled the main chain atoms and CB won't
+    change. So in this case, the returning list of atoms are the mainchain atoms and
+    CB. For mutating to GLY, CB and HA are also removed so the list may change
+    depending on the {residue_name}.
+    This function is mainly used for mutate_stru_with_tleap().
     Args:
-        residue_name: the 3-letter name for the target residue
+        residue_name: the 3-letter name for the residue after the mutation
     Returns:
         a list of atom names that remains the same before and after mutation"""
     if len(residue_name) != 3:

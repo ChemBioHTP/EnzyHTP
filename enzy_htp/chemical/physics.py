@@ -3,14 +3,14 @@
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2022-05-12
 """
-from typing import Union
+from typing import Union, Tuple, List
 import numpy as np
 
-def get_ele_field_strength_value(p0: Union[tuple, list],
+def get_ele_field_strength_value(p0: Union[Tuple, List],
                                  c0: float,
-                                 p1: Union[tuple, list],
-                                 p2: Union[tuple, list] = None,
-                                 d1: Union[tuple, list] = None) -> float:
+                                 p1: Union[Tuple, List],
+                                 p2: Union[Tuple, List] = None,
+                                 d1: Union[Tuple, List] = None) -> float:
     '''
     return field strength E of *p0(c0)* at *p1* in direction of *p2-p1* or *d1*
     Details:

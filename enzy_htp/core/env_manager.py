@@ -13,7 +13,7 @@ from subprocess import CompletedProcess, SubprocessError, run
 from enzy_htp.core.general import get_localtime
 
 from .logger import _LOGGER
-from .exception import EnvMissingExecutable, MissingEnvironmentElement
+from .exception import MissingEnvironmentElement
 
 
 class EnvironmentManager:
@@ -135,7 +135,7 @@ class EnvironmentManager:
             return the CompletedProcess object
 
         Raises:
-            EnvMissingExecutable
+            MissingEnvironmentElement
             SystemExit
             """
         if isinstance(args, list):
@@ -146,8 +146,7 @@ class EnvironmentManager:
         if exe in self.missing_executables_ or not self.__exe_exists(exe):
             _LOGGER.error(
                 f"This environment is missing '{exe}' and cannot run the command '{cmd}'")
-            _LOGGER.error(f"Exiting...")
-            raise EnvMissingExecutable
+            raise MissingEnvironmentElement
         if exe not in self.mapper:
             _LOGGER.warning(
                 f"(dev-only) Using unregistered executable: '{exe}'")

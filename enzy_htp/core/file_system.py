@@ -121,8 +121,13 @@ def write_data(outfile: str, tag: Any, data: Dict) -> str:
     return outfile
 
 
-def get_valid_temp_name(fname: str) -> None:
-    """find a vaild name for a temp file. add a index if name exist"""
+def get_valid_temp_name(fname: str) -> str:
+    """find a vaild name for a temporary file of {fname}. 
+    If {fname} exists, add a index after it.
+    Args:
+        fname: the filename of need.
+    Return:
+        result_fname: the valid filename that is unique to use"""
     idx = 0
     suffix = ''.join(Path(fname).suffixes)
     result_fname = fname
