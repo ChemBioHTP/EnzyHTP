@@ -29,9 +29,9 @@ Author: QZ Shao, <shaoqz@icloud.com>
 Date: 2022-10-21
 """
 import copy
+import time
 import numpy as np
 from typing import List, Iterable, Tuple, Dict
-from time import perf_counter
 import itertools
 
 from .logger import _LOGGER
@@ -91,17 +91,17 @@ def get_interval_str_from_list(target_list: List[int]) -> str:
     return result
 
 
-def get_random_list_elem(traget_list: list):
+def get_random_list_elem(target_list: list):
     """Helper method that randomly chooses an element from a list. numpy.random.choice() doesn't 
     like to take elements from list()'s of tuples so this is the work around."""
-    return np.random.choice(traget_list)
+    return target_list[np.random.randint(len(target_list))] #np.random.choice only works on 1d
 
 
-def pop_random_list_elem(traget_list: list):
+def pop_random_list_elem(target_list: list):
     """Helper method that randomly pop an element from a list. (delete from original list)
     numpy.random.choice() doesn't like to take elements from list()'s of tuples so
     this is the work around."""
-    return traget_list.pop(np.random.randint(len(traget_list)))
+    return target_list.pop(np.random.randint(len(target_list)))
 
 
 def product_lists_allow_empty(list_of_lists: List[list]) -> List[list]:
@@ -114,16 +114,44 @@ def product_lists_allow_empty(list_of_lists: List[list]) -> List[list]:
     ]
     return _product_lists_w_each_empty_ele(iter(list_of_lists_copy))
 
+# == Museum of Function ==
+# This is an old slow but insteresting function so it kept it here
+# def _product_lists_w_each_empty_ele(list_of_lists: Iterable[list]) -> List[list]:
+#     """a sub-function used for product_list_allow_empty"""
+#     curr_list = next(list_of_lists, None)
+#     if not curr_list:
+#         return [[]]
+#     next_list = _product_lists_w_each_empty_ele(list_of_lists)
+#     return [[x] + y if x != GHOST_LIST_ELEMENT else y for x in curr_list
+#             for y in next_list]
 
 def _product_lists_w_each_empty_ele(list_of_lists: Iterable[list]) -> List[list]:
     """a sub-function used for product_list_allow_empty"""
-    curr_list = next(list_of_lists, None)
-    if not curr_list:
-        return [[]]
-    next_list = _product_lists_w_each_empty_ele(list_of_lists)
-    return [[x] + y if x != GHOST_LIST_ELEMENT else y for x in curr_list
-            for y in next_list]
+    result_w_none = itertools.product(*list_of_lists)
+    result = []
+    count = 0
+    for sublists in result_w_none:
+        count += 1
+        result_sublist = []
+        for ele in sublists:
+            if ele is GHOST_LIST_ELEMENT:
+                continue
+            result_sublist.append(ele)
+        result.append(result_sublist)
+    return result
 
+def if_list_contain_repeating_element(target_list: list) -> bool:
+    """check if the target list contains any repeating elements"""
+    return len(target_list) != len(set(target_list))
+
+def list_remove_adjacent_duplicates(target_list: list) -> list:
+    """turn a new list removing all adjacent_duplicates. keep the 1st one.
+    keep the order."""
+    result = [target_list[0]]
+    for i in range(1, len(target_list)):
+        if target_list[i] != target_list[i-1]:
+            result.append(target_list[i])
+    return result
 
 # == Dict related ==
 def get_copy_of_deleted_dict(orig_dict: Dict, del_key) -> Dict:
@@ -140,19 +168,26 @@ def get_copy_of_deleted_dict(orig_dict: Dict, del_key) -> Dict:
 
     return dict_copy
 
-
 # == misc ===
 
 
 def timer(fn):
     """decodator for timing the run of the function {fn}"""
 
-    def inner(*args, **kwargs):
-        start_time = perf_counter()
+    def timer_inner(*args, **kwargs):
+        start_time = time.perf_counter()
         to_execute = fn(*args, **kwargs)
-        end_time = perf_counter()
+        end_time = time.perf_counter()
         execution_time = end_time - start_time
         _LOGGER.info("{0} took {1:.8f}s to execute".format(fn.__name__, execution_time))
         return to_execute
 
-    return inner
+    return timer_inner
+
+def get_localtime(time_stamp: float = None) -> str:
+    """function that default return current locat time as formatted string.
+    covert the {time_stamp} to localtime if provided"""
+    if time_stamp is None:
+        return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+    else:
+        return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time_stamp))

@@ -11,7 +11,7 @@ state, addition of missing residues, performing an amino acid substitution, and 
 Most enzyme modeling practices use similar structural operations but rely on manual curation, which is 
 highly inefficient and hampers reproducibility. EnzyHTP, a high-throughput enzyme simulation tool, bypasses 
 these issues through automation of molecular model construction, mutation, sampling and energy calculation.
-uthor: Qianzhen (QZ) Shao <shaoqz@icloud.com>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-26
 """

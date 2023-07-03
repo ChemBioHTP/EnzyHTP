@@ -7,6 +7,7 @@ Date: 2022-03-19
 """
 # TODO(CJ): figure out how to inherit docstrings to the children classes.
 from __future__ import annotations
+import copy
 import sys
 import numpy as np
 from collections import defaultdict
@@ -17,6 +18,7 @@ from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
 from enzy_htp.core import _LOGGER
 from enzy_htp.core.exception import ResidueDontHaveAtom
 import enzy_htp.chemical as chem
+from enzy_htp.core.math_helper import get_geom_center
 
 from .atom import Atom
 
@@ -126,7 +128,7 @@ class Residue(DoubleLinkedNode):
             return chem.convert_to_one_letter(self.name)
         return f" {self.name} "
 
-    def find_atom_name(self, name: str) -> List[Atom]:
+    def find_atom_name(self, name: str) -> Atom:
         """find child Atom base on its name"""
         result = list(filter(lambda a: a.name == name, self.atoms))
         if len(result) > 1:
@@ -145,6 +147,17 @@ class Residue(DoubleLinkedNode):
     def atom_idx_list(self) -> List[int]:
         """get a list of atom indexes in the residue"""
         return list(map(lambda a: a.idx, self.atoms))
+
+    @property
+    def ca_coord(self) -> Tuple[float, float, float]:
+        """get the C-Alpha coordinate of the residue"""
+        atom_ca = self.find_atom_name("CA")
+        return atom_ca.coord
+
+    @property
+    def geom_center(self) -> Tuple[float, float, float]:
+        """get the geom_center coordinate of the residue"""
+        return get_geom_center([i.coord for i in self.atoms])
 
     # def clone(self) -> Residue: #TODO
     #     """Creates a deepcopy of self."""
@@ -237,6 +250,15 @@ class Residue(DoubleLinkedNode):
         for idx, aa in enumerate(self._atoms):
             self._atoms[idx].atom_number = idx + start  #@shaoqz: why dont use aa?
         return idx + start
+
+    def remove_atoms_not_in_list(self, keep_name_list: List[str]):
+        """remove atoms that do not in the name list of keeping.
+        Make change in place"""
+        ref_atom_list: List[Atom] = copy.copy(self.atoms)
+        for atom in ref_atom_list:
+            if atom.name not in keep_name_list:
+                _LOGGER.debug(f"deleting {atom}")
+                atom.delete_from_parent()
 
     #endregion
 

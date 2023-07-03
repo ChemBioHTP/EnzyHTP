@@ -1,0 +1,74 @@
+-I: Adding /dors/csb/apps/amber19/dat/leap/prep to search path.
+-I: Adding /dors/csb/apps/amber19/dat/leap/lib to search path.
+-I: Adding /dors/csb/apps/amber19/dat/leap/parm to search path.
+-I: Adding /dors/csb/apps/amber19/dat/leap/cmd to search path.
+-s: Ignoring startup file: leaprc
+-f: Source /gpfs52/home/shaoq1/bin/dev_test/EnzyHTP-refactor/scratch/tleap_2.in.
+
+Welcome to LEaP!
+Sourcing: /gpfs52/home/shaoq1/bin/dev_test/EnzyHTP-refactor/scratch/tleap_2.in
+----- Source: /dors/csb/apps/amber19/dat/leap/cmd/leaprc.protein.ff14SB
+----- Source of /dors/csb/apps/amber19/dat/leap/cmd/leaprc.protein.ff14SB done
+Log file: ./leap.log
+Loading parameters: /dors/csb/apps/amber19/dat/leap/parm/parm10.dat
+Reading title:
+PARM99 + frcmod.ff99SB + frcmod.parmbsc0 + OL3 for RNA
+Loading parameters: /dors/csb/apps/amber19/dat/leap/parm/frcmod.ff14SB
+Reading force field modification type file (frcmod)
+Reading title:
+ff14SB protein backbone and sidechain parameters
+Loading library: /dors/csb/apps/amber19/dat/leap/lib/amino12.lib
+Loading library: /dors/csb/apps/amber19/dat/leap/lib/aminoct12.lib
+Loading library: /dors/csb/apps/amber19/dat/leap/lib/aminont12.lib
+Loading PDB file: /gpfs52/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data/KE_07_R7_2_S.pdb
+
+/dors/csb/apps/amber19/bin/teLeap: Warning!
+Unknown residue: H5J   number: 253   type: Terminal/last
+..relaxing end constraints to try for a dbase match
+
+/dors/csb/apps/amber19/bin/teLeap: Warning!
+  -no luck
+Creating new UNIT for residue: H5J sequence: 254
+Created a new atom named: OAB within residue: .R<H5J 254>
+Created a new atom named: NAL within residue: .R<H5J 254>
+Created a new atom named: OAA within residue: .R<H5J 254>
+Created a new atom named: CAI within residue: .R<H5J 254>
+Created a new atom named: CAF within residue: .R<H5J 254>
+Created a new atom named: H1 within residue: .R<H5J 254>
+Created a new atom named: CAC within residue: .R<H5J 254>
+Created a new atom named: H4 within residue: .R<H5J 254>
+Created a new atom named: CAD within residue: .R<H5J 254>
+Created a new atom named: H3 within residue: .R<H5J 254>
+Created a new atom named: CAK within residue: .R<H5J 254>
+Created a new atom named: CAJ within residue: .R<H5J 254>
+Created a new atom named: CAE within residue: .R<H5J 254>
+Created a new atom named: H2 within residue: .R<H5J 254>
+Created a new atom named: NAG within residue: .R<H5J 254>
+Created a new atom named: OAH within residue: .R<H5J 254>
+  total atoms in file: 3978
+  The file contained 16 atoms not in residue templates
+Checking Unit.
+
+/dors/csb/apps/amber19/bin/teLeap: Warning!
+The unperturbed charge of the unit (-7.000000) is not zero.
+FATAL:  Atom .R<H5J 254>.A<OAB 1> does not have a type.
+FATAL:  Atom .R<H5J 254>.A<NAL 2> does not have a type.
+FATAL:  Atom .R<H5J 254>.A<OAA 3> does not have a type.
+FATAL:  Atom .R<H5J 254>.A<CAI 4> does not have a type.
+FATAL:  Atom .R<H5J 254>.A<CAF 5> does not have a type.
+FATAL:  Atom .R<H5J 254>.A<H1 6> does not have a type.
+FATAL:  Atom .R<H5J 254>.A<CAC 7> does not have a type.
+FATAL:  Atom .R<H5J 254>.A<H4 8> does not have a type.
+FATAL:  Atom .R<H5J 254>.A<CAD 9> does not have a type.
+FATAL:  Atom .R<H5J 254>.A<H3 10> does not have a type.
+FATAL:  Atom .R<H5J 254>.A<CAK 11> does not have a type.
+FATAL:  Atom .R<H5J 254>.A<CAJ 12> does not have a type.
+FATAL:  Atom .R<H5J 254>.A<CAE 13> does not have a type.
+FATAL:  Atom .R<H5J 254>.A<H2 14> does not have a type.
+FATAL:  Atom .R<H5J 254>.A<NAG 15> does not have a type.
+FATAL:  Atom .R<H5J 254>.A<OAH 16> does not have a type.
+
+/dors/csb/apps/amber19/bin/teLeap: Fatal Error!
+Failed to generate parameters
+
+Exiting LEaP: Errors = 1; Warnings = 3; Notes = 0.

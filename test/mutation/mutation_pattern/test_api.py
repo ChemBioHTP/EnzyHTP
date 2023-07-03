@@ -1,4 +1,4 @@
-"""Testing the enzy_htp.mutation.mutation_pattern.general.py submodule.
+"""Testing the enzy_htp.mutation.mutation_pattern.api.py submodule.
 Author: QZ Shao <shaoqz@icloud.com>
 Date: 2023-01-26
 """
@@ -11,7 +11,7 @@ import pickle
 from enzy_htp.core.exception import InvalidMutationPatternSyntax
 from enzy_htp import PDBParser
 from enzy_htp.mutation.mutation import Mutation
-import enzy_htp.mutation.mutation_pattern.general as m_p
+import enzy_htp.mutation.mutation_pattern.api as m_p
 
 CURR_FILE = os.path.abspath(__file__)
 CURR_DIR = os.path.dirname(CURR_FILE)
@@ -83,8 +83,8 @@ def test_decode_direct_mutation():
     test_d_pattern_1 = "R154W"
     answer = Mutation(orig="ARG", target="TRP", chain_id="A", res_idx=154)
 
-    assert m_p.decode_direct_mutation(test_stru, test_d_pattern) == answer
-    assert m_p.decode_direct_mutation(test_stru, test_d_pattern_1) == answer
+    assert m_p.decode_direct_mutation(test_stru, test_d_pattern) == [[answer]]
+    assert m_p.decode_direct_mutation(test_stru, test_d_pattern_1) == [[answer]]
 
 
 def test_decode_mutation_esm_pattern():
@@ -190,6 +190,17 @@ def test_combine_section_mutant_one_to_many():
     for mut in mutants:
         assert Mutation(orig='LEU', target='ALA', chain_id='A', res_idx=10) in mut
 
+def test_combine_section_mutant_one_section():
+    """test the function works as expected in the case that
+    single mutant combine with many mutants"""
+    test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
+    test_stru = sp.get_structure(test_pdb)
+    test_sec_1 = "a:[resi 253+252:all not self]"
+    # build per-section mutant mapper
+    p_mutant_mapper = {}
+    p_mutant_mapper[test_sec_1] = m_p.decode_all_mutation(test_stru, test_sec_1)
+    mutants = m_p.combine_section_mutant(p_mutant_mapper)
+    assert len(mutants) == 400
 
 def test_combine_section_mutant_many_to_many():
     """test the function works as expected"""

@@ -1,0 +1,14 @@
+-I: Adding /dors/csb/apps/amber19/dat/leap/prep to search path.
+-I: Adding /dors/csb/apps/amber19/dat/leap/lib to search path.
+-I: Adding /dors/csb/apps/amber19/dat/leap/parm to search path.
+-I: Adding /dors/csb/apps/amber19/dat/leap/cmd to search path.
+-s: Ignoring startup file: leaprc
+-f: Source /gpfs52/home/shaoq1/bin/dev_test/EnzyHTP-refactor/scratch/tleap.in.
+
+Welcome to LEaP!
+Sourcing: /gpfs52/home/shaoq1/bin/dev_test/EnzyHTP-refactor/scratch/tleap.in
+
+/dors/csb/apps/amber19/bin/teLeap: Fatal Error!
+Could not open file leaprc.protein.ff24SB: not found
+
+Exiting LEaP: Errors = 1; Warnings = 0; Notes = 0.

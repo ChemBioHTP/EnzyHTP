@@ -156,4 +156,19 @@ def test_get_valid_temp_name():
     assert not os.path.exists(fname1)
 
 
+def test_clean_temp_file_n_dir():
+    temp_dir_path = f"{CURR_DIR}/temp/"
+    temp_path_list = [temp_dir_path]
+    fs.safe_mkdir(temp_dir_path)
+    for i in range(3):
+        temp_file = fs.get_valid_temp_name(f"{temp_dir_path}/temp.txt")
+        with open(temp_file, "w") as of:
+            of.write("test")
+        temp_path_list.append(temp_file)
+    for temp_path in temp_path_list:
+        assert os.path.exists(temp_path)
+    fs.clean_temp_file_n_dir(temp_path_list)
+    for temp_path in temp_path_list:
+        assert not os.path.exists(temp_path)
+
 # TODO(CJ) add tests for remove_ext

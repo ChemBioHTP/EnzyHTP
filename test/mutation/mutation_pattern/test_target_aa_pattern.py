@@ -15,18 +15,25 @@ def test_decode_target_aa_pattern():
     """test the function use a made up target_aa_pattern"""
     test_pattern = "self"
     test_orig_resi = "ARG"
-    assert m_p.decode_target_aa_pattern(test_orig_resi, test_pattern) == set(["ARG"])
+    assert set(m_p.decode_target_aa_pattern(test_orig_resi, test_pattern)) == set(["ARG"])
 
 
 def test_decode_target_aa_pattern_not_expr():
     """test the function use a made up target_aa_pattern"""
     test_pattern = "all not self"
     test_orig_resi = "ARG"
-    assert m_p.decode_target_aa_pattern(test_orig_resi, test_pattern) == set([
+    assert set(m_p.decode_target_aa_pattern(test_orig_resi, test_pattern)) == set([
         "GLU", "ASN", "HIS", "SER", "VAL", "GLN", "TYR", "PRO", "ASP", "CYS", "GLY",
         "ALA", "THR", "LYS", "LEU", "MET", "ILE", "TRP", "PHE"
     ])
 
+def test_decode_target_aa_pattern_direct_residue_name():
+    """test the function use a made up orig_resi"""
+    test_pattern = "PHE or ALA"
+    test_orig_resi = "ARG"
+    assert set(m_p.decode_target_aa_pattern(test_orig_resi, test_pattern)) == set([
+        "PHE", "ALA"
+    ])
 
 def test_decode_larger():
     """test the function use a made up orig_resi"""
@@ -45,3 +52,8 @@ def test_check_target_aa_pattern_charge(caplog):
     test_pattern = "charge+"
     m_p.check_target_aa_pattern(test_pattern)
     assert "HIS is not included" in caplog.text
+
+def test_decode_positive():
+    """test the function use a made up orig_resi"""
+    test_orig_resi = "GLY"
+    assert m_p.decode_positive(test_orig_resi) == ['ARG', 'LYS']

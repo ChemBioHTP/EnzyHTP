@@ -101,9 +101,11 @@ class Chain(DoubleLinkedNode):
         """
         interval_list = get_interval_from_list(self.residue_idxs)
         if if_str:
-            range_strs = ",".join(
-                [f"{x[0]}-{x[1]}" if x[0] != x[1] else f"{x[0]}" for x in interval_list])
-            return ",".join(range_strs)
+            contain_list = [f"{x[0]}-{x[1]}" if x[0] != x[1] else f"{x[0]}" for x in interval_list]
+            if len(contain_list) == 1:
+                return contain_list[0]
+            range_strs = ",".join(contain_list)
+            return range_strs
         return interval_list
 
     @property
@@ -168,12 +170,13 @@ class Chain(DoubleLinkedNode):
     #region === Checker ===
     def is_polypeptide(self) -> bool:
         """
-        if there is any residue not canonical
+        if there is any non-aminoacid part in chain
         """
         return not sum(
             list(
-                map(lambda rr: (not rr.is_canonical()) and
-                    (not rr.is_noncanonical()), self._residues)))
+                map(
+                    lambda rr: (not rr.is_canonical()) and (not rr.is_noncanonical()),
+                    self._residues)))
 
     def has_metal(self) -> bool:
         """Checks if any metals are contained within the current chain."""

@@ -61,7 +61,7 @@ def test_is_valid_mutation_passes():
     ]
 
     for mm in mutations:
-        mut.is_valid_mutation(mm, stru)
+        mm.is_valid_mutation(stru)
 
 
 def test_is_valid_mutation_fails():
@@ -69,41 +69,115 @@ def test_is_valid_mutation_fails():
     ref_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
     stru = es.PDBParser().get_structure(ref_pdb)
     mutations: List[mut.Mutation] = {
-        "wrong data type": mut.Mutation(orig=1, target='ASP', chain_id='A', res_idx=0),
-        "wrong data type": mut.Mutation(orig="ALA", target='ASP', chain_id='A', res_idx="0"),
-        "empty chain_id": mut.Mutation(orig='ARG', target='ALA', chain_id='', res_idx=1),
-        "does not exist in structure": mut.Mutation(orig='ARG',
-                                                    target='ASP',
-                                                    chain_id='B',
-                                                    res_idx=154),
-        "does not exist in structure ": mut.Mutation(orig='ARG',
-                                                     target='ASP',
-                                                     chain_id='A',
-                                                     res_idx=300),
-        "original residue does not match": mut.Mutation(orig='ALA',
-                                                        target='ASP',
-                                                        chain_id='A',
-                                                        res_idx=154),
-        "unsupported target residue": mut.Mutation(orig='ARG',
-                                                   target='SEC',
-                                                   chain_id='A',
-                                                   res_idx=154),
-        "unsupported target residue": mut.Mutation(orig='ARG',
-                                                   target='X',
-                                                   chain_id='A',
-                                                   res_idx=154),
-        "equivalent mutation detected": mut.Mutation(orig='ARG',
-                                                     target='ARG',
-                                                     chain_id='A',
-                                                     res_idx=154),
+        "wrong data type": [mut.Mutation(orig=1, target='ASP', chain_id='A', res_idx=0), 
+                            mut.Mutation(orig="ALA", target='ASP', chain_id='A', res_idx="0"),],
+        "empty chain_id": [mut.Mutation(orig='ARG', target='ALA', chain_id='', res_idx=1)],
+        "does not exist in structure": [mut.Mutation(orig='ARG', target='ASP', chain_id='B', res_idx=154),
+                                        mut.Mutation(orig='ARG', target='ASP', chain_id='A', res_idx=300),],
+        "original residue does not match": [mut.Mutation(orig='ALA', target='ASP', chain_id='A', res_idx=154),],
+        "unsupported target residue": [mut.Mutation(orig='ARG', target='SEC', chain_id='A', res_idx=154),
+                                      mut.Mutation(orig='ARG', target='X', chain_id='A', res_idx=154)],
+        "equivalent mutation detected": [mut.Mutation(orig='ARG', target='ARG', chain_id='A', res_idx=154)],
     }
 
     for msg_finger_p, mm in mutations.items():
-        with pytest.raises(Exception) as exe:
-            mut.is_valid_mutation(mm, stru)
-        assert exe.type == InvalidMutation
-        assert msg_finger_p in exe.value.args[0]
+        for m in mm:
+            with pytest.raises(Exception) as exe:
+                m.is_valid_mutation(stru)
+            assert exe.type == InvalidMutation
+            assert msg_finger_p in exe.value.args[0]
 
+
+def test_check_repeat_mutation():
+    """test to make sure function works as expected"""
+    test_mutant = [
+        mut.Mutation("ARG", "TRP", "A", 154),
+        mut.Mutation("ARG", "ILE", "A", 154),
+        mut.Mutation("ARG", "TRP", "B", 154),
+        mut.Mutation("LYS", "GLN", "A", 37),
+    ]
+    assert mut.check_repeat_mutation(test_mutant)
+    test_mutant = [
+        mut.Mutation("ARG", "TRP", "A", 154),
+        mut.Mutation("ARG", "TRP", "B", 154),
+        mut.Mutation("LYS", "GLN", "A", 37),
+    ]
+    assert not mut.check_repeat_mutation(test_mutant)
+
+def test_remove_repeat_mutation():
+    """test to make sure function works as expected"""
+    test_mutant = [
+        mut.Mutation("ARG", "TRP", "A", 154),
+        mut.Mutation("ARG", "ILE", "A", 154),
+        mut.Mutation("ARG", "TRP", "B", 154),
+        mut.Mutation("LYS", "GLN", "A", 37),
+    ]
+    assert mut.remove_repeat_mutation(test_mutant, "last") == [
+        mut.Mutation("ARG", "ILE", "A", 154),
+        mut.Mutation("ARG", "TRP", "B", 154),
+        mut.Mutation("LYS", "GLN", "A", 37),
+    ]
+    assert mut.remove_repeat_mutation(test_mutant, "first") == [
+        mut.Mutation("ARG", "TRP", "A", 154),
+        mut.Mutation("ARG", "TRP", "B", 154),
+        mut.Mutation("LYS", "GLN", "A", 37),
+    ]
+
+
+def test_hash_and_set():
+    """test is if __hash__ function is set correct that set() functions correctly"""
+    test_mutant = [
+        mut.Mutation("ARG", "TRP", "A", 154),
+        mut.Mutation("ARG", "TRP", "A", 154),
+        mut.Mutation("ARG", "TRP", "B", 154),
+        mut.Mutation("LYS", "GLN", "A", 37),
+    ]
+
+    test_mutant_2 = [
+        mut.Mutation("LYS", "GLN", "A", 37),
+        mut.Mutation("ARG", "TRP", "A", 154),
+        mut.Mutation("ARG", "TRP", "B", 154),
+        mut.Mutation("ARG", "TRP", "B", 154),
+    ]
+    assert len(set(test_mutant)) == 3
+    assert test_mutant[0] == test_mutant[1] # same value
+    assert test_mutant[0] is not test_mutant[1] # but different object
+    assert set(test_mutant) == set(test_mutant_2)
+
+def test_changed_clone():
+    """test to make sure function works as expected"""
+    test_mutation = mut.Mutation("ARG", "TRP", "A", 154)
+    assert test_mutation.changed_clone(target= "LEU", res_idx= 10) == ("ARG", "LEU", "A", 10)
+
+def test_str_wt():
+    """test behavior of __str__ on WT"""
+    wt_mutation = mut.Mutation(None, "WT", None, None)
+    assert str(wt_mutation) == "WT"
+
+def test_repr_wt():
+    """test behavior of __repr__ on WT"""
+    wt_mutation = mut.Mutation(None, "WT", None, None)
+    assert repr(wt_mutation) == "(None,'WT',None,None)"
+
+def test_repr():
+    """test behavior of __repr__"""
+    mutation = mut.Mutation("ARG", "TRP", "A", 154)
+    assert repr(mutation) == "('ARG','TRP','A',154)"
+
+def test_get_name_tag():
+    """test behavior of the function"""
+    test_mutant = [
+        mut.Mutation("ARG", "TRP", "A", 154),
+        mut.Mutation("ARG", "TRP", "B", 154),
+        mut.Mutation("LYS", "GLN", "A", 37),
+    ]
+
+    print(mut.get_mutant_name_tag(test_mutant))
+
+def test_get_charge_diff():
+    """test behavior of get_charge_diff"""
+    test_mutant = mut.Mutation("ARG", "TRP", "A", 154)
+    assert test_mutant.get_charge_diff() == -1
 
 # == TODO ==
 def test_generate_all_mutations():

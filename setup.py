@@ -22,8 +22,10 @@ SUB_MODULES=[
         'enzy_htp.structure',
         'enzy_htp.structure.structure_io',
         'enzy_htp.structure.structure_operation',
+        'enzy_htp.structure.structure_selection',
         'enzy_htp.preparation',
         'enzy_htp.mutation',
+        'enzy_htp.mutation.mutation_pattern',
 ]
 
 if __name__ == '__main__':

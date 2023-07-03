@@ -2,6 +2,10 @@
 Science API:
 + protonate_stru
 
+The function naming format in the module:
+    Engine/Method:      {(sub_)science_api}_with_{engine/method}
+    Wrapper/Interface:  {ext_software}_{(sub_)science_api}
+
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-04-05
@@ -24,7 +28,6 @@ import enzy_htp.structure.structure_operation as stru_oper
 
 from pdb2pqr.main import main_driver as run_pdb2pqr
 from pdb2pqr.main import build_main_parser as build_pdb2pqr_parser
-import openbabel
 import openbabel.pybel as pybel
 from .pdb_line import read_pdb_lines
 
@@ -124,16 +127,19 @@ def protonate_peptide_with_pdb2pqr(stru: Structure,
         stru: a reference of the changed original structure
     """
     sp = PDBParser()
-    # manage the path
+    # manage the temp file path
+    temp_path_list = []
+    scratch_dir = config["system.SCRATCH_DIR"]
     if int_pdb_path is None:
-        fs.safe_mkdir(
-            config["system.SCRATCH_DIR"])  # make them together into make_temp_file
+        fs.safe_mkdir(scratch_dir)  # make them together into make_temp_file
         int_pdb_path = fs.get_valid_temp_name(
-            f"{config['system.SCRATCH_DIR']}/protonate_peptide_with_pdb2pqr_input.pdb")
+            f"{scratch_dir}/protonate_peptide_with_pdb2pqr_input.pdb")
+        temp_path_list.extend([scratch_dir, int_pdb_path])
     if int_pqr_path is None:
-        fs.safe_mkdir("./temp")
+        fs.safe_mkdir(scratch_dir)
         int_pqr_path = fs.get_valid_temp_name(
-            f"{config['system.SCRATCH_DIR']}/protonate_peptide_with_pdb2pqr_output.pdb")
+            f"{scratch_dir}/protonate_peptide_with_pdb2pqr_output.pdb")
+        temp_path_list.extend([scratch_dir, int_pqr_path])
     if fs.get_file_ext(int_pqr_path) == ".pqr":
         _LOGGER.warning(
             f"changing {int_pqr_path} extension to pdb. This filename now changes.")
@@ -144,22 +150,22 @@ def protonate_peptide_with_pdb2pqr(stru: Structure,
             )
             int_pqr_path = fs.get_valid_temp_name(
                 int_pqr_path.removesuffix(".pdb") + "_1.pdb")
+
     # run pqr interface
     with open(int_pdb_path, "w") as of:
-        of.write(sp.get_file_str(
-            stru))  # give the whole structure as input here as PropKa can use ligand
+        of.write(sp.get_file_str(stru))  # give the whole structure as input here as PropKa can use ligand
     pdb2pqr_protonate_pdb(int_pdb_path, int_pqr_path, ph)
     peptide_protonated_stru = sp.get_structure(int_pqr_path)
-    stru_oper.remove_non_peptide(
-        peptide_protonated_stru)  # keep the peptide only (sometime it has solvent)
+    stru_oper.remove_non_peptide(peptide_protonated_stru)  # keep the peptide only (sometime it has solvent)
     stru_oper.update_residues(stru, peptide_protonated_stru)
     protonate_peptide_fix_metal_donor(stru, method=metal_fix_method)
-    if _LOGGER.level > 10:  # not DEBUG or below
-        fs.safe_rm(int_pdb_path)
-        fs.safe_rm(int_pqr_path)
+
+    # clean up temp files
+    fs.clean_temp_file_n_dir(list(set(temp_path_list)))
+
     return stru
 
-
+# PDB2PQR interface (NOTE: group to _interface when more PDB2PQR is needed)
 def pdb2pqr_protonate_pdb(pdb_path: str,
                           pqr_path: str,
                           ph: float = 7.0,
@@ -212,12 +218,11 @@ def deprotonate_metal_donors(center: MetalUnit):
     """
     donor_mapper = center.get_donor_mapper(method="ionic")
     for d_resi, d_atoms in donor_mapper.items():
-        if d_resi.is_deprotonatable(
-        ):  # the donor atom selection guarantees the atom is deprotonable
+        # the donor atom selection guarantees the atom is deprotonable
+        if d_resi.is_deprotonatable():
             # find_closest_h_to_center(d_atom, center)
-            stru_oper.deprotonate_residue(
-                d_resi,
-                d_atoms[0])  # TODO(qz): refine this by also determine the closest proton
+            stru_oper.deprotonate_residue(d_resi, d_atoms[0])
+            # TODO(qz): refine this by also determine the closest proton
         elif d_resi.is_hetatom_noproton():
             _LOGGER.info(
                 f"donor residue {d_resi} already have no proton in center {center}")
@@ -270,16 +275,12 @@ def protonate_ligand_with_pybel(stru: Structure,
         ref_ligand = sp.get_structure(int_pybel_file_path).ligands[0]
         stru_oper.update_residues(ligand, ref_ligand)
         # clean up temp files
-        if _LOGGER.level > 10:  # not DEBUG or below
-            fs.safe_rm(int_ligand_file_path)
-            fs.safe_rm(int_pybel_file_path)
+        fs.clean_temp_file_n_dir([int_ligand_file_path, int_pybel_file_path])
+    fs.clean_temp_file_n_dir([int_ligand_file_dir])
 
-    if _LOGGER.level > 10:  # not DEBUG or below
-        fs.safe_rmdir(int_ligand_file_dir,
-                      empty_only=True)  #prevent remove the entire scratch
     return stru
 
-
+# PYBEL interface
 def pybel_protonate_pdb_ligand(in_path: str, out_path: str, ph: float = 7.0) -> str:
     """
     This is a wrapper of [PYBEL](https://openbabel.org/docs/dev/UseTheLibrary/Python_Pybel.html)
@@ -304,8 +305,7 @@ def pybel_protonate_pdb_ligand(in_path: str, out_path: str, ph: float = 7.0) -> 
     # fix atom label and residue name
     _fix_pybel_output(int_path, out_path, in_path)
 
-    if _LOGGER.level > 10:  # not DEBUG or below
-        fs.safe_rm(int_path)
+    fs.clean_temp_file_n_dir([int_path])
     return out_path
 
 
