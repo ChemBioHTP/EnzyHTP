@@ -378,12 +378,41 @@ def mutate_stru_with_pymol(
     Args:
         stru: the 'WT' structure
         mutant: a list of Mutation() which describes a mutant to the 'WT'
-        in_place: if make the changes to the structure in-place """
+        in_place: if make the changes to the structure in-place 
+    Returns:
+        The mutated structure.
+    """
+
+    sp = PDBParser()
+    temp_file_name = fs.get_valid_temp_name("pymol_mutation_result.pdb")
+
+    # san check
+    for mut in mutant:
+        if not isinstance(mut, Mutation):
+            _LOGGER.error(
+                f"mutant takes only a list of Mutation(). Current mutant is: {mutant}")
+            raise TypeError
+
+    stru_cpy = copy.deepcopy(stru)
+
     pi = interface.pymol
     temp_session = pi.new_pymol_session()
-    pymol_obj_name, session = pi.load_enzy_htp_stru(stru, temp_session)
+    pymol_obj_name, session = pi.load_enzy_htp_stru(stru_cpy, temp_session)
 
-    return stru
+    for mut in mutant:
+        pi.point_mutate(mut.get_position_key(), mut.get_target(), session)
+
+    session.cmd.save(temp_file_name)
+    pymol_mutant_stru = sp.get_structure(temp_file_name)
+    fs.clean_temp_file_n_dir([temp_file_name])
+
+    stru_oper.update_residues(stru_cpy, pymol_mutant_stru)
+
+    if in_place:
+        stru_oper.update_residues(stru, stru_cpy)
+        return stru
+
+    return stru_cpy
 
 MUTATE_STRU_ENGINE = {
     "tleap_min" : mutate_stru_with_tleap,
