@@ -5,6 +5,7 @@ Science API:
 
 Mutation is carried out by an underlying engine and the supported engines currently include:
     + Amber/tleap
+    + PyMOL
 
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2022-10-24
@@ -198,6 +199,7 @@ def mutate_stru(
             the engine (method) used for determine the mutated structure
                 (current available keywords):
                 tleap_min
+                pymol
                 # TODO may need to add more arg when deletion and insertion are supported
                 # (e.g.: engine_del, engine_ins)
         in_place:
@@ -367,8 +369,25 @@ def mutate_stru_with_tleap(
 
     return stru_cpy
 
+def mutate_stru_with_pymol(
+        stru: Structure,
+        mutant: List[Mutation],
+        in_place: bool = False,
+) -> Structure:
+    """mutate the {stru} to its {mutant} structure using PyMOL.
+    Args:
+        stru: the 'WT' structure
+        mutant: a list of Mutation() which describes a mutant to the 'WT'
+        in_place: if make the changes to the structure in-place """
+    pi = interface.pymol
+    temp_session = pi.new_pymol_session()
+    pymol_obj_name, session = pi.load_enzy_htp_stru(stru, temp_session)
+
+    return stru
+
 MUTATE_STRU_ENGINE = {
-    "tleap_min" : mutate_stru_with_tleap
+    "tleap_min" : mutate_stru_with_tleap,
+    "pymol" : mutate_stru_with_pymol
 }
 """engines for mutate_stru()"""
 
