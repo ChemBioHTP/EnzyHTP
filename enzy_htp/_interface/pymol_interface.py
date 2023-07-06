@@ -101,6 +101,31 @@ class PyMolInterface:
 
         return sorted(result)
 
+    def point_mutate(self, pos_key: Tuple[str, int], target: str, pymol_session: pymol2.PyMOL) -> None:
+        """
+        Performs a single point mutation on the PDB file in the PyMOL session in-place.
+        Args:
+            orig: the original residue name (3 letters).
+            pos_key: the chain id and residue index.
+            target: the target residue name (3 letters).
+            pymol_obj_name: the name of the PDB file in PyMOL.
+            pymol_session: the current PyMOL session.
+        Returns:
+            None.
+        """
+
+        # load pymol wizard mutagenesis function
+        pymol_session.cmd.wizard("mutagenesis")
+        pymol_session.cmd.do("refresh_wizard")
+        
+        # select res idx to mutate to target
+        pymol_session.cmd.get_wizard().set_mode(target)
+        pymol_session.cmd.get_wizard().do_select(str(pos_key[1]) + "/")
+
+        # select the best rotamer (defaulted to frame 1) and apply
+        pymol_session.cmd.frame(1)
+        pymol_session.cmd.get_wizard().apply()
+        
     # == inter-session modular functions == (do not requires a session, will start and close one)
     # pass
 
