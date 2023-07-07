@@ -698,6 +698,15 @@ class RosettaInterface(BaseInterface):
         df:pd.DataFrame = self.parent().pymol.collect('production.pdb', 'resi ss resn'.split(), sele='name CA')
         df['resi'] = df.resi.astype(int)
 
+        ss = []
+        for i, row in df.iterrows():
+            if row.resn.upper() in "MG ZN HG".split():
+                ss.append('M')
+            else:
+                ss.append( row.ss )
+        
+        df['ss'] = ss
+
         elements:List[Dict]=[
             {'parent':'SCOREFXNS', 'tag':'ScoreFunction', 'name':'score_fxn', 'weights':'ref2015'},
             {'parent':'MOVERS', 'tag':'FastRelax', 'name':'fast_relax', 'scorefxn':'score_fxn'},

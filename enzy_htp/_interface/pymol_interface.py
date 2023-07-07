@@ -331,5 +331,5 @@ class PyMOLInterface(BaseInterface):
                 exit( 1 )
 
 
-
+        return result
 
