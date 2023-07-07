@@ -8,8 +8,9 @@ directly convert data structures but can only use pymol2 provided cmd.xxx APIs.
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2022-02-15
 """
-
+from pathlib import Path
 from typing import List, Dict, Any, Union, Tuple
+
 
 import pymol2
 import pandas as pd
@@ -38,7 +39,7 @@ class PyMolInterface(BaseInterface):
         """
         super().__init__(parent, config, default_pymol_config)
         self.session_ = self.new_session() 
-        self.available_cmds_:List[str] = dir(  pymol2.PyMOL().cmd )
+        self.available_cmds_:List[str] = self.session_.cmd.kw_list
 
     def new_session(self) -> pymol2.PyMOL:
         """create a new pymol session, start it, and set feedback level. Canonical means to get a session in enzy_htp."""
@@ -243,8 +244,8 @@ class PyMolInterface(BaseInterface):
 
         if not session:
             self.session_.cmd.delete('all')
-            return self.convert(
-                molfile=molfile,
+            return self.de_protonate(
+                molfile,
                 new_file=new_file,
                 session=self.session_,
             )
@@ -332,8 +333,10 @@ class PyMolInterface(BaseInterface):
         for vv in variables:
             check_var_type( vv, str )
 
-        fs.check_file_exists(molfile)    
-        session.cmd.delete('all')
+        if molfile != 'memory':
+            fs.check_file_exists(molfile)    
+            session.cmd.delete('all')
+            session.cmd.load(molfile)
 
         _eh_local: Dict[str, Any] = {'data':[]}
 
@@ -387,8 +390,9 @@ class PyMolInterface(BaseInterface):
 
             cmd_str:str=f"{cmd_name}({','.join(map(str, cmd_args))})"
             try:
+                fxn = getattr(session.cmd,cmd_name)
                 result.append(
-                    session.cmd.__dict__[cmd_name](*cmd_args)
+                    fxn(*cmd_args)
                 )
             except:
                 _LOGGER.error(f"PyMOL function call '{cmd_str}' resuled in an error. Exiting...")
