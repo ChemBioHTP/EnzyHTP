@@ -1,6 +1,6 @@
 """Test for enzy_htp.preparation.clean.py for science API related to structure cleaning
 
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2022-09-22
 """
 import os

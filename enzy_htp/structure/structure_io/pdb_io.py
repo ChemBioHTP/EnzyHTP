@@ -1,5 +1,6 @@
 """Generation/construction of Structure objects from PDB files and exporting it vice versa
 Definition of PDB file format (http://www.wwpdb.org/documentation/file-format-content/format33/v3.3.html)
+Also contains util function that requires knoweledge of PDB format
 
 Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
 Date: 2022-08-01
@@ -8,12 +9,17 @@ from collections import defaultdict
 import os
 import string
 import sys
-from typing import Dict, List, Union
-#from plum import dispatch, Dispatcher
+from typing import Dict, List, Tuple, Union
 from plum import dispatch
 from biopandas.pdb import PandasPdb
 import pandas as pd
 
+from enzy_htp.core import _LOGGER
+from enzy_htp.core.exception import IndexMappingError
+import enzy_htp.core.file_system as fs
+from enzy_htp.core.general import if_list_contain_repeating_element, list_remove_adjacent_duplicates
+from enzy_htp.core.pandas_helper import batch_edit_df_loc_value, split_df_base_on_column_value
+import enzy_htp.chemical as chem
 from ._interface import StructureParserInterface
 from ..atom import Atom
 from ..metal_atom import MetalUnit, residue_to_metal
@@ -22,12 +28,8 @@ from ..solvent import Solvent, residue_to_solvent
 from ..ligand import Ligand, residue_to_ligand
 from ..chain import Chain
 from ..structure import Structure
-from enzy_htp.core import _LOGGER
-import enzy_htp.core.file_system as fs
-import enzy_htp.chemical as chem
 
 
-# pylint: disable=logging-fstring-interpolation
 class PDBParser(StructureParserInterface):
     """
     Parser for covert PDB into Structure and vice versa
@@ -91,7 +93,7 @@ class PDBParser(StructureParserInterface):
         cls._resolve_alt_loc(
             target_model_df
         )  # resolve alt loc record in place by delele redundant df rows
-        #end region (Add here to address more problem related to the PDB file format here)
+        #endregion (Add here to address more problem related to the PDB file format here)
 
         # target_model_df below should be "standard" --> start building
         # mapper is for indicating superior information of the current level: e.g.: indicate
@@ -105,8 +107,6 @@ class PDBParser(StructureParserInterface):
         if give_idx_map:
             return Structure(chain_list), idx_change_mapper
         return Structure(chain_list)
-
-    
 
     @classmethod
     @dispatch
@@ -175,8 +175,6 @@ class PDBParser(StructureParserInterface):
             result_str += cls._write_pdb_chain(chain)
         result_str += f"END{os.linesep}"
         return result_str
-
-
 
     #region == pdb -> Stru ==
     @staticmethod
@@ -268,6 +266,44 @@ class PDBParser(StructureParserInterface):
         (e.g. chain A TER chain A -(update)-> chain A TER chain B. see 1Q4T.)
         according to the TER record provide by "ter_df"
         * ter df should share the same line index references as df (from same file)
+        3. allow different ligand in the same chain
+        ==details==
+        There are in total 12 cases
+            for each chain:
+            contain atom missing chain id:
+                have 0 chain id total:
+                    add chain id
+                have 1 chain id total:
+                    repeat:
+                        HET chain:
+                            update to a new chain id for whole chain
+                        ATOM chain:
+                            abort
+                    not repeat:
+                        add the same chain id to atoms that missing
+                have more than 1 chain id total:
+                    abort
+            contain no atom missing chain id:
+                have 1 chain id total:
+                    HET:
+                        repeat:
+                            update to a new chain id
+                        not repeat:
+                            record
+                    ATOM:
+                        repeat:
+                            abort
+                        not repeat:
+                            record
+                have more than 1 chain id total:
+                    HET:
+                        treat as individual chain. for each:
+                        repeat:
+                            update
+                        not repeat:
+                            record
+                    ATOM:
+                        abort
         Returns:
             [edit df in place]
             idx_change_mapper: the mapper recording index change when repeating chain id
@@ -648,11 +684,18 @@ class PDBParser(StructureParserInterface):
         insert_code = f"{'':1}"
         occupancy = f"{1.00:>6.2f}"
 
-        temp_factor: str = ' ' * 6
-        if atom.b_factor:
+        if atom.b_factor is None:
+            temp_factor = f"{0.0:>6.2f}"
+        else:
             temp_factor = f"{atom.b_factor:>6.2f}"
+
         seg_id = f"{'':<4}"
-        element = f"{atom.element:>2}"
+
+        if atom.element is None:
+            element = f"{'':>2}"
+        else:
+            element = f"{atom.element:>2}"
+
         if atom.charge is None:
             charge = f"{'':2}"
         else:
@@ -662,8 +705,6 @@ class PDBParser(StructureParserInterface):
         line = f"{l_type}{a_index} {a_name}{alt_loc_id}{r_name} {c_index}{r_index}{insert_code}   {x}{y}{z}{occupancy}{temp_factor}      {seg_id}{element}{charge}{os.linesep}"
         return line
 
-
-
     @dispatch
     def _(self):
         """
@@ -671,52 +712,108 @@ class PDBParser(StructureParserInterface):
         """
         pass
 
+#region == util of PDB file handling ==
+# these tools handles those tasks that dont worth converting to Structure
 
-# TODO go to core helper
-def split_df_base_on_column_value(df: pd.DataFrame,
-                                  column_name: str,
-                                  split_values: list,
-                                  copy: bool = False) -> List[pd.DataFrame]:
+# index related
+def restore_pdb_index(index_mapper: Dict[tuple, tuple],
+                      target_pdb: str,
+                      out_path: str) -> None:
+    """Helper method that renumbers the residue chain id's and residue numbers in the
+    new structure found in target_pdb according to the index mapper (go back to old index)
+    Args:
+        index_mapper:
+            The mapper for replacing the index in target pdb
+            {(new_chain_id, new_residue_idx):(old_chain_id, old_residue_idx),
+            ...}
+        target_pdb: The path of the target .pdb file.
+        out_path: the path for the output pdb
     """
-    split a dataframe base on the value of a column
-    ** the line in the split values will not be included **
-    Arg:
-        df: the target dataframe
-        column_name: the reference column"s name
-        split_value: the value mark for spliting
-    """
-    # empty list
-    if not split_values:
-        if copy:
-            return [df.copy()]
-        return [df]
+    pdb_panda_obj = PandasPdb().read_pdb(target_pdb)
+    pdb_df = get_pdb_df(target_pdb) # also fix for chain id
+    for index, row in pdb_df.iterrows():
+        old_chain_id, old_resi_idx = index_mapper[(row["chain_id"], row["residue_number"])]
+        # edit index in place
+        pdb_df.loc[index, "chain_id"] = old_chain_id
+        pdb_df.loc[index, "residue_number"] = old_resi_idx
+    pdb_panda_obj.df["ATOM"] = pdb_df
+    pdb_panda_obj.to_pdb(out_path, records=["ATOM", "OTHERS"])
 
-    split_values = sorted(split_values)
-    frist = 1
-    result_dfs = []
-    for this_value in split_values:
-        if frist:
-            frist_df = df[df[column_name] < this_value]
-            result_dfs.append(frist_df)
-            frist = 0
-            last_value = this_value
-            continue
-        result_df = df[(df[column_name] < this_value) & (df[column_name] > last_value)]
-        result_dfs.append(result_df)
-        last_value = this_value
-    # deal with the last portion
-    result_dfs.append(df[df[column_name] > split_values[-1]])
+def get_index_mapper_from_pdb(
+        npdb: str,
+        opdb: str,
+        method: Union[None, str] = None,
+        **kwargs) -> Dict[tuple, tuple]:
+    """get the index mapper from matching old pdb and new pdb
+    (new pdb -> old pdb)"""
+    npdb_df = get_pdb_df(npdb)
+    opdb_df = get_pdb_df(opdb)
+    if method is None:
+        method = "default"
+    result = INDEX_MAPPING_METHODS[method](npdb_df, opdb_df, **kwargs)
+    return result
 
-    if copy:
-        for i, df_i in enumerate(result_dfs):
-            result_dfs[i] = df_i.copy()
+def pdb_index_mapping_by_order(npdb_df: pd.DataFrame, opdb_df: pd.DataFrame) -> Dict[tuple, tuple]:
+    """default method of mapping indexes (new pdb -> new pdb)
+    Just align the indexes by orders in the PDB file:
+        The residue of the same sequence appearing in the PDB file should be mapped
+        as the same residue and thus using the correponding opdb index.
 
-    return result_dfs
+    WARNING: those do not consider the case that orders of residue sequence in the file
+    can be inverted after some process. (like pymol or enzyhtp they will invert the
+    order base on residue indexes)"""
+    nkeys, okeys = get_pdb_index_key(npdb_df), get_pdb_index_key(opdb_df)
+    if len(okeys) != len(nkeys):
+        _LOGGER.error(f"Residue key number does not match between old and new pdb. Index mapping is impossible")
+        raise IndexMappingError
+    if if_list_contain_repeating_element(okeys):
+        _LOGGER.error(f"Found repeating residue key in old pdb. Index mapping is impossible")
+        raise IndexMappingError
+    if if_list_contain_repeating_element(nkeys):
+        _LOGGER.error(f"Found repeating residue key in new pdb. Index mapping is impossible")
+        raise IndexMappingError
+    
+    idx_mapper = dict(zip(nkeys, okeys))
+    return idx_mapper
 
+@dispatch
+def get_pdb_index_key(pdb: str) -> List[Tuple[str, str]]:
+    """get a index key of every residue in the pdb in the form of
+    (chain_id, residue_number) with the same order in the PDB file"""
+    pdb_df = get_pdb_df(pdb)
+    result = list_remove_adjacent_duplicates(
+        list(zip(pdb_df.residue_name, pdb_df.chain_id, pdb_df.residue_number)))
+    result = [(i,j) for _, i, j in result]
+    return result
 
-def batch_edit_df_loc_value(df: pd.DataFrame, loc_value_list: List[tuple], column: str):
-    """
-    batch edit "column" of "df" with the "loc_value_list"
-    """
-    for loc, value in loc_value_list:
-        df.loc[loc, column] = value
+@dispatch
+def get_pdb_index_key(pdb_df: pd.DataFrame) -> List[Tuple[str, str]]:
+    """get a index key of every residue in the pdb in the form of
+    (chain_id, residue_number) with the same order in the PDB file"""
+    result = list_remove_adjacent_duplicates(
+        list(zip(pdb_df.residue_name, pdb_df.chain_id, pdb_df.residue_number)))
+    result = [(i,j) for _, i, j in result]
+    return result
+
+INDEX_MAPPING_METHODS = {
+    "default" : pdb_index_mapping_by_order,
+    "by_order" : pdb_index_mapping_by_order,
+}
+
+# general
+def get_pdb_df(pdb: str, fix_chain_id: bool = True) -> pd.DataFrame:
+    """get the df of pdb. Fix chain id by default.
+    The idea is chain id information is already implicitly defined by TER lines
+    Fixing it is just make it explicit"""
+    df: pd.DataFrame = PandasPdb().read_pdb(pdb).df
+    result = pd.concat(
+        (df["ATOM"], df["HETATM"]), ignore_index=True
+    )
+    result.sort_values("line_idx", inplace=True)
+    if fix_chain_id:
+        pdb_ter_df = df["OTHERS"][df["OTHERS"].record_name == "TER"]
+        PDBParser._resolve_missing_chain_id(result, pdb_ter_df)
+    return result
+
+#endregion
+

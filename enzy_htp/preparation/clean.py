@@ -1,5 +1,8 @@
 """Module for remove irrelevant structure parts (such as solvents).
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Science API:
++ remove_solvent
+
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2022-09-22
 """
 from enzy_htp.structure import Structure, Residue

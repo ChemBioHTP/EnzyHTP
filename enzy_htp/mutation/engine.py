@@ -6,7 +6,7 @@ Mutation is carried out by an underlying engine and the supported engines curren
 
 Note that the current implementation will mutate the .pdb file and keep the residue indicies and chain names 
 consistent.
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-15
 """
@@ -24,12 +24,12 @@ import numpy as np
 import pandas as pd
 from biopandas.pdb import PandasPdb
 
-from enzy_htp import interface
-import enzy_htp.chemical as chem
-import enzy_htp.structure as struct
-import enzy_htp.preparation as prep
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import _LOGGER, UnsupportedMethod
+import enzy_htp.chemical as chem
+import enzy_htp.structure as struct
+from enzy_htp import interface
+import enzy_htp.preparation as prep
 
 from .mutation_restrictions import MutationRestrictions, restriction_object
 from .mutation import generate_all_mutations, Mutation
@@ -41,7 +41,7 @@ def mutate_pdb(
     mutations: List[Mutation] = list(),
     restrictions: MutationRestrictions = None,
     engine: str = "tleap",
-    out_dir: str = None,
+    out_dir: str = None,  #N/A
     random_state: int = 100,
 ) -> str:
     """Top level method that users should call to mutated a given .pdb file. Function gives the ability to
@@ -75,7 +75,7 @@ def mutate_pdb(
     def unique_by_pos(muts) -> List[Mutation]:
         holder = defaultdict(list)
         for mm in muts:
-            holder[(mm.chain_id, mm.res_num)].append(deepcopy(mm))
+            holder[(mm.chain_id, mm.res_idx)].append(deepcopy(mm))
         result = list()
         for mlist in holder.values():
             result.append(mlist.pop())
@@ -151,7 +151,7 @@ def get_mutations(
     mut_dict: Dict[Tuple[Str, int], List[Mutation]] = generate_all_mutations(structure)
 
     for mut in mutations:
-        restrictions.lock_residue((mut.chain_id, mut.res_num))
+        restrictions.lock_residue((mut.chain_id, mut.res_idx))
 
     mut_dict = restrictions.apply(mut_dict)
 
@@ -167,9 +167,9 @@ def get_mutations(
             )
 
         md_keys = list(mut_dict.keys())
-        chosen = random_list_elem(md_keys)
+        chosen = random_list_elem(md_keys)  # random over position
         if len(mut_dict[chosen]):
-            result.append(random_list_elem(sorted(mut_dict[chosen])))
+            result.append(random_list_elem(sorted(mut_dict[chosen]))) # random over targets (why sorted)
         del mut_dict[chosen]
 
     return result
@@ -190,7 +190,7 @@ def mutated_name(pdb: str, outdir: str, mutations: List[Mutation]) -> str:
 
     def deduce_original(mm: Mutation, df: pd.DataFrame) -> str:
         for i, row in df.iterrows():
-            if row.chain_id == mm.chain_id and row.residue_number == mm.res_num:
+            if row.chain_id == mm.chain_id and row.residue_number == mm.res_idx:
                 return chem.convert_to_one_letter(row.residue_name)
         else:
             # TODO(CJ): improve this
@@ -201,13 +201,13 @@ def mutated_name(pdb: str, outdir: str, mutations: List[Mutation]) -> str:
         outdir = str(pdb_path.parent)
 
     name_stem: str = pdb_path.stem
-    mutations = sorted(mutations, key=lambda m: (m.chain_id, m.res_num))
+    mutations = sorted(mutations, key=lambda m: (m.chain_id, m.res_idx))
     for mut in mutations:
         if mut.orig == "X":
             orig_name: str = deduce_original(mut, pdb_df)
         else:
             orig_name: str = mut.orig
-        name_stem += f"_{orig_name}{mut.res_num}{mut.target}"
+        name_stem += f"_{orig_name}{mut.res_idx}{mut.target}"
     return f"{outdir}/{name_stem}.pdb"
 
 
@@ -340,7 +340,7 @@ def _mutate_tleap(pdb: str, outfile: str, mutations: List[Mutation]) -> None:
         for mf in mutations:
             # Test for every Flag for every lines
 
-            if curr_chain == mf.chain_id and pdb_l.resi_id == mf.res_num:
+            if curr_chain == mf.chain_id and pdb_l.resi_id == mf.res_idx:
                 # fix for mutations of Gly & Pro
                 old_atoms: List[str] = {
                     "G": ["N", "H", "CA", "C", "O"],

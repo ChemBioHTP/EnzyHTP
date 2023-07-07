@@ -2,12 +2,14 @@
 Meant to be stored alongside other Residue() and Residue() derived objects (Ligand() and MetalUnit()) inside of 
 the Chain() object. Solvent() objects SHOULD NOT exist on their own.
 
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-04-05
 """
 from __future__ import annotations
 from copy import deepcopy
+
+from enzy_htp.core.logger import _LOGGER
 
 from .atom import Atom
 from .residue import Residue
@@ -36,9 +38,23 @@ class Solvent(Residue):
         Residue.__init__(self, residue_idx, residue_name, atoms, parent)
         self.rtype = renum.ResidueType.SOLVENT
 
+    #region === Getter-Prop ===
+    def init_connect(self, method: str) -> None:
+        """initiate connectivity"""
+        support_method_list = ["caa"]
+        if method == "caa":
+            for atom in self.atoms:
+                atom.init_connect_in_caa()
+
+        if method not in support_method_list:
+            _LOGGER.error(f"Method {method} not in supported list: {support_method_list}")
+    #endregion
+
+    #region === Checker ===
     def is_solvent(self) -> bool:
         """Checks if the Solvent() is an solvent. Hard-coded to True for this derived class."""
         return True
+    #endregion
 
     # def clone(self) -> Solvent:
     #     """Creates deepcopy of self."""

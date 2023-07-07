@@ -18,12 +18,24 @@ Date: 2022-09-14
 
 import copy
 from typing import Any, Dict, List, Union
+from .general import delete_base_on_id
 
 
 class DoubleLinkedNode():
     """
     class for parent objects of the doubly linked tree
     """
+
+    def __init__(self, children: List= None, parent= None):
+        """place holder init function for deepcopy testing"""
+        if children is None:
+            self.set_ghost_children()
+        else:
+            self.set_children(children)
+        if parent is None:
+            self.set_ghost_parent()
+        else:
+            self.set_parent(parent)
 
     #region === Attr ===
     # parent use
@@ -105,6 +117,8 @@ class DoubleLinkedNode():
 
         Returns:
             a deepcopy of a DoubleLinkedNode with parent = None.
+
+        NOTE: if there are not constructor in the class. All children with have no parent.
         """
         # in case this is the first copied item
         if memo is None:
@@ -181,13 +195,3 @@ class DoubleLinkedNode():
 
     def __len__(self) -> int:
         return len(self._children)
-
-
-# TODO go to other core
-def delete_base_on_id(target_list: list, target_id: int):
-    """
-    delete an element from a list base on its id() value
-    """
-    for i in range(len(target_list) - 1, -1, -1):
-        if id(target_list[i]) == target_id:
-            del target_list[i]

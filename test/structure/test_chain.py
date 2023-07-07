@@ -30,6 +30,16 @@ def test_sequence_noncanonical():
     stru: Structure = sp.get_structure(pdb_file_path)
     assert stru[0].sequence == "KRMLNTGYSLNNVHIDYVPTV TPO A"
 
+def test_residue_idx_interval():
+    """test residue_idx_interval of the chain"""
+    pdb_file_path = f"{DATA_DIR}two_chain.pdb"
+    stru: Structure = sp.get_structure(pdb_file_path)
+    assert stru[0].residue_idx_interval() == "10-11"
+    stru[1].residues[2].delete_from_parent()
+    assert stru[1].residue_idx_interval() == "12-13,15-16"
+    # one number behavior
+    stru[1].residues[2].delete_from_parent()
+    assert stru[1].residue_idx_interval() == "12-13,16"
 
 def test_is_same_coord():
     """Testing that the Chain.is_same_coord() method works correctly"""

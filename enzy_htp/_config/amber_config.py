@@ -4,7 +4,7 @@ files for minimization, heating, constant pressure production, and constant pres
 equilibration. File also contains default_amber_config() which creates a default version
 of the AmberConfig() object.
 
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 
 Date: 2022-06-02
@@ -145,7 +145,7 @@ class AmberConfig:
             self.CPU_ENGINE,
             self.GPU_ENGINE,
             "tleap",
-            "ampdb",
+            "ambpdb",
             "parmchk2",
             "antechamber",
             "cpptraj",

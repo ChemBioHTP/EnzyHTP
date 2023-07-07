@@ -18,7 +18,7 @@ In addition to specific packages, settings for the system are specified with Sys
 Note that for a given <Package>, there should exist a default_<package>_config function which
 provides a default, deep-copied instance of the specific <Package>Confg.
 
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 
 Date: 2022-07-15

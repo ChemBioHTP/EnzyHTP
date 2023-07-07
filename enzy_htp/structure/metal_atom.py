@@ -1,6 +1,6 @@
 """Definition for the MetalUnit class. This is a specialization of the Residue() obejct that is
 stored alongside other Residue() children types in the Chain() class.
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-04-03
 """
@@ -130,6 +130,14 @@ class MetalUnit(Residue):
         get donor residue based on donor atoms. See get_donor_mapper for detail
         """
         return list(self.get_donor_mapper(method, check_radius).keys())
+
+    def init_connect(self, method: str) -> None:
+        """initiate connectivity for the atom"""
+        support_method_list = ["isolate"]
+        if method == "isolate":
+            self.atom.connect = []
+        if method not in support_method_list:
+            _LOGGER.error(f"Method {method} not in supported list: {support_method_list}")
 
     #endregion
 

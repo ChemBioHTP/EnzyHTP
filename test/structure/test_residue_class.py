@@ -2,6 +2,7 @@
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-19
 """
+import copy
 import itertools
 import os
 import pytest
@@ -12,7 +13,7 @@ from collections import defaultdict
 from biopandas.pdb import PandasPdb
 from enzy_htp.core.exception import ResidueDontHaveAtom
 
-from enzy_htp.structure import Atom, Residue
+from enzy_htp.structure import Atom, Residue, Chain
 from enzy_htp.structure.structure_io import PDBParser
 import enzy_htp.structure.structure_operation as so
 
@@ -87,25 +88,24 @@ def test_check_all_canonical():
 
 def test_sequence_equivalent_return_true():
     """Testing that the Residue.is_sequence_equivalent() method returns True when desired."""
-    r1 = Residue(1, "A", list())
-    r2 = Residue(1, "A", list())
+    r1 = Residue(1, "A", list(), Chain('A', list()))
+    r2 = Residue(1, "A", list(), Chain('A', list()))
     assert r1.is_sequence_eq(r2)
-    assert r1.is_sequence_eq(deepcopy(r1))
-    r3 = Residue(1, "A", list())
-    r3.chain = "B"
-    assert r1.is_sequence_eq(r3)
-    r3.chain = "A"
-    assert r1.is_sequence_eq(r3)
+    r3 = Residue(1, "A", list(), Chain('A', list()))
     r3.name = "B"
+    assert r1.is_sequence_eq(r3)
+    r3.chain.name = "A"
+    assert r1.is_sequence_eq(r3)
+    r3.chain.name = "B"
     assert not r1.is_sequence_eq(r3)
 
 
 def test_sequence_equivalent_return_false():
     """Testing that the Residue.is_sequence_equivalent() method returns False when desired."""
-    r1 = Residue(1, "A", list())
-    r2 = Residue(3, "B", list())
+    r1 = Residue(1, "A", list(), Chain('A', list()))
+    r2 = Residue(3, "B", list(), Chain('A', list()))
     assert not r1.is_sequence_eq(r2)
-    r3 = Residue(1, "C", list())
+    r3 = Residue(1, "C", list(), Chain('B', list()))
     assert not r1.is_sequence_eq(r3)
 
 
@@ -159,3 +159,12 @@ def test_renumber_atoms_bad_input():
 
     assert exe.type == SystemExit
     assert exe.value.code == 1
+
+def test_remove_atoms_not_in_list():
+    """test function works as expected"""
+    test_residue = copy.deepcopy(RESIDUES[1])
+    test_keep_list = ["C", "H", "CA", "N", "O"]
+    assert test_residue.num_atoms == 14
+    test_residue.remove_atoms_not_in_list(test_keep_list)
+    assert test_residue.num_atoms == 5
+    assert set(test_residue.atom_name_list) == set(test_keep_list)

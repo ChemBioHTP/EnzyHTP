@@ -2,7 +2,7 @@
 serves as a wrapper for all associated Multiwfin functionality though this behavior is also partially controlled
 by the MultiwfnConfig class owned by the interface. Supported operations include:
     + bond dipole calculations
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-07-01
 """
@@ -33,9 +33,17 @@ class MultiwfnInterface(BaseInterface):
         Calls parent class.
         """
         super().__init__(parent, config, default_multiwfn_config)
+        self.config_ = config
+        if not self.config_:
+            self.config_ = default_multiwfn_config()
+        self.env_manager_ = em.EnvironmentManager(
+            env_vars=self.config_.required_env_vars(),
+            executables=self.config_.required_executables(),
+        )
+        self.env_manager_.check_environment()
+        self.compatible_env_ = self.env_manager_.is_missing()
 
-    def get_dipoles(self, fname:str) -> pd.DataFrame:
-        """ """
+    def parse_two_center_dp_moments(self, fname) -> List[Tuple[Tuple, Tuple]]:
 
         fs.check_file_exists( fname )
 

@@ -6,11 +6,9 @@ Date: 2022-09-19
 """
 
 import copy
-from typing import Tuple, Union
 from plum import dispatch
 
 from enzy_htp.core.logger import _LOGGER
-import enzy_htp.chemical as chem
 from ..structure import Structure, Solvent, Chain, Residue, Atom
 
 
@@ -35,7 +33,7 @@ def remove_empty_chain(stru: Structure) -> Structure:
     original object.
     """
     ch: Chain
-    for ch in stru:
+    for ch in copy.copy(stru.chains): # shallow copy to avoid iteration-deletion problem
         if ch.is_empty():
             _LOGGER.debug(f"removing {ch}")
             ch.delete_from_parent()
@@ -45,7 +43,7 @@ def remove_empty_chain(stru: Structure) -> Structure:
 def remove_non_peptide(stru: Structure) -> Structure:
     """remove the non-peptide parts of the structure. 
     Make changes in-place and return a reference of the changed original object."""
-    non_peptides = filter(lambda c: not c.is_peptide(), stru.chains)
+    non_peptides = list(filter(lambda c: not c.is_polypeptide(), stru.chains))
     ch: Chain
     for ch in non_peptides:
         ch.delete_from_parent()
@@ -74,8 +72,7 @@ def update_residues(stru: Structure, ref_stru: Structure) -> Structure:
         if self_res.name != ref_res.name:
             _LOGGER.info(f"updating {self_res.key()} {self_res.name} to {ref_res.name}")
             self_res.name = ref_res.name
-        self_res.atoms = copy.deepcopy(
-            ref_res.atoms)  # this will also set self_res as parent
+        self_res.atoms = copy.deepcopy(ref_res.atoms)  # this will also set self_res as parent
     stru.renumber_atoms()
     return stru
 
@@ -96,53 +93,3 @@ def update_residues(resi: Residue, ref_resi: Residue) -> Residue:  # pylint: dis
         resi.name = ref_resi.name
     resi.atoms = copy.deepcopy(ref_resi.atoms)  # this will also set resi as parent
     return resi
-
-
-def deprotonate_residue(residue: Residue, target_atom: Union[None, Atom] = None) -> None:
-    """
-    deprotonate the {residue} on the {target_atom} (if provided).
-    remove the acidic hydrogen attached to the {target_atom} and change the residue name
-    correponding to chem.residue.DEPROTONATION_MAPPER or /resource/ProtonationState.cdx
-    """
-    new_resi_name, target_proton = get_default_deproton_info(residue, target_atom)
-    if new_resi_name is None:
-        if len(target_atom.attached_protons()) == 0:
-            _LOGGER.info(f"target atom {target_atom} already have no H. keep original")
-        else:
-            _LOGGER.warning(
-                f"cannot deprotonate {residue} on {target_atom}. keep original")
-        return None
-    _LOGGER.info(f"deprotonate {target_proton} from {residue}")
-    residue.name = new_resi_name
-    residue.find_atom_name(target_proton).delete_from_parent()
-    #TODO rename/complete atoms after this (e.g.: ARG:NH1 case, HID -> HIE case)
-
-
-def get_default_deproton_info(residue: Residue,
-                              target_atom: Union[None, Atom] = None) -> Tuple:
-    """
-    return the default proton in the residue on the target_atom (if provided) to deprotonate
-    Default HIP target is set to resulting HIE
-    """
-    r_name = residue.name
-    # default target atom
-    if target_atom is None:
-        target_atom_name = list(chem.residue.DEPROTONATION_MAPPER[r_name].keys())[0]
-    else:
-        target_atom_name = target_atom.name
-
-    depro_info = chem.residue.DEPROTONATION_MAPPER.get(r_name, None)
-    if depro_info is None:
-        _LOGGER.warn(
-            f"no default protonation info for {r_name}. Consider make a standard for it")
-        return None, None
-    if r_name in ["HIE", "HID"]:
-        _LOGGER.warn(
-            f"deprotonation info for {residue} is actually a switching between HID/HIE")
-    target_atom_depro_info = depro_info.get(target_atom_name, None)
-    if target_atom_depro_info is None:
-        _LOGGER.warn(
-            f"no default protonation info for {target_atom_name} in {r_name}. Could be no proton on it. Consider make a standard for it if do"
-        )
-        return None, None
-    return target_atom_depro_info

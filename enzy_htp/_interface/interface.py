@@ -23,6 +23,7 @@ from .moe_interface import MOEInterface
 from .multiwfn_interface import MultiwfnInterface
 from .pymol_interface import PyMOLInterface
 from .rosetta_interface import RosettaInterface
+from .pymol_interface import PyMolInterface
 
 from enzy_htp._config import Config
 
@@ -107,3 +108,4 @@ class Interface:
         """ TODO"""
         #TODO(CJ)
         pass
+

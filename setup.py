@@ -14,7 +14,6 @@ with open('requirements.txt', 'r') as f:
 
 SUB_MODULES=[
         'enzy_htp',
-        'enzy_htp._apps',
         'enzy_htp._config',
         'enzy_htp._interface',
         'enzy_htp.analysis',
@@ -23,8 +22,10 @@ SUB_MODULES=[
         'enzy_htp.structure',
         'enzy_htp.structure.structure_io',
         'enzy_htp.structure.structure_operation',
+        'enzy_htp.structure.structure_selection',
         'enzy_htp.preparation',
         'enzy_htp.mutation',
+        'enzy_htp.mutation.mutation_pattern',
 ]
 
 if __name__ == '__main__':
@@ -38,9 +39,4 @@ if __name__ == '__main__':
         include_package_data=True,
         packages=SUB_MODULES,
         install_requires=requirements,
-        entry_points={
-            'console_scripts': [
-                'eh-prepare = enzy_htp._apps.prepare:main'
-            ]
-        }
-    )
+        )

@@ -1,6 +1,6 @@
 """Stores mappers and definitions for different types of solvents found in PDBS.
 
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 """
 from typing import List

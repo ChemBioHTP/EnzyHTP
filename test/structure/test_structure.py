@@ -63,8 +63,8 @@ def test_solvents():
 def test_peptides():
     pdb_file_path = f"{DATA_DIR}1Q4T_ligand_test.pdb"
     stru: Structure = sp.get_structure(pdb_file_path)
-    assert len(stru.peptides) == 2
-    assert tuple(map(lambda x: x.name, stru.peptides)) == ("A", "B")
+    assert len(stru.polypeptides) == 2
+    assert tuple(map(lambda x: x.name, stru.polypeptides)) == ("A", "B")
 
 
 def test_sequence():
@@ -142,3 +142,39 @@ def test_atoms():  # TODO(shaoqz) wait for test
     TEST_FILE = f"{TEST_DIR}/preparation/data/3NIR.pdb"
     struct: Structure = PDBParser().get_structure(TEST_FILE)
     assert struct.atoms
+
+def test_deepcopy():
+    """test the hehavior of copy.deepcopy on Structure()
+    context"""
+    stru = PDBParser().get_structure(f"{DATA_DIR}12E8_small_four_chain.pdb")
+    new_stru = deepcopy(stru)
+    # ensure the list is new
+    assert id(stru) != id(new_stru)
+    # ensure children are pointing to the parent
+    for ch in new_stru.chains:
+        assert ch.parent is new_stru
+        for res in ch:
+            assert res.parent is ch
+            for atom in res:
+                assert atom.parent is res
+
+def test_find_residue_with_key(caplog):
+    """test function works as expected"""
+    pdb_file_path = f"{DATA_DIR}1Q4T_ligand_test.pdb"
+    stru: Structure = sp.get_structure(pdb_file_path)
+    res_a47 = stru.find_residue_with_key(("A", 47))
+    assert res_a47.name == "THR"
+    # warning case
+    res_a47.idx = 48
+    stru.find_residue_with_key(("A", 48))
+    assert "More than 1 residue with key: ('A', 48)" in caplog.text
+    # non case
+    assert not stru.find_residue_with_key(("A", 448))
+    assert "Didn't find any residue with key: ('A', 448)" in caplog.text
+
+def test_init_connect():
+    """test function works as expected"""
+    pdb_file_path = f"{DATA_DIR}1Q4T_ligand_test.pdb"
+    stru: Structure = sp.get_structure(pdb_file_path)
+
+    stru.init_connect()
