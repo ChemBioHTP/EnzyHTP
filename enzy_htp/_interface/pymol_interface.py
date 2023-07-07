@@ -37,15 +37,25 @@ class PyMolInterface(BaseInterface):
         Calls parent class.
         """
         super().__init__(parent, config, default_pymol_config)
-        self.session_ = None
+        self.session_ = self.new_session() 
         self.available_cmds_:List[str] = dir(  pymol2.PyMOL().cmd )
 
     def new_session(self) -> pymol2.PyMOL:
-        """Returns a new pymol2.PyMOL session."""
-        return pymol2.PyMOL()
+        """create a new pymol session, start it, and set feedback level. Canonical means to get a session in enzy_htp."""
+        result = pymol2.PyMOL()
+        result.start()
+        result.cmd.feedback(*self.config.DEFAULT_OUTPUT_LV)
+        return result
 
 
-    def convert(self, file_1:str, file_2:str=None, new_ext:str=None, split_states:bool=False, ) -> Union[str, List[str]]:
+    def check_pymol2_installed(self) -> None:
+        """Method that checks if """
+        if "pymol2" in self.missing_py_modules():
+            _LOGGER.errorf("pymol2 is NOT installed. Use 'conda install -c conda-forge -y -q pymol-open-source'. Exiting...")
+            exit( 1 )
+
+
+    def convert(self, file_1:str, file_2:str=None, new_ext:str=None, split_states:bool=False, session:pymol2.PyMOL=None) -> Union[str, List[str]]:
         """Method that converts a supplied file to a different format. Either a new filename or new file 
         extension can be supplied. If neither or both are supplied, then the function will exist. Note
         that the function does not check for valid file types and will catch any errors that are thrown
@@ -55,12 +65,25 @@ class PyMolInterface(BaseInterface):
             file_1 : The name of the original file as a str().
             file_2 : The name of the output file as a str(). Optional.
             new_ext : The new extension to use. Optional.
+            session : A pymol2.PyMOL() session to use. By default uses an internal session instance that resets each function call.
 
         Returns:
             The name of the new file as a str().
         """
+        self.check_pymol2_installed()
         #TODO(CJ): update split states. update return policy
         
+        if not session:
+            self.session_.cmd.delete('all')
+            return self.convert(
+                file_1=file_1,
+                file_2=file_2,
+                new_ext=new_ext,
+                split_states=split_states, 
+                session=self.session_,
+            )
+
+
         fs.check_file_exists( file_1 )
 
         if (not file_2 and not new_ext) :
@@ -78,28 +101,28 @@ class PyMolInterface(BaseInterface):
         result:str = str(file_2)
 
         try:
-            self.cmd.delete('all')
-            self.cmd.load(file_1)
+            session.cmd.delete('all')
+            session.cmd.load(file_1)
             
             if split_states:
-                self.cmd.split_states('all')                
+                session.cmd.split_states('all')                
                 result = Path(result)
                 parent_dir = result.parent 
                 result_stem = result.stem
                 result = []
                 
-                for oidx, oname in enumerate(self.cmd.get_object_list()):
+                for oidx, oname in enumerate(session.cmd.get_object_list()):
                     
-                    if self.cmd.count_states(oname) != 1:
-                        self.cmd.delete(oname)
+                    if session.cmd.count_states(oname) != 1:
+                        session.cmd.delete(oname)
                         continue
                     
                     fname = str( parent_dir / f"{result_stem}_{oidx}{new_ext}" )
-                    self.cmd.save( fname, oname )
+                    session.cmd.save( fname, oname )
                     result.append( fname )
             else:
-                self.cmd.save(result)
-                self.cmd.delete('all')
+                session.cmd.save(result)
+                session.cmd.delete('all')
         
         except Exception as exe:
             _LOGGER.error(f"Could not convert '{file_1}' to '{file_2}'. Encountered error: '{exe}'. Exiting...")
@@ -125,7 +148,7 @@ class PyMolInterface(BaseInterface):
         extension: str = Path(fname).suffix
         return extension in self.config().IO_EXTENSIONS
 
-    def get_charge(self, fname: str, sele: str = '(all)') -> int:
+    def get_charge(self, fname: str, sele: str = '(all)', session:pymol2.PyMOL=None) -> int:
         """Method that gets the formal charge for the specified sele in the 
         specified file. File must be a supported file type as listed in 
         PyMOLConfig. Checks if file exists and is supported type. If either 
@@ -135,30 +158,25 @@ class PyMolInterface(BaseInterface):
         Args:
             fname: The str() path to the file in question.
             sele: The str() specifying the atom selection in PyMOL synatx. Default is '(all)'.
+            session : A pymol2.PyMOL() session to use. By default uses an internal session instance that resets each function call.
         """
         pass
 
-    def new_pymol_session(self) -> pymol2.PyMOL:
-        """create a new pymol session, start it, and set feedback level
-        TODO(qz): is making a pymol_session class a good idea?"""
-        result = pymol2.PyMOL()
-        result.start()
-        result.cmd.feedback(*self.config.DEFAULT_OUTPUT_LV)
-        return result
 
     # == intra-session modular functions == (requires a session and wont close it)
     def load_enzy_htp_stru(self, stru: Structure,
-                           pymol_session: pymol2.PyMOL) -> Tuple[str, pymol2.PyMOL]:
+                           session: pymol2.PyMOL) -> Tuple[str, pymol2.PyMOL]:
         """convert enzy_htp.Structure into a pymol object in a
         pymol2.PyMOL() session. 
         Using cmd.load and mediate by PDB format
         
         Returns:
-            (pymol_obj_name, pymol_session) since the name is only valid in the session
+            (pymol_obj_name, session) since the name is only valid in the session
             
         Note: pymol wont reset residue idx or chain names but will reset atom index from 1"""
 
         # create temp PDB
+        self.check_pymol2_installed()
         pdb_str = PDBParser().get_file_str(stru, if_renumber=False)
         temp_dir = eh_config["system.SCRATCH_DIR"]
         temp_pdb_path = fs.get_valid_temp_name(f"{temp_dir}/temp_pymol_interface.pdb")
@@ -166,16 +184,16 @@ class PyMolInterface(BaseInterface):
         with open(temp_pdb_path, "w") as f:
             f.write(pdb_str)
         # create pymol obj
-        pymol_obj_name = pymol_session.cmd.get_unused_name("enzy_htp_stru")
-        pymol_session.cmd.load(temp_pdb_path, pymol_obj_name)
+        pymol_obj_name = session.cmd.get_unused_name("enzy_htp_stru")
+        session.cmd.load(temp_pdb_path, pymol_obj_name)
 
         # clean up temp PDB
         fs.clean_temp_file_n_dir([temp_dir, temp_pdb_path])
 
-        return (pymol_obj_name, pymol_session)
+        return (pymol_obj_name, session)
 
     def select_pymol_obj(self, pattern: str, pymol_obj_name: str,
-                         pymol_session: pymol2.PyMOL) -> List[int]:
+                         session: pymol2.PyMOL) -> List[int]:
         """an internal function return atom indexes of a pymol selection of a pymol obj 
         in the pymol session
         NOTE: in distance related selection scheme, there should be only on object in the session
@@ -184,16 +202,17 @@ class PyMolInterface(BaseInterface):
             a list of atom indexes 
             if the object is created from enzy_htp.Structure(), these indexex will be
             correponding to Atom().idx in Structure()"""
+        self.check_pymol2_installed()
         result = []
         # san check
-        if len(pymol_session.cmd.get_object_list()) != 1:
+        if len(session.cmd.get_object_list()) != 1:
             _LOGGER.warning(
                 "more than 1 object is found in current pymol session when doing select. May give absurd results if distance based selection is used. (It will use atoms from other objs)"
             )
         sele_pattern = f"{pymol_obj_name} & ({pattern})"
-        sele_name = pymol_session.cmd.get_unused_name("enzy_htp_stru_sele")
-        pymol_session.cmd.select(sele_name, sele_pattern)
-        pymol_session.cmd.iterate(sele_name, "result.append(ID)",
+        sele_name = session.cmd.get_unused_name("enzy_htp_stru_sele")
+        session.cmd.select(sele_name, sele_pattern)
+        session.cmd.iterate(sele_name, "result.append(ID)",
                                   space=locals())  # use ID instead of index here
 
         return sorted(result)
@@ -208,17 +227,28 @@ class PyMolInterface(BaseInterface):
         return self.config_
 
 
-    def de_protonate(self, molfile : str, new_file:str=None) -> str:
+    def de_protonate(self, molfile : str, new_file:str=None, session:pymol2.PyMOL=None) -> str:
         """Method that deprotonates the structure supplied by molife, saving it to a new file. 
         If no new_file is supplied, original file <name>.<ext> will be saved to <name>_deprotonated.<ext>
 
         Args:
             molfile: The name of the input file.
             new_file: Where to save the deprotonated structure. Optional.
+            session : A pymol2.PyMOL() session to use. By default uses an internal session instance that resets each function call.
     
         Returns:
             The name of the deprotonated structure.
         """
+        self.check_pymol2_installed()
+
+        if not session:
+            self.session_.cmd.delete('all')
+            return self.convert(
+                molfile=molfile,
+                new_file=new_file,
+                session=self.session_,
+            )
+
 
         fs.check_file_exists( molfile )
         
@@ -226,12 +256,14 @@ class PyMolInterface(BaseInterface):
             fpath = Path(molfile )
             new_file = fpath.parent / f"{fpath.stem}_deprotonated{fpath.suffix}"
 
-        self.cmd.delete( 'all' )
-        self.cmd.load( molfile )
-        self.cmd.remove( 'hydrogens' )
-        self.cmd.save( new_file )
 
-        self.cmd.delete('all')
+
+        session.cmd.delete( 'all' )
+        session.cmd.load( molfile )
+        session.cmd.remove( 'hydrogens' )
+        session.cmd.save( new_file )
+
+        session.cmd.delete('all')
 
         return new_file
 
@@ -268,7 +300,7 @@ class PyMolInterface(BaseInterface):
         return in_file
 
 
-    def collect(self, molfile:str, variables:List[str], sele:str='all', state:int=-1) -> pd.DataFrame:
+    def collect(self, molfile:str, variables:List[str], sele:str='all', state:int=-1, session:pymol2.PyMOL=None) -> pd.DataFrame:
         """Function that serves as a wrapper to the pymol cmd API's iterate_state() method. Checks if the supplied file exists prior to collecting data.
         Data is returned in a pandas DataFrame() where each row is an atom and each column is a variable.
 
@@ -277,52 +309,67 @@ class PyMolInterface(BaseInterface):
             variables: A list() of str()'s with variable names to pull from in the structure.
             sele: The pymol selection string to use. Defaults to 'all'
             state: The state to use. Defaults to -1 (current state).
+            session : A pymol2.PyMOL() session to use. By default uses an internal session instance that resets each function call.
 
         Returns:
             A pandas DataFrame() where each row is an atom and each column is a variable.
 
         """
+        self.check_pymol2_installed()
+
+        if not session:
+            self.session_.cmd.delete('all')
+            return self.collect(
+                molfile=molfile,
+                variables=variables,
+                sele=sele,
+                state=state,
+                session=self.session_,
+            )
 
 
         check_var_type(variables, list)
         for vv in variables:
             check_var_type( vv, str )
 
-        if molfile  != 'memory':
-            fs.check_file_exists(molfile)    
-            self.cmd.delete('all')
+        fs.check_file_exists(molfile)    
+        session.cmd.delete('all')
 
         _eh_local: Dict[str, Any] = {'data':[]}
 
-        if molfile != 'memory':
-            self.cmd.delete('all')
-            self.cmd.load(molfile)
-
         iter_stmt:str=f"data.append(({', '.join(variables)}))"
-        self.cmd.iterate_state(state,sele,iter_stmt,space=_eh_local)
+        session.cmd.iterate_state(state,sele,iter_stmt,space=_eh_local)
 
         result = pd.DataFrame(
             data=_eh_local['data'],
             columns=variables
         )
 
-        if molfile != 'memory':
-            self.cmd.delete('all')
-        
         return result
 
-    def execute(self, args:List[Tuple]) -> List[Any]:
+    def execute(self, args:List[Tuple], session:pymol2.PyMOL=None) -> List[Any]:
         """Executes a series of commands through the PyMOL/PyMOL2 python module in use. Takes input as a list of Tuple()'s
         where the first item in each tuple is a string specifying the function to use and the rest of the items are the
         arguments for that function.
     
         Args:
             args: A list() of tuple()'s of items where the first string names the pymol API command to use and the rest are arguments for that function.
+            session : A pymol2.PyMOL() session to use. By default uses an internal session instance that resets each function call.
 
         Returns:
             Each result for the respective command output.
         """
        
+        self.check_pymol2_installed()
+        
+        if not session:
+            self.session_.cmd.delete('all')
+            return self.execute(
+                args=args,
+                session=self.session_,
+            )
+
+
         result:List[Any] = list() 
 
         for cmd_set in args:
@@ -341,7 +388,7 @@ class PyMolInterface(BaseInterface):
             cmd_str:str=f"{cmd_name}({','.join(map(str, cmd_args))})"
             try:
                 result.append(
-                    self.cmd.__dict__[cmd_name](*cmd_args)
+                    session.cmd.__dict__[cmd_name](*cmd_args)
                 )
             except:
                 _LOGGER.error(f"PyMOL function call '{cmd_str}' resuled in an error. Exiting...")
@@ -350,7 +397,7 @@ class PyMolInterface(BaseInterface):
 
         return result
 
-    def get_charge(self, fname: str, sele: str = '(all)') -> int:
+    def get_charge(self, fname: str, sele: str = '(all)', session:pymol2.PyMOL=None) -> int:
         """Method that gets the formal charge for the specified sele in the specified file. File must be a supported file type as listed in
         PyMOLConfig. Checks if file exists and is supported type. If either
         are not true then an error is logged and the program exits. DOES
@@ -358,9 +405,23 @@ class PyMolInterface(BaseInterface):
         Args:
             fname: The str() path to the file in question.
             sele: The str() specifying the atom selection in PyMOL synatx. Default is '(all)'.
+            session : A pymol2.PyMOL() session to use. By default uses an internal session instance that resets each function call.
+
         Returns:
             The formal charge of the sele as an int().
         """
+
+        self.check_pymol2_installed()
+
+        if not session:
+            self.session_.cmd.delete('all')
+            return self.get_charge(
+                fname=fname,
+                sele=sele,
+                session=self.session_,
+            )
+
+
         if not Path(fname).exists():
             _LOGGER.error(f"The supplied file '{fname}' does not exist. Exiting...")
             exit(1)
@@ -372,14 +433,14 @@ class PyMolInterface(BaseInterface):
         
         _eh_local: Dict[str, Any] = {'fc': []}
         
-        self.cmd.delete('all')
-        self.cmd.load(fname)
-        self.cmd.iterate(sele, 'fc.append(formal_charge)', space=_eh_local)
-        self.cmd.delete('all')
+        session.cmd.delete('all')
+        session.cmd.load(fname)
+        session.cmd.iterate(sele, 'fc.append(formal_charge)', space=_eh_local)
+        session.cmd.delete('all')
         
         return sum(_eh_local['fc'])
 
-    def get_sequence(self, fname: str, sele: str = '(all)') -> str:
+    def get_sequence(self, fname: str, sele: str = '(all)', session:pymol2.PyMOL=None) -> str:
         """Method that gets the sequence for the specified sele in the
         specified file. File must be a supported file type as listed in
         PyMOLConfig. Checks if file exists and is supported type. If either
@@ -389,9 +450,23 @@ class PyMolInterface(BaseInterface):
         Args:
             fname: The str() path to the file in question.
             sele: The str() specifying the atom selection in PyMOL synatx. Default is '(all)'.
+            session : A pymol2.PyMOL() session to use. By default uses an internal session instance that resets each function call.
+
         Returns:
             A str() with the sequence of the sele as it would appear in a .fasta file..
         """
+
+        self.check_pymol2_installed()
+        
+        if not session:
+            self.session_.cmd.delete('all')
+            return self.get_sequence(
+                fname=fname,
+                sele=sele,
+                session=self.session_
+            )
+
+
         if not Path(fname).exists():
             _LOGGER.error(f"The supplied file '{fname}' does not exist. Exiting...")
             exit(1)
@@ -401,10 +476,10 @@ class PyMolInterface(BaseInterface):
                 f"The supplied file '{fname}' has an unsupported extension. Exiting...")
             exit(1)
 
-        self.cmd.delete('all')
-        self.cmd.load(fname)
-        lines: List[str] = self.cmd.get_fastastr(sele).splitlines()
-        self.cmd.delete('all')
+        session.cmd.delete('all')
+        session.cmd.load(fname)
+        lines: List[str] = session.cmd.get_fastastr(sele).splitlines()
+        session.cmd.delete('all')
 
         lines = list(filter(lambda ll: ll[0] != '>', lines))
         return ''.join(lines)

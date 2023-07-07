@@ -81,7 +81,6 @@ class EnvironmentManager:
     def check_python_modules(self) -> None:
         """Checks which python modules are availabe in the system, storing those that are missing."""
         for pm in self.py_modules_:
-            print(pm)
             try:
                 _ = importlib.import_module( pm )
             except ModuleNotFoundError:
