@@ -120,7 +120,7 @@ class PyMolInterface:
         
         # select res idx to mutate to target
         pymol_session.cmd.get_wizard().set_mode(target)
-        pymol_session.cmd.get_wizard().do_select(str(pos_key[1]) + "/")
+        pymol_session.cmd.get_wizard().do_select(pos_key[0] + "/" + str(pos_key[1]) + "/")
 
         # select the best rotamer (defaulted to frame 1) and apply
         pymol_session.cmd.frame(1)

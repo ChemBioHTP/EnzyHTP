@@ -402,6 +402,7 @@ def mutate_stru_with_pymol(
     for mut in mutant:
         pi.point_mutate(mut.get_position_key(), mut.get_target(), session)
 
+    session.cmd.set("retain_order")
     session.cmd.save(temp_file_name)
     pymol_mutant_stru = sp.get_structure(temp_file_name)
     fs.clean_temp_file_n_dir([temp_file_name])
