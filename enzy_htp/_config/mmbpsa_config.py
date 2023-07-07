@@ -78,12 +78,9 @@ class MMPBSAConfig:
         for i in ("startframe", "endframe", "interval"):
             if cls.conf_in[i] != None:
                 frame_line = frame_line + i + "=" + str(cls.conf_in[i]) + ", "
-        output_line = ("  verbose=" + str(cls.conf_in["verbose"]) + ", keep_files=" +
-                       str(cls.conf_in["keep_files"]) + ",")
-        gb_line = ("  igb=" + str(cls.conf_in["igb"]) + ", saltcon=" +
-                   str(cls.conf_in["saltcon"]) + ",")
-        pb_line = ("  istrng=" + str(cls.conf_in["istrng"]) + ", fillratio=" +
-                   str(cls.conf_in["fillratio"]))
+        output_line = ("  verbose=" + str(cls.conf_in["verbose"]) + ", keep_files=" + str(cls.conf_in["keep_files"]) + ",")
+        gb_line = ("  igb=" + str(cls.conf_in["igb"]) + ", saltcon=" + str(cls.conf_in["saltcon"]) + ",")
+        pb_line = ("  istrng=" + str(cls.conf_in["istrng"]) + ", fillratio=" + str(cls.conf_in["fillratio"]))
 
         with open(out_path, "w") as of:
             print("GB and PB calculation", end=line_feed, file=of)

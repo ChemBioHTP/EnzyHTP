@@ -19,21 +19,20 @@ class BCLConfig:
 
     """
 
-    BCL_EXE:str = "bcl.exe"
+    BCL_EXE: str = "bcl.exe"
     """The main bcl executable."""
 
     def required_executables(self) -> List[str]:
         """A hardcoded list of required executables for the BCL."""
-        return [
-            self.BCL_EXE
-        ]
+        return [self.BCL_EXE]
 
     def required_env_vars(self) -> List[str]:
         """A hardcoded list of required enviornment variables for the BCL."""
         return []
 
-
-
+    def required_py_modules(self) -> List[str]:
+        """ """
+        return list()
 
 def default_bcl_config() -> BCLConfig:
     """Creates a deep-copied default version of the BCLConfig() class."""

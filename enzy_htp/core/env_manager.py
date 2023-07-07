@@ -7,8 +7,9 @@ Date: 2022-02-12
 import os
 import time
 import shutil
-from typing import List, Union
+import importlib
 from pathlib import Path
+from typing import List, Union
 from subprocess import CompletedProcess, SubprocessError, run
 
 from enzy_htp.core.general import get_localtime
@@ -17,7 +18,7 @@ from .logger import _LOGGER
 from .exception import MissingEnvironmentElement
 
 class EnvironmentManager:
-        """Serves as general interface between module and the current computer environment (shell).
+    """Serves as general interface between module and the current computer environment (shell).
     Checks whether given applications and environment variables are set in the current environment.
     After check, stores names of executables.
     Serves as interface for running commands on system.
@@ -41,7 +42,7 @@ class EnvironmentManager:
         self.missing_env_vars_ = []
         self.missing_py_modules_ = []
         self.missing_executables_ = []
-
+    
     #region ==environment related==
     def add_executable(self, exe_name: str) -> None:
         """Adds the name of an executable to check for."""
@@ -80,10 +81,11 @@ class EnvironmentManager:
     def check_python_modules(self) -> None:
         """Checks which python modules are availabe in the system, storing those that are missing."""
         for pm in self.py_modules_:
+            print(pm)
             try:
                 _ = importlib.import_module( pm )
             except ModuleNotFoundError:
-                self.missing_py_modules.append( pm )
+                self.missing_py_modules_.append( pm )
 
     def display_missing(self) -> None:
         """Displays a list of missing environment variables and exectuables to the logger. Should be called after .check_environment() and .check_env_vars()."""
@@ -118,7 +120,7 @@ class EnvironmentManager:
 
     def is_missing(self) -> bool:
         """Checks if any executables or environment variables are missing."""
-        return len(self.missing_executables_) or len(self.missing_env_vars_)
+        return len(self.missing_executables_) or len(self.missing_env_vars_) or len(self.missing_py_modules_)
 
     def missing_executables(self) -> List[str]:
         """Getter for the missing executables in the environment."""
@@ -127,6 +129,10 @@ class EnvironmentManager:
     def missing_env_vars(self) -> List[str]:
         """Getter for the missing environment variables in the environment."""
         return self.missing_env_vars_
+
+    def missing_py_modules(self) -> List[str]:
+        """ """
+        return self.missing_py_modules_
 
     #region ==shell command==
     def run_command(self,

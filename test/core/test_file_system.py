@@ -171,4 +171,5 @@ def test_clean_temp_file_n_dir():
     for temp_path in temp_path_list:
         assert not os.path.exists(temp_path)
 
+
 # TODO(CJ) add tests for remove_ext

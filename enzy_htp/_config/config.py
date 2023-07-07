@@ -10,7 +10,7 @@ there are configuration settings for the below packages by the given <Package>Co
     + Gaussian, GaussianConfig
     + MOE, MOEConfig
     + Multiwfn, MultiwfnConfig
-    + PyMOL, PyMOLConfig
+    + PyMOL, PyMolConfig
     + Rosetta, RosettaConfig
 
 In addition to specific packages, settings for the system are specified with SystemConfig
@@ -29,7 +29,7 @@ from .bcl_config import BCLConfig, default_bcl_config
 from .gaussian_config import GaussianConfig, default_gaussian_config
 from .moe_config import MOEConfig, default_moe_config
 from .multiwfn_config import MultiwfnConfig, default_multiwfn_config
-from .pymol_config import PyMOLConfig, default_pymol_config
+from .pymol_config import PyMolConfig, default_pymol_config
 from .rosetta_config import RosettaConfig, default_rosetta_config
 from .system_config import SystemConfig, default_system_config
 
@@ -49,7 +49,7 @@ class Config:
         _gaussian: Private instance of GaussianConfig() with default settings.
         _moe: Private instance of MOEConfig() with default settings.
         _multiwfn: Private instance of MultiwfnConfig() with default settings.
-        _pymol: Private instance of PyMOLConfig() with default settings.
+        _pymol: Private instance of PyMolConfig() with default settings.
         _rosetta: Private instance of RosettaConfig() with default settings.
         _system: Private instance of SystemConfig() with default settings.
     """
@@ -110,7 +110,7 @@ class Config:
         Raises:
             TypeError() if any part of the key is invalid.
         """
-        #TODO(CJ): add the rosetta setters 
+        #TODO(CJ): add the rosetta setters
         if key.count("."):
             app, settings = key.split(".", 1)
             ptr = None

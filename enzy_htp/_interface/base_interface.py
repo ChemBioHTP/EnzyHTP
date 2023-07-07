@@ -17,8 +17,8 @@ Date: 2023-06-07
 from abc import ABC
 from typing import Callable, Dict, List
 
-
 from enzy_htp.core import env_manager as em
+
 
 class BaseInterface:
     """Abstract base class for all Package Interfaces. 
@@ -30,7 +30,7 @@ class BaseInterface:
         compatible_env_ : A bool() indicating if the current environment is compatible with the object itself.
     """
 
-    def __init__(self, parent, config = None, default_config : Callable = None) -> None:
+    def __init__(self, parent, config=None, default_config: Callable = None) -> None:
         """Simplistic constructor that optionally takes a <Package>Config object as its only argument.
         Also checks if the current environment is compatible with the <Package>Interface().
         """
@@ -41,10 +41,10 @@ class BaseInterface:
         self.env_manager_ = em.EnvironmentManager(
             env_vars=self.config_.required_env_vars(),
             executables=self.config_.required_executables(),
+            py_modules=self.config_.required_py_modules()
         )
         self.env_manager_.check_environment()
         self.compatible_env_ = self.env_manager_.is_missing()
-
 
     def parent(self):
         """Getter for the parent of the <Package>Interface."""
@@ -54,7 +54,6 @@ class BaseInterface:
         """Getter for the <Package>Config() instance belonging to the class."""
         return self.config_
 
-
     def compatible_environment(self) -> bool:
         """Checks if the current environment is compatible with all possible needs for the <Package>Interface.
         Returns:
@@ -62,8 +61,7 @@ class BaseInterface:
         """
         return self.compatible_env_
 
-
-    def missing_executables(self) -> List[str]: 
+    def missing_executables(self) -> List[str]:
         """ """
         return self.env_manager_.missing_executables()
 
@@ -71,3 +69,6 @@ class BaseInterface:
         """ """
         return self.env_manager_.missing_env_vars()
 
+    def missing_py_modules(self) -> List[str]:
+        """ """
+        return self.env_manager_.missing_py_modules()

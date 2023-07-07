@@ -46,6 +46,18 @@ class PyMolConfig:
         else:
             setattr(self, key, value)
 
+    def required_env_vars(self) -> List[str]:
+        """ """
+        return list()
+
+    def required_executables(self) -> List[str]:
+        """ """
+        return list()
+
+    def required_py_modules(self) -> List[str]:
+        """ """
+        return ["pymol2"]
+
 
 def default_pymol_config() -> PyMolConfig:
     """Creates a deep-copied default version of the PyMolConfig() class."""

@@ -12,18 +12,16 @@ import xml.etree.cElementTree as ET
 from collections import namedtuple
 from typing import List, Tuple, Dict
 
-
 import pandas as pd
 
 from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import env_manager as em
 
-
-
 from enzy_htp._config.rosetta_config import RosettaConfig, default_rosetta_config
 
 from .base_interface import BaseInterface
+
 
 class RosettaInterface(BaseInterface):
     """Class that provides an interface for enzy_htp to utilize the Rosetta molecular modelling software suite. Supported 
@@ -41,7 +39,7 @@ class RosettaInterface(BaseInterface):
         """
         super().__init__(parent, config, default_rosetta_config)
 
-    def _delete_score_file(self, working_dir:str='./') -> None:
+    def _delete_score_file(self, working_dir: str = './') -> None:
         """Helper method that deletes the score.sc file in the specified directory.
 
         Args:
@@ -51,8 +49,7 @@ class RosettaInterface(BaseInterface):
             Nothing.
         """
         score_file = working_dir + "/score.sc"
-        fs.safe_rm( score_file )
-
+        fs.safe_rm(score_file)
 
     def _delete_crash_log(self) -> None:
         """Helper method that deletes the ROSETTA_CRASH.log file in the current working directory. ROSETTA_CRASH.log
@@ -64,9 +61,9 @@ class RosettaInterface(BaseInterface):
         Returns:
             Nothing.
         """
-        fs.safe_rm( './ROSETTA_CRASH.log' )
+        fs.safe_rm('./ROSETTA_CRASH.log')
 
-    def run_rosetta_scripts(self, opts:List[str], logfile:str=None) -> None:
+    def run_rosetta_scripts(self, opts: List[str], logfile: str = None) -> None:
         """Method that runs the rosettascripts executabl along with the supplied options. Optionally outputs
         the stdout to a specified logfile. Note that no sanitation is performed prior to running.
 
@@ -79,22 +76,14 @@ class RosettaInterface(BaseInterface):
         """
 
         if logfile:
-            opts.extend(
-                [
-                    ">",str(logfile)
-                ]
-            )
+            opts.extend([">", str(logfile)])
 
-        self.env_manager_.run_command(
-            self.config_.ROSETTA_SCRIPTS,
-            opts
-        )
+        self.env_manager_.run_command(self.config_.ROSETTA_SCRIPTS, opts)
 
         if logfile:
             _LOGGER.info(f"Saved RosettaScripts log to '{Path(logfile).absolute}'.")
 
-
-    def parse_score_file(self, fname : str) -> pd.DataFrame:
+    def parse_score_file(self, fname: str) -> pd.DataFrame:
         """Method that parses a score file into a Pandas Dataframe. Only encodes lines that begin with SCORE.
 
         Args:
@@ -103,19 +92,19 @@ class RosettaInterface(BaseInterface):
         Returns:
             A pandas dataframe containing the data in the supplied score file.
         """
-        
+
         if not Path(fname).exists():
             _LOGGER.error(f"The suppliied file '{fname}' does not exist. Exiting...")
-            exit( 1 )
-        
-        lines:List[str] = fs.lines_from_file( fname )
-        
-        lines = list(filter(lambda ll: ll.startswith('SCORE:'), lines ))
-        
-        data = list(map(lambda ll: ll.split()[1:], lines ))
+            exit(1)
+
+        lines: List[str] = fs.lines_from_file(fname)
+
+        lines = list(filter(lambda ll: ll.startswith('SCORE:'), lines))
+
+        data = list(map(lambda ll: ll.split()[1:], lines))
 
         df = pd.DataFrame(data=data[1:], columns=data[0])
-       
+
         column_names = list(df.columns)
         for cn in column_names:
             if cn == 'description':
@@ -124,8 +113,7 @@ class RosettaInterface(BaseInterface):
 
         return df
 
-
-    def parameterize_ligand(self, molfile:str, res_name:str, outdir:str=None, conformers:str=None) -> Tuple[str, str]:
+    def parameterize_ligand(self, molfile: str, res_name: str, outdir: str = None, conformers: str = None) -> Tuple[str, str]:
         """Parameterizes the input ligand for use in the RosettaLigand protocol. Takes an input file with the ligand,
         as well as the name of the residue in PDB format (3 capitalized letters) as well as optionally where the output
         directory where the .params and .pdb files should be saved. The underlying script only supports .mol, .mol2, 
@@ -143,57 +131,49 @@ class RosettaInterface(BaseInterface):
 
         """
         #TODO(CJ): add in the ability to add a conformers file
-        fs.check_file_exists( molfile )
-    
-        ALLOWED_FORMATS:List[str] = ".sdf .mol2 .mol".split()
-        
+        fs.check_file_exists(molfile)
+
+        ALLOWED_FORMATS: List[str] = ".sdf .mol2 .mol".split()
+
         if Path(molfile).suffix not in ALLOWED_FORMATS:
-            _LOGGER.error(f"The supplied file '{molfile}' is of an unsupported file type. Supported types are {', '.join(ALLOWED_FORMATS)}. Exiting...")
-            exit( 1 )
+            _LOGGER.error(
+                f"The supplied file '{molfile}' is of an unsupported file type. Supported types are {', '.join(ALLOWED_FORMATS)}. Exiting..."
+            )
+            exit(1)
         #TODO(CJ): need to fix this. codes like 152 are valid  => only numbers
         #if not res_name.isupper() or not len(res_name) == 3 or not res_name.isalpha():
         #    _LOGGER.error(f"The supplied residue name '{res_name}' is invalid. It must be alphanumeric, capitalized, and have three characters. Exiting...")
         #    exit( 1 )
-        
-        flags:List[str] = [
-            self.config_.PARAMS_SCRIPT,
-            f"{molfile}",
-            f"--name={res_name}",
-            "--clobber"
-        ]
 
-        self.env_manager_.run_command(
-            "python2.7",
-            flags
-        )
+        flags: List[str] = [self.config_.PARAMS_SCRIPT, f"{molfile}", f"--name={res_name}", "--clobber"]
 
-        params_file:str = f"./{res_name}.params"
-        pdb_file:str = f"./{res_name}_0001.pdb"
+        self.env_manager_.run_command("python2.7", flags)
+
+        params_file: str = f"./{res_name}.params"
+        pdb_file: str = f"./{res_name}_0001.pdb"
 
         if outdir:
-            fs.safe_mkdir( outdir )
-            
+            fs.safe_mkdir(outdir)
+
             outdir = Path(outdir)
             params_start = params_file
             pdb_start = pdb_file
-            
-            params_file = str( outdir / Path(params_start).name)
+
+            params_file = str(outdir / Path(params_start).name)
             pdb_file = str(outdir / Path(pdb_start).name)
 
             shutil.move(params_start, params_file)
             shutil.move(pdb_start, pdb_file)
 
-        fs.check_file_exists( params_file )
-        fs.check_file_exists( pdb_file )
-
+        fs.check_file_exists(params_file)
+        fs.check_file_exists(pdb_file)
 
         if conformers:
-            self.add_conformers( params_file, conformers )
+            self.add_conformers(params_file, conformers)
 
         return (params_file, pdb_file)
 
-
-    def add_conformers(self, param_file:str, conformers_file:str) -> None:
+    def add_conformers(self, param_file: str, conformers_file: str) -> None:
         """Adds conformers to the end of the .params file for a given ligand. Checks that files exist and
         exits if not.
 
@@ -204,36 +184,36 @@ class RosettaInterface(BaseInterface):
         Returns:
             Nothing.
         """
-        
-        fs.check_file_exists( param_file )
-        fs.check_file_exists( conformers_file )
+
+        fs.check_file_exists(param_file)
+        fs.check_file_exists(conformers_file)
 
         if not Path(conformers_file).suffix == ".pdb":
             _LOGGER.error(f"The supplied file '{conformers_file}' is not in the .pdb format. Exiting...")
-            exit( 1 )
+            exit(1)
 
-        content:List[str] = fs.lines_from_file( param_file )
-        content.append(f"PDB_ROTAMERS {Path(conformers_file).absolute()}") 
+        content: List[str] = fs.lines_from_file(param_file)
+        content.append(f"PDB_ROTAMERS {Path(conformers_file).absolute()}")
         fs.write_lines(param_file, content)
 
-
-    def relax(self, 
-        infile:str, 
-        nstruct:int, 
-        ignore_zero_occupancy:bool=True,
-        full_atom:bool=True,
-        detect_disulf:bool=True,
-        linmem_ig:int=10,
-        constrain_relax_to_start_coords:bool=True,
-        coord_constrain_sidechains:bool=True, 
-        ramp_constraints:bool=True,
-        prefix:str=None,
-        overwrite:bool=True,
-        extra_flags:List[str]=None,
-        output_dir:str='./',
-        delete_scores:bool=True,
-        delete_crash:bool=True,
-        ) -> pd.DataFrame:
+    def relax(
+        self,
+        infile: str,
+        nstruct: int,
+        ignore_zero_occupancy: bool = True,
+        full_atom: bool = True,
+        detect_disulf: bool = True,
+        linmem_ig: int = 10,
+        constrain_relax_to_start_coords: bool = True,
+        coord_constrain_sidechains: bool = True,
+        ramp_constraints: bool = True,
+        prefix: str = None,
+        overwrite: bool = True,
+        extra_flags: List[str] = None,
+        output_dir: str = './',
+        delete_scores: bool = True,
+        delete_crash: bool = True,
+    ) -> pd.DataFrame:
         """Runs Rosetta's relax protocol on the supplied .pdb file, returning the path to the relaxaed structure as 
         well as a dictionary with all characteristics found in the score.sc file. Function provides direct access to a 
         number of commandline options and the ability to add arbitrary commandline options at the end. 
@@ -264,29 +244,27 @@ class RosettaInterface(BaseInterface):
             full paths to relaxed files. 
         """
         #TODO(CJ):should also be able to take a Structure as input.
-        fs.check_file_exists( infile )
+        fs.check_file_exists(infile)
 
         if Path(infile).suffix != '.pdb':
             _LOGGER.error(f"Expected input file format is .pdb. {infile} is an invalid entry. Exiting...")
-            exit( 1 )
+            exit(1)
 
-        fs.safe_rm( f'{output_dir}/score.sc')
-            #/dors/meilerlab/apps/rosetta/rosetta-3.13/main/source/bin/relax.default.linuxgccrelease
-            #-out:prefix $prefix
-            #-out:file:scorefile ${prefix}.sc &
-        flags:List[str]=[
+        fs.safe_rm(f'{output_dir}/score.sc')
+        #/dors/meilerlab/apps/rosetta/rosetta-3.13/main/source/bin/relax.default.linuxgccrelease
+        #-out:prefix $prefix
+        #-out:file:scorefile ${prefix}.sc &
+        flags: List[str] = [
             f"-in:file:s '{infile}'",
             f"-nstruct {nstruct}",
             f"-linmem_ig {linmem_ig}",
         ]
-        
-        
+
         flags.append(f"-ignore_zero_occupancy {'true' if ignore_zero_occupancy else 'false'}")
         flags.append(f"-relax:constrain_relax_to_start_coords {'true' if constrain_relax_to_start_coords else 'false'}")
         flags.append(f"-coord_constrain_sidechains {'true' if coord_constrain_sidechains else 'false'}")
         flags.append(f"-ramp_constraints {'true' if ramp_constraints else 'false'}")
         flags.append(f"-out:path:all {output_dir}")
-
 
         if full_atom:
             flags.append("-in:file:fullatom")
@@ -300,42 +278,35 @@ class RosettaInterface(BaseInterface):
         if overwrite:
             flags.append("-overwrite")
 
-
         if extra_flags:
             flags.extend(extra_flags)
 
-        fs.safe_mkdir( output_dir )
+        fs.safe_mkdir(output_dir)
 
-        self.env_manager_.run_command(
-            self.config_.RELAX,
-            flags
-        )
+        self.env_manager_.run_command(self.config_.RELAX, flags)
 
-        df:pd.DataFrame = self.parse_score_file(f'{output_dir}/score.sc')
+        df: pd.DataFrame = self.parse_score_file(f'{output_dir}/score.sc')
 
-        df['description'] = df.apply( lambda row: f"{output_dir}/{row.description}.pdb", axis=1 )
-
+        df['description'] = df.apply(lambda row: f"{output_dir}/{row.description}.pdb", axis=1)
 
         if delete_scores:
-            self._delete_score_file( output_dir )
+            self._delete_score_file(output_dir)
 
         if delete_crash:
-            self._delete_crash_log( )
+            self._delete_crash_log()
 
         return df
-            
 
-
-    def score(self,
-            infile:str,
-            ignore_zero_occupancy:bool=True,
-            overwrite:bool=True,
-            extra_flags:List[str]=None,
-            output_dir:str='./',
-            delete_scores:bool=True,
-            delete_crash:bool=True,
-
-        ) -> float:
+    def score(
+        self,
+        infile: str,
+        ignore_zero_occupancy: bool = True,
+        overwrite: bool = True,
+        extra_flags: List[str] = None,
+        output_dir: str = './',
+        delete_scores: bool = True,
+        delete_crash: bool = True,
+    ) -> float:
         """Provides the total score in Rosetta Energy Units (REU) for a given structure. Uses default flags but can have behavior modified
         via supplied extra_flags. Returns the total score in REU.
 
@@ -352,13 +323,13 @@ class RosettaInterface(BaseInterface):
             Score of structure in file in REU.
 
         """
-        fs.check_file_exists( infile )
-        
-        flags:List[str]=[
+        fs.check_file_exists(infile)
+
+        flags: List[str] = [
             f"-in:file:s '{infile}'",
-             "-ignore_unrecognized_res",
+            "-ignore_unrecognized_res",
         ]
-        
+
         flags.append(f"-ignore_zero_occupancy {'true' if ignore_zero_occupancy else 'false'}")
         flags.append(f"-out:path:all {output_dir}")
 
@@ -368,48 +339,44 @@ class RosettaInterface(BaseInterface):
         if extra_flags:
             flags.extend(extra_flags)
 
-        fs.safe_rm( f"{output_dir}/score.sc" )
+        fs.safe_rm(f"{output_dir}/score.sc")
 
-        fs.safe_mkdir( output_dir )
+        fs.safe_mkdir(output_dir)
 
-        self.env_manager_.run_command(
-            self.config_.SCORE,
-            flags
-        )
+        self.env_manager_.run_command(self.config_.SCORE, flags)
 
-
-        df:pd.DataFrame=self.parse_score_file(f"{output_dir}/score.sc")
+        df: pd.DataFrame = self.parse_score_file(f"{output_dir}/score.sc")
 
         if len(df) != 1:
             _LOGGER.error("Found more than one entry in score.sc file. Exiting...")
-            exit( 1 )
+            exit(1)
 
         if delete_scores:
-            self._delete_score_file( output_dir )
+            self._delete_score_file(output_dir)
 
         if delete_crash:
-            self._delete_crash_log( )
+            self._delete_crash_log()
 
         return df.iloc[0].total_score
 
-
-    def relax_loops(self, 
-        infile:str, 
-        nstruct:int, 
-        ignore_zero_occupancy:bool=True,
-        full_atom:bool=True,
-        detect_disulf:bool=True,
-        linmem_ig:int=10,
-        constrain_relax_to_start_coords:bool=True,
-        coord_constrain_sidechains:bool=True, 
-        ramp_constraints:bool=True,
-        prefix:str=None,
-        overwrite:bool=True,
-        extra_flags:List[str]=None,
-        output_dir:str='./',
-        delete_scores:bool=True,
-        delete_crash:bool=True,
-        ) -> pd.DataFrame:
+    def relax_loops(
+        self,
+        infile: str,
+        nstruct: int,
+        ignore_zero_occupancy: bool = True,
+        full_atom: bool = True,
+        detect_disulf: bool = True,
+        linmem_ig: int = 10,
+        constrain_relax_to_start_coords: bool = True,
+        coord_constrain_sidechains: bool = True,
+        ramp_constraints: bool = True,
+        prefix: str = None,
+        overwrite: bool = True,
+        extra_flags: List[str] = None,
+        output_dir: str = './',
+        delete_scores: bool = True,
+        delete_crash: bool = True,
+    ) -> pd.DataFrame:
         """
 
         Args:
@@ -435,29 +402,27 @@ class RosettaInterface(BaseInterface):
             full paths to relaxed files. 
         """
         #TODO(CJ):should also be able to take a Structure as input.
-        fs.check_file_exists( infile )
+        fs.check_file_exists(infile)
 
         if Path(infile).suffix != '.pdb':
             _LOGGER.error(f"Expected input file format is .pdb. {infile} is an invalid entry. Exiting...")
-            exit( 1 )
+            exit(1)
 
-        fs.safe_rm( f'{output_dir}/score.sc')
-            #/dors/meilerlab/apps/rosetta/rosetta-3.13/main/source/bin/relax.default.linuxgccrelease
-            #-out:prefix $prefix
-            #-out:file:scorefile ${prefix}.sc &
-        flags:List[str]=[
+        fs.safe_rm(f'{output_dir}/score.sc')
+        #/dors/meilerlab/apps/rosetta/rosetta-3.13/main/source/bin/relax.default.linuxgccrelease
+        #-out:prefix $prefix
+        #-out:file:scorefile ${prefix}.sc &
+        flags: List[str] = [
             f"-in:file:s '{infile}'",
             f"-nstruct {nstruct}",
             f"-linmem_ig {linmem_ig}",
         ]
-        
-        
+
         flags.append(f"-ignore_zero_occupancy {'true' if ignore_zero_occupancy else 'false'}")
         flags.append(f"-relax:constrain_relax_to_start_coords {'true' if constrain_relax_to_start_coords else 'false'}")
         flags.append(f"-coord_constrain_sidechains {'true' if coord_constrain_sidechains else 'false'}")
         flags.append(f"-ramp_constraints {'true' if ramp_constraints else 'false'}")
         flags.append(f"-out:path:all {output_dir}")
-
 
         if full_atom:
             flags.append("-in:file:fullatom")
@@ -471,42 +436,35 @@ class RosettaInterface(BaseInterface):
         if overwrite:
             flags.append("-overwrite")
 
-
         if extra_flags:
             flags.extend(extra_flags)
 
-        fs.safe_mkdir( output_dir )
+        fs.safe_mkdir(output_dir)
 
-        self.env_manager_.run_command(
-            self.config_.RELAX,
-            flags
-        )
+        self.env_manager_.run_command(self.config_.RELAX, flags)
 
-        df:pd.DataFrame = self.parse_score_file(f'{output_dir}/score.sc')
+        df: pd.DataFrame = self.parse_score_file(f'{output_dir}/score.sc')
 
-        df['description'] = df.apply( lambda row: f"{output_dir}/{row.description}.pdb", axis=1 )
-
+        df['description'] = df.apply(lambda row: f"{output_dir}/{row.description}.pdb", axis=1)
 
         if delete_scores:
-            self._delete_score_file( output_dir )
+            self._delete_score_file(output_dir)
 
         if delete_crash:
-            self._delete_crash_log( )
+            self._delete_crash_log()
 
         return df
-            
 
-
-    def score(self,
-            infile:str,
-            ignore_zero_occupancy:bool=True,
-            overwrite:bool=True,
-            extra_flags:List[str]=None,
-            output_dir:str='./',
-            delete_scores:bool=True,
-            delete_crash:bool=True,
-
-        ) -> float:
+    def score(
+        self,
+        infile: str,
+        ignore_zero_occupancy: bool = True,
+        overwrite: bool = True,
+        extra_flags: List[str] = None,
+        output_dir: str = './',
+        delete_scores: bool = True,
+        delete_crash: bool = True,
+    ) -> float:
         """Provides the total score in Rosetta Energy Units (REU) for a given structure. Uses default flags but can have behavior modified
         via supplied extra_flags. Returns the total score in REU.
 
@@ -523,13 +481,13 @@ class RosettaInterface(BaseInterface):
             Score of structure in file in REU.
 
         """
-        fs.check_file_exists( infile )
-        
-        flags:List[str]=[
+        fs.check_file_exists(infile)
+
+        flags: List[str] = [
             f"-in:file:s '{infile}'",
-             "-ignore_unrecognized_res",
+            "-ignore_unrecognized_res",
         ]
-        
+
         flags.append(f"-ignore_zero_occupancy {'true' if ignore_zero_occupancy else 'false'}")
         flags.append(f"-out:path:all {output_dir}")
 
@@ -539,33 +497,27 @@ class RosettaInterface(BaseInterface):
         if extra_flags:
             flags.extend(extra_flags)
 
-        fs.safe_rm( f"{output_dir}/score.sc" )
+        fs.safe_rm(f"{output_dir}/score.sc")
 
-        fs.safe_mkdir( output_dir )
+        fs.safe_mkdir(output_dir)
 
-        self.env_manager_.run_command(
-            self.config_.SCORE,
-            flags
-        )
+        self.env_manager_.run_command(self.config_.SCORE, flags)
 
-
-        df:pd.DataFrame=self.parse_score_file(f"{output_dir}/score.sc")
+        df: pd.DataFrame = self.parse_score_file(f"{output_dir}/score.sc")
 
         if len(df) != 1:
             _LOGGER.error("Found more than one entry in score.sc file. Exiting...")
-            exit( 1 )
+            exit(1)
 
         if delete_scores:
-            self._delete_score_file( output_dir )
+            self._delete_score_file(output_dir)
 
         if delete_crash:
-            self._delete_crash_log( )
+            self._delete_crash_log()
 
         return df.iloc[0].total_score
 
-
-
-    def write_script(self, fname:str, args:List[Dict] ) -> str:
+    def write_script(self, fname: str, args: List[Dict]) -> str:
         """Writes an XML script to be used with RosettaScripts. Each element of the XML script is represented
         as a dict() within a list() of args. Note that each element dict() is required to have two keys, "parent"
         and "tag". "parent" refers to which element it should be nested under. In the case that there are multiple
@@ -580,7 +532,7 @@ class RosettaInterface(BaseInterface):
             The name of the script file.
         """
 
-        def _find_node( elem : ET.Element, name:str ) -> ET.Element:
+        def _find_node(elem: ET.Element, name: str) -> ET.Element:
             """Helper function that recursively finds the specified parent XML node. Assumes that supplied name
             str() is correctly delimited with '.' characters. DOES NOT check for correctness of nam.e
 
@@ -591,22 +543,22 @@ class RosettaInterface(BaseInterface):
             Return:
                 The XML node with the target tag name.
             """
-            tks:List[str] = name.split('.', 1)
+            tks: List[str] = name.split('.', 1)
 
-            target:str=tks[0]
+            target: str = tks[0]
 
-            result:ET.Element=None
+            result: ET.Element = None
             for ee in elem:
                 if ee.tag == target:
                     result = ee
                     break
             else:
                 _LOGGER.error(f"There is no element with tag name '{target}' at this level. Exiting...")
-                exit( 1 )
+                exit(1)
 
             if len(tks) > 1:
-                return _find_node( result, tks[1] )
-            else:   
+                return _find_node(result, tks[1])
+            else:
                 return result
 
         root = ET.Element("ROSETTASCRIPTS")
@@ -618,16 +570,16 @@ class RosettaInterface(BaseInterface):
         ET.SubElement(root, "MOVERS")
         ET.SubElement(root, "PROTOCOLS")
         ET.SubElement(root, "OUTPUT")
-        
+
         for arg in args:
             parent_name = arg.pop("parent", None)
             tag_name = arg.pop("tag", None)
 
-            bad:bool = False
+            bad: bool = False
 
             if not parent_name:
                 _LOGGER.error("No parent name supplied in XML element dict()!")
-                bad = True 
+                bad = True
 
             if not parent_name:
                 _LOGGER.error("No tag name supplied in XML element dict()!")
@@ -635,36 +587,35 @@ class RosettaInterface(BaseInterface):
 
             if bad:
                 _LOGGER.error("Problems with XML elements detected. Exiting...")
-                exit( 1 )
+                exit(1)
 
-            parent:ET.Element=_find_node(root, parent_name )
+            parent: ET.Element = _find_node(root, parent_name)
 
-            _ = ET.SubElement(parent, tag_name, attrib=arg )
+            _ = ET.SubElement(parent, tag_name, attrib=arg)
 
         for rr in root:
             rr.text = "\n\t"
 
-
-        xmlstr:str = minidom.parseString(ET.tostring(root)).toprettyxml()
-        xml_content:List[str] = xmlstr.replace('<?xml version="1.0" ?>\n', '').splitlines()
+        xmlstr: str = minidom.parseString(ET.tostring(root)).toprettyxml()
+        xml_content: List[str] = xmlstr.replace('<?xml version="1.0" ?>\n', '').splitlines()
 
         fs.write_lines(fname, xml_content)
 
         return fname
 
-
-    def loop_relax(self, 
-        infile:str, 
-        nstruct:int, 
-        ignore_zero_occupancy:bool=True,
-        detect_disulf:bool=True,
-        linmem_ig:int=10,
-        overwrite:bool=True,
-        extra_flags:List[str]=None,
-        output_dir:str='./',
-        delete_scores:bool=True,
-        delete_crash:bool=True,
-        ) -> pd.DataFrame:
+    def loop_relax(
+        self,
+        infile: str,
+        nstruct: int,
+        ignore_zero_occupancy: bool = True,
+        detect_disulf: bool = True,
+        linmem_ig: int = 10,
+        overwrite: bool = True,
+        extra_flags: List[str] = None,
+        output_dir: str = './',
+        delete_scores: bool = True,
+        delete_crash: bool = True,
+    ) -> pd.DataFrame:
         """TODO
         Args:
             infile: A str() with the path to the .pdb file to relax. 
@@ -682,20 +633,20 @@ class RosettaInterface(BaseInterface):
             pandas DataFrame containing the results and energies of the relaxed structures. Description column contains
             full paths to relaxed files. 
         """
-        fs.check_file_exists( infile )
+        fs.check_file_exists(infile)
 
         if Path(infile).suffix != '.pdb':
             _LOGGER.error(f"Expected input file format is .pdb. {infile} is an invalid entry. Exiting...")
-            exit( 1 )
+            exit(1)
 
-        fs.safe_rm( f'{output_dir}/score.sc')
-        flags:List[str]=[
+        fs.safe_rm(f'{output_dir}/score.sc')
+        flags: List[str] = [
             f"-in:file:s '{infile}'",
             f"-nstruct {nstruct}",
             f"-linmem_ig {linmem_ig}",
         ]
-        
-        df:pd.DataFrame = self.parent().pymol.collect('production.pdb', 'resi ss resn'.split(), sele='name CA')
+
+        df: pd.DataFrame = self.parent().pymol.collect('production.pdb', 'resi ss resn'.split(), sele='name CA')
         df['resi'] = df.resi.astype(int)
 
         ss = []
@@ -703,53 +654,71 @@ class RosettaInterface(BaseInterface):
             if row.resn.upper() in "MG ZN HG".split():
                 ss.append('M')
             else:
-                ss.append( row.ss )
-        
+                ss.append(row.ss)
+
         df['ss'] = ss
 
-        elements:List[Dict]=[
-            {'parent':'SCOREFXNS', 'tag':'ScoreFunction', 'name':'score_fxn', 'weights':'ref2015'},
-            {'parent':'MOVERS', 'tag':'FastRelax', 'name':'fast_relax', 'scorefxn':'score_fxn'},
-            {'parent':'MOVERS.FastRelax', 'tag':'MoveMap', 'name':'move_map'},
+        elements: List[Dict] = [
+            {
+                'parent': 'SCOREFXNS',
+                'tag': 'ScoreFunction',
+                'name': 'score_fxn',
+                'weights': 'ref2015'
+            },
+            {
+                'parent': 'MOVERS',
+                'tag': 'FastRelax',
+                'name': 'fast_relax',
+                'scorefxn': 'score_fxn'
+            },
+            {
+                'parent': 'MOVERS.FastRelax',
+                'tag': 'MoveMap',
+                'name': 'move_map'
+            },
         ]
-        
-        temp:Dict[str,str] = deepcopy({'state':df.iloc[0].ss, 'start':df.iloc[0].resi, 'end':df.iloc[0].resi,})
+
+        temp: Dict[str, str] = deepcopy({
+            'state': df.iloc[0].ss,
+            'start': df.iloc[0].resi,
+            'end': df.iloc[0].resi,
+        })
 
         for i, row in df.iterrows():
-            #TODO(CJ): need to ignore the non-amino acid stuff here 
+            #TODO(CJ): need to ignore the non-amino acid stuff here
             if row.ss == temp['state']:
                 temp['end'] = row.resi
             else:
                 elements.append(
-                    deepcopy({'parent':'MOVERS.FastRelax.MoveMap', 
-                        'tag':'Span', 
-                        'begin':str(temp['start']),
-                        'end':str(temp['end']),
-                        'chi':'true',
-                        'bb':'true' if temp['state'] == 'L' else 'false'
-                    })
-                )
+                    deepcopy({
+                        'parent': 'MOVERS.FastRelax.MoveMap',
+                        'tag': 'Span',
+                        'begin': str(temp['start']),
+                        'end': str(temp['end']),
+                        'chi': 'true',
+                        'bb': 'true' if temp['state'] == 'L' else 'false'
+                    }))
                 temp = deepcopy({
-                    'state':row.ss,
-                    'start':row.resi,
-                    'end':row.resi,
+                    'state': row.ss,
+                    'start': row.resi,
+                    'end': row.resi,
                 })
 
         elements.append(
-            deepcopy({'parent':'MOVERS.FastRelax.MoveMap', 
-                'tag':'Span', 
-                'begin':str(temp['start']),
-                'end':str(temp['end']),
-                'chi':'true',
-                'bb':'true' if temp['state'] == 'L' else 'false'
-            })
-        )
+            deepcopy({
+                'parent': 'MOVERS.FastRelax.MoveMap',
+                'tag': 'Span',
+                'begin': str(temp['start']),
+                'end': str(temp['end']),
+                'chi': 'true',
+                'bb': 'true' if temp['state'] == 'L' else 'false'
+            }))
 
-        elements.append({'parent':'PROTOCOLS', 'tag':'Add', 'mover_name':'fast_relax'})
+        elements.append({'parent': 'PROTOCOLS', 'tag': 'Add', 'mover_name': 'fast_relax'})
 
         fpath = Path(infile)
-        xml_input:str=fpath.parent/"__temp.xml"
-        xml_script=self.write_script(xml_input, elements)
+        xml_input: str = fpath.parent / "__temp.xml"
+        xml_script = self.write_script(xml_input, elements)
 
         flags.extend(['-parser:protocol', str(xml_input.absolute())])
 
@@ -762,27 +731,21 @@ class RosettaInterface(BaseInterface):
         if overwrite:
             flags.append("-overwrite")
 
-
         if extra_flags:
             flags.extend(extra_flags)
 
-        fs.safe_mkdir( output_dir )
+        fs.safe_mkdir(output_dir)
 
-        
         self.run_rosetta_scripts(flags)
 
-        df:pd.DataFrame = self.parse_score_file(f'{output_dir}/score.sc')
+        df: pd.DataFrame = self.parse_score_file(f'{output_dir}/score.sc')
 
-        df['description'] = df.apply( lambda row: f"{output_dir}/{row.description}.pdb", axis=1 )
-
+        df['description'] = df.apply(lambda row: f"{output_dir}/{row.description}.pdb", axis=1)
 
         if delete_scores:
-            self._delete_score_file( output_dir )
+            self._delete_score_file(output_dir)
 
         if delete_crash:
-            self._delete_crash_log( )
+            self._delete_crash_log()
 
         return df
-            
-
-

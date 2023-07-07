@@ -17,6 +17,7 @@ CURRDIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = f"{CURRDIR}/../data/"
 sp = PDBParser()
 
+
 def test_deprotonate_residue():
     """test deprotonate_residue considered CYS on SG and HID on NE2 and ND1"""
     pdb_file_path = f"{DATA_DIR}1Q4T_peptide_protonated.pdb"
@@ -49,6 +50,7 @@ def test_deprotonate_residue_switch():
     assert residue.name == "HIE"
     assert len(residue) == 17
     # TODO add test with completion of LYS treatment etc.
+
 
 def test_remove_side_chain_atom():
     """test function works as expected"""

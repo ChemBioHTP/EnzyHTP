@@ -16,19 +16,18 @@ import enzy_htp.mutation.api as mapi
 from enzy_htp.mutation.mutation import Mutation
 
 DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/data/"
-sp=PDBParser()
+sp = PDBParser()
+
 
 def test_assign_mutant():
     """test function works as expected using KE07"""
-    test_mutation_pattern = ("KA162A, {RA154W, HA201A},"
-                             " {L10A, r:2[resi 254 around 3:all not self]*5}")
+    test_mutation_pattern = ("KA162A, {RA154W, HA201A}," " {L10A, r:2[resi 254 around 3:all not self]*5}")
     test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
     test_stru = sp.get_structure(test_pdb)
 
-    mutants = mapi.assign_mutant(
-        test_stru,
-        test_mutation_pattern)
+    mutants = mapi.assign_mutant(test_stru, test_mutation_pattern)
     # print(mutants)
+
 
 def test_assign_mutant_dimer():
     """test function works as expected using PuO
@@ -37,39 +36,26 @@ def test_assign_mutant_dimer():
     test_pdb = f"{DATA_DIR}puo_put.pdb"
     test_stru = sp.get_structure(test_pdb)
 
-    mutants = mapi.assign_mutant(
-        test_stru,
-        test_mutation_pattern,
-        chain_sync_list=[("A","B")],
-        chain_index_mapper={
-            "A":0,
-            "B":450
-        })
+    mutants = mapi.assign_mutant(test_stru, test_mutation_pattern, chain_sync_list=[("A", "B")], chain_index_mapper={"A": 0, "B": 450})
     print(mutants)
+
 
 def test_sync_mutation_over_chains():
     """test function works as expected"""
-    test_mutants = [
-        [Mutation(orig='ARG',target='ALA',chain_id='A',res_idx=3),
-         Mutation(orig='ARG',target='TRP',chain_id='A',res_idx=4)],
-        [Mutation(orig='TRP',target='GLY',chain_id='C',res_idx=1),
-         Mutation(orig='TRP',target='HIS',chain_id='C',res_idx=2)]]
-    test_chain_sync_list = [("A","B"), ("C","D")]
-    test_chain_index_mapper = {
-        "A": 0,
-        "B": 10,
-        "C": 20,
-        "D": 100
-    }
-    result = mapi.sync_mutation_over_chains(
-        test_mutants,
-        test_chain_sync_list,
-        test_chain_index_mapper)
+    test_mutants = [[
+        Mutation(orig='ARG', target='ALA', chain_id='A', res_idx=3),
+        Mutation(orig='ARG', target='TRP', chain_id='A', res_idx=4)
+    ], [Mutation(orig='TRP', target='GLY', chain_id='C', res_idx=1),
+        Mutation(orig='TRP', target='HIS', chain_id='C', res_idx=2)]]
+    test_chain_sync_list = [("A", "B"), ("C", "D")]
+    test_chain_index_mapper = {"A": 0, "B": 10, "C": 20, "D": 100}
+    result = mapi.sync_mutation_over_chains(test_mutants, test_chain_sync_list, test_chain_index_mapper)
     assert len(result) == 2
     assert len(result[0]) == 4
     assert Mutation(orig='ARG', target='TRP', chain_id='B', res_idx=14) in result[0]
     assert len(result[1]) == 4
     assert Mutation(orig='TRP', target='HIS', chain_id='D', res_idx=82) in result[1]
+
 
 def test_mutate_stru_with_tleap():
     """test function works as expected"""
@@ -86,6 +72,7 @@ def test_mutate_stru_with_tleap():
             for new_atom, old_atom in zip(new_res.atoms, old_res.atoms):
                 assert new_atom.coord == old_atom.coord
                 assert new_atom.name == old_atom.name
+
 
 def test_check_mutant_stru():
     """test function works as expected"""
@@ -133,9 +120,7 @@ def test_mutate_pdb_specified_mutation_tleap():
     target = f"{DATA_DIR}/one_res_P1G.pdb"
     fs.safe_rm(target)
     assert not os.path.exists(target)
-    mutated = mut.mutate_pdb(
-        ONE_RES, 1, [mut.Mutation(orig='P', target='G', chain_id='A', res_idx=1)], None,
-        "tleap", None, 100)
+    mutated = mut.mutate_pdb(ONE_RES, 1, [mut.Mutation(orig='P', target='G', chain_id='A', res_idx=1)], None, "tleap", None, 100)
     assert os.path.exists(target)
 
     lines: List[str] = fs.lines_from_file(target)

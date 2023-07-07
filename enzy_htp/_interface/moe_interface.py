@@ -16,8 +16,8 @@ from enzy_htp._config.moe_config import MOEConfig, default_moe_config
 
 #TODO(CJ): need to add tests for this section
 
-
 from .base_interface import BaseInterface
+
 
 class MOEInterface(BaseInterface):
     """Class that provides a direct interface for enzy_htp to utilize MOE software. Supported operations 
@@ -36,13 +36,11 @@ class MOEInterface(BaseInterface):
         """
         super().__init__(parent, config, default_moe_config)
 
-    
     def valid_license(self) -> bool:
         """MOE operates using a license based model. This function checks if a valid license is available in the system."""
         pass
 
-
-    def _run_moebatch(self, input_svl:str) -> None:
+    def _run_moebatch(self, input_svl: str) -> None:
         """Helper function that runs the supplied scientific vector language (SVL) file as input with moebatch.
         Method checks that the supplied svl file exists and has the correct file extension.
 
@@ -52,21 +50,16 @@ class MOEInterface(BaseInterface):
         Returns:
             Nothing.
         """
-        
-        fs.check_file_exists( input_svl )
+
+        fs.check_file_exists(input_svl)
 
         if Path(input_svl).suffix != '.svl':
             _LOGGER.error(f"The supplied svl file '{input_svl}' does not have the extension .svl. Exiting...")
-            exit( 1 )
+            exit(1)
 
+        self.env_manager_.run_command(self.config_.MOE_BATCH, ["-script", str(input_svl)])
 
-        self.env_manager_.run_command(
-            self.config_.MOE_BATCH,
-            ["-script", str(input_svl)]
-        )
-
-
-    def protonate(self, molfile:str, outfile:str=None, pH:float=7.0) -> str:
+    def protonate(self, molfile: str, outfile: str = None, pH: float = 7.0) -> str:
         """Protonates the structure in a supplied file at the specified pH. If nothing is supplied for the
         outfile, then it is set as <input_file>_protonated.<ext> for a given file of name <input_file>.<ext>.
         Checks that the supplied molfile exists and that it has one of the supported file types of .mol2,
@@ -81,40 +74,36 @@ class MOEInterface(BaseInterface):
         Returns:
             The path of the protonated structure as a str().            
         """
-        
-        fs.check_file_exists( molfile )
-        
-        FORMAT_MAPPER:Dict[str,str] = {
-            '.mol2':'TriposMOL2',
-            '.pdb':'PDB',
-            '.cif':'CIF',
+
+        fs.check_file_exists(molfile)
+
+        FORMAT_MAPPER: Dict[str, str] = {
+            '.mol2': 'TriposMOL2',
+            '.pdb': 'PDB',
+            '.cif': 'CIF',
         }
-        
-        ftype:str = FORMAT_MAPPER.get(Path(molfile).suffix, None)
+
+        ftype: str = FORMAT_MAPPER.get(Path(molfile).suffix, None)
 
         if not outfile:
-            tpath = Path( molfile )
+            tpath = Path(molfile)
             outfile = tpath.parent / f"{tpath.stem}_protonated{tpath.suffix}"
 
         if not ftype:
             _LOGGER.error(f"Supported file types for MOEInterface.protonate() only include .mol2, .pdb, and .cif. Exiting...")
-            exit( 1 )
-        
-        contents:List[str]=[
-            f"Read{ftype} '{molfile}';", 
-             "atoms = Atoms[];",
-            f"Protonate3D [atoms,atoms,atoms,[],[],[pH:{pH:.2f}]];",
-            f"Write{ftype} '{outfile}';",
-             "Close [];"
-        ]
-       
-        temp_file:str = Path(molfile).parent / "temp.svl"
-        
-        fs.write_lines( temp_file, contents )
+            exit(1)
 
-        self._run_moebatch( temp_file )
-        
-        fs.safe_rm( temp_file )
+        contents: List[str] = [
+            f"Read{ftype} '{molfile}';", "atoms = Atoms[];", f"Protonate3D [atoms,atoms,atoms,[],[],[pH:{pH:.2f}]];",
+            f"Write{ftype} '{outfile}';", "Close [];"
+        ]
+
+        temp_file: str = Path(molfile).parent / "temp.svl"
+
+        fs.write_lines(temp_file, contents)
+
+        self._run_moebatch(temp_file)
+
+        fs.safe_rm(temp_file)
 
         return outfile
-

@@ -23,10 +23,7 @@ sp = struct.PDBParser()
 
 
 # TODO(CJ): make testing utility files.
-def equiv_files(fname1: str,
-                fname2: str,
-                width: int = None,
-                skip_frist: bool = False) -> bool:
+def equiv_files(fname1: str, fname2: str, width: int = None, skip_frist: bool = False) -> bool:
     """Helper method to check if two files are exactly equivalent."""
     first = 1
     for l1, l2 in zip(fs.lines_from_file(fname1), fs.lines_from_file(fname2)):
@@ -45,14 +42,11 @@ def equiv_files(fname1: str,
 
 
 ligand_answer_list_1Q4T = [
-    "N1A", "C2A", "N3A", "C4A", "C5A", "C6A", "N6A", "N7A", "C8A", "N9A", "C1D", "C2D",
-    "O2D", "C3D", "O3D", "P3D", "O7A", "O8A", "O9A", "C4D", "O4D", "C5D", "O5D", "P1A",
-    "O1A", "O2A", "O3A", "P2A", "O4A", "O5A", "O6A", "CBP", "CCP", "CDP", "CEP", "CAP",
-    "OAP", "C9P", "O9P", "N8P", "C7P", "C6P", "C5P", "O5P", "N4P", "C3P", "C2P", "S1P",
-    "O1B", "C1B", "C2B", "C3B", "C4B", "C5B", "O2B", "C6B", "C7B", "CB", "H", "H1", "H2",
-    "H3", "H4", "H5", "H6", "H7", "H8", "H9", "H10", "H11", "H12", "H13", "H14", "H15",
-    "H16", "H17", "H18", "H19", "H20", "H21", "H22", "H23", "H24", "H25", "H26", "H27",
-    "H28", "H29", "H30", "H31", "H32", "H33", "H34", "H35", "H36", "H37"
+    "N1A", "C2A", "N3A", "C4A", "C5A", "C6A", "N6A", "N7A", "C8A", "N9A", "C1D", "C2D", "O2D", "C3D", "O3D", "P3D", "O7A", "O8A", "O9A",
+    "C4D", "O4D", "C5D", "O5D", "P1A", "O1A", "O2A", "O3A", "P2A", "O4A", "O5A", "O6A", "CBP", "CCP", "CDP", "CEP", "CAP", "OAP", "C9P",
+    "O9P", "N8P", "C7P", "C6P", "C5P", "O5P", "N4P", "C3P", "C2P", "S1P", "O1B", "C1B", "C2B", "C3B", "C4B", "C5B", "O2B", "C6B", "C7B",
+    "CB", "H", "H1", "H2", "H3", "H4", "H5", "H6", "H7", "H8", "H9", "H10", "H11", "H12", "H13", "H14", "H15", "H16", "H17", "H18", "H19",
+    "H20", "H21", "H22", "H23", "H24", "H25", "H26", "H27", "H28", "H29", "H30", "H31", "H32", "H33", "H34", "H35", "H36", "H37"
 ]
 
 
@@ -112,10 +106,11 @@ def test_protonate_peptide_with_pdb2pqr_no_metal():
     assert len(stru.find_residue_name("HIS")) == 0
     assert len(stru.find_residue_name("HID")) == 10
     assert len(stru.find_residue_name("HIE")) == 2
-    assert os.path.exists(int_pqr) # if specified, it should be preserved
+    assert os.path.exists(int_pqr)  # if specified, it should be preserved
     assert os.path.exists(int_pdb)
     fs.safe_rm(int_pqr)
     fs.safe_rm(int_pdb)
+
 
 def test_protonate_peptide_with_pdb2pqr_remove_temp():
     """test that protonate_peptide_with_pdb2pqr() works removing temp file"""
@@ -136,6 +131,7 @@ def test_protonate_peptide_with_pdb2pqr_remove_temp():
         assert not os.path.exists(int_pqr)
         assert not os.path.exists(int_pdb)
 
+
 def test_protonate_peptide_with_pdb2pqr_metal():
     """test that protonate_peptide_with_pdb2pqr() works without exceptions"""
     test_pdb = f"{DATA_DIR}/1NVG_metalcenter_noligand.pdb"
@@ -147,14 +143,13 @@ def test_protonate_peptide_with_pdb2pqr_metal():
 
     stru = sp.get_structure(test_pdb)
     prot.protonate_peptide_with_pdb2pqr(stru, 7.0, int_pdb, int_pqr)
-    assert list(
-        map(lambda r: r.name,
-            stru.metalcenters[0].get_donor_mapper())) == ["GLU", "CYM", "CYM", "CYM"]
+    assert list(map(lambda r: r.name, stru.metalcenters[0].get_donor_mapper())) == ["GLU", "CYM", "CYM", "CYM"]
     assert len(stru.atoms) == 5353  # removed 5 atoms
-    assert os.path.exists(int_pqr) # if specified, it should be preserved
+    assert os.path.exists(int_pqr)  # if specified, it should be preserved
     assert os.path.exists(int_pdb)
     fs.safe_rm(int_pqr)
     fs.safe_rm(int_pdb)
+
 
 def test_pdb2pqr_protonate_pdb_FAcD():
     """Making sure the protonate_pdb() method works for the FAcD enzyme system."""

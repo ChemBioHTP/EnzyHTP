@@ -18,8 +18,8 @@ from enzy_htp.core import file_system as fs
 
 from enzy_htp._config.multiwfn_config import MultiwfnConfig, default_multiwfn_config
 
-
 from .base_interface import BaseInterface
+
 
 class MultiwfnInterface(BaseInterface):
     """
@@ -45,7 +45,7 @@ class MultiwfnInterface(BaseInterface):
 
     def parse_two_center_dp_moments(self, fname) -> List[Tuple[Tuple, Tuple]]:
 
-        fs.check_file_exists( fname )
+        fs.check_file_exists(fname)
 
         def digits_only(raw: str) -> str:
             return re.sub(r"[a-z:/]", "", raw.lower())
@@ -112,9 +112,7 @@ class MultiwfnInterface(BaseInterface):
 
         # self.init_Multiwfn()
         infile = f"{Path(fchks[0]).parent}/dipole_settings.in"
-        settings: List[str] = (
-            "19 -8 1 y q".split()
-        )  # TODO(CJ): paramterize this so that it is controlled by MultiwfnConfig
+        settings: List[str] = ("19 -8 1 y q".split())  # TODO(CJ): paramterize this so that it is controlled by MultiwfnConfig
         fs.write_lines(infile, settings)
 
         for fchk in fchks:
@@ -124,8 +122,7 @@ class MultiwfnInterface(BaseInterface):
 
             # Run Multiwfn
             outfile = str(Path(fchk).with_suffix(".dip"))
-            self.env_manager_.run_command(
-                self.config_.EXE, [fchk, "<", infile, "&&", "mv", "LMOdip.txt", outfile])
+            self.env_manager_.run_command(self.config_.EXE, [fchk, "<", infile, "&&", "mv", "LMOdip.txt", outfile])
             fs.safe_rm("LMOcen.txt")
             fs.safe_rm("new.fch")
             dp_moments = self.parse_two_center_dp_moments(outfile)

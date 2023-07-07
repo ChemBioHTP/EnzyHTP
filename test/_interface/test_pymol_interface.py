@@ -24,8 +24,7 @@ def test_load_enzy_htp_stru():
     assert pymol_obj_name == "enzy_htp_stru01"
     assert pymol_obj_name in session.cmd.get_object_list()
     assert test_stru.chain_names == session.cmd.get_chains(pymol_obj_name)
-    assert len(
-        session.cmd.get_model(pymol_obj_name).get_residues()) == test_stru.num_residues
+    assert len(session.cmd.get_model(pymol_obj_name).get_residues()) == test_stru.num_residues
     #temp files
     if _LOGGER.level > 10:
         assert not os.path.exists(f"{eh_config['system.SCRATCH_DIR']}/temp_pymol_interface.pdb")
@@ -41,12 +40,9 @@ def test_load_enzy_htp_stru_not_start_from_one():
     assert pymol_obj_name == "enzy_htp_stru01"
     assert pymol_obj_name in session.cmd.get_object_list()
     assert test_stru.chain_names == session.cmd.get_chains(pymol_obj_name)
-    assert len(
-        session.cmd.get_model(pymol_obj_name).get_residues()) == test_stru.num_residues
+    assert len(session.cmd.get_model(pymol_obj_name).get_residues()) == test_stru.num_residues
     pymol_resi_idxs = []
-    session.cmd.iterate(f"{pymol_obj_name} & (n. CA|n. OAB) ",
-                        "pymol_resi_idxs.append(resi)",
-                        space=locals())
+    session.cmd.iterate(f"{pymol_obj_name} & (n. CA|n. OAB) ", "pymol_resi_idxs.append(resi)", space=locals())
     assert pymol_resi_idxs == [str(x) for x in test_stru.residue_indexes]
 
 
@@ -57,13 +53,11 @@ def test_select_pymol_obj():
     test_session = pi.new_pymol_session()
     pymol_obj_name, session = pi.load_enzy_htp_stru(test_stru, test_session)
     test_pattern = "resi 3"
-    assert test_stru["A"].find_residue_idx(3).atom_idx_list == pi.select_pymol_obj(
-        test_pattern, pymol_obj_name, session)
+    assert test_stru["A"].find_residue_idx(3).atom_idx_list == pi.select_pymol_obj(test_pattern, pymol_obj_name, session)
     test_pattern = "resi 254 around 5"
     assert pi.select_pymol_obj(test_pattern, pymol_obj_name, session) == [
-        138, 139, 140, 141, 142, 143, 144, 145, 165, 166, 168, 169, 175, 176, 177, 178,
-        179, 180, 181, 741, 742, 743, 744, 745, 772, 773, 774, 775, 776, 777, 778, 779,
-        780, 781, 782, 783, 784, 785, 786, 787, 788, 789, 1574, 1575, 1577, 1578, 1579,
-        1965, 1966, 1967, 1968, 1969, 1970, 1971, 1972, 1973, 1974, 1975, 1976, 1977,
-        1978, 1979, 1980, 2009, 2229, 2618, 2619, 2620, 2622, 2623, 2624, 2626, 2732, 2733
+        138, 139, 140, 141, 142, 143, 144, 145, 165, 166, 168, 169, 175, 176, 177, 178, 179, 180, 181, 741, 742, 743, 744, 745, 772, 773,
+        774, 775, 776, 777, 778, 779, 780, 781, 782, 783, 784, 785, 786, 787, 788, 789, 1574, 1575, 1577, 1578, 1579, 1965, 1966, 1967,
+        1968, 1969, 1970, 1971, 1972, 1973, 1974, 1975, 1976, 1977, 1978, 1979, 1980, 2009, 2229, 2618, 2619, 2620, 2622, 2623, 2624, 2626,
+        2732, 2733
     ]

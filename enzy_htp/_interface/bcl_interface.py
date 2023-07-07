@@ -12,10 +12,10 @@ from ..core.logger import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import env_manager as em
 
-
 from .base_interface import BaseInterface
 
 from enzy_htp._config.bcl_config import BCLConfig, default_bcl_config
+
 
 class BCLInterface(BaseInterface):
     """Class that provides a direct interfrace for enzy_htp to utilize the BCL. Supported opterations
@@ -28,14 +28,14 @@ class BCLInterface(BaseInterface):
         env_manager_ : The EnvironmentManager() class which ensure all required environment elements exist.
         compatible_env_ : A bool() indicating if the current environment is compatible with the object itself.
     """
-   
+
     def __init__(self, parent, config: BCLConfig = None) -> None:
         """Simplistic constructor that optionally takes a BCLConfig object as its only argument.
         Calls parent class.
         """
         super().__init__(parent, config, default_bcl_config)
 
-    def _run_bcl_cmd(self, protocol: str, flags:List[str]) -> None:
+    def _run_bcl_cmd(self, protocol: str, flags: List[str]) -> None:
         """Underlying method to use the BCL. BCL has a format/calling convention of:
             $ bcl.exe <protocol> <flags>
         
@@ -50,11 +50,9 @@ class BCLInterface(BaseInterface):
 
         """
         flags = [protocol] + flags
-        self.env_manager_.run_command(
-            self.config_.BCL_EXE, flags            
-        )
+        self.env_manager_.run_command(self.config_.BCL_EXE, flags)
 
-    def generate_conformers(self, molfile:str, n_conformers:int = 100, outfile:str=None ) -> str:
+    def generate_conformers(self, molfile: str, n_conformers: int = 100, outfile: str = None) -> str:
         """Method that creates conformers using the 'molecule:ConformerGenerator' method from the BCL.
         Note that the supplied molfile must exist but outfile does not. All conformers are saved to one
         file. When the outfile is not supplied, the output file is saved to the same directory as the 
@@ -72,30 +70,29 @@ class BCLInterface(BaseInterface):
 
         #TODO(CJ): add the ability to add more flags and that molfile is in the correct format
 
-        fs.check_file_exists( molfile )
+        fs.check_file_exists(molfile)
 
         if not outfile:
             fpath = Path(molfile)
             outfile = fpath.parent / f"{fpath.stem}_conformers.sdf"
-             
 
-        flags:List[str] = [
+        flags: List[str] = [
             "-conformation_comparer",
-            "SymmetryRMSD", "0.25",
-            "-ensemble_filenames", molfile,
-            "-top_models", f"{int(n_conformers)}",
-            "-conformers_single_file", f"{outfile}",
+            "SymmetryRMSD",
+            "0.25",
+            "-ensemble_filenames",
+            molfile,
+            "-top_models",
+            f"{int(n_conformers)}",
+            "-conformers_single_file",
+            f"{outfile}",
         ]
 
-        self._run_bcl_cmd(
-            "molecule:ConformerGenerator",
-            flags
-        )
+        self._run_bcl_cmd("molecule:ConformerGenerator", flags)
 
         return outfile
 
-
-    def formal_charge(self, molfile:str) -> int:
+    def formal_charge(self, molfile: str) -> int:
         """Find the formal charge of the supplied molfile using molecule:Properties routine. Supplied
         file MUST be in format .sdf otherwise the script will exit.
 
@@ -105,39 +102,21 @@ class BCLInterface(BaseInterface):
         Returns:
             Formal charge of the molecule as an int().
         """
-    
-        fs.check_file_exists( molfile )
+
+        fs.check_file_exists(molfile)
 
         if not Path(molfile).suffix == '.sdf':
             _LOGGER.error(f"Function expects .sdf file format. Exiting...")
-            exit( 1 )
+            exit(1)
 
-        temp_file:str = "__temp.csv"
+        temp_file: str = "__temp.csv"
 
-        flags:List[str] = [
-            "-input_filenames",  str(molfile),
-            "-output_table", temp_file,
-            "-tabulate", "TotalFormalCharge"
-        ]
-        
-        self._run_bcl_cmd(
-            "molecule:Properties",
-            flags
-        )
-        
-        df:pd.DataFrame = pd.read_csv(temp_file)
+        flags: List[str] = ["-input_filenames", str(molfile), "-output_table", temp_file, "-tabulate", "TotalFormalCharge"]
 
-        fs.safe_rm( temp_file )
+        self._run_bcl_cmd("molecule:Properties", flags)
+
+        df: pd.DataFrame = pd.read_csv(temp_file)
+
+        fs.safe_rm(temp_file)
 
         return df.iloc[0].TotalFormalCharge
-
-
-
-
-
-
-
-
-
-
-

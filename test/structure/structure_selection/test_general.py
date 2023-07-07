@@ -22,6 +22,4 @@ def test_select_stru():
     test_stru = sp.get_structure(test_pdb)
     test_pattern = "resi 254 around 4"
     select_obj = select_stru(test_stru, test_pattern)
-    assert sorted(select_obj.involved_residue_idx()) == [
-        9, 11, 48, 50, 101, 128, 169, 201, 202, 222, 224
-    ]
+    assert sorted(select_obj.involved_residue_idx()) == [9, 11, 48, 50, 101, 128, 169, 201, 202, 222, 224]
