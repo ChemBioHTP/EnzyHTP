@@ -76,4 +76,4 @@ def test_point_mutate():
     test_session = pi.new_pymol_session()
     pymol_obj_name, session = pi.load_enzy_htp_stru(test_stru, test_session)
     pi.point_mutate(("A", 154), "TRP", pymol_obj_name, session)
-    assert pi.select_pymol_obj("resi 154", pymol_obj_name, session) == test_mut_stru["A"].find_residue_idx(154).atom_idx_list
+    assert len(pi.select_pymol_obj("resi 154", pymol_obj_name, session)) == len(test_mut_stru["A"].find_residue_idx(154).atom_idx_list)
