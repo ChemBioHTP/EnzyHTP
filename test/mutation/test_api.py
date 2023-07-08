@@ -160,7 +160,32 @@ def test_mutate_pdb_raises_unsupported_method_exception():
     assert exe.type == UnsupportedMethod
 
 def test_mutate_stru_with_pymol():
+    """ test function works as expected """
     test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
     test_stru = sp.get_structure(test_pdb)
     mutant = mapi.assign_mutant(test_stru, "R154W")[0]
     mutant_stru = mapi.mutate_stru_with_pymol(test_stru, mutant)
+
+    for new_res, old_res in zip(mutant_stru.residues, test_stru.residues):
+        if new_res.idx == 154:
+            assert new_res.name == "TRP"
+            assert len(new_res.atoms) == 24
+        else:
+            for new_atom, old_atom in zip(new_res.atoms, old_res.atoms):
+                assert new_atom.coord == old_atom.coord
+                assert new_atom.name == old_atom.name
+
+    # test with multiple mutants
+    mutant_2 = mapi.assign_mutant(test_stru, "{R154W, HA201A}")[0]
+    mutant_stru_2 = mapi.mutate_stru_with_pymol(test_stru, mutant_2)
+
+    for new_res, old_res in zip(mutant_stru_2.residues, test_stru.residues):
+        if new_res.idx == 154:
+            assert new_res.name == "TRP"
+            assert len(new_res.atoms) == 24
+        elif new_res.idx == 201:
+            assert new_res.name == "ALA"
+        else:
+            for new_atom, old_atom in zip(new_res.atoms, old_res.atoms):
+                assert new_atom.coord == old_atom.coord
+                assert new_atom.name == old_atom.name
