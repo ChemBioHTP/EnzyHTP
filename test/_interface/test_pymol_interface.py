@@ -67,3 +67,13 @@ def test_select_pymol_obj():
         1965, 1966, 1967, 1968, 1969, 1970, 1971, 1972, 1973, 1974, 1975, 1976, 1977,
         1978, 1979, 1980, 2009, 2229, 2618, 2619, 2620, 2622, 2623, 2624, 2626, 2732, 2733
     ]
+
+def test_point_mutate():
+    """testing that point mutations work as expected"""
+    test_stru = PDBParser().get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
+    test_mut_stru = PDBParser().get_structure(f"{DATA_DIR}KE_07_R7_2_S_mut.pdb")
+    pi = interface.pymol
+    test_session = pi.new_pymol_session()
+    pymol_obj_name, session = pi.load_enzy_htp_stru(test_stru, test_session)
+    pi.point_mutate(("A", 154), "TRP", pymol_obj_name, session)
+    assert pi.select_pymol_obj("resi 154", pymol_obj_name, session) == test_mut_stru["A"].find_residue_idx(154).atom_idx_list

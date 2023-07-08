@@ -395,18 +395,22 @@ def mutate_stru_with_pymol(
 
     stru_cpy = copy.deepcopy(stru)
 
+    # 1. load stru into pymol
     pi = interface.pymol
     temp_session = pi.new_pymol_session()
     pymol_obj_name, session = pi.load_enzy_htp_stru(stru_cpy, temp_session)
 
+    # 2. loop through mutants and apply each one
     for mut in mutant:
-        pi.point_mutate(mut.get_position_key(), mut.get_target(), session)
+        pi.point_mutate(mut.get_position_key(), mut.get_target(), pymol_obj_name, session)
 
+    # 3. save to a structure. TODO(SS): add function in pymol interface for this?
     session.cmd.set("retain_order")
     session.cmd.save(temp_file_name)
     pymol_mutant_stru = sp.get_structure(temp_file_name)
     fs.clean_temp_file_n_dir([temp_file_name])
 
+    # 4. update residues
     stru_oper.update_residues(stru_cpy, pymol_mutant_stru)
 
     if in_place:
