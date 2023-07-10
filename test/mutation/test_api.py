@@ -159,6 +159,7 @@ def test_mutate_pdb_raises_unsupported_method_exception():
     assert exe
     assert exe.type == UnsupportedMethod
 
+
 def test_mutate_stru_with_pymol():
     """ test function works as expected """
     test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"

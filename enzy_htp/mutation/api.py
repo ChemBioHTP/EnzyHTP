@@ -373,7 +373,7 @@ def mutate_stru_with_pymol(
         stru: Structure,
         mutant: List[Mutation],
         in_place: bool = False,
-) -> Structure:
+        ) -> Structure:
     """mutate the {stru} to its {mutant} structure using PyMOL.
     Args:
         stru: the 'WT' structure

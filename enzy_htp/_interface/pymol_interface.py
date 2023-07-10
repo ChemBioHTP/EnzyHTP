@@ -101,7 +101,9 @@ class PyMolInterface:
 
         return sorted(result)
 
-    def point_mutate(self, pos_key: Tuple[str, int], target: str, pymol_obj_name: str, pymol_session: pymol2.PyMOL) -> None:
+    def point_mutate(self, pos_key: Tuple[str, int], 
+                     target: str, pymol_obj_name: str, 
+                     pymol_session: pymol2.PyMOL) -> None:
         """
         Performs a single point mutation on the PDB file in the PyMOL session in-place.
         Args:
@@ -119,7 +121,10 @@ class PyMolInterface:
         
         # select res idx to mutate to target
         pymol_session.cmd.get_wizard().set_mode(target)
-        pymol_session.cmd.get_wizard().do_select("/" + pymol_obj_name + "//" + pos_key[0] + "/" + str(pos_key[1]) + "/")
+        if pymol_obj_name == "":
+            pymol_session.cmd.get_wizard().do_select(pos_key[0] + "/" + str(pos_key[1]) + "/")
+        else:
+            pymol_session.cmd.get_wizard().do_select("/" + pymol_obj_name + "//" + pos_key[0] + "/" + str(pos_key[1]) + "/")
 
         # select the best rotamer (defaulted to frame 1) and apply
         pymol_session.cmd.frame(1)
