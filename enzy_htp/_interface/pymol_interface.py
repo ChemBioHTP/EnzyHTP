@@ -101,16 +101,16 @@ class PyMolInterface:
 
         return sorted(result)
 
-    def point_mutate(self, pos_key: Tuple[str, int], 
-                     target: str, pymol_obj_name: str, 
+    def point_mutate(self, pos_key: Tuple[str, int],
+                     target: str, pymol_obj_name: str,
                      pymol_session: pymol2.PyMOL) -> None:
         """
         Performs a single point mutation on the PDB file in the PyMOL session in-place.
         Args:
             pos_key: the chain id and residue index.
             target: the target residue name (3 letters).
-            pymol_obj_name: the name of the PDB file in PyMOL.
-            pymol_session: the current PyMOL session.
+            pymol_obj_name: the name of the target WT in PyMOL.
+            pymol_session: the target PyMOL session.
         Returns:
             None.
         """
@@ -122,13 +122,42 @@ class PyMolInterface:
         # select res idx to mutate to target
         pymol_session.cmd.get_wizard().set_mode(target)
         if pymol_obj_name == "":
-            pymol_session.cmd.get_wizard().do_select(pos_key[0] + "/" + str(pos_key[1]) + "/")
+            pymol_session.cmd.get_wizard().do_select(f"{pos_key[0]}/{str(pos_key[1])}/")
         else:
-            pymol_session.cmd.get_wizard().do_select("/" + pymol_obj_name + "//" + pos_key[0] + "/" + str(pos_key[1]) + "/")
+            pymol_session.cmd.get_wizard().do_select(f"{pymol_obj_name}//{pos_key[0]}/{str(pos_key[1])}/")
 
         # select the best rotamer (defaulted to frame 1) and apply
-        pymol_session.cmd.frame(1)
+        # pymol_session.cmd.frame(1)
+
         pymol_session.cmd.get_wizard().apply()
+
+    def save_to_stru(self, pymol_obj_name: str, 
+                    pymol_session: pymol2.PyMOL, 
+                    in_order: bool = True) -> Structure:
+        """
+        Saves a PyMOL object to a Structure object.
+        Args:
+            pymol_obj_name: the name of the target enzyme in PyMOL.
+            pymol_session: the target PyMOL session.
+            in_order: if the saving should keep the order of the atoms in the original object.
+        Returns:
+            A Structure object representing the target enzyme in PyMOL.
+        """
+        sp = PDBParser()
+        temp_dir = eh_config["system.SCRATCH_DIR"]
+        fs.safe_mkdir(temp_dir)
+        pymol_outfile_path = fs.get_valid_temp_name(
+                f"{eh_config['system.SCRATCH_DIR']}/pymol_output.pdb")
+
+        if in_order:
+            pymol_session.cmd.set("retain_order")
+
+        pymol_session.cmd.select(pymol_obj_name)
+        pymol_session.cmd.save(pymol_outfile_path, "(sele)")
+        res = sp.get_structure(pymol_outfile_path)
+        fs.clean_temp_file_n_dir([temp_dir, pymol_outfile_path])
+        return res
+        
         
     # == inter-session modular functions == (do not requires a session, will start and close one)
     # pass
