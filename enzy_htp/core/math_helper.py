@@ -45,14 +45,20 @@ def get_distance(p1: Union[tuple, list], p2: Union[tuple, list]) -> float:
 
 def get_dihedral(p1: Union[tuple, list], p2: Union[tuple, list],
                  p3: Union[tuple, list], p4: Union[tuple, list],
+                 determine_sign: bool= True,
                  rad_result: bool= False) -> float:
     """get the dihedral defined by p1, p2, o3, and p4
     Args:
         p1, p2, p3, p4:
             the coordinate of the 4 defining points in tuple or list
             the 2 plane is defined by p1, p2, p3 and p2, p3, p4.
-        rad_result:
-            whether giving result as radian (default: False)
+        determine_sign: (default: True)
+            whether want to determine the sign of the result, if do:
+                plane(123) spin to plane(234), watching along z-->z+,
+                clockwise: +
+                counter clockwise: -
+        rad_result: (default: False)
+            whether giving result as radian
     Return:
         the dihedral value (degrees by defaul)"""
     v1 = np.array(p2) - np.array(p1)
@@ -64,6 +70,10 @@ def get_dihedral(p1: Union[tuple, list], p2: Union[tuple, list],
     mag1 = np.linalg.norm(nv1)
     mag2 = np.linalg.norm(nv2)
     dihedral = np.arccos(dot / (mag1 * mag2))
+
+    if determine_sign:
+        if np.cross(nv1, nv2)[2] < 0:
+            dihedral *= -1
     if not rad_result:
         dihedral = np.degrees(dihedral)
 
