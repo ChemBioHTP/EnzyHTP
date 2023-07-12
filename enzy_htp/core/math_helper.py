@@ -45,18 +45,16 @@ def get_distance(p1: Union[tuple, list], p2: Union[tuple, list]) -> float:
 
 def get_dihedral(p1: Union[tuple, list], p2: Union[tuple, list],
                  p3: Union[tuple, list], p4: Union[tuple, list],
-                 determine_sign: bool= True,
                  rad_result: bool= False) -> float:
     """get the dihedral defined by p1, p2, o3, and p4
     Args:
         p1, p2, p3, p4:
             the coordinate of the 4 defining points in tuple or list
             the 2 plane is defined by p1, p2, p3 and p2, p3, p4.
-        determine_sign: (default: True)
-            whether want to determine the sign of the result, if do:
-                plane(123) spin to plane(234), watching along z-->z+,
-                clockwise: +
-                counter clockwise: -
+            plane(123) spin to plane(234), watching along z-->z+,
+            clockwise: +
+            counter clockwise: -
+            ref: https://math.stackexchange.com/questions/47059/how-do-i-calculate-a-dihedral-angle-given-cartesian-coordinates
         rad_result: (default: False)
             whether giving result as radian
     Return:
@@ -65,15 +63,15 @@ def get_dihedral(p1: Union[tuple, list], p2: Union[tuple, list],
     v2 = np.array(p3) - np.array(p2)
     v3 = np.array(p4) - np.array(p3)
     nv1 = np.cross(v1, v2)
+    nv1 = nv1/np.linalg.norm(nv1)
     nv2 = np.cross(v2, v3)
-    dot = np.dot(nv1, nv2)
-    mag1 = np.linalg.norm(nv1)
-    mag2 = np.linalg.norm(nv2)
-    dihedral = np.arccos(dot / (mag1 * mag2))
+    nv2 = nv2/np.linalg.norm(nv2)
 
-    if determine_sign:
-        if np.cross(nv1, nv2)[2] < 0:
-            dihedral *= -1
+    m1 = np.cross(nv1, v2/np.linalg.norm(v2))
+    x = np.dot(nv1, nv2)
+    y = np.dot(m1, nv2)
+    dihedral = -np.arctan2(y,x)
+
     if not rad_result:
         dihedral = np.degrees(dihedral)
 
