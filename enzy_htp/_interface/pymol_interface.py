@@ -103,7 +103,8 @@ class PyMolInterface:
 
     def point_mutate(self, pos_key: Tuple[str, int],
                      target: str, pymol_obj_name: str,
-                     pymol_session: pymol2.PyMOL) -> None:
+                     pymol_session: pymol2.PyMOL,
+                     debug: bool = False) -> None:
         """
         Performs a single point mutation on the PDB file in the PyMOL session in-place.
         Args:
@@ -111,6 +112,7 @@ class PyMolInterface:
             target: the target residue name (3 letters).
             pymol_obj_name: the name of the target WT in PyMOL.
             pymol_session: the target PyMOL session.
+            debug: prints all rotamer scores out for debugging purposes.
         Returns:
             None.
         """
@@ -126,20 +128,38 @@ class PyMolInterface:
         else:
             pymol_session.cmd.get_wizard().do_select(f"{pymol_obj_name}//{pos_key[0]}/{str(pos_key[1])}/")
 
-        # select the best rotamer (defaulted to frame 1) and apply
-        # pymol_session.cmd.frame(1)
+        # prints all rotamers and strains out; also saves each variation to a PDB file in scratch/.
+        # can use for debugging purposes
+        if debug:
+            for i in range(1, pymol_session.cmd.count_states() + 1):
+                pymol_session.cmd.wizard("mutagenesis")
+                pymol_session.cmd.do("refresh_wizard")
+                pymol_session.cmd.get_wizard().set_mode(target)
+                if pymol_obj_name == "":
+                    pymol_session.cmd.get_wizard().do_select(f"{pos_key[0]}/{str(pos_key[1])}/")
+                else:
+                    pymol_session.cmd.get_wizard().do_select(f"{pymol_obj_name}//{pos_key[0]}/{str(pos_key[1])}/")
+            
+                pymol_session.cmd.get_wizard().do_state(i)
+                pymol_session.cmd.frame(i)
+                pymol_session.cmd.get_wizard().apply()
+                self.save_to_stru(pymol_obj_name, pymol_session, True)
+            return
 
         pymol_session.cmd.get_wizard().apply()
 
-    def save_to_stru(self, pymol_obj_name: str, 
-                    pymol_session: pymol2.PyMOL, 
-                    in_order: bool = True) -> Structure:
+
+    def save_to_stru(self, pymol_obj_name: str,
+                    pymol_session: pymol2.PyMOL,
+                    in_order: bool = True,
+                    keep_files = False) -> Structure:
         """
         Saves a PyMOL object to a Structure object.
         Args:
             pymol_obj_name: the name of the target enzyme in PyMOL.
             pymol_session: the target PyMOL session.
             in_order: if the saving should keep the order of the atoms in the original object.
+            keep_files: if the program should clean up the temp files or not.
         Returns:
             A Structure object representing the target enzyme in PyMOL.
         """
@@ -155,7 +175,9 @@ class PyMolInterface:
         pymol_session.cmd.select(pymol_obj_name)
         pymol_session.cmd.save(pymol_outfile_path, "(sele)")
         res = sp.get_structure(pymol_outfile_path)
-        fs.clean_temp_file_n_dir([temp_dir, pymol_outfile_path])
+
+        if not keep_files:
+            fs.clean_temp_file_n_dir([temp_dir, pymol_outfile_path])
         return res
         
         
