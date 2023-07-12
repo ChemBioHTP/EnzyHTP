@@ -106,7 +106,7 @@ class PyMolInterface:
                      pymol_session: pymol2.PyMOL,
                      debug: bool = False) -> None:
         """
-        Performs a single point mutation on the PDB file in the PyMOL session in-place.
+        Performs a single point mutation on the target WT in the PyMOL session in-place.
         Args:
             pos_key: the chain id and residue index.
             target: the target residue name (3 letters).
