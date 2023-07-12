@@ -145,9 +145,10 @@ class Atom(DoubleLinkedNode):
     @property
     def connect(self) -> List[Atom]:
         """getter for _connect, the list for atoms it connects"""
-        if self.is_connected():
-            return self._connect
-        _LOGGER.warning(f"There are no connection info for {self}, consider initiate it first.")
+        if not self.is_connected():
+            _LOGGER.warning(f"There are no connection info for {self}, Initiating it.")
+            self.init_connect_in_caa() # TODO(qz): make this also works for non-caa
+        return self._connect
 
     @connect.setter
     def connect(self, val):
