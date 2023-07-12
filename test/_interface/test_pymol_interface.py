@@ -74,9 +74,21 @@ def test_point_mutate():
     test_stru = PDBParser().get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
     test_mut_stru = PDBParser().get_structure(f"{DATA_DIR}KE_07_R7_2_S_mut.pdb")
     pi = interface.pymol
-    test_session = pi.new_pymol_session()
-    pymol_obj_name, session = pi.load_enzy_htp_stru(test_stru, test_session)
+    pymol_obj_name, session = pi.load_enzy_htp_stru(test_stru, pi.new_pymol_session())
     pi.point_mutate(("A", 154), "TRP", pymol_obj_name, session)
     assert len(pi.select_pymol_obj("resi 154", pymol_obj_name, session)) == (
            len(test_mut_stru["A"].find_residue_idx(154).atom_idx_list)
     )
+
+
+def test_save_to_stru():
+    test_stru = PDBParser().get_structure(f"{DATA_DIR}KE_trun.pdb")
+    pi = interface.pymol
+    test_session = pi.new_pymol_session()
+    pymol_obj_name, session = pi.load_enzy_htp_stru(test_stru, test_session)
+    test_save_stru = pi.save_to_stru(pymol_obj_name, session)
+
+    for new_res, old_res in zip(test_save_stru.residues, test_stru.residues):
+        for new_atom, old_atom in zip(new_res.atoms, old_res.atoms):
+            assert new_atom.coord == old_atom.coord
+            assert new_atom.name == old_atom.name
