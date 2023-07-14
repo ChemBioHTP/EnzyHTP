@@ -10,6 +10,8 @@ from enzy_htp import interface
 from enzy_htp import PDBParser
 from enzy_htp import config as eh_config
 from enzy_htp.core.logger import _LOGGER
+from enzy_htp.core.file_system import clean_temp_file_n_dir
+from enzy_htp import config as eh_config
 
 BASE_DIR = Path(__file__).absolute().parent
 DATA_DIR = f"{BASE_DIR}/data/"
@@ -81,12 +83,26 @@ def test_point_mutate():
     )
 
 
-def test_save_to_stru():
+def test_export_enzy_htp_stru():
     test_stru = PDBParser().get_structure(f"{DATA_DIR}KE_trun.pdb")
     pi = interface.pymol
     test_session = pi.new_pymol_session()
     pymol_obj_name, session = pi.load_enzy_htp_stru(test_stru, test_session)
-    test_save_stru = pi.save_to_stru(pymol_obj_name, session)
+    test_save_stru = pi.export_enzy_htp_stru(pymol_obj_name, session)
+
+    for new_res, old_res in zip(test_save_stru.residues, test_stru.residues):
+        for new_atom, old_atom in zip(new_res.atoms, old_res.atoms):
+            assert new_atom.coord == old_atom.coord
+            assert new_atom.name == old_atom.name
+            
+def test_export_pymol_obj():
+    test_stru = PDBParser().get_structure(f"{DATA_DIR}KE_trun.pdb")
+    pi = interface.pymol
+    test_session = pi.new_pymol_session()
+    pymol_obj_name, session = pi.load_enzy_htp_stru(test_stru, test_session)
+    test_save_file = pi.export_pymol_obj(pymol_obj_name, session)
+    test_save_stru = PDBParser().get_structure(test_save_file)
+    clean_temp_file_n_dir([test_save_file, eh_config["system.SCRATCH_DIR"]])
 
     for new_res, old_res in zip(test_save_stru.residues, test_stru.residues):
         for new_atom, old_atom in zip(new_res.atoms, old_res.atoms):
@@ -95,3 +111,4 @@ def test_save_to_stru():
 
 def test_save_to_stru_1():
     test_stru = PDBParser().get_structure("scratch/pymol_output.pdb")
+
