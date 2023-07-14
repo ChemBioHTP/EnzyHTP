@@ -167,7 +167,7 @@ class PyMolInterface:
         fs.safe_mkdir(result_dir)
         if rotamer != 0:
             pymol_outfile_path = fs.get_valid_temp_name(
-                    f"{result_dir}/{pymol_obj_name}_{rotamer}.pdb")
+                    f"{result_dir}/{pymol_obj_name}_rotamer_{rotamer}.pdb")
         else:
             pymol_outfile_path = fs.get_valid_temp_name(
                 f"{result_dir}/{pymol_obj_name}.pdb")
