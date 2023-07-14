@@ -132,7 +132,6 @@ class PyMolInterface:
         # prints all rotamers and strains out; also saves each variation to a PDB file in scratch/.
         # can use for debugging purposes
         if debug:
-            mut_info = pos_key[0] + str(pos_key[1]) + THREE_LETTER_AA_MAPPER[target]
             for i in range(1, pymol_session.cmd.count_states() + 1):
                 pymol_session.cmd.wizard("mutagenesis")
                 pymol_session.cmd.do("refresh_wizard")
@@ -145,7 +144,7 @@ class PyMolInterface:
                 pymol_session.cmd.get_wizard().do_state(i)
                 pymol_session.cmd.frame(i)
                 pymol_session.cmd.get_wizard().apply()
-                self.export_pymol_obj(pymol_obj_name, pymol_session, rotamer=i, mut=mut_info)
+                self.export_pymol_obj(pymol_obj_name, pymol_session, rotamer=i)
             return
 
         pymol_session.cmd.get_wizard().apply()
@@ -153,8 +152,7 @@ class PyMolInterface:
     def export_pymol_obj(self, pymol_obj_name: str, 
                         pymol_session: pymol2.PyMOL,
                         if_retain_order: bool = True,
-                        rotamer: int = 0,
-                        mut: str = None) -> str:
+                        rotamer: int = 0) -> str:
         """
         Saves a PyMOL object to a PDB file.
         Args:
@@ -167,12 +165,9 @@ class PyMolInterface:
         """
         result_dir = eh_config["system.SCRATCH_DIR"]
         fs.safe_mkdir(result_dir)
-        if mut and rotamer != 0:
+        if rotamer != 0:
             pymol_outfile_path = fs.get_valid_temp_name(
-                    f"{result_dir}/pymol_output_{mut}_rotamer_{rotamer}.pdb")
-        elif mut and rotamer == 0:
-            pymol_outfile_path = fs.get_valid_temp_name(
-                    f"{result_dir}/pymol_output_{mut}.pdb")
+                    f"{result_dir}/pymol_output_rotamer_{rotamer}.pdb")
         else:
             pymol_outfile_path = fs.get_valid_temp_name(
                 f"{result_dir}/pymol_output.pdb")
