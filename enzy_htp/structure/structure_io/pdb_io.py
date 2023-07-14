@@ -256,7 +256,7 @@ class PDBParser(StructureParserInterface):
         return target_mdl_df, target_mdl_ter_df
 
     @classmethod
-    def _resolve_missing_chain_id(cls, df: pd.DataFrame, ter_df: pd.DataFrame) -> None:
+    def _resolve_missing_chain_id(cls, df: pd.DataFrame, ter_df: pd.DataFrame, allow_multichain_in_atom: bool= False) -> None:
         """
         Function takes the dataframes of chains and ensures consistent naming
         of chains with no blanks.
@@ -368,7 +368,7 @@ class PDBParser(StructureParserInterface):
                     if "ATOM" in current_chain_records:
                         # ATOM chain: multiple chain id not allowed
                         _LOGGER.error(
-                            "Found multiple chain id together with missing chain id in 1 chain. Impossible to solve."
+                            "Found multiple chain id in ATOM chain. Not allowed."
                         )
                         sys.exit(1)
                     else:
