@@ -92,3 +92,6 @@ def test_save_to_stru():
         for new_atom, old_atom in zip(new_res.atoms, old_res.atoms):
             assert new_atom.coord == old_atom.coord
             assert new_atom.name == old_atom.name
+
+def test_save_to_stru_1():
+    test_stru = PDBParser().get_structure("scratch/pymol_output.pdb")
