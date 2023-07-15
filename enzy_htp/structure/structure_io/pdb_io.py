@@ -56,20 +56,39 @@ class PDBParser(StructureParserInterface):
                       add_solvent_list: List = None,
                       add_ligand_list: List = None,
                       remove_trash: bool = True,
-                      give_idx_map: bool = False) -> Union[Structure, tuple]:
+                      give_idx_map: bool = False,
+                      allow_multichain_in_atom: bool= False) -> Union[Structure, tuple]:
         """
         Converting a PDB file (as its path) into the Structure()
         Arg:
-            path: the file path of the PDB file
-            model: The selected model index if there are multiple models in the file
-                    (start from 0 default: 0)
-                    (assume MODEL appears in order in the file)
-            add_solvent_list: (used for categorize residues) additional names for solvent
-            add_ligand_list: (used for categorize residues) additional names for ligands
-                * solvent list have higher pirority
-            remove_trash: if remove trash ligands
-            give_idx_map: if return a tuple of (Structure, idx_change_mapper) - which is a dict 
-                          with {(old_chain_id, old_residue_id): (new_chain_id, new_residue_id), ... }
+            path:
+                the file path of the PDB file
+            model:
+                The selected model index if there are multiple models in the file
+                (start from 0 default: 0)
+                (assume MODEL appears in order in the file)
+            add_solvent_list:
+                (used for categorize residues) additional names for solvent
+                solvents are recognized by matching names in these lists in
+                non-polypeptide chains:
+                    chem.RD_SOLVENT_LIST + add_solvent_list
+            add_ligand_list:
+                (used for categorize residues) additional names for ligands
+                ligands are recognized by not matching names in these lists
+                in non-polypeptide chains:
+                    1. chem.RD_SOLVENT_LIST + add_solvent_list
+                    2. chem.RD_NON_LIGAND_LIST - add_ligand_list
+                    * solvent list have higher pirority
+            remove_trash:
+                if remove trash ligands
+            give_idx_map:
+                if return a tuple of (Structure, idx_change_mapper) - which is a dict 
+                with {(old_chain_id, old_residue_id): (new_chain_id, new_residue_id), ... }
+            allow_multichain_in_atom:
+                (used for resolving chain id)
+                if allowing multiple chain IDs appears in the same chain that consists of ATOM
+                records. It conflict with the definiation of PDB file format but it is useful
+                for resolving chain id of pymol2 exported multichain PDBs.
 
         Return:
             Structure()
@@ -82,17 +101,14 @@ class PDBParser(StructureParserInterface):
 
         #region (PDB conundrums)
         # deal with multiple model
-        target_model_df, target_model_ter_df = cls._get_target_model(input_pdb.df,
-                                                                     model=model)
+        target_model_df, target_model_ter_df = cls._get_target_model(input_pdb.df, model=model)
 
         # TODO address when atom/residue/chain id is disordered respect to the line index
         # this is important to be aligned since Amber will force them to align and erase the chain id
         # a workaround is to add them back after Amber process
-        idx_change_mapper = cls._resolve_missing_chain_id(
-            target_model_df, target_model_ter_df)  # add missing chain id in place
-        cls._resolve_alt_loc(
-            target_model_df
-        )  # resolve alt loc record in place by delele redundant df rows
+        idx_change_mapper = cls._resolve_missing_chain_id(target_model_df, target_model_ter_df,
+                                                          allow_multichain_in_atom=allow_multichain_in_atom)  # add missing chain id in place
+        cls._resolve_alt_loc(target_model_df)  # resolve alt loc record in place by delele redundant df rows
         #endregion (Add here to address more problem related to the PDB file format here)
 
         # target_model_df below should be "standard" --> start building
@@ -256,7 +272,7 @@ class PDBParser(StructureParserInterface):
         return target_mdl_df, target_mdl_ter_df
 
     @classmethod
-    def _resolve_missing_chain_id(cls, df: pd.DataFrame, ter_df: pd.DataFrame) -> None:
+    def _resolve_missing_chain_id(cls, df: pd.DataFrame, ter_df: pd.DataFrame, allow_multichain_in_atom: bool= False) -> None:
         """
         Function takes the dataframes of chains and ensures consistent naming
         of chains with no blanks.
@@ -303,7 +319,15 @@ class PDBParser(StructureParserInterface):
                         not repeat:
                             record
                     ATOM:
-                        abort
+                        not allow_multichain_in_atom (default)
+                            abort
+                        allow_multichain_in_atom
+                            same as HET case. treat as individual chain.
+                            repeat:
+                                abort
+                            not repeat:
+                                record
+
         Returns:
             [edit df in place]
             idx_change_mapper: the mapper recording index change when repeating chain id
@@ -366,11 +390,28 @@ class PDBParser(StructureParserInterface):
                 else:
                     # case: more than 1 chain id (since it cannot be 0)
                     if "ATOM" in current_chain_records:
-                        # ATOM chain: multiple chain id not allowed
-                        _LOGGER.error(
-                            "Found multiple chain id together with missing chain id in 1 chain. Impossible to solve."
-                        )
-                        sys.exit(1)
+                        if not allow_multichain_in_atom:
+                            # ATOM chain: multiple chain id not allowed
+                            _LOGGER.error(
+                                "Found multiple chain id in ATOM chain. Not allowed."
+                            )
+                            sys.exit(1)
+                        else:
+                            # ATOM chain: (user option) multiple chain id allowed
+                            _LOGGER.warning(
+                                "Found multiple chain id in 1 ATOM chain. Allowed by the user option. Treating them as individual chains"
+                            )
+                            # case: no missing chain ids; multiple chain id; ATOM chain (user option)
+                            chains_in_chain = chain.groupby("chain_id", sort=False)
+                            for chain_id_in_chain, chain_in_chain in chains_in_chain:
+                                if chain_id_in_chain in recorded_chain_ids:
+                                    _LOGGER.error(
+                                        "Found the repeating chain id in a ATOM chain with multiple chain id. Check your PDB."
+                                    )
+                                    sys.exit(1)
+                                else:
+                                    recorded_chain_ids.append(chain_id_in_chain)
+                            continue      
                     else:
                         # HETATM chain: multiple chain id allowed and should be treated as individual chains
                         _LOGGER.warning(

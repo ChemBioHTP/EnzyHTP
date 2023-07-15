@@ -10,6 +10,8 @@ from enzy_htp import interface
 from enzy_htp import PDBParser
 from enzy_htp import config as eh_config
 from enzy_htp.core.logger import _LOGGER
+from enzy_htp.core.file_system import clean_temp_file_n_dir
+from enzy_htp import config as eh_config
 
 BASE_DIR = Path(__file__).absolute().parent
 DATA_DIR = f"{BASE_DIR}/data/"
@@ -61,3 +63,44 @@ def test_select_pymol_obj():
         1968, 1969, 1970, 1971, 1972, 1973, 1974, 1975, 1976, 1977, 1978, 1979, 1980, 2009, 2229, 2618, 2619, 2620, 2622, 2623, 2624, 2626,
         2732, 2733
     ]
+
+
+def test_point_mutate():
+    """testing that point mutations work as expected"""
+    test_stru = PDBParser().get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
+    test_mut_stru = PDBParser().get_structure(f"{DATA_DIR}KE_07_R7_2_S_mut.pdb")
+    pi = interface.pymol
+    pymol_obj_name, session = pi.load_enzy_htp_stru(test_stru, pi.new_pymol_session())
+    pi.point_mutate(("A", 154), "TRP", pymol_obj_name, session)
+    assert len(pi.select_pymol_obj("resi 154", pymol_obj_name, session)) == (
+           len(test_mut_stru["A"].find_residue_idx(154).atom_idx_list)
+    )
+
+
+def test_export_enzy_htp_stru():
+    test_stru = PDBParser().get_structure(f"{DATA_DIR}KE_trun.pdb")
+    pi = interface.pymol
+    test_session = pi.new_pymol_session()
+    pymol_obj_name, session = pi.load_enzy_htp_stru(test_stru, test_session)
+    test_save_stru = pi.export_enzy_htp_stru(pymol_obj_name, session)
+
+    for new_res, old_res in zip(test_save_stru.residues, test_stru.residues):
+        for new_atom, old_atom in zip(new_res.atoms, old_res.atoms):
+            assert new_atom.coord == old_atom.coord
+            assert new_atom.name == old_atom.name
+
+
+def test_export_pdb():
+    test_stru = PDBParser().get_structure(f"{DATA_DIR}KE_trun.pdb")
+    pi = interface.pymol
+    test_session = pi.new_pymol_session()
+    pymol_obj_name, session = pi.load_enzy_htp_stru(test_stru, test_session)
+    test_save_file = pi.export_pdb(pymol_obj_name, session)
+    test_save_stru = PDBParser().get_structure(test_save_file)
+    clean_temp_file_n_dir([test_save_file, eh_config["system.SCRATCH_DIR"]])
+
+    for new_res, old_res in zip(test_save_stru.residues, test_stru.residues):
+        for new_atom, old_atom in zip(new_res.atoms, old_res.atoms):
+            assert new_atom.coord == old_atom.coord
+            assert new_atom.name == old_atom.name
+

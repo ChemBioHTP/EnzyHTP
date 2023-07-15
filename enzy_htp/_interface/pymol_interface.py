@@ -22,6 +22,7 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core import _LOGGER, check_var_type
 from enzy_htp._config.pymol_config import PyMolConfig, default_pymol_config
 from enzy_htp.structure import Structure, PDBParser
+from enzy_htp.chemical.residue import THREE_LETTER_AA_MAPPER
 
 from .base_interface import BaseInterface
 
@@ -218,6 +219,104 @@ class PyMolInterface(BaseInterface):
 
         return sorted(result)
 
+    def point_mutate(self, pos_key: Tuple[str, int],
+                     target: str, pymol_obj_name: str,
+                     pymol_session: pymol2.PyMOL,
+                     debug: bool = False) -> None:
+        """
+        Performs a single point mutation on the target WT in the PyMOL session in-place.
+        Args:
+            pos_key: the chain id and residue index.
+            target: the target residue name (3 letters).
+            pymol_obj_name: the name of the target WT in PyMOL.
+            pymol_session: the target PyMOL session.
+            debug: prints all rotamer scores out for debugging purposes.
+        Returns:
+            None.
+        """
+
+        # load pymol wizard mutagenesis function
+        pymol_session.cmd.wizard("mutagenesis")
+        pymol_session.cmd.do("refresh_wizard")
+        
+        # select res idx to mutate to target
+        pymol_session.cmd.get_wizard().set_mode(target)
+        if pymol_obj_name == "":
+            pymol_session.cmd.get_wizard().do_select(f"{pos_key[0]}/{str(pos_key[1])}/")
+        else:
+            pymol_session.cmd.get_wizard().do_select(f"{pymol_obj_name}//{pos_key[0]}/{str(pos_key[1])}/")
+
+        # prints all rotamers and strains out; also saves each variation to a PDB file in scratch/.
+        # can use for debugging purposes
+        if debug:
+            for i in range(1, pymol_session.cmd.count_states() + 1):
+                pymol_session.cmd.wizard("mutagenesis")
+                pymol_session.cmd.do("refresh_wizard")
+                pymol_session.cmd.get_wizard().set_mode(target)
+                if pymol_obj_name == "":
+                    pymol_session.cmd.get_wizard().do_select(f"{pos_key[0]}/{str(pos_key[1])}/")
+                else:
+                    pymol_session.cmd.get_wizard().do_select(f"{pymol_obj_name}//{pos_key[0]}/{str(pos_key[1])}/")
+            
+                pymol_session.cmd.get_wizard().do_state(i)
+                pymol_session.cmd.frame(i)
+                pymol_session.cmd.get_wizard().apply()
+                self.export_pdb(pymol_obj_name, pymol_session, tag="rotamer_" + str(i))
+            return
+
+        pymol_session.cmd.get_wizard().apply()
+
+    def export_pdb(self, pymol_obj_name: str, 
+                        pymol_session: pymol2.PyMOL,
+                        if_retain_order: bool = True,
+                        tag: str = None) -> str:
+        """
+        Saves a PyMOL object to a PDB file.
+        Args:
+            pymol_obj_name: the name of the target enzyme in PyMOL.
+            pymol_session: the target PyMOL session.
+            in_order: if the saving should keep the order of the atoms in the original object.
+            tag: the name tag for the saved file.
+        Returns:
+            The path to the saved PDB file.
+        """
+        result_dir = eh_config["system.SCRATCH_DIR"]
+        fs.safe_mkdir(result_dir)
+        if tag is not None:
+            pymol_outfile_path = fs.get_valid_temp_name(
+                    f"{result_dir}/{pymol_obj_name}_{tag}.pdb")
+        else:
+            pymol_outfile_path = fs.get_valid_temp_name(
+                f"{result_dir}/{pymol_obj_name}.pdb")
+
+        if if_retain_order:
+            pymol_session.cmd.set("retain_order")
+        pymol_session.cmd.save(pymol_outfile_path, pymol_obj_name)
+
+        return pymol_outfile_path
+
+
+    def export_enzy_htp_stru(self, pymol_obj_name: str,
+                            pymol_session: pymol2.PyMOL,
+                            if_retain_order: bool = True,
+                            if_multichain: bool = False) -> Structure:
+        """
+        Saves a PyMOL object to a Structure object.
+        Args:
+            pymol_obj_name: the name of the target enzyme in PyMOL.
+            pymol_session: the target PyMOL session.
+            in_order: if the saving should keep the order of the atoms in the original object.
+            if_multichain: if the Structure object created will have more than one chain.
+        Returns:
+            A Structure object representing the target enzyme in PyMOL.
+        """
+        sp = PDBParser()
+        pymol_outfile_path = self.export_pdb(pymol_obj_name, pymol_session, if_retain_order=if_retain_order)
+        res = sp.get_structure(pymol_outfile_path, allow_multichain_in_atom=if_multichain)
+        fs.clean_temp_file_n_dir([pymol_outfile_path])
+        return res
+        
+        
     # == inter-session modular functions == (do not requires a session, will start and close one)
     # pass
 

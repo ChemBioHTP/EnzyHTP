@@ -537,6 +537,18 @@ def test_get_structure_ligand():
     assert len(ligand.atoms) == 7
     assert ligand.name == 'FAH'
 
+@pytest.mark.interface
+def test_get_structure_allow_multichain_in_atom(caplog):
+    messed_pdb = f"{DATA_DIR}/pymol_messed_output.pdb"
+    stru: Structure = sp.get_structure(messed_pdb, allow_multichain_in_atom=True)
+    assert "Found multiple chain id in 1 ATOM chain. Allowed by the user option." in caplog.text
+    assert list(stru.chain_mapper.keys()) == ["A", "B", "C", "D", "E", "F"]
+    assert list(stru["A"].residue_idx_interval(if_str=False)) == [(1, 450)]
+    assert list(stru["B"].residue_idx_interval(if_str=False)) == [(451, 900)]
+    assert list(stru["C"].residue_idx_interval(if_str=False)) == [(901, 901)]
+    assert list(stru["D"].residue_idx_interval(if_str=False)) == [(902, 902)]
+    assert list(stru["E"].residue_idx_interval(if_str=False)) == [(903, 903)]
+    assert list(stru["F"].residue_idx_interval(if_str=False)) == [(904, 904)]
 
 @pytest.mark.interface
 def test_get_file_str():
