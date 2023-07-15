@@ -190,3 +190,21 @@ def test_mutate_stru_with_pymol():
             for new_atom, old_atom in zip(new_res.atoms, old_res.atoms):
                 assert new_atom.coord == old_atom.coord
                 assert new_atom.name == old_atom.name
+
+    # # test with >1 chain enzyme
+    test = f"{DATA_DIR}puo_put_mut.pdb"
+    test2 = sp.get_structure(test)
+    
+    test_pdb_2 = f"{DATA_DIR}puo_put.pdb"
+    test_stru_2 = sp.get_structure(test_pdb_2)
+    mutant_3 = mapi.assign_mutant(test_stru_2, "RB533W")[0]
+    mutant_stru_3 = mapi.mutate_stru_with_pymol(test_stru_2, mutant_3)
+    print(mutant_stru_3)
+
+    for new_res, old_res in zip(mutant_stru_3.residues, test_stru_2.residues):
+        if new_res.idx == 533:
+            assert new_res.name == "TRP"
+        else:
+            for new_atom, old_atom in zip(new_res.atoms, old_res.atoms):
+                assert new_atom.coord == old_atom.coord
+                assert new_atom.name == old_atom.name

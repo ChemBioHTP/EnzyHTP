@@ -95,7 +95,7 @@ def test_export_enzy_htp_stru():
             assert new_atom.coord == old_atom.coord
             assert new_atom.name == old_atom.name
             
-def test_export_pymol_obj():
+def test_export_pdb():
     test_stru = PDBParser().get_structure(f"{DATA_DIR}KE_trun.pdb")
     pi = interface.pymol
     test_session = pi.new_pymol_session()

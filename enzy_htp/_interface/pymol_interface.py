@@ -144,12 +144,12 @@ class PyMolInterface:
                 pymol_session.cmd.get_wizard().do_state(i)
                 pymol_session.cmd.frame(i)
                 pymol_session.cmd.get_wizard().apply()
-                self.export_pymol_obj(pymol_obj_name, pymol_session, rotamer=i)
+                self.export_pdb(pymol_obj_name, pymol_session, rotamer=i)
             return
 
         pymol_session.cmd.get_wizard().apply()
 
-    def export_pymol_obj(self, pymol_obj_name: str, 
+    def export_pdb(self, pymol_obj_name: str, 
                         pymol_session: pymol2.PyMOL,
                         if_retain_order: bool = True,
                         rotamer: int = 0) -> str:
