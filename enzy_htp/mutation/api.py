@@ -394,16 +394,6 @@ def mutate_stru_with_pymol(
  
     stru_cpy = copy.deepcopy(stru)
 
-    if_retain_order = True
-
-    # if structure is multichain, set retain_order to false and raise a flag to mark multichain structure
-    # for further treatment
-    if stru_cpy.num_chains > 2:
-        if_multichain = True
-        if_retain_order = False
-    else:
-        if_multichain = False
-
     # 1. load stru into pymol
     pi = interface.pymol
     with OpenPyMolSession(pi) as pms:
@@ -412,8 +402,7 @@ def mutate_stru_with_pymol(
         for mut in mutant:
             pi.point_mutate(mut.get_position_key(), mut.get_target(), pymol_obj_name, pms)
         # 3. save to a structure.
-        pymol_mutant_stru = pi.export_enzy_htp_stru(pymol_obj_name, pms,
-                                                    if_retain_order=if_retain_order, if_multichain=if_multichain)
+        pymol_mutant_stru = pi.export_enzy_htp_stru(pymol_obj_name, pms)
 
     # 4. update residues
     stru_oper.update_residues(stru_cpy, pymol_mutant_stru)

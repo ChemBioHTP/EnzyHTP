@@ -151,14 +151,14 @@ class PyMolInterface:
 
     def export_pdb(self, pymol_obj_name: str, 
                         pymol_session: pymol2.PyMOL,
-                        if_retain_order: bool = True,
+                        if_retain_order: bool = False,
                         tag: str = None) -> str:
         """
         Saves a PyMOL object to a PDB file.
         Args:
             pymol_obj_name: the name of the target enzyme in PyMOL.
             pymol_session: the target PyMOL session.
-            in_order: if the saving should keep the order of the atoms in the original object.
+            if_retain_order: if the saving should keep the order of the atoms in the original object.
             tag: the name tag for the saved file.
         Returns:
             The path to the saved PDB file.
@@ -181,25 +181,23 @@ class PyMolInterface:
 
     def export_enzy_htp_stru(self, pymol_obj_name: str,
                             pymol_session: pymol2.PyMOL,
-                            if_retain_order: bool = True,
-                            if_multichain: bool = False) -> Structure:
+                            if_retain_order: bool = False) -> Structure:
         """
         Saves a PyMOL object to a Structure object.
         Args:
             pymol_obj_name: the name of the target enzyme in PyMOL.
             pymol_session: the target PyMOL session.
-            in_order: if the saving should keep the order of the atoms in the original object.
-            if_multichain: if the Structure object created will have more than one chain.
+            if_retain_order: if the saving should keep the order of the atoms in the original object.
         Returns:
             A Structure object representing the target enzyme in PyMOL.
         """
         sp = PDBParser()
         pymol_outfile_path = self.export_pdb(pymol_obj_name, pymol_session, if_retain_order=if_retain_order)
-        res = sp.get_structure(pymol_outfile_path, allow_multichain_in_atom=if_multichain)
-        fs.clean_temp_file_n_dir([pymol_outfile_path])
+        res = sp.get_structure(pymol_outfile_path, allow_multichain_in_atom=True)
+        fs.clean_temp_file_n_dir([pymol_outfile_path, eh_config["system.SCRATCH_DIR"]])
         return res
-        
-        
+
+
     # == inter-session modular functions == (do not requires a session, will start and close one)
     # pass
 
