@@ -94,13 +94,14 @@ def test_export_enzy_htp_stru():
         for new_atom, old_atom in zip(new_res.atoms, old_res.atoms):
             assert new_atom.coord == old_atom.coord
             assert new_atom.name == old_atom.name
-                   
+
+
 def test_export_pdb():
     test_stru = PDBParser().get_structure(f"{DATA_DIR}KE_trun.pdb")
     pi = interface.pymol
     test_session = pi.new_pymol_session()
     pymol_obj_name, session = pi.load_enzy_htp_stru(test_stru, test_session)
-    test_save_file = pi.export_pymol_obj(pymol_obj_name, session)
+    test_save_file = pi.export_pdb(pymol_obj_name, session)
     test_save_stru = PDBParser().get_structure(test_save_file)
     clean_temp_file_n_dir([test_save_file, eh_config["system.SCRATCH_DIR"]])
 
