@@ -158,3 +158,43 @@ def test_mutate_pdb_raises_unsupported_method_exception():
 
     assert exe
     assert exe.type == UnsupportedMethod
+
+
+def test_mutate_stru_with_pymol():
+    """ test function works as expected """
+    test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
+    test_stru = sp.get_structure(test_pdb)
+    mutant = mapi.assign_mutant(test_stru, "R154W")[0]
+    mutant_stru = mapi.mutate_stru_with_pymol(test_stru, mutant)
+
+    for new_res, old_res in zip(mutant_stru.residues, test_stru.residues):
+        if new_res.idx == 154:
+            assert new_res.name == "TRP"
+            assert len(new_res.atoms) == 24
+        else:
+            assert len(new_res.atoms) == len(old_res.atoms)
+
+    # test with multiple mutants
+    mutant_2 = mapi.assign_mutant(test_stru, "{R154W, HA201A}")[0]
+    mutant_stru_2 = mapi.mutate_stru_with_pymol(test_stru, mutant_2)
+
+    for new_res, old_res in zip(mutant_stru_2.residues, test_stru.residues):
+        if new_res.idx == 154:
+            assert new_res.name == "TRP"
+            assert len(new_res.atoms) == 24
+        elif new_res.idx == 201:
+            assert new_res.name == "ALA"
+        else:
+            assert len(new_res.atoms) == len(old_res.atoms)
+
+    # test with > 2 chain enzyme
+    test_pdb_2 = f"{DATA_DIR}puo_put.pdb"
+    test_stru_2 = sp.get_structure(test_pdb_2)
+    mutant_3 = mapi.assign_mutant(test_stru_2, "RB533W")[0]
+    mutant_stru_3 = mapi.mutate_stru_with_pymol(test_stru_2, mutant_3)
+
+    for new_res, old_res in zip(mutant_stru_3.residues, test_stru_2.residues):
+        if new_res.idx == 533:
+            assert new_res.name == "TRP"
+        else:
+            assert len(new_res.atoms) == len(old_res.atoms)
