@@ -175,6 +175,7 @@ class PyMolInterface:
         if if_retain_order:
             pymol_session.cmd.set("retain_order")
         pymol_session.cmd.save(pymol_outfile_path, pymol_obj_name)
+        #TODO: fix atom naming. add function here.
 
         return pymol_outfile_path
 
