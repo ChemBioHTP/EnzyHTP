@@ -176,11 +176,15 @@ class PyMolInterface:
         pymol_session.cmd.save(pymol_outfile_path, pymol_obj_name)
 
         # fix the atom naming issue.
-        temp_stru = PDBParser.get_structure(pymol_outfile_path)
+        temp_stru = PDBParser().get_structure(pymol_outfile_path,allow_multichain_in_atom=True)
         temp_stru.fix_pymol_naming()
-        result = PDBParser.get_file_str(temp_stru)
+        result = PDBParser().get_file_str(temp_stru)
 
-        return result
+        # overwrite bad pymol pdb with good pdb str
+        with open(pymol_outfile_path, "w+") as f:
+            f.writelines(result)
+        
+        return pymol_outfile_path
 
 
     def export_enzy_htp_stru(self, pymol_obj_name: str,
