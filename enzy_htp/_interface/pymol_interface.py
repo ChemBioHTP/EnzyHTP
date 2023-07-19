@@ -17,7 +17,6 @@ from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp._config.pymol_config import PyMolConfig, default_pymol_config
 from enzy_htp.structure import Structure, PDBParser
-from enzy_htp.chemical.residue import THREE_LETTER_AA_MAPPER
 
 # QZ:Env check for package type interface?
 try:
@@ -175,9 +174,13 @@ class PyMolInterface:
         if if_retain_order:
             pymol_session.cmd.set("retain_order")
         pymol_session.cmd.save(pymol_outfile_path, pymol_obj_name)
-        #TODO: fix atom naming. add function here.
 
-        return pymol_outfile_path
+        # fix the atom naming issue.
+        temp_stru = PDBParser.get_structure(pymol_outfile_path)
+        temp_stru.fix_pymol_naming()
+        result = PDBParser.get_file_str(temp_stru)
+
+        return result
 
 
     def export_enzy_htp_stru(self, pymol_obj_name: str,

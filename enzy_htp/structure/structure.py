@@ -112,6 +112,7 @@ from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
 from enzy_htp.chemical import convert_to_one_letter, ResidueType
+from enzy_htp.chemical.residue import PYMOL_TO_ATOM_MAPPER
 
 from .atom import Atom
 from . import Chain
@@ -993,6 +994,23 @@ class Structure(DoubleLinkedNode):
     #     return D
 
     #endregion
+
+    def fix_pymol_naming(self):
+        """Fixes PyMOL's naming of atoms in-place using the PYMOL_TO_ATOM_MAPPER in chemical/residue.py.
+        Args:
+            stru: the Structure that contains the wrong atom names (if any).
+        Returns:
+            Nothing.
+        """
+        for chain in self.chains:
+            for residue in chain.residues:
+                for atom in residue.atoms:
+                    # special case; HA in GLY becomes HA2
+                    if residue.name == "GLY" and atom.name == "HA":
+                        atom.name = "HA2"
+
+                    if atom.name in PYMOL_TO_ATOM_MAPPER:
+                        atom.name = PYMOL_TO_ATOM_MAPPER[atom.name]
 
 
 def compare_structures(left: Structure, right: Structure) -> Dict[str, List[str]]:
