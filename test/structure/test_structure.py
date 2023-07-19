@@ -178,3 +178,24 @@ def test_init_connect():
     stru: Structure = sp.get_structure(pdb_file_path)
 
     stru.init_connect()
+
+def test_fix_pymol_naming():
+    """Test function works as expected"""
+    atom_freq = {}
+
+    pymol_pdb_path = f"{DATA_DIR}pymol_TRP.pdb"
+    good_pdb_path = f"{DATA_DIR}Stru_TRP.pdb"
+
+    good_stru = PDBParser().get_structure(good_pdb_path)
+    pymol_stru = PDBParser().get_structure(pymol_pdb_path)
+
+    for atom in good_stru.atoms:
+        atom_freq[atom.name] = 1
+    
+    pymol_stru.fix_pymol_naming()
+
+    for atom in pymol_stru.atoms:
+        atom_freq[atom.name] -= 1
+
+    for atom in atom_freq:
+        assert atom_freq[atom] == 0
