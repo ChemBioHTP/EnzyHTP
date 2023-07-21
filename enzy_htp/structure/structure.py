@@ -995,7 +995,7 @@ class Structure(DoubleLinkedNode):
 
     #endregion
 
-    def fix_pymol_naming(self):
+    def fix_pymol_naming(self) -> None:
         """Fixes PyMOL's naming of atoms in-place using the PYMOL_TO_ATOM_MAPPER in chemical/residue.py.
         Args:
             stru: the Structure that contains the wrong atom names (if any).
@@ -1011,7 +1011,6 @@ class Structure(DoubleLinkedNode):
 
                     if atom.name in PYMOL_TO_ATOM_MAPPER:
                         atom.name = PYMOL_TO_ATOM_MAPPER[atom.name]
-
 
 def compare_structures(left: Structure, right: Structure) -> Dict[str, List[str]]:
     """Compares two Structure() objects and returns a dict() of missing Residues with format:
@@ -1053,3 +1052,16 @@ def merge_right(
         if lkey not in right_keys:
             struct_cpy.add_residue(left.get_residue(lkey))
     return struct_cpy
+
+
+def order_to_stru(stru: Structure, ordered_stru: Structure) -> None:
+    """Orders the atoms in stru in-place to match the ordered_stru's ordering.
+    Args:
+        stru: 
+        ordered_stru: the Structure object that has the desired order.
+    Returns:
+        Nothing.
+    """
+    for res, ordered_res in zip(stru.residues, ordered_stru.residues):
+        if res.name == ordered_res.name:
+            res.atoms = ordered_res.atoms

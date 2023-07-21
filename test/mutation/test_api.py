@@ -172,7 +172,9 @@ def test_mutate_stru_with_pymol():
             assert new_res.name == "TRP"
             assert len(new_res.atoms) == 24
         else:
-            assert len(new_res.atoms) == len(old_res.atoms)
+            for new_atom, old_atom in zip(new_res.atoms, old_res.atoms):
+                assert new_atom.coord == old_atom.coord
+                assert new_atom.name == old_atom.name
 
     # test with multiple mutants
     mutant_2 = mapi.assign_mutant(test_stru, "{R154W, HA201A}")[0]
@@ -185,7 +187,9 @@ def test_mutate_stru_with_pymol():
         elif new_res.idx == 201:
             assert new_res.name == "ALA"
         else:
-            assert len(new_res.atoms) == len(old_res.atoms)
+            for new_atom, old_atom in zip(new_res.atoms, old_res.atoms):
+                assert new_atom.coord == old_atom.coord
+                assert new_atom.name == old_atom.name
 
     # test with > 2 chain enzyme
     test_pdb_2 = f"{DATA_DIR}puo_put.pdb"
@@ -197,4 +201,6 @@ def test_mutate_stru_with_pymol():
         if new_res.idx == 533:
             assert new_res.name == "TRP"
         else:
-            assert len(new_res.atoms) == len(old_res.atoms)
+            for new_atom, old_atom in zip(new_res.atoms, old_res.atoms):
+                assert new_atom.coord == old_atom.coord
+                assert new_atom.name == old_atom.name

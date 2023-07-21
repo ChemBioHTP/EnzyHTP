@@ -402,7 +402,7 @@ def mutate_stru_with_pymol(
         for mut in mutant:
             pi.point_mutate(mut.get_position_key(), mut.get_target(), pymol_obj_name, pms)
         # 3. save to a structure.
-        pymol_mutant_stru = pi.export_enzy_htp_stru(pymol_obj_name, pms)
+        pymol_mutant_stru = pi.export_enzy_htp_stru(pymol_obj_name, pms, ordered_stru=stru_cpy)
 
     # 4. update residues
     stru_oper.update_residues(stru_cpy, pymol_mutant_stru)

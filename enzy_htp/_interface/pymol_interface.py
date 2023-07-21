@@ -17,6 +17,7 @@ from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp._config.pymol_config import PyMolConfig, default_pymol_config
 from enzy_htp.structure import Structure, PDBParser
+from enzy_htp.structure.structure import order_to_stru
 
 # QZ:Env check for package type interface?
 try:
@@ -189,7 +190,8 @@ class PyMolInterface:
 
     def export_enzy_htp_stru(self, pymol_obj_name: str,
                             pymol_session: pymol2.PyMOL,
-                            if_retain_order: bool = False) -> Structure:
+                            if_retain_order: bool = False,
+                            ordered_stru: Structure = None) -> Structure:
         """
         Saves a PyMOL object to a Structure object.
         Args:
@@ -202,6 +204,11 @@ class PyMolInterface:
         sp = PDBParser()
         pymol_outfile_path = self.export_pdb(pymol_obj_name, pymol_session, if_retain_order=if_retain_order)
         res = sp.get_structure(pymol_outfile_path, allow_multichain_in_atom=True)
+
+        # update order of non-mutated residues
+        if ordered_stru is not None:
+            order_to_stru(res, ordered_stru)
+
         fs.clean_temp_file_n_dir([pymol_outfile_path, eh_config["system.SCRATCH_DIR"]])
         return res
 

@@ -88,10 +88,12 @@ def test_export_enzy_htp_stru():
     pi = interface.pymol
     test_session = pi.new_pymol_session()
     pymol_obj_name, session = pi.load_enzy_htp_stru(test_stru, test_session)
-    test_save_stru = pi.export_enzy_htp_stru(pymol_obj_name, session)
+    test_save_stru = pi.export_enzy_htp_stru(pymol_obj_name, session, ordered_stru=test_stru)
 
     for new_res, old_res in zip(test_save_stru.residues, test_stru.residues):
-        assert len(new_res.atoms) == len(old_res.atoms)
+        for new_atom, old_atom in zip(new_res.atoms, old_res.atoms):
+            assert new_atom.coord == old_atom.coord
+            assert new_atom.name == old_atom.name
 
 
 def test_export_pdb():
