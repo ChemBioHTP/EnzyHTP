@@ -56,7 +56,7 @@ class BCLInterface(BaseInterface):
         """Method that creates conformers using the 'molecule:ConformerGenerator' method from the BCL.
         Note that the supplied molfile must exist but outfile does not. All conformers are saved to one
         file. When the outfile is not supplied, the output file is saved to the same directory as the 
-        input file with the suffix '_conformers' added to the name.
+        input file with the suffix '_conformers' added to the name. File must be in .sdf format.
 
         Args:
             molfile: str() with the name of the input file containing the small molecule of interest. 
