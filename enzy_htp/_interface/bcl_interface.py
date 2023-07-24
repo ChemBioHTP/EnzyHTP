@@ -92,7 +92,7 @@ class BCLInterface(BaseInterface):
 
         return outfile
 
-    def formal_charge(self, molfile: str) -> int:
+    def calculate_formal_charge(self, molfile: str) -> int:
         """Find the formal charge of the supplied molfile using molecule:Properties routine. Supplied
         file MUST be in format .sdf otherwise the script will exit.
 
