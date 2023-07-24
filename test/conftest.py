@@ -1,7 +1,9 @@
 import pytest
 
+
 class Helpers:
     """helper functions for unit tests in EnzyHTP"""
+
     @staticmethod
     def lines_from_file(fname):
         fh = open(fname, "r")
@@ -10,11 +12,7 @@ class Helpers:
         return result
 
     @classmethod
-    def equiv_files(cls,
-                    fname1: str,
-                    fname2: str,
-                    width: int = None,
-                    skip_frist: bool = False) -> bool:
+    def equiv_files(cls, fname1: str, fname2: str, width: int = None, skip_frist: bool = False) -> bool:
         """Helper method to check if two files are exactly equivalent."""
         first = 1
         for l1, l2 in zip(cls.lines_from_file(fname1), cls.lines_from_file(fname2)):
@@ -30,6 +28,7 @@ class Helpers:
                 print(f"'{l2}'")
                 return False
         return True
+
 
 @pytest.fixture
 def helpers():

@@ -26,7 +26,7 @@ class DoubleLinkedNode():
     class for parent objects of the doubly linked tree
     """
 
-    def __init__(self, children: List= None, parent= None):
+    def __init__(self, children: List = None, parent=None):
         """place holder init function for deepcopy testing"""
         if children is None:
             self.set_ghost_children()

@@ -15,11 +15,7 @@ def init_logger(
     start: bool = False,
 ) -> logging.Logger:
     """Function for creating the formatted logger. Taken from https://github.com/jyesselm/dreem/dreem/logger.py."""
-    log_format = ("[%(asctime)s "
-                  "%(name)s "
-                  "%(funcName)s] "
-                  "%(levelname)s "
-                  "%(message)s")
+    log_format = ("[%(asctime)s " "%(name)s " "%(funcName)s] " "%(levelname)s " "%(message)s")
 
     bold_seq = "\033[1m"
     colorlog_format = f"{bold_seq}" "%(log_color)s" f"{log_format}"

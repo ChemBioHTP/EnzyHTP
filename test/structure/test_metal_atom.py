@@ -8,8 +8,7 @@ import numpy as np
 from typing import List
 
 import enzy_htp.chemical as chem
-from enzy_htp.structure import (MetalUnit, PDBParser, Residue, Atom, residue_to_metal,
-                                PDBParser)
+from enzy_htp.structure import (MetalUnit, PDBParser, Residue, Atom, residue_to_metal, PDBParser)
 
 CURR_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = f"{CURR_DIR}/data/"

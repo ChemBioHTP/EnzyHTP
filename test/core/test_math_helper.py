@@ -30,10 +30,8 @@ def test_check_valid_ph_bad_input(caplog):
     assert "assigned pH: 15.00 out of range: [0.00,14.00]" in caplog.text
     enzy_htp._LOGGER.setLevel(existing_level)
 
+
 def test_get_geom_center():
     """test function works as expected"""
-    test_list_of_p = [
-        (1, 1, 1),
-        (2, 2, 5)
-    ]
+    test_list_of_p = [(1, 1, 1), (2, 2, 5)]
     assert mh.get_geom_center(test_list_of_p) == (1.5, 1.5, 3)

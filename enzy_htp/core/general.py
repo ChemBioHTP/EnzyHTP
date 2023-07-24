@@ -77,9 +77,7 @@ def get_interval_from_list(target_list: List[int]) -> Iterable[Tuple[int, int]]:
     # clean input
     target_list = sorted(set(target_list))
     # here use enum id as a ref sequence and group by the deviation
-    for i, j in itertools.groupby(
-            enumerate(target_list),
-            lambda ref_vs_target: ref_vs_target[1] - ref_vs_target[0]):
+    for i, j in itertools.groupby(enumerate(target_list), lambda ref_vs_target: ref_vs_target[1] - ref_vs_target[0]):
         j = list(j)
         yield j[0][1], j[-1][1]
 
@@ -94,7 +92,7 @@ def get_interval_str_from_list(target_list: List[int]) -> str:
 def get_random_list_elem(target_list: list):
     """Helper method that randomly chooses an element from a list. numpy.random.choice() doesn't 
     like to take elements from list()'s of tuples so this is the work around."""
-    return target_list[np.random.randint(len(target_list))] #np.random.choice only works on 1d
+    return target_list[np.random.randint(len(target_list))]  #np.random.choice only works on 1d
 
 
 def pop_random_list_elem(target_list: list):
@@ -109,10 +107,9 @@ def product_lists_allow_empty(list_of_lists: List[list]) -> List[list]:
     Different from itertool.product, not getting any element from a list is allowed.
     Note the result will include an empty list"""
     list_of_lists_copy = copy.deepcopy(list_of_lists)
-    list_of_lists_copy = [
-        each_list + [GHOST_LIST_ELEMENT] for each_list in list_of_lists_copy
-    ]
+    list_of_lists_copy = [each_list + [GHOST_LIST_ELEMENT] for each_list in list_of_lists_copy]
     return _product_lists_w_each_empty_ele(iter(list_of_lists_copy))
+
 
 # == Museum of Function ==
 # This is an old slow but insteresting function so it kept it here
@@ -124,6 +121,7 @@ def product_lists_allow_empty(list_of_lists: List[list]) -> List[list]:
 #     next_list = _product_lists_w_each_empty_ele(list_of_lists)
 #     return [[x] + y if x != GHOST_LIST_ELEMENT else y for x in curr_list
 #             for y in next_list]
+
 
 def _product_lists_w_each_empty_ele(list_of_lists: Iterable[list]) -> List[list]:
     """a sub-function used for product_list_allow_empty"""
@@ -140,18 +138,21 @@ def _product_lists_w_each_empty_ele(list_of_lists: Iterable[list]) -> List[list]
         result.append(result_sublist)
     return result
 
+
 def if_list_contain_repeating_element(target_list: list) -> bool:
     """check if the target list contains any repeating elements"""
     return len(target_list) != len(set(target_list))
+
 
 def list_remove_adjacent_duplicates(target_list: list) -> list:
     """turn a new list removing all adjacent_duplicates. keep the 1st one.
     keep the order."""
     result = [target_list[0]]
     for i in range(1, len(target_list)):
-        if target_list[i] != target_list[i-1]:
+        if target_list[i] != target_list[i - 1]:
             result.append(target_list[i])
     return result
+
 
 # == Dict related ==
 def get_copy_of_deleted_dict(orig_dict: Dict, del_key) -> Dict:
@@ -168,6 +169,7 @@ def get_copy_of_deleted_dict(orig_dict: Dict, del_key) -> Dict:
 
     return dict_copy
 
+
 # == misc ===
 
 
@@ -183,6 +185,7 @@ def timer(fn):
         return to_execute
 
     return timer_inner
+
 
 def get_localtime(time_stamp: float = None) -> str:
     """function that default return current locat time as formatted string.

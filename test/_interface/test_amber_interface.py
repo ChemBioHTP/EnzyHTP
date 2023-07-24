@@ -291,6 +291,7 @@ quit
         assert not os.path.exists(f"{eh_config['system.SCRATCH_DIR']}/tleap.in")
     fs.safe_rm(temp_test_file)
 
+
 def test_run_tleap_dev():
     """develop use test function. Dont do any assert"""
     ai = interface.amber
@@ -350,14 +351,14 @@ def test_find_tleap_error():
     ERR_EXP_DIR = f"{MM_DATA_DIR}tleap_errors/"
     error_example_and_reason = [
         (f"{ERR_EXP_DIR}e1.out", ["Could not open file leaprc.protein.ff24SB: not found"]),
-        (f"{ERR_EXP_DIR}e2.out", ["FATAL:  Atom .R<H5J 254>.A<NAL 2> does not have a type.",
-                                  "Failed to generate parameters"]),
+        (f"{ERR_EXP_DIR}e2.out", ["FATAL:  Atom .R<H5J 254>.A<NAL 2> does not have a type.", "Failed to generate parameters"]),
     ]
 
     for error_file, error_key_list in error_example_and_reason:
         tleap_error = ai._find_tleap_error(error_file)
         for error_key in error_key_list:
             assert error_key in tleap_error.error_info_str
+
 
 def test_tleap_clean_up_stru(helpers):
     """make sure the function correctly find all the errors in example files.
@@ -372,7 +373,3 @@ def test_tleap_clean_up_stru(helpers):
 
     assert helpers.equiv_files(test_out_path, test_answer_path)
     fs.safe_rm(test_out_path)
-
-    
-
-

@@ -164,7 +164,7 @@ class Atom(DoubleLinkedNode):
         _LOGGER.error(f"only calling from methods from {allowed_caller_class} is allowed")
         sys.exit(1)
 
-    def init_connect_in_caa(self) -> None: # this should actually go the residue class
+    def init_connect_in_caa(self) -> None:  # this should actually go the residue class
         """
         Initiate connectivity for this atom in a canonical amino acid. (and common solvents)
         find connect atom base on:
@@ -177,27 +177,22 @@ class Atom(DoubleLinkedNode):
         connect = []
         parent_residue = self.parent
         if parent_residue.name in chem.solvent.RD_SOLVENT_LIST:
-            cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP[parent_residue.name][
-                self.name]
+            cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP[parent_residue.name][self.name]
         elif parent_residue.is_canonical():
             r = parent_residue
             r1 = parent_residue.chain[0]
             rm1 = parent_residue.chain[-1]
             if r is r1:
                 # N terminal
-                cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP_NTERMINAL[
-                    parent_residue.name][self.name]
+                cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP_NTERMINAL[parent_residue.name][self.name]
             else:
                 if r == rm1:
                     # C terminal
-                    cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP_CTERMINAL[
-                        parent_residue.name][self.name]
+                    cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP_CTERMINAL[parent_residue.name][self.name]
                 else:
-                    cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP[
-                        parent_residue.name][self.name]
+                    cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP[parent_residue.name][self.name]
         else:
-            _LOGGER.error(
-                f"wrong method of getting connectivity of non-canonical residue {self.parent}. use Residue.init_connect_ncaa.")
+            _LOGGER.error(f"wrong method of getting connectivity of non-canonical residue {self.parent}. use Residue.init_connect_ncaa.")
             sys.exit(1)
 
         for name in cnt_atomnames:
@@ -212,9 +207,7 @@ class Atom(DoubleLinkedNode):
                     cnt_atom = cnt_resi.find_atom_name("N")
                 connect.append(cnt_atom)
             except ResidueDontHaveAtom as e:
-                _LOGGER.warning(
-                    f"missing connecting atom {e.atom_name} of {self}. Structure maybe incomplete."
-                )
+                _LOGGER.warning(f"missing connecting atom {e.atom_name} of {self}. Structure maybe incomplete.")
         self._connect = connect
 
     #endregion
@@ -241,7 +234,10 @@ class Atom(DoubleLinkedNode):
     @dispatch
     def distance_to(self, point: tuple) -> float:  # pylint: disable=function-redefined
         """Get the distance to the other atom or a point."""
-        return mh.get_distance(self.coord, point)
+        if type(point) == tuple:
+            return mh.get_distance(self.coord, point)
+        else:
+            return mh.get_distance(self.coord, point.coord)
 
     def attached_protons(self) -> List[Atom]:
         """find all protons attached to self"""

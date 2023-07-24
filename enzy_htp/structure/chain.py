@@ -81,17 +81,14 @@ class Chain(DoubleLinkedNode):
             _LOGGER.error(f"chain {self} have more than 1 residue on {idx}")
             sys.exit(1)
         if len(result) == 0:
-            _LOGGER.warning(f"residue idx {idx} out of chain's range {self}"
-                            )  #TODO may be make this an error
+            _LOGGER.warning(f"residue idx {idx} out of chain's range {self}")  #TODO may be make this an error
             return None
         return result[0]
 
     #endregion
 
     #region === Getter-Prop ===
-    def residue_idx_interval(self,
-                             if_str: bool = True
-                             ) -> Union[str, Iterable[Tuple[int, int]]]:
+    def residue_idx_interval(self, if_str: bool = True) -> Union[str, Iterable[Tuple[int, int]]]:
         """
         a range representation of containing residue indexes
         Args & Returns:
@@ -172,11 +169,7 @@ class Chain(DoubleLinkedNode):
         """
         if there is any non-aminoacid part in chain
         """
-        return not sum(
-            list(
-                map(
-                    lambda rr: (not rr.is_canonical()) and (not rr.is_noncanonical()),
-                    self._residues)))
+        return not sum(list(map(lambda rr: (not rr.is_canonical()) and (not rr.is_noncanonical()), self._residues)))
 
     def has_metal(self) -> bool:
         """Checks if any metals are contained within the current chain."""
@@ -272,8 +265,7 @@ class Chain(DoubleLinkedNode):
         else:
             self._residues.append(new_res)
 
-        self.rename(
-            self._name)  #@shaoqz: maybe better to change this residue attribute only?
+        self.rename(self._name)  #@shaoqz: maybe better to change this residue attribute only?
 
         if sort_after:
             self._residues.sort(
@@ -293,9 +285,7 @@ class Chain(DoubleLinkedNode):
 
         del self._residues[ridx]  #@shaoqz: why not move this line inside the loop?
 
-    def rename(
-        self, new_name: str
-    ) -> None:  # TODO#@shaoqz: using the 2-way link sheet will get rid of functions like this but both works.
+    def rename(self, new_name: str) -> None:  # TODO#@shaoqz: using the 2-way link sheet will get rid of functions like this but both works.
         """Renames the chain and propagates the new chain name to all child Residue()"s."""
         self._name = new_name
         res: Residue
@@ -303,15 +293,13 @@ class Chain(DoubleLinkedNode):
             self._residues[ridx].set_chain(new_name)  #@shaoqz: why not just use res?
 
     def renumber_atoms(
-        self,
-        start: int = 1
-    ) -> int:  # TODO#@shaoqz: @imp need to record the mapping of the index  #@shaoqz: also need one for residues
+            self,
+            start: int = 1) -> int:  # TODO#@shaoqz: @imp need to record the mapping of the index  #@shaoqz: also need one for residues
         """Renumbers the Atom()"s inside the chain beginning with "start" value and returns index of the last atom.
         Exits if start index <= 0.
         """
         if start <= 0:
-            _LOGGER.error(
-                f"Illegal start number '{start}'. Value must be >= 0. Exiting...")
+            _LOGGER.error(f"Illegal start number '{start}'. Value must be >= 0. Exiting...")
             exit(1)
         self._residues = sorted(self._residues, key=lambda r: r.idx())
         idx = start
@@ -320,8 +308,7 @@ class Chain(DoubleLinkedNode):
             idx = self._residues[ridx].renumber_atoms(idx)
             idx += 1
             terminal = (ridx < (num_residues - 1)) and (
-                res.is_canonical() and not self._residues[ridx + 1].is_canonical(
-                )  #@shaoqz: @imp what does this mean? the TER line?
+                res.is_canonical() and not self._residues[ridx + 1].is_canonical()  #@shaoqz: @imp what does this mean? the TER line?
             )
             if terminal:
                 idx += 1
