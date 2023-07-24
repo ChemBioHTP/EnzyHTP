@@ -84,15 +84,10 @@ def mutate_pdb(
     mutations = unique_by_pos(mutations)
     needed: int = n_mutations - len(mutations)
     if needed > 0:
-        mutations.extend(get_mutations(pdb, needed, mutations, random_state,
-                                       restrictions))
+        mutations.extend(get_mutations(pdb, needed, mutations, random_state, restrictions))
     else:
-        _LOGGER.warning(
-            f"{len(mutations)} unique mutations were provided but only {n_mutations} were requested."
-        )
-        _LOGGER.warning(
-            f"The first {n_mutations} will be used. To change this behavior, increase n_mutations."
-        )
+        _LOGGER.warning(f"{len(mutations)} unique mutations were provided but only {n_mutations} were requested.")
+        _LOGGER.warning(f"The first {n_mutations} will be used. To change this behavior, increase n_mutations.")
         mutations = sorted(mutations)[0:n_mutations]
 
     if out_dir is not None:
@@ -100,16 +95,11 @@ def mutate_pdb(
 
     outfile: str = mutated_name(pdb, out_dir, mutations)
 
-    IMPLEMENTATION: Dict = {
-        "tleap": _mutate_tleap, 
-        "pymol": _mutate_pymol,
-        "rosetta": _mutate_rosetta
-        }
+    IMPLEMENTATION: Dict = {"tleap": _mutate_tleap, "pymol": _mutate_pymol, "rosetta": _mutate_rosetta}
 
     if engine not in IMPLEMENTATION:
         raise UnsupportedMethod(
-            f"'{engine}' is not a supported mutation engine. Allowed values are {', '.join(list(IMPLEMENTATION.keys()))}"
-        )
+            f"'{engine}' is not a supported mutation engine. Allowed values are {', '.join(list(IMPLEMENTATION.keys()))}")
 
     IMPLEMENTATION[engine](pdb, outfile, mutations)
 
@@ -162,14 +152,12 @@ def get_mutations(
     while len(result) < needed:
 
         if not len(mut_dict):
-            raise Exception(
-                "Could not generate enough Mutation namedtuple()'s. This is likely due to too many restrictions being present."
-            )
+            raise Exception("Could not generate enough Mutation namedtuple()'s. This is likely due to too many restrictions being present.")
 
         md_keys = list(mut_dict.keys())
         chosen = random_list_elem(md_keys)  # random over position
         if len(mut_dict[chosen]):
-            result.append(random_list_elem(sorted(mut_dict[chosen]))) # random over targets (why sorted)
+            result.append(random_list_elem(sorted(mut_dict[chosen])))  # random over targets (why sorted)
         del mut_dict[chosen]
 
     return result
@@ -230,7 +218,7 @@ def _mutate_pymol(pdb: str, outfile: str, mutations: List[Mutation]) -> None:
     pass
 
 
-def _mutate_rosetta(pdb:str, outfile:str, mutations: List[Mutation]) -> None:
+def _mutate_rosetta(pdb: str, outfile: str, mutations: List[Mutation]) -> None:
     """Underlying implementation of mutation with Rosetta. Serves as an implementation only,
     SHOULD NOT BE CALLED BY USERS DIRECTLY. Follows generalized function signature taking the 
     name of the .pdb, the oufile to save the mutated version to and a list() of mutations. 
@@ -247,7 +235,8 @@ def _mutate_rosetta(pdb:str, outfile:str, mutations: List[Mutation]) -> None:
 
     working_dir = Path(pdb).parent
 
-    contents:List[str] = ["""<ROSETTASCRIPTS>
+    contents: List[str] = [
+        """<ROSETTASCRIPTS>
     <SCOREFXNS>
     </SCOREFXNS>
     <RESIDUE_SELECTORS>
@@ -259,37 +248,33 @@ def _mutate_rosetta(pdb:str, outfile:str, mutations: List[Mutation]) -> None:
     <FILTERS>
     </FILTERS>
     <MOVERS>
-"""]
-    mut_names:List[str] = list()
-    
+"""
+    ]
+    mut_names: List[str] = list()
+
     #TODO(CJ): have to solve the rosetta indexing problem
     for midx, mut in enumerate(mutations):
-        index:int = resolve_index(pdb_lines, mut)
-        mover_name:str=f"mr{midx+1}"
+        index: int = resolve_index(pdb_lines, mut)
+        mover_name: str = f"mr{midx+1}"
         contents.append(f"        <MutateResidue name=\"{mover_name}\" target=\"{TODO}\" new_res=\"{TODO}\" />")
-        mut_names.append( mover_name )
+        mut_names.append(mover_name)
 
     contents.append("""    </MOVERS>
     <PROTOCOLS>
 """)
-    
+
     for mn in mut_names:
         contents.append(f"        <Add mover_name=\"{mn}\" />")
     contents.append("""    </PROTOCOLS>
     <OUTPUT />
 <ROSETTASCRIPTS>
 """)
-    
-    script_file:Path = working_dir / "enzy_htp_mut.xml"
-    fs.write_lines(script_files, contents)
-   
 
-    options:List[str] = list()
-    interface.rosetta.run_rosetta_scripts(
-        pdb,
-        script_file,
-        options
-    )
+    script_file: Path = working_dir / "enzy_htp_mut.xml"
+    fs.write_lines(script_files, contents)
+
+    options: List[str] = list()
+    interface.rosetta.run_rosetta_scripts(pdb, script_file, options)
 
     #TODO(CJ): have to check that the file exists in the working directory
 
@@ -364,8 +349,7 @@ def _mutate_tleap(pdb: str, outfile: str, mutations: List[Mutation]) -> None:
             if rkey not in backup:
                 continue
             tmp_file = f"/tmp/ligand.{rkey}.tmp.pdb"
-            fs.write_lines(tmp_file,
-                           list(map(lambda ll: ll.line, backup[rkey])) + ['END'])
+            fs.write_lines(tmp_file, list(map(lambda ll: ll.line, backup[rkey])) + ['END'])
             lig: struct.Ligand = struct.ligand_from_pdb(tmp_file)
             (cname, rname, rnum) = rkey.split('.')
             rnum = int(rnum)

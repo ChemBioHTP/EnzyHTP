@@ -61,7 +61,7 @@ class Interface:
 
         missing_exes: List[str] = list()
         missing_env_vars: List[str] = list()
-        missing_py_modules :List[str] = list()
+        missing_py_modules: List[str] = list()
 
         missing_exes.extend(self.amber.missing_executables())
         missing_env_vars.extend(self.amber.missing_env_vars())
@@ -107,7 +107,7 @@ class Interface:
             _LOGGER.warning("The following environment variables are missing:")
             for mev in sorted(missing_env_vars):
                 _LOGGER.warning(f"      {mev}")
-        
+
         if missing_py_modules:
             missing = True
             _LOGGER.warning("The following python modules are missing:")

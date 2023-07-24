@@ -455,7 +455,6 @@ class RosettaInterface(BaseInterface):
 
         return df
 
-
     def write_script(self, fname: str, args: List[Dict]) -> str:
         """Writes an XML script to be used with RosettaScripts. Each element of the XML script is represented
         as a dict() within a list() of args. Note that each element dict() is required to have two keys, "parent"
@@ -689,11 +688,7 @@ class RosettaInterface(BaseInterface):
 
         return df
 
-
-    def mutate(self,
-        molfile:str, 
-        mutations:List[Tuple[str,int,str]]
-        ) -> str:
+    def mutate(self, molfile: str, mutations: List[Tuple[str, int, str]]) -> str:
         """Using Rosetta to mutate a protein
 
         Args:
@@ -703,16 +698,12 @@ class RosettaInterface(BaseInterface):
         Returns:
             The mutated structure.
         """
-        
-        # validation 
+
+        # validation
         for row in mutations:
             if len(row) != 3:
                 pass
         pass
-        args:List[Dict] = list() 
-        xml_file:str=f"{Path(mofile).parent}/__temp.xml"
-        self.write_script(
-            xml_file,
-            args
-        )
-    
+        args: List[Dict] = list()
+        xml_file: str = f"{Path(mofile).parent}/__temp.xml"
+        self.write_script(xml_file, args)

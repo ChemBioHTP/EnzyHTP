@@ -17,6 +17,7 @@ from enzy_htp.core.general import get_localtime
 from .logger import _LOGGER
 from .exception import MissingEnvironmentElement
 
+
 class EnvironmentManager:
     """Serves as general interface between module and the current computer environment (shell).
     Checks whether given applications and environment variables are set in the current environment.
@@ -42,7 +43,7 @@ class EnvironmentManager:
         self.missing_env_vars_ = []
         self.missing_py_modules_ = []
         self.missing_executables_ = []
-    
+
     #region ==environment related==
     def add_executable(self, exe_name: str) -> None:
         """Adds the name of an executable to check for."""
@@ -74,7 +75,7 @@ class EnvironmentManager:
 
             fpath = os.path.expandvars(exe)
             if Path(fpath).exists():
-                self.mapper[exe] = fpath 
+                self.mapper[exe] = fpath
             else:
                 self.mapper[exe] = shutil.which(exe)
 
@@ -82,9 +83,9 @@ class EnvironmentManager:
         """Checks which python modules are availabe in the system, storing those that are missing."""
         for pm in self.py_modules_:
             try:
-                _ = importlib.import_module( pm )
+                _ = importlib.import_module(pm)
             except ModuleNotFoundError:
-                self.missing_py_modules_.append( pm )
+                self.missing_py_modules_.append(pm)
 
     def display_missing(self) -> None:
         """Displays a list of missing environment variables and exectuables to the logger. Should be called after .check_environment() and .check_env_vars()."""
@@ -105,7 +106,7 @@ class EnvironmentManager:
 
     def check_environment(self) -> None:
         """Preferred client method for validating environment. Performs checks and logs output."""
-        
+
         self.check_env_vars()
         self.check_executables()
         self.check_python_modules()
@@ -137,10 +138,10 @@ class EnvironmentManager:
     def run_command(self,
                     exe: str,
                     args: Union[str, List[str]],
-                    try_time: int= 1,
-                    wait_time: float= 3.0,
-                    timeout: Union[None, float]= None,
-                    stdout_return_only: bool= False) -> Union[CompletedProcess, str]:
+                    try_time: int = 1,
+                    wait_time: float = 3.0,
+                    timeout: Union[None, float] = None,
+                    stdout_return_only: bool = False) -> Union[CompletedProcess, str]:
         """Interface to run a command with the exectuables specified by exe as well as a list of arguments.
         Args:
             exe:
@@ -174,20 +175,17 @@ class EnvironmentManager:
 
         # handle missing exe
         if exe in self.missing_executables_ or not self.__exe_exists(exe):
-            _LOGGER.error(
-                f"This environment is missing '{exe}' and cannot run the command '{cmd}'")
+            _LOGGER.error(f"This environment is missing '{exe}' and cannot run the command '{cmd}'")
             raise MissingEnvironmentElement
         if exe not in self.mapper:
-            _LOGGER.warning(
-                f"(dev-only) Using unregistered executable: '{exe}'")
-            _LOGGER.warning(
-                f"    Please add it to corresponding config.required_executables if this is a long-term use")
+            _LOGGER.warning(f"(dev-only) Using unregistered executable: '{exe}'")
+            _LOGGER.warning(f"    Please add it to corresponding config.required_executables if this is a long-term use")
 
         # run the command
         _LOGGER.info(f"Running command: `{cmd}`...")
         for i in range(try_time):
             try:
-                this_run = run(cmd, timeout=timeout, check=True,  text=True, shell=True, capture_output=True)
+                this_run = run(cmd, timeout=timeout, check=True, text=True, shell=True, capture_output=True)
                 _LOGGER.debug("Command finished!")
             except SubprocessError as e:
                 this_error = e
@@ -196,7 +194,7 @@ class EnvironmentManager:
                 _LOGGER.warning(f"    stdout: {str(e.stdout).strip()}")
                 if try_time > 1:
                     _LOGGER.warning(f"trying again... ({i+1}/{try_time})")
-            else: # untill there's no error
+            else:  # untill there's no error
                 _LOGGER.info(f"finished `{cmd}` after {i+1} tries @{get_localtime()}")
                 if stdout_return_only:
                     return str(this_run.stdout).strip()
@@ -208,6 +206,7 @@ class EnvironmentManager:
         # exceed the try time
         _LOGGER.error(f"Failed running `{cmd}` after {try_time} tries @{get_localtime()}")
         raise this_error
+
     #endregion
 
     def __getattr__(self, key: str) -> str:

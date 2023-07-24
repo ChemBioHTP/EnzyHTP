@@ -72,9 +72,7 @@ def test_point_mutate():
     pi = interface.pymol
     pymol_obj_name, session = pi.load_enzy_htp_stru(test_stru, pi.new_pymol_session())
     pi.point_mutate(("A", 154), "TRP", pymol_obj_name, session)
-    assert len(pi.select_pymol_obj("resi 154", pymol_obj_name, session)) == (
-           len(test_mut_stru["A"].find_residue_idx(154).atom_idx_list)
-    )
+    assert len(pi.select_pymol_obj("resi 154", pymol_obj_name, session)) == (len(test_mut_stru["A"].find_residue_idx(154).atom_idx_list))
 
 
 def test_export_enzy_htp_stru():
@@ -103,4 +101,3 @@ def test_export_pdb():
         for new_atom, old_atom in zip(new_res.atoms, old_res.atoms):
             assert new_atom.coord == old_atom.coord
             assert new_atom.name == old_atom.name
-

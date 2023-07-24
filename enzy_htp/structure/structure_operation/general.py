@@ -33,7 +33,7 @@ def remove_empty_chain(stru: Structure) -> Structure:
     original object.
     """
     ch: Chain
-    for ch in copy.copy(stru.chains): # shallow copy to avoid iteration-deletion problem
+    for ch in copy.copy(stru.chains):  # shallow copy to avoid iteration-deletion problem
         if ch.is_empty():
             _LOGGER.debug(f"removing {ch}")
             ch.delete_from_parent()

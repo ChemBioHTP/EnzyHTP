@@ -34,6 +34,7 @@ class BCLConfig:
         """ """
         return list()
 
+
 def default_bcl_config() -> BCLConfig:
     """Creates a deep-copied default version of the BCLConfig() class."""
     return deepcopy(BCLConfig())

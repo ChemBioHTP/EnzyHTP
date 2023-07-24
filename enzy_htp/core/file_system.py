@@ -17,9 +17,7 @@ def safe_rm(fname: str) -> None:
     """Removes a file if and only if the directory already exists. Provides a warning if the 
     supplied path is a directory."""
     if os.path.isdir(fname):
-        _LOGGER.warning(
-            f"The supplied path '{fname}' is a directory and cannot be removed by enzy_htp.core.file_system.safe_rm()"
-        )
+        _LOGGER.warning(f"The supplied path '{fname}' is a directory and cannot be removed by enzy_htp.core.file_system.safe_rm()")
         return
 
     if os.path.exists(fname):
@@ -39,8 +37,7 @@ def safe_rmdir(dirname: str, empty_only: bool = False) -> None:
     """Removes a directory if and only if the directory already exists."""
     if os.path.isdir(dirname):
         if empty_only and not is_empty_dir(dirname):
-            _LOGGER.debug(
-                f"{dirname} is not empty. turn empty_only off to force remove it.")
+            _LOGGER.debug(f"{dirname} is not empty. turn empty_only off to force remove it.")
         else:
             shutil.rmtree(dirname)
 
@@ -137,7 +134,7 @@ def get_valid_temp_name(fname: str) -> str:
     return result_fname
 
 
-def check_file_exists(fname: str, exit_script:bool=True) -> None:
+def check_file_exists(fname: str, exit_script: bool = True) -> None:
     """Function that checks if a file exists. Will either exit the script or raise
     an error depending on the specified behavior.
 
@@ -151,18 +148,18 @@ def check_file_exists(fname: str, exit_script:bool=True) -> None:
     Raises:
         FileNotFoundError if exit_script is set to False and the file does not exist.
     """
-    
+
     if Path(fname).exists():
-        return 
-    
+        return
+
     if exit_script:
         _LOGGER.error(f"The file '{fname}' does not exist. Exiting...")
-        exit( 1 )
+        exit(1)
     else:
         raise FileNotFoundError(f"The file '{fname}' does not exist.")
 
 
-def check_not_empty(fname:str) -> None:
+def check_not_empty(fname: str) -> None:
     """Function that checks if a file exists and is not empty. Will exit the script if either
     of the two conditions are false.
     
@@ -176,15 +173,16 @@ def check_not_empty(fname:str) -> None:
 
     check_file_exists(fname)
 
-    temp = Path(fname) 
+    temp = Path(fname)
     if temp.stat().st_size > 0:
         return
 
     _LOGGER.error(f"The file '{fname}' is empty. Exiting...")
 
-    exit( 1 )
+    exit(1)
 
-def has_content(fname:str) -> bool:
+
+def has_content(fname: str) -> bool:
     """Method that checks if the supplied path exists and contains content. Returns bool with result
 
     Args:
@@ -198,18 +196,17 @@ def has_content(fname:str) -> bool:
     return fpath.exists() and fpath.stat().st_size > 0
 
 
-def safe_mv(src:str, dest:str) -> str:
+def safe_mv(src: str, dest: str) -> str:
     """TODO(CJ)
     """
     src = Path(src)
     dest = Path(dest)
 
     if dest.is_dir():
-        safe_mkdir( dest ) 
+        safe_mkdir(dest)
         dest = dest / src.name
 
-    return str(shutil.move( src, dest ))
-
+    return str(shutil.move(src, dest))
 
 
 def clean_temp_file_n_dir(temp_path_list: List[str]) -> None:

@@ -537,6 +537,7 @@ def test_get_structure_ligand():
     assert len(ligand.atoms) == 7
     assert ligand.name == 'FAH'
 
+
 @pytest.mark.interface
 def test_get_structure_allow_multichain_in_atom(caplog):
     messed_pdb = f"{DATA_DIR}/pymol_messed_output.pdb"
@@ -549,6 +550,7 @@ def test_get_structure_allow_multichain_in_atom(caplog):
     assert list(stru["D"].residue_idx_interval(if_str=False)) == [(902, 902)]
     assert list(stru["E"].residue_idx_interval(if_str=False)) == [(903, 903)]
     assert list(stru["F"].residue_idx_interval(if_str=False)) == [(904, 904)]
+
 
 @pytest.mark.interface
 def test_get_file_str():

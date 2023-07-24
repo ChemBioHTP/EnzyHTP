@@ -37,6 +37,7 @@ class MOEConfig:
         """ """
         return list()
 
+
 def default_moe_config() -> MOEConfig:
     """Creates a deep-copied default version of the MOEConfig() class."""
     return deepcopy(MOEConfig())

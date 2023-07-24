@@ -47,6 +47,7 @@ class RosettaConfig:
         """ """
         return list()
 
+
 def default_rosetta_config() -> RosettaConfig:
     """Creates a deep-copied version of the RosettaConfig() class."""
     return deepcopy(RosettaConfig())

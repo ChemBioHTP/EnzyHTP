@@ -39,7 +39,6 @@ class MultiwfnConfig:
         """ """
         return list()
 
-
     def __getitem__(self, key: str) -> Any:
         if key.count("."):
             key1, key2 = key.split(".")

@@ -237,8 +237,7 @@ class Structure(DoubleLinkedNode):
             _LOGGER.info(f"Didn't find any residue with key: {key}")
             return None
         if len(result) > 1:
-            _LOGGER.warning(
-                f"More than 1 residue with key: {key}. Only the first one is used. Check those residues:")
+            _LOGGER.warning(f"More than 1 residue with key: {key}. Only the first one is used. Check those residues:")
             for i in result:
                 _LOGGER.warning(f"    {i}")
         return result[0]
@@ -252,8 +251,7 @@ class Structure(DoubleLinkedNode):
                 result.extend(residue.atoms)
         return result
 
-    def find_atoms_in_range(self, center: Union[Atom, Tuple[int, int, int]],
-                            range_distance: float) -> List[Atom]:
+    def find_atoms_in_range(self, center: Union[Atom, Tuple[int, int, int]], range_distance: float) -> List[Atom]:
         """find atoms in {range} of {center}. return a list of atoms found"""
         result = []
         for atom in self.atoms:
@@ -267,9 +265,7 @@ class Structure(DoubleLinkedNode):
         if not result:
             _LOGGER.info(f"found 0 atom with index: {atom_idx}")
         if len(result) > 1:
-            _LOGGER.warning(
-                f"found {len(result)} atoms with index: {atom_idx}! only the 1st one is used. consider sort_everything()"
-            )
+            _LOGGER.warning(f"found {len(result)} atoms with index: {atom_idx}! only the 1st one is used. consider sort_everything()")
         return result[0]
 
     def find_idxes_atom_list(self, atom_idx_list: int) -> List[Atom]:
@@ -328,12 +324,11 @@ class Structure(DoubleLinkedNode):
             result[ch.name] = ch.sequence
         return result
 
-    def init_connect(
-        self,
-        ligand_fix: int= "antechamber",
-        metal_fix: int= "isolate",
-        ncaa_fix: int= "antechamber",
-        solvent_fix: int= "caa") -> None:
+    def init_connect(self,
+                     ligand_fix: int = "antechamber",
+                     metal_fix: int = "isolate",
+                     ncaa_fix: int = "antechamber",
+                     solvent_fix: int = "caa") -> None:
         """
         Initiate connectivity for the Structure.
         Save the connectivity to self._connect of each Atom().
@@ -413,8 +408,7 @@ class Structure(DoubleLinkedNode):
                             continue
                         if if_loop:
                             lp = line.strip().split()
-                            lig._find_atom_name(lp[0]).connect.append(
-                                lig._find_atom_name(lp[1]))
+                            lig._find_atom_name(lp[0]).connect.append(lig._find_atom_name(lp[1]))
                             continue
                         # loop connect starts at LOOP
                         if line.strip() == "LOOP":
@@ -440,6 +434,7 @@ class Structure(DoubleLinkedNode):
         """initiate connectivity for solvents in the structure"""
         for sol in self.solvents:
             sol.init_connect(method)
+
     #endregion
 
     #region === Checker ===
@@ -461,9 +456,7 @@ class Structure(DoubleLinkedNode):
         ch: Chain
         for ch in self._chains:
             if ch.name in existing_c_id:
-                _LOGGER.warning(
-                    f"Duplicate chain names detected in Structure obj during {sys._getframe().f_back.f_code.co_name}()! "
-                )
+                _LOGGER.warning(f"Duplicate chain names detected in Structure obj during {sys._getframe().f_back.f_code.co_name}()! ")
                 return True
             existing_c_id.append(ch.name)
         return False
@@ -483,9 +476,7 @@ class Structure(DoubleLinkedNode):
         trgt_ch: Chain
         for trgt_ch in target_stru:
             if trgt_ch.name not in self.chain_mapper:
-                _LOGGER.info(
-                    f"current stru {list(self.chain_mapper.keys())} doesnt contain chain: {trgt_ch} from the target stru"
-                )
+                _LOGGER.info(f"current stru {list(self.chain_mapper.keys())} doesnt contain chain: {trgt_ch} from the target stru")
                 return False
 
             self_ch = self.chain_mapper[trgt_ch.name]
@@ -493,9 +484,7 @@ class Structure(DoubleLinkedNode):
             res: Residue
             for res in trgt_ch:
                 if res.idx not in self_ch_resi_idxes:
-                    _LOGGER.info(
-                        f"current stru chain {self_ch} doesnt contain residue: {res} of the target stru"
-                    )
+                    _LOGGER.info(f"current stru chain {self_ch} doesnt contain residue: {res} of the target stru")
                     return False
         return True
 
@@ -540,17 +529,14 @@ class Structure(DoubleLinkedNode):
         for ch in self.chains:
             if ch.name in mapper:
                 if ch.is_same_coord(mapper[ch.name]):
-                    _LOGGER.error(
-                        "Duplicate chain (same coordinate) detected in Structure obj! Exiting... "
-                    )
+                    _LOGGER.error("Duplicate chain (same coordinate) detected in Structure obj! Exiting... ")
                     sys.exit(1)
                 new_name = chr(ord(ch.name) + 1)  # TODO find a way
                 ch.name = new_name
                 if_rename = 1
             mapper[ch.name] = ch
         if if_rename:
-            _LOGGER.warning(
-                "Resolved duplicated chain (different ones) name by renaming.")
+            _LOGGER.warning("Resolved duplicated chain (different ones) name by renaming.")
 
     #endregion
 
@@ -569,9 +555,7 @@ class Structure(DoubleLinkedNode):
         out_line.append(f"chains: (sorted, original {list(self.chain_mapper.keys())})")
         for ch in sorted(self._chains, key=lambda x: x.name):
             ch: Chain
-            out_line.append(
-                f"    {ch.name}({ch.chain_type}): residue: {ch.residue_idx_interval()} atom_count: {ch.num_atoms}"
-            )
+            out_line.append(f"    {ch.name}({ch.chain_type}): residue: {ch.residue_idx_interval()} atom_count: {ch.num_atoms}")
         out_line.append(")")
         return os.linesep.join(out_line)
 
@@ -592,8 +576,6 @@ class Structure(DoubleLinkedNode):
         raise KeyError("Structure() delitem only take int or str as key")
 
     #endregion
-
-
 
     # ============= TODO below =================
     #region === Getters === (Attributes - accessing Structure data -  references)
@@ -616,8 +598,7 @@ class Structure(DoubleLinkedNode):
                 (chain, res_name, index) = residue.residue_key.split(".")
                 if residue.is_canonical():
                     result.append((chain, convert_to_one_letter(res_name), int(index)))
-                elif residue.is_metal(
-                ):  #@shaoqz: @imp2 any non-canonical should be using 3-letter name
+                elif residue.is_metal():  #@shaoqz: @imp2 any non-canonical should be using 3-letter name
                     result.append((chain, res_name, int(index)))
         return result
 
@@ -654,9 +635,7 @@ class Structure(DoubleLinkedNode):
     #endregion
 
     #region === Editor ===
-    def add_chain(self,
-                  new_chain: Chain,
-                  overwrite: bool = False) -> None:  #TODO add logic for overwriting
+    def add_chain(self, new_chain: Chain, overwrite: bool = False) -> None:  #TODO add logic for overwriting
         """Method that inserts a new chain and then sorts the chains based on name.
         Will overwrite if Chain() with existing name already in object. #@shaoqz: add + sort = insert
         """
@@ -695,15 +674,13 @@ class Structure(DoubleLinkedNode):
             self.chain_mapper[chain_name].add_residue(new_res)
 
         self.chains = list(self.chain_mapper.values())  #@shaoqz: why need this
-        self.chains.sort(
-            key=lambda c: c.name())  #@shaoqz: should this be in the 1st if block?
+        self.chains.sort(key=lambda c: c.name())  #@shaoqz: should this be in the 1st if block?
 
     def remove_residue(self, target_key: str) -> None:
         """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format,
         the Residue() is removed if it currently exists in one of the child Chain()"s. If the Chain() is empty after this
         removal, the chain is deleted."""
-        (chain_name, _,
-         _) = target_key.split(".")  #@shaoqz: why not use this in get lolll
+        (chain_name, _, _) = target_key.split(".")  #@shaoqz: why not use this in get lolll
         if self.has_chain(chain_name):
             self.chain_mapper[chain_name].remove_residue(target_key)
             if self.chain_mapper[chain_name].empty():
@@ -716,7 +693,7 @@ class Structure(DoubleLinkedNode):
         """Enables running assert Structure(). Checks if there is anything in the structure."""
         return bool(len(self.chains))
 
-    def __eq__(self, other: Structure) -> bool: # TODO
+    def __eq__(self, other: Structure) -> bool:  # TODO
         """Comparison operator for other Structure() objects. Checks first if both have same chain names and then if each named chain is identical."""
         if set(self.chain_mapper.keys()) != set(other.chain_mapper.keys()):
             return False
@@ -744,11 +721,7 @@ class Structure(DoubleLinkedNode):
     #region (TODO+OLD)
     # === TODO ===
     def get_connectivty_table(  #@shaoqz: ok seems not using
-            self,
-            ff="GAUSSIAN",
-            metal_fix=1,
-            ligand_fix=1,
-            prepi_path=None):
+            self, ff="GAUSSIAN", metal_fix=1, ligand_fix=1, prepi_path=None):
         """
         get connectivity table with atom index based on "ff" settings:
         ff = GAUSSIAN  -- continuous atom index start from 1, do not seperate by chain
@@ -821,12 +794,9 @@ class Structure(DoubleLinkedNode):
         return connectivty_table
 
     # === TO BE MOVE ===
-    def build_ligands(
-        self,
-        out_dir: str,
-        unique: bool = False
-    ) -> List[
-            str]:  # TODO(qz): change reference of this this to get_file_str(stru.ligands[i])
+    def build_ligands(self,
+                      out_dir: str,
+                      unique: bool = False) -> List[str]:  # TODO(qz): change reference of this this to get_file_str(stru.ligands[i])
         """Exports all the Ligand() objects in the Structure() to .pdb files.
 
         Args:
@@ -872,8 +842,7 @@ class Structure(DoubleLinkedNode):
 
         # write
         if ft == "PDB":
-            with open(out_path,
-                      "w") as of:  #@shaoqz: same as build ligand use IO interface class
+            with open(out_path, "w") as of:  #@shaoqz: same as build ligand use IO interface class
                 a_id = 0
                 r_id = 0
                 for chain in self.chains:
@@ -1011,9 +980,8 @@ def compare_structures(left: Structure, right: Structure) -> Dict[str, List[str]
     return result
 
 
-def merge_right(
-    left: Structure, right: Structure
-) -> Structure:  #@shaoqz: I believe there will be a bug due to the treatment of insert with same id
+def merge_right(left: Structure,
+                right: Structure) -> Structure:  #@shaoqz: I believe there will be a bug due to the treatment of insert with same id
     """Merges Residue() and derived objects from left Structure() to right Structure(), making sure that ALL Residue() and
         Residue() derived objects from the left are in the right. Note that the reverse is not applied and that elements initially found only in right are NOT
         merged back over to left. Also not the resulting Structure() is a deepcopy and no changes are made to the original left or right objects.

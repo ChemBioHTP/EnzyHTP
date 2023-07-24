@@ -132,24 +132,18 @@ def protonate_peptide_with_pdb2pqr(stru: Structure,
     scratch_dir = config["system.SCRATCH_DIR"]
     if int_pdb_path is None:
         fs.safe_mkdir(scratch_dir)  # make them together into make_temp_file
-        int_pdb_path = fs.get_valid_temp_name(
-            f"{scratch_dir}/protonate_peptide_with_pdb2pqr_input.pdb")
+        int_pdb_path = fs.get_valid_temp_name(f"{scratch_dir}/protonate_peptide_with_pdb2pqr_input.pdb")
         temp_path_list.extend([scratch_dir, int_pdb_path])
     if int_pqr_path is None:
         fs.safe_mkdir(scratch_dir)
-        int_pqr_path = fs.get_valid_temp_name(
-            f"{scratch_dir}/protonate_peptide_with_pdb2pqr_output.pdb")
+        int_pqr_path = fs.get_valid_temp_name(f"{scratch_dir}/protonate_peptide_with_pdb2pqr_output.pdb")
         temp_path_list.extend([scratch_dir, int_pqr_path])
     if fs.get_file_ext(int_pqr_path) == ".pqr":
-        _LOGGER.warning(
-            f"changing {int_pqr_path} extension to pdb. This filename now changes.")
+        _LOGGER.warning(f"changing {int_pqr_path} extension to pdb. This filename now changes.")
         int_pqr_path = fs.get_valid_temp_name(int_pqr_path.removesuffix("pqr") + "pdb")
         if int_pqr_path == int_pdb_path:
-            _LOGGER.warning(
-                "int_pqr_path and int_pdb_path is the same after extension change. Adding an index."
-            )
-            int_pqr_path = fs.get_valid_temp_name(
-                int_pqr_path.removesuffix(".pdb") + "_1.pdb")
+            _LOGGER.warning("int_pqr_path and int_pdb_path is the same after extension change. Adding an index.")
+            int_pqr_path = fs.get_valid_temp_name(int_pqr_path.removesuffix(".pdb") + "_1.pdb")
 
     # run pqr interface
     with open(int_pdb_path, "w") as of:
@@ -165,11 +159,9 @@ def protonate_peptide_with_pdb2pqr(stru: Structure,
 
     return stru
 
+
 # PDB2PQR interface (NOTE: group to _interface when more PDB2PQR is needed)
-def pdb2pqr_protonate_pdb(pdb_path: str,
-                          pqr_path: str,
-                          ph: float = 7.0,
-                          ffout: str = "AMBER") -> None:
+def pdb2pqr_protonate_pdb(pdb_path: str, pqr_path: str, ph: float = 7.0, ffout: str = "AMBER") -> None:
     """
     This is warpper function of pdb2pqr.
     Runs PDB2PQR on a specified pdb file and saves it to the specified pqr path. This preparation step
@@ -224,8 +216,7 @@ def deprotonate_metal_donors(center: MetalUnit):
             stru_oper.deprotonate_residue(d_resi, d_atoms[0])
             # TODO(qz): refine this by also determine the closest proton
         elif d_resi.is_hetatom_noproton():
-            _LOGGER.info(
-                f"donor residue {d_resi} already have no proton in center {center}")
+            _LOGGER.info(f"donor residue {d_resi} already have no proton in center {center}")
         else:
             _LOGGER.warn(f"uncommon donor residue {d_resi} found in center {center}")
 
@@ -240,9 +231,7 @@ METAL_FIX_METHODS = {"deprotonate_all": deprotonate_metal_donors}
 PEPTIDE_PROTONATION_METHODS = {"pdb2pqr": protonate_peptide_with_pdb2pqr}
 
 
-def protonate_ligand_with_pybel(stru: Structure,
-                                ph: float = 7.0,
-                                int_ligand_file_dir=None):
+def protonate_ligand_with_pybel(stru: Structure, ph: float = 7.0, int_ligand_file_dir=None):
     """
     the inteface for using PYBEL to protonate all ligands in {stru} with a given ph
     Args:
@@ -262,11 +251,8 @@ def protonate_ligand_with_pybel(stru: Structure,
 
     for ligand in stru.ligands:
         # path for each ligand
-        int_ligand_file_path = fs.get_valid_temp_name(
-            f"{int_ligand_file_dir}/ligand_{ligand.chain.name}_{ligand.idx}_{ligand.name}.pdb"
-        )
-        int_pybel_file_path = fs.get_valid_temp_name(
-            f"{int_ligand_file_path.removesuffix('.pdb')}_pybel.pdb")
+        int_ligand_file_path = fs.get_valid_temp_name(f"{int_ligand_file_dir}/ligand_{ligand.chain.name}_{ligand.idx}_{ligand.name}.pdb")
+        int_pybel_file_path = fs.get_valid_temp_name(f"{int_ligand_file_path.removesuffix('.pdb')}_pybel.pdb")
         # file interface with pybel
         ligand.fix_atom_names()  # make sure original ligand have all unique names
         with open(int_ligand_file_path, "w") as of:
@@ -279,6 +265,7 @@ def protonate_ligand_with_pybel(stru: Structure,
     fs.clean_temp_file_n_dir([int_ligand_file_dir])
 
     return stru
+
 
 # PYBEL interface
 def pybel_protonate_pdb_ligand(in_path: str, out_path: str, ph: float = 7.0) -> str:
@@ -320,8 +307,7 @@ def _fix_pybel_output(pdb_path: str, out_path: str, ref_name_path: str = None) -
         ref_atom_names = []
         ref_ligand = PandasPdb()
         ref_ligand.read_pdb(ref_name_path)
-        ref_ligand_df: pd.DataFrame = pd.concat(
-            (ref_ligand.df["ATOM"], ref_ligand.df["HETATM"]), ignore_index=True)
+        ref_ligand_df: pd.DataFrame = pd.concat((ref_ligand.df["ATOM"], ref_ligand.df["HETATM"]), ignore_index=True)
         ref_ligand_df.sort_values("line_idx", inplace=True)  # make sure lines are aligned
         ref_resi_name = ref_ligand_df.iloc[0]["residue_name"].strip()
         for i, atom_df in ref_ligand_df.iterrows():
@@ -329,8 +315,7 @@ def _fix_pybel_output(pdb_path: str, out_path: str, ref_name_path: str = None) -
 
     target_ligand = PandasPdb()
     target_ligand.read_pdb(pdb_path)
-    target_ligand_df: pd.DataFrame = pd.concat(
-        (target_ligand.df["ATOM"], target_ligand.df["HETATM"]), ignore_index=True)
+    target_ligand_df: pd.DataFrame = pd.concat((target_ligand.df["ATOM"], target_ligand.df["HETATM"]), ignore_index=True)
     target_ligand_df.sort_values("line_idx", inplace=True)  # make sure lines are aligned
     atom_names = list(target_ligand_df["atom_name"])
     if ref_name_path is not None:
@@ -362,7 +347,6 @@ def _ob_pdb_charge(pdb_path: str) -> int:
             if not len(raw):
                 continue
             charge = pdb_l.charge[::-1]
-            core._LOGGER.info(f"Found formal charge: {pdb_l.atom_name} {charge}"
-                              )  # TODO make this more intuitive/make sense
+            core._LOGGER.info(f"Found formal charge: {pdb_l.atom_name} {charge}")  # TODO make this more intuitive/make sense
             net_charge += int(charge)
     return net_charge
