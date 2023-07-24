@@ -452,7 +452,7 @@ class PyMolInterface(BaseInterface):
 
         return result
 
-    def execute(self, args:List[Tuple], session:pymol2.PyMOL=None) -> List[Any]:
+    def general_cmd(self, args:List[Tuple], session:pymol2.PyMOL=None) -> List[Any]:
         """Executes a series of commands through the PyMOL/PyMOL2 python module in use. Takes input as a list of Tuple()'s
         where the first item in each tuple is a string specifying the function to use and the rest of the items are the
         arguments for that function.
