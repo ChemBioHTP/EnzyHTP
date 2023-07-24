@@ -387,7 +387,7 @@ class PyMolInterface(BaseInterface):
         return in_file
 
 
-    def collect(self, , session:pymol2.PyMOL,molfile:str, variables:List[str], sele:str='all', state:int=-1) -> pd.DataFrame:
+    def collect(self, session:pymol2.PyMOL,molfile:str, variables:List[str], sele:str='all', state:int=-1) -> pd.DataFrame:
         """Function that serves as a wrapper to the pymol cmd API's iterate_state() method. Checks if the supplied file exists prior to collecting data.
         Data is returned in a pandas DataFrame() where each row is an atom and each column is a variable.
 

@@ -26,7 +26,9 @@ from enzy_htp._config.amber_config import AmberConfig, default_amber_config
 from enzy_htp import config as eh_config
 
 
-class AmberInterface:
+from .base_interface import BaseInterface
+
+class AmberInterface(BaseInterface):
     """Class that provides a direct inteface for enzy_htp to utilize AmberMD software. Supported operations
     minimization, heating constant pressure production, constant pressure equilibration, trajectory file
     conversion and mutation. Users should use this class as the only way to interact with any functionality
@@ -38,19 +40,11 @@ class AmberInterface:
         compatible_env_ : A bool() indicating if the current environment is compatible with the object itself.
     """
 
-    def __init__(self, config: AmberConfig = None) -> None:
+    def __init__(self, parent, config: AmberConfig = None) -> None:
         """Simplistic constructor that optionally takes an AmberConfig object as its only argument.
-        Also checks if the current environment is compatible with the AmberInteface().
+        Calls parent class.
         """
-        self.config_ = config
-        if not self.config_:
-            self.config_ = default_amber_config()
-        self.env_manager_ = em.EnvironmentManager(
-            env_vars=self.config_.required_env_vars(),
-            executables=self.config_.required_executables(),
-        )
-        self.env_manager_.check_environment()
-        self.compatible_env_ = self.env_manager_.is_missing()
+        super().__init__(parent, config, default_amber_config)
 
     # == interface general == TODO: go to a class
     def config(self) -> AmberConfig:

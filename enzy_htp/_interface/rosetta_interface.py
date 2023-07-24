@@ -692,7 +692,7 @@ class RosettaInterface(BaseInterface):
 
     def mutate(self,
         molfile:str, 
-        mutations:List[str,int,str]
+        mutations:List[Tuple[str,int,str]]
         ) -> str:
         """Using Rosetta to mutate a protein
 
