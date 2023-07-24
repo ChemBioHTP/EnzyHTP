@@ -455,67 +455,6 @@ class RosettaInterface(BaseInterface):
 
         return df
 
-    def score(
-        self,
-        infile: str,
-        ignore_zero_occupancy: bool = True,
-        overwrite: bool = True,
-        extra_flags: List[str] = None,
-        output_dir: str = './',
-        delete_scores: bool = True,
-        delete_crash: bool = True,
-    ) -> float:
-        """Provides the total score in Rosetta Energy Units (REU) for a given structure. Uses default flags but can have behavior modified
-        via supplied extra_flags. Returns the total score in REU.
-
-        Arguments:
-            infile: A str() with the path to the .pdb file to relax. 
-            ignore_zero_occupancy: If relax should ignore atoms with zero occupancy. True by default.
-            overwrite: If results should be overwritten. True by default.
-            extra_flags: A List[str] of extra flags to be added to the commandline. Empty by default. NOT CHECKED FOR CORRECTNESS. 
-            output_dir: The output directory where the files will be saved. './' by default.
-            delete_scores: Whether the score.sc file should be deleted after running. True by default.
-            delete_crash: Whether the ROSETTA_CRASH.log file should be deleted after running. True by default.
-
-        Returns:
-            Score of structure in file in REU.
-
-        """
-        fs.check_file_exists(infile)
-
-        flags: List[str] = [
-            f"-in:file:s '{infile}'",
-            "-ignore_unrecognized_res",
-        ]
-
-        flags.append(f"-ignore_zero_occupancy {'true' if ignore_zero_occupancy else 'false'}")
-        flags.append(f"-out:path:all {output_dir}")
-
-        if overwrite:
-            flags.append("-overwrite")
-
-        if extra_flags:
-            flags.extend(extra_flags)
-
-        fs.safe_rm(f"{output_dir}/score.sc")
-
-        fs.safe_mkdir(output_dir)
-
-        self.env_manager_.run_command(self.config_.SCORE, flags)
-
-        df: pd.DataFrame = self.parse_score_file(f"{output_dir}/score.sc")
-
-        if len(df) != 1:
-            _LOGGER.error("Found more than one entry in score.sc file. Exiting...")
-            exit(1)
-
-        if delete_scores:
-            self._delete_score_file(output_dir)
-
-        if delete_crash:
-            self._delete_crash_log()
-
-        return df.iloc[0].total_score
 
     def write_script(self, fname: str, args: List[Dict]) -> str:
         """Writes an XML script to be used with RosettaScripts. Each element of the XML script is represented
@@ -749,3 +688,31 @@ class RosettaInterface(BaseInterface):
             self._delete_crash_log()
 
         return df
+
+
+    def mutate(self,
+        molfile:str, 
+        mutations:List[str,int,str]
+        ) -> str:
+        """Using Rosetta to mutate a protein
+
+        Args:
+            molfile:
+            mutations:
+    
+        Returns:
+            The mutated structure.
+        """
+        
+        # validation 
+        for row in mutations:
+            if len(row) != 3:
+                pass
+        pass
+        args:List[Dict] = list() 
+        xml_file:str=f"{Path(mofile).parent}/__temp.xml"
+        self.write_script(
+            xml_file,
+            args
+        )
+    

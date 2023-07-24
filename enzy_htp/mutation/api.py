@@ -202,6 +202,7 @@ def mutate_stru(
                 (current available keywords):
                 tleap_min
                 pymol
+                rosetta
                 # TODO may need to add more arg when deletion and insertion are supported
                 # (e.g.: engine_del, engine_ins)
         in_place:
@@ -426,7 +427,8 @@ def mutate_stru_with_pymol(
 
 MUTATE_STRU_ENGINE = {
     "tleap_min" : mutate_stru_with_tleap,
-    "pymol" : mutate_stru_with_pymol
+    "pymol" : mutate_stru_with_pymol,
+    "rosetta": mutate_stru_with_rosetta
 }
 """engines for mutate_stru()"""
 
@@ -464,6 +466,60 @@ def check_mutant_stru(
     for checker, kwargs in checker_config.items():
         _LOGGER.debug(f"Checking {checker}...")
         MUTANT_STRU_ERROR_CHECKER[checker](mutant_stru, mutant, **kwargs)
+
+def mutate_stru_with_rosetta(
+        stru: Structure,
+        mutant: List[Mutation],
+        in_place: bool = False,
+        ) -> Union[Structure, None]:
+    """Applies mutations to a function using the Rosetta engine. 
+    Args:
+        stru: the 'WT' structure
+        mutant: a list of Mutation() which describes a mutant to the 'WT'
+        in_place: if make the changes to the structure in-place 
+    Returns:
+        The mutated structure. May be nothing.
+    """
+    
+    # san check
+    for mut in mutant:
+        if not isinstance(mut, Mutation):
+            _LOGGER.error(
+                f"mutant takes only a list of Mutation(). Current mutant is: {mutant}")
+            raise TypeError
+ 
+    stru_cpy = copy.deepcopy(stru)
+
+    if_retain_order = True
+    exit( 1 )
+    # if structure is multichain, set retain_order to false and raise a flag to mark multichain structure
+    # for further treatment
+#    if stru_cpy.num_chains > 2:
+#        if_multichain = True
+#        if_retain_order = False
+#    else:
+#        if_multichain = False
+#
+#    # 1. load stru into pymol
+#    pi = interface.pymol
+#    with OpenPyMolSession(pi) as pms:
+#        pymol_obj_name = pi.load_enzy_htp_stru(stru_cpy, pymol_session=pms)[0]
+#        # 2. loop through mutants and apply each one
+#        for mut in mutant:
+#            pi.point_mutate(mut.get_position_key(), mut.get_target(), pymol_obj_name, pms)
+#        # 3. save to a structure.
+#        pymol_mutant_stru = pi.export_enzy_htp_stru(pymol_obj_name, pms,
+#                                                    if_retain_order=if_retain_order, if_multichain=if_multichain)
+#
+#    # 4. update residues
+#    stru_oper.update_residues(stru_cpy, pymol_mutant_stru)
+#
+#    if in_place:
+#        stru_oper.update_residues(stru, stru_cpy)
+#        return stru
+#
+#    return stru_cpy
+
 
 def check_mutation_topology_error(stru: Structure, mutant: List[Mutation]):
     """check {stru} for topology error. (check for only the mutated residue)
