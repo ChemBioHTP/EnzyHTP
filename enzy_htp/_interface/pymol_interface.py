@@ -339,6 +339,9 @@ class PyMolInterface(BaseInterface):
         Returns:
             The name of the deprotonated structure.
         """
+        
+        _LOGGER.warning("This function should be used for non-amino acid structures only!") 
+
         self.check_pymol2_installed()
 
         if not session:
