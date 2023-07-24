@@ -25,13 +25,19 @@ class MultiwfnConfig:
     EXE: str = "Multiwfn"
     """Name of the """
 
-    DIR: str = "$Multiwfnpath"
+    DIR: str = "Multiwfnpath"
 
-    def required_executables(self):
+    def required_executables(self) -> List[str]:
+        """ """
         return [self.EXE]
 
-    def required_env_vars(self):
+    def required_env_vars(self) -> List[str]:
+        """ """
         return [self.DIR]
+
+    def required_py_modules(self) -> List[str]:
+        """ """
+        return list()
 
     def __getitem__(self, key: str) -> Any:
         if key.count("."):

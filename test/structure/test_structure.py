@@ -113,8 +113,7 @@ def equiv_files(fname1: str, fname2: str, width: int = None) -> bool:
                 return idx + 1
         return -1
 
-    for line_idx, (l1, l2) in enumerate(
-            zip(fs.lines_from_file(fname1), fs.lines_from_file(fname2))):
+    for line_idx, (l1, l2) in enumerate(zip(fs.lines_from_file(fname1), fs.lines_from_file(fname2))):
         if width:
             l1 = l1[:width]
             l2 = l2[:width]
@@ -131,9 +130,7 @@ def equiv_files(fname1: str, fname2: str, width: int = None) -> bool:
             print(f"'{l1}'")
             print(f"'{l2}'")
             print("".join(diff))
-            print(
-                f"Difference encountered on line {line_idx}. '{fname1}' and '{fname2}' are NOT equivalent"
-            )
+            print(f"Difference encountered on line {line_idx}. '{fname1}' and '{fname2}' are NOT equivalent")
             return False
     return True
 
@@ -142,6 +139,7 @@ def test_atoms():  # TODO(shaoqz) wait for test
     TEST_FILE = f"{TEST_DIR}/preparation/data/3NIR.pdb"
     struct: Structure = PDBParser().get_structure(TEST_FILE)
     assert struct.atoms
+
 
 def test_deepcopy():
     """test the hehavior of copy.deepcopy on Structure()
@@ -158,6 +156,7 @@ def test_deepcopy():
             for atom in res:
                 assert atom.parent is res
 
+
 def test_find_residue_with_key(caplog):
     """test function works as expected"""
     pdb_file_path = f"{DATA_DIR}1Q4T_ligand_test.pdb"
@@ -171,6 +170,7 @@ def test_find_residue_with_key(caplog):
     # non case
     assert not stru.find_residue_with_key(("A", 448))
     assert "Didn't find any residue with key: ('A', 448)" in caplog.text
+
 
 def test_init_connect():
     """test function works as expected"""

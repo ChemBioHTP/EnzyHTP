@@ -28,11 +28,7 @@ class Solvent(Residue):
         (same as residue)
     """
 
-    def __init__(self,
-                 residue_idx: int,
-                 residue_name: str,
-                 atoms: List[Atom],
-                 parent=None):
+    def __init__(self, residue_idx: int, residue_name: str, atoms: List[Atom], parent=None):
         """Constructor for Solvent. Identical to Residue() ctor. SHOULD NOT be called directly by users.
         Instead use enzy_htp.structure.solvent.residue_to_solvent()."""
         Residue.__init__(self, residue_idx, residue_name, atoms, parent)
@@ -48,12 +44,14 @@ class Solvent(Residue):
 
         if method not in support_method_list:
             _LOGGER.error(f"Method {method} not in supported list: {support_method_list}")
+
     #endregion
 
     #region === Checker ===
     def is_solvent(self) -> bool:
         """Checks if the Solvent() is an solvent. Hard-coded to True for this derived class."""
         return True
+
     #endregion
 
     # def clone(self) -> Solvent:

@@ -10,8 +10,7 @@ Date: 2022-06-15
 import copy
 import re
 from typing import List, Dict, Tuple, Union
-from enzy_htp.chemical.residue import (CAA_CHARGE_MAPPER, ONE_LETTER_AA_MAPPER, THREE_LETTER_AA_MAPPER,
-                                       convert_to_canonical_three_letter,
+from enzy_htp.chemical.residue import (CAA_CHARGE_MAPPER, ONE_LETTER_AA_MAPPER, THREE_LETTER_AA_MAPPER, convert_to_canonical_three_letter,
                                        convert_to_one_letter, convert_to_three_letter)
 
 from enzy_htp.core.exception import InvalidMutationFlagSyntax, InvalidMutation
@@ -19,6 +18,7 @@ from enzy_htp.core.general import get_copy_of_deleted_dict
 from enzy_htp.core.logger import _LOGGER
 import enzy_htp.chemical as chem
 import enzy_htp.structure as es
+
 
 class Mutation:
     """representing a single point mutation in an enzyme.
@@ -30,7 +30,7 @@ class Mutation:
 
         *In the case of WT, the tuple is defined as (None, "WT", None, None)
     """
-    
+
     SUPPORTED_MUTATION_TARGET_LIST = get_copy_of_deleted_dict(ONE_LETTER_AA_MAPPER, "U")
     """The list of EnzyHTP supported mutation target-residue list.
     add upon supporting. will do ncaa in the future
@@ -69,7 +69,7 @@ class Mutation:
         if self == (None, "WT", None, None):
             return True
 
-        # get data type right 
+        # get data type right
         # yapf: disable
         if (not isinstance(self.orig, str) or not isinstance(self.target, str)
                 or not isinstance(self.chain_id, str)
@@ -81,28 +81,20 @@ class Mutation:
         if self.chain_id.strip() is "":
             raise InvalidMutation(f"empty chain_id in: {self}")
         if self.chain_id not in stru.chain_mapper:
-            raise InvalidMutation(
-                f"chain id in {self} does not exist in structure (in-stru: {stru.chain_mapper.keys()})"
-            )
+            raise InvalidMutation(f"chain id in {self} does not exist in structure (in-stru: {stru.chain_mapper.keys()})")
         if self.res_idx not in stru[self.chain_id].residue_idxs:
-            raise InvalidMutation(
-                f"res_idx in {self} does not exist in structure (in-stru: {stru[self.chain_id].residue_idx_interval()})"
-            )
+            raise InvalidMutation(f"res_idx in {self} does not exist in structure (in-stru: {stru[self.chain_id].residue_idx_interval()})")
 
         # Mutation.orig: if match the original residue in the {stru}
-        real_orig = convert_to_canonical_three_letter(
-            stru[self.chain_id].find_residue_idx(self.res_idx).name)
+        real_orig = convert_to_canonical_three_letter(stru[self.chain_id].find_residue_idx(self.res_idx).name)
         if real_orig != self.orig:
-            raise InvalidMutation(
-                f"original residue does not match in: {self} (real_orig: {real_orig})")
+            raise InvalidMutation(f"original residue does not match in: {self} (real_orig: {real_orig})")
 
         # Mutation.target: a one-letter amino-acid code in the allowed list & different from orig
         if self.get_target(if_one_letter=True) not in self.SUPPORTED_MUTATION_TARGET_LIST:
             raise InvalidMutation(f"unsupported target residue in: {self}")
         if self.target == self.orig:
-            raise InvalidMutation(
-                f"equivalent mutation detected in: {self}. Should be (None, \"WT\", None, None)."
-            )
+            raise InvalidMutation(f"equivalent mutation detected in: {self}. Should be (None, \"WT\", None, None).")
 
         return True
 
@@ -113,13 +105,11 @@ class Mutation:
             return convert_to_one_letter(self.target)
         return self.target
 
-
     def get_orig(self, if_one_letter: bool = False) -> str:
         """get the original residue in 1/3-letter format"""
         if if_one_letter and (self.orig in THREE_LETTER_AA_MAPPER):  # for ncaa we want to use 3 letter
             return convert_to_one_letter(self.orig)
         return self.orig
-
 
     def get_position_key(self) -> Tuple[str, int]:
         """get the position key in a form of (chain_id, res_idx)
@@ -145,29 +135,24 @@ class Mutation:
             setattr(result, k, v)
         return result
 
-
     # special
     def __eq__(self, target) -> bool:
         """mimik the nametuple behavior. historical reason."""
         return self.mutation_tuple == target
 
-
     def __getitem__(self, idx: int) -> Union[str, int]:
         """mimik the nametuple behavior. historical reason."""
         return self.mutation_tuple[idx]
 
-
     def __hash__(self) -> int:
         """support set()"""
         return hash(self.mutation_tuple)
-
 
     def __str__(self) -> str:
         """give a string representation of the mutation"""
         if self.target == "WT":
             return "WT"
         return f"{self.get_orig(if_one_letter=True)}{self.chain_id}{self.res_idx}{self.get_target(if_one_letter=True)}"
-
 
     def __repr__(self) -> str:
         """give a string representation of the mutation"""
@@ -187,8 +172,7 @@ def generate_from_mutation_flag(mutation_flag: str) -> Mutation:
     pattern = r"([A-Z])([A-Z])?([0-9]+)([A-Z])"
     flag_match = re.match(pattern, mutation_flag)
     if flag_match is None:
-        raise InvalidMutationFlagSyntax(
-            f"{mutation_flag} doesnt match ([A-Z])([A-Z])?([0-9]+)([A-Z])")
+        raise InvalidMutationFlagSyntax(f"{mutation_flag} doesnt match ([A-Z])([A-Z])?([0-9]+)([A-Z])")
 
     orig = convert_to_three_letter(flag_match.group(1))
     chain_id = flag_match.group(2)
@@ -205,8 +189,7 @@ def generate_from_mutation_flag(mutation_flag: str) -> Mutation:
     return Mutation(orig, target, chain_id, res_idx)
 
 
-def generate_mutation_from_traget_list(position: Tuple[str, int], orig_resi: str,
-                                       target_list: str) -> List[Mutation]:
+def generate_mutation_from_traget_list(position: Tuple[str, int], orig_resi: str, target_list: str) -> List[Mutation]:
     """generate a list of Mutation() objects from position and a list of target residues
     Args:
         position: the sequence position of the mutation (e.g.: A 101)
@@ -219,10 +202,11 @@ def generate_mutation_from_traget_list(position: Tuple[str, int], orig_resi: str
     for target in target_list:
         result.append(
             Mutation(orig=convert_to_canonical_three_letter(orig_resi),
-                    target=convert_to_canonical_three_letter(target),
-                    chain_id=position[0],
-                    res_idx=position[1]))
+                     target=convert_to_canonical_three_letter(target),
+                     chain_id=position[0],
+                     res_idx=position[1]))
     return result
+
 
 # --Mutant--
 # below utilities are for a list of Mutation()
@@ -238,8 +222,9 @@ def check_repeat_mutation(mutant: List[Mutation]):
         mutation_posi.append(position_key)
     return False
 
+
 # == editor ==
-def remove_repeat_mutation(mutant: List[Mutation], keep: str= "last") -> List[Mutation]:
+def remove_repeat_mutation(mutant: List[Mutation], keep: str = "last") -> List[Mutation]:
     """remove all mutations that have repeating position in the mutant
     and keep only the {keep} specificed one.
     Args:
@@ -258,6 +243,7 @@ def remove_repeat_mutation(mutant: List[Mutation], keep: str= "last") -> List[Mu
                 continue
         mutation_mapper[position_key] = mut
     return list(mutation_mapper.values())
+
 
 # == property getter ==
 def get_mutant_name_tag(mutant: List[Mutation]) -> str:

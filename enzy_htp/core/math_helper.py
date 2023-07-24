@@ -16,8 +16,7 @@ def check_valid_ph(ph: float) -> NonCallableMock:
         _LOGGER.warning(f"assigned pH: {ph:.2f} out of range: [0.00,14.00]")
 
 
-def set_distance(p1: Union[tuple, list], p2: Union[tuple, list],
-                 d: float) -> Tuple[float, float, float]:
+def set_distance(p1: Union[tuple, list], p2: Union[tuple, list], d: float) -> Tuple[float, float, float]:
     """
     determine the coordinate of a point p3 with p1, p2, and d.
     p3 will be in the projection line of p1->p2 and have a d distance with p1.
@@ -78,8 +77,7 @@ def get_dihedral(p1: Union[tuple, list], p2: Union[tuple, list],
     return dihedral
 
 
-def get_center(p1: Union[tuple, list],
-               p2: Union[tuple, list]) -> Tuple[float, float, float]:
+def get_center(p1: Union[tuple, list], p2: Union[tuple, list]) -> Tuple[float, float, float]:
     """
     return the center of p1 and p2
     """
@@ -87,9 +85,11 @@ def get_center(p1: Union[tuple, list],
 
     return tuple(p3)
 
+
 def get_geom_center(list_of_p: list) -> Tuple[float, float, float]:
     """get the geometric center of a list of points"""
     return tuple(np.mean(np.array(list_of_p), axis=0))
+
 
 def round_by(num: float, cutnum: float) -> int:
     """
@@ -100,6 +100,7 @@ def round_by(num: float, cutnum: float) -> int:
     if dec_part > cutnum:
         int_part += 1
     return int(int_part)
+
 
 def calc_average_task_num(num_of_task: int, num_of_worker: int) -> List[int]:
     """calculate task number for each worker based on {num_of_task} and

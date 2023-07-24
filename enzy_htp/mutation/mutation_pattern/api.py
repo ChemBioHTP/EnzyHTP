@@ -11,11 +11,9 @@ import itertools
 
 from enzy_htp.core.exception import InvalidMutationPatternSyntax
 from enzy_htp.core.logger import _LOGGER
-from enzy_htp.core.general import (get_random_list_elem, pop_random_list_elem,
-                                   product_lists_allow_empty)
+from enzy_htp.core.general import (get_random_list_elem, pop_random_list_elem, product_lists_allow_empty)
 from enzy_htp.structure import Structure
-from ..mutation import (Mutation, generate_from_mutation_flag,
-                        generate_mutation_from_traget_list)
+from ..mutation import (Mutation, generate_from_mutation_flag, generate_mutation_from_traget_list)
 from .position_pattern import decode_position_pattern
 from .target_aa_pattern import check_target_aa_pattern, decode_target_aa_pattern
 
@@ -40,8 +38,7 @@ def decode_mutation_pattern(stru: Structure, pattern: str) -> List[List[Mutation
         for section_pattern in section_patterns:
             section_type = get_section_type(section_pattern)
             # here we decode it into a list of mutants each composed by a list of Mutation
-            p_mutant_mapper[section_pattern] = TYPE_SECTION_DECODERS[section_type](
-                stru, section_pattern)
+            p_mutant_mapper[section_pattern] = TYPE_SECTION_DECODERS[section_type](stru, section_pattern)
         pattern_mutants = combine_section_mutant(p_mutant_mapper)
         result_mutants.extend(pattern_mutants)
     return result_mutants
@@ -80,9 +77,8 @@ def get_section_type(section_pattern: str) -> str:
         return "a"
     if section_pattern[0].isupper():
         return "d"
-    raise InvalidMutationPatternSyntax(
-        f"Mutation pattern section startswith unsupported letter {section_pattern[0]}. Cant determine type."
-    )
+    raise InvalidMutationPatternSyntax(f"Mutation pattern section startswith unsupported letter {section_pattern[0]}. Cant determine type.")
+
 
 # d:
 def decode_direct_mutation(stru: Structure, section_pattern: str) -> List[List[Mutation]]:
@@ -92,6 +88,7 @@ def decode_direct_mutation(stru: Structure, section_pattern: str) -> List[List[M
     mutation_obj = generate_from_mutation_flag(section_pattern)
     mutation_obj.is_valid_mutation(stru)
     return [[mutation_obj]]
+
 
 # r:
 def decode_random_mutation(stru: Structure, section_pattern: str) -> List[List[Mutation]]:
@@ -109,15 +106,13 @@ def decode_random_mutation(stru: Structure, section_pattern: str) -> List[List[M
         (R stands for whether repeating mutation is allowed for each mutant and
         whether repeating mutant is allowed in the result, respectively)"""
     re_pattern = r"r:([0-9]*)(R?)\[(.+)\]\*([0-9]*)(R?)"
-    mut_point_num, point_allow_repeat, mutation_esm_patterns, mutant_num, mutant_allow_repeat = re.match(
-        re_pattern, section_pattern).groups()
+    mut_point_num, point_allow_repeat, mutation_esm_patterns, mutant_num, mutant_allow_repeat = re.match(re_pattern,
+                                                                                                         section_pattern).groups()
     mut_point_num = int(mut_point_num)
     mutant_num = int(mutant_num)
     mutation_esm_mapper = decode_mutation_esm_pattern(stru, mutation_esm_patterns)  # {mutation_site: Mutation}
 
-    _LOGGER.info(
-        f"generating random mutants in positions: {list(mutation_esm_mapper.keys())} ({len(mutation_esm_mapper)} sites total)"
-    )
+    _LOGGER.info(f"generating random mutants in positions: {list(mutation_esm_mapper.keys())} ({len(mutation_esm_mapper)} sites total)")
     if len(mutation_esm_mapper) < mut_point_num:
         raise InvalidMutationPatternSyntax(
             f"number of desired point mutations are more than the total number of possible mutation sites in the ensemble, desired: {mut_point_num}, possible_sites: {len(mutation_esm_mapper)}"
@@ -131,7 +126,7 @@ def decode_random_mutation(stru: Structure, section_pattern: str) -> List[List[M
         if not point_allow_repeat:
             non_repeat_points = list(mutation_esm_mapper.keys())
 
-        temp_point_num = mut_point_num # will only not eq to mut_point_num when repeat is allowed
+        temp_point_num = mut_point_num  # will only not eq to mut_point_num when repeat is allowed
         while len(each_mutant) < temp_point_num:
             # 1. determine positionn
             if point_allow_repeat:
@@ -153,14 +148,13 @@ def decode_random_mutation(stru: Structure, section_pattern: str) -> List[List[M
         else:  # do not allow repeat mutant -- check if repeat
             each_mutant = set(each_mutant.values())
             if each_mutant in result:
-                _LOGGER.info(
-                    f"repeating MUTANT is generated: {each_mutant}, regenerating it. (point_allow_repeat: False)"
-                )
+                _LOGGER.info(f"repeating MUTANT is generated: {each_mutant}, regenerating it. (point_allow_repeat: False)")
                 continue
             result.append(each_mutant)
 
     result = [list(x) for x in result]
     return result
+
 
 # a:
 def decode_all_mutation(stru: Structure, section_pattern: str) -> List[List[Mutation]]:
@@ -198,9 +192,7 @@ TYPE_SECTION_DECODERS = {
 }
 
 
-def decode_mutation_esm_pattern(
-        stru: Structure,
-        mutation_esm_patterns: str) -> Dict[Tuple[str, int], List[Mutation]]:
+def decode_mutation_esm_pattern(stru: Structure, mutation_esm_patterns: str) -> Dict[Tuple[str, int], List[Mutation]]:
     """decode mutation esm pattern into a list of mutation objects
     pattern_example: position_pattern_0:target_aa_pattern_0, ...
     NOTE: if different mutation_esm_pattern have shared points.
@@ -216,9 +208,7 @@ def decode_mutation_esm_pattern(
 
     esm_result: Dict[tuple, List[Mutation]] = {}
     seperate_pattern = r"(?:[^,(]|(?:\([^\}]*\)))+[^,]*"
-    esm_pattern_list = [
-        i.strip() for i in re.findall(seperate_pattern, mutation_esm_patterns)
-    ]
+    esm_pattern_list = [i.strip() for i in re.findall(seperate_pattern, mutation_esm_patterns)]
     for esm_pattern in esm_pattern_list:
         position_pattern, target_aa_pattern = esm_pattern.split(":")
         check_target_aa_pattern(target_aa_pattern)  # give warning about pattern
@@ -233,9 +223,7 @@ def decode_mutation_esm_pattern(
     # logging
     _LOGGER.info("Mutation ensemble of the section:")
     for k, v in esm_result.items():
-        _LOGGER.info(
-            f"    {k} : {[x.get_target(if_one_letter=True) for x in v]} (total: {len(v)})"
-        )
+        _LOGGER.info(f"    {k} : {[x.get_target(if_one_letter=True) for x in v]} (total: {len(v)})")
     _LOGGER.info(f"(total: {len(esm_result)} position)")
 
     return esm_result
@@ -248,8 +236,5 @@ def combine_section_mutant(mutation_mapper: Dict[str, List[List[Mutation]]]) -> 
     NOTE: merge repeating mutations into one and result permutation of combination
           of each section"""
     if len(mutation_mapper) == 1:
-        return list(mutation_mapper.values())[0] # save a lot of time
-    return [
-        list(set(itertools.chain.from_iterable(x)))
-        for x in itertools.product(*mutation_mapper.values())
-    ]
+        return list(mutation_mapper.values())[0]  # save a lot of time
+    return [list(set(itertools.chain.from_iterable(x))) for x in itertools.product(*mutation_mapper.values())]

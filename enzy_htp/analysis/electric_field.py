@@ -38,9 +38,7 @@ def electric_field(stru: Structure,
 
     allowed_locs: List[str] = 'p1 p2 center'.split()
     if location not in allowed_locs:
-        _LOGGER.error(
-            f"The supplied location {location} is valid. Acceptable values include: '{', '.join(allowed_locs)}'"
-        )
+        _LOGGER.error(f"The supplied location {location} is valid. Acceptable values include: '{', '.join(allowed_locs)}'")
         exit(1)
 
     if not stru.has_charges():

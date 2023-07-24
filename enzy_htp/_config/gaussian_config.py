@@ -77,10 +77,16 @@ class GaussianConfig:
         self._parent = parent
 
     def required_executables(self) -> List[str]:
+        """ """
         return [self.G16_EXE, self.G09_EXE]
 
     def required_env_vars(self):
+        """ """
         return []
+
+    def required_py_modules(self) -> List[str]:
+        """ """
+        return list()
 
     def __getitem__(self, key: str) -> Any:
         if key.count("."):

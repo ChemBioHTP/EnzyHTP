@@ -31,11 +31,7 @@ class MetalUnit(Residue):
         atom_name : the name of the atom of the MetalUnit unit
     """
 
-    def __init__(self,
-                 residue_idx: int,
-                 residue_name: str,
-                 atoms: List[Atom],
-                 parent=None):
+    def __init__(self, residue_idx: int, residue_name: str, atoms: List[Atom], parent=None):
         """Constructor for MetalUnit. Identical to Residue() constructor."""
         Residue.__init__(self, residue_idx, residue_name, atoms, parent)
         self.rtype = chem.ResidueType.METAL
@@ -72,24 +68,20 @@ class MetalUnit(Residue):
         """return the coordinate of the atom in the unit"""
         return self.atom.coord
 
-    def get_donor_mapper(self,
-                         method: str = "ionic",
-                         check_radius: int = 4.0) -> Dict[Residue, List[Atom]]:
+    def get_donor_mapper(self, method: str = "ionic", check_radius: int = 4.0) -> Dict[Residue, List[Atom]]:
         """
         get a mapper of {donor_residue : donor_atom_in_this_residue, ...} for a metal center
         """
         donor_mapper = {}
         donor_atoms = self.get_donor_atoms(method, check_radius)
         atoms_groupby_residue = itertools.groupby(
-            donor_atoms, lambda a: a.residue
-        )  # be careful if you want to turn this into a list. groupitem may lose
+            donor_atoms, lambda a: a.residue)  # be careful if you want to turn this into a list. groupitem may lose
         for i, j in atoms_groupby_residue:
             donor_mapper[i] = list(j)
         # san check
         for k, v in donor_mapper.items():
             if len(v) > 1:
-                _LOGGER.warning(
-                    f"More than 1 donor atom in residue {k} to center {self}: {v}")
+                _LOGGER.warning(f"More than 1 donor atom in residue {k} to center {self}: {v}")
         return donor_mapper
 
     def get_donor_atoms(self, method: str = "ionic", check_radius=4.0) -> List[Atom]:
@@ -112,15 +104,13 @@ class MetalUnit(Residue):
         # find radius for matal
         r_metal = self.atom.radius(method)
         # get target with in check_radius (default: 4A)
-        range_atoms = self.chain.parent.find_atoms_in_range(self.coord,
-                                                            range_distance=check_radius)
+        range_atoms = self.chain.parent.find_atoms_in_range(self.coord, range_distance=check_radius)
         atom: Atom
         for atom in range_atoms:
             # only check donor atom (by atom name)
             if atom.is_donor_atom():
                 r_donor = atom.radius(method)
-                if atom.distance_to(self.atom) - (
-                        r_metal + r_donor) <= 0.01:  # TODO refine this approximation
+                if atom.distance_to(self.atom) - (r_metal + r_donor) <= 0.01:  # TODO refine this approximation
                     result.append(atom)
                     _LOGGER.info(f"found donor atom of {self}: {atom}")
         return result
@@ -198,8 +188,7 @@ class MetalUnit(Residue):
                 resi.deprotonate(resi.d_atom)
             else:
                 if resi.name not in NoProton_list:
-                    print("!WARNING!: uncommon donor residue -- " + resi.chain.id + " " +
-                          resi.name + str(resi.id))
+                    print("!WARNING!: uncommon donor residue -- " + resi.chain.id + " " + resi.name + str(resi.id))
                     # resi.rot_proton(resi.d_atom)
 
     def _metal_fix_2(self):  # @nu
@@ -216,12 +205,7 @@ class MetalUnit(Residue):
         """
         pass
 
-    def build(self,
-              a_id=None,
-              r_id=None,
-              c_id=None,
-              ff="AMBER",
-              forcefield="ff14SB"):  # @nu
+    def build(self, a_id=None, r_id=None, c_id=None, ff="AMBER", forcefield="ff14SB"):  # @nu
         """
         generate an metal atom output line. End with LF
         return a line str
@@ -256,8 +240,8 @@ class MetalUnit(Residue):
             z = "{:>8.3f}".format(self.coord[2])
 
         # example: ATOM   5350  HB2 PRO   347      32.611  15.301  24.034  1.00  0.00
-        line = (l_type + a_index + " " + a_name + "   " + r_name + " " + c_index +
-                r_index + "    " + x + y + z + "  1.00  0.00" + line_feed)
+        line = (l_type + a_index + " " + a_name + "   " + r_name + " " + c_index + r_index + "    " + x + y + z + "  1.00  0.00" +
+                line_feed)
 
         return line
 
@@ -281,8 +265,7 @@ class MetalUnit(Residue):
             fz_flag = "-1"
             ly_flag = "L"
             if cnt_info != None:
-                cnt_flag = (" " + cnt_info[0] + "-" + cnt_info[1] + " " +
-                            str(cnt_info[2]))
+                cnt_flag = (" " + cnt_info[0] + "-" + cnt_info[1] + " " + str(cnt_info[2]))
 
         # label
         if self.resi_name in G16_label_map.keys():
@@ -290,9 +273,7 @@ class MetalUnit(Residue):
         else:
             if Config.debug >= 1:
                 print("Metal: " + self.name + " not in build-in atom type of ff96.")
-                print(
-                    "Use parameters and atom types from TIP3P (frcmod.ionsjc_tip3p & frcmod.ions234lm_126_tip3p)"
-                )
+                print("Use parameters and atom types from TIP3P (frcmod.ionsjc_tip3p & frcmod.ions234lm_126_tip3p)")
             G16_label = self.resi_name.strip("+-") + "0"
             self.parm = tip3p_metal_map[self.resi_name][self.name]
             self.parm[0] = G16_label
@@ -302,19 +283,15 @@ class MetalUnit(Residue):
             try:
                 chrg = self.charge  # from prmtop
             except NameError:
-                raise Exception(
-                    "You need to at least provide a charge or use get_atom_charge to get one from prmtop file."
-                )
+                raise Exception("You need to at least provide a charge or use get_atom_charge to get one from prmtop file.")
 
-        atom_label = "{:<16}".format(" " + self.ele + "-" + G16_label + "-" +
-                                     str(round(chrg, 6)))
+        atom_label = "{:<16}".format(" " + self.ele + "-" + G16_label + "-" + str(round(chrg, 6)))
         fz_flag = "{:>2}".format(fz_flag)
         x = "{:<14.8f}".format(self.coord[0])
         y = "{:<14.8f}".format(self.coord[1])
         z = "{:<14.8f}".format(self.coord[2])
 
-        line = (atom_label + " " + fz_flag + "   " + x + " " + y + " " + z + " " +
-                ly_flag + cnt_flag + line_feed)
+        line = (atom_label + " " + fz_flag + "   " + x + " " + y + " " + z + " " + ly_flag + cnt_flag + line_feed)
 
         return line
 
@@ -331,8 +308,6 @@ class MetalUnit(Residue):
 def residue_to_metal(residue: Residue) -> MetalUnit:
     """Convenience function that converts Residue() to MetalUnit() object."""
     if len(residue.atoms) > 1:
-        _LOGGER.error(
-            f"Found more than 1 atom in a metal residue unit: {residue.idx} {residue.name}"
-        )
+        _LOGGER.error(f"Found more than 1 atom in a metal residue unit: {residue.idx} {residue.name}")
         sys.exit(1)
     return MetalUnit(residue.idx, residue.name, residue.atoms, residue.parent)

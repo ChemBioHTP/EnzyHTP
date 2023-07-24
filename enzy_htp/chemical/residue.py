@@ -564,8 +564,7 @@ The key is the residue after the mutation."""
 def convert_to_three_letter(one_letter: str) -> str:
     """Converts a one letter amino acid name to a three letter. If supplied code is invalid, raises an enzy_htp.core.InvalidResidueCode() exception."""
     if len(one_letter) != 1:
-        raise InvalidResidueCode(
-            f"expecting one letter residue code. '{one_letter}' is invalid")
+        raise InvalidResidueCode(f"expecting one letter residue code. '{one_letter}' is invalid")
     one_letter = one_letter.upper()
     result = ONE_LETTER_AA_MAPPER.get(one_letter, None)
     if not result:
@@ -576,8 +575,7 @@ def convert_to_three_letter(one_letter: str) -> str:
 def convert_to_canonical_three_letter(three_letter: str) -> str:
     """Converts a one letter amino acid name to a three letter. If supplied code is invalid, raises an enzy_htp.core.InvalidResidueCode() exception."""
     if len(three_letter) != 3:
-        raise InvalidResidueCode(
-            f"expecting three letter residue code. '{three_letter}' is invalid")
+        raise InvalidResidueCode(f"expecting three letter residue code. '{three_letter}' is invalid")
     three_letter = three_letter.upper()
     result = THREE_TO_THREE_LETTER_CAA_MAPPER.get(three_letter, None)
     if not result:
@@ -588,8 +586,7 @@ def convert_to_canonical_three_letter(three_letter: str) -> str:
 def convert_to_one_letter(three_letter: str) -> str:
     """Converts a threee letter amino acid name to a one letter. If supplied code is invalid, raises an enzy_htp.core.InvalidResidueCode() exception."""
     if len(three_letter) != 3:
-        raise InvalidResidueCode(
-            f"expecting three letter residue code. '{three_letter}' is invalid")
+        raise InvalidResidueCode(f"expecting three letter residue code. '{three_letter}' is invalid")
     three_letter = three_letter.upper()
     result = THREE_LETTER_AA_MAPPER.get(three_letter, None)
     if not result:
@@ -600,9 +597,7 @@ def convert_to_one_letter(three_letter: str) -> str:
 def get_element_aliases(ff: str, element: str) -> Set[str]:
     """Gets all element aliases for a given force field (ff) and element name, retungin in a set. If the ff is not supported, will log and exit."""
     if ff not in RESIDUE_ELEMENT_MAP:
-        _LOGGER.error(
-            f"{ff} is not a supported force field type. Allowed are '{', '.join(list(RESIDUE_ELEMENT_MAP.keys()))}'. Exiting..."
-        )
+        _LOGGER.error(f"{ff} is not a supported force field type. Allowed are '{', '.join(list(RESIDUE_ELEMENT_MAP.keys()))}'. Exiting...")
         exit(0)
     ff_dict = RESIDUE_ELEMENT_MAP[ff]
     aliases = []
@@ -625,8 +620,7 @@ def one_letters_except(existing: str) -> List[str]:
 def residue_polarity(code: str) -> str:
     """Determines the polarity of a one-letter nucleotide, being 'negative', 'neutral' or 'positive."""
     if len(code) != 1:
-        raise InvalidResidueCode(
-            f"expecting one letter residue code. '{code}' is invalid")
+        raise InvalidResidueCode(f"expecting one letter residue code. '{code}' is invalid")
 
     result: str() = "unknown"
     for ptype in "positive negative neutral".split():
@@ -639,8 +633,7 @@ def non_polar(code: str) -> bool:
     # TODO(CJ): should probably check if it is a valid one letter residue code
     """Determines if a one-letter nucleotide amino acid is non-polar. Returns True if it is non-polar."""
     if len(code) != 1:
-        raise InvalidResidueCode(
-            f"expecting one letter residue code. '{code}' is invalid")
+        raise InvalidResidueCode(f"expecting one letter residue code. '{code}' is invalid")
 
     return code in RESIDUE_CATEGORIES["nonpolar"]
 
@@ -649,6 +642,7 @@ def polar(code: str) -> bool:
     """Determines if a one-letter nucleotide amino acid is polar. Returns True if it is non-polar."""
     # TODO(CJ): should probably check if it is a valid one letter residue code
     return not non_polar(code)
+
 
 def get_non_mutate_atom_names(residue_name: str) -> List[str]:
     """Get names of atoms that does not involve in a substitution mutation to
@@ -664,12 +658,8 @@ def get_non_mutate_atom_names(residue_name: str) -> List[str]:
     Returns:
         a list of atom names that remains the same before and after mutation"""
     if len(residue_name) != 3:
-        raise InvalidResidueCode(
-            f"expecting three letter residue code. '{residue_name}' is invalid")
+        raise InvalidResidueCode(f"expecting three letter residue code. '{residue_name}' is invalid")
     residue_name = residue_name.upper()
-    result = RESIDUE_NON_MUTATE_ATOM_MAPPER.get(
-        residue_name,
-        RESIDUE_NON_MUTATE_ATOM_MAPPER["default"])
+    result = RESIDUE_NON_MUTATE_ATOM_MAPPER.get(residue_name, RESIDUE_NON_MUTATE_ATOM_MAPPER["default"])
 
     return result
-    
