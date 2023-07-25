@@ -1,7 +1,7 @@
 """Define functions for mutate Structure(). 
 Science API:
     +mutate_stru()
-    +assign_mutation()
+    +assign_mutant()
 
 Mutation is carried out by an underlying engine and the supported engines currently include:
     + Amber/tleap
