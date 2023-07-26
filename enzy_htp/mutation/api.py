@@ -1,7 +1,7 @@
 """Define functions for mutate Structure(). 
 Science API:
     +mutate_stru()
-    +assign_mutation()
+    +assign_mutant()
 
 Mutation is carried out by an underlying engine and the supported engines currently include:
     + Amber/tleap
@@ -21,14 +21,9 @@ from enzy_htp import config
 from enzy_htp.structure import Structure, PDBParser
 import enzy_htp.structure.structure_operation as stru_oper
 from enzy_htp import interface
-from .mutation import (
-    Mutation,
-    check_repeat_mutation,
-    get_mutant_name_tag,
-    remove_repeat_mutation)
+from .mutation import (Mutation, check_repeat_mutation, get_mutant_name_tag, remove_repeat_mutation)
 from .mutation_pattern import decode_mutation_pattern
 from enzy_htp._interface.pymol_interface import OpenPyMolSession
-
 
 
 def assign_mutant(
@@ -124,6 +119,7 @@ def assign_mutant(
                 assert mutation.is_valid_mutation(stru)
     return mutants
 
+
 def sync_mutation_over_chains(mutants: List[List[Mutation]],
                               chain_sync_list: List[Tuple[str]],
                               chain_index_mapper: Dict[str, int] = None) -> List[List[Mutation]]:
@@ -173,19 +169,18 @@ def sync_mutation_over_chains(mutants: List[List[Mutation]],
                         # The index of the corresponding residue needs to be find by *pair-wise align* of the target and origin sequence and
                         # get the same aligned index.
                         new_mutant.append(new_mut)
-                    break # one chain id can only be in one group
+                    break  # one chain id can only be in one group
         result.append(list(set(new_mutant)))
     return result
 
-def mutate_stru(
-    stru: Structure,
-    mutant: List[Mutation],
-    engine: str = "tleap_min",
-    in_place: bool = False,
-    if_check_mutant_stru: bool = True,
-    checker_config: Dict[str, Dict[str, Any]] = None,
-    **kwargs
-) -> Structure:
+
+def mutate_stru(stru: Structure,
+                mutant: List[Mutation],
+                engine: str = "tleap_min",
+                in_place: bool = False,
+                if_check_mutant_stru: bool = True,
+                checker_config: Dict[str, Dict[str, Any]] = None,
+                **kwargs) -> Structure:
     """
     This science API solves the problem of protein structural prediction upon mutation.
     It means to determine which mutation to address and determine the structure of the
@@ -202,6 +197,7 @@ def mutate_stru(
                 (current available keywords):
                 tleap_min
                 pymol
+                rosetta
                 # TODO may need to add more arg when deletion and insertion are supported
                 # (e.g.: engine_del, engine_ins)
         in_place:
@@ -290,8 +286,7 @@ def mutate_stru(
     """
     # deal with repeating mutation
     if check_repeat_mutation(mutant):
-        _LOGGER.warning(
-            f"Detected repeating mutation in mutant: {mutant}. Only use the last one.")
+        _LOGGER.warning(f"Detected repeating mutation in mutant: {mutant}. Only use the last one.")
         mutant = remove_repeat_mutation(mutant, keep="last")
     # apply the mutation
     mutator = MUTATE_STRU_ENGINE[engine]
@@ -301,14 +296,15 @@ def mutate_stru(
         check_mutant_stru(mutant_stru, mutant, checker_config)
     return mutant_stru
 
+
 def mutate_stru_with_tleap(
-        stru: Structure,
-        mutant: List[Mutation],
-        in_place: bool = False,
-        # tleap_specifics_below
-        int_leapin_pdb_path: Union[str, None] = None,
-        int_leapout_pdb_path: Union[str, None] = None,
-        ) -> Structure:
+    stru: Structure,
+    mutant: List[Mutation],
+    in_place: bool = False,
+    # tleap_specifics_below
+    int_leapin_pdb_path: Union[str, None] = None,
+    int_leapout_pdb_path: Union[str, None] = None,
+) -> Structure:
     """mutate the {stru} to its {mutant} structure using tleap
     from AmberMD package.
     Args:
@@ -323,8 +319,7 @@ def mutate_stru_with_tleap(
     # san check
     for mut in mutant:
         if not isinstance(mut, Mutation):
-            _LOGGER.error(
-                f"mutant takes only a list of Mutation(). Current mutant is: {mutant}")
+            _LOGGER.error(f"mutant takes only a list of Mutation(). Current mutant is: {mutant}")
             raise TypeError
 
     # get name tag for the mutant
@@ -334,23 +329,20 @@ def mutate_stru_with_tleap(
     temp_path_list = []
     if int_leapin_pdb_path is None:
         fs.safe_mkdir(config["system.SCRATCH_DIR"])
-        int_leapin_pdb_path = fs.get_valid_temp_name(
-            f"{config['system.SCRATCH_DIR']}/mutate_stru_with_tleap_input{name_tag}.pdb")
+        int_leapin_pdb_path = fs.get_valid_temp_name(f"{config['system.SCRATCH_DIR']}/mutate_stru_with_tleap_input{name_tag}.pdb")
         temp_path_list.append(int_leapin_pdb_path)
 
     if int_leapout_pdb_path is None:
         fs.safe_mkdir(config["system.SCRATCH_DIR"])
-        int_leapout_pdb_path = fs.get_valid_temp_name(
-            f"{config['system.SCRATCH_DIR']}/mutate_stru_with_tleap_output{name_tag}.pdb")
+        int_leapout_pdb_path = fs.get_valid_temp_name(f"{config['system.SCRATCH_DIR']}/mutate_stru_with_tleap_output{name_tag}.pdb")
         temp_path_list.append(int_leapout_pdb_path)
 
     # 1. make side-chain deleted & name mutated PDB
     stru_cpy = copy.deepcopy(stru)
     for mut in mutant:
-        target_res = stru_cpy.find_residue_with_key(
-            mut.get_position_key())
-        stru_oper.remove_side_chain_mutating_atom(target_res, mut.target) # remove atom
-        target_res.name = mut.target # change name
+        target_res = stru_cpy.find_residue_with_key(mut.get_position_key())
+        stru_oper.remove_side_chain_mutating_atom(target_res, mut.target)  # remove atom
+        target_res.name = mut.target  # change name
     with open(int_leapin_pdb_path, "w") as of:
         of.write(sp.get_file_str(stru_cpy))
 
@@ -371,11 +363,12 @@ def mutate_stru_with_tleap(
 
     return stru_cpy
 
+
 def mutate_stru_with_pymol(
-        stru: Structure,
-        mutant: List[Mutation],
-        in_place: bool = False,
-        ) -> Structure:
+    stru: Structure,
+    mutant: List[Mutation],
+    in_place: bool = False,
+) -> Structure:
     """mutate the {stru} to its {mutant} structure using PyMOL.
     Args:
         stru: the 'WT' structure
@@ -384,14 +377,13 @@ def mutate_stru_with_pymol(
     Returns:
         The mutated structure.
     """
-    
+
     # san check
     for mut in mutant:
         if not isinstance(mut, Mutation):
-            _LOGGER.error(
-                f"mutant takes only a list of Mutation(). Current mutant is: {mutant}")
+            _LOGGER.error(f"mutant takes only a list of Mutation(). Current mutant is: {mutant}")
             raise TypeError
- 
+
     stru_cpy = copy.deepcopy(stru)
 
     # 1. load stru into pymol
@@ -413,16 +405,12 @@ def mutate_stru_with_pymol(
 
     return stru_cpy
 
-MUTATE_STRU_ENGINE = {
-    "tleap_min" : mutate_stru_with_tleap,
-    "pymol" : mutate_stru_with_pymol
-}
+
+MUTATE_STRU_ENGINE = {"tleap_min": mutate_stru_with_tleap, "pymol": mutate_stru_with_pymol, "rosetta": mutate_stru_with_rosetta}
 """engines for mutate_stru()"""
 
-def check_mutant_stru(
-        mutant_stru: Structure,
-        mutant: List[Mutation],
-        checker_config: Dict[str, Dict[str, Any]] = None):
+
+def check_mutant_stru(mutant_stru: Structure, mutant: List[Mutation], checker_config: Dict[str, Dict[str, Any]] = None):
     """check the generated mutant stru with following options:
         topology: rings in structure should not be circling on bonds.
 
@@ -447,12 +435,68 @@ def check_mutant_stru(
     # default: apply all checker
     if checker_config is None:
         checker_config = {
-            "topology" : {},
+            "topology": {},
         }
 
     for checker, kwargs in checker_config.items():
         _LOGGER.debug(f"Checking {checker}...")
         MUTANT_STRU_ERROR_CHECKER[checker](mutant_stru, mutant, **kwargs)
+
+
+def mutate_stru_with_rosetta(
+    stru: Structure,
+    mutant: List[Mutation],
+    in_place: bool = False,
+) -> Union[Structure, None]:
+    """Applies mutations to a function using the Rosetta engine. 
+    Args:
+        stru: the 'WT' structure
+        mutant: a list of Mutation() which describes a mutant to the 'WT'
+        in_place: if make the changes to the structure in-place 
+    Returns:
+        The mutated structure. May be nothing.
+    """
+
+    # san check
+    for mut in mutant:
+        if not isinstance(mut, Mutation):
+            _LOGGER.error(f"mutant takes only a list of Mutation(). Current mutant is: {mutant}")
+            raise TypeError
+
+    stru_cpy = copy.deepcopy(stru)
+
+    if_retain_order = True
+    exit(1)
+    # if structure is multichain, set retain_order to false and raise a flag to mark multichain structure
+    # for further treatment
+
+
+#    if stru_cpy.num_chains > 2:
+#        if_multichain = True
+#        if_retain_order = False
+#    else:
+#        if_multichain = False
+#
+#    # 1. load stru into pymol
+#    pi = interface.pymol
+#    with OpenPyMolSession(pi) as pms:
+#        pymol_obj_name = pi.load_enzy_htp_stru(stru_cpy, pymol_session=pms)[0]
+#        # 2. loop through mutants and apply each one
+#        for mut in mutant:
+#            pi.point_mutate(mut.get_position_key(), mut.get_target(), pymol_obj_name, pms)
+#        # 3. save to a structure.
+#        pymol_mutant_stru = pi.export_enzy_htp_stru(pymol_obj_name, pms,
+#                                                    if_retain_order=if_retain_order, if_multichain=if_multichain)
+#
+#    # 4. update residues
+#    stru_oper.update_residues(stru_cpy, pymol_mutant_stru)
+#
+#    if in_place:
+#        stru_oper.update_residues(stru, stru_cpy)
+#        return stru
+#
+#    return stru_cpy
+
 
 def check_mutation_topology_error(stru: Structure, mutant: List[Mutation]):
     """check {stru} for topology error. (check for only the mutated residue)
@@ -462,7 +506,6 @@ def check_mutation_topology_error(stru: Structure, mutant: List[Mutation]):
         res_key = mut.get_position_key()
         stru_oper.check_res_topology_error(stru, res_key)
 
-MUTANT_STRU_ERROR_CHECKER = {
-    "topology" : check_mutation_topology_error
-}
+
+MUTANT_STRU_ERROR_CHECKER = {"topology": check_mutation_topology_error}
 """checkers for check_mutant_stru()"""

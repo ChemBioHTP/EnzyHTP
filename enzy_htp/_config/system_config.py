@@ -49,9 +49,7 @@ class SystemConfig:
         Returns:
         """
         if key.count("."):
-            _LOGGER.error(
-                f"No nested variables currently exist in the SystemConfig() class. Exiting..."
-            )
+            _LOGGER.error(f"No nested variables currently exist in the SystemConfig() class. Exiting...")
             exit(1)
         else:
             return getattr(self, key)
@@ -67,9 +65,7 @@ class SystemConfig:
             Nothing
         """
         if key.count("."):
-            _LOGGER.error(
-                f"No nested variables currently exist in the SystemConfig() class. Exiting..."
-            )
+            _LOGGER.error(f"No nested variables currently exist in the SystemConfig() class. Exiting...")
             exit(1)
 
         else:

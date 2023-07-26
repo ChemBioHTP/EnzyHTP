@@ -19,8 +19,9 @@ def test_delete_from_parent():
 
     assert id(parent.children[0]) == id(child_2)
 
+
 def test_deepcopy():
-    """test if deepcopy assign parent correctly""" 
+    """test if deepcopy assign parent correctly"""
     child_1 = DoubleLinkedNode()
     child_2 = DoubleLinkedNode()
     parent = DoubleLinkedNode(children=[child_1, child_2])

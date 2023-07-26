@@ -45,7 +45,7 @@ class AmberConfig:
     BOX_TYPE: str = "box"
     """Water Box type. Allowed values are 'box' and 'oct'"""
 
-    BOX_SIZE = "10"
+    BOX_SIZE: str = "10"
     """Water Box size."""
 
     CONF_MIN: Dict = {
@@ -122,13 +122,7 @@ class AmberConfig:
     }
     """dict() holding the settings for an Amber constant pressure production run."""
 
-    RADII_MAP: Dict = {
-        '1': 'mbondi',
-        '2': 'mbondi2',
-        '5': 'mbondi2',
-        '7': 'bondi',
-        '8': 'mbondi3'
-    }
+    RADII_MAP: Dict = {'1': 'mbondi', '2': 'mbondi2', '5': 'mbondi2', '7': 'bondi', '8': 'mbondi3'}
     """dict() holding the radii mapping for the IGB solvation model."""
 
     def __init__(self, parent=None):
@@ -154,6 +148,10 @@ class AmberConfig:
     def required_env_vars(self) -> List[str]:
         """A hardcoded list of required enviornment variables for Amber."""
         return [self.HOME]
+
+    def required_py_modules(self) -> List[str]:
+        """ """
+        return list()
 
     def display(self) -> None:
         """Method that prints out all settings for the AmberConfig() object to the stdout."""

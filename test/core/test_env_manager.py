@@ -92,6 +92,7 @@ def test_run_command():
     with pytest.raises(EnvMissingExecutable) as exe:
         em.run_command("dne", [""])
 
+
 def test_run_command_fail_wo_retry(caplog):
     """testing the error capture of run_command"""
     em = EnvironmentManager()
@@ -100,6 +101,7 @@ def test_run_command_fail_wo_retry(caplog):
         em.run_command("cat", "abc")
     assert "Failed running `cat abc` after 1 tries @" in caplog.text
     assert e.value.cmd == "cat abc"
+
 
 def test_run_command_fail_w_retry(caplog):
     """testing the retry feature of run_command"""

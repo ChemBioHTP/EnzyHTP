@@ -16,8 +16,7 @@ def check_valid_ph(ph: float) -> NonCallableMock:
         _LOGGER.warning(f"assigned pH: {ph:.2f} out of range: [0.00,14.00]")
 
 
-def set_distance(p1: Union[tuple, list], p2: Union[tuple, list],
-                 d: float) -> Tuple[float, float, float]:
+def set_distance(p1: Union[tuple, list], p2: Union[tuple, list], d: float) -> Tuple[float, float, float]:
     """
     determine the coordinate of a point p3 with p1, p2, and d.
     p3 will be in the projection line of p1->p2 and have a d distance with p1.
@@ -43,9 +42,42 @@ def get_distance(p1: Union[tuple, list], p2: Union[tuple, list]) -> float:
     D = np.linalg.norm(d1)
     return D
 
+def get_dihedral(p1: Union[tuple, list], p2: Union[tuple, list],
+                 p3: Union[tuple, list], p4: Union[tuple, list],
+                 rad_result: bool= False) -> float:
+    """get the dihedral defined by p1, p2, o3, and p4
+    Args:
+        p1, p2, p3, p4:
+            the coordinate of the 4 defining points in tuple or list
+            the 2 plane is defined by p1, p2, p3 and p2, p3, p4.
+            plane(123) spin to plane(234), watching along z-->z+,
+            clockwise: +
+            counter clockwise: -
+            ref: https://math.stackexchange.com/questions/47059/how-do-i-calculate-a-dihedral-angle-given-cartesian-coordinates
+        rad_result: (default: False)
+            whether giving result as radian
+    Return:
+        the dihedral value (degrees by defaul)"""
+    v1 = np.array(p2) - np.array(p1)
+    v2 = np.array(p3) - np.array(p2)
+    v3 = np.array(p4) - np.array(p3)
+    nv1 = np.cross(v1, v2)
+    nv1 = nv1/np.linalg.norm(nv1)
+    nv2 = np.cross(v2, v3)
+    nv2 = nv2/np.linalg.norm(nv2)
 
-def get_center(p1: Union[tuple, list],
-               p2: Union[tuple, list]) -> Tuple[float, float, float]:
+    m1 = np.cross(nv1, v2/np.linalg.norm(v2))
+    x = np.dot(nv1, nv2)
+    y = np.dot(m1, nv2)
+    dihedral = -np.arctan2(y,x)
+
+    if not rad_result:
+        dihedral = np.degrees(dihedral)
+
+    return dihedral
+
+
+def get_center(p1: Union[tuple, list], p2: Union[tuple, list]) -> Tuple[float, float, float]:
     """
     return the center of p1 and p2
     """
@@ -53,9 +85,11 @@ def get_center(p1: Union[tuple, list],
 
     return tuple(p3)
 
+
 def get_geom_center(list_of_p: list) -> Tuple[float, float, float]:
     """get the geometric center of a list of points"""
     return tuple(np.mean(np.array(list_of_p), axis=0))
+
 
 def round_by(num: float, cutnum: float) -> int:
     """
@@ -66,6 +100,7 @@ def round_by(num: float, cutnum: float) -> int:
     if dec_part > cutnum:
         int_part += 1
     return int(int_part)
+
 
 def calc_average_task_num(num_of_task: int, num_of_worker: int) -> List[int]:
     """calculate task number for each worker based on {num_of_task} and

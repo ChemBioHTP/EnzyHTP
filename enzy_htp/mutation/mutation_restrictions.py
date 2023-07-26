@@ -13,8 +13,7 @@ from enzy_htp.core import InvalidMutationRestriction
 import enzy_htp.structure as es
 
 from .mutation import (
-    Mutation,
-)
+    Mutation, )
 
 
 class MutationRestrictions:
@@ -47,14 +46,12 @@ class MutationRestrictions:
             An InvalidMutationRestriction if the proposed new restriction is invalid or the proposed residue does not exist.
         """
         if rkey not in self.mapper_:
-            raise InvalidMutationRestriction(
-                f"{rkey} not in structure found at '{self.pdb_}'.")
+            raise InvalidMutationRestriction(f"{rkey} not in structure found at '{self.pdb_}'.")
 
         self.mapper_[rkey][ukey] = uval
 
         if not valid_restriction_dict(self.mapper_[rkey]):
-            raise InvalidMutationRestriction(
-                f"Restriction (key,value) pair ({ukey}, {uval}) is invalid")
+            raise InvalidMutationRestriction(f"Restriction (key,value) pair ({ukey}, {uval}) is invalid")
 
     def lock_chain(self, cname: str) -> None:
         """Method that locks mutations in all residues within the specified chain. Note that no error is raised
@@ -74,9 +71,7 @@ class MutationRestrictions:
         """
         self.add_restriction(rkey, "locked", True)
 
-    def apply(
-        self, muts: Dict[Tuple[str, int],
-                         List[Mutation]]) -> Dict[Tuple[str, int], List[Mutation]]:
+    def apply(self, muts: Dict[Tuple[str, int], List[Mutation]]) -> Dict[Tuple[str, int], List[Mutation]]:
         """Applies the restrictions specified from the object to the supplied mutations.
         Args:
             mut: A dict() containing all possible mutations for each of the residue positions. Should be generated from enzy_htp.mutation.generate_all_mutations()
@@ -92,9 +87,7 @@ class MutationRestrictions:
 
             mlist: List[Mutation] = muts[rkey]
             if restrict["illegal_targets"]:
-                mlist = list(
-                    filter(lambda mm: mm.target not in restrict["illegal_targets"],
-                           mlist))
+                mlist = list(filter(lambda mm: mm.target not in restrict["illegal_targets"], mlist))
 
             if restrict["no_size_increase"]:
                 mlist = list(filter(lambda mm: not size_increase(mm), mlist))
@@ -146,18 +139,13 @@ def valid_restriction_dict(rdict: Dict) -> bool:
     Returns:
         Whether the supplied dict() satisfies all requirements.
     """
-    target_keys: Set[str] = set(
-        "locked illegal_targets no_size_increase no_size_decrease no_polarity_change force_polarity_change"
-        .split())
+    target_keys: Set[str] = set("locked illegal_targets no_size_increase no_size_decrease no_polarity_change force_polarity_change".split())
     actual_keys: Set[str] = set(list(rdict.keys()))
 
     if target_keys != actual_keys:
         return False
 
-    for (
-            key
-    ) in "locked no_size_increase no_size_decrease no_polarity_change force_polarity_change".split(
-    ):
+    for (key) in "locked no_size_increase no_size_decrease no_polarity_change force_polarity_change".split():
         if not isinstance(rdict[key], bool):
             return False
 

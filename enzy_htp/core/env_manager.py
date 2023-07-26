@@ -5,8 +5,10 @@ Author: Chris Jurich, <chris.jurich@vanderbilt.edu>
 Date: 2022-02-12
 """
 import os
-import shutil
 import time
+import shutil
+import importlib
+from pathlib import Path
 from typing import List, Union
 from subprocess import CompletedProcess, SubprocessError, run
 
@@ -20,13 +22,15 @@ class EnvironmentManager:
     """Serves as general interface between module and the current computer environment (shell).
     Checks whether given applications and environment variables are set in the current environment.
     After check, stores names of executables.
-    Serves as interfrace for running commands on system.
+    Serves as interface for running commands on system.
 
 
     Attributes:
             env_vars_: A list of strings containing environment variables to check for.
+            py_modules_: A list of strings correspond to python modules to check for.
             executables_: a list of strings containing executables to check for.
             missing_env_vars_: A list of strings corresponding to environment variables that are missing.
+            missing_py_modules_: A list of strings corresponding to python modules that are missing.
             missing_executables_: A list of strings corresponding to executables that are missing.
     """
 
@@ -34,8 +38,10 @@ class EnvironmentManager:
         """Initializes object, optionally with starting environment variables and executables."""
         self.env_vars_ = kwargs.get("env_vars", [])
         self.executables_ = kwargs.get("executables", [])
+        self.py_modules_ = kwargs.get("py_modules", [])
         self.mapper = dict()
         self.missing_env_vars_ = []
+        self.missing_py_modules_ = []
         self.missing_executables_ = []
 
     #region ==environment related==
@@ -56,6 +62,8 @@ class EnvironmentManager:
     def __exe_exists(self, exe_name: str) -> bool:
         """Helper method that checks if executable exists in current environment."""
         full_path = os.path.expandvars(exe_name)
+        if Path(full_path).exists():
+            return True
         return shutil.which(exe_name) is not None
 
     def check_executables(self) -> None:
@@ -63,8 +71,21 @@ class EnvironmentManager:
         for exe in self.executables_:
             if not self.__exe_exists(exe):
                 self.missing_executables_.append(exe)
+                continue
+
+            fpath = os.path.expandvars(exe)
+            if Path(fpath).exists():
+                self.mapper[exe] = fpath
             else:
                 self.mapper[exe] = shutil.which(exe)
+
+    def check_python_modules(self) -> None:
+        """Checks which python modules are availabe in the system, storing those that are missing."""
+        for pm in self.py_modules_:
+            try:
+                _ = importlib.import_module(pm)
+            except ModuleNotFoundError:
+                self.missing_py_modules_.append(pm)
 
     def display_missing(self) -> None:
         """Displays a list of missing environment variables and exectuables to the logger. Should be called after .check_environment() and .check_env_vars()."""
@@ -85,11 +106,10 @@ class EnvironmentManager:
 
     def check_environment(self) -> None:
         """Preferred client method for validating environment. Performs checks and logs output."""
-        _LOGGER.info("Checking environment for required elements...")
+
         self.check_env_vars()
         self.check_executables()
-        self.display_missing()
-        _LOGGER.info("Environment check completed!")
+        self.check_python_modules()
 
     def reset(self) -> None:
         """Resets internal lists of env vars and executables."""
@@ -100,17 +120,28 @@ class EnvironmentManager:
 
     def is_missing(self) -> bool:
         """Checks if any executables or environment variables are missing."""
-        return len(self.missing_executables_) or len(self.missing_env_vars_)
-    #endregion
+        return len(self.missing_executables_) or len(self.missing_env_vars_) or len(self.missing_py_modules_)
+
+    def missing_executables(self) -> List[str]:
+        """Getter for the missing executables in the environment."""
+        return self.missing_executables_
+
+    def missing_env_vars(self) -> List[str]:
+        """Getter for the missing environment variables in the environment."""
+        return self.missing_env_vars_
+
+    def missing_py_modules(self) -> List[str]:
+        """ """
+        return self.missing_py_modules_
 
     #region ==shell command==
     def run_command(self,
                     exe: str,
                     args: Union[str, List[str]],
-                    try_time: int= 1,
-                    wait_time: float= 3.0,
-                    timeout: Union[None, float]= None,
-                    stdout_return_only: bool= False) -> Union[CompletedProcess, str]:
+                    try_time: int = 1,
+                    wait_time: float = 3.0,
+                    timeout: Union[None, float] = None,
+                    stdout_return_only: bool = False) -> Union[CompletedProcess, str]:
         """Interface to run a command with the exectuables specified by exe as well as a list of arguments.
         Args:
             exe:
@@ -144,20 +175,17 @@ class EnvironmentManager:
 
         # handle missing exe
         if exe in self.missing_executables_ or not self.__exe_exists(exe):
-            _LOGGER.error(
-                f"This environment is missing '{exe}' and cannot run the command '{cmd}'")
+            _LOGGER.error(f"This environment is missing '{exe}' and cannot run the command '{cmd}'")
             raise MissingEnvironmentElement
         if exe not in self.mapper:
-            _LOGGER.warning(
-                f"(dev-only) Using unregistered executable: '{exe}'")
-            _LOGGER.warning(
-                f"    Please add it to corresponding config.required_executables if this is a long-term use")
+            _LOGGER.warning(f"(dev-only) Using unregistered executable: '{exe}'")
+            _LOGGER.warning(f"    Please add it to corresponding config.required_executables if this is a long-term use")
 
         # run the command
         _LOGGER.info(f"Running command: `{cmd}`...")
         for i in range(try_time):
             try:
-                this_run = run(cmd, timeout=timeout, check=True,  text=True, shell=True, capture_output=True)
+                this_run = run(cmd, timeout=timeout, check=True, text=True, shell=True, capture_output=True)
                 _LOGGER.debug("Command finished!")
             except SubprocessError as e:
                 this_error = e
@@ -166,7 +194,7 @@ class EnvironmentManager:
                 _LOGGER.warning(f"    stdout: {str(e.stdout).strip()}")
                 if try_time > 1:
                     _LOGGER.warning(f"trying again... ({i+1}/{try_time})")
-            else: # untill there's no error
+            else:  # untill there's no error
                 _LOGGER.info(f"finished `{cmd}` after {i+1} tries @{get_localtime()}")
                 if stdout_return_only:
                     return str(this_run.stdout).strip()
@@ -178,6 +206,7 @@ class EnvironmentManager:
         # exceed the try time
         _LOGGER.error(f"Failed running `{cmd}` after {try_time} tries @{get_localtime()}")
         raise this_error
+
     #endregion
 
     def __getattr__(self, key: str) -> str:

@@ -38,11 +38,7 @@ class Residue(DoubleLinkedNode):
         num_atoms: number of belonging Atom()s
     """
 
-    def __init__(self,
-                 residue_idx: int,
-                 residue_name: str,
-                 atoms: List[Atom],
-                 parent=None):
+    def __init__(self, residue_idx: int, residue_name: str, atoms: List[Atom], parent=None):
         """Constructor for the Residue() object"""
         self._name = residue_name
         self._idx = residue_idx
@@ -240,12 +236,10 @@ class Residue(DoubleLinkedNode):
         NOTE: errors if "start" is <= 0.
         """
         if start <= 0:
-            _LOGGER.error(
-                f"Illegal start number '{start}'. Value must be >= 0. Exiting...")
+            _LOGGER.error(f"Illegal start number '{start}'. Value must be >= 0. Exiting...")
             exit(1)
         aa: Atom
-        self._atoms.sort(
-            key=lambda aa: aa.idx)  #@shaoqz: maybe use .sort to keep the reference.
+        self._atoms.sort(key=lambda aa: aa.idx)  #@shaoqz: maybe use .sort to keep the reference.
 
         for idx, aa in enumerate(self._atoms):
             self._atoms[idx].atom_number = idx + start  #@shaoqz: why dont use aa?

@@ -22,8 +22,7 @@ sp = PDBParser()
 @pytest.mark.interface
 def test_decode_mutation_pattern():
     """dev run of the function"""
-    test_mutation_pattern = ("KA162A, {RA154W, HA201A},"
-                             " {L10A, r:2[resi 254 around 3:all not self]*5}")
+    test_mutation_pattern = ("KA162A, {RA154W, HA201A}," " {L10A, r:2[resi 254 around 3:all not self]*5}")
     test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
     test_stru = sp.get_structure(test_pdb)
 
@@ -37,21 +36,19 @@ def test_decode_mutation_pattern():
 def test_seperate_mutants():
     """test the function use a made up mutation_pattern for KE
     use the len of the seperation result as the fingerprint to assert"""
-    test_mutation_pattern = (
-        "KA162A, {RA154W, HA201A},"
-        " r:2[resi 289 around 4 and not resi 36:larger,"
-        " proj(ID 1000, ID 2023, positive, 10):more_negative_charge]*100")
+    test_mutation_pattern = ("KA162A, {RA154W, HA201A},"
+                             " r:2[resi 289 around 4 and not resi 36:larger,"
+                             " proj(ID 1000, ID 2023, positive, 10):more_negative_charge]*100")
     assert len(m_p.seperate_mutant_patterns(test_mutation_pattern)) == 3
 
 
 def test_seperate_sections():
     """test the function use a made up mutation_pattern for KE
     use the len of the seperation result as the fingerprint to assert"""
-    test_mutation_pattern = (
-        "KA162A,"
-        " r:2[resi 289 around 4 and not resi 36:larger,"
-        " proj(ID 1000, ID 2023, positive, 10):more_negative_charge]*100,"
-        "RA154W")
+    test_mutation_pattern = ("KA162A,"
+                             " r:2[resi 289 around 4 and not resi 36:larger,"
+                             " proj(ID 1000, ID 2023, positive, 10):more_negative_charge]*100,"
+                             "RA154W")
     assert len(m_p.seperate_section_patterns(test_mutation_pattern)) == 3
 
 
@@ -190,6 +187,7 @@ def test_combine_section_mutant_one_to_many():
     for mut in mutants:
         assert Mutation(orig='LEU', target='ALA', chain_id='A', res_idx=10) in mut
 
+
 def test_combine_section_mutant_one_section():
     """test the function works as expected in the case that
     single mutant combine with many mutants"""
@@ -201,6 +199,7 @@ def test_combine_section_mutant_one_section():
     p_mutant_mapper[test_sec_1] = m_p.decode_all_mutation(test_stru, test_sec_1)
     mutants = m_p.combine_section_mutant(p_mutant_mapper)
     assert len(mutants) == 400
+
 
 def test_combine_section_mutant_many_to_many():
     """test the function works as expected"""
