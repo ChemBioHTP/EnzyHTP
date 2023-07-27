@@ -6,15 +6,19 @@ Science API:
 Mutation is carried out by an underlying engine and the supported engines currently include:
     + Amber/tleap
     + PyMOL
+    + Rosetta
 
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2022-10-24
 """
-
+#TODO(CJ): if its "in-place" it shouldnt return anything
 import copy
+from pathlib import Path
 from typing import Any, Dict, List, Tuple, Union
+
 import numpy as np
 
+import enzy_htp.chemical as chem 
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp import config
@@ -412,6 +416,7 @@ def mutate_stru_with_rosetta(
     in_place: bool = False,
 ) -> Union[Structure, None]:
     """Applies mutations to a function using the Rosetta engine. 
+
     Args:
         stru: the 'WT' structure
         mutant: a list of Mutation() which describes a mutant to the 'WT'
@@ -421,41 +426,71 @@ def mutate_stru_with_rosetta(
     """
 
     # san check
-    mut_tuple = list()
-    for mut in mutant:
+    elements: List[Dict] = list()
+    for midx, mut in enumerate(mutant):
         if not isinstance(mut, Mutation):
             _LOGGER.error(f"mutant takes only a list of Mutation(). Current mutant is: {mutant}")
             raise TypeError
-        #TODO(CJ): make sure target is the three letter version
-        mut_tuple.append(
-            (mut.chain_id,mut.res_idx,mut.target)
-        )
 
-    stru_cpy = copy.deepcopy(stru)
+        target = mut.target
+        if len(target) != 3:
+            target = chem.convert_to_canonical_three_letter( target )
+           
+        #TODO(CJ): remap the residue index here           
+        elements.extend([
+            {'parent':'RESIDUE_SELECTORS', 'tag':'Index', 'name':f"residue{midx+1}", 'resnums':str(mut.res_idx)},
+            {'parent':'MOVERS', 'tag':'MutateResidue', 'name':f'mutate{midx+1}', 'residue_selector':f"residue{midx+1}", 'new_res':target},
+            {'parent':'PROTOCOLS', 'tag':'Add', 'mover_name':f'mutate{midx+1}'},
+        ])
+
+
+    #stru_cpy = copy.deepcopy(stru)
 
     if_retain_order = True
     #TODO(CJ): need to remap the residue names at some point
+    #TODO(CJ): use the scratch_dir
     parser = PDBParser()
     stru_content:str = parser.get_file_str(stru)
     temp_file:str = '__mut_temp.pdb'
     fs.write_lines(temp_file, stru_content.splitlines())
-    mutant_file = interface.rosetta.mutate(
-            temp_file,
-            mut_tuple
-        )
-       
+    
+    xml_file: str = f"{Path(temp_file).parent}/__temp.xml"
+    interface.rosetta.write_script(xml_file, elements)
+    
+    opts:List[str] = [
+        '-parser:protocol', xml_file,
+        '-in:file:s', temp_file 
+    ]
+
+    interface.rosetta.run_rosetta_scripts( opts )
+    
+    temp_path = Path(temp_file)
+    expected_mutant:str = temp_path.parent / f"{temp_path.stem}_0001.pdb"
+
+    fs.check_file_exists( expected_mutant )
+    expected_mutant = str(expected_mutant)
+    fs.safe_rm( xml_file )
+    fs.safe_rm( temp_file )
+    #fs.safe_rm( expected_mutant )
+    #TODO(CJ): remove score.sc file
+
     if in_place:
-        stru = parser.get_structure(mutant_file)
+        stru_cpy = parser.get_structure(expected_mutant)
+        stru_oper.update_residues(stru, stru_cpy)
+        return 
     else:
-        return parser.get_structure(mutant_file)
-#       TODO(CJ): do it this way
-#    stru_oper.update_residues(stru_cpy, pymol_mutant_stru)
-#
-#    if in_place:
-#        stru_oper.update_residues(stru, stru_cpy)
-#        return stru
-#
-#    return stru_cpy
+        stru_cpy = copy.deepcopy( stru )
+        rosetta_stru  = parser.get_structure(expected_mutant)
+        stru_oper.update_residues( stru_cpy, rosetta_stru )
+        return stru_cpy
+       #TODO(CJ): do it this way
+    stru_oper.update_residues(stru_cpy, pymol_mutant_stru)
+
+    if in_place:
+        stru_oper.update_residues(stru, stru_cpy)
+        return stru
+
+    return stru_cpy
 
 
 MUTATE_STRU_ENGINE = {"tleap_min": mutate_stru_with_tleap, "pymol": mutate_stru_with_pymol, "rosetta": mutate_stru_with_rosetta}
