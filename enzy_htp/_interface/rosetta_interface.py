@@ -500,8 +500,8 @@ class RosettaInterface(BaseInterface):
                 return result
 
         root = ET.Element("ROSETTASCRIPTS")
-        ET.SubElement(root, "SCOREFXNS")
         ET.SubElement(root, "RESIDUE_SELECTORS")
+        ET.SubElement(root, "SCOREFXNS")
         ET.SubElement(root, "TASKOPERATIONS")
         ET.SubElement(root, "SIMPLE_METRICS")
         ET.SubElement(root, "FILTERS")
@@ -536,6 +536,11 @@ class RosettaInterface(BaseInterface):
 
         xmlstr: str = minidom.parseString(ET.tostring(root)).toprettyxml()
         xml_content: List[str] = xmlstr.replace('<?xml version="1.0" ?>\n', '').splitlines()
+        
+        xml_content = list(filter(
+            lambda ll: len(ll.strip()) > 0,
+            xml_content
+        ))
 
         fs.write_lines(fname, xml_content)
 
@@ -699,11 +704,30 @@ class RosettaInterface(BaseInterface):
             The mutated structure.
         """
 
-        # validation
-        for row in mutations:
+        elements: List[Dict] = list()
+        for midx, row in enumerate(mutations):
             if len(row) != 3:
                 pass
-        pass
-        args: List[Dict] = list()
-        xml_file: str = f"{Path(mofile).parent}/__temp.xml"
-        self.write_script(xml_file, args)
+            else:
+                elements.extend([
+                    {'parent':'RESIDUE_SELECTORS', 'tag':'Index', 'name':f"residue{midx+1}", 'resnums':str(row[1])},
+                    {'parent':'MOVERS', 'tag':'MutateResidue', 'name':f'mutate{midx+1}', 'residue_selector':f"residue{midx+1}", 'new_res':row[2]},
+                    {'parent':'PROTOCOLS', 'tag':'Add', 'mover_name':f'mutate{midx+1}'},
+                ])
+        
+        xml_file: str = f"{Path(molfile).parent}/__temp.xml"
+        self.write_script(xml_file, elements)
+        
+        opts:List[str] = [
+            '-parser:protocol', xml_file,
+            '-in:file:s', molfile
+        ]
+
+        self.env_manager_.run_command(
+            self.config_.ROSETTA_SCRIPTS,
+            opts
+        )
+        temp_path = Path(molfile)
+        result_file = temp_path.parent / f"{temp_path.stem}_0001.pdb"
+        #TODO(CJ): do some kind of validation here
+        return result_file
