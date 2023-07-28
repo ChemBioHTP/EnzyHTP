@@ -41,7 +41,7 @@ class PyMolInterface(BaseInterface):
         """
         super().__init__(parent, config, default_pymol_config)
         temp_session: pymol2.PyMOL = self.new_session()
-        self.available_cmds_: List[str] = temp_session
+        self.available_cmds_: List[str] = temp_session.cmd.__dict__['kw_list']
 
     def new_session(self) -> pymol2.PyMOL:
         """create a new pymol session, start it, and set feedback level. Canonical means to get a session in enzy_htp."""
