@@ -6,7 +6,7 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-03-28
 """
 
-from typing import List
+from typing import List, Any
 from copy import deepcopy
 
 
@@ -46,6 +46,17 @@ class RosettaConfig:
     def required_py_modules(self) -> List[str]:
         """ """
         return list()
+
+    def __getitem__(self, key:str) -> Any:
+
+        """TODO(CJ): this will be inherited soon I believe"""
+        return getattr(self, key)
+
+    def __setitem__(self, key:str, value: Any) -> None:
+
+        """TODO(CJ): this will be inherited soon I believe"""
+        setattr(self, key, value)
+
 
 
 def default_rosetta_config() -> RosettaConfig:

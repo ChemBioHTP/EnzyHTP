@@ -36,7 +36,7 @@ from .system_config import SystemConfig, default_system_config
 from enzy_htp.core import _LOGGER
 
 # TODO(CJ): add more syntax checking for getter/setter
-
+# TODO(CJ): need a BaseConfig() class so that the __getitem__ and __setitem__ can work better
 
 class Config:
     """Class that holds all configuration settings for the different external softwares 
@@ -116,12 +116,16 @@ class Config:
             ptr = None
             if app == "amber":
                 ptr = self._amber
+            elif app == "bcl":
+                ptr = self._bcl
             elif app == "gaussian":
                 ptr = self._gaussian
             elif app == "multiwfn":
                 ptr = self._multiwfn
             elif app == "pymol":
                 ptr = self._pymol
+            elif app == "rosetta":
+                ptr = self._rosetta
             elif app == "system":
                 ptr = self._system
             else:

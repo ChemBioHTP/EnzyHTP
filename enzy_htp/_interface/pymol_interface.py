@@ -417,6 +417,7 @@ class PyMolInterface(BaseInterface):
         """Executes a series of commands through the PyMOL/PyMOL2 python module in use. Takes input as a list of Tuple()'s
         where the first item in each tuple is a string specifying the function to use and the rest of the items are the
         arguments for that function.
+        TODO(CJ): add examples
     
         Args:
             session : A pymol2.PyMOL() session to use.
@@ -431,22 +432,26 @@ class PyMolInterface(BaseInterface):
         result: List[Any] = list()
 
         for cmd_set in args:
-            if len(cmd_set) < 2:
-                _LOGGER.error(f"The supplied argument {cmd_set} is not long enough. Musst have at least two items. Exiting...")
-                exit(1)
-
             cmd_name = cmd_set[0]
-            cmd_args = list(cmd_set[1:])
 
-            if cmd_name not in self.available_cmds_:
-                _LOGGER.error(f"The command '{cmd_name}' is not supported in this version of pymol. Exiting...")
-                exit(1)
+            #if cmd_name not in self.available_cmds_:
+               # _LOGGER.error(f"The command '{cmd_name}' is not supported in this version of pymol. Exiting...")
+                #exit(1)
+            
+            cmd_args = list()
+
+            if len(cmd_set) > 1:
+                cmd_args = list(cmd_set[1:])
 
             cmd_str: str = f"{cmd_name}({','.join(map(str, cmd_args))})"
             try:
                 fxn = getattr(session.cmd, cmd_name)
-                result.append(fxn(*cmd_args))
-            except:
+                if len(cmd_set) > 1:
+                    result.append(fxn(*cmd_args))
+                else:
+                    result.append(fxn())
+            except Exception as e:
+                _LOGGER.error(f"{e}")
                 _LOGGER.error(f"PyMOL function call '{cmd_str}' resuled in an error. Exiting...")
                 exit(1)
 

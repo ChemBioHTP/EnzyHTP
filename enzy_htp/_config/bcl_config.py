@@ -6,7 +6,7 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 
 Date: 2023-04-02
 """
-from typing import List
+from typing import List, Any
 
 from copy import deepcopy
 
@@ -33,6 +33,10 @@ class BCLConfig:
     def required_py_modules(self) -> List[str]:
         """ """
         return list()
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        """Setter that enables [] accession of BCLConfig() attributes with value validation."""
+        setattr(self, key, value)
 
 
 def default_bcl_config() -> BCLConfig:

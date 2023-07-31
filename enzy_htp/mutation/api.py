@@ -455,17 +455,20 @@ def mutate_stru_with_rosetta(
     fs.write_lines(temp_file, stru_content.splitlines())
     
     xml_file: str = f"{Path(temp_file).parent}/__temp.xml"
+    fs.safe_rm(xml_file)
     interface.rosetta.write_script(xml_file, elements)
     
     opts:List[str] = [
         '-parser:protocol', xml_file,
-        '-in:file:s', temp_file 
+        '-in:file:s', temp_file,
+        '-overwrite'
     ]
 
-    interface.rosetta.run_rosetta_scripts( opts )
-    
     temp_path = Path(temp_file)
     expected_mutant:str = temp_path.parent / f"{temp_path.stem}_0001.pdb"
+    fs.safe_rm( expected_mutant )
+    interface.rosetta.run_rosetta_scripts( opts )
+    
 
     fs.check_file_exists( expected_mutant )
     expected_mutant = str(expected_mutant)

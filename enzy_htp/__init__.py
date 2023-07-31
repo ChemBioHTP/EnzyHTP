@@ -37,7 +37,6 @@ from .core import (
 
 from ._config import config
 
-from .preparation import PDBLine, read_pdb_lines
 from .chemical import ResidueType
 
 from ._interface import Interface, OpenPyMolSession
@@ -47,5 +46,10 @@ interface = Interface(config)
 """Singleton interface for all softwares enzy_htp is capable of interfacing with. SHOULD NOT be used by
 end users and instead exists for developers to access external software. See enzy_htp/_interface/interface.py
 for full class defintion."""
+
+config = interface.config() 
+"""TODO(CJ)"""
+
+from .preparation import PDBLine, read_pdb_lines, dock_reactants
 
 from .analysis import ( electric_field )

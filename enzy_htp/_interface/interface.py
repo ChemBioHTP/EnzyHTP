@@ -33,6 +33,7 @@ class Interface:
     Each <Package>Interface is available as the attribute Interface.<package> (all lower case). Each instance
     needs an EnzyHTP.Config instance to hold all data.
     Attributes:
+        _config: TODO(CJ)
         amber: Corresponds to instance of AmberInterface().
         bcl: Corresponds to instance of BCLInterface().
         gaussian: Corresponds to instnce of GaussianInterface().
@@ -43,6 +44,7 @@ class Interface:
     """
 
     def __init__(self, config: Config):
+        self._config = config
         self.amber = AmberInterface(self, config._amber)
         self.bcl = BCLInterface(self, config._bcl)
         self.gaussian = GaussianInterface(self, config._gaussian)
@@ -52,6 +54,9 @@ class Interface:
         self.rosetta = RosettaInterface(self, config._rosetta)
 
         self.check_environment()
+
+    def config(self) -> Config:
+        return self._config
 
     def check_environment(self) -> None:
         """Checks for which elements are available in the environment. Gets executables and

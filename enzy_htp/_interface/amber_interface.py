@@ -21,7 +21,7 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core import env_manager as em
 from enzy_htp.core.exception import UnsupportedMethod, tLEaPError
 import enzy_htp.structure as struct
-import enzy_htp.preparation as prep
+#import enzy_htp.preparation as prep
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
 from enzy_htp import config as eh_config
 
