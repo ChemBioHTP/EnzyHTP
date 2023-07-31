@@ -281,7 +281,7 @@ class PyMolInterface(BaseInterface):
 
         # fix the atom naming issue.
         temp_stru = PDBParser().get_structure(pymol_outfile_path,allow_multichain_in_atom=True)
-        temp_stru.fix_pymol_naming()
+        self.fix_pymol_naming(temp_stru)
         result = PDBParser().get_file_str(temp_stru)
 
         # overwrite bad pymol pdb with good pdb str
@@ -293,8 +293,7 @@ class PyMolInterface(BaseInterface):
 
     def export_enzy_htp_stru(self, pymol_obj_name: str,
                             pymol_session: pymol2.PyMOL,
-                            if_retain_order: bool = False,
-                            ordered_stru: Structure = None) -> Structure:
+                            if_retain_order: bool = False) -> Structure:
         """
         Saves a PyMOL object to a Structure object.
         Args:
@@ -305,15 +304,31 @@ class PyMolInterface(BaseInterface):
             A Structure object representing the target enzyme in PyMOL.
         """
         sp = PDBParser()
-        pymol_outfile_path = self.export_pdb(pymol_obj_name, pymol_session, if_retain_order=if_retain_order)
+        pymol_outfile_path = self.export_pdb(pymol_session, pymol_obj_name,
+                                             if_retain_order=if_retain_order)
         res = sp.get_structure(pymol_outfile_path, allow_multichain_in_atom=True)
-
-        # update order of non-mutated residues
-        if ordered_stru is not None:
-            order_to_stru(res, ordered_stru)
 
         fs.clean_temp_file_n_dir([pymol_outfile_path, eh_config["system.SCRATCH_DIR"]])
         return res
+
+    def fix_pymol_naming(self, stru: Structure) -> None:
+        """Fixes PyMOL's naming of atoms in-place using the PYMOL_TO_ATOM_MAPPER in chemical/residue.py.
+        Args:
+            stru: the Structure that contains the wrong atom names (if any).
+        Returns:
+            Nothing.
+        """
+        for chain in stru.chains:
+            for residue in chain.residues:
+                for atom in residue.atoms:
+                    # special case; HA in GLY becomes HA2
+                    if residue.name == "GLY" and atom.name == "HA":
+                        atom.name = "HA2"
+
+                    if atom.name in PyMolConfig.PYMOL_TO_ATOM_MAPPER:
+                        atom.name = PyMolConfig.PYMOL_TO_ATOM_MAPPER[atom.name]
+
+    
     # == inter-session modular functions == (do not requires a session, will start and close one)
     # pass
 
@@ -543,7 +558,7 @@ class OpenPyMolSession:
 
     def __enter__(self):
         """open a pymol session once enter"""
-        self.session = self.interface.new_pymol_session()
+        self.session = self.interface.new_session()
         return self.session
 
     def __exit__(self, exc_type, exc_val, exc_tb):

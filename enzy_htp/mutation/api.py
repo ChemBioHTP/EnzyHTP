@@ -19,6 +19,7 @@ from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp import config
 from enzy_htp.structure import Structure, PDBParser
+from enzy_htp.structure.structure import order_to_stru
 import enzy_htp.structure.structure_operation as stru_oper
 from enzy_htp import interface
 from .mutation import (Mutation, check_repeat_mutation, get_mutant_name_tag, remove_repeat_mutation)
@@ -389,12 +390,14 @@ def mutate_stru_with_pymol(
     # 1. load stru into pymol
     pi = interface.pymol
     with OpenPyMolSession(pi) as pms:
-        pymol_obj_name = pi.load_enzy_htp_stru(stru_cpy, pymol_session=pms)[0]
+        pymol_obj_name = pi.load_enzy_htp_stru(stru=stru_cpy, session=pms)[0]
         # 2. loop through mutants and apply each one
         for mut in mutant:
-            pi.point_mutate(mut.get_position_key(), mut.get_target(), pymol_obj_name, pms)
+            pi.point_mutate(pos_key=mut.get_position_key(), target=mut.get_target(), 
+                            pymol_obj_name=pymol_obj_name, pymol_session=pms)
         # 3. save to a structure.
-        pymol_mutant_stru = pi.export_enzy_htp_stru(pymol_obj_name, pms, ordered_stru=stru_cpy)
+        pymol_mutant_stru = pi.export_enzy_htp_stru(pymol_obj_name, pms)
+        order_to_stru(pymol_mutant_stru, stru_cpy)
 
     # 4. update residues
     stru_oper.update_residues(stru_cpy, pymol_mutant_stru)
@@ -406,7 +409,9 @@ def mutate_stru_with_pymol(
     return stru_cpy
 
 
-MUTATE_STRU_ENGINE = {"tleap_min": mutate_stru_with_tleap, "pymol": mutate_stru_with_pymol, "rosetta": mutate_stru_with_rosetta}
+MUTATE_STRU_ENGINE = {"tleap_min": mutate_stru_with_tleap, 
+                      "pymol": mutate_stru_with_pymol,}
+                      #"rosetta": mutate_stru_with_rosetta}
 """engines for mutate_stru()"""
 
 
