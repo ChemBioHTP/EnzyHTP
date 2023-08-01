@@ -10,8 +10,9 @@ from typing import List, Any
 
 from copy import deepcopy
 
+from .base_config import BaseConfig
 
-class BCLConfig:
+class BCLConfig(BaseConfig):
     """Class that holds default values for running BCL within enzy_htp.
 
     Attributes:
@@ -33,10 +34,6 @@ class BCLConfig:
     def required_py_modules(self) -> List[str]:
         """ """
         return list()
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        """Setter that enables [] accession of BCLConfig() attributes with value validation."""
-        setattr(self, key, value)
 
 
 def default_bcl_config() -> BCLConfig:

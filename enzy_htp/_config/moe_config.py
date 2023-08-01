@@ -8,8 +8,9 @@ from typing import List
 
 from copy import deepcopy
 
+from .base_config import BaseConfig
 
-class MOEConfig:
+class MOEConfig(BaseConfig):
     """Class that holds default values and environment requirements for running MOE within
     enzy_htp.
 

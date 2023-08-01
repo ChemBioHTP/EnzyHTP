@@ -84,12 +84,16 @@ class Config:
             ptr = None
             if app == "amber":
                 ptr = self._amber
+            elif app == "bcl":
+                ptr = self._bcl
             elif app == "gaussian":
                 ptr = self._gaussian
             elif app == "multiwfn":
                 ptr = self._multiwfn
             elif app == "pymol":
                 ptr = self._pymol
+            elif app == "rosetta":
+                ptr = self._rosetta
             elif app == "system":
                 ptr = self._system
             else:

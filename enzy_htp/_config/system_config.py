@@ -15,7 +15,6 @@ from copy import deepcopy
 
 from enzy_htp.core import _LOGGER
 
-
 class SystemConfig:
     """Class that holds system settings for enzy_htp. Similar to other classes in this
     sub-module, SHOULD NOT be directly created by the end users. Instead, it should be 
@@ -39,37 +38,6 @@ class SystemConfig:
 
     SCRATCH_DIR: str = f"{WORK_DIR}/scratch"
     """Default temp directory for enzy_htp. Defaults to WORK_DIR/scratch"""
-
-    def __getitem__(self, key: str) -> Any:
-        """Accessor for SystemConfig() that leverages [] operator syntax.
-        
-        Args:
-            key: a str() key with the name of the variable you would like to access.
-
-        Returns:
-        """
-        if key.count("."):
-            _LOGGER.error(f"No nested variables currently exist in the SystemConfig() class. Exiting...")
-            exit(1)
-        else:
-            return getattr(self, key)
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        """Setter for SystemConfig() that leverages [] operator syntax.
-
-        Args:
-            key: a str() with the name of the variable you would like to update.
-            value: Whatever value you want to set the appropriate attribute to.
-
-        Returns:
-            Nothing
-        """
-        if key.count("."):
-            _LOGGER.error(f"No nested variables currently exist in the SystemConfig() class. Exiting...")
-            exit(1)
-
-        else:
-            setattr(self, key, value)
 
 
 def default_system_config() -> SystemConfig:

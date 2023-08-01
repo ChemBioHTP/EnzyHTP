@@ -9,8 +9,9 @@ Date: 2023-03-28
 from typing import List, Any
 from copy import deepcopy
 
+from .base_config import BaseConfig
 
-class RosettaConfig:
+class RosettaConfig(BaseConfig):
     """Class that holds default values for running Rosetta with enzy_htp and 
     also keeps track of required environment variables and exectuables.
 
@@ -46,17 +47,6 @@ class RosettaConfig:
     def required_py_modules(self) -> List[str]:
         """ """
         return list()
-
-    def __getitem__(self, key:str) -> Any:
-
-        """TODO(CJ): this will be inherited soon I believe"""
-        return getattr(self, key)
-
-    def __setitem__(self, key:str, value: Any) -> None:
-
-        """TODO(CJ): this will be inherited soon I believe"""
-        setattr(self, key, value)
-
 
 
 def default_rosetta_config() -> RosettaConfig:
