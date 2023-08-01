@@ -312,7 +312,7 @@ class PyMolInterface(BaseInterface):
         return res
 
     def fix_pymol_naming(self, stru: Structure) -> None:
-        """Fixes PyMOL's naming of atoms in-place using the PYMOL_TO_ATOM_MAPPER in chemical/residue.py.
+        """Fixes PyMOL's naming of atoms in-place using the PYMOL_TO_ATOM_MAPPER in pymol_config.py.
         Args:
             stru: the Structure that contains the wrong atom names (if any).
         Returns:
@@ -321,12 +321,9 @@ class PyMolInterface(BaseInterface):
         for chain in stru.chains:
             for residue in chain.residues:
                 for atom in residue.atoms:
-                    # special case; HA in GLY becomes HA2
-                    if residue.name == "GLY" and atom.name == "HA":
-                        atom.name = "HA2"
-
-                    if atom.name in PyMolConfig.PYMOL_TO_ATOM_MAPPER:
-                        atom.name = PyMolConfig.PYMOL_TO_ATOM_MAPPER[atom.name]
+                    correct_name = PyMolConfig().update_atom_name(residue.name, atom.name)
+                    if correct_name:
+                        atom.name = correct_name
 
     
     # == inter-session modular functions == (do not requires a session, will start and close one)

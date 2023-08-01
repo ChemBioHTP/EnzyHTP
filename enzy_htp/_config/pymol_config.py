@@ -95,7 +95,20 @@ class PyMolConfig:
     def required_py_modules(self) -> List[str]:
         """ """
         return ["pymol2"]
+    
+    def update_atom_name(self, res: str, atom: str) -> str:
+        """Updates PyMOL atom name to name consistent with Structure class.
+        Args:
+            res: the current residue.
+            atom: the current atom.
+        Returns:
+            The correct atom name. 
+        """
+        if res == "GLY" and atom == "HA":
+            return "HA2"
 
+        res = self.PYMOL_TO_ATOM_MAPPER.get(atom, None)
+        return res
 
 def default_pymol_config() -> PyMolConfig:
     """Creates a deep-copied default version of the PyMolConfig() class."""

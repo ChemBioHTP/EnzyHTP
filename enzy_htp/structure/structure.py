@@ -962,6 +962,18 @@ class Structure(DoubleLinkedNode):
     #     D = get_distance(p1, p2)
     #     return D
 
+    def batch_edit_atom_names(self, atom_map: Dict[str, str]) -> None:
+        """Updates Structure to match map's atom names
+        Args:
+            map: the map of incorrect atom names to correct atom names.
+        Returns:
+            Nothing.
+        """
+        for chain in self.chains:
+            for residue in chain.residues:
+                for atom in residue.atoms:
+                    if atom.name in atom_map:
+                        atom.name = atom_map[atom.name]
     #endregion
 
 def compare_structures(left: Structure, right: Structure) -> Dict[str, List[str]]:
