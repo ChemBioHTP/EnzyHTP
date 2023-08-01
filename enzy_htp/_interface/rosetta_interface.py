@@ -160,6 +160,39 @@ class RosettaCst:
 
         return False
 
+    def create_pdb_line(self, idx:int) -> str:
+        """TODO(CJ): documentation"""
+        return f"REMARK 666 MATCH TEMPLATE {self.rchain_1} {self.rname_1}  {self.rnum_1:>3} MATCH MOTIF {self.rchain_2} {self.rname_2}  {self.rnum_2:>3}  {idx:>3}  1"
+
+    def create_cst_lines(self) -> List[str]:
+        """TODO(CJ): documentation"""
+        cst_content:List[str] = list()
+        cst_content.append("CST::BEGIN")
+        cst_content.append(
+            f"   TEMPLATE::  ATOM_MAP: 1 atom_name: {' '.join(self.ratoms_1)}"
+        )
+        cst_content.append(
+            f"   TEMPLATE::  ATOM_MAP: 1 residue3: {self.rname_1}")
+        cst_content.append("")
+        cst_content.append(
+            f"   TEMPLATE::  ATOM_MAP: 2 atom_name: {' '.join(self.ratoms_2)}"
+        )
+        cst_content.append(
+            f"   TEMPLATE::  ATOM_MAP: 2 residue3: {self.rname_2}")
+        cst_content.append("")
+        
+        for ridx, rule in enumerate(self.constraints):
+            if rule[0] == 'distanceAB':
+                end = 0
+            else:
+                end = rule[4]
+            cst_content.append(
+                f"   CONSTRAINT::  {rule[0]:>10}: {rule[1]:6.2f} {rule[2]:6.2f} {rule[3]:6.2f} {end}"
+            )
+        
+        cst_content.append("CST::END")
+        
+        return cst_content
 
 
 class RosettaInterface(BaseInterface):
@@ -681,13 +714,16 @@ class RosettaInterface(BaseInterface):
             target: str = tks[0]
 
             result: ET.Element = None
-            for ee in elem:
-                if ee.tag == target:
-                    result = ee
-                    break
+            if elem.tag == target:
+                result = elem 
             else:
-                _LOGGER.error(f"There is no element with tag name '{target}' at this level. Exiting...")
-                exit(1)
+                for ee in elem:
+                    if ee.tag == target:
+                        result = ee
+                        break
+                else:
+                    _LOGGER.error(f"There is no element with tag name '{target}' at this level. Exiting...")
+                    exit(1)
 
             if len(tks) > 1:
                 return _find_node(result, tks[1])
@@ -697,6 +733,10 @@ class RosettaInterface(BaseInterface):
         root = ET.Element("ROSETTASCRIPTS")
         ET.SubElement(root, "RESIDUE_SELECTORS")
         ET.SubElement(root, "SCOREFXNS")
+        ET.SubElement(root, "LIGAND_AREAS")
+        ET.SubElement(root, "INTERFACE_BUILDERS")
+        ET.SubElement(root, "MOVEMAP_BUILDERS")
+        ET.SubElement(root, "SCORINGGRIDS")
         ET.SubElement(root, "TASKOPERATIONS")
         ET.SubElement(root, "SIMPLE_METRICS")
         ET.SubElement(root, "FILTERS")
@@ -707,24 +747,38 @@ class RosettaInterface(BaseInterface):
         for arg in args:
             parent_name = arg.pop("parent", None)
             tag_name = arg.pop("tag", None)
+            target_node = None
 
             bad: bool = False
 
             if not parent_name:
+                #TODO(CJ): check if the parent name has an equal sign specifying the target node
+                # more than what you would specify it otherwise
                 _LOGGER.error("No parent name supplied in XML element dict()!")
-                bad = True
-
-            if not parent_name:
-                _LOGGER.error("No tag name supplied in XML element dict()!")
                 bad = True
 
             if bad:
                 _LOGGER.error("Problems with XML elements detected. Exiting...")
                 exit(1)
+            
+            child_nodes = arg.pop('child_nodes', list())
+            if arg.get('append_elements_only', False):
+                _ = arg.pop('append_elements_only')
+                target_node = _find_node(root, tag_name)
+                for attrib, value in arg.items():
+                    target_node.set( attrib, value )
 
-            parent: ET.Element = _find_node(root, parent_name)
-
-            _ = ET.SubElement(parent, tag_name, attrib=arg)
+            else:
+                parent: ET.Element = _find_node(root, parent_name)
+                target_node = ET.SubElement(parent, tag_name, attrib=arg)
+            
+            if child_nodes:
+                for cn in child_nodes:
+                    tag_name = cn.pop('tag', None)
+                    _ = cn.pop('parent', None)
+                    #TODO(CJ): make this recursive so it actually works for super nested things
+                    _ = ET.SubElement(target_node, tag_name, attrib=cn)
+            
 
         for rr in root:
             rr.text = "\n\t"
@@ -933,11 +987,11 @@ class RosettaInterface(BaseInterface):
                     # and mention that we are using default parameters
                     if cst_type == 'distanceAB':
                         temp.extend(
-                            [2.00,0.25,1000.00,0][t_len-1:]
+                            [2.00,0.25,100.00,0][t_len-1:]
                         )
                     elif cst_type in 'angle_A angle_B'.split():
                         temp.extend(
-                            [180.0,5.0,1000.0,360.0,1][t_len-1:]
+                            [180.0,5.0,100.0,360.0,1][t_len-1:]
                         )
     
                     else:

@@ -9,7 +9,6 @@ Class contains:
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-06-07
-
 """
 
 #TODO(CJ): need more documentation here
@@ -20,7 +19,7 @@ from typing import Callable, Dict, List
 from enzy_htp.core import env_manager as em
 
 
-class BaseInterface:
+class BaseInterface(ABC):
     """Abstract base class for all Package Interfaces. 
 
     Attributes:
