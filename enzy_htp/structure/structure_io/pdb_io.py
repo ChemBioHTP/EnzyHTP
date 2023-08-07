@@ -45,7 +45,7 @@ class PDBParser(StructureParserInterface):
     PDB_NONSTRU_INFO_LINE_NAME = [
         "HEADER", "TITLE", "COMPND", "SOURCE", "KEYWDS", "EXPDTA", "NUMMDL", "AUTHOR", "REVDAT", "SPRSDE", "JRNL", "REMARK", "DBREF",
         "SEQADV", "SEQRES", "HELIX", "SHEET", "CRYST1", "ORIGX1", "ORIGX2", "ORIGX3", "SCALE1", "SCALE2", "SCALE3"
-    ]  #these keywords are for general information in the PDB database
+    ]  # these keywords are for general information in the PDB database
 
     # interface
     @classmethod
@@ -98,17 +98,19 @@ class PDBParser(StructureParserInterface):
         input_pdb = PandasPdb()
         input_pdb.read_pdb(path)
 
-        #region (PDB conundrums)
+        # region (PDB conundrums)
         # deal with multiple model
-        target_model_df, target_model_ter_df = cls._get_target_model(input_pdb.df, model=model)
+        target_model_df, target_model_ter_df = cls._get_target_model(
+            input_pdb.df, model=model)
 
         # TODO address when atom/residue/chain id is disordered respect to the line index
         # this is important to be aligned since Amber will force them to align and erase the chain id
         # a workaround is to add them back after Amber process
         idx_change_mapper = cls._resolve_missing_chain_id(
             target_model_df, target_model_ter_df, allow_multichain_in_atom=allow_multichain_in_atom)  # add missing chain id in place
-        cls._resolve_alt_loc(target_model_df)  # resolve alt loc record in place by delele redundant df rows
-        #endregion (Add here to address more problem related to the PDB file format here)
+        # resolve alt loc record in place by delele redundant df rows
+        cls._resolve_alt_loc(target_model_df)
+        # endregion (Add here to address more problem related to the PDB file format here)
 
         # target_model_df below should be "standard" --> start building
         # mapper is for indicating superior information of the current level: e.g.: indicate
@@ -116,49 +118,51 @@ class PDBParser(StructureParserInterface):
         # old enzyhtp is build iteratively chain frist and residues are build in the chain
         # builder and so on for atom. But current methods is used for better readability
         atom_mapper: Dict[tuple, Atom] = cls._build_atoms(target_model_df)
-        res_mapper = cls._build_residues(atom_mapper, add_solvent_list, add_ligand_list)
-        chain_list: Dict[str, Chain] = cls._build_chains(res_mapper, remove_trash)
+        res_mapper = cls._build_residues(
+            atom_mapper, add_solvent_list, add_ligand_list)
+        chain_list: Dict[str, Chain] = cls._build_chains(
+            res_mapper, remove_trash)
 
         if give_idx_map:
             return Structure(chain_list), idx_change_mapper
         return Structure(chain_list)
 
-    @classmethod
-    @dispatch
-    def get_file_str(cls, stru: Chain, if_renumber: bool = True, if_fix_atomname: bool = True) -> str:  # pylint: disable=function-redefined
-        """
-        dispatch for supporting get pdb file str with Chain only
-        """
-        if if_renumber:
-            stru.parent.renumber_atoms()
-        result_str = cls._write_pdb_chain(stru)
-        result_str += f"END{os.linesep}"
-        return result_str
+    # @classmethod
+    # @dispatch
+    # def get_file_str(cls, stru: Chain, if_renumber: bool = True, if_fix_atomname: bool = True) -> str:  # pylint: disable=function-redefined
+    #     """
+    #     dispatch for supporting get pdb file str with Chain only
+    #     """
+    #     if if_renumber:
+    #         stru.parent.renumber_atoms()
+    #     result_str = cls._write_pdb_chain(stru)
+    #     result_str += f"END{os.linesep}"
+    #     return result_str
+
+    # @classmethod
+    # @dispatch
+    # def get_file_str(cls, stru: Residue, if_renumber: bool = True, if_fix_atomname: bool = True) -> str:  # pylint: disable=function-redefined
+    #     """
+    #     dispatch for supporting get pdb file str with Residue only
+    #     """
+    #     if if_renumber:
+    #         stru.parent.parent.renumber_atoms()
+    #     result_str = cls._write_pdb_residue(stru)
+    #     result_str += f"TER{os.linesep}END{os.linesep}"
+    #     return result_str
+
+    # @classmethod
+    # @dispatch
+    # def get_file_str(cls, stru: Atom) -> str:  # pylint: disable=function-redefined
+    #     """
+    #     dispatch for supporting get pdb file str with Atom only
+    #     """
+    #     result_str = cls._write_pdb_atom(stru)
+    #     result_str += f"TER{os.linesep}END{os.linesep}"
+    #     return result_str
 
     @classmethod
-    @dispatch
-    def get_file_str(cls, stru: Residue, if_renumber: bool = True, if_fix_atomname: bool = True) -> str:  # pylint: disable=function-redefined
-        """
-        dispatch for supporting get pdb file str with Residue only
-        """
-        if if_renumber:
-            stru.parent.parent.renumber_atoms()
-        result_str = cls._write_pdb_residue(stru)
-        result_str += f"TER{os.linesep}END{os.linesep}"
-        return result_str
-
-    @classmethod
-    @dispatch
-    def get_file_str(cls, stru: Atom) -> str:  # pylint: disable=function-redefined
-        """
-        dispatch for supporting get pdb file str with Atom only
-        """
-        result_str = cls._write_pdb_atom(stru)
-        result_str += f"TER{os.linesep}END{os.linesep}"
-        return result_str
-
-    @classmethod
-    @dispatch
+    # @dispatch
     def get_file_str(
             cls,
             stru: Structure,  # pylint: disable=function-redefined
@@ -185,7 +189,7 @@ class PDBParser(StructureParserInterface):
         result_str += f"END{os.linesep}"
         return result_str
 
-    #region == pdb -> Stru ==
+    # region == pdb -> Stru ==
     @staticmethod
     def _check_valid_pdb(pdb_path: str) -> None:
         """Helper function that ensures the supplied pdb_path contain a valid pdb file.
@@ -193,16 +197,19 @@ class PDBParser(StructureParserInterface):
         # check for right extension
         ext: str = fs.get_file_ext(pdb_path)
         if ext.lower() != ".pdb":
-            _LOGGER.error(f"Supplied file '{pdb_path}' is NOT a PDB file. Exiting...")
+            _LOGGER.error(
+                f"Supplied file '{pdb_path}' is NOT a PDB file. Exiting...")
             sys.exit(1)
-        #check for file existance
+        # check for file existance
         if not os.path.exists(pdb_path):
-            _LOGGER.error(f"Supplied file '{pdb_path}' does NOT exist. Exiting...")
+            _LOGGER.error(
+                f"Supplied file '{pdb_path}' does NOT exist. Exiting...")
             sys.exit(1)
         # check for character encoding
         for idx, ll in enumerate(fs.lines_from_file(pdb_path)):
             if not ll.isascii():
-                _LOGGER.error(f"The PDB '{pdb_path}' contains non-ASCII text and is invalid in line {idx}: '{ll}'. Exiting...")
+                _LOGGER.error(
+                    f"The PDB '{pdb_path}' contains non-ASCII text and is invalid in line {idx}: '{ll}'. Exiting...")
                 sys.exit(1)
 
     @staticmethod
@@ -234,22 +241,29 @@ class PDBParser(StructureParserInterface):
                     first = 0
                     continue
                 if ind[0] == last_ind[0]:
-                    _LOGGER.error(f"Unclosed MODEL section is detected in pdb file. line: {last_ind[-1]}")
+                    _LOGGER.error(
+                        f"Unclosed MODEL section is detected in pdb file. line: {last_ind[-1]}")
                     sys.exit(1)
                 last_ind = ind
             # get target model unit range
-            mdl_start_lines = list(df["OTHERS"][df["OTHERS"].record_name == "MODEL"]["line_idx"])
-            mdl_end_lines = list(df["OTHERS"][df["OTHERS"].record_name == "ENDMDL"]["line_idx"])
+            mdl_start_lines = list(
+                df["OTHERS"][df["OTHERS"].record_name == "MODEL"]["line_idx"])
+            mdl_end_lines = list(
+                df["OTHERS"][df["OTHERS"].record_name == "ENDMDL"]["line_idx"])
             mdl_range = list(zip(mdl_start_lines, mdl_end_lines))
             target_mdl_range = mdl_range[model]
             mdl_query_pattern = f"line_idx > {target_mdl_range[0]} & line_idx < {target_mdl_range[1]}"
             # get model dataframe section as a copy
-            target_mdl_df = pd.concat((df["ATOM"], df["HETATM"]), ignore_index=True).query(mdl_query_pattern).copy()
-            target_mdl_ter_df = df["OTHERS"][df["OTHERS"].record_name == "TER"].query(mdl_query_pattern).copy()
+            target_mdl_df = pd.concat((df["ATOM"], df["HETATM"]), ignore_index=True).query(
+                mdl_query_pattern).copy()
+            target_mdl_ter_df = df["OTHERS"][df["OTHERS"].record_name == "TER"].query(
+                mdl_query_pattern).copy()
         else:
             # get all dataframe as a copy if there"s no MODEL record
-            target_mdl_df = pd.concat((df["ATOM"], df["HETATM"]), ignore_index=True).copy()  # insure unique df id
-            target_mdl_ter_df = df["OTHERS"][df["OTHERS"].record_name == "TER"].copy()
+            target_mdl_df = pd.concat(
+                (df["ATOM"], df["HETATM"]), ignore_index=True).copy()  # insure unique df id
+            target_mdl_ter_df = df["OTHERS"][df["OTHERS"].record_name == "TER"].copy(
+            )
 
         return target_mdl_df, target_mdl_ter_df
 
@@ -321,10 +335,10 @@ class PDBParser(StructureParserInterface):
         if "" in chain_ids:
             chain_ids.remove("")
         legal_ids = cls._get_legal_pdb_chain_ids(chain_ids)
-        ## split the df into chain dfs
+        # split the df into chain dfs
         ter_line_ids = list(ter_df["line_idx"])
         chain_dfs = split_df_base_on_column_value(df, "line_idx", ter_line_ids)
-        ## get a list of (loc, value) for editing in the original df
+        # get a list of (loc, value) for editing in the original df
         result_loc_map = []
         recorded_chain_ids = []
         chain: pd.DataFrame
@@ -334,13 +348,15 @@ class PDBParser(StructureParserInterface):
                 _LOGGER.debug("Found empty chain. ")
                 continue
             # check existing chain ids in this chain
-            existing_chain_ids = set(list(map(lambda c_id: c_id.strip(), chain["chain_id"])))
+            existing_chain_ids = set(
+                list(map(lambda c_id: c_id.strip(), chain["chain_id"])))
             existing_chain_ids.discard("")
             atom_missing_c_id = chain[chain.chain_id.str.strip() == ""]
             if len(atom_missing_c_id) == 0:
                 # case: no missing chain id (but potentially repeating chain id)
                 # divid into ATOM and HET chain
-                current_chain_records = set(list(map(lambda c_id: c_id.strip(), chain["record_name"])))
+                current_chain_records = set(
+                    list(map(lambda c_id: c_id.strip(), chain["record_name"])))
 
                 if len(existing_chain_ids) == 1:
                     # case: only 1 chain id
@@ -348,16 +364,20 @@ class PDBParser(StructureParserInterface):
                     if "ATOM" in current_chain_records:
                         # case: no missing chain id; single chain id; ATOM chain
                         if current_chain_id in recorded_chain_ids:
-                            _LOGGER.error("Found the same chain id in 2 different ATOM chains. Check your PDB.")
+                            _LOGGER.error(
+                                "Found the same chain id in 2 different ATOM chains. Check your PDB.")
                             sys.exit(1)
                         recorded_chain_ids.append(current_chain_id)
                     else:
                         # case: no missing chain id; single chain id; HET chain
                         if current_chain_id in recorded_chain_ids:
                             new_chain_id = legal_ids.pop()
-                            _LOGGER.debug(f"Found repeating chain id in a HETATM chain: assigning a new chain: {new_chain_id}")
-                            result_loc_map.extend(list(zip(chain.index, [new_chain_id] * len(chain))))
-                            cls._write_idx_change_when_resolve_chain_id(idx_change_mapper, chain, new_chain_id)
+                            _LOGGER.debug(
+                                f"Found repeating chain id in a HETATM chain: assigning a new chain: {new_chain_id}")
+                            result_loc_map.extend(
+                                list(zip(chain.index, [new_chain_id] * len(chain))))
+                            cls._write_idx_change_when_resolve_chain_id(
+                                idx_change_mapper, chain, new_chain_id)
                         else:
                             recorded_chain_ids.append(current_chain_id)
                     continue
@@ -366,32 +386,40 @@ class PDBParser(StructureParserInterface):
                     if "ATOM" in current_chain_records:
                         if not allow_multichain_in_atom:
                             # ATOM chain: multiple chain id not allowed
-                            _LOGGER.error("Found multiple chain id in ATOM chain. Not allowed.")
+                            _LOGGER.error(
+                                "Found multiple chain id in ATOM chain. Not allowed.")
                             sys.exit(1)
                         else:
                             # ATOM chain: (user option) multiple chain id allowed
                             _LOGGER.warning(
                                 "Found multiple chain id in 1 ATOM chain. Allowed by the user option. Treating them as individual chains")
                             # case: no missing chain ids; multiple chain id; ATOM chain (user option)
-                            chains_in_chain = chain.groupby("chain_id", sort=False)
+                            chains_in_chain = chain.groupby(
+                                "chain_id", sort=False)
                             for chain_id_in_chain, chain_in_chain in chains_in_chain:
                                 if chain_id_in_chain in recorded_chain_ids:
-                                    _LOGGER.error("Found the repeating chain id in a ATOM chain with multiple chain id. Check your PDB.")
+                                    _LOGGER.error(
+                                        "Found the repeating chain id in a ATOM chain with multiple chain id. Check your PDB.")
                                     sys.exit(1)
                                 else:
-                                    recorded_chain_ids.append(chain_id_in_chain)
+                                    recorded_chain_ids.append(
+                                        chain_id_in_chain)
                             continue
                     else:
                         # HETATM chain: multiple chain id allowed and should be treated as individual chains
-                        _LOGGER.warning("Found multiple chain id in 1 HETATM chain. Be careful. Treating them as individual chains")
+                        _LOGGER.warning(
+                            "Found multiple chain id in 1 HETATM chain. Be careful. Treating them as individual chains")
                         # case: no missing chain ids; multiple chain id; HET chain
                         chains_in_chain = chain.groupby("chain_id", sort=False)
                         for chain_id_in_chain, chain_in_chain in chains_in_chain:
                             if chain_id_in_chain in recorded_chain_ids:
                                 new_chain_id = legal_ids.pop()
-                                _LOGGER.debug(f"Found repeating chain id in a HETATM chain: assigning a new chain: {new_chain_id}")
-                                result_loc_map.extend(list(zip(chain_in_chain.index, [new_chain_id] * len(chain_in_chain))))
-                                cls._write_idx_change_when_resolve_chain_id(idx_change_mapper, chain_in_chain, new_chain_id)
+                                _LOGGER.debug(
+                                    f"Found repeating chain id in a HETATM chain: assigning a new chain: {new_chain_id}")
+                                result_loc_map.extend(
+                                    list(zip(chain_in_chain.index, [new_chain_id] * len(chain_in_chain))))
+                                cls._write_idx_change_when_resolve_chain_id(
+                                    idx_change_mapper, chain_in_chain, new_chain_id)
                                 # no need to record since it cant be the same as any existing or new ones
                             else:
                                 recorded_chain_ids.append(chain_id_in_chain)
@@ -399,26 +427,34 @@ class PDBParser(StructureParserInterface):
             else:
                 if len(existing_chain_ids) == 0:
                     # case: all atoms are missing chain id
-                    result_loc_map.extend(list(zip(atom_missing_c_id.index, [legal_ids.pop()] * len(atom_missing_c_id))))
+                    result_loc_map.extend(
+                        list(zip(atom_missing_c_id.index, [legal_ids.pop()] * len(atom_missing_c_id))))
                 elif len(existing_chain_ids) == 1:
                     # case: only some atoms are missing chain id
                     current_chain_id = list(existing_chain_ids)[0]
                     if current_chain_id in recorded_chain_ids:
                         # divid into ATOM and HET chain
-                        current_chain_records = set(list(map(lambda c_id: c_id.strip(), chain["record_name"])))
+                        current_chain_records = set(
+                            list(map(lambda c_id: c_id.strip(), chain["record_name"])))
                         if "ATOM" in current_chain_records:
-                            _LOGGER.error("Found the same chain id in 2 different ATOM chains. Check your PDB.")
+                            _LOGGER.error(
+                                "Found the same chain id in 2 different ATOM chains. Check your PDB.")
                             sys.exit(1)
                         else:
                             new_chain_id = legal_ids.pop()
-                            _LOGGER.debug(f"Found repeating chain id in a HETATM chain: assigning a new chain: {new_chain_id}")
-                            result_loc_map.extend(list(zip(chain.index, [new_chain_id] * len(chain))))
-                            cls._write_idx_change_when_resolve_chain_id(idx_change_mapper, chain, new_chain_id)
+                            _LOGGER.debug(
+                                f"Found repeating chain id in a HETATM chain: assigning a new chain: {new_chain_id}")
+                            result_loc_map.extend(
+                                list(zip(chain.index, [new_chain_id] * len(chain))))
+                            cls._write_idx_change_when_resolve_chain_id(
+                                idx_change_mapper, chain, new_chain_id)
                     else:
-                        result_loc_map.extend(list(zip(atom_missing_c_id.index, [current_chain_id] * len(atom_missing_c_id))))
+                        result_loc_map.extend(
+                            list(zip(atom_missing_c_id.index, [current_chain_id] * len(atom_missing_c_id))))
                 else:
                     # case: more than 1 chain id in chain
-                    _LOGGER.error("Found multiple chain id together with missing chain id in 1 chain. Impossible to solve.")
+                    _LOGGER.error(
+                        "Found multiple chain id together with missing chain id in 1 chain. Impossible to solve.")
                     sys.exit(1)
         # add missing chain id
         batch_edit_df_loc_value(df, result_loc_map, "chain_id")
@@ -437,7 +473,8 @@ class PDBParser(StructureParserInterface):
         Return:
             the legal chain name list in a reversed order (for doing .pop())
         """
-        result = list(string.ascii_uppercase) + list(map(lambda x: str(x), range(50000)))
+        result = list(string.ascii_uppercase) + \
+            list(map(lambda x: str(x), range(50000)))
         result = list(filter(lambda s: s not in taken_ids, result))
         return list(reversed(result))
 
@@ -470,13 +507,16 @@ class PDBParser(StructureParserInterface):
         # get a list of "loc" for deleting in the original df
         delete_loc_list = []
         # treat in residues
-        alt_loc_residues = alt_loc_atoms_df.groupby(["residue_number", "chain_id"], sort=False)
+        alt_loc_residues = alt_loc_atoms_df.groupby(
+            ["residue_number", "chain_id"], sort=False)
         for r_id_c_id, res_df in alt_loc_residues:
             alt_res_dfs = res_df.groupby("alt_loc", sort=False)
             if len(alt_res_dfs) == 1:
-                _LOGGER.debug(f"Only 1 alt_loc id found in residue {r_id_c_id[1], r_id_c_id[0]}. No need to resolve")
+                _LOGGER.debug(
+                    f"Only 1 alt_loc id found in residue {r_id_c_id[1], r_id_c_id[0]}. No need to resolve")
                 continue
-            _LOGGER.debug(f"Dealing with alt_loc residue: {r_id_c_id[1], r_id_c_id[0]}")
+            _LOGGER.debug(
+                f"Dealing with alt_loc residue: {r_id_c_id[1], r_id_c_id[0]}")
             if keep == "first":
                 delele_res_df_locs = list(alt_res_dfs.groups.values())
                 del delele_res_df_locs[0]
@@ -506,7 +546,8 @@ class PDBParser(StructureParserInterface):
         df.sort_values("line_idx", inplace=True)
         for i, row in df.iterrows():
             atom_obj = Atom(row)
-            residue_key = (row["chain_id"].strip(), row["residue_number"], row["residue_name"].strip())
+            residue_key = (row["chain_id"].strip(
+            ), row["residue_number"], row["residue_name"].strip())
             atom_mapper[residue_key].append(atom_obj)
         return atom_mapper
 
@@ -514,7 +555,7 @@ class PDBParser(StructureParserInterface):
     def _build_residues(cls,
                         atom_mapper: Dict[str, Atom],
                         add_solvent_list: List = None,
-                        add_ligand_list: List = None) -> Dict[str, Residue]:  #TODO add test for this
+                        add_ligand_list: List = None) -> Dict[str, Residue]:  # TODO add test for this
         """
         build Residue() objects from atom_mapper
         Arg:
@@ -528,16 +569,18 @@ class PDBParser(StructureParserInterface):
         result_mapper = defaultdict(list)
         for res_key, atoms in atom_mapper.items():
             res_obj = Residue(int(res_key[1]), res_key[2], atoms)
-            result_mapper[res_key[0]].append(res_obj)  # here it is {"chain_id": Residue()}
+            # here it is {"chain_id": Residue()}
+            result_mapper[res_key[0]].append(res_obj)
         # categorize_residue
-        cls._categorize_pdb_residue(result_mapper, add_solvent_list, add_ligand_list)
+        cls._categorize_pdb_residue(
+            result_mapper, add_solvent_list, add_ligand_list)
 
         return result_mapper
 
     @staticmethod
     def _categorize_pdb_residue(residue_mapper: Dict[str, List[Residue]],
                                 add_solvent_list: list = None,
-                                add_ligand_list: list = None) -> Union[Residue, Ligand, Solvent, MetalUnit]:  #TODO add test for this
+                                add_ligand_list: list = None) -> Union[Residue, Ligand, Solvent, MetalUnit]:  # TODO add test for this
         """
         Categorize Residue base on it 3-letter name and chain info in PDB format
         Takes a mapper of {chain_id, [Residue, ...]} and converts
@@ -566,7 +609,8 @@ class PDBParser(StructureParserInterface):
                                 f"a metal or solvent residue name is found in an peptide chain {chain_id}: {residue.idx} {residue.name}")
                             sys.exit(1)
                         # TODO maybe a class for non-canonical aa in the future
-                        _LOGGER.debug(f"found noncanonical {chain_id} {residue.idx}")
+                        _LOGGER.debug(
+                            f"found noncanonical {chain_id} {residue.idx}")
                         residue.rtype = chem.ResidueType.NONCANONICAL
                 continue
             # non-peptide chain
@@ -596,13 +640,14 @@ class PDBParser(StructureParserInterface):
         """
         chain_list = []
         for chain_id, residues in res_mapper.items():
-            ch_obj = Chain(chain_id, residues)  # TODO decouple chain name with pdb chain id? How to solve too many water chain
+            # TODO decouple chain name with pdb chain id? How to solve too many water chain
+            ch_obj = Chain(chain_id, residues)
             if remove_trash:
                 ch_obj.remove_trash()
             chain_list.append(ch_obj)
         return chain_list
 
-    #endregion
+    # endregion
 
     @classmethod
     def _write_pdb_chain(cls, chain: Chain) -> str:
@@ -636,7 +681,7 @@ class PDBParser(StructureParserInterface):
         the function intepret information from
         https://www.wwpdb.org/documentation/file-format
         """
-        #build an amber style line here
+        # build an amber style line here
         l_type = f"{'ATOM':<6}"
         a_index = f"{atom.idx:>5d}"
 
@@ -674,7 +719,7 @@ class PDBParser(StructureParserInterface):
         else:
             charge = f"{atom.charge:2}"
 
-        #example: ATOM   5350  HB2 PRO   347      32.611  15.301  24.034  1.00  0.00
+        # example: ATOM   5350  HB2 PRO   347      32.611  15.301  24.034  1.00  0.00
         line = f"{l_type}{a_index} {a_name}{alt_loc_id}{r_name} {c_index}{r_index}{insert_code}   {x}{y}{z}{occupancy}{temp_factor}      {seg_id}{element}{charge}{os.linesep}"
         return line
 
@@ -686,7 +731,7 @@ class PDBParser(StructureParserInterface):
         pass
 
 
-#region == util of PDB file handling ==
+# region == util of PDB file handling ==
 # these tools handles those tasks that dont worth converting to Structure
 
 
@@ -705,7 +750,8 @@ def restore_pdb_index(index_mapper: Dict[tuple, tuple], target_pdb: str, out_pat
     pdb_panda_obj = PandasPdb().read_pdb(target_pdb)
     pdb_df = get_pdb_df(target_pdb)  # also fix for chain id
     for index, row in pdb_df.iterrows():
-        old_chain_id, old_resi_idx = index_mapper[(row["chain_id"], row["residue_number"])]
+        old_chain_id, old_resi_idx = index_mapper[(
+            row["chain_id"], row["residue_number"])]
         # edit index in place
         pdb_df.loc[index, "chain_id"] = old_chain_id
         pdb_df.loc[index, "residue_number"] = old_resi_idx
@@ -735,13 +781,16 @@ def pdb_index_mapping_by_order(npdb_df: pd.DataFrame, opdb_df: pd.DataFrame) -> 
     order base on residue indexes)"""
     nkeys, okeys = get_pdb_index_key(npdb_df), get_pdb_index_key(opdb_df)
     if len(okeys) != len(nkeys):
-        _LOGGER.error(f"Residue key number does not match between old and new pdb. Index mapping is impossible")
+        _LOGGER.error(
+            f"Residue key number does not match between old and new pdb. Index mapping is impossible")
         raise IndexMappingError
     if if_list_contain_repeating_element(okeys):
-        _LOGGER.error(f"Found repeating residue key in old pdb. Index mapping is impossible")
+        _LOGGER.error(
+            f"Found repeating residue key in old pdb. Index mapping is impossible")
         raise IndexMappingError
     if if_list_contain_repeating_element(nkeys):
-        _LOGGER.error(f"Found repeating residue key in new pdb. Index mapping is impossible")
+        _LOGGER.error(
+            f"Found repeating residue key in new pdb. Index mapping is impossible")
         raise IndexMappingError
 
     idx_mapper = dict(zip(nkeys, okeys))
@@ -753,7 +802,8 @@ def get_pdb_index_key(pdb: str) -> List[Tuple[str, str]]:
     """get a index key of every residue in the pdb in the form of
     (chain_id, residue_number) with the same order in the PDB file"""
     pdb_df = get_pdb_df(pdb)
-    result = list_remove_adjacent_duplicates(list(zip(pdb_df.residue_name, pdb_df.chain_id, pdb_df.residue_number)))
+    result = list_remove_adjacent_duplicates(
+        list(zip(pdb_df.residue_name, pdb_df.chain_id, pdb_df.residue_number)))
     result = [(i, j) for _, i, j in result]
     return result
 
@@ -762,7 +812,8 @@ def get_pdb_index_key(pdb: str) -> List[Tuple[str, str]]:
 def get_pdb_index_key(pdb_df: pd.DataFrame) -> List[Tuple[str, str]]:
     """get a index key of every residue in the pdb in the form of
     (chain_id, residue_number) with the same order in the PDB file"""
-    result = list_remove_adjacent_duplicates(list(zip(pdb_df.residue_name, pdb_df.chain_id, pdb_df.residue_number)))
+    result = list_remove_adjacent_duplicates(
+        list(zip(pdb_df.residue_name, pdb_df.chain_id, pdb_df.residue_number)))
     result = [(i, j) for _, i, j in result]
     return result
 
@@ -787,4 +838,4 @@ def get_pdb_df(pdb: str, fix_chain_id: bool = True) -> pd.DataFrame:
     return result
 
 
-#endregion
+# endregion
