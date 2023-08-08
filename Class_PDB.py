@@ -1,15 +1,33 @@
-from math import exp, ceil
+import copy
+from math import ceil
 import os
+import io
 import re
-from subprocess import run, CalledProcessError
+import pandas as pd
+import shutil
+from shutil import rmtree
+from subprocess import SubprocessError, run, CalledProcessError
 from random import choice
+from typing import Dict, Union, List
 from AmberMaps import *
 from wrapper import *
 from Class_Structure import *
 from Class_line import *
 from Class_Conf import Config, Layer
 from Class_ONIOM_Frame import *
-from helper import Conformer_Gen_wRDKit, decode_atom_mask, get_center, get_field_strength_value, line_feed, mkdir, generate_Rosetta_params
+from core import job_manager
+from core.clusters._interface import ClusterInterface
+from helper import (
+    Conformer_Gen_wRDKit, 
+    delete_idx_line, 
+    decode_atom_mask, 
+    get_center, 
+    get_field_strength_value, 
+    line_feed, 
+    mkdir, 
+    generate_Rosetta_params,
+    AmberError,
+    )
 try:
     from pdb2pqr.main import main_driver as run_pdb2pqr
     from pdb2pqr.main import build_main_parser as build_pdb2pqr_parser
@@ -88,6 +106,9 @@ class PDB():
         self.MutaFlags = []
         self.nc=None
         self.frames=None
+        self.prepi_path = {}
+        self.frcmod_path = {}
+        self.disulfied_residue_pairs = []
         # default MD conf.
         self._init_MD_conf()
         # default ONIOM layer setting
@@ -157,16 +178,18 @@ class PDB():
                     print('PDB.get_stru: WARNING: self.stru has a different name')
                     print('     -self.name: '+self.name)
                     print('     -self.stru.name: '+self.stru.name)
-                    print('Getting new stru')
         else:
             get_flag = 1
 
         if get_flag or renew:
+            if Config.debug >= 1:
+                print('PDB.get_stru: Getting new stru')
             if self.path is not None:
                 self.stru = Structure.fromPDB(self.path, input_name=input_name, ligand_list=ligand_list)
             else:
                 self.stru = Structure.fromPDB(self.file_str, input_type='file_str', input_name=input_name, ligand_list=ligand_list)
-
+        elif Config.debug >= 1:
+            print('PDB.get_stru: Not getting new stru - have existing self.stru with the same name and renew == 0')
 
     def _get_file_str(self):
         '''
@@ -195,7 +218,7 @@ class PDB():
 
     def _init_MD_conf(self):
         '''
-        initialize default MD configuration. Replaced by manual setting if assigned later.
+        initialize default MD configuration. Replaced by manual setting if assigned later. TODO may be need copy & operation in where it is used.
         '''
         self.conf_min = Config.Amber.conf_min
         self.conf_heat = Config.Amber.conf_heat
@@ -486,7 +509,8 @@ class PDB():
         '''
         out_path=self.path_name+'_aH.pdb'
         self._get_file_path()
-        self._get_protonation_pdb2pqr(ph=ph)
+        disulfied_residue_pairs = self._get_protonation_pdb2pqr(ph=ph)
+        self.disulfied_residue_pairs = disulfied_residue_pairs # TODO this is a temp solution. This requires runnning this function everytime after mutation which is also recommanded.
         self._protonation_Fix(out_path, ph=ph, keep_id=keep_id, if_prt_ligand=if_prt_ligand)
         self.path = out_path
         self._update_name()
@@ -500,6 +524,9 @@ class PDB():
             (TARGET: 1. what is deleted from the structure // metal, ligand)
         
         save the result to self.pqr_path
+
+        Return:
+            return disulfied_residue_pairs in a format of e.g.: [(('A', 496), ('A', 440)), ...]
         '''
         # set default value for output pqr path
         if len(out_path) == 0:
@@ -509,10 +536,28 @@ class PDB():
         
         # input of PDB2PQR
         pdb2pqr_parser = build_pdb2pqr_parser()
-        args = pdb2pqr_parser.parse_args(['--ff=PARSE','--ffout='+ffout,'--with-ph='+str(ph),self.path,self.pqr_path])
+        pdb2pqr_logging_level = 'INFO'
+        args = pdb2pqr_parser.parse_args(['--ff=PARSE',f'--log-level={pdb2pqr_logging_level}','--ffout='+ffout,'--with-ph='+str(ph),self.path,self.pqr_path])
         # use context manager to hide output
-        with HiddenPrints('./._get_protonation_pdb2pqr.log'):
-            run_pdb2pqr(args)
+        with HiddenPrints(f'{self.dir}/._get_protonation_pdb2pqr.log'):
+            missed_residues, pka_df, biomolecule = run_pdb2pqr(args)
+
+        # S-S bond
+        disulfied_residue_pairs = []
+        for res in biomolecule.residues:
+            if getattr(res, 'ss_bonded', None):
+                res_key = (res.chain_id, res.res_seq)
+                for exist_pair in disulfied_residue_pairs:
+                    if res_key in exist_pair:
+                        break
+                else:
+                    disulfied_residue_pairs.append(
+                        (res_key,
+                        (res.ss_bonded_partner.chain_id, res.ss_bonded_partner.res_seq)))
+        for ss_bond in disulfied_residue_pairs:
+            print(f'INFO: detected disulfied bond by PDB2PQR: {ss_bond[0]} - {ss_bond[1]}')
+
+        return disulfied_residue_pairs
 
 
     def _protonation_Fix(self, out_path, Metal_Fix='1', ph = 7.0, keep_id=0, if_prt_ligand=1):
@@ -681,7 +726,7 @@ class PDB():
     Docking
     ========
     '''
-    def Dock_Reactive_Substrate(self, substrate, reactive_define, local_lig = 0):
+    def dock_reactive_substrate(self, substrate, reactive_define, local_lig = 0):
         '''
         Dock substrates into the apo enzyme in a reactive conformation
         Update self.path after docking. Will not update self.path in the middle of the docking
@@ -767,7 +812,8 @@ class PDB():
             Only used for build filenames. **Do not affect any calculation.**
         A : Chain index. Determine by 'TER' marks in the PDB file. (Do not consider chain_indexs in the original file.)
         11: Residue index. Strictly correponding residue indexes in the original file. (NO sort applied)
-        Y : Target residue name.  
+        Y : Target residue name.
+        * will just load and save in tleap if MutaFlag is only 'WT'.
 
         **WARNING** if there are multiple mutations on the same index, only the first one will be used.
         '''
@@ -809,6 +855,8 @@ class PDB():
                     # only match in the dataline and keep all non data lines
                     if pdb_l.line_type == 'ATOM':
                         for Flag in self.MutaFlags:
+                            if 'WT' in Flag:
+                                continue
                             # Test for every Flag for every lines
                             t_chain_id=Flag[1]
                             t_resi_id =Flag[2]
@@ -860,27 +908,81 @@ class PDB():
         return self.path
 
 
-    def Add_MutaFlag(self,Flag = 'r', if_U = 0, if_self=0):
-        '''
-        Input: 
-        Flags or "random"
-        ----------------------------------------------------
-        Flag   :(e.g. XA11Y) Can be a str or a list of str (a list of flags).
-        if_U   :if consider mutation to U in random generation (Selenocysteine)
-        if_self:if consider mutation to the residue itself in random generation(wt)
-        ----------------------------------------------------
-        Append self.MutaFlags with the Flag.
-        Grammer:
-        X : Original residue name. Leave X if unknow. 
-            Only used for build filenames. **Do not affect any calculation.**
-        A : Chain index. Determine by 'TER' marks in the PDB file. (Do not consider chain_indexs in the original file.)
-        11: Residue index. Strictly correponding residue indexes in the original file. (NO sort applied)
-        Y : Target residue name.  
-        ----------------------------------------------------
-        'random' or 'r' (default)
-        ----------------------------------------------------
-        return a label of mutations
-        '''
+    def Add_MutaFlag(self, Flag : str = 'r', if_U : bool = 0, if_self : bool = 0):
+        """Determine which mutation to deploy to the structure.
+        
+        User can 1. assign specific mutation(s). 
+              or 2. assign random mutation(s) by specifing a rule of randomlization.
+        The function will 
+        1. decode the input to a list of python tuples that 
+            each contains the information of a mutation as ('X','A','###','Y') 
+            save to *self.MutaFlags*
+        2. check the if the assigned mutation is reasonable that
+            specifing the correct original residue
+            within the range of chain ids
+            within the range of residue ids
+            the target residue is within the range of canonical AAs
+
+        Args:
+        (self):
+        The requirements for the input pdb object are:
+            TODO(shaoqz): add after refactoring
+        Flag: 
+            str or list of strings indicating specifc mutation(s) or a rule of randomlization. (default: r)
+            Grammer:
+            **Assign specific mutation(s)**
+                'XA##Y'
+                For each str that represent a mutation, the format should be 'XA##Y', in which
+                X : Original residue letter (One-letter code). Leave X if unknow. 
+                    (Only used for checking that will pop a warning if the residue doesn't match, 
+                    which usually means you are using a wrong residue id and requires a double check.)
+                A : Chain index. This is optional witha default value: A.
+                    (Different chains are defined by 'TER' marks in the PDB file and the index is noted in order.
+                    * Note this will not always be the same as the chain id in the PDB line
+                    * defined in self.stru)
+                ##: Residue index. 
+                    (Strictly correponding residue indexes in the original file.
+                    * defined in self.stru)
+                Y : Target residue letter.
+                    (The residue type after the mutation.) 
+                'WT'
+                Can also use WT to specify the WT. The decoded MutaFlag will be ('WT', 'WT', 'WT', 'WT') to fit in the format.
+            example:
+                >>> pdb_obj.Add_MutaFlag('D83K')
+                >>> pdb_obj.MutaFlags
+                [('D', 'A', '83', 'K')]
+                >>> pdb_obj.Add_MutaFlag('DA83K')
+                >>> pdb_obj.MutaFlags
+                [('D', 'A', '83', 'K')]
+                >>> pdb_obj.Add_MutaFlag(['DA83K', 'EB226P'])
+                >>> pdb_obj.MutaFlags
+                [('D', 'A', '83', 'K'), ('E', 'B', '226', 'P')]
+            
+            **Assign random mutation(s)** 
+                ['r', {'position': 'keyword', 
+                       'target_resi':'keyword'}]
+                To assigne random mutaion, start the list with 'r' or 'random' followed by a map that
+                defines the rule of the randomlization. In the map dictionary there are 2 keys to fill:
+                position        : use a keyword or a pattern to define availiable positions to mutate.
+                target_residue  : use a keyword or a pattern to define availiable target residues.
+                (* Note that when using random assignment, the list can no longer contain any manual assign str for mutation.
+                e.g.: pdb_obj.Add_MutaFlag(['V23T', 'r']) is not valid)
+            example:
+                TODO(shaoqz): finish this function.
+        if_U: 
+            if include mutations to U (selenocysteine) in random generation.
+        if_self:
+            if "mutation to the same amino acid" is allowed for random mutation.
+
+        Returns:
+        There are two parts of actually outputs:
+        In self.MutaFlags: Assigned mutations in a list of tuples
+            example: 
+            [('D', 'A', '83', 'K'), ('E', 'B', '226', 'P')]
+        In return value: A str representing a tag of current mutations to the PDB.
+            example:
+            _DA83K_EB226P
+        """
 
         if type(Flag) == str:
 
@@ -901,6 +1003,8 @@ class PDB():
                 if resi.name in Resi_map2:
                     resi_1 = Resi_map2[resi.name]
                 else:
+                    if Config.debug >= 1:
+                        print('WARNING: pdb.Add_MutaFlag(): A non-canonical animo acid is being mutated! The MutaFlag will have a 3-letter code for the original residue .')
                     resi_1 = resi.name
                 # random over the residue list
                 if if_U:
@@ -947,12 +1051,16 @@ class PDB():
         11: Residue index. Strictly correponding residue indexes in the original file. (NO sort applied)
         Y : Target residue name.
 
+        * can also use WT to specify the WT. The decoded MutaFlag will be ('WT', 'WT', 'WT', 'WT') to fit in the format
+
         the later 3 will go through a san check to make sure they are within the range:
         A : chain.id range in self.stru.chains
         11: resi.id range in self.stru.chain[int].residues
         Y : Resi_list
         '''
         pattern = r'([A-Z])([A-Z])?([0-9]+)([A-Z])'
+        if Flag == 'WT':
+            return ('WT', 'WT', 'WT', 'WT')
         F_match = re.match(pattern, Flag)
         if F_match is None:
             raise Exception('_read_MutaFlag: Required format: XA123Y (or X123Y indicating the first chain)')
@@ -988,62 +1096,109 @@ class PDB():
         '''
         Take a MutaFlag Tuple and return a str of name
         '''
+        if 'WT' in Flag:
+            return 'WT'
         return Flag[0]+Flag[1]+Flag[2]+Flag[3]
 
 
-    def PDBMin(self,cycle=2000,engine='Amber_GPU'):
+    def PDBMin(
+        self,
+        cycle: int = 20000,
+        engine: str = 'Amber_GPU',
+        if_cluster_job: bool = 1, 
+        cluster: ClusterInterface = None, 
+        period: int = 180,
+        res_setting: Union[dict, None] = None,
+        cpu_cores: Union[str, None] = None,
+        cluster_debug: bool = 0
+        ):
         '''
         Run a minization use self.prmtop and self.inpcrd and setting form class Config.
         --------------------------------------------------
         Save changed PDB to self.path (containing water and ions)
         Mainly used for remove bad contact from PDB2PDBwLeap.
+        cpu_cores
+            provide these for configure the gaussian input file when using a non-dict res_setting.
+            these values should be the same as indicated in the res_setting.
         '''
         
         out4_PDB_path=self.path_name+'_min.pdb'
 
-        #make sander input
+        #make MD config
         min_dir = self.cache_path+'/PDBMin'
         minin_path = min_dir + '/min.in'
         minout_path = min_dir + '/min.out'
         minrst_path = min_dir + '/min.ncrst' # change to ncrst seeking for solution of rst error
         mkdir(min_dir)
-        min_input=open(minin_path,'w')
-        min_input.write('Minimize'+line_feed)
-        min_input.write(' &cntrl'+line_feed)
-        min_input.write('  imin=1,'+line_feed)
-        min_input.write('  ntx=1,'+line_feed)
-        min_input.write('  irest=0,'+line_feed)
-        min_input.write('  maxcyc='+str(cycle)+','+line_feed)
-        min_input.write('  ncyc='+str(int(0.5*cycle))+','+line_feed)
-        min_input.write('  ntpr='+str(int(0.2*cycle))+','+line_feed)
-        min_input.write('  ntwx=0,'+line_feed)
-        min_input.write('  cut=8.0,'+line_feed)
-        min_input.write(' /'+line_feed)
-        min_input.close()
-    
-        # express engine
-        PC_cmd, engine_path = Config.Amber.get_Amber_engine(engine=engine)
+        self._build_MD_min(min_dir, cycle=cycle)
 
-        #run
-        if Config.debug >= 1:
-            print('running: '+PC_cmd +' '+ engine_path +' -O -i '+minin_path+' -o '+minout_path+' -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+minrst_path)
-        os.system(PC_cmd +' '+ engine_path +' -O -i '+minin_path+' -o '+minout_path+' -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+minrst_path)
-        #rst2pdb
-        try:
-            run('ambpdb -p '+self.prmtop_path+' -c '+minrst_path+' > '+out4_PDB_path, check=True, text=True, shell=True, capture_output=True)
-        except CalledProcessError:
-            if Config.debug >= 1:
-                print('Error: ambpdb cannot read PDBMin result .rst')
-                return 1
+        # determine cluster rescources
+        if if_cluster_job:
+            core_type = engine.split('_')[-1] # this go front because needed in expressing cmd
+            res_setting, env_settings = type(self)._prepare_cluster_job_pdbmd(cluster, core_type, res_setting)
+            if core_type == 'CPU':
+                # should some how wrap this up to a function
+                if isinstance(res_setting, dict):
+                    cpu_cores = res_setting['node_cores']
+                else: # directly use argument -> support non-dict res_setting input e.g.: str
+                    if cpu_cores == None:
+                        raise TypeError('ERROR: Requires cpu_cores input for configuring sander if using CPU and provide res_setting not as a dict')
+        elif cpu_cores != None:
+            raise TypeError('ERROR: cpu_cores should be None if not submit to cluster.')
+        # express engine
+        PC_cmd, engine_path = Config.Amber.get_Amber_engine(engine=engine, n_cores=cpu_cores)
+
+        # make cmd
+        cmd = f'{PC_cmd} {engine_path} -O -i {minin_path} -o {minout_path} -p {self.prmtop_path} -c {self.inpcrd_path} -r {minrst_path} -ref {self.inpcrd_path}'
         
+        # run
+        if if_cluster_job:
+            job = job_manager.ClusterJob.config_job(
+                commands = cmd,
+                cluster = cluster,
+                env_settings = env_settings,
+                res_keywords = res_setting,
+                sub_dir = './', # because path are relative
+                sub_script_path = f'{min_dir}/submit_PDBMin_{core_type}.cmd'
+            )
+            job.submit()
+            if Config.debug > 0:
+                print(f'''Running Min on {cluster.NAME}: job_id: {job.job_id} script: {job.sub_script_path} period: {period}''')
+            job.wait_to_end(period=period)
+            try:
+                PDB._detect_amber_error(job)
+            except AmberError as e:
+                if not PDB._is_normal_amber_output(minout_path):
+                    raise e
+            
+            if cluster_debug:
+                self.pdbmin_job = job
+        else:
+            if Config.debug >= 1:
+                print(f'running: {cmd}')
+            os.system(cmd)
+        
+        # rst2pdb
+        run('ambpdb -p '+self.prmtop_path+' -c '+minrst_path+' > '+out4_PDB_path, check=True, text=True, shell=True, capture_output=True)
+        
+        # clean
         os.system('mv '+self.prmtop_path+' '+self.inpcrd_path+' '+min_dir)
 
+        # update
         self.path = out4_PDB_path
         self._update_name()
-        self.prmtop_path=min_dir+'/'+self.prmtop_path
-        self.inpcrd_path=min_dir+'/'+self.inpcrd_path
-
+        self.prmtop_path=min_dir+'/'+self.prmtop_path.split('/')[-1]
+        self.inpcrd_path=min_dir+'/'+self.inpcrd_path.split('/')[-1]
         return self.path
+
+
+    @classmethod
+    def _is_normal_amber_output(cls, out_file):
+        '''check if the amber output file terminated normally'''
+        with open(out_file) as f:
+            if "5.  TIMINGS" in f.read():
+                return True
+            return False
 
 
     def rm_allH(self, ff='Amber', if_ligand=0):
@@ -1065,10 +1220,14 @@ class PDB():
                     for line in f:
                         if line.startswith('ATOM'):
                             atom_name = line[12:16].strip()
+                            resi_name = line[17:20].strip()
                             if atom_name[0] == 'H':
                                 if len(atom_name) >= 2:
                                     if atom_name[:2] not in not_H_list:
                                         continue
+                                    elif resi_name != atom_name[:2]: # non-metal
+                                        continue
+
                                 else:
                                     continue
                         of.write(line)
@@ -1095,7 +1254,18 @@ class PDB():
     ========
     '''
 
-    def PDB2FF(self, prm_out_path='', o_dir='', lig_method='AM1BCC', renew_lig=0, local_lig=1, ifsavepdb=0, igb=None, if_prm_only=0):
+    def PDB2FF(self, 
+        prm_out_path='', 
+        o_dir='', 
+        lig_method='AM1BCC', 
+        renew_lig=0, 
+        local_lig=1, 
+        ifsavepdb=0, 
+        igb=None, 
+        ifsolve=1,
+        if_prm_only=0,
+        lig_net_charge_mapper=None
+        ):
         '''
         PDB2FF(self, o_dir='')
         --------------------
@@ -1115,23 +1285,22 @@ class PDB():
 
         # build things seperately
         if local_lig:
-            lig_dir = self.dir+'/ligands/'
-            met_dir = self.dir+'/metalcenters/'
+            self.lig_dir = self.dir+'/ligands/'
+            self.met_dir = self.dir+'/metalcenters/'
         else:
-            lig_dir = self.dir+'/../ligands/'
-            met_dir = self.dir+'/../metalcenters/'
-        mkdir(lig_dir)
-        mkdir(met_dir)
+            self.lig_dir = self.dir+'/../ligands/'
+            self.met_dir = self.dir+'/../metalcenters/'
+        mkdir(self.lig_dir)
+        mkdir(self.met_dir)
 
-        ligands_pathNchrg = self.stru.build_ligands(lig_dir, ifcharge=1, ifunique=1)
-        # metalcenters_path = self.stru.build_metalcenters(met_dir)
+        # metalcenters_path = self.stru.build_metalcenters(self.met_dir)
         # parm
-        ligand_parm_paths = self._ligand_parm(ligands_pathNchrg, method=lig_method, renew=renew_lig)
+        ligand_parm_paths = self._ligand_parm(self.lig_dir, method=lig_method, renew=renew_lig, net_charge_mapper=lig_net_charge_mapper)
         # self._metal_parm(metalcenters_path)
         # combine
         if o_dir != '':
             mkdir(o_dir)
-        self._combine_parm(ligand_parm_paths, prm_out_path=prm_out_path, o_dir=o_dir, ifsavepdb=ifsavepdb, igb=igb, if_prm_only=if_prm_only)
+        self._combine_parm(ligand_parm_paths, prm_out_path=prm_out_path, o_dir=o_dir, ifsavepdb=ifsavepdb, igb=igb, ifsolve=ifsolve, if_prm_only=if_prm_only)
         if ifsavepdb:
             self.path = self.path_name+'_ff.pdb'
             self._update_name()
@@ -1139,7 +1308,7 @@ class PDB():
         return (self.prmtop_path,self.inpcrd_path)
 
     
-    def _ligand_parm(self, paths, method='AM1BCC', renew=0):
+    def _ligand_parm(self, lig_dir, method='AM1BCC', lig_charge_method='PYBEL', lig_charge_ph=7.0, renew=0, net_charge_mapper=None):
         '''
         Turn ligands to prepi (w/net charge), parameterize with parmchk
         return [(perpi_1, frcmod_1), ...]
@@ -1152,35 +1321,46 @@ class PDB():
         '''
         parm_paths = []
         self.prepi_path = {}
-
-        for lig_pdb, net_charge in paths:
-            if method == 'AM1BCC':
-                out_prepi = lig_pdb[:-3]+'prepin'
-                out_frcmod = lig_pdb[:-3]+'frcmod'
-                with open(lig_pdb) as f:
-                    for line in f:
-                        pdbl=PDB_line(line)
-                        if pdbl.line_type == 'ATOM' or pdbl.line_type == 'HETATM':
-                            lig_name = pdbl.resi_name
-                # if renew
-                if os.path.isfile(out_prepi) and os.path.isfile(out_frcmod) and not renew:
-                    if Config.debug >= 1:
-                        print('Parm files exist: ' + out_prepi + ' ' + out_frcmod)
-                        print('Using old parm files.')
+        self.frcmod_path = {}
+        
+        lig_list = self.stru.get_all_ligands(ifunique=1)
+        for lig in lig_list:
+            lig: Ligand
+            if Config.debug >= 1:
+                print( 'Working on: '+'_'.join((lig.name, str(lig.id))) )            
+            # target files
+            out_prepi = lig_dir+'ligand_'+lig.name+'.prepin'
+            out_frcmod = lig_dir+'ligand_'+lig.name+'.frcmod'
+            # if renew
+            if os.path.isfile(out_prepi) and os.path.isfile(out_frcmod) and not renew:
+                if Config.debug >= 1:
+                    print('Parm files exist: ' + out_prepi + ' ' + out_frcmod)
+                    print('Using old parm files.')
+            else:
+                # build ligand pdb file
+                lig_pdb_path = lig_dir+'ligand_'+lig.name+'.pdb'
+                lig.build(lig_pdb_path, ft='PDB')
+                # get net charge
+                if not (net_charge_mapper and net_charge_mapper.get(lig.name, None) != None):
+                    net_charge = lig.get_net_charge(method=lig_charge_method, ph=lig_charge_ph, o_dir=lig_dir)
                 else:
+                    net_charge = net_charge_mapper[lig.name]
+                # get parameters
+                if method == 'AM1BCC':
                     #gen prepi (net charge and correct protonation state is important)
                     if Config.debug >= 1:
-                        print('running: '+Config.Amber.AmberHome+'/bin/antechamber -i '+lig_pdb+' -fi pdb -o '+out_prepi+' -fo prepi -c bcc -s 0 -nc '+str(net_charge))
-                    run(Config.Amber.AmberHome+'/bin/antechamber -i '+lig_pdb+' -fi pdb -o '+out_prepi+' -fo prepi -c bcc -s 0 -nc '+str(net_charge), check=True, text=True, shell=True, capture_output=True)
+                        print('running: '+Config.Amber.AmberHome+'/bin/antechamber -i '+lig_pdb_path+' -fi pdb -o '+out_prepi+' -fo prepi -c bcc -s 0 -nc '+str(net_charge))
+                    run(Config.Amber.AmberHome+'/bin/antechamber -i '+lig_pdb_path+' -fi pdb -o '+out_prepi+' -fo prepi -c bcc -s 0 -nc '+str(net_charge), check=True, text=True, shell=True, capture_output=True)
                     if Config.debug <= 1:
                         os.system('rm ANTECHAMBER* ATOMTYPE.INF NEWPDB.PDB PREP.INF sqm.pdb sqm.in sqm.out')
                     #gen frcmod
                     if Config.debug >= 1:
                         print('running: '+Config.Amber.AmberHome+'/bin/parmchk2 -i '+out_prepi+' -f prepi -o '+out_frcmod)
                     run(Config.Amber.AmberHome+'/bin/parmchk2 -i '+out_prepi+' -f prepi -o '+out_frcmod, check=True, text=True, shell=True, capture_output=True)                
-                #record
-                parm_paths.append((out_prepi, out_frcmod))
-                self.prepi_path[lig_name] = out_prepi
+            #record
+            parm_paths.append((out_prepi, out_frcmod))
+            self.prepi_path[lig.name] = out_prepi
+            self.frcmod_path[lig.name] = out_frcmod
 
         return parm_paths
 
@@ -1207,6 +1387,9 @@ class PDB():
                 of.write('loadAmberParams '+frcmod+line_feed)
                 of.write('loadAmberPrep '+prepi+line_feed)
             of.write('a = loadpdb '+self.path+line_feed)
+            if self.disulfied_residue_pairs:
+                for ss_bond_pairs in self.disulfied_residue_pairs:
+                    of.write(f'bond a.{ss_bond_pairs[0][1]}.SG a.{ss_bond_pairs[1][1]}.SG{line_feed}')
             # igb Radii
             if igb != None:
                 radii = radii_map[str(igb)]
@@ -1235,8 +1418,9 @@ class PDB():
             else:
                 if o_dir == '':
                     if if_prm_only:
-                        mkdir('./tmp')
-                        of.write('saveamberparm a '+prm_out_path+' ./tmp/tmp.inpcrd'+line_feed)
+                        temp_dir = f'{self.dir}/temp'
+                        mkdir(temp_dir)
+                        of.write('saveamberparm a '+prm_out_path+f' {temp_dir}/tmp.inpcrd'+line_feed)
                         self.prmtop_path=prm_out_path
                         self.inpcrd_path=None
                     else:
@@ -1245,8 +1429,9 @@ class PDB():
                         self.inpcrd_path=self.path_name+'.inpcrd'
                 else:
                     if if_prm_only:
-                        mkdir('./tmp')
-                        of.write('saveamberparm a '+prm_out_path+' ./tmp/tmp.inpcrd'+line_feed)
+                        temp_dir = f'{self.dir}/temp'
+                        mkdir(temp_dir)
+                        of.write('saveamberparm a '+prm_out_path+f' {temp_dir}/tmp.inpcrd'+line_feed)
                         self.prmtop_path=prm_out_path
                         self.inpcrd_path=None
                     else:
@@ -1258,7 +1443,12 @@ class PDB():
                 of.write('savepdb a '+sol_path+line_feed)
             of.write('quit'+line_feed)
 
-        os.system('tleap -s -f '+leap_path+' > '+leap_path[:-2]+'out')
+        try:
+            run('tleap -s -f '+leap_path+' > '+leap_path[:-2]+'out', check=True,  text=True, shell=True, capture_output=True)
+        except SubprocessError as e:
+            print(f'stderr: {str(e.stderr).strip()}')
+            print(f'stdout: {str(e.stdout).strip()}')
+            raise e
 
         return self.prmtop_path, self.inpcrd_path
 
@@ -1319,26 +1509,101 @@ class PDB():
         return self.path
 
 
-    def PDBMD(self, tag='', o_dir='', engine='Amber_GPU', equi_cpu=0):
+    def PDBMD(  
+        self, 
+        tag: str = '', 
+        o_dir: str = '', 
+        engine: str = 'Amber_GPU', 
+        equi_cpu: bool = 0,
+        if_cluster_job: bool = 1, # TODO(qz) maybe its better to make everything below a dictionary 
+        cluster: ClusterInterface = None, # since the requirement is similar for a cluster job
+        period: int = 600,
+        res_setting: Union[dict, None] = None,
+        cpu_cores: Union[str, int, None] = None,
+        res_setting_equi_cpu: Union[dict, None] = None,
+        equi_cpu_cores: Union[str, int, None] = None,
+        cluster_debug: bool = 0,
+        check_out_put: bool = 1,
+        ):
         '''
         Use self.prmtop_path and self.inpcrd_path to initilize a MD simulation.
         The default MD configuration settings are assigned by class Config.Amber.
         * User can also set MD configuration for the current object by assigning values in self.conf_xxxx.
         * e.g.: self.conf_heat['nstlim'] = 50000
         --------------
-        o_dir   : Write files in o_dir (current self.dir/MD by default).
-        tag     : tag the name of the MD folder
-        engine  : MD engine (cpu/gpu)
-        equi_cpu: if use cpu for equi step
-        Return the nc path of the prod step and store in self.nc
+        Args:
+        self    :
+            dir 
+                - for creating the MD storage dir under
+            prmtop_path 
+                - MD input file
+            inpcrd_path 
+                - MD input file
+        o_dir   : 
+            Write files in o_dir (current self.dir/MD by default).
+        tag     : 
+            tag the assigned tag to the MD folder
+        engine  : 
+            MD engine (cpu/gpu)
+        equi_cpu: 
+            if use cpu for equi step
+        if_cluster_job:
+            if submit the calculation to a cluster using the job manager
+        cluster: (if_cluster_job is 1)
+            The cluster used
+        period: (if_cluster_job is 1)
+            the time cycle for each job state check (Unit: s) (default: 600)
+        res_setting: (if_cluster_job is 1)
+            (default: Config.Amber.MD_CPU_RES)
+            provide specific keys you want to change the rest will remain default.
+            (e.g. res_setting = {'node_cores':'2'} will still use a complete dictionary 
+            with only node_cores modified.)
+        res_setting_equi_cpu: 
+            resource for equi cpu job if use cpu for equi
+            provide specific keys you want to change the rest will remain default.
+        cpu_cores, equi_cpu_cores
+            provide these for configure the gaussian input file when using a non-dict res_setting.
+            these values should be the same as indicated in the res_setting.
+    cluster_debug:
+           1:  add also the pdbmd job obj to the pdb obj
+        --data--
+        Attribute:
+            store resulting NetCrd traj file path in self.nc
+        Return:
+            Return the nc path of the prod step
         '''
         # make folder
         if o_dir == '':
             o_dir = self.dir+'/MD'+tag
         mkdir(o_dir)
+        # default cpu cores
+        # format settings for cluster job (since it also influence the command)
+        if if_cluster_job:
+            core_type = engine.split('_')[-1]
+            res_setting, env_settings = type(self)._prepare_cluster_job_pdbmd(cluster, core_type, res_setting)
+            if core_type == 'CPU':
+                # TODO(shaoqz) see PDBMin, somehow wrap this up
+                if isinstance(res_setting, dict):
+                    cpu_cores = res_setting['node_cores']
+                else: # support non-dict res_setting input e.g.: str
+                    if cpu_cores == None:
+                        raise TypeError('ERROR: Requires cpu_cores input for configuring sander if using CPU and provide res_setting not as a dict')
+
+            if core_type == 'GPU' and equi_cpu:
+                # get env res for equi
+                env_settings_equi_cpu = cluster.AMBER_ENV['CPU']
+                res_setting_equi_cpu = type(self)._get_default_res_setting_pdbmd(res_setting_equi_cpu, 'CPU')
+                if isinstance(res_setting_equi_cpu, dict):
+                    equi_cpu_cores = res_setting_equi_cpu['node_cores']
+                else: # support non-dict res_setting input e.g.: str
+                    if equi_cpu_cores == None:
+                        raise TypeError('ERROR: Requires equi_cpu_cores input for configuring sander if using CPU and provide equi_res_setting not as a dict')
+        else:
+            if cpu_cores != None or equi_cpu_cores != None:
+                raise TypeError('ERROR: cpu_cores or equi_cpu_cores should be None if not submit to cluster.')        
 
         # express engine (pirority: AmberEXE_GPU/AmberEXE_CPU - AmberHome/bin/xxx)
-        PC_cmd, engine_path = Config.Amber.get_Amber_engine(engine=engine)
+        PC_cmd, engine_path = Config.Amber.get_Amber_engine(engine=engine, n_cores=cpu_cores)
         # express cpu engine if equi_cpu
         if equi_cpu:
             if Config.Amber.AmberEXE_CPU == None:
@@ -1351,35 +1616,153 @@ class PDB():
         heat_path = self._build_MD_heat(o_dir)
         equi_path = self._build_MD_equi(o_dir)
         prod_path = self._build_MD_prod(o_dir)
-
-        # run sander
-        if Config.debug >= 1:
-            print('running: '+PC_cmd +' '+ engine_path +' -O -i '+min_path +' -o '+o_dir+'/min.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+o_dir+'/min.rst -ref '+self.inpcrd_path)
-        os.system(PC_cmd +' '+ engine_path +' -O -i '+min_path +' -o '+o_dir+'/min.out -p '+self.prmtop_path+' -c '+self.inpcrd_path+' -r '+o_dir+'/min.rst -ref '+self.inpcrd_path)
-        if Config.debug >= 1:
-            print('running: '+PC_cmd +' '+ engine_path +' -O -i '+heat_path+' -o '+o_dir+'/heat.out -p '+self.prmtop_path+' -c '+o_dir+'/min.rst -ref ' +o_dir+'/min.rst -r ' +o_dir+'/heat.rst')
-        os.system(PC_cmd +' '+ engine_path +' -O -i '+heat_path+' -o '+o_dir+'/heat.out -p '+self.prmtop_path+' -c '+o_dir+'/min.rst -ref ' +o_dir+'/min.rst -r ' +o_dir+'/heat.rst')
-        
+        # build md commands
+        cmd_min = f'{PC_cmd} {engine_path} -O -i {min_path} -o {o_dir}/min.out -p {self.prmtop_path} -c {self.inpcrd_path} -r {o_dir}/min.rst -ref {self.inpcrd_path}{line_feed}'.strip(' ')
+        cmd_heat = f'{PC_cmd} {engine_path} -O -i {heat_path} -o {o_dir}/heat.out -p {self.prmtop_path} -c {o_dir}/min.rst -r {o_dir}/heat.rst -ref {o_dir}/min.rst{line_feed}'.strip(' ')
+        cmd_prod = f'{PC_cmd} {engine_path} -O -i {prod_path} -o {o_dir}/prod.out -p {self.prmtop_path} -c {o_dir}/equi.rst -r {o_dir}/prod.rst -ref {o_dir}/equi.rst -x {o_dir}/prod.nc{line_feed}'.strip(' ')
         # gpu debug for equi
-        if equi_cpu: 
-            # use Config.PC_cmd and cpu_engine_path
-            if Config.debug >= 1:
-                print('running: '+Config.PC_cmd +' '+ cpu_engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
-            os.system(Config.PC_cmd +' '+ cpu_engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
+        if equi_cpu:
+            cmd_equi = f'{Config.get_PC_cmd(equi_cpu_cores)} {cpu_engine_path} -O -i {equi_path} -o {o_dir}/equi.out -p {self.prmtop_path} -c {o_dir}/heat.rst -r {o_dir}/equi.rst -ref {o_dir}/heat.rst -x {o_dir}/equi.nc{line_feed}'.strip(' ')
+        else:
+            cmd_equi = f'{PC_cmd} {engine_path} -O -i {equi_path} -o {o_dir}/equi.out -p {self.prmtop_path} -c {o_dir}/heat.rst -r {o_dir}/equi.rst -ref {o_dir}/heat.rst -x {o_dir}/equi.nc{line_feed}'.strip(' ')
+
+        # run MD exe
+        if if_cluster_job:
+            md_jobs = []
+            if equi_cpu:
+                # divide into 3 jobs
+                cmd_1 = cmd_min + cmd_heat
+                cmd_2 = cmd_equi
+                cmd_3 = cmd_prod
+                # make job: 1&3 are in same environment 2 is always in CPU environment
+                job_1 = job_manager.ClusterJob.config_job(
+                    commands = cmd_1,
+                    cluster = cluster,
+                    env_settings = env_settings,
+                    res_keywords = res_setting,
+                    sub_dir = './', # because path are relative
+                    sub_script_path = f'{o_dir}/submit_PDBMD_1_{core_type}.cmd')
+                job_1.submit()
+                if Config.debug > 0:
+                    print(f'''Running MD on {cluster.NAME}: job_id: {job_1.job_id} script: {job_1.sub_script_path} period: {period}''')
+                job_1.wait_to_end(period)
+                type(self)._detect_amber_error(job_1)
+
+                job_2 = job_manager.ClusterJob.config_job(
+                    commands = cmd_2,
+                    cluster = cluster,
+                    env_settings = env_settings_equi_cpu,
+                    res_keywords = res_setting_equi_cpu,
+                    sub_dir = './', # because path are relative
+                    sub_script_path = f'{o_dir}/submit_PDBMD_2_CPU.cmd')
+                job_2.submit()
+                if Config.debug > 0:
+                    print(f'''Running MD on {cluster.NAME}: job_id: {job_2.job_id} script: {job_2.sub_script_path} period: {period}''')
+                job_2.wait_to_end(period)
+                type(self)._detect_amber_error(job_2)
+
+                job_3 = job_manager.ClusterJob.config_job(
+                    commands = cmd_3,
+                    cluster = cluster,
+                    env_settings = env_settings,
+                    res_keywords = res_setting,
+                    sub_dir = './', # because path are relative
+                    sub_script_path = f'{o_dir}/submit_PDBMD_3_{core_type}.cmd')
+                job_3.submit()
+                if Config.debug > 0:
+                    print(f'''Running MD on {cluster.NAME}: job_id: {job_3.job_id} script: {job_3.sub_script_path} period: {period}''')
+                job_3.wait_to_end(period)
+                type(self)._detect_amber_error(job_3)
+                md_jobs.extend([job_1, job_2, job_3])
+            else:
+                # all GPU or CPU
+                cmd = cmd_min + cmd_heat + cmd_equi + cmd_prod
+                job = job_manager.ClusterJob.config_job(
+                    commands = cmd,
+                    cluster = cluster,
+                    env_settings = env_settings,
+                    res_keywords = res_setting,
+                    sub_dir = './', # because path are relative
+                    sub_script_path = f'{o_dir}/submit_PDBMD_{core_type}.cmd'
+                )
+                job.submit()
+                if Config.debug > 0:
+                    print(f'''Running MD on {cluster.NAME}: job_id: {job.job_id} script: {job.sub_script_path} period: {period}''')
+                job.wait_to_end(period=period)
+                type(self)._detect_amber_error(job)
+                md_jobs.append(job)
+            
+            if cluster_debug:
+                self.pdbmd_jobs = md_jobs
+
         else:
             if Config.debug >= 1:
-                print('running: '+PC_cmd +' '+ engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
-            os.system(PC_cmd +' '+ engine_path +' -O -i '+equi_path+' -o '+o_dir+'/equi.out -p '+self.prmtop_path+' -c '+o_dir+'/heat.rst -ref '+o_dir+'/heat.rst -r '+o_dir+'/equi.rst -x '+o_dir+'/equi.nc')
-        
-        if Config.debug >= 1:
-            print('running: '+PC_cmd +' '+ engine_path +' -O -i '+prod_path+' -o '+o_dir+'/prod.out -p '+self.prmtop_path+' -c '+o_dir+'/equi.rst -ref '+o_dir+'/equi.rst -r '+o_dir+'/prod.rst -x '+o_dir+'/prod.nc')
-        os.system(PC_cmd +' '+ engine_path +' -O -i '+prod_path+' -o '+o_dir+'/prod.out -p '+self.prmtop_path+' -c '+o_dir+'/equi.rst -ref '+o_dir+'/equi.rst -r '+o_dir+'/prod.rst -x '+o_dir+'/prod.nc')
+                print(f'running: {cmd_min}')
+            os.system(cmd_min)
+            if Config.debug >= 1:
+                print(f'running: {cmd_heat}')
+            os.system(cmd_heat)
+            if Config.debug >= 1:
+                print(f'running: {cmd_equi}')
+            os.system(cmd_equi)
+            if Config.debug >= 1:
+                print(f'running: {cmd_prod}')
+            os.system(cmd_prod)
+        if check_out_put and not PDB._is_normal_amber_output(f'{o_dir}/prod.out'):
+            raise Exception("Amber production did not terminate normally")
 
+        # return value
         self.nc = o_dir+'/prod.nc'
         return o_dir+'/prod.nc'
 
+    @staticmethod
+    def _detect_amber_error(amber_job):
+        '''
+        amber pmemd tend to delay the error show up in the workflow.
+        It does not provide abnormal exit code but just output some error information to the stdout/stderr
+        '''
+        with open(amber_job.job_cluster_log) as f:
+            f_str = f.read()
+            if 'ERROR' in f_str or 'Error' in f_str:
+                raise AmberError(f'Amber Terminated Abnormally! Here is the output ({amber_job.job_cluster_log}):{line_feed} {f_str}') 
+                # TODO make a workflow exception that can show some more step releted info
+                # So that can use try except to do some special action when dont want one fail ruin the HTP
+                # this may also catch unnessessay error like MPI ones
 
-    def _build_MD_min(self, o_dir):
+    @staticmethod
+    def _get_default_res_setting_pdbmd(res_setting, core_type):
+        if res_setting is None:
+            res_setting = dict()
+        if isinstance(res_setting, dict):
+            res_setting_holder = copy.deepcopy(Config.Amber.MD_RES[core_type])
+            # replace assigned key in default dict
+            for k, v in res_setting.items():
+                res_setting_holder[k] = v
+            return res_setting_holder
+        if isinstance(res_setting, str):
+            return res_setting
+
+    @classmethod
+    def _prepare_cluster_job_pdbmd(cls, cluster, core_type, res_setting) -> tuple[str, str]:
+        '''
+        update the default res_setting with the input
+        get env_setting according to the core type
+        '''
+        #san check
+        if not isinstance(cluster, ClusterInterface):
+            raise TypeError('cluster job need a cluster (ClusterInterface object) input')
+        # get res and env settinng
+        # interface check
+        if 'AMBER_ENV' not in dir(cluster):
+            raise Exception('PDBMD requires the input cluster have the AMBER_ENV attr')
+        env_settings = cluster.AMBER_ENV[core_type]
+        # default for res
+        res_setting = cls._get_default_res_setting_pdbmd(res_setting, core_type)
+
+        return res_setting, env_settings
+
+
+    def _build_MD_min(self, o_dir, cycle=None):
         '''
         Build configuration file for a minimization job
         See default value Config.Amber.conf_min
@@ -1387,7 +1770,10 @@ class PDB():
         #path
         o_path=o_dir+'/min.in'
         #maxcyc related
-        maxcyc = self.conf_min['maxcyc']
+        if cycle:
+            maxcyc = cycle
+        else:
+            maxcyc = self.conf_min['maxcyc']
         if self.conf_min['ncyc'] == '0.5maxcyc':
             ncyc = str(int(0.5 * maxcyc))
         if self.conf_min['ntpr'] == '0.01maxcyc':
@@ -1398,7 +1784,17 @@ class PDB():
             ntr_line = '  ntr   = '+self.conf_min['ntr']+',	 restraint_wt = '+self.conf_min['restraint_wt']+', restraintmask = '+self.conf_min['restraintmask']+','+line_feed
         else:
             ntr_line = ''
-
+        if self.conf_min['nmropt_rest'] == '1':
+            self.conf_min['nmropt'] = '1'
+            nmropt_line = '  nmropt= '+self.conf_min['nmropt']+','+line_feed
+            DISANG_tail = ''' &wt
+  type='END'
+ /
+  DISANG= '''+self.conf_min['DISANG']+line_feed
+            self._build_MD_rs(step='min',o_path=self.conf_min['DISANG'])
+        else:
+            nmropt_line = ''
+            DISANG_tail = ''
         #text        
         conf_str='''Minimize
  &cntrl
@@ -1407,8 +1803,8 @@ class PDB():
   cut   = '''+self.conf_min['cut']+''',
   maxcyc= '''+maxcyc+''', ncyc  = '''+ncyc+''',
   ntpr  = '''+ntpr+''', ntwx  = 0,
-'''+ntr_line+''' /
-'''
+'''+ntr_line+nmropt_line+''' /
+'''+DISANG_tail
         #write
         with open(o_path,'w') as of:
             of.write(conf_str)
@@ -1439,7 +1835,11 @@ class PDB():
             ntr_line = '  ntr   = '+self.conf_heat['ntr']+', restraint_wt = '+self.conf_heat['restraint_wt']+', restraintmask = '+self.conf_heat['restraintmask']+','+line_feed
         else:
             ntr_line = ''
-
+        if self.conf_heat['nmropt_rest'] == '1':
+            DISANG_tail = '''  DISANG='''+self.conf_heat['DISANG']+line_feed
+            self._build_MD_rs(step='heat',o_path=self.conf_heat['DISANG'])
+        else:
+            DISANG_tail = ''
         conf_str='''Heat
  &cntrl
   imin  = 0,  ntx = 1, irest = 0,
@@ -1449,7 +1849,7 @@ class PDB():
   tempi = '''+self.conf_heat['tempi']+''',  temp0='''+self.conf_heat['temp0']+''',  
   ntpr  = '''+ntpr+''',  ntwx='''+ntwx+''',
   ntt   = '''+self.conf_heat['ntt']+''', gamma_ln = '''+self.conf_heat['gamma_ln']+''',
-  ntb   = 1,  ntp = 0,
+  ntb   = '''+self.conf_heat['ntb']+''',  ntp = '''+self.conf_heat['ntp']+''',
   iwrap = '''+self.conf_heat['iwarp']+''',
   nmropt= 1,
   ig    = -1,
@@ -1467,7 +1867,7 @@ class PDB():
  &wt
   type  = 'END',
  /
-'''
+'''+DISANG_tail
         #write
         with open(o_path,'w') as of:
             of.write(conf_str)
@@ -1493,6 +1893,17 @@ class PDB():
             ntr_line = '  ntr   = '+self.conf_equi['ntr']+', restraint_wt = '+self.conf_equi['restraint_wt']+', restraintmask = '+self.conf_equi['restraintmask']+','+line_feed
         else:
             ntr_line = ''
+        if self.conf_equi['nmropt_rest'] == '1':
+            self.conf_equi['nmropt'] = '1'
+            nmropt_line = '  nmropt= '+self.conf_equi['nmropt']+','+line_feed
+            DISANG_tail = ''' &wt
+  type='END'
+ /
+  DISANG= '''+self.conf_equi['DISANG']+line_feed
+            self._build_MD_rs(step='equi',o_path=self.conf_equi['DISANG'])
+        else:
+            nmropt_line = ''
+            DISANG_tail = ''
 
 
         conf_str='''Equilibration:constant pressure
@@ -1504,16 +1915,15 @@ class PDB():
   temp0 = '''+self.conf_equi['temp0']+''',
   ntpr  = '''+ntpr+''', ntwx = '''+self.conf_equi['ntwx']+''',
   ntt   = '''+self.conf_equi['ntt']+''', gamma_ln = '''+self.conf_equi['gamma_ln']+''',
-  ntb   = 2,  ntp = 1,
+  ntb   = '''+self.conf_equi['ntb']+''',  ntp = '''+self.conf_equi['ntp']+''',
   iwrap = '''+self.conf_equi['iwarp']+''',
   ig    = -1,
-'''+ntr_line+''' /
-'''
+'''+ntr_line+nmropt_line+''' /
+'''+DISANG_tail
         #write
         with open(o_path,'w') as of:
             of.write(conf_str)
         return o_path
-
 
 
     def _build_MD_prod(self, o_dir):
@@ -1534,9 +1944,20 @@ class PDB():
         if self.conf_prod['ntr'] == '1':
             ntr_line = '  ntr   = '+self.conf_prod['ntr']+', restraint_wt = '+self.conf_prod['restraint_wt']+', restraintmask = '+self.conf_prod['restraintmask']+','+line_feed
         else:
-            ntr_line = ''        
+            ntr_line = ''
+        if self.conf_prod['nmropt_rest'] == '1':
+            self.conf_prod['nmropt'] = '1'
+            nmropt_line = '  nmropt= '+self.conf_prod['nmropt']+','+line_feed
+            DISANG_tail = ''' &wt
+  type='END'
+ /
+  DISANG= '''+self.conf_prod['DISANG']+line_feed
+            self._build_MD_rs(step='prod',o_path=self.conf_prod['DISANG'])
+        else:
+            nmropt_line = ''
+            DISANG_tail = ''
 
-        conf_str='''Production: constant pressure
+        conf_str='''Production
  &cntrl
   imin  = 0, ntx = '''+self.conf_prod['ntx']+''', irest = '''+self.conf_prod['irest']+''',
   ntf   = '''+self.conf_prod['ntf']+''',  ntc = '''+self.conf_prod['ntc']+''',
@@ -1545,16 +1966,34 @@ class PDB():
   temp0 = '''+self.conf_prod['temp0']+''',
   ntpr  = '''+ntpr+''', ntwx = '''+self.conf_prod['ntwx']+''',
   ntt   = '''+self.conf_prod['ntt']+''', gamma_ln = '''+self.conf_prod['gamma_ln']+''',
-  ntb   = 2,  ntp = 1,
+  ntb   = '''+self.conf_prod['ntb']+''',  ntp = '''+self.conf_prod['ntp']+''',
   iwrap = '''+self.conf_prod['iwarp']+''',
   ig    = -1,
-'''+ntr_line+''' /
-'''        
+'''+ntr_line+nmropt_line+''' /
+'''+DISANG_tail
         #write
         with open(o_path,'w') as of:
             of.write(conf_str)
         return o_path
     
+
+    def _build_MD_rs(self,step,o_path):
+        '''
+        Generate a file for DISANG restraint. Get parameters from self.conf_step.
+        '''
+        rs_str=''
+        rs_data_step=self.__dict__['conf_'+step]['rs_constraints']
+        for rest_data in rs_data_step:
+            rs_str=rs_str+'''  &rst
+   iat=  '''+','.join(rest_data['iat'])+''', r1= '''+rest_data['r1']+''', r2= '''+rest_data['r2']+''', r3= '''+rest_data['r3']+''', r4= '''+rest_data['r4']+''',
+   rk2='''+rest_data['rk2']+''', rk3='''+rest_data['rk3']+''', ir6='''+rest_data['ir6']+''', ialtd='''+rest_data['ialtd']+''',
+  &end
+'''
+        #write
+        with open(o_path,'w') as of:
+            of.write(rs_str)
+        return o_path
+
 
     def reset_MD_conf(self):
         '''
@@ -1615,7 +2054,7 @@ class PDB():
         n_cores     : Cores for gaussian job (higher pirority)
         max_core    : Per core memory in MB for gaussian job (higher pirority)
         keywords    : a list of keywords that joined together when build
-        layer_preset：default preset id copied to self.layer_preset
+        layer_preset: default preset id copied to self.layer_preset
         layer_atoms : default layer_atoms copied to self.layer_atoms
         
         *om_lvl     : *(can only be edit manually before loading the module) oniom method level
@@ -1963,6 +2402,7 @@ class PDB():
                 with open(cpp_in_path,'w') as of:
                     of.write('parm '+self.prmtop_path+line_feed)
                     of.write('trajin '+self.nc+' '+str(start)+' '+end+' '+str(step)+line_feed)
+                    of.write(f'autoimage{line_feed}') # this is important
                     of.write('trajout '+o_path+line_feed)
                     of.write('run'+line_feed)
                     of.write('quit'+line_feed)
@@ -1977,25 +2417,89 @@ class PDB():
     QM Cluster
     ========    
     '''
-    def PDB2QMCluster(self, atom_mask, spin=1, o_dir='', tag='', QM='g16',g_route=None, ifchk=0, val_fix = 'internal'):
+    def PDB2QMCluster(
+        self, 
+        atom_mask: str, 
+        spin: int = 1, 
+        o_dir: Union[str, None] = None, 
+        tag: str = '', 
+        QM: str = 'g16',
+        g_route: Union[str, None] =None,
+        ifchk: bool = 0, 
+        val_fix: str = 'internal',
+        if_cluster_job: bool = 1, 
+        cluster: ClusterInterface = None,
+        job_array_size: int = 0,
+        period: int = 600,
+        res_setting: Union[dict, str, None] = None,
+        cpu_cores: Union[int, str, None] = None,
+        cpu_mem: Union[int, str, None] = None,
+        cluster_debug: bool = 0
+    ) -> list :
         '''
         Build & Run QM cluster input from self.mdcrd with selected atoms according to atom_mask
         ---------
-        spin: specific spin state for the qm cluster. (default: 1)
-        QM: QM engine (default: Gaussian)
-            g_route: Gaussian route line
-            ifchk: if save chk file of a gaussian job. (default: 0)
-        val_fix: fix free valance of truncated strutures
+        Args:
+        self (Pre-requisites):
+            dir 
+                - for *default dir*
+            path 
+                - for *get_stru()* 
+                - need the same pdb representing the structure in the MD frames
+            prmtop_path 
+                - for get *charge* list 
+                - need the prmtop file used as MD input
+            mdcrd 
+                - for *coordinates* of each QM cluster 
+                - the mdcrd file that sampled from the traj
+            prepi_path (val_fix='internal')
+                - for get *connectivity (ligand part)* and fix free valances if they exist
+                - the dict for prepin files for all ligands {'3_letter_name':'path_to_prepin_file', ...}
+            (* the later 3 should of the consistancy from the same MD*)
+        atom_mask:
+            Amber-style atom mask for specifing the the QM region.
+        spin: 
+            specific spin state for the qm cluster. (default: 1)
+        o_dir:
+            The output directory that contain all QM input & output jobs.
+        tag:
+            Add tag to default out_dir. It will be {self.dir}/QM_cluster{tag}
+        QM: 
+            QM engine (default: g16)
+        g_route: 
+            Gaussian route line
+        ifchk: 
+            if save chk file of a gaussian job. (default: 0)
+        val_fix: 
+            fix free valance of truncated strutures
             = internal: add H to where the original connecting atom is. 
                         special fix for classical case:
                         "sele by residue" (cut N-C) -- adjust dihedral for added H on N.
             = openbabel TODO
+        if_cluster_job:
+            if submit the calculation to a cluster using the job manager
+        cluster, job_array_size, period
+            see Run_QM
+        res_setting
+            see Run_QM for detail (default: Config.Gaussian.QMCLUSTER_CPU_RES)
+            provide specific keys you want to change the rest will remain default.
+            (e.g. res_setting = {'node_cores':'8'} will still use a complete dictionary 
+            with only node_cores modified.)
+        cpu_cores, cpu_mem
+            provide these for configure the gaussian input file when using a non-dict res_setting.
+            these values should be the same as indicated in the res_setting.
+        cluster_debug:
+           1:  add also the qm cluster job obj to the pdb obj
         ---data---
-        self.frames
-        self.qm_cluster_map (PDB atom id -> QM atom id)
+        Attribute:
+            self.frames
+            self.qm_cluster_map (PDB atom id -> QM atom id)
+        Return:
+            self.qm_cluster_out
+                the list of paths of the qm cluster output files
         '''
         # make folder
-        if o_dir == '':
+        if o_dir == None:
             o_dir = self.dir+'/QM_cluster'+tag
         mkdir(o_dir)
         # update stru
@@ -2010,6 +2514,21 @@ class PDB():
         chrgspin = self._get_qmcluster_chrgspin(sele_lines, spin=spin)
         if Config.debug >= 1:
             print('Charge: '+str(chrgspin[0])+' Spin: '+str(chrgspin[1]))
+        # get res setting
+        # overwrite those if cluster job is true
+        if if_cluster_job:
+            # default values TODO should contain them in Config.Gaussian
+            res_setting = type(self)._get_default_res_setting_qmcluster(res_setting)
+            if QM in ['g16','g09']:
+                if isinstance(res_setting, dict):
+                    cpu_cores = res_setting['node_cores']
+                    cpu_mem = res_setting['mem_per_core']
+                elif cpu_cores is None or cpu_mem is None:
+                    raise TypeError('ERROR: Requires cpu_cores and cpu_mem input for configuring Gaussian input file if using CPU and provide res_setting not as a dict')
+                cpu_mem = int(float(cpu_mem.rstrip('GB')) * 1024) # convert to number in MB
+        else:
+            cpu_cores = Config.n_cores
+            cpu_mem = Config.max_core
 
         #make inp files
         frames = Frame.fromMDCrd(self.mdcrd)
@@ -2020,10 +2539,25 @@ class PDB():
                 print('Writing QMcluster gjfs.')
             for i, frame in enumerate(frames):
                 gjf_path = o_dir+'/qm_cluster_'+str(i)+'.gjf'
-                frame.write_sele_lines(sele_lines, out_path=gjf_path, g_route=g_route, chrgspin=chrgspin, ifchk=ifchk)
+                frame.write_sele_lines(sele_lines, out_path=gjf_path, g_route=g_route, g_cores=cpu_cores, g_mem_cores=cpu_mem, chrgspin=chrgspin, ifchk=ifchk)
                 gjf_paths.append(gjf_path)
             # Run inp files
-            qm_cluster_out_paths = PDB.Run_QM(gjf_paths, prog=QM)
+            if if_cluster_job:
+                Run_QM_out = PDB.Run_QM( gjf_paths, 
+                                         prog=QM, 
+                                         if_cluster_job=if_cluster_job, 
+                                         cluster = cluster,
+                                         job_array_size = job_array_size,
+                                         period = period,
+                                         res_setting=res_setting,
+                                         cluster_debug=cluster_debug)
+                if cluster_debug:
+                    qm_cluster_out_paths = Run_QM_out[0]
+                    self.qm_cluster_jobs = Run_QM_out[1]
+                else:
+                    qm_cluster_out_paths = Run_QM_out
+            else:
+                qm_cluster_out_paths = PDB.Run_QM(gjf_paths, prog=QM, if_cluster_job=0)
             # get chk files if ifchk
             if ifchk:
                 qm_cluster_chk_paths = []
@@ -2044,6 +2578,7 @@ class PDB():
     def _get_qmcluster_chrgspin(self, sele, spin=1):
         '''
         get charge for qmcluster of sele from self.prmtop
+        # TODO refine charge count for qm region cut interface
         '''
         # get chrg list
         chrg_list_all = PDB.get_charge_list(self.prmtop_path)
@@ -2065,31 +2600,132 @@ class PDB():
 
         return (round(sele_chrg), spin)
 
+    @staticmethod
+    def _get_default_res_setting_qmcluster(res_setting):
+        if res_setting is None:
+            res_setting = dict()
+        if isinstance(res_setting, dict):
+            res_setting_holder = copy.deepcopy(Config.Gaussian.QMCLUSTER_CPU_RES)
+            # replace assigned key in default dict
+            for k, v in res_setting.items():
+                res_setting_holder[k] = v
+            return res_setting_holder
+        if isinstance(res_setting, str):
+            return res_setting
+
     @classmethod
-    def Run_QM(cls, inp, prog='g16'):
+    def Run_QM(
+        cls, 
+        inp: list[str], 
+        prog: str = 'g16', 
+        if_cluster_job: bool = 1,
+        cluster: ClusterInterface = None,
+        job_array_size: int = 0,
+        period: int = 600,
+        res_setting: dict = None,
+        clean_job_cluster_log: bool = True,
+        cluster_debug: bool = 0
+    ):
         '''
-        Run QM with prog
+        Run QM with {prog} for {inp} files and return paths of output files.
+        Args:
+        inp: 
+            list of paths of input files
+        prog:
+            the QM program (default: g16)
+        if_cluster_job:
+            if submit the QM calculation to a HPC (default: 1)
+        cluster:
+            The cluster used when if_cluster_job is 1.
+        job_array_size:
+            how many jobs are allowed to submit simultaneously. (default: 0 means len(inp))
+            (e.g. 5 for 100 jobs means run 20 groups. All groups will be submitted and 
+            in each group, submit the next job only after the previous one finishes.)
+        period:
+            the time cycle for each job state change (Unit: s) (default: 600)
+        res_setting:
+            resource setting dictionary
+        cluster_debug:
+            1: return also the job objects
+            0: return only the out file paths
+
+        TODO put this individually as part of the qm interface
+             maybe introduct the current executor object to decouple this module with the job manager.
         '''
-        if prog == 'g16':
-            outs = []
-            for gjf in inp:
-                out = gjf[:-3]+'out'
-                if Config.debug > 1:
-                    print('running: '+Config.Gaussian.g16_exe+' < '+gjf+' > '+out)
-                os.system(Config.Gaussian.g16_exe+' < '+gjf+' > '+out)
-                outs.append(out)
-            return outs
+        if if_cluster_job:
+            #san check
+            if not isinstance(cluster, ClusterInterface):
+                raise TypeError('cluster job need a cluster (ClusterInterface object) input')
+            
+            if prog == 'g16':
+                outs = []
+                # config jobs
+                jobs = []
+                for gjf_path in inp:
+                    out_path = gjf_path.removesuffix('gjf')+'out'
+                    jobs.append(cls._make_single_g16_job(gjf_path, out_path, cluster, res_setting))
+                    outs.append(out_path)
+                # submit and run in array
+                if Config.debug > 0:
+                    print(f'''Running QM array on {cluster.NAME}: number: {len(jobs)} size: {job_array_size} period: {period}''')
+                job_manager.ClusterJob.wait_to_array_end(jobs, period, job_array_size)
+                if clean_job_cluster_log:
+                    target_dir = f"{os.path.dirname(inp[0])}/cluster_log/"          
+                    mkdir(target_dir)
+                    for job in jobs:
+                        job: job_manager.ClusterJob
+                        new_path = shutil.move(job.job_cluster_log, target_dir)
+                        job.job_cluster_log = new_path
+                if cluster_debug:
+                    return outs, jobs
+                return outs
+        else:
+            # local job
+            if prog == 'g16':
+                outs = []
+                for gjf in inp:
+                    out = gjf[:-3]+'out'
+                    if Config.debug > 1:
+                        print('running: '+Config.Gaussian.g16_exe+' < '+gjf+' > '+out)
+                    os.system(Config.Gaussian.g16_exe+' < '+gjf+' > '+out)
+                    outs.append(out)
+                return outs
 
-        if prog == 'g09':
-            outs = []
-            for gjf in inp:
-                out = gjf[:-3]+'out'
-                if Config.debug > 1:
-                    print('running: '+Config.Gaussian.g09_exe+' < '+gjf+' > '+out)
-                os.system(Config.Gaussian.g09_exe+' < '+gjf+' > '+out)
-                outs.append(out)
-            return outs
+            if prog == 'g09':
+                outs = []
+                for gjf in inp:
+                    out = gjf[:-3]+'out'
+                    if Config.debug > 1:
+                        print('running: '+Config.Gaussian.g09_exe+' < '+gjf+' > '+out)
+                    os.system(Config.Gaussian.g09_exe+' < '+gjf+' > '+out)
+                    outs.append(out)
+                return outs
 
+    @classmethod
+    def _make_single_g16_job(
+            cls, 
+            gjf_path: str, 
+            out_path: str, 
+            cluster: ClusterInterface,
+            res_setting: dict
+        ) -> job_manager.ClusterJob :
+        '''
+        job for submit g16 for gjf > out to cluster
+        return a ClusterJob object
+        '''
+        cmd = f'{Config.Gaussian.g16_exe} < {gjf_path} > {out_path}'
+        # interface check
+        if 'G16_ENV' not in dir(cluster):
+            raise Exception('RunQM(prog = g16) requires the input cluster have the G16_ENV attr')
+        job = job_manager.ClusterJob.config_job(
+            commands = cmd,
+            cluster = cluster,
+            env_settings = cluster.G16_ENV['CPU'],
+            res_keywords = res_setting,
+            sub_dir = './', # because gjf path are relative
+            sub_script_path = gjf_path.removesuffix('gjf')+'cmd'
+        )
+        return job
 
     def get_fchk(self, keep_chk=0):
         '''
@@ -2118,10 +2754,15 @@ class PDB():
         self.qm_cluster_fchk = fchk_paths
         return self.qm_cluster_fchk
         
-
+    def gaussian_error_handling():
+        '''
+        TODO handle gaussian errors. can be enabled in RunQM
+        use maps in Config.Gaussian
+        '''
+        pass
     '''
     ========
-    QM Analysis 
+    Analysis 
     ========
     '''
     def get_field_strength(self, atom_mask, a1=None, a2=None, bond_p1='center', p1=None, p2=None, d1=None):
@@ -2212,7 +2853,7 @@ class PDB():
         Result direction: a1 -> a2
         
         REF: Lu, T.; Chen, F., Multiwfn: A multifunctional wavefunction analyzer. J. Comput. Chem. 2012, 33 (5), 580-592.
-        '''
+        ''' # TODO support array job
         Dipoles = []
 
         if prog == 'Multiwfn':
@@ -2299,7 +2940,640 @@ class PDB():
             print("Running: "+"sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  "+n_cores+"/' "+Config.Multiwfn.DIR+"/settings.ini")
         run("sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  "+n_cores+"/' "+Config.Multiwfn.DIR+"/settings.ini", check=True, text=True, shell=True, capture_output=True)
 
+    def get_rosetta_ddg(self, rosetta_home: str, muta_groups: List[tuple], relaxed_pdb: str,
+                        niter: int = 10,
+                        ddg_dir: str = None,
+                        in_place: bool = False, 
+                        if_cluster_job: bool = True,
+                        cluster: ClusterInterface = None,
+                        period: int = 120,
+                        job_array_size: int = 100,
+                        res_setting: Union[dict, None] = None,
+                        cluster_debug: bool = 0 ) -> dict:
+        '''
+        MVP function to obtain Rosetta ddG stability score for current structure in PDB()
+        ref: https://www.rosettacommons.org/docs/latest/cartesian-ddG
+        due to the fact that cartesian_ddg can only benefit from 1 cpu core, we will parallel
+        multi-mutants with ARMer job array to speed up.
+        '''
+        TEMP_ROSETTA_RES = {    'core_type' : 'cpu',
+                                'nodes':'1',
+                                'node_cores' : '1',
+                                'job_name' : 'EnzyHTP_ddG',
+                                'partition' : 'production',
+                                'mem_per_core' : '2G',
+                                'walltime' : '1-00:00:00',
+                                'account' : 'yang_lab_csb'}
+        if ddg_dir is None:
+            ddg_dir = f'{self.dir}/ddg/'
+        mkdir(ddg_dir)
+        ddg_jobs = []
+        ddg_result_files = {}
+
+        for i, mut_group in enumerate(muta_groups):
+            group_dir = f'{ddg_dir}group_{i}/'
+            mkdir(group_dir)
+            flag_file_path = f'{group_dir}/ddg_options.txt'
+            muta_file_path = f'{group_dir}/mutation.txt'
+            # make option file
+            with open(flag_file_path, 'w') as of:
+                of.write(f'''-in:file:s {os.path.abspath(relaxed_pdb)}
+-ddg::mut_file ./{os.path.relpath(muta_file_path, group_dir)}
+-ddg:iterations {niter}
+-force_iterations false
+-ddg::score_cutoff 1.0
+-ddg::cartesian
+-ddg::dump_pdbs false
+-fa_max_dis 9.0
+-score:weights talaris2014_cart
+-ddg::legacy false
+-mute all''')
+            # make mutant file
+            with open(muta_file_path, 'w') as of: # make this into different jobs (different folder containing options mutations submission)
+                of.write(f'total {len(mut_group)}{line_feed}')
+                of.write(f'{len(mut_group)}{line_feed}')
+                for r_mutaflag in mut_group:
+                    of.write(f'{r_mutaflag}{line_feed}')
+            # make job
+            ddg_cmd = f'{rosetta_home}/source/bin/cartesian_ddg.static.linuxgccrelease @ ./{os.path.relpath(flag_file_path, group_dir)}'
+            ddg_job = job_manager.ClusterJob.config_job(
+                        commands = ddg_cmd,
+                        cluster = cluster,
+                        env_settings = '',
+                        res_keywords = TEMP_ROSETTA_RES,
+                        sub_dir = group_dir,
+                        sub_script_path = f'{group_dir}/submit_ddg.cmd')
+            ddg_jobs.append(ddg_job)
+            ddg_result_files[mut_group] = f'{group_dir}/mutation.ddg'
+        
+        job_manager.ClusterJob.wait_to_array_end(ddg_jobs, period, job_array_size)
+        # support multi groups?
+        result = {}
+        for mutants, ddg_file in ddg_result_files.items():
+            ddg_value = type(self).get_rosetta_ddg_result(ddg_file, niter)
+            result[mutants] = ddg_value
+        return result
     
+    def relax_with_rosetta(self, rosetta_home: str, nstruct_relax: int = 20,
+                            in_place: bool = False, if_clean: bool = True,
+                            if_cluster_job: bool = True,
+                            cluster: ClusterInterface = None,
+                            period: int = 120,
+                            res_setting: Union[dict, None] = None,
+                            cluster_debug: bool = 0 ) -> str:
+        '''
+        MVP function to relax the structure with Rosetta
+        only can work with ddG calculation right now
+        ref: https://www.rosettacommons.org/docs/latest/application_documentation/structure_prediction/relax
+        '''
+        TEMP_ROSETTA_RES = {    'core_type' : 'cpu',
+                                'nodes':'1',
+                                'node_cores' : '24',
+                                'job_name' : 'EnzyHTP_r_relax',
+                                'partition' : 'production',
+                                'mem_per_core' : '2G',
+                                'walltime' : '1-00:00:00',
+                                'account' : 'yang_lab_csb'}
+
+        int_pdb_path_1 = f'{self.path.removesuffix(".pdb")}_rosetta.pdb'
+        int_pdb_path_2 = f'{self.path.removesuffix(".pdb")}_relaxed.pdb'
+        # remove ligands & clean for rosetta (tmp)
+        run(f'{rosetta_home}/tools/protein_tools/scripts/clean_pdb.py --allchains {self.path} ignorechain', # TODO replace this as described in https://www.shaoqz.cn/2022/02/05/Rosetta-Notes/
+            check=True, text=True, shell=True, capture_output=True)
+        run(f'mv {self.path.split("/")[-1].removesuffix(".pdb")}_ignorechain.pdb {int_pdb_path_1}',
+            check=True, text=True, shell=True, capture_output=True)        
+        run(f'rm {self.path.split("/")[-1].removesuffix(".pdb")}_ignorechain.fasta',
+            check=True, text=True, shell=True, capture_output=True)        
+        # relax
+        relax_cmd = f'mpiexec -np {TEMP_ROSETTA_RES["node_cores"]} {rosetta_home}/source/bin/relax.mpi.linuxgccrelease -s {int_pdb_path_1} -use_input_sc -ignore_unrecognized_res -nstruct {nstruct_relax} -fa_max_dis 9.0'
+        relax_job = job_manager.ClusterJob.config_job(
+                    commands = relax_cmd,
+                    cluster = cluster,
+                    env_settings = ['module load GCC/5.4.0-2.26', 'module load OpenMPI'],
+                    res_keywords = TEMP_ROSETTA_RES,
+                    sub_dir = self.dir,
+                    sub_script_path = f'{self.dir}/submit_relax.cmd')
+        relax_job.submit()
+        relax_job.wait_to_end(period=period)
+        # get relaxed pdb
+        # get the lowest score
+        target_idx = type(self).get_rosetta_lowest_score(self.dir+'/score.sc')
+        relaxed_pdb = f'{self.path.removesuffix(".pdb")}_rosetta_{target_idx:0>4}.pdb'
+        run(f'cp {relaxed_pdb} {int_pdb_path_2}',
+            check=True, text=True, shell=True, capture_output=True)
+        
+        if if_clean:
+            for f_p in map(lambda x: f'{self.path.removesuffix(".pdb")}_rosetta_{x:0>4}.pdb', range(1,nstruct_relax+1)):
+                os.remove(f_p)
+            os.remove(self.dir+'/score.sc')
+        return int_pdb_path_2
+    
+    @classmethod
+    def get_rosetta_lowest_score(cls, score_file):
+        '''
+        get the structure index with the lowest score in the score.sc file
+        '''
+        score_df = pd.read_csv(score_file, delim_whitespace=True, header=1)
+        min_sc_idx = score_df['total_score'].idxmin() + 1
+        return min_sc_idx
+
+    @classmethod
+    def get_rosetta_ddg_result(cls, ddg_file: str, niter: int):
+        '''
+        get the result ddg from the .ddg file
+        '''
+        score_df = pd.read_csv(ddg_file, delim_whitespace=True, header=None)
+        wt_sc_mean = score_df[3][:niter].mean()
+        mut_sc_mean = score_df[3][niter:].mean()
+        return mut_sc_mean - wt_sc_mean
+
+    @classmethod
+    def get_rmsd(cls, prmtop_path: str, traj_path: str, mask: str) -> float:
+        """
+        mvp function for RMSD calculation
+        """
+        tmp_rmsd_in = "./cpptraj_rmsd.in"
+        tmp_rmsd_out = "./rmsd.dat"
+
+        with open(tmp_rmsd_in, "w") as of:
+            of.write(f"""parm {prmtop_path}
+trajin {traj_path}
+autoimage
+rmsd {mask} first mass
+average crdset AVE {mask}
+run
+autoimage
+rmsd {mask} ref AVE * out {tmp_rmsd_out} mass
+run
+""")
+        try:
+            run(f"cpptraj -i {tmp_rmsd_in}",
+            check=True, text=True, shell=True, capture_output=True)
+        except CalledProcessError as e:
+            print(e.stdout, e.stderr, sep=os.linesep)
+            sys.exit(1)
+        result = cls.get_cpptraj_rmsd_result(tmp_rmsd_out)
+        os.remove(tmp_rmsd_in)
+        os.remove(tmp_rmsd_out)
+        return result
+
+    @classmethod
+    def get_cpptraj_rmsd_result(cls, result_path: str) -> float:
+        """
+        mvp function for RMSD calculation
+        """
+        result_df = pd.read_csv(result_path, delim_whitespace=True)
+        return result_df.iloc[:, 1].mean()
+    
+    @classmethod
+    def get_sasa_ratio(cls, 
+                 prmtop_path: str, traj_path: str,
+                 mask_pro: str, mask_pro_target: str, mask_sub: str,
+                 tmp_dir: str = '.') -> float:
+        """
+        mvp function for SASA calculation
+        Args:
+            prmtop_path
+            traj_path
+            mask_pro: mask selection for the protein
+            mask_pro_target: mask selection for the subsection in the protein as the SASA target
+            mask_sub: mask selection for the substrate
+            tmp_dir: temporary dir for divided traj files
+        Return:
+            (sasa_sub/sasa_pro).mean() average sasa ratio from each frame
+        # WARNING: @biopaul919 reported mt.load have a bug that make the result wrong.
+        """
+        import mdtraj as mt
+        # divide traj
+        traj_parm_1, traj_parm_2 = cls.divide_traj(prmtop_path, traj_path, mask_pro, mask_sub, tmp_dir)
+        # protein sasa
+        traj_1 = mt.load(traj_parm_1[0], top=traj_parm_1[1])
+        sasa_df_pro = mt.shrake_rupley(traj_1, n_sphere_points=5000, mode='residue')
+        target_resi_idx = map(lambda x: int(x.strip()), mask_pro_target[1:].split(','))
+        holder = np.zeros(len(sasa_df_pro)) # holder for sasa_pro of each frame
+        test = 0
+        for idx in target_resi_idx:
+            test +=  sasa_df_pro[0][idx-1]
+            holder += sasa_df_pro[:, idx-1]
+        sasa_pro_by_frame = holder*100
+        # substrate sasa
+        traj_2 = mt.load(traj_parm_2[0], top=traj_parm_2[1])
+        sasa_df_sub = mt.shrake_rupley(traj_2, n_sphere_points=5000, mode='residue')
+        sasa_sub_by_frame = sasa_df_sub[:, 0]*100
+
+        # clean up
+        os.remove(traj_parm_1[0])
+        os.remove(traj_parm_1[1])
+        os.remove(traj_parm_2[0])
+        os.remove(traj_parm_2[1])
+
+        return (sasa_sub_by_frame/sasa_pro_by_frame).mean()
+
+    @classmethod
+    def get_surface_ratio(cls, 
+                 prmtop_path: str, traj_path: str,
+                 mask_pro: str, mask_pro_target: str, mask_sub: str, dynamic_sele: bool=False,
+                 dot_solvent: int = 0, dot_density: int = 2,  
+                 tmp_dir: str = '.', traj_start: str=None, traj_end: str=None,
+                 if_complete_data: bool=False) -> float:
+        """
+        mvp function for SES calculation
+        Args:
+            prmtop_path
+            traj_path
+            mask_pro: mask selection for the protein
+            mask_pro_target: mask selection for the subsection in the protein as the SASA target
+            mask_sub: mask selection for the substrate
+            dynamic_sele: if update selection every frame, must use if distance based pattern is used
+                          in mask_pro_target
+            dot_solvent: surface type (0: ses 1: sasa)
+            dot_density: surface qulity
+            tmp_dir: temporary dir for divided traj files
+        Return:
+            avg(ses_sub)/avg(ses_pro)
+        """
+        import pymol2
+        if dynamic_sele:
+            # 1. split states frist
+            # 2. iterate using state names
+            # 3. use pattern like f"(br. (((({obj_name} & {mask}) around 4) and {obj_name}) and (not n. C+H+O+N) and (not elem H)) and (not resi 1449+1181)) & n. CA"
+            # ref https://github.com/shaoqx/CalcKit/tree/master/pymol_script/anchor_detect.py
+            sys.exit(1) # TODO place holder
+        # divide traj
+        traj_parm_1, traj_parm_2 = cls.divide_traj(
+            prmtop_path, traj_path, mask_pro, mask_sub, 
+            tmp_dir, traj_start, traj_end)
+        # protein ses
+        ## start pymol
+        p_session = pymol2.PyMOL()
+        p_session.start()
+        p_session.cmd.set("dot_solvent", dot_solvent)
+        p_session.cmd.set("dot_density", dot_density)
+        if Config.debug < 2:
+            p_session.cmd.feedback("disable","all","everything")
+        ## load traj protein
+        pro_traj_obj = p_session.cmd.get_unused_name("pro_traj")
+        p_session.cmd.load(traj_parm_1[1], pro_traj_obj)
+        p_session.cmd.load_traj(traj_parm_1[0], pro_traj_obj)
+        ## define selection
+        if mask_pro_target.startswith(":"):
+            target_resi_idx = map(lambda x: str(x.strip()), mask_pro_target[1:].split(','))
+            pymol_sele_pattern = f"resi {'+'.join(target_resi_idx)}"
+        else:
+            pymol_sele_pattern = mask_pro_target
+        ## calculate SES
+        num_frames = p_session.cmd.count_states(pro_traj_obj)
+        ses_pro_by_frame = []
+        for i in range(num_frames):
+            ses_pro_by_frame.append(
+                p_session.cmd.get_area(selection=f"{pymol_sele_pattern} & {pro_traj_obj}", state=i+1)
+            )
+        p_session.cmd.delete(pro_traj_obj)
+        # substrate sasa
+        ## load traj substrate
+        sub_traj_obj = p_session.cmd.get_unused_name("sub_traj")
+        p_session.cmd.load(traj_parm_2[1], sub_traj_obj)
+        p_session.cmd.load_traj(traj_parm_2[0], sub_traj_obj)
+        ## calculate SES
+        num_frames = p_session.cmd.count_states(sub_traj_obj)
+        ses_sub_by_frame = []
+        for i in range(num_frames):
+            ses_sub_by_frame.append(
+                p_session.cmd.get_area(selection=sub_traj_obj, state=i+1)
+            )
+        p_session.cmd.delete(sub_traj_obj)
+        # clean up
+        os.remove(traj_parm_1[0])
+        os.remove(traj_parm_1[1])
+        os.remove(traj_parm_2[0])
+        os.remove(traj_parm_2[1])
+        p_session.stop()
+        if if_complete_data:
+            return np.array(ses_sub_by_frame).mean(), np.array(ses_pro_by_frame).mean()
+        return (np.array(ses_sub_by_frame)/np.array(ses_pro_by_frame)).mean()
+
+    @classmethod
+    def divide_traj(cls, prmtop_path: str, traj_path: str, mask1: str, mask2: str,
+                    tmp_dir: str = '.', 
+                    traj_start: str=None, traj_end: str=None) -> tuple:
+        """
+        divide traj into 2 trajs defined by mask1 and mask2
+        """
+        tmp_cpptraj_in = f'{tmp_dir}/cpptraj_divide.in'
+        tmp_traj_1 = f'{tmp_dir}/traj_1.nc'
+        tmp_traj_2 = f'{tmp_dir}/traj_2.nc'
+        prmtop_name = prmtop_path.split('/')[-1]
+        tmp_prmtop_1 = f'{tmp_dir}/traj_1.{prmtop_name}'
+        tmp_prmtop_2 = f'{tmp_dir}/traj_2.{prmtop_name}'
+        start_end_pattern = ''
+        if traj_start and traj_end is not None:
+            start_end_pattern = f' {traj_start} {traj_end}'
+
+        with open(tmp_cpptraj_in, 'w') as of:
+            of.write(f'''parm {prmtop_path}
+trajin {traj_path}{start_end_pattern}
+autoimage
+strip !({mask1}) nobox outprefix {tmp_dir}/traj_1
+outtraj {tmp_traj_1}
+unstrip
+strip !({mask2}) nobox outprefix {tmp_dir}/traj_2
+outtraj {tmp_traj_2}
+''')
+        try:
+            run(f"cpptraj -i {tmp_cpptraj_in}",
+                check=True, text=True, shell=True, capture_output=True)
+        except CalledProcessError as e:
+            print(e.stdout, e.stderr, sep=os.linesep)
+            sys.exit(1)
+        os.remove(tmp_cpptraj_in)
+        return (tmp_traj_1, tmp_prmtop_1), (tmp_traj_2, tmp_prmtop_2)
+
+    def get_residue_pka(self, target_mask: str) -> float:
+        '''
+        mvp function for pka calculation for a specific residue using PROPKA
+        Args:
+            target_mask: pseudo AMBER style. e.g: ':1,2,3'
+        '''
+        target_resis = map(lambda x: int(x.strip()), 
+            target_mask.removeprefix(':').split(','))
+        # run propka (TODO go to interface)
+        from propka.lib import loadOptions
+        from propka.input import read_parameter_file, read_molecule_file
+        from propka.parameters import Parameters
+        from propka.molecular_container import MolecularContainer
+        options = loadOptions([self.path]) # use default in mvp
+        pdbfile = options.filenames[0]
+        parameters = read_parameter_file(options.parameters, Parameters())
+        my_molecule = MolecularContainer(parameters, options)
+        my_molecule = read_molecule_file(pdbfile, my_molecule)
+        my_molecule.calculate_pka()
+        conformation = my_molecule.conformations['AVR']
+        residues_pka = {}
+        for group in conformation.groups:
+            row_dict = {}
+            atom = group.atom
+            row_dict["res_num"] = atom.res_num
+            row_dict["ins_code"] = atom.icode
+            row_dict["res_name"] = atom.res_name
+            row_dict["chain_id"] = atom.chain_id
+            row_dict["group_label"] = group.label
+            row_dict["group_type"] = getattr(group, "type", None)
+            row_dict["pKa"] = group.pka_value
+            row_dict["model_pKa"] = group.model_pka
+            row_dict["buried"] = group.buried
+            if group.coupled_titrating_group:
+                row_dict["coupled_group"] = group.coupled_titrating_group.label
+            else:
+                row_dict["coupled_group"] = None
+            residues_pka[atom.res_num] = row_dict
+        return list(map(lambda y: residues_pka[y]['pKa'], target_resis))
+    
+    def get_mmpbsa_binding(
+        self, 
+        ligand_mask: str, 
+        igb: int = 5,
+        in_file: str = None,
+        overwrite_in: str = 0,
+        if_cluster_job: bool = True,
+        cluster: ClusterInterface = None,
+        period: int = 30,
+        res_setting: Union[dict, None] = None,
+        cluster_debug: bool = 0):
+        """mvp function for getting the MMPBSA binding assessment for
+        {ligand_mask} from the trajectory"""
+        traj_file = self.mdcrd
+        dr_prmtop, dl_prmtop, dc_prmtop, sc_prmtop = self.make_mmpbsa_prmtops(ligand_mask, igb)
+        mmpbsa_out_file = self.run_mmpbsa(
+            dr_prmtop, dl_prmtop, dc_prmtop, sc_prmtop, traj_file,
+            in_file, overwrite_in, 
+            if_cluster_job, cluster, period, res_setting, cluster_debug
+            )
+        result = type(self).extract_mmpbsa_out(mmpbsa_out_file)
+
+        #clean
+        if Config.debug < 2:
+            os.remove(dr_prmtop)
+            os.remove(dl_prmtop)
+            os.remove(dc_prmtop)
+            os.remove(sc_prmtop)
+        if Config.debug < 1:    
+            os.remove(mmpbsa_out_file)
+
+        return result
+
+    def make_mmpbsa_prmtops(self, ligand_mask: str, igb: int=5, use_ante_mmpbsa: bool=True):
+        '''
+        Make prmtop files for the MMPB(GB)SA calculation
+        1. make new pdbs
+        2. use tLeap to generate these from pdbs (use existing frcmod file)
+        Args:
+            frag_str:
+                A amber like str to define two fragments
+            igb:
+                gb method used
+        Returns:
+            dr_prmtop, dl_prmtop, dc_prmtop, sc_prmtop 
+            for dry receptor, dry ligand, dry complex, and solvate complex, respectively
+        '''
+        temp_dir = f"{self.dir}/temp/"
+        mkdir(temp_dir)
+
+        if use_ante_mmpbsa:
+            radii = radii_map[str(igb)]
+            dr_prmtop = f"{temp_dir}dr.prmtop"
+            dl_prmtop = f"{temp_dir}dl.prmtop"
+            dc_prmtop = f"{temp_dir}dc.prmtop"
+            ante_cmd = f'ante-MMPBSA.py -p {self.prmtop_path} --radii {radii} -s ":WAT,Na+,Cl-" -c {dc_prmtop} -n "{ligand_mask}" -l {dl_prmtop} -r {dr_prmtop}'
+            try:
+                run(ante_cmd, check=0, text=True, shell=True, capture_output=True)
+            except CalledProcessError as err:
+                print(err.stdout, err.stderr)
+                raise err
+
+        else:
+            frag1_path = f"{temp_dir}frag1.pdb"
+            frag2_path = f"{temp_dir}frag2.pdb"
+            dc_path = f"{temp_dir}dry_complex.pdb"
+            # decode ligand mask
+            ligand_idx = int(ligand_mask.strip()[1:])
+            print(f'working on binding of {ligand_idx}')
+
+            # make new pdb files 
+            stru1 = Structure.fromPDB(self.path).find_idx_residue(ligand_idx)
+            stru2 = Structure.fromPDB(self.path)
+            stru1.build(frag1_path)
+            stru2.solvents = []
+            stru2.metalatoms = list(filter(lambda x: x.resi_name not in ["Na+", "K+"], stru2.metalatoms))
+            stru2.delete_idx_ligand(ligand_idx)
+            stru2.build(frag2_path)
+            stru3 = Structure.fromPDB(self.path)
+            stru3.solvents = []
+            stru3.metalatoms = list(filter(lambda x: x.resi_name not in ["Na+", "K+"], stru2.metalatoms))
+            stru3.build(dc_path)
+
+            # convert frag pdbs to prmtop files
+            dl_prmtop = PDB(frag1_path, wk_dir=self.dir).PDB2FF(
+                local_lig = 0,
+                igb=igb, ifsolve=0,
+                prm_out_path=f'{temp_dir}dl.prmtop', if_prm_only=1)[0]
+            dr_prmtop = PDB(frag2_path, wk_dir=self.dir).PDB2FF(
+                local_lig = 0,
+                igb=igb, ifsolve=0, 
+                prm_out_path=f'{temp_dir}dr.prmtop', if_prm_only=1)[0]
+            dc_prmtop = PDB(dc_path, wk_dir=self.dir).PDB2FF(
+                local_lig = 0,
+                igb=igb, ifsolve=0, 
+                prm_out_path=f'{temp_dir}dc.prmtop', if_prm_only=1)[0]
+            # clean
+            if Config.debug < 2:
+                run('rm leap.log', check=0, text=True, shell=True, capture_output=True)
+
+        sc_prmtop = type(self).update_radii(
+            self.prmtop_path,
+            out_path=f'{temp_dir}sc.prmtop', igb=igb)
+
+ 
+        return dr_prmtop, dl_prmtop, dc_prmtop, sc_prmtop
+
+    def run_mmpbsa(
+        self,
+        dr_prmtop, dl_prmtop, dc_prmtop, sc_prmtop, traj_file,
+        in_file: str = None,
+        overwrite_in: str = 0,
+        if_cluster_job: bool = True,
+        cluster: ClusterInterface = None,
+        period: int = 30,
+        res_setting: Union[dict, None] = None,
+        cluster_debug: bool = 0):
+        """mvp function for running mmpbsa"""
+
+        if not in_file:
+            in_file = Config.Amber.MMPBSA.build_MMPBSA_in()
+        else:
+            if os.path.exists(in_file):
+                if overwrite_in:
+                    Config.Amber.MMPBSA.build_MMPBSA_in(in_file)
+            else:
+                Config.Amber.MMPBSA.build_MMPBSA_in(in_file)
+        temp_dir = f'{self.dir}/temp/'
+        mkdir(temp_dir)
+        mmpbsa_out_path = f'{temp_dir}mmpbsa.dat'
+
+        if if_cluster_job:
+            res_keywords = type(self)._get_default_res_setting_mmpbsa(res_setting)
+            cmd = f'{Config.get_PC_cmd(res_keywords["node_cores"])} python2 {Config.Amber.MMPBSA.get_MMPBSA_engine()} -O -i {in_file} -o {mmpbsa_out_path} -sp {sc_prmtop} -cp {dc_prmtop} -rp {dr_prmtop} -lp {dl_prmtop} -y {traj_file}'
+            mmpbsa_job = job_manager.ClusterJob.config_job(
+                commands = cmd,
+                cluster = cluster,
+                env_settings = cluster.AMBER_ENV['CPU'],
+                res_keywords = res_keywords,
+                sub_dir = './', # because path are relative
+                sub_script_path = f'{temp_dir}/submit_MMPBSA.cmd')
+            mmpbsa_job.submit()
+            mmpbsa_job.wait_to_end(period=period)
+        else:
+            raise Exception("only support cluster job mode right now")
+        # clean
+        if Config.debug < 2:
+            run('rm reference.frc _MMPBSA_info', check=0, text=True, shell=True, capture_output=True)
+            os.remove("./tmp/MMPBSA.in")
+            os.remove(mmpbsa_job.sub_script_path)
+
+        return mmpbsa_out_path
+
+    @staticmethod
+    def _get_default_res_setting_mmpbsa(res_setting):
+        """TODO combine those repeating functions"""
+        if res_setting is None:
+            res_setting = dict()
+        if isinstance(res_setting, dict):
+            res_setting_holder = copy.deepcopy(Config.Amber.MMPBSA.RES)
+            # replace assigned key in default dict
+            for k, v in res_setting.items():
+                res_setting_holder[k] = v
+            return res_setting_holder
+        if isinstance(res_setting, str):
+            return res_setting
+
+    @staticmethod
+    def extract_mmpbsa_out(mmpbsa_out_file: str) -> Dict[str, pd.DataFrame]:
+        """mvp function extracting mmpbsa out file"""
+        gb_pattern = r"GENERALIZED BORN:(?:.|\n)+?Differences \(Complex - Receptor - Ligand\):\n((?:.|\n)+?)-------------------------------------------------------------------------------\n-------------------------------------------------------------------------------"
+        pb_pattern = r"POISSON BOLTZMANN:(?:.|\n)+?Differences \(Complex - Receptor - Ligand\):\n((?:.|\n)+?)-------------------------------------------------------------------------------\n-------------------------------------------------------------------------------"
+        with open(mmpbsa_out_file) as f:
+            f_str = f.read()
+            gb_result_tb = re.search(gb_pattern, f_str).group(1).strip()
+            pb_result_tb = re.search(pb_pattern, f_str).group(1).strip()
+            gb_result = PDB._extract_pb_gb_table(gb_result_tb)
+            pb_result = PDB._extract_pb_gb_table(pb_result_tb)
+        return {"pb":pb_result, "gb":gb_result}
+    
+    @staticmethod
+    def _extract_pb_gb_table(table_str: str) -> pd.DataFrame:
+        """the table looks like this:
+        Energy Component            Average              Std. Dev.   Std. Err. of Mean
+        -------------------------------------------------------------------------------
+        VDWAALS                    -20.3834                3.1308              0.3131
+        EEL                        -19.1765                7.2973              0.7297
+        EGB                         20.8964                4.2728              0.4273
+        ESURF                       -3.8046                0.1256              0.0126
+
+        DELTA G gas                -39.5599                8.4658              0.8466
+        DELTA G solv                17.0918                4.2257              0.4226
+
+        DELTA TOTAL                -22.4680                5.2186              0.5219
+        Returns: (like this) pd.DataFrame
+                          mean      sd     sem
+            VDWAALS      -20.3834  3.1308  0.3131
+            EEL          -19.1765  7.2973  0.7297
+            EGB           20.8964  4.2728  0.4273
+            ESURF         -3.8046  0.1256  0.0126
+            DELTA G gas  -39.5599  8.4658  0.8466
+            DELTA G solv  17.0918  4.2257  0.4226
+            DELTA TOTAL  -22.4680  5.2186  0.5219"""
+
+        data_pattern = r"([A-z]+(?: [A-z]+)*)( *[0-9\-\.]+)( *[0-9\-\.]+)( *[0-9\-\.]+)"
+        data_lines = re.findall(data_pattern, table_str)
+        data_dict = {}
+        for line in data_lines:
+            data_dict[line[0].strip()] = [float(line[1].strip()), float(line[2].strip()), float(line[3].strip())]
+        
+        result_df = pd.DataFrame.from_dict(
+            data_dict, 
+            orient="index",
+            columns=["mean", "sd", "sem"])
+        
+        return result_df
+        
+    @staticmethod
+    def update_radii(prmtop_path, out_path, igb: int = 5):
+        '''
+        Update Radii for the MMGBSA calculation
+        '''
+        # get radii
+        radii = radii_map[str(igb)]
+
+        temp_dir = './parmed_tmp/'
+        mkdir(temp_dir)
+
+        new_prmtop_path = out_path
+        # change Radii
+        with open(f'{temp_dir}/parmed.in','w') as of:
+            of.write('changeRadii '+radii+line_feed)
+            of.write('parmout '+new_prmtop_path+line_feed)
+        try:
+            run(f'parmed -O -p {prmtop_path} -i {temp_dir}/parmed.in', 
+                check=True, text=True, shell=True, capture_output=True)
+        except CalledProcessError as err:
+            print(err.stdout, err.stderr)
+            raise err
+
+        # clean
+        if Config.debug < 2:
+            rmtree(temp_dir)
+
+        return out_path
+
 
 def get_PDB(name):
     '''
@@ -2313,7 +3587,7 @@ def PDB_to_AMBER_PDB(path):
     Make the file convertable with tleap without error
     - Test result: The header part cause duplication of the residues. Deleting that part may give normal tleap output
     - Test result: For some reason, some ligand will miss if directly covert after simple header cutting
-    - Test result: `cat 1NVG.pdb |grep "^ATOM\|^HETATM\|^TER|^END" > 1NVG-grep.pdb` will be fine
+    - Test result: `cat 1NVG.pdb |grep "^ATOM\\|^HETATM\\|^TER|^END" > 1NVG-grep.pdb` will be fine
     - WARNINGs
     '''
     pass

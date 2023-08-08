@@ -558,16 +558,10 @@ class Structure():
         out_ligs = []
 
         l_id = 0
-        lig_list = self.ligands
-        # Only build ligand with same name once
-        if ifunique:
-            lig_list_uni = {}
-            for lig in lig_list:
-                lig_list_uni[lig.name] = lig
-            lig_list = lig_list_uni.values()
+        lig_list = self.get_all_ligands(ifunique=ifunique)
 
-        for lig in lig_list:
-            l_id = l_id + 1 # current ligand id
+        for lig in lig_list: # TODO make this a method of Ligand.
+            l_id = l_id + 1 # current ligand id 
             # make output path
             if dir[-1] == '/':
                 dir = dir[:-1]
@@ -835,6 +829,21 @@ class Structure():
 
         return all_r_list
 
+    def find_idx_residue(self, idx: int):
+        result = list(filter(lambda x: x.id == idx, self.get_all_residue_unit()))
+        if len(result) == 0:
+            print(f"No residue found with idx: {idx}")
+            return None
+        if len(result) > 1:
+            raise Exception(f"found more than one residue with idx: {idx}. check your structure")
+        return result[0]
+
+
+    def delete_idx_ligand(self, idx: int):
+        for i in range(len(self.ligands)-1,-1,-1):
+            if self.ligands[i].id == idx:
+                del self.ligands[i]
+        
 
     def get_residue(self, id):
         '''
@@ -1039,6 +1048,21 @@ class Structure():
 
         return D
 
+
+    def get_all_ligands(self, ifunique: int = 0):
+        '''
+        get ligands from the structure
+        ifunique: 1: only return a list by the reference of the 1st ligand if there're
+                     multiple same ones. 
+                  0: return a referece of the self.ligands
+        '''
+        if ifunique:
+            lig_list_uni = {}
+            for lig in self.ligands:
+                lig_list_uni[lig.name] = lig
+            return lig_list_uni.values()
+        
+        return self.ligands
 
 
     '''

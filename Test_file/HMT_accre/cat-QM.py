@@ -8,7 +8,7 @@ from helper import write_data, line_feed
 # settings
 Config.n_cores = 12
 Config.max_core = 2000
-Config.PC_cmd = 'srun'
+#Config.PC_cmd = 'srun' # srun does not work like this use mpi instead
 Config.debug = 1
 data_output_path = './Mutation.dat'
 
@@ -26,8 +26,8 @@ def main():
 	pdb_obj.qm_cluster_fchk = glob('./QMCluster/*fchk')
 	pdb_obj.qm_cluster_fchk.sort(key=lambda file_name: int(file_name.split('.')[-2].split('_')[-1]))
 
-	# pdb_obj.get_fchk(keep_chk=0)				
-			
+	# pdb_obj.get_fchk(keep_chk=0)
+
 	# --- Analysis ---
 	# targeting C-I bond
 	a1 = int(pdb_obj.stru.ligands[1].C1)

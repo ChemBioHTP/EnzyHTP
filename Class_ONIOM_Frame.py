@@ -282,7 +282,7 @@ class Frame:
         return out_path
 
 
-    def write_sele_lines(self, sele_list, out_path = None, ff='gjf', g_route=None, chrgspin=None, ifchk=0):
+    def write_sele_lines(self, sele_list,  g_route, g_cores, g_mem_cores, out_path = None, ff='gjf', chrgspin=None, ifchk=0):
         '''
         the sele list should be a map like: {'int':'atom_name', '1':'H', ....}
         --------
@@ -321,12 +321,9 @@ class Frame:
             if ff == 'gjf':
                 if ifchk:
                     of.write(r'%chk='+chk_path+line_feed)
-                of.write('%mem='+str(Config.max_core*Config.n_cores)+'MB'+line_feed)
-                of.write('%nprocshared='+str(Config.n_cores)+line_feed)
-                if g_route == None:
-                    of.write('# hf/3-21g'+line_feed)
-                else:
-                    of.write(g_route+line_feed)
+                of.write(f'%mem={int(g_cores)*int(g_mem_cores)-1000}MB{line_feed}') # left 1000MB for outer usage
+                of.write(f'%nprocshared={g_cores}{line_feed}')
+                of.write(g_route+line_feed)
                 of.write(line_feed)
                 of.write('Title Card Required'+line_feed)
                 of.write(line_feed)

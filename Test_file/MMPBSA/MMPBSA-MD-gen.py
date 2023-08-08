@@ -8,7 +8,7 @@ from helper import line_feed
 # settings
 Config.n_cores = 16
 Config.max_core = 2000
-Config.PC_cmd = 'srun'
+#Config.PC_cmd = 'srun' # srun does not work like this use mpi instead
 wkflow_log_path = './MD-gen.log'
 Config.Amber.AmberHome='$AMBERHOME2'
 
