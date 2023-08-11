@@ -961,19 +961,6 @@ class Structure(DoubleLinkedNode):
     #         p2 = r2.get_mass_center()
     #     D = get_distance(p1, p2)
     #     return D
-
-    # def batch_edit_atom_names(self, atom_map: Dict[str, str]) -> None:
-    #     """Updates Structure to match map's atom names
-    #     Args:
-    #         map: the map of incorrect atom names to correct atom names.
-    #     Returns:
-    #         Nothing.
-    #     """
-    #     for chain in self.chains:
-    #         for residue in chain.residues:
-    #             for atom in residue.atoms:
-    #                 if atom.name in atom_map:
-    #                     atom.name = atom_map[atom.name]
     #endregion
 
 def compare_structures(left: Structure, right: Structure) -> Dict[str, List[str]]:
@@ -1015,16 +1002,3 @@ def merge_right(left: Structure,
         if lkey not in right_keys:
             struct_cpy.add_residue(left.get_residue(lkey))
     return struct_cpy
-
-
-def order_to_stru(stru: Structure, ordered_stru: Structure) -> None:
-    """Orders the atoms in stru in-place to match the ordered_stru's ordering.
-    Args:
-        stru: 
-        ordered_stru: the Structure object that has the desired order.
-    Returns:
-        Nothing.
-    """
-    for res, ordered_res in zip(stru.residues, ordered_stru.residues):
-        if res.name == ordered_res.name:
-            res.atoms = ordered_res.atoms

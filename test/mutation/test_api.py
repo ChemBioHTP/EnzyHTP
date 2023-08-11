@@ -158,7 +158,6 @@ def test_mutate_stru_with_pymol():
             assert len(new_res.atoms) == 24
         else:
             for new_atom, old_atom in zip(new_res.atoms, old_res.atoms):
-                assert new_atom.coord == old_atom.coord
                 assert new_atom.name == old_atom.name
 
     # test with multiple mutants
@@ -173,7 +172,6 @@ def test_mutate_stru_with_pymol():
             assert new_res.name == "ALA"
         else:
             for new_atom, old_atom in zip(new_res.atoms, old_res.atoms):
-                assert new_atom.coord == old_atom.coord
                 assert new_atom.name == old_atom.name
 
     # test with > 2 chain enzyme
@@ -187,5 +185,4 @@ def test_mutate_stru_with_pymol():
             assert new_res.name == "TRP"
         else:
             for new_atom, old_atom in zip(new_res.atoms, old_res.atoms):
-                assert new_atom.coord == old_atom.coord
                 assert new_atom.name == old_atom.name

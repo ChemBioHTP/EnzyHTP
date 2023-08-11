@@ -19,7 +19,6 @@ from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp import config
 from enzy_htp.structure import Structure, PDBParser
-from enzy_htp.structure.structure import order_to_stru
 import enzy_htp.structure.structure_operation as stru_oper
 from enzy_htp import interface
 from .mutation import (Mutation, check_repeat_mutation, get_mutant_name_tag, remove_repeat_mutation)
@@ -397,7 +396,7 @@ def mutate_stru_with_pymol(
                             pymol_obj_name=pymol_obj_name, pymol_session=pms)
         # 3. save to a structure.
         pymol_mutant_stru = pi.export_enzy_htp_stru(pymol_obj_name, pms, if_fix_naming=True)
-        order_to_stru(pymol_mutant_stru, stru_cpy)
+        stru_oper.order_atoms_to_stru(pymol_mutant_stru, stru_cpy)
 
     # 4. update residues
     stru_oper.update_residues(stru_cpy, pymol_mutant_stru)

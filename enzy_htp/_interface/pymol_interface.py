@@ -21,7 +21,6 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core import _LOGGER, check_var_type
 from enzy_htp._config.pymol_config import PyMolConfig, default_pymol_config
 from enzy_htp.structure import Structure, PDBParser
-from enzy_htp.structure.structure import order_to_stru
 
 from .base_interface import BaseInterface
 
@@ -292,7 +291,9 @@ class PyMolInterface(BaseInterface):
             pymol_session: the target PyMOL session.
             pymol_obj_name: the name of the target enzyme in PyMOL.
             if_retain_order: if the saving should keep the order of the atoms in the original object.
+                             Fixes PyMOL's scrambling of the atom order
             if_fix_naming: if the PyMOL naming of atoms should be updated to match the Structure convention.
+                           Allows for atom naming consistency (https://github.com/ChemBioHTP/EnzyHTP/issues/117)
         Returns:
             A Structure object representing the target enzyme in PyMOL.
         """
@@ -317,7 +318,7 @@ class PyMolInterface(BaseInterface):
         for chain in stru.chains:
             for residue in chain.residues:
                 for atom in residue.atoms:
-                    correct_name = PyMolConfig().update_atom_name(residue.name, atom.name)
+                    correct_name = PyMolConfig().get_canonical_atom_name(residue.name, atom.name)
                     if correct_name:
                         atom.name = correct_name
 

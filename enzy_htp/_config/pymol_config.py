@@ -18,7 +18,6 @@ from typing import Any, List, Dict, Tuple
 class PyMolConfig:
     """Class that holds default values for running PyMol within enzy_htp."""
 
-    """A map to convert messed up PyMOL atom names to a more conventional name for the Structure class."""
     PYMOL_TO_ATOM_MAPPER: Dict[str, str] = {
         "1HB": "HB1",
         "2HB": "HB2",
@@ -55,6 +54,8 @@ class PyMolConfig:
         "2HD2": "HD22",
         "3HD2": "HD23",
     }
+    """A map to convert messed up PyMOL atom names to a more conventional name for the Structure class."""
+
 
     DEFAULT_OUTPUT_LV: Tuple[str] = ("disable", "all", "everything")
     """the default output level of a new pymol session in enzy_htp: mute everything.
@@ -96,7 +97,7 @@ class PyMolConfig:
         """ """
         return ["pymol2"]
     
-    def update_atom_name(self, res: str, atom: str) -> str:
+    def get_canonical_atom_name(self, res: str, atom: str) -> str:
         """Updates PyMOL atom name to name consistent with Structure class.
         Args:
             res: the current residue.
