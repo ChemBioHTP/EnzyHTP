@@ -14,21 +14,20 @@ from typing import List, Dict, Any, Union, Tuple
 import pymol2
 import pandas as pd
 
-#TODO(CJ): add something to remove "PyMOL not running. Entering library mode (experimental" message on pymol running
+# TODO(CJ): add something to remove "PyMOL not running. Entering library mode (experimental" message on pymol running
 from enzy_htp import config as eh_config
 from enzy_htp.core import env_manager as em
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import _LOGGER, check_var_type
 from enzy_htp._config.pymol_config import PyMolConfig, default_pymol_config
 from enzy_htp.structure import Structure, PDBParser
-from enzy_htp.structure.structure import order_to_stru
 
 from .base_interface import BaseInterface
 
 
 class PyMolInterface(BaseInterface):
     """Class that provides a direct inteface for enzy_htp to utilize PyMol package. 
-    
+
     Atributes:
         config_ : The PyMOLConfig() class which provides settings for both running PyMOL and maintaining a compatible environment.
         env_manager_ : The EnvironmentManager() class which ensures all required environment elements exist.
@@ -53,7 +52,8 @@ class PyMolInterface(BaseInterface):
     def check_pymol2_installed(self) -> None:
         """Method that checks if """
         if "pymol2" in self.missing_py_modules():
-            _LOGGER.errorf("pymol2 is NOT installed. Use 'conda install -c conda-forge -y -q pymol-open-source'. Exiting...")
+            _LOGGER.errorf(
+                "pymol2 is NOT installed. Use 'conda install -c conda-forge -y -q pymol-open-source'. Exiting...")
             exit(1)
 
     def convert(self,
@@ -77,16 +77,18 @@ class PyMolInterface(BaseInterface):
             The name of the new file as a str().
         """
         self.check_pymol2_installed()
-        #TODO(CJ): update split states. update return policy
+        # TODO(CJ): update split states. update return policy
 
         fs.check_file_exists(file_1)
 
         if (not file_2 and not new_ext):
-            _LOGGER.error("Either a new file name or target extension must be supplied. Both are empty. Exiting...")
+            _LOGGER.error(
+                "Either a new file name or target extension must be supplied. Both are empty. Exiting...")
             exit(1)
 
         if file_2 and new_ext:
-            _LOGGER.error("Either a new file name or target extension must be supplied. Both were supplied. Exiting...")
+            _LOGGER.error(
+                "Either a new file name or target extension must be supplied. Both were supplied. Exiting...")
             exit(1)
 
         if not file_2:
@@ -120,7 +122,8 @@ class PyMolInterface(BaseInterface):
                 session.cmd.delete('all')
 
         except Exception as exe:
-            _LOGGER.error(f"Could not convert '{file_1}' to '{file_2}'. Encountered error: '{exe}'. Exiting...")
+            _LOGGER.error(
+                f"Could not convert '{file_1}' to '{file_2}'. Encountered error: '{exe}'. Exiting...")
             exit(1)
 
         return result
@@ -138,7 +141,7 @@ class PyMolInterface(BaseInterface):
         Returns:
             Whether the file type is supported.
         """
-        #TODO(CJ): need to check which file formats are actually supported
+        # TODO(CJ): need to check which file formats are actually supported
         extension: str = Path(fname).suffix
         return extension in self.config().IO_EXTENSIONS
 
@@ -161,17 +164,18 @@ class PyMolInterface(BaseInterface):
         """convert enzy_htp.Structure into a pymol object in a
         pymol2.PyMOL() session. 
         Using cmd.load and mediate by PDB format
-        
+
         Returns:
             (pymol_obj_name, session) since the name is only valid in the session
-            
+
         Note: pymol wont reset residue idx or chain names but will reset atom index from 1"""
 
         # create temp PDB
         self.check_pymol2_installed()
         pdb_str = PDBParser().get_file_str(stru, if_renumber=False)
         temp_dir = eh_config["system.SCRATCH_DIR"]
-        temp_pdb_path = fs.get_valid_temp_name(f"{temp_dir}/temp_pymol_interface.pdb")
+        temp_pdb_path = fs.get_valid_temp_name(
+            f"{temp_dir}/temp_pymol_interface.pdb")
         fs.safe_mkdir(temp_dir)
         with open(temp_pdb_path, "w") as f:
             f.write(pdb_str)
@@ -203,7 +207,8 @@ class PyMolInterface(BaseInterface):
         sele_pattern = f"{pymol_obj_name} & ({pattern})"
         sele_name = session.cmd.get_unused_name("enzy_htp_stru_sele")
         session.cmd.select(sele_name, sele_pattern)
-        session.cmd.iterate(sele_name, "result.append(ID)", space=locals())  # use ID instead of index here
+        session.cmd.iterate(sele_name, "result.append(ID)",
+                            space=locals())  # use ID instead of index here
 
         return sorted(result)
 
@@ -232,9 +237,11 @@ class PyMolInterface(BaseInterface):
         # select res idx to mutate to target
         pymol_session.cmd.get_wizard().set_mode(target)
         if pymol_obj_name == "":
-            pymol_session.cmd.get_wizard().do_select(f"{pos_key[0]}/{str(pos_key[1])}/")
+            pymol_session.cmd.get_wizard().do_select(
+                f"{pos_key[0]}/{str(pos_key[1])}/")
         else:
-            pymol_session.cmd.get_wizard().do_select(f"{pymol_obj_name}//{pos_key[0]}/{str(pos_key[1])}/")
+            pymol_session.cmd.get_wizard().do_select(
+                f"{pymol_obj_name}//{pos_key[0]}/{str(pos_key[1])}/")
 
         # prints all rotamers and strains out; also saves each variation to a PDB file in scratch/.
         # can use for debugging purposes
@@ -244,18 +251,20 @@ class PyMolInterface(BaseInterface):
                 pymol_session.cmd.do("refresh_wizard")
                 pymol_session.cmd.get_wizard().set_mode(target)
                 if pymol_obj_name == "":
-                    pymol_session.cmd.get_wizard().do_select(f"{pos_key[0]}/{str(pos_key[1])}/")
+                    pymol_session.cmd.get_wizard().do_select(
+                        f"{pos_key[0]}/{str(pos_key[1])}/")
                 else:
-                    pymol_session.cmd.get_wizard().do_select(f"{pymol_obj_name}//{pos_key[0]}/{str(pos_key[1])}/")
+                    pymol_session.cmd.get_wizard().do_select(
+                        f"{pymol_obj_name}//{pos_key[0]}/{str(pos_key[1])}/")
 
                 pymol_session.cmd.get_wizard().do_state(i)
                 pymol_session.cmd.frame(i)
                 pymol_session.cmd.get_wizard().apply()
-                self.export_pdb(pymol_obj_name, pymol_session, tag="rotamer_" + str(i))
+                self.export_pdb(pymol_obj_name, pymol_session,
+                                tag="rotamer_" + str(i))
             return
 
         pymol_session.cmd.get_wizard().apply()
-
 
     def export_pdb(self, pymol_session: pymol2.PyMOL, pymol_obj_name: str, if_retain_order: bool = True, tag: str = None) -> str:
         """
@@ -271,21 +280,22 @@ class PyMolInterface(BaseInterface):
         result_dir = eh_config["system.SCRATCH_DIR"]
         fs.safe_mkdir(result_dir)
         if tag is not None:
-            pymol_outfile_path = fs.get_valid_temp_name(f"{result_dir}/{pymol_obj_name}_{tag}.pdb")
+            pymol_outfile_path = fs.get_valid_temp_name(
+                f"{result_dir}/{pymol_obj_name}_{tag}.pdb")
         else:
-            pymol_outfile_path = fs.get_valid_temp_name(f"{result_dir}/{pymol_obj_name}.pdb")
+            pymol_outfile_path = fs.get_valid_temp_name(
+                f"{result_dir}/{pymol_obj_name}.pdb")
 
         if if_retain_order:
             pymol_session.cmd.set("retain_order")
         pymol_session.cmd.save(pymol_outfile_path, pymol_obj_name)
-        
+
         return pymol_outfile_path
 
-
     def export_enzy_htp_stru(self, pymol_obj_name: str,
-                            pymol_session: pymol2.PyMOL,
-                            if_retain_order: bool = False,
-                            if_fix_naming: bool = False) -> Structure:
+                             pymol_session: pymol2.PyMOL,
+                             if_retain_order: bool = False,
+                             if_fix_naming: bool = False) -> Structure:
         """
         Saves a PyMOL object to a Structure object.
         Args:
@@ -299,12 +309,14 @@ class PyMolInterface(BaseInterface):
         sp = PDBParser()
         pymol_outfile_path = self.export_pdb(pymol_session, pymol_obj_name,
                                              if_retain_order=if_retain_order)
-        res = sp.get_structure(pymol_outfile_path, allow_multichain_in_atom=True)
+        res = sp.get_structure(
+            pymol_outfile_path, allow_multichain_in_atom=True)
 
         if if_fix_naming:
             self.fix_pymol_naming(res)
 
-        fs.clean_temp_file_n_dir([pymol_outfile_path, eh_config["system.SCRATCH_DIR"]])
+        fs.clean_temp_file_n_dir(
+            [pymol_outfile_path, eh_config["system.SCRATCH_DIR"]])
         return res
 
     def fix_pymol_naming(self, stru: Structure) -> None:
@@ -321,11 +333,11 @@ class PyMolInterface(BaseInterface):
                     if correct_name:
                         atom.name = correct_name
 
-    
     # == inter-session modular functions == (do not requires a session, will start and close one)
     # pass
 
     # TODO: go to a parent class
+
     @property
     def config(self) -> PyMolConfig:
         """Getter for the PyMolConfig() instance belonging to the class."""
@@ -339,12 +351,13 @@ class PyMolInterface(BaseInterface):
             session : A pymol2.PyMOL() session to use. 
             molfile: The name of the input file.
             new_file: Where to save the deprotonated structure. Optional.
-    
+
         Returns:
             The name of the deprotonated structure.
         """
 
-        _LOGGER.warning("This function should be used for non-amino acid structures only!")
+        _LOGGER.warning(
+            "This function should be used for non-amino acid structures only!")
 
         self.check_pymol2_installed()
 
@@ -352,7 +365,8 @@ class PyMolInterface(BaseInterface):
 
         if not new_file:
             fpath = Path(molfile)
-            new_file = fpath.parent / f"{fpath.stem}_deprotonated{fpath.suffix}"
+            new_file = fpath.parent / \
+                f"{fpath.stem}_deprotonated{fpath.suffix}"
 
         session.cmd.delete('all')
         session.cmd.load(molfile)
@@ -369,11 +383,13 @@ class PyMolInterface(BaseInterface):
 
         self.cmd.delete('all')
         self.cmd.load(template)
-        self.cmd.iterate('all', 'template.append((name, elem, ID))', space=_eh_local)
+        self.cmd.iterate(
+            'all', 'template.append((name, elem, ID))', space=_eh_local)
         self.cmd.delete('all')
 
         self.cmd.load(in_file)
-        self.cmd.iterate('all', 'in_stru.append((name, elem, ID))', space=_eh_local)
+        self.cmd.iterate(
+            'all', 'in_stru.append((name, elem, ID))', space=_eh_local)
 
         if len(_eh_local['template']) != len(_eh_local['in_stru']):
             _LOGGER.error(
@@ -440,7 +456,7 @@ class PyMolInterface(BaseInterface):
         """Executes a series of commands through the PyMOL/PyMOL2 python module in use. Takes input as a list of Tuple()'s
         where the first item in each tuple is a string specifying the function to use and the rest of the items are the
         arguments for that function.
-    
+
         Args:
             session : A pymol2.PyMOL() session to use.
             args: A list() of tuple()'s of items where the first string names the pymol API command to use and the rest are arguments for that function.
@@ -455,14 +471,16 @@ class PyMolInterface(BaseInterface):
 
         for cmd_set in args:
             if len(cmd_set) < 2:
-                _LOGGER.error(f"The supplied argument {cmd_set} is not long enough. Musst have at least two items. Exiting...")
+                _LOGGER.error(
+                    f"The supplied argument {cmd_set} is not long enough. Musst have at least two items. Exiting...")
                 exit(1)
 
             cmd_name = cmd_set[0]
             cmd_args = list(cmd_set[1:])
 
             if cmd_name not in self.available_cmds_:
-                _LOGGER.error(f"The command '{cmd_name}' is not supported in this version of pymol. Exiting...")
+                _LOGGER.error(
+                    f"The command '{cmd_name}' is not supported in this version of pymol. Exiting...")
                 exit(1)
 
             cmd_str: str = f"{cmd_name}({','.join(map(str, cmd_args))})"
@@ -470,7 +488,8 @@ class PyMolInterface(BaseInterface):
                 fxn = getattr(session.cmd, cmd_name)
                 result.append(fxn(*cmd_args))
             except:
-                _LOGGER.error(f"PyMOL function call '{cmd_str}' resuled in an error. Exiting...")
+                _LOGGER.error(
+                    f"PyMOL function call '{cmd_str}' resuled in an error. Exiting...")
                 exit(1)
 
         return result
@@ -492,11 +511,13 @@ class PyMolInterface(BaseInterface):
         self.check_pymol2_installed()
 
         if not Path(fname).exists():
-            _LOGGER.error(f"The supplied file '{fname}' does not exist. Exiting...")
+            _LOGGER.error(
+                f"The supplied file '{fname}' does not exist. Exiting...")
             exit(1)
 
         if not self.supported_file_type(fname):
-            _LOGGER.error(f"The supplied file '{fname}' has an unsupported extension. Exiting...")
+            _LOGGER.error(
+                f"The supplied file '{fname}' has an unsupported extension. Exiting...")
             exit(1)
 
         _eh_local: Dict[str, Any] = {'fc': []}
@@ -527,11 +548,13 @@ class PyMolInterface(BaseInterface):
         self.check_pymol2_installed()
 
         if not Path(fname).exists():
-            _LOGGER.error(f"The supplied file '{fname}' does not exist. Exiting...")
+            _LOGGER.error(
+                f"The supplied file '{fname}' does not exist. Exiting...")
             exit(1)
 
         if not self.supported_file_type(fname):
-            _LOGGER.error(f"The supplied file '{fname}' has an unsupported extension. Exiting...")
+            _LOGGER.error(
+                f"The supplied file '{fname}' has an unsupported extension. Exiting...")
             exit(1)
 
         session.cmd.delete('all')

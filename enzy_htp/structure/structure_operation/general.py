@@ -96,3 +96,25 @@ def update_residues(stru: Structure, ref_stru: Structure) -> Structure:
 #         resi.name = ref_resi.name
 #     resi.atoms = copy.deepcopy(ref_resi.atoms)  # this will also set resi as parent
 #     return resi
+
+def order_atoms_to_stru(stru: Structure, ref_stru: Structure) -> None:
+    """Orders the atoms in stru in-place to match the ref_stru's ordering as long
+       the residues are in the same order.
+    Args:
+        stru: 
+        ref_stru: the Structure object that has the desired order.
+    Returns:
+        Nothing.
+    """
+    for res, ref_res in zip(stru.residues, ref_stru.residues):
+        if res.name == ref_res.name:
+            res.atoms = ref_res.atoms
+            new_res = copy.deepcopy(res)
+            new_res.atoms = []
+            visited = []
+            for ref_atom in ref_res.atoms:
+                for atom in res.atoms:
+                    if atom not in visited and atom.name == ref_atom.name:
+                        visited.append(atom)
+                        new_res.atoms.append(atom)
+            res.atoms = new_res.atoms

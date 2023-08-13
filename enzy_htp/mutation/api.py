@@ -19,10 +19,10 @@ from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp import config
 from enzy_htp.structure import Structure, PDBParser
-from enzy_htp.structure.structure import order_to_stru
 import enzy_htp.structure.structure_operation as stru_oper
 from enzy_htp import interface
-from .mutation import (Mutation, check_repeat_mutation, get_mutant_name_tag, remove_repeat_mutation)
+from .mutation import (Mutation, check_repeat_mutation,
+                       get_mutant_name_tag, remove_repeat_mutation)
 from .mutation_pattern import decode_mutation_pattern
 from enzy_htp._interface.pymol_interface import OpenPyMolSession
 
@@ -112,7 +112,8 @@ def assign_mutant(
     mutants = decode_mutation_pattern(stru, pattern)
     # sync over polymers
     if chain_sync_list:
-        mutants = sync_mutation_over_chains(mutants, chain_sync_list, chain_index_mapper)
+        mutants = sync_mutation_over_chains(
+            mutants, chain_sync_list, chain_index_mapper)
     # san check of the mutation_flagss
     if if_check:
         for mutant in mutants:
@@ -162,10 +163,14 @@ def sync_mutation_over_chains(mutants: List[List[Mutation]],
             orig_chain_id = mut.chain_id
             for chain_sync_group in chain_sync_list:
                 if orig_chain_id in chain_sync_group:
-                    sync_targets = filter(lambda x: x != orig_chain_id, chain_sync_group)
+                    sync_targets = filter(
+                        lambda x: x != orig_chain_id, chain_sync_group)
                     for sync_target in sync_targets:
-                        new_res_idx = mut.res_idx - chain_index_mapper.get(orig_chain_id, 0) + chain_index_mapper.get(sync_target, 0)
-                        new_mut = mut.changed_clone(chain_id=sync_target, res_idx=new_res_idx)
+                        new_res_idx = mut.res_idx - \
+                            chain_index_mapper.get(
+                                orig_chain_id, 0) + chain_index_mapper.get(sync_target, 0)
+                        new_mut = mut.changed_clone(
+                            chain_id=sync_target, res_idx=new_res_idx)
                         # TODO(qz): this does not work in most of the cases.
                         # The index of the corresponding residue needs to be find by *pair-wise align* of the target and origin sequence and
                         # get the same aligned index.
@@ -250,7 +255,7 @@ def mutate_stru(stru: Structure,
             The method is only used as a place holder for 1st version EnzyHTP. We have encounter any problem
             brought by the accuracy of the mutation when using this method in workflows but users should be
             cautious with it and consider it a potential source of absured results.
-        
+
         Side-chain rotamer library:
         (most used in the field)
         - SCWRL4 (http://dunbrack.fccc.edu/lab/scwrl)
@@ -287,7 +292,8 @@ def mutate_stru(stru: Structure,
     """
     # deal with repeating mutation
     if check_repeat_mutation(mutant):
-        _LOGGER.warning(f"Detected repeating mutation in mutant: {mutant}. Only use the last one.")
+        _LOGGER.warning(
+            f"Detected repeating mutation in mutant: {mutant}. Only use the last one.")
         mutant = remove_repeat_mutation(mutant, keep="last")
     # apply the mutation
     mutator = MUTATE_STRU_ENGINE[engine]
@@ -320,7 +326,8 @@ def mutate_stru_with_tleap(
     # san check
     for mut in mutant:
         if not isinstance(mut, Mutation):
-            _LOGGER.error(f"mutant takes only a list of Mutation(). Current mutant is: {mutant}")
+            _LOGGER.error(
+                f"mutant takes only a list of Mutation(). Current mutant is: {mutant}")
             raise TypeError
 
     # get name tag for the mutant
@@ -330,19 +337,22 @@ def mutate_stru_with_tleap(
     temp_path_list = []
     if int_leapin_pdb_path is None:
         fs.safe_mkdir(config["system.SCRATCH_DIR"])
-        int_leapin_pdb_path = fs.get_valid_temp_name(f"{config['system.SCRATCH_DIR']}/mutate_stru_with_tleap_input{name_tag}.pdb")
+        int_leapin_pdb_path = fs.get_valid_temp_name(
+            f"{config['system.SCRATCH_DIR']}/mutate_stru_with_tleap_input{name_tag}.pdb")
         temp_path_list.append(int_leapin_pdb_path)
 
     if int_leapout_pdb_path is None:
         fs.safe_mkdir(config["system.SCRATCH_DIR"])
-        int_leapout_pdb_path = fs.get_valid_temp_name(f"{config['system.SCRATCH_DIR']}/mutate_stru_with_tleap_output{name_tag}.pdb")
+        int_leapout_pdb_path = fs.get_valid_temp_name(
+            f"{config['system.SCRATCH_DIR']}/mutate_stru_with_tleap_output{name_tag}.pdb")
         temp_path_list.append(int_leapout_pdb_path)
 
     # 1. make side-chain deleted & name mutated PDB
     stru_cpy = copy.deepcopy(stru)
     for mut in mutant:
         target_res = stru_cpy.find_residue_with_key(mut.get_position_key())
-        stru_oper.remove_side_chain_mutating_atom(target_res, mut.target)  # remove atom
+        stru_oper.remove_side_chain_mutating_atom(
+            target_res, mut.target)  # remove atom
         target_res.name = mut.target  # change name
     with open(int_leapin_pdb_path, "w") as of:
         of.write(sp.get_file_str(stru_cpy))
@@ -382,7 +392,8 @@ def mutate_stru_with_pymol(
     # san check
     for mut in mutant:
         if not isinstance(mut, Mutation):
-            _LOGGER.error(f"mutant takes only a list of Mutation(). Current mutant is: {mutant}")
+            _LOGGER.error(
+                f"mutant takes only a list of Mutation(). Current mutant is: {mutant}")
             raise TypeError
 
     stru_cpy = copy.deepcopy(stru)
@@ -393,11 +404,12 @@ def mutate_stru_with_pymol(
         pymol_obj_name = pi.load_enzy_htp_stru(stru=stru_cpy, session=pms)[0]
         # 2. loop through mutants and apply each one
         for mut in mutant:
-            pi.point_mutate(pos_key=mut.get_position_key(), target=mut.get_target(), 
+            pi.point_mutate(pos_key=mut.get_position_key(), target=mut.get_target(),
                             pymol_obj_name=pymol_obj_name, pymol_session=pms)
         # 3. save to a structure.
-        pymol_mutant_stru = pi.export_enzy_htp_stru(pymol_obj_name, pms, if_fix_naming=True)
-        order_to_stru(pymol_mutant_stru, stru_cpy)
+        pymol_mutant_stru = pi.export_enzy_htp_stru(
+            pymol_obj_name, pms, if_fix_naming=True)
+        stru_oper.order_atoms_to_stru(pymol_mutant_stru, stru_cpy)
 
     # 4. update residues
     stru_oper.update_residues(stru_cpy, pymol_mutant_stru)
@@ -409,9 +421,9 @@ def mutate_stru_with_pymol(
     return stru_cpy
 
 
-MUTATE_STRU_ENGINE = {"tleap_min": mutate_stru_with_tleap, 
-                      "pymol": mutate_stru_with_pymol,}
-                      #"rosetta": mutate_stru_with_rosetta}
+MUTATE_STRU_ENGINE = {"tleap_min": mutate_stru_with_tleap,
+                      "pymol": mutate_stru_with_pymol, }
+# "rosetta": mutate_stru_with_rosetta}
 """engines for mutate_stru()"""
 
 
@@ -465,7 +477,8 @@ def mutate_stru_with_rosetta(
     # san check
     for mut in mutant:
         if not isinstance(mut, Mutation):
-            _LOGGER.error(f"mutant takes only a list of Mutation(). Current mutant is: {mutant}")
+            _LOGGER.error(
+                f"mutant takes only a list of Mutation(). Current mutant is: {mutant}")
             raise TypeError
 
     stru_cpy = copy.deepcopy(stru)
