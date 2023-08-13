@@ -366,7 +366,8 @@ class PDBParser(StructureParserInterface):
                         if current_chain_id in recorded_chain_ids:
                             _LOGGER.error(
                                 "Found the same chain id in 2 different ATOM chains. Check your PDB.")
-                            raise Exception
+                            raise Exception(
+                                "Found the same chain id in 2 different ATOM chains. Check your PDB.")
                         recorded_chain_ids.append(current_chain_id)
                     else:
                         # case: no missing chain id; single chain id; HET chain
@@ -388,7 +389,8 @@ class PDBParser(StructureParserInterface):
                             # ATOM chain: multiple chain id not allowed
                             _LOGGER.error(
                                 "Found multiple chain id in ATOM chain. Not allowed.")
-                            raise Exception
+                            raise Exception(
+                                "Found multiple chain id in ATOM chain. Not allowed.")
                         else:
                             # ATOM chain: (user option) multiple chain id allowed
                             _LOGGER.warning(
@@ -400,7 +402,8 @@ class PDBParser(StructureParserInterface):
                                 if chain_id_in_chain in recorded_chain_ids:
                                     _LOGGER.error(
                                         "Found the repeating chain id in a ATOM chain with multiple chain id. Check your PDB.")
-                                    raise Exception
+                                    raise Exception(
+                                        "Found the repeating chain id in a ATOM chain with multiple chain id. Check your PDB.")
                                 else:
                                     recorded_chain_ids.append(
                                         chain_id_in_chain)
@@ -439,7 +442,8 @@ class PDBParser(StructureParserInterface):
                         if "ATOM" in current_chain_records:
                             _LOGGER.error(
                                 "Found the same chain id in 2 different ATOM chains. Check your PDB.")
-                            raise Exception
+                            raise Exception(
+                                "Found the same chain id in 2 different ATOM chains. Check your PDB.")
                         else:
                             new_chain_id = legal_ids.pop()
                             _LOGGER.debug(
@@ -455,7 +459,8 @@ class PDBParser(StructureParserInterface):
                     # case: more than 1 chain id in chain
                     _LOGGER.error(
                         "Found multiple chain id together with missing chain id in 1 chain. Impossible to solve.")
-                    raise Exception
+                    raise Exception(
+                        "Found multiple chain id together with missing chain id in 1 chain. Impossible to solve.")
         # add missing chain id
         batch_edit_df_loc_value(df, result_loc_map, "chain_id")
         return idx_change_mapper
