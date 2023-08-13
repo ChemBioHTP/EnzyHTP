@@ -10,12 +10,14 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-10-16
 """
 import os
-from typing import Any
+from typing import Any, List
 from copy import deepcopy
 
 from enzy_htp.core import _LOGGER
 
-class SystemConfig:
+from .base_config import BaseConfig
+
+class SystemConfig(BaseConfig):
     """Class that holds system settings for enzy_htp. Similar to other classes in this
     sub-module, SHOULD NOT be directly created by the end users. Instead, it should be 
     accessed via the singleton config variable. 
@@ -38,6 +40,18 @@ class SystemConfig:
 
     SCRATCH_DIR: str = f"{WORK_DIR}/scratch"
     """Default temp directory for enzy_htp. Defaults to WORK_DIR/scratch"""
+
+    def required_executables(self) -> List[str]:
+        """A list of all required executables for SystemConfig."""
+        return list()
+
+    def required_env_vars(self) -> List[str]:
+        """A list of all required environment variables for SystemConfig."""
+        return list()
+
+    def required_py_modules(self) -> List[str]:
+        """A list of all required environment python modules for SystemConfig."""
+        return list()
 
 
 def default_system_config() -> SystemConfig:

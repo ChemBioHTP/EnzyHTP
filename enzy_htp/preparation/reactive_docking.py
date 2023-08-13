@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import List
 from copy import deepcopy
 
+import numpy as np
 import pandas as pd
 
 from enzy_htp import interface
@@ -16,6 +17,7 @@ from enzy_htp._interface.rosetta_interface import RosettaCst
 
 
 from enzy_htp import config
+import enzy_htp.chemical as chem
 from enzy_htp import mutation as mm 
 from enzy_htp.structure import PDBParser
 from enzy_htp.core import file_system as fs
@@ -30,16 +32,28 @@ def dock_reactants( structure,
                     save_work_dir:bool=False,
                     reactant_conformers:str=None,
                     rng_seed:int=1996,
-                    n_struct:int=None
+                    n_struct:int=1000,
+                    use_cache:bool=True
                     ) -> List[str]:
     """
 
     Args:
+        structure:
+        reactants:
+        contraints:
+        mutations:
+        work_dir:
+        save_work_dir:
+        reactant_conformers:
+        rng_seed:
+        n_struct:
+        use_cache:
 
     Returns:
 
     """
-
+    #TODO(CJ): check if the ligands are in the structure
+    #TODO(CJ): checks on 
     if not work_dir:
         work_dir = config["system.SCRATCH_DIR"] 
 
@@ -49,53 +63,58 @@ def dock_reactants( structure,
 
     docked_complexes:List[str] = list()
    
-    if mutations and constraints:
-    #TODO(CJ): make this a prettier function
-        kept = []        
-        for mut in mutations:
-            constrained_mutation=False
-            for cst in constraints:
-                if mutation_cst_overlap(mut,cst):
-                    pass
-                    constrained_mutation=True
-                    #TODO(CJ): too tired to do this rn
-                    exit( 0 )
-            if not constrained_mutation:
-                kept.append( mut )
-        mutations = kept
-
-
+    if (mutations and constraints) and mut_cst_overlap(mutations, constraints):
+        docked_complexes.extend(
+            _dock_mut_cst_overlaps(
+                        structure, 
+                        reactants, 
+                        constraints, 
+                        mutations,
+                        work_dir,
+                        save_work_dir,
+                        reactant_conformers,
+                        rng_seed,
+                        n_struct
+                    )
+        )
+    
     (start_pdb, cst_file) = _integrate_csts( structure, constraints, work_dir )
 
-    xml_file:str =  _create_xml(f"{work_dir}/_script.xml", "Y Z".split()) #TODO(CJ): need to get the chain names
+    chain_names:List[str] = _ligand_chain_names( start_pdb )
 
-    options_file:str = make_options_file(start_pdb, xml_file, param_files, cst_file, work_dir) 
+    xml_file:str =  _create_xml(f"{work_dir}/_script.xml", chain_names)
+
+    options_file:str = make_options_file(start_pdb, xml_file, param_files, cst_file, work_dir, rng_seed, n_struct) 
     
     df:pd.DataFrame = _docking_run(options_file)
     
     _evaluate_csts(df, constraints)
 
-    #TODO(CJ): this is where we do the docking run
+    df['clash_ct'] = df.apply(lambda row: _clash_count(row.description), axis=1)
 
+    df.to_csv(f"{work_dir}/scores.csv", index=False)
+    (selected, wt_fpath) = _select_complex(df, work_dir)
+
+    docked_complexes.append( wt_fpath ) 
     #TODO(CJ): here is where we do QM ranking
 
-    
-
     if mutations:
-        for mut in mutations:
-            print(mut)
-            mutated = mm.mutate_stru( structure, [mut], engine="rosetta" )
-            outfile:str = f"{work_dir}/{mut}.pdb"
-            print(outfile)
-            #TODO(CJ): need to save the file and add to the overall 
-                        
+        docked_complexes.extend(
+            _mutate_result(selected, mutations, work_dir )
+        )
+
+    df.to_csv(f"{work_dir}/scores.csv", index=False)
 
     return docked_complexes
 
 
-def mutation_cst_overlap(mut, cst) -> bool:
+def mut_cst_overlap(mutations, constraints) -> bool:
     #TODO(CJ): check if the constraint contains a mutation but if it gets mutated back to itself 
-    return cst.contains(mut.chain_id, mut.res_idx)
+    for mut in mutations:
+        for cst in constraints:
+            if cst.contains(mut.chain_id, mut.res_idx):
+                return True
+    return False
 
 
 def _parameterize_reactant(reactant:str, reactant_name:str, conformers:str=None) -> str:
@@ -183,7 +202,10 @@ def _create_xml(fname:str, chains:List[str]) -> str:
 
     for cc in chains:
         elements.extend([
-            {'parent':'MOVERS', 'tag':'Transform', 'name':f'transform_{cc.lower()}','chain':f'{cc.upper()}',  'box_size':'5', 'move_distance':'0.1', 'angle':'20', 'cycles':'1000', 'repeats':'1', 'temperature':'5'},
+            {'parent':'MOVERS', 'tag':'Transform', 
+                    'name':f'transform_{cc.lower()}','chain':f'{cc.upper()}',  
+                    'box_size':'2', 'move_distance':'0.1', 
+                    'angle':'45', 'cycles':'500', 'repeats':'5', 'temperature':'25'},
             {'parent':'MOVERS', 'tag':'HighResDocker', 'name':f'high_res_docker_{cc.lower()}', 'cycles':'6', 'repack_every_Nth':'3', 'scorefxn':'ligand_soft_rep', 'movemap_builder':f'docking_{cc.lower()}'},
             {'parent':'MOVERS', 'tag':'FinalMinimizer', 'name':f'final_{cc.lower()}', 'scorefxn':'hard_rep', 'movemap_builder':f'final_{cc.lower()}'}
         ])
@@ -223,9 +245,11 @@ def _create_xml(fname:str, chains:List[str]) -> str:
     return fname
 
 
-def make_options_file(pdb_file:str, xml_file:str, param_files:List[str], cst_file:str, work_dir:str) -> str:
+def make_options_file(pdb_file:str,  xml_file:str, param_files:List[str], cst_file:str, work_dir:str, rng_seed:int, n_struct:int) -> str:
     """ """
     content: List[str] = [
+        "-run:constant_seed",
+       f"-run:jran {int(rng_seed)}",
         "-in:file",
        f"    -s '{pdb_file}'",
     ]
@@ -257,20 +281,28 @@ def make_options_file(pdb_file:str, xml_file:str, param_files:List[str], cst_fil
         "-out",
         f"   -file:scorefile 'score.sc'",
         "   -level 200",
-        f"   -nstruct 5", 
+        f"   -nstruct {n_struct}", 
         "   -overwrite",
         "   -path",
         f"       -all './complexes'",
     ])
     
+    qsar_grid:str=f"{work_dir}/complexes/qsar_grids/"
+    content.append(f"-qsar:grid_dir {qsar_grid}")
+
+
     fname = Path(work_dir) / "options.txt"
     
     fs.write_lines(fname, content)
     
     fs.safe_rmdir(f"{work_dir}/complexes/") 
     fs.safe_mkdir(f"{work_dir}/complexes/")
-    
+   
+    fs.safe_rmdir( qsar_grid )
+    fs.safe_mkdir( qsar_grid )
+
     score_file: str = f"{work_dir}/complexes/score.sc"
+
     option_file = fname.absolute()
     
     fs.safe_rm(score_file)
@@ -280,10 +312,16 @@ def make_options_file(pdb_file:str, xml_file:str, param_files:List[str], cst_fil
     
     
     
-def _docking_run(options:str) -> pd.DataFrame:
-    """ """
+def _docking_run(option_file:str) -> pd.DataFrame:
+    """
+
+    Args:
+
+    Returns:
+
+    """
     
-    opt_path = Path(options)
+    opt_path = Path(option_file)
     start_dir:str = os.getcwd()
     os.chdir(str(opt_path.parent))
 
@@ -302,12 +340,20 @@ def _docking_run(options:str) -> pd.DataFrame:
     return df
 
 
-def _evaluate_csts(df:pd.DataFrame, csts:List[RosettaCst]) -> pd.DataFrame:
-    """ """
+def _evaluate_csts(df:pd.DataFrame, csts:List[RosettaCst]) -> None:
+    """
+    Args:
+        df:
+        csts:
+
+    Returns:
+        Nothing.
+    """
     cst_diff = [] 
     for i, row in df.iterrows():
         total = 0.0
         for cst in csts:
+            #TODO(CJ): Check if the row.description attribute works
             for tl in cst.evaluate( row.description ):
                 if tl > 1.0:
                     total += tl
@@ -316,7 +362,16 @@ def _evaluate_csts(df:pd.DataFrame, csts:List[RosettaCst]) -> pd.DataFrame:
     df['cst_diff'] = cst_diff
 
 
-def _prepare_reactants(reactants, reactant_conformers) -> List[str]:
+def _prepare_reactants(reactants:List[str], reactant_conformers:List[str]=None) -> List[str]:
+    """
+    Args:
+        reactants:
+        reactant_conformers:
+
+    Returns:
+        A list() of the .params files for the given reactants.
+    """
+    #TODO(CJ): error if not enough conformers... then make the conformers
     param_files:List[str] = list()
     for ridx, rct in enumerate(reactants):
         reactant_name:str=f"L{ridx+1:02d}"
@@ -329,5 +384,127 @@ def _prepare_reactants(reactants, reactant_conformers) -> List[str]:
         )
 
     return param_files
+
+def _dock_mut_cst_overlaps(structure,
+                            reactants:List[str], 
+                            constraints:List[RosettaCst], 
+                            mutations:List[mm.Mutation],
+                            work_dir:str,
+                            save_work_dir:bool,
+                            reactant_conformers:List[str],
+                            rng_seed:int,
+                            n_struct:int
+                            ) -> List[str]:
+    """ """
+    pass
+    #TODO(CJ): implement this
+
+
+def _mutate_result(structure, mutations:List[mm.Mutation], work_dir :str) -> List[str]:
+    """ TODO(CJ)"""
+
+    res_names = {}
+    for res in structure.residues:
+        if res.name.upper() in chem.METAL_CENTER_MAP:
+            continue
+        if res.name not in chem.THREE_LETTER_AA_MAPPER:
+            continue
+        res_names[
+            f"{res.chain.name}.{res.idx}"
+            ] = chem.convert_to_one_letter(res.name)
+
+    result:List[str] = list()
+    for mut in mutations:
+        original = res_names[f"{mut.chain_id}.{mut.res_idx}"]
+        mutated_outfile:str=f"{work_dir}/{original}{mut.res_idx}{chem.convert_to_one_letter(mut.target)}.pdb"
+        mutant = mm.mutate_stru(structure, [mut], engine='rosetta')
+        parser = PDBParser()
+        file_str = parser.get_file_str(mutant, if_renumber=False, if_fix_atomname=False)
+        fs.safe_rm(mutated_outfile)
+        fs.write_lines( mutated_outfile, file_str.splitlines() )
+        result.append( mutated_outfile )
+
+    return result 
+
+
+def _ligand_chain_names( start_pdb : str ) -> List[str]:
+    """
+    Args:
+
+    Returns:
+    """
+    fs.check_file_exists( start_pdb ) 
+    session = interface.pymol.new_session()
+    df:pd.DataFrame=interface.pymol.collect(session, start_pdb, "chain resn".split()    )
+
+    result:List[str] = list()
+
+    for i, row in df.iterrows():
+
+        if row.resn in chem.THREE_LETTER_AA_MAPPER:
+            continue
+
+        if row.resn.upper() in chem.METAL_CENTER_MAP:
+            continue
+
+        result.append(row.chain)
+
+
+    return list(set(result))
+
+def _clash_count(fname:str, cutoff:float=2.25) -> int:
+    """ """
+    session = interface.pymol.new_session()
+    df = interface.pymol.collect(session, fname, "elem resn vdw x y z".split())
+    df:pd.DataFrame = df[df.elem!='H']
+    df.reset_index(drop=True,inplace=True)
+
+    ligand_names = list()
+    for rn in df.resn.unique():
+        if rn[0] == 'L' and rn[1].isnumeric() and rn[2].isnumeric():
+            ligand_names.append( rn )
+
+    count = 0
+    for resn in ligand_names:
+        ligand = df[df.resn==resn].reset_index(drop=True)
+        l_xyz = np.transpose(np.array([ligand.x.to_numpy(), ligand.y.to_numpy(), ligand.z.to_numpy()]))
+        other = df[df.resn!=resn].reset_index(drop=True)
+        o_xyz = np.transpose(np.array([other.x.to_numpy(), other.y.to_numpy(), other.z.to_numpy()]))
+
+        for ll in l_xyz:
+            if np.min(np.sqrt(np.sum(np.power(o_xyz-ll,2),axis=1))) < cutoff:
+                count += 1
+
+    return count
+
+
+def _select_complex(df : pd.DataFrame, work_dir:str, cutoff:float=0.20):
+    n = max(1, int(cutoff*len(df)))
+    df.sort_values(by='total_score', inplace=True)
+    e_cutoff = df.total_score.to_list()[n]
+    df.sort_values(by='cst_diff', inplace=True)
+    cst_cutoff = df.cst_diff.to_list()[n]
+    df.sort_values(by='clash_ct', inplace=True)
+    clash_cutoff = df.clash_ct.to_list()[n]
+
+    mask = (df.total_score>=e_cutoff)&(df.cst_diff>=cst_cutoff)&(df.clash_ct>=clash_cutoff)
     
+    print(sum(mask))
+
+    for i, row in df[mask].iterrows():
+        print(row.description)        
+    
+    #energy_sorted = df.sort_values(by='total_score')
+    #energy_sorted = energy_sorted.head(n)
+    #cst_sorted = df.sort_values(by='cst_diff')
+    #
+    exit(0)
+    parser = PDBParser()
+    selected = parser.get_structure(cst_sorted.description[0])
+    outfile = f"{work_dir}/WT.pdb"
+    
+    file_str = parser.get_file_str(selected, if_renumber=False, if_fix_atomname=False)
+    fs.write_lines(outfile, file_str.splitlines())
+
+    return (selected, outfile)
 
