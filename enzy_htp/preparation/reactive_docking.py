@@ -487,7 +487,7 @@ def _select_complex(df : pd.DataFrame, work_dir:str, cutoff:float=0.20):
     df.sort_values(by='clash_ct', inplace=True)
     clash_cutoff = df.clash_ct.to_list()[n]
 
-    mask = (df.total_score>=e_cutoff)&(df.cst_diff>=cst_cutoff)&(df.clash_ct>=clash_cutoff)
+    mask = (df.total_score<=e_cutoff)&(df.cst_diff<=cst_cutoff)&(df.clash_ct<=clash_cutoff)
     
     print(sum(mask))
 

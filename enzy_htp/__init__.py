@@ -50,6 +50,6 @@ for full class defintion."""
 config = interface.config() 
 """TODO(CJ)"""
 
-from .preparation import PDBLine, read_pdb_lines, dock_reactants
+from .preparation import PDBLine, read_pdb_lines, dock_reactants, create_cluster
 
 from .analysis import ( electric_field )
