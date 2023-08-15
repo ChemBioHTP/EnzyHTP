@@ -12,6 +12,7 @@ there are configuration settings for the below packages by the given <Package>Co
     + Multiwfn, MultiwfnConfig
     + PyMOL, PyMolConfig
     + Rosetta, RosettaConfig
+    + xtb, XTBConfig
 
 In addition to specific packages, settings for the system are specified with SystemConfig
 
@@ -32,6 +33,7 @@ from .multiwfn_config import MultiwfnConfig, default_multiwfn_config
 from .pymol_config import PyMolConfig, default_pymol_config
 from .rosetta_config import RosettaConfig, default_rosetta_config
 from .system_config import SystemConfig, default_system_config
+from .xtb_config import XTBConfig, default_xtb_config
 
 from enzy_htp.core import _LOGGER
 
@@ -52,6 +54,7 @@ class Config:
         _pymol: Private instance of PyMolConfig() with default settings.
         _rosetta: Private instance of RosettaConfig() with default settings.
         _system: Private instance of SystemConfig() with default settings.
+        _xtb: Private instance of XTBConfig() with default settings.
     """
 
     def __init__(self):
@@ -64,6 +67,7 @@ class Config:
         self._pymol = default_pymol_config()
         self._rosetta = default_rosetta_config()
         self._system = default_system_config()
+        self._xtb = default_xtb_config()
 
     def __getitem__(self, key: str) -> Any:
         """Getter for the settings in the Config() object. Uses the grammar: "<package>.<setting>" 
@@ -96,6 +100,8 @@ class Config:
                 ptr = self._rosetta
             elif app == "system":
                 ptr = self._system
+            elif app == "xtb":
+                ptr = self._xtb
             else:
                 raise TypeError()
             return ptr[settings]
@@ -132,6 +138,8 @@ class Config:
                 ptr = self._rosetta
             elif app == "system":
                 ptr = self._system
+            elif app == "xtb":
+                ptr = self._xtb
             else:
                 raise TypeError()
             ptr[settings] = value

@@ -6,7 +6,7 @@ Date: 2023-07-28
 """
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 from copy import deepcopy
 
 import numpy as np
@@ -110,7 +110,7 @@ def dock_reactants( structure:Structure,
     return docked_complexes
 
 
-def mut_cst_overlap(mutations:List[Mutation], constraints:List[RosettaCst]) -> bool:
+def mut_cst_overlap(mutations:List[mm.Mutation], constraints:List[RosettaCst]) -> bool:
     """
 
     Args:
