@@ -16,6 +16,14 @@ class XTBInterface(BaseInterface):
 
 
     def single_point(self, fname:str, charge:int=0, spin:int=1) -> float:
-
         """ """
-        pass
+        results = self.env_manager_.run_command(self.config_.XTB_EXE,[
+            f"--chrg", str(charge),
+            "--sp",
+            fname
+        ])
+        for ll in results.stdout.splitlines():
+            if ll.find('TOTAL ENERGY') != -1:
+                return float(ll.split()[3])
+        
+        assert False

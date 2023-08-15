@@ -12,12 +12,10 @@ from copy import deepcopy
 import numpy as np
 import pandas as pd
 
-from enzy_htp import interface
-
+from enzy_htp import interface, config, _LOGGER
 from enzy_htp._interface.rosetta_interface import RosettaCst
 
 
-from enzy_htp import config
 import enzy_htp.chemical as chem
 from enzy_htp import mutation as mm 
 from enzy_htp.structure import PDBParser, Structure
@@ -30,25 +28,30 @@ def dock_reactants( structure:Structure,
                     constraints:List[RosettaCst] = None, 
                     mutations:List[mm.Mutation] = None,
                     work_dir:str=None,
-                    save_work_dir:bool=False,
-                    reactant_conformers:str=None,
+                    save_work_dir:bool=True,
+                    reactant_conformers:List[str]=None,
                     rng_seed:int=1996,
                     n_struct:int=1000,
                     use_cache:bool=True
                     ) -> List[str]:
-    """
+    """Performs reactive docking by placing the supplied reactants into the given Structure object. Uses the RosettaLigand
+    docking engine to sample geometries and applies constraints to sample realistic geometries. All other arguments are optional
+    but generally improve the quality of the generated structures. Assumes that both the supplied Structure and ligands are 
+    protonated correctly. The default system is saved to WT.pdb and all mutated versions are saved to <MUT>.pdb files where 
+    <MUT> is of the form <original one letter AA><residue index><mutated one letter AA>. Mutations are applied AFTER the 
+    reactants are docked, unless the mutations and contraints overlap.  
 
     Args:
-        structure:
-        reactants:
-        contraints:
-        mutations:
-        work_dir:
-        save_work_dir:
-        reactant_conformers:
-        rng_seed:
-        n_struct:
-        use_cache:
+        structure: The structure where the reactants will be docked.
+        reactants: A list of .mol2 files containing reactants to be docked.
+        contraints: A list of RosettaCst objects. Optional.
+        mutations: A list of Mutation objects to apply to the system. Optional.
+        work_dir: Directory where various temp files will be saved. Uses cwd if not specified.
+        save_work_dir: Should the work directory be saved? Default is True.
+        reactant_conformers: A list of .pdb files containing conformers in the Rosetta format. Must be same length as reactants if supplied. 
+        rng_seed: An int() rng seed to achieve reproducibility. Default is 1996.
+        n_struct: Number of structures to create during geometry sampling stage. Default is 1000. 
+        use_cache: Should cached files be used? Default is False.
 
     Returns:
         A list() of the reactive complexes including a "WT" complex as well as various mutated versions.
@@ -80,15 +83,15 @@ def dock_reactants( structure:Structure,
                     )
         )
     
-    (start_pdb, cst_file) = _integrate_csts( structure, constraints, work_dir )
+    (start_pdb, cst_file) = _integrate_csts( structure, constraints, work_dir, use_cache )
 
     chain_names:List[str] = _ligand_chain_names( start_pdb )
 
-    xml_file:str =  _create_xml(f"{work_dir}/_script.xml", chain_names)
+    xml_file:str =  _create_xml(f"{work_dir}/_script.xml", chain_names, use_cache)
 
-    options_file:str = make_options_file(start_pdb, xml_file, param_files, cst_file, work_dir, rng_seed, n_struct) 
+    options_file:str = make_options_file(start_pdb, xml_file, param_files, work_dir, rng_seed, n_struct, use_cache, cst_file) 
     
-    df:pd.DataFrame = _docking_run(options_file)
+    df:pd.DataFrame = _docking_run(options_file, use_cache)
     
     _evaluate_csts(df, constraints)
 
@@ -111,36 +114,43 @@ def dock_reactants( structure:Structure,
 
 
 def mut_cst_overlap(mutations:List[mm.Mutation], constraints:List[RosettaCst]) -> bool:
-    """
+    """Checks if a mutationa and constraint overlap. Note: will return False if a constrained
+    residue is mutated back to itself.
 
     Args:
+        mutations: A list() of Mutation() objects to check.
+        constraints: A list() of RosettaCst() objects to check.
 
     Returns:
         Whether the system will try to mutate a constrained residue.
     """
-    #TODO(CJ): check if the constraint contains a mutation but if it gets mutated back to itself 
     for mut in mutations:
         for cst in constraints:
-            if cst.contains(mut.chain_id, mut.res_idx):
+            if cst.contains(mut.chain_id, mut.res_idx) and mut.orig != mut.target:
                 return True
     return False
 
 
 def _parameterize_reactant(reactant:str, reactant_name:str, conformers:str=None) -> str:
-    """
+    """Parameterizes reactant for RosettaLigand docking. Adds both a conformers and formal charge
+    lines to the file.
     
     Args:
-        reactant:
-        reactant_name:
-        conformers:
+        reactant: Path to the reactant.
+        reactant_name: 3 letter PDB style reactant name as a str().
+        conformers: Path to files containing conformers. Optional.
     
     Returns:
         Path to the Rosetta .params file for the reactant.
 
     """
 
+    if len(reactant_name) != 3:
+        _LOGGER.error(f"Invalid reactant name supplied: '{reactant_name}'. Must be alphanumeric and 3 letters long. Exiting...")
+        exit( 1 )
+
+
     session = interface.pymol.new_session()
-    #TODO(CJ): this is where the parameterizing goes
     (param_file, pdb_file) = interface.rosetta.parameterize_ligand(reactant,reactant_name, conformers=conformers)
     fs.safe_rm(pdb_file)
     
@@ -161,7 +171,18 @@ def _parameterize_reactant(reactant:str, reactant_name:str, conformers:str=None)
     return param_file
        
 
-def _integrate_csts( stru, csts, work_dir ):
+def _integrate_csts( stru:Structure, csts:List[RosettaCst], work_dir:str, use_cache:bool ) -> Tuple[str,str]:
+    """
+    
+    Args:
+        stru:
+        csts:
+        work_dir:
+
+    Returns:
+        A Tuple() with the format (pdb file, .cst file).
+
+    """
     parser = PDBParser()
     file_str = parser.get_file_str(stru, if_renumber=False, if_fix_atomname=False)
     
@@ -174,16 +195,26 @@ def _integrate_csts( stru, csts, work_dir ):
     pdb_file:str = f"{work_dir}/start.pdb"
     cst_file:str = f"{work_dir}/rdock.cst"
 
-    fs.safe_rm( pdb_file )
-    fs.safe_rm( cst_file )
+    if not use_cache:
+        fs.safe_rm( pdb_file )
+        fs.safe_rm( cst_file )
 
-    fs.write_lines( pdb_file, pdb_content + file_str.splitlines())
-    fs.write_lines( cst_file, cst_content)
+    if not Path(pdb_file).exists():
+        fs.write_lines( pdb_file, pdb_content + file_str.splitlines())
+
+    if not Path(cst_file).exists():
+        fs.write_lines( cst_file, cst_content)
+
     return (pdb_file, cst_file)
 
 
-def _create_xml(fname:str, chains:List[str]) -> str:
+def _create_xml(fname:str, chains:List[str], use_cache:bool) -> str:
     """ """
+    if not use_cache:
+        fs.safe_rm(fname)
+
+    if Path(fname).exists():
+        return fname
     #TODO(CJ): do some kind of validation against the chain name
     elements:List[Dict] = [
         {'parent':'SCOREFXNS', 'tag':'ScoreFunction', 'name':'ligand_soft_rep', 'weights':'ligand_soft_rep'},
@@ -264,17 +295,19 @@ def _create_xml(fname:str, chains:List[str]) -> str:
     return fname
 
 
-def make_options_file(pdb_file:str,  xml_file:str, param_files:List[str], cst_file:str, work_dir:str, rng_seed:int, n_struct:int) -> str:
-    """
+def make_options_file(pdb_file:str,  xml_file:str, param_files:List[str],  work_dir:str, rng_seed:int, n_struct:int, use_cache:bool, cst_file:str=None) -> str:
+    """Makes the options.txt file that the docking run will actually use. Takes a variety of arguments and 
+    can used cached values if needed. This function DOES NOT make any checks to the inputs.
     
     Args:
-        pdb_file:
-        xml_file:
-        param_files:
-        cst_file:
-        work_dir:
-        rng_seed:
-        n_struct:
+        pdb_file: The .pdb file (with constraints) to use. 
+        xml_file: The validated RosettaScripts .xml file to be used for docking.
+        param_files: The list() of reactant .params files.
+        work_dir: The working directory 
+        rng_seed: rng seed to be used during dcking.
+        n_struct: Number of strutures to make as an int().
+        use_cache: Should we used cached values? 
+        cst_file: The contraints file to be used. Optional. 
 
     Returns:
         Path to the options.txt file with all the Rosetta options.
@@ -302,11 +335,11 @@ def make_options_file(pdb_file:str,  xml_file:str, param_files:List[str], cst_fi
     ])
     
     if cst_file:
-        #TODO(CJ): add a warning if there are no .csts
         content.extend([
             f"-enzdes:cstfile '{Path(cst_file).absolute()}'"
         ])
-    
+    else:
+        _LOGGER.warning("No constraints supplied! This will hurt reaction complex accuracy!")
     
     content.extend([
         "-parser",
@@ -323,29 +356,28 @@ def make_options_file(pdb_file:str,  xml_file:str, param_files:List[str], cst_fi
     qsar_grid:str=f"{work_dir}/complexes/qsar_grids/"
     content.append(f"-qsar:grid_dir {qsar_grid}")
 
-
     fname = Path(work_dir) / "options.txt"
-    
-    fs.write_lines(fname, content)
-    #TODO(CJ): add back 
-    #fs.safe_rmdir(f"{work_dir}/complexes/") 
-    #fs.safe_mkdir(f"{work_dir}/complexes/")
-   
-    #fs.safe_rmdir( qsar_grid )
-    #fs.safe_mkdir( qsar_grid )
-
     score_file: str = f"{work_dir}/complexes/score.sc"
+    
+    if not use_cache:
+        fs.safe_rm(fname)
+        fs.safe_rm(score_file)
+        fs.safe_rmdir(f"{work_dir}/complexes/") 
+        fs.safe_rmdir( qsar_grid )
+
+    fs.safe_mkdir( qsar_grid )
+    fs.safe_mkdir(f"{work_dir}/complexes/")
+
+    if not fname.exists():
+        fs.write_lines(fname, content)
 
     option_file = fname.absolute()
-    
-    #fs.safe_rm(score_file)
-    
     
     return str( fname )        
     
     
     
-def _docking_run(option_file:str) -> pd.DataFrame:
+def _docking_run(option_file:str, use_cache:bool) -> pd.DataFrame:
     """
 
     Args:
@@ -353,16 +385,27 @@ def _docking_run(option_file:str) -> pd.DataFrame:
     Returns:
 
     """
-    
+
     opt_path = Path(option_file)
+    if use_cache: 
+        df=pd.read_csv(str(opt_path.parent / "scores.csv"))
+        
+        for i, row in df.iterrows():
+            if not Path(row.description).exists():
+                break
+        else:
+            return df
+
+
+    
     start_dir:str = os.getcwd()
-    #os.chdir(str(opt_path.parent))
+    os.chdir(str(opt_path.parent))
 
-    #interface.rosetta.run_rosetta_scripts(
-    #    [f"@{opt_path.name}"]
-    #)
+    interface.rosetta.run_rosetta_scripts(
+        [f"@{opt_path.name}"]
+    )
 
-    #os.chdir(start_dir)
+    os.chdir(start_dir)
     
     df:pd.DataFrame=interface.rosetta.parse_score_file(
         str(opt_path.parent / "complexes/score.sc")
@@ -511,13 +554,17 @@ def _clash_count(fname:str, cutoff:float=2.25) -> int:
     return count
 
 
-def _select_complex(df : pd.DataFrame, work_dir:str, cutoff:float=0.20) -> Tuple[Structure,str]:
+def _select_complex(df : pd.DataFrame, work_dir:str, cutoff:int=20) -> Tuple[Structure,str]:
     """
-    """
-    n = max(1, int(cutoff*len(df)))
+    
+    Args:
+        df:
+        work_dir:
+        cutoff:
 
-    # clash cutoff
-    cutoff=20
+    Returns:
+        A Tuple() with the layout (selected structure, selected .pdb file).
+    """
     cpy = deepcopy( df )
 
     clash_cutoff = np.percentile(cpy.clash_ct, cutoff) #TODO(CJ): cutoffs
@@ -527,8 +574,6 @@ def _select_complex(df : pd.DataFrame, work_dir:str, cutoff:float=0.20) -> Tuple
     cst_cutoff= np.percentile(cpy.cst_diff.to_numpy(),cutoff)
 
     mask = (cpy.total_score<=score_cutoff)&(cpy.cst_diff<=cst_cutoff)
-
-    print(sum(mask))
 
 
     cpy = cpy[mask].reset_index(drop=True)
@@ -564,17 +609,10 @@ def _select_complex(df : pd.DataFrame, work_dir:str, cutoff:float=0.20) -> Tuple
         fs.safe_rm( temp_sdf )                                
 
         cluster = create_cluster(row.description, sele_stmt, outfile= f'{work_dir}/__temp.xyz')
-        lines = os.popen(f"xtb --chrg {charge} --sp {cluster}").read().splitlines()
-        energy = 1000
-        for ll in lines:
-            if ll.find('TOTAL ENERGY') != -1:
-                energy = float(ll.split()[3])
-                print(energy)
-
+        energy = interface.xtb.single_point(cluster, charge=charge)
         data.append((energy, row.description))
 
     data.sort(key=lambda pr: pr[0]) 
-    print(data[0][1])
     parser = PDBParser()
     selected = parser.get_structure(data[0][1])
     outfile = f"{work_dir}/WT.pdb"
