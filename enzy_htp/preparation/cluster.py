@@ -1,15 +1,15 @@
 """
 """
+from pathlib import Path
 import pandas as pd
 
 from enzy_htp import interface, config
 
 import enzy_htp.chemical as chem
 
+from enzy_htp.core import file_system as fs
 
-
-
-def create_cluster( fname:str, outfile:str, sele_str:str, cap_strategy:str='H', work_dir:str=None, session=None) -> str:
+def create_cluster( fname:str, sele_str:str,outfile:str=None,cap_strategy:str='H', work_dir:str=None, session=None) -> str:
     """ 
     """
 
@@ -19,13 +19,17 @@ def create_cluster( fname:str, outfile:str, sele_str:str, cap_strategy:str='H', 
     if session is None:
         session = interface.pymol.new_session()
 
+    fs.check_file_exists(fname)
+
+    if outfile is None:
+        temp_path = Path(fname)
+        outfile:str = f"{work_dir}/{temp_path.stem}_cluster{temp_path.suffix}"
+
     #TODO(CJ): add file check for fname
     obj_name:str='__eh_cluster'
     interface.pymol.general_cmd(session, [('load', fname), ('select', sele_str),('create',obj_name,sele_str)])
 
-
     df:pd.DataFrame=interface.pymol.collect(session, 'memory', "chain resi resn name".split())
-
 
     args = list()
     for i,row in df.iterrows():
@@ -41,7 +45,6 @@ def create_cluster( fname:str, outfile:str, sele_str:str, cap_strategy:str='H', 
 
     interface.pymol.general_cmd(session, args )
 
-    outfile = f"{work_dir}/try.pdb"
     interface.pymol.general_cmd(session, [("save", outfile, obj_name)])
 
     if cap_strategy == 'H':
@@ -73,7 +76,6 @@ def create_cluster( fname:str, outfile:str, sele_str:str, cap_strategy:str='H', 
                 ('alter', f"chain {tp[0]} and resi {tp[1]} and resn {tp[2]} and name {tp[3]}", f"name='{new_name}'"),
             ])
 
-        outfile = f"{work_dir}/try.mol2"
         args.extend([
             ('valence', 'guess', 'name C21 or name C22'),
             ('h_add','name C21'),
@@ -82,4 +84,4 @@ def create_cluster( fname:str, outfile:str, sele_str:str, cap_strategy:str='H', 
         ])
         interface.pymol.general_cmd(session, args )
 
-
+    return outfile    

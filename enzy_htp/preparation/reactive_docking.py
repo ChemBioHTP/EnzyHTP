@@ -1,4 +1,5 @@
-"""TODO(CJ)
+"""Driver for the reactive docking functionality available in enzy_htp. The only function that that should be 
+called is dock_reactants(). All others are implementation functions that SHOULD NOT be used. 
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-07-28
@@ -19,12 +20,12 @@ from enzy_htp._interface.rosetta_interface import RosettaCst
 from enzy_htp import config
 import enzy_htp.chemical as chem
 from enzy_htp import mutation as mm 
-from enzy_htp.structure import PDBParser
+from enzy_htp.structure import PDBParser, Structure
 from enzy_htp.core import file_system as fs
 
+from .cluster import create_cluster
 
-#TODO(CJ): add an rng seed
-def dock_reactants( structure, 
+def dock_reactants( structure:Structure, 
                     reactants:List[str], 
                     constraints:List[RosettaCst] = None, 
                     mutations:List[mm.Mutation] = None,
@@ -50,6 +51,7 @@ def dock_reactants( structure,
         use_cache:
 
     Returns:
+        A list() of the reactive complexes including a "WT" complex as well as various mutated versions.
 
     """
     #TODO(CJ): check if the ligands are in the structure
@@ -108,7 +110,14 @@ def dock_reactants( structure,
     return docked_complexes
 
 
-def mut_cst_overlap(mutations, constraints) -> bool:
+def mut_cst_overlap(mutations:List[Mutation], constraints:List[RosettaCst]) -> bool:
+    """
+
+    Args:
+
+    Returns:
+        Whether the system will try to mutate a constrained residue.
+    """
     #TODO(CJ): check if the constraint contains a mutation but if it gets mutated back to itself 
     for mut in mutations:
         for cst in constraints:
@@ -118,7 +127,17 @@ def mut_cst_overlap(mutations, constraints) -> bool:
 
 
 def _parameterize_reactant(reactant:str, reactant_name:str, conformers:str=None) -> str:
-    """ """
+    """
+    
+    Args:
+        reactant:
+        reactant_name:
+        conformers:
+    
+    Returns:
+        Path to the Rosetta .params file for the reactant.
+
+    """
 
     session = interface.pymol.new_session()
     #TODO(CJ): this is where the parameterizing goes
@@ -246,7 +265,21 @@ def _create_xml(fname:str, chains:List[str]) -> str:
 
 
 def make_options_file(pdb_file:str,  xml_file:str, param_files:List[str], cst_file:str, work_dir:str, rng_seed:int, n_struct:int) -> str:
-    """ """
+    """
+    
+    Args:
+        pdb_file:
+        xml_file:
+        param_files:
+        cst_file:
+        work_dir:
+        rng_seed:
+        n_struct:
+
+    Returns:
+        Path to the options.txt file with all the Rosetta options.
+
+    """
     content: List[str] = [
         "-run:constant_seed",
        f"-run:jran {int(rng_seed)}",
@@ -294,18 +327,18 @@ def make_options_file(pdb_file:str,  xml_file:str, param_files:List[str], cst_fi
     fname = Path(work_dir) / "options.txt"
     
     fs.write_lines(fname, content)
-    
-    fs.safe_rmdir(f"{work_dir}/complexes/") 
-    fs.safe_mkdir(f"{work_dir}/complexes/")
+    #TODO(CJ): add back 
+    #fs.safe_rmdir(f"{work_dir}/complexes/") 
+    #fs.safe_mkdir(f"{work_dir}/complexes/")
    
-    fs.safe_rmdir( qsar_grid )
-    fs.safe_mkdir( qsar_grid )
+    #fs.safe_rmdir( qsar_grid )
+    #fs.safe_mkdir( qsar_grid )
 
     score_file: str = f"{work_dir}/complexes/score.sc"
 
     option_file = fname.absolute()
     
-    fs.safe_rm(score_file)
+    #fs.safe_rm(score_file)
     
     
     return str( fname )        
@@ -323,13 +356,13 @@ def _docking_run(option_file:str) -> pd.DataFrame:
     
     opt_path = Path(option_file)
     start_dir:str = os.getcwd()
-    os.chdir(str(opt_path.parent))
+    #os.chdir(str(opt_path.parent))
 
-    interface.rosetta.run_rosetta_scripts(
-        [f"@{opt_path.name}"]
-    )
+    #interface.rosetta.run_rosetta_scripts(
+    #    [f"@{opt_path.name}"]
+    #)
 
-    os.chdir(start_dir)
+    #os.chdir(start_dir)
     
     df:pd.DataFrame=interface.rosetta.parse_score_file(
         str(opt_path.parent / "complexes/score.sc")
@@ -478,29 +511,72 @@ def _clash_count(fname:str, cutoff:float=2.25) -> int:
     return count
 
 
-def _select_complex(df : pd.DataFrame, work_dir:str, cutoff:float=0.20):
+def _select_complex(df : pd.DataFrame, work_dir:str, cutoff:float=0.20) -> Tuple[Structure,str]:
+    """
+    """
     n = max(1, int(cutoff*len(df)))
-    df.sort_values(by='total_score', inplace=True)
-    e_cutoff = df.total_score.to_list()[n]
-    df.sort_values(by='cst_diff', inplace=True)
-    cst_cutoff = df.cst_diff.to_list()[n]
-    df.sort_values(by='clash_ct', inplace=True)
-    clash_cutoff = df.clash_ct.to_list()[n]
 
-    mask = (df.total_score<=e_cutoff)&(df.cst_diff<=cst_cutoff)&(df.clash_ct<=clash_cutoff)
-    
+    # clash cutoff
+    cutoff=20
+    cpy = deepcopy( df )
+
+    clash_cutoff = np.percentile(cpy.clash_ct, cutoff) #TODO(CJ): cutoffs
+    cpy = cpy[cpy.clash_ct<=clash_cutoff].reset_index(drop=True)
+
+    score_cutoff= np.percentile(cpy.total_score.to_numpy(),cutoff)
+    cst_cutoff= np.percentile(cpy.cst_diff.to_numpy(),cutoff)
+
+    mask = (cpy.total_score<=score_cutoff)&(cpy.cst_diff<=cst_cutoff)
+
     print(sum(mask))
 
-    for i, row in df[mask].iterrows():
-        print(row.description)        
+
+    cpy = cpy[mask].reset_index(drop=True)
+   
+    temp_xyz = f'{work_dir}/__temp_cluster.xyz'
+    temp_sdf = f'{work_dir}/__temp_cluster.sdf'
+    session = interface.pymol.new_session()
+
+    interface.pymol.general_cmd(session,[
+        ('load', df.description[0]),
+        ('select', '__eh_sele', '(all within 3 of resn L01) or (all within 3 of resn L02)')
+    ])
+
+    #TODO(CJ): make this not hardcoded
+
+    active_site = interface.pymol.collect(session, "memory", "chain resi".split(), sele='__eh_sele')
     
-    #energy_sorted = df.sort_values(by='total_score')
-    #energy_sorted = energy_sorted.head(n)
-    #cst_sorted = df.sort_values(by='cst_diff')
-    #
-    exit(0)
+    sele_stmt:str = " or ".join(map(lambda pr: f"(chain {pr[0]} and resi {pr[1]})",
+                    set(zip(active_site.chain, active_site.resi))
+    ))
+
+    interface.pymol.general_cmd(session,[
+        ('save', f'{work_dir}/__temp.sdf', sele_stmt)
+    ])
+    cluster = create_cluster(df.description[0], sele_stmt, outfile= f'{work_dir}/__temp.sdf')
+
+    charge:int=interface.bcl.calculate_formal_charge(cluster)
+    # QM ranking
+    data = list()
+    for i, row in cpy.iterrows():
+        
+        fs.safe_rm( temp_xyz )                                
+        fs.safe_rm( temp_sdf )                                
+
+        cluster = create_cluster(row.description, sele_stmt, outfile= f'{work_dir}/__temp.xyz')
+        lines = os.popen(f"xtb --chrg {charge} --sp {cluster}").read().splitlines()
+        energy = 1000
+        for ll in lines:
+            if ll.find('TOTAL ENERGY') != -1:
+                energy = float(ll.split()[3])
+                print(energy)
+
+        data.append((energy, row.description))
+
+    data.sort(key=lambda pr: pr[0]) 
+    print(data[0][1])
     parser = PDBParser()
-    selected = parser.get_structure(cst_sorted.description[0])
+    selected = parser.get_structure(data[0][1])
     outfile = f"{work_dir}/WT.pdb"
     
     file_str = parser.get_file_str(selected, if_renumber=False, if_fix_atomname=False)
