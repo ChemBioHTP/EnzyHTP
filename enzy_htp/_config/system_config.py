@@ -42,17 +42,16 @@ class SystemConfig(BaseConfig):
     """Default temp directory for enzy_htp. Defaults to WORK_DIR/scratch"""
 
     def required_executables(self) -> List[str]:
-        """A list of all required executables for <Package>Config."""
+        """A list of all required executables for SystemConfig."""
         return list()
 
     def required_env_vars(self) -> List[str]:
-        """A list of all required environment variables for <Package>Config."""
+        """A list of all required environment variables for SystemConfig."""
         return list()
 
     def required_py_modules(self) -> List[str]:
-        """A list of all required environment python modules for <Package>Config."""
+        """A list of all required environment python modules for SystemConfig."""
         return list()
-
 
 
 def default_system_config() -> SystemConfig:

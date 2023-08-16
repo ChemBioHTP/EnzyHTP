@@ -316,8 +316,8 @@ class RosettaInterface(BaseInterface):
         #if not res_name.isupper() or not len(res_name) == 3 or not res_name.isalpha():
         #    _LOGGER.error(f"The supplied residue name '{res_name}' is invalid. It must be alphanumeric, capitalized, and have three characters. Exiting...")
         #    exit( 1 )
-        #TODO(CJ): need to add some flags here
-        flags: List[str] = [self.config_.PARAMS_SCRIPT, f"{molfile}", f"--name={res_name}", "--clobber"]
+        #TODO(CJ): need to add some flags here -> potentially the charge one
+        flags: List[str] = [self.config_.PARAMS_SCRIPT, f"{molfile}", f"--name={res_name}", "--clobber", "--keep-names"]
 
         self.env_manager_.run_command("python2.7", flags)
 

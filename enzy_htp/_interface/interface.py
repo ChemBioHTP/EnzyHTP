@@ -9,6 +9,7 @@ class. Packages:
     + Multiwfn, MultiwfnInterface
     + PyMol, PyMolInterface
     + Rosetta, RosettaInterface
+    + xtb, XTBInterface
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-07-20
 """
@@ -23,7 +24,8 @@ from .moe_interface import MOEInterface
 from .multiwfn_interface import MultiwfnInterface
 from .pymol_interface import PyMolInterface
 from .rosetta_interface import RosettaInterface
-from .pymol_interface import PyMolInterface
+from .xtb_interface import XTBInterface
+
 
 from enzy_htp._config import Config
 
@@ -41,6 +43,7 @@ class Interface:
         multiwfn: Corresponds to instance of MultiwfnInterface().
         pymol: Corresponds to instance of PyMolInteface().
         rosetta: Corresponds to instance of RosettaInterface().
+        xtb: Corresponds to an isntance of XTBInterface().
     """
 
     def __init__(self, config: Config):
@@ -52,6 +55,7 @@ class Interface:
         self.multiwfn = MultiwfnInterface(self, config._multiwfn)
         self.pymol = PyMolInterface(self, config._pymol)
         self.rosetta = RosettaInterface(self, config._rosetta)
+        self.xtb = XTBInterface(self, config._xtb)
 
         self.check_environment()
 
@@ -95,6 +99,11 @@ class Interface:
         missing_exes.extend(self.rosetta.missing_executables())
         missing_env_vars.extend(self.rosetta.missing_env_vars())
         missing_py_modules.extend(self.rosetta.missing_py_modules())
+        
+        missing_exes.extend(self.xtb.missing_executables())
+        missing_env_vars.extend(self.xtb.missing_env_vars())
+        missing_py_modules.extend(self.xtb.missing_py_modules())
+
 
         _LOGGER.info("Beginning environment check...")
         _LOGGER.info("Environment check complete!")
