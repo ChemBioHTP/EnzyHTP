@@ -43,3 +43,42 @@ class ResidueDontHaveAtom(Exception):
         super().__init__(*args)
         self.residue = residue
         self.atom_name = atom_name
+
+
+class InvalidMutationPatternSyntax(Exception):
+    """Exception corresponding to an invalid mutation syntax in enzy_htp.mutation.mutation_pattern"""
+    pass
+
+
+class InvalidMutationFlagSyntax(InvalidMutationPatternSyntax):
+    """Exception corresponding to an invalid mutation syntax in enzy_htp.mutation.mutation"""
+    pass
+
+
+class InvalidMutation(Exception):
+    """Exception corresponding to an invalid mutation in enzy_htp.mutation.mutation"""
+    pass
+
+
+class tLEaPError(Exception):
+    """Exception corresponding runtime error of tleap in enzy_htp._interface.amber_interface.run_tleap()
+    contains a list of error information"""
+
+    def __init__(self, error_info_list, *args) -> None:
+        super().__init__(*args)
+        self.error_info_list = error_info_list
+
+    @property
+    def error_info_str(self) -> str:
+        return "\n".join(self.error_info_list)
+
+
+class IndexMappingError(Exception):
+    """Exception corresponding index mapping error for residue in enzymes or atoms in molecules"""
+    pass
+
+
+class BadMutantStructure(Exception):
+    """Exception corresponding to structure that didn't pass the check in
+    enzy_htp.mutation.api.check_mutant_stru"""
+    pass

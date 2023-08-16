@@ -1,28 +1,34 @@
 """Defines an AmberInterface class that serves as a bridge for enzy_htp to utilize AmberMD software. Uses the AmberConfig class
 found in enzy_htp/molecular_mechanics/amber_config.py. Supported operations include minimization, 
 heating, constant pressure production, and constant pressure equilibration.
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-02
 """
 import re, os
 import shutil
 from pathlib import Path
+from subprocess import CalledProcessError
 from typing import List, Tuple, Union, Dict, Any
 
 import pandas as pd
 from biopandas.pdb import PandasPdb
 
+from enzy_htp.structure.structure_io import pdb_io
+
 from ..core.logger import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import env_manager as em
-from enzy_htp.core.exception import UnsupportedMethod
+from enzy_htp.core.exception import UnsupportedMethod, tLEaPError
 import enzy_htp.structure as struct
-import enzy_htp.preparation as prep
+#import enzy_htp.preparation as prep
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
+from enzy_htp import config as eh_config
+
+from .base_interface import BaseInterface
 
 
-class AmberInterface:
+class AmberInterface(BaseInterface):
     """Class that provides a direct inteface for enzy_htp to utilize AmberMD software. Supported operations
     minimization, heating constant pressure production, constant pressure equilibration, trajectory file
     conversion and mutation. Users should use this class as the only way to interact with any functionality
@@ -34,20 +40,13 @@ class AmberInterface:
         compatible_env_ : A bool() indicating if the current environment is compatible with the object itself.
     """
 
-    def __init__(self, config: AmberConfig = None) -> None:
+    def __init__(self, parent, config: AmberConfig = None) -> None:
         """Simplistic constructor that optionally takes an AmberConfig object as its only argument.
-        Also checks if the current environment is compatible with the AmberInteface().
+        Calls parent class.
         """
-        self.config_ = config
-        if not self.config_:
-            self.config_ = default_amber_config()
-        self.env_manager_ = em.EnvironmentManager(
-            env_vars=self.config_.required_env_vars(),
-            exectubles=self.config_.required_executables(),
-        )
-        self.env_manager_.check_environment()
-        self.compatible_env_ = self.env_manager_.is_missing()
+        super().__init__(parent, config, default_amber_config)
 
+    # == interface general == TODO: go to a class
     def config(self) -> AmberConfig:
         """Getter for the AmberConfig() instance belonging to the class."""
         return self.config_
@@ -63,6 +62,7 @@ class AmberInterface:
         """
         return self.compatible_env_
 
+    # == minimization-related? ==
     def write_minimize_input_file(self, fname: str, cycle: int) -> None:
         """Creates a minimization file to be used in an amber run. SHOULD NOT BE CALLED BY USERS DIRECTLY.
         All parameters in the &ctrl block are hardcoded except for ncyc and ntpr, which are 0.5*cycle
@@ -84,11 +84,7 @@ class AmberInterface:
         ]
         fs.write_lines(fname, minimize_lines)
 
-    def minimize_structure(self,
-                           pdb: str,
-                           min_dir: str = "./",
-                           mode: str = "CPU",
-                           cycle: int = 2000) -> str:
+    def minimize_structure(self, pdb: str, min_dir: str = "./", mode: str = "CPU", cycle: int = 2000) -> str:
         """Class method that minimizes the structure found in a supplied .pdb file, returning
         the path to the minimized file.
         Args:
@@ -150,17 +146,11 @@ class AmberInterface:
         elif self.config_.BOX_TYPE == "box":
             result.append(f"solvatebox a TIP3PBOX {self.config_.BOX_SIZE}")
         else:
-            _LOGGER.error(
-                f"The supplied box type {self.config_.BOX_SIZE} is NOT supported. Exiting..."
-            )
+            _LOGGER.error(f"The supplied box type {self.config_.BOX_SIZE} is NOT supported. Exiting...")
             exit(1)
         return result
 
-    def build_param_files(self,
-                          in_pdb: str,
-                          build_dir: str,
-                          pH: float = 7.0,
-                          igb: str = None) -> Tuple[str, str]:
+    def build_param_files(self, in_pdb: str, build_dir: str, pH: float = 7.0, igb: str = None) -> Tuple[str, str]:
         """Creates the .prmtop and .inpcrd files for the supplied .pdb file. Handles
         processing of the Ligand() and MetalCenter() objects in the structure. Note that the supplied
         pdb file is assumed to be protonated.
@@ -182,10 +172,8 @@ class AmberInterface:
         ligand_paths: List[str] = structure.build_ligands(ligand_dir, True)
         for lig in ligand_paths:
             _ = prep.protonate._protonate_ligand_PYBEL(lig, pH, lig)
-        ligand_charges: List[int] = list(
-            map(lambda pp: prep.protonate._ob_pdb_charge(pp), ligand_paths))
-        ligand_params: List[Tuple[str, str]] = self.build_ligand_param_files(
-            ligand_paths, ligand_charges)
+        ligand_charges: List[int] = list(map(lambda pp: prep.protonate._ob_pdb_charge(pp), ligand_paths))
+        ligand_params: List[Tuple[str, str]] = self.build_ligand_param_files(ligand_paths, ligand_charges)
         leap_path: str = f"{build_dir}/leap.in"
         leap_log: str = f"{build_dir}/leap.out"
 
@@ -203,8 +191,7 @@ class AmberInterface:
         prmtop: str = f"{build_dir}/{pdb_path.stem}.prmtop"
         inpcrd: str = f"{build_dir}/{pdb_path.stem}.inpcrd"
         pdb_ff: str = f"{build_dir}/{pdb_path.stem}_ff.pdb"
-        leap_contents.extend(
-            [f"saveamberparm a {prmtop} {inpcrd}", f"savepdb a {pdb_ff}", "quit"])
+        leap_contents.extend([f"saveamberparm a {prmtop} {inpcrd}", f"savepdb a {pdb_ff}", "quit"])
         fs.write_lines(leap_path, leap_contents)
 
         # yapf: disable
@@ -229,9 +216,7 @@ class AmberInterface:
                 _LOGGER.warn(msg)
 
         if not good_output:
-            _LOGGER.error(
-                f"The output generated by AmberInterface.build_param_files() is incomplete. Exiting..."
-            )
+            _LOGGER.error(f"The output generated by AmberInterface.build_param_files() is incomplete. Exiting...")
             exit(1)
 
         return (prmtop, inpcrd)
@@ -535,58 +520,75 @@ class AmberInterface:
 
         return prod_nc
 
-    def mutate(self, outfile: str) -> None:
-        """Method that uses tleap to apply the mutations described in the supplied outfile
-        to that file. Because tleap writes the modified version to another file, the destination
-        file with name 'outfile.tmp.pdb' is copied over the outfile name. As a result there
-        may be additional files in the local directory when problems occur.
+    def run_tleap(
+        self,
+        tleap_in_str: str,
+        # cmd based
+        if_ignore_start_up: bool = True,
+        additional_search_path: List[str] = None,
+        tleap_out_path: str = None,
+    ) -> None:
+        """the python wrapper of running tleap
         Args:
-            outfile: The name of the modified .pdb file that needs to be treated with tleap.
-        """
+            tleap_in_str:
+                the str content of leap.in file
+            if_ignore_start_up:
+                if adding the '-s' flag to ignore leaprc startup file.
+            additional_search_path:
+                list of addition search path of leaprc files. Each path
+                in the list will be applied using a '-I' flag.
+            tleap_out_path:
+                file path for stdout of the tleap command. the _LOGGER level
+                determines if delete the file.
 
-        def renumber_pdb(opdb: str, npdb: str) -> None:
-            """Helper method that renumbers the residue chain id's and residue numbers in the
-            new structure found in npdb to the original values found in the opdb structure file.
-            TODO(CJ): This may need to get moved elsewhere since it has use elsewhere.
-            Args:
-                opdb: The name of the original .pdb file.
-                npdb: The name of the new .pdb file.
-            """
+        NOTE: run_tleap API should not handle the index alignment since it do
+        not carry information of the input pdb"""
+        temp_path_list = []
+        # init file paths (tleap_in_path, tleap_out_path)
+        fs.safe_mkdir(eh_config["system.SCRATCH_DIR"])
+        tleap_in_path = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/tleap.in")
+        temp_path_list.extend([eh_config["system.SCRATCH_DIR"], tleap_in_path])
+        if tleap_out_path is None:
+            tleap_out_path = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/tleap.out")
+            temp_path_list.append(tleap_out_path)
+        # write tleap.in
+        with open(tleap_in_path, "w") as of:
+            of.write(tleap_in_str)
+        # run tleap command
+        cmd_args = f"-f {tleap_in_path} > {tleap_out_path}"
+        if if_ignore_start_up:
+            cmd_args = f"-s {cmd_args}"
+        if additional_search_path:
+            for add_path in additional_search_path:
+                cmd_args = f"{cmd_args} -I {add_path}"
+        try:
+            self.env_manager_.run_command("tleap", cmd_args)
+        except CalledProcessError as e:
+            if (not e.stderr.strip()) and (not e.stdout.strip()):  # empty stderr & stdout
+                # find the error information in tleap.out
+                new_e = self._find_tleap_error(tleap_out_path)
+                # express the error
+                for e_info in new_e.error_info_list:
+                    _LOGGER.error(e_info)
+                raise new_e from e
 
-            def get_all_keys(pdb: str) -> List[Tuple[str, str]]:
-                df: pd.DataFrame = PandasPdb().read_pdb(pdb).df["ATOM"]
-                return sorted(list(set(list(zip(df.chain_id, df.residue_number)))))
+        # clean up temp file if success
+        fs.clean_temp_file_n_dir(temp_path_list)
 
-            okeys, nkeys = get_all_keys(opdb), get_all_keys(npdb)
-            assert len(okeys) == len(nkeys)
-            mapper = dict(zip(nkeys, okeys))
-            nlines: List[prep.PDBLine] = prep.read_pdb_lines(npdb)
-            for nl in nlines:
-                if not nl.is_ATOM():
-                    continue
-                (n_chain, n_rid) = mapper[(nl.chain_id.strip(), int(nl.resi_id))]
-                # TODO(CJ): this should be done in the oop part of the PDBLine;
-                raw = nl.line
-                nl.line = f"{raw[0:21]}{n_chain}{n_rid: >4}{raw[26:]}"
-                # print(n_chain, n_rid)
-                # print(nl.__dict__);exit( 0 )
-            fs.write_lines(npdb, list(map(lambda pl: pl.line, nlines)))
+    @staticmethod
+    def _find_tleap_error(tleap_out_path: str) -> tLEaPError:
+        """an internal used function that find the text describing the error
+        from a tleap output file
+        Return a tLEaPError containing all the error information"""
+        error_info_pattern = r"(.*(?:FATAL|Fatal).*\n(?:.*\n)+?)(?:(?:Exiting LEaP:)|/)"
+        with open(tleap_out_path) as f:
+            error_info_list = re.findall(error_info_pattern, f.read())
+            error_info_list = [i.strip() for i in error_info_list]
+            if not error_info_list:
+                _LOGGER.warning("did not found any error in tleap out file. Here is the complete output:")
+                _LOGGER.warning(f.read())
 
-        work_dir: str = str(Path(outfile).parent)
-        leap_in: str = f"{work_dir}/leap_mutate.in"
-        leap_out: str = f"{work_dir}/leap_mutate.out"
-        pdb_temp = str(Path(outfile).with_suffix(".tmp.pdb"))
-        leap_lines: List[str] = [
-            "source leaprc.protein.ff14SB",
-            f"a = loadpdb {outfile}",
-            f"savepdb a {pdb_temp}",
-            "quit",
-        ]
-        fs.write_lines(leap_in, leap_lines)
-        self.env_manager_.run_command("tleap", ["-s", "-f", leap_in, ">", leap_out])
-        renumber_pdb(outfile, pdb_temp)
-        shutil.move(pdb_temp, outfile)
-        fs.safe_rm("leap.log")
+        return tLEaPError(error_info_list)
 
     def nc2mdcrd(
         self,
@@ -630,9 +632,7 @@ class AmberInterface:
             #fs.safe_rm(cpptraj_in)
             #fs.safe_rm(cpptraj_out)
         else:
-            raise UnsupportedMethod(
-                f"'{engine}' is not a supported method for AmberInteface.nc2mdcrd(). Allowed methods are: 'cpptraj'."
-            )
+            raise UnsupportedMethod(f"'{engine}' is not a supported method for AmberInteface.nc2mdcrd(). Allowed methods are: 'cpptraj'.")
 
         return mdcrd
 
@@ -770,9 +770,7 @@ class AmberInterface:
 
         """
 
-        files_to_remove: List[str] = [
-            f"{dname}/ATOMTYPE.INF", f"{dname}/PREP.INF", f"{dname}/NEWPDB.PDB"
-        ]
+        files_to_remove: List[str] = [f"{dname}/ATOMTYPE.INF", f"{dname}/PREP.INF", f"{dname}/NEWPDB.PDB"]
         files_to_remove.extend(list(map(str, Path(f"{dname}").glob("ANTECHAMBER*"))))
         files_to_remove.extend(list(map(str, Path(f"{dname}").glob("sqm*"))))
 
@@ -807,15 +805,63 @@ class AmberInterface:
         for c, an, rn, aa in zip(charges, anames, res_names, stru.atoms):
 
             if not (an == aa.name and aa.residue.name == rn):
-                _LOGGER.error(
-                    f"There is a mismatch in the atoms. Make sure the supplied prmtop file is correct. Exiting.."
-                )
+                _LOGGER.error(f"There is a mismatch in the atoms. Make sure the supplied prmtop file is correct. Exiting..")
                 exit(1)
             aa.charge = c
 
         if not stru.has_charges():
-            _LOGGER.error(
-                "Not all atoms in the supplied structure were assigned charges. Exiting..."
-            )
+            _LOGGER.error("Not all atoms in the supplied structure were assigned charges. Exiting...")
             exit(1)
             pass
+
+    # == engines ==
+    # (engines for sciencs APIs)
+    def tleap_clean_up_stru(
+        self,
+        input_pdb: str,
+        out_path: str,
+        if_align_index: bool = True,
+        amber_lib: str = "leaprc.protein.ff14SB",
+    ) -> None:
+        """Method that uses tleap to clean up {input_pdb} by loading and saving the PDB with
+        the {amber_lib}.
+        Typical changes are:
+            - complete missing atoms based on the AA defination in {amber_lib}
+            of the correponding residue name
+            - change terminal atom names
+            - (if_align_index = False)renumber residue index and atom index from 1 and
+            ignore chain index
+            - add TER around all residue unit that is not recognized or is a ligand.
+            (The might be harmful when a structure have a modified animo acid TODO)
+
+        Args:
+            input_pdb:
+                the path of the input pdb for cleaning
+            out_path:
+                the path of the output pdb after cleaning
+            if_align_index:
+                whether or not align index back after cleaning.
+            amber_lib:
+                the amber library used for cleaning.
+
+        Application:
+            Used in mutation.api.mutate_stru_with_tleap()"""
+
+        tleap_in_lines: List[str] = [
+            f"source {amber_lib}",
+            f"a = loadpdb {input_pdb}",
+            f"savepdb a {out_path}",
+            "quit",
+        ]
+        tleap_in_str = "\n".join(tleap_in_lines)
+        self.run_tleap(tleap_in_str)
+        if if_align_index:
+            # temp file
+            temp_dir = eh_config["system.SCRATCH_DIR"]
+            fs.safe_mkdir(temp_dir)
+            renumbered_pdb = fs.get_valid_temp_name(f"{temp_dir}/tleap_out_renumbered.pdb")
+            # renumber
+            index_mapper = pdb_io.get_index_mapper_from_pdb(out_path, input_pdb, method="by_order")
+            pdb_io.restore_pdb_index(index_mapper, out_path, renumbered_pdb)
+            shutil.move(renumbered_pdb, out_path)
+            fs.clean_temp_file_n_dir([temp_dir, renumbered_pdb])

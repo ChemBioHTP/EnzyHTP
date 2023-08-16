@@ -1,7 +1,7 @@
 """Definition for the Atom class. Meant to be the base unit of structural information: coordinate and
 topology (atom type & connectivity). Serve solely for storing and accessing data.
 
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-19
 """
@@ -38,6 +38,7 @@ class Atom(DoubleLinkedNode):
         b_factor : A float representing the temperature factor (b factor).
         charge : Charge of the atom.
         element : Character representing element.
+        connect : the connectivity of this atom. (a list of reference of connected Atom objs)
     """
 
     def __init__(self, ds: pd.Series, parent=None):
@@ -144,66 +145,71 @@ class Atom(DoubleLinkedNode):
     @property
     def connect(self) -> List[Atom]:
         """getter for _connect, the list for atoms it connects"""
-        if self.is_connected():
-            return self._connect
-        return self.get_connect()
+        if not self.is_connected():
+            _LOGGER.warning(f"There are no connection info for {self}, Initiating it.")
+            self.init_connect_in_caa() # TODO(qz): make this also works for non-caa
+        return self._connect
 
     @connect.setter
     def connect(self, val):
-        self._connect = val
+        """setter of connect is nessessary for residue level objects to set connectivity for atoms
+        raise an error if called by non residue objects"""
+        allowed_caller_class = ["Residue"]
+        # determine caller class
+        caller_locals = sys._getframe(1).f_locals
+        if "self" in caller_locals:
+            caller_class = caller_locals["self"].__class__.__name__
+            if caller_class in allowed_caller_class:
+                self._connect = val
+                return
+        _LOGGER.error(f"only calling from methods from {allowed_caller_class} is allowed")
+        sys.exit(1)
 
-    def get_connect(self) -> List[Atom]:
+    def init_connect_in_caa(self) -> None:  # this should actually go the residue class
         """
-        Use this to generate/update connectivity for atom.
+        Initiate connectivity for this atom in a canonical amino acid. (and common solvents)
         find connect atom base on:
         1. chem.residue.RESIDUE_CONNECTIVITY_MAP
         2. parent residue name
-        * Using standard Amber atom names and C/N terminal name. TODO make this a standard or change to another
-        save found list of Atom object to self.connect (make the object to a connected state)
+        * Using standard Amber atom names and C/N terminal name.
+          (TODO make this a standard and convert other atom name formats)
+        save found list of Atom object to self._connect (make the object to a connected state)
         """
         connect = []
         parent_residue = self.parent
         if parent_residue.name in chem.solvent.RD_SOLVENT_LIST:
-            cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP[parent_residue.name][
-                self.name]
+            cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP[parent_residue.name][self.name]
         elif parent_residue.is_canonical():
             r = parent_residue
             r1 = parent_residue.chain[0]
             rm1 = parent_residue.chain[-1]
             if r is r1:
                 # N terminal
-                cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP_NTERMINAL[
-                    parent_residue.name][self.name]
+                cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP_NTERMINAL[parent_residue.name][self.name]
             else:
                 if r == rm1:
                     # C terminal
-                    cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP_CTERMINAL[
-                        parent_residue.name][self.name]
+                    cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP_CTERMINAL[parent_residue.name][self.name]
                 else:
-                    cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP[
-                        parent_residue.name][self.name]
+                    cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP[parent_residue.name][self.name]
         else:
-            _LOGGER.error(f"getting connectivity of non-canonical residue {self.parent}")
+            _LOGGER.error(f"wrong method of getting connectivity of non-canonical residue {self.parent}. use Residue.init_connect_ncaa.")
             sys.exit(1)
+
         for name in cnt_atomnames:
             try:
                 if name not in ["-1C", "+1N"]:
                     cnt_atom = parent_residue.find_atom_name(name)
                 if name == "-1C":
-                    cnt_resi = parent_residue.chain.find_residue_idx(parent_residue.idx -
-                                                                     1)
+                    cnt_resi = parent_residue.chain.find_residue_idx(parent_residue.idx - 1)
                     cnt_atom = cnt_resi.find_atom_name("C")
                 if name == "+1N":
-                    cnt_resi = parent_residue.chain.find_residue_idx(parent_residue.idx +
-                                                                     1)
+                    cnt_resi = parent_residue.chain.find_residue_idx(parent_residue.idx + 1)
                     cnt_atom = cnt_resi.find_atom_name("N")
                 connect.append(cnt_atom)
             except ResidueDontHaveAtom as e:
-                _LOGGER.warning(
-                    f"missing connecting atom {e.atom_name} of {self}. Structure maybe incomplete."
-                )
+                _LOGGER.warning(f"missing connecting atom {e.atom_name} of {self}. Structure maybe incomplete.")
         self._connect = connect
-        return self._connect
 
     #endregion
 
@@ -229,7 +235,10 @@ class Atom(DoubleLinkedNode):
     @dispatch
     def distance_to(self, point: tuple) -> float:  # pylint: disable=function-redefined
         """Get the distance to the other atom or a point."""
-        return mh.get_distance(self.coord, point)
+        if type(point) == tuple:
+            return mh.get_distance(self.coord, point)
+        else:
+            return mh.get_distance(self.coord, point.coord)
 
     def attached_protons(self) -> List[Atom]:
         """find all protons attached to self"""

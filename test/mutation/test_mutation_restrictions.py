@@ -46,8 +46,7 @@ def test_default_restriction_dict_deepcopy():
 
 def test_valid_restriction_dict_returns_true():
     """Testing that the valid_restriction_dict() method returns False when it should."""
-    assert mut.valid_restriction_dict(
-        mut.mutation_restrictions.default_restriction_dict())
+    assert mut.valid_restriction_dict(mut.mutation_restrictions.default_restriction_dict())
     test_dict: Dict = mut.mutation_restrictions.default_restriction_dict()
     test_dict['illegal_targets'] = "A B C D E".split()
     assert mut.valid_restriction_dict(test_dict)
@@ -88,8 +87,7 @@ def test_restriction_object():
 
 def test_mutation_restrictions_add_restriction():
     """Testing that the MutationRestrictions.add_restriction() method works for valid input cases."""
-    mr: mut.MutationRestrictions = dummy_mr_object([('A', 1), ('A', 2), ('A', 3),
-                                                    ('B', 1), ('B', 2), ('B', 3)])
+    mr: mut.MutationRestrictions = dummy_mr_object([('A', 1), ('A', 2), ('A', 3), ('B', 1), ('B', 2), ('B', 3)])
     assert not mr.mapper_[('A', 1)]['locked']
     mr.add_restriction(('A', 1), 'locked', True)
     assert mr.mapper_[('A', 1)]['locked']
@@ -101,16 +99,14 @@ def test_mutation_restrictions_add_restriction():
 def test_mutation_restrictions_add_restriction_throws():
     """Testing that the MutationRestrictions.add_restriction() throws for missing keys and conflicting flag settings.."""
 
-    mr: mut.MutationRestrictions = dummy_mr_object([('A', 1), ('A', 2), ('A', 3),
-                                                    ('B', 1), ('B', 2), ('B', 3)])
+    mr: mut.MutationRestrictions = dummy_mr_object([('A', 1), ('A', 2), ('A', 3), ('B', 1), ('B', 2), ('B', 3)])
     with pytest.raises(core.InvalidMutationRestriction) as exe:
         mr.add_restriction(('A', 4), 'locked', True)
 
     assert exe
     assert exe.type == core.InvalidMutationRestriction
 
-    mr: mut.MutationRestrictions = dummy_mr_object([('A', 1), ('A', 2), ('A', 3),
-                                                    ('B', 1), ('B', 2), ('B', 3)])
+    mr: mut.MutationRestrictions = dummy_mr_object([('A', 1), ('A', 2), ('A', 3), ('B', 1), ('B', 2), ('B', 3)])
     mr.add_restriction(('A', 1), 'no_size_increase', True)
     with pytest.raises(core.InvalidMutationRestriction) as exe:
         mr.add_restriction(('A', 1), 'no_size_decrease', True)
@@ -121,8 +117,7 @@ def test_mutation_restrictions_add_restriction_throws():
 
 def test_mutation_restrictions_lock_chain():
     """Testing that the MuationRestrictions.lock_chain() method works correctly."""
-    mr: mut.MutationRestrictions = dummy_mr_object([('A', 1), ('A', 2), ('A', 3),
-                                                    ('B', 1), ('B', 2), ('B', 3)])
+    mr: mut.MutationRestrictions = dummy_mr_object([('A', 1), ('A', 2), ('A', 3), ('B', 1), ('B', 2), ('B', 3)])
     mr.lock_chain('A')
     assert mr.mapper_[('A', 1)]['locked']
     assert mr.mapper_[('A', 2)]['locked']
@@ -141,8 +136,7 @@ def test_mutation_restrictions_lock_chain():
 def test_mutation_restrictions_lock_residue():
     """Testing that the MuationRestrictions.lock_residue() method works correctly."""
 
-    mr: mut.MutationRestrictions = dummy_mr_object([('A', 1), ('A', 2), ('A', 3),
-                                                    ('B', 1), ('B', 2), ('B', 3)])
+    mr: mut.MutationRestrictions = dummy_mr_object([('A', 1), ('A', 2), ('A', 3), ('B', 1), ('B', 2), ('B', 3)])
 
     assert not mr.mapper_[('A', 1)]['locked']
     mr.lock_residue(('A', 1))
@@ -151,21 +145,20 @@ def test_mutation_restrictions_lock_residue():
 
 def test_apply():
     """Testing that the MutationRestrictions.lock_residue() method works correctly."""
-    mr: mut.MutationRestrictions = dummy_mr_object([('A', 1), ('A', 2), ('A', 3),
-                                                    ('B', 1), ('B', 2), ('B', 3)])
+    mr: mut.MutationRestrictions = dummy_mr_object([('A', 1), ('A', 2), ('A', 3), ('B', 1), ('B', 2), ('B', 3)])
     mutations = dict()
     mutations[('A', 1)] = list(range(10))
     mutations[('A', 2)] = list(range(10))
     mutations[('A', 3)] = list(range(10))
     mutations[('B', 1)] = list(range(10))
     mutations[('B', 2)] = [
-        mut.Mutation(orig='A', target='C', chain_id='B', res_num=10),
-        mut.Mutation(orig='C', target='A', chain_id='B', res_num=10)
+        mut.Mutation(orig='A', target='C', chain_id='B', res_idx=10),
+        mut.Mutation(orig='C', target='A', chain_id='B', res_idx=10)
     ]
     mutations[('B', 3)] = [
-        mut.Mutation(orig='R', target='H', chain_id='B', res_num=10),
-        mut.Mutation(orig='R', target='A', chain_id='B', res_num=10),
-        mut.Mutation(orig='A', target='R', chain_id='B', res_num=10)
+        mut.Mutation(orig='R', target='H', chain_id='B', res_idx=10),
+        mut.Mutation(orig='R', target='A', chain_id='B', res_idx=10),
+        mut.Mutation(orig='A', target='R', chain_id='B', res_idx=10)
     ]
     mr.lock_chain('A')
     mr.lock_residue(('B', 1))
@@ -177,9 +170,5 @@ def test_apply():
     assert not mutations[('A', 2)]
     assert not mutations[('A', 3)]
     assert not mutations[('B', 1)]
-    assert mutations[('B', 2)] == [
-        mut.Mutation(orig='C', target='A', chain_id='B', res_num=10)
-    ]
-    assert mutations[('B', 3)] == [
-        mut.Mutation(orig='R', target='H', chain_id='B', res_num=10)
-    ]
+    assert mutations[('B', 2)] == [mut.Mutation(orig='C', target='A', chain_id='B', res_idx=10)]
+    assert mutations[('B', 3)] == [mut.Mutation(orig='R', target='H', chain_id='B', res_idx=10)]

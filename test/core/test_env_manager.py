@@ -4,9 +4,11 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-19
 """
 import os
+from subprocess import SubprocessError
 import pytest
 
 from enzy_htp.core import EnvironmentManager
+from enzy_htp.core.exception import EnvMissingExecutable
 
 
 def test_check_environment():
@@ -75,19 +77,38 @@ def test_executable___gettattr__():
 def test_run_command():
     """Ensuring that EnvironmentManager.run_command() works and raises errors when it is supposed to."""
     em = EnvironmentManager()
-    contents = em.run_command("echo", ["hello world"])
-    assert contents == ["hello world"]
-
-    with pytest.raises(SystemExit) as exe:
+    # args as list
+    contents = em.run_command("echo", ["hello world"], stdout_return_only=True)
+    assert contents == "hello world"
+    # args as str
+    contents = em.run_command("echo", "hello world", stdout_return_only=True)
+    assert contents == "hello world"
+    # exe dont exist
+    with pytest.raises(EnvMissingExecutable) as exe:
         em.run_command("dne", [""])
-
-    assert exe.type == SystemExit
-    assert exe.value.code == 1
 
     em.check_environment()
 
-    with pytest.raises(SystemExit) as exe:
+    with pytest.raises(EnvMissingExecutable) as exe:
         em.run_command("dne", [""])
 
-    assert exe.type == SystemExit
-    assert exe.value.code == 1
+
+def test_run_command_fail_wo_retry(caplog):
+    """testing the error capture of run_command"""
+    em = EnvironmentManager()
+    # args as list
+    with pytest.raises(SubprocessError) as e:
+        em.run_command("cat", "abc")
+    assert "Failed running `cat abc` after 1 tries @" in caplog.text
+    assert e.value.cmd == "cat abc"
+
+
+def test_run_command_fail_w_retry(caplog):
+    """testing the retry feature of run_command"""
+    em = EnvironmentManager()
+    # args as list
+    with pytest.raises(SubprocessError) as e:
+        em.run_command("cat", "abc", try_time=2, wait_time=1)
+    assert "trying again" in caplog.text
+    assert "stderr: cat: abc: No such file or directory" in caplog.text
+    assert "Failed running `cat abc` after 2 tries @" in caplog.text

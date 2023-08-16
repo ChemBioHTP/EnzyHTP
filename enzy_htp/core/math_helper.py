@@ -3,7 +3,7 @@
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2022-09-26
 """
-from typing import Tuple, Union
+from typing import List, Tuple, Union
 from unittest.mock import NonCallableMock
 from .logger import _LOGGER
 import numpy as np
@@ -16,8 +16,7 @@ def check_valid_ph(ph: float) -> NonCallableMock:
         _LOGGER.warning(f"assigned pH: {ph:.2f} out of range: [0.00,14.00]")
 
 
-def set_distance(p1: Union[tuple, list], p2: Union[tuple, list],
-                 d: float) -> Tuple[float, float, float]:
+def set_distance(p1: Union[tuple, list], p2: Union[tuple, list], d: float) -> Tuple[float, float, float]:
     """
     determine the coordinate of a point p3 with p1, p2, and d.
     p3 will be in the projection line of p1->p2 and have a d distance with p1.
@@ -43,59 +42,53 @@ def get_distance(p1: Union[tuple, list], p2: Union[tuple, list]) -> float:
     D = np.linalg.norm(d1)
     return D
 
-
-def get_field_strength_value(p0: Union[tuple, list],
-                             c0: float,
-                             p1: Union[tuple, list],
-                             p2: Union[tuple, list] = None,
-                             d1: Union[tuple, list] = None) -> float:
-    """
-    calculate field strength E of *p0(c0)* at *p1* in direction of *p2-p1* or *d1*
-    E = kq/r^2 (Unit: kcal/mol)
-    point charge:   c0 in p0 
-    point:          p1
-    direction:      p2-p1 or d1
+def get_dihedral(p1: Union[tuple, list], p2: Union[tuple, list],
+                 p3: Union[tuple, list], p4: Union[tuple, list],
+                 rad_result: bool= False) -> float:
+    """get the dihedral defined by p1, p2, o3, and p4
     Args:
-        p0: position of charge of field source
-        c0: point charge in p0
-        p1: the query position to calculate the field strength
-        p2: the point that defines the direction of field strength projection by p2-p1
-        d1: the vector that defines the direction of field strength projection
-    Returns:
-        E: the field strength
-    """
-    # Unit
-    k = 332.4  # kcal*Ang/(mol*e^2) = (10^10)*(4.184^-1)*(Na)*(10^-3)*(1.602*10^-19)^2 * 9.0*10^-9 N*m^2/C^2
-    q = c0  # e
-    p0 = np.array(p0)  # Ang
-    p1 = np.array(p1)  # Ang
-    if d1 == None:
-        d1 = np.array(p2) - p1
-    else:
-        d1 = np.array(d1)
-    d1 = d1 / np.linalg.norm(d1)  # Ang
+        p1, p2, p3, p4:
+            the coordinate of the 4 defining points in tuple or list
+            the 2 plane is defined by p1, p2, p3 and p2, p3, p4.
+            plane(123) spin to plane(234), watching along z-->z+,
+            clockwise: +
+            counter clockwise: -
+            ref: https://math.stackexchange.com/questions/47059/how-do-i-calculate-a-dihedral-angle-given-cartesian-coordinates
+        rad_result: (default: False)
+            whether giving result as radian
+    Return:
+        the dihedral value (degrees by defaul)"""
+    v1 = np.array(p2) - np.array(p1)
+    v2 = np.array(p3) - np.array(p2)
+    v3 = np.array(p4) - np.array(p3)
+    nv1 = np.cross(v1, v2)
+    nv1 = nv1/np.linalg.norm(nv1)
+    nv2 = np.cross(v2, v3)
+    nv2 = nv2/np.linalg.norm(nv2)
 
-    # Get r
-    r = p1 - p0
-    r_m = np.linalg.norm(r)
-    r_u = r / r_m
+    m1 = np.cross(nv1, v2/np.linalg.norm(v2))
+    x = np.dot(nv1, nv2)
+    y = np.dot(m1, nv2)
+    dihedral = -np.arctan2(y,x)
 
-    # Get E
-    E = (k * q / (r_m**2)) * r_u
-    # Get E in direction
-    Ed = np.dot(E, d1)  # kcal/(mol*e*Ang)
+    if not rad_result:
+        dihedral = np.degrees(dihedral)
 
-    return Ed
+    return dihedral
 
 
-def get_center(p1: Union[tuple, list], p2: Union[tuple,
-                                                 list]) -> Tuple[float, float, float]:
+def get_center(p1: Union[tuple, list], p2: Union[tuple, list]) -> Tuple[float, float, float]:
     """
     return the center of p1 and p2
     """
     p3 = 0.5 * (np.array(p1) + np.array(p2))
 
     return tuple(p3)
+
+
+def get_geom_center(list_of_p: list) -> Tuple[float, float, float]:
+    """get the geometric center of a list of points"""
+    return tuple(np.mean(np.array(list_of_p), axis=0))
 
 
 def round_by(num: float, cutnum: float) -> int:
@@ -107,3 +100,14 @@ def round_by(num: float, cutnum: float) -> int:
     if dec_part > cutnum:
         int_part += 1
     return int(int_part)
+
+
+def calc_average_task_num(num_of_task: int, num_of_worker: int) -> List[int]:
+    """calculate task number for each worker based on {num_of_task} and
+    {num_of_worker}. Return a list of task numbers for each worker."""
+    task_each_worker = num_of_task // num_of_worker
+    remaining_tasks = num_of_task % num_of_worker
+    result = [task_each_worker for i in range(num_of_worker)]
+    for i in range(remaining_tasks):
+        result[i] += 1
+    return result

@@ -3,7 +3,7 @@ as it is removed from the full structure during protonation. In addition to Resi
 Meant to be stored alongside other Residue() and Residue() derived objets (MetalUnit() and Solvent()) inside of the
 Chain() object. Ligand() objects SHOULD NOT exist on their own.
 
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-04-03
 """
@@ -37,12 +37,7 @@ class Ligand(Residue):
         net_charge : The net charge of the molecule as an int.
     """
 
-    def __init__(self,
-                 residue_idx: int,
-                 residue_name: str,
-                 atoms: List[Atom],
-                 parent=None,
-                 **kwargs):
+    def __init__(self, residue_idx: int, residue_name: str, atoms: List[Atom], parent=None, **kwargs):
         """
         Constructor for Ligand. Identical to Residue() ctor but also takes net_charge value.
         """
@@ -75,8 +70,7 @@ class Ligand(Residue):
         new_name_list = chem.get_valid_generic_atom_name(name_list)
         for name, atom in zip(new_name_list, self.atoms):
             if atom.name != name:
-                _LOGGER.info(
-                    f"found atom with invalid name {atom}. changing it to {name}")
+                _LOGGER.info(f"found atom with invalid name {atom}. changing it to {name}")
                 atom.name = name
 
     # === Special ===
@@ -86,8 +80,4 @@ class Ligand(Residue):
 
 def residue_to_ligand(residue: Residue, net_charge: float = None) -> Ligand:
     """Convenience function that converts Residue to ligand."""
-    return Ligand(residue.idx,
-                  residue.name,
-                  residue.atoms,
-                  residue.parent,
-                  net_charge=net_charge)
+    return Ligand(residue.idx, residue.name, residue.atoms, residue.parent, net_charge=net_charge)

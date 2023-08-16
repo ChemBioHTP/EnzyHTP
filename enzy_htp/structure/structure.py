@@ -92,7 +92,7 @@ Operation:
     Saving the structure:
         >>> structure.to_pdb( "/path/to/copy/of/pdb" )
 
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-04-03
 """
@@ -122,13 +122,13 @@ from .solvent import Solvent, residue_to_solvent
 from .metal_atom import MetalUnit
 
 
-class Structure(
-        DoubleLinkedNode
-):  # TODO implement different copy methods for the doubly linked ds; by default are all shollow copy and references
+class Structure(DoubleLinkedNode):
     """Protein structure.
     Designed for direct interfacing by users.
     Composed of child Chain() objects and their subsequent child Residue() objects and so on Atom() objects.
     Note: This class SHOULD NOT be created directly by users. It should be created with methods from the StructureIO module.
+    Note: regardless of index assigned to residues and atoms, there is an intrinsic indexing system based on the order of 
+    _children lists. This intrinsicc index can be compared with pymol's index (not id)
 
     Attributes:
         children/chains: List[Chain]
@@ -196,6 +196,21 @@ class Structure(
         return len(self._chains)
 
     @property
+    def chain_names(self) -> List[str]:
+        """Returns a list of chain names"""
+        return list(map(lambda x: x.name, self._chains))
+
+    @property
+    def num_residues(self) -> int:
+        """Returns the number of Residue() objects in the current Structure()."""
+        return len(self.residues)
+
+    @property
+    def residue_indexes(self) -> int:
+        """Returns the number of Residue() objects in the current Structure()."""
+        return list(map(lambda x: x.idx, self.residues))
+
+    @property
     def residues(self) -> List[Residue]:
         """Return a list of the residues in the Structure() object sorted by (chain_id, residue_id)"""
         result = list(itertools.chain.from_iterable(self._chains))
@@ -215,6 +230,18 @@ class Structure(
         result = list(filter(lambda r: r.name == name, self.residues))
         return result
 
+    def find_residue_with_key(self, key: Tuple[str, int]) -> Union[Residue, None]:
+        """find residues base on its (chain_id, idx). Return the matching residues"""
+        result = list(filter(lambda r: r.key() == key, self.residues))
+        if len(result) == 0:
+            _LOGGER.info(f"Didn't find any residue with key: {key}")
+            return None
+        if len(result) > 1:
+            _LOGGER.warning(f"More than 1 residue with key: {key}. Only the first one is used. Check those residues:")
+            for i in result:
+                _LOGGER.warning(f"    {i}")
+        return result[0]
+
     @property
     def atoms(self) -> List[Atom]:
         """Accessor to get the atoms in the enzyme as a list of Atom objects."""
@@ -224,19 +251,29 @@ class Structure(
                 result.extend(residue.atoms)
         return result
 
-    def find_atoms_in_range(self, center: Union[Atom, Tuple[int, int, int]],
+    def find_atoms_in_range(self, center: Union[Atom, Tuple[float, float, float]],
                             range_distance: float) -> List[Atom]:
         """find atoms in {range} of {center}. return a list of atoms found"""
-        if isinstance(center,Atom):
-            center = center.coord
-        
         result = []
         for atom in self.atoms:
-            a_coord = atom.coord 
-            dist = ((center[0]-a_coord[0])**2 + (center[1]-a_coord[1])**2 + (center[2]-a_coord[2])**2)**0.5
-            
-            if dist <= range_distance:
+            if atom.distance_to(center) <= range_distance:
                 result.append(atom)
+        return result
+
+    def find_idx_atom(self, atom_idx: int) -> Atom:
+        """find atom base on its idx. return a reference of the atom."""
+        result = list(filter(lambda a: a.idx == atom_idx, self.atoms))
+        if not result:
+            _LOGGER.info(f"found 0 atom with index: {atom_idx}")
+        if len(result) > 1:
+            _LOGGER.warning(f"found {len(result)} atoms with index: {atom_idx}! only the 1st one is used. consider sort_everything()")
+        return result[0]
+
+    def find_idxes_atom_list(self, atom_idx_list: int) -> List[Atom]:
+        """find atom base on its idx. return a list reference of the atoms."""
+        result = []
+        for idx in atom_idx_list:
+            result.append(self.find_idx_atom(idx))
         return result
 
     @property
@@ -256,7 +293,7 @@ class Structure(
         return result
 
     @property
-    def metals(self) -> List[Residue]:
+    def metals(self) -> List[MetalUnit]:
         """Filters out the metal Residue()"s from the chains in the Structure()."""
         result: List[Residue] = []
         for chain in self.chains:
@@ -264,7 +301,7 @@ class Structure(
         return result
 
     @property
-    def metalcenters(self) -> List[Residue]:
+    def metalcenters(self) -> List[MetalUnit]:
         """Filters out the metal coordination center Residue()"s from the chains 
         in the Structure()."""
         result: List[Residue] = []
@@ -273,9 +310,9 @@ class Structure(
         return result
 
     @property
-    def peptides(self) -> List[Chain]:
+    def polypeptides(self) -> List[Chain]:
         """return the peptide part of current Structure() as a list of chains"""
-        result: List[Chain] = list(filter(lambda c: c.is_peptide(), self._chains))
+        result: List[Chain] = list(filter(lambda c: c.is_polypeptide(), self._chains))
         return result
 
     @property
@@ -288,8 +325,120 @@ class Structure(
             result[ch.name] = ch.sequence
         return result
 
+    def init_connect(self,
+                     ligand_fix: int = "antechamber",
+                     metal_fix: int = "isolate",
+                     ncaa_fix: int = "antechamber",
+                     solvent_fix: int = "caa") -> None:
+        """
+        Initiate connectivity for the Structure.
+        Save the connectivity to self._connect of each Atom().
+        Args:
+            ligand_fix:
+                the method that determines connectivity for ligand. (see details below)
+            metal_fix:
+                the method that determines connectivity for metal. (see details below)
+            ncaa_fix:
+                the method that determines connectivity for ncaa. (see details below)
+            solvent_fix:
+                the method that determines connectivity for solvent. (see details below)
+
+        Details:
+            polypeptide:
+                using documented connectivity for each canonical amino acid from Amber
+                library.
+            ligand:
+                fix = "antechamber":
+                    use antechamber to generated connectivity and read from prepin file.
+                    (according to https://ambermd.org/doc/prep.html the coordniate line will
+                    always start at the 11th line after 3 DUMM.)
+            metalatom:
+                fix = "isolate": treat as isolated atom
+                TODO fix = "mcpb": connect to donor atom (MCPB?)
+            non-canonical residues:
+                fix = "antechamber": same as above in ligand.
+            solvent:
+                fix = "caa": same as polypeptide part
+        """
+        # TODO(qz)(high_prior) finish all the called functions
+        self.init_connect_for_polypeptides(ncaa_fix=ncaa_fix)
+        self.init_connect_for_ligands(method=ligand_fix)
+        self.init_connect_for_metals(method=metal_fix)
+        self.init_connect_for_solvents(method=solvent_fix)
+        # check if all atoms are connected
+        for atm in self.atoms:
+            if not atm.is_connected():
+                _LOGGER.error(f"Atom {atm} doesn't have connect record after initiation.")
+                sys.exit(1)
+
+    def init_connect_for_polypeptides(self, ncaa_fix: str):
+        """initiate connectivity for polypeptides."""
+        for chain in self.polypeptides:
+            for res in chain.residues:
+                if res.is_noncanonical():
+                    res.init_connect_ncaa(method=ncaa_fix)
+                else:
+                    for atom in res.atoms:
+                        atom.init_connect_in_caa()
+
+    def init_connect_for_ligands(self, method: str):
+        """"""
+        # TODO(qz)(high_prior)
+        # TODO generate prepi by itself and store it to a global database path so that other
+        # process in the same workflow can share the generated file.
+        support_method_list = ["caa"]
+        # ligand
+        # init
+        for lig in self.ligands:
+            for atom in lig:
+                atom.connect = []
+        # fix 1
+        if ligand_fix == 1:
+            for lig in self.ligands:
+                # read prepin for each ligand
+                with open(prepi_path[lig.name]) as f:
+                    line_id = 0
+                    if_loop = 0
+                    for line in f:
+                        line_id += 1
+                        if line.strip() == "":
+                            if if_loop == 1:
+                                # switch off loop and break if first blank after LOOP encountered
+                                if_loop = 0
+                                break
+                            continue
+                        if if_loop:
+                            lp = line.strip().split()
+                            lig._find_atom_name(lp[0]).connect.append(lig._find_atom_name(lp[1]))
+                            continue
+                        # loop connect starts at LOOP
+                        if line.strip() == "LOOP":
+                            if_loop = 1
+                            continue
+                        # coord starts at 11th
+                        if line_id >= 11:
+                            lp = line.strip().split()
+                            atom_id = int(lp[0]) - 3
+                            atom_cnt = int(lp[4]) - 3
+                            if atom_cnt != 0:
+                                lig[atom_id - 1].connect.append(lig[atom_cnt - 1])
+                                lig[atom_cnt - 1].connect.append(lig[atom_id - 1])
+        if method not in support_method_list:
+            _LOGGER.error(f"Method {method} not in supported list: {support_method_list}")
+
+    def init_connect_for_metals(self, method: str):
+        """initiate connectivity for metals in the structure"""
+        for metal in self.metals:
+            metal.init_connect(method)
+
+    def init_connect_for_solvents(self, method: str):
+        """initiate connectivity for solvents in the structure"""
+        for sol in self.solvents:
+            sol.init_connect(method)
+
     #endregion
 
+    #region === Checker ===
     def has_charges(self) -> bool:
         """Checks if the current Structure has charges for all atoms.
 
@@ -301,7 +450,6 @@ class Structure(
                 return False
         return True
 
-    #region === Checker ===
     def has_duplicate_chain_name(self) -> bool:
         """check if self._chain have duplicated chain name
         give warning if do."""
@@ -309,9 +457,7 @@ class Structure(
         ch: Chain
         for ch in self._chains:
             if ch.name in existing_c_id:
-                _LOGGER.warning(
-                    f"Duplicate chain names detected in Structure obj during {sys._getframe().f_back.f_code.co_name}()! "
-                )
+                _LOGGER.warning(f"Duplicate chain names detected in Structure obj during {sys._getframe().f_back.f_code.co_name}()! ")
                 return True
             existing_c_id.append(ch.name)
         return False
@@ -331,9 +477,7 @@ class Structure(
         trgt_ch: Chain
         for trgt_ch in target_stru:
             if trgt_ch.name not in self.chain_mapper:
-                _LOGGER.info(
-                    f"current stru {list(self.chain_mapper.keys())} doesnt contain chain: {trgt_ch} from the target stru"
-                )
+                _LOGGER.info(f"current stru {list(self.chain_mapper.keys())} doesnt contain chain: {trgt_ch} from the target stru")
                 return False
 
             self_ch = self.chain_mapper[trgt_ch.name]
@@ -341,9 +485,7 @@ class Structure(
             res: Residue
             for res in trgt_ch:
                 if res.idx not in self_ch_resi_idxes:
-                    _LOGGER.info(
-                        f"current stru chain {self_ch} doesnt contain residue: {res} of the target stru"
-                    )
+                    _LOGGER.info(f"current stru chain {self_ch} doesnt contain residue: {res} of the target stru")
                     return False
         return True
 
@@ -388,17 +530,14 @@ class Structure(
         for ch in self.chains:
             if ch.name in mapper:
                 if ch.is_same_coord(mapper[ch.name]):
-                    _LOGGER.error(
-                        "Duplicate chain (same coordinate) detected in Structure obj! Exiting... "
-                    )
+                    _LOGGER.error("Duplicate chain (same coordinate) detected in Structure obj! Exiting... ")
                     sys.exit(1)
                 new_name = chr(ord(ch.name) + 1)  # TODO find a way
                 ch.name = new_name
                 if_rename = 1
             mapper[ch.name] = ch
         if if_rename:
-            _LOGGER.warning(
-                "Resolved duplicated chain (different ones) name by renaming.")
+            _LOGGER.warning("Resolved duplicated chain (different ones) name by renaming.")
 
     #endregion
 
@@ -416,14 +555,13 @@ class Structure(
         out_line.append("Structure(")
         out_line.append(f"chains: (sorted, original {list(self.chain_mapper.keys())})")
         for ch in sorted(self._chains, key=lambda x: x.name):
-            out_line.append(
-                f"    {ch.name}({ch.chain_type}): residue: {ch.residue_idx_interval()} atom_count: {ch.num_atoms}"
-            )
+            ch: Chain
+            out_line.append(f"    {ch.name}({ch.chain_type}): residue: {ch.residue_idx_interval()} atom_count: {ch.num_atoms}")
         out_line.append(")")
         return os.linesep.join(out_line)
 
     def __getitem__(self, key: Union[int, str]):
-        """support dictionary like access"""
+        """support dictionary/list-like access"""
         if isinstance(key, int):
             return super().__getitem__(key)
         if isinstance(key, str):
@@ -461,8 +599,7 @@ class Structure(
                 (chain, res_name, index) = residue.residue_key.split(".")
                 if residue.is_canonical():
                     result.append((chain, convert_to_one_letter(res_name), int(index)))
-                elif residue.is_metal(
-                ):  #@shaoqz: @imp2 any non-canonical should be using 3-letter name
+                elif residue.is_metal():  #@shaoqz: @imp2 any non-canonical should be using 3-letter name
                     result.append((chain, res_name, int(index)))
         return result
 
@@ -499,9 +636,7 @@ class Structure(
     #endregion
 
     #region === Editor ===
-    def add_chain(self,
-                  new_chain: Chain,
-                  overwrite: bool = False) -> None:  #TODO add logic for overwriting
+    def add_chain(self, new_chain: Chain, overwrite: bool = False) -> None:  #TODO add logic for overwriting
         """Method that inserts a new chain and then sorts the chains based on name.
         Will overwrite if Chain() with existing name already in object. #@shaoqz: add + sort = insert
         """
@@ -540,15 +675,13 @@ class Structure(
             self.chain_mapper[chain_name].add_residue(new_res)
 
         self.chains = list(self.chain_mapper.values())  #@shaoqz: why need this
-        self.chains.sort(
-            key=lambda c: c.name())  #@shaoqz: should this be in the 1st if block?
+        self.chains.sort(key=lambda c: c.name())  #@shaoqz: should this be in the 1st if block?
 
     def remove_residue(self, target_key: str) -> None:
         """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format,
         the Residue() is removed if it currently exists in one of the child Chain()"s. If the Chain() is empty after this
         removal, the chain is deleted."""
-        (chain_name, _,
-         _) = target_key.split(".")  #@shaoqz: why not use this in get lolll
+        (chain_name, _, _) = target_key.split(".")  #@shaoqz: why not use this in get lolll
         if self.has_chain(chain_name):
             self.chain_mapper[chain_name].remove_residue(target_key)
             if self.chain_mapper[chain_name].empty():
@@ -561,7 +694,7 @@ class Structure(
         """Enables running assert Structure(). Checks if there is anything in the structure."""
         return bool(len(self.chains))
 
-    def __eq__(self, other: Structure) -> bool:
+    def __eq__(self, other: Structure) -> bool:  # TODO
         """Comparison operator for other Structure() objects. Checks first if both have same chain names and then if each named chain is identical."""
         if set(self.chain_mapper.keys()) != set(other.chain_mapper.keys()):
             return False
@@ -588,85 +721,8 @@ class Structure(
 
     #region (TODO+OLD)
     # === TODO ===
-    def get_connect(
-        self,
-        metal_fix=1,
-        ligand_fix=1,
-        prepi_path=None
-    ):  #@shaoqz: @nu ### TODO rewrite doc # also change a name this is not a getter but to generate sth.
-        """
-        get connectivity 
-        -----------------
-        TREATMENT
-        chain: based on connectivity map of each atom in each residue
-        metalatom:  fix1: treat as isolated atom
-                    fix2: connect to donor atom (MCPB?)
-        ligand: fix1: use antechamber generated prepin file to get connectivity.
-                      according to https://ambermd.org/doc/prep.html the coordniate line will always start at the 11th line after 3 DUMM.
-        """
-        # san check
-        if ligand_fix == 1 and prepi_path == None:
-            raise Exception("Ligand fix 1 requires prepin_path.")
-        # chain part
-        for chain in self.chains:
-            for res in chain:
-                for atom in res:  #@shaoqz: @imp this no longer works right?
-                    atom.get_connect()
-        for sol in self.solvents:
-            for atom in sol:
-                atom.get_connect()
-        # metal
-        for metal in self.metalatoms:
-            metal.connect = []
-        if metal_fix == 1:
-            pass
-        if metal_fix == 2:
-            raise Exception("TODO: Still working on 2 right now")
-
-        # ligand
-        # init
-        for lig in self.ligands:
-            for atom in lig:
-                atom.connect = []
-        # fix 1
-        if ligand_fix == 1:
-            for lig in self.ligands:
-                # read prepin for each ligand
-                with open(prepi_path[lig.name]) as f:
-                    line_id = 0
-                    if_loop = 0
-                    for line in f:
-                        line_id += 1
-                        if line.strip() == "":
-                            if if_loop == 1:
-                                # switch off loop and break if first blank after LOOP encountered
-                                if_loop = 0
-                                break
-                            continue
-                        if if_loop:
-                            lp = line.strip().split()
-                            lig._find_atom_name(lp[0]).connect.append(
-                                lig._find_atom_name(lp[1]))
-                            continue
-                        # loop connect starts at LOOP
-                        if line.strip() == "LOOP":
-                            if_loop = 1
-                            continue
-                        # coord starts at 11th
-                        if line_id >= 11:
-                            lp = line.strip().split()
-                            atom_id = int(lp[0]) - 3
-                            atom_cnt = int(lp[4]) - 3
-                            if atom_cnt != 0:
-                                lig[atom_id - 1].connect.append(lig[atom_cnt - 1])
-                                lig[atom_cnt - 1].connect.append(lig[atom_id - 1])
-
     def get_connectivty_table(  #@shaoqz: ok seems not using
-            self,
-            ff="GAUSSIAN",
-            metal_fix=1,
-            ligand_fix=1,
-            prepi_path=None):
+            self, ff="GAUSSIAN", metal_fix=1, ligand_fix=1, prepi_path=None):
         """
         get connectivity table with atom index based on "ff" settings:
         ff = GAUSSIAN  -- continuous atom index start from 1, do not seperate by chain
@@ -683,7 +739,7 @@ class Structure(
         """
         connectivty_table = ""
         # get connect for every atom in stru
-        self.get_connect(metal_fix, ligand_fix, prepi_path)
+        self.init_connect(metal_fix, ligand_fix, prepi_path)
 
         # write str in order
         # Note: Only write the connected atom with larger id
@@ -739,12 +795,9 @@ class Structure(
         return connectivty_table
 
     # === TO BE MOVE ===
-    def build_ligands(
-        self,
-        out_dir: str,
-        unique: bool = False
-    ) -> List[
-            str]:  # TODO(qz): change reference of this this to get_file_str(stru.ligands[i])
+    def build_ligands(self,
+                      out_dir: str,
+                      unique: bool = False) -> List[str]:  # TODO(qz): change reference of this this to get_file_str(stru.ligands[i])
         """Exports all the Ligand() objects in the Structure() to .pdb files.
 
         Args:
@@ -790,8 +843,7 @@ class Structure(
 
         # write
         if ft == "PDB":
-            with open(out_path,
-                      "w") as of:  #@shaoqz: same as build ligand use IO interface class
+            with open(out_path, "w") as of:  #@shaoqz: same as build ligand use IO interface class
                 a_id = 0
                 r_id = 0
                 for chain in self.chains:
@@ -929,9 +981,8 @@ def compare_structures(left: Structure, right: Structure) -> Dict[str, List[str]
     return result
 
 
-def merge_right(
-    left: Structure, right: Structure
-) -> Structure:  #@shaoqz: I believe there will be a bug due to the treatment of insert with same id
+def merge_right(left: Structure,
+                right: Structure) -> Structure:  #@shaoqz: I believe there will be a bug due to the treatment of insert with same id
     """Merges Residue() and derived objects from left Structure() to right Structure(), making sure that ALL Residue() and
         Residue() derived objects from the left are in the right. Note that the reverse is not applied and that elements initially found only in right are NOT
         merged back over to left. Also not the resulting Structure() is a deepcopy and no changes are made to the original left or right objects.

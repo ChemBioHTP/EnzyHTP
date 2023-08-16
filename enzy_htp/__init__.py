@@ -11,7 +11,7 @@ state, addition of missing residues, performing an amino acid substitution, and 
 Most enzyme modeling practices use similar structural operations but rely on manual curation, which is 
 highly inefficient and hampers reproducibility. EnzyHTP, a high-throughput enzyme simulation tool, bypasses 
 these issues through automation of molecular model construction, mutation, sampling and energy calculation.
-uthor: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-26
 """
@@ -37,15 +37,19 @@ from .core import (
 
 from ._config import config
 
-from .preparation import PDBLine, read_pdb_lines
 from .chemical import ResidueType
 
-from ._interface import Interface
+from ._interface import Interface, OpenPyMolSession
 
 
 interface = Interface(config)
 """Singleton interface for all softwares enzy_htp is capable of interfacing with. SHOULD NOT be used by
 end users and instead exists for developers to access external software. See enzy_htp/_interface/interface.py
 for full class defintion."""
+
+config = interface.config() 
+"""TODO(CJ)"""
+
+from .preparation import PDBLine, read_pdb_lines, dock_reactants
 
 from .analysis import ( electric_field )

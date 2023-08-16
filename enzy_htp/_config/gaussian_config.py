@@ -3,7 +3,7 @@ required executables, enviornment variables and settings for using Gaussian with
 features default_gaussian_config() which provides a deep-copied GaussianConfig() object for use in Gaussian based
 calculations.
 
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 
 Date: 2022-06-11
@@ -11,8 +11,9 @@ Date: 2022-06-11
 from copy import deepcopy
 from typing import Any, List, Dict
 
+from .base_config import BaseConfig
 
-class GaussianConfig:
+class GaussianConfig(BaseConfig):
     """Class that holds default values for running Gaussian within enzy_htp as well as the required
     executables and variables that need to be present in the environment.
 
@@ -77,10 +78,16 @@ class GaussianConfig:
         self._parent = parent
 
     def required_executables(self) -> List[str]:
+        """ """
         return [self.G16_EXE, self.G09_EXE]
 
     def required_env_vars(self):
+        """ """
         return []
+
+    def required_py_modules(self) -> List[str]:
+        """ """
+        return list()
 
     def __getitem__(self, key: str) -> Any:
         if key.count("."):

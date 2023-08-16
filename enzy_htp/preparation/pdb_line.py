@@ -4,7 +4,7 @@ for easy editing of raw files.
 PDBLine objects should not be handled by non-developer users and are primarily intended as a lighter
 weight representation of PDB objects when manipulating the files directly.
 
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-19
 """
@@ -238,7 +238,6 @@ def read_pdb_lines(fname: str) -> List[PDBLine]:
     # TODO(CJ): there is a chance that we only want HETATM/ATOM/TER/END... will figure out if this is the case later
     ending = fs.get_file_ext(fname).lower()
     if not ending == ".pdb":
-        raise core.UnsupportedFileType(
-            f"read_pdb_lines() requires a .pdb file. Could not read '{fname}'")
+        raise core.UnsupportedFileType(f"read_pdb_lines() requires a .pdb file. Could not read '{fname}'")
     non_empty = list(filter(len, fs.lines_from_file(fname)))
     return list(map(PDBLine, non_empty))

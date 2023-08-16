@@ -9,7 +9,7 @@ Date: 2022-08-30
 # pylint: disable=all, E
 import enzy_htp as eh
 
-stru_parser = eh.structure.structure_io.PDBParser()
+stru_parser = eh.structure.PDBParser()
 
 
 def mutant_design_workflow(stru_parser: StructureParser):
@@ -107,18 +107,27 @@ def mutant_ts_barrier_workflow():
     '''
     pass
 
+# a good idea in the avoid over engineering and use function as much as possible instead of classes. And those loosely defined interfaces can be made up by a well curated document.
 
 def mutant_design_workflow_wo_object():
-    raw_stru = eh.structure.structure_io.parser_struture(
-        'a-path-to-file-or-a-object', 'pdb'
-    )  # this way supporting a new format or changing an existing format will cause multiple code changes across layers
+    raw_stru = stru_parser.get_structure('a-path-to-file-or-a-object')  # this way supporting a new format or changing an existing format will cause multiple code changes across layers
     problems = eh.preparation.detect_stru_problems(raw_stru)
-    problems.append(
-        'docking')  # code for configuring each step is coupled with the workflow code
-    eh.preparation.prepare_stru(
-        raw_stru, problems, docking_ligand_path='path-to-ligand', protonation_ph=7.0
-    )  # too many arguments are required. And it is coupled with the detect_stru_problem since it has to know which problem to provide information with
+    problems.append('docking')  # code for configuring each step is coupled with the workflow code
+    eh.preparation.prepare_stru(raw_stru, problems, docking_ligand_path='path-to-ligand', protonation_ph=7.0)
     pass
 
-
-# a good idea in the avoid over engineering and use function as much as possible instead of classes. And those loosely defined interfaces can be made up by a well curated document.
+def mutant_design_workflow_complex():
+    stru = stru_parser.get_structure('a-path-to-file-or-a-object')
+    # prepare
+    eh.preparation.remove_solvent(stru)
+    eh.preparation.protonate_stru(stru, protonate_ligand=True)
+    # mutate
+    mutaflags = eh.mutation.assign_mutation("r")
+    eh.mutation.deploy_mutation(stru, mutaflags)
+    # MD
+    stru_ensemble = eh.geometry.sample_with_MD(stru)
+    # QM
+    for stru_frame in stru_ensemble:
+        energy, wfn_file = eh.energy.qm_cluster(stru_frame, "mask")
+        bond_dipole = eh.energy.analysis.get_bond_dipole(stru_frame, wfn_file, "mask")
+        electric_field = eh.energy.analysis.get_field_strength(stru_frame, "mask")

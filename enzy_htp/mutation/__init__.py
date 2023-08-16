@@ -6,20 +6,15 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-15
 """
 
-from .engine import mutate_pdb
-
 from .mutation import (
     Mutation,
-    valid_mutation,
-    generate_all_mutations,
-    size_increase,
-    size_decrease,
-    polarity_change,
-    same_polarity,
+    generate_from_mutation_flag,
+    check_repeat_mutation,
+    remove_repeat_mutation,
+    get_mutant_name_tag,
 )
 
-from .mutation_restrictions import (
-    MutationRestrictions,
-    restriction_object,
-    valid_restriction_dict,
+from .api import (
+    assign_mutant,
+    mutate_stru,
 )

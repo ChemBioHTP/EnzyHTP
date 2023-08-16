@@ -1,16 +1,17 @@
 """Definition for the Chain class. Chains primarily store Residue() objects and organize them
 within the overall structure of an enzyme.
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-20
 """
 from __future__ import annotations
 from copy import deepcopy
-import itertools
 import sys
-from enzy_htp.core import _LOGGER
 from typing import Iterable, List, Tuple, Union
+
+from enzy_htp.core import _LOGGER
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
+from enzy_htp.core.general import get_interval_from_list
 
 from enzy_htp.structure.atom import Atom
 import enzy_htp.chemical as chem
@@ -80,17 +81,14 @@ class Chain(DoubleLinkedNode):
             _LOGGER.error(f"chain {self} have more than 1 residue on {idx}")
             sys.exit(1)
         if len(result) == 0:
-            _LOGGER.warning(f"residue idx {idx} out of chain's range {self}"
-                            )  #TODO may be make this an error
+            _LOGGER.warning(f"residue idx {idx} out of chain's range {self}")  #TODO may be make this an error
             return None
         return result[0]
 
     #endregion
 
     #region === Getter-Prop ===
-    def residue_idx_interval(self,
-                             if_str: bool = True
-                             ) -> Union[str, Iterable[Tuple[int, int]]]:
+    def residue_idx_interval(self, if_str: bool = True) -> Union[str, Iterable[Tuple[int, int]]]:
         """
         a range representation of containing residue indexes
         Args & Returns:
@@ -100,8 +98,11 @@ class Chain(DoubleLinkedNode):
         """
         interval_list = get_interval_from_list(self.residue_idxs)
         if if_str:
-            range_strs = map(lambda x: f"{x[0]}-{x[1]}", interval_list)
-            return ",".join(range_strs)
+            contain_list = [f"{x[0]}-{x[1]}" if x[0] != x[1] else f"{x[0]}" for x in interval_list]
+            if len(contain_list) == 1:
+                return contain_list[0]
+            range_strs = ",".join(contain_list)
+            return range_strs
         return interval_list
 
     @property
@@ -139,8 +140,8 @@ class Chain(DoubleLinkedNode):
                 Any composition from metal, ligand, solvent, trash
         """
         chain_type = []
-        if self.is_peptide():
-            return "peptide"
+        if self.is_polypeptide():
+            return "polypeptide"
         if self.has_metal():
             chain_type.append("metal")
         if self.has_ligand():
@@ -164,14 +165,11 @@ class Chain(DoubleLinkedNode):
     #endregion
 
     #region === Checker ===
-    def is_peptide(self) -> bool:
+    def is_polypeptide(self) -> bool:
         """
-        if there is any residue not canonical
+        if there is any non-aminoacid part in chain
         """
-        return not sum(
-            list(
-                map(lambda rr: (not rr.is_canonical()) and
-                    (not rr.is_noncanonical()), self._residues)))
+        return not sum(list(map(lambda rr: (not rr.is_canonical()) and (not rr.is_noncanonical()), self._residues)))
 
     def has_metal(self) -> bool:
         """Checks if any metals are contained within the current chain."""
@@ -267,8 +265,7 @@ class Chain(DoubleLinkedNode):
         else:
             self._residues.append(new_res)
 
-        self.rename(
-            self._name)  #@shaoqz: maybe better to change this residue attribute only?
+        self.rename(self._name)  #@shaoqz: maybe better to change this residue attribute only?
 
         if sort_after:
             self._residues.sort(
@@ -288,9 +285,7 @@ class Chain(DoubleLinkedNode):
 
         del self._residues[ridx]  #@shaoqz: why not move this line inside the loop?
 
-    def rename(
-        self, new_name: str
-    ) -> None:  # TODO#@shaoqz: using the 2-way link sheet will get rid of functions like this but both works.
+    def rename(self, new_name: str) -> None:  # TODO#@shaoqz: using the 2-way link sheet will get rid of functions like this but both works.
         """Renames the chain and propagates the new chain name to all child Residue()"s."""
         self._name = new_name
         res: Residue
@@ -298,15 +293,13 @@ class Chain(DoubleLinkedNode):
             self._residues[ridx].set_chain(new_name)  #@shaoqz: why not just use res?
 
     def renumber_atoms(
-        self,
-        start: int = 1
-    ) -> int:  # TODO#@shaoqz: @imp need to record the mapping of the index  #@shaoqz: also need one for residues
+            self,
+            start: int = 1) -> int:  # TODO#@shaoqz: @imp need to record the mapping of the index  #@shaoqz: also need one for residues
         """Renumbers the Atom()"s inside the chain beginning with "start" value and returns index of the last atom.
         Exits if start index <= 0.
         """
         if start <= 0:
-            _LOGGER.error(
-                f"Illegal start number '{start}'. Value must be >= 0. Exiting...")
+            _LOGGER.error(f"Illegal start number '{start}'. Value must be >= 0. Exiting...")
             exit(1)
         self._residues = sorted(self._residues, key=lambda r: r.idx())
         idx = start
@@ -315,8 +308,7 @@ class Chain(DoubleLinkedNode):
             idx = self._residues[ridx].renumber_atoms(idx)
             idx += 1
             terminal = (ridx < (num_residues - 1)) and (
-                res.is_canonical() and not self._residues[ridx + 1].is_canonical(
-                )  #@shaoqz: @imp what does this mean? the TER line?
+                res.is_canonical() and not self._residues[ridx + 1].is_canonical()  #@shaoqz: @imp what does this mean? the TER line?
             )
             if terminal:
                 idx += 1
@@ -330,24 +322,3 @@ class Chain(DoubleLinkedNode):
         return f"Chain({self._name}, residue: {self.residue_idx_interval()})"
 
     #endregion
-
-
-# TODO go to core
-def get_interval_from_list(target_list: List[int]) -> Iterable[Tuple[int, int]]:
-    """
-    convert a list of int to the interval/range representation
-    Returns:
-        a generater of tuples with each indicating the start/end of the interval
-    Example:
-        >>> list(get_interval_from_list([1,2,3,6,7,8]))
-        [(1,3),(6,8)]
-    reference: https://stackoverflow.com/questions/4628333
-    """
-    # clean input
-    target_list = sorted(set(target_list))
-    # here use enum id as a ref sequence and group by the deviation
-    for i, j in itertools.groupby(
-            enumerate(target_list),
-            lambda ref_vs_target: ref_vs_target[1] - ref_vs_target[0]):
-        j = list(j)
-        yield j[0][1], j[-1][1]
