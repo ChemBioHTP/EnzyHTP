@@ -414,6 +414,7 @@ def mutate_stru_with_rosetta(
     stru: Structure,
     mutant: List[Mutation],
     in_place: bool = False,
+    **kwargs
 ) -> Union[Structure, None]:
     """Applies mutations to a function using the Rosetta engine. 
 
@@ -463,6 +464,8 @@ def mutate_stru_with_rosetta(
         '-in:file:s', temp_file,
         '-overwrite'
     ]
+
+    opts.extend(kwargs.get('extra_flags',[]))
 
     temp_path = Path(temp_file)
     expected_mutant:str = temp_path.parent / f"{temp_path.stem}_0001.pdb"

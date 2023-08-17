@@ -21,8 +21,6 @@ from enzy_htp import mutation as mm
 from enzy_htp.structure import PDBParser, Structure
 from enzy_htp.core import file_system as fs
 
-from .cluster import create_cluster
-
 def dock_reactants( structure:Structure, 
                     reactants:List[str], 
                     constraints:List[RosettaCst] = None, 
@@ -94,7 +92,7 @@ def dock_reactants( structure:Structure,
     df:pd.DataFrame = _docking_run(options_file, use_cache)
     
     _evaluate_csts(df, constraints)
-
+    
     df['clash_ct'] = df.apply(lambda row: _clash_count(row.description), axis=1)
 
     df.to_csv(f"{work_dir}/scores.csv", index=False)
@@ -103,9 +101,13 @@ def dock_reactants( structure:Structure,
     docked_complexes.append( wt_fpath ) 
     #TODO(CJ): here is where we do QM ranking
 
+    e_flags = []
+    for pf in param_files:
+        e_flags.extend(['-extra_res_fa', str(Path(pf).absolute())])
+
     if mutations:
         docked_complexes.extend(
-            _mutate_result(selected, mutations, work_dir )
+            _mutate_result(selected, mutations, work_dir, e_flags )
         )
 
     df.to_csv(f"{work_dir}/scores.csv", index=False)
@@ -388,13 +390,15 @@ def _docking_run(option_file:str, use_cache:bool) -> pd.DataFrame:
 
     opt_path = Path(option_file)
     if use_cache: 
-        df=pd.read_csv(str(opt_path.parent / "scores.csv"))
-        
-        for i, row in df.iterrows():
-            if not Path(row.description).exists():
-                break
-        else:
-            return df
+        csv_file = Path(str(opt_path.parent / "scores.csv"))
+        if csv_file.exists():
+            df=pd.read_csv(csv_file)
+            
+            for i, row in df.iterrows():
+                if not Path(row.description).exists():
+                    break
+            else:
+                return df
 
 
     
@@ -476,7 +480,7 @@ def _dock_mut_cst_overlaps(structure,
     #TODO(CJ): implement this
 
 
-def _mutate_result(structure, mutations:List[mm.Mutation], work_dir :str) -> List[str]:
+def _mutate_result(structure, mutations:List[mm.Mutation], work_dir :str, extra_flags=None) -> List[str]:
     """ TODO(CJ)"""
 
     res_names = {}
@@ -489,11 +493,14 @@ def _mutate_result(structure, mutations:List[mm.Mutation], work_dir :str) -> Lis
             f"{res.chain.name}.{res.idx}"
             ] = chem.convert_to_one_letter(res.name)
 
+    if extra_flags is None:
+        extra_flags = list()
+
     result:List[str] = list()
     for mut in mutations:
         original = res_names[f"{mut.chain_id}.{mut.res_idx}"]
         mutated_outfile:str=f"{work_dir}/{original}{mut.res_idx}{chem.convert_to_one_letter(mut.target)}.pdb"
-        mutant = mm.mutate_stru(structure, [mut], engine='rosetta')
+        mutant = mm.mutate_stru(structure, [mut], engine='rosetta', extra_flags=extra_flags )
         parser = PDBParser()
         file_str = parser.get_file_str(mutant, if_renumber=False, if_fix_atomname=False)
         fs.safe_rm(mutated_outfile)
@@ -602,6 +609,7 @@ def _select_complex(df : pd.DataFrame, work_dir:str, cutoff:int=20) -> Tuple[Str
 
     charge:int=interface.bcl.calculate_formal_charge(cluster)
     # QM ranking
+    #TODO(CJ): make this another function
     data = list()
     for i, row in cpy.iterrows():
         
