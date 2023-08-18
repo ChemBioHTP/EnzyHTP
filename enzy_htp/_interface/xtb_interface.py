@@ -55,7 +55,10 @@ class XTBInterface(BaseInterface):
             Single point energy value in Hartrees.           
 
         """
-        
+       
+        fs.check_file_exists( fname )
+        self._check_valid_extension( fname )
+
         if n_iter == -1:
             n_iter = self.config_.N_ITER
 
@@ -91,5 +94,11 @@ class XTBInterface(BaseInterface):
             Nothing.
         """
 
-        for fname in "wbo xtbrestart xtbtopo.mol".split():
+        for fname in "charges wbo xtbrestart xtbtopo.mol".split():
             fs.safe_rm(f"{work_dir}/{fname}")
+
+    def _check_valid_extension(self, fname:str) -> None:
+        """Does the supplied file have a supported file extension? Logs an error
+        and exits if not."""
+        ext:str=fs.get_file_ext(str(fname))
+        #TODO(CJ): finish this

@@ -23,7 +23,7 @@ class XTBConfig(BaseConfig):
     XTB_EXE:str = "xtb"
     """Name of the xtb executable as a str()."""
 
-    N_ITER:int = 100
+    N_ITER:int = 500
     """Number of SCF iterations to try as an int()."""
 
     N_PROC:int = 1 
