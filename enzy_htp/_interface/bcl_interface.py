@@ -1,5 +1,8 @@
 """Defines a BCLInterface class that serves as a bridge for enzy_htp to utilize the biochemical library (BCL)
-Uses the BCLConfig class found in enzy_htp/_config/_config.py. Supported operations include conformer generation.
+Uses the BCLConfig class found in enzy_htp/_config/bcl_config.py. Supported operations include:
+
+    + conformer generation
+    + formal charge calculation
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-04-01
@@ -19,19 +22,19 @@ from enzy_htp._config.bcl_config import BCLConfig, default_bcl_config
 
 class BCLInterface(BaseInterface):
     """Class that provides a direct interfrace for enzy_htp to utilize the BCL. Supported opterations
-    include conformer generation. Users should use this class as the only way to interact with any application
+    include conformer generation and formal charge calculation. Users should use this class as the only way to interact with any application
     in BCL.
 
 
     Attributes:
         config_	: The BCLConfig() class which provides settings for both running BCL and maintaining a compatible environment.
-        env_manager_ : The EnvironmentManager() class which ensure all required environment elements exist.
+        env_manager_ : The EnvironmentManager() class which ensures all required environment elements exist.
         compatible_env_ : A bool() indicating if the current environment is compatible with the object itself.
     """
 
     def __init__(self, parent, config: BCLConfig = None) -> None:
         """Simplistic constructor that optionally takes a BCLConfig object as its only argument.
-        Calls parent class.
+        Calls parent constructor.
         """
         super().__init__(parent, config, default_bcl_config)
 
