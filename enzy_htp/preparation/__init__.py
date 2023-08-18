@@ -9,5 +9,4 @@ Date: 2022-03-19
 from .pdb_line import PDBLine, read_pdb_lines
 from .protonate import protonate_stru
 from .clean import remove_solvent
-from .cluster import create_cluster
 from .reactive_docking import dock_reactants

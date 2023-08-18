@@ -43,13 +43,12 @@ def create_cluster( fname:str, sele_str:str,outfile:str=None,cap_strategy:str='H
             ('h_add', f"chain {row.chain} and resi {row.resi} and resn {row.resn} and name {row['name']}")
         )
 
-    interface.pymol.general_cmd(session, args )
+    args.append(("save", outfile, obj_name))
 
-    interface.pymol.general_cmd(session, [("save", outfile, obj_name)])
+    interface.pymol.general_cmd(session, args )
 
     if cap_strategy == 'H':
         return outfile
-
 
     if cap_strategy == 'CH3':
         
