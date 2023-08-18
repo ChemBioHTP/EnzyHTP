@@ -1,5 +1,5 @@
 
-
+from pathlib import Path
 
 #TODO(CJ): add in itertions stuff
 from .base_interface import BaseInterface

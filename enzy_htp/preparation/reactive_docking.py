@@ -30,6 +30,7 @@ def dock_reactants( structure:Structure,
                     reactant_conformers:List[str]=None,
                     rng_seed:int=1996,
                     n_struct:int=1000,
+
                     use_cache:bool=True
                     ) -> List[str]:
     """Performs reactive docking by placing the supplied reactants into the given Structure object. Uses the RosettaLigand
@@ -92,8 +93,10 @@ def dock_reactants( structure:Structure,
     df:pd.DataFrame = _docking_run(options_file, use_cache)
     
     _evaluate_csts(df, constraints)
-    
-    df['clash_ct'] = df.apply(lambda row: _clash_count(row.description), axis=1)
+
+    _evalute_clashes(df, clash_cutoff)
+
+    #df['clash_ct'] = df.apply(lambda row: _clash_count(row.description), axis=1)
 
     df.to_csv(f"{work_dir}/scores.csv", index=False)
     (selected, wt_fpath) = _select_complex(df, work_dir)
@@ -416,7 +419,9 @@ def _docking_run(option_file:str, use_cache:bool) -> pd.DataFrame:
     )
 
     df['description'] = df.apply( lambda row: f"{opt_path.parent}/complexes/{row.description}.pdb", axis=1)
-    
+   
+    df['selected'] = True
+
     return df
 
 
@@ -465,7 +470,7 @@ def _prepare_reactants(reactants:List[str], reactant_conformers:List[str]=None) 
 
     return param_files
 
-def _dock_mut_cst_overlaps(structure,
+def _dock_mut_cst_overlaps(structure:Structure,
                             reactants:List[str], 
                             constraints:List[RosettaCst], 
                             mutations:List[mm.Mutation],
@@ -475,7 +480,13 @@ def _dock_mut_cst_overlaps(structure,
                             rng_seed:int,
                             n_struct:int
                             ) -> List[str]:
-    """ """
+    """
+    
+    Args:
+
+    Returns:
+
+    """
     pass
     #TODO(CJ): implement this
 
@@ -574,8 +585,8 @@ def _select_complex(df : pd.DataFrame, work_dir:str, cutoff:int=20) -> Tuple[Str
     """
     cpy = deepcopy( df )
 
-    clash_cutoff = np.percentile(cpy.clash_ct, cutoff) #TODO(CJ): cutoffs
-    cpy = cpy[cpy.clash_ct<=clash_cutoff].reset_index(drop=True)
+#    clash_cutoff = np.percentile(cpy.clash_ct, cutoff) #TODO(CJ): cutoffs
+#    cpy = cpy[cpy.clash_ct<=clash_cutoff].reset_index(drop=True)
 
     score_cutoff= np.percentile(cpy.total_score.to_numpy(),cutoff)
     cst_cutoff= np.percentile(cpy.cst_diff.to_numpy(),cutoff)
@@ -605,7 +616,7 @@ def _select_complex(df : pd.DataFrame, work_dir:str, cutoff:int=20) -> Tuple[Str
     interface.pymol.general_cmd(session,[
         ('save', f'{work_dir}/__temp.sdf', sele_stmt)
     ])
-    cluster = create_cluster(df.description[0], sele_stmt, outfile= f'{work_dir}/__temp.sdf')
+    cluster = interface.pymol.create_cluster(session, df.description[0], sele_stmt, outfile= f'{work_dir}/__temp.sdf', cap_strategy='CH3')
 
     charge:int=interface.bcl.calculate_formal_charge(cluster)
     # QM ranking
@@ -616,7 +627,7 @@ def _select_complex(df : pd.DataFrame, work_dir:str, cutoff:int=20) -> Tuple[Str
         fs.safe_rm( temp_xyz )                                
         fs.safe_rm( temp_sdf )                                
 
-        cluster = create_cluster(row.description, sele_stmt, outfile= f'{work_dir}/__temp.xyz')
+        cluster = interface.pymol.create_cluster(session, row.description, sele_stmt, outfile= f'{work_dir}/__temp.xyz', cap_strategy='CH3')
         energy = interface.xtb.single_point(cluster, charge=charge)
         data.append((energy, row.description))
 

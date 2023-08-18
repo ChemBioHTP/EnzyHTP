@@ -530,7 +530,7 @@ class PyMolInterface(BaseInterface):
         """
     
         if work_dir is None:
-            work_dir = config['system.WORK_DIR']
+            work_dir = eh_config['system.WORK_DIR']
     
         fs.check_file_exists(fname)
     
