@@ -11,6 +11,8 @@ TODO: support 3A MMPBSA
 from subprocess import run, CalledProcessError
 from glob import glob
 import os
+import mdtraj
+import numpy as np
 
 from Class_PDB import PDB
 from Class_Structure import *
@@ -31,9 +33,9 @@ class Traj_calc:
     prmtop
     pdb
     '''
-    def __init__(self, nc, prmtop, pdb=None, name=None) -> None:
+    def __init__(self, traj: str, prmtop: str, pdb: str=None, name: str=None) -> None:
         self.name = name
-        self.nc = nc
+        self.traj = traj
         self.prmtop = prmtop
         self.pdb = pdb
 
@@ -86,6 +88,49 @@ class Traj_calc:
         
         return traj_list
 
+    @classmethod
+    def from_keyword_find_single_traj(cls, path, keyword=''):
+        '''
+        Find all (.prmtop, .pdb and .nc file) groups for EnzyHTP result
+        keyword search using 'find' with san check about file existance (used in 2021/11/30 - CHEM5420 final project)
+        -----
+        path: Search path root
+        keyword: keyword used for search (in shell find style)
+        -return--
+        A list of Traj_calc objects: [Traj_calc(nc, prmtop, name, pdb), ...]
+        '''
+        traj_list = []
+        cmd = f'find {path} -wholename "{keyword}"'
+        p_path = run(cmd, check=True, text=True, shell=True, capture_output=True).stdout.strip()
+        if not p_path:
+            print('WARNING: Do not find prmtop file in:', keyword)
+        p_name = keyword
+        p_path = os.path.dirname(p_path)
+        #--name--
+        p_name = p_path.split('/')[-1]
+        #--nc--
+        p_traj = p_path+'/MD/prod.mdcrd'
+        #   san check
+        if not os.path.exists(p_traj):
+            print('INFO: Do not find mdcrd file. Ignoring:', p_path)
+        #--prmtop--
+        p_prmtop = glob(p_path+'/*prmtop')
+        #   san check
+        if len(p_prmtop) == 0:
+            print('WARNING: Do not find prmtop file while nc file exists. Ignoring:', p_path)
+        if len(p_prmtop) > 1:
+            print('WARNING: Found more than one prmtop files in:', p_path)
+            print('Please choose between:', p_prmtop)
+            raise TrajCalcERROR
+        p_prmtop = p_prmtop[0]
+        #--pdb--
+        # find the pdb with the same name as prmtop. Based on the common procedure in the EnzyHTP
+        p_prm_name = p_prmtop[:-7]
+        p_pdb = p_prm_name + '.pdb'
+        if not os.path.exists(p_pdb):
+            print('WARNING: Do not find pdb file while nc and prmtop file exists. Ignoring:', p_path)
+
+        return cls(p_traj, p_prmtop, p_pdb, p_name)
 
     # === MMPBSA ===
     def update_Radii(self, igb=5):
@@ -291,8 +336,23 @@ class Traj_calc:
             except TrajCalcERROR as err:
                 print('ERROR:', err)
         return data_files
-        
-        
+
+    # === RMSD clustering ===
+    def get_rep_structure(self, target_mask: str, save_dir: str):
+        """get representative structures of the trajectory"""
+        from sklearn.cluster import KMeans
+        traj = mdtraj.load(self.traj, top=self.prmtop)
+        traj = traj.remove_solvent()
+        atom_list = traj.topology.select(target_mask)
+        frame_rmsd = mdtraj.rmsd(traj, traj, 0, atom_list)
+        X = np.array(frame_rmsd).reshape(-1, 1)
+        km = KMeans()
+        km.fit(X)
+        clusters = km.labels_
+        representative_frames = [
+            frame for i, frame in enumerate(traj) if frame_rmsd[i] == np.median(X[clusters == clusters[i]])]
+        for i, rep_frame in enumerate(representative_frames):
+            rep_frame.save_pdb(f"{save_dir}rep_stru_{i}.pdb")
 
 def main():
     # Config.n_cores=4    
