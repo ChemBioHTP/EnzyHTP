@@ -30,7 +30,9 @@ def dock_reactants( structure:Structure,
                     reactant_conformers:List[str]=None,
                     rng_seed:int=1996,
                     n_struct:int=1000,
-
+                    cst_cutoff:int=20,
+                    clash_cutoff:float=1.0,
+                    binding_cutoff:int=50,
                     use_cache:bool=True
                     ) -> List[str]:
     """Performs reactive docking by placing the supplied reactants into the given Structure object. Uses the RosettaLigand
