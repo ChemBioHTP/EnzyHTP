@@ -1509,6 +1509,19 @@ class PDB():
         return self.path
 
 
+    def rm_ligands(self) -> str:
+        '''mvp function that removes all ligands from the structure'''
+        out_path = self.path_name+'_rmL.pdb'
+        
+        self.get_stru()
+        self.stru.ligands = []
+        self.stru.build(out_path, keep_id=0)
+        self.path=out_path
+        self._update_name()
+
+        return self.path
+
+
     def PDBMD(  
         self, 
         tag: str = '', 
@@ -2291,7 +2304,7 @@ class PDB():
                     coord += atom.build_oniom('h', self.chrg_list_all[atom.id-1], if_sol=1)
                 else:
                     # consider connection
-                    cnt_info = None # for future update
+                    cnt_info = None # for future update ligand
                     repeat_flag = 0
                     for cnt_atom in atom.connect:
                         if cnt_atom.id in self.layer[0]:

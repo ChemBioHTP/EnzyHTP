@@ -589,6 +589,16 @@ def test_get_protonation_pdb2pqr_disulfied():
     disulfied_residue_pairs = test_pdb._get_protonation_pdb2pqr()
     assert len(disulfied_residue_pairs) == 3
 
+def test_rm_ligand():
+    """test if rm_ligand functions correctly"""
+    test_dir = 'test/testfile_Class_PDB/'
+    test_pdb = PDB(f'{test_dir}KE07R7.pdb', wk_dir=test_dir)
+    test_pdb.rm_ligands()
+    test_pdb.get_stru()
+    test_file_paths.append(test_pdb.path)
+
+    assert not test_pdb.stru.ligands
+
 ### utilities ###
 @pytest.mark.clean
 def test_clean_files():
