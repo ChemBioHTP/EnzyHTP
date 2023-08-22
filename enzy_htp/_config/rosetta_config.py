@@ -36,12 +36,15 @@ class RosettaConfig(BaseConfig):
     SCORE: str = f"$ROSETTA3/source/bin/score_jd2.default.linuxgccrelease"
     """Executable used to score a specific structure/pose."""
 
+    PY_2_7:str = "python2.7"
+    """TODO(CJ)"""
+
     def required_executables(self) -> List[str]:
         """A hardcoded list of required executables for Rosetta."""
-        return [self.ROSETTA_SCRIPTS, self.PARAMS_SCRIPT]
+        return [self.ROSETTA_SCRIPTS, self.PARAMS_SCRIPT, self.PY_2_7]
 
     def required_env_vars(self) -> List[str]:
-        """A hardcoded list of required enviornment variables for Amber."""
+        """A hardcoded list of required enviornment variables for Rosetta."""
         return [self.ROSETTA3]
 
     def required_py_modules(self) -> List[str]:

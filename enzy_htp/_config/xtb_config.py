@@ -35,7 +35,7 @@ class XTBConfig(BaseConfig):
     OMP_STACKSIZE:str = "OMP_STACKSIZE"
     """Environment variable corresponding to OMP stack size."""
 
-    SUPPORT_EXTENSIONSS:List[str] = ".xyz .mol .sdf .pdb".split()
+    SUPPORTED_EXTENSIONS:List[str] = ".xyz .mol .sdf .pdb".split()
     """A List[str] of supported file extensions for xtb."""
 
     def required_executables(self) -> List[str]:

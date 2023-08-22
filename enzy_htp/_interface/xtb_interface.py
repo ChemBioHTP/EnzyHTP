@@ -101,4 +101,9 @@ class XTBInterface(BaseInterface):
         """Does the supplied file have a supported file extension? Logs an error
         and exits if not."""
         ext:str=fs.get_file_ext(str(fname))
-        #TODO(CJ): finish this
+        if ext in self.config_.SUPPORTED_EXTENSIONS:
+            return 
+
+        _LOGGER.error(f"The supplied file '{fname}' has an unsupported extension of '{ext}'. Supported include {', '.join(self.config_.SUPPORTED_EXTENSIONS)}. Exiting...")
+        exit( 1 )
+

@@ -319,7 +319,7 @@ class RosettaInterface(BaseInterface):
         #TODO(CJ): need to add some flags here -> potentially the charge one
         flags: List[str] = [self.config_.PARAMS_SCRIPT, f"{molfile}", f"--name={res_name}", "--clobber", "--keep-names"]
 
-        self.env_manager_.run_command("python2.7", flags)
+        self.env_manager_.run_command(self.config_.PY_2_7, flags)
 
         params_file: str = f"./{res_name}.params"
         pdb_file: str = f"./{res_name}_0001.pdb"
@@ -422,6 +422,7 @@ class RosettaInterface(BaseInterface):
 
         content: List[str] = fs.lines_from_file(param_file)
         content.append(f"PDB_ROTAMERS {Path(conformers_file).absolute()}")
+        fs.safe_rm(param_file)
         fs.write_lines(param_file, content)
 
     def relax(
