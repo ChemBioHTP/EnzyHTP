@@ -599,6 +599,13 @@ def test_rm_ligand():
 
     assert not test_pdb.stru.ligands
 
+def test_rm_wat():
+    """test if rm_wat functions correctly"""
+    test_dir = 'test/testfile_Class_PDB/'
+    test_pdb = PDB(f'{test_dir}KE07R7.pdb', wk_dir=test_dir)
+    test_pdb.rm_wat()
+    test_file_paths.append(test_pdb.path)
+
 ### utilities ###
 @pytest.mark.clean
 def test_clean_files():

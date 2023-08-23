@@ -1453,7 +1453,7 @@ class PDB():
         return self.prmtop_path, self.inpcrd_path
 
 
-    def rm_wat(self):
+    def rm_wat(self, add_skip_names: list =None):
         '''
         Remove water and ion for the pdb. Remians the same if there's no water or ion.
         Now only skip [Na+,Cl-,WAT,HOH] // Append more in the future.
@@ -1462,9 +1462,13 @@ class PDB():
         '''
         out_path = self.path_name+'_rmW.pdb'
         self._get_file_path()
+        if add_skip_names is None:
+            skip_list=['Na+','Cl-','WAT','HOH']
+        else:
+            skip_list = add_skip_names.extend(['Na+','Cl-','WAT','HOH'])
+
         with open(self.path) as f:
             with open(out_path,'w') as of:
-                skip_list=['Na+','Cl-','WAT','HOH']
                 change_flag=0
                 for line in f:
                     PDB_l = PDB_line(line)
@@ -1488,15 +1492,22 @@ class PDB():
                         continue
 
                     #skip the water and ion(Append in the future)
-                    for i in skip_list:
-                        if PDB_l.resi_name == i:
-                            skip_flag=1
-                            break
-                    if skip_flag:
-                        change_flag=1
-                        continue
+                    # keep only ATOM and HETATM record
+                    if PDB_l.line_type in ['ATOM', 'HETATM']:
+                        for i in skip_list:
+                            if PDB_l.resi_name == i:
+                                skip_flag=1
+                                break
+                        if skip_flag:
+                            change_flag=1
+                            continue
 
-                    of.write(line)
+                        of.write(line)
+                    else:
+                        change_flag = 1
+                        if Config.debug > 1:
+                            print(f'rm_wat(): skipping {PDB_l.line_type}')
+                    
                     # set to 0 until first following line after TER is kept (not TER or skip_list)
                     ter_flag=0
 
