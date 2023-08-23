@@ -602,7 +602,7 @@ def test_rm_ligand():
 def test_rm_wat():
     """test if rm_wat functions correctly"""
     test_dir = 'test/testfile_Class_PDB/'
-    test_pdb = PDB(f'{test_dir}KE07R7.pdb', wk_dir=test_dir)
+    test_pdb = PDB(f'{test_dir}1nvg.pdb', wk_dir=test_dir)
     test_pdb.rm_wat()
     test_file_paths.append(test_pdb.path)
 
