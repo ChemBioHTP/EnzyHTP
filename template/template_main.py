@@ -36,6 +36,7 @@ def main():
     for mut in mutants:        
         # Prepare
         pdb_obj = PDB(wt_pdb, wk_dir=f"./mutation_{'_'.join(mut)}")
+        pdb_obj.rm_wat()
         pdb_obj.rm_allH()
         pdb_obj.get_protonation(if_prt_ligand=0)
 
