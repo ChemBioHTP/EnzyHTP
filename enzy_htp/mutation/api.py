@@ -469,6 +469,7 @@ def mutate_stru_with_rosetta(
 
     temp_path = Path(temp_file)
     expected_mutant:str = temp_path.parent / f"{temp_path.stem}_0001.pdb"
+    score_sc:str = str(temp_path.parent / "score.sc")
     fs.safe_rm( expected_mutant )
     interface.rosetta.run_rosetta_scripts( opts )
     
@@ -477,16 +478,18 @@ def mutate_stru_with_rosetta(
     expected_mutant = str(expected_mutant)
     fs.safe_rm( xml_file )
     fs.safe_rm( temp_file )
+    fs.safe_rm( score_sc )
     #fs.safe_rm( expected_mutant )
-    #TODO(CJ): remove score.sc file
 
     if in_place:
         stru_cpy = parser.get_structure(expected_mutant)
+        fs.safe_rm( expected_mutant )
         stru_oper.update_residues(stru, stru_cpy)
         return 
     else:
         stru_cpy = copy.deepcopy( stru )
         rosetta_stru  = parser.get_structure(expected_mutant)
+        fs.safe_rm( expected_mutant )
         stru_oper.update_residues( stru_cpy, rosetta_stru )
         return stru_cpy
        #TODO(CJ): do it this way

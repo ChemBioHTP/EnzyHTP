@@ -95,29 +95,30 @@ class PyMolInterface(BaseInterface):
 
         result: str = str(file_2)
 
+
+        self.general_cmd(session, [('delete', 'all')])
+        
         try:
-            session.cmd.delete('all')
-            session.cmd.load(file_1)
+            self.general_cmd(session, [('load', file_1)])
 
             if split_states:
-                session.cmd.split_states('all')
+                self.general_cmd(session, [('split_states', 'all')])
                 result = Path(result)
                 parent_dir = result.parent
                 result_stem = result.stem
                 result = []
 
-                for oidx, oname in enumerate(session.cmd.get_object_list()):
+                for oidx, oname in enumerate(self.general_cmd(session, [('get_object_list')])[0]):
 
-                    if session.cmd.count_states(oname) != 1:
+                    if self.general_cmd(session, [('count_states',oname)])[0] != 1:
                         session.cmd.delete(oname)
                         continue
 
                     fname = str(parent_dir / f"{result_stem}_{oidx}{new_ext}")
-                    session.cmd.save(fname, oname)
+                    self.general_cmd(session, [('save', fname, oname)])
                     result.append(fname)
             else:
-                session.cmd.save(result)
-                session.cmd.delete('all')
+                self.general_cmd(session, [('save', result), ('delete', 'all')])
 
         except Exception as exe:
             _LOGGER.error(f"Could not convert '{file_1}' to '{file_2}'. Encountered error: '{exe}'. Exiting...")
@@ -452,7 +453,7 @@ class PyMolInterface(BaseInterface):
                     result.append(fxn())
             except Exception as e:
                 _LOGGER.error(f"{e}")
-                _LOGGER.error(f"PyMOL function call '{cmd_str}' resuled in an error. Exiting...")
+                _LOGGER.error(f"PyMOL function call '{cmd_str}' resulted in an error. Exiting...")
                 exit(1)
 
         return result
@@ -526,8 +527,7 @@ class PyMolInterface(BaseInterface):
 
 
     def create_cluster(self,session, fname:str, sele_str:str,outfile:str=None,cap_strategy:str='H', work_dir:str=None) -> str:
-        """ 
-        """
+        """TODO(CJ)"""
     
         if work_dir is None:
             work_dir = eh_config['system.WORK_DIR']
@@ -540,7 +540,9 @@ class PyMolInterface(BaseInterface):
     
         #TODO(CJ): add file check for fname
         obj_name:str='__eh_cluster'
-        self.general_cmd(session, [('load', fname), ('select', sele_str),('create',obj_name,sele_str)])
+        self.general_cmd(session, 
+            [('delete','all'),('load', fname), ('select', sele_str),('create',obj_name,sele_str), ('delete', Path(fname).stem)]
+        )
     
         df:pd.DataFrame=self.collect(session, 'memory', "chain resi resn name".split())
     
@@ -573,27 +575,28 @@ class PyMolInterface(BaseInterface):
             new = set(
                 zip(updated.chain,updated.resi,updated.resn,updated['name'])
             )
-    
-            for tp in new:
-                if tp in orig:
-                    continue
-                if tp[3] == 'H01':
+   
+           
+            for (cname, res_num, res_name, aname) in filter(lambda x: x not in orig,  new ):
+                if aname == 'H01':
                     new_name='C21'
-                elif tp[3] == 'H02':
+                elif aname == 'H02':
                     new_name='C22'
                 else:
-                    assert False
+                    assert False,(cname, res_num, res_name, aname)
                 args.extend([
-                    ('alter', f"chain {tp[0]} and resi {tp[1]} and resn {tp[2]} and name {tp[3]}", "elem='C'"),
-                    ('alter', f"chain {tp[0]} and resi {tp[1]} and resn {tp[2]} and name {tp[3]}", f"name='{new_name}'"),
+                    ('alter', f"chain {cname} and resi {res_num} and resn {res_name} and name {aname}", "elem='C'"),
+                    ('alter', f"chain {cname} and resi {res_num} and resn {res_name} and name {aname}", f"name='{new_name}'"),
                 ])
+            
+            self.general_cmd(session, args )
     
-            args.extend([
+            args = [
                 ('valence', 'guess', 'name C21 or name C22'),
                 ('h_add','name C21'),
                 ('h_add','name C22'),
                 ("save", outfile, obj_name)
-            ])
+            ]
             self.general_cmd(session, args )
     
         return outfile    

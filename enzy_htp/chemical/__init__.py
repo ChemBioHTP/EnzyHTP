@@ -15,6 +15,7 @@ from .residue import (
     ONE_LETTER_AA_MAPPER,
     RESIDUE_VOLUME_MAPPER,
     RESIDUE_CATEGORIES,
+    AA_CHARGE_MAPPER,
     one_letters_except,
     convert_to_one_letter,
     convert_to_three_letter,

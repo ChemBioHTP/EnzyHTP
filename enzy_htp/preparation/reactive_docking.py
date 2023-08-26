@@ -6,6 +6,7 @@ Date: 2023-07-28
 """
 import os
 from pathlib import Path
+from collections import defaultdict
 from typing import List, Tuple, Set
 from copy import deepcopy
 
@@ -32,35 +33,14 @@ def dock_reactants( structure:Structure,
                     n_struct:int=1000,
                     
                     cst_cutoff:int=10,
-                    clash_distance:float=1.75,
-                    clash_cutoff:int=5,
+                    clash_distance:float=2.0,
+                    clash_cutoff:int=1,
                     binding_cutoff:int=20,
+                    cluster_distance:float=2.5,
                     
                     use_cache:bool=True
                     ) -> List[str]:
-    """Performs reactive docking by placing the supplied reactants into the given Structure object. Uses the RosettaLigand
-    docking engine to sample geometries and applies constraints to sample realistic geometries. All other arguments are optional
-    but generally improve the quality of the generated structures. Assumes that both the supplied Structure and ligands are 
-    protonated correctly. The default system is saved to WT.pdb and all mutated versions are saved to <MUT>.pdb files where 
-    <MUT> is of the form <original one letter AA><residue index><mutated one letter AA>. Mutations are applied AFTER the 
-    reactants are docked, unless the mutations and contraints overlap.  
-
-    Args:
-        structure: The structure where the reactants will be docked.
-        reactants: A list of .mol2 files containing reactants to be docked.
-        contraints: A list of RosettaCst objects. Optional.
-        mutations: A list of Mutation objects to apply to the system. Optional.
-        work_dir: Directory where various temp files will be saved. Uses cwd if not specified.
-        save_work_dir: Should the work directory be saved? Default is True.
-        reactant_conformers: A list of .pdb files containing conformers in the Rosetta format. Must be same length as reactants if supplied. 
-        rng_seed: An int() rng seed to achieve reproducibility. Default is 1996.
-        n_struct: Number of structures to create during geometry sampling stage. Default is 1000. 
-        use_cache: Should cached files be used? Default is False.
-
-    Returns:
-        A list() of the reactive complexes including a "WT" complex as well as various mutated versions.
-
-    """
+    """TODO"""
 
     if not work_dir:
         work_dir = config["system.SCRATCH_DIR"] 
@@ -69,54 +49,54 @@ def dock_reactants( structure:Structure,
 
     _place_reactants( structure, reactants )
 
-    param_files:List[str] = _prepare_reactants(reactants, reactant_conformers)
+    (param_files, charge_mapper) = _prepare_reactants(reactants, reactant_conformers)
 
     docked_complexes:List[str] = list()
    
-    if (mutations and constraints) and mut_cst_overlap(mutations, constraints):
-        docked_complexes.extend(
-            _dock_mut_cst_overlaps(
-                        structure, 
-                        reactants, 
-                        constraints, 
-                        mutations,
-                        work_dir,
-                        save_work_dir,
-                        reactant_conformers,
-                        rng_seed,
-                        n_struct
-                    )
-        )
+    resolved = _resolve_mut_cst_overlap(mutations, constraints)
     
+    if resolved:
+        ((resolved_mutations,resolved_csts),mutants)=resolved
+        resolved_complexes = dock_reactants( structure, reactants, resolved_csts, resolved_mutations,
+                work_dir,
+                save_work_dir,
+                reactant_conformers,
+                rng_seed,
+                n_struct,
+                cst_cutoff,
+                clash_distance,
+                clash_cutoff,
+                binding_cutoff,
+                cluster_distance,
+                use_cache
+                ) 
+
+        for rc in resolved_complexes:
+            if rc.find('WT') != -1:
+                continue
+                docked_complexes.append( rc )
+
     (start_pdb, cst_file) = _integrate_csts( structure, constraints, work_dir, use_cache )
 
     chain_names:List[str] = _ligand_chain_names( start_pdb )
 
-    xml_file:str =  _create_xml(f"{work_dir}/_script.xml", chain_names, use_cache)
+    xml_file:str =  _create_xml(work_dir, chain_names, use_cache)
 
     options_file:str = make_options_file(start_pdb, xml_file, param_files, work_dir, rng_seed, n_struct, use_cache, cst_file) 
     
     df:pd.DataFrame = _docking_run(options_file, use_cache)
-    print(sum(df.selected)) 
+    
     _evaluate_csts(df, constraints, cst_cutoff)
 
-    print(sum(df.selected)) 
     _evaluate_clashes(df, clash_distance, clash_cutoff)
 
     _evaluate_binding(df, start_pdb, binding_cutoff)
 
-    cluster_cutoff=5
+    _evaluate_qm(df, start_pdb, charge_mapper, cluster_distance) 
 
-    _evaluate_qm(df, cluster_cutoff) 
-
-    print(sum(df.selected)) 
-    #df['clash_ct'] = df.apply(lambda row: _clash_count(row.description), axis=1)
-
-    df.to_csv(f"{work_dir}/scores.csv", index=False)
     (selected, wt_fpath) = _select_complex(df, work_dir)
 
     docked_complexes.append( wt_fpath ) 
-    #TODO(CJ): here is where we do QM ranking
 
     e_flags = []
     for pf in param_files:
@@ -127,12 +107,10 @@ def dock_reactants( structure:Structure,
             _mutate_result(selected, mutations, work_dir, e_flags )
         )
 
-    df.to_csv(f"{work_dir}/scores.csv", index=False)
-
     return docked_complexes
 
 
-def mut_cst_overlap(mutations:List[List[mm.Mutation]], constraints:List[RosettaCst]) -> bool:
+def _resolve_mut_cst_overlap(mutations:List[List[mm.Mutation]], constraints:List[RosettaCst]) -> bool:
     """Checks if a mutation and constraint overlap. Note: will return False if a constrained
     residue is mutated back to itself.
 
@@ -143,15 +121,42 @@ def mut_cst_overlap(mutations:List[List[mm.Mutation]], constraints:List[RosettaC
     Returns:
         Whether the system will try to mutate a constrained residue.
     """
+    if not mutations or not constraints:
+        return False
+
+    resolved_inputs = list()
+    resolved_mutations = list()
+    
     for mut_set in mutations:
+        
+        cst_cpy = []
+        overlap = False
         for mut in mut_set:
             for cst in constraints:
                 if cst.contains(mut.chain_id, mut.res_idx) and mut.orig != mut.target:
-                    return True
-    return False
+                    overlap = True
+                    pass
+                else:
+                    cst_cpy.append( deepcopy( cst ) )
+        
+        if overlap:
+            resolved_inputs.append((
+                [deepcopy(ms) for ms in mut_set],
+                cst_cpy
+            ))
+        else:
+            resolved_mutations.append(
+                [deepcopy(ms) for ms in mut_set]
+            )
+
+    
+    if not resolved_inputs:
+        return False
+    else:
+        return (resolved_inputs, resolved_mutations)
 
 
-def _parameterize_reactant(reactant:str, reactant_name:str, conformers:str=None) -> str:
+def _parameterize_reactant(reactant:str, reactant_name:str, conformers:str=None) -> Tuple[str,int]:
     """Parameterizes reactant for RosettaLigand docking. Adds both a conformers and formal charge
     lines to the file.
     
@@ -188,7 +193,7 @@ def _parameterize_reactant(reactant:str, reactant_name:str, conformers:str=None)
     fs.safe_rm( param_file )
     fs.write_lines( param_file, lines )
 
-    return param_file
+    return (param_file, fcharge)
        
 
 def _integrate_csts( stru:Structure, csts:List[RosettaCst], work_dir:str, use_cache:bool ) -> Tuple[str,str]:
@@ -228,12 +233,14 @@ def _integrate_csts( stru:Structure, csts:List[RosettaCst], work_dir:str, use_ca
     return (pdb_file, cst_file)
 
 
-def _create_xml(fname:str, chains:List[str], use_cache:bool) -> str:
+def _create_xml(work_dir:str, chains:List[str], use_cache:bool) -> str:
     """ """
     if not use_cache:
         fs.safe_rm(fname)
 
-    if Path(fname).exists():
+    fname:str=f"{work_dir}/__script.xml"
+
+    if Path(fname).exists() and use_cache:
         return fname
     #TODO(CJ): do some kind of validation against the chain name
     elements:List[Dict] = [
@@ -334,6 +341,7 @@ def make_options_file(pdb_file:str,  xml_file:str, param_files:List[str],  work_
 
     """
     content: List[str] = [
+        "-keep_input_protonation_state",
         "-run:constant_seed",
        f"-run:jran {int(rng_seed)}",
         "-in:file",
@@ -342,6 +350,10 @@ def make_options_file(pdb_file:str,  xml_file:str, param_files:List[str],  work_
     
     for pf in param_files:
         content.append(f"    -extra_res_fa '{Path(pf).absolute()}'")
+
+    stub_parent:str = os.path.expandvars(f"${config['rosetta.ROSETTA3']}/database/chemical/residue_type_sets/fa_standard/residue_types/protonation_states/")
+    for stub in "GLU_P1.params GLU_P2.params LYS_D.params ASP_P1.params TYR_D.params HIS_P.params ASP_P2.params".split():
+        content.append(f"    -extra_res_fa '{stub_parent}/{stub}'")
 
     content.extend([
         "-run:preserve_header",
@@ -478,18 +490,22 @@ def _prepare_reactants(reactants:List[str], reactant_conformers:List[str]=None) 
         A list() of the .params files for the given reactants.
     """
     #TODO(CJ): error if not enough conformers... then make the conformers
+    #TODO(CJ): update function signature
     param_files:List[str] = list()
+    charge_mapper:Dict[str,int] = dict()
     for ridx, rct in enumerate(reactants):
         reactant_name:str=f"L{ridx+1:02d}"
-        param_files.append( 
-            _parameterize_reactant(
+        #param_files.append( 
+        (pfile, charge) = _parameterize_reactant(
                 rct,
                 reactant_name,
                 conformers=reactant_conformers[ridx] #TODO(CJ): deal with this
             )
-        )
+        #)
+        charge_mapper[reactant_name] = charge
+        param_files.append( pfile )
 
-    return param_files
+    return (param_files, charge_mapper)
 
 def _dock_mut_cst_overlaps(structure:Structure,
                             reactants:List[str], 
@@ -512,7 +528,7 @@ def _dock_mut_cst_overlaps(structure:Structure,
     #TODO(CJ): implement this
 
 
-def _mutate_result(structure, mutations:List[mm.Mutation], work_dir :str, extra_flags=None) -> List[str]:
+def _mutate_result(structure, mutations:List[List[mm.Mutation]], work_dir :str, extra_flags=None) -> List[str]:
     """ TODO(CJ)"""
 
     res_names = {}
@@ -530,10 +546,14 @@ def _mutate_result(structure, mutations:List[mm.Mutation], work_dir :str, extra_
 
     result:List[str] = list()
     #TODO(CJ): get this to work for List[List[Mutation]]
-    for mut in mutations:
-        original = res_names[f"{mut.chain_id}.{mut.res_idx}"]
-        mutated_outfile:str=f"{work_dir}/{original}{mut.res_idx}{chem.convert_to_one_letter(mut.target)}.pdb"
-        mutant = mm.mutate_stru(structure, [mut], engine='rosetta', extra_flags=extra_flags )
+    for mut_sets in mutations:
+        mutated_outfile=str()
+        for mut in mut_sets:
+            original = res_names[f"{mut.chain_id}.{mut.res_idx}"]
+            mutated_outfile += f"{original}{mut.res_idx}{chem.convert_to_one_letter(mut.target)}_"
+        
+        mutated_outfile:str = f"{work_dir}/{mutated_outfile[:-1]}.pdb"
+        mutant = mm.mutate_stru(structure, mut_sets, engine='rosetta', extra_flags=extra_flags )
         parser = PDBParser()
         file_str = parser.get_file_str(mutant, if_renumber=False, if_fix_atomname=False)
         fs.safe_rm(mutated_outfile)
@@ -570,7 +590,7 @@ def _ligand_chain_names( start_pdb : str ) -> List[str]:
 
 
 def _select_complex(df : pd.DataFrame, work_dir:str, cutoff:int=20) -> Tuple[Structure,str]:
-    """
+    """Final selection of the complex that we will use.
     
     Args:
         df:
@@ -582,66 +602,26 @@ def _select_complex(df : pd.DataFrame, work_dir:str, cutoff:int=20) -> Tuple[Str
     """
     #TODO(CJ): I need to change this so that I am just ranking based on QM energy
     # then I should:
-    # 1. save the dataframe 
+    # 1. save the dataframe  -> still need to do this
     # 2. get the structure
     # 3. get the wt filepath
     cpy = deepcopy( df )
-
-#    clash_cutoff = np.percentile(cpy.clash_ct, cutoff) #TODO(CJ): cutoffs
-#    cpy = cpy[cpy.clash_ct<=clash_cutoff].reset_index(drop=True)
-
-    score_cutoff= np.percentile(cpy.total_score.to_numpy(),cutoff)
-    cst_cutoff= np.percentile(cpy.cst_diff.to_numpy(),cutoff)
-
-    mask = (cpy.total_score<=score_cutoff)&(cpy.cst_diff<=cst_cutoff)
-
-
-    cpy = cpy[mask].reset_index(drop=True)
-   
-    temp_xyz = f'{work_dir}/__temp_cluster.xyz'
-    temp_sdf = f'{work_dir}/__temp_cluster.sdf'
-    session = interface.pymol.new_session()
-
-    interface.pymol.general_cmd(session,[
-        ('load', df.description[0]),
-        ('select', '__eh_sele', '(all within 3 of resn L01) or (all within 3 of resn L02)')
-    ])
-
-    #TODO(CJ): make this not hardcoded
-
-    active_site = interface.pymol.collect(session, "memory", "chain resi".split(), sele='__eh_sele')
     
-    sele_stmt:str = " or ".join(map(lambda pr: f"(chain {pr[0]} and resi {pr[1]})",
-                    set(zip(active_site.chain, active_site.resi))
-    ))
+    cpy = cpy[cpy.selected].reset_index(drop=True)
 
-    interface.pymol.general_cmd(session,[
-        ('save', f'{work_dir}/__temp.sdf', sele_stmt)
-    ])
-    cluster = interface.pymol.create_cluster(session, df.description[0], sele_stmt, outfile= f'{work_dir}/__temp.sdf', cap_strategy='CH3')
+    cpy.sort_values(by='qm_energy', inplace=True)
 
-    charge:int=interface.bcl.calculate_formal_charge(cluster)
-    # QM ranking
-    #TODO(CJ): make this another function
-    data = list()
-    for i, row in cpy.iterrows():
-        
-        fs.safe_rm( temp_xyz )                                
-        fs.safe_rm( temp_sdf )                                
+    wt_fpath:str=cpy.description[0] 
 
-        cluster = interface.pymol.create_cluster(session, row.description, sele_stmt, outfile= f'{work_dir}/__temp.xyz', cap_strategy='CH3')
-        energy = interface.xtb.single_point(cluster, charge=charge)
-        data.append((energy, row.description))
+    #TODO(CJ): check that the df does  have length of at least 1
 
-    data.sort(key=lambda pr: pr[0]) 
     parser = PDBParser()
-    selected = parser.get_structure(data[0][1])
-    outfile = f"{work_dir}/WT.pdb"
-    
-    file_str = parser.get_file_str(selected, if_renumber=False, if_fix_atomname=False)
-    fs.write_lines(outfile, file_str.splitlines())
 
-    return (selected, outfile)
+    result_stru = parser.get_structure( wt_fpath )
+
+    return (result_stru, str(Path(wt_fpath).absolute()) )
+
+
 
 
 def _place_reactants( structure:Structure, reactants:List[str] ) -> bool:
@@ -722,7 +702,7 @@ def _evaluate_binding(df:pd.DataFrame, start_pdb:str, binding_cutoff:int, distan
     for rn in res_names:
         if rn.upper() in chem.METAL_CENTER_MAP or rn.upper() in chem.THREE_LETTER_AA_MAPPER:
             continue
-        print(rn)
+        
         atoms:pd.DataFrame = interface.pymol.collect(session, start_pdb,
             "resi chain".split(),
             sele=f"(all within {distance_cutoff:.2f} of resn {rn}) and not resn {rn}"
@@ -752,8 +732,6 @@ def _evaluate_binding(df:pd.DataFrame, start_pdb:str, binding_cutoff:int, distan
     fs.safe_rm( temp_sdf )
     reactants:List[str] = list(sele_names.keys())
 
-    #TODO(CJ): need to do the charges here
-
     for i, row in df.iterrows():
         if not row.selected:
             for rn in reactants:
@@ -773,40 +751,91 @@ def _evaluate_binding(df:pd.DataFrame, start_pdb:str, binding_cutoff:int, distan
 
                 )
             )
-            print(binding_ddg)        
-    
+  
+    all_negative = np.array([True]*len(df)) 
     binding_log_sum = np.zeros(len(df))     
     for rn, values in binding_ddg.items():
-        df[f"{rn}_ddg}"] = values
-        binding_log_sum += np.exp(df[f"{rn}_ddg}"].to_numpy())
+        df[f"{rn}_ddg"] = values
+        binding_log_sum += np.exp(df[f"{rn}_ddg"].to_numpy())
+        all_negative &= (df[f"{rn}_ddg"] <= 0.0)
 
-
+    df['all_negative'] = all_negative
     df['binding_log_sum'] = binding_log_sum
-
-    cutoff:float=np.percentile(df[df.selected].binding_log_sum, binding_cutoff)
     
-    #TODO(CJ): check how many are all negative. if all negatve < percentile cutoff,
-    # use cutoff. Else all negative
+    if not df.selected.sum():
+        return
+
+    bls_cutoff:float=np.percentile(df[df.selected].binding_log_sum, binding_cutoff)
+    
+    an_cutoff = int((df.selected.sum())*(float(binding_cutoff)/100.0))
+    
+    if df.all_negative.sum() >= an_cutoff:
+        df['selected'] = (df.selected)&(df.all_negative)
+    else:
+        df['selected'] = (df.selected)&(df.binding_log_sum<=cutoff)
 
 
-    df['selected'] = (df.selected)&(df.binding_log_sum<=cutoff)
-
-
-def _evaluate_qm(df:pd.DataFrame, cluster_cutoff:float) -> None:
+def _evaluate_qm(df:pd.DataFrame, start_pdb:str, charge_mapper, cluster_cutoff:float) -> None:
     """ """
-
+    # steps
+    # 1. get system charge
+    # 2. run through each cluster and do it
     qm_energy:List[float] = list()
+    
+    session = interface.pymol.new_session()
+    res_keys = interface.pymol.collect(session, start_pdb, "chain resn resi".split())
+    res_keys = sorted(set(zip(res_keys.chain, res_keys.resn, res_keys.resi)))
 
-    #TODO(CJ): figure out the charge and residues up here
+    reactants = set()
+    reactant_counter = defaultdict(int)
+    
+    for (cname, resn, resi) in res_keys:
+        if resn.upper() in chem.METAL_CENTER_MAP or resn.upper() in chem.THREE_LETTER_AA_MAPPER:
+            continue
+        
+        reactants.add(resn)
 
+        reactant_counter[resn] += 1
+
+
+    as_sele:str=" or ".join(map(lambda rn: f"(byres all within {cluster_cutoff} of resn {rn})",reactants))
+    
+    interface.pymol.general_cmd(session,[('delete','all')])
+    res_keys = interface.pymol.collect(session, start_pdb, "chain resn resi".split(), sele=as_sele)
+    res_keys = sorted(set(zip(res_keys.chain, res_keys.resn, res_keys.resi)))
+    atom_mapper = defaultdict(list)
+    atoms = interface.pymol.collect(session, start_pdb, "chain resn resi name".split(), sele=as_sele)
+    for i, row in atoms.iterrows():
+        atom_mapper[(row.chain, row.resn, row.resi)].append( row['name'] )
+
+    charge = 0
+    
+    for (name, res_name, resi) in res_keys:
+        if res_name in chem.AA_CHARGE_MAPPER:
+            charge += chem.AA_CHARGE_MAPPER[res_name]
+        elif res_name in charge_mapper:
+            charge += charge_mapper[res_name]
+        elif res_name.upper() == "MG":
+            charge += 2
+        else:
+            assert False, res_name
+
+        if res_name == 'ASP':
+            res_atoms = atom_mapper[(name, res_name, resi)]
+            if 'HD2' in res_atoms:
+                charge += 1
 
     for i, row in df.iterrows():
         if not row.selected:
-            qm_energy.append( 1 )
+            qm_energy.append( 0  )
             continue
 
-        
 
-        qm_energy.append( None )
+        interface.pymol.general_cmd(session,[('delete','all')])
+        interface.pymol.create_cluster(session, row.description, as_sele, outfile='temp.mol', cap_strategy='CH3')
+        qm_energy.append( 
+            interface.xtb.single_point('temp.mol', charge=charge)
+        )
 
 
+    df['qm_energy'] = qm_energy
