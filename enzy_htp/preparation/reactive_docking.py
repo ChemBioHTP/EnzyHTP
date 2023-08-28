@@ -129,8 +129,8 @@ def dock_reactants( structure:Structure,
     _evaluate_csts(df, constraints, cst_cutoff)
 
     _evaluate_clashes(df, clash_distance, clash_cutoff)
-
-    _evaluate_binding(df, start_pdb, binding_cutoff, chain_names)
+    df = df.head(10)
+    _evaluate_binding(df, start_pdb, binding_cutoff, chain_names, charge_mapper=charge_mapper)
 
     _evaluate_qm(df, start_pdb, charge_mapper, cluster_distance) 
 
@@ -792,133 +792,240 @@ def _evaluate_clashes(df:pd.DataFrame, clash_distance:float, clash_cutoff:int) -
     _LOGGER.info(f"Finished clash evaluation. {df.selected.sum()} geometries have <= {clash_cutoff} of distance {clash_distance:.3f} angstroms")
     
 
-def _evaluate_binding(df:pd.DataFrame, start_pdb:str, binding_cutoff:int, chain_names, distance_cutoff:float=4.0, use_rms:bool=True) -> None:
-    """ """
-    
-    _LOGGER.info(f"Beginning binding evaluation. {df.selected.sum()} geometries still selected...")
+
+def _create_binding_clusters(geometries:List[str], chain_names):
+    _LOGGER.info("Creating binding clusters...")
+
     session = interface.pymol.new_session()
-    
-    if use_rms:
-        rms_mapper = dict()
-        geometries = df[df.selected].description.to_list()
-        sele_names = [Path(gg).stem for gg in geometries]
 
-        args = []
-        for gg in geometries:
-            args.append(('load', gg))
+    rms_mapper = dict()
+    sele_names = [Path(gg).stem for gg in geometries]
 
-        args.append(('remove', 'not ( ' + ' or '.join(map(lambda ll: f"chain {ll}", chain_names)) + ' ) '))
-        args.append(('save','temp.pse'))
+    args = []
+    for gg in geometries:
+        args.append(('load', gg))
 
-        interface.pymol.general_cmd(session, args)
-            
+    args.append(('remove', 'not ( ' + ' or '.join(map(lambda ll: f"chain {ll}", chain_names)) + ' ) '))
+    args.append(('save','temp.pse'))
 
-        n_geo:int = len(geometries)
-        chain_sele = "(" + " or ".join(map(lambda ll: f"chain {ll}",chain_names)) + ")"
-        for gidx1 in range( n_geo ):
-            for gidx2 in range(gidx1+1, n_geo):
-                g1, g2 = geometries[gidx1], geometries[gidx2]
-                args = [
-                    ('rms', f"{sele_names[gidx1]} and {chain_sele}", f"{sele_names[gidx2]} and {chain_sele}")
-                ]
-                rms_value:float=interface.pymol.general_cmd(session, args)[-1]
-                rms_mapper[(g1,g2)] = rms_value
-                rms_mapper[(g2,g1)] = rms_value
-        interface.pymol.general_cmd(session, [('delete', 'all')])
+    interface.pymol.general_cmd(session, args)
+        
 
-        rms_clusters = list() 
+    n_geo:int = len(geometries)
+    chain_sele = "(" + " or ".join(map(lambda ll: f"chain {ll}",chain_names)) + ")"
+    for gidx1 in range( n_geo ):
+        for gidx2 in range(gidx1+1, n_geo):
+            g1, g2 = geometries[gidx1], geometries[gidx2]
+            args = [
+                ('rms', f"{sele_names[gidx1]} and {chain_sele}", f"{sele_names[gidx2]} and {chain_sele}")
+            ]
+            rms_value:float=interface.pymol.general_cmd(session, args)[-1]
+            rms_mapper[(g1,g2)] = rms_value
+            rms_mapper[(g2,g1)] = rms_value
+    interface.pymol.general_cmd(session, [('delete', 'all')])
+
+    rms_clusters = list() 
 
 
-        for gg in geometries:
-            if gg.find('.pdb') == -1:
-                continue
-            placed = False 
-            for grp in rms_clusters:
-                for member in grp:
-                    if rms_mapper[(gg, member)] <= 1.0:
-                        grp.add(gg)
-                        placed = True
-                    if placed:
-                        break
+    for gg in geometries:
+        placed = False 
+        for grp in rms_clusters:
+            for member in grp:
+                if rms_mapper[(gg, member)] <= 1.0: #TODO(CJ): paramterize this
+                    grp.add(gg)
+                    placed = True
                 if placed:
                     break
-            if not placed:
-                rms_clusters.append(set(gg))
+            if placed:
+                break
+        if not placed:
+            rms_clusters.append({gg})
+   
+    _LOGGER.info(f"Created {len(rms_clusters)} clusters!")
+
+    return rms_clusters
+
+
+def _system_charge(df:pd.DataFrame, charge_mapper=None)->int:
+    """ """
+    _LOGGER.info("Beginning enzyme system charge deduction...")
+    charge = 0
+    
+    residues = sorted(list(set(
+            zip(df.chain, df.resi, df.resn)        
+    )))
+    _LOGGER.info(f"Found {len(residues)} residues in enzyme system!")
+
+    for (chain, resi,resn) in residues:
+        atoms = df[(df.chain==chain)&(df.resi==resi)].name.to_list()
         
-        print(len(rms_clusters))
-        print(rms_clusters)
+        charge_str = str() 
+        residue_charge:int = 0
+        if resn in chem.AA_CHARGE_MAPPER:
+            residue_charge = chem.AA_CHARGE_MAPPER[resn]
+            charge_str = f"Detected {resn} with charge: {residue_charge}"
+        elif resn in charge_mapper:
+            residue_charge = charge_mapper[resn]
+            charge_str = f"Detected {resn} with charge: {residue_charge}"
+        elif resn.upper() == "MG":#TODO(CJ): add more charges 
+            residue_charge = 2
+            charge_str = f"Detected metal ion {resn} with charge: {residue_charge}"
+        else:
+            _LOGGER.error(f"Unable to assign charge to {resn}. Exiting...")
+            exit( 1 )
+
+        # correcting titratable residues
+        special_titration:bool=False
+        if resn == "GLU":
+            if "HE2" in atoms:
+                residue_charge += 1
+                special_titration=True
+            if "HE1" in atoms:
+                residue_charge += 1
+                special_titration=True
+        
+        if resn == "LYS":
+            if "3HZ" not in atoms:
+                residue_charge -= 1
+                special_titration=True
+
+        if resn == "ASP":
+            if "HD2" in atoms:
+                residue_charge += 1
+                special_titration=True
+            if "HD1" in atoms:
+                residue_charge += 1
+                special_titration=True
+        
+        if resn == "TYR":
+            if "HH" not in atoms:
+                residue_charge -= 1
+                special_titration=True
+
+        if resn == "HIS":
+            if "HD1" in atoms and "HE1" in atoms:
+                residue_charge += 1
+                special_titration=True
+
+        if special_titration:
+            charge_str = f"Detected special protonation state of {resn}. New charge: {residue_charge}"
+
+        charge += residue_charge
+        _LOGGER.info(charge_str)
+
+    _LOGGER.info(f"Total charge of enzyme system: {charge}")
+    
+    return charge
 
 
-    temp_sdf:str=f"{config['system.SCRATCH_DIR']}/__temp.sdf"
-    fs.safe_rm(temp_sdf)
-
+def _define_binding_pockets(start_pdb:str, distance_cutoff,charge_mapper=None):
+    """TODO"""
+    #TODO(CJ): make this work for multiple reactants
+    session = interface.pymol.new_session()
     res_names:List[str] = interface.pymol.collect(session, start_pdb, "resn".split()).resn.unique()
     sele_names:Dict[str, str] = {}
     binding_ddg:Dict[str, List[float]] = {}
     charges:Dict[str,float] = {}
-    
-    _LOGGER.info("Analyzing binding pockets of each reactant...")
+
+    binding_pockets = list()
+
+    reactants = list()    
     for rn in res_names:
         if rn.upper() in chem.METAL_CENTER_MAP or rn.upper() in chem.THREE_LETTER_AA_MAPPER:
             continue
+        reactants.append(rn)
     
-        #TODO(CJ): need to update the charge system here 
+    _LOGGER.info(f"Found {len(rn)} reactants: {', '.join(reactants)}")
+    _LOGGER.info("Analyzing binding pockets of each reactant...")
+   
 
+    reactant_sele = " or ".join(map(lambda ll: f"resn {ll}", reactants))        
+    for rn in reactants:
+    
+        binding_pocket = dict()
         _LOGGER.info(f"Analyzing reactant {rn}...")
         atoms:pd.DataFrame = interface.pymol.collect(session, start_pdb,
-            "resi chain".split(),
-            sele=f"(all within {distance_cutoff:.2f} of resn {rn}) and not resn {rn}"
+            "resi chain resn name".split(),
+            sele=f"(byres all within {distance_cutoff:.2f} of resn {rn}) and not ({reactant_sele})"
             )
         
-        sele_names[rn] = " or ".join(map(lambda pr: f"(resi {pr[0]} and chain {pr[1]})",set(zip(atoms.resi,atoms.chain))))
-        _LOGGER.info(f"\tselection expression: {sele_names[rn]}")
-        binding_ddg[rn] = list()
+        binding_pocket["receptor_charge"] = _system_charge(atoms, charge_mapper)
+        binding_pocket["probe_charge"] = charge_mapper[rn]
+        binding_pocket["sele"] = " or ".join(map(lambda pr: f"(resi {pr[0]} and chain {pr[1]})",set(zip(atoms.resi,atoms.chain))))
+        binding_pocket["resn"] = rn
 
-        receptor_cluster:str=interface.pymol.create_cluster(session, 
-                    start_pdb,
-                    sele_names[rn],
-                    cap_strategy='CH3',
-                    outfile=temp_sdf
-                    )
-        
-        charges[f"{rn}_receptor"] = interface.bcl.calculate_formal_charge( temp_sdf)
-        charge = charges[f'{rn}_receptor']
-        _LOGGER.info(f"\treceptor charge: {charge}")
+        _LOGGER.info(f"\tprobe charge: {binding_pocket['probe_charge']}")
+        _LOGGER.info(f"\treceptor charge {binding_pocket['receptor_charge']}")
+        _LOGGER.info(f"\tnumber of residues in receptor: {binding_pocket['sele'].count(' or ')+1}")
 
-        probe_cluster:str=interface.pymol.create_cluster(session, 
-                    start_pdb,
-                    f"resn {rn}",
-                    cap_strategy='CH3',
-                    outfile=temp_sdf
-                    )
+        binding_pockets.append(
+            binding_pocket
+        )
+
         
-        charges[f"{rn}_probe"] = interface.bcl.calculate_formal_charge( temp_sdf )
-        charge = charges[f'{rn}_probe']
-        _LOGGER.info(f"\tprobe charge: {charge}")
+    return binding_pockets
+
+
+def _evaluate_binding(df:pd.DataFrame, start_pdb:str, binding_cutoff:int, chain_names, distance_cutoff:float=4.0, use_rms:bool=True, charge_mapper=None) -> None:
+    """ """
+    
+    _LOGGER.info(f"Beginning binding evaluation. {df.selected.sum()} geometries still selected...")
+
+    rms_clusters=_create_binding_clusters(df[df.selected].description.to_list(),chain_names)
+
+    session = interface.pymol.new_session()
+    
+    binding_pockets:List[Set[str]]=_define_binding_pockets(start_pdb, distance_cutoff, charge_mapper)
+
+    
+    clusters = dict() 
+    cluster_mapper = dict()
+    resnames=set()
+    for cidx, rcluster in enumerate(rms_clusters):
+        cluster_name:str=f"cluster_{cidx:03d}"
+        cluster = {"name": cluster_name}
+        _LOGGER.info(f"Analyzing cluster {cidx+1} of {len(rms_clusters)}..")
+        molfile:str = list(rcluster)[0]
+        for rc in rcluster:
+            cluster_mapper[rc] = cluster_name
+
+        _LOGGER.info(f"Using file {molfile}")
+
+        for bp in binding_pockets:
+            #TODO(CJ): check if xtb failed for SCF iteration reasons and retry if so 
+            _LOGGER.info(f"Calculating binding energy for {bp['resn']}...")
+            be:float = binding_energy(
+                molfile,
+                f"resn {bp['resn']}",
+                bp['sele'],
+                bp['probe_charge'],
+                bp['receptor_charge'],
+                work_dir=config["system.SCRATCH_DIR"]
+            )
+            _LOGGER.info(f"Found binding energy of {be:.3f} hartrees")
+            cluster[bp['resn']] = be
+            resnames.add(bp['resn'])
         
-    fs.safe_rm( temp_sdf )
-    reactants:List[str] = list(sele_names.keys())
+        clusters[cluster_name] = cluster 
+   
+    
+    new_data = defaultdict(list)
 
     for i, row in df.iterrows():
         if not row.selected:
-            for rn in reactants:
-                binding_ddg[rn].append( 1.0 )
-            continue
+            new_data['cluster'].append( None )
+            for rn in resnames:
+                new_data[f"{rn}_ddg"].append( None )
+        else:
+            new_data['cluster'].append( cluster_mapper[row.description] )
+            for rn in resnames:
+                new_data[f"{rn}_ddg"].append( clusters[cluster_name][rn] )
 
-        
-        for rn in reactants:
-            binding_ddg[rn].append(
-                binding_energy(
-                    row.description,
-                    f"resn {rn}",
-                    sele_names[rn],
-                    charges[f"{rn}_probe"],
-                    charges[f"{rn}_receptor"],
-                    work_dir=config["system.SCRATCH_DIR"]
+    for k,v in new_data.items():
+        df[k] = v
 
-                )
-            )
-  
+    print(df)
+    exit( 0 ) 
     all_negative = np.array([True]*len(df)) 
     binding_log_sum = np.zeros(len(df))     
     for rn, values in binding_ddg.items():
