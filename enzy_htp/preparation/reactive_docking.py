@@ -44,6 +44,38 @@ def dock_reactants( structure:Structure,
 
     if not work_dir:
         work_dir = config["system.SCRATCH_DIR"] 
+
+    _LOGGER.info("Beginning EnzyRCD Reactive docking run! Below are the run settings and characteristics:") 
+    #TODO(CJ): maybe add something for the structures?
+    _LOGGER.info(f"\t{len(reactants)} reactants: {', '.join(reactants)}")
+    
+    if constraints is not None:
+        _LOGGER.info(f"\t{len(constraints)} RosettaConstraints")
+    else:
+        _LOGGER.info("\t0 RosettaConstraints")
+   
+    if mutations is not None:
+        _LOGGER.info(f"\t{len(mutations)} mutation sets")
+    else:
+        _LOGGER.info("\t0 mutation sets")
+
+    _LOGGER.info(f"\t{work_dir=}")
+    _LOGGER.info(f"\t{save_work_dir=}")
+
+    if reactant_conformers is not None:
+        _LOGGER.info(f"\t{len(reactant_conformers)} conformer libraries: {', '.join(reactant_conformers)}")
+    else:
+        _LOGGER.info(f"\t0 conformer libraries")
+
+    _LOGGER.info(f"\t{rng_seed=}")
+    _LOGGER.info(f"\t{n_struct=}")
+    _LOGGER.info(f"\t{cst_cutoff=} tolerance units")
+    _LOGGER.info(f"\t{clash_distance=} angstroms")
+    _LOGGER.info(f"\t{clash_cutoff=} clashes")
+    _LOGGER.info(f"\t{binding_cutoff=}")
+    _LOGGER.info(f"\t{cluster_distance=} angstroms")
+    _LOGGER.info(f"\t{use_cache=}")
+
     
     fs.safe_mkdir( work_dir )
 
@@ -56,9 +88,15 @@ def dock_reactants( structure:Structure,
     resolved = _resolve_mut_cst_overlap(mutations, constraints)
     
     if resolved:
-        ((resolved_mutations,resolved_csts),mutants)=resolved
-        resolved_complexes = dock_reactants( structure, reactants, resolved_csts, resolved_mutations,
-                work_dir,
+        (resolved_inputs,mutations)=resolved
+        for ridx,(resolved_mutations,resolved_csts) in enumerate(resolved_inputs):
+            _LOGGER.info(f"Beginning child reactive docking run {ridx+1} of {len(resolved_inputs)}...")
+            resolved_complexes = dock_reactants(
+                structure,
+                reactants,
+                resolved_csts,
+                [resolved_mutations],
+                f"child_{ridx:04d}", 
                 save_work_dir,
                 reactant_conformers,
                 rng_seed,
@@ -70,10 +108,12 @@ def dock_reactants( structure:Structure,
                 cluster_distance,
                 use_cache
                 ) 
+            _LOGGER.info(f"Finished child reactive docking run {ridx+1} of {len(resolved_inputs)}!")
 
         for rc in resolved_complexes:
             if rc.find('WT') != -1:
-                continue
+                fs.safe_rm( rc )
+            else:
                 docked_complexes.append( rc )
 
     (start_pdb, cst_file) = _integrate_csts( structure, constraints, work_dir, use_cache )
@@ -90,7 +130,7 @@ def dock_reactants( structure:Structure,
 
     _evaluate_clashes(df, clash_distance, clash_cutoff)
 
-    _evaluate_binding(df, start_pdb, binding_cutoff)
+    _evaluate_binding(df, start_pdb, binding_cutoff, chain_names)
 
     _evaluate_qm(df, start_pdb, charge_mapper, cluster_distance) 
 
@@ -107,6 +147,8 @@ def dock_reactants( structure:Structure,
             _mutate_result(selected, mutations, work_dir, e_flags )
         )
 
+    #TODO(CJ): delete leftover files 
+
     return docked_complexes
 
 
@@ -121,23 +163,29 @@ def _resolve_mut_cst_overlap(mutations:List[List[mm.Mutation]], constraints:List
     Returns:
         Whether the system will try to mutate a constrained residue.
     """
+    #TODO(CJ): create string representation for RosettaCst
+    _LOGGER.info("Beginning checks for RosettaCst and mutation overlaps...")
+
     if not mutations or not constraints:
+        _LOGGER.info("No overlaps! Continuing...")
         return False
 
     resolved_inputs = list()
     resolved_mutations = list()
     
-    for mut_set in mutations:
+    for midx, mut_set in enumerate(mutations):
+        _LOGGER.info(f"Beginning mutation set {midx+1} of {len(mutations)}. Contains {len(mut_set)} mutations...") 
         
         cst_cpy = []
         overlap = False
         for mut in mut_set:
             for cst in constraints:
                 if cst.contains(mut.chain_id, mut.res_idx) and mut.orig != mut.target:
+                    _LOGGER.info(f"Overlap identified between mutation {mut} and constraint on residue {mut.res_idx}")
                     overlap = True
                     pass
                 else:
-                    cst_cpy.append( deepcopy( cst ) )
+                    cst_cpy.append( cst )
         
         if overlap:
             resolved_inputs.append((
@@ -151,8 +199,10 @@ def _resolve_mut_cst_overlap(mutations:List[List[mm.Mutation]], constraints:List
 
     
     if not resolved_inputs:
+        _LOGGER.info("No overlaps! Continuing...")
         return False
     else:
+        _LOGGER.info(f"Found overlaps. {len(resolved_inputs)} child EnzyRCD runs needed!")
         return (resolved_inputs, resolved_mutations)
 
 
@@ -174,7 +224,7 @@ def _parameterize_reactant(reactant:str, reactant_name:str, conformers:str=None)
         _LOGGER.error(f"Invalid reactant name supplied: '{reactant_name}'. Must be alphanumeric and 3 letters long. Exiting...")
         exit( 1 )
 
-
+    #TODO(CJ): create the conformers if there aren't any
     session = interface.pymol.new_session()
     (param_file, pdb_file) = interface.rosetta.parameterize_ligand(reactant,reactant_name, conformers=conformers)
     fs.safe_rm(pdb_file)
@@ -208,6 +258,7 @@ def _integrate_csts( stru:Structure, csts:List[RosettaCst], work_dir:str, use_ca
         A Tuple() with the format (pdb file, .cst file).
 
     """
+    _LOGGER.info("Beginning RosettaCst constraint integration...")
     parser = PDBParser()
     file_str = parser.get_file_str(stru, if_renumber=False, if_fix_atomname=False)
     
@@ -226,21 +277,27 @@ def _integrate_csts( stru:Structure, csts:List[RosettaCst], work_dir:str, use_ca
 
     if not Path(pdb_file).exists():
         fs.write_lines( pdb_file, pdb_content + file_str.splitlines())
-
+    
     if not Path(cst_file).exists():
         fs.write_lines( cst_file, cst_content)
+
+
+    _LOGGER.info("RosettaCst constraint integration successful! Relevant files:")
+    _LOGGER.info(f"\t.pdb file: {Path(pdb_file).absolute()}")
+    _LOGGER.info(f"\t.cst file: {Path(cst_file).absolute()}")
 
     return (pdb_file, cst_file)
 
 
 def _create_xml(work_dir:str, chains:List[str], use_cache:bool) -> str:
     """ """
+    fname:str=f"{work_dir}/__script.xml"
     if not use_cache:
         fs.safe_rm(fname)
 
-    fname:str=f"{work_dir}/__script.xml"
-
-    if Path(fname).exists() and use_cache:
+    fpath=Path(fname)
+    if fpath.exists() and use_cache:
+        _LOGGER.info(f"Using cached RosettaScripts .xml file at {fpath.absolute()}")
         return fname
     #TODO(CJ): do some kind of validation against the chain name
     elements:List[Dict] = [
@@ -311,7 +368,6 @@ def _create_xml(work_dir:str, chains:List[str], use_cache:bool) -> str:
 
     ])
 
-
     elements.extend(
         [deepcopy({'parent':'PROTOCOLS', 'tag':'Add', 'mover_name':f'low_res_dock_{cc.lower()}'}) for cc in chains] + 
         [{'parent':'PROTOCOLS','tag':'Add', 'mover_name':'high_res_dock'}, {'parent':'PROTOCOLS', 'tag':'Add', 'mover_name':'reporting'}]
@@ -319,6 +375,7 @@ def _create_xml(work_dir:str, chains:List[str], use_cache:bool) -> str:
 
     interface.rosetta.write_script(fname, elements)
 
+    _LOGGER.info(f"Saved new RosettaScripts .xml file at {fpath.absolute()}!")
     return fname
 
 
@@ -340,12 +397,13 @@ def make_options_file(pdb_file:str,  xml_file:str, param_files:List[str],  work_
         Path to the options.txt file with all the Rosetta options.
 
     """
+    _LOGGER.info("Beginning creation of options file for Rosetta...")
     content: List[str] = [
         "-keep_input_protonation_state",
         "-run:constant_seed",
        f"-run:jran {int(rng_seed)}",
         "-in:file",
-       f"    -s '{pdb_file}'",
+       f"    -s '{Path(pdb_file).name}'",
     ]
     
     for pf in param_files:
@@ -385,13 +443,18 @@ def make_options_file(pdb_file:str,  xml_file:str, param_files:List[str],  work_
         f"       -all './complexes'",
     ])
     
-    qsar_grid:str=f"{work_dir}/complexes/qsar_grids/"
-    content.append(f"-qsar:grid_dir {qsar_grid}")
+    qsar_grid:str=f"./complexes/qsar_grids/"
+    #content.append(f"-qsar:grid_dir {qsar_grid}") #TODO(CJ): figure this out.
 
     fname = Path(work_dir) / "options.txt"
     score_file: str = f"{work_dir}/complexes/score.sc"
     
     if not use_cache:
+        _LOGGER.info("Not using cache mode. Deleting the following (if they already exist):")
+        _LOGGER.info(f"\toptions file: {fname}")
+        _LOGGER.info(f"\tscore file: {score_file}")
+        _LOGGER.info(f"\tenzyme-reactant complexes directory: {work_dir}/complexes")
+        _LOGGER.info(f"\tqsar_gird directory: {qsar_grid}")
         fs.safe_rm(fname)
         fs.safe_rm(score_file)
         fs.safe_rmdir(f"{work_dir}/complexes/") 
@@ -401,7 +464,15 @@ def make_options_file(pdb_file:str,  xml_file:str, param_files:List[str],  work_
     fs.safe_mkdir(f"{work_dir}/complexes/")
 
     if not fname.exists():
+        _LOGGER.info(f"Wrote the below settings to {fname}:")
+        for ll in content:
+            _LOGGER.info(f"\t{ll}")
         fs.write_lines(fname, content)
+    else:
+        _LOGGER.info(f"Cache mode enabled. Using below settings from {fname}:")
+        content:List[str]=fs.lines_from_file(fname)
+        for ll in content:
+            _LOGGER.info(f"\t{ll}")
 
     option_file = fname.absolute()
     
@@ -417,22 +488,30 @@ def _docking_run(option_file:str, use_cache:bool) -> pd.DataFrame:
     Returns:
 
     """
-
+    _LOGGER.info("Beginning RosettaLigand docking run...")
     opt_path = Path(option_file)
+    
     if use_cache: 
         csv_file = Path(str(opt_path.parent / "scores.csv"))
+        _LOGGER.info(f"Cache mode enabled. Looking for {csv_file} ...")
         if csv_file.exists():
             df=pd.read_csv(csv_file)
             df['selected'] = True
+            _LOGGER.info(f"Found file {csv_file}. Checking for existence of {len(df)} output .pdbs") 
             
             for i, row in df.iterrows():
+                if (i+1)%25 == 0:
+                    _LOGGER.info(f"\tChecking {i+1} of {len(df)}...")
                 if not Path(row.description).exists():
+                    _LOGGER.info(f"\t{row.description} is missing. Cannot use cached results!" )
                     break
             else:
+                _LOGGER.info("All cached .pdbs exist! Using cached RosettaLigand structures!")
                 return df
-
-
-    
+        else:
+            _LOGGER.info(f"{csv_file} not found. Continuing with standard run")
+   
+    _LOGGER.info("Beginning RosettaLigand geometry sampling step...")
     start_dir:str = os.getcwd()
     os.chdir(str(opt_path.parent))
 
@@ -449,6 +528,8 @@ def _docking_run(option_file:str, use_cache:bool) -> pd.DataFrame:
     df['description'] = df.apply( lambda row: f"{opt_path.parent}/complexes/{row.description}.pdb", axis=1)
    
     df['selected'] = True
+    
+    _LOGGER.info("Completed RosettaLigand geometry sampling!")
 
     return df
 
@@ -467,8 +548,12 @@ def _evaluate_csts(df:pd.DataFrame, csts:List[RosettaCst], cst_cutoff:int) -> No
     Returns:
         Nothing.
     """
+    _LOGGER.info(f"Beginning RosettaCst evaluation. {df.selected.sum()} geometries still selected...")
+
     cst_diff = [] 
     for i, row in df.iterrows():
+        if (i+1)%25==0:
+            _LOGGER.info(f"\tChecking geometry {i+1} of {len(df)}...")
         total = 0.0
         for cst in csts:
             for tl in cst.evaluate( row.description ):
@@ -478,6 +563,8 @@ def _evaluate_csts(df:pd.DataFrame, csts:List[RosettaCst], cst_cutoff:int) -> No
 
     df['cst_diff'] = cst_diff
     df['selected'] &= (df['cst_diff'] <= cst_cutoff)
+    
+    _LOGGER.info(f"Finished RosettaCst evaluation. {df.selected.sum()} geometries have constraint tolerances <= {cst_cutoff:.3f} tolerance units")
 
 
 def _prepare_reactants(reactants:List[str], reactant_conformers:List[str]=None) -> List[str]:
@@ -489,22 +576,27 @@ def _prepare_reactants(reactants:List[str], reactant_conformers:List[str]=None) 
     Returns:
         A list() of the .params files for the given reactants.
     """
+    _LOGGER.info("Beginning preparation of each reactant...")
     #TODO(CJ): error if not enough conformers... then make the conformers
     #TODO(CJ): update function signature
     param_files:List[str] = list()
     charge_mapper:Dict[str,int] = dict()
     for ridx, rct in enumerate(reactants):
+        _LOGGER.info(f"Parameterizing reactant {ridx+1} of {len(reactants)}: {rct}")
         reactant_name:str=f"L{ridx+1:02d}"
-        #param_files.append( 
         (pfile, charge) = _parameterize_reactant(
                 rct,
                 reactant_name,
                 conformers=reactant_conformers[ridx] #TODO(CJ): deal with this
             )
         #)
+        _LOGGER.info(f"Information for reactant {rct}:")
+        _LOGGER.info(f"\tparam file: {pfile}")
+        _LOGGER.info(f"\tcharge: {charge}")
         charge_mapper[reactant_name] = charge
         param_files.append( pfile )
 
+    _LOGGER.info("Finished reactant preparation!")
     return (param_files, charge_mapper)
 
 def _dock_mut_cst_overlaps(structure:Structure,
@@ -569,6 +661,8 @@ def _ligand_chain_names( start_pdb : str ) -> List[str]:
 
     Returns:
     """
+    #TODO(CJ): change to reactant names
+    _LOGGER.info(f"Quick analysis of reactant-enzyme system...")
     fs.check_file_exists( start_pdb ) 
     session = interface.pymol.new_session()
     df:pd.DataFrame=interface.pymol.collect(session, start_pdb, "chain resn".split()    )
@@ -583,10 +677,15 @@ def _ligand_chain_names( start_pdb : str ) -> List[str]:
         if row.resn.upper() in chem.METAL_CENTER_MAP:
             continue
 
-        result.append(row.chain)
+        result.append((row.chain, row.resn))
+
+    #TODO(CJ): worry about no reactants later? or is this even a problem
+    _LOGGER.info("Detected reactants:")
+    for cc, rr in sorted(list(set(result))):
+        _LOGGER.info(f"\treactant {rr} in chain {cc}")
 
 
-    return list(set(result))
+    return list(set([pr[0] for pr in result]))
 
 
 def _select_complex(df : pd.DataFrame, work_dir:str, cutoff:int=20) -> Tuple[Structure,str]:
@@ -627,6 +726,8 @@ def _select_complex(df : pd.DataFrame, work_dir:str, cutoff:int=20) -> Tuple[Str
 def _place_reactants( structure:Structure, reactants:List[str] ) -> bool:
     """TODO(CJ)"""
     
+    _LOGGER.info("Beginning placement of reactants into apo-enzyme...")
+
     n_reactants:int=len(reactants)
     reactants_left:Set=set([Path(rr).stem for rr in reactants])
     
@@ -649,10 +750,14 @@ def _place_reactants( structure:Structure, reactants:List[str] ) -> bool:
 def _evaluate_clashes(df:pd.DataFrame, clash_distance:float, clash_cutoff:int) -> None:
     """TODO(CJ)"""
 
+    _LOGGER.info(f"Beginning clash evaluation. {df.selected.sum()} geometries still selected...")
     session = interface.pymol.new_session()
     clash_ct:List[int] = list() 
     for i, row in df.iterrows():
-        
+   
+        if (i+1)%25==0:
+            _LOGGER.info(f"\tChecking geometry {i+1} of {len(df)}...")
+
         if not row.selected:
             clash_ct.append( -1 )
             continue
@@ -679,36 +784,94 @@ def _evaluate_clashes(df:pd.DataFrame, clash_distance:float, clash_cutoff:int) -
                     ) <= clash_distance:
                     count += 1
         clash_ct.append( count )
-    
-    df['clash_ct'] = clash_ct
+   
 
+    df['clash_ct'] = clash_ct
     df['selected'] = (df.selected)&(df.clash_ct<=clash_cutoff)
     
-
-def _evaluate_binding(df:pd.DataFrame, start_pdb:str, binding_cutoff:int, distance_cutoff:float=4.0) -> None:
-    """ """
-    session = interface.pymol.new_session()
-    res_names:List[str] = interface.pymol.collect(session, start_pdb, "resn".split()).resn.unique()
+    _LOGGER.info(f"Finished clash evaluation. {df.selected.sum()} geometries have <= {clash_cutoff} of distance {clash_distance:.3f} angstroms")
     
-    sele_names:Dict[str, str] = {}
-    binding_ddg:Dict[str, List[float]] = {}
-    charges:Dict[str,float] = {}
+
+def _evaluate_binding(df:pd.DataFrame, start_pdb:str, binding_cutoff:int, chain_names, distance_cutoff:float=4.0, use_rms:bool=True) -> None:
+    """ """
+    
+    _LOGGER.info(f"Beginning binding evaluation. {df.selected.sum()} geometries still selected...")
+    session = interface.pymol.new_session()
+    
+    if use_rms:
+        rms_mapper = dict()
+        geometries = df[df.selected].description.to_list()
+        sele_names = [Path(gg).stem for gg in geometries]
+
+        args = []
+        for gg in geometries:
+            args.append(('load', gg))
+
+        args.append(('remove', 'not ( ' + ' or '.join(map(lambda ll: f"chain {ll}", chain_names)) + ' ) '))
+        args.append(('save','temp.pse'))
+
+        interface.pymol.general_cmd(session, args)
+            
+
+        n_geo:int = len(geometries)
+        chain_sele = "(" + " or ".join(map(lambda ll: f"chain {ll}",chain_names)) + ")"
+        for gidx1 in range( n_geo ):
+            for gidx2 in range(gidx1+1, n_geo):
+                g1, g2 = geometries[gidx1], geometries[gidx2]
+                args = [
+                    ('rms', f"{sele_names[gidx1]} and {chain_sele}", f"{sele_names[gidx2]} and {chain_sele}")
+                ]
+                rms_value:float=interface.pymol.general_cmd(session, args)[-1]
+                rms_mapper[(g1,g2)] = rms_value
+                rms_mapper[(g2,g1)] = rms_value
+        interface.pymol.general_cmd(session, [('delete', 'all')])
+
+        rms_clusters = list() 
+
+
+        for gg in geometries:
+            if gg.find('.pdb') == -1:
+                continue
+            placed = False 
+            for grp in rms_clusters:
+                for member in grp:
+                    if rms_mapper[(gg, member)] <= 1.0:
+                        grp.add(gg)
+                        placed = True
+                    if placed:
+                        break
+                if placed:
+                    break
+            if not placed:
+                rms_clusters.append(set(gg))
+        
+        print(len(rms_clusters))
+        print(rms_clusters)
 
 
     temp_sdf:str=f"{config['system.SCRATCH_DIR']}/__temp.sdf"
     fs.safe_rm(temp_sdf)
 
-
+    res_names:List[str] = interface.pymol.collect(session, start_pdb, "resn".split()).resn.unique()
+    sele_names:Dict[str, str] = {}
+    binding_ddg:Dict[str, List[float]] = {}
+    charges:Dict[str,float] = {}
+    
+    _LOGGER.info("Analyzing binding pockets of each reactant...")
     for rn in res_names:
         if rn.upper() in chem.METAL_CENTER_MAP or rn.upper() in chem.THREE_LETTER_AA_MAPPER:
             continue
-        
+    
+        #TODO(CJ): need to update the charge system here 
+
+        _LOGGER.info(f"Analyzing reactant {rn}...")
         atoms:pd.DataFrame = interface.pymol.collect(session, start_pdb,
             "resi chain".split(),
             sele=f"(all within {distance_cutoff:.2f} of resn {rn}) and not resn {rn}"
             )
         
         sele_names[rn] = " or ".join(map(lambda pr: f"(resi {pr[0]} and chain {pr[1]})",set(zip(atoms.resi,atoms.chain))))
+        _LOGGER.info(f"\tselection expression: {sele_names[rn]}")
         binding_ddg[rn] = list()
 
         receptor_cluster:str=interface.pymol.create_cluster(session, 
@@ -719,15 +882,19 @@ def _evaluate_binding(df:pd.DataFrame, start_pdb:str, binding_cutoff:int, distan
                     )
         
         charges[f"{rn}_receptor"] = interface.bcl.calculate_formal_charge( temp_sdf)
-        
+        charge = charges[f'{rn}_receptor']
+        _LOGGER.info(f"\treceptor charge: {charge}")
+
         probe_cluster:str=interface.pymol.create_cluster(session, 
                     start_pdb,
                     f"resn {rn}",
                     cap_strategy='CH3',
                     outfile=temp_sdf
                     )
-
+        
         charges[f"{rn}_probe"] = interface.bcl.calculate_formal_charge( temp_sdf )
+        charge = charges[f'{rn}_probe']
+        _LOGGER.info(f"\tprobe charge: {charge}")
         
     fs.safe_rm( temp_sdf )
     reactants:List[str] = list(sele_names.keys())
@@ -774,6 +941,7 @@ def _evaluate_binding(df:pd.DataFrame, start_pdb:str, binding_cutoff:int, distan
     else:
         df['selected'] = (df.selected)&(df.binding_log_sum<=cutoff)
 
+    #_LOGGER.info(f"Finished binding evaluation. {df.selected.sum()} geometries have <= {clash_cutoff} of distance {clash_distance:.3f} angstroms")
 
 def _evaluate_qm(df:pd.DataFrame, start_pdb:str, charge_mapper, cluster_cutoff:float) -> None:
     """ """

@@ -69,6 +69,7 @@ class XTBInterface(BaseInterface):
             "--chrg", str(charge),
             "--iterations", str(n_iter),
             "--parallel", str(n_proc),
+            "--norestart",
             "--sp",
             fname
         ])
