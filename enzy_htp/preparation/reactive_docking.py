@@ -129,7 +129,7 @@ def dock_reactants( structure:Structure,
     _evaluate_csts(df, constraints, cst_cutoff)
 
     _evaluate_clashes(df, clash_distance, clash_cutoff)
-    df = df.head(10)
+    
     _evaluate_binding(df, start_pdb, binding_cutoff, chain_names, charge_mapper=charge_mapper)
 
     _evaluate_qm(df, start_pdb, charge_mapper, cluster_distance) 
@@ -622,7 +622,7 @@ def _dock_mut_cst_overlaps(structure:Structure,
 
 def _mutate_result(structure, mutations:List[List[mm.Mutation]], work_dir :str, extra_flags=None) -> List[str]:
     """ TODO(CJ)"""
-
+    _LOGGER.info("Mutating selected structure...")
     res_names = {}
     for res in structure.residues:
         if res.name.upper() in chem.METAL_CENTER_MAP:
@@ -638,7 +638,8 @@ def _mutate_result(structure, mutations:List[List[mm.Mutation]], work_dir :str, 
 
     result:List[str] = list()
     #TODO(CJ): get this to work for List[List[Mutation]]
-    for mut_sets in mutations:
+    for midx, mut_sets in enumerate(mutations):
+        _LOGGER.info(f"Deploying mutation set {midx+1} of {len(mutations)}")
         mutated_outfile=str()
         for mut in mut_sets:
             original = res_names[f"{mut.chain_id}.{mut.res_idx}"]
@@ -650,7 +651,10 @@ def _mutate_result(structure, mutations:List[List[mm.Mutation]], work_dir :str, 
         file_str = parser.get_file_str(mutant, if_renumber=False, if_fix_atomname=False)
         fs.safe_rm(mutated_outfile)
         fs.write_lines( mutated_outfile, file_str.splitlines() )
+        _LOGGER.info(f"Saved mutated structure to {mutated_outfile}") 
         result.append( mutated_outfile )
+
+    _LOGGER.info("Finished mutations!")
 
     return result 
 
@@ -699,6 +703,7 @@ def _select_complex(df : pd.DataFrame, work_dir:str, cutoff:int=20) -> Tuple[Str
     Returns:
         A Tuple() with the layout (selected structure, selected .pdb file).
     """
+    _LOGGER.info("Beginning selection of final complex...")
     #TODO(CJ): I need to change this so that I am just ranking based on QM energy
     # then I should:
     # 1. save the dataframe  -> still need to do this
@@ -711,6 +716,8 @@ def _select_complex(df : pd.DataFrame, work_dir:str, cutoff:int=20) -> Tuple[Str
     cpy.sort_values(by='qm_energy', inplace=True)
 
     wt_fpath:str=cpy.description[0] 
+
+    _LOGGER.info(f"Selected structure in {wt_fpath}, with energy of {cpy.qm_energy[0]:.3f} hartree")
 
     #TODO(CJ): check that the df does  have length of at least 1
 
@@ -973,10 +980,7 @@ def _evaluate_binding(df:pd.DataFrame, start_pdb:str, binding_cutoff:int, chain_
 
     rms_clusters=_create_binding_clusters(df[df.selected].description.to_list(),chain_names)
 
-    session = interface.pymol.new_session()
-    
     binding_pockets:List[Set[str]]=_define_binding_pockets(start_pdb, distance_cutoff, charge_mapper)
-
     
     clusters = dict() 
     cluster_mapper = dict()
@@ -1006,111 +1010,99 @@ def _evaluate_binding(df:pd.DataFrame, start_pdb:str, binding_cutoff:int, chain_
             cluster[bp['resn']] = be
             resnames.add(bp['resn'])
         
-        clusters[cluster_name] = cluster 
-   
+        clusters[cluster_name] = cluster
     
     new_data = defaultdict(list)
 
     for i, row in df.iterrows():
-        if not row.selected:
-            new_data['cluster'].append( None )
-            for rn in resnames:
-                new_data[f"{rn}_ddg"].append( None )
-        else:
-            new_data['cluster'].append( cluster_mapper[row.description] )
-            for rn in resnames:
-                new_data[f"{rn}_ddg"].append( clusters[cluster_name][rn] )
+        cluster_name:str = cluster_mapper.get(row.description, None)
+        new_data['cluster'].append( cluster_mapper.get(row.description, None) )
+        for rn in resnames:
+            temp = clusters.get(cluster_name, None)
+            if temp is not None:
+                temp = temp.get(rn, None)
+            new_data[f"{rn}_ddg"].append( temp )
 
-    for k,v in new_data.items():
-        df[k] = v
 
-    print(df)
-    exit( 0 ) 
-    all_negative = np.array([True]*len(df)) 
-    binding_log_sum = np.zeros(len(df))     
-    for rn, values in binding_ddg.items():
-        df[f"{rn}_ddg"] = values
-        binding_log_sum += np.exp(df[f"{rn}_ddg"].to_numpy())
-        all_negative &= (df[f"{rn}_ddg"] <= 0.0)
+    binding_log_sum = np.zeros(len(df))
+    for col_name,col_values in new_data.items():
+        df[col_name] = col_values
+        
+        if col_name != 'cluster':
+            binding_log_sum += np.exp(df[col_name].to_numpy())
 
-    df['all_negative'] = all_negative
-    df['binding_log_sum'] = binding_log_sum
-    
-    if not df.selected.sum():
-        return
+    df['binding_ddg_log_sum'] = binding_log_sum
 
-    bls_cutoff:float=np.percentile(df[df.selected].binding_log_sum, binding_cutoff)
-    
-    an_cutoff = int((df.selected.sum())*(float(binding_cutoff)/100.0))
-    
-    if df.all_negative.sum() >= an_cutoff:
-        df['selected'] = (df.selected)&(df.all_negative)
-    else:
-        df['selected'] = (df.selected)&(df.binding_log_sum<=cutoff)
+    bls = df.binding_ddg_log_sum.to_numpy()
+    bls_is_nan = np.isnan(bls)
+    bls_cutoff = np.percentile(bls[~bls_is_nan], binding_cutoff)
+    df['selected'] = (df.selected)&(~bls_is_nan)&(bls<=bls_cutoff)
 
-    #_LOGGER.info(f"Finished binding evaluation. {df.selected.sum()} geometries have <= {clash_cutoff} of distance {clash_distance:.3f} angstroms")
+    _LOGGER.info(f"Finished binding evaluation. {df.selected.sum()} geometries have been selected.")
+
+
+def _define_active_site(start_pdb:str, distance_cutoff, charge_mapper=None):
+    session = interface.pymol.new_session()
+    res_names:List[str] = interface.pymol.collect(session, start_pdb, "resn".split()).resn.unique()
+    sele_names:Dict[str, str] = {}
+    binding_ddg:Dict[str, List[float]] = {}
+    charges:Dict[str,float] = {}
+
+    binding_pockets = list()
+
+    _LOGGER.info("Analyzing enzyme active site...")
+    reactants = list()    
+    sele = [] 
+    for rn in res_names:
+        if rn.upper() in chem.METAL_CENTER_MAP or rn.upper() in chem.THREE_LETTER_AA_MAPPER:
+            continue
+        reactants.append(rn)
+        sele.append(
+            f"(byres all within {distance_cutoff:.2f} of resn {rn})"
+        )
+    sele_str = " or ".join(sele)
+    atoms:pd.DataFrame = interface.pymol.collect(session, start_pdb,
+        "resi chain resn name".split(),
+        sele=sele_str
+        )
+    residues = sorted(list(set(zip(
+        atoms.chain,atoms.resi
+    ))))
+    charge = _system_charge( atoms, charge_mapper ) 
+    _LOGGER.info(f"Found {len(residues)} residues within {distance_cutoff} angstroms of reactants. Active site info:")
+    _LOGGER.info(f"\tresidues: {len(residues)}")
+    _LOGGER.info(f"\tcharge: {charge}")
+
+    return {
+        "sele":sele_str,
+        "charge":charge
+    }
+
 
 def _evaluate_qm(df:pd.DataFrame, start_pdb:str, charge_mapper, cluster_cutoff:float) -> None:
     """ """
     # steps
     # 1. get system charge
     # 2. run through each cluster and do it
-    qm_energy:List[float] = list()
-    
-    session = interface.pymol.new_session()
-    res_keys = interface.pymol.collect(session, start_pdb, "chain resn resi".split())
-    res_keys = sorted(set(zip(res_keys.chain, res_keys.resn, res_keys.resi)))
+    _LOGGER.info(f"Beginning qm energy evaluation. {df.selected.sum()} geometries still selected...")
+    as_info = _define_active_site(start_pdb, cluster_cutoff, charge_mapper)
+    session = interface.pymol.new_session() 
 
-    reactants = set()
-    reactant_counter = defaultdict(int)
-    
-    for (cname, resn, resi) in res_keys:
-        if resn.upper() in chem.METAL_CENTER_MAP or resn.upper() in chem.THREE_LETTER_AA_MAPPER:
-            continue
-        
-        reactants.add(resn)
-
-        reactant_counter[resn] += 1
-
-
-    as_sele:str=" or ".join(map(lambda rn: f"(byres all within {cluster_cutoff} of resn {rn})",reactants))
-    
-    interface.pymol.general_cmd(session,[('delete','all')])
-    res_keys = interface.pymol.collect(session, start_pdb, "chain resn resi".split(), sele=as_sele)
-    res_keys = sorted(set(zip(res_keys.chain, res_keys.resn, res_keys.resi)))
-    atom_mapper = defaultdict(list)
-    atoms = interface.pymol.collect(session, start_pdb, "chain resn resi name".split(), sele=as_sele)
-    for i, row in atoms.iterrows():
-        atom_mapper[(row.chain, row.resn, row.resi)].append( row['name'] )
-
-    charge = 0
-    
-    for (name, res_name, resi) in res_keys:
-        if res_name in chem.AA_CHARGE_MAPPER:
-            charge += chem.AA_CHARGE_MAPPER[res_name]
-        elif res_name in charge_mapper:
-            charge += charge_mapper[res_name]
-        elif res_name.upper() == "MG":
-            charge += 2
-        else:
-            assert False, res_name
-
-        if res_name == 'ASP':
-            res_atoms = atom_mapper[(name, res_name, resi)]
-            if 'HD2' in res_atoms:
-                charge += 1
+    qm_energy = []
 
     for i, row in df.iterrows():
         if not row.selected:
-            qm_energy.append( 0  )
+            qm_energy.append(None)
             continue
-
-
+        
         interface.pymol.general_cmd(session,[('delete','all')])
-        interface.pymol.create_cluster(session, row.description, as_sele, outfile='temp.mol', cap_strategy='CH3')
+        interface.pymol.create_cluster(session, row.description, as_info['sele'], outfile='temp.xyz', cap_strategy='CH3')
         qm_energy.append( 
-            interface.xtb.single_point('temp.mol', charge=charge)
+            interface.xtb.single_point('temp.xyz', charge=as_info['charge'])
         )
+
+        fs.safe_rm('temp.mol')
 
 
     df['qm_energy'] = qm_energy
+    _LOGGER.info("Finished qm energy evaluation!")
