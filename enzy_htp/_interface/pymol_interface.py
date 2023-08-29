@@ -583,6 +583,7 @@ class PyMolInterface(BaseInterface):
                 elif aname == 'H02':
                     new_name='C22'
                 else:
+                    self.general_cmd(session, [('save', '_____mess_up.pdb')])
                     assert False,(cname, res_num, res_name, aname)
                 args.extend([
                     ('alter', f"chain {cname} and resi {res_num} and resn {res_name} and name {aname}", "elem='C'"),

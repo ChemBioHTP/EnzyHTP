@@ -528,7 +528,9 @@ def _docking_run(option_file:str, use_cache:bool) -> pd.DataFrame:
     df['description'] = df.apply( lambda row: f"{opt_path.parent}/complexes/{row.description}.pdb", axis=1)
    
     df['selected'] = True
-    
+   
+    df.to_csv(str(opt_path.parent / "scores.csv"),index=False)
+
     _LOGGER.info("Completed RosettaLigand geometry sampling!")
 
     return df
@@ -838,7 +840,7 @@ def _create_binding_clusters(geometries:List[str], chain_names):
         placed = False 
         for grp in rms_clusters:
             for member in grp:
-                if rms_mapper[(gg, member)] <= 1.0: #TODO(CJ): paramterize this
+                if rms_mapper[(gg, member)] <= 2.0: #TODO(CJ): paramterize this
                     grp.add(gg)
                     placed = True
                 if placed:
@@ -998,15 +1000,19 @@ def _evaluate_binding(df:pd.DataFrame, start_pdb:str, binding_cutoff:int, chain_
         for bp in binding_pockets:
             #TODO(CJ): check if xtb failed for SCF iteration reasons and retry if so 
             _LOGGER.info(f"Calculating binding energy for {bp['resn']}...")
-            be:float = binding_energy(
-                molfile,
-                f"resn {bp['resn']}",
-                bp['sele'],
-                bp['probe_charge'],
-                bp['receptor_charge'],
-                work_dir=config["system.SCRATCH_DIR"]
-            )
-            _LOGGER.info(f"Found binding energy of {be:.3f} hartrees")
+            try:
+                be:float = binding_energy(
+                    molfile,
+                    f"resn {bp['resn']}",
+                    bp['sele'],
+                    bp['probe_charge'],
+                    bp['receptor_charge'],
+                    work_dir=config["system.SCRATCH_DIR"]
+                )
+                _LOGGER.info(f"Found binding energy of {be:.3f} hartrees")
+            except:
+                _LOGGER.warning(f"Could not calculate binding energy for {molfile}. Continuing...")
+                be:float = 10.0
             cluster[bp['resn']] = be
             resnames.add(bp['resn'])
         
@@ -1097,9 +1103,14 @@ def _evaluate_qm(df:pd.DataFrame, start_pdb:str, charge_mapper, cluster_cutoff:f
         
         interface.pymol.general_cmd(session,[('delete','all')])
         interface.pymol.create_cluster(session, row.description, as_info['sele'], outfile='temp.xyz', cap_strategy='CH3')
-        qm_energy.append( 
-            interface.xtb.single_point('temp.xyz', charge=as_info['charge'])
-        )
+        try:
+            qm_energy.append( 
+                interface.xtb.single_point('temp.xyz', charge=as_info['charge'])
+            )
+        except: #TODO(CJ): make this the correct exception
+            _LOGGER.warning(f"Could not calculate single point energy for {row.description}. Continuing...")
+            qm_energy.append( None )
+
 
         fs.safe_rm('temp.mol')
 

@@ -60,6 +60,7 @@ def xtb_binding_energy( fname:str,
 
     session = interface.pymol.new_session()
 
+    interface.pymol.general_cmd(session,[('delete','all')])
     interface.pymol.create_cluster(session, fname, probe, outfile=probe_sdf,cap_strategy='CH3',work_dir=work_dir)
 
     if probe_charge is None:
@@ -82,6 +83,8 @@ def xtb_binding_energy( fname:str,
     interface.pymol.create_cluster(session, fname, f"({probe}) or ({receptor})", outfile=union_xyz,cap_strategy='CH3',work_dir=work_dir)
     
     union_charge=probe_charge+receptor_charge
+
+    original_n_iter:int=config['xtb.N_ITER']
 
     union_energy:float=interface.xtb.single_point(union_xyz, charge=union_charge)
     probe_energy:float=interface.xtb.single_point(probe_xyz, charge=probe_charge)
