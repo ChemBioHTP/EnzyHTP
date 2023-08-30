@@ -8,7 +8,7 @@ from .general import (
     remove_empty_chain,
     remove_non_peptide,
     update_residues,
-    order_atoms_to_stru,
+    align_atom_order_in_each_residue,
 )
 from .residue import (
     deprotonate_residue,

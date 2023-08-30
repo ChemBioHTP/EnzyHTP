@@ -95,24 +95,18 @@ def update_residues(resi: Residue, ref_resi: Residue) -> Residue:  # pylint: dis
     return resi
 
 
-def order_atoms_to_stru(stru: Structure, ref_stru: Structure) -> None:
-    """Orders the atoms in stru in-place to match the ref_stru's ordering as long
+def align_atom_order_in_each_residue(stru: Structure, ref_stru: Structure) -> Structure:
+    """Orders the atoms in stru to match the ref_stru's ordering as long
        the residues are in the same order.
     Args:
-        stru: 
+        stru: the unsorted Structure object.
         ref_stru: the Structure object that has the desired order.
     Returns:
-        Nothing.
+        A sorted structure.
     """
-    for res, ref_res in zip(stru.residues, ref_stru.residues):
+    ordered_stru = copy.deepcopy(stru)
+    for res, ref_res in zip(ordered_stru.residues, ref_stru.residues):
         if res.name == ref_res.name:
-            res.atoms = ref_res.atoms
-            new_res = copy.deepcopy(res)
-            new_res.atoms = []
-            visited = []
-            for ref_atom in ref_res.atoms:
-                for atom in res.atoms:
-                    if atom not in visited and atom.name == ref_atom.name:
-                        visited.append(atom)
-                        new_res.atoms.append(atom)
-            res.atoms = new_res.atoms
+            d_ref = {k.name:v for v,k in enumerate(ref_res.atoms)}
+            res.atoms.sort(key=lambda x: d_ref[x.name])
+    return ordered_stru
