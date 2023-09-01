@@ -38,46 +38,35 @@ def dock_reactants( structure:Structure,
                     binding_cutoff:int=20,
                     cluster_distance:float=2.5,
                     
-                    use_cache:bool=True
+                    use_cache:bool=True,
+                    parent:bool=False 
                     ) -> List[str]:
     """TODO"""
 
     if not work_dir:
         work_dir = config["system.SCRATCH_DIR"] 
 
-    _LOGGER.info("Beginning EnzyRCD Reactive docking run! Below are the run settings and characteristics:") 
-    #TODO(CJ): maybe add something for the structures?
-    _LOGGER.info(f"\t{len(reactants)} reactants: {', '.join(reactants)}")
-    
-    if constraints is not None:
-        _LOGGER.info(f"\t{len(constraints)} RosettaConstraints")
-    else:
-        _LOGGER.info("\t0 RosettaConstraints")
-   
-    if mutations is not None:
-        _LOGGER.info(f"\t{len(mutations)} mutation sets")
-    else:
-        _LOGGER.info("\t0 mutation sets")
-
-    _LOGGER.info(f"\t{work_dir=}")
-    _LOGGER.info(f"\t{save_work_dir=}")
-
-    if reactant_conformers is not None:
-        _LOGGER.info(f"\t{len(reactant_conformers)} conformer libraries: {', '.join(reactant_conformers)}")
-    else:
-        _LOGGER.info(f"\t0 conformer libraries")
-
-    _LOGGER.info(f"\t{rng_seed=}")
-    _LOGGER.info(f"\t{n_struct=}")
-    _LOGGER.info(f"\t{cst_cutoff=} tolerance units")
-    _LOGGER.info(f"\t{clash_distance=} angstroms")
-    _LOGGER.info(f"\t{clash_cutoff=} clashes")
-    _LOGGER.info(f"\t{binding_cutoff=}")
-    _LOGGER.info(f"\t{cluster_distance=} angstroms")
-    _LOGGER.info(f"\t{use_cache=}")
-
-    
     fs.safe_mkdir( work_dir )
+
+    _log_settings(
+        reactants,
+        constraints,
+        mutations,
+        work_dir,
+        save_work_dir,
+        reactant_conformers,
+        rng_seed,
+        n_struct,
+        cst_cutoff,
+        clash_distance,
+        clash_cutoff,
+        binding_cutoff,
+        cluster_distance,
+        use_cache,
+        parent
+    )
+
+   
 
     _place_reactants( structure, reactants )
 
@@ -106,7 +95,8 @@ def dock_reactants( structure:Structure,
                 clash_cutoff,
                 binding_cutoff,
                 cluster_distance,
-                use_cache
+                use_cache,
+                False # always a child run from here
                 ) 
             _LOGGER.info(f"Finished child reactive docking run {ridx+1} of {len(resolved_inputs)}!")
 
@@ -458,9 +448,9 @@ def make_options_file(pdb_file:str,  xml_file:str, param_files:List[str],  work_
         fs.safe_rm(fname)
         fs.safe_rm(score_file)
         fs.safe_rmdir(f"{work_dir}/complexes/") 
-        fs.safe_rmdir( qsar_grid )
+        #fs.safe_rmdir( qsar_grid )
 
-    fs.safe_mkdir( qsar_grid )
+    #fs.safe_mkdir( qsar_grid )
     fs.safe_mkdir(f"{work_dir}/complexes/")
 
     if not fname.exists():
@@ -559,8 +549,7 @@ def _evaluate_csts(df:pd.DataFrame, csts:List[RosettaCst], cst_cutoff:int) -> No
         total = 0.0
         for cst in csts:
             for tl in cst.evaluate( row.description ):
-                if tl > 1.0:
-                    total += tl
+                total += tl
         cst_diff.append( total )
 
     df['cst_diff'] = cst_diff
@@ -912,7 +901,7 @@ def _system_charge(df:pd.DataFrame, charge_mapper=None)->int:
                 special_titration=True
 
         if resn == "HIS":
-            if "HD1" in atoms and "HE1" in atoms:
+            if "HD1" in atoms and "HE2" in atoms:
                 residue_charge += 1
                 special_titration=True
 
@@ -1000,19 +989,15 @@ def _evaluate_binding(df:pd.DataFrame, start_pdb:str, binding_cutoff:int, chain_
         for bp in binding_pockets:
             #TODO(CJ): check if xtb failed for SCF iteration reasons and retry if so 
             _LOGGER.info(f"Calculating binding energy for {bp['resn']}...")
-            try:
-                be:float = binding_energy(
-                    molfile,
-                    f"resn {bp['resn']}",
-                    bp['sele'],
-                    bp['probe_charge'],
-                    bp['receptor_charge'],
-                    work_dir=config["system.SCRATCH_DIR"]
-                )
-                _LOGGER.info(f"Found binding energy of {be:.3f} hartrees")
-            except:
-                _LOGGER.warning(f"Could not calculate binding energy for {molfile}. Continuing...")
-                be:float = 10.0
+            be:float = binding_energy(
+                molfile,
+                f"resn {bp['resn']}",
+                bp['sele'],
+                bp['probe_charge'],
+                bp['receptor_charge'],
+                work_dir=config["system.SCRATCH_DIR"]
+            )
+            _LOGGER.info(f"Found binding energy of {be:.3f} hartrees")
             cluster[bp['resn']] = be
             resnames.add(bp['resn'])
         
@@ -1103,17 +1088,68 @@ def _evaluate_qm(df:pd.DataFrame, start_pdb:str, charge_mapper, cluster_cutoff:f
         
         interface.pymol.general_cmd(session,[('delete','all')])
         interface.pymol.create_cluster(session, row.description, as_info['sele'], outfile='temp.xyz', cap_strategy='CH3')
-        try:
-            qm_energy.append( 
-                interface.xtb.single_point('temp.xyz', charge=as_info['charge'])
-            )
-        except: #TODO(CJ): make this the correct exception
-            _LOGGER.warning(f"Could not calculate single point energy for {row.description}. Continuing...")
-            qm_energy.append( None )
+        qm_energy.append( 
+            interface.xtb.single_point('temp.xyz', charge=as_info['charge'])
+        )
 
-
-        fs.safe_rm('temp.mol')
+        fs.safe_rm('temp.xyz')
 
 
     df['qm_energy'] = qm_energy
     _LOGGER.info("Finished qm energy evaluation!")
+
+
+
+def    _log_settings(
+        reactants,
+        constraints,
+        mutations,
+        work_dir,
+        save_work_dir,
+        reactant_conformers,
+        rng_seed,
+        n_struct,
+        cst_cutoff,
+        clash_distance,
+        clash_cutoff,
+        binding_cutoff,
+        cluster_distance,
+        use_cache,
+        parent
+    ):
+    """ """
+    if parent:
+        return
+
+    _LOGGER.info("Beginning EnzyRCD Reactive docking run! Below are the run settings and characteristics:") 
+    #TODO(CJ): maybe add something for the structures?
+    _LOGGER.info(f"\t{len(reactants)} reactants: {', '.join(reactants)}")
+    
+    if constraints is not None:
+        _LOGGER.info(f"\t{len(constraints)} RosettaConstraints")
+    else:
+        _LOGGER.info("\t0 RosettaConstraints")
+   
+    if mutations is not None:
+        _LOGGER.info(f"\t{len(mutations)} mutation sets")
+    else:
+        _LOGGER.info("\t0 mutation sets")
+
+    _LOGGER.info(f"\t{work_dir=}")
+    _LOGGER.info(f"\t{save_work_dir=}")
+
+    if reactant_conformers is not None:
+        _LOGGER.info(f"\t{len(reactant_conformers)} conformer libraries: {', '.join(reactant_conformers)}")
+    else:
+        _LOGGER.info(f"\t0 conformer libraries")
+
+    _LOGGER.info(f"\t{rng_seed=}")
+    _LOGGER.info(f"\t{n_struct=}")
+    _LOGGER.info(f"\t{cst_cutoff=} tolerance units")
+    _LOGGER.info(f"\t{clash_distance=} angstroms")
+    _LOGGER.info(f"\t{clash_cutoff=} clashes")
+    _LOGGER.info(f"\t{binding_cutoff=}")
+    _LOGGER.info(f"\t{cluster_distance=} angstroms")
+    _LOGGER.info(f"\t{use_cache=}")
+
+ 

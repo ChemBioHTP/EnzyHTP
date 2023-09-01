@@ -554,9 +554,11 @@ class PyMolInterface(BaseInterface):
             if not row.resn in THREE_LETTER_AA_MAPPER:
                 continue
             
-            args.append(
+
+            args.extend([
+                ('valence', 'guess', f"chain {row.chain} and resi {row.resi} and resn {row.resn} and name {row['name']}"),
                 ('h_add', f"chain {row.chain} and resi {row.resi} and resn {row.resn} and name {row['name']}")
-            )
+            ])
     
         args.append(("save", outfile, obj_name))
     
@@ -583,6 +585,7 @@ class PyMolInterface(BaseInterface):
                 elif aname == 'H02':
                     new_name='C22'
                 else:
+                    #TODO(CJ): better error message
                     self.general_cmd(session, [('save', '_____mess_up.pdb')])
                     assert False,(cname, res_num, res_name, aname)
                 args.extend([

@@ -66,22 +66,18 @@ class XTBInterface(BaseInterface):
             n_proc = self.config_.N_PROC
 
 
-        while n_iter <= 2500:
-            try:
-    
-                results = self.env_manager_.run_command(self.config_.XTB_EXE,[
-                    "--chrg", str(charge),
-                    "--iterations", str(n_iter),
-                    "--parallel", str(n_proc),
-                    "--norestart",
-                    "--sp",
-                    fname
-                ])
-                break
-            except:
-                if results.stderr.find("iterator did not converge") != -1:
-                    n_iter += 500
-                    _LOGGER.info(f"xtb ailure was due to a lack of convergence. Raising n_iter to {n_iter} and retrying...")
+        try:
+        
+            results = self.env_manager_.run_command(self.config_.XTB_EXE,[
+                "--chrg", str(charge),
+                "--iterations", str(n_iter),
+                "--parallel", str(n_proc),
+                "--norestart",
+                "--sp",
+                fname
+            ])
+        except:
+            _LOGGER.info(f"xtb failure occurred! Exiting...")
 
 
         self._remove_temp_files(str(Path(fname).parent))
