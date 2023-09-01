@@ -396,11 +396,10 @@ def mutate_stru_with_pymol(
                             pymol_obj_name=pymol_obj_name, pymol_session=pms)
         # 3. save to a structure.
         pymol_mutant_stru = pi.export_enzy_htp_stru(pymol_obj_name, pms, if_fix_naming=True)
-        sorted_pymol_mutant_stru = stru_oper.align_atom_order_in_each_residue(pymol_mutant_stru, stru_cpy)
+        stru_oper.align_atom_order_in_each_residue(pymol_mutant_stru, stru_cpy)
         
-
     # 4. update residues
-    stru_oper.update_residues(stru_cpy, sorted_pymol_mutant_stru)
+    stru_oper.update_residues(stru_cpy, pymol_mutant_stru)
     
     if in_place:
         stru_oper.update_residues(stru, stru_cpy)
