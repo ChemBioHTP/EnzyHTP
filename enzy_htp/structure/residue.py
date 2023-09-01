@@ -231,20 +231,13 @@ class Residue(DoubleLinkedNode):
         """
         raise Exception  #TODO need to figure out how to determine the connectivity without the name
 
-    def renumber_atoms(self, start: int = 1) -> int:  # TODO
-        """Renumbers the Residue()'s Atom()'s beginning with "start" paramter, defaulted to 1. Returns the index of the last Atom().
-        NOTE: errors if "start" is <= 0.
+    def renumber_atoms(self, atom_idx_list: List[int]) -> None:  # TODO
+        """Renumbers the Residue()'s Atom()'s to match atom_idx_list
         """
-        if start <= 0:
-            _LOGGER.error(f"Illegal start number '{start}'. Value must be >= 0. Exiting...")
-            exit(1)
-        #aa: Atom
-        #self._atoms.sort(key=lambda aa: aa.idx)  #@shaoqz: maybe use .sort to keep the reference.
         idx = 0
         for atom in self._atoms:
-            atom._idx = idx + start  #@shaoqz: why dont use aa?
+            atom._idx = atom_idx_list[idx]
             idx += 1
-        return idx + start
 
     def remove_atoms_not_in_list(self, keep_name_list: List[str]):
         """remove atoms that do not in the name list of keeping.
