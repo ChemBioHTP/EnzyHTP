@@ -109,4 +109,5 @@ def align_atom_order_in_each_residue(stru: Structure, ref_stru: Structure) -> St
         if res.name == ref_res.name:
             d_ref = {k.name:v for v,k in enumerate(ref_res.atoms)}
             res.atoms.sort(key=lambda x: d_ref[x.name])
+            res.renumber_atoms()
     return ordered_stru

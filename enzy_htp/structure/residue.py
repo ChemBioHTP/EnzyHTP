@@ -238,11 +238,12 @@ class Residue(DoubleLinkedNode):
         if start <= 0:
             _LOGGER.error(f"Illegal start number '{start}'. Value must be >= 0. Exiting...")
             exit(1)
-        aa: Atom
-        self._atoms.sort(key=lambda aa: aa.idx)  #@shaoqz: maybe use .sort to keep the reference.
-
-        for idx, aa in enumerate(self._atoms):
-            self._atoms[idx].atom_number = idx + start  #@shaoqz: why dont use aa?
+        #aa: Atom
+        #self._atoms.sort(key=lambda aa: aa.idx)  #@shaoqz: maybe use .sort to keep the reference.
+        idx = 0
+        for atom in self._atoms:
+            atom._idx = idx + start  #@shaoqz: why dont use aa?
+            idx += 1
         return idx + start
 
     def remove_atoms_not_in_list(self, keep_name_list: List[str]):
