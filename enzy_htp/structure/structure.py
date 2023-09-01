@@ -505,6 +505,7 @@ class Structure(DoubleLinkedNode):
         for ch in self._chains:
             ch.sort_residues()
             for res in ch:
+                res: Residue
                 res.sort_atoms()
 
     def renumber_atoms(self, sort_first: bool = True) -> None:
