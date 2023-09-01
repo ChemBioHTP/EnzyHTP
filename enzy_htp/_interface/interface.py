@@ -9,6 +9,7 @@ class. Packages:
     + Multiwfn, MultiwfnInterface
     + PyMol, PyMolInterface
     + Rosetta, RosettaInterface
+    + RDKit, RDKitInterface
     + xtb, XTBInterface
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-07-20
@@ -24,6 +25,7 @@ from .moe_interface import MOEInterface
 from .multiwfn_interface import MultiwfnInterface
 from .pymol_interface import PyMolInterface
 from .rosetta_interface import RosettaInterface
+from .rdkit_interface import RTKitInterface
 from .xtb_interface import XTBInterface
 
 
@@ -43,6 +45,7 @@ class Interface:
         multiwfn: Corresponds to instance of MultiwfnInterface().
         pymol: Corresponds to instance of PyMolInteface().
         rosetta: Corresponds to instance of RosettaInterface().
+        rdkit: Corresponds to instance of RDKitInterface().
         xtb: Corresponds to an isntance of XTBInterface().
     """
 

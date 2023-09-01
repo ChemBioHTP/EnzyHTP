@@ -12,6 +12,7 @@ there are configuration settings for the below packages by the given <Package>Co
     + Multiwfn, MultiwfnConfig
     + PyMOL, PyMolConfig
     + Rosetta, RosettaConfig
+    + RDKit, RDKitConfig
     + xtb, XTBConfig
 
 In addition to specific packages, settings for the system are specified with SystemConfig
@@ -31,6 +32,7 @@ from .gaussian_config import GaussianConfig, default_gaussian_config
 from .moe_config import MOEConfig, default_moe_config
 from .multiwfn_config import MultiwfnConfig, default_multiwfn_config
 from .pymol_config import PyMolConfig, default_pymol_config
+from .rdkit_config import RDKitConfig, default_rdkit_config
 from .rosetta_config import RosettaConfig, default_rosetta_config
 from .system_config import SystemConfig, default_system_config
 from .xtb_config import XTBConfig, default_xtb_config
@@ -52,6 +54,7 @@ class Config:
         _moe: Private instance of MOEConfig() with default settings.
         _multiwfn: Private instance of MultiwfnConfig() with default settings.
         _pymol: Private instance of PyMolConfig() with default settings.
+        _rdkit: Private instace of RDKitConfig() with default settings.
         _rosetta: Private instance of RosettaConfig() with default settings.
         _system: Private instance of SystemConfig() with default settings.
         _xtb: Private instance of XTBConfig() with default settings.
@@ -65,6 +68,7 @@ class Config:
         self._multiwfn = default_multiwfn_config()
         self._moe = default_moe_config()
         self._pymol = default_pymol_config()
+        self._rdkit = default_rdkit_config()
         self._rosetta = default_rosetta_config()
         self._system = default_system_config()
         self._xtb = default_xtb_config()
@@ -96,6 +100,8 @@ class Config:
                 ptr = self._multiwfn
             elif app == "pymol":
                 ptr = self._pymol
+            elif app == "rdkit":
+                ptr = self._rdkit
             elif app == "rosetta":
                 ptr = self._rosetta
             elif app == "system":
@@ -134,6 +140,8 @@ class Config:
                 ptr = self._multiwfn
             elif app == "pymol":
                 ptr = self._pymol
+            elif app == "rdkit":
+                ptr = self._rdkit
             elif app == "rosetta":
                 ptr = self._rosetta
             elif app == "system":
@@ -144,4 +152,5 @@ class Config:
                 raise TypeError()
             ptr[settings] = value
         else:
+            #TODO(CJ): add error logging here. also for the getter
             raise TypeError()
