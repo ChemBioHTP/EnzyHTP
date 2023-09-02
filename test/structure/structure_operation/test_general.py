@@ -58,6 +58,7 @@ def test_update_residues():
                               "    D(ligand): residue: 371-371 atom_count: 58\n"
                               ")")
 
+
 def test_align_atom_order_in_each_residue():
     """test updating the atom order in each residue of an enzyme"""
     pdb_file_path = f"{DATA_DIR}KE_07_R7_2_S_mut.pdb"
