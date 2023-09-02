@@ -560,7 +560,6 @@ The key is the residue after the mutation."""
 
 # yapf: enable
 
-
 def convert_to_three_letter(one_letter: str) -> str:
     """Converts a one letter amino acid name to a three letter. If supplied code is invalid, raises an enzy_htp.core.InvalidResidueCode() exception."""
     if len(one_letter) != 1:

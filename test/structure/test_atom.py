@@ -35,6 +35,19 @@ def test_deepcopy():
     # ensure parent of every atom is None
     assert all(i.parent is None for i in new_list)
 
+def test_deepcopy_more_than_once():
+    """test the hehavior of copy.deepcopy on Atom() under a Structure()
+    context and if copied more than once"""
+    stru = PDBParser().get_structure(f"{DATA_DIR}12E8_small_four_chain.pdb")
+    atom_list = stru[0][0][1:3] + stru[0][1][1:2]  # target for deepcopy
+    assert atom_list[0].name != "X"
+    new_list = deepcopy(atom_list)
+    new_list[0].name = "X"
+    new_new_list = deepcopy(new_list)
+    assert new_new_list[0].name == "X"
+    # ensure parent of every atom is None (so not using the python default deepcopy)
+    assert all(i.parent is None for i in new_list)
+    assert all(i.parent is None for i in new_new_list)
 
 def test_no_optional_data():
     """test the case pdb dont have atom number"""
