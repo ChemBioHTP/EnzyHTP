@@ -57,3 +57,21 @@ def test_update_residues():
                               "    C(ligand): residue: 370-370 atom_count: 58\n"
                               "    D(ligand): residue: 371-371 atom_count: 58\n"
                               ")")
+
+def test_align_atom_order_in_each_residue():
+    """test updating the atom order in each residue of an enzyme"""
+    pdb_file_path = f"{DATA_DIR}KE_07_R7_2_S_mut.pdb"
+    stru: Structure = sp.get_structure(pdb_file_path)
+    pdb_file_path_2 = f"{DATA_DIR}KE_07_R7_2_S.pdb"
+    stru_2: Structure = sp.get_structure(pdb_file_path_2)
+    stru_oper.align_atom_order_in_each_residue(stru, stru_2)
+    
+    for new_res, old_res in zip(stru.residues, stru_2.residues):
+        if new_res.idx == 154:
+            assert new_res.name == "TRP"
+            assert len(new_res.atoms) == 24
+        else:
+            for new_atom, old_atom in zip(new_res.atoms, old_res.atoms):
+                assert new_atom.name == old_atom.name and new_atom.idx == old_atom.idx
+
+    
