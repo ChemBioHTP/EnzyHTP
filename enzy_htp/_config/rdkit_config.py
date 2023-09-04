@@ -1,9 +1,14 @@
 """ """
-
+#TODO(CJ): do the documentation here
+from copy import deepcopy
+from typing import List
 
 from .base_config import BaseConfig
 
 class RDKitConfig(BaseConfig):
+
+    SUPPORTED_FTYPES:List[str] = ".pdb .mol .mol2 .sdf".split()
+    """ """
 
     def required_executables(self) -> List[str]:
         """A hardcoded list of required executables for xtb."""
@@ -18,6 +23,6 @@ class RDKitConfig(BaseConfig):
         """A hardcoded list of required enviornment variables for xtb."""
         return ["rdkit"]
 
-def default_xtb_config() -> XTBConfig:
-    """Creates a deep-copied default version of the XTBConfig() class."""
-    return deepcopy(XTBConfig())
+def default_rdkit_config() -> RDKitConfig:
+    """Creates a deep-copied default version of the RDKitConfig() class."""
+    return deepcopy(RDKitConfig())

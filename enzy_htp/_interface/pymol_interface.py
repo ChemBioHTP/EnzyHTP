@@ -53,7 +53,7 @@ class PyMolInterface(BaseInterface):
     def check_pymol2_installed(self) -> None:
         """Method that checks if """
         if "pymol2" in self.missing_py_modules():
-            _LOGGER.errorf("pymol2 is NOT installed. Use 'conda install -c conda-forge -y -q pymol-open-source'. Exiting...")
+            _LOGGER.error(f"pymol2 is NOT installed. Use 'conda install -c conda-forge -y -q pymol-open-source'. Exiting...")
             exit(1)
 
     def convert(self,

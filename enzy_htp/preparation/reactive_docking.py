@@ -22,6 +22,10 @@ from enzy_htp import mutation as mm
 from enzy_htp.structure import PDBParser, Structure
 from enzy_htp.core import file_system as fs
 
+#TODO(CJ): I should go through and use existing values if cache mode is selected
+#TODO(CJ): need to be able to specify the size of the grid
+
+
 def dock_reactants( structure:Structure, 
                     reactants:List[str], 
                     constraints:List[RosettaCst] = None, 
@@ -1100,7 +1104,7 @@ def _evaluate_qm(df:pd.DataFrame, start_pdb:str, charge_mapper, cluster_cutoff:f
 
 
 
-def    _log_settings(
+def _log_settings(
         reactants,
         constraints,
         mutations,

@@ -8,8 +8,8 @@ class. Packages:
     + MOE, MOEInterface
     + Multiwfn, MultiwfnInterface
     + PyMol, PyMolInterface
-    + Rosetta, RosettaInterface
     + RDKit, RDKitInterface
+    + Rosetta, RosettaInterface
     + xtb, XTBInterface
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-07-20
@@ -24,8 +24,8 @@ from .gaussian_interface import GaussianInterface
 from .moe_interface import MOEInterface
 from .multiwfn_interface import MultiwfnInterface
 from .pymol_interface import PyMolInterface
+from .rdkit_interface import RDKitInterface
 from .rosetta_interface import RosettaInterface
-from .rdkit_interface import RTKitInterface
 from .xtb_interface import XTBInterface
 
 
@@ -44,8 +44,8 @@ class Interface:
         moe: Corresponds to instance of MOEInterface().
         multiwfn: Corresponds to instance of MultiwfnInterface().
         pymol: Corresponds to instance of PyMolInteface().
-        rosetta: Corresponds to instance of RosettaInterface().
         rdkit: Corresponds to instance of RDKitInterface().
+        rosetta: Corresponds to instance of RosettaInterface().
         xtb: Corresponds to an isntance of XTBInterface().
     """
 
@@ -57,6 +57,7 @@ class Interface:
         self.moe = MOEInterface(self, config._moe)
         self.multiwfn = MultiwfnInterface(self, config._multiwfn)
         self.pymol = PyMolInterface(self, config._pymol)
+        self.rdkit = RDKitInterface(self, config._rdkit)
         self.rosetta = RosettaInterface(self, config._rosetta)
         self.xtb = XTBInterface(self, config._xtb)
 

@@ -78,6 +78,7 @@ class XTBInterface(BaseInterface):
             ])
         except:
             _LOGGER.info(f"xtb failure occurred! Exiting...")
+            raise TypeError()
 
 
         self._remove_temp_files(str(Path(fname).parent))
