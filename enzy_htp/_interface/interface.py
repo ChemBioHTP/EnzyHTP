@@ -2,6 +2,7 @@
 model sees all interactions between EnzyHTP and a given application via a data attribute which is an instance of a 
 specific application interface. At present, the below packages can be interacted with via the corresponding Interface
 class. Packages:
+
     + AmberMD, AmberInterface
     + AlphaFill, AlphaFillInterface
     + BCL, BCLInterface
@@ -12,6 +13,7 @@ class. Packages:
     + RDKit, RDKitInterface
     + Rosetta, RosettaInterface
     + xtb, XTBInterface
+
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-07-20
 """
@@ -38,8 +40,9 @@ class Interface:
     """Wrapper class that houses access to individual <Package>Interface classes that exist in EnzyHTP.
     Each <Package>Interface is available as the attribute Interface.<package> (all lower case). Each instance
     needs an EnzyHTP.Config instance to hold all data.
+
     Attributes:
-        _config: TODO(CJ)
+        _config: Corresponds to instance of Config().
         amber: Corresponds to instance of AmberInterface().
         alphafill: Corresponds to instance of AlphaFillInterface().
         bcl: Corresponds to instance of BCLInterface().
@@ -53,6 +56,7 @@ class Interface:
     """
 
     def __init__(self, config: Config):
+        """Constructor for the Interface(). Takes only a Config() class."""
         self._config = config
         self.alphafill = AlphaFillInterface(self, config._alphafill)
         self.amber = AmberInterface(self, config._amber)
@@ -68,6 +72,7 @@ class Interface:
         self.check_environment()
 
     def config(self) -> Config:
+        """Getter for the config class."""
         return self._config
 
     def check_environment(self) -> None:
@@ -115,7 +120,3 @@ class Interface:
         else:
             _LOGGER.info("All elements are available in environment!")
 
-    def check_for_elements(self, keys: List[str]) -> Dict[str, bool]:
-        """ TODO"""
-        #TODO(CJ)
-        pass

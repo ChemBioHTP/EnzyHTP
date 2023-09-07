@@ -26,7 +26,7 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 
 Date: 2022-07-15
 """
-from typing import Any, Dict
+from typing import Any, Dict, List
 from .alphafill_config import AlphaFillConfig, default_alphafill_config
 from .amber_config import AmberConfig, default_amber_config
 from .bcl_config import BCLConfig, default_bcl_config
@@ -40,9 +40,6 @@ from .system_config import SystemConfig, default_system_config
 from .xtb_config import XTBConfig, default_xtb_config
 
 from enzy_htp.core import _LOGGER
-
-# TODO(CJ): add more syntax checking for getter/setter
-# TODO(CJ): need a BaseConfig() class so that the __getitem__ and __setitem__ can work better
 
 class Config:
     """Class that holds all configuration settings for the different external softwares 
@@ -61,7 +58,7 @@ class Config:
         _rosetta: Private instance of RosettaConfig() with default settings.
         _system: Private instance of SystemConfig() with default settings.
         _xtb: Private instance of XTBConfig() with default settings.
-        _mapper: TODO(CJ)
+        _mapper: Helper dict() that maps between name of the package and its config. For internal use only.
     """
 
     def __init__(self):
@@ -102,20 +99,15 @@ class Config:
         Returns:
             Corresponding value, if it exists.
 
-        Raises:
-            TypeError() if any part of the key is invalid.
         """
-        #TODO(CJ): add the rosetta accessors
         if key.count("."):
             app, settings = key.split(".", 1)
             ptr = self._mapper.get(app, None)
             if ptr is not None:
                 return ptr[settings]
-            else:
-                raise TypeError()
-                pass
-        else:
-            raise TypeError()
+        
+        _LOGGER.error(f"The supplied key {key} is invalid. Exiting...")
+        exit( 1 )
 
     def __setitem__(self, key: str, value: Any) -> None:
         """Setter for the configuration values in the Config object. Uses the grammar
@@ -126,17 +118,18 @@ class Config:
             key: A string with the grammar "<package>.<name>" for the value you will be updating.
             value: The value you are going to set the corresponding variable to. Can have any type.
 
-        Raises:
-            TypeError() if any part of the key is invalid.
+        Returns:
+            Nothing.
+
         """
-        #TODO(CJ): add the rosetta setters
         if key.count("."):
             app, settings = key.split(".", 1)
             ptr = self._mapper.get(app, None) 
             if ptr is not None:
                 ptr[settings] = value
-            else:
-                raise TypeError()
-        else:
-            #TODO(CJ): add error logging here. also for the getter
-            raise TypeError()
+                return
+
+        _LOGGER.error(f"The supplied key {key} is invalid. Exiting...")
+        exit( 1 )
+
+
