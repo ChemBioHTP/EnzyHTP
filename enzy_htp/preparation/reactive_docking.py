@@ -43,7 +43,8 @@ def dock_reactants( structure:Structure,
                     cluster_distance:float=2.5,
                     
                     use_cache:bool=True,
-                    parent:bool=False 
+                    parent:bool=False,
+                    pdb_code:None=str
                     ) -> List[str]:
     """TODO"""
 
@@ -72,7 +73,7 @@ def dock_reactants( structure:Structure,
 
    
 
-    _place_reactants( structure, reactants )
+    _place_reactants( structure, reactants, pdb_code )
 
     (param_files, charge_mapper) = _prepare_reactants(reactants, reactant_conformers)
 
@@ -487,7 +488,7 @@ def make_options_file(pdb_file:str,  xml_file:str, param_files:List[str],  work_
         f"       -all './complexes'",
     ])
     
-    qsar_grid:str=f"{work_dir}/complexes/qsar_grids/"
+    qsar_grid:str=str(Path(f"{work_dir}/complexes/qsar_grids/").absolute())
     content.append(f"-qsar:grid_dir {qsar_grid}") 
 
     fname = Path(work_dir) / "options.txt"
@@ -775,7 +776,7 @@ def _select_complex(df : pd.DataFrame, work_dir:str, cutoff:int=20) -> Tuple[Str
 
 
 
-def _place_reactants( structure:Structure, reactants:List[str] ) -> bool:
+def _place_reactants( structure:Structure, reactants:List[str], pdb_code ) -> bool:
     """TODO(CJ)"""
     
     _LOGGER.info("Beginning placement of reactants into apo-enzyme...")

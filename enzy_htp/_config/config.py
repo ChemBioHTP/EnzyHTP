@@ -5,6 +5,7 @@ only by the module. For each <Package> that EnzyHTP interfaces with, there shoul
 <Package>Interface in enzy_htp/_interface and a <Package>Config in enzy/_config. At present,
 there are configuration settings for the below packages by the given <Package>Config:
 
+    + AlphaFill, AlphaFillConfig 
     + AmberMD, AmberConfig
     + BCL, BCLConfig
     + Gaussian, GaussianConfig
@@ -26,6 +27,7 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-07-15
 """
 from typing import Any, Dict
+from .alphafill_config import AlphaFillConfig, default_alphafill_config
 from .amber_config import AmberConfig, default_amber_config
 from .bcl_config import BCLConfig, default_bcl_config
 from .gaussian_config import GaussianConfig, default_gaussian_config
@@ -48,6 +50,7 @@ class Config:
     as well as namespace dotting. Direct accession of the sub-configs is NOT recommended. 
 
     Attributes:
+        _alphafill: Private instance of AlphaFillConfig() with default settings.
         _amber: Private instance of AmberConfig() with default settings.
         _bcl: Private instance of BCLConfig() with default settings.
         _gaussian: Private instance of GaussianConfig() with default settings.
@@ -58,10 +61,12 @@ class Config:
         _rosetta: Private instance of RosettaConfig() with default settings.
         _system: Private instance of SystemConfig() with default settings.
         _xtb: Private instance of XTBConfig() with default settings.
+        _mapper: TODO(CJ)
     """
 
     def __init__(self):
         """Constructor that creates a <Package>Config instance for each <package> using default_<package>_config."""
+        self._alphafill = default_alphafill_config()
         self._amber = default_amber_config()
         self._bcl = default_bcl_config()
         self._gaussian = default_gaussian_config()
@@ -72,6 +77,20 @@ class Config:
         self._rosetta = default_rosetta_config()
         self._system = default_system_config()
         self._xtb = default_xtb_config()
+        self._mapper = {
+            "alphafill" : self._alphafill,
+            "amber"     : self._amber,
+            "bcl"       : self._bcl,
+            "gaussian"  : self._gaussian,
+            "moe"       : self._moe,
+            "multiwfin" : self._multiwfn,
+            "pymol"     : self._pymol,
+            "rdkit"     : self._rdkit,
+            "rosetta"   : self._rosetta,
+            "system"    : self._system,
+            "xtb"       : self._xtb,
+        }
+
 
     def __getitem__(self, key: str) -> Any:
         """Getter for the settings in the Config() object. Uses the grammar: "<package>.<setting>" 
@@ -89,28 +108,12 @@ class Config:
         #TODO(CJ): add the rosetta accessors
         if key.count("."):
             app, settings = key.split(".", 1)
-            ptr = None
-            if app == "amber":
-                ptr = self._amber
-            elif app == "bcl":
-                ptr = self._bcl
-            elif app == "gaussian":
-                ptr = self._gaussian
-            elif app == "multiwfn":
-                ptr = self._multiwfn
-            elif app == "pymol":
-                ptr = self._pymol
-            elif app == "rdkit":
-                ptr = self._rdkit
-            elif app == "rosetta":
-                ptr = self._rosetta
-            elif app == "system":
-                ptr = self._system
-            elif app == "xtb":
-                ptr = self._xtb
+            ptr = self._mapper.get(app, None)
+            if ptr is not None:
+                return ptr[settings]
             else:
                 raise TypeError()
-            return ptr[settings]
+                pass
         else:
             raise TypeError()
 
@@ -129,28 +132,11 @@ class Config:
         #TODO(CJ): add the rosetta setters
         if key.count("."):
             app, settings = key.split(".", 1)
-            ptr = None
-            if app == "amber":
-                ptr = self._amber
-            elif app == "bcl":
-                ptr = self._bcl
-            elif app == "gaussian":
-                ptr = self._gaussian
-            elif app == "multiwfn":
-                ptr = self._multiwfn
-            elif app == "pymol":
-                ptr = self._pymol
-            elif app == "rdkit":
-                ptr = self._rdkit
-            elif app == "rosetta":
-                ptr = self._rosetta
-            elif app == "system":
-                ptr = self._system
-            elif app == "xtb":
-                ptr = self._xtb
+            ptr = self._mapper.get(app, None) 
+            if ptr is not None:
+                ptr[settings] = value
             else:
                 raise TypeError()
-            ptr[settings] = value
         else:
             #TODO(CJ): add error logging here. also for the getter
             raise TypeError()

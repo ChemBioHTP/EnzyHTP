@@ -605,6 +605,21 @@ class PyMolInterface(BaseInterface):
     
         return outfile    
 
+    def fetch(self, code:str) -> str:
+        """ """
+        outfile = f"{code.upper()}.cif"
+        if len(code) == 3:
+            url:str=f"{self.config_.LIGAND_STEM}/{outfile}"
+        elif len(code) == 4:
+            url:str=f"{self.config_.STRUCTURE_STEM}/{outfile}"
+        else:
+            assert False
+        
+        self.env_manager_.run_command(self.config_.WGET, [url])
+
+        return outfile
+
+                
 
 class OpenPyMolSession:
     """a context manager that open a pymol session once enter and close once exit"""
