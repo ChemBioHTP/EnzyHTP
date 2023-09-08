@@ -7,6 +7,9 @@ Mutation is carried out by an underlying engine and the supported engines curren
     + Amber/tleap
     + PyMOL
 
+The function naming format in the module:
+    Engine/Method:      {(sub_)science_api}_with_{engine/method}
+
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2022-10-24
 """
@@ -406,10 +409,6 @@ def mutate_stru_with_pymol(
     return stru_cpy
 
 
-MUTATE_STRU_ENGINE = {"tleap_min": mutate_stru_with_tleap, "pymol": mutate_stru_with_pymol, "rosetta": mutate_stru_with_rosetta}
-"""engines for mutate_stru()"""
-
-
 def check_mutant_stru(mutant_stru: Structure, mutant: List[Mutation], checker_config: Dict[str, Dict[str, Any]] = None):
     """check the generated mutant stru with following options:
         topology: rings in structure should not be circling on bonds.
@@ -496,6 +495,10 @@ def mutate_stru_with_rosetta(
 #        return stru
 #
 #    return stru_cpy
+
+
+MUTATE_STRU_ENGINE = {"tleap_min": mutate_stru_with_tleap, "pymol": mutate_stru_with_pymol, "rosetta": mutate_stru_with_rosetta}
+"""engines for mutate_stru()"""
 
 
 def check_mutation_topology_error(stru: Structure, mutant: List[Mutation]):
