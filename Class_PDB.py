@@ -8,7 +8,7 @@ import shutil
 from shutil import rmtree
 from subprocess import SubprocessError, run, CalledProcessError
 from random import choice
-from typing import Dict, Union, List
+from typing import Any, Dict, Union, List
 from AmberMaps import *
 from wrapper import *
 from Class_Structure import *
@@ -906,6 +906,129 @@ class PDB():
         self._update_name()
 
         return self.path
+
+    def future_assign_mutant(
+        self,
+        pattern: str,
+        chain_sync_list: List[tuple] = None,
+        chain_index_mapper: Dict[str, int] = None,
+        random_state: int = 100,
+        if_check: bool = True):
+        """
+        ** THIS FUNCTION IS IMPORTED FROM FUTURE ENZYHTP **
+
+        This science API assigns mutants targeted in the study.
+        decode the user assigned {pattern} based on the {stru} and get a list of mutants defined by
+        a list of mutation objects each.
+
+        Args:
+            self
+            pattern: the pattern that defines the mutation (see syntax below)
+            chain_sync_list: a list like [(A,C),(B,D)] to indicate homo-chains in enzyme ploymer
+                (like dimer). Mutations will be **copied** to the correponding homo-chains as it
+                is maybe experimentally impossible to only do mutations on one chain of a homo-dimer
+                enzyme.
+            random_state: The int() seed for the random number generator. Default value is 100.
+            (temp)
+            chain_index_mapper: TODO(qz): add biopython pairwise2.align.globalxx
+                A temp solution for cases that residue index in each chain is not aligned. (e.g.:
+                for a pair of homo-dimer below:
+                "A": ABCDEFG (start from 7)
+                "B": BCDEFGH (start from 14)
+                the chain_sync_mapper should be {"A":0, "B":6} and index conversion is done by
+                A_res_idx - 0 + 6 = B_res_idx)
+            if_check: if or not checking if each mutation is valid. (This could be pretty slow if
+                the mutant is >10^7 level)
+        Raises:
+            enzy_htp.core.exception.InvalidMutationPatternSyntax
+        Return:
+            a list of mutants defined each by a list of mutation objects.
+            *!NOTE!: this function generates WT as [] instead of a Mutation()
+                    unless directly indication. Act accordingly.
+
+        *Pattern Syntax:*
+            "mutant_1,mutant_2,mutant_3,..."
+            The top layer of the mutation_pattern specify mutants with comma seperated patterns
+            In the pattern of each mutant, there could be more than one sections, but if multiple
+            sections are used, {} is needed to group those sections.
+            "{section_a1,section_a2,section_a3},{section_b1,section_b2,section_b3},..."
+            Each section can be one of the format below:
+            1. direct indication                    : XA###Y
+            2. random M, N-point mutation in a set  : r:N[mutation_esm_patterns]*M
+                                                    or r:NR[mutation_esm_patterns]*MR
+                                                    (N and M are int,
+                                                    R stands for allowing repeating mutations in randomization)
+            3. all mutation in a set: a             : a:[mutation_esm_patterns]
+                                                    or a:M[mutation_esm_patterns]
+                                                    (M stands for force mutate each position so that
+                                                    no mutation on any position is not allowed)
+
+            The mutation_esm_patterns is seperated by comma and each describes 2 things:
+            1. position_pattern: a set of positions
+                                (check selection syntax in .mutation_pattern.position_pattern)
+                                NOTE: all non polypeptide part are filtered out.
+            2. target_aa_pattern: a set of target mutations apply to all positions in the current set
+                                (check syntax in .mutation_pattern.target_aa_pattern)
+            The two pattern are seperated by ":" and a mutation_esm_patterns looks like:
+            "position_pattern_0:target_aa_pattern_0, ..."
+
+            *In 2&3 the pattern may indicate a mutant collection, if more than one mutant collection
+            are indicated in the same {}, all combination of them is considered.
+
+            Overall an example of pattern will be:
+            "{RA154W, DA11G}, r:2[resi 289 around 4 and not resi 36:larger, proj(id 1000, id 2023, positive, 10):more_negative_charge]*100"
+            * here proj() is a hypothetical selection function
+
+        Details:
+            Which mutations should we study is a non-trivial question. Mutations could be assigned
+        from a database or a site-saturation requirement. It reflexs the scientific question defined
+        Assigning the mutation requires converting chemical/structural language to strict mutation
+        definitions. Some fast calculations can also be done during the selection of mutations. (e.g.:
+        calculating residues aligned with the projection line of the reacting bond [ref])
+            There are no existing software besides EnzyHTP addressing this challenge.
+            A language that helps user to assign mutations is defined above.
+        """
+        from enzy_htp import PDBParser
+        from enzy_htp.mutation import assign_mutant
+        sp = PDBParser()    
+        stru = sp.get_structure(self.path)
+        mutants = assign_mutant(stru,
+                               pattern,
+                               chain_sync_list,
+                               chain_index_mapper,
+                               random_state,
+                               if_check)
+        return mutants
+    
+
+    def future_mutate_stru( self,
+                            mutant: list,
+                            engine: str = "pymol",
+                            in_place: bool = False,
+                            if_check_mutant_stru: bool = True,
+                            checker_config: Dict[str, Dict[str, Any]] = None,
+                            **kwargs):
+        '''
+        ** THIS FUNCTION IS IMPORTED FROM FUTURE ENZYHTP **
+        '''
+        from enzy_htp import PDBParser
+        from enzy_htp.mutation import mutate_stru, get_mutant_name_tag
+        sp = PDBParser()
+        stru = sp.get_structure(self.path)
+        mutant_stru = mutate_stru(
+            stru,
+            mutant,
+            engine,
+            in_place,
+            if_check_mutant_stru,
+            checker_config,
+            **kwargs)
+        tot_Flag_name = get_mutant_name_tag(mutant)
+        new_pdb_path = f'{self.path_name}{tot_Flag_name}.pdb'
+        with open(new_pdb_path, 'w') as of:
+            of.write(sp.get_file_str(mutant_stru))
+        self.path = new_pdb_path
+        self._update_name()
 
 
     def Add_MutaFlag(self, Flag : str = 'r', if_U : bool = 0, if_self : bool = 0):
