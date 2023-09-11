@@ -175,11 +175,11 @@ def get_copy_of_deleted_dict(orig_dict: Dict, del_key) -> Dict:
 # == context manager ==
 class HiddenPrints:
     """block or redirect stdout/stderr prints to 'redirect'
-    
+
     Example:
         with HiddenPrints(filename):
             print('this will go to filename')
-    
+
     Note:
         This function will also redirect all the influenced logging handlers"""
     def __init__(self, redirect=os.devnull):
