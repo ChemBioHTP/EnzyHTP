@@ -29,6 +29,9 @@ Author: QZ Shao, <shaoqz@icloud.com>
 Date: 2022-10-21
 """
 import copy
+import os
+import sys
+import logging
 import time
 import numpy as np
 from typing import List, Iterable, Tuple, Dict
@@ -169,10 +172,45 @@ def get_copy_of_deleted_dict(orig_dict: Dict, del_key) -> Dict:
 
     return dict_copy
 
+# == context manager ==
+class HiddenPrints:
+    """block or redirect stdout/stderr prints to 'redirect'
+    
+    Example:
+        with HiddenPrints(filename):
+            print('this will go to filename')
+    
+    Note:
+        This function will also redirect all the influenced logging handlers"""
+    def __init__(self, redirect=os.devnull):
+        self.redirect=redirect
+
+    def __enter__(self):
+        self.original_stdout = sys.stdout
+        self.original_stderr = sys.stderr
+        self.redirect_stdout = open(self.redirect, 'w')
+        self.redirect_stderr = open(self.redirect, 'w')
+        sys.stdout = self.redirect_stdout
+        sys.stderr = self.redirect_stderr
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.redirect_stdout.close()
+        self.redirect_stderr.close()
+        sys.stdout = self.original_stdout
+        sys.stderr = self.original_stderr
+        # restore any logging handler that lead to redirect_io_obj
+        all_loggers = [logging.getLogger("")] + [j for i, j in logging.Logger.manager.loggerDict.items()]
+        for logger in all_loggers:
+            if hasattr(logger, "handlers"):
+                for handler in logger.handlers:
+                    if hasattr(handler, "stream"):
+                        if handler.stream is self.redirect_stdout:
+                            handler.stream = self.original_stdout
+                        if handler.stream is self.redirect_stderr:
+                            handler.stream = self.original_stderr
+
 
 # == misc ===
-
-
 def timer(fn):
     """decodator for timing the run of the function {fn}"""
 
