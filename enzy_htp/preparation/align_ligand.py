@@ -82,7 +82,7 @@ def non_h_bonds(atom : _rchem.Atom) -> int:
             count += 1
     return count            
 
-def _map_atoms(mol:_rchem.RWMol, fname;str, cutoff:float=0.001) -> Tuple[Dict,List[str]]:
+def _map_atoms(mol:_rchem.RWMol, fname:str, cutoff:float=0.001) -> Tuple[Dict,List[str]]:
     """Function that maps atom indices from rdkit to PDB-style atom names. Returns a dict()
     containing the individual mappings as well as a list() of the PDB-style atom names as str()'s.
 
@@ -397,13 +397,16 @@ def _molecule_info(fname:str, template:bool=True) -> Dict:
 
 
 def _adjust_torsions(template:Dict, ligand:Dict, adjust_rings=False) -> None:
-    """
+    """Given a template geometry, sets the backbone torsions in the supplied ligand. 
     Args:
+        template:
+        ligand:
+        adjust_rings            
 
     Returns:
         Nothing.
     """
-    #print(template)
+    
     intersection:Set[str] = set(template['df'].mapped_dihedrals.to_list()).intersection(set(ligand['df'].mapped_dihedrals.to_list()))
 
     tconf=template['mol'].GetConformers()[0]
