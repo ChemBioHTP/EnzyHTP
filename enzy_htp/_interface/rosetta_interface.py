@@ -737,7 +737,7 @@ class RosettaInterface(BaseInterface):
         ET.SubElement(root, "LIGAND_AREAS")
         ET.SubElement(root, "INTERFACE_BUILDERS")
         ET.SubElement(root, "MOVEMAP_BUILDERS")
-        ET.SubElement(root, "SCORINGGRIDS")
+        #ET.SubElement(root, "SCORINGGRIDS")
         ET.SubElement(root, "TASKOPERATIONS")
         ET.SubElement(root, "SIMPLE_METRICS")
         ET.SubElement(root, "FILTERS")
@@ -763,15 +763,31 @@ class RosettaInterface(BaseInterface):
                 exit(1)
             
             child_nodes = arg.pop('child_nodes', list())
+            #if arg.get('append_elements_only', False):
+            #    _ = arg.pop('append_elements_only')
+            #    target_node = _find_node(root, tag_name)
+            #    for attrib, value in arg.items():
+            #        target_node.set( attrib, value )
+
+            #else:
+            parent: ET.Element = _find_node(root, parent_name)
+
             if arg.get('append_elements_only', False):
                 _ = arg.pop('append_elements_only')
-                target_node = _find_node(root, tag_name)
+                if tag_name == "SCORINGGRIDS":
+                    parent: ET.Element = _find_node(root, 'ROSETTASCRIPTS')
+                    target_node = ET.Element( tag_name )
+                    parent.insert(0, target_node)
+                    #target_node = ET.SubElement(parent[0], tag_name )
+                else:
+                    target_node = ET.SubElement(parent, tag_name )
+
                 for attrib, value in arg.items():
                     target_node.set( attrib, value )
-
             else:
-                parent: ET.Element = _find_node(root, parent_name)
                 target_node = ET.SubElement(parent, tag_name, attrib=arg)
+
+
             
             if child_nodes:
                 for cn in child_nodes:

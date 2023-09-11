@@ -43,7 +43,8 @@ def dock_reactants( structure:Structure,
                     cluster_distance:float=2.5,
                     
                     use_cache:bool=True,
-                    parent:bool=False 
+                    parent:bool=False,
+                    pdb_code:None=str
                     ) -> List[str]:
     """TODO"""
 
@@ -72,7 +73,7 @@ def dock_reactants( structure:Structure,
 
    
 
-    _place_reactants( structure, reactants )
+    _place_reactants( structure, reactants, pdb_code )
 
     (param_files, charge_mapper) = _prepare_reactants(reactants, reactant_conformers)
 
@@ -114,7 +115,7 @@ def dock_reactants( structure:Structure,
 
     chain_names:List[str] = _ligand_chain_names( start_pdb )
 
-    xml_file:str =  _create_xml(work_dir, chain_names, use_cache)
+    xml_file:str =  _create_xml(work_dir, reactants, use_cache) #TODO(CJ): going to overhaul this
 
     options_file:str = make_options_file(start_pdb, xml_file, param_files, work_dir, rng_seed, n_struct, use_cache, cst_file) 
     
@@ -283,8 +284,36 @@ def _integrate_csts( stru:Structure, csts:List[RosettaCst], work_dir:str, use_ca
     return (pdb_file, cst_file)
 
 
-def _create_xml(work_dir:str, chains:List[str], use_cache:bool) -> str:
-    """ """
+def _create_xml(work_dir:str, reactants:List[str], use_cache:bool) -> str:
+    """
+
+    Args:
+        
+
+    Returns:
+        The relative filepath of the RosettaScripts .xml file.
+    """
+    reactant_dicts = list()
+    for rr in reactants:
+        temp = dict()        
+        session = interface.pymol.new_session()
+        df:pd.DataFrame = interface.pymol.collect(session, rr, "chain resn x y z name".split(),sele='not elem H')
+        temp['resn'] = df.resn[0]
+        temp['chain'] = df.chain[0]
+        temp['volume'] = interface.rdkit.volume(rr)
+        points = np.transpose(np.array([df.x.to_numpy(), df.y.to_numpy(), df.z.to_numpy()]))
+        distances = list()
+        n_points = len(points)
+        for p1 in range(n_points):
+            for p2 in range(n_points):
+                distances.append(
+                    np.sqrt(np.sum((points[p1]-points[p2])**2))
+                )
+        temp['length'] = np.max(np.array(distances))
+        reactant_dicts.append( temp )
+
+    reactant_dicts.sort(key=lambda dd: dd['chain'])
+
     fname:str=f"{work_dir}/__script.xml"
     if not use_cache:
         fs.safe_rm(fname)
@@ -293,7 +322,7 @@ def _create_xml(work_dir:str, chains:List[str], use_cache:bool) -> str:
     if fpath.exists() and use_cache:
         _LOGGER.info(f"Using cached RosettaScripts .xml file at {fpath.absolute()}")
         return fname
-    #TODO(CJ): do some kind of validation against the chain name
+
     elements:List[Dict] = [
         {'parent':'SCOREFXNS', 'tag':'ScoreFunction', 'name':'ligand_soft_rep', 'weights':'ligand_soft_rep'},
         {'parent':'SCOREFXNS', 'tag':'ScoreFunction', 'name':'hard_rep', 'weights':'ligand'},
@@ -304,7 +333,8 @@ def _create_xml(work_dir:str, chains:List[str], use_cache:bool) -> str:
         {'parent':'SCOREFXNS.ScoreFunction', 'tag':'Reweight', 'scoretype':'chainbreak', 'weight':'1.0'},
     ]
     
-    for cc in chains:
+    for rd in reactant_dicts:
+        cc = rd['chain']
         elements.extend([
             {'parent':'LIGAND_AREAS', 'tag':'LigandArea', 'name':f'docking_sidechain_{cc.lower()}', 'chain':f'{cc.upper()}', 'cutoff':'6.0', 'add_nbr_radius':'true','all_atom_mode':'false'},
             {'parent':'LIGAND_AREAS', 'tag':'LigandArea', 'name':f'final_sidechain_{cc.lower()}', 'chain':f'{cc.upper()}', 'cutoff':'6.0', 'add_nbr_radius':'true','all_atom_mode':'false'},
@@ -320,30 +350,51 @@ def _create_xml(work_dir:str, chains:List[str], use_cache:bool) -> str:
 
         ])
 
+    
+    for ridx,rd in enumerate(reactant_dicts):
+        cc = rd['chain']
+        rd['grid_name'] = f"grid_{ridx+1}"
+         
+        elements.extend([
+            {'parent':'ROSETTASCRIPTS', 'tag':'SCORINGGRIDS',
+            'ligand_chain':cc.upper(), 'width':str(rd['length']*2),'append_elements_only':True, 'name':rd['grid_name'],
+            'child_nodes':[
+                {'parent':'SCORINGGRIDS', 'tag':'ClassicGrid', 'grid_name':'classic', 'weight':'1.0'},
+                {'parent':'SCORINGGRIDS', 'tag':'HbdGrid', 'grid_name':'hbd_grid', 'weight':'1.0'},
+                {'parent':'SCORINGGRIDS', 'tag':'HbaGrid', 'grid_name':'hba_grid', 'weight':'1.0'},
+            ]},
+        ]) 
 
     elements.extend([
-        {'parent':'ROSETTASCRIPTS', 'tag':'SCORINGGRIDS', 'ligand_chain':chains[0].upper(), 'width':'15','append_elements_only':True},
-        {'parent':'SCORINGGRIDS', 'tag':'ClassicGrid', 'grid_name':'classic', 'weight':'1.0'},
-        {'parent':'MOVERS', 'tag':'AddOrRemoveMatchCsts', 'name':'cstadd', 'cst_instruction':'add_new'}
-
+            {'parent':'MOVERS', 'tag':'AddOrRemoveMatchCsts', 'name':'cstadd', 'cst_instruction':'add_new'}
     ])
 
-    for cc in chains:
+
+    for rd in reactant_dicts:
+        cc:str = rd['chain']
+        radius:float = rd['length'] 
         elements.extend([
             {'parent':'MOVERS', 'tag':'Transform', 
                     'name':f'transform_{cc.lower()}','chain':f'{cc.upper()}',  
-                    'box_size':'2', 'move_distance':'0.1', 
-                    'angle':'45', 'cycles':'500', 'repeats':'5', 'temperature':'25'},
+                    'box_size':str(1.5*radius), 'move_distance':'0.1', 
+                    'angle':'45', 'cycles':'200', 'repeats':'10', 'temperature':'25', 'grid_set':rd['grid_name']},
             {'parent':'MOVERS', 'tag':'HighResDocker', 'name':f'high_res_docker_{cc.lower()}', 'cycles':'6', 'repack_every_Nth':'3', 'scorefxn':'ligand_soft_rep', 'movemap_builder':f'docking_{cc.lower()}'},
             {'parent':'MOVERS', 'tag':'FinalMinimizer', 'name':f'final_{cc.lower()}', 'scorefxn':'hard_rep', 'movemap_builder':f'final_{cc.lower()}'}
         ])
 
     elements.append(
-        {'parent':'MOVERS', 'tag':'InterfaceScoreCalculator', 'name':'add_scores', 'chains':','.join(map(lambda ss: ss.upper(), chains)), 'scorefxn':'hard_rep'}
+        {
+        'parent':'MOVERS', 
+        'tag':'InterfaceScoreCalculator', 
+        'name':'add_scores', 
+        'chains':','.join(map(lambda ss: ss['chain'].upper(), reactant_dicts)),
+        'scorefxn':'hard_rep'}
     )
 
 
-    for cc in chains:
+    for rd in reactant_dicts:
+        cc:str = rd['chain']
+        
         elements.extend([
             {'parent':'MOVERS', 'tag':'ParsedProtocol', 'name':f'low_res_dock_{cc.lower()}', 'child_nodes':[
                 {'tag':'Add', 'mover_name':'cstadd'},
@@ -354,7 +405,7 @@ def _create_xml(work_dir:str, chains:List[str], use_cache:bool) -> str:
     elements.extend([
 
         {'parent':'MOVERS', 'tag':'ParsedProtocol', 'name':'high_res_dock', 'child_nodes':
-            [deepcopy({'tag':'Add', 'mover_name':f'high_res_docker_{cc.lower()}'}) for cc in chains]
+            [deepcopy({'tag':'Add', 'mover_name':f'high_res_docker_{rd["chain"].lower()}'}) for rd in reactant_dicts]
         },
         {'parent':'MOVERS', 'tag':'ParsedProtocol', 'name':'reporting', 'child_nodes':
             [{'tag':'Add', 'mover_name':'add_scores'}]
@@ -363,7 +414,7 @@ def _create_xml(work_dir:str, chains:List[str], use_cache:bool) -> str:
     ])
 
     elements.extend(
-        [deepcopy({'parent':'PROTOCOLS', 'tag':'Add', 'mover_name':f'low_res_dock_{cc.lower()}'}) for cc in chains] + 
+        [deepcopy({'parent':'PROTOCOLS', 'tag':'Add', 'mover_name':f'low_res_dock_{rd["chain"].lower()}'}) for rd in reactant_dicts] + 
         [{'parent':'PROTOCOLS','tag':'Add', 'mover_name':'high_res_dock'}, {'parent':'PROTOCOLS', 'tag':'Add', 'mover_name':'reporting'}]
     )
 
@@ -437,8 +488,8 @@ def make_options_file(pdb_file:str,  xml_file:str, param_files:List[str],  work_
         f"       -all './complexes'",
     ])
     
-    qsar_grid:str=f"./complexes/qsar_grids/"
-    #content.append(f"-qsar:grid_dir {qsar_grid}") #TODO(CJ): figure this out.
+    qsar_grid:str=str(Path(f"{work_dir}/complexes/qsar_grids/").absolute())
+    content.append(f"-qsar:grid_dir {qsar_grid}") 
 
     fname = Path(work_dir) / "options.txt"
     score_file: str = f"{work_dir}/complexes/score.sc"
@@ -452,10 +503,10 @@ def make_options_file(pdb_file:str,  xml_file:str, param_files:List[str],  work_
         fs.safe_rm(fname)
         fs.safe_rm(score_file)
         fs.safe_rmdir(f"{work_dir}/complexes/") 
-        #fs.safe_rmdir( qsar_grid )
+        fs.safe_rmdir( qsar_grid )
 
-    #fs.safe_mkdir( qsar_grid )
     fs.safe_mkdir(f"{work_dir}/complexes/")
+    fs.safe_mkdir( qsar_grid )
 
     if not fname.exists():
         _LOGGER.info(f"Wrote the below settings to {fname}:")
@@ -725,7 +776,7 @@ def _select_complex(df : pd.DataFrame, work_dir:str, cutoff:int=20) -> Tuple[Str
 
 
 
-def _place_reactants( structure:Structure, reactants:List[str] ) -> bool:
+def _place_reactants( structure:Structure, reactants:List[str], pdb_code ) -> bool:
     """TODO(CJ)"""
     
     _LOGGER.info("Beginning placement of reactants into apo-enzyme...")

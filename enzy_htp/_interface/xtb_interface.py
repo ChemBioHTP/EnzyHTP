@@ -77,8 +77,11 @@ class XTBInterface(BaseInterface):
                 fname
             ])
         except:
+            #TODO(CJ): do file cleanup here
             _LOGGER.info(f"xtb failure occurred! Exiting...")
-            raise TypeError()
+            return 1000.0
+            #TODO(CJ): obviously not the greatest 
+            #raise TypeError()
 
 
         self._remove_temp_files(str(Path(fname).parent))

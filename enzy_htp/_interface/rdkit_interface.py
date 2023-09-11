@@ -1,4 +1,7 @@
-"""TODO"""
+"""
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Date: 2023-10-09
+"""
 
 #TODO(CJ): maybe wrap this in a try,except loop
 import rdkit
@@ -26,7 +29,7 @@ class RDKitInterface(BaseInterface):
         super().__init__(parent, config, default_rdkit_config )
 
     def _supported_ftype(self, molfile:str) -> None:
-        """ """
+        """Is the supplied file type supported for use in rdkit? Errors and exists if not."""
         ext:str = Path(molfile).suffix
 
         if ext not in self.config_.SUPPORTED_FTYPES:
@@ -34,6 +37,7 @@ class RDKitInterface(BaseInterface):
             exit( 1 )
 
     def check_rdkit_installed(self) -> None:
+        """ """
         if "rdkit" in self.missing_py_modules():
             _LOGGER.error("rdkit is NOT installed. Use 'conda install -c conda-forge -y -q rdkit'")
             exit(1)
@@ -125,15 +129,25 @@ class RDKitInterface(BaseInterface):
 
 
     def num_rotatable_bonds(self, molfile:str) -> int:
-        """ """
+        """How many rotatble bonds does the molecule have?"""
         mol = self._load_molecule(molfile) 
         
         return _rchem.rdMolDescriptors.CalcNumRotatableBonds( mol )
 
 
 
-    def volume(self, molfile:str,gridSpacing:float=0.2,boxMargin:float=2.0) -> float:
-        """ """
+    def volume(self, molfile:str, gridSpacing:float=0.2, boxMargin:float=2.0) -> float:
+        """Calculates the volume of the molecule in the supplied file. All calculations done in Angstroms.
+
+        Args:
+            molfile:
+            gridSpacing:
+            boxMargin:
+
+        Returns:
+            The volume in Angstroms^3.
+            
+        """
         self.check_rdkit_installed()
         mol:_rdkit.Chem=self._load_molecule(molfile)
         return _rchem_ac.ComputeMolVolume(
