@@ -18,7 +18,6 @@ import os,sys
 #             return results
 #         return wrapper
 #     return blockprint_dec
-
 class HiddenPrints:
     '''
     HiddenPrints(redirect=os.devnull)
@@ -31,11 +30,11 @@ class HiddenPrints:
     def __enter__(self):
         self._original_stdout = sys.stdout
         self._original_stderr = sys.stderr
-        sys.stdout = open(self.redirect, 'w')
-        sys.stderr = open(self.redirect, 'w')
+        self.redirect_file_obj = open(self.redirect, 'w')
+        sys.stdout = self.redirect_file_obj
+        sys.stderr = self.redirect_file_obj
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        sys.stdout.close()
-        sys.stderr.close()
+        self.redirect_file_obj.close()
         sys.stdout = self._original_stdout
         sys.stderr = self._original_stderr

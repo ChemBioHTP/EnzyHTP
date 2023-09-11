@@ -537,7 +537,14 @@ class PDB():
         # input of PDB2PQR
         pdb2pqr_parser = build_pdb2pqr_parser()
         pdb2pqr_logging_level = 'INFO'
-        args = pdb2pqr_parser.parse_args(['--ff=PARSE',f'--log-level={pdb2pqr_logging_level}','--ffout='+ffout,'--with-ph='+str(ph),self.path,self.pqr_path])
+        args = pdb2pqr_parser.parse_args([
+            '--ff=PARSE',
+            f'--log-level={pdb2pqr_logging_level}',
+            '--ffout='+ffout,
+            '--with-ph='+str(ph),
+            self.path,
+            self.pqr_path
+            ])
         # use context manager to hide output
         with HiddenPrints(f'{self.dir}/._get_protonation_pdb2pqr.log'):
             missed_residues, pka_df, biomolecule = run_pdb2pqr(args)
