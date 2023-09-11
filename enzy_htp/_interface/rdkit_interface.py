@@ -114,7 +114,7 @@ class RDKitInterface(BaseInterface):
             writer.close()
         
 
-        return oufile
+        return outfile
 
     def kekulize(self, molfile:str, outfile:str) -> str:
         """ """
