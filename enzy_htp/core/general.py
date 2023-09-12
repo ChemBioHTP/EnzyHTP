@@ -192,13 +192,23 @@ class HiddenPrints:
         self.redirect_stderr = open(self.redirect, 'w')
         sys.stdout = self.redirect_stdout
         sys.stderr = self.redirect_stderr
+        # redirect any logging handler that lead to stdout/stderr
+        all_loggers = [logging.getLogger("")] + [j for i, j in logging.Logger.manager.loggerDict.items()]
+        for logger in all_loggers:
+            if hasattr(logger, "handlers"):
+                for handler in logger.handlers:
+                    if hasattr(handler, "stream"):
+                        if handler.stream is self.original_stdout:
+                            handler.stream = self.redirect_stdout
+                        if handler.stream is self.original_stderr:
+                            handler.stream = self.redirect_stderr
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.redirect_stdout.close()
         self.redirect_stderr.close()
         sys.stdout = self.original_stdout
         sys.stderr = self.original_stderr
-        # restore any logging handler that lead to redirect_io_obj
+        # restore any logging handler that lead to redirect_stdout/stderr
         all_loggers = [logging.getLogger("")] + [j for i, j in logging.Logger.manager.loggerDict.items()]
         for logger in all_loggers:
             if hasattr(logger, "handlers"):
