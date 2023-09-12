@@ -1394,7 +1394,8 @@ class PDB():
         igb=None, 
         ifsolve=1,
         if_prm_only=0,
-        lig_net_charge_mapper=None
+        lig_net_charge_mapper=None,
+        maa_parm_file_path=None
         ):
         '''
         PDB2FF(self, o_dir='')
@@ -1430,7 +1431,16 @@ class PDB():
         # combine
         if o_dir != '':
             mkdir(o_dir)
-        self._combine_parm(ligand_parm_paths, prm_out_path=prm_out_path, o_dir=o_dir, ifsavepdb=ifsavepdb, igb=igb, ifsolve=ifsolve, if_prm_only=if_prm_only)
+        self._combine_parm(
+            ligand_parm_paths,
+            prm_out_path=prm_out_path,
+            o_dir=o_dir,
+            ifsavepdb=ifsavepdb,
+            igb=igb,
+            ifsolve=ifsolve,
+            if_prm_only=if_prm_only,
+            maa_parm_file_path=maa_parm_file_path)
+
         if ifsavepdb:
             self.path = self.path_name+'_ff.pdb'
             self._update_name()
@@ -1438,7 +1448,13 @@ class PDB():
         return (self.prmtop_path,self.inpcrd_path)
 
     
-    def _ligand_parm(self, lig_dir, method='AM1BCC', lig_charge_method='PYBEL', lig_charge_ph=7.0, renew=0, net_charge_mapper=None):
+    def _ligand_parm(self,
+                     lig_dir,
+                     method='AM1BCC',
+                     lig_charge_method='PYBEL',
+                     lig_charge_ph=7.0,
+                     renew=0,
+                     net_charge_mapper=None):
         '''
         Turn ligands to prepi (w/net charge), parameterize with parmchk
         return [(perpi_1, frcmod_1), ...]
@@ -1495,9 +1511,21 @@ class PDB():
         return parm_paths
 
 
-    def _combine_parm(self, lig_parms, prm_out_path='', o_dir='', ifsavepdb=0, ifsolve=1, box_type=None, box_size=Config.Amber.box_size, igb=None, if_prm_only=0):
+    def _combine_parm(self,
+                      lig_parms,
+                      prm_out_path='',
+                      o_dir='',
+                      ifsavepdb=0,
+                      ifsolve=1,
+                      box_type=None,
+                      box_size=Config.Amber.box_size,
+                      igb=None,
+                      if_prm_only=0,
+                      maa_parm_file_path=None):
         '''
         combine different parmeter files and make finally inpcrd and prmtop
+        maa_parm_file_path: a list of supp files for modified amino acid
+            format: [[prepin_file, [frcmod_file, ...]], ...]
         -------
         structure: pdb
         ligands: prepi, frcmod
@@ -1509,13 +1537,20 @@ class PDB():
         leap_path= self.cache_path+'/leap.in'
         sol_path= self.path_name+'_ff.pdb'
         with open(leap_path, 'w') as of:
-            of.write('source leaprc.protein.ff14SB'+line_feed)
-            of.write('source leaprc.gaff'+line_feed)
+            of.write('source leaprc.protein.ff19SB'+line_feed)
+            of.write('source leaprc.protein.ff19SB_modAA'+line_feed)
+            of.write('source leaprc.gaff2'+line_feed)
             of.write('source leaprc.water.tip3p'+line_feed)
             # ligands
             for prepi, frcmod in lig_parms:
                 of.write('loadAmberParams '+frcmod+line_feed)
                 of.write('loadAmberPrep '+prepi+line_feed)
+            # Modified Amino Acid
+            for prepi, frcmods in maa_parm_file_path:
+                for frcmod in frcmods:
+                    of.write('loadAmberParams '+frcmod+line_feed)
+                of.write('loadAmberPrep '+prepi+line_feed)  
+          
             of.write('a = loadpdb '+self.path+line_feed)
             if self.disulfied_residue_pairs:
                 for ss_bond_pairs in self.disulfied_residue_pairs:
