@@ -605,8 +605,8 @@ class PyMolInterface(BaseInterface):
     
         return outfile    
 
-    def fetch(self, code:str) -> str:
-        """ """
+    def fetch(self, code:str, out_dir:str=None) -> str:
+        """TODO(CJ)"""
         outfile = f"{code.upper()}.cif"
         if len(code) == 3:
             url:str=f"{self.config_.LIGAND_STEM}/{outfile}"
@@ -616,6 +616,9 @@ class PyMolInterface(BaseInterface):
             assert False
         
         self.env_manager_.run_command(self.config_.WGET, [url])
+
+        if out_dir is not None:
+            outfile = fs.safe_mv(outfile, f"{out_dir}/")
 
         return outfile
 

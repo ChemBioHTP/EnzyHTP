@@ -21,7 +21,7 @@ from enzy_htp._config.bcl_config import BCLConfig, default_bcl_config
 
 
 class BCLInterface(BaseInterface):
-    """Class that provides a direct interfrace for enzy_htp to utilize the BCL. Supported opterations
+    """Class that provides a direct interface for enzy_htp to utilize the BCL. Supported operations
     include conformer generation and formal charge calculation. Users should use this class as the only way to interact with any application
     in BCL.
 
