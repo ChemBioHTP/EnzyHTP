@@ -301,11 +301,9 @@ class Structure():
         return self.metal_centers
 
 
-    def get_art_resi(self):
-        '''
-        find art_resi
-        '''
-        pass
+    def get_mod_resi(self):
+        '''Find modified residues in the structure. Return a list of modified residue object'''
+        return filter(lambda x: x.is_mod_resi(), self.get_all_residue_polypeptide())          
 
 
     def add(self, obj, id=None, sort=0):
@@ -648,8 +646,11 @@ class Structure():
         # chain part
         for chain in self.chains:
             for res in chain:
-                for atom in res:
-                    atom.get_connect()
+                res: Residue
+                if not res.is_mod_resi():
+                    for atom in res:
+                        atom: Atom
+                        atom.get_connect()
         for sol in self.solvents:
             for atom in sol:
                 atom.get_connect()
@@ -669,35 +670,63 @@ class Structure():
         # fix 1
         if ligand_fix == 1:
             for lig in self.ligands:
-                # read prepin for each ligand
-                with open(prepi_path[lig.name]) as f:
-                    line_id = 0
-                    if_loop = 0
-                    for line in f:
-                        line_id += 1
-                        if line.strip() == '':
-                            if if_loop == 1:
-                                # switch off loop and break if first blank after LOOP encountered
-                                if_loop = 0
-                                break
-                            continue
-                        if if_loop:
-                            lp = line.strip().split()
-                            lig._find_atom_name(lp[0]).connect.append(lig._find_atom_name(lp[1]))
-                            continue
-                        # loop connect starts at LOOP
-                        if line.strip() == 'LOOP':
-                            if_loop = 1
-                            continue
-                        # coord starts at 11th
-                        if line_id >= 11:
-                            lp = line.strip().split()
-                            atom_id = int(lp[0])-3
-                            atom_cnt = int(lp[4])-3
-                            if atom_cnt != 0:
-                                lig[atom_id-1].connect.append(lig[atom_cnt-1])
-                                lig[atom_cnt-1].connect.append(lig[atom_id-1])
-                            
+                type(self)._parse_prepin_connect(prepi_path[lig.name], lig)
+        # mod AA
+        for mod_aa in self.get_mod_resi():
+            for atom in mod_aa:
+                atom.connect = []
+        for mod_aa in self.get_mod_resi():
+            mod_aa: Residue
+            # read prepin for each ligand
+            type(self)._parse_prepin_connect(prepi_path[mod_aa.name], mod_aa)
+            # deal with terminal connectivity
+            m1_res = mod_aa.chain._find_resi_id(mod_aa.id-1)
+            p1_res = mod_aa.chain._find_resi_id(mod_aa.id+1)
+            if m1_res: #-1C
+                mod_aa._find_atom_name('N').connect.append(m1_res._find_atom_name('C'))
+            if p1_res: #+1N
+                mod_aa._find_atom_name('C').connect.append(p1_res._find_atom_name('N'))
+
+    @classmethod
+    def _parse_prepin_connect(cls, prepi_path, res):
+        '''parse the prepin file and store connectivity info to {res}'''
+        prepi_atom_mapper = {}
+        with open(prepi_path) as f:
+            line_id = 0
+            if_loop = 0
+            for line in f:
+                line_id += 1
+                if line.strip() == '':
+                    if if_loop == 1:
+                        # switch off loop and break if first blank after LOOP encountered
+                        if_loop = 0
+                        break
+                    continue
+                if if_loop:
+                    lp = line.strip().split()
+                    res._find_atom_name(lp[0]).connect.append(res._find_atom_name(lp[1]))
+                    continue
+                # loop connect starts at LOOP
+                if line.strip() == 'LOOP':
+                    if_loop = 1
+                    continue
+                # coord starts at 11th
+                if line_id >= 11:
+                    lp = line.strip().split()
+                    atom_id = int(lp[0])-3
+                    atom_name = lp[1]
+                    atom_cnt = int(lp[4])-3
+                    prepi_atom_mapper[atom_id] = (res._find_atom_name(atom_name), atom_cnt)
+
+        for atom_id, (atom, atom_cnt) in prepi_atom_mapper.items():
+            if atom_cnt != 0: # why is this? lol
+                cnt_atom_obj = prepi_atom_mapper[atom_cnt][0]
+                atom.connect.append(cnt_atom_obj)
+                cnt_atom_obj.connect.append(atom)
+        
+        for atom in res:
+            atom.connect = list(set(atom.connect))
+
 
     def get_connectivty_table(self, ff='GAUSSIAN', metal_fix = 1, ligand_fix = 1, prepi_path=None):
         '''
@@ -811,6 +840,10 @@ class Structure():
         return all_P_atoms
 
 
+    def get_all_residue_polypeptide(self):
+        '''get all polypeptide forming residues'''
+        return [resi for chain in self.chains for resi in chain]
+
     def get_all_residue_unit(self, ifsolvent=0):
         all_r_list = []
         for chain in self.chains:
@@ -829,6 +862,7 @@ class Structure():
 
         return all_r_list
 
+
     def find_idx_residue(self, idx: int):
         result = list(filter(lambda x: x.id == idx, self.get_all_residue_unit()))
         if len(result) == 0:
@@ -837,6 +871,10 @@ class Structure():
         if len(result) > 1:
             raise Exception(f"found more than one residue with idx: {idx}. check your structure")
         return result[0]
+
+    def find_name_residue(self, name: int):
+        result = list(filter(lambda x: x.name == name, self.get_all_residue_unit()))
+        return result
 
 
     def delete_idx_ligand(self, idx: int):
@@ -1571,8 +1609,9 @@ class Residue(Child):
     Method
     ====
     '''
-    def if_art_resi(self):
-        pass
+    def is_mod_resi(self):
+        '''tell whether self is an modified residue'''
+        return self.name not in Resi_map2
 
     
     def deprotonate(self, T_atom = None, HIP = 'HIE'):
@@ -2182,6 +2221,13 @@ class Atom(Child):
     def __int__(self):
         return self.id
 
+    def __repr__(self):
+        '''special method for coverting Atom() to repr'''
+        return f"Atom({self.name}, {self.coord}, {self.id}, (Residue: {self.parent.id}))"
+
+    def __str__(self):
+        '''special method for coverting Atom() to repr'''
+        return self.name
 
 
 class Metalatom(Atom):
