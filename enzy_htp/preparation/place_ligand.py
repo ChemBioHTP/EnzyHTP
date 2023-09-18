@@ -4,7 +4,7 @@ Author: Chris Jurich <chris.jurich@vanderbit.edu>
 Date: 2023-09-14
 """
 
-from typing import Tuple, Dict
+from typing import List, Tuple, Dict
 
 
 import numpy as np
@@ -20,10 +20,11 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core import _LOGGER
 
 from enzy_htp.structure import PDBParser, Structure
+from enzy_htp._interface import RosettaCst
 
 from .align_ligand import align_ligand
 
-def place_ligand(molfile:str, ligand:str, code:str=None, method:str=None, new_res_key:Tuple=None, work_dir:str=None, outfile:str=None, constraints=None, **kwargs ) -> Tuple[str, str]:
+def place_ligand(molfile:str, ligand:str, code:str=None, method:str=None, new_res_key:Tuple=None, work_dir:str=None, outfile:str=None, constraints:List[RosettaCst]=None, **kwargs ) -> Tuple[str, str]:
     """Algorithm for placing a ligand into  
 
     Args:
@@ -40,7 +41,7 @@ def place_ligand(molfile:str, ligand:str, code:str=None, method:str=None, new_re
     Returns:
         A Tuple[str,str] with the layout (enzyme-ligand complex in .pdb format, exact ligand conformation in .mol2 format).
     """
-
+    #TODO(CJ): check for None values and throw errors if they are given
     if not work_dir:
         work_dir = config['system.SCRATCH_DIR']
     
@@ -78,7 +79,10 @@ def place_ligand(molfile:str, ligand:str, code:str=None, method:str=None, new_re
 
     return (outfile, placed_ligand)
 
-
+def _place_constraints(molfile:str, reactant:str, work_dir:str, constraints:List[RosettaCst]) -> str:
+    """TODO(CJ)"""
+    #for cst in constraints
+    pass
 
 
 def _place_alphafill(molfile:str, reactant:str, code:str, work_dir:str, similarity_cutoff:float=0.75, clash_radius:float=2.0, **kwargs) -> str:
@@ -206,7 +210,8 @@ def _count_clashes(df1:pd.DataFrame, df2:pd.DataFrame, cutoff:float) -> int:
 
 
 PLACEMENT_MAPPER:Dict = {
-    'alphafill':_place_alphafill
+    'alphafill': _place_alphafill,
+    'constraints': _place_constraints
 }
 """TODO(CJ)"""
 

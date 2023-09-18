@@ -64,6 +64,7 @@ def align_ligand(
     t_info:Dict = _molecule_info(template, mapping_tol)
     l_info:Dict = _molecule_info(ligand, mapping_tol)
 
+    _rchem.SanitizeMol(l_info['mol'])
     props=_rchem.AllChem.MMFFGetMoleculeProperties(l_info['mol'])
     ff=_rchem.AllChem.MMFFGetMoleculeForceField(l_info['mol'], props)
 
@@ -94,7 +95,6 @@ def align_ligand(
                 i,j = idx1,idx2
             else:
                 j,i = idx1, idx2
-            
             rdmt.SetBondLength(l_conf, i, j, orig_mat[idx1][idx2])
 
     ff.Initialize()
@@ -177,6 +177,7 @@ def _molecule_info(fname:str, dist_tol:float) -> Dict:
     mol:_rchem.Molecule = interface.rdkit._load_molecule(fname, sanitize=True)
     if mol is None:
         mol = interface.rdkit._load_molecule(fname)
+
     
     mapper = _map_atoms(mol, fname, dist_tol)
     

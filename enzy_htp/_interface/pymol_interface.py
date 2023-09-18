@@ -606,7 +606,13 @@ class PyMolInterface(BaseInterface):
         return outfile    
 
     def fetch(self, code:str, out_dir:str=None) -> str:
-        """TODO(CJ)"""
+        """
+
+        Args:
+
+        Returns:
+            The path to the
+        """
         outfile = f"{code.upper()}.cif"
         if len(code) == 3:
             url:str=f"{self.config_.LIGAND_STEM}/{outfile}"
@@ -619,7 +625,7 @@ class PyMolInterface(BaseInterface):
 
         if out_dir is not None:
             outfile = fs.safe_mv(outfile, f"{out_dir}/")
-
+        #TODO(CJ): check if the file is downloaded
         return outfile
 
                 
