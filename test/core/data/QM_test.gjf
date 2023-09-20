@@ -1,6 +1,6 @@
 %mem=50000MB
 %nprocshared=24
-# b3lyp/6-31g(d,p) em=gd3bj
+# hf/sto-3g
 
 Title Card Required
 
