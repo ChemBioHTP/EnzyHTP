@@ -63,18 +63,24 @@ def md_simulation(stru: Structure,
 
     Common implemtations of MD for enzyme in the field are:
     (TODO do more search on this, complete the note for each packages)
-        - Amber (https://ambermd.org/, https://ambermd.org/2012_wires.pdf, https://github.com/Amber-MD) 
-            Contain QUICK that support GPU-accelerated QM for QM/MM MD
+        - Amber (https://ambermd.org/, https://ambermd.org/2012_wires.pdf, https://github.com/Amber-MD)
+            Large community, may be the best GPU speed for MD.
+            Contain QUICK that support GPU-accelerated QM for QM/MM MD.
+            Not Free.
         - OpenMM (https://github.com/openmm/openmm, https://github.com/molmod/openmm-tutorial-msbs/tree/main)
             A Python library for MD. Python friendly. Colabed with Tinker and have a AMOEBA plugin.
             Doesn't support FF19SB in normal way. Can only convert from prmtop generated using ff19SB.
             Free and open-source
         - Tinker (https://dasher.wustl.edu/tinker/)
             Support GPU-accelerate AMOEBA polarized FF.
+            Free.
         - CHARMM (https://www.charmm.org/)
             Support multisite lambda dynamics (MSLD)
+            Not Free.
         - NAMD (https://www.ks.uiuc.edu/Research/namd/)
-            Support BFEE2 for automated free energy calculation
+            Support BFEE2 for automated free energy calculation.
+            Scale to 100,000+ cores. (according to https://youtu.be/_TiQYNWJwYg?list=PLGL4XGw8noUwrh16gsC9H_D03fED3IcHo&t=2229)
+            Free.
         - Gromacs (https://www.gromacs.org/)
             Free and open-source.
     """
