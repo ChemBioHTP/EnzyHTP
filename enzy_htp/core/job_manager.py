@@ -1,4 +1,5 @@
-'''Manage the job queue for running jobs on a cluster. Interface with different linux resource managers (e.g. slurm)
+"""The Adaptive Resource Manager (ARMer) module. (cite: https://pubs.acs.org/doi/10.1021/acs.jcim.3c00618)
+Manage the job queue for running jobs on a cluster. Interface with different linux resource managers (e.g. slurm)
 The general workflow is
     (take job commands)
     1) compile the submission script
@@ -12,8 +13,8 @@ Feature:
     - Allow users to add support for their own clusters. (By making new ClusterInterface classes)
 
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
-Date: 2022-04-13
-'''
+Date: 2022-04-13"""
+
 import time
 from typing import Union
 from plum import dispatch
