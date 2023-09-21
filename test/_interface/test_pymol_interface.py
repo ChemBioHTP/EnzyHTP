@@ -97,4 +97,3 @@ def test_export_pdb():
 
     for new_res, old_res in zip(test_save_stru.residues, test_stru.residues):
         assert len(new_res.atoms) == len(old_res.atoms)
-

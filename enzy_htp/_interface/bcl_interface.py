@@ -111,7 +111,7 @@ class BCLInterface(BaseInterface):
         if not Path(molfile).suffix == '.sdf':
             _LOGGER.error(f"Function expects .sdf file format. Exiting...")
             exit(1)
-        #TODO(CJ): I want to use the high level scratch directory to do this stuff 
+        #TODO(CJ): I want to use the high level scratch directory to do this stuff
         temp_file: str = "__temp.csv"
 
         flags: List[str] = ["-input_filenames", str(molfile), "-output_table", temp_file, "-tabulate", "TotalFormalCharge"]

@@ -6,13 +6,12 @@ from copy import deepcopy
 
 from .base_config import BaseConfig
 
+
 class AlphaFillConfig(BaseConfig):
-    
 
+    ALPHAFILL_EXE: str = "alphafill"
 
-    ALPHAFILL_EXE:str="alphafill"
-
-    CONFIG_FILE:str="alphafill.conf"
+    CONFIG_FILE: str = "alphafill.conf"
 
     def required_executables(self) -> List[str]:
         """A hardcoded list of required executables for AlphaFill."""

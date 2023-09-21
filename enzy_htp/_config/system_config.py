@@ -17,6 +17,7 @@ from enzy_htp.core import _LOGGER
 
 from .base_config import BaseConfig
 
+
 class SystemConfig(BaseConfig):
     """Class that holds system settings for enzy_htp. Similar to other classes in this
     sub-module, SHOULD NOT be directly created by the end users. Instead, it should be 

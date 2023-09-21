@@ -11,6 +11,7 @@ from copy import deepcopy
 
 from .base_config import BaseConfig
 
+
 class RosettaConfig(BaseConfig):
     """Class that holds default values for running Rosetta with enzy_htp and 
     also keeps track of required environment variables and exectuables.
@@ -36,7 +37,7 @@ class RosettaConfig(BaseConfig):
     SCORE: str = f"$ROSETTA3/source/bin/score_jd2.default.linuxgccrelease"
     """Executable used to score a specific structure/pose."""
 
-    PY_2_7:str = "python2.7"
+    PY_2_7: str = "python2.7"
     """TODO(CJ)"""
 
     def required_executables(self) -> List[str]:

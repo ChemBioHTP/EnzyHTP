@@ -12,6 +12,7 @@ from copy import deepcopy
 
 from .base_config import BaseConfig
 
+
 class XTBConfig(BaseConfig):
     """Class that holds default alues for running xtb within enzy_htp.
 
@@ -20,34 +21,33 @@ class XTBConfig(BaseConfig):
         N_ITER : int() corresponding to number of scf iterations to run.
     """
 
-    XTB_EXE:str = "xtb"
+    XTB_EXE: str = "xtb"
     """Name of the xtb executable as a str()."""
 
-    N_ITER:int = 500
+    N_ITER: int = 500
     """Number of SCF iterations to try as an int()."""
 
-    N_PROC:int = 1 
+    N_PROC: int = 1
     """Number of parrallel processes to use during a calculation as an int()."""
 
-    KMP_STACKSIZE:str = "KMP_STACKSIZE"
+    KMP_STACKSIZE: str = "KMP_STACKSIZE"
     """Environment variable corresponding to KMP stack size."""
 
-    OMP_STACKSIZE:str = "OMP_STACKSIZE"
+    OMP_STACKSIZE: str = "OMP_STACKSIZE"
     """Environment variable corresponding to OMP stack size."""
 
-    SUPPORTED_EXTENSIONS:List[str] = ".xyz .mol .sdf .pdb".split()
+    SUPPORTED_EXTENSIONS: List[str] = ".xyz .mol .sdf .pdb".split()
     """A List[str] of supported file extensions for xtb."""
 
     def required_executables(self) -> List[str]:
         """A hardcoded list of required executables for xtb."""
         return [self.XTB_EXE]
 
-    def required_env_vars(self)-> List[str]:
+    def required_env_vars(self) -> List[str]:
         """A hardcoded list of required enviornment variables for xtb."""
         return [self.KMP_STACKSIZE, self.OMP_STACKSIZE]
 
-
-    def required_py_modules(self)-> List[str]:
+    def required_py_modules(self) -> List[str]:
         """A hardcoded list of required enviornment variables for xtb."""
         return list()
 

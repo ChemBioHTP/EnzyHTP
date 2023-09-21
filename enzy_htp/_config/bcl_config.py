@@ -12,6 +12,7 @@ from copy import deepcopy
 
 from .base_config import BaseConfig
 
+
 class BCLConfig(BaseConfig):
     """Class that holds default values for running BCL within enzy_htp.
 

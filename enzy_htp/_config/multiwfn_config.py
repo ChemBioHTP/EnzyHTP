@@ -14,6 +14,7 @@ from typing import Any, List
 
 from .base_config import BaseConfig
 
+
 class MultiwfnConfig(BaseConfig):
     """Class that holds the default values for running Multiwfn within enzy_htp as well
     the names of required executables and environment variables.

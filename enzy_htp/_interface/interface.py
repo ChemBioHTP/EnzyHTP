@@ -32,7 +32,6 @@ from .rdkit_interface import RDKitInterface
 from .rosetta_interface import RosettaInterface
 from .xtb_interface import XTBInterface
 
-
 from enzy_htp._config import Config
 
 
@@ -82,16 +81,15 @@ class Interface:
         missing_exes: List[str] = list()
         missing_env_vars: List[str] = list()
         missing_py_modules: List[str] = list()
-        
+
         for interface_name, ii in self.__dict__.items():
             if interface_name.startswith('_'):
                 continue
-            
-            missing_exes.extend( ii.missing_executables() )
-            missing_env_vars.extend( ii.missing_env_vars() )
-            missing_py_modules.extend( ii.missing_py_modules() )
 
-        
+            missing_exes.extend(ii.missing_executables())
+            missing_env_vars.extend(ii.missing_env_vars())
+            missing_py_modules.extend(ii.missing_py_modules())
+
         _LOGGER.info("Beginning environment check...")
         _LOGGER.info("Environment check complete!")
 
@@ -119,4 +117,3 @@ class Interface:
             _LOGGER.warning("Some elements are missing in environment. Not all functionality will be possible.")
         else:
             _LOGGER.info("All elements are available in environment!")
-

@@ -42,9 +42,12 @@ def get_distance(p1: Union[tuple, list], p2: Union[tuple, list]) -> float:
     D = np.linalg.norm(d1)
     return D
 
-def get_dihedral(p1: Union[tuple, list], p2: Union[tuple, list],
-                 p3: Union[tuple, list], p4: Union[tuple, list],
-                 rad_result: bool= False) -> float:
+
+def get_dihedral(p1: Union[tuple, list],
+                 p2: Union[tuple, list],
+                 p3: Union[tuple, list],
+                 p4: Union[tuple, list],
+                 rad_result: bool = False) -> float:
     """get the dihedral defined by p1, p2, o3, and p4
     Args:
         p1, p2, p3, p4:
@@ -62,14 +65,14 @@ def get_dihedral(p1: Union[tuple, list], p2: Union[tuple, list],
     v2 = np.array(p3) - np.array(p2)
     v3 = np.array(p4) - np.array(p3)
     nv1 = np.cross(v1, v2)
-    nv1 = nv1/np.linalg.norm(nv1)
+    nv1 = nv1 / np.linalg.norm(nv1)
     nv2 = np.cross(v2, v3)
-    nv2 = nv2/np.linalg.norm(nv2)
+    nv2 = nv2 / np.linalg.norm(nv2)
 
-    m1 = np.cross(nv1, v2/np.linalg.norm(v2))
+    m1 = np.cross(nv1, v2 / np.linalg.norm(v2))
     x = np.dot(nv1, nv2)
     y = np.dot(m1, nv2)
-    dihedral = -np.arctan2(y,x)
+    dihedral = -np.arctan2(y, x)
 
     if not rad_result:
         dihedral = np.degrees(dihedral)

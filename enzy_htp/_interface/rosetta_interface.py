@@ -26,44 +26,47 @@ from .base_interface import BaseInterface
 
 class RosettaCst:
     """Class that reprsents a constraint set in the Rosetta molecular modelling package. Stores information about the residues
-    and atoms involved. 
-    TODO(CJ):
-
-    """
+    and atoms involved. The class also provides functionality to compare an observed geometry to the desired, idealized geometry and
+    convert RosettaCst objects to str()'s needed for constrained protocols in Rosetta. Functions for loading RosettaCst's is found in 
+    the RosettaInterface() class. 
     
-    ALLOWED_CSTS: Set[str] = {"distanceAB", "angle_A", "angle_B", "torsion_A", "torsion_B", "torsion_AB"}
-    """ """        
+    Attributes:
+        parent_: The parent to the instance. Typically a RosettaInterface() instance.
+        rname_1: Name of the first residue as a str().
+        rnum_1: Residue index of the first residue as an int().
+        ratoms_1: List[str] of three atom names for the first residue.
+        rchain_1: Name of the first residue chain as a str().
+        rname_2: Name of the second residue as a str().
+        rnum_2: Residue index of the second residue as an int().
+        ratoms_2: List[str] of three atom names for the second residue.
+        rchain_2: Name of the second residue chain as a str().
+        constraints: The actual constraints to implement between the two residues.
+    """
 
-    def __init__(self, 
-                parent,
-                rname_1:str, 
-                rnum_1:int, 
-                ratoms_1:List[str], 
-                rchain_1:str,
-                rname_2:str,
-                rnum_2:int,
-                ratoms_2:List[str],
-                rchain_2:str,
-                constraints:List[Union[str,int]]):
-        """"""
+    ALLOWED_CSTS: Set[str] = {"distanceAB", "angle_A", "angle_B", "torsion_A", "torsion_B", "torsion_AB"}
+    """A Set() of the allowed constraints that you can use."""
+
+    def __init__(self, parent, rname_1: str, rnum_1: int, ratoms_1: List[str], rchain_1: str, rname_2: str, rnum_2: int,
+                 ratoms_2: List[str], rchain_2: str, constraints: List[Union[str, int]]):
+        """Populates all fields in the RosettaCst by the associated named attribute."""
         self.parent_ = parent
         self.rname_1 = rname_1
-        self.rnum_1 = rnum_1 
-        self.ratoms_1 = ratoms_1 
-        self.rchain_1 = rchain_1 
-        self.rname_2 = rname_2 
-        self.rnum_2 = rnum_2 
-        self.ratoms_2 = ratoms_2 
-        self.rchain_2 = rchain_2 
-        self.constraints = constraints 
+        self.rnum_1 = rnum_1
+        self.ratoms_1 = ratoms_1
+        self.rchain_1 = rchain_1
+        self.rname_2 = rname_2
+        self.rnum_2 = rnum_2
+        self.ratoms_2 = ratoms_2
+        self.rchain_2 = rchain_2
+        self.constraints = constraints
 
         #TODO(CJ): do some kind of validation for the constraints
 
-
-    def parent(self):
+    def parent(self) -> Any:
+        """Getter for the parent() object."""
         return self.parent_
 
-    def set(self, key:str, value: Any) -> None:
+    def set(self, key: str, value: Any) -> None:
         """Sets an attribute specified by the 'key' to the given 'value'. No checks are performed
         on the supplied value.
 
@@ -82,30 +85,32 @@ class RosettaCst:
 
         self.__dict__[key] = value
 
+    def evaluate(self, file: str) -> List[float]:
+        """Evaluates the deviation between the RosettaCst and observed geometry in terms of tolerance units. For each
+        constraint, there exists a target value x0 and allowed tolerance xtol. Evaluation in tolerance units is defined as:
 
-    def evaluate(self, file:str) -> List[float]:
-        """ 
+        abs(x0-xtol)/xtol
+
+        This normalization is performed to enable proper comparison between Angle, Distance, and Dihedral constraints.
 
         Args:
             file: Name of the file to analyze.
 
         Returns:
-            
+            A list() of the tolerance unit evaluations for each constraint. 
         """
         session = self.parent().parent().pymol.new_session()
-        self.parent().parent().pymol.general_cmd(session,[
-            ('delete','all'),
-            ('load', file)
-        ])
+        self.parent().parent().pymol.general_cmd(session, [('delete', 'all'), ('load', file)])
 
         sele1, sele2, sele3, sele4 = None, None, None, None
 
-        differences:List[float] = list() 
+        differences: List[float] = list()
 
         for cst in self.constraints:
+            #TODO(CJ): check if the constrained atoms are actually in the file
             #print(cst)
             #TODO(CJ): do a tuple expansion here
-            cst_type:str = cst[0]
+            cst_type: str = cst[0]
             target = cst[1]
             tolerance = cst[2]
             #TODO(CJ): need to check if the angle is weird for this
@@ -113,10 +118,10 @@ class RosettaCst:
             if cst_type.startswith('distance'):
                 sele1 = f"chain {self.rchain_1} and resi {self.rnum_1} and name {self.ratoms_1[0]}"
                 sele2 = f"chain {self.rchain_2} and resi {self.rnum_2} and name {self.ratoms_2[0]}"
-                dist:float = self.parent().parent().pymol.general_cmd(session, [('distance', None, sele1, sele2)] )[0]
-                differences.append( abs(dist - target ) / tolerance) 
+                dist: float = self.parent().parent().pymol.general_cmd(session, [('distance', None, sele1, sele2)])[0]
+                differences.append(abs(dist - target) / tolerance)
             elif cst_type.startswith('angle'):
-                #TODO(CJ): need to address periodicity 
+                #TODO(CJ): need to address periodicity
                 if cst_type == 'angle_A':
                     sele1 = f"chain {self.rchain_1} and resi {self.rnum_1} and name {self.ratoms_1[1]}"
                     sele2 = f"chain {self.rchain_1} and resi {self.rnum_1} and name {self.ratoms_1[0]}"
@@ -125,8 +130,8 @@ class RosettaCst:
                     sele1 = f"chain {self.rchain_1} and resi {self.rnum_1} and name {self.ratoms_1[0]}"
                     sele2 = f"chain {self.rchain_2} and resi {self.rnum_2} and name {self.ratoms_2[0]}"
                     sele3 = f"chain {self.rchain_2} and resi {self.rnum_2} and name {self.ratoms_2[1]}"
-                angle:float = self.parent().parent().pymol.general_cmd(session,[('angle', None, sele1, sele2, sele3)])[0]
-                differences.append( abs(angle-target)/tolerance )
+                angle: float = self.parent().parent().pymol.general_cmd(session, [('angle', None, sele1, sele2, sele3)])[0]
+                differences.append(abs(angle - target) / tolerance)
             elif cst_type.startswith('dihedral'):
                 if cst_type == 'torsionA':
                     sele1 = f"chain {self.rchain_1} and resi {self.rnum_1} and name {self.ratoms_1[2]}"
@@ -144,13 +149,11 @@ class RosettaCst:
                     sele3 = f"chain {self.rchain_2} and resi {self.rnum_2} and name {self.ratoms_2[1]}"
                     sele4 = f"chain {self.rchain_2} and resi {self.rnum_2} and name {self.ratoms_2[2]}"
                 assert False
-                args.append(
-                    ('dihedral', sele1, sele2, sele3, sele4 )
-                )
+                args.append(('dihedral', sele1, sele2, sele3, sele4))
 
         return differences
 
-    def contains(self, chain:str, res_num:int) -> bool:
+    def contains(self, chain: str, res_num: int) -> bool:
         """Does the constraint contain the residue at <chain>.<res_num>?"""
         if chain == self.rchain_1 and res_num == self.rnum_1:
             return True
@@ -160,38 +163,40 @@ class RosettaCst:
 
         return False
 
-    def create_pdb_line(self, idx:int) -> str:
-        """TODO(CJ): documentation"""
+    def create_pdb_line(self, idx: int) -> str:
+        """Creates a str() PDB line in the appropriate format so that Rosetta can apply the constrained geometry
+        described by the RosettaCst. This line goes in the corresponding PDB file.
+        
+        Args:
+            idx: The index of the RosettaCst as an int().
+            
+        Returns:
+            The PDB line corresponding to the RosettaCst.
+
+        """
         return f"REMARK 666 MATCH TEMPLATE {self.rchain_1} {self.rname_1}  {self.rnum_1:>3} MATCH MOTIF {self.rchain_2} {self.rname_2}  {self.rnum_2:>3}  {idx:>3}  1"
 
     def create_cst_lines(self) -> List[str]:
-        """TODO(CJ): documentation"""
-        cst_content:List[str] = list()
+        """Creates a List[str] which describes the constrained geometries in the required enzyme design format for Rosetta.
+        These lines go into the corresponding .cst file."""
+        cst_content: List[str] = list()
         cst_content.append("CST::BEGIN")
-        cst_content.append(
-            f"   TEMPLATE::  ATOM_MAP: 1 atom_name: {' '.join(self.ratoms_1)}"
-        )
-        cst_content.append(
-            f"   TEMPLATE::  ATOM_MAP: 1 residue3: {self.rname_1}")
+        cst_content.append(f"   TEMPLATE::  ATOM_MAP: 1 atom_name: {' '.join(self.ratoms_1)}")
+        cst_content.append(f"   TEMPLATE::  ATOM_MAP: 1 residue3: {self.rname_1}")
         cst_content.append("")
-        cst_content.append(
-            f"   TEMPLATE::  ATOM_MAP: 2 atom_name: {' '.join(self.ratoms_2)}"
-        )
-        cst_content.append(
-            f"   TEMPLATE::  ATOM_MAP: 2 residue3: {self.rname_2}")
+        cst_content.append(f"   TEMPLATE::  ATOM_MAP: 2 atom_name: {' '.join(self.ratoms_2)}")
+        cst_content.append(f"   TEMPLATE::  ATOM_MAP: 2 residue3: {self.rname_2}")
         cst_content.append("")
-        
+
         for ridx, rule in enumerate(self.constraints):
             if rule[0] == 'distanceAB':
                 end = 0
             else:
                 end = rule[4]
-            cst_content.append(
-                f"   CONSTRAINT::  {rule[0]:>10}: {rule[1]:6.2f} {rule[2]:6.2f} {rule[3]:6.2f} {end}"
-            )
-        
+            cst_content.append(f"   CONSTRAINT::  {rule[0]:>10}: {rule[1]:6.2f} {rule[2]:6.2f} {rule[3]:6.2f} {end}")
+
         cst_content.append("CST::END")
-        
+
         return cst_content
 
 
@@ -342,50 +347,42 @@ class RosettaInterface(BaseInterface):
 
         if conformers:
             #TODO(CJ): figure out exactly how I deal with the movment of conformer files
-            self.add_conformers(res_name, params_file, pdb_file, conformers )
+            self.add_conformers(res_name, params_file, pdb_file, conformers)
 
         return (params_file, pdb_file)
 
-
-    def _fix_conformers(self, res_code:str, pdb_template:str, conformers_file:str) -> str:
+    def _fix_conformers(self, res_code: str, pdb_template: str, conformers_file: str) -> str:
         """TODO(CJ)"""
         session = self.parent().pymol.new_session()
         self.parent().pymol.general_cmd(session, [("load", pdb_template)])
-        template_df:pd.DataFrame = self.parent().pymol.collect(session, "memory", "name elem x y z ID chain resn resi".split())
-        
-        original:str = self.parent().pymol.general_cmd(session, [
-            ("delete", "all"), ("load", conformers_file), ("get_object_list",'all')
-        ])[-1]
+        template_df: pd.DataFrame = self.parent().pymol.collect(session, "memory", "name elem x y z ID chain resn resi".split())
+
+        original: str = self.parent().pymol.general_cmd(session, [("delete", "all"), ("load", conformers_file),
+                                                                  ("get_object_list", 'all')])[-1]
 
         #original = session.cmd.get_object_list()
         assert len(original) == 1
-        split:List[str] = self.parent().pymol.general_cmd(session, [
-            ("split_states","all"), ("get_object_list","all")
-        ])[-1]
+        split: List[str] = self.parent().pymol.general_cmd(session, [("split_states", "all"), ("get_object_list", "all")])[-1]
         print(split)
-#        original = original[0]
-#        content: List[str] = list()
-#        #TODO(CJ): figure out a way to get rid of the warnings
-#        #redirect_stdout()
+        #        original = original[0]
+        #        content: List[str] = list()
+        #        #TODO(CJ): figure out a way to get rid of the warnings
+        #        #redirect_stdout()
         for oidx, oo in enumerate(split):
             if oo == original:
                 continue
-            df:pd.DataFrame = self.parent().pymol.collect(session, "memory", "name elem x y z ID chain resn resi".split(), sele=oo)
+            df: pd.DataFrame = self.parent().pymol.collect(session, "memory", "name elem x y z ID chain resn resi".split(), sele=oo)
             assert len(df) == len(template_df), f"{len(df)} {len(template_df)}"
-            for (tidx, trow), (idx, row) in zip(template_df.iterrows(),
-                                                df.iterrows()):
+            for (tidx, trow), (idx, row) in zip(template_df.iterrows(), df.iterrows()):
                 assert trow.elem == row.elem
-                self.parent().pymol.general_cmd(session,[
-                    ("alter", f"{oo} and ID {row.ID}", "name=" + trow["name"] ),
+                self.parent().pymol.general_cmd(session, [
+                    ("alter", f"{oo} and ID {row.ID}", "name=" + trow["name"]),
                     ("alter", f"{oo} and ID {row.ID}", f"chain='{trow.chain}'"),
                     ("alter", f"{oo} and ID {row.ID}", f"resn='{res_code}'"),
                 ])
 
-
             temp_fname = f"state_{oidx}.pdb"
-            self.parent().pymol.general_cmd(session,[
-                    ("save", temp_name, oo)
-            ])
+            self.parent().pymol.general_cmd(session, [("save", temp_name, oo)])
 
             for ll in fs.lines_from_file(temp_fname):
                 if ll.startswith('HETATM') or ll.startswith('ATOM'):
@@ -400,24 +397,25 @@ class RosettaInterface(BaseInterface):
         outfile = Path(conformers).with_suffix('.pdb')
         fs.write_lines(outfile, content)
         print(outfile)
-        exit( 0 )
+        exit(0)
         return str(outfile)
 
-
-    def add_conformers(self, res_code:str, param_file: str, pdb_template:str, conformers_file: str) -> None:
+    def add_conformers(self, res_code: str, param_file: str, pdb_template: str, conformers_file: str) -> None:
         """TODO(CJ)"""
 
         fs.check_file_exists(param_file)
         fs.check_file_exists(conformers_file)
 
-        suffix:str = Path(conformers_file).suffix
+        suffix: str = Path(conformers_file).suffix
         if suffix != ".pdb":
             if suffix in ".mol2 .mol .sdf".split():
                 #TODO(CJ): this does not work
                 conformers_file = self._fix_conformers(res_code, pdb_template, conformers_file)
                 pass
             else:
-                _LOGGER.error(f"The supplied file '{conformers_file}' is not in the .pdb and cannot be converted from .mol2, .mol, or .sdf. Exiting...")
+                _LOGGER.error(
+                    f"The supplied file '{conformers_file}' is not in the .pdb and cannot be converted from .mol2, .mol, or .sdf. Exiting..."
+                )
                 exit(1)
 
         content: List[str] = fs.lines_from_file(param_file)
@@ -716,7 +714,7 @@ class RosettaInterface(BaseInterface):
 
             result: ET.Element = None
             if elem.tag == target:
-                result = elem 
+                result = elem
             else:
                 for ee in elem:
                     if ee.tag == target:
@@ -761,7 +759,7 @@ class RosettaInterface(BaseInterface):
             if bad:
                 _LOGGER.error("Problems with XML elements detected. Exiting...")
                 exit(1)
-            
+
             child_nodes = arg.pop('child_nodes', list())
             #if arg.get('append_elements_only', False):
             #    _ = arg.pop('append_elements_only')
@@ -776,37 +774,31 @@ class RosettaInterface(BaseInterface):
                 _ = arg.pop('append_elements_only')
                 if tag_name == "SCORINGGRIDS":
                     parent: ET.Element = _find_node(root, 'ROSETTASCRIPTS')
-                    target_node = ET.Element( tag_name )
+                    target_node = ET.Element(tag_name)
                     parent.insert(0, target_node)
                     #target_node = ET.SubElement(parent[0], tag_name )
                 else:
-                    target_node = ET.SubElement(parent, tag_name )
+                    target_node = ET.SubElement(parent, tag_name)
 
                 for attrib, value in arg.items():
-                    target_node.set( attrib, value )
+                    target_node.set(attrib, value)
             else:
                 target_node = ET.SubElement(parent, tag_name, attrib=arg)
 
-
-            
             if child_nodes:
                 for cn in child_nodes:
                     tag_name = cn.pop('tag', None)
                     _ = cn.pop('parent', None)
                     #TODO(CJ): make this recursive so it actually works for super nested things
                     _ = ET.SubElement(target_node, tag_name, attrib=cn)
-            
 
         for rr in root:
             rr.text = "\n\t"
 
         xmlstr: str = minidom.parseString(ET.tostring(root)).toprettyxml()
         xml_content: List[str] = xmlstr.replace('<?xml version="1.0" ?>\n', '').splitlines()
-        
-        xml_content = list(filter(
-            lambda ll: len(ll.strip()) > 0,
-            xml_content
-        ))
+
+        xml_content = list(filter(lambda ll: len(ll.strip()) > 0, xml_content))
 
         fs.write_lines(fname, xml_content)
 
@@ -959,21 +951,28 @@ class RosettaInterface(BaseInterface):
 
         return df
 
+    def _parse_cst(self, raw: str) -> RosettaCst:
+        """Implementation function for parsing of RosettaCst's. DO NOT call directly. Works only on a single raw str()
+        and creates a single RosettaCst object. If values for constraints are not supplied, default values are supplied
+        based on the chemistry of the constrained atoms.
 
-    def _parse_cst(self, raw:str) -> RosettaCst:
-        """ """
-        var:Dict[str,Any] = {'constraints': []}
-    
-        tokens:List[str] = list(filter(len,re.split('[()]',raw)))
-    
+        Args:
+            raw: The raw RosettaCst str() to parse. 
+
+        Returns:
+            The new RosettaCst object.
+        """
+        var: Dict[str, Any] = {'constraints': []}
+
+        tokens: List[str] = list(filter(len, re.split('[()]', raw)))
+
         if len(tokens) < 3:
             _LOGGER.info(
-                f"There must be at least 3 blocks in an individual constraint. There are only {len(tokens)} in '{raw}'. Exiting..."
-            )
+                f"There must be at least 3 blocks in an individual constraint. There are only {len(tokens)} in '{raw}'. Exiting...")
             exit(1)
-    
+
         for tidx, tk in enumerate(tokens):
-    
+
             spl: List[str] = tk.split(',')
             if tidx < 2:
                 var[f"rchain_{tidx+1}"] = spl[0]
@@ -981,89 +980,90 @@ class RosettaInterface(BaseInterface):
                 var[f"rname_{tidx+1}"] = spl[2]
                 var[f"ratoms_{tidx+1}"] = spl[3:]
             else:
-                cst_type:str=spl[0]
+                cst_type: str = spl[0]
                 if cst_type not in RosettaCst.ALLOWED_CSTS:
                     _LOGGER.error(
                         f"The supplied constraint type {cst_type} is not supported. Allowed are: {', '.join(sorted(list(RosettaCst.ALLOWED_CSTS)))}. Exiting..."
                     )
                     exit(1)
-                
+
                 temp = [cst_type]
-                
+
                 for tt in spl[1:]:
                     if tt.find('.') == -1:
                         temp.append(int(tt))
                     else:
                         temp.append(float(tt))
-                
-                t_len:int=len(temp)
-    
+
+                t_len: int = len(temp)
+
                 if t_len < 5:
-    
+
                     #TODO(CJ): add in some discussion of using a database here
                     # and mention that we are using default parameters
+                    #TODO(CJ): put this in enzy_htp.chemical
                     if cst_type == 'distanceAB':
-                        temp.extend(
-                            [2.00,0.25,100.00,0][t_len-1:]
-                        )
+                        temp.extend([2.00, 0.25, 100.00, 0][t_len - 1:])
                     elif cst_type in 'angle_A angle_B'.split():
-                        temp.extend(
-                            [180.0,5.0,100.0,360.0,1][t_len-1:]
-                        )
-    
+                        temp.extend([180.0, 5.0, 100.0, 360.0, 1][t_len - 1:])
+
                     else:
                         raise TypeError()
-    
+
                 var['constraints'].append(temp)
+
+        return RosettaCst(parent=self,
+                          rname_1=var['rname_1'],
+                          rnum_1=var['rnum_1'],
+                          ratoms_1=var['ratoms_1'],
+                          rchain_1=var['rchain_1'],
+                          rname_2=var['rname_2'],
+                          rnum_2=var['rnum_2'],
+                          ratoms_2=var['ratoms_2'],
+                          rchain_2=var['rchain_2'],
+                          constraints=var['constraints'])
+
+    def csts_from_file(self, fname: str) -> List[RosettaCst]:
+        """Loads RosettaCst's from a file. Checks that the file exists, errors if it does not.
+        See RosettaInterface.csts_from_str() for more information.
+
+        Args:
+            fname: Name of the file to get constraints from, as a str().
         
-        return RosettaCst(
-                            parent=self,
-                            rname_1=var['rname_1'],
-                            rnum_1=var['rnum_1'],
-                            ratoms_1=var['ratoms_1'],
-                            rchain_1=var['rchain_1'],
-                            rname_2=var['rname_2'],
-                            rnum_2=var['rnum_2'],
-                            ratoms_2=var['ratoms_2'],
-                            rchain_2=var['rchain_2'],
-                            constraints=var['constraints']
-                        )
-    
-    
-    def csts_from_file(self, fname:str) -> List[RosettaCst]:
-        """ """
-        fs.check_file_exists( fname )
-    
-        raw:str = fs.content_from_file( fname ) 
-    
-        return self.csts_from_str( raw )
-    
-    
+        Returns:    
+            A list() of RosettaCst objects.
+        """
+        fs.check_file_exists(fname)
+
+        raw: str = fs.content_from_file(fname)
+
+        return self.csts_from_str(raw)
+
     def csts_from_str(self, raw: str) -> List[RosettaCst]:
-        """ """
+        """Creates RosettaCst's from a raw str(). Performs basic checks and removes whitespace.
+
+        Args:
+            raw: The str() to parse from.
+
+        Returns:
+            A list() of RosettaCst objects.
+
+        """
         raw = ''.join(raw.split())
-        
+
         if raw.count('(') != raw.count(')'):
             _LOGGER.error(f"Unbalanced parantheses in raw constraint '{raw}'. Exiting...")
-            exit( 1 )
-    
+            exit(1)
+
         result = list()
-    
+
         for token in raw.split('),('):
             if token[0] != '(':
                 token = '(' + token
-    
+
             if token[-1] != ')':
                 token = ')' + token
-    
-            result.append(
-                self._parse_cst( token )
-            )
-    
-    
-        return result        
 
+            result.append(self._parse_cst(token))
 
-
-
-
+        return result

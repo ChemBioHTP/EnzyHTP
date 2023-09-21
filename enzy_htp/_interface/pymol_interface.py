@@ -95,9 +95,8 @@ class PyMolInterface(BaseInterface):
 
         result: str = str(file_2)
 
-
         self.general_cmd(session, [('delete', 'all')])
-        
+
         try:
             self.general_cmd(session, [('load', file_1)])
 
@@ -110,7 +109,7 @@ class PyMolInterface(BaseInterface):
 
                 for oidx, oname in enumerate(self.general_cmd(session, [('get_object_list')])[0]):
 
-                    if self.general_cmd(session, [('count_states',oname)])[0] != 1:
+                    if self.general_cmd(session, [('count_states', oname)])[0] != 1:
                         session.cmd.delete(oname)
                         continue
 
@@ -257,7 +256,6 @@ class PyMolInterface(BaseInterface):
 
         pymol_session.cmd.get_wizard().apply()
 
-
     def export_pdb(self, pymol_session: pymol2.PyMOL, pymol_obj_name: str, if_retain_order: bool = True, tag: str = None) -> str:
         """
         Saves a PyMOL object to a PDB file.
@@ -282,10 +280,7 @@ class PyMolInterface(BaseInterface):
 
         return pymol_outfile_path
 
-    def export_enzy_htp_stru(self, 
-                             pymol_session: pymol2.PyMOL,
-                             pymol_obj_name: str,        
-                             if_retain_order: bool = False) -> Structure:
+    def export_enzy_htp_stru(self, pymol_session: pymol2.PyMOL, pymol_obj_name: str, if_retain_order: bool = False) -> Structure:
         """
         Saves a PyMOL object to a Structure object.
         Args:
@@ -300,6 +295,7 @@ class PyMolInterface(BaseInterface):
         res = sp.get_structure(pymol_outfile_path, allow_multichain_in_atom=True)
         fs.clean_temp_file_n_dir([pymol_outfile_path, eh_config["system.SCRATCH_DIR"]])
         return res
+
     # == inter-session modular functions == (do not requires a session, will start and close one)
     # pass
 
@@ -436,9 +432,9 @@ class PyMolInterface(BaseInterface):
             cmd_name = cmd_set[0]
 
             #if cmd_name not in self.available_cmds_:
-               # _LOGGER.error(f"The command '{cmd_name}' is not supported in this version of pymol. Exiting...")
-                #exit(1)
-            
+            # _LOGGER.error(f"The command '{cmd_name}' is not supported in this version of pymol. Exiting...")
+            #exit(1)
+
             cmd_args = list()
 
             if len(cmd_set) > 1:
@@ -525,87 +521,72 @@ class PyMolInterface(BaseInterface):
         lines = list(filter(lambda ll: ll[0] != '>', lines))
         return ''.join(lines)
 
-
-    def create_cluster(self,session, fname:str, sele_str:str,outfile:str=None,cap_strategy:str='H', work_dir:str=None) -> str:
+    def create_cluster(self, session, fname: str, sele_str: str, outfile: str = None, cap_strategy: str = 'H', work_dir: str = None) -> str:
         """TODO(CJ)"""
-    
+
         if work_dir is None:
             work_dir = eh_config['system.WORK_DIR']
-    
+
         fs.check_file_exists(fname)
-    
+
         if outfile is None:
             temp_path = Path(fname)
-            outfile:str = f"{work_dir}/{temp_path.stem}_cluster{temp_path.suffix}"
-    
+            outfile: str = f"{work_dir}/{temp_path.stem}_cluster{temp_path.suffix}"
+
         #TODO(CJ): add file check for fname
-        obj_name:str='__eh_cluster'
-        self.general_cmd(session, 
-            [('delete','all'),('load', fname), ('select', sele_str),('create',obj_name,sele_str), ('delete', Path(fname).stem)]
-        )
-    
-        df:pd.DataFrame=self.collect(session, 'memory', "chain resi resn name".split())
-    
+        obj_name: str = '__eh_cluster'
+        self.general_cmd(session, [('delete', 'all'), ('load', fname), ('select', sele_str), ('create', obj_name, sele_str),
+                                   ('delete', Path(fname).stem)])
+
+        df: pd.DataFrame = self.collect(session, 'memory', "chain resi resn name".split())
+
         args = list()
-        for i,row in df.iterrows():
+        for i, row in df.iterrows():
             if row['name'] not in "N C".split():
                 continue
-            
+
             if not row.resn in THREE_LETTER_AA_MAPPER:
                 continue
-            
 
-            args.extend([
-                ('valence', 'guess', f"chain {row.chain} and resi {row.resi} and resn {row.resn} and name {row['name']}"),
-                ('h_add', f"chain {row.chain} and resi {row.resi} and resn {row.resn} and name {row['name']}")
-            ])
-    
+            args.extend([('valence', 'guess', f"chain {row.chain} and resi {row.resi} and resn {row.resn} and name {row['name']}"),
+                         ('h_add', f"chain {row.chain} and resi {row.resi} and resn {row.resn} and name {row['name']}")])
+
         args.append(("save", outfile, obj_name))
-    
-        self.general_cmd(session, args )
-    
+
+        self.general_cmd(session, args)
+
         if cap_strategy == 'H':
             return outfile
-    
+
         if cap_strategy == 'CH3':
-            
+
             args = []
-            orig = set(
-                zip(df.chain,df.resi,df.resn,df['name'])
-            )
-            updated:pd.DataFrame=self.collect(session, 'memory', "chain resi resn name".split())
-            new = set(
-                zip(updated.chain,updated.resi,updated.resn,updated['name'])
-            )
-   
-           
-            for (cname, res_num, res_name, aname) in filter(lambda x: x not in orig,  new ):
+            orig = set(zip(df.chain, df.resi, df.resn, df['name']))
+            updated: pd.DataFrame = self.collect(session, 'memory', "chain resi resn name".split())
+            new = set(zip(updated.chain, updated.resi, updated.resn, updated['name']))
+
+            for (cname, res_num, res_name, aname) in filter(lambda x: x not in orig, new):
                 if aname == 'H01':
-                    new_name='C21'
+                    new_name = 'C21'
                 elif aname == 'H02':
-                    new_name='C22'
+                    new_name = 'C22'
                 else:
                     #TODO(CJ): better error message
                     self.general_cmd(session, [('save', '_____mess_up.pdb')])
-                    assert False,(cname, res_num, res_name, aname)
+                    assert False, (cname, res_num, res_name, aname)
                 args.extend([
                     ('alter', f"chain {cname} and resi {res_num} and resn {res_name} and name {aname}", "elem='C'"),
                     ('alter', f"chain {cname} and resi {res_num} and resn {res_name} and name {aname}", f"name='{new_name}'"),
                 ])
-            
-            self.general_cmd(session, args )
-    
-            args = [
-                ('valence', 'guess', 'name C21 or name C22'),
-                ('h_add','name C21'),
-                ('h_add','name C22'),
-                ("save", outfile, obj_name)
-            ]
-            self.general_cmd(session, args )
-    
-        return outfile    
 
-    def fetch(self, code:str, out_dir:str=None) -> str:
+            self.general_cmd(session, args)
+
+            args = [('valence', 'guess', 'name C21 or name C22'), ('h_add', 'name C21'), ('h_add', 'name C22'), ("save", outfile, obj_name)]
+            self.general_cmd(session, args)
+
+        return outfile
+
+    def fetch(self, code: str, out_dir: str = None) -> str:
         """
 
         Args:
@@ -615,12 +596,12 @@ class PyMolInterface(BaseInterface):
         """
         outfile = f"{code.upper()}.cif"
         if len(code) == 3:
-            url:str=f"{self.config_.LIGAND_STEM}/{outfile}"
+            url: str = f"{self.config_.LIGAND_STEM}/{outfile}"
         elif len(code) == 4:
-            url:str=f"{self.config_.STRUCTURE_STEM}/{outfile}"
+            url: str = f"{self.config_.STRUCTURE_STEM}/{outfile}"
         else:
             assert False
-        
+
         self.env_manager_.run_command(self.config_.WGET, [url])
 
         if out_dir is not None:
@@ -628,7 +609,6 @@ class PyMolInterface(BaseInterface):
         #TODO(CJ): check if the file is downloaded
         return outfile
 
-                
 
 class OpenPyMolSession:
     """a context manager that open a pymol session once enter and close once exit"""

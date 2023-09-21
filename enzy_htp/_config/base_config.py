@@ -25,7 +25,7 @@ class BaseConfig(ABC):
     def __init__(self):
         """Trivial constructor"""
         pass
-    
+
     @abc.abstractmethod
     def required_executables(self) -> List[str]:
         """A list of all required executables for <Package>Config."""
@@ -41,8 +41,7 @@ class BaseConfig(ABC):
         """A list of all required environment python modules for <Package>Config."""
         pass
 
-
-    def __getitem__(self, key:str) -> Any:
+    def __getitem__(self, key: str) -> Any:
         """Getter for the config object. Exits if the supplied key is invalid.
 
         Args:
@@ -53,11 +52,11 @@ class BaseConfig(ABC):
         """
         if not hasattr(self, key):
             _LOGGER.error(f"The Config object has not attribute {key}. Exiting...")
-            exit( 1 )
+            exit(1)
 
         return getattr(self, key)
 
-    def __setitem__(self, key:str, value: Any) -> None:
+    def __setitem__(self, key: str, value: Any) -> None:
         """Setter for the config object. Checks if the attribute exists, exits if not.
 
         Args:
@@ -69,7 +68,6 @@ class BaseConfig(ABC):
         """
         if not hasattr(self, key):
             _LOGGER.error(f"The Config object has not attribute {key}. Exiting...")
-            exit( 1 )
+            exit(1)
 
-        setattr(self, key, value )
-
+        setattr(self, key, value)

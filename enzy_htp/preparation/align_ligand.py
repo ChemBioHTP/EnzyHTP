@@ -18,12 +18,18 @@ from rdkit.Chem import rdMolTransforms as rdmt
 from enzy_htp import config, interface
 
 from enzy_htp.core import file_system as fs
-from enzy_htp.core import _LOGGER 
+from enzy_htp.core import _LOGGER
 
 
-def align_ligand(
-    template:str, ligand:str, work_dir:str=None, outfile:str=None, minimize_its:int=10000, mapping_tol:float=0.001, cst_tol:float=0.05, cst_penalty:float=100.0, bond_tol:float=0.05
-) -> str:
+def align_ligand(template: str,
+                 ligand: str,
+                 work_dir: str = None,
+                 outfile: str = None,
+                 minimize_its: int = 10000,
+                 mapping_tol: float = 0.001,
+                 cst_tol: float = 0.05,
+                 cst_penalty: float = 100.0,
+                 bond_tol: float = 0.05) -> str:
     """Method that aligns a ligand to a template geometry using atomic locations. Relies on the atom naming scheme
     used in the PDB. This approach enables greater flexibility as ATP, ADP, and AMP can all be aligned to a template
     ADP molecule, for example. Derivatized molecules can also be aligned to a target substrate. The general workflow
@@ -47,7 +53,7 @@ def align_ligand(
     Returns:
         The path to the aligned ligand.
     """
-    err_msg:List[str]=list()
+    err_msg: List[str] = list()
     if fs.get_file_ext(template) != '.mol2':
         err_msg.append(f"\tThe supplied file {template} is not a .mol2 file!")
 
@@ -59,18 +65,18 @@ def align_ligand(
         for em in err_msg:
             _LOGGER.error(em)
         _LOGGER.error("Exiting...")
-        exit( 1 )
+        exit(1)
 
-    t_info:Dict = _molecule_info(template, mapping_tol)
-    l_info:Dict = _molecule_info(ligand, mapping_tol)
+    t_info: Dict = _molecule_info(template, mapping_tol)
+    l_info: Dict = _molecule_info(ligand, mapping_tol)
 
     _rchem.SanitizeMol(l_info['mol'])
-    props=_rchem.AllChem.MMFFGetMoleculeProperties(l_info['mol'])
-    ff=_rchem.AllChem.MMFFGetMoleculeForceField(l_info['mol'], props)
+    props = _rchem.AllChem.MMFFGetMoleculeProperties(l_info['mol'])
+    ff = _rchem.AllChem.MMFFGetMoleculeForceField(l_info['mol'], props)
 
-    orig_mat=_rchem.rdmolops.Get3DDistanceMatrix(l_info['mol'])
+    orig_mat = _rchem.rdmolops.Get3DDistanceMatrix(l_info['mol'])
 
-    mapped_atoms=set()
+    mapped_atoms = set()
     for bb in t_info['bonded'].intersection(l_info['bonded']):
         mapped_atoms.add(bb[0])
         mapped_atoms.add(bb[1])
@@ -79,42 +85,37 @@ def align_ligand(
     l_conf = l_info['mol'].GetConformers()[0]
 
     for an in mapped_atoms:
-        l_conf.SetAtomPosition(
-            l_info['mapper'][an],
-            t_conf.GetAtomPosition(t_info['mapper'][an])
-        )
+        l_conf.SetAtomPosition(l_info['mapper'][an], t_conf.GetAtomPosition(t_info['mapper'][an]))
         ff.MMFFAddPositionConstraint(l_info['mapper'][an], cst_tol, cst_penalty)
 
     updated_mat = _rchem.rdmolops.Get3DDistanceMatrix(l_info['mol'])
 
     for bond in l_info['bonded']:
         idx1, idx2 = l_info['mapper'][bond[0]], l_info['mapper'][bond[1]]
-        avg=(updated_mat[idx1][idx2]+orig_mat[idx1][idx2])/2
-        if abs(updated_mat[idx1][idx2]-orig_mat[idx1][idx2])/avg >= bond_tol:
+        avg = (updated_mat[idx1][idx2] + orig_mat[idx1][idx2]) / 2
+        if abs(updated_mat[idx1][idx2] - orig_mat[idx1][idx2]) / avg >= bond_tol:
             if bond[0] in mapped_atoms:
-                i,j = idx1,idx2
+                i, j = idx1, idx2
             else:
-                j,i = idx1, idx2
+                j, i = idx1, idx2
             rdmt.SetBondLength(l_conf, i, j, orig_mat[idx1][idx2])
 
     ff.Initialize()
     ff.Minimize(maxIts=minimize_its)
-    temp_path=Path(ligand)
+    temp_path = Path(ligand)
 
     if work_dir is None:
         work_dir = config['system.WORK_DIR']
 
     if outfile is None:
-        outfile:str=f"{work_dir}/{temp_path.stem}_placed{temp_path.suffix}"
+        outfile: str = f"{work_dir}/{temp_path.stem}_placed{temp_path.suffix}"
 
     session = interface.pymol.new_session()
     args = [('load', ligand)]
     for aidx, atom in enumerate(l_info['mol'].GetAtoms()):
         pos = l_info['mol'].GetConformer().GetAtomPosition(aidx)
 
-        args.append(
-            ('alter_state', -1, f'name {l_info["mapper"][aidx]}', f'(x,y,z) = ({pos.x},{pos.y},{pos.z})')
-        )
+        args.append(('alter_state', -1, f'name {l_info["mapper"][aidx]}', f'(x,y,z) = ({pos.x},{pos.y},{pos.z})'))
 
     args.append(('save', outfile))
 
@@ -122,7 +123,8 @@ def align_ligand(
 
     return outfile
 
-def _map_atoms(mol:_rchem.RWMol, fname:str, cutoff:float=0.001) -> Tuple[Dict,List[str]]:
+
+def _map_atoms(mol: _rchem.RWMol, fname: str, cutoff: float = 0.001) -> Tuple[Dict, List[str]]:
     """Function that maps atom indices from rdkit to PDB-style atom names. Returns a dict()
     containing the individual mappings. Atoms are mapped in both directions, i.e. name->index and index->name.
 
@@ -135,28 +137,28 @@ def _map_atoms(mol:_rchem.RWMol, fname:str, cutoff:float=0.001) -> Tuple[Dict,Li
         The mapper dict() which maps string atom names to atom index and vice-versa.
     """
     session = interface.pymol.new_session()
-    interface.pymol.general_cmd(session, [('delete', 'all'),('load', fname)])
-    df:pd.DataFrame=interface.pymol.collect(session, 'memory', 'name x y z'.split())
+    interface.pymol.general_cmd(session, [('delete', 'all'), ('load', fname)])
+    df: pd.DataFrame = interface.pymol.collect(session, 'memory', 'name x y z'.split())
     points = np.transpose(np.array([df.x.to_numpy(), df.y.to_numpy(), df.z.to_numpy()]))
-    names:List[str] = df.name.to_list()
-    
-    mapper = dict()        
+    names: List[str] = df.name.to_list()
+
+    mapper = dict()
 
     for aidx, atom in enumerate(mol.GetAtoms()):
         pos = mol.GetConformer().GetAtomPosition(aidx)
         point = np.array([pos.x, pos.y, pos.z])
-        dists = np.sqrt(np.sum((points-point)**2,axis=1))
+        dists = np.sqrt(np.sum((points - point)**2, axis=1))
         it = np.argmin(dists)
-        
+
         if dists[it] >= cutoff:
             continue
         mapper[atom.GetIdx()] = names[it]
         mapper[names[it]] = atom.GetIdx()
 
-    return mapper 
+    return mapper
 
 
-def _molecule_info(fname:str, dist_tol:float) -> Dict:  
+def _molecule_info(fname: str, dist_tol: float) -> Dict:
     """Gathers information about the molecule needed for alignment. Information includes the dihedral angles,
     atom names, and other information. If the molecule is specified as a template, only backbone dihedral angles
     are taken. Otherwise all possible dihedrals are found. The returned dict() has the following keys with 
@@ -174,13 +176,12 @@ def _molecule_info(fname:str, dist_tol:float) -> Dict:
     Returns:
         A dict() with the keys 'mol', 'mapper', and 'bonded'. Descriptions of values are given above.
     """
-    mol:_rchem.Molecule = interface.rdkit._load_molecule(fname, sanitize=True)
+    mol: _rchem.Molecule = interface.rdkit._load_molecule(fname, sanitize=True)
     if mol is None:
         mol = interface.rdkit._load_molecule(fname)
 
-    
     mapper = _map_atoms(mol, fname, dist_tol)
-    
+
     bonded = set()
 
     for bond in mol.GetBonds():
@@ -189,8 +190,7 @@ def _molecule_info(fname:str, dist_tol:float) -> Dict:
         bonded.add((mapper[a2_idx], mapper[a1_idx]))
 
     return {
-        'mol':_rchem.RWMol(mol),
-        'mapper':mapper,
-        'bonded':bonded,
+        'mol': _rchem.RWMol(mol),
+        'mapper': mapper,
+        'bonded': bonded,
     }
-

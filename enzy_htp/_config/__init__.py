@@ -20,12 +20,12 @@ import os
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import _LOGGER
 
-config_file:str=os.path.expandvars('$HOME/.eh_config')
+config_file: str = os.path.expandvars('$HOME/.eh_config')
 
 if fs.has_content(config_file):
     _LOGGER.info(f"Found config file: {config_file}...")
-    lines:List[str]=fs.lines_from_file(config_file)
-    counter:int = 0
+    lines: List[str] = fs.lines_from_file(config_file)
+    counter: int = 0
     for ll in lines:
         tks = ll.split('#')
         tk = tks[0].strip()

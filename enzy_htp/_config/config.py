@@ -41,6 +41,7 @@ from .xtb_config import XTBConfig, default_xtb_config
 
 from enzy_htp.core import _LOGGER
 
+
 class Config:
     """Class that holds all configuration settings for the different external softwares 
     that EnzyHTP relies on. Uses a parameter setting/getting syntax that uses [] operators
@@ -75,19 +76,18 @@ class Config:
         self._system = default_system_config()
         self._xtb = default_xtb_config()
         self._mapper = {
-            "alphafill" : self._alphafill,
-            "amber"     : self._amber,
-            "bcl"       : self._bcl,
-            "gaussian"  : self._gaussian,
-            "moe"       : self._moe,
-            "multiwfin" : self._multiwfn,
-            "pymol"     : self._pymol,
-            "rdkit"     : self._rdkit,
-            "rosetta"   : self._rosetta,
-            "system"    : self._system,
-            "xtb"       : self._xtb,
+            "alphafill": self._alphafill,
+            "amber": self._amber,
+            "bcl": self._bcl,
+            "gaussian": self._gaussian,
+            "moe": self._moe,
+            "multiwfin": self._multiwfn,
+            "pymol": self._pymol,
+            "rdkit": self._rdkit,
+            "rosetta": self._rosetta,
+            "system": self._system,
+            "xtb": self._xtb,
         }
-
 
     def __getitem__(self, key: str) -> Any:
         """Getter for the settings in the Config() object. Uses the grammar: "<package>.<setting>" 
@@ -105,9 +105,9 @@ class Config:
             ptr = self._mapper.get(app, None)
             if ptr is not None:
                 return ptr[settings]
-        
+
         _LOGGER.error(f"The supplied key {key} is invalid. Exiting...")
-        exit( 1 )
+        exit(1)
 
     def __setitem__(self, key: str, value: Any) -> None:
         """Setter for the configuration values in the Config object. Uses the grammar
@@ -124,12 +124,10 @@ class Config:
         """
         if key.count("."):
             app, settings = key.split(".", 1)
-            ptr = self._mapper.get(app, None) 
+            ptr = self._mapper.get(app, None)
             if ptr is not None:
                 ptr[settings] = value
                 return
 
         _LOGGER.error(f"The supplied key {key} is invalid. Exiting...")
-        exit( 1 )
-
-
+        exit(1)

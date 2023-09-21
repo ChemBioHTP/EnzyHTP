@@ -16,20 +16,21 @@ from typing import Any, List, Dict, Tuple
 
 from .base_config import BaseConfig
 
+
 class PyMolConfig(BaseConfig):
     """Class that holds default values for running PyMol within enzy_htp."""
 
-    WGET:str="wget"
+    WGET: str = "wget"
     """ """
 
     DEFAULT_OUTPUT_LV: Tuple[str] = ("disable", "all", "everything")
     """the default output level of a new pymol session in enzy_htp: mute everything.
     used in session.cmd.feedback() ref: https://pymolwiki.org/index.php/Feedback"""
 
-    STRUCTURE_STEM:str="https://files.rcsb.org/download/"
+    STRUCTURE_STEM: str = "https://files.rcsb.org/download/"
     """ """
 
-    LIGAND_STEM:str="https://files.rcsb.org/ligands/download/"
+    LIGAND_STEM: str = "https://files.rcsb.org/ligands/download/"
     """ """
 
     def display(self) -> None:

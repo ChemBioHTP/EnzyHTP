@@ -15,6 +15,7 @@ from typing import Any, List, Dict
 
 from .base_config import BaseConfig
 
+
 class AmberConfig(BaseConfig):
     """Class that holds default values for running Amber within enzy_htp and also creates
     input files for minimzation, heating, constant pressure production, and constant

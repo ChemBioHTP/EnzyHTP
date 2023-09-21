@@ -251,8 +251,7 @@ class Structure(DoubleLinkedNode):
                 result.extend(residue.atoms)
         return result
 
-    def find_atoms_in_range(self, center: Union[Atom, Tuple[float, float, float]],
-                            range_distance: float) -> List[Atom]:
+    def find_atoms_in_range(self, center: Union[Atom, Tuple[float, float, float]], range_distance: float) -> List[Atom]:
         """find atoms in {range} of {center}. return a list of atoms found"""
         result = []
         for atom in self.atoms:
