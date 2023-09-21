@@ -1,4 +1,5 @@
 """Information of the enzy_htp module. Responsibilities include versioning, path to data directory and determining operating system.
+Should be import as the whole module if want to change constants. (e.g.: `from enzy_htp.core import enzyhtp_info`).
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Author: QZ Shao <shaoqz@icloud.com>
