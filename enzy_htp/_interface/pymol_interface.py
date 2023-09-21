@@ -256,7 +256,6 @@ class PyMolInterface(BaseInterface):
 
         pymol_session.cmd.get_wizard().apply()
 
-
     def export_pdb(self, pymol_session: pymol2.PyMOL, pymol_obj_name: str, if_retain_order: bool = True, tag: str = None) -> str:
         """
         Saves a PyMOL object to a PDB file.
