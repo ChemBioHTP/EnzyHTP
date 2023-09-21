@@ -20,10 +20,10 @@ from plum import dispatch
 from copy import deepcopy
 import os
 
-from core.clusters._interface import ClusterInterface
-from helper import get_localtime, line_feed
-from Class_Conf import Config
-
+from .clusters import ClusterInterface
+from .general import get_localtime
+from enzy_htp import config as eh_config
+# TODO fix more Config
 
 class ClusterJob():
     """
@@ -130,7 +130,7 @@ class ClusterJob():
                             command_str,
                             env_str,
                             res_str,
-                            f"# {Config.WATERMARK}{line_feed}"
+                            f"# {eh_config['system.CHILDREN_SCRIPT_WATERMARK']}{os.linesep}"
                             )
 
         return cls(cluster, sub_script_str, sub_dir, sub_script_path)
@@ -139,19 +139,19 @@ class ClusterJob():
     @staticmethod
     @dispatch
     def _get_command_str(cmd: list) -> str:
-        return line_feed.join(cmd) + line_feed
+        return os.linesep.join(cmd) + os.linesep
 
     @staticmethod
     @dispatch
     def _get_command_str(cmd: str) -> str:
-        return cmd + line_feed
+        return cmd + os.linesep
     # endregion
 
     # region (_get_env_str)
     @staticmethod
     @dispatch
     def _get_env_str(env: list) -> str:
-        return line_feed.join(env) + line_feed
+        return os.linesep.join(env) + os.linesep
 
     @staticmethod
     @dispatch
@@ -163,14 +163,14 @@ class ClusterJob():
         if list(env.keys()) == ["head", "tail"] or list(env.keys()) == ["tail", "head"]:
             env = deepcopy(env)
             for i in env:
-                env[i] += line_feed
+                env[i] += os.linesep
             return env
         raise KeyError('Can only have "head" or "tail" as key in env_settings')
 
     @staticmethod
     @dispatch
     def _get_env_str(env: str) -> str:
-        return env + line_feed
+        return env + os.linesep
     # endregion
 
     # region (_get_res_str)
@@ -192,7 +192,7 @@ class ClusterJob():
         """
         combine command_str, env_str, res_str to sub_script_str
         """
-        sub_script_str = line_feed.join((res_str, watermark, env_str, command_str))
+        sub_script_str = os.linesep.join((res_str, watermark, env_str, command_str))
         return sub_script_str
    
     @staticmethod
@@ -201,7 +201,7 @@ class ClusterJob():
         """
         combine command_str, env_str, res_str to sub_script_str
         """
-        sub_script_str = line_feed.join((res_str, watermark, env_str["head"], command_str, env_str["tail"]))
+        sub_script_str = os.linesep.join((res_str, watermark, env_str["head"], command_str, env_str["tail"]))
         return sub_script_str
     # endregion
 
@@ -251,10 +251,10 @@ class ClusterJob():
         # san check
         if self.job_id is not None:
             if self.state[0][0] in ["run", "pend"]:
-                raise Exception(f"attempt to submit a non-finished (pend, run) job.{line_feed} id: {self.job_id} state: {self.state[0][0]}::{self.state[0][1]} @{get_localtime(self.state[1])}")
+                raise Exception(f"attempt to submit a non-finished (pend, run) job.{os.linesep} id: {self.job_id} state: {self.state[0][0]}::{self.state[0][1]} @{get_localtime(self.state[1])}")
             else: #finished job
                 if Config.debug > 0:
-                    print(f"WARNING: re-submitting a ended job. The job id will be renewed and the old job id will be lose tracked{line_feed} id: {self.job_id} state: {self.state[0][0]}::{self.state[0][1]} @{get_localtime(self.state[1])}")
+                    print(f"WARNING: re-submitting a ended job. The job id will be renewed and the old job id will be lose tracked{os.linesep} id: {self.job_id} state: {self.state[0][0]}::{self.state[0][1]} @{get_localtime(self.state[1])}")
 
         self.sub_script_path = self._deploy_sub_script(script_path)
         if Config.debug > 1:
@@ -286,7 +286,7 @@ class ClusterJob():
             job_id_log_path = Config.JOB_ID_LOG_PATH
         # write to
         with open(job_id_log_path, "a") as of:
-            of.write(f"{self.job_id} {self.sub_script_path}{line_feed}")
+            of.write(f"{self.job_id} {self.sub_script_path}{os.linesep}")
 
     ### control ###
     def kill(self):

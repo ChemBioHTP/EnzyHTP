@@ -6,8 +6,8 @@ from subprocess import run
 import re
 import pytest
 
-from core import clusters
-from core.job_manager import *
+from enzy_htp.core import clusters
+from enzy_htp.core.job_manager import *
 
 command_2_run = ["g16 < xxx.gjf > xxx.out"]
 env_settings_list =  [  "module load GCC/6.4.0-2.28  OpenMPI/2.1.1",
