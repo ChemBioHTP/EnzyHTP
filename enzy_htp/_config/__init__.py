@@ -12,5 +12,5 @@ from .config import Config
 
 config = Config()
 """
-Singleton object for accessing all configurations.
+Singleton object for accessing all configurations. Import convention: `from enzy_htp import config as eh_config`
 """
