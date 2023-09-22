@@ -5,9 +5,10 @@ Date: 2023-09-20
 from subprocess import run
 import re
 import pytest
+import os
 
 from enzy_htp.core import clusters
-from enzy_htp.core.job_manager import *
+from enzy_htp.core.job_manager import ClusterJob
 
 command_2_run = ["g16 < xxx.gjf > xxx.out"]
 env_settings_list =  [  "module load GCC/6.4.0-2.28  OpenMPI/2.1.1",
