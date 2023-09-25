@@ -133,6 +133,7 @@ class EnvironmentManager:
     def missing_py_modules(self) -> List[str]:
         """ """
         return self.missing_py_modules_
+    #endregion
 
     #region ==shell command==
     def run_command(self,
