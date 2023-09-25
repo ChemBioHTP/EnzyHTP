@@ -13,10 +13,14 @@ import os
 from subprocess import CompletedProcess, run
 import time
 
-from Class_Conf import Config
-from helper import round_by, run_cmd
 from ._interface import ClusterInterface
+from ..math_helper import round_by
+from ..env_manager import EnvironmentManager
+from ..logger import _LOGGER
 
+# Empty env manager just for running commands 
+# (env checking will be done whenever a command is needed, otherwise there will be too much warning)
+ENV_MANAGER = EnvironmentManager() # TODO(qz): for reason ABC is not happy with this going into the class
 
 class Accre(ClusterInterface):
     """
@@ -160,17 +164,17 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID""",
             file: slurm-#######.out will be generated in the *submission dir*
             exec: commands in the script will run under the *submission dir*
         """
-        cmd = cls._format_submit_cmd(os.path.abspath(script_path))
-        # debug
+        # for unit test
         if debug:
-            print(cmd)
-            return (cmd, sub_dir, script_path), None
+            return (f"{cls.SUBMIT_CMD} {script_path}", sub_dir, script_path), None
 
         cwd = os.getcwd()
         # cd to sub_path
         os.chdir(sub_dir)
-        try:    
-            submit_cmd = run_cmd(cmd, try_time=1440, wait_time=60, timeout=120) # 12 hrs
+        try:
+            submit_cmd = ENV_MANAGER.run_command(exe=cls.SUBMIT_CMD,
+                                                 args=[script_path],
+                                                 try_time=1440, wait_time=60, timeout=120) # 12 hrs
         finally:
             # TODO(shaoqz) timeout condition is hard to test
             os.chdir(cwd) # avoid messing up the dir
@@ -178,15 +182,6 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID""",
         job_id = cls._get_job_id_from_submit(submit_cmd)
         slurm_log_path = cls._get_log_from_id(sub_dir, job_id)
         return (job_id, slurm_log_path)
-
-    @classmethod
-    def _format_submit_cmd(cls, sub_script_path: str) -> str:
-        """
-        format the command for job submission on ACCRE
-        return the format command.
-        """
-        cmd = " ".join((cls.SUBMIT_CMD, sub_script_path))
-        return cmd
 
     @classmethod
     def _get_job_id_from_submit(cls, submit_job: CompletedProcess) -> str:
@@ -245,25 +240,27 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID""",
         # get info
         # squeue
         cmd = f"{cls.INFO_CMD[0]} -u $USER -O JobID,{field}" # donot use the -j method to be more stable
-        info_run = run_cmd(cmd, try_time=2880, wait_time=120, timeout=120)
+        info_run = ENV_MANAGER.run_command(exe=cmd.split()[0],
+                                           args=cmd.split()[1:],
+                                           try_time=2880, wait_time=120, timeout=120)
         # if exist
         info_out_lines = info_run.stdout.strip().splitlines()
         for info_line in info_out_lines: 
             info_line_parts = info_line.strip().split()
             if len(info_line_parts) < 2:
-                if Config.debug > 1:
-                    print(f"field: {field} is not supported in squeue. Switch to sacct.")
+                _LOGGER.info(f"field: {field} is not supported in squeue. Switch to sacct.")
                 break
             if job_id in info_line:
                 job_field_info = info_line_parts[1].strip().strip("+")
                 return job_field_info
         # use sacct if squeue do not have info
         # wait a update gap
-        if Config.debug > 1:
-            print("No info from squeue. Switch to sacct")
+        _LOGGER.info("No info from squeue. Switch to sacct")
         time.sleep(wait_time)
         cmd = f"{cls.INFO_CMD[1]} -j {job_id} -o {field}"
-        info_run = run_cmd(cmd, try_time=2880, wait_time=120, timeout=120)            
+        info_run = ENV_MANAGER.run_command(exe=cmd.split()[0],
+                                           args=cmd.split()[1:],
+                                           try_time=2880, wait_time=120, timeout=120)          
         # if exist
         info_out = info_run.stdout.strip().splitlines()
         if len(info_out) >= 3:

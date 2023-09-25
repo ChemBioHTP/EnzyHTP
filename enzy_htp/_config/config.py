@@ -5,6 +5,8 @@ only by the module. For each <Package> that EnzyHTP interfaces with, there shoul
 <Package>Interface in enzy_htp/_interface and a <Package>Config in enzy/_config. At present,
 there are configuration settings for the below packages by the given <Package>Config:
 
+    + SystemConfig
+    + ARMerConfig
     + AmberMD, AmberConfig
     + BCL, BCLConfig
     + Gaussian, GaussianConfig
@@ -32,6 +34,7 @@ from .multiwfn_config import MultiwfnConfig, default_multiwfn_config
 from .pymol_config import PyMolConfig, default_pymol_config
 from .rosetta_config import RosettaConfig, default_rosetta_config
 from .system_config import SystemConfig, default_system_config
+from .armer_config import ARMerConfig, default_armer_config
 
 from enzy_htp.core import _LOGGER
 
@@ -52,6 +55,7 @@ class Config:
         _pymol: Private instance of PyMolConfig() with default settings.
         _rosetta: Private instance of RosettaConfig() with default settings.
         _system: Private instance of SystemConfig() with default settings.
+        _armer: Private instance of ARMerConfig() with default settings.
     """
 
     def __init__(self):
@@ -64,6 +68,7 @@ class Config:
         self._pymol = default_pymol_config()
         self._rosetta = default_rosetta_config()
         self._system = default_system_config()
+        self._armer = default_armer_config()
 
     def __getitem__(self, key: str) -> Any:
         """Getter for the settings in the Config() object. Uses the grammar: "<package>.<setting>" 
@@ -92,6 +97,8 @@ class Config:
                 ptr = self._pymol
             elif app == "system":
                 ptr = self._system
+            elif app == "armer":
+                ptr = self._armer
             else:
                 raise TypeError()
             return ptr[settings]
@@ -124,6 +131,8 @@ class Config:
                 ptr = self._pymol
             elif app == "system":
                 ptr = self._system
+            elif app == "armer":
+                ptr = self._armer
             else:
                 raise TypeError()
             ptr[settings] = value

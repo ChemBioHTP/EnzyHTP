@@ -15,14 +15,16 @@ Feature:
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Date: 2022-04-13"""
 
+import logging
 import time
-from typing import Union
+from typing import Tuple, Union
 from plum import dispatch
 from copy import deepcopy
 import os
 
 from .clusters import ClusterInterface
 from .general import get_localtime
+from enzy_htp.core.logger import _LOGGER, get_eh_logging_level
 from enzy_htp import config as eh_config
 # TODO fix more Config
 
@@ -59,7 +61,7 @@ class ClusterJob():
 
         self.job_cluster_log: str = None
         self.job_id: str = None
-        self.state: tuple = None # state and the update time in s
+        self.last_state: Tuple[Tuple[str, str], float] = None # ((canonical_state, cluster_specific_state), time_stamp)
 
     ### config (construct object) ###
     @classmethod
@@ -91,7 +93,7 @@ class ClusterJob():
             resource settings. Can be a dictionary indicating each keywords or the string of the whole section.
             The name and value should be exactly the same as required by the cluster.
             **Use presets in ClusterInterface classes to save effort**
-       
+
         Return:
         A ClusterJob object
 
@@ -103,7 +105,7 @@ class ClusterJob():
                         env_settings = [cluster.AMBER_GPU_ENV, cluster.G16_CPU_ENV],
                         res_keywords = cluster.CPU_RES
                     )
-        >>> print(job.sub_script_str)   
+        >>> print(job.sub_script_str)
         #!/bin/bash
         #SBATCH --core_type=cpu
         #SBATCH --node_cores=24
@@ -195,7 +197,7 @@ class ClusterJob():
         """
         sub_script_str = os.linesep.join((res_str, watermark, env_str, command_str))
         return sub_script_str
-   
+
     @staticmethod
     @dispatch
     def _get_sub_script_str(command_str: str, env_str: dict, res_str: str, watermark: str) -> str:
@@ -222,7 +224,7 @@ class ClusterJob():
                 * will use self.sub_script_path if sub_dir is not provided
             debug:
                 debug behavior that does not submit the job but print out the submission command.
-                        
+
         Return:
             self.job_id
 
@@ -230,7 +232,7 @@ class ClusterJob():
             sub_script_path
             job_id
             sub_dir
-       
+
         Example:
             >>> sub_dir = "/EnzyHTP-test/test_job_manager/"
             >>> job.submit( sub_dir= sub_dir,
@@ -251,18 +253,16 @@ class ClusterJob():
 
         # san check
         if self.job_id is not None:
-            if self.state[0][0] in ["run", "pend"]:
-                raise Exception(f"attempt to submit a non-finished (pend, run) job.{os.linesep} id: {self.job_id} state: {self.state[0][0]}::{self.state[0][1]} @{get_localtime(self.state[1])}")
+            if self.last_state[0][0] in ["run", "pend"]:
+                raise Exception(f"attempt to submit a non-finished (pend, run) job.{os.linesep} id: {self.job_id} state: {self.last_state[0][0]}::{self.last_state[0][1]} @{get_localtime(self.last_state[1])}")
             else: #finished job
-                if Config.debug > 0:
-                    print(f"WARNING: re-submitting a ended job. The job id will be renewed and the old job id will be lose tracked{os.linesep} id: {self.job_id} state: {self.state[0][0]}::{self.state[0][1]} @{get_localtime(self.state[1])}")
+                _LOGGER.warning(f"WARNING: re-submitting a finished job. The job id will be renewed and the old job id will be lose tracked{os.linesep} id: {self.job_id} state: {self.last_state[0][0]}::{self.last_state[0][1]} @{get_localtime(self.last_state[1])}")
 
         self.sub_script_path = self._deploy_sub_script(script_path)
-        if Config.debug > 1:
-            print(f"submitting {script_path} in {sub_dir}")
+        _LOGGER.debug(f"submitting {script_path} in {sub_dir}")
         self.job_id, self.job_cluster_log = self.cluster.submit_job(sub_dir, script_path, debug=debug)
         self.sub_dir = sub_dir
-        if Config.debug > 0:
+        if get_eh_logging_level() < logging.CRITICAL:
             self._record_job_id_to_file()
 
         return self.job_id
@@ -281,10 +281,10 @@ class ClusterJob():
         record submitted job id to a file to help removing and tracking all jobs upon aborting
         """
         # get file path
-        if Config.JOB_ID_LOG_PATH == "":
+        if eh_config["system.JOB_ID_LOG_PATH"] == "DEFAULT":
             job_id_log_path = f"{self.sub_dir}/submitted_job_ids.log"
         else:
-            job_id_log_path = Config.JOB_ID_LOG_PATH
+            job_id_log_path = eh_config["system.JOB_ID_LOG_PATH"]
         # write to
         with open(job_id_log_path, "a") as of:
             of.write(f"{self.job_id} {self.sub_script_path}{os.linesep}")
@@ -294,30 +294,30 @@ class ClusterJob():
         """
         kill the job with the job_id
         """
+        # san check
         self.require_job_id()
 
-        if Config.debug >= 1:
-            print(f"killing: {self.job_id}")
+        _LOGGER.info(f"killing: {self.job_id}")
         self.cluster.kill_job(self.job_id)
 
     def hold(self):
         """
         hold the job from running
         """
+        # san check
         self.require_job_id()
 
-        if Config.debug >= 1:
-            print(f"holding: {self.job_id}")
+        _LOGGER.info(f"holding: {self.job_id}")
         self.cluster.hold_job(self.job_id)
 
     def release(self):
         """
         release the job to run
         """
+        # san check
         self.require_job_id()
 
-        if Config.debug >= 1:
-            print(f"releasing: {self.job_id}")
+        _LOGGER.info(f"releasing: {self.job_id}")
         self.cluster.release_job(self.job_id)
 
     ### monitor ###
@@ -334,11 +334,14 @@ class ClusterJob():
             a tuple of
             (a str of pend or run or complete or canel or error,
                 the real keyword form the cluster)
+
+        Will also assign self.last_state
         """
+        # san check
         self.require_job_id()
 
         result = self.cluster.get_job_state(self.job_id)
-        self.state = (result, time.time())
+        self.last_state = (result, time.time()) # TODO(qz): this may not be a good design. It record the last state with a time tho.
         return result
 
     def ifcomplete(self) -> bool:
@@ -365,9 +368,7 @@ class ClusterJob():
             if self.get_state()[0] in ("complete", "error", "cancel"):
                 return type(self)._action_end_with(self)
             # check every {period} second
-            if Config.debug >= 2:
-                local_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.state[1]))
-                print(f"Job {self.job_id} state: {self.state[0][0]} (at {local_time})")
+            _LOGGER.debug(f"Job {self.job_id} state: {self.last_state[0][0]} (at {get_localtime(self.last_state[1])})")
             time.sleep(period)
 
     @staticmethod
@@ -376,16 +377,14 @@ class ClusterJob():
         the action when job ends with the {end_state}
         the end_state can only be one of ("complete", "error", "cancel")
         """
-        end_state = ended_job.state[0]
+        end_state = ended_job.last_state[0]
         general_state = end_state[0]
         detailed_state = end_state[1]
 
         if general_state not in ("complete", "error", "cancel"):
             raise TypeError('_action_end_with: only take state in ("complete", "error", "cancel")')
         # general action
-        if Config.debug > 0:
-            local_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(ended_job.state[1]))
-            print(f"Job {ended_job.job_id} end with {general_state}::{detailed_state} at {local_time} !")
+        _LOGGER.info(f"Job {ended_job.job_id} end with {general_state}::{detailed_state} at {get_localtime(ended_job.last_state[1])} !")
         # state related action
         if general_state == "complete":
             pass
@@ -406,7 +405,7 @@ class ClusterJob():
         """
         submit an array of jobs in a way that only {array_size} number of jobs is submitted simultaneously.
         Wait until all job ends.
-       
+
         Args:
         jobs:
             a list of ClusterJob object to be execute
@@ -422,7 +421,7 @@ class ClusterJob():
         sub_scirpt_path: (default: self.sub_script_path)
             path of the submission script. Overwrite existing self.sub_script_path in the job obj
             * you can set the self value during config_job to make each job different
-       
+
         Return:
         return a list of not completed job. (error + canceled)
         """
@@ -449,20 +448,19 @@ class ClusterJob():
             for j in range(len(current_active_job)-1,-1,-1):
                 job = current_active_job[j]
                 if job.get_state()[0] not in ["pend", "run"]:
-                    if Config.debug > 1:
+                    if get_eh_logging_level() <= logging.DEBUG:
                         cls._action_end_with(job)
                     finished_job.append(job)
                     del current_active_job[j]
             # 3. wait a period before next check TODO: add behavior that the more checking the longer time till a limit
             time.sleep(period)
-       
+
         # summarize
-        n_complete = list(filter(lambda x: x.state[0][0] == "complete", finished_job))
-        n_error = list(filter(lambda x: x.state[0][0] == "error", finished_job))
-        n_cancel = list(filter(lambda x: x.state[0][0] == "cancel", finished_job))
-        if Config.debug > 0:
-            print(f"Job array finished: {len(n_complete)} complete {len(n_error)} error {len(n_cancel)} cancel")
-       
+        n_complete = list(filter(lambda x: x.last_state[0][0] == "complete", finished_job))
+        n_error = list(filter(lambda x: x.last_state[0][0] == "error", finished_job))
+        n_cancel = list(filter(lambda x: x.last_state[0][0] == "cancel", finished_job))
+        _LOGGER.info(f"Job array finished: {len(n_complete)} complete {len(n_error)} error {len(n_cancel)} cancel")
+
         return n_error + n_cancel
 
     ### misc ###
@@ -472,7 +470,7 @@ class ClusterJob():
         """
         if self.job_id is None:
             raise AttributeError("Need to submit the job and get an job id!")
-   
+
     @dispatch
     def _(self):
         """
