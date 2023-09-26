@@ -29,8 +29,9 @@ class Accre(ClusterInterface):
 
     # environment presets #
     AMBER_ENV = { 
-        'CPU': '''module load GCC/6.4.0-2.28  OpenMPI/2.1.1
-module load Amber/17-Python-2.7.14''', # only this version have sander.MPI
+        'CPU': '''source /home/shaoq1/bin/amber_env/amber-accre.sh''',
+#         '''module load GCC/6.4.0-2.28  OpenMPI/2.1.1
+# module load Amber/17-Python-2.7.14''',
         'GPU': '''source /home/shaoq1/bin/amber_env/amber-accre.sh'''
     }
 
