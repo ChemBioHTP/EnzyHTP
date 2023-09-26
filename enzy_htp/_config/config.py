@@ -10,6 +10,7 @@ there are configuration settings for the below packages by the given <Package>Co
     + BCL, BCLConfig
     + Gaussian, GaussianConfig
     + MOE, MOEConfig
+    + Mole2, Mole2Config
     + Multiwfn, MultiwfnConfig
     + PyMOL, PyMolConfig
     + Rosetta, RosettaConfig
@@ -32,6 +33,7 @@ from .amber_config import AmberConfig, default_amber_config
 from .bcl_config import BCLConfig, default_bcl_config
 from .gaussian_config import GaussianConfig, default_gaussian_config
 from .moe_config import MOEConfig, default_moe_config
+from .mole2_config import Mole2Config, default_mole2_config
 from .multiwfn_config import MultiwfnConfig, default_multiwfn_config
 from .pymol_config import PyMolConfig, default_pymol_config
 from .rdkit_config import RDKitConfig, default_rdkit_config
@@ -53,6 +55,7 @@ class Config:
         _bcl: Private instance of BCLConfig() with default settings.
         _gaussian: Private instance of GaussianConfig() with default settings.
         _moe: Private instance of MOEConfig() with default settings.
+        _mole2: Private instance of Mole2Config() with default settings.
         _multiwfn: Private instance of MultiwfnConfig() with default settings.
         _pymol: Private instance of PyMolConfig() with default settings.
         _rdkit: Private instace of RDKitConfig() with default settings.
@@ -70,6 +73,7 @@ class Config:
         self._gaussian = default_gaussian_config()
         self._multiwfn = default_multiwfn_config()
         self._moe = default_moe_config()
+        self._mole2 = default_mole2_config()
         self._pymol = default_pymol_config()
         self._rdkit = default_rdkit_config()
         self._rosetta = default_rosetta_config()
@@ -81,6 +85,7 @@ class Config:
             "bcl": self._bcl,
             "gaussian": self._gaussian,
             "moe": self._moe,
+            "mole2": self._mole2,
             "multiwfin": self._multiwfn,
             "pymol": self._pymol,
             "rdkit": self._rdkit,

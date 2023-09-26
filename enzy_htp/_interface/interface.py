@@ -8,6 +8,7 @@ class. Packages:
     + BCL, BCLInterface
     + Gaussian, GaussianInterface
     + MOE, MOEInterface
+    + Mole2, Mole2Interface
     + Multiwfn, MultiwfnInterface
     + PyMol, PyMolInterface
     + RDKit, RDKitInterface
@@ -26,6 +27,7 @@ from .alphafill_interface import AlphaFillInterface
 from .bcl_interface import BCLInterface
 from .gaussian_interface import GaussianInterface
 from .moe_interface import MOEInterface
+from .mole2_interface import Mole2Interface
 from .multiwfn_interface import MultiwfnInterface
 from .pymol_interface import PyMolInterface
 from .rdkit_interface import RDKitInterface
@@ -47,6 +49,7 @@ class Interface:
         bcl: Corresponds to instance of BCLInterface().
         gaussian: Corresponds to instnce of GaussianInterface().
         moe: Corresponds to instance of MOEInterface().
+        mole2: Corresponds to instance of Mole2Interface().
         multiwfn: Corresponds to instance of MultiwfnInterface().
         pymol: Corresponds to instance of PyMolInteface().
         rdkit: Corresponds to instance of RDKitInterface().
@@ -62,6 +65,7 @@ class Interface:
         self.bcl = BCLInterface(self, config._bcl)
         self.gaussian = GaussianInterface(self, config._gaussian)
         self.moe = MOEInterface(self, config._moe)
+        self.mole2 = Mole2Interface(self, config._mole2)
         self.multiwfn = MultiwfnInterface(self, config._multiwfn)
         self.pymol = PyMolInterface(self, config._pymol)
         self.rdkit = RDKitInterface(self, config._rdkit)
