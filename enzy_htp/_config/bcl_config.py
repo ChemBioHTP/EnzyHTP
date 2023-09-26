@@ -3,7 +3,6 @@ software package. File also contains default_bcl_config() which creates a defaul
 the BCLConfig() class.
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
-
 Date: 2023-04-02
 """
 from typing import List, Any
@@ -18,7 +17,6 @@ class BCLConfig(BaseConfig):
 
     Attributes:
         BCL : str() corresponding to the main bcl.exe application.
-
     """
 
     BCL_EXE: str = "bcl.exe"

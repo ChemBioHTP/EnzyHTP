@@ -16,7 +16,7 @@ from enzy_htp._config.alphafill_config import AlphaFillConfig, default_alphafill
 
 
 class AlphaFillInterface(BaseInterface):
-    """ Class that provides a direct interface for enzy_htp to utilize AlphaFill. Supported operations
+    """Class that provides a direct interface for enzy_htp to utilize AlphaFill. Supported operations
     include filling structures with ligand transplants. Users should use this class as the only way to 
     interact with this application.
 
