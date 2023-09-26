@@ -35,7 +35,7 @@ class ARMerConfig:
         'account' : 'yang_lab_csb',
         }
     """Default resource settings for QM cluster jobs from `energy`"""
-    
+
     def required_executables(self) -> List[str]:
         """A list of all required executables for ARMerConfig."""
         return list()
@@ -50,7 +50,7 @@ class ARMerConfig:
 
     def __getitem__(self, key: str) -> Any:
         """Accessor for SystemConfig() that leverages [] operator syntax.
-        
+
         Args:
             key: a str() key with the name of the variable you would like to access.
 
