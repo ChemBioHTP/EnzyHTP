@@ -8,7 +8,7 @@ Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 
 Date: 2023-09-22"""
 
-from typing import Any
+from typing import Any, List
 from copy import deepcopy
 
 from enzy_htp.core import _LOGGER
@@ -36,6 +36,18 @@ class ARMerConfig:
         }
     """Default resource settings for QM cluster jobs from `energy`"""
     
+    def required_executables(self) -> List[str]:
+        """A list of all required executables for ARMerConfig."""
+        return list()
+
+    def required_env_vars(self) -> List[str]:
+        """A list of all required environment variables for ARMerConfig."""
+        return list()
+
+    def required_py_modules(self) -> List[str]:
+        """A list of all required environment python modules for ARMerConfig."""
+        return list()
+
     def __getitem__(self, key: str) -> Any:
         """Accessor for SystemConfig() that leverages [] operator syntax.
         
