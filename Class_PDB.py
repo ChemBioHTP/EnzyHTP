@@ -1537,8 +1537,7 @@ class PDB():
         leap_path= self.cache_path+'/leap.in'
         sol_path= self.path_name+'_ff.pdb'
         with open(leap_path, 'w') as of:
-            of.write('source leaprc.protein.ff19SB'+line_feed)
-            of.write('source leaprc.protein.ff19SB_modAA'+line_feed)
+            of.write('source leaprc.protein.ff14SB'+line_feed) # change to ff14SB due to suppport reason of OpenMM in the future
             of.write('source leaprc.gaff2'+line_feed)
             of.write('source leaprc.water.tip3p'+line_feed)
             # ligands
@@ -3650,7 +3649,7 @@ outtraj {tmp_traj_2}
 
         if if_cluster_job:
             res_keywords = type(self)._get_default_res_setting_mmpbsa(res_setting)
-            cmd = f'{Config.get_PC_cmd(res_keywords["node_cores"])} python2 {Config.Amber.MMPBSA.get_MMPBSA_engine()} -O -i {in_file} -o {mmpbsa_out_path} -sp {sc_prmtop} -cp {dc_prmtop} -rp {dr_prmtop} -lp {dl_prmtop} -y {traj_file}'
+            cmd = f'{Config.get_PC_cmd(res_keywords["node_cores"])} {Config.Amber.MMPBSA.get_MMPBSA_engine()} -O -i {in_file} -o {mmpbsa_out_path} -sp {sc_prmtop} -cp {dc_prmtop} -rp {dr_prmtop} -lp {dl_prmtop} -y {traj_file}'
             mmpbsa_job = job_manager.ClusterJob.config_job(
                 commands = cmd,
                 cluster = cluster,
