@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Union, Tuple
 
 import pymol2
+import numpy as np
 import pandas as pd
 
 #TODO(CJ): add something to remove "PyMOL not running. Entering library mode (experimental" message on pymol running
@@ -586,10 +587,29 @@ class PyMolInterface(BaseInterface):
 
         return outfile
 
+
+    def center_of_mass(self, session, sele:str='all', no_hydrogens:bool=True):
+        """TODO(CJ)
+        Args:
+            session:
+            sele:
+            no_hydrogens:
+
+        Returns:
+            The specified center of mass.
+        """
+        if no_hydrogens:
+            sele += " and (not elem H)"
+            
+        df = self.collect(session, 'memory', "x y z".split(), sele=sele)
+        return np.mean(np.array([df.x.to_numpy(), df.y.to_numpy(), df.z.to_numpy()]),axis=1)
+
     def fetch(self, code: str, out_dir: str = None) -> str:
         """
 
         Args:
+            code:
+            out_dir
 
         Returns:
             The path to the

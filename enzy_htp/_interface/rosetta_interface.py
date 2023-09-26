@@ -62,6 +62,28 @@ class RosettaCst:
 
         #TODO(CJ): do some kind of validation for the constraints
 
+    def __repr__(self) -> str:
+        """A way to show each RosettaCst object. Specifies the constrained residues and constraint types."""
+
+        return f"RosettaCst(res1={self.rchain_1}.{self.rnum_1}.{self.rname_1},res2={self.rchain_2}.{self.rnum_2}.{self.rname_2},constrained={','.join(map(lambda cc: cc[0], self.constraints))})"
+
+
+    def remove_constraint(self, cst_name:str) -> None:
+        """Removes a specific constraint of the specified cst_name.
+
+        Args:
+            cst_name: The type of constraint to remove (i.e. distanceAB, angle_A, etc).
+
+        Returns:
+            Nothing.
+        """
+
+        for cidx,cc in enumerate(self.constraints):
+            if cc[0] == cst_name:
+                self.constraints.remove(cc)
+
+
+
     def parent(self) -> Any:
         """Getter for the parent() object."""
         return self.parent_
@@ -162,6 +184,28 @@ class RosettaCst:
             return True
 
         return False
+
+
+    def other(self, chain : str, res_num : int ) -> Tuple[str,int]:
+        """Given a chain id and residue number for one residue in the constraint, get the chain id and residue number for the other 
+        constrained residue.
+
+        Args:
+            chain: 
+            res_num:
+
+        Returns:
+            A tuple describing the (chain id, residue number) of a residue.
+        """
+
+        if not self.contains( chain, res_num ):
+            #TODO(CJ): put the error here
+            pass
+        if chain == self.rchain_1 and res_num == self.rnum_1:
+            return (self.rchain_2, self.rnum_2)
+
+        if chain == self.rchain_2 and res_num == self.rnum_2:
+            return (self.rchain_1, self.rnum_1)
 
     def create_pdb_line(self, idx: int) -> str:
         """Creates a str() PDB line in the appropriate format so that Rosetta can apply the constrained geometry

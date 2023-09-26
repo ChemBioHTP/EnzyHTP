@@ -1,8 +1,12 @@
 """Provides functionality for placing a ligand into a protein. All functionalty should be accessed through 
-the place_ligand() function. Allows for placement of ligands via one of the below methods:
+the place_ligand() function. No other function should be called directly by users. Allows for placement of 
+ligands via one of the below methods:
 
-    + alphafill: 
-    + rosetta_ligand: 
+    + alphafill: Uses the AlphaFill transplant algorithm to identify a location for a given ligand. Works best
+    for common bi-molecular co-factors (i.e. SAM, ATP, etc). Assumes PDB style atom naming.
+    + rosetta_ligand: Uses constrained docking with Rosetta's RosettaLigand protocol and enzdes constraint 
+    functionality to identify a location for a given ligand. Works best for substrates that are not similar to 
+    common co-factors (i.e. SAM, ATP, etc).
 
 Author: Chris Jurich <chris.jurich@vanderbit.edu>
 Date: 2023-09-14
@@ -29,17 +33,19 @@ from enzy_htp._interface import RosettaCst
 from .align_ligand import align_ligand
 from .constrained_docking import constrained_docking
 
-
+#TODO(CJ): for the RosettaLigand version, set the COM to the COM of the constrained residue
 def place_ligand(molfile: str,
                  ligand: str,
                  code: str = None,
-                 method: str = None,
+                 method: str = 'alphafill',
                  new_res_key: Tuple = None,
                  work_dir: str = None,
                  outfile: str = None,
                  constraints: List[RosettaCst] = None,
+                 n_struct:int = 50,
+                 use_cache:bool = True,
                  **kwargs) -> Tuple[str, str]:
-    """Algorithm for placing a ligand into  
+    """Protocol for placing a ligand into an enzyme,  
 
     Args:
         molfile:
@@ -50,6 +56,7 @@ def place_ligand(molfile: str,
         work_dir:
         outfile:
         constraints:
+        n_struct: 
 
 
     Returns:
@@ -66,8 +73,7 @@ def place_ligand(molfile: str,
     if method == "alphafill":
         placed_ligand = _place_alphafill(molfile, ligand, code=code, work_dir=work_dir, **kwargs)
     elif method == "rosetta_ligand":
-        place_ligand = _place_rosetta_ligand(molfile, ligand, new_res_key=new_res_key, work_dir=work_dir, constraints=constraints, **kwargs)
-        pass
+        place_ligand = _place_rosetta_ligand(molfile, ligand, new_res_key=new_res_key, work_dir=work_dir, constraints=constraints, n_struct=n_struct, use_cache=use_cache, **kwargs)
     else:
         _LOGGER.error(
             f"The supplied method placement method {method} is not supported. Allowed methods are 'alphafill' and 'rosetta_ligand'. Exiting..."
@@ -97,10 +103,19 @@ def place_ligand(molfile: str,
     return (outfile, placed_ligand)
 
 
-def _place_rosetta_ligand(molfile: str, reactant: str, new_res_key: Tuple, work_dir: str, constraints: List[RosettaCst], **kwargs) -> str:
-    """TODO(CJ)
+def _place_rosetta_ligand(molfile: str, reactant: str, new_res_key: Tuple, work_dir: str, constraints: List[RosettaCst], n_struct:int, use_cache:bool, **kwargs) -> str:
+    """Protocol that uses Rosetta's RosettaLigand and enzdes constraint functionality to place a ligand into an enzyme. SHOULD NOT be called
+    directly by the user. Instead, call `enzy_htp.preparation.place_ligand.place_ligand()`. Uses the starting file, reactant, new residue key, 
+    and constraints to perform a fast docking protocol which does not perform high resolution docking or side-chain packaing. Note that at least
+    one of the supplied constraints must contain the ligand to be placed. If it does not, an error will be thrown. 
 
     Args:
+        molfile:
+        reactant:
+        new_res_key:
+        work_dir: 
+        constraints:
+
 
     Returns:
         
@@ -113,6 +128,24 @@ def _place_rosetta_ligand(molfile: str, reactant: str, new_res_key: Tuple, work_
     for cc in constraints:
         if cc.contains(new_res_key[0], new_res_key[1]):
             relevant_constraints.append(cc)
+
+    for rc in relevant_constraints:
+        rc.remove_constraint('angle_A')
+        rc.remove_constraint('angle_B')
+        rc.remove_constraint('torsion_A')
+        rc.remove_constraint('torsion_B')
+        rc.remove_constraint('torsion_AB')
+
+    print(relevant_constraints)
+
+    #TODO(CJ): find the anchor residue 
+    anchors = list()        
+    for rc in relevant_constraints:
+        anchors.append(rc.other(new_res_key[0], new_res_key[1]))
+
+    shifted_reactant:str = _shift_reactant(molfile, reactant, anchors, work_dir)
+
+    #!move it to near the anchor!!
 
     if not relevant_constraints:
         _LOGGER.error(
@@ -128,13 +161,13 @@ def _place_rosetta_ligand(molfile: str, reactant: str, new_res_key: Tuple, work_
     interface.pymol.general_cmd(
         session,
         [
-            ('load', reactant),
+            ('load', shifted_reactant),
             ('alter', 'all', f"chain='{new_res_key[0]}'"),
             ('alter', 'all', f"resi='{new_res_key[1]}'"),
             ('alter', 'all', f"resn='{new_res_key[2]}'"),
             ('alter', 'all', f"segi=''"),
             #('load', molfile),
-            ('save', reactant),
+            ('save', shifted_reactant),
             ('delete', 'all')
         ])
     interface.pymol.general_cmd(session, [('load', molfile)])
@@ -165,12 +198,21 @@ def _place_rosetta_ligand(molfile: str, reactant: str, new_res_key: Tuple, work_
     param_files.append(interface.rosetta.parameterize_ligand(reactant, new_res_key[2])[0])
     parser = eh.PDBParser()
 
-    interface.pymol.general_cmd(session, [('load', reactant), ('save', other)])
+    interface.pymol.general_cmd(session, [('load', shifted_reactant), ('save', other)])
 
     structure = parser.get_structure(other)
     #TODO(CJ): make this less error prone
     #TODO(CJ): need to look through and find all the parts where there are
-    constrained_docking(structure, [reactant], param_files, relevant_constraints, work_dir=work_dir)
+    df:pd.DataFrame=constrained_docking(structure, [reactant], param_files, relevant_constraints, work_dir=work_dir, minimize=False, n_struct=n_struct, use_cache=use_cache)
+    cst_diff:List[float] = list()
+    for i, row in df.iterrows():
+        total:float = 0.0
+        for rc in relevant_constraints:
+            total += sum(rc.evaluate(row.description))
+        cst_diff.append( total )
+    df['cst_diff'] = cst_diff
+    print(cst_diff)
+    print(df)
     #what needs to happen here?
     # 1. figure out which constraints involve the reactant we care about
     # 2. create the input files that we'll need
@@ -178,292 +220,32 @@ def _place_rosetta_ligand(molfile: str, reactant: str, new_res_key: Tuple, work_
     # 4. select placement with best constraint score
     assert False
 
-
-def _create_xml(work_dir: str, reactants: List[str], chain_names: List[str], use_cache: bool) -> str:
+def _shift_reactant(molfile:str, reactant:str, anchors:List[str], work_dir:str) -> str:
     """
-
     Args:
-        
 
     Returns:
-        The relative filepath of the RosettaScripts .xml file.
+        The shifted
     """
-    reactant_dicts = list()
-    for ridx, rr in enumerate(reactants):
-        temp = dict()
-        session = interface.pymol.new_session()
-        df: pd.DataFrame = interface.pymol.collect(session, rr, "chain resn x y z name".split(), sele='not elem H')
-        temp['resn'] = df.resn[0]
-        temp['chain'] = chain_names[ridx]
-        temp['volume'] = interface.rdkit.volume(rr)
-        points = np.transpose(np.array([df.x.to_numpy(), df.y.to_numpy(), df.z.to_numpy()]))
-        distances = list()
-        n_points = len(points)
-        for p1 in range(n_points):
-            for p2 in range(n_points):
-                distances.append(np.sqrt(np.sum((points[p1] - points[p2])**2)))
-        temp['length'] = np.max(np.array(distances))
-        reactant_dicts.append(temp)
+    #TODO(CJ): some code about selecting the right anchor constraint        
+    session = interface.pymol.new_session()
+    interface.pymol.general_cmd(session, [('load', molfile)])
+    anchor_com = interface.pymol.center_of_mass(session, sele=f"chain {anchors[0][0]} and resi {anchors[0][1]}")
+    #TODO(CJ): add error if the com is zero
+    interface.pymol.general_cmd(session, [('delete', 'all'), ('load', reactant)])
+    reactant_com = interface.pymol.center_of_mass(session)
+    shift = anchor_com - reactant_com
 
-    reactant_dicts.sort(key=lambda dd: dd['chain'])
-
-    fname: str = f"{work_dir}/__script.xml"
-    if not use_cache:
-        fs.safe_rm(fname)
-
-    fpath = Path(fname)
-    if fpath.exists() and use_cache:
-        _LOGGER.info(f"Using cached RosettaScripts .xml file at {fpath.absolute()}")
-        return fname
-
-    elements: List[Dict] = [
-        {
-            'parent': 'SCOREFXNS',
-            'tag': 'ScoreFunction',
-            'name': 'ligand_soft_rep',
-            'weights': 'ligand_soft_rep'
-        },
-        {
-            'parent': 'SCOREFXNS',
-            'tag': 'ScoreFunction',
-            'name': 'hard_rep',
-            'weights': 'ligand'
-        },
-        {
-            'parent': 'SCOREFXNS.ScoreFunction',
-            'tag': 'Reweight',
-            'scoretype': 'coordinate_constraint',
-            'weight': '1.0'
-        },
-        {
-            'parent': 'SCOREFXNS.ScoreFunction',
-            'tag': 'Reweight',
-            'scoretype': 'atom_pair_constraint',
-            'weight': '1.0'
-        },
-        {
-            'parent': 'SCOREFXNS.ScoreFunction',
-            'tag': 'Reweight',
-            'scoretype': 'angle_constraint',
-            'weight': '1.0'
-        },
-        {
-            'parent': 'SCOREFXNS.ScoreFunction',
-            'tag': 'Reweight',
-            'scoretype': 'dihedral_constraint',
-            'weight': '1.0'
-        },
-        {
-            'parent': 'SCOREFXNS.ScoreFunction',
-            'tag': 'Reweight',
-            'scoretype': 'chainbreak',
-            'weight': '1.0'
-        },
-    ]
-
-    for rd in reactant_dicts:
-        cc = rd['chain']
-        elements.extend([
-            {
-                'parent': 'LIGAND_AREAS',
-                'tag': 'LigandArea',
-                'name': f'docking_sidechain_{cc.lower()}',
-                'chain': f'{cc.upper()}',
-                'cutoff': '6.0',
-                'add_nbr_radius': 'true',
-                'all_atom_mode': 'false'
-            },
-            {
-                'parent': 'LIGAND_AREAS',
-                'tag': 'LigandArea',
-                'name': f'final_sidechain_{cc.lower()}',
-                'chain': f'{cc.upper()}',
-                'cutoff': '6.0',
-                'add_nbr_radius': 'true',
-                'all_atom_mode': 'false'
-            },
-            {
-                'parent': 'LIGAND_AREAS',
-                'tag': 'LigandArea',
-                'name': f'final_backbone_{cc.lower()}',
-                'chain': f'{cc.upper()}',
-                'cutoff': '7.0',
-                'add_nbr_radius': 'false',
-                'all_atom_mode': 'true',
-                'Calpha_restraints': "0.3"
-            },
-            {
-                'parent': 'INTERFACE_BUILDERS',
-                'tag': 'InterfaceBuilder',
-                'name': f'side_chain_for_docking_{cc.lower()}',
-                'ligand_areas': f'docking_sidechain_{cc.lower()}'
-            },
-            {
-                'parent': 'INTERFACE_BUILDERS',
-                'tag': 'InterfaceBuilder',
-                'name': f'side_chain_for_final_{cc.lower()}',
-                'ligand_areas': f'final_sidechain_{cc.lower()}'
-            },
-            {
-                'parent': 'INTERFACE_BUILDERS',
-                'tag': 'InterfaceBuilder',
-                'name': f'backbone_{cc.lower()}',
-                'ligand_areas': f'final_backbone_{cc.lower()}',
-                'extension_window': '3'
-            },
-            {
-                'parent': 'MOVEMAP_BUILDERS',
-                'tag': 'MoveMapBuilder',
-                'name': f'docking_{cc.lower()}',
-                'sc_interface': f'side_chain_for_docking_{cc.lower()}',
-                'minimize_water': 'false'
-            },
-            {
-                'parent': 'MOVEMAP_BUILDERS',
-                'tag': 'MoveMapBuilder',
-                'name': f'final_{cc.lower()}',
-                'sc_interface': f'side_chain_for_final_{cc.lower()}',
-                'bb_interface': f'backbone_{cc.lower()}',
-                'minimize_water': 'false'
-            },
-        ])
-
-    for ridx, rd in enumerate(reactant_dicts):
-        cc = rd['chain']
-        rd['grid_name'] = f"grid_{ridx+1}"
-
-        elements.extend([
-            {
-                'parent': 'ROSETTASCRIPTS',
-                'tag': 'SCORINGGRIDS',
-                'ligand_chain': cc.upper(),
-                'width': str(rd['length'] * 2),
-                'append_elements_only': True,
-                'name': rd['grid_name'],
-                'child_nodes': [
-                    {
-                        'parent': 'SCORINGGRIDS',
-                        'tag': 'ClassicGrid',
-                        'grid_name': 'classic',
-                        'weight': '1.0'
-                    },
-                    {
-                        'parent': 'SCORINGGRIDS',
-                        'tag': 'HbdGrid',
-                        'grid_name': 'hbd_grid',
-                        'weight': '1.0'
-                    },
-                    {
-                        'parent': 'SCORINGGRIDS',
-                        'tag': 'HbaGrid',
-                        'grid_name': 'hba_grid',
-                        'weight': '1.0'
-                    },
-                ]
-            },
-        ])
-
-    elements.extend([{'parent': 'MOVERS', 'tag': 'AddOrRemoveMatchCsts', 'name': 'cstadd', 'cst_instruction': 'add_new'}])
-
-    for rd in reactant_dicts:
-        cc: str = rd['chain']
-        radius: float = rd['length']
-        elements.extend([{
-            'parent': 'MOVERS',
-            'tag': 'Transform',
-            'name': f'transform_{cc.lower()}',
-            'chain': f'{cc.upper()}',
-            'box_size': str(1.5 * radius),
-            'move_distance': '0.1',
-            'angle': '45',
-            'cycles': '200',
-            'repeats': '10',
-            'temperature': '25',
-            'grid_set': rd['grid_name']
-        }, {
-            'parent': 'MOVERS',
-            'tag': 'HighResDocker',
-            'name': f'high_res_docker_{cc.lower()}',
-            'cycles': '6',
-            'repack_every_Nth': '3',
-            'scorefxn': 'ligand_soft_rep',
-            'movemap_builder': f'docking_{cc.lower()}'
-        }, {
-            'parent': 'MOVERS',
-            'tag': 'FinalMinimizer',
-            'name': f'final_{cc.lower()}',
-            'scorefxn': 'hard_rep',
-            'movemap_builder': f'final_{cc.lower()}'
-        }])
-
-    elements.append({
-        'parent': 'MOVERS',
-        'tag': 'InterfaceScoreCalculator',
-        'name': 'add_scores',
-        'chains': ','.join(map(lambda ss: ss['chain'].upper(), reactant_dicts)),
-        'scorefxn': 'hard_rep'
-    })
-
-    for rd in reactant_dicts:
-        cc: str = rd['chain']
-
-        elements.extend([{
-            'parent': 'MOVERS',
-            'tag': 'ParsedProtocol',
-            'name': f'low_res_dock_{cc.lower()}',
-            'child_nodes': [
-                {
-                    'tag': 'Add',
-                    'mover_name': 'cstadd'
-                },
-                {
-                    'tag': 'Add',
-                    'mover_name': f'transform_{cc.lower()}'
-                },
-            ]
-        }])
-
-    elements.extend([
-        {
-            'parent': 'MOVERS',
-            'tag': 'ParsedProtocol',
-            'name': 'high_res_dock',
-            'child_nodes': [deepcopy({
-                'tag': 'Add',
-                'mover_name': f'high_res_docker_{rd["chain"].lower()}'
-            }) for rd in reactant_dicts]
-        },
-        {
-            'parent': 'MOVERS',
-            'tag': 'ParsedProtocol',
-            'name': 'reporting',
-            'child_nodes': [{
-                'tag': 'Add',
-                'mover_name': 'add_scores'
-            }]
-        },
+    temp_path = Path(reactant)
+    outfile = str(Path(work_dir) / f"{temp_path.stem}_shifted{temp_path.suffix}")
+    interface.pymol.general_cmd(session,[
+        ('alter_state', '1', '(all)', f"x+={shift[0]}"), 
+        ('alter_state', '1', '(all)', f"y+={shift[1]}"), 
+        ('alter_state', '1', '(all)', f"z+={shift[2]}"), 
+        ('save', outfile)
     ])
 
-    elements.extend(
-        [deepcopy({
-            'parent': 'PROTOCOLS',
-            'tag': 'Add',
-            'mover_name': f'low_res_dock_{rd["chain"].lower()}'
-        }) for rd in reactant_dicts] + [{
-            'parent': 'PROTOCOLS',
-            'tag': 'Add',
-            'mover_name': 'high_res_dock'
-        }, {
-            'parent': 'PROTOCOLS',
-            'tag': 'Add',
-            'mover_name': 'reporting'
-        }])
-
-    interface.rosetta.write_script(fname, elements)
-
-    _LOGGER.info(f"Saved new RosettaScripts .xml file at {fpath.absolute()}!")
-    return fname
-
+    return outfile
 
 def _place_alphafill(molfile: str,
                      reactant: str,
@@ -473,7 +255,8 @@ def _place_alphafill(molfile: str,
                      clash_radius: float = 2.0,
                      **kwargs) -> str:
     """Implementation function that places a specified ligand into a molfile structure using the alphafill 
-    algorithm (https://doi.org/10.1038/s41592-022-01685-y). Assumes that the input ligand has PDB style naming 
+    algorithm (https://doi.org/10.1038/s41592-022-01685-y). SHOULD NOT be called directly by the user. 
+    Instead, call `enzy_htp.preparation.place_ligand.place_ligand()`. Assumes that the input ligand has PDB style naming 
     and is in the .mol2 format. When scanning alphafill transplants, the algorithm looks for exact atom label
     matches. If no exact matches exist, then it looks for candidates where the reactant's atom names are a subset 
     of the candidates. If no satisfactory matches are found, it looks for candidates where the candidate's atom
@@ -541,7 +324,8 @@ def _place_alphafill(molfile: str,
     exact_matches = list()
     rct_is_subset = list()
     can_is_subset = list()
-
+    
+    #TODO(CJ): fix this part
     for cc in candidates:
         if rct['names'] == cc['names']:
             exact_matches.append(cc)

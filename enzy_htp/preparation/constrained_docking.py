@@ -29,30 +29,51 @@ def constrained_docking(structure: Structure,
                         work_dir: str = None,
                         use_cache: bool = False,
                         rng_seed: int = 1996,
-                        n_struct: int = 100) -> pd.DataFrame:
+                        n_struct: int = 100,
+                        minimize: bool = True) -> pd.DataFrame:
+    """Performs constrained docking using the RosettaLigand docking algorithm and the enzdes constraints system available within Rosetta.
+    All results are contained within a pandas DataFrame format returned by the function. The DataFrame contains what would normally be 
+    found in the score.sc file.
+    
+    Args:
+        structure: The Structure object serving as the basis for the docking.
+        reactants: A List[str] specifying paths of the reactants to perform docking on. 
+        param_files: A List[str] of .params files for ligands in the system.
+        constraints: A List[RosettaCst] defining geometric constraints for the system.
+        work_dir: Where all temp files should be saved. Optional, defaults to config['system.SCRATCH_DIR'].
+        use_cache: Should the cache be used? Defaults to False.
+        rng_seed: int() rng seed to use. Defaults to 1996.
+        n_struct: Number of docked conformers to produce. Defaults to 100.
+        minimize: Should side chain minimization be performed? Defaults to True.
+        
+    Returns:
+        A pandas Dataframe containing all results for the docking run.         
     """
+    if work_dir is None:
+        work_dir = config['system.SCRATCH_DIR']
 
-
-    """
 
     (start_pdb, cst_file) = _integrate_csts(structure, constraints, work_dir, use_cache)
 
-    #chain_names:List[str] = _ligand_chain_names( start_pdb )
+    xml_file: str = _create_xml(work_dir, reactants, use_cache, minimize) 
 
-    xml_file: str = _create_xml(work_dir, reactants, use_cache)  #TODO(CJ): going to overhaul this
-
-    options_file: str = make_options_file(start_pdb, xml_file, param_files, work_dir, rng_seed, n_struct, use_cache, cst_file)
+    options_file: str = _make_options_file(start_pdb, xml_file, param_files, work_dir, rng_seed, n_struct, use_cache, cst_file)
 
     df: pd.DataFrame = _docking_run(options_file, use_cache)
 
+    return df
+
 
 def _integrate_csts(stru: Structure, csts: List[RosettaCst], work_dir: str, use_cache: bool) -> Tuple[str, str]:
-    """
+    """Given a structure and constraints, combines all necessary information so that an enzdes-constrained RosettaLigand run
+    can be performed. Results in a .pdb file with the appropriate REMARK lines and a .cst constraints file that documents
+    the described constraints.
     
     Args:
-        stru:
-        csts:
-        work_dir:
+        stru: The Structure to save into a .pdb file and apply constraints to.  
+        csts: A list() of RosettaCst's to incorporate into the .pdb and .cst files. 
+        work_dir: The directory to save the .pdb and .cst files in. 
+        use_cache: Should existing files be used when available? 
 
     Returns:
         A Tuple() with the format (pdb file, .cst file).
@@ -88,15 +109,31 @@ def _integrate_csts(stru: Structure, csts: List[RosettaCst], work_dir: str, use_
     return (pdb_file, cst_file)
 
 
-def _create_xml(work_dir: str, reactants: List[str], use_cache: bool) -> str:
-    """
+def _create_xml(work_dir: str, reactants: List[str], use_cache: bool, minimize:bool) -> str:
+    """Creates the RosettaScripts .xml file for the RosettaLigand run. Can be run in the cache or minmization mode 
+    which uses the existing .xml script and allow for side chain-ligand minimization respectively , respectively. 
+    This function assumes that the reactants are in a format where their associated chain id and residue names are correct.
+    
 
     Args:
+        work_dir: The dir as a str() where the .xml script should be saved.
+        reactants: A List[str] of reactant names. 
+        use_cache: Should existing files be used when possible?
+        minimize: Should minimization be performed.
         
 
     Returns:
         The relative filepath of the RosettaScripts .xml file.
     """
+    fname: str = f"{work_dir}/__script.xml"
+    if not use_cache:
+        fs.safe_rm(fname)
+    elif fs.has_content(fname):
+        _LOGGER.info(f"Using cached RosettaScripts .xml file at {fname}")
+        return fname
+
+
+
     reactant_dicts = list()
     for rr in reactants:
         temp = dict()
@@ -116,14 +153,6 @@ def _create_xml(work_dir: str, reactants: List[str], use_cache: bool) -> str:
 
     reactant_dicts.sort(key=lambda dd: dd['chain'])
 
-    fname: str = f"{work_dir}/__script.xml"
-    if not use_cache:
-        fs.safe_rm(fname)
-
-    fpath = Path(fname)
-    if fpath.exists() and use_cache:
-        _LOGGER.info(f"Using cached RosettaScripts .xml file at {fpath.absolute()}")
-        return fname
 
     elements: List[Dict] = [
         {
@@ -370,117 +399,11 @@ def _create_xml(work_dir: str, reactants: List[str], use_cache: bool) -> str:
 
     interface.rosetta.write_script(fname, elements)
 
-    _LOGGER.info(f"Saved new RosettaScripts .xml file at {fpath.absolute()}!")
+    _LOGGER.info(f"Saved new RosettaScripts .xml file at {fname}!")
     return fname
 
 
-def make_options_file(pdb_file: str,
-                      xml_file: str,
-                      param_files: List[str],
-                      work_dir: str,
-                      rng_seed: int,
-                      n_struct: int,
-                      use_cache: bool,
-                      cst_file: str = None) -> str:
-    """Makes the options.txt file that the docking run will actually use. Takes a variety of arguments and 
-    can used cached values if needed. This function DOES NOT make any checks to the inputs.
-    
-    Args:
-        pdb_file: The .pdb file (with constraints) to use. 
-        xml_file: The validated RosettaScripts .xml file to be used for docking.
-        param_files: The list() of reactant .params files.
-        work_dir: The working directory 
-        rng_seed: rng seed to be used during dcking.
-        n_struct: Number of strutures to make as an int().
-        use_cache: Should we used cached values? 
-        cst_file: The contraints file to be used. Optional. 
-
-    Returns:
-        Path to the options.txt file with all the Rosetta options.
-
-    """
-    _LOGGER.info("Beginning creation of options file for Rosetta...")
-    content: List[str] = [
-        "-keep_input_protonation_state",
-        "-run:constant_seed",
-        f"-run:jran {int(rng_seed)}",
-        "-in:file",
-        f"    -s '{Path(pdb_file).name}'",
-    ]
-
-    for pf in param_files:
-        content.append(f"    -extra_res_fa '{Path(pf).absolute()}'")
-
-    stub_parent: str = os.path.expandvars(
-        f"${config['rosetta.ROSETTA3']}/database/chemical/residue_type_sets/fa_standard/residue_types/protonation_states/")
-    for stub in "GLU_P1.params GLU_P2.params LYS_D.params ASP_P1.params TYR_D.params HIS_P.params ASP_P2.params".split():
-        content.append(f"    -extra_res_fa '{stub_parent}/{stub}'")
-
-    content.extend([
-        "-run:preserve_header",
-        "-packing",
-        "    -ex1",
-        "    -ex2aro",
-        "    -ex2 ",
-        "    -no_optH false",
-        "    -flip_HNQ true",
-        "    -ignore_ligand_chi true",
-    ])
-
-    if cst_file:
-        content.extend([f"-enzdes:cstfile '{Path(cst_file).absolute()}'"])
-    else:
-        _LOGGER.warning("No constraints supplied! This will hurt reaction complex accuracy!")
-
-    content.extend([
-        "-parser",
-        f"   -protocol {Path(xml_file).absolute()}",
-        "-out",
-        f"   -file:scorefile 'score.sc'",
-        "   -level 200",
-        f"   -nstruct {n_struct}",
-        "   -overwrite",
-        "   -path",
-        f"       -all './complexes'",
-    ])
-
-    qsar_grid: str = str(Path(f"{work_dir}/complexes/qsar_grids/").absolute())
-    content.append(f"-qsar:grid_dir {qsar_grid}")
-
-    fname = Path(work_dir) / "options.txt"
-    score_file: str = f"{work_dir}/complexes/score.sc"
-
-    if not use_cache:
-        _LOGGER.info("Not using cache mode. Deleting the following (if they already exist):")
-        _LOGGER.info(f"\toptions file: {fname}")
-        _LOGGER.info(f"\tscore file: {score_file}")
-        _LOGGER.info(f"\tenzyme-reactant complexes directory: {work_dir}/complexes")
-        _LOGGER.info(f"\tqsar_gird directory: {qsar_grid}")
-        fs.safe_rm(fname)
-        fs.safe_rm(score_file)
-        fs.safe_rmdir(f"{work_dir}/complexes/")
-        fs.safe_rmdir(qsar_grid)
-
-    fs.safe_mkdir(f"{work_dir}/complexes/")
-    fs.safe_mkdir(qsar_grid)
-
-    if not fname.exists():
-        _LOGGER.info(f"Wrote the below settings to {fname}:")
-        for ll in content:
-            _LOGGER.info(f"\t{ll}")
-        fs.write_lines(fname, content)
-    else:
-        _LOGGER.info(f"Cache mode enabled. Using below settings from {fname}:")
-        content: List[str] = fs.lines_from_file(fname)
-        for ll in content:
-            _LOGGER.info(f"\t{ll}")
-
-    option_file = fname.absolute()
-
-    return str(fname)
-
-
-def make_options_file(pdb_file: str,
+def _make_options_file(pdb_file: str,
                       xml_file: str,
                       param_files: List[str],
                       work_dir: str,
@@ -587,12 +510,15 @@ def make_options_file(pdb_file: str,
 
 
 def _docking_run(option_file: str, use_cache: bool) -> pd.DataFrame:
-    """
+    """Executes the actual docking run prepared by the rest of the functions in this sub-module. Changes directories
+    to where the options.txt file is located. All results are returned in a pandas DataFrame.
 
     Args:
+        option_file: Name of the options.txt file being used as a str().
+        use_cache: Should we use existing results when available.
 
     Returns:
-
+        The results in a pandas DataFrame format.
     """
     _LOGGER.info("Beginning RosettaLigand docking run...")
     opt_path = Path(option_file)

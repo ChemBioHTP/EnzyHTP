@@ -1,5 +1,6 @@
 """
-preparation module for enzy_htp. Responsibilities include removal of waters, getting protonation state and generation of mutations.
+Preparation module for enzy_htp. Responsibilities include removal of waters, setting protonation states, and placement of reactants/ligands 
+into apo-enzyme complexes. 
 
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
