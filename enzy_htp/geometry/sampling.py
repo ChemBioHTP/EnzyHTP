@@ -109,7 +109,7 @@ def md_simulation(stru: Structure,
     if parallel_method == "cluster_job":
         results = _parallelize_md_steps_with_cluster_job(parallel_runs, work_dir, steps, params)
     ## sequential
-    if parallel_method is None:
+    if parallel_method is None or parallel_runs == 1:
         results = _serial_md_steps(parallel_runs, work_dir, steps, params)
 
     return results
