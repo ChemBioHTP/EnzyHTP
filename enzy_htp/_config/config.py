@@ -42,6 +42,7 @@ from .system_config import SystemConfig, default_system_config
 from .xtb_config import XTBConfig, default_xtb_config
 
 from enzy_htp.core import _LOGGER
+from enzy_htp.core import file_system as fs
 
 
 class Config:
@@ -136,3 +137,23 @@ class Config:
 
         _LOGGER.error(f"The supplied key {key} is invalid. Exiting...")
         exit(1)
+
+
+    def load_config(self, fname: str) -> None:
+        """TODO(CJ)"""
+        pass
+
+        _LOGGER.info(f"Found config file: {fname}...")
+        lines: List[str] = fs.lines_from_file(fname)
+        counter: int = 0
+        for ll in lines:
+            tks = ll.split('#')
+            tk = tks[0].strip()
+            if not tk:
+                continue
+            #exec(tk)
+            counter += 1
+
+        _LOGGER.info(f"Updated {counter} config settings!")
+
+        exit( 0 )

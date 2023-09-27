@@ -4,9 +4,7 @@ ligands via one of the below methods:
 
     + alphafill: Uses the AlphaFill transplant algorithm to identify a location for a given ligand. Works best
     for common bi-molecular co-factors (i.e. SAM, ATP, etc). Assumes PDB style atom naming.
-    + rosetta_ligand: Uses constrained docking with Rosetta's RosettaLigand protocol and enzdes constraint 
-    functionality to identify a location for a given ligand. Works best for substrates that are not similar to 
-    common co-factors (i.e. SAM, ATP, etc).
+    + mole2: TODO(CJ)
 
 Author: Chris Jurich <chris.jurich@vanderbit.edu>
 Date: 2023-09-14
@@ -14,6 +12,7 @@ Date: 2023-09-14
 
 from typing import List, Tuple, Dict
 
+from rdkit import Chem as _rchem
 import numpy as np
 import pandas as pd
 import enzy_htp as eh
@@ -28,7 +27,7 @@ from enzy_htp.core import _LOGGER
 
 import enzy_htp.chemical as chem
 from enzy_htp.structure import PDBParser, Structure
-from enzy_htp._interface import RosettaCst
+from enzy_htp._interface import RosettaCst, Mole2Cavity
 
 from .align_ligand import align_ligand
 from .constrained_docking import constrained_docking
@@ -72,11 +71,13 @@ def place_ligand(molfile: str,
 
     if method == "alphafill":
         placed_ligand = _place_alphafill(molfile, ligand, code=code, work_dir=work_dir, **kwargs)
-    elif method == "rosetta_ligand":
-        place_ligand = _place_rosetta_ligand(molfile, ligand, new_res_key=new_res_key, work_dir=work_dir, constraints=constraints, n_struct=n_struct, use_cache=use_cache, **kwargs)
+    elif method == "mole2":
+        pass
+        placed_ligand = _place_mole2(molfile, ligand, constraints=constraints, new_res_key=new_res_key, work_dir=work_dir, **kwargs)
+        #place_ligand = _place_rosetta_ligand(molfile, ligand, new_res_key=new_res_key, work_dir=work_dir, constraints=constraints, n_struct=n_struct, use_cache=use_cache, **kwargs)
     else:
         _LOGGER.error(
-            f"The supplied method placement method {method} is not supported. Allowed methods are 'alphafill' and 'rosetta_ligand'. Exiting..."
+            f"The supplied method placement method {method} is not supported. Allowed methods are 'alphafill' and 'mole2'. Exiting..."
         )
         exit(1)
 
@@ -101,6 +102,63 @@ def place_ligand(molfile: str,
     interface.pymol.general_cmd(session, args)
 
     return (outfile, placed_ligand)
+
+def _place_mole2(molfile, ligand, constraints, new_res_key, work_dir:str, **kwargs) -> str:
+    """TODO(CJ)"""
+    #TODO(CJ): check how many atoms fit in the molecule
+    if not work_dir:
+        work_dir = config['system.SCRATCH_DIR']
+
+    relevant_constraints: List[str] = list()
+    
+    #TODO(CJ): probably need to deepcopy these
+    for cc in constraints:
+        if cc.contains(new_res_key[0], new_res_key[1]):
+            relevant_constraints.append(cc)
+
+    for rc in relevant_constraints:
+        rc.remove_constraint('angle_A')
+        rc.remove_constraint('angle_B')
+        rc.remove_constraint('torsion_A')
+        rc.remove_constraint('torsion_B')
+        rc.remove_constraint('torsion_AB')
+
+    anchors = list()        
+    for rc in relevant_constraints:
+        anchors.append(rc.other(new_res_key[0], new_res_key[1]))
+
+
+    cavities:List[Mole2Cavity] = interface.mole2.identify_cavities(molfile)
+    for cc in cavities:
+        print(cc, cc.center_of_mass(), cc.volume())
+
+    session = interface.pymol.new_session()
+    interface.pymol.general_cmd(session, [('load', molfile)])
+    anchor_com = interface.pymol.center_of_mass(session, sele=f"chain {anchors[0][0]} and resi {anchors[0][1]}")
+   
+    distances = list()
+    for cc in cavities:
+        distances.append(np.sqrt(np.sum((cc.center_of_mass()-anchor_com)**2)))
+   
+
+    target_cat = cavities[np.argmin(np.array(distances))]
+    
+    target_com = target_cat.center_of_mass()
+
+    interface.pymol.general_cmd(session, [('delete', 'all'), ('load', ligand)])
+    reactant_com = interface.pymol.center_of_mass(session)
+    shift = target_com - reactant_com
+
+    temp_path = Path(ligand)
+    outfile = str(Path(work_dir) / f"{temp_path.stem}_shifted{temp_path.suffix}")
+    interface.pymol.general_cmd(session,[
+        ('alter_state', '1', '(all)', f"x+={shift[0]}"), 
+        ('alter_state', '1', '(all)', f"y+={shift[1]}"), 
+        ('alter_state', '1', '(all)', f"z+={shift[2]}"), 
+        ('save', outfile)
+    ])
+
+    return outfile
 
 
 def _place_rosetta_ligand(molfile: str, reactant: str, new_res_key: Tuple, work_dir: str, constraints: List[RosettaCst], n_struct:int, use_cache:bool, **kwargs) -> str:

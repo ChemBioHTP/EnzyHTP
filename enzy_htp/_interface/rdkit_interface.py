@@ -26,6 +26,8 @@ class RDKitInterface(BaseInterface):
         """
         super().__init__(parent, config, default_rdkit_config)
 
+        #self.rdkit = 
+
     def _supported_ftype(self, molfile: str) -> None:
         """Is the supplied file type supported for use in rdkit? Errors and exists if not."""
         ext: str = Path(molfile).suffix
