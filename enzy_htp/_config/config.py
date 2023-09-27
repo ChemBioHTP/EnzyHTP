@@ -140,20 +140,58 @@ class Config:
 
 
     def load_config(self, fname: str) -> None:
-        """TODO(CJ)"""
-        pass
+        """Function that loads configuration settings from the supplied file. The supplied file
+        can have comments. The function utilizes basic type deduction to interpret the supplied settings.
+
+        Args:
+            fname: Name of the file to parse a str(). 
+
+        Returns:
+            Nothing.
+        """
+        if not fs.has_content(fname):
+            _LOGGER.error(f"The supplied file {fname} does not exist or is empty. Exiting...")
+            exit( 1 )
 
         _LOGGER.info(f"Found config file: {fname}...")
         lines: List[str] = fs.lines_from_file(fname)
+        
         counter: int = 0
         for ll in lines:
             tks = ll.split('#')
             tk = tks[0].strip()
             if not tk:
                 continue
-            #exec(tk)
+            
+            key,value=tk.split('=',1)
+            key,value=key.strip(),value.strip()
+            if key[0:6] != 'config':
+                _LOGGER.warning(f"Improper syntax found in line: {tk}. Continuing...")
+                continue
+            key = key[7:-1]
+            
+            key = key.replace("\'","")
+            key = key.replace("\"","")
+
+            if value in ["True", "False"]:
+                value = bool(value)                
+            elif value == "None":
+                value = None
+            elif value[0].isnumeric():
+                if value.find('.') != -1:
+                    value = float(value)
+                else:
+                    value = int(value)
+            
+            elif value[0] == value[-1] and value[0] in ["\"", "\'"]:
+                value = value.replace("\'","")
+                value = value.replace("\"","")
+            else:
+                _LOGGER.warning(f"Improper syntax found in value {value}. Continuing...")
+                continue
+            
+            self[key] = value
             counter += 1
 
         _LOGGER.info(f"Updated {counter} config settings!")
 
-        exit( 0 )

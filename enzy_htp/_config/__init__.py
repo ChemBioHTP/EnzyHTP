@@ -16,8 +16,6 @@ config = Config()
 Singleton object for accessing all configurations.
 """
 
-from .load_config import load_config
-
 import os
 from enzy_htp.core import file_system as fs
 
