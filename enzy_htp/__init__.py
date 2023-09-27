@@ -47,10 +47,8 @@ interface = Interface(config)
 end users and instead exists for developers to access external software. See enzy_htp/_interface/interface.py
 for full class defintion."""
 
-config = interface.config() 
-"""Singleton interface for the config settings for all software packages and the system settings in enzy_htp. Can be accessed
+config.__doc__="""Singleton interface for the config settings for all software packages and the system settings in enzy_htp. Can be accessed
 by end users and should be used to customize system settings for each environment they are working in."""
-
 
 from .analysis import ( electric_field, binding_energy )
 
