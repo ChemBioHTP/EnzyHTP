@@ -280,9 +280,6 @@ class PyMolInterface(BaseInterface):
         
         return pymol_outfile_path
 
-    def export_enzy_htp_stru(self, pymol_session: pymol2.PyMOL, pymol_obj_name: str, if_retain_order: bool = False) -> Structure:
-
-
     def export_enzy_htp_stru(self, pymol_obj_name: str,
                             pymol_session: pymol2.PyMOL,
                             if_retain_order: bool = False,
