@@ -393,16 +393,18 @@ def mutate_stru_with_pymol(
     # 1. load stru into pymol
     pi = interface.pymol
     with OpenPyMolSession(pi) as pms:
-        pymol_obj_name = pi.load_enzy_htp_stru(stru_cpy, pymol_session=pms)[0]
+        pymol_obj_name = pi.load_enzy_htp_stru(stru=stru_cpy, session=pms)[0]
         # 2. loop through mutants and apply each one
         for mut in mutant:
-            pi.point_mutate(mut.get_position_key(), mut.get_target(), pymol_obj_name, pms)
+            pi.point_mutate(pos_key=mut.get_position_key(), target=mut.get_target(), 
+                            pymol_obj_name=pymol_obj_name, pymol_session=pms)
         # 3. save to a structure.
-        pymol_mutant_stru = pi.export_enzy_htp_stru(pms, pymol_obj_name)
-
+        pymol_mutant_stru = pi.export_enzy_htp_stru(pymol_obj_name, pms, if_fix_naming=True)
+        stru_oper.align_atom_order_in_each_residue(pymol_mutant_stru, stru_cpy)
+        
     # 4. update residues
     stru_oper.update_residues(stru_cpy, pymol_mutant_stru)
-
+    
     if in_place:
         stru_oper.update_residues(stru, stru_cpy)
         return stru

@@ -22,7 +22,6 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core import _LOGGER, check_var_type
 from enzy_htp._config.pymol_config import PyMolConfig, default_pymol_config
 from enzy_htp.structure import Structure, PDBParser
-from enzy_htp.chemical.residue import THREE_LETTER_AA_MAPPER
 
 from .base_interface import BaseInterface
 
@@ -278,24 +277,53 @@ class PyMolInterface(BaseInterface):
         if if_retain_order:
             pymol_session.cmd.set("retain_order")
         pymol_session.cmd.save(pymol_outfile_path, pymol_obj_name)
-
+        
         return pymol_outfile_path
 
     def export_enzy_htp_stru(self, pymol_session: pymol2.PyMOL, pymol_obj_name: str, if_retain_order: bool = False) -> Structure:
+
+
+    def export_enzy_htp_stru(self, pymol_obj_name: str,
+                            pymol_session: pymol2.PyMOL,
+                            if_retain_order: bool = False,
+                            if_fix_naming: bool = False) -> Structure:
         """
         Saves a PyMOL object to a Structure object.
         Args:
             pymol_session: the target PyMOL session.
             pymol_obj_name: the name of the target enzyme in PyMOL.
             if_retain_order: if the saving should keep the order of the atoms in the original object.
+                             Fixes PyMOL's scrambling of the atom order
+            if_fix_naming: if the PyMOL naming of atoms should be updated to match the Structure convention.
+                           Allows for atom naming consistency (https://github.com/ChemBioHTP/EnzyHTP/issues/117)
         Returns:
             A Structure object representing the target enzyme in PyMOL.
         """
         sp = PDBParser()
-        pymol_outfile_path = self.export_pdb(pymol_obj_name, pymol_session, if_retain_order=if_retain_order)
+        pymol_outfile_path = self.export_pdb(pymol_session, pymol_obj_name,
+                                             if_retain_order=if_retain_order)
         res = sp.get_structure(pymol_outfile_path, allow_multichain_in_atom=True)
+
+        if if_fix_naming:
+            self.fix_pymol_naming(res)
+
         fs.clean_temp_file_n_dir([pymol_outfile_path, eh_config["system.SCRATCH_DIR"]])
         return res
+
+
+    def fix_pymol_naming(self, stru: Structure) -> None:
+        """Fixes PyMOL's naming of atoms in-place using the PYMOL_TO_ATOM_MAPPER in pymol_config.py.
+        Args:
+            stru: the Structure that contains the wrong atom names (if any).
+        Returns:
+            Nothing.
+        """
+        for chain in stru.chains:
+            for residue in chain.residues:
+                for atom in residue.atoms:
+                    correct_name = PyMolConfig().get_canonical_atom_name(residue.name, atom.name)
+                    if correct_name:
+                        atom.name = correct_name
 
     # == inter-session modular functions == (do not requires a session, will start and close one)
     # pass
@@ -638,7 +666,7 @@ class OpenPyMolSession:
 
     def __enter__(self):
         """open a pymol session once enter"""
-        self.session = self.interface.new_pymol_session()
+        self.session = self.interface.new_session()
         return self.session
 
     def __exit__(self, exc_type, exc_val, exc_tb):

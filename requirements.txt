@@ -4,7 +4,7 @@ plum-dispatch
 numpy
 # openbabel
 pandas
-pymol
+# pymol
 colorlog
 modeller
 pyvista

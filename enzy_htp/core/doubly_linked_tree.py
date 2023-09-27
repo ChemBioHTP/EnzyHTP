@@ -135,14 +135,14 @@ class DoubleLinkedNode():
             # parent in memo -> this is part of the recursive copying initiated from the parent: default
 
         # mask current method to use original deepcopy
-        deepcopy_method = self.__deepcopy__
         self.__deepcopy__ = None
 
         new_self = copy.deepcopy(self, memo)
 
         # recover current method for future use
-        self.__deepcopy__ = deepcopy_method
-        new_self.__deepcopy__ = deepcopy_method
+        # test shows this will rebind the method to correct instance when its called again
+        delattr(self, "__deepcopy__")
+        delattr(new_self, "__deepcopy__")
 
         return new_self
 

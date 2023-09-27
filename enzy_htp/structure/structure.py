@@ -504,6 +504,7 @@ class Structure(DoubleLinkedNode):
         for ch in self._chains:
             ch.sort_residues()
             for res in ch:
+                res: Residue
                 res.sort_atoms()
 
     def renumber_atoms(self, sort_first: bool = True) -> None:
@@ -960,9 +961,7 @@ class Structure(DoubleLinkedNode):
     #         p2 = r2.get_mass_center()
     #     D = get_distance(p1, p2)
     #     return D
-
     #endregion
-
 
 def compare_structures(left: Structure, right: Structure) -> Dict[str, List[str]]:
     """Compares two Structure() objects and returns a dict() of missing Residues with format:
