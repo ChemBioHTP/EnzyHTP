@@ -142,3 +142,28 @@ def test_distance_to():
     atom2 = Atom({'x_coord': 0, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'DUMMY'})
     assert np.isclose(atom1.distance_to(atom2), 0)
     assert np.isclose(atom2.distance_to(atom1), 0)
+
+def test_check_connect_setter_data_type_correct():
+    """check using correct data type"""
+    atom1 = Atom({'x_coord': 0, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'DUMMY'})
+    atom2 = Atom({'x_coord': 0, 'y_coord': 0, 'z_coord': 1, 'atom_name': 'DUMMY'})
+
+    atom1.connect = [[atom2, "s"]]
+
+def test_check_connect_setter_data_type_wrong():
+    """check using several wrong data type"""
+    atom1 = Atom({'x_coord': 0, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'DUMMY'})
+    atom2 = Atom({'x_coord': 0, 'y_coord': 0, 'z_coord': 1, 'atom_name': 'DUMMY'})
+
+    with pytest.raises(TypeError) as exe:
+        atom1.connect = [(atom2, "s")]
+    assert exe.value.args[0] == "Assigning wrong data type for connect. Correct data type: [[Atom(), 'bond_order_info'], ...]"
+
+    with pytest.raises(TypeError):
+        atom1.connect = [atom2, "s"]
+
+    with pytest.raises(TypeError):
+        atom1.connect = [atom2]
+
+    with pytest.raises(TypeError):
+        atom1.connect = [[atom2, "s"], atom2]
