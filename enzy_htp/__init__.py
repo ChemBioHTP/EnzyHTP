@@ -48,7 +48,8 @@ end users and instead exists for developers to access external software. See enz
 for full class defintion."""
 
 config = interface.config() 
-"""TODO(CJ)"""
+"""Singleton interface for the config settings for all software packages and the system settings in enzy_htp. Can be accessed
+by end users and should be used to customize system settings for each environment they are working in."""
 
 
 from .analysis import ( electric_field, binding_energy )
