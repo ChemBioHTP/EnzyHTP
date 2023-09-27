@@ -6,11 +6,13 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-03-28
 """
 
-from typing import List
+from typing import List, Any
 from copy import deepcopy
 
+from .base_config import BaseConfig
 
-class RosettaConfig:
+
+class RosettaConfig(BaseConfig):
     """Class that holds default values for running Rosetta with enzy_htp and 
     also keeps track of required environment variables and exectuables.
 
@@ -35,12 +37,15 @@ class RosettaConfig:
     SCORE: str = f"$ROSETTA3/source/bin/score_jd2.default.linuxgccrelease"
     """Executable used to score a specific structure/pose."""
 
+    PY_2_7: str = "python2.7"
+    """TODO(CJ)"""
+
     def required_executables(self) -> List[str]:
         """A hardcoded list of required executables for Rosetta."""
-        return [self.ROSETTA_SCRIPTS, self.PARAMS_SCRIPT]
+        return [self.ROSETTA_SCRIPTS, self.PARAMS_SCRIPT, self.PY_2_7]
 
     def required_env_vars(self) -> List[str]:
-        """A hardcoded list of required enviornment variables for Amber."""
+        """A hardcoded list of required enviornment variables for Rosetta."""
         return [self.ROSETTA3]
 
     def required_py_modules(self) -> List[str]:

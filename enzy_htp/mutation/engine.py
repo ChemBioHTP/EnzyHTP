@@ -218,69 +218,6 @@ def _mutate_pymol(pdb: str, outfile: str, mutations: List[Mutation]) -> None:
     pass
 
 
-def _mutate_rosetta(pdb: str, outfile: str, mutations: List[Mutation]) -> None:
-    """Underlying implementation of mutation with Rosetta. Serves as an implementation only,
-    SHOULD NOT BE CALLED BY USERS DIRECTLY. Follows generalized function signature taking the 
-    name of the .pdb, the oufile to save the mutated version to and a list() of mutations. 
-    Function assumes that the supplied mutations are valid. Procedure is to perform the mutation
-    using RosettaScripts and the MutateResidue mover.
-    Args:
-        pdb: The name of the original .pdb file as a str().
-        outfile: Name of the file to save the mutated structure to.
-        mutations: A list() of Mutation namedtuple()'s to apply.
-    Returns:
-        Nothing.
-
-    """
-
-    working_dir = Path(pdb).parent
-
-    contents: List[str] = [
-        """<ROSETTASCRIPTS>
-    <SCOREFXNS>
-    </SCOREFXNS>
-    <RESIDUE_SELECTORS>
-    </RESIDUE_SELECTORS>
-    <TASKOPERATIONS>
-    </TASKOPERATIONS>
-    <SIMPLE_METRICS>
-    </SIMPLE_METRICS>
-    <FILTERS>
-    </FILTERS>
-    <MOVERS>
-"""
-    ]
-    mut_names: List[str] = list()
-
-    #TODO(CJ): have to solve the rosetta indexing problem
-    for midx, mut in enumerate(mutations):
-        index: int = resolve_index(pdb_lines, mut)
-        mover_name: str = f"mr{midx+1}"
-        contents.append(f"        <MutateResidue name=\"{mover_name}\" target=\"{TODO}\" new_res=\"{TODO}\" />")
-        mut_names.append(mover_name)
-
-    contents.append("""    </MOVERS>
-    <PROTOCOLS>
-""")
-
-    for mn in mut_names:
-        contents.append(f"        <Add mover_name=\"{mn}\" />")
-    contents.append("""    </PROTOCOLS>
-    <OUTPUT />
-<ROSETTASCRIPTS>
-""")
-
-    script_file: Path = working_dir / "enzy_htp_mut.xml"
-    fs.write_lines(script_files, contents)
-
-    options: List[str] = list()
-    interface.rosetta.run_rosetta_scripts(pdb, script_file, options)
-
-    #TODO(CJ): have to check that the file exists in the working directory
-
-    #TODO(CJ): copy the file to the output file
-
-
 def _mutate_tleap(pdb: str, outfile: str, mutations: List[Mutation]) -> None:
     """Underlying implementation of mutation with tleap. Serves as implementation only, SHOULD NOT
     BE CALLED BY USERS DIRECTLY. Follows generalized function signature taking the name of the .pdb,

@@ -12,8 +12,10 @@ Date: 2022-07-01
 from copy import deepcopy
 from typing import Any, List
 
+from .base_config import BaseConfig
 
-class MultiwfnConfig:
+
+class MultiwfnConfig(BaseConfig):
     """Class that holds the default values for running Multiwfn within enzy_htp as well
     the names of required executables and environment variables.
 
@@ -38,20 +40,6 @@ class MultiwfnConfig:
     def required_py_modules(self) -> List[str]:
         """ """
         return list()
-
-    def __getitem__(self, key: str) -> Any:
-        if key.count("."):
-            key1, key2 = key.split(".")
-            return getattr(self, key1)[key2]
-        else:
-            return getattr(self, key)
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        if key.count("."):
-            key1, key2 = key.split(".")
-            MultiwfnConfig.__dict__[key1][key2] = value
-        else:
-            setattr(self, key, value)
 
 
 def default_multiwfn_config() -> MultiwfnConfig:

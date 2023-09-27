@@ -7,6 +7,7 @@ Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-07-12
 """
+from typing import List
 
 from .config import Config
 
@@ -14,3 +15,14 @@ config = Config()
 """
 Singleton object for accessing all configurations.
 """
+
+import os
+from enzy_htp.core import file_system as fs
+
+
+config_file: str = os.path.expandvars('$HOME/.eh_config')
+
+
+if fs.has_content(config_file):
+    config.load_config( config_file )
+

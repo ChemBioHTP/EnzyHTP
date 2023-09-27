@@ -5,14 +5,14 @@ Class contains:
     + default constructor
     + getter for <Package>Config instance 
     + getter for whether the current environment is compatible with the <Package>Interface() 
+    + getter for missing executables in the environment
+    + getter for missing environment variabels in the environment
+    + getter for missing python modules in the environment
 
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-06-07
-
 """
-
-#TODO(CJ): need more documentation here
 
 from abc import ABC
 from typing import Callable, Dict, List
@@ -20,7 +20,7 @@ from typing import Callable, Dict, List
 from enzy_htp.core import env_manager as em
 
 
-class BaseInterface:
+class BaseInterface(ABC):
     """Abstract base class for all Package Interfaces. 
 
     Attributes:
@@ -53,20 +53,17 @@ class BaseInterface:
         return self.config_
 
     def compatible_environment(self) -> bool:
-        """Checks if the current environment is compatible with all possible needs for the <Package>Interface.
-        Returns:
-                Whether the current environment is suitable for the <Package>Interface().
-        """
+        """Is the current environment compatible with all possible needs for the <Package>Interface?"""
         return self.compatible_env_
 
     def missing_executables(self) -> List[str]:
-        """ """
+        """What executables are missing for this software package?"""
         return self.env_manager_.missing_executables()
 
     def missing_env_vars(self) -> List[str]:
-        """ """
+        """Which environment variables are missing for this software package?"""
         return self.env_manager_.missing_env_vars()
 
     def missing_py_modules(self) -> List[str]:
-        """ """
+        """Which python modules are missing for this software package?"""
         return self.env_manager_.missing_py_modules()

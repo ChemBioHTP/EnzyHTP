@@ -14,9 +14,14 @@ from pprint import pprint
 from copy import deepcopy
 from typing import Any, List, Dict, Tuple
 
+from .base_config import BaseConfig
 
-class PyMolConfig:
+
+class PyMolConfig(BaseConfig):
     """Class that holds default values for running PyMol within enzy_htp."""
+
+    WGET: str = "wget"
+    """ """
 
     PYMOL_TO_ATOM_MAPPER: Dict[str, str] = {
         "1HB": "HB1",
@@ -61,29 +66,15 @@ class PyMolConfig:
     """the default output level of a new pymol session in enzy_htp: mute everything.
     used in session.cmd.feedback() ref: https://pymolwiki.org/index.php/Feedback"""
 
-    def __init__(self, parent=None):
-        """Trivial constructor that optionally sets parent_ dependency. parent_ is None by default."""
-        self.parent_ = parent
+    STRUCTURE_STEM: str = "https://files.rcsb.org/download/"
+    """ """
+
+    LIGAND_STEM: str = "https://files.rcsb.org/ligands/download/"
+    """ """
 
     def display(self) -> None:
         """TODO"""
         pass
-
-    def __getitem__(self, key: str) -> Any:
-        """Getter that enables [] accession of PyMolConfig() attributes."""
-        if key.count("."):
-            key1, key2 = key.split(".", 1)
-            return getattr(self, key1)[key2]
-        else:
-            return getattr(self, key)
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        """Setter that enables [] accession of PyMolConfig() attributes with value validation."""
-        if key.count("."):
-            key1, key2 = key.split(".")
-            PyMolConfig.__dict__[key1][key2] = value
-        else:
-            setattr(self, key, value)
 
     def required_env_vars(self) -> List[str]:
         """ """
@@ -91,7 +82,7 @@ class PyMolConfig:
 
     def required_executables(self) -> List[str]:
         """ """
-        return list()
+        return [self.WGET]
 
     def required_py_modules(self) -> List[str]:
         """ """

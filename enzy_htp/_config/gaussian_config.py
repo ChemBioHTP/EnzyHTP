@@ -11,8 +11,10 @@ Date: 2022-06-11
 from copy import deepcopy
 from typing import Any, List, Dict
 
+from .base_config import BaseConfig
 
-class GaussianConfig:
+
+class GaussianConfig(BaseConfig):
     """Class that holds default values for running Gaussian within enzy_htp as well as the required
     executables and variables that need to be present in the environment.
 

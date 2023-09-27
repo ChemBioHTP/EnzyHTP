@@ -4,13 +4,14 @@ relaxation (minimization), scoring, ligand parameterization, and the ability to 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-03-28
 """
+import re
 import shutil
 from pathlib import Path
 from copy import deepcopy
 from xml.dom import minidom
 import xml.etree.cElementTree as ET
 from collections import namedtuple
-from typing import List, Tuple, Dict
+from typing import Any, Dict, List, Tuple, Set, Union
 
 import pandas as pd
 
@@ -21,6 +22,226 @@ from enzy_htp.core import env_manager as em
 from enzy_htp._config.rosetta_config import RosettaConfig, default_rosetta_config
 
 from .base_interface import BaseInterface
+
+
+class RosettaCst:
+    """Class that reprsents a constraint set in the Rosetta molecular modelling package. Stores information about the residues
+    and atoms involved. The class also provides functionality to compare an observed geometry to the desired, idealized geometry and
+    convert RosettaCst objects to str()'s needed for constrained protocols in Rosetta. Functions for loading RosettaCst's is found in 
+    the RosettaInterface() class. 
+    
+    Attributes:
+        parent_: The parent to the instance. Typically a RosettaInterface() instance.
+        rname_1: Name of the first residue as a str().
+        rnum_1: Residue index of the first residue as an int().
+        ratoms_1: List[str] of three atom names for the first residue.
+        rchain_1: Name of the first residue chain as a str().
+        rname_2: Name of the second residue as a str().
+        rnum_2: Residue index of the second residue as an int().
+        ratoms_2: List[str] of three atom names for the second residue.
+        rchain_2: Name of the second residue chain as a str().
+        constraints: The actual constraints to implement between the two residues.
+    """
+
+    ALLOWED_CSTS: Set[str] = {"distanceAB", "angle_A", "angle_B", "torsion_A", "torsion_B", "torsion_AB"}
+    """A Set() of the allowed constraints that you can use."""
+
+    def __init__(self, parent, rname_1: str, rnum_1: int, ratoms_1: List[str], rchain_1: str, rname_2: str, rnum_2: int,
+                 ratoms_2: List[str], rchain_2: str, constraints: List[Union[str, int]]):
+        """Populates all fields in the RosettaCst by the associated named attribute."""
+        self.parent_ = parent
+        self.rname_1 = rname_1
+        self.rnum_1 = rnum_1
+        self.ratoms_1 = ratoms_1
+        self.rchain_1 = rchain_1
+        self.rname_2 = rname_2
+        self.rnum_2 = rnum_2
+        self.ratoms_2 = ratoms_2
+        self.rchain_2 = rchain_2
+        self.constraints = constraints
+
+        #TODO(CJ): do some kind of validation for the constraints
+
+    def __repr__(self) -> str:
+        """A way to show each RosettaCst object. Specifies the constrained residues and constraint types."""
+
+        return f"RosettaCst(res1={self.rchain_1}.{self.rnum_1}.{self.rname_1},res2={self.rchain_2}.{self.rnum_2}.{self.rname_2},constrained={','.join(map(lambda cc: cc[0], self.constraints))})"
+
+
+    def remove_constraint(self, cst_name:str) -> None:
+        """Removes a specific constraint of the specified cst_name.
+
+        Args:
+            cst_name: The type of constraint to remove (i.e. distanceAB, angle_A, etc).
+
+        Returns:
+            Nothing.
+        """
+
+        for cidx,cc in enumerate(self.constraints):
+            if cc[0] == cst_name:
+                self.constraints.remove(cc)
+
+
+
+    def parent(self) -> Any:
+        """Getter for the parent() object."""
+        return self.parent_
+
+    def set(self, key: str, value: Any) -> None:
+        """Sets an attribute specified by the 'key' to the given 'value'. No checks are performed
+        on the supplied value.
+
+        Args:
+            key: The str() name of the attribute to change.
+            value: What you want to set the attribute to.
+
+        Returns:
+            Nothing.
+
+        Raises:
+            KeyError() if the supplied attribute does not exist. 
+        """
+        if key not in self.__dict__:
+            raise KeyError(f"{key} is not in the constraint")
+
+        self.__dict__[key] = value
+
+    def evaluate(self, file: str) -> List[float]:
+        """Evaluates the deviation between the RosettaCst and observed geometry in terms of tolerance units. For each
+        constraint, there exists a target value x0 and allowed tolerance xtol. Evaluation in tolerance units is defined as:
+
+        abs(x0-xtol)/xtol
+
+        This normalization is performed to enable proper comparison between Angle, Distance, and Dihedral constraints.
+
+        Args:
+            file: Name of the file to analyze.
+
+        Returns:
+            A list() of the tolerance unit evaluations for each constraint. 
+        """
+        session = self.parent().parent().pymol.new_session()
+        self.parent().parent().pymol.general_cmd(session, [('delete', 'all'), ('load', file)])
+
+        sele1, sele2, sele3, sele4 = None, None, None, None
+
+        differences: List[float] = list()
+
+        for cst in self.constraints:
+            #TODO(CJ): check if the constrained atoms are actually in the file
+            #print(cst)
+            #TODO(CJ): do a tuple expansion here
+            cst_type: str = cst[0]
+            target = cst[1]
+            tolerance = cst[2]
+            #TODO(CJ): need to check if the angle is weird for this
+
+            if cst_type.startswith('distance'):
+                sele1 = f"chain {self.rchain_1} and resi {self.rnum_1} and name {self.ratoms_1[0]}"
+                sele2 = f"chain {self.rchain_2} and resi {self.rnum_2} and name {self.ratoms_2[0]}"
+                dist: float = self.parent().parent().pymol.general_cmd(session, [('distance', None, sele1, sele2)])[0]
+                differences.append(abs(dist - target) / tolerance)
+            elif cst_type.startswith('angle'):
+                #TODO(CJ): need to address periodicity
+                if cst_type == 'angle_A':
+                    sele1 = f"chain {self.rchain_1} and resi {self.rnum_1} and name {self.ratoms_1[1]}"
+                    sele2 = f"chain {self.rchain_1} and resi {self.rnum_1} and name {self.ratoms_1[0]}"
+                    sele3 = f"chain {self.rchain_2} and resi {self.rnum_2} and name {self.ratoms_2[0]}"
+                elif cst_type == 'angle_B':
+                    sele1 = f"chain {self.rchain_1} and resi {self.rnum_1} and name {self.ratoms_1[0]}"
+                    sele2 = f"chain {self.rchain_2} and resi {self.rnum_2} and name {self.ratoms_2[0]}"
+                    sele3 = f"chain {self.rchain_2} and resi {self.rnum_2} and name {self.ratoms_2[1]}"
+                angle: float = self.parent().parent().pymol.general_cmd(session, [('angle', None, sele1, sele2, sele3)])[0]
+                differences.append(abs(angle - target) / tolerance)
+            elif cst_type.startswith('dihedral'):
+                if cst_type == 'torsionA':
+                    sele1 = f"chain {self.rchain_1} and resi {self.rnum_1} and name {self.ratoms_1[2]}"
+                    sele2 = f"chain {self.rchain_1} and resi {self.rnum_1} and name {self.ratoms_1[1]}"
+                    sele3 = f"chain {self.rchain_1} and resi {self.rnum_1} and name {self.ratoms_1[0]}"
+                    sele4 = f"chain {self.rchain_2} and resi {self.rnum_2} and name {self.ratoms_2[0]}"
+                elif cst_type == 'torsionAB':
+                    sele1 = f"chain {self.rchain_1} and resi {self.rnum_1} and name {self.ratoms_1[1]}"
+                    sele2 = f"chain {self.rchain_1} and resi {self.rnum_1} and name {self.ratoms_1[0]}"
+                    sele3 = f"chain {self.rchain_2} and resi {self.rnum_2} and name {self.ratoms_2[0]}"
+                    sele4 = f"chain {self.rchain_2} and resi {self.rnum_2} and name {self.ratoms_2[1]}"
+                elif cst_type == 'torsionB':
+                    sele1 = f"chain {self.rchain_1} and resi {self.rnum_1} and name {self.ratoms_1[0]}"
+                    sele2 = f"chain {self.rchain_2} and resi {self.rnum_2} and name {self.ratoms_2[0]}"
+                    sele3 = f"chain {self.rchain_2} and resi {self.rnum_2} and name {self.ratoms_2[1]}"
+                    sele4 = f"chain {self.rchain_2} and resi {self.rnum_2} and name {self.ratoms_2[2]}"
+                assert False
+                args.append(('dihedral', sele1, sele2, sele3, sele4))
+
+        return differences
+
+    def contains(self, chain: str, res_num: int) -> bool:
+        """Does the constraint contain the residue at <chain>.<res_num>?"""
+        if chain == self.rchain_1 and res_num == self.rnum_1:
+            return True
+
+        if chain == self.rchain_2 and res_num == self.rnum_2:
+            return True
+
+        return False
+
+
+    def other(self, chain : str, res_num : int ) -> Tuple[str,int]:
+        """Given a chain id and residue number for one residue in the constraint, get the chain id and residue number for the other 
+        constrained residue.
+
+        Args:
+            chain: 
+            res_num:
+
+        Returns:
+            A tuple describing the (chain id, residue number) of a residue.
+        """
+
+        if not self.contains( chain, res_num ):
+            #TODO(CJ): put the error here
+            pass
+        if chain == self.rchain_1 and res_num == self.rnum_1:
+            return (self.rchain_2, self.rnum_2)
+
+        if chain == self.rchain_2 and res_num == self.rnum_2:
+            return (self.rchain_1, self.rnum_1)
+
+    def create_pdb_line(self, idx: int) -> str:
+        """Creates a str() PDB line in the appropriate format so that Rosetta can apply the constrained geometry
+        described by the RosettaCst. This line goes in the corresponding PDB file.
+        
+        Args:
+            idx: The index of the RosettaCst as an int().
+            
+        Returns:
+            The PDB line corresponding to the RosettaCst.
+
+        """
+        return f"REMARK 666 MATCH TEMPLATE {self.rchain_1} {self.rname_1}  {self.rnum_1:>3} MATCH MOTIF {self.rchain_2} {self.rname_2}  {self.rnum_2:>3}  {idx:>3}  1"
+
+    def create_cst_lines(self) -> List[str]:
+        """Creates a List[str] which describes the constrained geometries in the required enzyme design format for Rosetta.
+        These lines go into the corresponding .cst file."""
+        cst_content: List[str] = list()
+        cst_content.append("CST::BEGIN")
+        cst_content.append(f"   TEMPLATE::  ATOM_MAP: 1 atom_name: {' '.join(self.ratoms_1)}")
+        cst_content.append(f"   TEMPLATE::  ATOM_MAP: 1 residue3: {self.rname_1}")
+        cst_content.append("")
+        cst_content.append(f"   TEMPLATE::  ATOM_MAP: 2 atom_name: {' '.join(self.ratoms_2)}")
+        cst_content.append(f"   TEMPLATE::  ATOM_MAP: 2 residue3: {self.rname_2}")
+        cst_content.append("")
+
+        for ridx, rule in enumerate(self.constraints):
+            if rule[0] == 'distanceAB':
+                end = 0
+            else:
+                end = rule[4]
+            cst_content.append(f"   CONSTRAINT::  {rule[0]:>10}: {rule[1]:6.2f} {rule[2]:6.2f} {rule[3]:6.2f} {end}")
+
+        cst_content.append("CST::END")
+
+        return cst_content
 
 
 class RosettaInterface(BaseInterface):
@@ -144,10 +365,10 @@ class RosettaInterface(BaseInterface):
         #if not res_name.isupper() or not len(res_name) == 3 or not res_name.isalpha():
         #    _LOGGER.error(f"The supplied residue name '{res_name}' is invalid. It must be alphanumeric, capitalized, and have three characters. Exiting...")
         #    exit( 1 )
+        #TODO(CJ): need to add some flags here -> potentially the charge one
+        flags: List[str] = [self.config_.PARAMS_SCRIPT, f"{molfile}", f"--name={res_name}", "--clobber", "--keep-names"]
 
-        flags: List[str] = [self.config_.PARAMS_SCRIPT, f"{molfile}", f"--name={res_name}", "--clobber"]
-
-        self.env_manager_.run_command("python2.7", flags)
+        self.env_manager_.run_command(self.config_.PY_2_7, flags)
 
         params_file: str = f"./{res_name}.params"
         pdb_file: str = f"./{res_name}_0001.pdb"
@@ -161,7 +382,7 @@ class RosettaInterface(BaseInterface):
 
             params_file = str(outdir / Path(params_start).name)
             pdb_file = str(outdir / Path(pdb_start).name)
-
+            #TODO(CJ): use the safe_mv function here
             shutil.move(params_start, params_file)
             shutil.move(pdb_start, pdb_file)
 
@@ -169,31 +390,81 @@ class RosettaInterface(BaseInterface):
         fs.check_file_exists(pdb_file)
 
         if conformers:
-            self.add_conformers(params_file, conformers)
+            #TODO(CJ): figure out exactly how I deal with the movment of conformer files
+            self.add_conformers(res_name, params_file, pdb_file, conformers)
 
         return (params_file, pdb_file)
 
-    def add_conformers(self, param_file: str, conformers_file: str) -> None:
-        """Adds conformers to the end of the .params file for a given ligand. Checks that files exist and
-        exits if not.
+    def _fix_conformers(self, res_code: str, pdb_template: str, conformers_file: str) -> str:
+        """TODO(CJ)"""
+        session = self.parent().pymol.new_session()
+        self.parent().pymol.general_cmd(session, [("load", pdb_template)])
+        template_df: pd.DataFrame = self.parent().pymol.collect(session, "memory", "name elem x y z ID chain resn resi".split())
 
-        Args:
-            param_file: The .params file as a str().
-            conformers_file: The path to the conformers file. MUST BE IN .pdb FORMAT. 
+        original: str = self.parent().pymol.general_cmd(session, [("delete", "all"), ("load", conformers_file),
+                                                                  ("get_object_list", 'all')])[-1]
 
-        Returns:
-            Nothing.
-        """
+        #original = session.cmd.get_object_list()
+        assert len(original) == 1
+        split: List[str] = self.parent().pymol.general_cmd(session, [("split_states", "all"), ("get_object_list", "all")])[-1]
+        print(split)
+        #        original = original[0]
+        #        content: List[str] = list()
+        #        #TODO(CJ): figure out a way to get rid of the warnings
+        #        #redirect_stdout()
+        for oidx, oo in enumerate(split):
+            if oo == original:
+                continue
+            df: pd.DataFrame = self.parent().pymol.collect(session, "memory", "name elem x y z ID chain resn resi".split(), sele=oo)
+            assert len(df) == len(template_df), f"{len(df)} {len(template_df)}"
+            for (tidx, trow), (idx, row) in zip(template_df.iterrows(), df.iterrows()):
+                assert trow.elem == row.elem
+                self.parent().pymol.general_cmd(session, [
+                    ("alter", f"{oo} and ID {row.ID}", "name=" + trow["name"]),
+                    ("alter", f"{oo} and ID {row.ID}", f"chain='{trow.chain}'"),
+                    ("alter", f"{oo} and ID {row.ID}", f"resn='{res_code}'"),
+                ])
+
+            temp_fname = f"state_{oidx}.pdb"
+            self.parent().pymol.general_cmd(session, [("save", temp_name, oo)])
+
+            for ll in fs.lines_from_file(temp_fname):
+                if ll.startswith('HETATM') or ll.startswith('ATOM'):
+                    content.append(ll)
+
+            content.append('TER')
+            fs.safe_rm(temp_fname)
+
+        content.pop()
+        content.append('END')
+
+        outfile = Path(conformers).with_suffix('.pdb')
+        fs.write_lines(outfile, content)
+        print(outfile)
+        exit(0)
+        return str(outfile)
+
+    def add_conformers(self, res_code: str, param_file: str, pdb_template: str, conformers_file: str) -> None:
+        """TODO(CJ)"""
 
         fs.check_file_exists(param_file)
         fs.check_file_exists(conformers_file)
 
-        if not Path(conformers_file).suffix == ".pdb":
-            _LOGGER.error(f"The supplied file '{conformers_file}' is not in the .pdb format. Exiting...")
-            exit(1)
+        suffix: str = Path(conformers_file).suffix
+        if suffix != ".pdb":
+            if suffix in ".mol2 .mol .sdf".split():
+                #TODO(CJ): this does not work
+                conformers_file = self._fix_conformers(res_code, pdb_template, conformers_file)
+                pass
+            else:
+                _LOGGER.error(
+                    f"The supplied file '{conformers_file}' is not in the .pdb and cannot be converted from .mol2, .mol, or .sdf. Exiting..."
+                )
+                exit(1)
 
         content: List[str] = fs.lines_from_file(param_file)
         content.append(f"PDB_ROTAMERS {Path(conformers_file).absolute()}")
+        fs.safe_rm(param_file)
         fs.write_lines(param_file, content)
 
     def relax(
@@ -486,13 +757,16 @@ class RosettaInterface(BaseInterface):
             target: str = tks[0]
 
             result: ET.Element = None
-            for ee in elem:
-                if ee.tag == target:
-                    result = ee
-                    break
+            if elem.tag == target:
+                result = elem
             else:
-                _LOGGER.error(f"There is no element with tag name '{target}' at this level. Exiting...")
-                exit(1)
+                for ee in elem:
+                    if ee.tag == target:
+                        result = ee
+                        break
+                else:
+                    _LOGGER.error(f"There is no element with tag name '{target}' at this level. Exiting...")
+                    exit(1)
 
             if len(tks) > 1:
                 return _find_node(result, tks[1])
@@ -500,8 +774,12 @@ class RosettaInterface(BaseInterface):
                 return result
 
         root = ET.Element("ROSETTASCRIPTS")
-        ET.SubElement(root, "SCOREFXNS")
         ET.SubElement(root, "RESIDUE_SELECTORS")
+        ET.SubElement(root, "SCOREFXNS")
+        ET.SubElement(root, "LIGAND_AREAS")
+        ET.SubElement(root, "INTERFACE_BUILDERS")
+        ET.SubElement(root, "MOVEMAP_BUILDERS")
+        #ET.SubElement(root, "SCORINGGRIDS")
         ET.SubElement(root, "TASKOPERATIONS")
         ET.SubElement(root, "SIMPLE_METRICS")
         ET.SubElement(root, "FILTERS")
@@ -512,30 +790,59 @@ class RosettaInterface(BaseInterface):
         for arg in args:
             parent_name = arg.pop("parent", None)
             tag_name = arg.pop("tag", None)
+            target_node = None
 
             bad: bool = False
 
             if not parent_name:
+                #TODO(CJ): check if the parent name has an equal sign specifying the target node
+                # more than what you would specify it otherwise
                 _LOGGER.error("No parent name supplied in XML element dict()!")
-                bad = True
-
-            if not parent_name:
-                _LOGGER.error("No tag name supplied in XML element dict()!")
                 bad = True
 
             if bad:
                 _LOGGER.error("Problems with XML elements detected. Exiting...")
                 exit(1)
 
+            child_nodes = arg.pop('child_nodes', list())
+            #if arg.get('append_elements_only', False):
+            #    _ = arg.pop('append_elements_only')
+            #    target_node = _find_node(root, tag_name)
+            #    for attrib, value in arg.items():
+            #        target_node.set( attrib, value )
+
+            #else:
             parent: ET.Element = _find_node(root, parent_name)
 
-            _ = ET.SubElement(parent, tag_name, attrib=arg)
+            if arg.get('append_elements_only', False):
+                _ = arg.pop('append_elements_only')
+                if tag_name == "SCORINGGRIDS":
+                    parent: ET.Element = _find_node(root, 'ROSETTASCRIPTS')
+                    target_node = ET.Element(tag_name)
+                    parent.insert(0, target_node)
+                    #target_node = ET.SubElement(parent[0], tag_name )
+                else:
+                    target_node = ET.SubElement(parent, tag_name)
+
+                for attrib, value in arg.items():
+                    target_node.set(attrib, value)
+            else:
+                target_node = ET.SubElement(parent, tag_name, attrib=arg)
+
+            if child_nodes:
+                for cn in child_nodes:
+                    tag_name = cn.pop('tag', None)
+                    _ = cn.pop('parent', None)
+                    #TODO(CJ): make this recursive so it actually works for super nested things
+                    _ = ET.SubElement(target_node, tag_name, attrib=cn)
 
         for rr in root:
             rr.text = "\n\t"
 
         xmlstr: str = minidom.parseString(ET.tostring(root)).toprettyxml()
         xml_content: List[str] = xmlstr.replace('<?xml version="1.0" ?>\n', '').splitlines()
+
+        xml_content = list(filter(lambda ll: len(ll.strip()) > 0, xml_content))
 
         fs.write_lines(fname, xml_content)
 
@@ -688,22 +995,119 @@ class RosettaInterface(BaseInterface):
 
         return df
 
-    def mutate(self, molfile: str, mutations: List[Tuple[str, int, str]]) -> str:
-        """Using Rosetta to mutate a protein
+    def _parse_cst(self, raw: str) -> RosettaCst:
+        """Implementation function for parsing of RosettaCst's. DO NOT call directly. Works only on a single raw str()
+        and creates a single RosettaCst object. If values for constraints are not supplied, default values are supplied
+        based on the chemistry of the constrained atoms.
 
         Args:
-            molfile:
-            mutations:
-    
-        Returns:
-            The mutated structure.
-        """
+            raw: The raw RosettaCst str() to parse. 
 
-        # validation
-        for row in mutations:
-            if len(row) != 3:
-                pass
-        pass
-        args: List[Dict] = list()
-        xml_file: str = f"{Path(mofile).parent}/__temp.xml"
-        self.write_script(xml_file, args)
+        Returns:
+            The new RosettaCst object.
+        """
+        var: Dict[str, Any] = {'constraints': []}
+
+        tokens: List[str] = list(filter(len, re.split('[()]', raw)))
+
+        if len(tokens) < 3:
+            _LOGGER.info(
+                f"There must be at least 3 blocks in an individual constraint. There are only {len(tokens)} in '{raw}'. Exiting...")
+            exit(1)
+
+        for tidx, tk in enumerate(tokens):
+
+            spl: List[str] = tk.split(',')
+            if tidx < 2:
+                var[f"rchain_{tidx+1}"] = spl[0]
+                var[f"rnum_{tidx+1}"] = int(spl[1])
+                var[f"rname_{tidx+1}"] = spl[2]
+                var[f"ratoms_{tidx+1}"] = spl[3:]
+            else:
+                cst_type: str = spl[0]
+                if cst_type not in RosettaCst.ALLOWED_CSTS:
+                    _LOGGER.error(
+                        f"The supplied constraint type {cst_type} is not supported. Allowed are: {', '.join(sorted(list(RosettaCst.ALLOWED_CSTS)))}. Exiting..."
+                    )
+                    exit(1)
+
+                temp = [cst_type]
+
+                for tt in spl[1:]:
+                    if tt.find('.') == -1:
+                        temp.append(int(tt))
+                    else:
+                        temp.append(float(tt))
+
+                t_len: int = len(temp)
+
+                if t_len < 5:
+
+                    #TODO(CJ): add in some discussion of using a database here
+                    # and mention that we are using default parameters
+                    #TODO(CJ): put this in enzy_htp.chemical
+                    if cst_type == 'distanceAB':
+                        temp.extend([2.00, 0.25, 100.00, 0][t_len - 1:])
+                    elif cst_type in 'angle_A angle_B'.split():
+                        temp.extend([180.0, 5.0, 100.0, 360.0, 1][t_len - 1:])
+
+                    else:
+                        raise TypeError()
+
+                var['constraints'].append(temp)
+
+        return RosettaCst(parent=self,
+                          rname_1=var['rname_1'],
+                          rnum_1=var['rnum_1'],
+                          ratoms_1=var['ratoms_1'],
+                          rchain_1=var['rchain_1'],
+                          rname_2=var['rname_2'],
+                          rnum_2=var['rnum_2'],
+                          ratoms_2=var['ratoms_2'],
+                          rchain_2=var['rchain_2'],
+                          constraints=var['constraints'])
+
+    def csts_from_file(self, fname: str) -> List[RosettaCst]:
+        """Loads RosettaCst's from a file. Checks that the file exists, errors if it does not.
+        See RosettaInterface.csts_from_str() for more information.
+
+        Args:
+            fname: Name of the file to get constraints from, as a str().
+        
+        Returns:    
+            A list() of RosettaCst objects.
+        """
+        fs.check_file_exists(fname)
+
+        raw: str = fs.content_from_file(fname)
+
+        return self.csts_from_str(raw)
+
+    def csts_from_str(self, raw: str) -> List[RosettaCst]:
+        """Creates RosettaCst's from a raw str(). Performs basic checks and removes whitespace.
+
+        Args:
+            raw: The str() to parse from.
+
+        Returns:
+            A list() of RosettaCst objects.
+
+        """
+        raw = ''.join(raw.split())
+
+        if raw.count('(') != raw.count(')'):
+            _LOGGER.error(f"Unbalanced parantheses in raw constraint '{raw}'. Exiting...")
+            exit(1)
+
+        result = list()
+
+        for token in raw.split('),('):
+            if token[0] != '(':
+                token = '(' + token
+
+            if token[-1] != ')':
+                token = ')' + token
+
+            result.append(self._parse_cst(token))
+
+        return result

@@ -147,7 +147,7 @@ class Atom(DoubleLinkedNode):
         """getter for _connect, the list for atoms it connects"""
         if not self.is_connected():
             _LOGGER.warning(f"There are no connection info for {self}, Initiating it.")
-            self.init_connect_in_caa() # TODO(qz): make this also works for non-caa
+            self.init_connect_in_caa()  # TODO(qz): make this also works for non-caa
         return self._connect
 
     @connect.setter

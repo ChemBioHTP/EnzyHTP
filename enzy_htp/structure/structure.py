@@ -251,8 +251,7 @@ class Structure(DoubleLinkedNode):
                 result.extend(residue.atoms)
         return result
 
-    def find_atoms_in_range(self, center: Union[Atom, Tuple[float, float, float]],
-                            range_distance: float) -> List[Atom]:
+    def find_atoms_in_range(self, center: Union[Atom, Tuple[float, float, float]], range_distance: float) -> List[Atom]:
         """find atoms in {range} of {center}. return a list of atoms found"""
         result = []
         for atom in self.atoms:
@@ -596,7 +595,7 @@ class Structure(DoubleLinkedNode):
         This method is designed for debuging purpose"""
         result = list()
         for cname, chain in self.chain_mapper.items():
-            for residue in chain.residues():
+            for residue in chain.residues:
                 (chain, res_name, index) = residue.residue_key.split(".")
                 if residue.is_canonical():
                     result.append((chain, convert_to_one_letter(res_name), int(index)))
@@ -609,7 +608,7 @@ class Structure(DoubleLinkedNode):
         """Generates a list of strings containing all residue_key values for all child Residue()"s"""
         result = list()
         for chain in self.chains:
-            for res in chain.residues():
+            for res in chain.residues:
                 result.append(res.residue_key)
         return result
 

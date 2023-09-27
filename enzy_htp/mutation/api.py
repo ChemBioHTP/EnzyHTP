@@ -6,15 +6,19 @@ Science API:
 Mutation is carried out by an underlying engine and the supported engines currently include:
     + Amber/tleap
     + PyMOL
+    + Rosetta
 
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2022-10-24
 """
-
+#TODO(CJ): if its "in-place" it shouldnt return anything
 import copy
+from pathlib import Path
 from typing import Any, Dict, List, Tuple, Union
+
 import numpy as np
 
+import enzy_htp.chemical as chem
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp import config
@@ -408,9 +412,103 @@ def mutate_stru_with_pymol(
     return stru_cpy
 
 
-MUTATE_STRU_ENGINE = {"tleap_min": mutate_stru_with_tleap, 
-                      "pymol": mutate_stru_with_pymol,}
-                      #"rosetta": mutate_stru_with_rosetta}
+def mutate_stru_with_rosetta(stru: Structure, mutant: List[Mutation], in_place: bool = False, **kwargs) -> Union[Structure, None]:
+    """Applies mutations to a function using the Rosetta engine. 
+
+    Args:
+        stru: the 'WT' structure
+        mutant: a list of Mutation() which describes a mutant to the 'WT'
+        in_place: if make the changes to the structure in-place 
+    Returns:
+        The mutated structure. May be nothing.
+    """
+
+    # san check
+    elements: List[Dict] = list()
+    for midx, mut in enumerate(mutant):
+        if not isinstance(mut, Mutation):
+            _LOGGER.error(f"mutant takes only a list of Mutation(). Current mutant is: {mutant}")
+            raise TypeError
+
+        target = mut.target
+        if len(target) != 3:
+            target = chem.convert_to_canonical_three_letter(target)
+
+        #TODO(CJ): remap the residue index here
+        elements.extend([
+            {
+                'parent': 'RESIDUE_SELECTORS',
+                'tag': 'Index',
+                'name': f"residue{midx+1}",
+                'resnums': str(mut.res_idx)
+            },
+            {
+                'parent': 'MOVERS',
+                'tag': 'MutateResidue',
+                'name': f'mutate{midx+1}',
+                'residue_selector': f"residue{midx+1}",
+                'new_res': target
+            },
+            {
+                'parent': 'PROTOCOLS',
+                'tag': 'Add',
+                'mover_name': f'mutate{midx+1}'
+            },
+        ])
+
+    #stru_cpy = copy.deepcopy(stru)
+
+    if_retain_order = True
+    #TODO(CJ): need to remap the residue names at some point
+    #TODO(CJ): use the scratch_dir
+    parser = PDBParser()
+    stru_content: str = parser.get_file_str(stru)
+    temp_file: str = '__mut_temp.pdb'
+    fs.write_lines(temp_file, stru_content.splitlines())
+
+    xml_file: str = f"{Path(temp_file).parent}/__temp.xml"
+    fs.safe_rm(xml_file)
+    interface.rosetta.write_script(xml_file, elements)
+
+    opts: List[str] = ['-parser:protocol', xml_file, '-in:file:s', temp_file, '-overwrite']
+
+    opts.extend(kwargs.get('extra_flags', []))
+
+    temp_path = Path(temp_file)
+    expected_mutant: str = temp_path.parent / f"{temp_path.stem}_0001.pdb"
+    score_sc: str = str(temp_path.parent / "score.sc")
+    fs.safe_rm(expected_mutant)
+    interface.rosetta.run_rosetta_scripts(opts)
+
+    fs.check_file_exists(expected_mutant)
+    expected_mutant = str(expected_mutant)
+    fs.safe_rm(xml_file)
+    fs.safe_rm(temp_file)
+    fs.safe_rm(score_sc)
+    #fs.safe_rm( expected_mutant )
+
+    if in_place:
+        stru_cpy = parser.get_structure(expected_mutant)
+        fs.safe_rm(expected_mutant)
+        stru_oper.update_residues(stru, stru_cpy)
+        return
+    else:
+        stru_cpy = copy.deepcopy(stru)
+        rosetta_stru = parser.get_structure(expected_mutant)
+        fs.safe_rm(expected_mutant)
+        stru_oper.update_residues(stru_cpy, rosetta_stru)
+        return stru_cpy
+    #TODO(CJ): do it this way
+    stru_oper.update_residues(stru_cpy, pymol_mutant_stru)
+
+    if in_place:
+        stru_oper.update_residues(stru, stru_cpy)
+        return stru
+
+    return stru_cpy
+
+
+MUTATE_STRU_ENGINE = {"tleap_min": mutate_stru_with_tleap, "pymol": mutate_stru_with_pymol, "rosetta": mutate_stru_with_rosetta}
 """engines for mutate_stru()"""
 
 
@@ -445,61 +543,6 @@ def check_mutant_stru(mutant_stru: Structure, mutant: List[Mutation], checker_co
     for checker, kwargs in checker_config.items():
         _LOGGER.debug(f"Checking {checker}...")
         MUTANT_STRU_ERROR_CHECKER[checker](mutant_stru, mutant, **kwargs)
-
-
-def mutate_stru_with_rosetta(
-    stru: Structure,
-    mutant: List[Mutation],
-    in_place: bool = False,
-) -> Union[Structure, None]:
-    """Applies mutations to a function using the Rosetta engine. 
-    Args:
-        stru: the 'WT' structure
-        mutant: a list of Mutation() which describes a mutant to the 'WT'
-        in_place: if make the changes to the structure in-place 
-    Returns:
-        The mutated structure. May be nothing.
-    """
-
-    # san check
-    for mut in mutant:
-        if not isinstance(mut, Mutation):
-            _LOGGER.error(f"mutant takes only a list of Mutation(). Current mutant is: {mutant}")
-            raise TypeError
-
-    stru_cpy = copy.deepcopy(stru)
-
-    if_retain_order = True
-    exit(1)
-    # if structure is multichain, set retain_order to false and raise a flag to mark multichain structure
-    # for further treatment
-
-
-#    if stru_cpy.num_chains > 2:
-#        if_multichain = True
-#        if_retain_order = False
-#    else:
-#        if_multichain = False
-#
-#    # 1. load stru into pymol
-#    pi = interface.pymol
-#    with OpenPyMolSession(pi) as pms:
-#        pymol_obj_name = pi.load_enzy_htp_stru(stru_cpy, pymol_session=pms)[0]
-#        # 2. loop through mutants and apply each one
-#        for mut in mutant:
-#            pi.point_mutate(mut.get_position_key(), mut.get_target(), pymol_obj_name, pms)
-#        # 3. save to a structure.
-#        pymol_mutant_stru = pi.export_enzy_htp_stru(pymol_obj_name, pms,
-#                                                    if_retain_order=if_retain_order, if_multichain=if_multichain)
-#
-#    # 4. update residues
-#    stru_oper.update_residues(stru_cpy, pymol_mutant_stru)
-#
-#    if in_place:
-#        stru_oper.update_residues(stru, stru_cpy)
-#        return stru
-#
-#    return stru_cpy
 
 
 def check_mutation_topology_error(stru: Structure, mutant: List[Mutation]):
