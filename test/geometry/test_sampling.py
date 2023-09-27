@@ -15,7 +15,7 @@ sp = PDBParser()
 amber_interface = interface.amber
 
 
-# TODO: finish these tests while finished Amber interface
+# TODO: finish these tests while finished Amber interface EOD
 @pytest.mark.accre
 def test_md_simulation_amber_no_repeat():
     """Test running a non-replica MD.
