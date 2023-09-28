@@ -55,6 +55,7 @@ def init_logger(
 
 _LOGGER = init_logger("EnzyHTP", None, start=True)
 """Singleton logging object to log to throught enzy_htp."""
+_LOGGER.propagate = False # want to make sure EnzyHTP logger is not affected by root logger
 
 def get_eh_logging_level() -> int:
     """Lazy determination of the logging level of the EnzyHTP _LOGGER."""

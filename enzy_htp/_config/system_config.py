@@ -10,15 +10,16 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-10-16
 """
 import os
-from typing import Any
+from typing import Any, List
 from copy import deepcopy
 from time import strftime, localtime
 
+from .base_config import BaseConfig
 from enzy_htp.core import _LOGGER
 from enzy_htp.core import enzyhtp_info
 
 
-class SystemConfig:
+class SystemConfig(BaseConfig):
     """Class that holds system settings for enzy_htp. Similar to other classes in this
     sub-module, SHOULD NOT be directly created by the end users. Instead, it should be 
     accessed via the singleton config variable. 
@@ -50,36 +51,17 @@ class SystemConfig:
     """The path for the log file that stores all the job ids for submitted ClusterJobs.
     (default: job_obj.sub_dir/submitted_job_ids.log)"""
 
-    def __getitem__(self, key: str) -> Any:
-        """Accessor for SystemConfig() that leverages [] operator syntax.
-        
-        Args:
-            key: a str() key with the name of the variable you would like to access.
+    def required_executables(self) -> List[str]:
+        """A list of all required executables for SystemConfig."""
+        return list()
 
-        Returns:
-        """
-        if key.count("."):
-            _LOGGER.error(f"No nested variables currently exist in the SystemConfig() class. Exiting...")
-            exit(1)
-        else:
-            return getattr(self, key)
+    def required_env_vars(self) -> List[str]:
+        """A list of all required environment variables for SystemConfig."""
+        return list()
 
-    def __setitem__(self, key: str, value: Any) -> None:
-        """Setter for SystemConfig() that leverages [] operator syntax.
-
-        Args:
-            key: a str() with the name of the variable you would like to update.
-            value: Whatever value you want to set the appropriate attribute to.
-
-        Returns:
-            Nothing
-        """
-        if key.count("."):
-            _LOGGER.error(f"No nested variables currently exist in the SystemConfig() class. Exiting...")
-            exit(1)
-
-        else:
-            setattr(self, key, value)
+    def required_py_modules(self) -> List[str]:
+        """A list of all required environment python modules for SystemConfig."""
+        return list()
 
 
 def default_system_config() -> SystemConfig:

@@ -21,7 +21,7 @@ from enzy_htp.core.exception import UnsupportedMethod, tLEaPError
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
 from enzy_htp.structure.structure_io import pdb_io
 import enzy_htp.structure as struct
-import enzy_htp.preparation as prep
+# import enzy_htp.preparation as prep
 from enzy_htp import config as eh_config
 
 class AmberInterface(BaseInterface): # TODO(qz) EOD

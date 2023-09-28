@@ -70,16 +70,17 @@ def test_point_mutate():
     test_stru = PDBParser().get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
     test_mut_stru = PDBParser().get_structure(f"{DATA_DIR}KE_07_R7_2_S_mut.pdb")
     pi = interface.pymol
-    pymol_obj_name, session = pi.load_enzy_htp_stru(test_stru, pi.new_pymol_session())
-    pi.point_mutate(("A", 154), "TRP", pymol_obj_name, session)
-    assert len(pi.select_pymol_obj("resi 154", pymol_obj_name, session)) == (len(test_mut_stru["A"].find_residue_idx(154).atom_idx_list))
+    pymol_obj_name, session = pi.load_enzy_htp_stru(stru=test_stru, session=pi.new_session())
+    pi.point_mutate(pos_key=("A", 154), target="TRP", pymol_obj_name=pymol_obj_name, pymol_session=session)
+    assert (len(pi.select_pymol_obj(pattern="resi 154", pymol_obj_name=pymol_obj_name, session=session)) == 
+    (len(test_mut_stru["A"].find_residue_idx(154).atom_idx_list)))
 
 
 def test_export_enzy_htp_stru():
     test_stru = PDBParser().get_structure(f"{DATA_DIR}KE_trun.pdb")
     pi = interface.pymol
-    test_session = pi.new_pymol_session()
-    pymol_obj_name, session = pi.load_enzy_htp_stru(test_stru, test_session)
+    test_session = pi.new_session()
+    pymol_obj_name, session = pi.load_enzy_htp_stru(stru=test_stru, session=test_session)
     test_save_stru = pi.export_enzy_htp_stru(pymol_obj_name, session)
 
     for new_res, old_res in zip(test_save_stru.residues, test_stru.residues):
@@ -89,12 +90,33 @@ def test_export_enzy_htp_stru():
 def test_export_pdb():
     test_stru = PDBParser().get_structure(f"{DATA_DIR}KE_trun.pdb")
     pi = interface.pymol
-    test_session = pi.new_pymol_session()
-    pymol_obj_name, session = pi.load_enzy_htp_stru(test_stru, test_session)
-    test_save_file = pi.export_pdb(pymol_obj_name, session)
+    test_session = pi.new_session()
+    pymol_obj_name, session = pi.load_enzy_htp_stru(stru=test_stru, session=test_session)
+    test_save_file = pi.export_pdb(pymol_obj_name=pymol_obj_name, pymol_session=session)
     test_save_stru = PDBParser().get_structure(test_save_file)
     clean_temp_file_n_dir([test_save_file, eh_config["system.SCRATCH_DIR"]])
 
     for new_res, old_res in zip(test_save_stru.residues, test_stru.residues):
         assert len(new_res.atoms) == len(old_res.atoms)
 
+def test_fix_pymol_naming():
+    """Test function works as expected"""
+    atom_freq = {}
+
+    pymol_pdb_path = f"{DATA_DIR}pymol_TRP.pdb"
+    good_pdb_path = f"{DATA_DIR}Stru_TRP.pdb"
+
+    good_stru = PDBParser().get_structure(good_pdb_path)
+    pymol_stru = PDBParser().get_structure(pymol_pdb_path)
+
+    for atom in good_stru.atoms:
+        atom_freq[atom.name] = 1
+    
+    pi = interface.pymol
+    pi.fix_pymol_naming(pymol_stru)
+
+    for atom in pymol_stru.atoms:
+        atom_freq[atom.name] -= 1
+
+    for atom in atom_freq:
+        assert atom_freq[atom] == 0

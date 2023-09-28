@@ -1,22 +1,22 @@
-"""Define BCLConfig() which holds configuration settings for enzy_htp to interface with the BCL
+"""Defines a  BCLConfig() which holds configuration settings for enzy_htp to interface with the BCL
 software package. File also contains default_bcl_config() which creates a default version of 
 the BCLConfig() class.
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
-
 Date: 2023-04-02
 """
-from typing import List
+from typing import List, Any
 
 from copy import deepcopy
 
+from .base_config import BaseConfig
 
-class BCLConfig:
+
+class BCLConfig(BaseConfig):
     """Class that holds default values for running BCL within enzy_htp.
 
     Attributes:
         BCL : str() corresponding to the main bcl.exe application.
-
     """
 
     BCL_EXE: str = "bcl.exe"
@@ -31,7 +31,7 @@ class BCLConfig:
         return []
 
     def required_py_modules(self) -> List[str]:
-        """ """
+        """A hardcoded list of required python modules for the BCL."""
         return list()
 
 

@@ -37,7 +37,6 @@ from .core import (
 
 from ._config import config
 
-from .preparation import PDBLine, read_pdb_lines
 from .chemical import ResidueType
 
 from ._interface import Interface, OpenPyMolSession
@@ -48,4 +47,10 @@ interface = Interface(config)
 end users and instead exists for developers to access external software. See enzy_htp/_interface/interface.py
 for full class defintion."""
 
-from .analysis import ( electric_field )
+config.__doc__="""Singleton interface for the config settings for all software packages and the system settings in enzy_htp. Can be accessed
+by end users and should be used to customize system settings for each environment they are working in."""
+
+from .analysis import ( electric_field, binding_energy )
+
+from .preparation import PDBLine, read_pdb_lines, dock_reactants
+

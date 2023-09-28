@@ -251,8 +251,7 @@ class Structure(DoubleLinkedNode):
                 result.extend(residue.atoms)
         return result
 
-    def find_atoms_in_range(self, center: Union[Atom, Tuple[float, float, float]],
-                            range_distance: float) -> List[Atom]:
+    def find_atoms_in_range(self, center: Union[Atom, Tuple[float, float, float]], range_distance: float) -> List[Atom]:
         """find atoms in {range} of {center}. return a list of atoms found"""
         result = []
         for atom in self.atoms:
@@ -505,6 +504,7 @@ class Structure(DoubleLinkedNode):
         for ch in self._chains:
             ch.sort_residues()
             for res in ch:
+                res: Residue
                 res.sort_atoms()
 
     def renumber_atoms(self, sort_first: bool = True) -> None:
@@ -595,7 +595,7 @@ class Structure(DoubleLinkedNode):
         This method is designed for debuging purpose"""
         result = list()
         for cname, chain in self.chain_mapper.items():
-            for residue in chain.residues():
+            for residue in chain.residues:
                 (chain, res_name, index) = residue.residue_key.split(".")
                 if residue.is_canonical():
                     result.append((chain, convert_to_one_letter(res_name), int(index)))
@@ -608,7 +608,7 @@ class Structure(DoubleLinkedNode):
         """Generates a list of strings containing all residue_key values for all child Residue()"s"""
         result = list()
         for chain in self.chains:
-            for res in chain.residues():
+            for res in chain.residues:
                 result.append(res.residue_key)
         return result
 
@@ -961,9 +961,7 @@ class Structure(DoubleLinkedNode):
     #         p2 = r2.get_mass_center()
     #     D = get_distance(p1, p2)
     #     return D
-
     #endregion
-
 
 def compare_structures(left: Structure, right: Structure) -> Dict[str, List[str]]:
     """Compares two Structure() objects and returns a dict() of missing Residues with format:

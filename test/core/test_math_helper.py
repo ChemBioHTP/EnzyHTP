@@ -36,6 +36,7 @@ def test_get_geom_center():
     test_list_of_p = [(1, 1, 1), (2, 2, 5)]
     assert mh.get_geom_center(test_list_of_p) == (1.5, 1.5, 3)
 
+
 def test_get_dihedral():
     """test if function works as expected"""
     test_points = [

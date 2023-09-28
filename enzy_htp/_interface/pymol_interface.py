@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Union, Tuple
 
 import pymol2
+import numpy as np
 import pandas as pd
 
 #TODO(CJ): add something to remove "PyMOL not running. Entering library mode (experimental" message on pymol running
@@ -21,7 +22,6 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core import _LOGGER, check_var_type
 from enzy_htp._config.pymol_config import PyMolConfig, default_pymol_config
 from enzy_htp.structure import Structure, PDBParser
-from enzy_htp.chemical.residue import THREE_LETTER_AA_MAPPER
 
 from .base_interface import BaseInterface
 
@@ -41,7 +41,7 @@ class PyMolInterface(BaseInterface):
         """
         super().__init__(parent, config, default_pymol_config)
         temp_session: pymol2.PyMOL = self.new_session()
-        self.available_cmds_: List[str] = temp_session
+        self.available_cmds_: List[str] = temp_session.cmd.__dict__['kw_list']
 
     def new_session(self) -> pymol2.PyMOL:
         """create a new pymol session, start it, and set feedback level. Canonical means to get a session in enzy_htp."""
@@ -53,7 +53,7 @@ class PyMolInterface(BaseInterface):
     def check_pymol2_installed(self) -> None:
         """Method that checks if """
         if "pymol2" in self.missing_py_modules():
-            _LOGGER.errorf("pymol2 is NOT installed. Use 'conda install -c conda-forge -y -q pymol-open-source'. Exiting...")
+            _LOGGER.error(f"pymol2 is NOT installed. Use 'conda install -c conda-forge -y -q pymol-open-source'. Exiting...")
             exit(1)
 
     def convert(self,
@@ -95,29 +95,29 @@ class PyMolInterface(BaseInterface):
 
         result: str = str(file_2)
 
+        self.general_cmd(session, [('delete', 'all')])
+
         try:
-            session.cmd.delete('all')
-            session.cmd.load(file_1)
+            self.general_cmd(session, [('load', file_1)])
 
             if split_states:
-                session.cmd.split_states('all')
+                self.general_cmd(session, [('split_states', 'all')])
                 result = Path(result)
                 parent_dir = result.parent
                 result_stem = result.stem
                 result = []
 
-                for oidx, oname in enumerate(session.cmd.get_object_list()):
+                for oidx, oname in enumerate(self.general_cmd(session, [('get_object_list')])[0]):
 
-                    if session.cmd.count_states(oname) != 1:
+                    if self.general_cmd(session, [('count_states', oname)])[0] != 1:
                         session.cmd.delete(oname)
                         continue
 
                     fname = str(parent_dir / f"{result_stem}_{oidx}{new_ext}")
-                    session.cmd.save(fname, oname)
+                    self.general_cmd(session, [('save', fname, oname)])
                     result.append(fname)
             else:
-                session.cmd.save(result)
-                session.cmd.delete('all')
+                self.general_cmd(session, [('save', result), ('delete', 'all')])
 
         except Exception as exe:
             _LOGGER.error(f"Could not convert '{file_1}' to '{file_2}'. Encountered error: '{exe}'. Exiting...")
@@ -277,27 +277,51 @@ class PyMolInterface(BaseInterface):
         if if_retain_order:
             pymol_session.cmd.set("retain_order")
         pymol_session.cmd.save(pymol_outfile_path, pymol_obj_name)
-
+        
         return pymol_outfile_path
 
-    def export_enzy_htp_stru(self, 
-                             pymol_session: pymol2.PyMOL,
-                             pymol_obj_name: str,        
-                             if_retain_order: bool = False) -> Structure:
+    def export_enzy_htp_stru(self, pymol_obj_name: str,
+                            pymol_session: pymol2.PyMOL,
+                            if_retain_order: bool = False,
+                            if_fix_naming: bool = False) -> Structure:
         """
         Saves a PyMOL object to a Structure object.
         Args:
             pymol_session: the target PyMOL session.
             pymol_obj_name: the name of the target enzyme in PyMOL.
             if_retain_order: if the saving should keep the order of the atoms in the original object.
+                             Fixes PyMOL's scrambling of the atom order
+            if_fix_naming: if the PyMOL naming of atoms should be updated to match the Structure convention.
+                           Allows for atom naming consistency (https://github.com/ChemBioHTP/EnzyHTP/issues/117)
         Returns:
             A Structure object representing the target enzyme in PyMOL.
         """
         sp = PDBParser()
-        pymol_outfile_path = self.export_pdb(pymol_obj_name, pymol_session, if_retain_order=if_retain_order)
+        pymol_outfile_path = self.export_pdb(pymol_session, pymol_obj_name,
+                                             if_retain_order=if_retain_order)
         res = sp.get_structure(pymol_outfile_path, allow_multichain_in_atom=True)
+
+        if if_fix_naming:
+            self.fix_pymol_naming(res)
+
         fs.clean_temp_file_n_dir([pymol_outfile_path, eh_config["system.SCRATCH_DIR"]])
         return res
+
+
+    def fix_pymol_naming(self, stru: Structure) -> None:
+        """Fixes PyMOL's naming of atoms in-place using the PYMOL_TO_ATOM_MAPPER in pymol_config.py.
+        Args:
+            stru: the Structure that contains the wrong atom names (if any).
+        Returns:
+            Nothing.
+        """
+        for chain in stru.chains:
+            for residue in chain.residues:
+                for atom in residue.atoms:
+                    correct_name = PyMolConfig().get_canonical_atom_name(residue.name, atom.name)
+                    if correct_name:
+                        atom.name = correct_name
+
     # == inter-session modular functions == (do not requires a session, will start and close one)
     # pass
 
@@ -416,6 +440,7 @@ class PyMolInterface(BaseInterface):
         """Executes a series of commands through the PyMOL/PyMOL2 python module in use. Takes input as a list of Tuple()'s
         where the first item in each tuple is a string specifying the function to use and the rest of the items are the
         arguments for that function.
+        TODO(CJ): add examples
     
         Args:
             session : A pymol2.PyMOL() session to use.
@@ -430,23 +455,27 @@ class PyMolInterface(BaseInterface):
         result: List[Any] = list()
 
         for cmd_set in args:
-            if len(cmd_set) < 2:
-                _LOGGER.error(f"The supplied argument {cmd_set} is not long enough. Musst have at least two items. Exiting...")
-                exit(1)
-
             cmd_name = cmd_set[0]
-            cmd_args = list(cmd_set[1:])
 
-            if cmd_name not in self.available_cmds_:
-                _LOGGER.error(f"The command '{cmd_name}' is not supported in this version of pymol. Exiting...")
-                exit(1)
+            #if cmd_name not in self.available_cmds_:
+            # _LOGGER.error(f"The command '{cmd_name}' is not supported in this version of pymol. Exiting...")
+            #exit(1)
+
+            cmd_args = list()
+
+            if len(cmd_set) > 1:
+                cmd_args = list(cmd_set[1:])
 
             cmd_str: str = f"{cmd_name}({','.join(map(str, cmd_args))})"
             try:
                 fxn = getattr(session.cmd, cmd_name)
-                result.append(fxn(*cmd_args))
-            except:
-                _LOGGER.error(f"PyMOL function call '{cmd_str}' resuled in an error. Exiting...")
+                if len(cmd_set) > 1:
+                    result.append(fxn(*cmd_args))
+                else:
+                    result.append(fxn())
+            except Exception as e:
+                _LOGGER.error(f"{e}")
+                _LOGGER.error(f"PyMOL function call '{cmd_str}' resulted in an error. Exiting...")
                 exit(1)
 
         return result
@@ -518,6 +547,113 @@ class PyMolInterface(BaseInterface):
         lines = list(filter(lambda ll: ll[0] != '>', lines))
         return ''.join(lines)
 
+    def create_cluster(self, session, fname: str, sele_str: str, outfile: str = None, cap_strategy: str = 'H', work_dir: str = None) -> str:
+        """TODO(CJ)"""
+
+        if work_dir is None:
+            work_dir = eh_config['system.WORK_DIR']
+
+        fs.check_file_exists(fname)
+
+        if outfile is None:
+            temp_path = Path(fname)
+            outfile: str = f"{work_dir}/{temp_path.stem}_cluster{temp_path.suffix}"
+
+        #TODO(CJ): add file check for fname
+        obj_name: str = '__eh_cluster'
+        self.general_cmd(session, [('delete', 'all'), ('load', fname), ('select', sele_str), ('create', obj_name, sele_str),
+                                   ('delete', Path(fname).stem)])
+
+        df: pd.DataFrame = self.collect(session, 'memory', "chain resi resn name".split())
+
+        args = list()
+        for i, row in df.iterrows():
+            if row['name'] not in "N C".split():
+                continue
+
+            if not row.resn in THREE_LETTER_AA_MAPPER:
+                continue
+
+            args.extend([('valence', 'guess', f"chain {row.chain} and resi {row.resi} and resn {row.resn} and name {row['name']}"),
+                         ('h_add', f"chain {row.chain} and resi {row.resi} and resn {row.resn} and name {row['name']}")])
+
+        args.append(("save", outfile, obj_name))
+
+        self.general_cmd(session, args)
+
+        if cap_strategy == 'H':
+            return outfile
+
+        if cap_strategy == 'CH3':
+
+            args = []
+            orig = set(zip(df.chain, df.resi, df.resn, df['name']))
+            updated: pd.DataFrame = self.collect(session, 'memory', "chain resi resn name".split())
+            new = set(zip(updated.chain, updated.resi, updated.resn, updated['name']))
+
+            for (cname, res_num, res_name, aname) in filter(lambda x: x not in orig, new):
+                if aname == 'H01':
+                    new_name = 'C21'
+                elif aname == 'H02':
+                    new_name = 'C22'
+                else:
+                    #TODO(CJ): better error message
+                    self.general_cmd(session, [('save', '_____mess_up.pdb')])
+                    assert False, (cname, res_num, res_name, aname)
+                args.extend([
+                    ('alter', f"chain {cname} and resi {res_num} and resn {res_name} and name {aname}", "elem='C'"),
+                    ('alter', f"chain {cname} and resi {res_num} and resn {res_name} and name {aname}", f"name='{new_name}'"),
+                ])
+
+            self.general_cmd(session, args)
+
+            args = [('valence', 'guess', 'name C21 or name C22'), ('h_add', 'name C21'), ('h_add', 'name C22'), ("save", outfile, obj_name)]
+            self.general_cmd(session, args)
+
+        return outfile
+
+
+    def center_of_mass(self, session, sele:str='all', no_hydrogens:bool=True):
+        """TODO(CJ)
+        Args:
+            session:
+            sele:
+            no_hydrogens:
+
+        Returns:
+            The specified center of mass.
+        """
+        if no_hydrogens:
+            sele += " and (not elem H)"
+            
+        df = self.collect(session, 'memory', "x y z".split(), sele=sele)
+        return np.mean(np.array([df.x.to_numpy(), df.y.to_numpy(), df.z.to_numpy()]),axis=1)
+
+    def fetch(self, code: str, out_dir: str = None) -> str:
+        """
+
+        Args:
+            code:
+            out_dir
+
+        Returns:
+            The path to the
+        """
+        outfile = f"{code.upper()}.cif"
+        if len(code) == 3:
+            url: str = f"{self.config_.LIGAND_STEM}/{outfile}"
+        elif len(code) == 4:
+            url: str = f"{self.config_.STRUCTURE_STEM}/{outfile}"
+        else:
+            assert False
+
+        self.env_manager_.run_command(self.config_.WGET, [url])
+
+        if out_dir is not None:
+            outfile = fs.safe_mv(outfile, f"{out_dir}/")
+        #TODO(CJ): check if the file is downloaded
+        return outfile
+
 
 class OpenPyMolSession:
     """a context manager that open a pymol session once enter and close once exit"""
@@ -527,7 +663,7 @@ class OpenPyMolSession:
 
     def __enter__(self):
         """open a pymol session once enter"""
-        self.session = self.interface.new_pymol_session()
+        self.session = self.interface.new_session()
         return self.session
 
     def __exit__(self, exc_type, exc_val, exc_tb):
