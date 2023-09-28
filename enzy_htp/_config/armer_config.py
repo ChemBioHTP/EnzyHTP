@@ -11,9 +11,10 @@ Date: 2023-09-22"""
 from typing import Any, List
 from copy import deepcopy
 
+from .base_config import BaseConfig
 from enzy_htp.core import _LOGGER
 
-class ARMerConfig:
+class ARMerConfig(BaseConfig):
     """Class that holds ARMer settings for enzy_htp. Similar to other classes in this
     sub-module, SHOULD NOT be directly created by the end users. Instead, it should be 
     accessed via the singleton config variable.
@@ -48,36 +49,6 @@ class ARMerConfig:
         """A list of all required environment python modules for ARMerConfig."""
         return list()
 
-    def __getitem__(self, key: str) -> Any:
-        """Accessor for SystemConfig() that leverages [] operator syntax.
-
-        Args:
-            key: a str() key with the name of the variable you would like to access.
-
-        Returns:
-        """
-        if key.count("."):
-            _LOGGER.error(f"No nested variables currently exist in the SystemConfig() class. Exiting...")
-            exit(1)
-        else:
-            return getattr(self, key)
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        """Setter for SystemConfig() that leverages [] operator syntax.
-
-        Args:
-            key: a str() with the name of the variable you would like to update.
-            value: Whatever value you want to set the appropriate attribute to.
-
-        Returns:
-            Nothing
-        """
-        if key.count("."):
-            _LOGGER.error(f"No nested variables currently exist in the SystemConfig() class. Exiting...")
-            exit(1)
-
-        else:
-            setattr(self, key, value)
 
 def default_armer_config() -> ARMerConfig:
     """Creates a deep-copied default version of the ARMerConfig() class."""
