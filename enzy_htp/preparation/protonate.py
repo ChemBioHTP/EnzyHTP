@@ -19,7 +19,7 @@ import pandas as pd
 import enzy_htp.core as core
 import enzy_htp.chemical as chem
 from enzy_htp.core import file_system as fs
-from enzy_htp import config
+from enzy_htp import config as eh_config
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.structure import (Structure, Ligand, Chain, PDBParser)
 
@@ -129,7 +129,7 @@ def protonate_peptide_with_pdb2pqr(stru: Structure,
     sp = PDBParser()
     # manage the temp file path
     temp_path_list = []
-    scratch_dir = config["system.SCRATCH_DIR"]
+    scratch_dir = eh_config["system.SCRATCH_DIR"]
     if int_pdb_path is None:
         fs.safe_mkdir(scratch_dir)  # make them together into make_temp_file
         int_pdb_path = fs.get_valid_temp_name(f"{scratch_dir}/protonate_peptide_with_pdb2pqr_input.pdb")
@@ -246,7 +246,7 @@ def protonate_ligand_with_pybel(stru: Structure, ph: float = 7.0, int_ligand_fil
     sp = PDBParser()
     #work on the path
     if int_ligand_file_dir is None:
-        int_ligand_file_dir = config["system.SCRATCH_DIR"]
+        int_ligand_file_dir = eh_config["system.SCRATCH_DIR"]
     fs.safe_mkdir(int_ligand_file_dir)
 
     for ligand in stru.ligands:

@@ -82,3 +82,8 @@ class BadMutantStructure(Exception):
     """Exception corresponding to structure that didn't pass the check in
     enzy_htp.mutation.api.check_mutant_stru"""
     pass
+
+class InconsistentMDEngine(Exception):
+    """Exception corresponding to inconsistency of engine between MD building
+    blocks in enzy_htp.geometry.sampling"""
+    pass

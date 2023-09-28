@@ -5,6 +5,8 @@ only by the module. For each <Package> that EnzyHTP interfaces with, there shoul
 <Package>Interface in enzy_htp/_interface and a <Package>Config in enzy/_config. At present,
 there are configuration settings for the below packages by the given <Package>Config:
 
+    + SystemConfig
+    + ARMerConfig
     + AlphaFill, AlphaFillConfig 
     + AmberMD, AmberConfig
     + BCL, BCLConfig
@@ -39,6 +41,7 @@ from .pymol_config import PyMolConfig, default_pymol_config
 from .rdkit_config import RDKitConfig, default_rdkit_config
 from .rosetta_config import RosettaConfig, default_rosetta_config
 from .system_config import SystemConfig, default_system_config
+from .armer_config import ARMerConfig, default_armer_config
 from .xtb_config import XTBConfig, default_xtb_config
 
 from enzy_htp.core import _LOGGER
@@ -62,6 +65,7 @@ class Config:
         _rdkit: Private instace of RDKitConfig() with default settings.
         _rosetta: Private instance of RosettaConfig() with default settings.
         _system: Private instance of SystemConfig() with default settings.
+        _armer: Private instance of ARMerConfig() with default settings.
         _xtb: Private instance of XTBConfig() with default settings.
         _mapper: Helper dict() that maps between name of the package and its config. For internal use only.
     """
@@ -79,6 +83,7 @@ class Config:
         self._rdkit = default_rdkit_config()
         self._rosetta = default_rosetta_config()
         self._system = default_system_config()
+        self._armer = default_armer_config()
         self._xtb = default_xtb_config()
         self._mapper = {
             "alphafill": self._alphafill,
@@ -93,6 +98,7 @@ class Config:
             "rosetta": self._rosetta,
             "system": self._system,
             "xtb": self._xtb,
+            "armer": self._armer,
         }
 
     def __getitem__(self, key: str) -> Any:

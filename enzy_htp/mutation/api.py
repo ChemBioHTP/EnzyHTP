@@ -8,6 +8,9 @@ Mutation is carried out by an underlying engine and the supported engines curren
     + PyMOL
     + Rosetta
 
+The function naming format in the module:
+    Engine/Method:      {(sub_)science_api}_with_{engine/method}
+
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2022-10-24
 """

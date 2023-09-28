@@ -1,34 +1,30 @@
 """Defines an AmberInterface class that serves as a bridge for enzy_htp to utilize AmberMD software. Uses the AmberConfig class
-found in enzy_htp/molecular_mechanics/amber_config.py. Supported operations include minimization, 
-heating, constant pressure production, and constant pressure equilibration.
+found in enzy_htp/molecular_mechanics/amber_config.py. Supported operations include mutation with tLEaP, MolDynStep for module 
+MD steps that can be minimization, heating, constant pressure production, or constant pressure equilibration
+
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-02
 """
-import re, os
+import re
 import shutil
 from pathlib import Path
 from subprocess import CalledProcessError
 from typing import List, Tuple, Union, Dict, Any
 
-import pandas as pd
-from biopandas.pdb import PandasPdb
+from .base_interface import BaseInterface
 
-from enzy_htp.structure.structure_io import pdb_io
-
-from ..core.logger import _LOGGER
+from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import env_manager as em
 from enzy_htp.core.exception import UnsupportedMethod, tLEaPError
-import enzy_htp.structure as struct
-#import enzy_htp.preparation as prep
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
+from enzy_htp.structure.structure_io import pdb_io
+import enzy_htp.structure as struct
+# import enzy_htp.preparation as prep
 from enzy_htp import config as eh_config
 
-from .base_interface import BaseInterface
-
-
-class AmberInterface(BaseInterface):
+class AmberInterface(BaseInterface): # TODO(qz) EOD
     """Class that provides a direct inteface for enzy_htp to utilize AmberMD software. Supported operations
     minimization, heating constant pressure production, constant pressure equilibration, trajectory file
     conversion and mutation. Users should use this class as the only way to interact with any functionality

@@ -8,7 +8,7 @@ Date: 2022-03-19
 from __future__ import annotations
 import re
 import sys
-from typing import List, Tuple
+from typing import Any, List, Tuple
 from plum import dispatch
 
 import numpy as np
@@ -143,27 +143,51 @@ class Atom(DoubleLinkedNode):
         self._charge = val
 
     @property
-    def connect(self) -> List[Atom]:
-        """getter for _connect, the list for atoms it connects"""
+    def connect(self) -> List[Atom, str]:
+        """getter for _connect, the list for (atoms, bond_type) it connects"""
         if not self.is_connected():
             _LOGGER.warning(f"There are no connection info for {self}, Initiating it.")
             self.init_connect_in_caa()  # TODO(qz): make this also works for non-caa
         return self._connect
 
     @connect.setter
-    def connect(self, val):
+    def connect(self, val: List[Atom, str]):
         """setter of connect is nessessary for residue level objects to set connectivity for atoms
-        raise an error if called by non residue objects"""
-        allowed_caller_class = ["Residue"]
+        raise an error if called by non allowed objects.
+        raise an error if the assigned val doesn't align with the format"""
+
+        # 1. check for caller
+        allowed_caller_class = ["Residue", "Atom"] # add allowed class here, prob also the adaptor class for RDKit
         # determine caller class
         caller_locals = sys._getframe(1).f_locals
         if "self" in caller_locals:
             caller_class = caller_locals["self"].__class__.__name__
-            if caller_class in allowed_caller_class:
-                self._connect = val
-                return
-        _LOGGER.error(f"only calling from methods from {allowed_caller_class} is allowed")
-        sys.exit(1)
+            if caller_class not in allowed_caller_class:
+                _LOGGER.error(f"only calling from methods from {allowed_caller_class} is allowed")
+                sys.exit(1)
+        
+        # 2. check for data format
+        type(self)._check_assigning_connect_data_type(val)
+
+        # 3. assign the value if all passed
+        self._connect = val
+
+    @staticmethod
+    def _check_assigning_connect_data_type(val: Any) -> bool:
+        """Function used by the setter of connect. Check if the data format of val meetings the definiation.
+        The format is defined in this function.
+        Raise an error if the format is not met.
+        Format: [[Atom(), "bond_order_info"], ...]"""
+        check_pass = 1
+        if isinstance(val, list):
+            for i in val:
+                if isinstance(i, list):
+                    if isinstance(i[0], Atom):
+                        if isinstance(i[1], str): # TODO we can also check the format of bond info here (what format should we use?)
+                            continue
+                check_pass *= 0
+        if not check_pass:
+            raise TypeError("Assigning wrong data type for connect. Correct data type: [[Atom(), 'bond_order_info'], ...]")
 
     def init_connect_in_caa(self) -> None:  # this should actually go the residue class
         """
@@ -174,6 +198,7 @@ class Atom(DoubleLinkedNode):
         * Using standard Amber atom names and C/N terminal name.
           (TODO make this a standard and convert other atom name formats)
         save found list of Atom object to self._connect (make the object to a connected state)
+        TODO(qz) make sure also leave space for bond order info
         """
         connect = []
         parent_residue = self.parent
