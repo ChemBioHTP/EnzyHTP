@@ -3,6 +3,7 @@ Misc helper func and class
 '''
 from distutils.command.config import config
 import math
+import pickle
 from subprocess import CompletedProcess, SubprocessError, run
 import time
 import os
@@ -307,13 +308,16 @@ def delete_idx_line(target_line_str: str, idx: int) -> str:
     lines.pop(idx)
     return "\n".join(lines)
 
-def check_complete_metric_run(mutant: List[str], data_file_path: str) -> bool:
+def check_complete_metric_run(mutant: List[str], data_file_path: str, new_data: bool=False) -> bool:
     """Check if a mutation is fully finished in a typical enzy_htp run"""
     if not os.path.exists(data_file_path):
         return False
     data_dict_list = extract_enzy_htp_data(data_file_path)
     for data_dict in data_dict_list:
-        muta_flags = ["".join(x) for x in data_dict["TAG"]]
+        if new_data:
+            muta_flags = data_dict["TAG"]
+        else:
+            muta_flags = ["".join(x) for x in data_dict["TAG"]]
         if mutant == muta_flags:
             return True
     return False
