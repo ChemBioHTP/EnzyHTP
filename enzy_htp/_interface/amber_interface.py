@@ -1,6 +1,7 @@
 """Defines an AmberInterface class that serves as a bridge for enzy_htp to utilize AmberMD software. Uses the AmberConfig class
-found in enzy_htp/molecular_mechanics/amber_config.py. Supported operations include mutation with tLEaP, MolDynStep for module 
-MD steps that can be minimization, heating, constant pressure production, or constant pressure equilibration
+found in enzy_htp/molecular_mechanics/amber_config.py. Supported operations include mutation with tLEaP, MolDynParameterizer for MD,
+and MolDynStep for modular MD steps that can be minimization, heating, constant pressure production, or constant pressure
+equilibration.
 
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
@@ -21,42 +22,33 @@ from enzy_htp.core.exception import UnsupportedMethod, tLEaPError
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
 from enzy_htp.structure.structure_io import pdb_io
 import enzy_htp.structure as struct
-# import enzy_htp.preparation as prep
 from enzy_htp import config as eh_config
 
-class AmberInterface(BaseInterface): # TODO(qz) EOD
-    """Class that provides a direct inteface for enzy_htp to utilize AmberMD software. Supported operations
-    minimization, heating constant pressure production, constant pressure equilibration, trajectory file
-    conversion and mutation. Users should use this class as the only way to interact with any functionality
-    in Amber or associated tools like tleap.
+class AmberInterface(BaseInterface):
+    """Class that provides a direct inteface for enzy_htp to utilize AmberMD software.
+    Main supported operations:
+    MolDynStep: a modular MD step.
+    MolDynParameterizer: parameterizer for MD.
+    run_tleap: tleap interface and a series of tleap based operations like tleap_clean_up_stru.
+    TODO: add more
+    * Users should use this class as the only way to interact with any functionality
+      in Amber or associated tools like tleap or cpptraj.
 
     Attributes:
         config_	: The AmberConfig() class which provides settings for both running Amber and maintaining a compatible environment.
-        env_manager_ : The EnvironmentManager() class which ensure all required environment elements exist.
+        env_manager_ : The EnvironmentManager() that interface with the shell and ensure all required environment elements exist.
         compatible_env_ : A bool() indicating if the current environment is compatible with the object itself.
     """
 
     def __init__(self, parent, config: AmberConfig = None) -> None:
         """Simplistic constructor that optionally takes an AmberConfig object as its only argument.
-        Calls parent class.
-        """
+        Calls parent class."""
         super().__init__(parent, config, default_amber_config)
 
-    # == interface general == TODO: go to a class
-    def config(self) -> AmberConfig:
-        """Getter for the AmberConfig() instance belonging to the class."""
-        return self.config_
-
+    # == interface general ==
     def display_config(self) -> None:
         """Prints all settings for the object's AmberConfig() inteface to stdout using AmberConfig.display()."""
         self.config_.display()
-
-    def compatible_environment(self) -> bool:
-        """Checks if the current environment is compatible with all possible needs for the AmberInterface.
-        Returns:
-                Whether the current environment is suitable for the AmberInterface().
-        """
-        return self.compatible_env_
 
     # == minimization-related? ==
     def write_minimize_input_file(self, fname: str, cycle: int) -> None:

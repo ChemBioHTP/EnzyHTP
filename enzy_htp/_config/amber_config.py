@@ -9,12 +9,15 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 
 Date: 2022-06-02
 """
+import os
 from pprint import pprint
 from copy import deepcopy
 from typing import Any, List, Dict
 
 from .base_config import BaseConfig
 
+from enzy_htp.core.general import get_str_for_print_class_var
+from enzy_htp.core.logger import _LOGGER
 
 class AmberConfig(BaseConfig):
     """Class that holds default values for running Amber within enzy_htp and also creates
@@ -155,33 +158,12 @@ class AmberConfig(BaseConfig):
         """ """
         return list()
 
-    def display(self) -> None:
-        """Method that prints out all settings for the AmberConfig() object to the stdout."""
+    @classmethod
+    def display(cls) -> None:
+        """Method that prints out all settings for the AmberConfig class to the stdout."""
         dash_line: str = "-" * 40
-        print("AmberConfig() settings:")
-        print(dash_line)
-        print(f"HOME = {self.HOME}")
-        print(dash_line)
-        print(f"CPU_ENGINE = {self.CPU_ENGINE}")
-        print(dash_line)
-        print(f"GPU_ENGINE = {self.GPU_ENGINE}")
-        print(dash_line)
-        print(f"BOX_TYPE = {self.BOX_TYPE}")
-        print(dash_line)
-        print(f"BOX_SIZE = {self.BOX_SIZE}")
-        print(dash_line)
-        print("CONF_MIN:")
-        pprint(self.CONF_MIN)
-        print(dash_line)
-        print("CONF_HEAT:")
-        pprint(self.CONF_HEAT)
-        print(dash_line)
-        print("CONF_EQUI:")
-        pprint(self.CONF_EQUI)
-        print(dash_line)
-        print("CONF_PROD:")
-        pprint(self.CONF_PROD)
-        print(dash_line)
+        dis_info = f"AmberConfig settings:{os.linesep}{dash_line}{get_str_for_print_class_var(cls)}"
+        _LOGGER.info(dis_info)
 
     def __getitem__(self, key: str) -> Any:
         """Getter that enables [] accession of AmberConfig() attributes."""
