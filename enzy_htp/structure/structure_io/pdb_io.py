@@ -124,6 +124,20 @@ class PDBParser(StructureParserInterface):
         return Structure(chain_list)
 
     @classmethod
+    def save_structure(
+                    cls,
+                    outfile:str,
+                    stru: Structure,
+                    if_renumber: bool = True,
+                    if_fix_atomname: bool = True ) -> str:
+        """TODO(CJ): documentation"""            
+        content:str = cls.get_file_str( stru, if_renumber, if_fix_atomname )
+
+        fs.write_lines( outfile, content.splitlines() )
+
+        return outfile
+
+    @classmethod
     @dispatch
     def get_file_str(cls, stru: Chain, if_renumber: bool = True, if_fix_atomname: bool = True) -> str:  # pylint: disable=function-redefined
         """

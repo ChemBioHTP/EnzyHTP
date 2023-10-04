@@ -33,6 +33,7 @@ from .align_ligand import align_ligand
 from .constrained_docking import constrained_docking
 
 #TODO(CJ): for the RosettaLigand version, set the COM to the COM of the constrained residue
+#TODO(CJ): need to start switching everything to Structure and Ligand objects instead of random str()'s
 def place_ligand(molfile: str,
                  ligand: str,
                  code: str = None,
@@ -44,7 +45,7 @@ def place_ligand(molfile: str,
                  n_struct:int = 50,
                  use_cache:bool = True,
                  **kwargs) -> Tuple[str, str]:
-    """Protocol for placing a ligand into an enzyme,  
+    """Protocol for placing a ligand into an enzyme in an unoptimized manner.
 
     Args:
         molfile:
