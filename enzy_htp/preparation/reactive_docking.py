@@ -95,7 +95,7 @@ def dock_reactants(structure: Structure,
             else:
                 docked_complexes.append(rc)
 
-    chain_names: List[str] = _ligand_chain_names(start_pdb)
+    chain_names: List[str] = _ligand_chain_names(structure)
 
     #TODO(CJ): a lot of this can be combined to a bigger function
     (start_pdb, cst_file) = _integrate_csts(structure, constraints, work_dir, use_cache)
@@ -818,7 +818,7 @@ def _mutate_result(structure, mutations: List[List[mm.Mutation]], work_dir: str,
     return result
 
 
-def _ligand_chain_names(start_pdb: str) -> List[str]:
+def _ligand_chain_names(structure: Structure) -> List[str]:
     """TODO(CJ): 
     Args:
 
@@ -826,21 +826,15 @@ def _ligand_chain_names(start_pdb: str) -> List[str]:
     """
     #TODO(CJ): change to reactant names
     _LOGGER.info(f"Quick analysis of reactant-enzyme system...")
-    fs.check_file_exists(start_pdb)
-    session = interface.pymol.new_session()
-    df: pd.DataFrame = interface.pymol.collect(session, start_pdb, "chain resn".split())
+
 
     result: List[str] = list()
-
-    for i, row in df.iterrows():
-
-        if row.resn in chem.THREE_LETTER_AA_MAPPER:
+    for rr in structure.residues:
+       
+        if rr.is_canonical() or rr.is_metal():
             continue
 
-        if row.resn.upper() in chem.METAL_CENTER_MAP:
-            continue
-
-        result.append((row.chain, row.resn))
+        result.append((rr.chain.name, rr.name))
 
     #TODO(CJ): worry about no reactants later? or is this even a problem
     _LOGGER.info("Detected reactants:")

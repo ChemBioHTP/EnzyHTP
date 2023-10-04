@@ -80,7 +80,7 @@ class GaussianConfig(BaseConfig):
 
     def required_executables(self) -> List[str]:
         """ """
-        return [self.G16_EXE, self.G09_EXE]
+        return [self.G16_EXE]
 
     def required_env_vars(self):
         """ """

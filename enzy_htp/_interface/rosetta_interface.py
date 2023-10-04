@@ -4,6 +4,8 @@ relaxation (minimization), scoring, ligand parameterization, and the ability to 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-03-28
 """
+from __future__ import annotations
+
 import re
 import shutil
 from pathlib import Path
@@ -66,6 +68,21 @@ class RosettaCst:
         """A way to show each RosettaCst object. Specifies the constrained residues and constraint types."""
 
         return f"RosettaCst(res1={self.rchain_1}.{self.rnum_1}.{self.rname_1},res2={self.rchain_2}.{self.rnum_2}.{self.rname_2},constrained={','.join(map(lambda cc: cc[0], self.constraints))})"
+
+    def clone(self) -> RosettaCst:
+        """Creates a deepcopied clone of the RosettaCst."""
+        return RosettaCst(
+            parent=self.parent_,
+            rname_1=self.rname_1,
+            rnum_1=self.rnum_1,
+            ratoms_1=self.ratoms_1,
+            rchain_1=self.rchain_1,
+            rname_2=self.rname_2,
+            rnum_2=self.rnum_2,
+            ratoms_2=self.ratoms_2,
+            rchain_2=self.rchain_2,
+            constraints=self.constraints)
+
 
 
     def remove_constraint(self, cst_name:str) -> None:

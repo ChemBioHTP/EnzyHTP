@@ -47,7 +47,7 @@ def place_ligand(molfile: str,
     """Protocol for placing a ligand into an enzyme,  
 
     Args:
-        molfile:
+        molfile: 
         ligand:
         code:
         method:
@@ -74,7 +74,6 @@ def place_ligand(molfile: str,
     elif method == "mole2":
         pass
         placed_ligand = _place_mole2(molfile, ligand, constraints=constraints, new_res_key=new_res_key, work_dir=work_dir, **kwargs)
-        #place_ligand = _place_rosetta_ligand(molfile, ligand, new_res_key=new_res_key, work_dir=work_dir, constraints=constraints, n_struct=n_struct, use_cache=use_cache, **kwargs)
     else:
         _LOGGER.error(
             f"The supplied method placement method {method} is not supported. Allowed methods are 'alphafill' and 'mole2'. Exiting..."
@@ -103,8 +102,20 @@ def place_ligand(molfile: str,
 
     return (outfile, placed_ligand)
 
-def _place_mole2(molfile, ligand, constraints, new_res_key, work_dir:str, **kwargs) -> str:
-    """TODO(CJ)"""
+def _place_mole2(molfile:str, ligand:str, constraints:List[RosettaCst], new_res_key:Tuple, work_dir:str, **kwargs) -> str:
+    """
+    
+    Args:
+        molfile:
+        ligand:
+        constraints:
+        new_res_key:
+        work_dir:
+
+    Returns:
+        
+
+    """
     #TODO(CJ): check how many atoms fit in the molecule
     if not work_dir:
         work_dir = config['system.SCRATCH_DIR']
@@ -114,7 +125,7 @@ def _place_mole2(molfile, ligand, constraints, new_res_key, work_dir:str, **kwar
     #TODO(CJ): probably need to deepcopy these
     for cc in constraints:
         if cc.contains(new_res_key[0], new_res_key[1]):
-            relevant_constraints.append(cc)
+            relevant_constraints.append(cc.clone())
 
     for rc in relevant_constraints:
         rc.remove_constraint('angle_A')
@@ -129,8 +140,6 @@ def _place_mole2(molfile, ligand, constraints, new_res_key, work_dir:str, **kwar
 
 
     cavities:List[Mole2Cavity] = interface.mole2.identify_cavities(molfile)
-    for cc in cavities:
-        print(cc, cc.center_of_mass(), cc.volume())
 
     session = interface.pymol.new_session()
     interface.pymol.general_cmd(session, [('load', molfile)])
