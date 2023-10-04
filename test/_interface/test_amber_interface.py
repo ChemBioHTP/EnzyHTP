@@ -1,5 +1,6 @@
-"""Testing the enzy_htp.molecular_mechanics.AmberInterface class.
+"""Testing the enzy_htp._interface.AmberInterface class.
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Author: QZ Shao <shaoqz@icloud.com>
 Date: 2022-06-03
 """
 import os
@@ -26,7 +27,7 @@ TARGET_MINIMIZE_INPUT_2 = f"{MM_DATA_DIR}/target_min_2.inp"
 ANTECHAMBER_FNAMES = "ANTECHAMBER_AC.AC ANTECHAMBER_AC.AC0 ANTECHAMBER_AM1BCC.AC ANTECHAMBER_AM1BCC_PRE.AC ANTECHAMBER_BOND_TYPE.AC ANTECHAMBER_BOND_TYPE.AC0 ANTECHAMBER_PREP.AC ANTECHAMBER_PREP.AC0 ATOMTYPE.INF NEWPDB.PDB PREP.INF sqm.in sqm.out sqm.pdb".split(
 )
 
-
+# region Tools
 def touch(fname: Union[str, Path]):
     if not isinstance(fname, Path):
         fpath = Path(fname)
@@ -55,7 +56,115 @@ def files_equivalent(fname1: str, fname2: str) -> bool:
             return False
 
     return True
+# endregion Tools
 
+def test_run_tleap():
+    """test function runs as expected"""
+    ai = interface.amber
+    temp_test_file = f"{MM_BASE_DIR}/work_dir/test_run_tleap.pdb"
+    tleap_in_str = f"""source leaprc.protein.ff14SB
+a = loadpdb {MM_DATA_DIR}KE_07_R7_2_S.pdb
+savepdb a {temp_test_file}
+quit
+"""
+
+    ai.run_tleap(tleap_in_str)
+
+    assert os.path.exists(temp_test_file)
+    with open(temp_test_file) as f:
+        assert len(f.readlines()) == 3981
+    if _LOGGER.level > 10:
+        assert not os.path.exists(f"{eh_config['system.SCRATCH_DIR']}/tleap.out")
+        assert not os.path.exists(f"{eh_config['system.SCRATCH_DIR']}/tleap.in")
+    fs.safe_rm(temp_test_file)
+
+
+def test_run_tleap_dev():
+    """develop use test function. Dont do any assert"""
+    ai = interface.amber
+    test_input_pdb = f"{MM_DATA_DIR}KE_07_R7_2_S.pdb"
+    temp_test_file = f"{MM_BASE_DIR}/work_dir/test_run_tleap.pdb"
+    tleap_in_str = f"""source leaprc.protein.ff14SB
+a = loadpdb {test_input_pdb}
+savepdb a {temp_test_file}
+quit
+"""
+
+    ai.run_tleap(tleap_in_str, additional_search_path=["./", "../"])
+    fs.safe_rm(temp_test_file)
+
+
+def test_run_tleap_w_error(caplog):
+    """test if the function captures the a errored run of tleap"""
+    ai = interface.amber
+    temp_test_pdb = f"{MM_BASE_DIR}/work_dir/test_run_tleap.pdb"
+    temp_test_prmtop = f"{MM_BASE_DIR}/work_dir/test_run_tleap.prmtop"
+    temp_test_inpcrd = f"{MM_BASE_DIR}/work_dir/test_run_tleap.inpcrd"
+    # e1
+    tleap_in_str = f"""source leaprc.protein.ff24SB
+a = loadpdb {MM_DATA_DIR}KE_07_R7_2_S.pdb
+savepdb a {temp_test_pdb}
+quit
+"""
+    with pytest.raises(tLEaPError) as e:
+        ai.run_tleap(tleap_in_str)
+    assert "Could not open file leaprc.protein.ff24SB: not found" in caplog.text
+    # e2
+    tleap_in_str = f"""source leaprc.protein.ff14SB
+a = loadpdb {MM_DATA_DIR}KE_07_R7_2_R.pdb
+savepdb a {temp_test_pdb}
+quit
+"""
+    with pytest.raises(tLEaPError) as e:
+        ai.run_tleap(tleap_in_str)
+    assert "KE_07_R7_2_R.pdb: No such file or directory" in caplog.text
+    # e3
+    tleap_in_str = f"""source leaprc.protein.ff14SB
+a = loadpdb {MM_DATA_DIR}KE_07_R7_2_S.pdb
+saveamberparm a {temp_test_prmtop} {temp_test_inpcrd}
+quit
+"""
+    with pytest.raises(tLEaPError) as e:
+        ai.run_tleap(tleap_in_str)
+
+    fs.safe_rm(temp_test_pdb)
+    fs.safe_rm(temp_test_prmtop)
+    fs.safe_rm(temp_test_inpcrd)
+
+
+def test_find_tleap_error():
+    """make sure the function correctly find all the errors in example files"""
+    ai = interface.amber
+    ERR_EXP_DIR = f"{MM_DATA_DIR}tleap_errors/"
+    error_example_and_reason = [
+        (f"{ERR_EXP_DIR}e1.out", ["Could not open file leaprc.protein.ff24SB: not found"]),
+        (f"{ERR_EXP_DIR}e2.out", ["FATAL:  Atom .R<H5J 254>.A<NAL 2> does not have a type.", "Failed to generate parameters"]),
+    ]
+
+    for error_file, error_key_list in error_example_and_reason:
+        tleap_error = ai._find_tleap_error(error_file)
+        for error_key in error_key_list:
+            assert error_key in tleap_error.error_info_str
+
+
+def test_tleap_clean_up_stru(helpers):
+    """make sure the function correctly find all the errors in example files.
+    the test file is a truncated KE pdb also deleted the side chain atoms of residue 4
+    and changed its name to TRP mimiking a mutation sceniro."""
+    ai = interface.amber
+    test_input_pdb = f"{MM_DATA_DIR}tleap_clean_up_test_KE.pdb"
+    test_out_path = f"{MM_WORK_DIR}tleap_clean_up_out.pdb"
+    test_answer_path = f"{MM_DATA_DIR}tleap_clean_up_answer_KE.pdb"
+
+    ai.tleap_clean_up_stru(test_input_pdb, test_out_path, if_align_index=True)
+
+    assert helpers.equiv_files(test_out_path, test_answer_path)
+    fs.safe_rm(test_out_path)
+
+
+def test_build_md_paramete
+
+# region TODO
 
 def test_write_minimize_input_file():
     """Testing that minimization input files are generated correctly."""
@@ -270,106 +379,4 @@ def test_add_charges_bad_file():
 
     assert exe
 
-
-def test_run_tleap():
-    """test function runs as expected"""
-    ai = interface.amber
-    temp_test_file = f"{MM_BASE_DIR}/work_dir/test_run_tleap.pdb"
-    tleap_in_str = f"""source leaprc.protein.ff14SB
-a = loadpdb {MM_DATA_DIR}KE_07_R7_2_S.pdb
-savepdb a {temp_test_file}
-quit
-"""
-
-    ai.run_tleap(tleap_in_str)
-
-    assert os.path.exists(temp_test_file)
-    with open(temp_test_file) as f:
-        assert len(f.readlines()) == 3981
-    if _LOGGER.level > 10:
-        assert not os.path.exists(f"{eh_config['system.SCRATCH_DIR']}/tleap.out")
-        assert not os.path.exists(f"{eh_config['system.SCRATCH_DIR']}/tleap.in")
-    fs.safe_rm(temp_test_file)
-
-
-def test_run_tleap_dev():
-    """develop use test function. Dont do any assert"""
-    ai = interface.amber
-    test_input_pdb = f"{MM_DATA_DIR}KE_07_R7_2_S.pdb"
-    temp_test_file = f"{MM_BASE_DIR}/work_dir/test_run_tleap.pdb"
-    tleap_in_str = f"""source leaprc.protein.ff14SB
-a = loadpdb {test_input_pdb}
-savepdb a {temp_test_file}
-quit
-"""
-
-    ai.run_tleap(tleap_in_str, additional_search_path=["./", "../"])
-    fs.safe_rm(temp_test_file)
-
-
-def test_run_tleap_w_error(caplog):
-    """test if the function captures the a errored run of tleap"""
-    ai = interface.amber
-    temp_test_pdb = f"{MM_BASE_DIR}/work_dir/test_run_tleap.pdb"
-    temp_test_prmtop = f"{MM_BASE_DIR}/work_dir/test_run_tleap.prmtop"
-    temp_test_inpcrd = f"{MM_BASE_DIR}/work_dir/test_run_tleap.inpcrd"
-    # e1
-    tleap_in_str = f"""source leaprc.protein.ff24SB
-a = loadpdb {MM_DATA_DIR}KE_07_R7_2_S.pdb
-savepdb a {temp_test_pdb}
-quit
-"""
-    with pytest.raises(tLEaPError) as e:
-        ai.run_tleap(tleap_in_str)
-    assert "Could not open file leaprc.protein.ff24SB: not found" in caplog.text
-    # e2
-    tleap_in_str = f"""source leaprc.protein.ff14SB
-a = loadpdb {MM_DATA_DIR}KE_07_R7_2_R.pdb
-savepdb a {temp_test_pdb}
-quit
-"""
-    with pytest.raises(tLEaPError) as e:
-        ai.run_tleap(tleap_in_str)
-    assert "KE_07_R7_2_R.pdb: No such file or directory" in caplog.text
-    # e3
-    tleap_in_str = f"""source leaprc.protein.ff14SB
-a = loadpdb {MM_DATA_DIR}KE_07_R7_2_S.pdb
-saveamberparm a {temp_test_prmtop} {temp_test_inpcrd}
-quit
-"""
-    with pytest.raises(tLEaPError) as e:
-        ai.run_tleap(tleap_in_str)
-
-    fs.safe_rm(temp_test_pdb)
-    fs.safe_rm(temp_test_prmtop)
-    fs.safe_rm(temp_test_inpcrd)
-
-
-def test_find_tleap_error():
-    """make sure the function correctly find all the errors in example files"""
-    ai = interface.amber
-    ERR_EXP_DIR = f"{MM_DATA_DIR}tleap_errors/"
-    error_example_and_reason = [
-        (f"{ERR_EXP_DIR}e1.out", ["Could not open file leaprc.protein.ff24SB: not found"]),
-        (f"{ERR_EXP_DIR}e2.out", ["FATAL:  Atom .R<H5J 254>.A<NAL 2> does not have a type.", "Failed to generate parameters"]),
-    ]
-
-    for error_file, error_key_list in error_example_and_reason:
-        tleap_error = ai._find_tleap_error(error_file)
-        for error_key in error_key_list:
-            assert error_key in tleap_error.error_info_str
-
-
-def test_tleap_clean_up_stru(helpers):
-    """make sure the function correctly find all the errors in example files.
-    the test file is a truncated KE pdb also deleted the side chain atoms of residue 4
-    and changed its name to TRP mimiking a mutation sceniro."""
-    ai = interface.amber
-    test_input_pdb = f"{MM_DATA_DIR}tleap_clean_up_test_KE.pdb"
-    test_out_path = f"{MM_WORK_DIR}tleap_clean_up_out.pdb"
-    test_answer_path = f"{MM_DATA_DIR}tleap_clean_up_answer_KE.pdb"
-
-    ai.tleap_clean_up_stru(test_input_pdb, test_out_path, if_align_index=True)
-
-    assert helpers.equiv_files(test_out_path, test_answer_path)
-    fs.safe_rm(test_out_path)
+# endregion TODO

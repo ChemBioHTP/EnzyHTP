@@ -21,7 +21,7 @@ def test_md_simulation_amber_no_repeat():
     """Test running a non-replica MD.
     Using Amber & Accre as an example engine"""
     test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
-    test_param_method = amber_interface.TODO
+    test_param_method = amber_interface.build_md_parameterizer()
     step_1 = amber_interface.TODO
     step_2 = amber_interface.TODO
     step_3 = amber_interface.TODO

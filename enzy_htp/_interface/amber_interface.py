@@ -14,6 +14,7 @@ from subprocess import CalledProcessError
 from typing import List, Tuple, Union, Dict, Any
 
 from .base_interface import BaseInterface
+from .handle_types import MolDynParameterizer, MolDynParameter, MolDynStep
 
 from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
@@ -21,9 +22,57 @@ from enzy_htp.core import env_manager as em
 from enzy_htp.core.exception import UnsupportedMethod, tLEaPError
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
 from enzy_htp.structure.structure_io import pdb_io
-import enzy_htp.structure as struct
+from enzy_htp.structure import Structure
 from enzy_htp import config as eh_config
 
+class AmberParameter(MolDynParameter):
+    """the Amber format MD parameter. Enforce the Amber parameter format
+    in AmberMDStep.
+    Attribute:
+        inpcrd: the path of the .inpcrd input coordinate file
+        prmtop: the path of the .prmtop parameter topology file"""
+
+    def __init__(self, inpcrd_path: str, prmtop_path: str):
+        self.inpcrd = inpcrd_path
+        self.prmtop = prmtop_path
+
+    @property
+    def engine(self) -> str:
+        return "Amber"
+    
+    def get_solvated_structure(self) -> Structure:
+        """get the solvated structure corresponding to the parameters"""
+        pass # TODO do we really need this?
+
+class AmberParameterizer(MolDynParameterizer):
+    """the MD parameterizer for Amber.
+    Attributes: (configuration of the parameterization process)
+        pass"""
+
+    def __init__(self) -> None:
+        pass
+
+    @property
+    def engine(self) -> str:
+        return "Amber"
+
+    def run(self, stru: Structure) -> AmberParameter:
+        """the parameterizer convert stru to amber parameter (inpcrd, prmtop)"""
+
+
+class AmberMDStep(MolDynStep):
+    """the modular MD step of Amber.
+    Attributes: (necessary information of the modular MD step)
+        pass"""
+
+    def __init__(self) -> None:
+        pass
+
+    @property
+    def engine(self) -> str:
+        return "Amber"
+
+ 
 class AmberInterface(BaseInterface):
     """Class that provides a direct inteface for enzy_htp to utilize AmberMD software.
     Main supported operations:
@@ -50,7 +99,201 @@ class AmberInterface(BaseInterface):
         """Prints all settings for the object's AmberConfig() inteface to stdout using AmberConfig.display()."""
         self.config_.display()
 
-    # == minimization-related? ==
+    # == general amber app interface ==
+    # -- tleap --
+    def run_tleap(
+        self,
+        tleap_in_str: str,
+        # cmd based
+        if_ignore_start_up: bool = True,
+        additional_search_path: List[str] = None,
+        tleap_out_path: str = None,
+    ) -> None:
+        """the python wrapper of running tleap
+        Args:
+            tleap_in_str:
+                the str content of leap.in file
+            if_ignore_start_up:
+                if adding the '-s' flag to ignore leaprc startup file.
+            additional_search_path:
+                list of addition search path of leaprc files. Each path
+                in the list will be applied using a '-I' flag.
+            tleap_out_path:
+                file path for stdout of the tleap command. the _LOGGER level
+                determines if delete the file.
+
+        NOTE: run_tleap API should not handle the index alignment since it do
+        not carry information of the input pdb"""
+        temp_path_list = []
+        # init file paths (tleap_in_path, tleap_out_path)
+        fs.safe_mkdir(eh_config["system.SCRATCH_DIR"])
+        tleap_in_path = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/tleap.in")
+        temp_path_list.extend([eh_config["system.SCRATCH_DIR"], tleap_in_path])
+        if tleap_out_path is None:
+            tleap_out_path = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/tleap.out")
+            temp_path_list.append(tleap_out_path)
+        # write tleap.in
+        with open(tleap_in_path, "w") as of:
+            of.write(tleap_in_str)
+        # run tleap command
+        cmd_args = f"-f {tleap_in_path} > {tleap_out_path}"
+        if if_ignore_start_up:
+            cmd_args = f"-s {cmd_args}"
+        if additional_search_path:
+            for add_path in additional_search_path:
+                cmd_args = f"{cmd_args} -I {add_path}"
+        try:
+            self.env_manager_.run_command("tleap", cmd_args)
+        except CalledProcessError as e:
+            if (not e.stderr.strip()) and (not e.stdout.strip()):  # empty stderr & stdout
+                # find the error information in tleap.out
+                new_e = self._find_tleap_error(tleap_out_path)
+                # express the error
+                for e_info in new_e.error_info_list:
+                    _LOGGER.error(e_info)
+                raise new_e from e
+
+        # clean up temp file if success
+        fs.clean_temp_file_n_dir(temp_path_list)
+
+    @staticmethod
+    def _find_tleap_error(tleap_out_path: str) -> tLEaPError:
+        """an internal used function that find the text describing the error
+        from a tleap output file
+        Return a tLEaPError containing all the error information"""
+        error_info_pattern = r"(.*(?:FATAL|Fatal).*\n(?:.*\n)+?)(?:(?:Exiting LEaP:)|/)"
+        with open(tleap_out_path) as f:
+            error_info_list = re.findall(error_info_pattern, f.read())
+            error_info_list = [i.strip() for i in error_info_list]
+            if not error_info_list:
+                _LOGGER.warning("did not found any error in tleap out file. Here is the complete output:")
+                _LOGGER.warning(f.read())
+
+        return tLEaPError(error_info_list)
+
+    # -- cpptraj --
+
+    # -- sander --
+
+    # -- pmemd --
+
+    # == engines ==
+    # (engines for science APIs)
+    # -- mutation/clean up --
+    def tleap_clean_up_stru(
+        self,
+        input_pdb: str,
+        out_path: str,
+        if_align_index: bool = True,
+        amber_lib: str = "leaprc.protein.ff14SB",
+    ) -> None:
+        """Method that uses tleap to clean up {input_pdb} by loading and saving the PDB with
+        the {amber_lib}.
+        Typical changes are:
+            - complete missing atoms based on the AA defination in {amber_lib}
+            of the correponding residue name
+            - change terminal atom names
+            - (if_align_index = False)renumber residue index and atom index from 1 and
+            ignore chain index
+            - add TER around all residue unit that is not recognized or is a ligand.
+            (The might be harmful when a structure have a modified animo acid TODO)
+
+        Args:
+            input_pdb:
+                the path of the input pdb for cleaning
+            out_path:
+                the path of the output pdb after cleaning
+            if_align_index:
+                whether or not align index back after cleaning.
+            amber_lib:
+                the amber library used for cleaning.
+
+        Application:
+            Used in mutation.api.mutate_stru_with_tleap()"""
+
+        tleap_in_lines: List[str] = [
+            f"source {amber_lib}",
+            f"a = loadpdb {input_pdb}",
+            f"savepdb a {out_path}",
+            "quit",
+        ]
+        tleap_in_str = "\n".join(tleap_in_lines)
+        self.run_tleap(tleap_in_str)
+        if if_align_index:
+            # temp file
+            temp_dir = eh_config["system.SCRATCH_DIR"]
+            fs.safe_mkdir(temp_dir)
+            renumbered_pdb = fs.get_valid_temp_name(f"{temp_dir}/tleap_out_renumbered.pdb")
+            # renumber
+            index_mapper = pdb_io.get_index_mapper_from_pdb(out_path, input_pdb, method="by_order")
+            pdb_io.restore_pdb_index(index_mapper, out_path, renumbered_pdb)
+            shutil.move(renumbered_pdb, out_path)
+            fs.clean_temp_file_n_dir([temp_dir, renumbered_pdb])
+
+    def build_md_parameterizer(
+            self,
+            # TODO put most of below in config so that user can batch assign
+            # charge
+            charge_method: str = "AM1BCC",
+            resp_engine: str = "g16",
+            resp_lvl_of_theory: str = "b3lyp/def2svp em=d3",
+            # workflow
+            ncaa_param_lib_path: str = "../ncaa_param",
+            force_renew_ncaa_parameter: bool = False,
+            ncaa_net_charge_engine: str = "PYBEL",
+            ncaa_net_charge_ph: float = 7.0,
+            solvate_box_type: str = "oct",
+            solvate_box_size: float = 10.0,
+            # mod_aa_engine TODO ask if the other way really work
+            # GB related
+            gb_radii: str = None,
+            # temp paths
+            temp_wk_dir: str = None, # default: {config[system.SCRATCH_DIR]}/amber_parameterizer
+            additional_tleap_lines: List[str] = None,
+            ) -> AmberParameterizer:
+        """the constructor for AmberParameterizer
+        Args:
+            charge_method:
+                The method used for determine the atomic charge.
+                This method is applied to parameterization of ligand, modified AA,
+                and metal binding site.
+            (the following args only apply when charge_method="RESP")
+                resp_engine:
+                    The engine for calculating the RESP charge.
+                resp_lvl_of_theory:
+                    The level of theory for calculating the RESP charge
+            ncaa_param_lib_path:
+                The path of the non-CAA parameter library. This is where all generated
+                NCAA params goes to. It will prevent redundant generation of same NCAAs.
+                Normally we suggest setting this to a directory that contains all workflows
+                of a same wild-type/template enzyme.
+                * The NCAA-file correspondence is determined by the 
+                  (1) 3-letter name in the file
+                  (2) (if not 1 not exist) the file name
+                * Setting this to a path that is too general may cause conflict when different
+                NCAAs have the same name. (e.g.: different tautomer or general res name like LIG)
+            force_renew_ncaa_parameter:
+                Whether force renew the parameter files (frcmod etc.) for all ncaa
+                (ligand, mod AA, or metal)
+            ncaa_net_charge_engine:
+                The engine the determines the net charge of NCAA if none is assigned in NCAA objects (Ligand,
+                ModifedResidue TODO, MetalUnit)
+            ncaa_net_charge_ph:
+                The pH value used in determining the net charge of NCAA.
+            solvate_box_type:
+                The shape of the solvation box.
+            solvate_box_size:
+                The size of the solvation box.
+            gb_radii:
+                The effective GB radii used in the Generalized Born calculation. This will influence
+                the GB radii in the prmtop file and are only used implicit solvent calculations.
+            temp_wk_dir:
+                The temporary working directory that contains all the files generated by the AmberParameterizer
+            additional_tleap_lines:
+                handle for adding additional tleap lines before generating the parameters."""
+            #TODO eod
+        
+    # region == TODO ==
     def write_minimize_input_file(self, fname: str, cycle: int) -> None:
         """Creates a minimization file to be used in an amber run. SHOULD NOT BE CALLED BY USERS DIRECTLY.
         All parameters in the &ctrl block are hardcoded except for ncyc and ntpr, which are 0.5*cycle
@@ -508,75 +751,6 @@ class AmberInterface(BaseInterface):
 
         return prod_nc
 
-    def run_tleap(
-        self,
-        tleap_in_str: str,
-        # cmd based
-        if_ignore_start_up: bool = True,
-        additional_search_path: List[str] = None,
-        tleap_out_path: str = None,
-    ) -> None:
-        """the python wrapper of running tleap
-        Args:
-            tleap_in_str:
-                the str content of leap.in file
-            if_ignore_start_up:
-                if adding the '-s' flag to ignore leaprc startup file.
-            additional_search_path:
-                list of addition search path of leaprc files. Each path
-                in the list will be applied using a '-I' flag.
-            tleap_out_path:
-                file path for stdout of the tleap command. the _LOGGER level
-                determines if delete the file.
-
-        NOTE: run_tleap API should not handle the index alignment since it do
-        not carry information of the input pdb"""
-        temp_path_list = []
-        # init file paths (tleap_in_path, tleap_out_path)
-        fs.safe_mkdir(eh_config["system.SCRATCH_DIR"])
-        tleap_in_path = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/tleap.in")
-        temp_path_list.extend([eh_config["system.SCRATCH_DIR"], tleap_in_path])
-        if tleap_out_path is None:
-            tleap_out_path = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/tleap.out")
-            temp_path_list.append(tleap_out_path)
-        # write tleap.in
-        with open(tleap_in_path, "w") as of:
-            of.write(tleap_in_str)
-        # run tleap command
-        cmd_args = f"-f {tleap_in_path} > {tleap_out_path}"
-        if if_ignore_start_up:
-            cmd_args = f"-s {cmd_args}"
-        if additional_search_path:
-            for add_path in additional_search_path:
-                cmd_args = f"{cmd_args} -I {add_path}"
-        try:
-            self.env_manager_.run_command("tleap", cmd_args)
-        except CalledProcessError as e:
-            if (not e.stderr.strip()) and (not e.stdout.strip()):  # empty stderr & stdout
-                # find the error information in tleap.out
-                new_e = self._find_tleap_error(tleap_out_path)
-                # express the error
-                for e_info in new_e.error_info_list:
-                    _LOGGER.error(e_info)
-                raise new_e from e
-
-        # clean up temp file if success
-        fs.clean_temp_file_n_dir(temp_path_list)
-
-    @staticmethod
-    def _find_tleap_error(tleap_out_path: str) -> tLEaPError:
-        """an internal used function that find the text describing the error
-        from a tleap output file
-        Return a tLEaPError containing all the error information"""
-        error_info_pattern = r"(.*(?:FATAL|Fatal).*\n(?:.*\n)+?)(?:(?:Exiting LEaP:)|/)"
-        with open(tleap_out_path) as f:
-            error_info_list = re.findall(error_info_pattern, f.read())
-            error_info_list = [i.strip() for i in error_info_list]
-            if not error_info_list:
-                _LOGGER.warning("did not found any error in tleap out file. Here is the complete output:")
-                _LOGGER.warning(f.read())
-
-        return tLEaPError(error_info_list)
 
     def nc2mdcrd(
         self,
@@ -802,54 +976,4 @@ class AmberInterface(BaseInterface):
             exit(1)
             pass
 
-    # == engines ==
-    # (engines for sciencs APIs)
-    def tleap_clean_up_stru(
-        self,
-        input_pdb: str,
-        out_path: str,
-        if_align_index: bool = True,
-        amber_lib: str = "leaprc.protein.ff14SB",
-    ) -> None:
-        """Method that uses tleap to clean up {input_pdb} by loading and saving the PDB with
-        the {amber_lib}.
-        Typical changes are:
-            - complete missing atoms based on the AA defination in {amber_lib}
-            of the correponding residue name
-            - change terminal atom names
-            - (if_align_index = False)renumber residue index and atom index from 1 and
-            ignore chain index
-            - add TER around all residue unit that is not recognized or is a ligand.
-            (The might be harmful when a structure have a modified animo acid TODO)
-
-        Args:
-            input_pdb:
-                the path of the input pdb for cleaning
-            out_path:
-                the path of the output pdb after cleaning
-            if_align_index:
-                whether or not align index back after cleaning.
-            amber_lib:
-                the amber library used for cleaning.
-
-        Application:
-            Used in mutation.api.mutate_stru_with_tleap()"""
-
-        tleap_in_lines: List[str] = [
-            f"source {amber_lib}",
-            f"a = loadpdb {input_pdb}",
-            f"savepdb a {out_path}",
-            "quit",
-        ]
-        tleap_in_str = "\n".join(tleap_in_lines)
-        self.run_tleap(tleap_in_str)
-        if if_align_index:
-            # temp file
-            temp_dir = eh_config["system.SCRATCH_DIR"]
-            fs.safe_mkdir(temp_dir)
-            renumbered_pdb = fs.get_valid_temp_name(f"{temp_dir}/tleap_out_renumbered.pdb")
-            # renumber
-            index_mapper = pdb_io.get_index_mapper_from_pdb(out_path, input_pdb, method="by_order")
-            pdb_io.restore_pdb_index(index_mapper, out_path, renumbered_pdb)
-            shutil.move(renumbered_pdb, out_path)
-            fs.clean_temp_file_n_dir([temp_dir, renumbered_pdb])
+    # endregion == TODO ==
