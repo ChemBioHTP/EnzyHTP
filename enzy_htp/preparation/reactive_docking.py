@@ -18,7 +18,7 @@ from enzy_htp._interface.rosetta_interface import RosettaCst
 
 import enzy_htp.chemical as chem
 from enzy_htp import mutation as mm
-from enzy_htp.structure import PDBParser, Structure
+from enzy_htp.structure import PDBParser, Mol2Parser, Structure, Ligand
 from enzy_htp.core import file_system as fs
 
 #TODO(CJ): I should go through and use existing values if cache mode is selected
@@ -26,12 +26,9 @@ from enzy_htp.core import file_system as fs
 
 
 def dock_reactants(structure: Structure,
-                   reactants: List[str],
                    constraints: List[RosettaCst] = None,
-                   mutations: List[List[mm.Mutation]] = None,
                    work_dir: str = None,
                    save_work_dir: bool = True,
-                   reactant_conformers: List[str] = None,
                    rng_seed: int = 1996,
                    n_struct: int = 1000,
                    cst_cutoff: int = 10,
@@ -40,10 +37,8 @@ def dock_reactants(structure: Structure,
                    binding_cutoff: int = 20,
                    cluster_distance: float = 2.5,
                    use_cache: bool = True,
-                   parent: bool = False,
                    pdb_code: None = str) -> List[str]:
     """
-
 
     """
 

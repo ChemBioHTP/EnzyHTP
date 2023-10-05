@@ -14,7 +14,7 @@ from copy import deepcopy
 import numpy as np
 
 from .atom import Atom
-from typing import List
+from typing import List, Tuple
 from .residue import Residue
 import enzy_htp.chemical as chem
 
@@ -35,6 +35,8 @@ class Ligand(Residue):
 
     Attributes:
         net_charge : The net charge of the molecule as an int.
+        bonds: 
+        conformer_coords:
     """
 
     def __init__(self, residue_idx: int, residue_name: str, atoms: List[Atom], parent=None, **kwargs):
@@ -45,6 +47,26 @@ class Ligand(Residue):
         self.net_charge = kwargs.get("net_charge", None)
         Residue.__init__(self, residue_idx, residue_name, atoms, parent)
         self.rtype = chem.ResidueType.LIGAND
+        self.conformer_coords = list()
+
+    
+    def add_conformer(self, points:List[Tuple[float,float,float]] ) -> int:
+        """ """
+        if len(points) != len(self.atoms):
+            _LOGGER.error(f"A total of {len(points)} were supplied. Was expecting {len(self.atoms)}. Exiting...")
+            exit( 1 )
+
+        for row in points:
+            if len(row) != 3:
+                _LOGGER.error(f"The supplied point {row} is of the wrong dimension (expecting 3 elements). Exiting...")
+                exit( 1 )
+
+        self.conformer_coords.append( points )
+
+
+    def n_conformers(self) -> int:
+        """How many conformers does this Ligand have?"""
+        return len(self.conformer_coords) + 1
 
     # === Getter-Attr ===
     # === Getter-Prop ===
