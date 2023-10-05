@@ -41,6 +41,7 @@ class Ligand(Residue):
         """
         Constructor for Ligand. Identical to Residue() ctor but also takes net_charge value.
         """
+        self.bonds = kwargs.get('bonds', list()) 
         self.net_charge = kwargs.get("net_charge", None)
         Residue.__init__(self, residue_idx, residue_name, atoms, parent)
         self.rtype = chem.ResidueType.LIGAND

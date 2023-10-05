@@ -19,3 +19,4 @@ from .metal_atom import MetalUnit, residue_to_metal
 from .chain import Chain
 from .structure import Structure, compare_structures, merge_right
 from .structure_io import PDBParser
+from .ligand_io import Mol2Parser

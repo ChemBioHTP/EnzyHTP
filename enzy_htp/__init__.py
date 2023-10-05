@@ -25,6 +25,7 @@ from .structure import (
     MetalUnit,
     Solvent,
     PDBParser,
+    Mol2Parser
 )
 
 from .core import (
