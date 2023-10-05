@@ -22,7 +22,6 @@ class Mol2Parser():
     be accessed through the get_ligand() and save_ligand() methods. All other methods are meant for implementation only and SHOULD NOT
     be accessed directly by users. 
     """
-   
 
     @classmethod
     def _parse_molecule_section(cls, raw:List[str]) -> Dict:
@@ -35,7 +34,6 @@ class Mol2Parser():
 
         Returns:
             A dictionary with the above keys. 
-
         """
         result:Dict = {
             'mol_name':raw[0].strip(),
@@ -203,6 +201,13 @@ class Mol2Parser():
             The newly created Ligand() object.
         """
 
+        ext:str=fs.get_file_ext(path)
+
+        if ext != '.mol2':
+            _LOGGER.error(f"The supplied file {path} does not have a .mol2 extension. Exiting...")
+            exit( 1 )
+
+
         file_info:Dict=cls.parse_mol2_file(path)
 
         subst_name:str = file_info['SUBSTRUCTURE'][0]['subst_name']
@@ -235,6 +240,14 @@ class Mol2Parser():
         Returns:
             The name of the newly saved .mol2 file as a str().
         """
+        
+        ext:str=fs.get_file_ext(outfile)
+
+        if ext != '.mol2':
+            _LOGGER.error(f"The supplied file {outfile} does not have a .mol2 extension. Exiting...")
+            exit( 1 )
+        
+
         content:List[str] = [
             "@<TRIPOS>MOLECULE",
             ligand.name if ligand.name else "UNK",
