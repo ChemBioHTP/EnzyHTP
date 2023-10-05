@@ -130,7 +130,17 @@ class PDBParser(StructureParserInterface):
                     stru: Structure,
                     if_renumber: bool = True,
                     if_fix_atomname: bool = True ) -> str:
-        """TODO(CJ): documentation"""            
+        """Inverse of PDBParser.get_structure(). Given a Structure(), save it to the given .pdb path.
+
+        Args:
+            outfile: Path to save the Structure() as a str().
+            stru: The Structure() to save.
+            if_renumber: Should atoms be renumbered from 1?
+            if_fix_atomname: Should atoms be ranemed to PDB convention?
+
+        Returns: 
+            Path to the saved Structure() as a str().
+        """            
         content:str = cls.get_file_str( stru, if_renumber, if_fix_atomname )
 
         fs.write_lines( outfile, content.splitlines() )
