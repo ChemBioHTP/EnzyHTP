@@ -12,6 +12,7 @@ from typing import Union
 from enzy_htp.core.exception import tLEaPError
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core import file_system as fs
+from enzy_htp._interface.amber_interface import AmberParameterizer
 import enzy_htp.structure as struct
 from enzy_htp import interface
 from enzy_htp import config as eh_config
@@ -162,7 +163,42 @@ def test_tleap_clean_up_stru(helpers):
     fs.safe_rm(test_out_path)
 
 
-def test_build_md_paramete
+def test_build_md_parameterizer_default_value():
+    """as said in the name. Assert a charge_method default value
+    as a sample."""
+    ai = interface.amber
+    param_worker: AmberParameterizer = ai.build_md_parameterizer()
+    assert param_worker.charge_method == "AM1BCC"
+
+
+def test_amber_parameterizer_engine():
+    """as said in the name."""
+    ai = interface.amber
+    test_param_worker: AmberParameterizer = ai.build_md_parameterizer()
+    assert test_param_worker.engine == "Amber"
+
+
+def test_amber_parameterizer_run_lv_1():
+    """level 1 test of the parameterizer.
+    Test structure diversity:
+    - single polypeptide chain"""
+    ai = interface.amber
+    test_param_worker: AmberParameterizer = ai.build_md_parameterizer()
+    test_stru = struct.PDBParser().get_structure(
+        f"{MM_DATA_DIR}/KE_wo_S.pdb")
+    params = test_param_worker.run(test_stru)
+
+
+def test_amber_parameterizer_run_lv_2():
+    """level 1 test of the parameterizer.
+    Test structure diversity:
+    - single polypeptide chain
+    - single substrate (CHON)"""
+    ai = interface.amber
+    test_param_worker: AmberParameterizer = ai.build_md_parameterizer()
+    test_stru = struct.PDBParser().get_structure(
+        f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb")
+    test_param_worker.run(test_stru)
 
 # region TODO
 
