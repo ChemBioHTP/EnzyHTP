@@ -230,7 +230,7 @@ class Chain(DoubleLinkedNode):
 
     #endregion
 
-    # === Editor ===
+    #region === Editor ===
     def remove_trash(self):
         """
         remove trash ligands in the chain
@@ -248,71 +248,37 @@ class Chain(DoubleLinkedNode):
         """
         self._children.sort(key=lambda x: x.idx)
 
-    def add_residue(
-        self,
-        new_res: Residue,
-        sort_after: bool = True,
-        overwrite: bool = False
-    ) -> None:  # TODO#@shaoqz: @imp overwriting a residue is rarely a demand but instead inserting one with same name and index but different stru is.
-        """Allows for insertion of a new Residue() object into the Chain. If the new Residue() is an exact # TODO work on overwriting
-        copy, it fully overwrites the existing value. The sort_after flag specifies if the Residue()"s should
-        be sorted by residue_number after the insertion.
-        """
-        for ridx, res in enumerate(self._residues):
-            if new_res.name == res.name and new_res.num_ == res.num_:  #@shaoqz: @imp should not work like this. Imaging the case where both residue is called LIG but they are different ligands. They are neither the same nor should be overwritten.
-                self._residues[ridx] = deepcopy(new_res)
-                break
+    def add(self, new_res: Residue,
+            overwrite: bool = False, sort: bool = True,) -> None:
+        """Method that adds a new residue based on the idx. If idx is None it is added in the end by default.
+        Args:
+            overwrite: if overwrite when residue same idx. if not overwrite the new
+                res will be inserted after the idx (which will cause the idx change of all following residues).
+            sort: if sort after adding"""
+        new_res.parent = self
+        push_number = 0
+        if (new_res.idx is None) or (new_res.idx not in self.residue_idxs):
+            self.residues.append(new_res)
         else:
-            self._residues.append(new_res)
+            for i, res in enumerate(self.residues):
+                if res.idx == new_res.idx:
+                    if overwrite:
+                        self.residues[i] = new_res
+                    else:
+                        self.residues.insert(i, new_res)
+                        push_number = 1
+                    break
 
-        self.rename(self._name)  #@shaoqz: maybe better to change this residue attribute only?
+        if push_number:
+            push_idx = new_res.idx
+            for res in self.residues:
+                if res.idx > push_idx:
+                    res.idx += 1
+            new_res.idx += 1
 
-        if sort_after:
-            self._residues.sort(
-                key=lambda r: r.idx()
-            )  #@shaoqz: @imp this does not work when two different residue have the same index which often happens when you want to add a ligand to the structure.
-
-    def remove_residue(
-        self, target_key: str
-    ) -> None:  # TODO#@shaoqz: @imp2 target key should not require the name. We should minimize the prerequisite of any input since its for HTP.
-        """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format,
-        the Residue() is removed if it currently exists in the Chain() object."""
-        for ridx, res in enumerate(self._residues):
-            if res.residue_key == target_key:
-                break
-        else:
-            return
-
-        del self._residues[ridx]  #@shaoqz: why not move this line inside the loop?
-
-    def rename(self, new_name: str) -> None:  # TODO#@shaoqz: using the 2-way link sheet will get rid of functions like this but both works.
-        """Renames the chain and propagates the new chain name to all child Residue()"s."""
-        self._name = new_name
-        res: Residue
-        for ridx, res in enumerate(self._residues):
-            self._residues[ridx].set_chain(new_name)  #@shaoqz: why not just use res?
-
-    def renumber_atoms(
-            self,
-            start: int = 1) -> int:  # TODO#@shaoqz: @imp need to record the mapping of the index  #@shaoqz: also need one for residues
-        """Renumbers the Atom()"s inside the chain beginning with "start" value and returns index of the last atom.
-        Exits if start index <= 0.
-        """
-        if start <= 0:
-            _LOGGER.error(f"Illegal start number '{start}'. Value must be >= 0. Exiting...")
-            exit(1)
-        self._residues = sorted(self._residues, key=lambda r: r.idx())
-        idx = start
-        num_residues: int = self.num_residues
-        for ridx, res in enumerate(self._residues):
-            idx = self._residues[ridx].renumber_atoms(idx)
-            idx += 1
-            terminal = (ridx < (num_residues - 1)) and (
-                res.is_canonical() and not self._residues[ridx + 1].is_canonical()  #@shaoqz: @imp what does this mean? the TER line?
-            )
-            if terminal:
-                idx += 1
-        return idx - 1
+        if sort:
+            self.sort_residues()
+    #endregion
 
     #region === Special ===
     def __str__(self):

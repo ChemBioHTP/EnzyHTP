@@ -14,6 +14,7 @@ from enzy_htp.structure import (
     Residue,
     Chain,
     Atom,
+    Ligand,
 )
 
 #TODO(CJ): add tests for Structure.build_ligands()
@@ -157,7 +158,7 @@ def test_deepcopy():
                 assert atom.parent is res
 
 
-def test_find_residue_with_key(caplog):
+def test_find_residue_with_key(caplog): # TODO caplog does not work when logger is not propagate. fix them by a context manager.
     """test function works as expected"""
     pdb_file_path = f"{DATA_DIR}1Q4T_ligand_test.pdb"
     stru: Structure = sp.get_structure(pdb_file_path)
@@ -178,3 +179,23 @@ def test_init_connect():
     stru: Structure = sp.get_structure(pdb_file_path)
 
     stru.init_connect()
+
+def test_add_chain():
+    """test function works as expected"""
+    pdb_file_path = f"{DATA_DIR}1Q4T_ligand_test.pdb"
+    stru: Structure = sp.get_structure(pdb_file_path)
+    new_chain = Chain("X", [], None)
+    stru.add(new_chain)
+    assert stru.chain_mapper.get("X", False) is not False
+
+def test_add_residue():
+    """test function works as expected"""
+    pdb_file_path = f"{DATA_DIR}1Q4T_ligand_test.pdb"
+    stru: Structure = sp.get_structure(pdb_file_path)
+    new_res = Ligand(
+        residue_idx=0,
+        residue_name="LIG",
+        atoms=[],
+        parent=None,)
+    stru.add(new_res)
+    assert stru["E"].residues[0] is new_res
