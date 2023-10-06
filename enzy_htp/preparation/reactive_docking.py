@@ -61,7 +61,7 @@ def dock_reactants(structure: Structure,
     # is there; get rid of it if not
     #_place_reactants(structure, reactants, pdb_code)
 
-    (param_files, charge_mapper) = _prepare_reactants(reactants, reactant_conformers)
+    (param_files, charge_mapper) = _parameterize_system(structure, work_dir)
 
     docked_complexes: List[str] = list()
 
@@ -99,7 +99,14 @@ def dock_reactants(structure: Structure,
 
     return docked_complexes
 
+def _validate_system( stru:Structure, constraints:List[RosettaCst] ) -> None:
+    """TODO(CJ)"""
+    _LOGGER.info("Validating the supplied system...")
+    #TODO(CJ): just write all this...
+    for cst in constraints:
+        print(cst)
 
+        
 
 def _parameterize_reactant(reactant: str, reactant_name: str, conformers: str = None) -> Tuple[str, int]:
     """Parameterizes reactant for RosettaLigand docking. Adds both a conformers and formal charge
@@ -658,7 +665,7 @@ def _evaluate_csts(df: pd.DataFrame, csts: List[RosettaCst], cst_cutoff: int) ->
         f"Finished RosettaCst evaluation. {df.selected.sum()} geometries have constraint tolerances <= {cst_cutoff:.3f} tolerance units")
 
 
-def _prepare_reactants(reactants: List[str], reactant_conformers: List[str] = None) -> List[str]:
+def _parameterize_system(stru:Structure, work_dir:str) -> List[str]:
     """
     Args:
         reactants:
@@ -672,6 +679,27 @@ def _prepare_reactants(reactants: List[str], reactant_conformers: List[str] = No
     #TODO(CJ): update function signature
     param_files: List[str] = list()
     charge_mapper: Dict[str, int] = dict()
+   
+    parser = Mol2Parser()
+    for res in stru.residues:
+        if type(res) != Ligand:
+            continue
+        _LOGGER.info(f"Detected residue {res.name} in chain {res.parent.name}...")
+        if res.n_conformers() == 1:
+            _LOGGER.info(f"\tDetected no conformers!")
+        else:
+            #TODO(CJ): when there are conformers.
+            pass
+        temp_rct:str = f"{work_dir}/__temp_rct.mol2"
+        parser.save_ligand(temp_rct, res)
+        (pfile, charge) = _paramterize_reactant(
+            temp_rct,
+            res.name
+        )
+        print(res)
+    exit( 0 )
+
+
     for ridx, rct in enumerate(reactants):
         _LOGGER.info(f"Parameterizing reactant {ridx+1} of {len(reactants)}: {rct}")
         reactant_name: str = f"L{ridx+1:02d}"
@@ -1173,26 +1201,14 @@ def _log_settings(constraints: List[RosettaCst], work_dir: str, save_work_dir: b
         Nothing.
     """
     _LOGGER.info("Beginning EnzyRCD Reactive docking run! Below are the run settings and characteristics:")
-    #TODO(CJ): maybe add something for the structures?
-    _LOGGER.info(f"\t{len(reactants)} reactants: {', '.join(reactants)}")
 
     if constraints is not None:
         _LOGGER.info(f"\t{len(constraints)} RosettaConstraints")
     else:
         _LOGGER.info("\t0 RosettaConstraints")
 
-    if mutations is not None:
-        _LOGGER.info(f"\t{len(mutations)} mutation sets")
-    else:
-        _LOGGER.info("\t0 mutation sets")
-
     _LOGGER.info(f"\t{work_dir=}")
     _LOGGER.info(f"\t{save_work_dir=}")
-
-    if reactant_conformers is not None:
-        _LOGGER.info(f"\t{len(reactant_conformers)} conformer libraries: {', '.join(reactant_conformers)}")
-    else:
-        _LOGGER.info(f"\t0 conformer libraries")
 
     _LOGGER.info(f"\t{rng_seed=}")
     _LOGGER.info(f"\t{n_struct=}")
