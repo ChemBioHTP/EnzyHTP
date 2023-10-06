@@ -1,5 +1,6 @@
 """Driver for the reactive docking functionality available in enzy_htp. The only function that that should be 
-called is dock_reactants(). All others are implementation functions that SHOULD NOT be used. 
+called is dock_reactants(). All others are implementation functions that SHOULD NOT be used. All operations
+are done on deep-copied Structure objects. 
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-07-28
@@ -36,9 +37,14 @@ def dock_reactants(structure: Structure,
                    clash_cutoff: int = 1,
                    binding_cutoff: int = 20,
                    cluster_distance: float = 2.5,
-                   use_cache: bool = True,
-                   pdb_code: None = str) -> List[str]:
-    """
+                   use_cache: bool = True
+                   ) -> Structure:
+    """Given a structure and constraints,  
+
+    Args:
+
+    Params:
+        A deep-copy of the 
 
     """
 
@@ -47,48 +53,17 @@ def dock_reactants(structure: Structure,
 
     fs.safe_mkdir(work_dir)
 
-    _log_settings(reactants, constraints, mutations, work_dir, save_work_dir, reactant_conformers, rng_seed, n_struct, cst_cutoff,
-                  clash_distance, clash_cutoff, binding_cutoff, cluster_distance, use_cache, parent)
-
+    _log_settings(constraints, work_dir, save_work_dir, rng_seed, n_struct, cst_cutoff,
+                  clash_distance, clash_cutoff, binding_cutoff, cluster_distance, use_cache)
+    
+    _validate_system( structure, constraints )
     #TODO(CJ): this will no longer exist in the current version of the algorithm... just check if the reactant
     # is there; get rid of it if not
-    _place_reactants(structure, reactants, pdb_code)
+    #_place_reactants(structure, reactants, pdb_code)
 
     (param_files, charge_mapper) = _prepare_reactants(reactants, reactant_conformers)
 
     docked_complexes: List[str] = list()
-
-    resolved = _resolve_mut_cst_overlap(mutations, constraints)
-
-    if resolved:
-        (resolved_inputs, mutations) = resolved
-        for ridx, (resolved_mutations, resolved_csts) in enumerate(resolved_inputs):
-            _LOGGER.info(f"Beginning child reactive docking run {ridx+1} of {len(resolved_inputs)}...")
-            resolved_complexes = dock_reactants(
-                structure,
-                reactants,
-                resolved_csts,
-                [resolved_mutations],
-                f"child_{ridx:04d}",
-                save_work_dir,
-                reactant_conformers,
-                rng_seed,
-                n_struct,
-                cst_cutoff,
-                clash_distance,
-                clash_cutoff,
-                binding_cutoff,
-                cluster_distance,
-                use_cache,
-                False  # always a child run from here
-            )
-            _LOGGER.info(f"Finished child reactive docking run {ridx+1} of {len(resolved_inputs)}!")
-
-        for rc in resolved_complexes:
-            if rc.find('WT') != -1:
-                fs.safe_rm(rc)
-            else:
-                docked_complexes.append(rc)
 
     chain_names: List[str] = _ligand_chain_names(start_pdb)
 
@@ -124,53 +99,6 @@ def dock_reactants(structure: Structure,
 
     return docked_complexes
 
-
-def _resolve_mut_cst_overlap(mutations: List[List[mm.Mutation]], constraints: List[RosettaCst]) -> bool:
-    """Checks if a mutation and constraint overlap. Note: will return False if a constrained
-    residue is mutated back to itself.
-
-    Args:
-        mutations: A list(list()) of Mutation() objects to check.
-        constraints: A list() of RosettaCst() objects to check.
-
-    Returns:
-        Whether the system will try to mutate a constrained residue.
-    """
-    #TODO(CJ): create string representation for RosettaCst
-    _LOGGER.info("Beginning checks for RosettaCst and mutation overlaps...")
-
-    if not mutations or not constraints:
-        _LOGGER.info("No overlaps! Continuing...")
-        return False
-
-    resolved_inputs = list()
-    resolved_mutations = list()
-
-    for midx, mut_set in enumerate(mutations):
-        _LOGGER.info(f"Beginning mutation set {midx+1} of {len(mutations)}. Contains {len(mut_set)} mutations...")
-
-        cst_cpy = []
-        overlap = False
-        for mut in mut_set:
-            for cst in constraints:
-                if cst.contains(mut.chain_id, mut.res_idx) and mut.orig != mut.target:
-                    _LOGGER.info(f"Overlap identified between mutation {mut} and constraint on residue {mut.res_idx}")
-                    overlap = True
-                    pass
-                else:
-                    cst_cpy.append(cst)
-
-        if overlap:
-            resolved_inputs.append(([deepcopy(ms) for ms in mut_set], cst_cpy))
-        else:
-            resolved_mutations.append([deepcopy(ms) for ms in mut_set])
-
-    if not resolved_inputs:
-        _LOGGER.info("No overlaps! Continuing...")
-        return False
-    else:
-        _LOGGER.info(f"Found overlaps. {len(resolved_inputs)} child EnzyRCD runs needed!")
-        return (resolved_inputs, resolved_mutations)
 
 
 def _parameterize_reactant(reactant: str, reactant_name: str, conformers: str = None) -> Tuple[str, int]:
@@ -1234,20 +1162,16 @@ def _evaluate_qm(df: pd.DataFrame, start_pdb: str, charge_mapper, cluster_cutoff
     _LOGGER.info("Finished qm energy evaluation!")
 
 
-def _log_settings(reactants: List[str], constraints: List, mutations: List, work_dir: str, save_work_dir: bool,
-                  reactant_conformers: List[str], rng_seed: int, n_struct: int, cst_cutoff, clash_distance, clash_cutoff, binding_cutoff,
-                  cluster_distance: float, use_cache: bool, parent: bool):
+def _log_settings(constraints: List[RosettaCst], work_dir: str, save_work_dir: bool,
+                  rng_seed: int, n_struct: int, cst_cutoff:int, clash_distance:float, clash_cutoff:int, binding_cutoff:int,
+                  cluster_distance: float, use_cache: bool):
     """Logs settings for the current reactive docking run. Only meant to be called during the parent call to dock_reactants().
 
     Args:
-        TODO(CJ):
 
     Returns:
         Nothing.
     """
-    if parent:
-        return
-
     _LOGGER.info("Beginning EnzyRCD Reactive docking run! Below are the run settings and characteristics:")
     #TODO(CJ): maybe add something for the structures?
     _LOGGER.info(f"\t{len(reactants)} reactants: {', '.join(reactants)}")

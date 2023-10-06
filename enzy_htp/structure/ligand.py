@@ -1,7 +1,7 @@
 """Specialization of the Residue() class for a Ligand. Primarly used to interface with PDB2PQR for ONLY the ligand
 as it is removed from the full structure during protonation. In addition to Residue() object, has net_charge attribute.
 Meant to be stored alongside other Residue() and Residue() derived objets (MetalUnit() and Solvent()) inside of the
-Chain() object. Ligand() objects SHOULD NOT exist on their own.
+Chain() object. Ligand() objects SHOULD NOT exist on their own. 
 
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
@@ -35,8 +35,8 @@ class Ligand(Residue):
 
     Attributes:
         net_charge : The net charge of the molecule as an int.
-        bonds: 
-        conformer_coords:
+        bonds: A List[Dict] containing bond information in the TRIPOS .mol2 format.
+        conformer_coords: A List[List[Tuple[float,float,float]]] containing the coordinates of conformers.
     """
 
     def __init__(self, residue_idx: int, residue_name: str, atoms: List[Atom], parent=None, **kwargs):
@@ -51,7 +51,15 @@ class Ligand(Residue):
 
     
     def add_conformer(self, points:List[Tuple[float,float,float]] ) -> int:
-        """ """
+        """Add the coordinates of a conformer to the Ligand(). Performs checks that the number of points matches the
+        number of atoms in the Ligand. Also checks that each point is a tuple of size 3.
+        
+        Args:
+            points: A List[Tuple[float,float,float]] containing the points of a new conformer.
+
+        Returns:
+            The number of conformers the Ligand has.
+        """
         if len(points) != len(self.atoms):
             _LOGGER.error(f"A total of {len(points)} were supplied. Was expecting {len(self.atoms)}. Exiting...")
             exit( 1 )
@@ -62,6 +70,8 @@ class Ligand(Residue):
                 exit( 1 )
 
         self.conformer_coords.append( points )
+
+        return self.n_conformers()
 
 
     def n_conformers(self) -> int:

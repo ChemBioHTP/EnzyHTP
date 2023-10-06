@@ -693,10 +693,10 @@ class PDBParser(StructureParserInterface):
         else:
             element = f"{atom.element:>2}"
 
-        if atom.charge is None:
-            charge = f"{'':2}"
+        if atom.charge is not None and int(atom.charge) != 0:
+            charge = f"{int(atom.charge):2}"
         else:
-            charge = f"{atom.charge:2}"
+            charge = f"{'':2}"
 
         #example: ATOM   5350  HB2 PRO   347      32.611  15.301  24.034  1.00  0.00
         line = f"{l_type}{a_index} {a_name}{alt_loc_id}{r_name} {c_index}{r_index}{insert_code}   {x}{y}{z}{occupancy}{temp_factor}      {seg_id}{element}{charge}{os.linesep}"

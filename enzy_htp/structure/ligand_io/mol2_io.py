@@ -224,7 +224,10 @@ class Mol2Parser():
             temp = dict()
             for ll in labels:
                 temp[ll] = aa[ll]
+            
             atoms.append( Atom(temp) )
+            atoms[-1].idx = aa['atom_id']
+            atoms[-1].element = aa['atom_type'].split('.')[0]
 
         return Ligand(residue_idx=residue_idx, residue_name=residue_name, atoms=atoms, bonds=file_info['BOND'])            
 

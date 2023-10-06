@@ -4,13 +4,15 @@ ligands via one of the below methods:
 
     + alphafill: Uses the AlphaFill transplant algorithm to identify a location for a given ligand. Works best
     for common bi-molecular co-factors (i.e. SAM, ATP, etc). Assumes PDB style atom naming.
-    + mole2: TODO(CJ)
+    + mole2: Uses cavities identified by the Mole2 software suite to identify possible locations for a given 
+    Ligand. Ranks possible locations/orientations using supplied geomtry constraints. Works best for non-co-factor
+    substrates. More neutral to atom naming than alphafill.
 
 Author: Chris Jurich <chris.jurich@vanderbit.edu>
 Date: 2023-09-14
 """
-
-from typing import List, Tuple, Dict
+import json
+from typing import List, Tuple, Dict, Set
 
 from rdkit import Chem as _rchem
 import numpy as np
@@ -26,43 +28,45 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core import _LOGGER
 
 import enzy_htp.chemical as chem
-from enzy_htp.structure import PDBParser, Structure
+from enzy_htp.structure import PDBParser, Structure, Ligand, Mol2Parser, Chain
 from enzy_htp._interface import RosettaCst, Mole2Cavity
 
 from .align_ligand import align_ligand
 from .constrained_docking import constrained_docking
 
-#TODO(CJ): for the RosettaLigand version, set the COM to the COM of the constrained residue
-#TODO(CJ): need to start switching everything to Structure and Ligand objects instead of random str()'s
-def place_ligand(molfile: str,
-                 ligand: str,
+def place_ligand(stru : Structure,
+                 ligand: Ligand,
+                 new_res_key: Tuple[str, int, str],
                  code: str = None,
                  method: str = 'alphafill',
-                 new_res_key: Tuple = None,
                  work_dir: str = None,
-                 outfile: str = None,
                  constraints: List[RosettaCst] = None,
-                 n_struct:int = 50,
                  use_cache:bool = True,
-                 **kwargs) -> Tuple[str, str]:
-    """Protocol for placing a ligand into an enzyme in an unoptimized manner.
+                 **kwargs) -> Structure:
+    """Protocol for placing a ligand into an enzyme in an unoptimized manner. Operates directly on the Structure and Ligand objects,
+    and returns a new, deep-copied Structure object with the placed ligand. The Chain, residue index, and ligand name must be specified
+    through the new_res_key Tuple with layout (chain, idx, name). The ligand placement strategy is specified with the 'method' keyword.
+    Note that additional arguments and key word arguments are not explained in detail/validated in this method, but in the child methods
+    that are called during the ligand placement progress.
 
     Args:
-        molfile:
-        ligand:
-        code:
-        method:
-        new_res_key:
-        work_dir:
-        outfile:
-        constraints:
-        n_struct: 
+        stru: Structure that the Ligand() will be placed within.
+        ligand: Ligand() to be placed.
+        new_res_key: Name of the new residue as a Tuple with format (chain, index, name).
+        code: The PDB code of the original structure. Optional.
+        method: How the ligand will be placed in the Structure. Defaults to 'alphafill'
+        work_dir: Where the work will be done and temporary files will be saved. Defaults to system.SCRATCH_DIR
+        constraints: A List[RosettaCst] objects. Optional.
+        use_cache: Should we used existing results when present?
 
 
     Returns:
-        A Tuple[str,str] with the layout (enzyme-ligand complex in .pdb format, exact ligand conformation in .mol2 format).
+        A deepcopied Structure() which contains the new Ligand() at the specified location.
     """
-    #TODO(CJ): check for None values and throw errors if they are given
+    if len(new_res_key) != 3 or len(new_res_key[-1]) != 3:
+        _LOGGER.error(f"The new_res_key expects a tuple of size 3 with layout (chain name, index, residue name). Exiting...")
+        exit( 1 )
+
     if not work_dir:
         work_dir = config['system.SCRATCH_DIR']
 
@@ -71,41 +75,53 @@ def place_ligand(molfile: str,
     placed_ligand: str = None
 
     if method == "alphafill":
-        placed_ligand = _place_alphafill(molfile, ligand, code=code, work_dir=work_dir, **kwargs)
+        if code is None:
+            _LOGGER.error(f"When using the alphafill method, you MUST supply a .pdb code for where the protein comes from. Exiting...")
+            exit( 1 )
+        placed_ligand = _place_alphafill(stru, ligand, code=code, work_dir=work_dir, **kwargs)
     elif method == "mole2":
-        pass
-        placed_ligand = _place_mole2(molfile, ligand, constraints=constraints, new_res_key=new_res_key, work_dir=work_dir, **kwargs)
-        #place_ligand = _place_rosetta_ligand(molfile, ligand, new_res_key=new_res_key, work_dir=work_dir, constraints=constraints, n_struct=n_struct, use_cache=use_cache, **kwargs)
+        placed_ligand = _place_mole2(stru, ligand, constraints=constraints, new_res_key=new_res_key, work_dir=work_dir, **kwargs)
     else:
         _LOGGER.error(
             f"The supplied method placement method {method} is not supported. Allowed methods are 'alphafill' and 'mole2'. Exiting..."
         )
         exit(1)
 
-    session = interface.pymol.new_session()
+    placed_ligand.name = new_res_key[2]
+    placed_ligand.idx = new_res_key[1]
+        
+    for cc in stru.chains:
+        if cc.name == new_res_key[0]:
+            cc.add_residue( placed_ligand )
+            return deepcopy( stru )
+    else:        
+        copied_chains = [deepcopy(cc) for cc in stru.chains]
+        new_chain = Chain(new_res_key[0], [placed_ligand])
+        return Structure( copied_chains + [new_chain])
 
-    args = [('load', placed_ligand)]
+def _place_mole2(stru:Structure,
+                    ligand:Ligand,
+                    constraints:List[RosettaCst],
+                    new_res_key:Tuple,
+                    work_dir:str,
+                    **kwargs) -> Ligand:
+    """Implementation function that places a specified ligand into a structure using the cavities generated by
+    the Mole2 topological analysis software. SHOULD NOT be called directly by the user. Instead, call 
+    `enzy_htp.preparation.place_ligand.place_ligand()`. Selection of a cavity is based on whether 1) the cavity
+    is capable of holding the Ligand() and 2) if the Ligand() is in a favorable geometry as defined by the 
+    supplied RosettaCst constraints.
 
-    if new_res_key is not None:
-        args.extend([
-            ('alter', 'all', f'chain="{new_res_key[0]}"'),
-            ('alter', 'all', f'resi="{new_res_key[1]}"'),
-            ('alter', 'all', f'resn="{new_res_key[2]}"'),
-            ('alter', 'all', 'segi=""'),
-        ])
+    Args:
+        stru: Structure() where teh Ligand() will be added. 
+        ligand: The Ligand() object that is being placed.
+        constraints: A List[RosettaCst] that define the geometry involving the Ligand().
+        new_res_key: Tuple specifying the (chain, idx, name) of the Ligand().
+        work_dir: Directory where all temporary files will be saved.
 
-    if not outfile:
-        temp_path = Path(molfile)
-        outfile = f"{work_dir}/{temp_path.stem}_placed{temp_path.suffix}"
-
-    args.extend([('save', placed_ligand), ('load', molfile), ('save', outfile)])
-
-    interface.pymol.general_cmd(session, args)
-
-    return (outfile, placed_ligand)
-
-def _place_mole2(molfile, ligand, constraints, new_res_key, work_dir:str, **kwargs) -> str:
-    """TODO(CJ)"""
+    Returns:
+        An aligned, deecopied Ligand().
+    """
+    #TODO(CJ): rotate the ligand in the cavity
     #TODO(CJ): check how many atoms fit in the molecule
     if not work_dir:
         work_dir = config['system.SCRATCH_DIR']
@@ -128,13 +144,15 @@ def _place_mole2(molfile, ligand, constraints, new_res_key, work_dir:str, **kwar
     for rc in relevant_constraints:
         anchors.append(rc.other(new_res_key[0], new_res_key[1]))
 
+    temp_pdb:str=f"{work_dir}/__temp.pdb"
+    to_delete:List[str] = [ temp_pdb ]
 
-    cavities:List[Mole2Cavity] = interface.mole2.identify_cavities(molfile)
-    for cc in cavities:
-        print(cc, cc.center_of_mass(), cc.volume())
+    parser = PDBParser()
+    parser.save_structure( temp_pdb, stru )
+    cavities:List[Mole2Cavity] = interface.mole2.identify_cavities(temp_pdb)
 
     session = interface.pymol.new_session()
-    interface.pymol.general_cmd(session, [('load', molfile)])
+    interface.pymol.general_cmd(session, [('load', temp_pdb)])
     anchor_com = interface.pymol.center_of_mass(session, sele=f"chain {anchors[0][0]} and resi {anchors[0][1]}")
    
     distances = list()
@@ -143,301 +161,111 @@ def _place_mole2(molfile, ligand, constraints, new_res_key, work_dir:str, **kwar
    
 
     target_cat = cavities[np.argmin(np.array(distances))]
-    
     target_com = target_cat.center_of_mass()
 
-    interface.pymol.general_cmd(session, [('delete', 'all'), ('load', ligand)])
-    reactant_com = interface.pymol.center_of_mass(session)
+    reactant_com = np.array(list(ligand.geom_center))
     shift = target_com - reactant_com
+    ligand.shift(shift)
+    return ligand
 
-    temp_path = Path(ligand)
-    outfile = str(Path(work_dir) / f"{temp_path.stem}_shifted{temp_path.suffix}")
-    interface.pymol.general_cmd(session,[
-        ('alter_state', '1', '(all)', f"x+={shift[0]}"), 
-        ('alter_state', '1', '(all)', f"y+={shift[1]}"), 
-        ('alter_state', '1', '(all)', f"z+={shift[2]}"), 
-        ('save', outfile)
-    ])
-
-    return outfile
-
-
-def _place_rosetta_ligand(molfile: str, reactant: str, new_res_key: Tuple, work_dir: str, constraints: List[RosettaCst], n_struct:int, use_cache:bool, **kwargs) -> str:
-    """Protocol that uses Rosetta's RosettaLigand and enzdes constraint functionality to place a ligand into an enzyme. SHOULD NOT be called
-    directly by the user. Instead, call `enzy_htp.preparation.place_ligand.place_ligand()`. Uses the starting file, reactant, new residue key, 
-    and constraints to perform a fast docking protocol which does not perform high resolution docking or side-chain packaing. Note that at least
-    one of the supplied constraints must contain the ligand to be placed. If it does not, an error will be thrown. 
-
-    Args:
-        molfile:
-        reactant:
-        new_res_key:
-        work_dir: 
-        constraints:
-
-
-    Returns:
-        
-    """
-    if not work_dir:
-        work_dir = config['system.SCRATCH_DIR']
-
-    relevant_constraints: List[str] = list()
-
-    for cc in constraints:
-        if cc.contains(new_res_key[0], new_res_key[1]):
-            relevant_constraints.append(cc)
-
-    for rc in relevant_constraints:
-        rc.remove_constraint('angle_A')
-        rc.remove_constraint('angle_B')
-        rc.remove_constraint('torsion_A')
-        rc.remove_constraint('torsion_B')
-        rc.remove_constraint('torsion_AB')
-
-    print(relevant_constraints)
-
-    #TODO(CJ): find the anchor residue 
-    anchors = list()        
-    for rc in relevant_constraints:
-        anchors.append(rc.other(new_res_key[0], new_res_key[1]))
-
-    shifted_reactant:str = _shift_reactant(molfile, reactant, anchors, work_dir)
-
-    #!move it to near the anchor!!
-
-    if not relevant_constraints:
-        _LOGGER.error(
-            f"To place a ligand with RosettaLigand, you must supply at least one constraint involving the target ligand. Exiting...")
-        exit(1)
-    else:
-        _LOGGER.info(f"Found {len(relevant_constraints)} constraints that involve the ligand! Continuing...")
-
-    temppath = Path(molfile)
-    other = str(temppath.parent / "other.pdb")
-
-    session = interface.pymol.new_session()
-    interface.pymol.general_cmd(
-        session,
-        [
-            ('load', shifted_reactant),
-            ('alter', 'all', f"chain='{new_res_key[0]}'"),
-            ('alter', 'all', f"resi='{new_res_key[1]}'"),
-            ('alter', 'all', f"resn='{new_res_key[2]}'"),
-            ('alter', 'all', f"segi=''"),
-            #('load', molfile),
-            ('save', shifted_reactant),
-            ('delete', 'all')
-        ])
-    interface.pymol.general_cmd(session, [('load', molfile)])
-
-    df: pd.DataFrame = interface.pymol.collect(session, 'memory', 'chain resn resi'.split())
-    need_params: List[str] = list()
-
-    for i, row in df.iterrows():
-        key = (row.chain, row.resn, row.resi)
-
-        if key in need_params:
-            continue
-
-        if key[1].upper() in chem.METAL_CENTER_MAP:
-            continue
-
-        if key[1].upper() in chem.THREE_LETTER_AA_MAPPER:
-            continue
-
-        need_params.append(key)
-
-    param_files: List[str] = list()
-    for needs in need_params:
-        temp_file: str = f"{work_dir}/temp.mol2"
-        interface.pymol.general_cmd(session, [("save", temp_file, f"chain {needs[0]} and resn {needs[1]} and resi {needs[2]}")])
-        param_files.append(interface.rosetta.parameterize_ligand(temp_file, needs[1])[0])
-
-    param_files.append(interface.rosetta.parameterize_ligand(reactant, new_res_key[2])[0])
-    parser = eh.PDBParser()
-
-    interface.pymol.general_cmd(session, [('load', shifted_reactant), ('save', other)])
-
-    structure = parser.get_structure(other)
-    #TODO(CJ): make this less error prone
-    #TODO(CJ): need to look through and find all the parts where there are
-    df:pd.DataFrame=constrained_docking(structure, [reactant], param_files, relevant_constraints, work_dir=work_dir, minimize=False, n_struct=n_struct, use_cache=use_cache)
-    cst_diff:List[float] = list()
-    for i, row in df.iterrows():
-        total:float = 0.0
-        for rc in relevant_constraints:
-            total += sum(rc.evaluate(row.description))
-        cst_diff.append( total )
-    df['cst_diff'] = cst_diff
-    print(cst_diff)
-    print(df)
-    #what needs to happen here?
-    # 1. figure out which constraints involve the reactant we care about
-    # 2. create the input files that we'll need
-    # 3. run the rosetaLigand run
-    # 4. select placement with best constraint score
-    assert False
-
-def _shift_reactant(molfile:str, reactant:str, anchors:List[str], work_dir:str) -> str:
-    """
-    Args:
-
-    Returns:
-        The shifted
-    """
-    #TODO(CJ): some code about selecting the right anchor constraint        
-    session = interface.pymol.new_session()
-    interface.pymol.general_cmd(session, [('load', molfile)])
-    anchor_com = interface.pymol.center_of_mass(session, sele=f"chain {anchors[0][0]} and resi {anchors[0][1]}")
-    #TODO(CJ): add error if the com is zero
-    interface.pymol.general_cmd(session, [('delete', 'all'), ('load', reactant)])
-    reactant_com = interface.pymol.center_of_mass(session)
-    shift = anchor_com - reactant_com
-
-    temp_path = Path(reactant)
-    outfile = str(Path(work_dir) / f"{temp_path.stem}_shifted{temp_path.suffix}")
-    interface.pymol.general_cmd(session,[
-        ('alter_state', '1', '(all)', f"x+={shift[0]}"), 
-        ('alter_state', '1', '(all)', f"y+={shift[1]}"), 
-        ('alter_state', '1', '(all)', f"z+={shift[2]}"), 
-        ('save', outfile)
-    ])
-
-    return outfile
-
-def _place_alphafill(molfile: str,
-                     reactant: str,
+def _place_alphafill(stru: Structure,
+                     ligand: Ligand,
                      code: str,
                      work_dir: str,
                      similarity_cutoff: float = 0.75,
                      clash_radius: float = 2.0,
-                     **kwargs) -> str:
-    """Implementation function that places a specified ligand into a molfile structure using the alphafill 
+                     **kwargs) -> Ligand:
+    """Implementation function that places a specified ligand into a structure using the alphafill 
     algorithm (https://doi.org/10.1038/s41592-022-01685-y). SHOULD NOT be called directly by the user. 
-    Instead, call `enzy_htp.preparation.place_ligand.place_ligand()`. Assumes that the input ligand has PDB style naming 
+    Instead, call `enzy_htp.preparation.place_ligand.place_ligand()`. Assumes that the input Ligand() has PDB style naming 
     and is in the .mol2 format. When scanning alphafill transplants, the algorithm looks for exact atom label
-    matches. If no exact matches exist, then it looks for candidates where the reactant's atom names are a subset 
-    of the candidates. If no satisfactory matches are found, it looks for candidates where the candidate's atom
-    names are a subset of the reactants. For each subcategory, candidates template molecules are ranked by the 
-    number of clashes with the protein structure, with fewer being better. The satisfactory template molecule is
-    saved to a .mol2 file in the work_dir and returned. If no template is found, an empty str() is returned.
+    matches. If none are found, then a similarity score is calculated which is:
 
+    intersection(candidate atoms, template atoms) / max( number candidate atoms, number template atoms )
 
     Args:
-        molfile:
-        reactant:
-        code:
-        work_dir:
-        similarity_cutoff:
-        clash_radius:
+        stru: Structure() where the Ligand() will be added.
+        ligand: The Ligand() object that is being placed.
+        code: The .pdb code to use for homology modelling.
+        work_dir: Directory where all temporary files will be saved.
+        similarity_cutoff: How similar a Ligand() and template must be to get considered.
+        clash_radius: Radius cutoff (Angstroms) for clash counting between two heavy atoms.
 
     Returns:
-        THe path to the placed reactant in a .mol2 file.
-
+        An aligned, deepcopied Ligand().
     """
-    #TODO(CJ): get the kwargs unpacked here
-    _LOGGER.info(f"Beginnning placement of ligand {reactant} into {molfile}...")
+    _LOGGER.info(f"Beginnning placement of ligand {ligand} into the structure...")
     _LOGGER.info(f"Calling out to AlphaFill to fill structure...")
     filled_structure: str = interface.pymol.fetch(code, work_dir)
-    filled_structure = interface.alphafill.fill_structure(filled_structure)
+    (filled_structure, transplant_info_fpath) = interface.alphafill.fill_structure(filled_structure)
     _LOGGER.info("Filled structure using AlphaFill!")
-
-    session = interface.pymol.new_session()
-    interface.pymol.general_cmd(session, [("load", filled_structure), ("remove", "solvent"), ("load", molfile),
-                                          ("align", Path(filled_structure).stem, Path(molfile).stem)])
-    f_df: pd.DataFrame = interface.pymol.collect(session,
-                                                 'memory',
-                                                 "chain resn resi segi name elem x y z".split(),
-                                                 sele=f"{Path(filled_structure).stem} and (not elem H)")
-    p_df: pd.DataFrame = interface.pymol.collect(session,
-                                                 'memory',
-                                                 "chain resn resi segi name elem x y z".split(),
-                                                 sele=f"{Path(molfile).stem} and (not elem H)")
-    interface.pymol.general_cmd(session, [("delete", Path(molfile).stem)])
-
-    protein_tks = list()
-    candidates = list()
-    for (chain, resi, resn, segi) in set(zip(f_df.chain, f_df.resi, f_df.resn, f_df.segi)):
-        if resn in eh.chemical.THREE_LETTER_AA_MAPPER:
-            protein_tks.append(f"( chain {chain} and resi {resi} and resn {resn} and segi {segi})")
-            continue
-
-        if resn.upper() in "MG ZN CL NA".split():  #TODO(CJ): make this a function in chemical
-            continue
-        temp = f_df[(f_df.chain == chain) & (f_df.resi == resi) & (f_df.resn == resn) & (f_df.segi == segi)].reset_index(drop=True)
-        candidates.append(deepcopy({'df': temp, 'names': set(temp.name.to_list()), 'key': (chain, resi, resn, segi)}))
-
-    protein_sele: str = "not elem H and " + " or ".join(protein_tks)
-    interface.pymol.general_cmd(session, [("delete", "all"), ("load", filled_structure), ("remove", "solvent")])
-    #p_df:pd.DataFrame=interface.pymol.collect(session, 'memory', "chain resn resi segi name elem x y z".split(), sele=protein_sele)
-
-    for cc in candidates:
-        cc['clashes'] = _count_clashes(p_df, cc['df'], clash_radius)
-
-    interface.pymol.general_cmd(session, [("delete", "all"), ("load", reactant), ("remove", "solvent")])
-    r_df: pd.DataFrame = interface.pymol.collect(session, 'memory', "chain resn resi segi name elem x y z".split(), sele="not elem H")
-
-    rct = {'df': r_df, 'names': set(r_df.name.to_list())}
-
-    exact_matches = list()
-    rct_is_subset = list()
-    can_is_subset = list()
     
-    #TODO(CJ): fix this part
-    for cc in candidates:
-        if rct['names'] == cc['names']:
-            exact_matches.append(cc)
+    transplant_info = json.load(open(transplant_info_fpath, 'r'))
+   
+    transplant_data = defaultdict(list)
+    for hit in transplant_info['hits']:
+        identity = hit['identity']
+        for tt in hit['transplants']:
+            transplant_data['analogue_id'].append( tt['analogue_id'] )
+            transplant_data['identity'].append( identity )
+            transplant_data['asym_id'].append( tt['asym_id'] )
+            transplant_data['clash_count'].append(tt['clash']['clash_count'])
+    
+    df = pd.DataFrame(transplant_data)
+    #TODO(CJ): add logging and actually use the similarity_cutoff 
+    memo = dict()
+    session = interface.pymol.new_session()
+    atom_names:List[List[str]] = list()
+    for i, row in df.iterrows():
+        if len(row.analogue_id) <= 2:
+            atom_names.append(set([row.analogue_id]))
             continue
+        temp_file:str = interface.pymol.fetch(row.analogue_id, out_dir=work_dir)
+        if row.analogue_id not in memo:
+            interface.pymol.general_cmd(session, [('load', temp_file)])
+            memo[row.analogue_id] = set(interface.pymol.collect(session, 'memory', 'name'.split())['name'].to_list())
+            interface.pymol.general_cmd(session, [('delete', 'all')])
 
-        if rct['names'].issubset(cc['names']):
-            rct_is_subset.append(cc)
-            continue
+        atom_names.append(memo[row.analogue_id])
 
-        if cc['names'].issubset(rct['names']):
-            can_is_subset.append(cc)
-            continue
+    df['atom_names'] = atom_names
+   
+    ligand_atoms:Set[str]=set([aa.name for aa in ligand.atoms])
+    
+    similarity_score:List[float] = list()
+    for i, row in df.iterrows():
+        numerator:int=len(row.atom_names.intersection(ligand_atoms))
+        denominator:int=max(len(ligand_atoms), len(row.atom_names))
+        similarity_score.append(numerator/denominator)
 
-    template = str()
-    if exact_matches:
-        exact_matches.sort(key=lambda dd: dd['clashes'])
-        row = exact_matches[0]['df'].iloc[0]
+    df['similarity_score'] = similarity_score
+    df = df[df.similarity_score >= similarity_cutoff].reset_index(drop=True)
+    similarity = df.similarity_score.to_numpy()
+    df = df[np.isclose(similarity, np.max(similarity))].reset_index(drop=True)
 
-        _LOGGER.info(f"Found exact match at {row.chain}.{row.resi}.{row.resn}! Transplanting")
-        temp_path = Path(reactant)
-        outfile = temp_path.parent / f"{temp_path.stem}_placed.mol2"
-        template: str = f"{work_dir}/template.mol2"
-        interface.pymol.general_cmd(
-            session, [("delete", "all"), ("load", filled_structure), ("load", molfile),
-                      ("align", Path(filled_structure).stem, Path(molfile).stem),
-                      ("save", template,
-                       f"{Path(filled_structure).stem} and chain {row.chain} and resn {row.resn} and resi {row.resi} and segi {row.segi}")])
-        return align_ligand(template, reactant, outfile=outfile)
+    df.sort_values(by='clash_count',inplace=True)
+    selected_id:str=df.asym_id[0]
 
-    assert False
-    if rct_is_subset:
-        pass
+    molfile:str=f"{work_dir}/__temp.pdb"
+    reactant:str=f"{work_dir}/__temp_ligand.mol2"
+    template:str=f"{work_dir}/__template_ligand.mol2"
+    outfile:str=f"{work_dir}/__aligned_ligand.mol2"
+    to_delete:List[str] = [molfile, reactant, template, outfile]
 
+    PDBParser().save_structure(molfile, stru)
 
-def _count_clashes(df1: pd.DataFrame, df2: pd.DataFrame, cutoff: float) -> int:
-    """Counts the number of clashes between the points in df1 and df2
+    Mol2Parser().save_ligand(reactant, ligand)
 
-    Args:
-        df1:
-        df2:
-        cutoff:
+    interface.pymol.general_cmd(session, [('delete', 'all'), ("load", filled_structure), ("remove", "solvent"), ("load", molfile),
+                                          ("align", Path(filled_structure).stem, Path(molfile).stem),
+                                          ("delete", Path(molfile).stem),
+                                          ("save", template, f"chain {selected_id} and segi {selected_id}")])
 
-    Returns:
-        pass
-    """
-    #TODO(CJ): do checks on the input pandas dataframes
-    points1 = np.transpose(np.array([df1.x.to_numpy(), df1.y.to_numpy(), df1.z.to_numpy()]))
-    points2 = np.transpose(np.array([df2.x.to_numpy(), df2.y.to_numpy(), df2.z.to_numpy()]))
+    outfile:str=align_ligand(template, reactant, outfile=outfile)
+    aligned_ligand:Ligand=Mol2Parser().get_ligand(outfile)
 
-    count: int = 0
+    for td in to_delete:
+        fs.safe_rm( td )
 
-    for pp1 in points1:
-        for pp2 in points2:
-            count += np.sqrt(np.sum((pp1 - pp2)**2)) <= cutoff
+    return aligned_ligand
 
-    return count
