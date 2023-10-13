@@ -22,7 +22,11 @@ from enzy_htp.core import env_manager as em
 from enzy_htp.core.exception import UnsupportedMethod, tLEaPError
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
 from enzy_htp.structure.structure_io import pdb_io
-from enzy_htp.structure import Structure
+from enzy_htp.structure import (
+    Structure,
+    Ligand,
+    MetalUnit,
+    ModifiedResidue,)
 from enzy_htp import config as eh_config
 
 class AmberParameter(MolDynParameter):
@@ -46,6 +50,8 @@ class AmberParameter(MolDynParameter):
 
 class AmberParameterizer(MolDynParameterizer):
     """the MD parameterizer for Amber.
+    Constructer:
+        AmberInterface.build_md_parameterizer()
     Attributes: (configuration of the parameterization process)
         charge_method
         resp_engine
@@ -93,8 +99,122 @@ class AmberParameterizer(MolDynParameterizer):
 
     def run(self, stru: Structure) -> AmberParameter:
         """the parameterizer convert stru to amber parameter (inpcrd, prmtop)"""
+        # 0. set up paths
+        result_inpcrd = fs.get_valid_temp_name(f"{self.parameterizer_temp_dir}/amber_parm.inpcrd")
+        result_frcmod = fs.get_valid_temp_name(f"{self.parameterizer_temp_dir}/amber_parm.frcmod")
+        fs.safe_mkdir(self.parameterizer_temp_dir)
 
+        # 1. check stru diversity
+        diversity = stru.chemical_diversity
+        _LOGGER.debug(f"diversity: {diversity}")
 
+        # 2. extract and parameterize each special component
+        if "ligand" in diversity:
+            ligand_parms = {}
+            for lig in stru.ligands:
+                ligand_parms[lig.name] = self._parameterize_ligand(lig)
+        if "modified_residue" in diversity:
+            maa_parms = {}
+            for maa in stru.modified_residue:
+                maa_parms[maa.name] = self._parameterize_modified_res(maa)
+        if "metalcenter" in diversity:
+            all_used_residue_names = []
+            all_used_atom_types = []
+            metalcenter_parms = {}
+            for metal in stru.metalcenters:
+                parms, used_residue_names, used_atom_types = self._parameterize_metalcenter(
+                    metal, ligand_parms, maa_parms)
+                metalcenter_parms.update(parms)
+                all_used_residue_names.extend(used_residue_names)
+                all_used_atom_types.extend(used_atom_types)
+
+        # 3. write the combining tleap.in
+        self._write_combining_tleap_input(
+            ligand_parms,
+            maa_parms,
+            metalcenter_parms,)
+
+        # 4. run tleap
+
+        # 5. clean up
+        fs.safe_rmdir(self.parameterizer_temp_dir, empty_only=True)
+
+        return AmberParameter(result_inpcrd, result_frcmod)
+
+    def _parameterize_ligand(self, lig: Ligand) -> Tuple[str, List[str]]:
+        """"""
+        fs.safe_mkdir(self.ncaa_param_lib_path)
+        # 0. search parm lib
+
+        # 1. make ligand PDB
+
+        # 1.1. Run RESP calculation (option)
+
+        # 2. run antechamber on the PDB get mol2
+        mol2_path = fs.get_valid_temp_name(
+            f"{self.ncaa_param_lib_path}/{lig.name}.mol2")
+
+        # 3. run parmchk2 on the PDB
+        frcmod_path = fs.get_valid_temp_name(
+            f"{self.ncaa_param_lib_path}/{lig.name}.frcmod")
+
+        return mol2_path, [frcmod_path]
+
+    def _parameterize_modified_res(self, maa: ModifiedResidue) -> Tuple[str, List[str]]:
+        """"""
+        fs.safe_mkdir(self.ncaa_param_lib_path)
+        # 0. search parm lib
+
+        # 1. make maa PDB
+
+        # 2. run antechamber on the PDB get ac
+        ac_path = fs.get_valid_temp_name(
+            f"{self.ncaa_param_lib_path}/{maa.name}.ac")
+        # 2.1 fix the wrong atom type given by antechamber
+
+        # 3. run prepgen on ac & mc get prepin
+        prepin_path = fs.get_valid_temp_name(
+            f"{self.ncaa_param_lib_path}/{maa.name}.prepin")
+
+        # 4. run antechamber on prepin get mol2
+        mol2_path = fs.get_valid_temp_name(
+            f"{self.ncaa_param_lib_path}/{maa.name}.mol2")
+
+        # 5. run parmchk2 twice on prepin get frcmod & frcmod2
+        frcmod_path = fs.get_valid_temp_name(
+            f"{self.ncaa_param_lib_path}/{maa.name}.frcmod")
+        frcmod2_path = fs.get_valid_temp_name(
+            f"{self.ncaa_param_lib_path}/{maa.name}.frcmod2")
+
+        return mol2_path, [frcmod_path, frcmod2_path] # TODO make sure whether mol2 works or do we even need it?
+
+    def _parameterize_metalcenter(self, metal: MetalUnit,
+                                  ligand_parms: Dict[str, Tuple[str, List[str]]],
+                                  maa_parms: Dict[str, Tuple[str, List[str]]],) -> List[Dict[str, str], List, List] :
+        """TODO maybe rewrote MCPB.py"""
+        mcpb_path = f"{self.ncaa_param_lib_path}/mcpb"
+        fs.safe_mkdir(mcpb_path)
+        # 1. run MCPB.py 1st step - get involved residues from "small", new res name
+        mcpbin_path = fs.get_valid_temp_name(
+            f"{mcpb_path}/{metal.name}.mcpbin")
+        # 2. search parm lib TODO: prob by coordinate
+
+        # 3. run gaussian calculation
+
+        # 4. run MCPB 2/3/4 step get mol2 files, frcmod file, new pdb, new atom types, bond lines
+        new_residue_names = []
+        new_atom_types = []
+
+        # 5. store mol2, frcmod, bond lines in parm_dict
+        parm_dict = {}
+
+        return parm_dict, new_residue_names, new_atom_types
+
+    def _write_combining_tleap_input(self, 
+            ligand_parms,
+            maa_parms,
+            metalcenter_parms):
+        pass
 class AmberMDStep(MolDynStep):
     """the modular MD step of Amber.
     Attributes: (necessary information of the modular MD step)
@@ -327,8 +447,8 @@ class AmberInterface(BaseInterface):
                 The temporary working directory that contains all the files generated by the AmberParameterizer
             additional_tleap_lines:
                 handle for adding additional tleap lines before generating the parameters."""
-        # write the below code
-        print(AmberInterface._generate_default_assigning_lines_for_build_md_parameterizer(locals().items()))
+        # tool: write the below code
+        # print(AmberInterface._generate_default_assigning_lines_for_build_md_parameterizer(locals().items()))
 
         # init default values
         if charge_method == "default":
@@ -351,7 +471,7 @@ class AmberInterface(BaseInterface):
             solvate_box_size = self.config()["DEFAULT_SOLVATE_BOX_SIZE"]
         if parameterizer_temp_dir == "default":
             parameterizer_temp_dir = self.config()["DEFAULT_PARAMETERIZER_TEMP_DIR"]
-  
+
         return AmberParameterizer(
             charge_method,
             resp_engine,
