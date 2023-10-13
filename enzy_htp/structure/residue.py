@@ -174,8 +174,9 @@ class Residue(DoubleLinkedNode):
         return self._rtype == chem.ResidueType.CANONICAL
 
     def is_noncanonical(self) -> bool:
-        """Checks if Residue() is canonical. Inherited by children."""
-        return self._rtype == chem.ResidueType.NONCANONICAL # TODO maybe change to modified
+        """Checks if Residue() is a modified residue. Inherited by children.
+        TODO: would MODIFIED a better name?"""
+        return self._rtype == chem.ResidueType.NONCANONICAL
 
     def is_ligand(self) -> bool:
         """Checks if Residue() is a ligand. Inherited by children."""
