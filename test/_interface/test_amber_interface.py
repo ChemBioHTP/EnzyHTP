@@ -190,7 +190,7 @@ def test_amber_parameterizer_run_lv_1():
 
 
 def test_amber_parameterizer_run_lv_2():
-    """level 1 test of the parameterizer.
+    """level 2 test of the parameterizer.
     Test structure diversity:
     - single polypeptide chain
     - single substrate (CHON)"""
@@ -198,6 +198,17 @@ def test_amber_parameterizer_run_lv_2():
     test_param_worker: AmberParameterizer = ai.build_md_parameterizer()
     test_stru = struct.PDBParser().get_structure(
         f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb")
+    test_param_worker.run(test_stru)
+
+def test_amber_parameterizer_run_lv_3():
+    """level 3 test of the parameterizer.
+    Test structure diversity:
+    - 2 polypeptide chain
+    - 2 substrate (CHN, CHONP), special net charge"""
+    ai = interface.amber
+    test_param_worker: AmberParameterizer = ai.build_md_parameterizer()
+    test_stru = struct.PDBParser().get_structure(
+        f"{MM_DATA_DIR}/puo_put.pdb")
     test_param_worker.run(test_stru)
 
 # region TODO
