@@ -34,13 +34,30 @@ class ModifiedResidue(Residue):
         Constructor for ModifiedResidue. Identical to Residue() ctor but also takes net_charge value.
         """
         self.net_charge = kwargs.get("net_charge", None)
+        self._multiplicity = kwargs.get("multiplicity", None)
         Residue.__init__(self, residue_idx, residue_name, atoms, parent)
         self.rtype = chem.ResidueType.NONCANONICAL
 
     # === Getter-Attr ===
-    def get_net_charge(self) -> int:
+    @property
+    def net_charge(self) -> int:
         """Getter for the net_charge attribute."""
-        return self.net_charge
+        return self._net_charge
+
+    @net_charge.setter
+    def net_charge(self, val: int):
+        """Setter for the net_charge attribute."""
+        self._net_charge = val
+
+    @property
+    def multiplicity(self) -> int:
+        """Getter for the multiplicity attribute."""
+        return self._multiplicity
+
+    @multiplicity.setter
+    def multiplicity(self, val: int):
+        """Setter for the multiplicity attribute."""
+        self._multiplicity = val
 
     # === Getter-Prop ===
     def clone(self) -> ModifiedResidue:
