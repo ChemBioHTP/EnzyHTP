@@ -21,9 +21,10 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core import env_manager as em
 from enzy_htp.core.exception import UnsupportedMethod, tLEaPError
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
-from enzy_htp.structure.structure_io import pdb_io
+from enzy_htp.structure.structure_io import pdb_io, StructureParserInterface
 from enzy_htp.structure import (
     Structure,
+    Residue,
     Ligand,
     MetalUnit,
     ModifiedResidue,)
@@ -92,6 +93,8 @@ class AmberParameterizer(MolDynParameterizer):
         self.gb_radii = gb_radii
         self.parameterizer_temp_dir = parameterizer_temp_dir
         self.additional_tleap_lines = additional_tleap_lines
+        # caches init val
+        self.cache_ncaa_lib_mapper = {}
 
     @property
     def engine(self) -> str:
@@ -118,15 +121,20 @@ class AmberParameterizer(MolDynParameterizer):
             for maa in stru.modified_residue:
                 maa_parms[maa.name] = self._parameterize_modified_res(maa)
         if "metalcenter" in diversity:
-            all_used_residue_names = []
-            all_used_atom_types = []
+            _LOGGER.warning(
+                "Support for paramization of metalcenter is not ready yet."
+                " You can use AmberParameterizer().additional_tleap_lines"
+                " & change relevant residue names to apply pre-made parameters"
+                " for metal centers.")
+            # all_used_residue_names = []
+            # all_used_atom_types = []
             metalcenter_parms = {}
-            for metal in stru.metalcenters:
-                parms, used_residue_names, used_atom_types = self._parameterize_metalcenter(
-                    metal, ligand_parms, maa_parms)
-                metalcenter_parms.update(parms)
-                all_used_residue_names.extend(used_residue_names)
-                all_used_atom_types.extend(used_atom_types)
+            # for metal in stru.metalcenters:
+            #     parms, used_residue_names, used_atom_types = self._parameterize_metalcenter(
+            #         metal, ligand_parms, maa_parms)
+            #     metalcenter_parms.update(parms)
+            #     all_used_residue_names.extend(used_residue_names)
+            #     all_used_atom_types.extend(used_atom_types)
 
         # 3. write the combining tleap.in
         self._write_combining_tleap_input(
@@ -142,26 +150,36 @@ class AmberParameterizer(MolDynParameterizer):
         return AmberParameter(result_inpcrd, result_frcmod)
 
     def _parameterize_ligand(self, lig: Ligand) -> Tuple[str, List[str]]:
-        """"""
+        """parameterize ligand for AmberMD, use ncaa_param_lib_path for customized
+        parameters. Multiplicity and charge information can be set in Ligand objects.
+        TODO prob add a Structure method for batch assigning it"""
+
         fs.safe_mkdir(self.ncaa_param_lib_path)
         # 0. search parm lib
+        mol_desc_path, frcmod_path_list = self._search_ncaa_parm_file(lig)
 
-        # 1. make ligand PDB
+        if mol_desc_path:
+            if frcmod_path_list:
+                return mol_desc_path, frcmod_path_list
+        else:
+            # 1. make ligand PDB
 
-        # 1.1. Run RESP calculation (option)
+            # 1.1. Run RESP calculation (option)
 
-        # 2. run antechamber on the PDB get mol2
-        mol2_path = fs.get_valid_temp_name(
-            f"{self.ncaa_param_lib_path}/{lig.name}.mol2")
+            # 2. run antechamber on the PDB get mol2
+            mol_desc_path = fs.get_valid_temp_name(
+                f"{self.ncaa_param_lib_path}/{lig.name}.mol2")
 
         # 3. run parmchk2 on the PDB
+        # (this also runs when mol_desc exsit but not frcmod)
         frcmod_path = fs.get_valid_temp_name(
             f"{self.ncaa_param_lib_path}/{lig.name}.frcmod")
 
-        return mol2_path, [frcmod_path]
+        return mol_desc_path, frcmod_path_list
 
     def _parameterize_modified_res(self, maa: ModifiedResidue) -> Tuple[str, List[str]]:
-        """"""
+        """parameterize modified residues for AmberMD, use ncaa_param_lib_path for customized
+        parameters. Multiplicity and charge information can be set in ModifiedResidue objects."""
         fs.safe_mkdir(self.ncaa_param_lib_path)
         # 0. search parm lib
 
@@ -190,7 +208,7 @@ class AmberParameterizer(MolDynParameterizer):
 
     def _parameterize_metalcenter(self, metal: MetalUnit,
                                   ligand_parms: Dict[str, Tuple[str, List[str]]],
-                                  maa_parms: Dict[str, Tuple[str, List[str]]],) -> List[Dict[str, str], List, List] :
+                                  maa_parms: Dict[str, Tuple[str, List[str]]],) -> List :
         """TODO maybe rewrote MCPB.py"""
         mcpb_path = f"{self.ncaa_param_lib_path}/mcpb"
         fs.safe_mkdir(mcpb_path)
@@ -210,11 +228,102 @@ class AmberParameterizer(MolDynParameterizer):
 
         return parm_dict, new_residue_names, new_atom_types
 
-    def _write_combining_tleap_input(self, 
+    def _write_combining_tleap_input(self,
             ligand_parms,
             maa_parms,
             metalcenter_parms):
         pass
+
+    def _search_ncaa_parm_file(self, target_res: Residue) -> Tuple[str, List[str]]:
+        """search for ncaa parm files for {target_res_name} from self.ncaa_param_lib_path.
+        Args:
+            target_res: the target Residue child class instance. (e.g.: Ligand, ModifiedResidue)
+        Returns:
+            (prepi/mol2_path, [frcmod_path, ...]) if found
+            (None, []) if not found"""
+        mol_desc_path = None
+        frcmod_path_list = []
+
+        # I. initiate the ncaa_lib_mapper {file : res_name} (1-time effort if no new files added)
+        ncaa_lib_mapper = {}
+
+        parm_file_list = fs.get_all_file_in_dir(self.ncaa_param_lib_path)
+        for parm_file in parm_file_list:
+            res_name = self.cache_ncaa_lib_mapper.get(parm_file, None)
+            if res_name: # exist in cache
+                
+                ncaa_lib_mapper[parm_file] = res_name
+
+            else: # not exist in cache - file the res_name
+
+                # prepin
+                if fs.get_file_ext(parm_file) in [".prepin", ".prepi"]:
+                    # 1. find 3-letter name in file
+                    parm_stru = PrepinParser().get_structure(parm_file)
+                    res_name = parm_stru.residues[0].name
+                    if res_name in [None, "UNK"]:
+                        # 2. find 3-letter name in filename
+                        res_name = self._get_ncaa_parm_file_res_name_from_filename(parm_file)
+                # mol2
+                elif fs.get_file_ext(parm_file) in [".mol2"]:
+                    pass
+                    # # 1. find 3-letter name in file
+                    # parm_stru = Mol2Parser().get_structure(parm_file)
+                    # res_name = parm_stru.residues[0].name
+                    # if res_name in [None, "UNK"]:
+                    #     # 2. find 3-letter name in filename
+                    #     res_name = self._get_ncaa_parm_file_res_name_from_filename(parm_file)
+
+                # frcmod*
+                elif ".frcmod" in fs.get_file_ext(parm_file):
+                    # seems frcmod file wont contain residue name in file
+                    res_name = self._get_ncaa_parm_file_res_name_from_filename(parm_file)
+
+                else:
+                    _LOGGER.warning(
+                        f"The file: {parm_file} in ncaa_parm_lib have an unknown extension."
+                        "This file will not be considered during parameterization"
+                        "currently supported types are: prepin, mol2, frcmod*")
+                    continue
+
+                # known file type
+                if res_name:
+                    ncaa_lib_mapper[parm_file] = res_name
+                else:
+                    _LOGGER.warning(
+                        f"The file: {parm_file} in ncaa_parm_lib does not have an "
+                        "associated residue name. This file will not be considered "
+                        "during parameterization. Make sure this is what you want! "
+                        "You can add residue name by adding it to the corresponding "
+                        "part in the file format or use the 3-letter name as filename (in upper case)") 
+
+        self.cache_ncaa_lib_mapper.update(ncaa_lib_mapper) # cache known ones
+
+        # II. assign to target_res
+        for file_path, res_name in ncaa_lib_mapper.items():
+            if res_name == target_res.name:
+                # prepin/mol2
+                if fs.get_file_ext(file_path) in [".prepin", ".prepi", ".mol2"]:
+                    mol_desc_path = file_path
+                # frcmod*
+                if ".frcmod" in fs.get_file_ext(file_path):
+                    frcmod_path_list.append(file_path)
+
+        return mol_desc_path, frcmod_path_list
+
+    def _get_ncaa_parm_file_res_name_from_filename(self, filename: str) -> Union[str, None]:
+        """as name desc"""
+        base_file_name = fs.base_file_name(filename)
+        if re.match("[A-Z][A-Z][A-Z]", base_file_name):
+            return base_file_name
+        else:
+            return None
+
+
+class PrepinParser(StructureParserInterface):
+    """the parser for AmberMD prepin files"""
+    
+
 class AmberMDStep(MolDynStep):
     """the modular MD step of Amber.
     Attributes: (necessary information of the modular MD step)

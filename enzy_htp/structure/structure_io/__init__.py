@@ -4,6 +4,7 @@ Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
 Date: 2022-08-01
 """
 from .pdb_io import PDBParser
+from _interface import StructureParserInterface
 # # import all modules under the dir to support user customization.
 # __all__ = []
 # for f in os.listdir(os.path.dirname(__file__)):
