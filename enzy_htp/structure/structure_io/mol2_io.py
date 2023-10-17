@@ -90,7 +90,7 @@ class Mol2Parser():
                 temp[ll] = cc(tt)
             result.append(temp)
 
-        return result 
+        return result
 
     @classmethod
     def _parse_substructure_section(cls, raw:List[str]) -> List[Dict]:
