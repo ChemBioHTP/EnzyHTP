@@ -1,9 +1,13 @@
-"""the I/O submodule for generation/construction of Structure objects from files and other data structures (?should it be here) and exporting it vice versa
+"""the I/O submodule for generation, construction, importing, and exporting of various structure related objects:
+    + Structure objects: PDBParser
+    + Ligand objects: Mol2Parser
 
 Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-08-01
 """
 from .pdb_io import PDBParser
+from .mol2_io import Mol2Parser
 # # import all modules under the dir to support user customization.
 # __all__ = []
 # for f in os.listdir(os.path.dirname(__file__)):

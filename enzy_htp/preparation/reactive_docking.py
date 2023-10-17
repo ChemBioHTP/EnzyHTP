@@ -8,7 +8,7 @@ Date: 2023-07-28
 import os
 from pathlib import Path
 from collections import defaultdict
-from typing import List, Tuple, Set
+from typing import List, Tuple, Set, Dict
 from copy import deepcopy
 
 import numpy as np
@@ -39,7 +39,7 @@ def dock_reactants(structure: Structure,
                    cluster_distance: float = 2.5,
                    use_cache: bool = True
                    ) -> Structure:
-    """Given a structure and constraints,  
+    """Given a structure and constraints, 
 
     Args:
 
@@ -57,54 +57,74 @@ def dock_reactants(structure: Structure,
                   clash_distance, clash_cutoff, binding_cutoff, cluster_distance, use_cache)
     
     _validate_system( structure, constraints )
-    #TODO(CJ): this will no longer exist in the current version of the algorithm... just check if the reactant
-    # is there; get rid of it if not
-    #_place_reactants(structure, reactants, pdb_code)
 
-    (param_files, charge_mapper) = _parameterize_system(structure, work_dir)
+    df:pd.DataFrame = _dock_system(structure, constraints, n_struct, work_dir, rng_seed, use_cache )
 
-    docked_complexes: List[str] = list()
-
-    chain_names: List[str] = _ligand_chain_names(start_pdb)
-
-    #TODO(CJ): a lot of this can be combined to a bigger function
-    (start_pdb, cst_file) = _integrate_csts(structure, constraints, work_dir, use_cache)
-
-    xml_file: str = _create_xml(work_dir, reactants, use_cache)  #TODO(CJ): going to overhaul this
-
-    options_file: str = make_options_file(start_pdb, xml_file, param_files, work_dir, rng_seed, n_struct, use_cache, cst_file)
-
-    df: pd.DataFrame = _docking_run(options_file, use_cache)
 
     _evaluate_csts(df, constraints, cst_cutoff)
-
+    
     _evaluate_clashes(df, clash_distance, clash_cutoff)
-
+    
     _evaluate_binding(df, start_pdb, binding_cutoff, chain_names, charge_mapper=charge_mapper)
-
+   
     _evaluate_qm(df, start_pdb, charge_mapper, cluster_distance)
-
+    
     (selected, wt_fpath) = _select_complex(df, work_dir)
 
     docked_complexes.append(wt_fpath)
 
-    e_flags = []
-    for pf in param_files:
-        e_flags.extend(['-extra_res_fa', str(Path(pf).absolute())])
-
-    if mutations:
-        docked_complexes.extend(_mutate_result(selected, mutations, work_dir, e_flags))
-
-    #TODO(CJ): delete leftover files
-
     return docked_complexes
 
 def _validate_system( stru:Structure, constraints:List[RosettaCst] ) -> None:
-    """TODO(CJ)"""
+    """Checks if the supplied list of contraints exists and is compatible with the supplied Structure() object.
+    If it is not, a detailed error message is logged and the program exits.
+    
+    Args:
+        stru: The Structure() to validate the proposed constraints in.
+        constraints: A List[RosettaCst] objects 
+
+    Returns:
+        Nothing.
+    """
     _LOGGER.info("Validating the supplied system...")
-    #TODO(CJ): just write all this...
+    msg:str=''
+    error:bool = False
     for cst in constraints:
-        print(cst)
+        r1_found, r2_found = False, False
+        for rr in stru.residues:
+            if rr.chain.name == cst.rchain_1 and rr.name == cst.rname_1 and rr.idx == cst.rnum_1:
+                atom_names:List[str] = [aa.name for aa in rr.atoms]
+                for aa in cst.ratoms_1:
+                    if aa not in atom_names:
+                        break
+                else:
+                    r1_found = True
+
+            if rr.chain.name == cst.rchain_2 and rr.name == cst.rname_2 and rr.idx == cst.rnum_2:
+                atom_names:List[str] = [aa.name for aa in rr.atoms]
+                for aa in cst.ratoms_2:
+                    if aa not in atom_names:
+                        break
+                else:
+                    r2_found = True
+
+        if not r1_found:
+            msg += f"({cst.rchain_1}.{cst.rnum_1}.{cst.rname_1}),"
+            error = True
+
+
+        if not r2_found:
+            msg += f"({cst.rchain_2}.{cst.rnum_2}.{cst.rname_2}),"
+            error = True
+
+
+
+    if error:
+        _LOGGER.error(f"Errors while trying to validate the supplied system. Could not locate residues or had incorrect atom names: {msg[:-1]}")
+        _LOGGER.error("Exiting...")
+        exit( 1 )
+    else:   
+        _LOGGER.info("Validation complete! Supplied constraints can be applied to the supplied Structure") 
 
         
 
@@ -188,7 +208,7 @@ def _integrate_csts(stru: Structure, csts: List[RosettaCst], work_dir: str, use_
     return (pdb_file, cst_file)
 
 
-def _create_xml(work_dir: str, reactants: List[str], use_cache: bool) -> str:
+def _create_xml(stru:Structure, work_dir: str, use_cache: bool) -> str:
     """
 
     Args:
@@ -197,26 +217,31 @@ def _create_xml(work_dir: str, reactants: List[str], use_cache: bool) -> str:
     Returns:
         The relative filepath of the RosettaScripts .xml file.
     """
+    parser = Mol2Parser()
+    temp_mol2:str=f"{work_dir}/__temp_mol2.mol2"
     reactant_dicts = list()
-    for rr in reactants:
+    for rr in stru.residues:
+        if not rr.is_ligand():
+            continue
         temp = dict()
-        session = interface.pymol.new_session()
-        df: pd.DataFrame = interface.pymol.collect(session, rr, "chain resn x y z name".split(), sele='not elem H')
-        temp['resn'] = df.resn[0]
-        temp['chain'] = df.chain[0]
-        temp['volume'] = interface.rdkit.volume(rr)
-        points = np.transpose(np.array([df.x.to_numpy(), df.y.to_numpy(), df.z.to_numpy()]))
-        distances = list()
-        n_points = len(points)
-        for p1 in range(n_points):
-            for p2 in range(n_points):
-                distances.append(np.sqrt(np.sum((points[p1] - points[p2])**2)))
-        temp['length'] = np.max(np.array(distances))
-        reactant_dicts.append(temp)
+        temp['resn'] = rr.name
+        temp['chain'] = rr.chain.name
+        parser.save_ligand(temp_mol2, rr )
+        temp['volume'] = interface.rdkit.volume(temp_mol2)
+        reactant_dicts.append( temp )
+        coords = [np.array(aa.coord) for aa in rr.atoms]
+        max_dist:float = -1.0
+        for c1 in coords:
+            for c2 in coords:
+                dist = np.sqrt(np.sum((c1-c2)**2))
+                if dist > max_dist:
+                    max_dist = dist
+        temp['length'] = max_dist
+    fs.safe_rm( temp_mol2 )
 
     reactant_dicts.sort(key=lambda dd: dd['chain'])
-
     fname: str = f"{work_dir}/__script.xml"
+
     if not use_cache:
         fs.safe_rm(fname)
 
@@ -270,72 +295,72 @@ def _create_xml(work_dir: str, reactants: List[str], use_cache: bool) -> str:
         },
     ]
 
-    for rd in reactant_dicts:
-        cc = rd['chain']
-        elements.extend([
-            {
-                'parent': 'LIGAND_AREAS',
-                'tag': 'LigandArea',
-                'name': f'docking_sidechain_{cc.lower()}',
-                'chain': f'{cc.upper()}',
-                'cutoff': '6.0',
-                'add_nbr_radius': 'true',
-                'all_atom_mode': 'false'
-            },
-            {
-                'parent': 'LIGAND_AREAS',
-                'tag': 'LigandArea',
-                'name': f'final_sidechain_{cc.lower()}',
-                'chain': f'{cc.upper()}',
-                'cutoff': '6.0',
-                'add_nbr_radius': 'true',
-                'all_atom_mode': 'false'
-            },
-            {
-                'parent': 'LIGAND_AREAS',
-                'tag': 'LigandArea',
-                'name': f'final_backbone_{cc.lower()}',
-                'chain': f'{cc.upper()}',
-                'cutoff': '7.0',
-                'add_nbr_radius': 'false',
-                'all_atom_mode': 'true',
-                'Calpha_restraints': "0.3"
-            },
-            {
-                'parent': 'INTERFACE_BUILDERS',
-                'tag': 'InterfaceBuilder',
-                'name': f'side_chain_for_docking_{cc.lower()}',
-                'ligand_areas': f'docking_sidechain_{cc.lower()}'
-            },
-            {
-                'parent': 'INTERFACE_BUILDERS',
-                'tag': 'InterfaceBuilder',
-                'name': f'side_chain_for_final_{cc.lower()}',
-                'ligand_areas': f'final_sidechain_{cc.lower()}'
-            },
-            {
-                'parent': 'INTERFACE_BUILDERS',
-                'tag': 'InterfaceBuilder',
-                'name': f'backbone_{cc.lower()}',
-                'ligand_areas': f'final_backbone_{cc.lower()}',
-                'extension_window': '3'
-            },
-            {
-                'parent': 'MOVEMAP_BUILDERS',
-                'tag': 'MoveMapBuilder',
-                'name': f'docking_{cc.lower()}',
-                'sc_interface': f'side_chain_for_docking_{cc.lower()}',
-                'minimize_water': 'false'
-            },
-            {
-                'parent': 'MOVEMAP_BUILDERS',
-                'tag': 'MoveMapBuilder',
-                'name': f'final_{cc.lower()}',
-                'sc_interface': f'side_chain_for_final_{cc.lower()}',
-                'bb_interface': f'backbone_{cc.lower()}',
-                'minimize_water': 'false'
-            },
-        ])
+#    for rd in reactant_dicts:
+#        cc = rd['chain']
+#        elements.extend([
+#            {
+#                'parent': 'LIGAND_AREAS',
+#                'tag': 'LigandArea',
+#                'name': f'docking_sidechain_{cc.lower()}',
+#                'chain': f'{cc.upper()}',
+#                'cutoff': '6.0',
+#                'add_nbr_radius': 'true',
+#                'all_atom_mode': 'false'
+#            },
+#            {
+#                'parent': 'LIGAND_AREAS',
+#                'tag': 'LigandArea',
+#                'name': f'final_sidechain_{cc.lower()}',
+#                'chain': f'{cc.upper()}',
+#                'cutoff': '6.0',
+#                'add_nbr_radius': 'true',
+#                'all_atom_mode': 'false'
+#            },
+#            {
+#                'parent': 'LIGAND_AREAS',
+#                'tag': 'LigandArea',
+#                'name': f'final_backbone_{cc.lower()}',
+#                'chain': f'{cc.upper()}',
+#                'cutoff': '7.0',
+#                'add_nbr_radius': 'false',
+#                'all_atom_mode': 'true',
+#                'Calpha_restraints': "0.3"
+#            },
+#            {
+#                'parent': 'INTERFACE_BUILDERS',
+#                'tag': 'InterfaceBuilder',
+#                'name': f'side_chain_for_docking_{cc.lower()}',
+#                'ligand_areas': f'docking_sidechain_{cc.lower()}'
+#            },
+#            {
+#                'parent': 'INTERFACE_BUILDERS',
+#                'tag': 'InterfaceBuilder',
+#                'name': f'side_chain_for_final_{cc.lower()}',
+#                'ligand_areas': f'final_sidechain_{cc.lower()}'
+#            },
+#            {
+#                'parent': 'INTERFACE_BUILDERS',
+#                'tag': 'InterfaceBuilder',
+#                'name': f'backbone_{cc.lower()}',
+#                'ligand_areas': f'final_backbone_{cc.lower()}',
+#                'extension_window': '3'
+#            },
+#            {
+#                'parent': 'MOVEMAP_BUILDERS',
+#                'tag': 'MoveMapBuilder',
+#                'name': f'docking_{cc.lower()}',
+#                'sc_interface': f'side_chain_for_docking_{cc.lower()}',
+#                'minimize_water': 'false'
+#            },
+#            {
+#                'parent': 'MOVEMAP_BUILDERS',
+#                'tag': 'MoveMapBuilder',
+#                'name': f'final_{cc.lower()}',
+#                'sc_interface': f'side_chain_for_final_{cc.lower()}',
+#                'bb_interface': f'backbone_{cc.lower()}',
+#                'minimize_water': 'false'
+#            },
+#        ])
 
     for ridx, rd in enumerate(reactant_dicts):
         cc = rd['chain']
@@ -346,7 +371,7 @@ def _create_xml(work_dir: str, reactants: List[str], use_cache: bool) -> str:
                 'parent': 'ROSETTASCRIPTS',
                 'tag': 'SCORINGGRIDS',
                 'ligand_chain': cc.upper(),
-                'width': str(rd['length'] * 2),
+                'width': '20', 
                 'append_elements_only': True,
                 'name': rd['grid_name'],
                 'child_nodes': [
@@ -374,99 +399,47 @@ def _create_xml(work_dir: str, reactants: List[str], use_cache: bool) -> str:
 
     elements.extend([{'parent': 'MOVERS', 'tag': 'AddOrRemoveMatchCsts', 'name': 'cstadd', 'cst_instruction': 'add_new'}])
 
+    protocol_names:List[str] = list()
     for rd in reactant_dicts:
         cc: str = rd['chain']
         radius: float = rd['length']
+        predock:str=f'predock_{cc.lower()}'
+        dock:str=f'dock_{cc.lower()}'
         elements.extend([{
             'parent': 'MOVERS',
             'tag': 'Transform',
-            'name': f'transform_{cc.lower()}',
+            'name': predock,
             'chain': f'{cc.upper()}',
-            'box_size': str(1.5 * radius),
-            'move_distance': '0.1',
-            'angle': '45',
-            'cycles': '200',
-            'repeats': '10',
-            'temperature': '25',
+            'box_size': f'{1.5 * radius:.3f}',
+            'move_distance': '10.0',
+            'angle': '360',
+            'cycles': '1000',
+            'repeats': '3',
+            'temperature': '5',
             'grid_set': rd['grid_name']
-        }, {
+        },{
             'parent': 'MOVERS',
-            'tag': 'HighResDocker',
-            'name': f'high_res_docker_{cc.lower()}',
-            'cycles': '6',
-            'repack_every_Nth': '3',
-            'scorefxn': 'ligand_soft_rep',
-            'movemap_builder': f'docking_{cc.lower()}'
-        }, {
-            'parent': 'MOVERS',
-            'tag': 'FinalMinimizer',
-            'name': f'final_{cc.lower()}',
-            'scorefxn': 'hard_rep',
-            'movemap_builder': f'final_{cc.lower()}'
+            'tag': 'Transform',
+            'name': dock,
+            'chain': f'{cc.upper()}',
+            'box_size': f'{0.5 * radius:.3f}',
+            'move_distance': '0.1',
+            'angle': '360',
+            'cycles': '1000',
+            'repeats': '3',
+            'temperature': '5',
+            'grid_set': rd['grid_name']
         }])
-
-    elements.append({
-        'parent': 'MOVERS',
-        'tag': 'InterfaceScoreCalculator',
-        'name': 'add_scores',
-        'chains': ','.join(map(lambda ss: ss['chain'].upper(), reactant_dicts)),
-        'scorefxn': 'hard_rep'
-    })
-
-    for rd in reactant_dicts:
-        cc: str = rd['chain']
-
-        elements.extend([{
-            'parent': 'MOVERS',
-            'tag': 'ParsedProtocol',
-            'name': f'low_res_dock_{cc.lower()}',
-            'child_nodes': [
-                {
-                    'tag': 'Add',
-                    'mover_name': 'cstadd'
-                },
-                {
-                    'tag': 'Add',
-                    'mover_name': f'transform_{cc.lower()}'
-                },
-            ]
-        }])
-
-    elements.extend([
-        {
-            'parent': 'MOVERS',
-            'tag': 'ParsedProtocol',
-            'name': 'high_res_dock',
-            'child_nodes': [deepcopy({
-                'tag': 'Add',
-                'mover_name': f'high_res_docker_{rd["chain"].lower()}'
-            }) for rd in reactant_dicts]
-        },
-        {
-            'parent': 'MOVERS',
-            'tag': 'ParsedProtocol',
-            'name': 'reporting',
-            'child_nodes': [{
-                'tag': 'Add',
-                'mover_name': 'add_scores'
-            }]
-        },
-    ])
+        protocol_names.extend([predock,dock])
 
     elements.extend(
-        [deepcopy({
-            'parent': 'PROTOCOLS',
-            'tag': 'Add',
-            'mover_name': f'low_res_dock_{rd["chain"].lower()}'
-        }) for rd in reactant_dicts] + [{
-            'parent': 'PROTOCOLS',
-            'tag': 'Add',
-            'mover_name': 'high_res_dock'
-        }, {
-            'parent': 'PROTOCOLS',
-            'tag': 'Add',
-            'mover_name': 'reporting'
-        }])
+        [{'parent': 'PROTOCOLS', 'tag': 'Add','mover_name': 'cstadd'}] + 
+        [{'parent': 'PROTOCOLS', 'tag': 'Add', 'mover_name': pn } for pn in protocol_names] + 
+        [{'parent': 'MOVERS', 'tag': 'EnzRepackMinimize', 'name':'cstopt', 'minimize_rb':'1', 
+        'cst_opt':'1', 'cycles':'5', 'scorefxn_repack': 'ligand_soft_rep', 'scorefxn_minimize': 'ligand_soft_rep',
+        'minimize_lig':'1'
+        },{'parent': 'PROTOCOLS', 'tag': 'Add', 'mover_name': 'cstopt'}
+    ])            
 
     interface.rosetta.write_script(fname, elements)
 
@@ -474,7 +447,7 @@ def _create_xml(work_dir: str, reactants: List[str], use_cache: bool) -> str:
     return fname
 
 
-def make_options_file(pdb_file: str,
+def _make_options_file(pdb_file: str,
                       xml_file: str,
                       param_files: List[str],
                       work_dir: str,
@@ -501,7 +474,7 @@ def make_options_file(pdb_file: str,
     """
     _LOGGER.info("Beginning creation of options file for Rosetta...")
     content: List[str] = [
-        "-keep_input_protonation_state",
+        #"-keep_input_protonation_state", TODO(CJ): get rid of this for now; but want it back someday
         "-run:constant_seed",
         f"-run:jran {int(rng_seed)}",
         "-in:file",
@@ -525,6 +498,7 @@ def make_options_file(pdb_file: str,
         "    -no_optH false",
         "    -flip_HNQ true",
         "    -ignore_ligand_chi true",
+        "-enzdes:minimize_all_ligand_torsions 5.0",
     ])
 
     if cst_file:
@@ -580,7 +554,12 @@ def make_options_file(pdb_file: str,
     return str(fname)
 
 
-def _docking_run(option_file: str, use_cache: bool) -> pd.DataFrame:
+def _dock_system(structure: Structure,
+            constraints: List[RosettaCst],
+            n_struct:int,
+            work_dir:str,
+            rng_seed:int,
+            use_cache:bool) -> pd.DataFrame:
     """
 
     Args:
@@ -589,7 +568,16 @@ def _docking_run(option_file: str, use_cache: bool) -> pd.DataFrame:
 
     """
     _LOGGER.info("Beginning RosettaLigand docking run...")
-    opt_path = Path(option_file)
+
+    (param_files, charge_mapper) = _parameterize_system(structure, work_dir)
+
+    (start_pdb, cst_file) = _integrate_csts(structure, constraints, work_dir, use_cache)
+
+    xml_file: str = _create_xml(structure, work_dir, use_cache)  #TODO(CJ): going to overhaul this
+
+    options_file: str = _make_options_file(start_pdb, xml_file, param_files, work_dir, rng_seed, n_struct, use_cache, cst_file)
+
+    opt_path = Path(options_file)
 
     if use_cache:
         csv_file = Path(str(opt_path.parent / "scores.csv"))
@@ -665,111 +653,67 @@ def _evaluate_csts(df: pd.DataFrame, csts: List[RosettaCst], cst_cutoff: int) ->
         f"Finished RosettaCst evaluation. {df.selected.sum()} geometries have constraint tolerances <= {cst_cutoff:.3f} tolerance units")
 
 
-def _parameterize_system(stru:Structure, work_dir:str) -> List[str]:
-    """
+def _parameterize_system(stru:Structure, work_dir:str) -> Tuple[List[str], Dict[str, int]]:
+    """Given the input Structure(), parameterize 
     Args:
         reactants:
         reactant_conformers:
 
     Returns:
-        A list() of the .params files for the given reactants.
+        A Tuple() with the format (list(), dict()), holding the (.params file names, charge mapper ). 
     """
     _LOGGER.info("Beginning preparation of each reactant...")
     #TODO(CJ): error if not enough conformers... then make the conformers
-    #TODO(CJ): update function signature
     param_files: List[str] = list()
     charge_mapper: Dict[str, int] = dict()
    
     parser = Mol2Parser()
     for res in stru.residues:
+        conformers:str=None
         if type(res) != Ligand:
             continue
         _LOGGER.info(f"Detected residue {res.name} in chain {res.parent.name}...")
         if res.n_conformers() == 1:
             _LOGGER.info(f"\tDetected no conformers!")
         else:
-            #TODO(CJ): when there are conformers.
-            pass
+            _parser = PDBParser()
+            
+            orig:List[Tuple[float,float,float]] = [aa.coord for aa in res.atoms]
+
+            content:List[str]=list()
+            for conf_coords in res.conformer_coords:                
+                for aidx, aa in enumerate(res.atoms):
+                    aa.coord = conf_coords[aidx]
+                content.extend(_parser.get_file_str(res, if_renumber=False).splitlines())
+
+            for aidx, aa in enumerate(res.atoms):
+                aa.coord = orig[aidx]
+            
+            conformers = f"{work_dir}/{res.name}_conformers.pdb"
+            fs.write_lines(conformers, filter(lambda ll: not ll.startswith('TER'), content ) )
+
         temp_rct:str = f"{work_dir}/__temp_rct.mol2"
         parser.save_ligand(temp_rct, res)
-        (pfile, charge) = _paramterize_reactant(
-            temp_rct,
-            res.name
-        )
-        print(res)
-    exit( 0 )
-
-
-    for ridx, rct in enumerate(reactants):
-        _LOGGER.info(f"Parameterizing reactant {ridx+1} of {len(reactants)}: {rct}")
-        reactant_name: str = f"L{ridx+1:02d}"
         (pfile, charge) = _parameterize_reactant(
-            rct,
-            reactant_name,
-            conformers=reactant_conformers[ridx]  #TODO(CJ): deal with this
+            temp_rct,
+            res.name,
+            conformers
         )
-        #)
-        _LOGGER.info(f"Information for reactant {rct}:")
+        _LOGGER.info(f"Information for reactant {res.name}:")
         _LOGGER.info(f"\tparam file: {pfile}")
         _LOGGER.info(f"\tcharge: {charge}")
-        charge_mapper[reactant_name] = charge
         param_files.append(pfile)
+        charge_mapper[res.name] = charge
+        fs.safe_rm( temp_rct )
 
     _LOGGER.info("Finished reactant preparation!")
+
     return (param_files, charge_mapper)
 
 
-def _dock_mut_cst_overlaps(structure: Structure, reactants: List[str], constraints: List[RosettaCst], mutations: List[mm.Mutation],
-                           work_dir: str, save_work_dir: bool, reactant_conformers: List[str], rng_seed: int, n_struct: int) -> List[str]:
-    """
-    
-    Args:
-
-    Returns:
-
-    """
-    pass
-    #TODO(CJ): implement this
 
 
-def _mutate_result(structure, mutations: List[List[mm.Mutation]], work_dir: str, extra_flags=None) -> List[str]:
-    """ TODO(CJ)"""
-    _LOGGER.info("Mutating selected structure...")
-    res_names = {}
-    for res in structure.residues:
-        if res.name.upper() in chem.METAL_CENTER_MAP:
-            continue
-        if res.name not in chem.THREE_LETTER_AA_MAPPER:
-            continue
-        res_names[f"{res.chain.name}.{res.idx}"] = chem.convert_to_one_letter(res.name)
-
-    if extra_flags is None:
-        extra_flags = list()
-
-    result: List[str] = list()
-    #TODO(CJ): get this to work for List[List[Mutation]]
-    for midx, mut_sets in enumerate(mutations):
-        _LOGGER.info(f"Deploying mutation set {midx+1} of {len(mutations)}")
-        mutated_outfile = str()
-        for mut in mut_sets:
-            original = res_names[f"{mut.chain_id}.{mut.res_idx}"]
-            mutated_outfile += f"{original}{mut.res_idx}{chem.convert_to_one_letter(mut.target)}_"
-
-        mutated_outfile: str = f"{work_dir}/{mutated_outfile[:-1]}.pdb"
-        mutant = mm.mutate_stru(structure, mut_sets, engine='rosetta', extra_flags=extra_flags)
-        parser = PDBParser()
-        file_str = parser.get_file_str(mutant, if_renumber=False, if_fix_atomname=False)
-        fs.safe_rm(mutated_outfile)
-        fs.write_lines(mutated_outfile, file_str.splitlines())
-        _LOGGER.info(f"Saved mutated structure to {mutated_outfile}")
-        result.append(mutated_outfile)
-
-    _LOGGER.info("Finished mutations!")
-
-    return result
-
-
-def _ligand_chain_names(start_pdb: str) -> List[str]:
+def _ligand_chain_names(stru:Structure) -> List[str]:
     """TODO(CJ): 
     Args:
 
@@ -777,28 +721,16 @@ def _ligand_chain_names(start_pdb: str) -> List[str]:
     """
     #TODO(CJ): change to reactant names
     _LOGGER.info(f"Quick analysis of reactant-enzyme system...")
-    fs.check_file_exists(start_pdb)
-    session = interface.pymol.new_session()
-    df: pd.DataFrame = interface.pymol.collect(session, start_pdb, "chain resn".split())
-
     result: List[str] = list()
 
-    for i, row in df.iterrows():
+    _LOGGER.info("Detecting reactants:")
+    for chain in stru.chains:
+        for residue in chain.residues:
+            if residue.is_ligand():
+                _LOGGER.info(f"\treactant {residue.name} in chain {chain.name}")
+                result.append(chain.name)
 
-        if row.resn in chem.THREE_LETTER_AA_MAPPER:
-            continue
-
-        if row.resn.upper() in chem.METAL_CENTER_MAP:
-            continue
-
-        result.append((row.chain, row.resn))
-
-    #TODO(CJ): worry about no reactants later? or is this even a problem
-    _LOGGER.info("Detected reactants:")
-    for cc, rr in sorted(list(set(result))):
-        _LOGGER.info(f"\treactant {rr} in chain {cc}")
-
-    return list(set([pr[0] for pr in result]))
+    return result
 
 
 def _select_complex(df: pd.DataFrame, work_dir: str, cutoff: int = 20) -> Tuple[Structure, str]:
@@ -1193,9 +1125,20 @@ def _evaluate_qm(df: pd.DataFrame, start_pdb: str, charge_mapper, cluster_cutoff
 def _log_settings(constraints: List[RosettaCst], work_dir: str, save_work_dir: bool,
                   rng_seed: int, n_struct: int, cst_cutoff:int, clash_distance:float, clash_cutoff:int, binding_cutoff:int,
                   cluster_distance: float, use_cache: bool):
-    """Logs settings for the current reactive docking run. Only meant to be called during the parent call to dock_reactants().
+    """Logs settings for the current reactive docking run. Done at the INFO level.
 
     Args:
+        constraints: A List[RosettaCst]'s for the run.
+        work_dir: The direcotry where all work will be done.
+        save_work_dir: Should temp files be saved?
+        rng_seed: The integer rng seed to use during the run.
+        n_struct: The integer number of structures to create during the docking phase.
+        cst_cutoff: Allowed variance in tolerance units for supplied RosettaCst's.
+        clash_distance: How close (in angstrom's) do two atoms have to be for a clash to be recorded?
+        clash_cutoff: Allowed number of clashes as an int().
+        binding_cutoff: The percentile of binding energy that will be selected during filtration.
+        cluster_distance: The RMSD distance allowed during structures clustering.
+        use_cache: A flag indicating if we should use existing files when available.
 
     Returns:
         Nothing.

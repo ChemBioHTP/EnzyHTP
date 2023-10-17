@@ -635,6 +635,7 @@ class Structure(DoubleLinkedNode):
 
     #endregion
 
+
     #region === Editor ===
     def add_chain(self, new_chain: Chain, overwrite: bool = False) -> None:  #TODO add logic for overwriting
         """Method that inserts a new chain and then sorts the chains based on name.
@@ -662,20 +663,22 @@ class Structure(DoubleLinkedNode):
         if to_remove != -1:
             del self.chains[to_remove]
 
-    def add_residue(self, new_res: Residue) -> None:
+    def add_residue(self, new_res: Residue, chain_name:str=None) -> None:
         """Inserts a new Residue() object into the Structure(). If the exact Residue (chain_id, name, residue_id) already
         exists, the new Residue overwrites it. If the new Residue specifies a Chain() that does not exist, a new chain is made.
         """
-        chain_name: str = new_res.chain()
+        if chain_name is None:
+            chain_name: str = new_res.chain()
+
         if not self.has_chain(chain_name):
             new_chain: Chain = Chain(chain_name, [new_res])  #@shaoqz: give a warning
-            self.chains.apppend(new_chain)
+            self.chains.append(new_chain)
             self.chain_mapper[chain_name] = new_chain
         else:
             self.chain_mapper[chain_name].add_residue(new_res)
 
         self.chains = list(self.chain_mapper.values())  #@shaoqz: why need this
-        self.chains.sort(key=lambda c: c.name())  #@shaoqz: should this be in the 1st if block?
+        self.chains.sort(key=lambda c: c.name)  #@shaoqz: should this be in the 1st if block?
 
     def remove_residue(self, target_key: str) -> None:
         """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format,

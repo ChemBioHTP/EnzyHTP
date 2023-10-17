@@ -21,7 +21,7 @@ from enzy_htp.structure import PDBParser, Mol2Parser, Structure, Ligand
 
 
 
-def generate_conformers( ligand : Ligand, n_conformers:int=100, engine:str='bcl', work_dir:str=None, **kwargs):
+def generate_conformers( ligand : Ligand, n_conformers:int=100, engine:str='bcl', work_dir:str=None, **kwargs) -> None:
     """Create conformers for the specified ligand and add them to the ligand object. Conformers can be created using multiple
     engines. All conformer addition is done in place to the Ligand and all temp files are deleted. No sanitation of the 
     input Ligand() is performed. A warning is logged if enough conformers are not produced.
