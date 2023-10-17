@@ -54,6 +54,7 @@ class Atom(DoubleLinkedNode):
         self._element = None
         self._charge = None
         self._connect = None
+        self._atom_type = None
         ds_keys = ds.keys()
         if "atom_number" in ds_keys and not np.isnan(ds["atom_number"]):
             self._idx = ds["atom_number"]
@@ -63,6 +64,8 @@ class Atom(DoubleLinkedNode):
             self._element = ds["element_symbol"].strip()
         if "charge" in ds_keys and not np.isnan(ds["charge"]):
             self._charge = float(ds["charge"])
+        if "atom_type" in ds_keys and ds["atom_type"].strip() != "":
+            self._atom_type = ds["atom_type"]
 
     #region === Getter-Attr (ref) ===
     @property

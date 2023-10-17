@@ -1,7 +1,7 @@
 """Specialization of the Residue() class for a Ligand. Primarly used to interface with PDB2PQR for ONLY the ligand
 as it is removed from the full structure during protonation. In addition to Residue() object, has net_charge attribute.
 Meant to be stored alongside other Residue() and Residue() derived objets (MetalUnit() and Solvent()) inside of the
-Chain() object. Ligand() objects SHOULD NOT exist on their own.
+Chain() object. Ligand() objects SHOULD NOT exist on their own. 
 
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
@@ -14,7 +14,7 @@ from copy import deepcopy
 import numpy as np
 
 from .atom import Atom
-from typing import List
+from typing import List, Tuple
 from .residue import Residue
 import enzy_htp.chemical as chem
 
@@ -35,6 +35,8 @@ class Ligand(Residue):
 
     Attributes:
         net_charge : The net charge of the molecule as an int.
+        bonds: A List[Dict] containing bond information in the TRIPOS .mol2 format.
+        conformer_coords: A List[List[Tuple[float,float,float]]] containing the coordinates of conformers.
     """
 
     def __init__(self, residue_idx: int, residue_name: str, atoms: List[Atom], parent=None, **kwargs):
@@ -43,8 +45,39 @@ class Ligand(Residue):
         """
         self._net_charge = kwargs.get("net_charge", None)
         self._multiplicity = kwargs.get("multiplicity", None)
+        self.bonds = kwargs.get('bonds', list()) 
         Residue.__init__(self, residue_idx, residue_name, atoms, parent)
         self.rtype = chem.ResidueType.LIGAND
+        self.conformer_coords = list()
+
+    
+    def add_conformer(self, points:List[Tuple[float,float,float]] ) -> int:
+        """Add the coordinates of a conformer to the Ligand(). Performs checks that the number of points matches the
+        number of atoms in the Ligand. Also checks that each point is a tuple of size 3.
+        
+        Args:
+            points: A List[Tuple[float,float,float]] containing the points of a new conformer.
+
+        Returns:
+            The number of conformers the Ligand has.
+        """
+        if len(points) != len(self.atoms):
+            _LOGGER.error(f"A total of {len(points)} were supplied. Was expecting {len(self.atoms)}. Exiting...")
+            exit( 1 )
+
+        for row in points:
+            if len(row) != 3:
+                _LOGGER.error(f"The supplied point {row} is of the wrong dimension (expecting 3 elements). Exiting...")
+                exit( 1 )
+
+        self.conformer_coords.append( points )
+
+        return self.n_conformers()
+
+
+    def n_conformers(self) -> int:
+        """How many conformers does this Ligand have?"""
+        return len(self.conformer_coords) + 1
 
     # === Getter-Attr ===
     @property

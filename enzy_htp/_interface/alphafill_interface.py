@@ -6,6 +6,7 @@ the AlphaFillConfig class found in enzy_htp/_config/alphafill_config.py. Support
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-09-14
 """
+from typing import List, Tuple
 from pathlib import Path
 
 from .base_interface import BaseInterface
@@ -32,7 +33,7 @@ class AlphaFillInterface(BaseInterface):
         """
         super().__init__(parent, config, default_alphafill_config)
 
-    def fill_structure(self, molfile: str, outfile: str = None, work_dir: str = None, use_cache: bool = True) -> str:
+    def fill_structure(self, molfile: str, outfile: str = None, work_dir: str = None, use_cache: bool = True) -> Tuple[str, str]:
         """TODO(CJ): need to do this
 
         Args:
@@ -52,13 +53,13 @@ class AlphaFillInterface(BaseInterface):
         fs.check_file_exists(molfile)
         temp_path = Path(molfile)
         outfile = str(temp_path.parent / f"{temp_path.stem}_filled.cif")
-        if use_cache and fs.has_content(outfile):
-            _LOGGER.info(f"The output file {outfile} exists and caching is enabled. Using this file.")
-            return outfile
+        json_outfile = str(temp_path.parent / f"{temp_path.stem}_filled.json")
+        if use_cache and fs.has_content(outfile) and fs.has_content( json_outfile ):
+            _LOGGER.info(f"The output files {outfile} and {json_outfile} exist and caching is enabled. Using these files as is.")
+            return (outfile, json_outfile)
         else:
             fs.safe_rm(outfile)
 
         results = self.env_manager_.run_command(self.config_.ALPHAFILL_EXE,
                                                 ["--config", self.config_.CONFIG_FILE, "process", molfile, outfile])
-
-        return outfile
+        return (outfile, json_outfile)
