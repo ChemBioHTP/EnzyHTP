@@ -337,7 +337,7 @@ class PrepinParser(StructureParserInterface):
         Return:
             Structure()
         """
-        # TODO finish this after merge the new Ligand class
+        
     # @classmethod
     # def _parse_prepin_connect(cls, prepi_path, res):
     #     '''parse the prepin file and store connectivity info to {res}'''
