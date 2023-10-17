@@ -212,7 +212,7 @@ class Atom(DoubleLinkedNode):
 
     def attached_protons(self) -> List[Atom]:
         """find all protons attached to self"""
-        result = list(filter(lambda a: a.element == "H", self.connect))
+        result = list(filter(lambda a: a[0].element == "H", self.connect))
         return result
 
     #endregion
