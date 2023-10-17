@@ -255,7 +255,7 @@ class AmberParameterizer(MolDynParameterizer):
                 ncaa_lib_mapper[parm_file] = res_name
 
             else: # not exist in cache - file the res_name
-
+                # TODO support lib/off?
                 # prepin
                 if fs.get_file_ext(parm_file) in [".prepin", ".prepi"]:
                     # 1. find 3-letter name in file
@@ -322,7 +322,62 @@ class AmberParameterizer(MolDynParameterizer):
 
 class PrepinParser(StructureParserInterface):
     """the parser for AmberMD prepin files"""
-    
+
+    def __init__(self) -> None:  # pylint: disable=super-init-not-called
+        """pass"""
+        pass
+
+    @classmethod
+    def get_structure(cls, path: str) -> Structure:
+        """
+        Converting a .prepin file (as its path) into the Structure()
+        Arg:
+            path:
+                the file path of the PDB file
+        Return:
+            Structure()
+        """
+        # TODO finish this after merge the new Ligand class
+    # @classmethod
+    # def _parse_prepin_connect(cls, prepi_path, res):
+    #     '''parse the prepin file and store connectivity info to {res}'''
+    #     prepi_atom_mapper = {}
+    #     with open(prepi_path) as f:
+    #         line_id = 0
+    #         if_loop = 0
+    #         for line in f:
+    #             line_id += 1
+    #             if line.strip() == '':
+    #                 if if_loop == 1:
+    #                     # switch off loop and break if first blank after LOOP encountered
+    #                     if_loop = 0
+    #                     break
+    #                 continue
+    #             if if_loop:
+    #                 lp = line.strip().split()
+    #                 res._find_atom_name(lp[0]).connect.append(res._find_atom_name(lp[1]))
+    #                 continue
+    #             # loop connect starts at LOOP
+    #             if line.strip() == 'LOOP':
+    #                 if_loop = 1
+    #                 continue
+    #             # coord starts at 11th
+    #             if line_id >= 11:
+    #                 lp = line.strip().split()
+    #                 atom_id = int(lp[0])-3
+    #                 atom_name = lp[1]
+    #                 atom_cnt = int(lp[4])-3
+    #                 prepi_atom_mapper[atom_id] = (res._find_atom_name(atom_name), atom_cnt)
+
+    #     for atom_id, (atom, atom_cnt) in prepi_atom_mapper.items():
+    #         if atom_cnt != 0: # why is this? lol
+    #             cnt_atom_obj = prepi_atom_mapper[atom_cnt][0]
+    #             atom.connect.append(cnt_atom_obj)
+    #             cnt_atom_obj.connect.append(atom)
+        
+    #     for atom in res:
+    #         atom.connect = list(set(atom.connect))
+
 
 class AmberMDStep(MolDynStep):
     """the modular MD step of Amber.
