@@ -7,7 +7,7 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-08-01
 """
 from .pdb_io import PDBParser
-from _interface import StructureParserInterface
+from ._interface import StructureParserInterface
 from .mol2_io import Mol2Parser
 # # import all modules under the dir to support user customization.
 # __all__ = []

@@ -9,10 +9,8 @@ Date: 2022-03-19
 from __future__ import annotations
 import copy
 import sys
-import numpy as np
-from collections import defaultdict
-from plum import dispatch
-from typing import Tuple, List, Dict
+import math
+from typing import Tuple, List
 
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
 from enzy_htp.core import _LOGGER
@@ -219,6 +217,9 @@ class Residue(DoubleLinkedNode):
         """check if the residue contain no acidic proton on side chain hetero atoms"""
         return self.name in chem.residue.NOPROTON_LIST
 
+    def is_connected(self) -> bool:
+        """check if every atom in the residue have a connect record"""
+        return math.prod([atom.is_connected() for atom in self.atoms])
     #endregion
 
     #region === Editor ===

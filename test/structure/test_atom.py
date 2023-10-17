@@ -161,7 +161,8 @@ def test_check_connect_setter_data_type_correct():
     atom1 = Atom({'x_coord': 0, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'DUMMY'})
     atom2 = Atom({'x_coord': 0, 'y_coord': 0, 'z_coord': 1, 'atom_name': 'DUMMY'})
 
-    atom1.connect = [[atom2, "s"]]
+    atom1.connect = [(atom2, "s")]
+    atom1.connect = [(atom2, None)]
 
 def test_check_connect_setter_data_type_wrong():
     """check using several wrong data type"""
@@ -169,7 +170,7 @@ def test_check_connect_setter_data_type_wrong():
     atom2 = Atom({'x_coord': 0, 'y_coord': 0, 'z_coord': 1, 'atom_name': 'DUMMY'})
 
     with pytest.raises(TypeError) as exe:
-        atom1.connect = [(atom2, "s")]
+        atom1.connect = [[atom2, "s"]]
     assert exe.value.args[0] == "Assigning wrong data type for connect. Correct data type: [[Atom(), 'bond_order_info'], ...]"
 
     with pytest.raises(TypeError):
@@ -179,4 +180,4 @@ def test_check_connect_setter_data_type_wrong():
         atom1.connect = [atom2]
 
     with pytest.raises(TypeError):
-        atom1.connect = [[atom2, "s"], atom2]
+        atom1.connect = [(atom2, "s"), atom2]

@@ -16,3 +16,7 @@ from .residue import (
     remove_side_chain_mutating_atom,
     check_res_topology_error,
 )
+
+from .connectivity import (
+    init_connectivity
+)
