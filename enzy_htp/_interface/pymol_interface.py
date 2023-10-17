@@ -22,6 +22,7 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core import _LOGGER, check_var_type
 from enzy_htp._config.pymol_config import PyMolConfig, default_pymol_config
 from enzy_htp.structure import Structure, PDBParser
+import enzy_htp.chemical as chem
 
 from .base_interface import BaseInterface
 
@@ -571,7 +572,7 @@ class PyMolInterface(BaseInterface):
             if row['name'] not in "N C".split():
                 continue
 
-            if not row.resn in THREE_LETTER_AA_MAPPER:
+            if not row.resn in chem.THREE_LETTER_AA_MAPPER:
                 continue
 
             args.extend([('valence', 'guess', f"chain {row.chain} and resi {row.resi} and resn {row.resn} and name {row['name']}"),

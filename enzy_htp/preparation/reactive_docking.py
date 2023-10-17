@@ -35,8 +35,7 @@ def dock_reactants(structure: Structure,
                    cst_cutoff: int = 10,
                    clash_distance: float = 2.0,
                    clash_cutoff: int = 1,
-                   binding_cutoff: int = 20,
-                   cluster_distance: float = 2.5,
+                   max_sasa_ratio:float = 0.60,
                    use_cache: bool = True
                    ) -> Structure:
     """Given a structure and constraints, 
@@ -54,26 +53,25 @@ def dock_reactants(structure: Structure,
     fs.safe_mkdir(work_dir)
 
     _log_settings(constraints, work_dir, save_work_dir, rng_seed, n_struct, cst_cutoff,
-                  clash_distance, clash_cutoff, binding_cutoff, cluster_distance, use_cache)
+                  clash_distance, clash_cutoff, use_cache)
     
     _validate_system( structure, constraints )
 
-    df:pd.DataFrame = _dock_system(structure, constraints, n_struct, work_dir, rng_seed, use_cache )
+    df, charge_mapper = _dock_system(structure, constraints, n_struct, work_dir, rng_seed, use_cache )
 
+    _evaluate_SASA(df, max_sasa_ratio)
+
+    _evaluate_clashes(df, clash_distance, clash_cutoff)
 
     _evaluate_csts(df, constraints, cst_cutoff)
     
-    _evaluate_clashes(df, clash_distance, clash_cutoff)
+    #_evaluate_binding(df, start_pdb, binding_cutoff, chain_names, charge_mapper=charge_mapper)
+    cluster_distance=2.0
+    _evaluate_qm(df, structure, charge_mapper, cluster_distance)
     
-    _evaluate_binding(df, start_pdb, binding_cutoff, chain_names, charge_mapper=charge_mapper)
-   
-    _evaluate_qm(df, start_pdb, charge_mapper, cluster_distance)
-    
-    (selected, wt_fpath) = _select_complex(df, work_dir)
+    #TODO(CJ): add some kind of logging about the results. Also do some optimization of the system.
 
-    docked_complexes.append(wt_fpath)
-
-    return docked_complexes
+    return  _select_complex(df, work_dir)
 
 def _validate_system( stru:Structure, constraints:List[RosettaCst] ) -> None:
     """Checks if the supplied list of contraints exists and is compatible with the supplied Structure() object.
@@ -295,72 +293,6 @@ def _create_xml(stru:Structure, work_dir: str, use_cache: bool) -> str:
         },
     ]
 
-#    for rd in reactant_dicts:
-#        cc = rd['chain']
-#        elements.extend([
-#            {
-#                'parent': 'LIGAND_AREAS',
-#                'tag': 'LigandArea',
-#                'name': f'docking_sidechain_{cc.lower()}',
-#                'chain': f'{cc.upper()}',
-#                'cutoff': '6.0',
-#                'add_nbr_radius': 'true',
-#                'all_atom_mode': 'false'
-#            },
-#            {
-#                'parent': 'LIGAND_AREAS',
-#                'tag': 'LigandArea',
-#                'name': f'final_sidechain_{cc.lower()}',
-#                'chain': f'{cc.upper()}',
-#                'cutoff': '6.0',
-#                'add_nbr_radius': 'true',
-#                'all_atom_mode': 'false'
-#            },
-#            {
-#                'parent': 'LIGAND_AREAS',
-#                'tag': 'LigandArea',
-#                'name': f'final_backbone_{cc.lower()}',
-#                'chain': f'{cc.upper()}',
-#                'cutoff': '7.0',
-#                'add_nbr_radius': 'false',
-#                'all_atom_mode': 'true',
-#                'Calpha_restraints': "0.3"
-#            },
-#            {
-#                'parent': 'INTERFACE_BUILDERS',
-#                'tag': 'InterfaceBuilder',
-#                'name': f'side_chain_for_docking_{cc.lower()}',
-#                'ligand_areas': f'docking_sidechain_{cc.lower()}'
-#            },
-#            {
-#                'parent': 'INTERFACE_BUILDERS',
-#                'tag': 'InterfaceBuilder',
-#                'name': f'side_chain_for_final_{cc.lower()}',
-#                'ligand_areas': f'final_sidechain_{cc.lower()}'
-#            },
-#            {
-#                'parent': 'INTERFACE_BUILDERS',
-#                'tag': 'InterfaceBuilder',
-#                'name': f'backbone_{cc.lower()}',
-#                'ligand_areas': f'final_backbone_{cc.lower()}',
-#                'extension_window': '3'
-#            },
-#            {
-#                'parent': 'MOVEMAP_BUILDERS',
-#                'tag': 'MoveMapBuilder',
-#                'name': f'docking_{cc.lower()}',
-#                'sc_interface': f'side_chain_for_docking_{cc.lower()}',
-#                'minimize_water': 'false'
-#            },
-#            {
-#                'parent': 'MOVEMAP_BUILDERS',
-#                'tag': 'MoveMapBuilder',
-#                'name': f'final_{cc.lower()}',
-#                'sc_interface': f'side_chain_for_final_{cc.lower()}',
-#                'bb_interface': f'backbone_{cc.lower()}',
-#                'minimize_water': 'false'
-#            },
-#        ])
 
     for ridx, rd in enumerate(reactant_dicts):
         cc = rd['chain']
@@ -405,19 +337,21 @@ def _create_xml(stru:Structure, work_dir: str, use_cache: bool) -> str:
         radius: float = rd['length']
         predock:str=f'predock_{cc.lower()}'
         dock:str=f'dock_{cc.lower()}'
-        elements.extend([{
-            'parent': 'MOVERS',
-            'tag': 'Transform',
-            'name': predock,
-            'chain': f'{cc.upper()}',
-            'box_size': f'{1.5 * radius:.3f}',
-            'move_distance': '10.0',
-            'angle': '360',
-            'cycles': '1000',
-            'repeats': '3',
-            'temperature': '5',
-            'grid_set': rd['grid_name']
-        },{
+        elements.extend([
+#        {
+#            'parent': 'MOVERS',
+#            'tag': 'Transform',
+#            'name': predock,
+#            'chain': f'{cc.upper()}',
+#            'box_size': f'{1.5 * radius:.3f}',
+#            'move_distance': '10.0',
+#            'angle': '360',
+#            'cycles': '1000',
+#            'repeats': '3',
+#            'temperature': '5',
+#            'grid_set': rd['grid_name']
+#        },
+        {
             'parent': 'MOVERS',
             'tag': 'Transform',
             'name': dock,
@@ -430,7 +364,7 @@ def _create_xml(stru:Structure, work_dir: str, use_cache: bool) -> str:
             'temperature': '5',
             'grid_set': rd['grid_name']
         }])
-        protocol_names.extend([predock,dock])
+        protocol_names.extend([dock])
 
     elements.extend(
         [{'parent': 'PROTOCOLS', 'tag': 'Add','mover_name': 'cstadd'}] + 
@@ -595,7 +529,7 @@ def _dock_system(structure: Structure,
                     break
             else:
                 _LOGGER.info("All cached .pdbs exist! Using cached RosettaLigand structures!")
-                return df
+                return df, charge_mapper
         else:
             _LOGGER.info(f"{csv_file} not found. Continuing with standard run")
 
@@ -617,7 +551,41 @@ def _dock_system(structure: Structure,
 
     _LOGGER.info("Completed RosettaLigand geometry sampling!")
 
-    return df
+    return df, charge_mapper
+
+def _evaluate_SASA(df: pd.DataFrame, max_sasa_ratio:float) -> None:
+    """TODO(CJ)"""
+    #TODO(CJ): put an error if the df is empty
+    _LOGGER.info(f"Beginning ligand SASA evaluation. {df.selected.sum()} geometries still selected...")
+    parser = PDBParser()
+    stru:Structure = parser.get_structure(df.iloc[0].description)
+   
+    sele_str=str()
+    ligand_keys = list()
+    for residue in stru.residues:
+        if not residue.is_ligand():
+            continue
+        ligand_keys.append((residue.chain.name, str(residue.idx)))
+        sele_str += f"( chain {ligand_keys[-1][0]} and resi {ligand_keys[-1][1]}) or "
+
+    session = interface.pymol.new_session()
+    args = [('flag', 'ignore', 'none'), ('flag', 'ignore', 'solvent')]
+    interface.pymol.general_cmd(session, args)
+    good_sasa:List[bool]=list()
+    for i,row in df.iterrows():
+        good = True
+        args = [('delete', 'all'), ('load', row.description), ("get_sasa_relative", sele_str[:-3])]
+        sasa_values = interface.pymol.general_cmd(session, args)[-1]
+        for (_,_,sv_chain,sv_index),sasa_rel in sasa_values.items():
+            if (sv_chain,sv_index) in ligand_keys:
+                if sasa_rel >= max_sasa_ratio:
+                    good = False
+        good_sasa.append(good)
+
+
+    df['good_sasa'] = good_sasa
+    df['selected'] = (df.selected) & (df.good_sasa)
+    _LOGGER.info(f"Finished ligand SASA evaluation. {df.selected.sum()} geomtries have ligands with relative SASA <= {max_sasa_ratio:.3f}")
 
 
 def _evaluate_csts(df: pd.DataFrame, csts: List[RosettaCst], cst_cutoff: int) -> None:
@@ -766,7 +734,7 @@ def _select_complex(df: pd.DataFrame, work_dir: str, cutoff: int = 20) -> Tuple[
 
     result_stru = parser.get_structure(wt_fpath)
 
-    return (result_stru, str(Path(wt_fpath).absolute()))
+    return result_stru
 
 
 def _place_reactants(structure: Structure, reactants: List[str], pdb_code) -> bool:
@@ -1068,7 +1036,12 @@ def _evaluate_binding(df: pd.DataFrame,
     _LOGGER.info(f"Finished binding evaluation. {df.selected.sum()} geometries have been selected.")
 
 
-def _define_active_site(start_pdb: str, distance_cutoff, charge_mapper=None):
+def _define_active_site(structure: Structure, distance_cutoff, charge_mapper=None):
+
+    parser = PDBParser()
+    start_pdb:str=f"{config['system.SCRATCH_DIR']}/__temp_as.pdb"
+    parser.save_structure(start_pdb, structure)
+
     session = interface.pymol.new_session()
     res_names: List[str] = interface.pymol.collect(session, start_pdb, "resn".split()).resn.unique()
     sele_names: Dict[str, str] = {}
@@ -1093,16 +1066,18 @@ def _define_active_site(start_pdb: str, distance_cutoff, charge_mapper=None):
     _LOGGER.info(f"\tresidues: {len(residues)}")
     _LOGGER.info(f"\tcharge: {charge}")
 
+    fs.safe_rm(start_pdb)
+
     return {"sele": sele_str, "charge": charge}
 
 
-def _evaluate_qm(df: pd.DataFrame, start_pdb: str, charge_mapper, cluster_cutoff: float) -> None:
+def _evaluate_qm(df: pd.DataFrame, structure: Structure, charge_mapper, cluster_cutoff: float) -> None:
     """ """
     # steps
     # 1. get system charge
     # 2. run through each cluster and do it
     _LOGGER.info(f"Beginning qm energy evaluation. {df.selected.sum()} geometries still selected...")
-    as_info = _define_active_site(start_pdb, cluster_cutoff, charge_mapper)
+    as_info = _define_active_site(structure, cluster_cutoff, charge_mapper)
     session = interface.pymol.new_session()
 
     qm_energy = []
@@ -1123,8 +1098,8 @@ def _evaluate_qm(df: pd.DataFrame, start_pdb: str, charge_mapper, cluster_cutoff
 
 
 def _log_settings(constraints: List[RosettaCst], work_dir: str, save_work_dir: bool,
-                  rng_seed: int, n_struct: int, cst_cutoff:int, clash_distance:float, clash_cutoff:int, binding_cutoff:int,
-                  cluster_distance: float, use_cache: bool):
+                  rng_seed: int, n_struct: int, cst_cutoff:int, clash_distance:float, clash_cutoff:int, 
+                  use_cache: bool):
     """Logs settings for the current reactive docking run. Done at the INFO level.
 
     Args:
@@ -1136,8 +1111,6 @@ def _log_settings(constraints: List[RosettaCst], work_dir: str, save_work_dir: b
         cst_cutoff: Allowed variance in tolerance units for supplied RosettaCst's.
         clash_distance: How close (in angstrom's) do two atoms have to be for a clash to be recorded?
         clash_cutoff: Allowed number of clashes as an int().
-        binding_cutoff: The percentile of binding energy that will be selected during filtration.
-        cluster_distance: The RMSD distance allowed during structures clustering.
         use_cache: A flag indicating if we should use existing files when available.
 
     Returns:
@@ -1158,6 +1131,4 @@ def _log_settings(constraints: List[RosettaCst], work_dir: str, save_work_dir: b
     _LOGGER.info(f"\t{cst_cutoff=} tolerance units")
     _LOGGER.info(f"\t{clash_distance=} angstroms")
     _LOGGER.info(f"\t{clash_cutoff=} clashes")
-    _LOGGER.info(f"\t{binding_cutoff=}")
-    _LOGGER.info(f"\t{cluster_distance=} angstroms")
     _LOGGER.info(f"\t{use_cache=}")
