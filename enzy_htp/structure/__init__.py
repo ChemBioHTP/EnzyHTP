@@ -17,5 +17,5 @@ from .residue import Residue
 from .solvent import Solvent, residue_to_solvent
 from .metal_atom import MetalUnit, residue_to_metal
 from .chain import Chain
-from .structure import Structure, compare_structures, merge_right
-from .structure_io import PDBParser
+from .structure import Structure
+from .structure_io import PDBParser, Mol2Parser

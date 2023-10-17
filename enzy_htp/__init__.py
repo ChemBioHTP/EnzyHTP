@@ -25,6 +25,7 @@ from .structure import (
     MetalUnit,
     Solvent,
     PDBParser,
+    Mol2Parser
 )
 
 from .core import (
@@ -52,5 +53,5 @@ by end users and should be used to customize system settings for each environmen
 
 from .analysis import ( electric_field, binding_energy )
 
-from .preparation import PDBLine, read_pdb_lines, dock_reactants
+from .preparation import PDBLine, read_pdb_lines, dock_reactants, generate_conformers
 

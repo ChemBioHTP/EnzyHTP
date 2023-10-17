@@ -248,6 +248,24 @@ class Residue(DoubleLinkedNode):
                 _LOGGER.debug(f"deleting {atom}")
                 atom.delete_from_parent()
 
+    def shift(self, point:List[float] ) -> None:
+        """Shift all atoms by the supplied vector. Checks if the input is the correct
+        size and throws if not.
+        
+        Args:
+            point: An iterable, indexable object containing 3 floats().
+
+        Returns:
+            Nothing.
+        """
+        if len(point) != 3:
+            raise TypeError(f"The supplied point is NOT of length 3 ({point})")
+
+        for aa in self.atoms:
+            orig = aa.coord
+            updated = (orig[0]+point[0], orig[1]+point[1], orig[2]+point[2])
+            aa.coord = updated
+
     #endregion
 
     #region === Special ===
