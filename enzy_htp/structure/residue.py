@@ -155,6 +155,14 @@ class Residue(DoubleLinkedNode):
         """get the geom_center coordinate of the residue"""
         return get_geom_center([i.coord for i in self.atoms])
 
+    @property
+    def element_composition(self) -> set:
+        """get the element composition of the residue"""
+        result = set()
+        for atom in self.atoms:
+            result.add(atom.element)
+        return result
+
     # def clone(self) -> Residue: #TODO
     #     """Creates a deepcopy of self."""
     #     return deepcopy(self)
@@ -166,7 +174,8 @@ class Residue(DoubleLinkedNode):
         return self._rtype == chem.ResidueType.CANONICAL
 
     def is_noncanonical(self) -> bool:
-        """Checks if Residue() is canonical. Inherited by children."""
+        """Checks if Residue() is a modified residue. Inherited by children.
+        TODO: would MODIFIED a better name?"""
         return self._rtype == chem.ResidueType.NONCANONICAL
 
     def is_ligand(self) -> bool:

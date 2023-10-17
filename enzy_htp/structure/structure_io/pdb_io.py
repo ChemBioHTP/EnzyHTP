@@ -26,6 +26,7 @@ from ..metal_atom import MetalUnit, residue_to_metal
 from ..residue import Residue
 from ..solvent import Solvent, residue_to_solvent
 from ..ligand import Ligand, residue_to_ligand
+from ..modified_residue import ModifiedResidue, residue_to_modified_residue
 from ..chain import Chain
 from ..structure import Structure
 
@@ -561,7 +562,7 @@ class PDBParser(StructureParserInterface):
     @staticmethod
     def _categorize_pdb_residue(residue_mapper: Dict[str, List[Residue]],
                                 add_solvent_list: list = None,
-                                add_ligand_list: list = None) -> Union[Residue, Ligand, Solvent, MetalUnit]:  #TODO add test for this
+                                add_ligand_list: list = None) -> None:
         """
         Categorize Residue base on it 3-letter name and chain info in PDB format
         Takes a mapper of {chain_id, [Residue, ...]} and converts
@@ -583,15 +584,14 @@ class PDBParser(StructureParserInterface):
             # in a chain with canonical aa or a individual chain
             if peptide_chain:
                 # only non-canonical aa can be in a peptide chain
-                for residue in residues:
+                for i, residue in enumerate(residues):
                     if residue.rtype == chem.ResidueType.UNKNOWN:
                         if residue.name in list(chem.METAL_MAPPER.keys()) + chem.RD_SOLVENT_LIST + add_solvent_list:
                             _LOGGER.error(
                                 f"a metal or solvent residue name is found in an peptide chain {chain_id}: {residue.idx} {residue.name}")
                             sys.exit(1)
-                        # TODO maybe a class for non-canonical aa in the future
                         _LOGGER.debug(f"found noncanonical {chain_id} {residue.idx}")
-                        residue.rtype = chem.ResidueType.NONCANONICAL
+                        residue_mapper[chain_id][i] = residue_to_modified_residue(residue)
                 continue
             # non-peptide chain
             for i, residue in enumerate(residues):

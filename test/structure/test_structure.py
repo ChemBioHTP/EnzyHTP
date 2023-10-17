@@ -23,6 +23,36 @@ TEST_DIR = os.path.dirname(CURR_DIR)
 DATA_DIR = f"{CURR_DIR}/data/"
 sp = PDBParser()
 
+def equiv_files(fname1: str, fname2: str, width: int = None) -> bool:
+    """Helper method to check if two files are exactly equivalent."""
+
+    def find_first_diff(l1, l2):
+        for idx, (ch1, ch2) in enumerate(zip(l1, l2)):
+            if ch1 != ch2:
+                return idx + 1
+        return -1
+
+    for line_idx, (l1, l2) in enumerate(zip(fs.lines_from_file(fname1), fs.lines_from_file(fname2))):
+        if width:
+            l1 = l1[:width]
+            l2 = l2[:width]
+            if len(l2) < width:
+                l2 += " " * (width - len(l2))
+            if len(l1) < width:
+                l1 += " " * (width - len(l1))
+
+        first_diff = find_first_diff(l1, l2)
+        if first_diff != -1:
+            diff = [" "] * min(len(l1), len(l2))
+            diff[first_diff] = "^"
+
+            print(f"'{l1}'")
+            print(f"'{l2}'")
+            print("".join(diff))
+            print(f"Difference encountered on line {line_idx}. '{fname1}' and '{fname2}' are NOT equivalent")
+            return False
+    return True
+
 
 def test_structure_ctor_bad_input():
     """Testing that the Structure() ctor fails when given duplicate chains."""
@@ -105,37 +135,6 @@ def test_is_idx_subset_non_ch_subset():
     assert not stru.is_idx_subset(target_stru)
 
 
-def equiv_files(fname1: str, fname2: str, width: int = None) -> bool:
-    """Helper method to check if two files are exactly equivalent."""
-
-    def find_first_diff(l1, l2):
-        for idx, (ch1, ch2) in enumerate(zip(l1, l2)):
-            if ch1 != ch2:
-                return idx + 1
-        return -1
-
-    for line_idx, (l1, l2) in enumerate(zip(fs.lines_from_file(fname1), fs.lines_from_file(fname2))):
-        if width:
-            l1 = l1[:width]
-            l2 = l2[:width]
-            if len(l2) < width:
-                l2 += " " * (width - len(l2))
-            if len(l1) < width:
-                l1 += " " * (width - len(l1))
-
-        first_diff = find_first_diff(l1, l2)
-        if first_diff != -1:
-            diff = [" "] * min(len(l1), len(l2))
-            diff[first_diff] = "^"
-
-            print(f"'{l1}'")
-            print(f"'{l2}'")
-            print("".join(diff))
-            print(f"Difference encountered on line {line_idx}. '{fname1}' and '{fname2}' are NOT equivalent")
-            return False
-    return True
-
-
 def test_atoms():  # TODO(shaoqz) wait for test
     TEST_FILE = f"{TEST_DIR}/preparation/data/3NIR.pdb"
     struct: Structure = PDBParser().get_structure(TEST_FILE)
@@ -172,6 +171,18 @@ def test_find_residue_with_key(caplog): # TODO caplog does not work when logger 
     assert not stru.find_residue_with_key(("A", 448))
     assert "Didn't find any residue with key: ('A', 448)" in caplog.text
 
+
+def test_chemical_diversity_ligand():
+    """test function works as expected"""
+    pdb_file_path = f"{DATA_DIR}1Q4T_ligand_test.pdb"
+    stru: Structure = sp.get_structure(pdb_file_path)
+    assert stru.chemical_diversity == {'polypeptide': 2, 'ligand': {'N', 'S', 'O', 'P', 'C'}}
+
+def test_chemical_diversity_metal():
+    """test function works as expected"""
+    pdb_file_path = f"{DATA_DIR}1NVG.pdb"
+    stru: Structure = sp.get_structure(pdb_file_path)
+    assert stru.chemical_diversity == {'polypeptide': 1, 'metalcenters': {'Zn'}}
 
 def test_init_connect():
     """test function works as expected"""

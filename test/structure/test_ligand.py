@@ -33,9 +33,9 @@ def test_fix_atom_names():
 def test_net_charge():
     """Checking that the net_charge attribute works properly for both default and set values."""
     lig = Ligand(10, "B", list())
-    assert lig.get_net_charge() is None
+    assert lig.net_charge is None
     lig = Ligand(10, "B", list(), net_charge=1.0)
-    assert np.isclose(lig.get_net_charge(), 1.0)
+    assert np.isclose(lig.net_charge, 1.0)
 
 
 def test_clone():

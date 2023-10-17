@@ -114,18 +114,6 @@ def product_lists_allow_empty(list_of_lists: List[list]) -> List[list]:
     return _product_lists_w_each_empty_ele(iter(list_of_lists_copy))
 
 
-# == Museum of Function ==
-# This is an old slow but insteresting function so it kept it here
-# def _product_lists_w_each_empty_ele(list_of_lists: Iterable[list]) -> List[list]:
-#     """a sub-function used for product_list_allow_empty"""
-#     curr_list = next(list_of_lists, None)
-#     if not curr_list:
-#         return [[]]
-#     next_list = _product_lists_w_each_empty_ele(list_of_lists)
-#     return [[x] + y if x != GHOST_LIST_ELEMENT else y for x in curr_list
-#             for y in next_list]
-
-
 def _product_lists_w_each_empty_ele(list_of_lists: Iterable[list]) -> List[list]:
     """a sub-function used for product_list_allow_empty"""
     result_w_none = itertools.product(*list_of_lists)
@@ -156,6 +144,17 @@ def list_remove_adjacent_duplicates(target_list: list) -> list:
             result.append(target_list[i])
     return result
 
+# = Museum of Function =
+# This is an old slow but insteresting function so it kept it here
+# def _product_lists_w_each_empty_ele(list_of_lists: Iterable[list]) -> List[list]:
+#     """a sub-function used for product_list_allow_empty"""
+#     curr_list = next(list_of_lists, None)
+#     if not curr_list:
+#         return [[]]
+#     next_list = _product_lists_w_each_empty_ele(list_of_lists)
+#     return [[x] + y if x != GHOST_LIST_ELEMENT else y for x in curr_list
+#             for y in next_list]
+
 
 # == Dict related ==
 def get_copy_of_deleted_dict(orig_dict: Dict, del_key) -> Dict:
@@ -171,6 +170,21 @@ def get_copy_of_deleted_dict(orig_dict: Dict, del_key) -> Dict:
         del dict_copy[del_key]
 
     return dict_copy
+
+
+# == Class related ==
+def get_str_for_print_class_var(cls) -> str:
+    """return the str for printing out variables and values of cls to stdout"""
+    result = ""
+    class_members = dir(cls)
+    # Filter out class variables (excluding methods and special members)
+    class_variables = [member for member in class_members if not callable(getattr(cls, member)) and not member.startswith("__")]
+
+    for var_name in class_variables:
+        var_value = getattr(cls, var_name)
+        result += f"{os.linesep}{var_name}: {os.linesep}{var_value}{os.linesep}"
+    return result
+
 
 # == context manager ==
 class HiddenPrints:

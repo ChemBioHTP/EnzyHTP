@@ -1,5 +1,6 @@
-"""Testing the enzy_htp.molecular_mechanics.AmberInterface class.
+"""Testing the enzy_htp._interface.AmberInterface class.
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Author: QZ Shao <shaoqz@icloud.com>
 Date: 2022-06-03
 """
 import os
@@ -11,6 +12,7 @@ from typing import Union
 from enzy_htp.core.exception import tLEaPError
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core import file_system as fs
+from enzy_htp._interface.amber_interface import AmberParameterizer, PrepinParser
 import enzy_htp.structure as struct
 from enzy_htp import interface
 from enzy_htp import config as eh_config
@@ -26,7 +28,7 @@ TARGET_MINIMIZE_INPUT_2 = f"{MM_DATA_DIR}/target_min_2.inp"
 ANTECHAMBER_FNAMES = "ANTECHAMBER_AC.AC ANTECHAMBER_AC.AC0 ANTECHAMBER_AM1BCC.AC ANTECHAMBER_AM1BCC_PRE.AC ANTECHAMBER_BOND_TYPE.AC ANTECHAMBER_BOND_TYPE.AC0 ANTECHAMBER_PREP.AC ANTECHAMBER_PREP.AC0 ATOMTYPE.INF NEWPDB.PDB PREP.INF sqm.in sqm.out sqm.pdb".split(
 )
 
-
+# region Tools
 def touch(fname: Union[str, Path]):
     if not isinstance(fname, Path):
         fpath = Path(fname)
@@ -55,7 +57,219 @@ def files_equivalent(fname1: str, fname2: str) -> bool:
             return False
 
     return True
+# endregion Tools
 
+def test_run_tleap():
+    """test function runs as expected"""
+    ai = interface.amber
+    temp_test_file = f"{MM_BASE_DIR}/work_dir/test_run_tleap.pdb"
+    tleap_in_str = f"""source leaprc.protein.ff14SB
+a = loadpdb {MM_DATA_DIR}KE_07_R7_2_S.pdb
+savepdb a {temp_test_file}
+quit
+"""
+
+    ai.run_tleap(tleap_in_str)
+
+    assert os.path.exists(temp_test_file)
+    with open(temp_test_file) as f:
+        assert len(f.readlines()) == 3981
+    if _LOGGER.level > 10:
+        assert not os.path.exists(f"{eh_config['system.SCRATCH_DIR']}/tleap.out")
+        assert not os.path.exists(f"{eh_config['system.SCRATCH_DIR']}/tleap.in")
+    fs.safe_rm(temp_test_file)
+
+
+def test_run_tleap_dev():
+    """develop use test function. Dont do any assert"""
+    ai = interface.amber
+    test_input_pdb = f"{MM_DATA_DIR}KE_07_R7_2_S.pdb"
+    temp_test_file = f"{MM_BASE_DIR}/work_dir/test_run_tleap.pdb"
+    tleap_in_str = f"""source leaprc.protein.ff14SB
+a = loadpdb {test_input_pdb}
+savepdb a {temp_test_file}
+quit
+"""
+
+    ai.run_tleap(tleap_in_str, additional_search_path=["./", "../"])
+    fs.safe_rm(temp_test_file)
+
+
+def test_run_tleap_w_error(caplog):
+    """test if the function captures the a errored run of tleap"""
+    ai = interface.amber
+    temp_test_pdb = f"{MM_BASE_DIR}/work_dir/test_run_tleap.pdb"
+    temp_test_prmtop = f"{MM_BASE_DIR}/work_dir/test_run_tleap.prmtop"
+    temp_test_inpcrd = f"{MM_BASE_DIR}/work_dir/test_run_tleap.inpcrd"
+    # e1
+    tleap_in_str = f"""source leaprc.protein.ff24SB
+a = loadpdb {MM_DATA_DIR}KE_07_R7_2_S.pdb
+savepdb a {temp_test_pdb}
+quit
+"""
+    with pytest.raises(tLEaPError) as e:
+        ai.run_tleap(tleap_in_str)
+    assert "Could not open file leaprc.protein.ff24SB: not found" in caplog.text
+    # e2
+    tleap_in_str = f"""source leaprc.protein.ff14SB
+a = loadpdb {MM_DATA_DIR}KE_07_R7_2_R.pdb
+savepdb a {temp_test_pdb}
+quit
+"""
+    with pytest.raises(tLEaPError) as e:
+        ai.run_tleap(tleap_in_str)
+    assert "KE_07_R7_2_R.pdb: No such file or directory" in caplog.text
+    # e3
+    tleap_in_str = f"""source leaprc.protein.ff14SB
+a = loadpdb {MM_DATA_DIR}KE_07_R7_2_S.pdb
+saveamberparm a {temp_test_prmtop} {temp_test_inpcrd}
+quit
+"""
+    with pytest.raises(tLEaPError) as e:
+        ai.run_tleap(tleap_in_str)
+
+    fs.safe_rm(temp_test_pdb)
+    fs.safe_rm(temp_test_prmtop)
+    fs.safe_rm(temp_test_inpcrd)
+
+
+def test_find_tleap_error():
+    """make sure the function correctly find all the errors in example files"""
+    ai = interface.amber
+    ERR_EXP_DIR = f"{MM_DATA_DIR}tleap_errors/"
+    error_example_and_reason = [
+        (f"{ERR_EXP_DIR}e1.out", ["Could not open file leaprc.protein.ff24SB: not found"]),
+        (f"{ERR_EXP_DIR}e2.out", ["FATAL:  Atom .R<H5J 254>.A<NAL 2> does not have a type.", "Failed to generate parameters"]),
+    ]
+
+    for error_file, error_key_list in error_example_and_reason:
+        tleap_error = ai._find_tleap_error(error_file)
+        for error_key in error_key_list:
+            assert error_key in tleap_error.error_info_str
+
+
+def test_tleap_clean_up_stru(helpers):
+    """make sure the function correctly find all the errors in example files.
+    the test file is a truncated KE pdb also deleted the side chain atoms of residue 4
+    and changed its name to TRP mimiking a mutation sceniro."""
+    ai = interface.amber
+    test_input_pdb = f"{MM_DATA_DIR}tleap_clean_up_test_KE.pdb"
+    test_out_path = f"{MM_WORK_DIR}tleap_clean_up_out.pdb"
+    test_answer_path = f"{MM_DATA_DIR}tleap_clean_up_answer_KE.pdb"
+
+    ai.tleap_clean_up_stru(test_input_pdb, test_out_path, if_align_index=True)
+
+    assert helpers.equiv_files(test_out_path, test_answer_path)
+    fs.safe_rm(test_out_path)
+
+
+def test_build_md_parameterizer_default_value():
+    """as said in the name. Assert a charge_method default value
+    as a sample."""
+    ai = interface.amber
+    param_worker: AmberParameterizer = ai.build_md_parameterizer()
+    assert param_worker.charge_method == "AM1BCC"
+
+
+def test_amber_parameterizer_engine():
+    """as said in the name."""
+    ai = interface.amber
+    test_param_worker: AmberParameterizer = ai.build_md_parameterizer()
+    assert test_param_worker.engine == "Amber"
+
+
+def test_amber_parameterizer_run_lv_1():
+    """level 1 test of the parameterizer.
+    Test structure diversity:
+    - single polypeptide chain"""
+    ai = interface.amber
+    test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
+        ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib_empty"
+    )
+    test_stru = struct.PDBParser().get_structure(
+        f"{MM_DATA_DIR}/KE_wo_S.pdb")
+    params = test_param_worker.run(test_stru)
+
+
+def test_amber_parameterizer_run_lv_2():
+    """level 2 test of the parameterizer.
+    Test structure diversity:
+    - single polypeptide chain
+    - single substrate (CHON)
+    ** use existing parm files for ligand"""
+    ai = interface.amber
+    test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
+        ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib"
+    )
+    test_stru = struct.PDBParser().get_structure(
+        f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb")
+    params = test_param_worker.run(test_stru)
+
+
+def test_amber_parameterizer_run_lv_3():
+    """level 3 test of the parameterizer.
+    Test structure diversity:
+    - single polypeptide chain
+    - single substrate (CHON)"""
+    ai = interface.amber
+    test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
+        ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib_empty"
+    )
+    test_stru = struct.PDBParser().get_structure(
+        f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb")
+    test_param_worker.run(test_stru)
+
+
+def test_amber_parameterizer_run_lv_4():
+    """level 4 test of the parameterizer.
+    Test structure diversity:
+    - 2 polypeptide chain
+    - 2 substrate (CHN, CHONP), special net charge"""
+    ai = interface.amber
+    test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
+        ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib_empty"
+    )
+    test_stru = struct.PDBParser().get_structure(
+        f"{MM_DATA_DIR}/puo_put.pdb")
+    test_param_worker.run(test_stru)
+
+
+def test_amber_parameterizer_run_lv_5():
+    """level 5 test of the parameterizer.
+    Test structure diversity:
+    - 2 polypeptide chain
+    - 1 substrate (CHONP)
+    - 1 modified amino acid (CHONP)"""
+    ai = interface.amber
+    test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
+        ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib_empty"
+    )
+    test_stru = struct.PDBParser().get_structure(
+        f"{MM_DATA_DIR}/3cfr-slp-pea_ah.pdb")
+    test_param_worker.run(test_stru)
+
+
+def test_amber_parameterizer_run_lv_6():
+    """level 6 test of the parameterizer.
+    Test structure diversity:
+    - 2 polypeptide chain
+    - 1 substrate (CHONP)
+    - 1 modified amino acid (CHONP)"""
+    ai = interface.amber
+    test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
+        ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib_empty"
+    )
+    test_stru = struct.PDBParser().get_structure(
+        f"{MM_DATA_DIR}/tyna_clean.pdb")
+    test_param_worker.run(test_stru)
+
+def test_prepin_parser_get_stru():
+    """make sure function works as expected"""
+    test_prepin = f"{MM_DATA_DIR}/ncaa_lib/ligand_H5J.prepin"
+    test_stru = PrepinParser().get_structure(test_prepin)
+    print(test_stru)
+
+# region TODO
 
 def test_write_minimize_input_file():
     """Testing that minimization input files are generated correctly."""
@@ -270,106 +484,4 @@ def test_add_charges_bad_file():
 
     assert exe
 
-
-def test_run_tleap():
-    """test function runs as expected"""
-    ai = interface.amber
-    temp_test_file = f"{MM_BASE_DIR}/work_dir/test_run_tleap.pdb"
-    tleap_in_str = f"""source leaprc.protein.ff14SB
-a = loadpdb {MM_DATA_DIR}KE_07_R7_2_S.pdb
-savepdb a {temp_test_file}
-quit
-"""
-
-    ai.run_tleap(tleap_in_str)
-
-    assert os.path.exists(temp_test_file)
-    with open(temp_test_file) as f:
-        assert len(f.readlines()) == 3981
-    if _LOGGER.level > 10:
-        assert not os.path.exists(f"{eh_config['system.SCRATCH_DIR']}/tleap.out")
-        assert not os.path.exists(f"{eh_config['system.SCRATCH_DIR']}/tleap.in")
-    fs.safe_rm(temp_test_file)
-
-
-def test_run_tleap_dev():
-    """develop use test function. Dont do any assert"""
-    ai = interface.amber
-    test_input_pdb = f"{MM_DATA_DIR}KE_07_R7_2_S.pdb"
-    temp_test_file = f"{MM_BASE_DIR}/work_dir/test_run_tleap.pdb"
-    tleap_in_str = f"""source leaprc.protein.ff14SB
-a = loadpdb {test_input_pdb}
-savepdb a {temp_test_file}
-quit
-"""
-
-    ai.run_tleap(tleap_in_str, additional_search_path=["./", "../"])
-    fs.safe_rm(temp_test_file)
-
-
-def test_run_tleap_w_error(caplog):
-    """test if the function captures the a errored run of tleap"""
-    ai = interface.amber
-    temp_test_pdb = f"{MM_BASE_DIR}/work_dir/test_run_tleap.pdb"
-    temp_test_prmtop = f"{MM_BASE_DIR}/work_dir/test_run_tleap.prmtop"
-    temp_test_inpcrd = f"{MM_BASE_DIR}/work_dir/test_run_tleap.inpcrd"
-    # e1
-    tleap_in_str = f"""source leaprc.protein.ff24SB
-a = loadpdb {MM_DATA_DIR}KE_07_R7_2_S.pdb
-savepdb a {temp_test_pdb}
-quit
-"""
-    with pytest.raises(tLEaPError) as e:
-        ai.run_tleap(tleap_in_str)
-    assert "Could not open file leaprc.protein.ff24SB: not found" in caplog.text
-    # e2
-    tleap_in_str = f"""source leaprc.protein.ff14SB
-a = loadpdb {MM_DATA_DIR}KE_07_R7_2_R.pdb
-savepdb a {temp_test_pdb}
-quit
-"""
-    with pytest.raises(tLEaPError) as e:
-        ai.run_tleap(tleap_in_str)
-    assert "KE_07_R7_2_R.pdb: No such file or directory" in caplog.text
-    # e3
-    tleap_in_str = f"""source leaprc.protein.ff14SB
-a = loadpdb {MM_DATA_DIR}KE_07_R7_2_S.pdb
-saveamberparm a {temp_test_prmtop} {temp_test_inpcrd}
-quit
-"""
-    with pytest.raises(tLEaPError) as e:
-        ai.run_tleap(tleap_in_str)
-
-    fs.safe_rm(temp_test_pdb)
-    fs.safe_rm(temp_test_prmtop)
-    fs.safe_rm(temp_test_inpcrd)
-
-
-def test_find_tleap_error():
-    """make sure the function correctly find all the errors in example files"""
-    ai = interface.amber
-    ERR_EXP_DIR = f"{MM_DATA_DIR}tleap_errors/"
-    error_example_and_reason = [
-        (f"{ERR_EXP_DIR}e1.out", ["Could not open file leaprc.protein.ff24SB: not found"]),
-        (f"{ERR_EXP_DIR}e2.out", ["FATAL:  Atom .R<H5J 254>.A<NAL 2> does not have a type.", "Failed to generate parameters"]),
-    ]
-
-    for error_file, error_key_list in error_example_and_reason:
-        tleap_error = ai._find_tleap_error(error_file)
-        for error_key in error_key_list:
-            assert error_key in tleap_error.error_info_str
-
-
-def test_tleap_clean_up_stru(helpers):
-    """make sure the function correctly find all the errors in example files.
-    the test file is a truncated KE pdb also deleted the side chain atoms of residue 4
-    and changed its name to TRP mimiking a mutation sceniro."""
-    ai = interface.amber
-    test_input_pdb = f"{MM_DATA_DIR}tleap_clean_up_test_KE.pdb"
-    test_out_path = f"{MM_WORK_DIR}tleap_clean_up_out.pdb"
-    test_answer_path = f"{MM_DATA_DIR}tleap_clean_up_answer_KE.pdb"
-
-    ai.tleap_clean_up_stru(test_input_pdb, test_out_path, if_align_index=True)
-
-    assert helpers.equiv_files(test_out_path, test_answer_path)
-    fs.safe_rm(test_out_path)
+# endregion TODO

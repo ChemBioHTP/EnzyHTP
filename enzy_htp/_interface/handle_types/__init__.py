@@ -8,4 +8,4 @@ Date: 2023-09-19
 """
 
 from .mol_dyn_step import MolDynStep
-from .mol_dyn_parameterizer import MolDynParameterizer
+from .mol_dyn_parameterizer import MolDynParameterizer, MolDynParameter

@@ -296,6 +296,15 @@ class Structure(DoubleLinkedNode):
         return result
 
     @property
+    def modified_residue(self) -> List[Residue]:
+        """Filters out the modified residue Residue()"s from the chains in the Structure().
+        TODO may need a class for them"""
+        result: List[Residue] = list()
+        for chain in self.chains:
+            result.extend(list(filter(lambda r: r.is_noncanonical(), chain)))
+        return result
+
+    @property
     def solvents(self) -> List[Solvent]:
         """return all solvents hold by current Structure()"""
         result: List[Solvent] = []
@@ -313,8 +322,8 @@ class Structure(DoubleLinkedNode):
 
     @property
     def metalcenters(self) -> List[MetalUnit]:
-        """Filters out the metal coordination center Residue()"s from the chains 
-        in the Structure()."""
+        """Filters out the metal coordination center (instead of metal in general like Na+) 
+        Residue()"s from the chains in the Structure()."""
         result: List[Residue] = []
         for chain in self.chains:
             result.extend(list(filter(lambda r: r.is_metal_center(), chain.residues)))
@@ -335,7 +344,55 @@ class Structure(DoubleLinkedNode):
         for ch in self._chains:
             result[ch.name] = ch.sequence
         return result
+    
+    @property
+    def chemical_diversity(self) -> Dict[str, str]:
+        """determine and return the chemical diversity of current Structure()
+        The chemical diversity is the diversity of chemcial structure types. For example,
+        an enzyme composed by a single polypeptide chain and nothing else is less diversed
+        than an enzyme composed by 2 chains, 1 ligand, 1 modified amino acid, and 1 metal center
+        on each chain.
+        This property normally associates with the difficulty of modeling the Structure()
+        TODO include stuffs like missing loops/heavyatoms
+        
+        Return:
+            a dict() that contains the diveristy types and diversity details of each type.
+        
+            all types & spec:
+            {
+            "polypeptide" : number_of_chains,
+            "ligand" : element_composition,
+            "modified_residue" : element_composition,
+            "metalcenters" : element_composition,
+            }"""
+        result = {}
+        # polypeptide
+        if self.contain_polypeptide():
+            result.update({"polypeptide" : len(self.polypeptides)})
+        # ligand
+        if self.contain_ligand():
+            eles = set()
+            for lig in self.ligands:
+                eles = eles.union(lig.element_composition)
+            result.update({"ligand" : eles})
+        # mod aa
+        if self.contain_modified_residue():
+            eles = set()
+            for mod_aa in self.modified_residue:
+                eles = eles.union(mod_aa.element_composition)
+            result.update({"modified_residue" : eles})
+        # metalcenters
+        if self.contain_metalcenters():
+            eles = set()
+            for mc in self.metalcenters:
+                eles = eles.union(mc.element_composition)
+            result.update({"metalcenters" : eles})
 
+        return result
+
+    # endregion
+
+    #region === Initiator === initiate date but not direct reture it 
     def init_connect(self,
                      ligand_fix: int = "antechamber",
                      metal_fix: int = "isolate",
@@ -446,7 +503,6 @@ class Structure(DoubleLinkedNode):
         """initiate connectivity for solvents in the structure"""
         for sol in self.solvents:
             sol.init_connect(method)
-
     #endregion
 
     #region === Checker ===
@@ -499,6 +555,22 @@ class Structure(DoubleLinkedNode):
                     _LOGGER.info(f"current stru chain {self_ch} doesnt contain residue: {res} of the target stru")
                     return False
         return True
+
+    def contain_polypeptide(self) -> bool:
+        """checker that determine whether there is a polypeptide chain in the structure"""
+        return len(self.polypeptides) != 0
+
+    def contain_ligand(self) -> bool:
+        """checker that determine whether there is a polypeptide chain in the structure"""
+        return len(self.ligands) != 0
+
+    def contain_modified_residue(self) -> bool:
+        """check if there is a modified amino acid in the structure"""
+        return len(self.modified_residue) != 0
+
+    def contain_metalcenters(self) -> bool:
+        """check if there is a metal coordination ceneter in the structure"""
+        return len(self.metalcenters) != 0
 
     def has_chain(self, chain_name: str) -> bool:
         """Checks if the Structure() has a chain with the specified chain_name."""
