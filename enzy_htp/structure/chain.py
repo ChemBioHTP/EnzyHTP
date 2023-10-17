@@ -6,6 +6,7 @@ Date: 2022-03-20
 """
 from __future__ import annotations
 from copy import deepcopy
+import math
 import sys
 from typing import Iterable, List, Tuple, Union
 
@@ -228,6 +229,9 @@ class Chain(DoubleLinkedNode):
                 return False
         return True
 
+    def is_connected(self) -> bool:
+        """check whether all atoms within the chain have connected initiated"""
+        return math.prod([atom.is_connected() for atom in self.atoms])
     #endregion
 
     #region === Editor ===
