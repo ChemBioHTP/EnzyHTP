@@ -3,7 +3,9 @@
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-19
 """
+import multiprocessing
 import os
+import time
 
 import enzy_htp.core.file_system as fs
 
@@ -180,5 +182,35 @@ def test_all_file_in_dir():
 
     nonrecursive_files = fs.all_file_in_dir(test_dirname, recursive=False)
     assert len(nonrecursive_files) == 1
+
+
+def test_lock():
+    """test the homemade file lock"""
+    def worker_1():
+        f = open("test.file", "wb")
+        fs.lock(f)
+        f.write(b"Hi")
+        time.sleep(5)
+        fs.unlock(f)
+        f.close()
+
+    def worker_2(result_queue):
+        f = open("test.file", "rb")
+        while fs.is_locked(f):
+            time.sleep(0.5)
+        content = f.read()
+        result_queue.put(content)
+        f.close()
+
+    result_queue = multiprocessing.Queue()
+    process1 = multiprocessing.Process(target=worker_1)
+    process2 = multiprocessing.Process(target=worker_2, args=(result_queue,))
+    process1.start()
+    process2.start()
+    process1.join()
+    process2.join()
+    fs.safe_rm("test.file")
+
+    assert result_queue.get() == b"Hi"
 
 # TODO(CJ) add tests for remove_ext

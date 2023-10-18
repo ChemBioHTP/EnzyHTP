@@ -3,8 +3,8 @@
 Author: Chris Jurich, <chris.jurich@vanderbilt.edu>
 Date: 2022-03-14
 """
+from io import IOBase
 import os
-import sys
 import glob
 import shutil
 import datetime
@@ -229,6 +229,30 @@ def clean_temp_file_n_dir(temp_path_list: List[str]) -> None:
             safe_rm(file_path)
         for dir_path in dir_list:
             safe_rmdir(dir_path, empty_only=True)
+
+
+# make own lock function that python ones not really work
+def is_locked(f: IOBase) -> bool:
+    """check whether the file is locked by another process"""
+    lock_path = f"{os.path.abspath(f.name)}.lock"
+    return Path(lock_path).exists()
+
+def lock(f: IOBase):
+    """lock a file by making a lock file"""
+    lock_path = f"{os.path.abspath(f.name)}.lock"
+    if is_locked(f):
+        _LOGGER.error(f"lock already exist in {lock_path}")
+        raise IOError
+    with open(lock_path, "w"):
+        pass
+
+def unlock(f: IOBase):
+    """unlock a file by deleting a lock file"""
+    lock_path = f"{os.path.abspath(f.name)}.lock"
+    if is_locked(f):
+        safe_rm(lock_path)
+    else:
+        _LOGGER.warning(f"unlocking non-existing lock: {lock_path}")
 
 # == time ==
 def get_current_time() -> str:
