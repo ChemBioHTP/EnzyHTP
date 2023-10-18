@@ -57,7 +57,7 @@ class AmberConfig(BaseConfig):
     DEFAULT_RESP_LVL_OF_THEORY: str = "b3lyp/def2svp em=d3"
     """build_md_parameterizer: default level of theory for calculating the RESP charge."""
 
-    DEFAULT_NCAA_PARAM_LIB_PATH: str = "../ncaa_param"
+    DEFAULT_NCAA_PARAM_LIB_PATH: str = SystemConfig.NCAA_LIB_PATH
     """build_md_parameterizer: default path of the non-CAA parameter library."""
 
     DEFAULT_FORCE_RENEW_NCAA_PARAMETER: bool = False
