@@ -172,13 +172,13 @@ def test_clean_temp_file_n_dir():
         assert not os.path.exists(temp_path)
 
 
-def test_get_all_file_in_dir():
+def test_all_file_in_dir():
     """test the function using dummy folder and files"""
     test_dirname = f"{CURR_DIR}/data/dummy_dir"
-    recursive_files = fs.get_all_file_in_dir(test_dirname, recursive=True)
+    recursive_files = fs.all_file_in_dir(test_dirname, recursive=True)
     assert len(recursive_files) == 2
 
-    nonrecursive_files = fs.get_all_file_in_dir(test_dirname, recursive=False)
+    nonrecursive_files = fs.all_file_in_dir(test_dirname, recursive=False)
     assert len(nonrecursive_files) == 1
 
 # TODO(CJ) add tests for remove_ext

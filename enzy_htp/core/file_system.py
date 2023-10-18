@@ -61,7 +61,7 @@ def safe_mkdir(dirname: str) -> None:
         Path(dirname).mkdir(parents=True, exist_ok=True)
 
 
-def get_all_file_in_dir(dirname: str, recursive: bool=True):
+def all_file_in_dir(dirname: str, recursive: bool=True):
     """get path of all files under a dir. filter out all subdir paths themselves"""
     if recursive:
         file_paths = glob.glob(f"{dirname}/**/*", recursive=True)
