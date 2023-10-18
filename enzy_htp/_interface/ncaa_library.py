@@ -16,18 +16,19 @@ from enzy_htp.structure import (
 MOL_DESC_FILE_EXT = [".prepin", ".prepi", ".mol2"]
 MM_PARM_FILE_EXT = [".frcmod"]
 
-def search_ncaa_parm_file(target_res: Residue, ncaa_lib_path: str) -> Tuple[str, List[str]]: 
-    """search for ncaa parm files for {target_res_name} from {ncaa_lib_path}.
-    A cache file stores known {file : res_name} relationship in pickle format under the path.
+def search_ncaa_parm_file(target_res: Residue, target_method: Union[str, None], ncaa_lib_path: str) -> Tuple[str, List[str]]: 
+    """search for ncaa parm files for {target_res_name} with {target_method} from {ncaa_lib_path}.
+    A cache file stores known {file : (res_name, method)} relationship in pickle format under the path.
     Args:
         target_res: the target Residue child class instance. (e.g.: Ligand, ModifiedResidue)
+        target_method: the desired method for the parm file (if None is supplied, the first file for the residue is used)
     Returns:
         (prepi/mol2_path, [frcmod_path, ...]) if found
         (None, []) if not found"""
     mol_desc_path = None
     frcmod_path_list = []
 
-    # I. initiate the ncaa_lib_mapper {file : res_name} (1-time effort if no new files added)
+    # I. initiate the ncaa_lib_mapper {file : (res_name, method)} (1-time effort if no new files added)
     ncaa_lib_mapper = {}
 
     parm_file_list = fs.get_all_file_in_dir(ncaa_lib_path)
