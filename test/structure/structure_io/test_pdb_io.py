@@ -1,9 +1,9 @@
-'''Testing the PDBParser class in the enzy_htp.structure.structure_io.pdb_io
+"""Testing the PDBParser class in the enzy_htp.structure.structure_io.pdb_io
 This class is for parsing in and out from PDB to Structure
 
 Author: QZ Shao <shaoqz@icloud.com>
 Date: 2022-09-08
-'''
+"""
 from collections import defaultdict
 import itertools
 import logging
