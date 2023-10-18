@@ -21,7 +21,7 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core import env_manager as em
 from enzy_htp.core.exception import UnsupportedMethod, tLEaPError
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
-from enzy_htp.structure.structure_io import pdb_io, StructureParserInterface
+from enzy_htp.structure.structure_io import pdb_io, PrepinParser
 from enzy_htp.structure import (
     Structure,
     Residue,
@@ -162,6 +162,7 @@ class AmberParameterizer(MolDynParameterizer):
             if frcmod_path_list:
                 return mol_desc_path, frcmod_path_list
         else:
+        # TODO make a function in whole for this part
             # 1. make ligand PDB
 
             # 1.1. Run RESP calculation (option)
@@ -234,7 +235,7 @@ class AmberParameterizer(MolDynParameterizer):
             metalcenter_parms):
         pass
 
-    def _search_ncaa_parm_file(self, target_res: Residue) -> Tuple[str, List[str]]:
+    def _search_ncaa_parm_file(self, target_res: Residue) -> Tuple[str, List[str]]:  # TODO make this globally use
         """search for ncaa parm files for {target_res_name} from self.ncaa_param_lib_path.
         Args:
             target_res: the target Residue child class instance. (e.g.: Ligand, ModifiedResidue)
@@ -318,65 +319,6 @@ class AmberParameterizer(MolDynParameterizer):
             return base_file_name
         else:
             return None
-
-
-class PrepinParser(StructureParserInterface):
-    """the parser for AmberMD prepin files"""
-
-    def __init__(self) -> None:  # pylint: disable=super-init-not-called
-        """pass"""
-        pass
-
-    @classmethod
-    def get_structure(cls, path: str) -> Structure:
-        """
-        Converting a .prepin file (as its path) into the Structure()
-        Arg:
-            path:
-                the file path of the PDB file
-        Return:
-            Structure()
-        """
-        
-    # @classmethod
-    # def _parse_prepin_connect(cls, prepi_path, res):
-    #     '''parse the prepin file and store connectivity info to {res}'''
-    #     prepi_atom_mapper = {}
-    #     with open(prepi_path) as f:
-    #         line_id = 0
-    #         if_loop = 0
-    #         for line in f:
-    #             line_id += 1
-    #             if line.strip() == '':
-    #                 if if_loop == 1:
-    #                     # switch off loop and break if first blank after LOOP encountered
-    #                     if_loop = 0
-    #                     break
-    #                 continue
-    #             if if_loop:
-    #                 lp = line.strip().split()
-    #                 res._find_atom_name(lp[0]).connect.append(res._find_atom_name(lp[1]))
-    #                 continue
-    #             # loop connect starts at LOOP
-    #             if line.strip() == 'LOOP':
-    #                 if_loop = 1
-    #                 continue
-    #             # coord starts at 11th
-    #             if line_id >= 11:
-    #                 lp = line.strip().split()
-    #                 atom_id = int(lp[0])-3
-    #                 atom_name = lp[1]
-    #                 atom_cnt = int(lp[4])-3
-    #                 prepi_atom_mapper[atom_id] = (res._find_atom_name(atom_name), atom_cnt)
-
-    #     for atom_id, (atom, atom_cnt) in prepi_atom_mapper.items():
-    #         if atom_cnt != 0: # why is this? lol
-    #             cnt_atom_obj = prepi_atom_mapper[atom_cnt][0]
-    #             atom.connect.append(cnt_atom_obj)
-    #             cnt_atom_obj.connect.append(atom)
-        
-    #     for atom in res:
-    #         atom.connect = list(set(atom.connect))
 
 
 class AmberMDStep(MolDynStep):
@@ -615,6 +557,7 @@ class AmberInterface(BaseInterface):
         # print(AmberInterface._generate_default_assigning_lines_for_build_md_parameterizer(locals().items()))
 
         # init default values
+        type_hint_for_config: AmberConfig
         if charge_method == "default":
             charge_method = self.config()["DEFAULT_CHARGE_METHOD"]
         if resp_engine == "default":
