@@ -25,7 +25,6 @@ from enzy_htp.core import file_system as fs
 #TODO(CJ): I should go through and use existing values if cache mode is selected
 #TODO(CJ): need to be able to specify the size of the grid
 
-
 def dock_reactants(structure: Structure,
                    constraints: List[RosettaCst] = None,
                    work_dir: str = None,
@@ -34,6 +33,7 @@ def dock_reactants(structure: Structure,
                    n_struct: int = 1000,
                    cst_cutoff: int = 10,
                    clash_distance: float = 2.0,
+                   cluster_distance: float = 2.0,
                    clash_cutoff: int = 1,
                    max_sasa_ratio:float = 0.60,
                    use_cache: bool = True
@@ -43,7 +43,8 @@ def dock_reactants(structure: Structure,
     Args:
 
     Params:
-        A deep-copy of the 
+
+    Returns:
 
     """
 
@@ -64,9 +65,7 @@ def dock_reactants(structure: Structure,
     _evaluate_clashes(df, clash_distance, clash_cutoff)
 
     _evaluate_csts(df, constraints, cst_cutoff)
-    
-    #_evaluate_binding(df, start_pdb, binding_cutoff, chain_names, charge_mapper=charge_mapper)
-    cluster_distance=2.0
+   
     _evaluate_qm(df, structure, charge_mapper, cluster_distance)
     
     #TODO(CJ): add some kind of logging about the results. Also do some optimization of the system.
@@ -367,12 +366,43 @@ def _create_xml(stru:Structure, work_dir: str, use_cache: bool) -> str:
         protocol_names.extend([dock])
 
     elements.extend(
-        [{'parent': 'PROTOCOLS', 'tag': 'Add','mover_name': 'cstadd'}] + 
-        [{'parent': 'PROTOCOLS', 'tag': 'Add', 'mover_name': pn } for pn in protocol_names] + 
-        [{'parent': 'MOVERS', 'tag': 'EnzRepackMinimize', 'name':'cstopt', 'minimize_rb':'1', 
-        'cst_opt':'1', 'cycles':'5', 'scorefxn_repack': 'ligand_soft_rep', 'scorefxn_minimize': 'ligand_soft_rep',
-        'minimize_lig':'1'
-        },{'parent': 'PROTOCOLS', 'tag': 'Add', 'mover_name': 'cstopt'}
+        [{'parent': 'PROTOCOLS', 'tag': 'Add', 'mover_name': pn } for pn in protocol_names] +
+        [{'parent': 'PROTOCOLS',
+            'tag': 'Add',
+            'mover_name': 'cstadd'},
+        {'parent': 'MOVERS',
+            'tag': 'EnzRepackMinimize',
+            'name':'cstopt',
+            'minimize_rb':'1', 
+            'cst_opt':'1',
+            'cycles':'5',
+            'scorefxn_repack': 'ligand_soft_rep',
+            'scorefxn_minimize': 'ligand_soft_rep',
+            'minimize_lig':'1',
+            'minimize_sc':'1',
+            'minimize_bb':'1',
+            'cycles':'3',
+            'min_in_stages':'0',},
+        {'parent': 'PROTOCOLS',
+            'tag': 'Add',
+            'mover_name': 'cstopt'},
+        {'parent': 'MOVERS',
+            'tag': 'EnzRepackMinimize',
+            'name': 'final_minimize',
+            'design': '0',
+            'repack_only': '1',
+            'scorefxn_repack': 'ligand_soft_rep',
+            'scorefxn_minimize': 'ligand_soft_rep',
+            'minimize_rb':'1',
+            'minimize_bb':'1',
+            'minimize_sc':'1',
+            'cycles':'2',
+            'minimize_lig':'1',
+            'min_in_stages':'0',
+            'backrub':'0',},
+#        {'parent':'PROTOCOLS',
+#            'tag': 'Add',
+#            'mover_name': 'final_minimize'}
     ])            
 
     interface.rosetta.write_script(fname, elements)
@@ -495,26 +525,11 @@ def _dock_system(structure: Structure,
             rng_seed:int,
             use_cache:bool) -> pd.DataFrame:
     """
-
-    Args:
-
-    Returns:
-
+    TODO(CJ)
     """
-    _LOGGER.info("Beginning RosettaLigand docking run...")
-
-    (param_files, charge_mapper) = _parameterize_system(structure, work_dir)
-
-    (start_pdb, cst_file) = _integrate_csts(structure, constraints, work_dir, use_cache)
-
-    xml_file: str = _create_xml(structure, work_dir, use_cache)  #TODO(CJ): going to overhaul this
-
-    options_file: str = _make_options_file(start_pdb, xml_file, param_files, work_dir, rng_seed, n_struct, use_cache, cst_file)
-
-    opt_path = Path(options_file)
-
+    
     if use_cache:
-        csv_file = Path(str(opt_path.parent / "scores.csv"))
+        csv_file = Path( f"{work_dir}/scores.csv")
         _LOGGER.info(f"Cache mode enabled. Looking for {csv_file} ...")
         if csv_file.exists():
             df = pd.read_csv(csv_file)
@@ -529,12 +544,25 @@ def _dock_system(structure: Structure,
                     break
             else:
                 _LOGGER.info("All cached .pdbs exist! Using cached RosettaLigand structures!")
+                (_, charge_mapper) = _parameterize_system(structure, work_dir)
                 return df, charge_mapper
         else:
             _LOGGER.info(f"{csv_file} not found. Continuing with standard run")
 
+    (param_files, charge_mapper) = _parameterize_system(structure, work_dir)
+
+    (start_pdb, cst_file) = _integrate_csts(structure, constraints, work_dir, use_cache)
+
+    xml_file: str = _create_xml(structure, work_dir, use_cache)  #TODO(CJ): going to overhaul this
+
+    options_file: str = _make_options_file(start_pdb, xml_file, param_files, work_dir, rng_seed, n_struct, use_cache, cst_file)
+
+    opt_path = Path(options_file)
+
     _LOGGER.info("Beginning RosettaLigand geometry sampling step...")
+    
     start_dir: str = os.getcwd()
+    
     os.chdir(str(opt_path.parent))
 
     interface.rosetta.run_rosetta_scripts([f"@{opt_path.name}"])
@@ -573,14 +601,17 @@ def _evaluate_SASA(df: pd.DataFrame, max_sasa_ratio:float) -> None:
     interface.pymol.general_cmd(session, args)
     good_sasa:List[bool]=list()
     for i,row in df.iterrows():
-        good = True
-        args = [('delete', 'all'), ('load', row.description), ("get_sasa_relative", sele_str[:-3])]
-        sasa_values = interface.pymol.general_cmd(session, args)[-1]
-        for (_,_,sv_chain,sv_index),sasa_rel in sasa_values.items():
-            if (sv_chain,sv_index) in ligand_keys:
-                if sasa_rel >= max_sasa_ratio:
-                    good = False
-        good_sasa.append(good)
+        if not row.selected:
+            good_sasa.append( False )
+        else:
+            good = True
+            args = [('delete', 'all'), ('load', row.description), ("get_sasa_relative", sele_str[:-3])]
+            sasa_values = interface.pymol.general_cmd(session, args)[-1]
+            for (_,_,sv_chain,sv_index),sasa_rel in sasa_values.items():
+                if (sv_chain,sv_index) in ligand_keys:
+                    if sasa_rel >= max_sasa_ratio:
+                        good = False
+            good_sasa.append(good)
 
 
     df['good_sasa'] = good_sasa
@@ -606,8 +637,6 @@ def _evaluate_csts(df: pd.DataFrame, csts: List[RosettaCst], cst_cutoff: int) ->
 
     cst_diff = []
     for i, row in df.iterrows():
-        if (i + 1) % 25 == 0:
-            _LOGGER.info(f"\tChecking geometry {i+1} of {len(df)}...")
         total = 0.0
         for cst in csts:
             for tl in cst.evaluate(row.description):
@@ -769,9 +798,6 @@ def _evaluate_clashes(df: pd.DataFrame, clash_distance: float, clash_cutoff: int
     clash_ct: List[int] = list()
     for i, row in df.iterrows():
 
-        if (i + 1) % 25 == 0:
-            _LOGGER.info(f"\tChecking geometry {i+1} of {len(df)}...")
-
         if not row.selected:
             clash_ct.append(-1)
             continue
@@ -851,7 +877,7 @@ def _create_binding_clusters(geometries: List[str], chain_names):
 
 
 def _system_charge(df: pd.DataFrame, charge_mapper=None) -> int:
-    """ """
+    """TODO(CJ) """
     _LOGGER.info("Beginning enzyme system charge deduction...")
     charge = 0
 
@@ -1037,6 +1063,7 @@ def _evaluate_binding(df: pd.DataFrame,
 
 
 def _define_active_site(structure: Structure, distance_cutoff, charge_mapper=None):
+    """TODO(CJ)"""
 
     parser = PDBParser()
     start_pdb:str=f"{config['system.SCRATCH_DIR']}/__temp_as.pdb"
@@ -1057,7 +1084,7 @@ def _define_active_site(structure: Structure, distance_cutoff, charge_mapper=Non
         if rn.upper() in chem.METAL_CENTER_MAP or rn.upper() in chem.THREE_LETTER_AA_MAPPER:
             continue
         reactants.append(rn)
-        sele.append(f"(byres all within {distance_cutoff:.2f} of resn {rn})")
+        sele.append(f"((byres all within {distance_cutoff:.2f} of resn {rn}) or (metals within  {2*distance_cutoff:.2f} of resn {rn}))")
     sele_str = " or ".join(sele)
     atoms: pd.DataFrame = interface.pymol.collect(session, start_pdb, "resi chain resn name".split(), sele=sele_str)
     residues = sorted(list(set(zip(atoms.chain, atoms.resi))))
@@ -1068,11 +1095,13 @@ def _define_active_site(structure: Structure, distance_cutoff, charge_mapper=Non
 
     fs.safe_rm(start_pdb)
 
+    sele_str = " or ".join(map(lambda pr: f"(chain {pr[0]} and resi {pr[1]})", residues))
+
     return {"sele": sele_str, "charge": charge}
 
 
 def _evaluate_qm(df: pd.DataFrame, structure: Structure, charge_mapper, cluster_cutoff: float) -> None:
-    """ """
+    """TODO(CJ) """
     # steps
     # 1. get system charge
     # 2. run through each cluster and do it
