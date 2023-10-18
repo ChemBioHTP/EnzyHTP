@@ -197,6 +197,7 @@ def test_lock():
     def worker_2(result_queue):
         f = open("test.file", "rb")
         while fs.is_locked(f):
+            print(1)
             time.sleep(0.5)
         content = f.read()
         result_queue.put(content)
@@ -206,6 +207,7 @@ def test_lock():
     process1 = multiprocessing.Process(target=worker_1)
     process2 = multiprocessing.Process(target=worker_2, args=(result_queue,))
     process1.start()
+    time.sleep(0.1)
     process2.start()
     process1.join()
     process2.join()

@@ -238,7 +238,8 @@ def is_locked(f: IOBase) -> bool:
     return Path(lock_path).exists()
 
 def lock(f: IOBase):
-    """lock a file by making a lock file"""
+    """lock a file by making a lock file
+    * this does not work when the read happens too fast"""
     lock_path = f"{os.path.abspath(f.name)}.lock"
     if is_locked(f):
         _LOGGER.error(f"lock already exist in {lock_path}")
