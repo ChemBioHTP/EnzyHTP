@@ -15,6 +15,7 @@ from typing import List, Tuple, Union, Dict, Any
 
 from .base_interface import BaseInterface
 from .handle_types import MolDynParameterizer, MolDynParameter, MolDynStep
+from .ncaa_library import search_ncaa_parm_file
 
 from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
@@ -93,8 +94,6 @@ class AmberParameterizer(MolDynParameterizer):
         self.gb_radii = gb_radii
         self.parameterizer_temp_dir = parameterizer_temp_dir
         self.additional_tleap_lines = additional_tleap_lines
-        # caches init val
-        self.cache_ncaa_lib_mapper = {}
 
     @property
     def engine(self) -> str:
@@ -156,7 +155,7 @@ class AmberParameterizer(MolDynParameterizer):
 
         fs.safe_mkdir(self.ncaa_param_lib_path)
         # 0. search parm lib
-        mol_desc_path, frcmod_path_list = self._search_ncaa_parm_file(lig)
+        mol_desc_path, frcmod_path_list = search_ncaa_parm_file(lig, self.ncaa_param_lib_path)
 
         if mol_desc_path:
             if frcmod_path_list:
@@ -234,91 +233,6 @@ class AmberParameterizer(MolDynParameterizer):
             maa_parms,
             metalcenter_parms):
         pass
-
-    def _search_ncaa_parm_file(self, target_res: Residue) -> Tuple[str, List[str]]:  # TODO make this globally use
-        """search for ncaa parm files for {target_res_name} from self.ncaa_param_lib_path.
-        Args:
-            target_res: the target Residue child class instance. (e.g.: Ligand, ModifiedResidue)
-        Returns:
-            (prepi/mol2_path, [frcmod_path, ...]) if found
-            (None, []) if not found"""
-        mol_desc_path = None
-        frcmod_path_list = []
-
-        # I. initiate the ncaa_lib_mapper {file : res_name} (1-time effort if no new files added)
-        ncaa_lib_mapper = {}
-
-        parm_file_list = fs.get_all_file_in_dir(self.ncaa_param_lib_path)
-        for parm_file in parm_file_list:
-            res_name = self.cache_ncaa_lib_mapper.get(parm_file, None)
-            if res_name: # exist in cache
-                
-                ncaa_lib_mapper[parm_file] = res_name
-
-            else: # not exist in cache - file the res_name
-                # TODO support lib/off?
-                # prepin
-                if fs.get_file_ext(parm_file) in [".prepin", ".prepi"]:
-                    # 1. find 3-letter name in file
-                    parm_stru = PrepinParser().get_structure(parm_file)
-                    res_name = parm_stru.residues[0].name
-                    if res_name in [None, "UNK"]:
-                        # 2. find 3-letter name in filename
-                        res_name = self._get_ncaa_parm_file_res_name_from_filename(parm_file)
-                # mol2
-                elif fs.get_file_ext(parm_file) in [".mol2"]:
-                    pass
-                    # # 1. find 3-letter name in file
-                    # parm_stru = Mol2Parser().get_structure(parm_file)
-                    # res_name = parm_stru.residues[0].name
-                    # if res_name in [None, "UNK"]:
-                    #     # 2. find 3-letter name in filename
-                    #     res_name = self._get_ncaa_parm_file_res_name_from_filename(parm_file)
-
-                # frcmod*
-                elif ".frcmod" in fs.get_file_ext(parm_file):
-                    # seems frcmod file wont contain residue name in file
-                    res_name = self._get_ncaa_parm_file_res_name_from_filename(parm_file)
-
-                else:
-                    _LOGGER.warning(
-                        f"The file: {parm_file} in ncaa_parm_lib have an unknown extension."
-                        "This file will not be considered during parameterization"
-                        "currently supported types are: prepin, mol2, frcmod*")
-                    continue
-
-                # known file type
-                if res_name:
-                    ncaa_lib_mapper[parm_file] = res_name
-                else:
-                    _LOGGER.warning(
-                        f"The file: {parm_file} in ncaa_parm_lib does not have an "
-                        "associated residue name. This file will not be considered "
-                        "during parameterization. Make sure this is what you want! "
-                        "You can add residue name by adding it to the corresponding "
-                        "part in the file format or use the 3-letter name as filename (in upper case)") 
-
-        self.cache_ncaa_lib_mapper.update(ncaa_lib_mapper) # cache known ones
-
-        # II. assign to target_res
-        for file_path, res_name in ncaa_lib_mapper.items():
-            if res_name == target_res.name:
-                # prepin/mol2
-                if fs.get_file_ext(file_path) in [".prepin", ".prepi", ".mol2"]:
-                    mol_desc_path = file_path
-                # frcmod*
-                if ".frcmod" in fs.get_file_ext(file_path):
-                    frcmod_path_list.append(file_path)
-
-        return mol_desc_path, frcmod_path_list
-
-    def _get_ncaa_parm_file_res_name_from_filename(self, filename: str) -> Union[str, None]:
-        """as name desc"""
-        base_file_name = fs.base_file_name(filename)
-        if re.match("[A-Z][A-Z][A-Z]", base_file_name):
-            return base_file_name
-        else:
-            return None
 
 
 class AmberMDStep(MolDynStep):

@@ -195,7 +195,10 @@ def _connect_ligand(lig: Ligand, method: str) -> None: # TODO use lib to avoid r
     """initiate connectivity for ligand"""
     support_method_list = ["antechamber"]
     if method == "antechamber":
-        pass 
+        # 0. search lib for prepin/mol2 of ligand
+        # 1. make mol2 for ligand
+        # 2. parse mol2 for connectivity
+        pass
 
     if method not in support_method_list:
         _LOGGER.error(f"Method {method} not in supported list: {support_method_list}")
