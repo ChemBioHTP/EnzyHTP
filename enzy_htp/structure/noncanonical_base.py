@@ -17,15 +17,14 @@ from typing import List, Tuple
 from .residue import Residue
 import enzy_htp.chemical as chem
 
+from enzy_htp.core.general import swapped_dict
 from enzy_htp.core import file_system as fs
-from enzy_htp.core import (
-    UnsupportedFileType,
-    _LOGGER,
-)
+from enzy_htp.core import _LOGGER
 
 
 class NonCanonicalBase(Residue):
-    """Base class for residue units other that canonical amino acid and water.
+    """Base class for Residue units other that canonical amino acid and water.
+    Parent class: Residue
     Children classes include Ligand, ModifiedResidue, MetalUnit.
     Should never be instantiated.
 
@@ -66,5 +65,31 @@ class NonCanonicalBase(Residue):
 
     # === Editor ===
     def clone_connectivity(self, other: NonCanonicalBase) -> None:
-        """clone connectivity from {other}."""
-        pass #TODO
+        """clone connectivity from {other}.
+        The atoms are aligned and a connect record is added to each atom referencing
+        the connect from the aligned atom from other"""
+        # 1. san check
+        # - make sure self and other have same set of atom names
+        if set(self.atom_name_list) != set(other.atom_name_list):
+            _LOGGER.error(f"Atom names are not consistent between {self} and {other}. Cannot align.")
+            raise ValueError
+        # - make sure other is connected
+        if not other.is_connected():
+            _LOGGER.error(f"clone target not connected: {other}.")
+            raise ValueError
+
+        # 2. align
+        self_other_atom_mapper = {}
+        for atom in self.atoms:
+            self_other_atom_mapper[atom] = other.find_atom_name(atom.name)
+        other_self_atom_mapper = swapped_dict(self_other_atom_mapper)
+
+        # 3. clone
+        for self_atom in self.atoms:
+            result = []
+            other_atom: Atom = self_other_atom_mapper[self_atom]
+            for other_cnt_atom, bond_type in other_atom.connect:
+                self_cnt_atom = other_self_atom_mapper[other_cnt_atom]
+                result.append((self_cnt_atom, bond_type))
+            self_atom.connect = result
+            
