@@ -159,7 +159,7 @@ def list_remove_adjacent_duplicates(target_list: list) -> list:
 # == Dict related ==
 def get_copy_of_deleted_dict(orig_dict: Dict, del_key) -> Dict:
     """
-    get a copy of the orig_dict and delete an item base on the del_key
+    get a copy of the orig_dict and delete an item in the copy base on the del_key
     the del_key can be a list of keys
     """
     dict_copy = copy.deepcopy(orig_dict)
@@ -171,6 +171,10 @@ def get_copy_of_deleted_dict(orig_dict: Dict, del_key) -> Dict:
 
     return dict_copy
 
+def swapped_dict(orig_dict: Dict) -> Dict:
+    """get a swapped dictionary based on the original dictionary. The key and value are swapped
+    in the new dictionary."""
+    return {v : k for k, v in orig_dict.items()}
 
 # == Class related ==
 def get_str_for_print_class_var(cls) -> str:

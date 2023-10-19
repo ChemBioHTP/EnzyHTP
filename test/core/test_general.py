@@ -31,3 +31,18 @@ def test_list_remove_adjacent_duplicates():
     test_list = [1, 2, 2, 3, 3, 4, 6, 6, 3, 5, 5]
     result_list = eg.list_remove_adjacent_duplicates(test_list)
     assert result_list == [1, 2, 3, 4, 6, 3, 5]
+
+def test_swapped_dict():
+    """test function works as expected"""
+    test_dict = {
+        1 : "1",
+        2 : "2",
+        3 : "3",
+    }
+    result_dict = eg.swapped_dict(test_dict)
+    assert result_dict == {
+        "1" : 1,
+        "2" : 2,
+        "3" : 3,
+    }
+    
