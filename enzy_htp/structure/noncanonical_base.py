@@ -8,17 +8,11 @@ Date: 2023-10-18
 """
 from __future__ import annotations
 
-from copy import deepcopy
-
-import numpy as np
-
-from .atom import Atom
-from typing import List, Tuple
+from typing import List
 from .residue import Residue
 import enzy_htp.chemical as chem
 
 from enzy_htp.core.general import swapped_dict
-from enzy_htp.core import file_system as fs
 from enzy_htp.core import _LOGGER
 
 
