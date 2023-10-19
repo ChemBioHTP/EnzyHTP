@@ -16,7 +16,7 @@ DATA_DIR = f"{CURR_DIR}/../../test_data"
 STRU_DATA_DIR = f"{CURR_DIR}/../data"
 sp = PDBParser()
 
-def test_init_connectivity(): #TODO: finish these test
+def test_init_connectivity(): #TODO: finish these test after finish mol_desc_gen using antechamber
     """test function works as expected"""
     pdb_file_path = f"{DATA_DIR}1Q4T_ligand_test.pdb"
     stru: Structure = sp.get_structure(pdb_file_path)
@@ -84,7 +84,7 @@ def test_init_connectivity_lv_6():
         f"{DATA_DIR}/diversed_stru/tyna_clean.pdb")
     init_connectivity(test_stru)
 
-# TODO 
+# TODO
 def test_init_connectivity_atom_missing_h(caplog):
     """get connect with missing H atoms"""
 
