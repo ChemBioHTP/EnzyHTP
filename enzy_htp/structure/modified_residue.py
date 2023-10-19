@@ -13,11 +13,12 @@ from copy import deepcopy
 from .atom import Atom
 from typing import List
 from .residue import Residue
+from .noncanonical_base import NonCanonicalBase
 import enzy_htp.chemical as chem
 from enzy_htp.core import _LOGGER
 
 
-class ModifiedResidue(Residue):
+class ModifiedResidue(NonCanonicalBase):
     """Represents a specific ModifiedResidue found in a .pdb file. (#@shaoqz: a non-covalently binding small molecule to the protein part of the enzyme. decouple with PDB)
         Typically created from a base Residue() object using
         the residue_to_modified_residue() method found in enzy_htp.structure.modified_residue.py. In addition to base attributes, has
@@ -33,32 +34,10 @@ class ModifiedResidue(Residue):
         """
         Constructor for ModifiedResidue. Identical to Residue() ctor but also takes net_charge value.
         """
-        self.net_charge = kwargs.get("net_charge", None)
-        self._multiplicity = kwargs.get("multiplicity", None)
-        Residue.__init__(self, residue_idx, residue_name, atoms, parent)
+        NonCanonicalBase.__init__(self, residue_idx, residue_name, atoms, parent, **kwargs)
         self.rtype = chem.ResidueType.MODIFIED
 
     # === Getter-Attr ===
-    @property
-    def net_charge(self) -> int:
-        """Getter for the net_charge attribute."""
-        return self._net_charge
-
-    @net_charge.setter
-    def net_charge(self, val: int):
-        """Setter for the net_charge attribute."""
-        self._net_charge = val
-
-    @property
-    def multiplicity(self) -> int:
-        """Getter for the multiplicity attribute."""
-        return self._multiplicity
-
-    @multiplicity.setter
-    def multiplicity(self, val: int):
-        """Setter for the multiplicity attribute."""
-        self._multiplicity = val
-
     # === Getter-Prop ===
     def clone(self) -> ModifiedResidue:
         """Creates deecopy of self."""

@@ -16,16 +16,13 @@ import numpy as np
 from .atom import Atom
 from typing import List, Tuple
 from .residue import Residue
+from .noncanonical_base import NonCanonicalBase
 import enzy_htp.chemical as chem
 
-from enzy_htp.core import file_system as fs
-from enzy_htp.core import (
-    UnsupportedFileType,
-    _LOGGER,
-)
+from enzy_htp.core import _LOGGER
 
 
-class Ligand(Residue):
+class Ligand(NonCanonicalBase):
     """Represents a specific Ligand found in a .pdb file. (#@shaoqz: a non-covalently binding small molecule to the protein part of the enzyme. decouple with PDB)
         Typically created from a base Residue() object using
         the residue_to_ligand() method found in enzy_htp.structure.ligand.py. In addition to base attributes, has
@@ -44,34 +41,13 @@ class Ligand(Residue):
         """
         Constructor for Ligand. Identical to Residue() ctor but also takes net_charge value.
         """
-        self._net_charge = kwargs.get("net_charge", None)
-        self._multiplicity = kwargs.get("multiplicity", None)
-        Residue.__init__(self, residue_idx, residue_name, atoms, parent)
+        NonCanonicalBase.__init__(self, residue_idx, residue_name, atoms, parent, **kwargs)
         self.rtype = chem.ResidueType.LIGAND
 
         self.bonds = kwargs.get('bonds', list())  # TODO change this to a more general represetation
         self.conformer_coords = list() # TODO change this to StructureEnsemble (we can leave a reference_var here tho)
 
     # === Getter-Attr ===
-    @property
-    def net_charge(self) -> int:
-        """Getter for the net_charge attribute."""
-        return self._net_charge
-
-    @net_charge.setter
-    def net_charge(self, val: int):
-        """Setter for the net_charge attribute."""
-        self._net_charge = val
-
-    @property
-    def multiplicity(self) -> int:
-        """Getter for the multiplicity attribute."""
-        return self._multiplicity
-
-    @multiplicity.setter
-    def multiplicity(self, val: int):
-        """Setter for the multiplicity attribute."""
-        self._multiplicity = val
 
     # === Getter-Prop ===
     def clone(self) -> Ligand:
