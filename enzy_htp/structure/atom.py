@@ -146,7 +146,7 @@ class Atom(DoubleLinkedNode):
         self._charge = val
 
     @property
-    def connect(self) -> List[Atom, str]:
+    def connect(self) -> List[Tuple[Atom, str]]:
         """getter for _connect, the list for (atoms, bond_type) it connects"""
         if not self.is_connected():
             _LOGGER.error(f"There are no connection info for {self}. "
@@ -213,6 +213,7 @@ class Atom(DoubleLinkedNode):
     def attached_protons(self) -> List[Atom]:
         """find all protons attached to self"""
         result = list(filter(lambda a: a[0].element == "H", self.connect))
+        result = [cnt_atom for cnt_atom, bond in result]
         return result
 
     #endregion
