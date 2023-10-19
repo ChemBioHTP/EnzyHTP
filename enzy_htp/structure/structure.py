@@ -301,7 +301,7 @@ class Structure(DoubleLinkedNode):
         TODO may need a class for them"""
         result: List[Residue] = list()
         for chain in self.chains:
-            result.extend(list(filter(lambda r: r.is_noncanonical(), chain)))
+            result.extend(list(filter(lambda r: r.is_modified(), chain)))
         return result
 
     @property
@@ -547,7 +547,7 @@ class Structure(DoubleLinkedNode):
         """add a residue into the structure."""
         res_type = target.rtype
         if res_type in [ResidueType.CANONICAL,
-                        ResidueType.NONCANONICAL]:
+                        ResidueType.MODIFIED]:
             _LOGGER.error("adding amino acid into the structure needs to be chain-specific. Please use Chain().add()")
             raise NameError
         elif res_type in [ResidueType.LIGAND,

@@ -22,7 +22,7 @@ class ModifiedResidue(Residue):
         Typically created from a base Residue() object using
         the residue_to_modified_residue() method found in enzy_htp.structure.modified_residue.py. In addition to base attributes, has
         net_charge attribute which is Union[float,None]. The value is_modified_residue() has been hard-coded to True and
-        ModifiedResidue.rtype_ is set to ResidueType.NONCANONICAL. Meant to be stored alongside other Residue() and Residue()-derived
+        ModifiedResidue.rtype_ is set to ResidueType.MODIFIED. Meant to be stored alongside other Residue() and Residue()-derived
         classes (MetalUnit() and Solvent()) in Chain() objects.
 
     Attributes:
@@ -36,7 +36,7 @@ class ModifiedResidue(Residue):
         self.net_charge = kwargs.get("net_charge", None)
         self._multiplicity = kwargs.get("multiplicity", None)
         Residue.__init__(self, residue_idx, residue_name, atoms, parent)
-        self.rtype = chem.ResidueType.NONCANONICAL
+        self.rtype = chem.ResidueType.MODIFIED
 
     # === Getter-Attr ===
     @property

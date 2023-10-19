@@ -170,7 +170,7 @@ class Chain(DoubleLinkedNode):
         """
         if there is any non-aminoacid part in chain
         """
-        return not sum(list(map(lambda rr: (not rr.is_canonical()) and (not rr.is_noncanonical()), self._residues)))
+        return not sum(list(map(lambda rr: (not rr.is_canonical()) and (not rr.is_modified()), self._residues)))
 
     def has_metal(self) -> bool:
         """Checks if any metals are contained within the current chain."""

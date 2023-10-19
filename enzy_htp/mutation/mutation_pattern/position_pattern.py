@@ -22,7 +22,7 @@ def decode_position_pattern(stru: Structure, pattern: str, if_name: bool = False
         ((chain_id, resi_idx), resi_name)  if_name=True"""
     selection_obj = select_stru(stru, pattern)
     result_residue: Residue = selection_obj.involved_residues
-    result_residue = filter(lambda i: i.is_canonical() or i.is_noncanonical(),
+    result_residue = filter(lambda i: i.is_canonical() or i.is_modified(),
                             result_residue)  # because it is impossible and dont make sense to mutate non-polypeptide
     if if_name:
         result = [(x.key(), x.name) for x in result_residue]
