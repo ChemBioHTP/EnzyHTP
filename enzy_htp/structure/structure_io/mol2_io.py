@@ -7,9 +7,6 @@ Date: 2023-10-05
 """
 from typing import List, Dict, Any
 
-import pandas as pd
-
-
 from enzy_htp.core import _LOGGER
 import enzy_htp.core.file_system as fs
 
