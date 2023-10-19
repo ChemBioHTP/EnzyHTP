@@ -12,15 +12,22 @@ from ...structure import (
     Structure,
     Chain,
     Residue,
+    NonCanonicalBase,
     Atom,
     Ligand,
     ModifiedResidue,
     MetalUnit,
-    Solvent
+    Solvent,
+    Mol2Parser,
+    PrepinParser,
 )
+
+import enzy_htp.core.file_system as fs
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.exception import ResidueDontHaveAtom
 import enzy_htp.chemical as chem
+from enzy_htp._interface.ncaa_library import search_ncaa_parm_file
+from enzy_htp import config as eh_config
 
 # == API ==
 @dispatch
@@ -177,7 +184,7 @@ def _connect_res(res: Residue,
 
     if res.is_canonical():
         _connect_caa(res)
-    elif res.is_noncanonical():
+    elif res.is_modified():
         _connect_maa(res, maa_fix)
     elif res.is_ligand():
         _connect_ligand(res, ligand_fix)
@@ -191,26 +198,58 @@ def _connect_caa(res: Residue) -> None:
     for atom in res.atoms:
         _connect_caa_atom(atom)
 
-def _connect_ligand(lig: Ligand, method: str) -> None: # TODO use lib to avoid repeating, make lib and cache globally accessible
+MOL_DESC_METHODS = ["antechamber"]
+"""the list for method keywords that belongs to molecule description file based methods."""
+
+MOL_DESC_GEN_MAPPER = {
+    "antechamber" : None, # some func in amber interface
+}
+"""the mapper that interpret the method keyword to a function that generate mol describing file
+The functions needs to support both ligand and modified amino acid"""
+
+MOL_DESC_PARSER_MAPPER = {
+    ".mol2" : Mol2Parser.get_structure,
+    ".prepin" : PrepinParser.get_structure,
+    ".prepi" : PrepinParser.get_structure,
+}
+"""the mapper that interpret the method keyword to a function that generate mol describing file"""
+
+def _connect_ligand(lig: Ligand, method: str) -> None:
     """initiate connectivity for ligand"""
     support_method_list = ["antechamber"]
-    if method == "antechamber":
-        # 0. search lib for prepin/mol2 of ligand
-        # 1. make mol2 for ligand
-        # 2. parse mol2 for connectivity
-        pass
+    if method in MOL_DESC_METHODS:
+        _mol_desc_based_ncaa_method(lig, method)
+        return
 
     if method not in support_method_list:
         _LOGGER.error(f"Method {method} not in supported list: {support_method_list}")
 
-def _connect_maa(maa: ModifiedResidue, method: str) -> None:  # TODO
-    """initiate connectivity for modified residue""" 
+def _connect_maa(maa: ModifiedResidue, method: str) -> None:
+    """initiate connectivity for modified residue"""
     support_method_list = ["antechamber"]
-    if method == "antechamber":
-        pass
+    if method in MOL_DESC_METHODS:
+        _mol_desc_based_ncaa_method(maa, method)
+        return
 
     if method not in support_method_list:
         _LOGGER.error(f"Method {method} not in supported list: {support_method_list}")
+
+def _mol_desc_based_ncaa_method(ncaa: NonCanonicalBase, engine: str):
+    """mol desc based method to generate connectivty for ncaa"""
+    # 0. search lib for prepin/mol2 of maa
+    ncaa_lib = eh_config["system.NCAA_LIB_PATH"]
+    fs.safe_mkdir(ncaa_lib)
+    mol_desc_path = search_ncaa_parm_file(ncaa,
+                        target_method="any",
+                        ncaa_lib_path=ncaa_lib)[0]
+
+    # 1. make mol describing file for maa
+    if not mol_desc_path:
+        mol_desc_path = MOL_DESC_GEN_MAPPER[engine](ncaa)
+    # 2. parse mol describing and clone into connectivity
+    cnt_stru = MOL_DESC_PARSER_MAPPER[fs.get_file_ext(mol_desc_path)](mol_desc_path)
+    cnt_maa = cnt_stru.residues[0]
+    ncaa.clone_connectivity(cnt_maa)
 
 def _connect_solvent(sol: Solvent, method: str) -> None:
     """initate connectivity for solvent."""
