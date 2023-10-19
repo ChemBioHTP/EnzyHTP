@@ -155,7 +155,9 @@ class AmberParameterizer(MolDynParameterizer):
 
         fs.safe_mkdir(self.ncaa_param_lib_path)
         # 0. search parm lib
-        mol_desc_path, frcmod_path_list = search_ncaa_parm_file(lig, self.ncaa_param_lib_path)
+        mol_desc_path, frcmod_path_list = search_ncaa_parm_file(lig,
+                                            target_method=self.ncaa_net_charge_engine,
+                                            ncaa_lib_path=self.ncaa_param_lib_path)
 
         if mol_desc_path:
             if frcmod_path_list:
@@ -471,7 +473,7 @@ class AmberInterface(BaseInterface):
         # print(AmberInterface._generate_default_assigning_lines_for_build_md_parameterizer(locals().items()))
 
         # init default values
-        type_hint_for_config: AmberConfig
+        type_hint_sticker: AmberConfig
         if charge_method == "default":
             charge_method = self.config()["DEFAULT_CHARGE_METHOD"]
         if resp_engine == "default":

@@ -12,7 +12,7 @@ from typing import Union
 from enzy_htp.core.exception import tLEaPError
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core import file_system as fs
-from enzy_htp._interface.amber_interface import AmberParameterizer, PrepinParser
+from enzy_htp._interface.amber_interface import AmberParameterizer
 import enzy_htp.structure as struct
 from enzy_htp import interface
 from enzy_htp import config as eh_config
@@ -262,12 +262,6 @@ def test_amber_parameterizer_run_lv_6():
     test_stru = struct.PDBParser().get_structure(
         f"{MM_DATA_DIR}/tyna_clean.pdb")
     test_param_worker.run(test_stru)
-
-def test_prepin_parser_get_stru():
-    """make sure function works as expected"""
-    test_prepin = f"{MM_DATA_DIR}/ncaa_lib/ligand_H5J.prepin"
-    test_stru = PrepinParser().get_structure(test_prepin)
-    print(test_stru)
 
 # region TODO
 
