@@ -82,7 +82,35 @@ class RosettaCst:
             if cc[0] == cst_name:
                 self.constraints.remove(cc)
 
+    def get_constraints(self):
+        result = list()
+        for cst in self.constraints:
+            cst_type = cst[0]
+            temp = {'cst_type': cst_type}
+            temp['ideal_value'] = cst[1]
+            if cst_type == 'distanceAB':
+                temp['generic_type'] = 'distance'
+                temp['atoms'] = [
+                    (self.rchain_1, self.rname_1, self.rnum_1, self.ratoms_1[0]),
+                    (self.rchain_2, self.rname_2, self.rnum_2, self.ratoms_2[0])
+                    ]
+            elif cst_type == 'angle_A':
+                temp['generic_type'] = 'angle'
+                temp['atoms'] = [
+                    (self.rchain_1, self.rname_1, self.rnum_1, self.ratoms_1[1]),
+                    (self.rchain_1, self.rname_1, self.rnum_1, self.ratoms_1[0]),
+                    (self.rchain_2, self.rname_2, self.rnum_2, self.ratoms_2[0])
+                    ]
+            elif cst_type == 'angle_B':
+                temp['generic_type'] = 'angle'
+                temp['atoms'] = [
+                    (self.rchain_1, self.rname_1,  self.rnum_1, self.ratoms_1[0]),
+                    (self.rchain_2, self.rname_2,  self.rnum_2, self.ratoms_2[0]),
+                    (self.rchain_2, self.rname_2,  self.rnum_2, self.ratoms_2[1])
+                    ]
+            result.append( temp )
 
+        return result
 
     def parent(self) -> Any:
         """Getter for the parent() object."""

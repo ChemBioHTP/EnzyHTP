@@ -10,6 +10,7 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-08-17
 """
 from pathlib import Path
+from typing import Tuple, List
 
 from .base_interface import BaseInterface
 
@@ -47,7 +48,6 @@ class XTBInterface(BaseInterface):
 
         Returns:
             Single point energy value in Hartrees.           
-
         """
 
         fs.check_file_exists(fname)
@@ -82,19 +82,99 @@ class XTBInterface(BaseInterface):
         _LOGGER.error(f"ERROR: Single point energy calculation for file '{fname}' did not contain energy value. Exiting...")
         exit(1)
 
-    def _remove_temp_files(self, work_dir: str) -> None:
+
+    def geo_opt(self,
+                fname: str,
+                charge: int = 0,
+                spin: int = 1,
+                n_iter: int = -1,
+                n_proc: int = -1,
+                freeze_atoms:List[int]=None,
+                constraints:List=None) -> Tuple[str, float]:
+        """
+            TODO(CJ)
+        Args:
+
+        Returns:
+            
+            
+        """
+        fs.check_file_exists(fname)
+        self._check_valid_extension(fname)
+
+        fs.check_file_exists(fname)
+        self._check_valid_extension(fname)
+
+        if n_iter == -1:
+            n_iter = self.config_.N_ITER
+
+        if n_proc == -1:
+            n_proc = self.config_.N_PROC
+
+        input_lines:List[str]=list()
+
+        if freeze_atoms is not None:
+            input_lines.extend([
+                '$fix',
+               f'   atoms: {",".join(map(str,freeze_atoms))}',
+                '$end'
+            ])
+
+        if constraints is not None:
+            input_lines.append('$constrain')
+            for cst in constraints:
+                input_lines.append(
+                f'   {cst[0]}: {", ".join(map(lambda ff: str(int(ff)), cst[-1]))}, {cst[1]:.2f}'
+                )
+                print(cst)
+
+            input_lines.append('$end')
+
+        cmd_args:List[str] = ["--chrg", str(charge), "--iterations", str(n_iter), "--parallel", str(n_proc), "--norestart", "--input" ]
+
+        geom_input:str=None
+        if input_lines:
+            temp_path = Path(fname)
+            geom_input = str(temp_path.parent / f"__geo_opt.inp")
+            fs.write_lines(geom_input, input_lines)
+            cmd_args.append( geom_input ) 
+
+        cmd_args.extend([fname, "--opt" ])
+        ext:str=fs.get_file_ext(fname)
+        expected_output:str=f"xtbopt{ext}"
+
+        results = self.env_manager_.run_command(
+                self.config_.XTB_EXE,
+                cmd_args)
+        
+        self._remove_temp_files( str(Path(fname).parent) )
+        
+        energy:float=None
+        for ll in results.stdout.splitlines():
+            if ll.find('TOTAL ENERGY') != -1:
+                energy = float(ll.split()[3])
+
+        return (expected_output, energy)
+
+
+    def _remove_temp_files(self, work_dir: str, extra_files:List[str]=None) -> None:
         """Removes the expected temp files created in the working directory of the input file. Deletes the file safely and 
         silently.
 
         Args:
             work_dir: Name of the directory to search for the files in.
+            extra_files: A List[str] containing extra files to delete in the function.
 
         Returns:
             Nothing.
         """
 
-        for fname in "charges wbo xtbrestart xtbtopo.mol".split():
+        for fname in "charges wbo xtbrestart xtbtopo.mol xtbopt.log xtbopt.pdb xtbopt.mol xtbopt.xyz".split():
             fs.safe_rm(f"{work_dir}/{fname}")
+
+        if extra_files:
+            for ef in extra_files:
+                fs.safe_rm(ef)
 
     def _check_valid_extension(self, fname: str) -> None:
         """Does the supplied file have a supported file extension? Logs an error

@@ -53,5 +53,5 @@ by end users and should be used to customize system settings for each environmen
 
 from .analysis import ( electric_field, binding_energy )
 
-from .preparation import PDBLine, read_pdb_lines, dock_reactants, generate_conformers
+from .preparation import PDBLine, read_pdb_lines, dock_reactants, generate_conformers, _system_charge, _qm_minimization #TODO(CJ): get rid of system charge
 

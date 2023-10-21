@@ -548,6 +548,29 @@ class PyMolInterface(BaseInterface):
         lines = list(filter(lambda ll: ll[0] != '>', lines))
         return ''.join(lines)
 
+    def _remove_ligand_bonding(self, session):
+        def dist( p1, p2 ):
+            return np.sqrt(np.sum((p1-p2)**2))
+        #TODO(CJ): documentation
+        df: pd.DataFrame = self.collect(session, 'memory', "chain resi resn name x y z".split(), "not polymer.protein")
+        df['point'] = df.apply(lambda row: np.array([row.x, row.y, row.z]) ,axis = 1)
+        non_aa = set(list(zip(df.chain, df.resi, df.resn)))
+        sele_str = " or ".join(map(lambda pr: f"(chain {pr[0]} and resi {pr[1]} and resn {pr[2]})", non_aa))
+
+        df2 = self.collect(session, 'memory', 'chain resi resn name x y z'.split(), f'polymer.protein within 3 of {sele_str}')
+        df2['point'] = df2.apply(lambda row: np.array([row.x, row.y, row.z]) ,axis = 1)
+       
+        args = list()
+        for i, row in df.iterrows():
+            for i2, row2 in df2.iterrows():
+                if dist(row.point, row2.point) <= 2:
+                    args.append(('unbond',
+                        f"chain {row.chain} and resi {row.resi} and resn {row.resn}",
+                        f"chain {row2.chain} and resi {row2.resi} and resn {row2.resn}",
+                    ))
+        self.general_cmd(session, args)
+
+
     def create_cluster(self, session, fname: str, sele_str: str, outfile: str = None, cap_strategy: str = 'H', work_dir: str = None) -> str:
         """TODO(CJ)"""
 
@@ -564,6 +587,8 @@ class PyMolInterface(BaseInterface):
         obj_name: str = '__eh_cluster'
         self.general_cmd(session, [('delete', 'all'), ('load', fname), ('select', sele_str), ('create', obj_name, sele_str),
                                    ('delete', Path(fname).stem)])
+
+        self._remove_ligand_bonding(session)
 
         df: pd.DataFrame = self.collect(session, 'memory', "chain resi resn name".split())
 
@@ -607,7 +632,6 @@ class PyMolInterface(BaseInterface):
                 ])
 
             self.general_cmd(session, args)
-
             args = [('valence', 'guess', 'name C21 or name C22'), ('h_add', 'name C21'), ('h_add', 'name C22'), ("save", outfile, obj_name)]
             self.general_cmd(session, args)
 

@@ -16,6 +16,7 @@ import pandas as pd
 
 from enzy_htp import interface, config, _LOGGER, binding_energy
 from enzy_htp._interface.rosetta_interface import RosettaCst
+import enzy_htp.structure.structure_operation as stru_oper
 
 import enzy_htp.chemical as chem
 from enzy_htp import mutation as mm
@@ -33,8 +34,8 @@ def dock_reactants(structure: Structure,
                    n_struct: int = 1000,
                    cst_cutoff: int = 10,
                    clash_distance: float = 2.0,
-                   cluster_distance: float = 2.0,
                    clash_cutoff: int = 1,
+                   cluster_distance: float = 2.0,
                    max_sasa_ratio:float = 0.60,
                    use_cache: bool = True
                    ) -> Structure:
@@ -67,10 +68,14 @@ def dock_reactants(structure: Structure,
     _evaluate_csts(df, constraints, cst_cutoff)
    
     _evaluate_qm(df, structure, charge_mapper, cluster_distance)
-    
-    #TODO(CJ): add some kind of logging about the results. Also do some optimization of the system.
 
-    return  _select_complex(df, work_dir)
+    final_geometry:str =  _qm_minimization(df, charge_mapper, cluster_distance, constraints)
+    
+    parser = PDBParser()
+    final_stru = parser.get_structure(final_geometry)
+    stru_oper.update_residues(structure, final_stru)
+    
+    return structure 
 
 def _validate_system( stru:Structure, constraints:List[RosettaCst] ) -> None:
     """Checks if the supplied list of contraints exists and is compatible with the supplied Structure() object.
@@ -729,43 +734,6 @@ def _ligand_chain_names(stru:Structure) -> List[str]:
 
     return result
 
-
-def _select_complex(df: pd.DataFrame, work_dir: str, cutoff: int = 20) -> Tuple[Structure, str]:
-    """Final selection of the complex that we will use.
-    
-    Args:
-        df:
-        work_dir:
-        cutoff:
-
-    Returns:
-        A Tuple() with the layout (selected structure, selected .pdb file).
-    """
-    _LOGGER.info("Beginning selection of final complex...")
-    #TODO(CJ): I need to change this so that I am just ranking based on QM energy
-    # then I should:
-    # 1. save the dataframe  -> still need to do this
-    # 2. get the structure
-    # 3. get the wt filepath
-    cpy = deepcopy(df)
-
-    cpy = cpy[cpy.selected].reset_index(drop=True)
-
-    cpy.sort_values(by='qm_energy', inplace=True)
-
-    wt_fpath: str = cpy.description[0]
-
-    _LOGGER.info(f"Selected structure in {wt_fpath}, with energy of {cpy.qm_energy[0]:.3f} hartree")
-
-    #TODO(CJ): check that the df does  have length of at least 1
-
-    parser = PDBParser()
-
-    result_stru = parser.get_structure(wt_fpath)
-
-    return result_stru
-
-
 def _place_reactants(structure: Structure, reactants: List[str], pdb_code) -> bool:
     """TODO(CJ)"""
 
@@ -1099,6 +1067,112 @@ def _define_active_site(structure: Structure, distance_cutoff, charge_mapper=Non
 
     return {"sele": sele_str, "charge": charge}
 
+
+def _qm_minimization(df:pd.DataFrame, charge_mapper, cluster_distance:float, constraints=None, work_dir:str=None) -> str:
+    """TODO(CJ)
+    
+    Args:
+        df:
+        charge_mapper:
+        cluster_distance:
+        constraints:
+        work_dir:
+
+    Returns:
+
+    """
+    def __map(asite, enzyme):
+        mapper = dict()
+
+        atom_mapper:Dict = dict(zip(
+            zip(enzyme.chain, enzyme.resn, enzyme.resi, enzyme['name']),enzyme['rank']
+        ))
+
+        for aidx, arow in asite.iterrows():
+            a_key = (arow.chain, arow.resn, arow.resi, arow['name'])
+
+            result = atom_mapper.get(a_key, None)
+            mapper[(arow.chain, arow.resn, int(arow.resi), arow['name'])] = arow['rank']
+
+            if result is None:
+                continue
+
+            #TODO(CJ): map more stuff
+            mapper[arow['rank']] = result
+
+        return mapper
+
+    if work_dir is None:
+        work_dir = config['system.SCRATCH_DIR']
+
+    infile:str=df.sort_values(by='qm_energy').description[0]
+    session = interface.pymol.new_session()
+    non_aa:pd.DataFrame = interface.pymol.collect(session, infile, 'chain resn resi'.split(), 'not polymer.protein')
+    
+    sele:str = " or ".join(
+        map(lambda pr: f"( byres all within {cluster_distance} of  (chain {pr[0]} and resn {pr[1]} and resi {pr[2]}) )",
+        set(zip(non_aa.chain, non_aa.resn, non_aa.resi))
+    ))
+    
+    full_system:pd.DataFrame = interface.pymol.collect(session, infile, 'chain resn resi name rank'.split())
+    
+    temp_pdb = f"{work_dir}/__qm_min_temp.pdb"
+    temp_mol = f"{work_dir}/__qm_min_temp.mol"
+    
+    temp_pdb = interface.pymol.create_cluster(session, infile, sele_str=sele, outfile=temp_pdb, cap_strategy='CH3')
+    active_site:pd.DataFrame = interface.pymol.collect(session, temp_pdb, 'chain resn resi name rank'.split(), sele)
+
+    atom_mapper:Dict = __map(active_site, full_system)
+    charge:int = _system_charge(active_site, charge_mapper)
+
+    temp_df = interface.pymol.collect(interface.pymol.new_session(), temp_pdb, 'chain resn resi name rank'.split())
+    
+    freeze_atoms = interface.pymol.collect(interface.pymol.new_session(), temp_pdb, 'rank'.split(), 'bb.')['rank'].to_numpy() + 1
+
+    temp_sdf = interface.pymol.create_cluster(session, infile, sele_str=sele, outfile=temp_mol, cap_strategy='CH3')
+
+    mapped_constraints:List = list()
+    if constraints is not None:
+        for cst in constraints:
+            for raw_cst in cst.get_constraints():
+                print(raw_cst)
+                mapped_atoms = list()
+                for ra in raw_cst['atoms']:
+                    mapped_atom = atom_mapper.get(ra, None)
+                    if mapped_atom is None:
+                        continue
+                    mapped_atoms.append(mapped_atom + 1)
+                if len(mapped_atoms) != len(raw_cst['atoms']):
+                    continue
+                mapped_constraints.append((raw_cst['generic_type'], raw_cst['ideal_value'], mapped_atoms))
+
+
+    (optimized_cluster, energy) = interface.xtb.geo_opt(
+        temp_mol,
+        charge=charge,
+        freeze_atoms=freeze_atoms,
+        constraints=mapped_constraints
+        )
+
+    optimized_df = interface.pymol.collect(interface.pymol.new_session(), optimized_cluster, 'x y z rank'.split())
+
+    args = [('load', infile)]
+    for i, row in optimized_df.iterrows():
+        mapped_index = atom_mapper.get(row['rank'])
+        if mapped_index is None:
+            continue
+
+        args.append((
+            'alter_state', 1, f'(rank {mapped_index})',f'(x,y,z)=({row["x"]},{row["y"]},{row["z"]})'
+        ))
+        
+    temp_path = Path(infile)
+    outfile = str(temp_path.parent / f"{temp_path.stem}_optimized.pdb")
+    args.append(('save', outfile))
+
+    session = interface.pymol.new_session()
+    interface.pymol.general_cmd(session, args)
+    return outfile
 
 def _evaluate_qm(df: pd.DataFrame, structure: Structure, charge_mapper, cluster_cutoff: float) -> None:
     """TODO(CJ) """
