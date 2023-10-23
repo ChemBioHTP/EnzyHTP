@@ -1,6 +1,5 @@
 """Driver for the reactive docking functionality available in enzy_htp. The only function that that should be 
-called is dock_reactants(). All others are implementation functions that SHOULD NOT be used. All operations
-are done on deep-copied Structure objects. 
+called is dock_reactants(). All others are implementation functions that SHOULD NOT be used. 
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-07-28
@@ -28,39 +27,65 @@ from enzy_htp.core import file_system as fs
 
 def dock_reactants(structure: Structure,
                    constraints: List[RosettaCst] = None,
-                   work_dir: str = None,
-                   save_work_dir: bool = True,
-                   rng_seed: int = 1996,
                    n_struct: int = 1000,
-                   cst_cutoff: int = 10,
+                   cst_energy: float = None,
                    clash_distance: float = 2.0,
                    clash_cutoff: int = 1,
-                   cluster_distance: float = 2.0,
                    max_sasa_ratio:float = 0.60,
-                   use_cache: bool = True
+                   cluster_distance: float = 2.0,
+                   use_cache: bool = True,
+                   rng_seed: int = 1996,
+                   work_dir: str = None,
+                   save_work_dir: bool = True
                    ) -> Structure:
-    """Given a structure and constraints, 
+    """Given a structure containing reactants and constraints defining a pre-reaction complex, perform reactive docking
+    to produce the desired geometry. Function consists of the following steps:
+
+    1. system validation
+    2. low-resolution geometry sampling and minimization
+    3. geometry pruning
+        a. SASA ratio filtering
+        b. clash count filtering
+        c. constraint energy filtering
+        d. QM energy ranking
+    4. QM-active site optimization
 
     Args:
-
-    Params:
+        structure:
+        constraints:
+        n_struct:
+        cst_energy:
+        clash_distance:
+        clash_cutoff:
+        max_sasa_ratio:
+        cluster_distance:
+        use_cache:
+        rng_seed:
+        work_dir:
+        save_work_dir:
 
     Returns:
+        A Structure() with the specified, constrained geometry. 
 
     """
 
-    if not work_dir:
+    if work_dir is None:
         work_dir = config["system.SCRATCH_DIR"]
+
+    if cst_energy is None:
+        cst_energy = len(constraints)*2000.0
 
     fs.safe_mkdir(work_dir)
 
-    _log_settings(constraints, work_dir, save_work_dir, rng_seed, n_struct, cst_cutoff,
-                  clash_distance, clash_cutoff, use_cache)
+    _log_settings(constraints, n_struct, cst_energy, clash_distance, clash_cutoff, max_sasa_ratio,
+                cluster_distance, use_cache, rng_seed, work_dir, save_work_dir)
     
     _validate_system( structure, constraints )
+   
+    (param_files, charge_mapper) = _parameterize_system(structure, work_dir)
 
-    df, charge_mapper = _dock_system(structure, constraints, n_struct, work_dir, rng_seed, use_cache )
-
+    df = _dock_system(structure, constraints, n_struct, param_files, charge_mapper, work_dir, rng_seed, use_cache )
+    
     _evaluate_SASA(df, max_sasa_ratio)
 
     _evaluate_clashes(df, clash_distance, clash_cutoff)
@@ -69,12 +94,16 @@ def dock_reactants(structure: Structure,
    
     _evaluate_qm(df, structure, charge_mapper, cluster_distance)
 
-    final_geometry:str =  _qm_minimization(df, charge_mapper, cluster_distance, constraints)
+    final_geometry:str = _qm_minimization(df, charge_mapper, cluster_distance, constraints)
     
     parser = PDBParser()
     final_stru = parser.get_structure(final_geometry)
     stru_oper.update_residues(structure, final_stru)
-    
+   
+    if not save_work_dir:
+        _LOGGER.info(f"save_work_dir set to False! Deleting {work_dir}")
+        fs.safe_rmdir( work_dir )
+
     return structure 
 
 def _validate_system( stru:Structure, constraints:List[RosettaCst] ) -> None:
@@ -120,13 +149,12 @@ def _validate_system( stru:Structure, constraints:List[RosettaCst] ) -> None:
             error = True
 
 
-
     if error:
         _LOGGER.error(f"Errors while trying to validate the supplied system. Could not locate residues or had incorrect atom names: {msg[:-1]}")
         _LOGGER.error("Exiting...")
         exit( 1 )
     else:   
-        _LOGGER.info("Validation complete! Supplied constraints can be applied to the supplied Structure") 
+        _LOGGER.info("Validation complete! Supplied constraints can be applied to the supplied Structure()") 
 
         
 
@@ -317,23 +345,18 @@ def _create_xml(stru:Structure, work_dir: str, use_cache: bool) -> str:
                         'grid_name': 'classic',
                         'weight': '1.0'
                     },
-                    {
-                        'parent': 'SCORINGGRIDS',
-                        'tag': 'HbdGrid',
-                        'grid_name': 'hbd_grid',
-                        'weight': '1.0'
-                    },
-                    {
-                        'parent': 'SCORINGGRIDS',
-                        'tag': 'HbaGrid',
-                        'grid_name': 'hba_grid',
-                        'weight': '1.0'
-                    },
                 ]
             },
         ])
 
-    elements.extend([{'parent': 'MOVERS', 'tag': 'AddOrRemoveMatchCsts', 'name': 'cstadd', 'cst_instruction': 'add_new'}])
+    elements.extend([
+        {'parent': 'MOVERS',
+        'tag': 'AddOrRemoveMatchCsts',
+        'name': 'cstadd', 'cst_instruction': 'add_new'},
+        {'parent': 'PROTOCOLS',
+            'tag': 'Add',
+            'mover_name': 'cstadd'}
+        ])
 
     protocol_names:List[str] = list()
     for rd in reactant_dicts:
@@ -342,19 +365,6 @@ def _create_xml(stru:Structure, work_dir: str, use_cache: bool) -> str:
         predock:str=f'predock_{cc.lower()}'
         dock:str=f'dock_{cc.lower()}'
         elements.extend([
-#        {
-#            'parent': 'MOVERS',
-#            'tag': 'Transform',
-#            'name': predock,
-#            'chain': f'{cc.upper()}',
-#            'box_size': f'{1.5 * radius:.3f}',
-#            'move_distance': '10.0',
-#            'angle': '360',
-#            'cycles': '1000',
-#            'repeats': '3',
-#            'temperature': '5',
-#            'grid_set': rd['grid_name']
-#        },
         {
             'parent': 'MOVERS',
             'tag': 'Transform',
@@ -372,43 +382,24 @@ def _create_xml(stru:Structure, work_dir: str, use_cache: bool) -> str:
 
     elements.extend(
         [{'parent': 'PROTOCOLS', 'tag': 'Add', 'mover_name': pn } for pn in protocol_names] +
-        [{'parent': 'PROTOCOLS',
-            'tag': 'Add',
-            'mover_name': 'cstadd'},
-        {'parent': 'MOVERS',
+        [{'parent': 'MOVERS',
             'tag': 'EnzRepackMinimize',
             'name':'cstopt',
-            'minimize_rb':'1', 
+            'minimize_rb':'0', 
             'cst_opt':'1',
-            'cycles':'5',
+            'cycles':'3',
             'scorefxn_repack': 'ligand_soft_rep',
             'scorefxn_minimize': 'ligand_soft_rep',
             'minimize_lig':'1',
             'minimize_sc':'1',
-            'minimize_bb':'1',
+            'minimize_bb':'0',
             'cycles':'3',
             'min_in_stages':'0',},
         {'parent': 'PROTOCOLS',
             'tag': 'Add',
             'mover_name': 'cstopt'},
-        {'parent': 'MOVERS',
-            'tag': 'EnzRepackMinimize',
-            'name': 'final_minimize',
-            'design': '0',
-            'repack_only': '1',
-            'scorefxn_repack': 'ligand_soft_rep',
-            'scorefxn_minimize': 'ligand_soft_rep',
-            'minimize_rb':'1',
-            'minimize_bb':'1',
-            'minimize_sc':'1',
-            'cycles':'2',
-            'minimize_lig':'1',
-            'min_in_stages':'0',
-            'backrub':'0',},
-#        {'parent':'PROTOCOLS',
-#            'tag': 'Add',
-#            'mover_name': 'final_minimize'}
-    ])            
+     ])
+                
 
     interface.rosetta.write_script(fname, elements)
 
@@ -444,6 +435,7 @@ def _make_options_file(pdb_file: str,
     _LOGGER.info("Beginning creation of options file for Rosetta...")
     content: List[str] = [
         #"-keep_input_protonation_state", TODO(CJ): get rid of this for now; but want it back someday
+        "-auto_setup_metals",
         "-run:constant_seed",
         f"-run:jran {int(rng_seed)}",
         "-in:file",
@@ -526,11 +518,23 @@ def _make_options_file(pdb_file: str,
 def _dock_system(structure: Structure,
             constraints: List[RosettaCst],
             n_struct:int,
+            param_files:List[str],
+            charge_mapper:Dict[str,int],
             work_dir:str,
             rng_seed:int,
             use_cache:bool) -> pd.DataFrame:
     """
-    TODO(CJ)
+
+    Args:
+        structure:
+        constraints:
+        n_struct:
+        work_dir:
+        rng_seed:
+        use_cache:
+
+    Returns:
+
     """
     
     if use_cache:
@@ -542,19 +546,15 @@ def _dock_system(structure: Structure,
             _LOGGER.info(f"Found file {csv_file}. Checking for existence of {len(df)} output .pdbs")
 
             for i, row in df.iterrows():
-                if (i + 1) % 25 == 0:
-                    _LOGGER.info(f"\tChecking {i+1} of {len(df)}...")
                 if not Path(row.description).exists():
                     _LOGGER.info(f"\t{row.description} is missing. Cannot use cached results!")
                     break
             else:
-                _LOGGER.info("All cached .pdbs exist! Using cached RosettaLigand structures!")
-                (_, charge_mapper) = _parameterize_system(structure, work_dir)
-                return df, charge_mapper
+                if len(df) == n_struct:
+                    _LOGGER.info("All cached .pdbs exist! Using cached RosettaLigand structures!")
+                    return df
         else:
             _LOGGER.info(f"{csv_file} not found. Continuing with standard run")
-
-    (param_files, charge_mapper) = _parameterize_system(structure, work_dir)
 
     (start_pdb, cst_file) = _integrate_csts(structure, constraints, work_dir, use_cache)
 
@@ -644,13 +644,16 @@ def _evaluate_csts(df: pd.DataFrame, csts: List[RosettaCst], cst_cutoff: int) ->
     for i, row in df.iterrows():
         total = 0.0
         for cst in csts:
-            for tl in cst.evaluate(row.description):
-                total += tl
+            for tidx, tl in enumerate(cst.evaluate(row.description)):
+                penalty = cst.constraints[tidx][3]
+                if tl > 1.0:
+                    total += (tl-1)*penalty
         cst_diff.append(total)
 
     df['cst_diff'] = cst_diff
     df['selected'] &= (df['cst_diff'] <= cst_cutoff)
 
+    #exit( 0 )
     _LOGGER.info(
         f"Finished RosettaCst evaluation. {df.selected.sum()} geometries have constraint tolerances <= {cst_cutoff:.3f} tolerance units")
 
@@ -1104,8 +1107,9 @@ def _qm_minimization(df:pd.DataFrame, charge_mapper, cluster_distance:float, con
 
     if work_dir is None:
         work_dir = config['system.SCRATCH_DIR']
-
-    infile:str=df.sort_values(by='qm_energy').description[0]
+    _LOGGER.info(df.sort_values(by='qm_energy'))
+    infile:str=df[df.selected].sort_values(by='qm_energy').description.to_list()[0]
+    
     session = interface.pymol.new_session()
     non_aa:pd.DataFrame = interface.pymol.collect(session, infile, 'chain resn resi'.split(), 'not polymer.protein')
     
@@ -1135,7 +1139,6 @@ def _qm_minimization(df:pd.DataFrame, charge_mapper, cluster_distance:float, con
     if constraints is not None:
         for cst in constraints:
             for raw_cst in cst.get_constraints():
-                print(raw_cst)
                 mapped_atoms = list()
                 for ra in raw_cst['atoms']:
                     mapped_atom = atom_mapper.get(ra, None)
@@ -1195,26 +1198,28 @@ def _evaluate_qm(df: pd.DataFrame, structure: Structure, charge_mapper, cluster_
         qm_energy.append(interface.xtb.single_point('temp.xyz', charge=as_info['charge']))
 
         fs.safe_rm('temp.xyz')
+        _LOGGER.info(row.description)
 
     df['qm_energy'] = qm_energy
     _LOGGER.info("Finished qm energy evaluation!")
 
 
-def _log_settings(constraints: List[RosettaCst], work_dir: str, save_work_dir: bool,
-                  rng_seed: int, n_struct: int, cst_cutoff:int, clash_distance:float, clash_cutoff:int, 
-                  use_cache: bool):
+def _log_settings(
+    constraints:List[RosettaCst],
+    n_struct: int,
+    cst_energy:float,
+    clash_distance:float,
+    clash_cutoff:int,
+    max_sasa_ratio:float,
+    cluster_distance:float,
+    use_cache:bool,
+    rng_seed:int,
+    work_dir:str,
+    save_work_dir:bool
+):
     """Logs settings for the current reactive docking run. Done at the INFO level.
 
     Args:
-        constraints: A List[RosettaCst]'s for the run.
-        work_dir: The direcotry where all work will be done.
-        save_work_dir: Should temp files be saved?
-        rng_seed: The integer rng seed to use during the run.
-        n_struct: The integer number of structures to create during the docking phase.
-        cst_cutoff: Allowed variance in tolerance units for supplied RosettaCst's.
-        clash_distance: How close (in angstrom's) do two atoms have to be for a clash to be recorded?
-        clash_cutoff: Allowed number of clashes as an int().
-        use_cache: A flag indicating if we should use existing files when available.
 
     Returns:
         Nothing.
@@ -1226,12 +1231,14 @@ def _log_settings(constraints: List[RosettaCst], work_dir: str, save_work_dir: b
     else:
         _LOGGER.info("\t0 RosettaConstraints")
 
+    _LOGGER.info(f"\t{n_struct=}")
+    _LOGGER.info(f"\t{cst_energy=:.3f} rosetta energy units")
+    _LOGGER.info(f"\t{clash_distance=:.3f} angstroms")
+    _LOGGER.info(f"\t{clash_cutoff=} clashes")
+    _LOGGER.info(f"\t{max_sasa_ratio=:.3f} maximum allowed SASA ratio")
+    _LOGGER.info(f"\t{cluster_distance=:.3f} angstroms")
+
+    _LOGGER.info(f"\t{use_cache=}")
+    _LOGGER.info(f"\t{rng_seed=}")
     _LOGGER.info(f"\t{work_dir=}")
     _LOGGER.info(f"\t{save_work_dir=}")
-
-    _LOGGER.info(f"\t{rng_seed=}")
-    _LOGGER.info(f"\t{n_struct=}")
-    _LOGGER.info(f"\t{cst_cutoff=} tolerance units")
-    _LOGGER.info(f"\t{clash_distance=} angstroms")
-    _LOGGER.info(f"\t{clash_cutoff=} clashes")
-    _LOGGER.info(f"\t{use_cache=}")

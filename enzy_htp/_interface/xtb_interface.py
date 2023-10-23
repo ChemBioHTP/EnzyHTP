@@ -35,7 +35,7 @@ class XTBInterface(BaseInterface):
         """
         super().__init__(parent, config, default_xtb_config)
 
-    def single_point(self, fname: str, charge: int = 0, spin: int = 1, n_iter: int = -1, n_proc: int = -1) -> float:
+    def single_point(self, fname: str, charge: int = 0, spin: int = 1, n_iter: int = -1, n_proc: int = -1, work_dir:str=None) -> float:
         """Performs a single point energy calculation on the supplied file. Checks if the file exists and is one of the correct
         file formats. Errors if not. Returns a value in Hartrees. 
 
@@ -45,6 +45,7 @@ class XTBInterface(BaseInterface):
             spin: Optional spin of the system as an int(). Defaults to 0.
             n_iter: Number of SCF iterations. Optional, if not specified uses value in XTBConfig.
             n_proc: Number of processes to use in calculation. Optional, if not specified uses value in XTBConfig.
+            work_dir:TODO(CJ)
 
         Returns:
             Single point energy value in Hartrees.           
@@ -59,19 +60,14 @@ class XTBInterface(BaseInterface):
         if n_proc == -1:
             n_proc = self.config_.N_PROC
 
-        try:
+#        if work_dir is None: #TODO(CJ)
+#            work_dir = config['system.SCRATCH_DIR']
 
-            results = self.env_manager_.run_command(
-                self.config_.XTB_EXE,
-                ["--chrg", str(charge), "--iterations",
-                 str(n_iter), "--parallel",
-                 str(n_proc), "--norestart", "--sp", fname])
-        except:
-            #TODO(CJ): do file cleanup here
-            _LOGGER.info(f"xtb failure occurred! Exiting...")
-            return 1000.0
-            #TODO(CJ): obviously not the greatest
-            #raise TypeError()
+        results = self.env_manager_.run_command(
+            self.config_.XTB_EXE,
+            ["--chrg", str(charge), "--iterations",
+             str(n_iter), "--parallel",
+             str(n_proc), "--norestart", "--sp", fname])
 
         self._remove_temp_files(str(Path(fname).parent))
 
@@ -80,8 +76,7 @@ class XTBInterface(BaseInterface):
                 return float(ll.split()[3])
 
         _LOGGER.error(f"ERROR: Single point energy calculation for file '{fname}' did not contain energy value. Exiting...")
-        exit(1)
-
+        exit( 1 )
 
     def geo_opt(self,
                 fname: str,
@@ -90,13 +85,14 @@ class XTBInterface(BaseInterface):
                 n_iter: int = -1,
                 n_proc: int = -1,
                 freeze_atoms:List[int]=None,
-                constraints:List=None) -> Tuple[str, float]:
+                constraints:List=None,
+                work_dir:str=None
+                ) -> Tuple[str, float]:
         """
             TODO(CJ)
         Args:
 
         Returns:
-            
             
         """
         fs.check_file_exists(fname)
@@ -126,8 +122,6 @@ class XTBInterface(BaseInterface):
                 input_lines.append(
                 f'   {cst[0]}: {", ".join(map(lambda ff: str(int(ff)), cst[-1]))}, {cst[1]:.2f}'
                 )
-                print(cst)
-
             input_lines.append('$end')
 
         cmd_args:List[str] = ["--chrg", str(charge), "--iterations", str(n_iter), "--parallel", str(n_proc), "--norestart", "--input" ]
@@ -153,6 +147,10 @@ class XTBInterface(BaseInterface):
         for ll in results.stdout.splitlines():
             if ll.find('TOTAL ENERGY') != -1:
                 energy = float(ll.split()[3])
+
+        self._remove_temp_files(str(Path(fname).parent))
+    
+        #TODO(CJ): actually delete the temp files
 
         return (expected_output, energy)
 
