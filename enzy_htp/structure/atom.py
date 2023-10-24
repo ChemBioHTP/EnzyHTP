@@ -8,7 +8,7 @@ Date: 2022-03-19
 from __future__ import annotations
 import re
 import sys
-from typing import Any, List, Tuple
+from typing import Any, List, Tuple, Union, Dict
 from plum import dispatch
 
 import numpy as np
@@ -38,10 +38,11 @@ class Atom(DoubleLinkedNode):
         b_factor : A float representing the temperature factor (b factor).
         charge : Charge of the atom.
         element : Character representing element.
+        atom_type: a non-standard attribute of Atom(). It is specific to a force field or software.
         connect : the connectivity of this atom. (a list of reference of connected Atom objs)
     """
 
-    def __init__(self, ds: pd.Series, parent=None):
+    def __init__(self, ds: Union[Dict, pd.Series], parent=None):
         """Constructor of Atom(), where ds is of type pandas.Series"""
         # nessessary
         self._name = ds["atom_name"].strip()
@@ -64,7 +65,7 @@ class Atom(DoubleLinkedNode):
             self._element = ds["element_symbol"].strip()
         if "charge" in ds_keys and not np.isnan(ds["charge"]):
             self._charge = float(ds["charge"])
-        if "atom_type" in ds_keys and ds["atom_type"].strip() != "":
+        if "atom_type" in ds_keys and ds["atom_type"].strip() != "": #TODO(qz): add a format field
             self._atom_type = ds["atom_type"]
 
     #region === Getter-Attr (ref) ===

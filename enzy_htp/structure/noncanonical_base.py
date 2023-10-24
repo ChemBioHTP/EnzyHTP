@@ -10,8 +10,9 @@ from __future__ import annotations
 
 from typing import List
 from .residue import Residue
-import enzy_htp.chemical as chem
+from .atom import Atom
 
+import enzy_htp.chemical as chem
 from enzy_htp.core.general import swapped_dict
 from enzy_htp.core import _LOGGER
 

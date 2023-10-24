@@ -3,6 +3,7 @@ Definition of .mol2 format (http://chemyang.ccnu.edu.cn/ccb/server/AIMMS/mol2.pd
 this parser only. The Mol2Parser has no private data and serves as a namespace for .mol2 I/O conversion functions.
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Author: QZ Shao <shaoqz@icloud.com>
 Date: 2023-10-05
 """
 from typing import List, Dict, Any
