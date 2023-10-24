@@ -11,8 +11,7 @@ from enzy_htp.core import _LOGGER
 import enzy_htp.core.file_system as fs
 
 from ._interface import StructureParserInterface
-from ..structure import Structure
-from ..chain import Chain
+from ..structure import Structure, convert_res_to_structure
 from ..atom import Atom
 from ..ligand import Ligand
 
@@ -20,7 +19,7 @@ class Mol2Parser(StructureParserInterface):
     """Holds all functionality for .mol2 I/O with respect to the Ligand() class. This parser contains no private data
     and instead serves as a namespace to hold this functionality. All functions are static classmethods. Functionality is intended to 
     be accessed through the get_ligand() and save_ligand() methods. All other methods are meant for implementation only and SHOULD NOT
-    be accessed directly by users. 
+    be accessed directly by users.
     """
 
     def __init__(self) -> None:
@@ -32,9 +31,7 @@ class Mol2Parser(StructureParserInterface):
     def get_structure(cls, path: str, **kwarg) -> Structure:
         """convert a .mol2 file to Structure()"""
         lig = cls.get_ligand(path, **kwarg)
-        chain = Chain(name="A", residues=[lig], parent=None)
-        stru = Structure(chains=[chain])
-        return stru
+        return convert_res_to_structure(lig)
 
     @classmethod
     def get_file_str(cls, stru: Structure) -> str:
@@ -71,12 +68,13 @@ class Mol2Parser(StructureParserInterface):
         file_info:Dict=cls.parse_mol2_file(path)
 
         subst_name:str = file_info['SUBSTRUCTURE'][0]['subst_name']
+        subst_id:str = file_info['SUBSTRUCTURE'][0]['subst_id']
 
         if residue_name is None:
             residue_name = subst_name[0:3]
 
         if residue_idx is None:
-            residue_idx = int(subst_name[3:])
+            residue_idx = subst_id
 
         atoms = list()
         for aa in file_info['ATOM']:
