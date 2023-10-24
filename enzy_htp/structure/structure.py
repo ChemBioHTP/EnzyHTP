@@ -638,3 +638,9 @@ class Structure(DoubleLinkedNode):
         dummy method for dispatch
         """
         pass
+
+def convert_res_to_structure(residue: Residue) -> Structure:
+    """method that build a Structure that only contain 1 residue."""
+    chain = Chain(name="A", residues=[residue], parent=None)
+    stru = Structure(chains=[chain])
+    return stru
