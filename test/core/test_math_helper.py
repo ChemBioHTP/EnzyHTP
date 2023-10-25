@@ -94,7 +94,8 @@ def test_calcuate_cartesian():
         assert np.isclose(i,j)
 
 def test_internal_to_cartesian():
-    """test using an example data"""
+    """test using an example data.
+    answer provided by http://www.shodor.org/chemviz/zmatrices/babel.html"""
     test_internal_coord = [
         [0, 0.000,  0,    .0  ,  0,     .0  ],
         [0, 1.449,  0,    .0  ,  0,     .0  ],
