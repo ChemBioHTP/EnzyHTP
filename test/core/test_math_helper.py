@@ -60,3 +60,55 @@ def test_get_dihedral():
         (36.42900085449219, 41.4739990234375, 39.000999450683594),
     ]
     assert mh.get_dihedral(*test_points) == -100.3235330367286
+
+def test_convert_first_three_point():
+    """test using an example data"""
+    test_internal_coord = [
+        [0, 0.000, -1,    .0  , -2,     .0  ],
+        [0, 1.449,  0,    .0  , -1,     .0  ],
+        [1, 1.523,  0, 111.21 ,  0,     .0  ],
+        [2, 1.540,  1, 111.208,  0, -180.000],
+        [3, 1.218,  2, 107.632,  1, -179.951],
+        [4, 1.218,  3, 119.996,  2,    0.229],
+    ]
+    result = mh._convert_first_three_point(test_internal_coord[:3])
+    answer = [  [0., 0., 0.],
+                [1.449, 0., 0.],
+                [2.00000204, 1.419833, 0.],]
+    for i,j in zip(result, answer):
+        for k,l in zip(i,j):
+            assert np.isclose(k,l)
+
+def test_calcuate_cartesian():
+    """test using an example data"""
+    test_known_points = [
+        np.array([0., 0., 0.]),
+        np.array([1.449, 0., 0.]),
+        np.array([2.00000204, 1.419833, 0.]),
+    ]
+    test_point = [2, 1.540,  1, 111.208,  0, 20.000]
+
+    new_point =  mh._calculate_cartesian(test_point, test_known_points)
+    answer = [0.94383, 2.42729, 0.49104]
+    for i,j in zip(new_point, answer):
+        assert np.isclose(i,j)
+
+def test_internal_to_cartesian():
+    """test using an example data"""
+    test_internal_coord = [
+        [0, 0.000,  0,    .0  ,  0,     .0  ],
+        [0, 1.449,  0,    .0  ,  0,     .0  ],
+        [1, 1.523,  0, 111.21 ,  0,     .0  ],
+        [2, 1.540,  1, 111.208,  0, -180.000],
+        [3, 1.218,  2, 107.632,  1, -179.951],
+        [4, 1.218,  3, 119.996,  2,    0.229],
+    ]
+    result = mh.internal_to_cartesian(test_internal_coord)
+    answer = [
+        [3.54000, 1.41978, -0.00000],
+        [3.90898, 2.58055,  0.00079],
+        [3.08816, 3.48041,  0.00562],
+    ]
+    for i,j in zip(result, answer):
+        for k,l in zip(i,j):
+            assert np.isclose(k,l, atol=1e-3)
