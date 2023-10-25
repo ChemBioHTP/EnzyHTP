@@ -33,10 +33,10 @@ MM_PARM_FILE_EXT = [".frcmod"]
 
 PARM_METHOD_LIST = ["AM1BCC", "RESP", "MCPB", "any"]
 """a list of keywords for supported parm_method as a search target. If 'any' is used, any method
-will be matched including None pr ''."""
+will be matched including None or ''."""
 
 def search_ncaa_parm_file(target_res: NonCanonicalBase, target_method: str,
-                          ncaa_lib_path: str) -> Tuple[str, List[str]]:
+                          ncaa_lib_path: str, use_cache: bool= True) -> Tuple[str, List[str]]:
     """search for ncaa parm files for {target_res_name} with {target_method} from {ncaa_lib_path}.
     A cache file will be made to store known {file : (res_name, method)} relationship in pickle
     format under the path.
@@ -44,7 +44,7 @@ def search_ncaa_parm_file(target_res: NonCanonicalBase, target_method: str,
         target_res:
             the target Residue child class instance. (e.g.: Ligand, ModifiedResidue)
         target_method:
-            the desired method for the parm file 
+            the desired method for the parm file
             (if "any" is supplied, any method is accepted, first found is used)
     Returns:
         (prepi/mol2_path, [frcmod_path, ...]) if found
@@ -77,7 +77,8 @@ def search_ncaa_parm_file(target_res: NonCanonicalBase, target_method: str,
 
         res_name, parm_method = cache_ncaa_lib_mapper.get(parm_file, (None, None))
 
-        if res_name: # exist in cache (because we allow parm_method to be None)
+        if res_name and use_cache: # exist in cache (because we allow parm_method to be None)
+            _LOGGER.debug(f"using cache for {parm_file} : {(res_name, parm_method)} ")
             ncaa_lib_mapper[parm_file] = (res_name, parm_method)
 
         else: # not exist in cache - deduce (res_name, method)
@@ -151,9 +152,10 @@ def search_ncaa_parm_file(target_res: NonCanonicalBase, target_method: str,
             if fs.get_file_ext(file_path) in MOL_DESC_FILE_EXT:
                 mol_desc_path = file_path
             # frcmod*/...
-            if MM_PARM_FILE_EXT in fs.get_file_ext(file_path):
-                frcmod_path_list.append(file_path)
-            break
+            for parm_ext in MM_PARM_FILE_EXT:
+                if parm_ext in fs.get_file_ext(file_path):
+                    frcmod_path_list.append(file_path)
+                    break
 
     return mol_desc_path, frcmod_path_list
 
@@ -161,15 +163,15 @@ def _get_res_name_from_filename(filename: str) -> Union[str, None]:
     """as name desc"""
     base_file_name = fs.base_file_name(filename)
     res_name_part = base_file_name.split("_")[0]
-    if re.match("[A-Z][A-Z][A-Z]", res_name_part):
-        return base_file_name
+    if re.match("[A-Z0-9][A-Z0-9][A-Z0-9]", res_name_part):
+        return res_name_part
     else:
         return None
 
 def _get_parm_method_from_filename(filename: str) -> Union[str, None]:
     """as name desc"""
     base_file_name_parts = fs.base_file_name(filename).split("_")
-    if base_file_name_parts < 2:
+    if len(base_file_name_parts) < 2:
         return None
     method = base_file_name_parts[1]
     if method not in PARM_METHOD_LIST:
