@@ -65,7 +65,7 @@ class Atom(DoubleLinkedNode):
             self._element = ds["element_symbol"].strip()
         if "charge" in ds_keys and not np.isnan(ds["charge"]):
             self._charge = float(ds["charge"])
-        if "atom_type" in ds_keys and ds["atom_type"].strip() != "": #TODO(qz): add a format field
+        if "atom_type" in ds_keys and ds["atom_type"].strip() != "": #TODO(qz): find a way to unify
             self._atom_type = ds["atom_type"]
 
     #region === Getter-Attr (ref) ===
@@ -156,7 +156,7 @@ class Atom(DoubleLinkedNode):
         return self._connect
 
     @connect.setter
-    def connect(self, val: List[Atom, str]):
+    def connect(self, val: List[Tuple[Atom, str]]):
         """setter of connect is nessessary for residue level objects to set connectivity for atoms
         raise an error if the assigned val doesn't align with the format"""        
         # check for data format
@@ -165,8 +165,34 @@ class Atom(DoubleLinkedNode):
         # assign the value if passed
         self._connect = val
 
-    @staticmethod
-    def _check_assigning_connect_data_type(val: Any) -> bool:
+    def connect_to(self, other: Atom, bond: str=None):
+        """connect {self} with {other}. add each other to .connect with {bond}"""
+        # connect self to other
+        if self._connect is None:
+            self._connect = []
+
+        if other in self.connect_atoms:
+            _LOGGER.debug(f"{other} already in connect of {self}. Doing nothing.")
+            return
+
+        connect_info = (other, bond)
+        type(self)._check_connect_element_data_type(connect_info)
+        self.connect.append(connect_info)
+
+        # connect other to self
+        if other._connect is None:
+            other._connect = []
+
+        if self in other.connect_atoms:
+            _LOGGER.debug(f"{self} already in connect of {other}. Doing nothing.")
+            return
+
+        connect_info = (self, bond)
+        type(other)._check_connect_element_data_type(connect_info)
+        other.connect.append(connect_info)
+
+    @classmethod
+    def _check_assigning_connect_data_type(cls, val: Any) -> bool:
         """Function used by the setter of connect. Check if the data format of val meetings the definiation.
         The format is defined in this function.
         Raise an error if the format is not met.
@@ -174,14 +200,28 @@ class Atom(DoubleLinkedNode):
         check_pass = 1
         if isinstance(val, list):
             for i in val:
-                if isinstance(i, tuple):
-                    if isinstance(i[0], Atom):
-                        if isinstance(i[1], str) or (i[1] is None): # TODO we can also check the format of bond info here (what format should we use?)
-                            continue
+                if cls._check_connect_element_data_type(i, raise_error=False):
+                    continue
                 check_pass *= 0
         if not check_pass:
             raise TypeError("Assigning wrong data type for connect. Correct data type: [[Atom(), 'bond_order_info'], ...]")
 
+    @classmethod
+    def _check_connect_element_data_type(cls, val: Any, raise_error: bool=True) -> bool:
+        """Function used by the setter of connect. Check if the data format of val meetings the definiation.
+        The format is defined in this function.
+        Raise an error if the format is not met.
+        Format: (Atom(), "bond_order_info")"""
+        check_pass = False
+        if isinstance(val, tuple):
+            if isinstance(val[0], Atom):
+                if isinstance(val[1], str) or (val[1] is None):
+                    check_pass = True
+        if raise_error:
+            if not check_pass:
+                raise TypeError("Adding wrong data type to connect. Correct data type: (Atom(), 'bond_order_info')")
+        else:
+            return check_pass
     #endregion
 
     #region === Getter-Property (ref) ===
@@ -217,6 +257,14 @@ class Atom(DoubleLinkedNode):
         result = [cnt_atom for cnt_atom, bond in result]
         return result
 
+    @property
+    def connect_atoms(self) -> List[Atom]:
+        """get all atoms of connection without the bond info"""
+        if not self.is_connected():
+            _LOGGER.error(f"There are no connection info for {self}. "
+                            "Please initiate it use structure.structure_operation.init_connectivity()")
+            raise AttributeError
+        return [atom for atom, bond in self._connect]
     #endregion
 
     #region === Check ===

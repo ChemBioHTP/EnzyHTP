@@ -13,6 +13,7 @@ from ..atom import Atom
 from ..residue import Residue
 
 import enzy_htp.core.file_system as fs
+from enzy_htp.core.math_helper import internal_to_cartesian
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.exception import FileFormatError
 
@@ -40,6 +41,9 @@ class PrepinParser(StructureParserInterface):
                           f"Please post an issue if really needed. ({path})")
             raise FileFormatError
 
+        # convert to cartesian coordinate
+        cls._deduce_cartesian_coord(prepin_data)
+
         # build Structure()
         atoms = cls._build_atoms(prepin_data)
         cls._connect_atoms(atoms, prepin_data)
@@ -49,17 +53,18 @@ class PrepinParser(StructureParserInterface):
     @classmethod
     def get_file_str(cls, stru: Structure) -> str:
         """convert a Structure() to .prepin file content. Only 1 residue unit is allowed in the stru"""
-        pass # TODO
+        pass # TODO: add when need
 
     @classmethod
     def _parse_prepin_file(cls, path: str) -> Dict:
         """parse prepin file to a data dictionary. The name of keys are based on
         'Input  description' section of https://ambermd.org/doc/prep.html with
-        slight modification described in docstrings of called function below"""
+        slight modification described in docstrings of called function below.
+        Modification: 'atoms' for section 8."""
         if not fs.has_content( path ):
             _LOGGER.error(f"The supplied file {path} does not exist or is empty. Exiting...")
             raise ValueError
-                
+
         result = {}
         lines: List[str] = fs.lines_from_file( path )
 
@@ -233,7 +238,7 @@ class PrepinParser(StructureParserInterface):
 
     @classmethod
     def _parse_coord(cls, lines: List[str]) -> Dict:
-        """coordinate_section: List[Dict], each list element comes from each line.
+        """atoms: List[Dict], each list element comes from each line.
         For each line:
         Fortran format: FORMAT(I,3A,3I,4F)
             id
@@ -246,12 +251,12 @@ class PrepinParser(StructureParserInterface):
 
             NOTE:  PREP always expects three dummy atoms for the beginning.
 
-            name
+            atom_name
                 A unique atom name for the atom I. If coordinates are
                 read in at the EDIT stage, this name will be used for
                 matching atoms.  Maximum 4 characters.
 
-            atomtype
+            atom_type
                 A symbol for the atom I which defines its force field
                 atom type and is used in the module PARM for assigning
                 the force field parameters.
@@ -302,20 +307,20 @@ class PrepinParser(StructureParserInterface):
                 raise FileFormatError
 
             result.append({
-                "id" : line_parts[0],
-                "name" : line_parts[1],
-                "atomtype" : line_parts[2],
+                "id" : int(line_parts[0]),
+                "atom_name" : line_parts[1],
+                "atom_type" : line_parts[2],
                 "ITREE" : line_parts[3],
-                "NA" : line_parts[4],
-                "NB" : line_parts[5],
-                "NC" : line_parts[6],
-                "R" : line_parts[7],
-                "THETA" : line_parts[8],
-                "PHI" : line_parts[9],
-                "CHRG" : line_parts[10],
+                "NA" : int(line_parts[4]),
+                "NB" : int(line_parts[5]),
+                "NC" : int(line_parts[6]),
+                "R" : float(line_parts[7]),
+                "THETA" : float(line_parts[8]),
+                "PHI" : float(line_parts[9]),
+                "CHRG" : float(line_parts[10]),
             })
 
-        return {"coordinate_section" : result}
+        return {"atoms" : result}
 
     @classmethod
     def _parse_iopr(cls, lines: List[str]) -> Dict:
@@ -439,19 +444,73 @@ class PrepinParser(StructureParserInterface):
         raise Exception
 
     @classmethod
-    def _build_atom(cls, prepin_data: Dict) -> List[Atom]:
-        """build a list of Atom()s from {prepin_data}"""
-        labels:List[str]="x_coord y_coord z_coord atom_name charge atom_type".split()
-        temp = dict()
-        for ll in labels:
-            temp[ll] = aa[ll]
-        # TODO
+    def _deduce_cartesian_coord(cls, prepin_data: Dict) -> None:
+        """deduce cartesian coordinate based on the z-matrix
+        from prepin.
+        Write 'x_coord','y_coord','z_coord' to prepin_data['atoms'] elements"""
+        # san check
+        for i, atom_data in enumerate(prepin_data["atoms"]):
+            if i != atom_data["id"] - 1:
+                _LOGGER.error(f"prepin file have disordered atom id ({atom_data} - should be {i+1})"
+                              "Do not support disordered id yet. Contact author if it is necessary.")
+                raise FileFormatError
 
-    @classmethod 
+        internal_coord = []
+        format_key = "NA R NB THETA NC PHI".split()
+        add_coord_format_key = "x_coord y_coord z_coord".split()
+        for atom_data in prepin_data["atoms"]:
+            internal_coord.append([atom_data[k] for k in format_key])
+        cartesian_coord = internal_to_cartesian(
+                                internal_coord,
+                                remove_dummy_point=False,
+                                start_from_1=True)
+        for atom_data, coord in zip(prepin_data["atoms"], cartesian_coord):
+            for k, v in zip(add_coord_format_key, coord):
+                atom_data[k] = v
+
+    @classmethod
+    def _build_atoms(cls, prepin_data: Dict) -> List[Atom]:
+        """build a list of Atom()s from {prepin_data}"""
+        result = []
+        oformat_keys = "atom_name atom_type x_coord y_coord z_coord charge".split()
+        iformat_keys = "atom_name atom_type x_coord y_coord z_coord CHRG".split()
+        for atom_data in prepin_data["atoms"]:
+            if atom_data["atom_name"] != "DUMM":
+                atom_dict = {}
+                for ik, ok in zip(iformat_keys, oformat_keys):
+                    atom_dict[ok] = atom_data[ik]
+                atom = Atom(atom_dict)
+                result.append(atom)
+        return result
+
+    @classmethod
     def _connect_atoms(cls, atoms: List[Atom], prepin_data: Dict):
         """connect {atoms} using information from {prepin_data}.
         connectivities are written to {atom.connect} of each {atom}"""
+        # init connectivity
+        atom_mapper = {}
+        for atom in atoms:
+            atom.connect = []
+            atom_mapper[atom.name] = atom
 
-    @classmethod 
+        for i, atom_data in enumerate(prepin_data["atoms"]):
+            real_index = i - 3
+            real_cnt_index = atom_data["NA"] - 4
+            if real_index >= 0 and real_cnt_index >= 0: # deal with first 4
+                this_atom = atoms[real_index]
+                bond_atom = atoms[real_cnt_index]
+                this_atom.connect_to(bond_atom) # connect_to make sure it is not repeating
+
+        for name_1, name_2 in prepin_data["LOOP"]:
+            atom_1 = atom_mapper[name_1]
+            atom_2 = atom_mapper[name_2]
+            atom_1.connect_to(atom_2)
+
+    @classmethod
     def _build_residue(cls, atoms: List[Atom], prepin_data: Dict) -> Residue:
         """build Residue() based on {atoms} and {prepin_data}"""
+        res_name = prepin_data["NAMRES"]
+        
+        return Residue(residue_idx=1, 
+                       residue_name=res_name,
+                       atoms=atoms)

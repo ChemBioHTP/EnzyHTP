@@ -23,6 +23,7 @@ def test_init_connectivity(): #TODO: finish these test after finish mol_desc_gen
 
     init_connectivity(stru)
 
+
 def test_init_connectivity_lv_1():
     """level 1 test of the init_connectivity.
     Test structure diversity:

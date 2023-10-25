@@ -15,13 +15,14 @@ import pytest
 from biopandas.pdb import PandasPdb
 
 from enzy_htp.core.file_system import lines_from_file
+from enzy_htp.core.logger import _LOGGER
 from enzy_htp.structure.atom import Atom
 from enzy_htp.structure.structure_io import PDBParser
 from enzy_htp.structure.structure_operation import init_connectivity
 
 CURR_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = f"{CURR_DIR}/data/"
-
+_LOGGER.propagate = 1
 
 def test_deepcopy():
     """test the hehavior of copy.deepcopy on Atom() under a Structure()
@@ -155,3 +156,16 @@ def test_check_connect_setter_data_type_wrong():
 
     with pytest.raises(TypeError):
         atom1.connect = [(atom2, "s"), atom2]
+
+def test_connect_to(caplog):
+    """test using example"""
+    _LOGGER.setLevel(logging.DEBUG)
+    atom1 = Atom({'x_coord': 0, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'DUMMY'})
+    atom2 = Atom({'x_coord': 0, 'y_coord': 0, 'z_coord': 1, 'atom_name': 'DUMMY'})
+
+    atom1.connect_to(atom2)
+    atom1.connect_to(atom2)
+    assert "already in connect" in caplog.text
+
+    assert atom2 in atom1.connect_atoms
+    assert atom1 in atom2.connect_atoms
