@@ -119,19 +119,20 @@ def calc_average_task_num(num_of_task: int, num_of_worker: int) -> List[int]:
 
 
 def internal_to_cartesian(internal_coordinate: List[npt.ArrayLike],
-                          remove_dummy_point: bool=True) -> List[npt.NDArray]:
+                          remove_dummy_point: bool=True,
+                          start_from_1: bool=False,) -> List[npt.NDArray]:
     """derive cartesian coordinate for a list of points in internal coordinate.
     Args:
         internal_coordinate:
             format: [(bond_index, bond, angle_index, angle, dihedral_index, dihedral), ...]
     Returns:
         cartesian_coordinate:
-            format: [(x, y, z), ...]"""
+            format: [(x,  y, z), ...]"""
     result = []
     result.extend(_convert_first_three_point(internal_coordinate[:3]))
 
     for point in internal_coordinate[3:]:
-        result.append(_calculate_cartesian(point, result))
+        result.append(_calculate_cartesian(point, result, start_from_1))
 
     if remove_dummy_point:
         result = _remove_dummy_point(result)
@@ -160,10 +161,15 @@ def _convert_first_three_point(frist_three: List[npt.ArrayLike]) -> List[npt.NDA
 
 
 def _calculate_cartesian(point: List,
-                         known_points: List[npt.NDArray]) -> npt.NDArray:
+                         known_points: List[npt.NDArray],
+                         start_from_1: bool) -> npt.NDArray:
     """calculate the cartesian coordinate of {point} in internal coordinate
     using {known_points} in cartesian coordinate"""
     p1_id, r, p2_id, angle, p3_id, dihedral = point
+    if start_from_1:
+        p1_id -= 1
+        p2_id -= 1
+        p3_id -= 1
 
     p1 = known_points[p1_id]
     p2 = known_points[p2_id]

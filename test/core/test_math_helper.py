@@ -113,3 +113,24 @@ def test_internal_to_cartesian():
     for i,j in zip(result, answer):
         for k,l in zip(i,j):
             assert np.isclose(k,l, atol=1e-3)
+
+def test_internal_to_cartesian_from_1():
+    """test using an example data.
+    answer provided by http://www.shodor.org/chemviz/zmatrices/babel.html"""
+    test_internal_coord = [
+        [0, 0.000,  0,    .0  ,  0,     .0  ],
+        [1, 1.449,  0,    .0  ,  0,     .0  ],
+        [2, 1.523,  1, 111.21 ,  0,     .0  ],
+        [3, 1.540,  2, 111.208,  1, -180.000],
+        [4, 1.218,  3, 107.632,  2, -179.951],
+        [5, 1.218,  4, 119.996,  3,    0.229],
+    ]
+    result = mh.internal_to_cartesian(test_internal_coord, start_from_1=True)
+    answer = [
+        [3.54000, 1.41978, -0.00000],
+        [3.90898, 2.58055,  0.00079],
+        [3.08816, 3.48041,  0.00562],
+    ]
+    for i,j in zip(result, answer):
+        for k,l in zip(i,j):
+            assert np.isclose(k,l, atol=1e-3)
