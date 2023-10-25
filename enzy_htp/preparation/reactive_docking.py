@@ -90,7 +90,7 @@ def dock_reactants(structure: Structure,
 
     _evaluate_clashes(df, clash_distance, clash_cutoff)
 
-    _evaluate_csts(df, constraints, cst_cutoff)
+    _evaluate_csts(df, constraints, cst_energy)
    
     _evaluate_qm(df, structure, charge_mapper, cluster_distance)
 
@@ -584,10 +584,17 @@ def _dock_system(structure: Structure,
 
     _LOGGER.info("Completed RosettaLigand geometry sampling!")
 
-    return df, charge_mapper
+    return df
 
 def _evaluate_SASA(df: pd.DataFrame, max_sasa_ratio:float) -> None:
-    """TODO(CJ)"""
+    """TODO(CJ)
+    Args:
+        df:
+        max_sasa_ratio:
+
+    Returns:
+        Nothing
+    """
     #TODO(CJ): put an error if the df is empty
     _LOGGER.info(f"Beginning ligand SASA evaluation. {df.selected.sum()} geometries still selected...")
     parser = PDBParser()

@@ -86,7 +86,8 @@ def place_ligand(stru : Structure,
             f"The supplied method placement method {method} is not supported. Allowed methods are 'alphafill' and 'mole2'. Exiting..."
         )
         exit(1)
-
+    
+    #TODO(CJ): QZ made a better way to insert a residue. Do that
     placed_ligand.name = new_res_key[2]
     placed_ligand.idx = new_res_key[1]
         
