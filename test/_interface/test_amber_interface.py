@@ -189,6 +189,11 @@ def test_amber_parameterizer_run_lv_1():
     test_stru = struct.PDBParser().get_structure(
         f"{MM_DATA_DIR}/KE_wo_S.pdb")
     params = test_param_worker.run(test_stru)
+    assert params.is_valid()
+    for f in params.file_list:
+        fs.safe_rm(f)
+    fs.safe_rmdir(test_param_worker.parameterizer_temp_dir)
+    fs.safe_rmdir(eh_config["system.SCRATCH_DIR"])
 
 
 def test_amber_parameterizer_run_lv_2():
@@ -205,10 +210,11 @@ def test_amber_parameterizer_run_lv_2():
         f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb")
     params = test_param_worker.run(test_stru)
     assert params.is_valid()
-    for file in params.file_list:
-        fs.safe_rm(file)
+    for f in params.file_list:
+        fs.safe_rm(f)
     fs.safe_rmdir(test_param_worker.parameterizer_temp_dir)
     fs.safe_rmdir(eh_config["system.SCRATCH_DIR"])
+
 
 def test_amber_parameterizer_run_lv_3():
     """level 3 test of the parameterizer.
