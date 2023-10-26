@@ -7,7 +7,7 @@ import pickle
 from subprocess import CompletedProcess, SubprocessError, run
 import time
 import os
-from typing import List
+from typing import Any, List
 import numpy as np
 
 from Class_Conf import Config
@@ -361,4 +361,15 @@ def extract_enzy_htp_data(data_file_path: str) -> List[dict]:
                 m_data[Term] = line_data
                 d_flag = 0
                 continue
+    return result
+
+def pickle_load_objs(fpath: str) -> List[Any]:
+    """load a pickle file that contain objects from multiple dumps"""
+    result = []
+    with open(fpath, "rb") as f:
+        while True:
+            try:
+                result.append(pickle.load(f))
+            except EOFError:
+                break
     return result
