@@ -51,7 +51,7 @@ class AmberParameter(MolDynParameter):
     def get_solvated_structure(self) -> Structure:
         """get the solvated structure corresponding to the parameters"""
         pass # TODO do we really need this?
-    
+
     @property
     def file_list(self) -> List[str]:
         """return a list of files that composes the parameter"""
@@ -1314,5 +1314,6 @@ class AmberInterface(BaseInterface):
             pass
 
     # endregion == TODO ==
+
 
 amber_interface = AmberInterface(None, eh_config._amber)
