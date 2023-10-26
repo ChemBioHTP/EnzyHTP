@@ -184,9 +184,9 @@ class PDBParser(StructureParserInterface):
 
     @classmethod
     @dispatch
-    def get_file_str(
+    def get_file_str(   # pylint: disable=function-redefined
             cls,
-            stru: Structure,  # pylint: disable=function-redefined
+            stru: Structure,  
             if_renumber: bool = True,
             if_fix_atomname: bool = True) -> str:
         """

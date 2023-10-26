@@ -7,6 +7,7 @@ Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-02
 """
+import os
 import re
 import shutil
 from pathlib import Path
@@ -22,7 +23,7 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core import env_manager as em
 from enzy_htp.core.exception import UnsupportedMethod, tLEaPError
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
-from enzy_htp.structure.structure_io import pdb_io, PrepinParser
+from enzy_htp.structure.structure_io import pdb_io
 from enzy_htp.structure import (
     Structure,
     Residue,
@@ -39,16 +40,39 @@ class AmberParameter(MolDynParameter):
         prmtop: the path of the .prmtop parameter topology file"""
 
     def __init__(self, inpcrd_path: str, prmtop_path: str):
-        self.inpcrd = inpcrd_path
-        self.prmtop = prmtop_path
+        self._inpcrd = inpcrd_path
+        self._prmtop = prmtop_path
 
+    #region == property ==
     @property
     def engine(self) -> str:
         return "Amber"
-    
+
     def get_solvated_structure(self) -> Structure:
         """get the solvated structure corresponding to the parameters"""
         pass # TODO do we really need this?
+    
+    @property
+    def file_list(self) -> List[str]:
+        """return a list of files that composes the parameter"""
+        return [self._inpcrd, self._prmtop]
+    #endregion
+
+    #region == checker ==
+    def is_valid(self) -> bool:
+        """check whether the parameter files represented by {self} is valid"""
+        result = 1
+        # file exist
+        result *= Path(self._inpcrd).exists()
+        result *= Path(self._prmtop).exists()
+        # file size not zero
+        result *= os.path.getsize(self._inpcrd) != 0
+        result *= os.path.getsize(self._prmtop) != 0
+        # TODO add upon need
+        return bool(result)
+
+    #endregion
+
 
 class AmberParameterizer(MolDynParameterizer):
     """the MD parameterizer for Amber.
@@ -70,6 +94,7 @@ class AmberParameterizer(MolDynParameterizer):
 
     def __init__(
             self,
+            force_fields: List[str],
             charge_method: str,
             resp_engine: str,
             resp_lvl_of_theory: str,
@@ -82,6 +107,7 @@ class AmberParameterizer(MolDynParameterizer):
             gb_radii: str,
             parameterizer_temp_dir: str,
             additional_tleap_lines: List[str],) -> None:
+        self.force_fields = force_fields
         self.charge_method = charge_method
         self.resp_engine = resp_engine
         self.resp_lvl_of_theory = resp_lvl_of_theory
@@ -103,7 +129,7 @@ class AmberParameterizer(MolDynParameterizer):
         """the parameterizer convert stru to amber parameter (inpcrd, prmtop)"""
         # 0. set up paths
         result_inpcrd = fs.get_valid_temp_name(f"{self.parameterizer_temp_dir}/amber_parm.inpcrd")
-        result_frcmod = fs.get_valid_temp_name(f"{self.parameterizer_temp_dir}/amber_parm.frcmod")
+        result_prmtop = fs.get_valid_temp_name(f"{self.parameterizer_temp_dir}/amber_parm.prmtop")
         fs.safe_mkdir(self.parameterizer_temp_dir)
 
         # 1. check stru diversity
@@ -111,14 +137,17 @@ class AmberParameterizer(MolDynParameterizer):
         _LOGGER.debug(f"diversity: {diversity}")
 
         # 2. extract and parameterize each special component
+        ligand_parms = {}
+        maa_parms = {}
+        metalcenter_parms = {}
         if "ligand" in diversity:
-            ligand_parms = {}
             for lig in stru.ligands:
-                ligand_parms[lig.name] = self._parameterize_ligand(lig)
+                if lig.name not in ligand_parms: # avoid repeating calculation
+                    ligand_parms[lig.name] = self._parameterize_ligand(lig)
         if "modified_residue" in diversity:
-            maa_parms = {}
             for maa in stru.modified_residue:
-                maa_parms[maa.name] = self._parameterize_modified_res(maa)
+                if maa.name not in maa_parms:
+                    maa_parms[maa.name] = self._parameterize_modified_res(maa)
         if "metalcenter" in diversity:
             _LOGGER.warning(
                 "Support for paramization of metalcenter is not ready yet."
@@ -127,7 +156,6 @@ class AmberParameterizer(MolDynParameterizer):
                 " for metal centers.")
             # all_used_residue_names = []
             # all_used_atom_types = []
-            metalcenter_parms = {}
             # for metal in stru.metalcenters:
             #     parms, used_residue_names, used_atom_types = self._parameterize_metalcenter(
             #         metal, ligand_parms, maa_parms)
@@ -136,27 +164,36 @@ class AmberParameterizer(MolDynParameterizer):
             #     all_used_atom_types.extend(used_atom_types)
 
         # 3. write the combining tleap.in
-        self._write_combining_tleap_input(
-            ligand_parms,
-            maa_parms,
-            metalcenter_parms,)
+        tleap_content, temp_dry_pdb = self._write_combining_tleap_input(
+                                            stru,
+                                            ligand_parms,
+                                            maa_parms,
+                                            metalcenter_parms,
+                                            result_inpcrd,
+                                            result_prmtop,)
 
         # 4. run tleap
+        amber_interface.run_tleap(tleap_content)
 
         # 5. clean up
-        fs.safe_rmdir(self.parameterizer_temp_dir, empty_only=True)
+        fs.clean_temp_file_n_dir([
+            temp_dry_pdb,
+            self.parameterizer_temp_dir,
+        ])
 
-        return AmberParameter(result_inpcrd, result_frcmod)
+        return AmberParameter(result_inpcrd, result_prmtop)
 
     def _parameterize_ligand(self, lig: Ligand) -> Tuple[str, List[str]]:
         """parameterize ligand for AmberMD, use ncaa_param_lib_path for customized
         parameters. Multiplicity and charge information can be set in Ligand objects.
-        TODO prob add a Structure method for batch assigning it"""
+        TODO prob add a Structure method for batch assigning it
+        Returns:
+            mol_desc_path, [frcmod_path, ...]"""
 
         fs.safe_mkdir(self.ncaa_param_lib_path)
         # 0. search parm lib
         mol_desc_path, frcmod_path_list = search_ncaa_parm_file(lig,
-                                            target_method=self.ncaa_net_charge_engine,
+                                            target_method=self.charge_method,
                                             ncaa_lib_path=self.ncaa_param_lib_path)
 
         if mol_desc_path:
@@ -231,10 +268,74 @@ class AmberParameterizer(MolDynParameterizer):
         return parm_dict, new_residue_names, new_atom_types
 
     def _write_combining_tleap_input(self,
-            ligand_parms,
-            maa_parms,
-            metalcenter_parms):
-        pass
+            stru: Structure,
+            ligand_parms: Dict,
+            maa_parms: Dict,
+            metalcenter_parms: Dict,
+            result_inpcrd: str,
+            result_prmtop: str,) -> Tuple[str, str]:
+        """combine mol_desc and parm file of each noncanonical parts and make the content
+        of the input file for tleap.
+        Returns:
+            (tleap.in content, temp_pdb_path)"""
+        # init file path
+        temp_pdb_path = fs.get_valid_temp_name(f"{self.parameterizer_temp_dir}/tleap_combine.pdb")
+        # make content
+        lines = []
+        for ff in self.force_fields:
+            lines.append(f"source {ff}")
+
+        # NCAA parts
+
+        # # add atom types TODO
+        # for xxx, new_atom_types in metalcenter_parms.values():
+        #     pass
+
+        # ligand
+        for ncaa_name, (mol_desc_path, frcmod_path_list) in ligand_parms.items():
+            lines.extend(
+                self._make_ncaa_tleap_lines(ncaa_name, mol_desc_path, frcmod_path_list))
+        # MAA
+        for ncaa_name, (mol_desc_path, frcmod_path_list) in maa_parms.items():
+            lines.extend(
+                self._make_ncaa_tleap_lines(ncaa_name, mol_desc_path, frcmod_path_list))
+            
+        # load PDB
+        pdb_io.PDBParser().save_structure(outfile=temp_pdb_path,
+                                          stru=stru,
+                                          if_renumber=False)
+        lines.extend([
+            f"a = loadpdb {temp_pdb_path}",
+            "center a",
+            "addions a Na+ 0",
+            "addions a Cl- 0",
+            f"solvate{self.solvate_box_type} a TIP3PBOX {self.solvate_box_size}",
+            f"saveamberparm a {result_prmtop} {result_inpcrd}",
+            "quit",
+        ])
+
+        result = "\n".join(lines)
+
+        return result, temp_pdb_path
+
+    def _make_ncaa_tleap_lines(self,
+            ncaa_name: str,
+            mol_desc_path: str,
+            frcmod_path_list: List[str]) -> List[str]:
+        """make ncaa moldesc and params lines in tleap.in"""
+        result = []
+        # params
+        for frcmod in frcmod_path_list:
+            result.append(f"loadAmberParams {frcmod}")
+        # mol desc
+        if fs.get_file_ext(mol_desc_path) in [".prepin", ".prepi"]:
+            result.append(f"loadAmberPrep {mol_desc_path}")
+        elif fs.get_file_ext(mol_desc_path) in [".mol2"]:
+            result.append(f"{ncaa_name} = loadmol2 {mol_desc_path}")
+        else:
+            _LOGGER.error(f"Got file with wrong extension {mol_desc_path}")
+            raise ValueError
+        return result
 
 
 class AmberMDStep(MolDynStep):
@@ -410,7 +511,8 @@ class AmberInterface(BaseInterface):
     def build_md_parameterizer(
             self,
             # find default values in AmberConfig
-            # charge
+            # method
+            force_fields: List[str] = "default",
             charge_method: str = "default",
             resp_engine: str = "default",
             resp_lvl_of_theory: str = "default",
@@ -431,6 +533,9 @@ class AmberInterface(BaseInterface):
             ) -> AmberParameterizer:
         """the constructor for AmberParameterizer
         Args:
+            force_fields:
+                The list of force fields used for parameterization in Amber tleap format
+                (e.g.: ["leaprc.protein.ff14SB", "leaprc.gaff", "leaprc.water.tip3p"])
             charge_method:
                 The method used for determine the atomic charge.
                 This method is applied to parameterization of ligand, modified AA,
@@ -465,7 +570,7 @@ class AmberInterface(BaseInterface):
             gb_radii:
                 The effective GB radii used in the Generalized Born calculation. This will influence
                 the GB radii in the prmtop file and are only used implicit solvent calculations.
-            temp_wk_dir:
+            parameterizer_temp_dir: (default: {config[system.SCRATCH_DIR]}/amber_parameterizer)
                 The temporary working directory that contains all the files generated by the AmberParameterizer
             additional_tleap_lines:
                 handle for adding additional tleap lines before generating the parameters."""
@@ -474,6 +579,8 @@ class AmberInterface(BaseInterface):
 
         # init default values
         type_hint_sticker: AmberConfig
+        if force_fields == "default":
+            force_fields = self.config()["DEFAULT_FORCE_FIELDS"]        
         if charge_method == "default":
             charge_method = self.config()["DEFAULT_CHARGE_METHOD"]
         if resp_engine == "default":
@@ -496,6 +603,7 @@ class AmberInterface(BaseInterface):
             parameterizer_temp_dir = self.config()["DEFAULT_PARAMETERIZER_TEMP_DIR"]
 
         return AmberParameterizer(
+            force_fields,
             charge_method,
             resp_engine,
             resp_lvl_of_theory,
@@ -1206,3 +1314,5 @@ class AmberInterface(BaseInterface):
             pass
 
     # endregion == TODO ==
+
+amber_interface = AmberInterface(None, eh_config._amber)
