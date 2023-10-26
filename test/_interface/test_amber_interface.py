@@ -215,19 +215,29 @@ def test_amber_parameterizer_run_lv_2():
     fs.safe_rmdir(test_param_worker.parameterizer_temp_dir)
     fs.safe_rmdir(eh_config["system.SCRATCH_DIR"])
 
-
 def test_amber_parameterizer_run_lv_3():
     """level 3 test of the parameterizer.
     Test structure diversity:
     - single polypeptide chain
     - single substrate (CHON)"""
+    temp_prepin_path = f"{MM_DATA_DIR}/ncaa_lib_empty/H5J_AM1BCC.prepin"
+    temp_frcmod_path = f"{MM_DATA_DIR}/ncaa_lib_empty/H5J_AM1BCC.frcmod"
     ai = interface.amber
     test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
         ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib_empty"
     )
     test_stru = struct.PDBParser().get_structure(
         f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb")
-    test_param_worker.run(test_stru)
+    test_stru.assign_ncaa_net_charge({"H5J" : 0})
+    params = test_param_worker.run(test_stru)
+    assert params.is_valid()
+
+    for f in params.file_list:
+        fs.safe_rm(f)
+    fs.safe_rm(temp_prepin_path)
+    fs.safe_rm(temp_frcmod_path)
+    fs.safe_rmdir(test_param_worker.parameterizer_temp_dir)
+    fs.safe_rmdir(eh_config["system.SCRATCH_DIR"])
 
 
 def test_amber_parameterizer_run_lv_4():
