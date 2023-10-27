@@ -238,6 +238,18 @@ class HiddenPrints:
                             handler.stream = self.original_stderr
 
 
+class EnablePropagate:
+    """_LOGGER.propagate = True in the block"""
+    def __init__(self, logger: logging.Logger) -> None:
+        self.logger = logger
+
+    def __enter__(self,):
+        self.logger.propagate = True
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.logger.propagate = False
+
+
 # == misc ===
 def timer(fn):
     """decodator for timing the run of the function {fn}"""

@@ -3,6 +3,7 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Author: QZ Shao <shaoqz@icloud.com>
 Date: 2022-06-03
 """
+import glob
 import os
 import shutil
 import pytest
@@ -11,6 +12,7 @@ from typing import Union
 
 from enzy_htp.core.exception import tLEaPError
 from enzy_htp.core.logger import _LOGGER
+from enzy_htp.core.general import EnablePropagate
 from enzy_htp.core import file_system as fs
 from enzy_htp._interface.amber_interface import AmberParameterizer
 import enzy_htp.structure as struct
@@ -329,6 +331,47 @@ def test_run_parmchk2():
     assert len(fs.lines_from_file(temp_frcmod_file)) == 23
     fs.safe_rm(temp_frcmod_file)
 
+def test_run_antechamber():
+    """test the function works well"""
+    ai = interface.amber
+    test_in_file = f"{MM_DATA_DIR}/H5J.pdb"
+    temp_mol2_file = f"{MM_WORK_DIR}/H5J.mol2"
+
+    ai.run_antechamber(test_in_file, temp_mol2_file,
+                        net_charge=0, spin=1,
+                        charge_method="bcc")
+
+    assert os.path.exists(temp_mol2_file)
+    assert len(fs.lines_from_file(temp_mol2_file)) == 43
+    for temp_files in ["ATOMTYPE.INF","NEWPDB.PDB","PREP.INF","sqm.pdb","sqm.in","sqm.out"]:
+        assert not os.path.exists(temp_files)
+    assert not glob.glob("ANTECHAMBER*")
+    fs.safe_rm(temp_mol2_file)
+
+def test_run_antechamber_wrong(caplog):
+    """test the function works well reporting the error"""
+    ai = interface.amber
+    test_in_file = f"{MM_DATA_DIR}/H5J.pdb"
+    temp_mol2_file = f"{MM_WORK_DIR}/H5J.mol2"
+
+    with EnablePropagate(_LOGGER):
+        with pytest.raises(ValueError) as exe:
+            ai.run_antechamber(test_in_file, temp_mol2_file,
+                                net_charge=0, spin=1,
+                                charge_method="cm1")
+        assert "found unsupported charge method" in caplog.text
+
+        with pytest.raises(ValueError) as exe:
+            ai.run_antechamber(test_in_file, temp_mol2_file,
+                                net_charge=0, spin=1,
+                                charge_method="rc")
+        assert "no charge_file is provided" in caplog.text
+
+        with pytest.raises(ValueError) as exe:
+            ai.run_antechamber(test_in_file, temp_mol2_file,
+                                net_charge=0, spin=1,
+                                charge_method="resp")
+        assert "not gesp or gout" in caplog.text
 
 # region TODO
 
