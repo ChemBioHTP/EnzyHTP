@@ -26,10 +26,10 @@ def test_search_ncaa_parm_file_standard():
 
     mol_desc, parm_list = search_ncaa_parm_file(
                             target_res=test_lig,
-                            target_method="AM1BCC",
+                            target_method="AM1BCC-GAFF",
                             ncaa_lib_path=test_ncaa_lib,
                             use_cache=False)
-    assert fs.base_file_name(mol_desc) == "H5J_AM1BCC"
+    assert fs.base_file_name(mol_desc) == "H5J_AM1BCC-GAFF"
     assert fs.get_file_ext(mol_desc) == ".prepin"
     assert len(parm_list) == 2
 
@@ -44,10 +44,10 @@ def test_search_ncaa_parm_file_nonstandard():
 
     mol_desc, parm_list = search_ncaa_parm_file(
                             target_res=test_lig,
-                            target_method="AM1BCC",
+                            target_method="AM1BCC-GAFF",
                             ncaa_lib_path=test_ncaa_lib,
                             use_cache=False)
-    assert fs.base_file_name(mol_desc) == "RES_AM1BCC"
+    assert fs.base_file_name(mol_desc) == "RES_AM1BCC-GAFF"
     assert fs.get_file_ext(mol_desc) == ".prepin"
     assert not parm_list
 
@@ -61,7 +61,7 @@ def test_search_ncaa_parm_file_wrongname(caplog):
 
     mol_desc, parm_list = search_ncaa_parm_file(
                             target_res=test_lig,
-                            target_method="AM1BCC",
+                            target_method="AM1BCC-GAFF",
                             ncaa_lib_path=test_ncaa_lib,
                             use_cache=False)
     assert not mol_desc
@@ -100,11 +100,11 @@ def test_search_ncaa_parm_file_cache(caplog):
     _LOGGER.setLevel(logging.DEBUG)
     mol_desc, parm_list = search_ncaa_parm_file(
                             target_res=test_lig,
-                            target_method="AM1BCC",
+                            target_method="AM1BCC-GAFF",
                             ncaa_lib_path=test_ncaa_lib,
                             use_cache=True)
     assert "using cache" in caplog.text
 
-    assert fs.base_file_name(mol_desc) == "H5J_AM1BCC"
+    assert fs.base_file_name(mol_desc) == "H5J_AM1BCC-GAFF"
     assert fs.get_file_ext(mol_desc) == ".prepin"
     assert len(parm_list) == 2

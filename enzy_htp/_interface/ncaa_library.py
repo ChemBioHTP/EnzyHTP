@@ -31,9 +31,9 @@ MOL_DESC_FILE_EXT = [".prepin", ".prepi", ".mol2"]
 MM_PARM_FILE_EXT = [".frcmod"]
 """extensions of parameter file types"""
 
-PARM_METHOD_LIST = ["AM1BCC", "RESP", "MCPB", "any"]
+PARM_METHOD_LIST = ["AM1BCC-GAFF2", "RESP-GAFF2", "AM1BCC-GAFF", "RESP-GAFF", "MCPB", "any"]
 """a list of keywords for supported parm_method as a search target. If 'any' is used, any method
-will be matched including None or ''."""
+will be matched including None or ''. * GAFF is used if not specificed."""
 
 def search_ncaa_parm_file(target_res: NonCanonicalBase, target_method: str,
                           ncaa_lib_path: str, use_cache: bool= True) -> Tuple[str, List[str]]:
