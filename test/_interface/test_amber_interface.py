@@ -204,7 +204,12 @@ def test_amber_parameterizer_run_lv_2():
     ** use existing parm files for ligand"""
     ai = interface.amber
     test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
-        ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib"
+        ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib",
+        force_fields=[
+            "leaprc.protein.ff14SB",
+            "leaprc.gaff",
+            "leaprc.water.tip3p",
+        ]
     )
     test_stru = struct.PDBParser().get_structure(
         f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb")
@@ -282,6 +287,34 @@ def test_amber_parameterizer_run_lv_6():
     test_stru = struct.PDBParser().get_structure(
         f"{MM_DATA_DIR}/tyna_clean.pdb")
     test_param_worker.run(test_stru)
+
+
+def test_check_gaff_type():
+    """test _check_gaff_type in AmberParameterizer"""
+    ai = interface.amber
+    test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
+        ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib_empty",
+        force_fields=[
+            "leaprc.protein.ff14SB",
+            "leaprc.gaff2",
+            "leaprc.water.tip3p",
+        ]
+    )
+    assert test_param_worker._check_gaff_type() == "GAFF2"
+
+    test_param_worker.force_fields = [
+            "leaprc.protein.ff14SB",
+            "leaprc.gaff",
+            "leaprc.water.tip3p",
+        ]
+    assert test_param_worker._check_gaff_type() == "GAFF"
+
+    test_param_worker.force_fields = [
+            "leaprc.protein.ff14SB",
+            "leaprc.water.tip3p",
+        ]
+    assert test_param_worker._check_gaff_type() is None
+
 
 # region TODO
 
