@@ -220,6 +220,7 @@ def test_amber_parameterizer_run_lv_2():
     fs.safe_rmdir(test_param_worker.parameterizer_temp_dir)
     fs.safe_rmdir(eh_config["system.SCRATCH_DIR"])
 
+
 def test_amber_parameterizer_run_lv_3():
     """level 3 test of the parameterizer.
     Test structure diversity:
@@ -314,6 +315,19 @@ def test_check_gaff_type():
             "leaprc.water.tip3p",
         ]
     assert test_param_worker._check_gaff_type() is None
+
+
+def test_run_parmchk2():
+    """test the function works well"""
+    ai = interface.amber
+    test_in_file = f"{MM_DATA_DIR}/ncaa_lib/H5J_AM1BCC-GAFF.prepin"
+    temp_frcmod_file = f"{MM_WORK_DIR}/frcmod"
+
+    ai.run_parmchk2(test_in_file, temp_frcmod_file, gaff_type="GAFF")
+
+    assert os.path.exists(temp_frcmod_file)
+    assert len(fs.lines_from_file(temp_frcmod_file)) == 23
+    fs.safe_rm(temp_frcmod_file)
 
 
 # region TODO
