@@ -161,6 +161,18 @@ class Residue(DoubleLinkedNode):
             result.add(atom.element)
         return result
 
+    @property
+    def mainchain_atoms(self) -> List[Atom]:
+        """return a list of mainchain atoms"""
+        result = []
+        if self.is_modified():
+            raise Exception("TODO prob determine start/end atom and deduce mainchain")
+        else:
+            atom_names = "C CA N".split()
+            for name in atom_names:
+                result.append(self.find_atom_name(name))
+        return result
+
     # def clone(self) -> Residue: #TODO
     #     """Creates a deepcopy of self."""
     #     return deepcopy(self)

@@ -391,6 +391,22 @@ class Structure(DoubleLinkedNode):
 
         return result
 
+    def backbone_atoms(self, by_chain: bool=False) -> Union[List[Atom], Dict[str, List[Atom]]]:
+        """return all the backbone forming atoms {by_chain} or not"""
+        if by_chain:
+            result = defaultdict(list)
+        else:
+            result = []
+
+        for ch_id, ch in self.chain_mapper.items():
+            if ch.is_polypeptide():
+                for res in ch.residues:
+                    if by_chain:
+                        result[ch_id].extend(res.mainchain_atoms)
+                    else:
+                        result.append(res.mainchain_atoms)
+        return result
+
     # endregion
 
     #region === Checker ===
