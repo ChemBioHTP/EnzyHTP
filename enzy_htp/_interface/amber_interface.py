@@ -252,7 +252,7 @@ class AmberParameterizer(MolDynParameterizer):
             f"{self.ncaa_param_lib_path}/{maa.name}.frcmod")
         frcmod2_path = fs.get_valid_temp_name(
             f"{self.ncaa_param_lib_path}/{maa.name}.frcmod2")
-
+        raise Exception("TODO")
         return mol2_path, [frcmod_path, frcmod2_path] # TODO make sure whether mol2 works or do we even need it?
 
     def _parameterize_metalcenter(self, metal: MetalUnit,
@@ -274,7 +274,7 @@ class AmberParameterizer(MolDynParameterizer):
 
         # 5. store mol2, frcmod, bond lines in parm_dict
         parm_dict = {}
-
+        raise Exception("TODO")
         return parm_dict, new_residue_names, new_atom_types
 
     def _write_combining_tleap_input(self,
@@ -811,8 +811,8 @@ class AmberInterface(BaseInterface):
             the out_path
             """
         # san check
-        if (not ncaa.multiplicity) or (not ncaa.net_charge):
-            _LOGGER.error("supplied NCAA does not have charge and spin."
+        if (ncaa.multiplicity is None) or (ncaa.net_charge is None):
+            _LOGGER.error(f"supplied NCAA ({ncaa.name}) does not have charge and spin."
                           " ALWAYS check and explicit assign it using"
                           " Structure.assign_ncaa_chargespin()")
             raise ValueError
