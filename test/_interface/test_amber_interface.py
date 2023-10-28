@@ -280,7 +280,7 @@ def test_amber_parameterizer_run_lv_4():
     fs.safe_rmdir(eh_config["system.SCRATCH_DIR"])
 
 
-def test_amber_parameterizer_run_lv_5():
+def test_amber_parameterizer_run_lv_5(): #TODO
     """level 5 test of the parameterizer.
     Test structure diversity:
     - 2 polypeptide chain
@@ -295,7 +295,7 @@ def test_amber_parameterizer_run_lv_5():
     test_param_worker.run(test_stru)
 
 
-def test_amber_parameterizer_run_lv_6():
+def test_amber_parameterizer_run_lv_6(): #TODO
     """level 6 test of the parameterizer.
     Test structure diversity:
     - 2 polypeptide chain

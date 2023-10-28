@@ -96,6 +96,7 @@ class AmberParameterizer(MolDynParameterizer):
 
     def __init__(
             self,
+            amber_interface,
             force_fields: List[str],
             charge_method: str,
             resp_engine: str,
@@ -109,6 +110,7 @@ class AmberParameterizer(MolDynParameterizer):
             gb_radii: str,
             parameterizer_temp_dir: str,
             additional_tleap_lines: List[str],) -> None:
+        self.amber_interface = amber_interface
         self.force_fields = force_fields
         self.charge_method = charge_method
         self.resp_engine = resp_engine
@@ -176,7 +178,7 @@ class AmberParameterizer(MolDynParameterizer):
                                             result_prmtop,)
 
         # 4. run tleap
-        amber_interface.run_tleap(tleap_content)
+        self.amber_interface.run_tleap(tleap_content)
 
         # 5. clean up
         fs.clean_temp_file_n_dir([
@@ -213,14 +215,14 @@ class AmberParameterizer(MolDynParameterizer):
         else:
             # 1. generate mol2 if not found
             mol_desc_path = f"{self.ncaa_param_lib_path}/{lig.name}_{target_method}.mol2" # the search ensured no existing file named this
-            amber_interface.antechamber_ncaa_to_moldesc(ncaa=lig,
+            self.amber_interface.antechamber_ncaa_to_moldesc(ncaa=lig,
                                                         out_path=mol_desc_path,
                                                         gaff_type=gaff_type)
 
         # 2. run parmchk2 on the PDB
         # (this also runs when mol_desc exsit but not frcmod)
         frcmod_path = f"{self.ncaa_param_lib_path}/{lig.name}_{target_method}.frcmod"
-        amber_interface.run_parmchk2(in_file=mol_desc_path,
+        self.amber_interface.run_parmchk2(in_file=mol_desc_path,
                                      out_file=frcmod_path,
                                      gaff_type=gaff_type)
 
@@ -547,11 +549,11 @@ class AmberInterface(BaseInterface):
                 The smaller the value, the faster the algorithm, default is -1 (use full length),
                 set this parameter to 10 to 30 if your molecule is big (# atoms >= 100)
                 -dr acdoctor mode: validate the input file a la acdoctor, yes(y, default) or no(n)"""
-        in_format = amber_interface.get_file_format(in_file)
+        in_format = self.get_file_format(in_file)
         cmd_args = ["-i", in_file,
                     "-fi", in_format,
                     "-o", out_file,
-                    "-fo", amber_interface.get_file_format(out_file),
+                    "-fo", self.get_file_format(out_file),
                     "-nc", str(net_charge),
                     "-m", str(spin),
                     "-at", atom_type.lower()]
@@ -603,7 +605,7 @@ class AmberInterface(BaseInterface):
             is_custom_ff_type_amber: is the type of custom_ff amber
             * TODO: support -c -a -w when needed"""
         cmd_args = ["-i", in_file,
-                    "-f", amber_interface.get_file_format(in_file),
+                    "-f", self.get_file_format(in_file),
                     "-o", out_file,
                     "-s", gaff_type.lower(),]
         if custom_force_field:
@@ -672,7 +674,7 @@ class AmberInterface(BaseInterface):
             shutil.move(renumbered_pdb, out_path)
             fs.clean_temp_file_n_dir([temp_dir, renumbered_pdb])
 
-    # -- parameterize --
+    # -- MD --
     def build_md_parameterizer(
             self,
             # find default values in AmberConfig
@@ -768,6 +770,7 @@ class AmberInterface(BaseInterface):
             parameterizer_temp_dir = self.config()["DEFAULT_PARAMETERIZER_TEMP_DIR"]
 
         return AmberParameterizer(
+            self,
             force_fields,
             charge_method,
             resp_engine,
@@ -883,6 +886,8 @@ class AmberInterface(BaseInterface):
 
         return temp_chg_file
 
+    def build_md_step(self) -> AmberMDStep:
+        """"""
 
     # region == TODO ==
     def write_minimize_input_file(self, fname: str, cycle: int) -> None:
