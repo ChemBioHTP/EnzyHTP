@@ -25,7 +25,7 @@ from ..core.logger import _LOGGER
 from .amber_interface import amber_interface
 from .alphafill_interface import AlphaFillInterface
 from .bcl_interface import BCLInterface
-from .gaussian_interface import GaussianInterface
+from .gaussian_interface import gaussian_interface
 from .moe_interface import MOEInterface
 from .mole2_interface import Mole2Interface
 from .multiwfn_interface import MultiwfnInterface
@@ -64,7 +64,8 @@ class Interface:
         amber_interface.set_parent(self) # made change for local access in amber_interface.py
         self.amber = amber_interface
         self.bcl = BCLInterface(self, config._bcl)
-        self.gaussian = GaussianInterface(self, config._gaussian)
+        gaussian_interface.set_parent(self)
+        self.gaussian = gaussian_interface
         self.moe = MOEInterface(self, config._moe)
         self.mole2 = Mole2Interface(self, config._mole2)
         self.multiwfn = MultiwfnInterface(self, config._multiwfn)

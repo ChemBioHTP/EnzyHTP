@@ -18,6 +18,7 @@ from typing import List, Tuple, Union, Dict, Any
 from .base_interface import BaseInterface
 from .handle_types import MolDynParameterizer, MolDynParameter, MolDynStep
 from .ncaa_library import search_ncaa_parm_file
+from .gaussian_interface import gaussian_interface
 
 from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
@@ -797,13 +798,15 @@ class AmberInterface(BaseInterface):
                                     ncaa: NonCanonicalBase,
                                     out_path: str,
                                     gaff_type: str = "GAFF",
-                                    charge_method: str = "AM1BCC",) -> str:
+                                    charge_method: str = "AM1BCC",
+                                    cluster_job_config: Dict=None,) -> str:
         """use antechamber to generate .mol2/.ac file for ligand/modified amino acid.
         Args:
             ncaa: the target Ligand/ModifiedAminoAcid
             out_path: the path of the output molecule description file. (use ext here to determine target format)
             gaff_type: the ff type used for NCAA. This influence the atom type in the moldesc file
             charge_method: the method for generation of atomic charges
+            cluster_job_config: the configuration for submitting cluster jobs (used for Gaussian if charge_method='resp')
         Return:
             the out_path
             """
@@ -821,7 +824,7 @@ class AmberInterface(BaseInterface):
                 pass
             if charge_method == "resp":
             # 2.1. Run RESP calculation (option)
-                gout_file = self._calculate_charge_with(charge_method)
+                gout_file = self._calculate_charge_with(charge_method, ncaa, cluster_job_config)
                 input_file = gout_file
         else:
             _LOGGER.error(f"found unsupported charge method {charge_method}."
@@ -843,21 +846,30 @@ class AmberInterface(BaseInterface):
         ])
         return out_path
 
-    def _calculate_charge_with(self, charge_method: str) -> str:
+    def _calculate_charge_with(self, charge_method: str, ncaa: NonCanonicalBase,
+                               cluster_job_config: Dict) -> str:
         """generate the charge file of {charge_method} for antechamber_ncaa_to_moldesc.
         return the output file containing the charge information varied by charge_method."""
         temp_chg_file = fs.get_valid_temp_name(
-            f"{eh_config['system.SCRATCH_DIR']}/temp_charge_file.out")
+            f"{eh_config['system.SCRATCH_DIR']}/temp_charge.out")
+        temp_opt_file = fs.get_valid_temp_name(
+            f"{eh_config['system.SCRATCH_DIR']}/temp_opt.out")
         supported_list = ["resp"]
         if charge_method in supported_list:
             if charge_method == "resp":
-                # 1. generate gjf file # use gaussian interface  TODO
-                # 2. optimize (H only) "PBE1PBE/def2SVP em=gd3"? Do we?
-                # 3. calculate charge "#p hf/6-31g* SCF=tight Pop=MK iop(6/33=2" -from Qingyang
-                # 4. convert
-                raise Exception("TODO, support this after finished gaussian_interface"
-                                " reference the manual"
-                                " antechamber -i ch3I.gesp -fi gesp -o ch3I_resp.mol2 -fo mol2 -c resp -eq 2 ")        
+                # 1. optimize (H only) "PBE1PBE/def2SVP em=gd3"? Do we?
+                gaussian_interface.gaussain_optimize(ncaa,
+                    out_file=temp_opt_file,
+                    method="PBE1PBE/def2SVP em=gd3 nosymm",
+                    cluster_job_config=cluster_job_config)
+                # 2. calculate charge
+                gaussian_interface.gaussain_single_point(temp_opt_file,
+                    out_file=temp_chg_file,
+                    method="hf/6-31g* SCF=tight Pop=MK iop(6/33=2)",
+                    addition_output=True,
+                    cluster_job_config=cluster_job_config,)
+                # 3. clean up
+                fs.clean_temp_file_n_dir(temp_opt_file)
         else:
             _LOGGER.error(f"using unsupported charge_method {charge_method}.")
             raise ValueError
