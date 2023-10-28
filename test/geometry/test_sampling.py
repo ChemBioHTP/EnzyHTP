@@ -7,6 +7,7 @@ import pytest
 import os
 
 from enzy_htp.core.clusters.accre import Accre
+from enzy_htp.structure import structure_constrain
 from enzy_htp.geometry import md_simulation, equi_md_sampling
 from enzy_htp import interface
 from enzy_htp import PDBParser
@@ -18,9 +19,12 @@ amber_interface = interface.amber
 
 # TODO: finish these tests while finished Amber interface
 @pytest.mark.accre
-def test_md_simulation_amber_no_repeat():
+def test_md_simulation_amber_lv1():
     """Test running a non-replica MD.
-    Using Amber & Accre as an example engine"""
+    Using Amber & Accre as an example engine
+    level 1:
+    - no replica
+    - no constrain"""
     test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
     test_stru.assign_ncaa_chargespin({"H5J" : (0,1)})
     test_param_method = amber_interface.build_md_parameterizer(
@@ -42,6 +46,51 @@ def test_md_simulation_amber_no_repeat():
         cluster_job_config=cluster_job_config,
         core_type="GPU",
         temperature=300,)
+
+    step_3 = amber_interface.build_md_step(
+        length=0.05, # ns
+        cluster_job_config=cluster_job_config,
+        core_type="GPU",
+        if_report=True,
+        temperature=300,
+        record_period=0.0005,)
+
+    md_simulation(stru=test_stru,
+                  param_method=test_param_method,
+                  steps=[step_1, step_2, step_3],
+                  parallel_runs=1)
+
+@pytest.mark.accre
+def test_md_simulation_amber_lv2():
+    """Test running a non-replica MD.
+    Using Amber & Accre as an example engine
+    level 1:
+    - no replica
+    - backbone constrain"""
+    test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
+    test_stru.assign_ncaa_chargespin({"H5J" : (0,1)})
+    test_param_method = amber_interface.build_md_parameterizer(
+        ncaa_param_lib_path=f"{DATA_DIR}/ncaa_lib_empty",
+    )
+    cluster_job_config = {
+        "cluster" : Accre(),
+        "period" : 60,
+        "res_setting" : {"account" : "csb_gpu_acc"}
+    }
+    constrain = structure_constrain.build_from_preset(test_stru, "freeze_backbone")
+    step_1  = amber_interface.build_md_step(
+        minimize=True,
+        length=2000, # cycle
+        cluster_job_config=cluster_job_config,
+        core_type="GPU",
+        constrain=constrain,)
+
+    step_2 = amber_interface.build_md_step(
+        length=0.001, # ns
+        cluster_job_config=cluster_job_config,
+        core_type="GPU",
+        temperature=300,
+        constrain=constrain,)
 
     step_3 = amber_interface.build_md_step(
         length=0.05, # ns
