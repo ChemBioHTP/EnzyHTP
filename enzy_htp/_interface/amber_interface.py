@@ -397,6 +397,7 @@ class AmberMDStep(MolDynStep):
     """the modular MD step of Amber.
     Attributes: (necessary information of the modular MD step)
         pass"""
+    # TODO also support build from .in file
 
     def __init__(self, interface) -> None:
         self._parent_interface = interface
@@ -947,6 +948,7 @@ class AmberInterface(BaseInterface):
                       if_report: bool = False,
                       work_dir: str = "default") -> AmberMDStep:
         """the constructor for AmberMDStep"""
+        # TODO reference sampling.equi_md_sampling
         return AmberMDStep() # TODO build methods first and determine what init info is needed
 
     # region == TODO ==
