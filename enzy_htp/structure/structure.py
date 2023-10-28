@@ -37,13 +37,13 @@ Operation:
 
     Loading a structure from PDB:
         >>> import enzy_htp
-        >>> structure : enzy_htp.Structure = enzy_htp.structure_from_pdb("/path/to/pdb")
+        >>> structure : enzy_htp.Structure = enzy_htp.PDBParser().get_structure("/path/to/pdb")
 
     Surveying basic information:
         >>> structure.num_chains()
         2
-        >>> structure.residue_state
-        [("A","ASP",1),("A","ASP",2),("A","ASP",3),("B","ASP",1)] #@shaoqz:shouldn"t it be 1-letter name?
+        >>> structure.sequence
+        {"A": "HEHEHEAA", "B": "HEHEHEAA"}
         >>> structure.num_residues
         4
 
@@ -111,14 +111,15 @@ import enzy_htp.core.math_helper as mh
 from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
-from enzy_htp.chemical import convert_to_one_letter, ResidueType
+from enzy_htp.chemical import ResidueType
 
 from .atom import Atom
 from . import Chain
 from .residue import Residue
+from .noncanonical_base import NonCanonicalBase
 from .metal_atom import MetalUnit
-from .ligand import Ligand, residue_to_ligand
-from .solvent import Solvent, residue_to_solvent
+from .ligand import Ligand
+from .solvent import Solvent
 from .metal_atom import MetalUnit
 
 
@@ -579,6 +580,21 @@ class Structure(DoubleLinkedNode):
         if sort:
             for ch in self:
                 ch.sort_residues()
+
+    def assign_ncaa_chargespin(self, net_charge_mapper: Dict[str, Tuple[int, int]]):
+        """assign net charges to NCAAs in Structure() based on net_charge_mapper
+        format: {"RES" : (charge, spin), ...}
+            RES is the 3-letter name of NCAAs
+            charge is the net charge
+            spin the 2S+1 number for multiplicity"""
+        for resname, (charge, spin) in net_charge_mapper.items():
+            for ncaa in self.find_residue_name(resname):
+                if not ncaa.is_noncanonical():
+                    _LOGGER.error(f"the assigning residue name {resname} is not a NCAA")
+                    raise ValueError
+                ncaa: NonCanonicalBase
+                ncaa.net_charge = charge
+                ncaa.multiplicity = spin
 
     #endregion
 
