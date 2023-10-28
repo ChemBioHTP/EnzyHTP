@@ -3,7 +3,7 @@ the target start structure on the energy surface defined by a certain energy fun
 
 Science API:
     + md_simulation
-    + equi_sampling()?
+    + equi_md_sampling()
 
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2023-7-30
@@ -30,7 +30,7 @@ def equi_md_sampling(stru: Structure,
                      prod_time: float= 50.0, # ns
                      prod_temperature: float = 300.0, #K
                      record_period: float= 0.5, # ns
-                     prod_constrain: StructureConstrain= None,
+                     prod_constrain: structure_constrain.StructureConstrain= None,
                      cluster_job_config: Dict= None,
                      cpu_equi_step: bool= False,
                      cpu_equi_job_config: Dict= None,
