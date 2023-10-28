@@ -395,6 +395,20 @@ def test_antechamber_ncaa_to_moldesc():
     assert not os.path.exists("scratch/H5J.pdb")
     fs.safe_rm(temp_mol2_path)
 
+def test_antechamber_ncaa_to_moldesc_wrong(caplog):
+    """test the function works well"""
+    temp_mol2_path = f"{MM_WORK_DIR}/H5J_AM1BCC.mol2"
+    ai = interface.amber
+    test_stru = struct.PDBParser().get_structure(
+        f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb").ligands[0]
+
+    with EnablePropagate(_LOGGER):
+        with pytest.raises(ValueError) as exe:
+            ai.antechamber_ncaa_to_moldesc(ncaa=test_stru,
+                                        out_path=temp_mol2_path,
+                                        gaff_type="GAFF",
+                                        charge_method="AM1BCC",)
+            assert "supplied NCAA does not have charge and spin." in caplog.text
 
 def test_antechamber_ncaa_to_moldesc_resp(): #TODO
     """test the function works well"""

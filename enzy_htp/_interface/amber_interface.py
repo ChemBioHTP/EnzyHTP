@@ -810,6 +810,13 @@ class AmberInterface(BaseInterface):
         Return:
             the out_path
             """
+        # san check
+        if (not ncaa.multiplicity) or (not ncaa.net_charge):
+            _LOGGER.error("supplied NCAA does not have charge and spin."
+                          " ALWAYS check and explicit assign it using"
+                          " Structure.assign_ncaa_chargespin()")
+            raise ValueError
+
         # 1. make ligand PDB
         temp_dir = eh_config["system.SCRATCH_DIR"]
         fs.safe_mkdir(temp_dir)
