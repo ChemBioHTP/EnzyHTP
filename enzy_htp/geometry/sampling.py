@@ -36,7 +36,7 @@ def equi_md_sampling(stru: Structure,
                      cpu_equi_job_config: Dict= None,
                      ) -> List[StructureEnsemble]:
     """This science API performs a production run of molecular dynamics simulation with the
-    system equilibrated by several short md simulations.
+    system equilibrated by several short md simulations from the starting {stru}
     (Basically md_simulation() with preset steps)
     Args:
         stru: the starting structure
