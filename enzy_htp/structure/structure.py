@@ -558,7 +558,7 @@ class Structure(DoubleLinkedNode):
             # always make a new chain as they are not covalently connected
             if not chain_name:
                 chain_name = self._legal_new_chain_names()[0]
-            
+
             new_chain = Chain(
                 name=chain_name,
                 residues=[target,],
