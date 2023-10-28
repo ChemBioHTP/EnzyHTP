@@ -24,7 +24,7 @@ from enzy_htp._interface.handle_types import (
 def equi_md_sampling(stru: Structure,
                      param_method: MolDynParameterizer,
                      parallel_runs: int= 3,
-                     parallel_method: str= "cluster_job",
+                     parallel_method: str= "cluster_job", # TODO prepare_only for just export files and cmd
                      work_dir: str="./MD",
                      # config for steps
                      prod_time: float= 50.0, # ns
