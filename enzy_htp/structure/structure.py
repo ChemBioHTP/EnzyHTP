@@ -573,7 +573,7 @@ class Structure(DoubleLinkedNode):
 
     @dispatch
     def add(self, target: List[Residue], # pylint: disable=function-redefined
-            sort: bool = False) -> None: 
+            sort: bool = False) -> None:
         """add a list of residues into the structure."""
         for res in target:
             self.add(res, False)
