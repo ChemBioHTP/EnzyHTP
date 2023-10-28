@@ -26,9 +26,30 @@ def test_md_simulation_amber_no_repeat():
     test_param_method = amber_interface.build_md_parameterizer(
         ncaa_param_lib_path=f"{DATA_DIR}/ncaa_lib_empty",
     )
-    step_1 = amber_interface.build_md_step()
-    step_2 = amber_interface.build_md_step()
-    step_3 = amber_interface.build_md_step()
+    cluster_job_config = {
+        "cluster" : Accre(),
+        "period" : 60,
+        "res_setting" : {"account" : "csb_gpu_acc"}
+    }
+    step_1  = amber_interface.build_md_step(
+        minimize=True,
+        length=2000, # cycle
+        cluster_job_config=cluster_job_config,
+        core_type="GPU",)
+
+    step_2 = amber_interface.build_md_step(
+        length=0.001, # ns
+        cluster_job_config=cluster_job_config,
+        core_type="GPU",
+        temperature=300,)
+
+    step_3 = amber_interface.build_md_step(
+        length=0.05, # ns
+        cluster_job_config=cluster_job_config,
+        core_type="GPU",
+        if_report=True,
+        temperature=300,
+        record_period=0.0005,)
 
     md_simulation(stru=test_stru,
                   param_method=test_param_method,
