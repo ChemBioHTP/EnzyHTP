@@ -29,7 +29,7 @@ class PrepinParser(StructureParserInterface):
         """Converting a .prepin file (as its path) into the Structure()
         Arg:
             path:
-                the file path of the PDB file
+                the file path of the .prepin file
         Return:
             Structure()
         """
