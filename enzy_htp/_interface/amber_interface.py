@@ -96,7 +96,7 @@ class AmberParameterizer(MolDynParameterizer):
 
     def __init__(
             self,
-            amber_interface,
+            interface,
             force_fields: List[str],
             charge_method: str,
             resp_engine: str,
@@ -110,7 +110,7 @@ class AmberParameterizer(MolDynParameterizer):
             gb_radii: str,
             parameterizer_temp_dir: str,
             additional_tleap_lines: List[str],) -> None:
-        self.amber_interface = amber_interface
+        self.amber_interface = interface
         self.force_fields = force_fields
         self.charge_method = charge_method
         self.resp_engine = resp_engine
