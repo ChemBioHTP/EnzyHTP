@@ -452,56 +452,6 @@ def test_antechamber_ncaa_to_moldesc_resp(): #TODO
 
 # region TODO
 
-def test_write_minimize_input_file():
-    """Testing that minimization input files are generated correctly."""
-    ai = interface.amber
-    assert not Path(MINIMIZE_INPUT_1).exists()
-    assert not Path(MINIMIZE_INPUT_2).exists()
-    ai.write_minimize_input_file(MINIMIZE_INPUT_1, 2000)
-    assert files_equivalent(MINIMIZE_INPUT_1, TARGET_MINIMIZE_INPUT_1)
-    ai.write_minimize_input_file(MINIMIZE_INPUT_2, 1000)
-    assert files_equivalent(MINIMIZE_INPUT_2, TARGET_MINIMIZE_INPUT_2)
-    fs.safe_rm(MINIMIZE_INPUT_1)
-    fs.safe_rm(MINIMIZE_INPUT_2)
-    assert not Path(MINIMIZE_INPUT_1).exists()
-    assert not Path(MINIMIZE_INPUT_2).exists()
-
-
-def test_build_param_files():
-    """Testing that the AmberInterface.build_param_files() method works correctly. Does not check that the 
-    actual output is correct, but only that the output is made.
-    """
-    ai = interface.amber
-    outdir = Path('demo/')
-    assert not outdir.is_dir()
-    test_file: str = f"{MM_BASE_DIR}/data/ff.pdb"
-    ai.build_param_files(test_file, str(outdir))
-
-    fnames: List[str] = ["ff_ff.pdb", "ff.inpcrd", "ff.prmtop", "leap.in", "leap.out"]
-
-    for fn in fnames:
-        assert (outdir / fn).exists()
-
-    shutil.rmtree(outdir)
-
-
-def test_build_param_files_does_not_exist():
-    """Testing that the AmberInterface.build_param_files() method with throw an error when the supplied .pdb file does NOT exist."""
-
-    dne = Path('dne.pdb')
-    work_dir = Path('work/')
-
-    assert not dne.exists()
-
-    ai = interface.amber
-    with pytest.raises(SystemExit) as exe:
-        ai.build_param_files(dne, work_dir)
-
-    shutil.rmtree(work_dir)
-
-    assert exe
-
-
 def test_parse_fmt_uppercase():
     """Testing that the AmberInterface.parse_fmt() method works correctly for uppercase inputs."""
     ai = interface.amber
@@ -535,40 +485,6 @@ def test_parse_fmt_bad_input():
 
     assert ai.parse_fmt('%FORMAT(20a4') == (None, -1)
 
-
-def test_remove_antechamber_temp_files_cwd():
-    """Testing that the AmberInterface.remove_antechamber_temp_files() method works when the current working directory is used."""
-    for acf in ANTECHAMBER_FNAMES:
-        touch(acf)
-        assert Path(acf).exists()
-
-    ai = interface.amber
-    ai.remove_antechamber_temp_files()
-
-    for acf in ANTECHAMBER_FNAMES:
-        assert not Path(acf).exists()
-
-
-def test_remove_antechamber_temp_files_non_cwd():
-    """Testing that the AmberInterface.remove_antechamber_temp_files() method works when a directory other than the current working directory is used."""
-    dirname = Path('ac-test-dir/')
-
-    assert not dirname.is_dir()
-    dirname.mkdir()
-
-    dir_ac_fnames = list(map(lambda ll: dirname / ll, ANTECHAMBER_FNAMES))
-
-    for acf in dir_ac_fnames:
-        touch(acf)
-        assert acf.exists()
-
-    ai = interface.amber
-    ai.remove_antechamber_temp_files(str(dirname))
-
-    for acf in dir_ac_fnames:
-        assert not acf.exists()
-
-    dirname.rmdir()
 
 
 def test_parse_prmtop():

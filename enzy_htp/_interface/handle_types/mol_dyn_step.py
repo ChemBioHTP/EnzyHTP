@@ -12,6 +12,8 @@ from typing import List
 from enzy_htp.core.job_manager import ClusterJob
 from enzy_htp.core.mol_dyn_result import MolDynResult
 
+from ..base_interface import BaseInterface
+
 class MolDynStep(ABC):
     """A modular/indivisible step of Molecular Dynamics simulation.
     This is expected to be the most general building block of all different
@@ -21,6 +23,13 @@ class MolDynStep(ABC):
     @abstractmethod
     def engine(self) -> str:
         """the engine name that should be hardcoded in each concrete class"""
+        pass
+
+    @property
+    @abstractmethod
+    def parent_interface(self) -> BaseInterface:
+        """the interface of the corresponding engine software.
+        normally contains all the constructors"""
         pass
 
     @property
