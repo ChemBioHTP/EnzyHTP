@@ -391,6 +391,13 @@ class AmberInterface(BaseInterface):
     """the mapper for {ext:format} for file formats defined/used by amber
      that are different than the extension TODO add upon need"""
 
+    SUPPORTED_CHARGE_METHOD_MAPPER = {
+        "AM1BCC" : "bcc", "bcc" : "bcc",
+        "RESP" : "resp", "resp" : "resp",
+        "rc" : "rc",
+    }
+    """dictionary that maps keywords to charge method that current supported in run_antechamber()"""
+
     def __init__(self, parent, config: AmberConfig = None) -> None:
         """Simplistic constructor that optionally takes an AmberConfig object as its only argument.
         Calls parent class."""
@@ -539,11 +546,6 @@ class AmberInterface(BaseInterface):
                 The smaller the value, the faster the algorithm, default is -1 (use full length),
                 set this parameter to 10 to 30 if your molecule is big (# atoms >= 100)
                 -dr acdoctor mode: validate the input file a la acdoctor, yes(y, default) or no(n)"""
-        SUPPORTED_CHARGE_METHOD_MAPPER = {
-            "AM1BCC" : "bcc", "bcc" : "bcc",
-            "RESP" : "resp", "resp" : "resp",
-            "rc" : "rc",
-        }
         in_format = amber_interface.get_file_format(in_file)
         cmd_args = ["-i", in_file,
                     "-fi", in_format,
@@ -555,8 +557,8 @@ class AmberInterface(BaseInterface):
         if res_name:
             cmd_args.extend(["-rn", res_name])
         # charge
-        if charge_method in SUPPORTED_CHARGE_METHOD_MAPPER:
-            charge_method = SUPPORTED_CHARGE_METHOD_MAPPER[charge_method]
+        if charge_method in self.SUPPORTED_CHARGE_METHOD_MAPPER:
+            charge_method = self.SUPPORTED_CHARGE_METHOD_MAPPER[charge_method]
             cmd_args.extend(["-c", charge_method])
             if charge_method == "rc":
                 if charge_file:
@@ -570,7 +572,7 @@ class AmberInterface(BaseInterface):
                     raise ValueError
         else:
             _LOGGER.error(f"found unsupported charge method {charge_method}."
-                          "(Supported keywords: {SUPPORTED_CHARGE_METHOD_MAPPER.keys()})"
+                          f"(Supported keywords: {self.SUPPORTED_CHARGE_METHOD_MAPPER.keys()})"
                           "Contact author for support if it is necessary for your work.")
             raise ValueError
 
@@ -585,25 +587,6 @@ class AmberInterface(BaseInterface):
             "sqm.in",
             "sqm.out",
         ] + glob.glob("ANTECHAMBER*"))
-
-    # TODO think about where to put/use this
-    # def _generate_charge_file(self, charge_method: str) -> str:
-    #     """generate the charge file of {charge_method} for antechamber"""
-    #     temp_chg_file = fs.get_valid_temp_name(
-    #         f"{eh_config['system.SCRATCH_DIR']}/antechamber_temp_file.chg")
-    #     supported_list = ["resp"]
-    #     if charge_method in supported_list:
-    #         if charge_method == "resp":
-    #             # 1. generate gjf file # use -fo gcrt of antechamber
-    #             # 2. optimize "PBE1PBE/def2SVP em=gd3"? Do we?
-    #             # 3. calculate charge "HF/6-31G* SCF=Tight Pop=MK IOp(6/33=2, 6/41=10, 6/42=17)"
-    #             # 4. convert 
-    #             raise Exception("TODO, support this after finished gaussian_interface"
-    #                             " reference the manual"
-    #                             " antechamber -i ch3I.gesp -fi gesp -o ch3I_resp.mol2 -fo mol2 -c resp -eq 2 ")        
-    #     else:
-    #         _LOGGER.error(f"using unsupported charge_method {charge_method}.")
-    #         raise ValueError
 
     def run_parmchk2(self, in_file: str, out_file: str, gaff_type: str,
                      custom_force_field: str=None,
@@ -819,20 +802,68 @@ class AmberInterface(BaseInterface):
         Args:
             ncaa: the target Ligand/ModifiedAminoAcid
             out_path: the path of the output molecule description file. (use ext here to determine target format)
-        
+            gaff_type: the ff type used for NCAA. This influence the atom type in the moldesc file
+            charge_method: the method for generation of atomic charges
+        Return:
+            the out_path
             """
-        # 1. make ligand PDB TODO(eod)
+        # 1. make ligand PDB
         temp_dir = eh_config["system.SCRATCH_DIR"]
+        fs.safe_mkdir(temp_dir)
         temp_pdb_path = fs.get_valid_temp_name(f"{temp_dir}/{ncaa.name}.pdb")
+        pdb_io.PDBParser().save_structure(temp_pdb_path, ncaa)
+        input_file = temp_pdb_path
 
-        # 1.1. Run RESP calculation (option)
+        # 2. determine charge
+        charge_method = self.SUPPORTED_CHARGE_METHOD_MAPPER.get(charge_method, None)
+        if charge_method:
+            if charge_method == "bcc":
+                pass
+            if charge_method == "resp":
+            # 2.1. Run RESP calculation (option)
+                gout_file = self._calculate_charge_with(charge_method)
+                input_file = gout_file
+        else:
+            _LOGGER.error(f"found unsupported charge method {charge_method}."
+                          f"(Supported keywords: {self.SUPPORTED_CHARGE_METHOD_MAPPER.keys()})")
+            raise ValueError
 
-        # 2. run antechamber on the PDB get mol2
-        self.run_antechamber(in_file=temp_pdb_path,
+        # 3. run antechamber on the PDB get mol2
+        self.run_antechamber(in_file=input_file,
                              out_file=out_path,
                              charge_method=charge_method,
                              spin=ncaa.multiplicity,
-                             net_charge=ncaa.net_charge)
+                             net_charge=ncaa.net_charge,
+                             atom_type=gaff_type,)
+
+        # 4. clean up
+        fs.clean_temp_file_n_dir([
+            input_file,
+            temp_dir
+        ])
+        return out_path
+
+    def _calculate_charge_with(self, charge_method: str) -> str:
+        """generate the charge file of {charge_method} for antechamber_ncaa_to_moldesc.
+        return the output file containing the charge information varied by charge_method."""
+        temp_chg_file = fs.get_valid_temp_name(
+            f"{eh_config['system.SCRATCH_DIR']}/temp_charge_file.out")
+        supported_list = ["resp"]
+        if charge_method in supported_list:
+            if charge_method == "resp":
+                # 1. generate gjf file # use gaussian interface  TODO
+                # 2. optimize (H only) "PBE1PBE/def2SVP em=gd3"? Do we?
+                # 3. calculate charge "#p hf/6-31g* SCF=tight Pop=MK iop(6/33=2" -from Qingyang
+                # 4. convert
+                raise Exception("TODO, support this after finished gaussian_interface"
+                                " reference the manual"
+                                " antechamber -i ch3I.gesp -fi gesp -o ch3I_resp.mol2 -fo mol2 -c resp -eq 2 ")        
+        else:
+            _LOGGER.error(f"using unsupported charge_method {charge_method}.")
+            raise ValueError
+
+        return temp_chg_file
+
 
     # region == TODO ==
     def write_minimize_input_file(self, fname: str, cycle: int) -> None:

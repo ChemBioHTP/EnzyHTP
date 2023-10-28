@@ -331,6 +331,7 @@ def test_run_parmchk2():
     assert len(fs.lines_from_file(temp_frcmod_file)) == 23
     fs.safe_rm(temp_frcmod_file)
 
+
 def test_run_antechamber():
     """test the function works well"""
     ai = interface.amber
@@ -347,6 +348,7 @@ def test_run_antechamber():
         assert not os.path.exists(temp_files)
     assert not glob.glob("ANTECHAMBER*")
     fs.safe_rm(temp_mol2_file)
+
 
 def test_run_antechamber_wrong(caplog):
     """test the function works well reporting the error"""
@@ -372,6 +374,47 @@ def test_run_antechamber_wrong(caplog):
                                 net_charge=0, spin=1,
                                 charge_method="resp")
         assert "not gesp or gout" in caplog.text
+
+
+def test_antechamber_ncaa_to_moldesc():
+    """test the function works well"""
+    temp_mol2_path = f"{MM_WORK_DIR}/H5J_AM1BCC.mol2"
+    ai = interface.amber
+    test_stru = struct.PDBParser().get_structure(
+        f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb").ligands[0]
+    test_stru.net_charge = 0
+    test_stru.spin = 1
+
+    ai.antechamber_ncaa_to_moldesc(ncaa=test_stru,
+                                   out_path=temp_mol2_path,
+                                   gaff_type="GAFF",
+                                   charge_method="AM1BCC",)
+
+    assert os.path.exists(temp_mol2_path)
+    assert len(fs.lines_from_file(temp_mol2_path)) == 43
+    assert not os.path.exists("scratch/H5J.pdb")
+    fs.safe_rm(temp_mol2_path)
+
+
+def test_antechamber_ncaa_to_moldesc_resp(): #TODO
+    """test the function works well"""
+    temp_mol2_path = f"{MM_WORK_DIR}/H5J_RESP.mol2"
+    ai = interface.amber
+    test_stru = struct.PDBParser().get_structure(
+        f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb").ligands[0]
+    test_stru.net_charge = 0
+    test_stru.spin = 1
+
+    ai.antechamber_ncaa_to_moldesc(ncaa=test_stru,
+                                   out_path=temp_mol2_path,
+                                   gaff_type="GAFF",
+                                   charge_method="RESP",)
+
+    assert os.path.exists(temp_mol2_path)
+    assert len(fs.lines_from_file(temp_mol2_path)) == 43
+    assert not os.path.exists("scratch/H5J.pdb")
+    fs.safe_rm(temp_mol2_path)
+
 
 # region TODO
 
