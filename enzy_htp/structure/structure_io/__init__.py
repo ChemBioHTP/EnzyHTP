@@ -10,6 +10,8 @@ from ._interface import StructureParserInterface
 from .pdb_io import PDBParser
 from .mol2_io import Mol2Parser
 from .prepin_io import PrepinParser
+from .gjf_io import GJFParser
+from .prmtop_io import PrmtopParser
 
 # # import all modules under the dir to support user customization.
 # __all__ = []

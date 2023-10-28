@@ -23,9 +23,11 @@ from .gaussian_interface import gaussian_interface
 from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import env_manager as em
+from enzy_htp.core.job_manager import ClusterJob
+from enzy_htp.core.mol_dyn_result import MolDynResult
 from enzy_htp.core.exception import UnsupportedMethod, tLEaPError
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
-from enzy_htp.structure.structure_io import pdb_io
+from enzy_htp.structure.structure_io import pdb_io, prmtop_io
 from enzy_htp.structure import (
     Structure,
     Ligand,
@@ -58,6 +60,17 @@ class AmberParameter(MolDynParameter):
     def file_list(self) -> List[str]:
         """return a list of files that composes the parameter"""
         return [self._inpcrd, self._prmtop]
+
+    @property
+    def topology_file(self) -> str:
+        """return the path of the topology file that composes the parameter"""
+        return self._prmtop
+
+    @property
+    def topology_parser(self) -> str:
+        """return the parser object for topology_file"""
+        return prmtop_io.PrmtopParser()
+
     #endregion
 
     #region == checker ==
@@ -383,6 +396,25 @@ class AmberMDStep(MolDynStep):
     @property
     def parent_interface(self):
         return self._parent_interface
+
+    @property
+    def if_report(self) -> bool:
+        """whether the step reports the output"""
+        pass
+
+    def make_job(self) -> ClusterJob:
+        """the method that make a ClusterJob that runs the step"""
+        pass
+
+    def translate(self) -> MolDynResult:
+        """the method convert engine specific results to general output"""
+        pass
+
+    @classmethod
+    def try_merge_jobs(cls, job_list: List[ClusterJob]) -> List[ClusterJob]:
+        """the classmethod that merge a list of jobs from MolDynStep to fewer jobs"""
+        pass
+
 
 
 class AmberInterface(BaseInterface):
@@ -899,9 +931,15 @@ class AmberInterface(BaseInterface):
 
         return temp_chg_file
 
-    def build_md_step(self) -> AmberMDStep:
+    def build_md_step(self,
+                      if_report: bool = False,
+                      work_dir: str = "default") -> AmberMDStep:
         """the constructor for AmberMDStep"""
-        return AmberMDStep(self)
+        return AmberMDStep(
+            self,
+            if_report,
+            work_dir,
+            )
 
     # region == TODO ==
     def write_minimize_input_file(self, fname: str, cycle: int) -> None:

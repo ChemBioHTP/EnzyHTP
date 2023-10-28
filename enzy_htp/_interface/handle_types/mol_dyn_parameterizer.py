@@ -22,6 +22,16 @@ class MolDynParameter(ABC):
         """the engine name that should be hardcoded in each concrete class"""
         pass
 
+    @property
+    @abstractmethod
+    def topology_file(self) -> str:
+        """return the path of the topology file that composes the parameter"""
+        pass
+
+    @property
+    def topology_parser(self) -> str:
+        """return the parser object for topology_file"""
+        pass
 
 class MolDynParameterizer(ABC):
     """The parameterizer for Molecular Dynamics simulation.
