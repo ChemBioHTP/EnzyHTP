@@ -73,7 +73,7 @@ class RDKitInterface(BaseInterface):
             for rr in reader:
                 return rr
 
-    def _save_molcule(self, mol: _rchem.Mol, outfile: str, kekulize: bool = True) -> str:
+    def _save_molecule(self, mol: _rchem.Mol, outfile: str, kekulize: bool = True) -> str:
         """ """
         self._supported_ftype(outfile)
 

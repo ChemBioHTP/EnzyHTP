@@ -124,14 +124,14 @@ class XTBInterface(BaseInterface):
                 )
             input_lines.append('$end')
 
-        cmd_args:List[str] = ["--chrg", str(charge), "--iterations", str(n_iter), "--parallel", str(n_proc), "--norestart", "--input" ]
+        cmd_args:List[str] = ["--chrg", str(charge), "--iterations", str(n_iter), "--parallel", str(n_proc), "--norestart" ]
 
         geom_input:str=None
         if input_lines:
             temp_path = Path(fname)
             geom_input = str(temp_path.parent / f"__geo_opt.inp")
             fs.write_lines(geom_input, input_lines)
-            cmd_args.append( geom_input ) 
+            cmd_args.extend(["--input", geom_input ]) 
 
         cmd_args.extend([fname, "--opt" ])
         ext:str=fs.get_file_ext(fname)
@@ -148,7 +148,7 @@ class XTBInterface(BaseInterface):
             if ll.find('TOTAL ENERGY') != -1:
                 energy = float(ll.split()[3])
 
-        self._remove_temp_files(str(Path(fname).parent))
+        #self._remove_temp_files(str(Path(fname).parent))
     
         #TODO(CJ): actually delete the temp files
 
