@@ -15,7 +15,7 @@ from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.exception import InconsistentMDEngine
 from enzy_htp.core import job_manager
 from enzy_htp.core.mol_dyn_result import MolDynResult
-from enzy_htp.structure import Structure, StructureEnsemble, structure_constrain
+from enzy_htp.structure import Structure, StructureEnsemble, structure_constraint
 from enzy_htp._interface.handle_types import (
     MolDynStep,
     MolDynParameterizer,
@@ -30,7 +30,7 @@ def equi_md_sampling(stru: Structure,
                      prod_time: float= 50.0, # ns
                      prod_temperature: float = 300.0, #K
                      record_period: float= 0.5, # ns
-                     prod_constrain: structure_constrain.StructureConstrain= None,
+                     prod_constrain: structure_constraint.StructureConstraint= None,
                      cluster_job_config: Dict= None,
                      cpu_equi_step: bool= False,
                      cpu_equi_job_config: Dict= None,
@@ -69,7 +69,7 @@ def equi_md_sampling(stru: Structure,
             _LOGGER.error("cpu_equi_step is used but cpu_equi_job_config is not given!")
             raise ValueError
 
-    freeze_backbone = structure_constrain.build_from_preset(stru, "freeze_backbone")
+    freeze_backbone = structure_constraint.build_from_preset(stru, "freeze_backbone")
     min_step  = parent_interface.build_md_step(
         minimize=True,
         length=20000, # cycle

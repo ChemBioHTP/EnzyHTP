@@ -3,4 +3,4 @@
 Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
 Date: 2022-10-28
 """
-from .api import StructureConstrain, build_from_preset
+from .api import StructureConstraint, build_from_preset

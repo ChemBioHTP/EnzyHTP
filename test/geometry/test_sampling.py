@@ -7,7 +7,7 @@ import pytest
 import os
 
 from enzy_htp.core.clusters.accre import Accre
-from enzy_htp.structure import structure_constrain
+from enzy_htp.structure import structure_constraint
 from enzy_htp.geometry import md_simulation, equi_md_sampling
 from enzy_htp import interface
 from enzy_htp import PDBParser
@@ -77,7 +77,7 @@ def test_md_simulation_amber_lv2():
         "period" : 60,
         "res_setting" : {"account" : "csb_gpu_acc"}
     }
-    constrain = structure_constrain.build_from_preset(test_stru, "freeze_backbone")
+    constrain = structure_constraint.build_from_preset(test_stru, "freeze_backbone")
     step_1  = amber_interface.build_md_step(
         minimize=True,
         length=2000, # cycle

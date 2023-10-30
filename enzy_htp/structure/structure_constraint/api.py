@@ -1,6 +1,6 @@
-"""Defines the StructureConstrain class.
+"""Defines the StructureConstraint class.
 This class is one of the data structure of EnzyHTP.
-StructureConstrain stands for a coordinate constrain for the structure, including
+StructureConstraint stands for a coordinate constrain for the structure, including
 freeze coordinate and geometry constrain (distance, angle, dihedral).
 
 Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
@@ -12,7 +12,7 @@ from typing import List, Tuple
 from enzy_htp.core.logger import _LOGGER
 from ..structure import Structure, Solvent, Chain, Residue, Atom
 
-class StructureConstrain:
+class StructureConstraint:
     """This class describe a constrain of a structure (defined by the topology)
     Constructors:
         from_keyword()
@@ -41,8 +41,8 @@ class StructureConstrain:
 
 
 def build_from_preset(topology: Structure,
-                      keyword: str,) -> StructureConstrain:
-    """constructor that allows building a StructureConstrain from a keyword.
+                      keyword: str,) -> StructureConstraint:
+    """constructor that allows building a StructureConstraint from a keyword.
     recommand combining this with functools.partial to make general constrains
     that can apply to different structures
     Args:
@@ -52,7 +52,7 @@ def build_from_preset(topology: Structure,
     supported_keywords = ["freeze_backbone"]
     if keyword == "freeze_backbone":
         freeze_atoms = topology.backbone_atoms()
-        result = StructureConstrain(topology, freeze_atoms, geom_constrain=[])
+        result = StructureConstraint(topology, freeze_atoms, geom_constrain=[])
         result._is_backbone_freeze = True
     else:
         _LOGGER.error(f"using unsupported keyword {keyword}. (Supported: {supported_keywords})")
