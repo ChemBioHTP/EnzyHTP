@@ -154,3 +154,4 @@ cython_debug/
 
 # Dont want to keep the files generated in testing
 test/preparation/work_dir/*
+.cache*

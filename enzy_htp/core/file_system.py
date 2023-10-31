@@ -3,8 +3,9 @@
 Author: Chris Jurich, <chris.jurich@vanderbilt.edu>
 Date: 2022-03-14
 """
+from io import IOBase
 import os
-import sys
+import glob
 import shutil
 import datetime
 from typing import List, Any, Dict
@@ -12,7 +13,7 @@ from pathlib import Path
 
 from .logger import _LOGGER
 
-
+# == general ==
 def safe_rm(fname: str) -> None:
     """Removes a file if and only if the directory already exists. Provides a warning if the 
     supplied path is a directory."""
@@ -23,7 +24,19 @@ def safe_rm(fname: str) -> None:
     if os.path.exists(fname):
         os.remove(fname)
 
+def safe_mv(src: str, dest: str) -> str:
+    """TODO(CJ)
+    """
+    src = Path(src)
+    dest = Path(dest)
 
+    if dest.is_dir():
+        safe_mkdir(dest)
+        dest = dest / src.name
+
+    return str(shutil.move(src, dest))
+
+# == dir ==
 def is_empty_dir(dir_path: str) -> bool:
     """Is the supplied directory empty?"""
     if os.path.isdir(dir_path):
@@ -48,6 +61,18 @@ def safe_mkdir(dirname: str) -> None:
         Path(dirname).mkdir(parents=True, exist_ok=True)
 
 
+def all_file_in_dir(dirname: str, recursive: bool=True):
+    """get path of all files under a dir. filter out all subdir paths themselves"""
+    if recursive:
+        file_paths = glob.glob(f"{dirname}/**/*", recursive=True)
+    else:
+        file_paths = glob.glob(f"{dirname}/*")
+    # filter out all dir
+    file_paths = [f for f in file_paths if not os.path.isdir(f)]
+
+    return file_paths
+
+# == path/file ==
 def base_file_name(fname: str) -> str:
     """Given a filename, gets just the base name without extension or leading directories.
     Does not check if file exists.
@@ -64,11 +89,6 @@ def remove_ext(fname: str) -> str:
 def get_file_ext(fname: str) -> str:
     """Gets the file extension for a supplied file name."""
     return Path(fname).suffix
-
-
-def get_current_time() -> str:
-    """Gets current system time in format YYYY_MM_DD_H_m"""
-    return datetime.datetime.now().strftime("%Y_%m_%d_%H_%M")
 
 
 def lines_from_file(fname: str) -> List[str]:
@@ -196,19 +216,6 @@ def has_content(fname: str) -> bool:
     return fpath.exists() and fpath.stat().st_size > 0
 
 
-def safe_mv(src: str, dest: str) -> str:
-    """TODO(CJ)
-    """
-    src = Path(src)
-    dest = Path(dest)
-
-    if dest.is_dir():
-        safe_mkdir(dest)
-        dest = dest / src.name
-
-    return str(shutil.move(src, dest))
-
-
 def clean_temp_file_n_dir(temp_path_list: List[str]) -> None:
     """clean temporary files created by EnzyHTP functions.
     removes file first and then dirs.
@@ -222,3 +229,34 @@ def clean_temp_file_n_dir(temp_path_list: List[str]) -> None:
             safe_rm(file_path)
         for dir_path in dir_list:
             safe_rmdir(dir_path, empty_only=True)
+
+
+# make own lock function that python ones not really work
+def is_locked(f: IOBase) -> bool:
+    """check whether the file is locked by another process"""
+    lock_path = f"{os.path.abspath(f.name)}.lock"
+    return Path(lock_path).exists()
+
+def lock(f: IOBase):
+    """lock a file by making a lock file
+    * this does not work when the read happens too fast"""
+    lock_path = f"{os.path.abspath(f.name)}.lock"
+    if is_locked(f):
+        _LOGGER.error(f"lock already exist in {lock_path}")
+        raise IOError
+    with open(lock_path, "w"):
+        pass
+
+def unlock(f: IOBase):
+    """unlock a file by deleting a lock file"""
+    lock_path = f"{os.path.abspath(f.name)}.lock"
+    if is_locked(f):
+        safe_rm(lock_path)
+    else:
+        _LOGGER.warning(f"unlocking non-existing lock: {lock_path}")
+
+# == time ==
+def get_current_time() -> str:
+    """Gets current system time in format YYYY_MM_DD_H_m"""
+    return datetime.datetime.now().strftime("%Y_%m_%d_%H_%M")
+

@@ -9,10 +9,8 @@ Date: 2022-03-19
 from __future__ import annotations
 import copy
 import sys
-import numpy as np
-from collections import defaultdict
-from plum import dispatch
-from typing import Tuple, List, Dict
+import math
+from typing import Tuple, List
 
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
 from enzy_htp.core import _LOGGER
@@ -155,6 +153,26 @@ class Residue(DoubleLinkedNode):
         """get the geom_center coordinate of the residue"""
         return get_geom_center([i.coord for i in self.atoms])
 
+    @property
+    def element_composition(self) -> set:
+        """get the element composition of the residue"""
+        result = set()
+        for atom in self.atoms:
+            result.add(atom.element)
+        return result
+
+    @property
+    def mainchain_atoms(self) -> List[Atom]:
+        """return a list of mainchain atoms"""
+        result = []
+        if self.is_modified():
+            raise Exception("TODO prob determine start/end atom and deduce mainchain")
+        else:
+            atom_names = "C CA N".split()
+            for name in atom_names:
+                result.append(self.find_atom_name(name))
+        return result
+
     # def clone(self) -> Residue: #TODO
     #     """Creates a deepcopy of self."""
     #     return deepcopy(self)
@@ -167,7 +185,12 @@ class Residue(DoubleLinkedNode):
 
     def is_noncanonical(self) -> bool:
         """Checks if Residue() is canonical. Inherited by children."""
-        return self._rtype == chem.ResidueType.NONCANONICAL
+        return (self.is_modified() or self.is_ligand() or self.is_metal())
+
+    def is_modified(self) -> bool:
+        """Checks if Residue() is a modified residue. Inherited by children.
+        TODO: would MODIFIED a better name?"""
+        return self._rtype == chem.ResidueType.MODIFIED
 
     def is_ligand(self) -> bool:
         """Checks if Residue() is a ligand. Inherited by children."""
@@ -210,6 +233,9 @@ class Residue(DoubleLinkedNode):
         """check if the residue contain no acidic proton on side chain hetero atoms"""
         return self.name in chem.residue.NOPROTON_LIST
 
+    def is_connected(self) -> bool:
+        """check if every atom in the residue have a connect record"""
+        return math.prod([atom.is_connected() for atom in self.atoms])
     #endregion
 
     #region === Editor ===

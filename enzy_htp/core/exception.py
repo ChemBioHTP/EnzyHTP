@@ -87,3 +87,8 @@ class InconsistentMDEngine(Exception):
     """Exception corresponding to inconsistency of engine between MD building
     blocks in enzy_htp.geometry.sampling"""
     pass
+
+class FileFormatError(Exception):
+    """Exception corresponding to wrong file format. Mainly used in file parsing in
+    StructureParserInterface concrete classes"""
+    pass

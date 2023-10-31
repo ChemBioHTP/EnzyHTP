@@ -7,21 +7,17 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-11
 """
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Union
+from plum import dispatch
+
+from .base_interface import BaseInterface
 
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import env_manager as em
-
-# from enzy_htp.molecular_mechanics import Frame
-from enzy_htp.structure import Structure, PDBParser
-#structure_from_pdb
-
-# from .gaussian_config import GaussianConfig, default_gaussian_config
-
-# TODO(CJ): add .config() getter
+from enzy_htp.core.logger import _LOGGER
+from enzy_htp.structure import Structure, PDBParser, Residue
 from enzy_htp._config.gaussian_config import GaussianConfig, default_gaussian_config
-
-from .base_interface import BaseInterface
+from enzy_htp import config as eh_config
 
 
 class GaussianInterface(BaseInterface):
@@ -38,6 +34,72 @@ class GaussianInterface(BaseInterface):
         """
         super().__init__(parent, config, default_gaussian_config)
 
+    # region == general Gaussian app interface ==
+
+    def run_gaussian(self):
+        pass
+    
+    # endregion
+
+    # region == engines ==
+    @dispatch
+    def gaussain_optimize(self, stru: str, *args, **kwargs) -> str:
+        """dispatch for using gout file as input"""
+        # san check
+        supported_format = [".log",".out"]
+        if not Path(stru).exists():
+            _LOGGER.error(f"file dont exist: {stru}")
+            raise ValueError
+        if fs.get_file_ext(stru) not in supported_format:
+            _LOGGER.error(f"file type not support: {stru} (supported: {supported_format})")
+            raise ValueError
+        
+        # stru = GOUTParser.get_structure(stru, frame="last")
+        raise Exception("TODO")
+
+
+    @dispatch
+    def gaussain_optimize(self, stru: Union[Residue, Structure],
+                          out_file: str, method: str,
+                          cluster_job_config: Dict,
+                          addition_output: bool=False,) -> str:
+        """"""
+        raise Exception("TODO")
+
+
+    @dispatch
+    def gaussain_single_point(self, stru: str, *args, **kwargs) -> str:
+        """dispatch for using gout file as input"""
+        # san check
+        supported_format = [".log",".out"]
+        if not Path(stru).exists():
+            _LOGGER.error(f"file dont exist: {stru}")
+            raise ValueError
+        if fs.get_file_ext(stru) not in supported_format:
+            _LOGGER.error(f"file type not support: {stru} (supported: {supported_format})")
+            raise ValueError
+        
+        # stru = GOUTParser.get_structure(stru, frame="last")
+        raise Exception("TODO")
+
+
+    @dispatch
+    def gaussain_single_point(self, stru: Union[Residue, Structure],
+                          out_file: str, method: str,
+                          cluster_job_config: Dict,
+                          addition_output: bool=False,) -> str:
+        """"""
+        raise Exception("TODO")
+    # endregion
+
+
+    @dispatch
+    def _(self):
+        """
+        dummy method for dispatch
+        """
+        pass
+    # region == TODO ==
     def PDB2QMMM(
         self,
         o_dir="",
@@ -459,3 +521,6 @@ class GaussianInterface(BaseInterface):
             self.env_manager_.run_command(self.config_.G16_EXE, ["<", ci, ">", outfile])
 
         return (cluster_inputs, chk_outputs)
+    # endregion
+
+gaussian_interface = GaussianInterface(None, eh_config._gaussian)

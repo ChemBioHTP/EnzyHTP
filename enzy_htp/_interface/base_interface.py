@@ -48,6 +48,10 @@ class BaseInterface(ABC):
         """Getter for the parent of the <Package>Interface."""
         return self.parent_
 
+    def set_parent(self, val):
+        """Setter for the parent of the <Package>Interface."""
+        self.parent_ = val
+
     def config(self):
         """Getter for the <Package>Config() instance belonging to the class."""
         return self.config_

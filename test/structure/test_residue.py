@@ -169,3 +169,10 @@ def test_remove_atoms_not_in_list():
     test_residue.remove_atoms_not_in_list(test_keep_list)
     assert test_residue.num_atoms == 5
     assert set(test_residue.atom_name_list) == set(test_keep_list)
+
+def test_is_connected():
+    """test function works as expected"""
+    test_residue = copy.deepcopy(RESIDUES[1])
+    test_residue.parent = RESIDUES[2].parent
+    so.init_connectivity(test_residue)
+    assert test_residue.is_connected()

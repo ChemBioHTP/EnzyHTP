@@ -1,9 +1,9 @@
-'''Testing the PDBParser class in the enzy_htp.structure.structure_io.pdb_io
+"""Testing the PDBParser class in the enzy_htp.structure.structure_io.pdb_io
 This class is for parsing in and out from PDB to Structure
 
 Author: QZ Shao <shaoqz@icloud.com>
 Date: 2022-09-08
-'''
+"""
 from collections import defaultdict
 import itertools
 import logging
@@ -28,6 +28,7 @@ from enzy_htp.structure import (
     MetalUnit,
     Ligand,
     Solvent,
+    ModifiedResidue,
 )
 
 # pylint: disable=protected-access, invalid-name
@@ -451,8 +452,8 @@ def test_categorize_residue_metal():
     assert all_residue[0].rtype is chem.ResidueType.METAL
 
 
-def test_categorize_residue_noncanonical():
-    """make a clean df manually and build atoms upon that. test if categorize_residue works for noncanonical"""
+def test_categorize_residue_modified():
+    """make a clean df manually and build atoms upon that. test if categorize_residue works for modified"""
     pdb_file_path = f'{DATA_DIR}/5JT3_noncanonical_test.pdb'
     input_pdb = PandasPdb()
     input_pdb.read_pdb(pdb_file_path)
@@ -464,7 +465,8 @@ def test_categorize_residue_noncanonical():
 
     sp._categorize_pdb_residue(res_mapper)
     all_residue = list(itertools.chain.from_iterable(res_mapper.values()))
-    assert len(list(filter(lambda x: x.rtype is chem.ResidueType.NONCANONICAL, all_residue))) == 1
+    assert len(list(filter(lambda x: x.rtype is chem.ResidueType.MODIFIED, all_residue))) == 1
+    assert len(list(filter(lambda x: isinstance(x, ModifiedResidue), all_residue))) == 1
 
 
 @pytest.mark.interface  # TODO recover some test / check the structure
