@@ -7,6 +7,8 @@ Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-02
 """
+import glob
+import os
 import re
 import shutil
 from pathlib import Path
@@ -15,19 +17,23 @@ from typing import List, Tuple, Union, Dict, Any
 
 from .base_interface import BaseInterface
 from .handle_types import MolDynParameterizer, MolDynParameter, MolDynStep
+from .ncaa_library import search_ncaa_parm_file
+from .gaussian_interface import gaussian_interface
 
 from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import env_manager as em
+from enzy_htp.core.job_manager import ClusterJob
+from enzy_htp.core.mol_dyn_result import MolDynResult
 from enzy_htp.core.exception import UnsupportedMethod, tLEaPError
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
-from enzy_htp.structure.structure_io import pdb_io, StructureParserInterface
+from enzy_htp.structure.structure_io import pdb_io, prmtop_io
 from enzy_htp.structure import (
     Structure,
-    Residue,
     Ligand,
     MetalUnit,
-    ModifiedResidue,)
+    ModifiedResidue,
+    NonCanonicalBase,)
 from enzy_htp import config as eh_config
 
 class AmberParameter(MolDynParameter):
@@ -38,22 +44,58 @@ class AmberParameter(MolDynParameter):
         prmtop: the path of the .prmtop parameter topology file"""
 
     def __init__(self, inpcrd_path: str, prmtop_path: str):
-        self.inpcrd = inpcrd_path
-        self.prmtop = prmtop_path
+        self._inpcrd = inpcrd_path
+        self._prmtop = prmtop_path
 
+    #region == property ==
     @property
     def engine(self) -> str:
         return "Amber"
-    
+
     def get_solvated_structure(self) -> Structure:
         """get the solvated structure corresponding to the parameters"""
         pass # TODO do we really need this?
+
+    @property
+    def file_list(self) -> List[str]:
+        """return a list of files that composes the parameter"""
+        return [self._inpcrd, self._prmtop]
+
+    @property
+    def topology_file(self) -> str:
+        """return the path of the topology file that composes the parameter"""
+        return self._prmtop
+
+    @property
+    def topology_parser(self) -> str:
+        """return the parser object for topology_file"""
+        return prmtop_io.PrmtopParser()
+
+    #endregion
+
+    #region == checker ==
+    def is_valid(self) -> bool:
+        """check whether the parameter files represented by {self} is valid"""
+        result = 1
+        # file exist
+        result *= Path(self._inpcrd).exists()
+        result *= Path(self._prmtop).exists()
+        # file size not zero
+        result *= os.path.getsize(self._inpcrd) != 0
+        result *= os.path.getsize(self._prmtop) != 0
+        # TODO add upon need
+        return bool(result)
+
+    #endregion
+
 
 class AmberParameterizer(MolDynParameterizer):
     """the MD parameterizer for Amber.
     Constructer:
         AmberInterface.build_md_parameterizer()
     Attributes: (configuration of the parameterization process)
+        parent_interface
+        engine
         charge_method
         resp_engine
         resp_lvl_of_theory
@@ -65,10 +107,23 @@ class AmberParameterizer(MolDynParameterizer):
         solvate_box_size
         gb_radii
         parameterizer_temp_dir
-        additional_tleap_lines"""
+        additional_tleap_lines
+    Methods:
+        run()
+        """
+
+    RADII_MAPPER={
+        1 : 'mbondi',
+        2 : 'mbondi2',
+        5 : 'mbondi2',
+        7 : 'bondi',
+        8 : 'mbondi3'}
+    """{igb methods -> Radii keyword} mapping"""
 
     def __init__(
             self,
+            interface,
+            force_fields: List[str],
             charge_method: str,
             resp_engine: str,
             resp_lvl_of_theory: str,
@@ -78,9 +133,11 @@ class AmberParameterizer(MolDynParameterizer):
             ncaa_net_charge_ph: float,
             solvate_box_type: str,
             solvate_box_size: float,
-            gb_radii: str,
+            gb_radii: int,
             parameterizer_temp_dir: str,
             additional_tleap_lines: List[str],) -> None:
+        self._parent_interface = interface
+        self.force_fields = force_fields
         self.charge_method = charge_method
         self.resp_engine = resp_engine
         self.resp_lvl_of_theory = resp_lvl_of_theory
@@ -93,18 +150,20 @@ class AmberParameterizer(MolDynParameterizer):
         self.gb_radii = gb_radii
         self.parameterizer_temp_dir = parameterizer_temp_dir
         self.additional_tleap_lines = additional_tleap_lines
-        # caches init val
-        self.cache_ncaa_lib_mapper = {}
 
     @property
     def engine(self) -> str:
         return "Amber"
 
+    @property
+    def parent_interface(self):
+        return self._parent_interface
+
     def run(self, stru: Structure) -> AmberParameter:
         """the parameterizer convert stru to amber parameter (inpcrd, prmtop)"""
         # 0. set up paths
         result_inpcrd = fs.get_valid_temp_name(f"{self.parameterizer_temp_dir}/amber_parm.inpcrd")
-        result_frcmod = fs.get_valid_temp_name(f"{self.parameterizer_temp_dir}/amber_parm.frcmod")
+        result_prmtop = fs.get_valid_temp_name(f"{self.parameterizer_temp_dir}/amber_parm.prmtop")
         fs.safe_mkdir(self.parameterizer_temp_dir)
 
         # 1. check stru diversity
@@ -112,14 +171,18 @@ class AmberParameterizer(MolDynParameterizer):
         _LOGGER.debug(f"diversity: {diversity}")
 
         # 2. extract and parameterize each special component
+        ligand_parms = {}
+        maa_parms = {}
+        metalcenter_parms = {}
+        gaff_type = self._check_gaff_type()
         if "ligand" in diversity:
-            ligand_parms = {}
             for lig in stru.ligands:
-                ligand_parms[lig.name] = self._parameterize_ligand(lig)
+                if lig.name not in ligand_parms: # avoid repeating calculation
+                    ligand_parms[lig.name] = self._parameterize_ligand(lig, gaff_type)
         if "modified_residue" in diversity:
-            maa_parms = {}
             for maa in stru.modified_residue:
-                maa_parms[maa.name] = self._parameterize_modified_res(maa)
+                if maa.name not in maa_parms:
+                    maa_parms[maa.name] = self._parameterize_modified_res(maa, gaff_type)
         if "metalcenter" in diversity:
             _LOGGER.warning(
                 "Support for paramization of metalcenter is not ready yet."
@@ -128,7 +191,6 @@ class AmberParameterizer(MolDynParameterizer):
                 " for metal centers.")
             # all_used_residue_names = []
             # all_used_atom_types = []
-            metalcenter_parms = {}
             # for metal in stru.metalcenters:
             #     parms, used_residue_names, used_atom_types = self._parameterize_metalcenter(
             #         metal, ligand_parms, maa_parms)
@@ -137,47 +199,66 @@ class AmberParameterizer(MolDynParameterizer):
             #     all_used_atom_types.extend(used_atom_types)
 
         # 3. write the combining tleap.in
-        self._write_combining_tleap_input(
-            ligand_parms,
-            maa_parms,
-            metalcenter_parms,)
+        tleap_content, temp_dry_pdb = self._write_combining_tleap_input(
+                                            stru,
+                                            ligand_parms,
+                                            maa_parms,
+                                            metalcenter_parms,
+                                            result_inpcrd,
+                                            result_prmtop,)
 
         # 4. run tleap
+        self.parent_interface.run_tleap(tleap_content)
 
         # 5. clean up
-        fs.safe_rmdir(self.parameterizer_temp_dir, empty_only=True)
+        fs.clean_temp_file_n_dir([
+            temp_dry_pdb,
+            self.parameterizer_temp_dir,
+        ])
 
-        return AmberParameter(result_inpcrd, result_frcmod)
+        return AmberParameter(result_inpcrd, result_prmtop)
 
-    def _parameterize_ligand(self, lig: Ligand) -> Tuple[str, List[str]]:
+    def _parameterize_ligand(self, lig: Ligand, gaff_type: str) -> Tuple[str, List[str]]:
         """parameterize ligand for AmberMD, use ncaa_param_lib_path for customized
         parameters. Multiplicity and charge information can be set in Ligand objects.
-        TODO prob add a Structure method for batch assigning it"""
-
+        TODO prob add a Structure method for batch assigning it
+        Returns:
+            mol_desc_path, [frcmod_path, ...]"""
+        # san check
+        if not gaff_type:
+            _LOGGER.error("The structure contains non-canonical residue"
+                          " (lig or maa) but GAFF/GAFF2 is not used!"
+                          f" Check you force_fields. (current: {self.force_fields})")
+            raise ValueError
+        # init
         fs.safe_mkdir(self.ncaa_param_lib_path)
+        target_method = f"{self.charge_method}-{gaff_type}"
+
         # 0. search parm lib
-        mol_desc_path, frcmod_path_list = self._search_ncaa_parm_file(lig)
+        mol_desc_path, frcmod_path_list = search_ncaa_parm_file(lig,
+                                            target_method=target_method,
+                                            ncaa_lib_path=self.ncaa_param_lib_path)
 
         if mol_desc_path:
             if frcmod_path_list:
                 return mol_desc_path, frcmod_path_list
         else:
-            # 1. make ligand PDB
+            # 1. generate mol2 if not found
+            mol_desc_path = f"{self.ncaa_param_lib_path}/{lig.name}_{target_method}.mol2" # the search ensured no existing file named this
+            self.parent_interface.antechamber_ncaa_to_moldesc(ncaa=lig,
+                                                        out_path=mol_desc_path,
+                                                        gaff_type=gaff_type)
 
-            # 1.1. Run RESP calculation (option)
-
-            # 2. run antechamber on the PDB get mol2
-            mol_desc_path = fs.get_valid_temp_name(
-                f"{self.ncaa_param_lib_path}/{lig.name}.mol2")
-
-        # 3. run parmchk2 on the PDB
+        # 2. run parmchk2 on the PDB
         # (this also runs when mol_desc exsit but not frcmod)
-        frcmod_path = fs.get_valid_temp_name(
-            f"{self.ncaa_param_lib_path}/{lig.name}.frcmod")
+        frcmod_path = f"{self.ncaa_param_lib_path}/{lig.name}_{target_method}.frcmod"
+        self.parent_interface.run_parmchk2(in_file=mol_desc_path,
+                                     out_file=frcmod_path,
+                                     gaff_type=gaff_type)
 
-        return mol_desc_path, frcmod_path_list
+        return mol_desc_path, [frcmod_path]
 
-    def _parameterize_modified_res(self, maa: ModifiedResidue) -> Tuple[str, List[str]]:
+    def _parameterize_modified_res(self, maa: ModifiedResidue, gaff_type: str) -> Tuple[str, List[str]]:
         """parameterize modified residues for AmberMD, use ncaa_param_lib_path for customized
         parameters. Multiplicity and charge information can be set in ModifiedResidue objects."""
         fs.safe_mkdir(self.ncaa_param_lib_path)
@@ -203,7 +284,7 @@ class AmberParameterizer(MolDynParameterizer):
             f"{self.ncaa_param_lib_path}/{maa.name}.frcmod")
         frcmod2_path = fs.get_valid_temp_name(
             f"{self.ncaa_param_lib_path}/{maa.name}.frcmod2")
-
+        raise Exception("TODO")
         return mol2_path, [frcmod_path, frcmod2_path] # TODO make sure whether mol2 works or do we even need it?
 
     def _parameterize_metalcenter(self, metal: MetalUnit,
@@ -225,171 +306,128 @@ class AmberParameterizer(MolDynParameterizer):
 
         # 5. store mol2, frcmod, bond lines in parm_dict
         parm_dict = {}
-
+        raise Exception("TODO")
         return parm_dict, new_residue_names, new_atom_types
 
     def _write_combining_tleap_input(self,
-            ligand_parms,
-            maa_parms,
-            metalcenter_parms):
-        pass
-
-    def _search_ncaa_parm_file(self, target_res: Residue) -> Tuple[str, List[str]]:
-        """search for ncaa parm files for {target_res_name} from self.ncaa_param_lib_path.
-        Args:
-            target_res: the target Residue child class instance. (e.g.: Ligand, ModifiedResidue)
+            stru: Structure,
+            ligand_parms: Dict,
+            maa_parms: Dict,
+            metalcenter_parms: Dict,
+            result_inpcrd: str,
+            result_prmtop: str,) -> Tuple[str, str]:
+        """combine mol_desc and parm file of each noncanonical parts and make the content
+        of the input file for tleap.
         Returns:
-            (prepi/mol2_path, [frcmod_path, ...]) if found
-            (None, []) if not found"""
-        mol_desc_path = None
-        frcmod_path_list = []
+            (tleap.in content, temp_pdb_path)"""
+        # init file path
+        temp_pdb_path = fs.get_valid_temp_name(f"{self.parameterizer_temp_dir}/tleap_combine.pdb")
+        # make content
+        lines = []
+        for ff in self.force_fields:
+            lines.append(f"source {ff}")
 
-        # I. initiate the ncaa_lib_mapper {file : res_name} (1-time effort if no new files added)
-        ncaa_lib_mapper = {}
+        # NCAA parts
 
-        parm_file_list = fs.get_all_file_in_dir(self.ncaa_param_lib_path)
-        for parm_file in parm_file_list:
-            res_name = self.cache_ncaa_lib_mapper.get(parm_file, None)
-            if res_name: # exist in cache
-                
-                ncaa_lib_mapper[parm_file] = res_name
+        # # add atom types TODO
+        # for xxx, new_atom_types in metalcenter_parms.values():
+        #     pass
 
-            else: # not exist in cache - file the res_name
-                # TODO support lib/off?
-                # prepin
-                if fs.get_file_ext(parm_file) in [".prepin", ".prepi"]:
-                    # 1. find 3-letter name in file
-                    parm_stru = PrepinParser().get_structure(parm_file)
-                    res_name = parm_stru.residues[0].name
-                    if res_name in [None, "UNK"]:
-                        # 2. find 3-letter name in filename
-                        res_name = self._get_ncaa_parm_file_res_name_from_filename(parm_file)
-                # mol2
-                elif fs.get_file_ext(parm_file) in [".mol2"]:
-                    pass
-                    # # 1. find 3-letter name in file
-                    # parm_stru = Mol2Parser().get_structure(parm_file)
-                    # res_name = parm_stru.residues[0].name
-                    # if res_name in [None, "UNK"]:
-                    #     # 2. find 3-letter name in filename
-                    #     res_name = self._get_ncaa_parm_file_res_name_from_filename(parm_file)
+        # ligand
+        for ncaa_name, (mol_desc_path, frcmod_path_list) in ligand_parms.items():
+            lines.extend(
+                self._make_ncaa_tleap_lines(ncaa_name, mol_desc_path, frcmod_path_list))
+        # MAA
+        for ncaa_name, (mol_desc_path, frcmod_path_list) in maa_parms.items():
+            lines.extend(
+                self._make_ncaa_tleap_lines(ncaa_name, mol_desc_path, frcmod_path_list))
+            
+        # PB/GBRadii setting
+        if self.gb_radii:
+            lines.append(f"set default PBRadii {self.RADII_MAPPER[self.gb_radii]}")
 
-                # frcmod*
-                elif ".frcmod" in fs.get_file_ext(parm_file):
-                    # seems frcmod file wont contain residue name in file
-                    res_name = self._get_ncaa_parm_file_res_name_from_filename(parm_file)
+        # load PDB
+        pdb_io.PDBParser().save_structure(outfile=temp_pdb_path,
+                                          stru=stru,
+                                          if_renumber=False)
+        lines.extend([
+            f"a = loadpdb {temp_pdb_path}",
+            "center a",
+            "addions a Na+ 0",
+            "addions a Cl- 0",
+            f"solvate{self.solvate_box_type} a TIP3PBOX {self.solvate_box_size}",
+            f"saveamberparm a {result_prmtop} {result_inpcrd}",
+            "quit",
+        ])
 
-                else:
-                    _LOGGER.warning(
-                        f"The file: {parm_file} in ncaa_parm_lib have an unknown extension."
-                        "This file will not be considered during parameterization"
-                        "currently supported types are: prepin, mol2, frcmod*")
-                    continue
+        result = "\n".join(lines)
 
-                # known file type
-                if res_name:
-                    ncaa_lib_mapper[parm_file] = res_name
-                else:
-                    _LOGGER.warning(
-                        f"The file: {parm_file} in ncaa_parm_lib does not have an "
-                        "associated residue name. This file will not be considered "
-                        "during parameterization. Make sure this is what you want! "
-                        "You can add residue name by adding it to the corresponding "
-                        "part in the file format or use the 3-letter name as filename (in upper case)") 
+        return result, temp_pdb_path
 
-        self.cache_ncaa_lib_mapper.update(ncaa_lib_mapper) # cache known ones
-
-        # II. assign to target_res
-        for file_path, res_name in ncaa_lib_mapper.items():
-            if res_name == target_res.name:
-                # prepin/mol2
-                if fs.get_file_ext(file_path) in [".prepin", ".prepi", ".mol2"]:
-                    mol_desc_path = file_path
-                # frcmod*
-                if ".frcmod" in fs.get_file_ext(file_path):
-                    frcmod_path_list.append(file_path)
-
-        return mol_desc_path, frcmod_path_list
-
-    def _get_ncaa_parm_file_res_name_from_filename(self, filename: str) -> Union[str, None]:
-        """as name desc"""
-        base_file_name = fs.base_file_name(filename)
-        if re.match("[A-Z][A-Z][A-Z]", base_file_name):
-            return base_file_name
+    def _make_ncaa_tleap_lines(self,
+            ncaa_name: str,
+            mol_desc_path: str,
+            frcmod_path_list: List[str]) -> List[str]:
+        """make ncaa moldesc and params lines in tleap.in"""
+        result = []
+        # params
+        for frcmod in frcmod_path_list:
+            result.append(f"loadAmberParams {frcmod}")
+        # mol desc
+        if fs.get_file_ext(mol_desc_path) in [".prepin", ".prepi"]:
+            result.append(f"loadAmberPrep {mol_desc_path}")
+        elif fs.get_file_ext(mol_desc_path) in [".mol2"]:
+            result.append(f"{ncaa_name} = loadmol2 {mol_desc_path}")
         else:
-            return None
+            _LOGGER.error(f"Got file with wrong extension {mol_desc_path}")
+            raise ValueError
+        return result
 
-
-class PrepinParser(StructureParserInterface):
-    """the parser for AmberMD prepin files"""
-
-    def __init__(self) -> None:  # pylint: disable=super-init-not-called
-        """pass"""
-        pass
-
-    @classmethod
-    def get_structure(cls, path: str) -> Structure:
-        """
-        Converting a .prepin file (as its path) into the Structure()
-        Arg:
-            path:
-                the file path of the PDB file
-        Return:
-            Structure()
-        """
-        # TODO finish this after merge the new Ligand class
-    # @classmethod
-    # def _parse_prepin_connect(cls, prepi_path, res):
-    #     '''parse the prepin file and store connectivity info to {res}'''
-    #     prepi_atom_mapper = {}
-    #     with open(prepi_path) as f:
-    #         line_id = 0
-    #         if_loop = 0
-    #         for line in f:
-    #             line_id += 1
-    #             if line.strip() == '':
-    #                 if if_loop == 1:
-    #                     # switch off loop and break if first blank after LOOP encountered
-    #                     if_loop = 0
-    #                     break
-    #                 continue
-    #             if if_loop:
-    #                 lp = line.strip().split()
-    #                 res._find_atom_name(lp[0]).connect.append(res._find_atom_name(lp[1]))
-    #                 continue
-    #             # loop connect starts at LOOP
-    #             if line.strip() == 'LOOP':
-    #                 if_loop = 1
-    #                 continue
-    #             # coord starts at 11th
-    #             if line_id >= 11:
-    #                 lp = line.strip().split()
-    #                 atom_id = int(lp[0])-3
-    #                 atom_name = lp[1]
-    #                 atom_cnt = int(lp[4])-3
-    #                 prepi_atom_mapper[atom_id] = (res._find_atom_name(atom_name), atom_cnt)
-
-    #     for atom_id, (atom, atom_cnt) in prepi_atom_mapper.items():
-    #         if atom_cnt != 0: # why is this? lol
-    #             cnt_atom_obj = prepi_atom_mapper[atom_cnt][0]
-    #             atom.connect.append(cnt_atom_obj)
-    #             cnt_atom_obj.connect.append(atom)
-        
-    #     for atom in res:
-    #         atom.connect = list(set(atom.connect))
+    def _check_gaff_type(self) -> str:
+        """check the GAFF type used for parameterization.
+        Return None if non of them are used."""
+        for ff in self.force_fields:
+            pattern_match = re.search(r"[Gg][Aa][Ff][Ff]2?", ff)
+            if pattern_match:
+                return pattern_match.group().upper()
+        return None
 
 
 class AmberMDStep(MolDynStep):
     """the modular MD step of Amber.
     Attributes: (necessary information of the modular MD step)
         pass"""
+    # TODO also support build from .in file
 
-    def __init__(self) -> None:
-        pass
+    def __init__(self, interface) -> None:
+        self._parent_interface = interface
 
     @property
     def engine(self) -> str:
         return "Amber"
+
+    @property
+    def parent_interface(self):
+        return self._parent_interface
+
+    @property
+    def if_report(self) -> bool:
+        """whether the step reports the output"""
+        pass
+
+    def make_job(self) -> ClusterJob:
+        """the method that make a ClusterJob that runs the step"""
+        pass
+
+    def translate(self) -> MolDynResult:
+        """the method convert engine specific results to general output"""
+        pass
+
+    @classmethod
+    def try_merge_jobs(cls, job_list: List[ClusterJob]) -> List[ClusterJob]:
+        """the classmethod that merge a list of jobs from MolDynStep to fewer jobs"""
+        pass
+
 
 
 class AmberInterface(BaseInterface):
@@ -408,6 +446,19 @@ class AmberInterface(BaseInterface):
         compatible_env_ : A bool() indicating if the current environment is compatible with the object itself.
     """
 
+    AMBER_FILE_FORMAT_MAPPER = {
+        ".prepin" : "prepi",
+    }
+    """the mapper for {ext:format} for file formats defined/used by amber
+     that are different than the extension TODO add upon need"""
+
+    SUPPORTED_CHARGE_METHOD_MAPPER = {
+        "AM1BCC" : "bcc", "bcc" : "bcc",
+        "RESP" : "resp", "resp" : "resp",
+        "rc" : "rc",
+    }
+    """dictionary that maps keywords to charge method that current supported in run_antechamber()"""
+
     def __init__(self, parent, config: AmberConfig = None) -> None:
         """Simplistic constructor that optionally takes an AmberConfig object as its only argument.
         Calls parent class."""
@@ -419,6 +470,13 @@ class AmberInterface(BaseInterface):
         self.config_.display()
 
     # == general amber app interface ==
+    def get_file_format(self, fname: str) -> str:
+        """determine the file type give file path"""
+        ext = fs.get_file_ext(fname)
+        if "frcmod" in ext:
+            return "frcmod"
+        return self.AMBER_FILE_FORMAT_MAPPER.get(ext, ext[1:])
+
     # -- tleap --
     def run_tleap(
         self,
@@ -490,6 +548,131 @@ class AmberInterface(BaseInterface):
 
         return tLEaPError(error_info_list)
 
+    # -- antechamber/parmchk2 --
+    def run_antechamber(self, in_file: str, out_file: str, net_charge: int, spin: int,
+                        charge_method: str, atom_type: str = "gaff", 
+                        charge_file: str=None,
+                        res_name: str=None,) -> None:
+        """the python wrapper of running antechamber
+        Args:
+            in_file: input file path
+            out_file: the output molecule description file path (e.g.: mol2, prepin, ac)
+            atom_type: the target atom types for generation.
+                = gaff : the default
+                = gaff2: for GAFF, version 2
+                = amber: for PARM94/99/99SB
+                = bcc : for AM1-BCC
+                = sybyl: for atom types used in sybyl
+            charge_method: the method for determining the atomic charge of atoms from the input file
+            charge_file: the charge file. (used when charge_method="rc")
+            net_charge: net_charge of the molecule. Always explicitly specify it.
+            spin: multiplicity (2S+1). Always explicitly specify it.
+            res_name: residue name (only used if not available in the input file)
+
+        Unsupported options: (Add when need)
+            -a additional file name
+            -fa additional file format
+            -ao additional file operation
+                crd : only read in coordinate
+                crg: only read in charge
+                radius: only read in radius
+                name : only read in atom name
+                type : only read in atom type
+                bond : only read in bond type
+            -rf residue topology file name in prep input file, default is molecule.res
+            -ch check file name in gaussian input file, default is molecule
+            -ek QM program (mopac or sqm) keyword (in quotes); overwrites previous keywords.
+            -gk gaussian keyword in a pair of quotation marks
+            -gm gaussian assign memory, inside a pair of quotes, such as "%mem=1000MB"
+            -gn gaussian assign number of processor, inside a pair of quotes, such as "%nproc=8"
+            -gv add keyword to generate gesp file (for Gaussian 09 only) 1: yes; 0: no, the default
+            -ge gaussian esp file generated by iop(6/50=1), default is g09.gesp
+            -df use divcon flag, 0 - use mopac; 2 - use sqm (the default)
+            -du check atom name duplications, can be yes(y) or no(n), default is yes
+            -bk 4-character component Id, for ccif
+            -j atom type and bond type prediction index, default is 4
+                0 : no assignment
+                1 : atom type
+                2 : full bond types
+                3 : part bond types
+                4 : atom and full bond type
+                5 : atom and part bond type
+            -eq equalize atomic charge, default is 1 for '-c resp' and '-c bcc'
+                0 : no equalization
+                1 : by atomic paths
+                2 : by atomic paths and geometry, such as E/Z configurations
+            -s status information, can be 0 (brief), 1 (the default) and 2 (verbose)
+            -pf remove the intermediate files: can be yes (y) and no (n, default)
+            -pl maximum path length to determin equivalence of atomic charges for resp and bcc.
+                The smaller the value, the faster the algorithm, default is -1 (use full length),
+                set this parameter to 10 to 30 if your molecule is big (# atoms >= 100)
+                -dr acdoctor mode: validate the input file a la acdoctor, yes(y, default) or no(n)"""
+        in_format = self.get_file_format(in_file)
+        cmd_args = ["-i", in_file,
+                    "-fi", in_format,
+                    "-o", out_file,
+                    "-fo", self.get_file_format(out_file),
+                    "-nc", str(net_charge),
+                    "-m", str(spin),
+                    "-at", atom_type.lower()]
+        if res_name:
+            cmd_args.extend(["-rn", res_name])
+        # charge
+        if charge_method in self.SUPPORTED_CHARGE_METHOD_MAPPER:
+            charge_method = self.SUPPORTED_CHARGE_METHOD_MAPPER[charge_method]
+            cmd_args.extend(["-c", charge_method])
+            if charge_method == "rc":
+                if charge_file:
+                    cmd_args.extend(["-cf", charge_file])
+                else:
+                    _LOGGER.error("charge_method='rc' is used but no charge_file is provided.")
+                    raise ValueError
+            if charge_method == "resp":
+                if in_format not in ["gesp", "gout"]:
+                    _LOGGER.error(f"charge_method='resp' is used but input file format ({in_file}) is not gesp or gout.")
+                    raise ValueError
+        else:
+            _LOGGER.error(f"found unsupported charge method {charge_method}."
+                          f"(Supported keywords: {self.SUPPORTED_CHARGE_METHOD_MAPPER.keys()})"
+                          "Contact author for support if it is necessary for your work.")
+            raise ValueError
+
+        self.env_manager_.run_command("antechamber", cmd_args)
+
+        # clean up
+        fs.clean_temp_file_n_dir([
+            "ATOMTYPE.INF",
+            "NEWPDB.PDB",
+            "PREP.INF",
+            "sqm.pdb",
+            "sqm.in",
+            "sqm.out",
+        ] + glob.glob("ANTECHAMBER*"))
+
+    def run_parmchk2(self, in_file: str, out_file: str, gaff_type: str,
+                     custom_force_field: str=None,
+                     is_custom_ff_type_amber: bool=True,
+                     ) -> None:
+        """the python wrapper of running parmchk2
+        Args:
+            in_file: input file path
+            out_file: the output frcmod file path
+            gaff_type: ff parm set, it is suppressed by "custom_force_field" option
+            custom_ff: the path of a customize ff file for search.
+                       (e.g.: this allows you to use ff14SB for maa)
+            is_custom_ff_type_amber: is the type of custom_ff amber
+            * TODO: support -c -a -w when needed"""
+        cmd_args = ["-i", in_file,
+                    "-f", self.get_file_format(in_file),
+                    "-o", out_file,
+                    "-s", gaff_type.lower(),]
+        if custom_force_field:
+            cmd_args.extend(["-p", custom_force_field])
+            if not is_custom_ff_type_amber:
+                cmd_args.extend(["-pf", "2"])
+
+        self.env_manager_.run_command("parmchk2", cmd_args)
+
     # -- cpptraj --
 
     # -- sander --
@@ -549,10 +732,12 @@ class AmberInterface(BaseInterface):
             shutil.move(renumbered_pdb, out_path)
             fs.clean_temp_file_n_dir([temp_dir, renumbered_pdb])
 
+    # -- MD --
     def build_md_parameterizer(
             self,
             # find default values in AmberConfig
-            # charge
+            # method
+            force_fields: List[str] = "default",
             charge_method: str = "default",
             resp_engine: str = "default",
             resp_lvl_of_theory: str = "default",
@@ -566,13 +751,16 @@ class AmberInterface(BaseInterface):
             # mod_aa_engine TODO ask if the other way really work
             # MCPY.py related TODO add when use
             # GB related
-            gb_radii: str = None,
+            gb_radii: int = None,
             # temp paths
             parameterizer_temp_dir: str = "default", # default: {config[system.SCRATCH_DIR]}/amber_parameterizer
             additional_tleap_lines: List[str] = None,
             ) -> AmberParameterizer:
         """the constructor for AmberParameterizer
         Args:
+            force_fields:
+                The list of force fields used for parameterization in Amber tleap format
+                (e.g.: ["leaprc.protein.ff14SB", "leaprc.gaff", "leaprc.water.tip3p"])
             charge_method:
                 The method used for determine the atomic charge.
                 This method is applied to parameterization of ligand, modified AA,
@@ -605,9 +793,9 @@ class AmberInterface(BaseInterface):
             solvate_box_size:
                 The size of the solvation box.
             gb_radii:
-                The effective GB radii used in the Generalized Born calculation. This will influence
-                the GB radii in the prmtop file and are only used implicit solvent calculations.
-            temp_wk_dir:
+                The igb number - the effective GB radii used in the Generalized Born calculation.
+                This will influence the GB radii in the prmtop file and are only used implicit solvent calculations.
+            parameterizer_temp_dir: (default: {config[system.SCRATCH_DIR]}/amber_parameterizer)
                 The temporary working directory that contains all the files generated by the AmberParameterizer
             additional_tleap_lines:
                 handle for adding additional tleap lines before generating the parameters."""
@@ -615,6 +803,9 @@ class AmberInterface(BaseInterface):
         # print(AmberInterface._generate_default_assigning_lines_for_build_md_parameterizer(locals().items()))
 
         # init default values
+        type_hint_sticker: AmberConfig
+        if force_fields == "default":
+            force_fields = self.config()["DEFAULT_FORCE_FIELDS"]        
         if charge_method == "default":
             charge_method = self.config()["DEFAULT_CHARGE_METHOD"]
         if resp_engine == "default":
@@ -637,6 +828,8 @@ class AmberInterface(BaseInterface):
             parameterizer_temp_dir = self.config()["DEFAULT_PARAMETERIZER_TEMP_DIR"]
 
         return AmberParameterizer(
+            self,
+            force_fields,
             charge_method,
             resp_engine,
             resp_lvl_of_theory,
@@ -662,6 +855,101 @@ class AmberInterface(BaseInterface):
         """)
         return result
 
+    def antechamber_ncaa_to_moldesc(self,
+                                    ncaa: NonCanonicalBase,
+                                    out_path: str,
+                                    gaff_type: str = "GAFF",
+                                    charge_method: str = "AM1BCC",
+                                    cluster_job_config: Dict=None,) -> str:
+        """use antechamber to generate .mol2/.ac file for ligand/modified amino acid.
+        Args:
+            ncaa: the target Ligand/ModifiedAminoAcid
+            out_path: the path of the output molecule description file. (use ext here to determine target format)
+            gaff_type: the ff type used for NCAA. This influence the atom type in the moldesc file
+            charge_method: the method for generation of atomic charges
+            cluster_job_config: the configuration for submitting cluster jobs (used for Gaussian if charge_method='resp')
+        Return:
+            the out_path
+            """
+        # san check
+        if (ncaa.multiplicity is None) or (ncaa.net_charge is None):
+            _LOGGER.error(f"supplied NCAA ({ncaa.name}) does not have charge and spin."
+                          " ALWAYS check and explicit assign it using"
+                          " Structure.assign_ncaa_chargespin()")
+            raise ValueError
+
+        # 1. make ligand PDB
+        temp_dir = eh_config["system.SCRATCH_DIR"]
+        fs.safe_mkdir(temp_dir)
+        temp_pdb_path = fs.get_valid_temp_name(f"{temp_dir}/{ncaa.name}.pdb")
+        pdb_io.PDBParser().save_structure(temp_pdb_path, ncaa)
+        input_file = temp_pdb_path
+
+        # 2. determine charge
+        charge_method = self.SUPPORTED_CHARGE_METHOD_MAPPER.get(charge_method, None)
+        if charge_method:
+            if charge_method == "bcc":
+                pass
+            if charge_method == "resp":
+            # 2.1. Run RESP calculation (option)
+                gout_file = self._calculate_charge_with(charge_method, ncaa, cluster_job_config)
+                input_file = gout_file
+        else:
+            _LOGGER.error(f"found unsupported charge method {charge_method}."
+                          f"(Supported keywords: {self.SUPPORTED_CHARGE_METHOD_MAPPER.keys()})")
+            raise ValueError
+
+        # 3. run antechamber on the PDB get mol2
+        self.run_antechamber(in_file=input_file,
+                             out_file=out_path,
+                             charge_method=charge_method,
+                             spin=ncaa.multiplicity,
+                             net_charge=ncaa.net_charge,
+                             atom_type=gaff_type,)
+
+        # 4. clean up
+        fs.clean_temp_file_n_dir([
+            input_file,
+            temp_dir
+        ])
+        return out_path
+
+    def _calculate_charge_with(self, charge_method: str, ncaa: NonCanonicalBase,
+                               cluster_job_config: Dict) -> str:
+        """generate the charge file of {charge_method} for antechamber_ncaa_to_moldesc.
+        return the output file containing the charge information varied by charge_method."""
+        temp_chg_file = fs.get_valid_temp_name(
+            f"{eh_config['system.SCRATCH_DIR']}/temp_charge.out")
+        temp_opt_file = fs.get_valid_temp_name(
+            f"{eh_config['system.SCRATCH_DIR']}/temp_opt.out")
+        supported_list = ["resp"]
+        if charge_method in supported_list:
+            if charge_method == "resp":
+                # 1. optimize (H only) "PBE1PBE/def2SVP em=gd3"? Do we?
+                gaussian_interface.gaussain_optimize(ncaa,
+                    out_file=temp_opt_file,
+                    method="PBE1PBE/def2SVP em=gd3 nosymm",
+                    cluster_job_config=cluster_job_config)
+                # 2. calculate charge
+                gaussian_interface.gaussain_single_point(temp_opt_file,
+                    out_file=temp_chg_file,
+                    method="hf/6-31g* SCF=tight Pop=MK iop(6/33=2)",
+                    addition_output=True,
+                    cluster_job_config=cluster_job_config,)
+                # 3. clean up
+                fs.clean_temp_file_n_dir(temp_opt_file)
+        else:
+            _LOGGER.error(f"using unsupported charge_method {charge_method}.")
+            raise ValueError
+
+        return temp_chg_file
+
+    def build_md_step(self,
+                      if_report: bool = False,
+                      work_dir: str = "default") -> AmberMDStep:
+        """the constructor for AmberMDStep"""
+        # TODO reference sampling.equi_md_sampling
+        return AmberMDStep() # TODO build methods first and determine what init info is needed
 
     # region == TODO ==
     def write_minimize_input_file(self, fname: str, cycle: int) -> None:
@@ -722,150 +1010,6 @@ class AmberInterface(BaseInterface):
         # yapf: enable
 
         return outfile
-
-    def _setup_solvation(self, igb: Union[None, str]) -> List[str]:
-        """Method that creates solvation box settings for system paramterization.
-        Args:
-            igb: The Born solvation setting.
-        Returns:
-            A list() of the lines to be added to the leap.in. 
-        """
-        result: List[str] = list()
-        if igb:
-            igb_str: str = str(igb)
-            radii: str = self.config_.RADII_MAP.get(igb_val)
-            if radii:
-                result.append(f"set default PDBRadii {radii}")
-            else:
-                _LOGGGER.warning(f"The IGB value {igb} is NOT suppported. Continuing...")
-
-        result.append("center a")
-        result.extend(["addions a Na+ 0", "addions a Cl- 0"])
-
-        if self.config_.BOX_TYPE == "oct":
-            result.append(f"solvateOct a TIP3PBOX {self.config_.BOX_SIZE}")
-        elif self.config_.BOX_TYPE == "box":
-            result.append(f"solvatebox a TIP3PBOX {self.config_.BOX_SIZE}")
-        else:
-            _LOGGER.error(f"The supplied box type {self.config_.BOX_SIZE} is NOT supported. Exiting...")
-            exit(1)
-        return result
-
-    def build_param_files(self, in_pdb: str, build_dir: str, pH: float = 7.0, igb: str = None) -> Tuple[str, str]:
-        """Creates the .prmtop and .inpcrd files for the supplied .pdb file. Handles
-        processing of the Ligand() and MetalCenter() objects in the structure. Note that the supplied
-        pdb file is assumed to be protonated.
-        Args:
-            in_pdb: The .pdb file to build parameter files for.
-            buld_dir: The directory to build the parameter files in.
-            pH: A float() representing the pH the parameter files should be made at. Default value is 7.0.
-            igb: a str() representing Born sovlation radius settting. 
-        Returns:
-            A Tuple[str,str] with the containing (.prmtop path, .inpcrd path).
-        """
-        ligand_dir: str = f"{build_dir}/ligands/"
-        metalcenter_dir: str = f"{build_dir}/metalcenter/"
-
-        fs.safe_mkdir(ligand_dir)
-        fs.safe_mkdir(metalcenter_dir)
-
-        structure: Structure = PDBParser().get_structure(in_pdb)
-        ligand_paths: List[str] = structure.build_ligands(ligand_dir, True)
-        for lig in ligand_paths:
-            _ = prep.protonate._protonate_ligand_PYBEL(lig, pH, lig)
-        ligand_charges: List[int] = list(map(lambda pp: prep.protonate._ob_pdb_charge(pp), ligand_paths))
-        ligand_params: List[Tuple[str, str]] = self.build_ligand_param_files(ligand_paths, ligand_charges)
-        leap_path: str = f"{build_dir}/leap.in"
-        leap_log: str = f"{build_dir}/leap.out"
-
-        leap_contents: List[str] = [
-            "source leaprc.protein.ff14SB",
-            "source leaprc.gaff",
-            "source leaprc.water.tip3p",
-        ]
-        for (prepin, frcmod) in ligand_params:
-            leap_contents.extend([f"loadAmberPrep {prepin}", f"loadAmberParams {frcmod}"])
-        leap_contents.append(f"a = loadpdb {in_pdb}")
-
-        leap_contents.extend(self._setup_solvation(igb))
-        pdb_path: Path = Path(in_pdb)
-        prmtop: str = f"{build_dir}/{pdb_path.stem}.prmtop"
-        inpcrd: str = f"{build_dir}/{pdb_path.stem}.inpcrd"
-        pdb_ff: str = f"{build_dir}/{pdb_path.stem}_ff.pdb"
-        leap_contents.extend([f"saveamberparm a {prmtop} {inpcrd}", f"savepdb a {pdb_ff}", "quit"])
-        fs.write_lines(leap_path, leap_contents)
-
-        # yapf: disable
-        self.env_manager_.run_command(
-            "tleap",
-            ["-s", "-f", leap_path, ">", leap_log]
-        )
-        # yapf: enable
-
-        good_output: bool = True
-
-        for pp in map(Path, [prmtop, inpcrd, pdb_ff]):
-            msg = str()
-            if not pp.exists():
-                good_output = False
-                msg = f"The file {pp} does not exist."
-            else:
-                if pp.stat().st_size == 0:
-                    msg = f"The file {pp} exists but is empty."
-                    good_output = False
-            if msg:
-                _LOGGER.warn(msg)
-
-        if not good_output:
-            _LOGGER.error(f"The output generated by AmberInterface.build_param_files() is incomplete. Exiting...")
-            exit(1)
-
-        return (prmtop, inpcrd)
-
-    def build_ligand_param_files(
-        self,
-        paths: List[str],
-        charges: List[int],
-    ) -> List[Tuple[str, str]]:
-        # TODO(CJ): add the method flag?
-        """Creates .prepin and .frcmod files for all the supplied .pdb files. Saves files to
-        same directory as the supplied .pdb files. Removes intermediate files. Should not
-        be called directly by the user. Instead use AmberInterface.build_param_files()
-        Args:
-            paths: A list() of ligand .pdb files to prepare. MUST BE SAME LENGHT AS charges.
-            charges: A list() of charges accompanying the paths. MUST BE SAME LENGTH AS paths.
-        Returns:
-            A list() of filename pairs with with the .prepin and .frcmod files for each supplied .pdb file.
-        Raises:
-            AssertionErrors: When various input sanitization checks fail.
-        """
-        result: List[Tuple[str, str]] = list()
-        assert len(paths) == len(charges)
-        for lig_pdb, net_charge in zip(paths, charges):
-            lig_name: str = PDBParser.get_structure(lig_pdb)
-            print(lig_name)
-            lig_pdb = Path(lig_pdb)
-            prepin: str = str(lig_pdb.with_suffix(".prepin"))
-            frcmod: str = str(lig_pdb.with_suffix(".frcmod"))
-            lig_pdb: str = str(lig_pdb)
-            # TODO(CJ): check if you can get the ligand name from the
-            # .pdb filename alone... I think this may be possible
-            # if renew
-            # yapf: disable
-            self.env_manager_.run_command(
-                "antechamber",
-                ["-i", lig_pdb, "-fi", "pdb", "-o", prepin, "-fo", "prepi", "-c", "bcc", "-s", "0", "-nc", str(net_charge), ],
-            )
-            # yapf: enable
-            self.remove_antechamber_temp_files()
-            self.env_manager_.run_command(
-                # yapf: disable
-                "parmchk2",
-                ["-i", prepin, "-f", "prepi", "-o", frcmod])
-            # yapf: enable
-            # record
-            result.append((prepin, frcmod))
-        return result
 
     def md_min_file(self, outfile: str) -> str:
         """Using the settings specified by AmberConfig.CONF_MIN, creates a min.in file for an Amber minimization run.
@@ -1289,25 +1433,6 @@ class AmberInterface(BaseInterface):
 
         return result
 
-    def remove_antechamber_temp_files(self, dname: str = './') -> None:
-        """Helper method that removes temporary files generated by antechamber from a given directory.
-        Removes the files "ATOMTYPE.INF", "NEWPDB.PDB", "PREP.INF" and those with the patterns "ANTECHAMBER*"
-        and "sqm.*".
-
-        Args:
-            dname: str() with the path to the directory to clean out. Uses current directory as default.
-
-        Returns:
-            Nothing.
-
-        """
-
-        files_to_remove: List[str] = [f"{dname}/ATOMTYPE.INF", f"{dname}/PREP.INF", f"{dname}/NEWPDB.PDB"]
-        files_to_remove.extend(list(map(str, Path(f"{dname}").glob("ANTECHAMBER*"))))
-        files_to_remove.extend(list(map(str, Path(f"{dname}").glob("sqm*"))))
-
-        _ = list(map(fs.safe_rm, files_to_remove))
-
     def add_charges(self, stru: Structure, prmtop: str) -> None:
         """Method that adds RESP charges from a .prmtop file to the supplied Structure object. If the supplied prmtop
         file does not line up with the structure, an error is thrown. Performs operation in place.
@@ -1347,3 +1472,6 @@ class AmberInterface(BaseInterface):
             pass
 
     # endregion == TODO ==
+
+
+amber_interface = AmberInterface(None, eh_config._amber)

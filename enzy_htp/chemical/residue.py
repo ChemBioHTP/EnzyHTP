@@ -301,7 +301,8 @@ RESIDUE_CONNECTIVITY_MAP: Dict[str, Dict[str, List[str]]] = {
                   "TRP": {"N": ["H", "CA", "-1C"], "H": ["N"], "CA": ["N", "HA", "CB", "C"], "HA": ["CA"], "CB": ["CA", "HB2", "HB3", "CG"], "HB2": ["CB"], "HB3": ["CB"], "CG": ["CB", "CD1", "CD2"], "CD1": ["CG", "HD1", "NE1"], "HD1": ["CD1"], "NE1": ["CD1", "HE1", "CE2"], "HE1": ["NE1"], "CE2": ["NE1", "CZ2", "CD2"], "CZ2": ["CE2", "HZ2", "CH2"], "HZ2": ["CZ2"], "CH2": ["CZ2", "HH2", "CZ3"], "HH2": ["CH2"], "CZ3": ["CH2", "HZ3", "CE3"], "HZ3": ["CZ3"], "CE3": ["CZ3", "HE3", "CD2"], "HE3": ["CE3"], "CD2": ["CG", "CE2", "CE3"], "C": ["CA", "O", "+1N"], "O": ["C"]},
                   "TYR": {"N": ["H", "CA", "-1C"], "H": ["N"], "CA": ["N", "HA", "CB", "C"], "HA": ["CA"], "CB": ["CA", "HB2", "HB3", "CG"], "HB2": ["CB"], "HB3": ["CB"], "CG": ["CB", "CD1", "CD2"], "CD1": ["CG", "HD1", "CE1"], "HD1": ["CD1"], "CE1": ["CD1", "HE1", "CZ"], "HE1": ["CE1"], "CZ": ["CE1", "OH", "CE2"], "OH": ["CZ", "HH"], "HH": ["OH"], "CE2": ["CZ", "HE2", "CD2"], "HE2": ["CE2"], "CD2": ["CG", "CE2", "HD2"], "HD2": ["CD2"], "C": ["CA", "O", "+1N"], "O": ["C"]},
                   "VAL": {"N": ["H", "CA", "-1C"], "H": ["N"], "CA": ["N", "HA", "CB", "C"], "HA": ["CA"], "CB": ["CA", "HB", "CG1", "CG2"], "HB": ["CB"], "CG1": ["CB", "HG11", "HG12", "HG13"], "HG11": ["CG1"], "HG12": ["CG1"], "HG13": ["CG1"], "CG2": ["CB", "HG21", "HG22", "HG23"], "HG21": ["CG2"], "HG22": ["CG2"], "HG23": ["CG2"], "C": ["CA", "O", "+1N"], "O": ["C"]},
-                  "WAT": {"O": ["H1", "H2"], "H1":["O"], "H2": ["O"]}
+                  "WAT": {"O": ["H1", "H2"], "H1":["O"], "H2": ["O"]},
+                  "HOH": {"O": ["H1", "H2"], "H1":["O"], "H2": ["O"]}
 }
 """dict() that maps the connectivity of atom's based on their parent residue and atom identity.
 (key, value) pairs are (3-letter AA name, connector), where connector is another dict() with 

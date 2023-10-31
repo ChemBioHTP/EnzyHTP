@@ -184,13 +184,6 @@ def test_chemical_diversity_metal():
     stru: Structure = sp.get_structure(pdb_file_path)
     assert stru.chemical_diversity == {'polypeptide': 1, 'metalcenters': {'Zn'}}
 
-def test_init_connect():
-    """test function works as expected"""
-    pdb_file_path = f"{DATA_DIR}1Q4T_ligand_test.pdb"
-    stru: Structure = sp.get_structure(pdb_file_path)
-
-    stru.init_connect()
-
 def test_add_chain():
     """test function works as expected"""
     pdb_file_path = f"{DATA_DIR}1Q4T_ligand_test.pdb"

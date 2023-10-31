@@ -7,19 +7,17 @@ Date: 2022-04-03
 from __future__ import annotations
 
 from copy import deepcopy
-from curses.ascii import isupper
 import itertools
 import sys
-import numpy as np
 from typing import List, Tuple, Union, Dict
 
+from .noncanonical_base import NonCanonicalBase
 import enzy_htp.chemical as chem
-import enzy_htp.core.math_helper as mh
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.structure import Residue, Atom
 
 
-class MetalUnit(Residue):
+class MetalUnit(NonCanonicalBase):
     """Class representing a residue unit that contains a meetal atom in a protein/enzyme
     structure or system. Only a single atom is allowed since atoms are assumed to have connectivity
     in the residue
@@ -33,9 +31,7 @@ class MetalUnit(Residue):
 
     def __init__(self, residue_idx: int, residue_name: str, atoms: List[Atom], parent=None, **kwargs):
         """Constructor for MetalUnit. Identical to Residue() constructor."""
-        self._net_charge = kwargs.get("net_charge", None)
-        self._multiplicity = kwargs.get("multiplicity", None)
-        Residue.__init__(self, residue_idx, residue_name, atoms, parent)
+        NonCanonicalBase.__init__(self, residue_idx, residue_name, atoms, parent, **kwargs)
         self.rtype = chem.ResidueType.METAL
 
     #region === Getter-Attr ===
@@ -56,26 +52,6 @@ class MetalUnit(Residue):
     @atom_name.setter
     def atom_name(self, val: str):
         self._atoms[0].name = val
-
-    @property
-    def net_charge(self) -> int:
-        """Getter for the net_charge attribute."""
-        return self._net_charge
-
-    @net_charge.setter
-    def net_charge(self, val: int):
-        """Setter for the net_charge attribute."""
-        self._net_charge = val
-
-    @property
-    def multiplicity(self) -> int:
-        """Getter for the multiplicity attribute."""
-        return self._multiplicity
-
-    @multiplicity.setter
-    def multiplicity(self, val: int):
-        """Setter for the multiplicity attribute."""
-        self._multiplicity = val
 
     #endregion
 
@@ -142,14 +118,6 @@ class MetalUnit(Residue):
         get donor residue based on donor atoms. See get_donor_mapper for detail
         """
         return list(self.get_donor_mapper(method, check_radius).keys())
-
-    def init_connect(self, method: str) -> None:
-        """initiate connectivity for the atom"""
-        support_method_list = ["isolate"]
-        if method == "isolate":
-            self.atom.connect = []
-        if method not in support_method_list:
-            _LOGGER.error(f"Method {method} not in supported list: {support_method_list}")
 
     def clone(self) -> MetalUnit:
         """Creates deepcopy of self."""

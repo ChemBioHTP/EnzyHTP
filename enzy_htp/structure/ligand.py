@@ -16,16 +16,13 @@ import numpy as np
 from .atom import Atom
 from typing import List, Tuple
 from .residue import Residue
+from .noncanonical_base import NonCanonicalBase
 import enzy_htp.chemical as chem
 
-from enzy_htp.core import file_system as fs
-from enzy_htp.core import (
-    UnsupportedFileType,
-    _LOGGER,
-)
+from enzy_htp.core import _LOGGER
 
 
-class Ligand(Residue):
+class Ligand(NonCanonicalBase):
     """Represents a specific Ligand found in a .pdb file. (#@shaoqz: a non-covalently binding small molecule to the protein part of the enzyme. decouple with PDB)
         Typically created from a base Residue() object using
         the residue_to_ligand() method found in enzy_htp.structure.ligand.py. In addition to base attributes, has
@@ -35,7 +32,8 @@ class Ligand(Residue):
 
     Attributes:
         net_charge : The net charge of the molecule as an int.
-        bonds: A List[Dict] containing bond information in the TRIPOS .mol2 format.
+        multiplicity: The multiplicity of the molecule as an int
+        bonds: A List[Dict] containing bond information.
         conformer_coords: A List[List[Tuple[float,float,float]]] containing the coordinates of conformers.
     """
 
@@ -43,62 +41,13 @@ class Ligand(Residue):
         """
         Constructor for Ligand. Identical to Residue() ctor but also takes net_charge value.
         """
-        self._net_charge = kwargs.get("net_charge", None)
-        self._multiplicity = kwargs.get("multiplicity", None)
-        self.bonds = kwargs.get('bonds', list()) 
-        Residue.__init__(self, residue_idx, residue_name, atoms, parent)
+        NonCanonicalBase.__init__(self, residue_idx, residue_name, atoms, parent, **kwargs)
         self.rtype = chem.ResidueType.LIGAND
-        self.conformer_coords = list()
 
-    
-    def add_conformer(self, points:List[Tuple[float,float,float]] ) -> int:
-        """Add the coordinates of a conformer to the Ligand(). Performs checks that the number of points matches the
-        number of atoms in the Ligand. Also checks that each point is a tuple of size 3.
-        
-        Args:
-            points: A List[Tuple[float,float,float]] containing the points of a new conformer.
-
-        Returns:
-            The number of conformers the Ligand has.
-        """
-        if len(points) != len(self.atoms):
-            _LOGGER.error(f"A total of {len(points)} were supplied. Was expecting {len(self.atoms)}. Exiting...")
-            exit( 1 )
-
-        for row in points:
-            if len(row) != 3:
-                _LOGGER.error(f"The supplied point {row} is of the wrong dimension (expecting 3 elements). Exiting...")
-                exit( 1 )
-
-        self.conformer_coords.append( points )
-
-        return self.n_conformers()
-
-
-    def n_conformers(self) -> int:
-        """How many conformers does this Ligand have?"""
-        return len(self.conformer_coords) + 1
+        self.bonds = kwargs.get('bonds', list())  # TODO change this to a more general represetation
+        self.conformer_coords = list() # TODO change this to StructureEnsemble (we can leave a reference_var here tho)
 
     # === Getter-Attr ===
-    @property
-    def net_charge(self) -> int:
-        """Getter for the net_charge attribute."""
-        return self._net_charge
-
-    @net_charge.setter
-    def net_charge(self, val: int):
-        """Setter for the net_charge attribute."""
-        self._net_charge = val
-
-    @property
-    def multiplicity(self) -> int:
-        """Getter for the multiplicity attribute."""
-        return self._multiplicity
-
-    @multiplicity.setter
-    def multiplicity(self, val: int):
-        """Setter for the multiplicity attribute."""
-        self._multiplicity = val
 
     # === Getter-Prop ===
     def clone(self) -> Ligand:
@@ -127,6 +76,35 @@ class Ligand(Residue):
     def __str__(self) -> str:
         return f"Ligand({self._idx}, {self._name}, atom:{len(self._atoms)}, {self._parent})"
 
+    #region == TODO (move to StructureEnsemble) ==
+    def add_conformer(self, points:List[Tuple[float,float,float]] ) -> int:
+        """Add the coordinates of a conformer to the Ligand(). Performs checks that the number of points matches the
+        number of atoms in the Ligand. Also checks that each point is a tuple of size 3.
+        
+        Args:
+            points: A List[Tuple[float,float,float]] containing the points of a new conformer.
+
+        Returns:
+            The number of conformers the Ligand has.
+        """
+        if len(points) != len(self.atoms):
+            _LOGGER.error(f"A total of {len(points)} were supplied. Was expecting {len(self.atoms)}. Exiting...")
+            exit( 1 )
+
+        for row in points:
+            if len(row) != 3:
+                _LOGGER.error(f"The supplied point {row} is of the wrong dimension (expecting 3 elements). Exiting...")
+                exit( 1 )
+
+        self.conformer_coords.append( points )
+
+        return self.n_conformers()
+
+
+    def n_conformers(self) -> int:
+        """How many conformers does this Ligand have?"""
+        return len(self.conformer_coords) + 1
+    #endregion
 
 def residue_to_ligand(residue: Residue, net_charge: float = None) -> Ligand:
     """Convenience function that converts Residue to ligand."""

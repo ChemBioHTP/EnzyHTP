@@ -10,7 +10,7 @@ class ResidueType(IntEnum):
     """Enumerated type representing types of residues found in PDB entries."""
 
     CANONICAL = 0
-    NONCANONICAL = 1
+    MODIFIED = 1
     SOLVENT = 2
     METAL = 3
     LIGAND = 4
@@ -20,7 +20,7 @@ class ResidueType(IntEnum):
 
 RESIDUE_TYPE_MAPPER = {
     ResidueType.CANONICAL: "CANONICAL",
-    ResidueType.NONCANONICAL: "NONCANONICAL",
+    ResidueType.MODIFIED: "MODIFIED",
     ResidueType.SOLVENT: "SOLVENT",
     ResidueType.METAL: "METAL",
     ResidueType.LIGAND: "LIGAND",

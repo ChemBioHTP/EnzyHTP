@@ -10,6 +10,7 @@ Date: 2023-09-19
 from abc import ABC, abstractmethod
 
 from enzy_htp.structure import Structure
+from ..base_interface import BaseInterface
 
 class MolDynParameter(ABC):
     """The parameter of Molecular Dynamics simulation. Different package have
@@ -21,6 +22,16 @@ class MolDynParameter(ABC):
         """the engine name that should be hardcoded in each concrete class"""
         pass
 
+    @property
+    @abstractmethod
+    def topology_file(self) -> str:
+        """return the path of the topology file that composes the parameter"""
+        pass
+
+    @property
+    def topology_parser(self) -> str:
+        """return the parser object for topology_file"""
+        pass
 
 class MolDynParameterizer(ABC):
     """The parameterizer for Molecular Dynamics simulation.
@@ -32,6 +43,14 @@ class MolDynParameterizer(ABC):
         """the engine name that should be hardcoded in each concrete class"""
         pass
 
+    @property
+    @abstractmethod
+    def parent_interface(self) -> BaseInterface:
+        """the interface of the corresponding engine software.
+        normally contains all the constructors"""
+        pass
+
     @abstractmethod
     def run(self, stru: Structure) -> MolDynParameter:
+        """the parameterization process"""
         pass

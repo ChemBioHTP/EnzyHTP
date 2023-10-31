@@ -7,6 +7,8 @@ from typing import List, Tuple, Union
 from unittest.mock import NonCallableMock
 from .logger import _LOGGER
 import numpy as np
+import numpy.typing as npt
+from scipy.spatial.transform import Rotation as R
 import math
 
 
@@ -114,3 +116,87 @@ def calc_average_task_num(num_of_task: int, num_of_worker: int) -> List[int]:
     for i in range(remaining_tasks):
         result[i] += 1
     return result
+
+
+def internal_to_cartesian(internal_coordinate: List[npt.ArrayLike],
+                          remove_dummy_point: bool=True,
+                          start_from_1: bool=False,) -> List[npt.NDArray]:
+    """derive cartesian coordinate for a list of points in internal coordinate.
+    Args:
+        internal_coordinate:
+            format: [(bond_index, bond, angle_index, angle, dihedral_index, dihedral), ...]
+    Returns:
+        cartesian_coordinate:
+            format: [(x,  y, z), ...]"""
+    result = []
+    result.extend(_convert_first_three_point(internal_coordinate[:3]))
+
+    for point in internal_coordinate[3:]:
+        result.append(_calculate_cartesian(point, result, start_from_1))
+
+    if remove_dummy_point:
+        result = _remove_dummy_point(result)
+
+    return result
+
+
+def _convert_first_three_point(frist_three: List[npt.ArrayLike]) -> List[npt.NDArray]:
+    """convert the first three point of internal coordinate using a different method"""
+    result = []
+    # 1st point
+    p_1 = np.array([0.0, 0.0, 0.0])
+    result.append(p_1)
+
+    # 2nd point
+    p_2 = np.array([frist_three[1][1], 0.0, 0.0])
+    result.append(p_2)
+
+    # 3rd point
+    r = frist_three[2][1]
+    theta = frist_three[2][3]
+    p_3 = p_2 + np.array([r * np.cos(np.deg2rad(180.0-theta)), r * np.sin(np.deg2rad(180.0-theta)), 0])
+    result.append(p_3)
+
+    return result
+
+
+def _calculate_cartesian(point: List,
+                         known_points: List[npt.NDArray],
+                         start_from_1: bool) -> npt.NDArray:
+    """calculate the cartesian coordinate of {point} in internal coordinate
+    using {known_points} in cartesian coordinate"""
+    p1_id, r, p2_id, angle, p3_id, dihedral = point
+    if start_from_1:
+        p1_id -= 1
+        p2_id -= 1
+        p3_id -= 1
+
+    p1 = known_points[p1_id]
+    p2 = known_points[p2_id]
+    p3 = known_points[p3_id]
+
+    # calculate the rotation vector (unit_axis * theta_in_degree) for angle
+    v1 = p2 - p3
+    v2 = p1 - p2
+    nv1 = np.cross(v1, v2)
+    rv1 = nv1 / np.linalg.norm(nv1) * -angle
+    rot_1 = R.from_rotvec(rv1, degrees=True)
+    # calculate the rotation vector (unit_axis * theta_in_degree) for dihedral
+    rv2 = v2 / np.linalg.norm(v2) * dihedral
+    rot_2 = R.from_rotvec(rv2, degrees=True)
+
+    # calculate displacement vector
+    dv = r * (p2 - p1) / np.linalg.norm(p2 - p1)
+
+    # rotate dv with rv1, rv2
+    dv = rot_2.apply(rot_1.apply(dv))
+
+    # apply dv to p1
+    result = p1 + dv
+
+    return result
+
+
+def _remove_dummy_point(coord: List[npt.NDArray]) -> List[npt.NDArray]:
+    """remove the first 3 dummy points"""
+    return coord[3:]

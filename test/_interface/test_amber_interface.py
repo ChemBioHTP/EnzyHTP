@@ -3,6 +3,7 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Author: QZ Shao <shaoqz@icloud.com>
 Date: 2022-06-03
 """
+import glob
 import os
 import shutil
 import pytest
@@ -11,8 +12,9 @@ from typing import Union
 
 from enzy_htp.core.exception import tLEaPError
 from enzy_htp.core.logger import _LOGGER
+from enzy_htp.core.general import EnablePropagate
 from enzy_htp.core import file_system as fs
-from enzy_htp._interface.amber_interface import AmberParameterizer, PrepinParser
+from enzy_htp._interface.amber_interface import AmberParameterizer
 import enzy_htp.structure as struct
 from enzy_htp import interface
 from enzy_htp import config as eh_config
@@ -189,6 +191,11 @@ def test_amber_parameterizer_run_lv_1():
     test_stru = struct.PDBParser().get_structure(
         f"{MM_DATA_DIR}/KE_wo_S.pdb")
     params = test_param_worker.run(test_stru)
+    assert params.is_valid()
+    for f in params.file_list:
+        fs.safe_rm(f)
+    fs.safe_rmdir(test_param_worker.parameterizer_temp_dir)
+    fs.safe_rmdir(eh_config["system.SCRATCH_DIR"])
 
 
 def test_amber_parameterizer_run_lv_2():
@@ -199,11 +206,21 @@ def test_amber_parameterizer_run_lv_2():
     ** use existing parm files for ligand"""
     ai = interface.amber
     test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
-        ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib"
+        ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib",
+        force_fields=[
+            "leaprc.protein.ff14SB",
+            "leaprc.gaff",
+            "leaprc.water.tip3p",
+        ]
     )
     test_stru = struct.PDBParser().get_structure(
         f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb")
     params = test_param_worker.run(test_stru)
+    assert params.is_valid()
+    for f in params.file_list:
+        fs.safe_rm(f)
+    fs.safe_rmdir(test_param_worker.parameterizer_temp_dir)
+    fs.safe_rmdir(eh_config["system.SCRATCH_DIR"])
 
 
 def test_amber_parameterizer_run_lv_3():
@@ -211,30 +228,59 @@ def test_amber_parameterizer_run_lv_3():
     Test structure diversity:
     - single polypeptide chain
     - single substrate (CHON)"""
+    temp_mol2_path = f"{MM_DATA_DIR}/ncaa_lib_empty/H5J_AM1BCC-GAFF2.mol2"
+    temp_frcmod_path = f"{MM_DATA_DIR}/ncaa_lib_empty/H5J_AM1BCC-GAFF2.frcmod"
     ai = interface.amber
     test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
         ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib_empty"
     )
     test_stru = struct.PDBParser().get_structure(
         f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb")
-    test_param_worker.run(test_stru)
+    test_stru.assign_ncaa_chargespin({"H5J" : (0,1)})
+    params = test_param_worker.run(test_stru)
+    assert params.is_valid()
+
+    for f in params.file_list:
+        fs.safe_rm(f)
+    fs.safe_rm(temp_mol2_path)
+    fs.safe_rm(temp_frcmod_path)
+    fs.safe_rmdir(test_param_worker.parameterizer_temp_dir)
+    fs.safe_rmdir(eh_config["system.SCRATCH_DIR"])
 
 
 def test_amber_parameterizer_run_lv_4():
     """level 4 test of the parameterizer.
     Test structure diversity:
     - 2 polypeptide chain
-    - 2 substrate (CHN, CHONP), special net charge"""
+    - 2 substrate (CHN, CHONP), special net charge
+    * use lib to make test faster"""
+    temp_mol2_path = f"{MM_DATA_DIR}/ncaa_lib_empty/PUT_AM1BCC-GAFF.mol2"
+    temp_frcmod_path = f"{MM_DATA_DIR}/ncaa_lib_empty/PUT_AM1BCC-GAFF.frcmod"
     ai = interface.amber
     test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
-        ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib_empty"
+        ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib_empty",
+        force_fields=[
+            "leaprc.protein.ff14SB",
+            "leaprc.gaff",
+            "leaprc.water.tip3p",
+        ]
     )
     test_stru = struct.PDBParser().get_structure(
         f"{MM_DATA_DIR}/puo_put.pdb")
-    test_param_worker.run(test_stru)
+    test_stru.assign_ncaa_chargespin({"PUT" : (1,1),
+                                      "FAD" : (0,1)})
+    params = test_param_worker.run(test_stru)
+    assert params.is_valid()
+
+    for f in params.file_list:
+        fs.safe_rm(f)
+    fs.safe_rm(temp_mol2_path)
+    fs.safe_rm(temp_frcmod_path)
+    fs.safe_rmdir(test_param_worker.parameterizer_temp_dir)
+    fs.safe_rmdir(eh_config["system.SCRATCH_DIR"])
 
 
-def test_amber_parameterizer_run_lv_5():
+def test_amber_parameterizer_run_lv_5(): #TODO
     """level 5 test of the parameterizer.
     Test structure diversity:
     - 2 polypeptide chain
@@ -249,7 +295,7 @@ def test_amber_parameterizer_run_lv_5():
     test_param_worker.run(test_stru)
 
 
-def test_amber_parameterizer_run_lv_6():
+def test_amber_parameterizer_run_lv_6(): #TODO
     """level 6 test of the parameterizer.
     Test structure diversity:
     - 2 polypeptide chain
@@ -263,63 +309,148 @@ def test_amber_parameterizer_run_lv_6():
         f"{MM_DATA_DIR}/tyna_clean.pdb")
     test_param_worker.run(test_stru)
 
-def test_prepin_parser_get_stru():
-    """make sure function works as expected"""
-    test_prepin = f"{MM_DATA_DIR}/ncaa_lib/ligand_H5J.prepin"
-    test_stru = PrepinParser().get_structure(test_prepin)
-    print(test_stru)
+
+def test_check_gaff_type():
+    """test _check_gaff_type in AmberParameterizer"""
+    ai = interface.amber
+    test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
+        ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib_empty",
+        force_fields=[
+            "leaprc.protein.ff14SB",
+            "leaprc.gaff2",
+            "leaprc.water.tip3p",
+        ]
+    )
+    assert test_param_worker._check_gaff_type() == "GAFF2"
+
+    test_param_worker.force_fields = [
+            "leaprc.protein.ff14SB",
+            "leaprc.gaff",
+            "leaprc.water.tip3p",
+        ]
+    assert test_param_worker._check_gaff_type() == "GAFF"
+
+    test_param_worker.force_fields = [
+            "leaprc.protein.ff14SB",
+            "leaprc.water.tip3p",
+        ]
+    assert test_param_worker._check_gaff_type() is None
+
+
+def test_run_parmchk2():
+    """test the function works well"""
+    ai = interface.amber
+    test_in_file = f"{MM_DATA_DIR}/ncaa_lib/H5J_AM1BCC-GAFF.prepin"
+    temp_frcmod_file = f"{MM_WORK_DIR}/frcmod"
+
+    ai.run_parmchk2(test_in_file, temp_frcmod_file, gaff_type="GAFF")
+
+    assert os.path.exists(temp_frcmod_file)
+    assert len(fs.lines_from_file(temp_frcmod_file)) == 23
+    fs.safe_rm(temp_frcmod_file)
+
+
+def test_run_antechamber():
+    """test the function works well"""
+    ai = interface.amber
+    test_in_file = f"{MM_DATA_DIR}/H5J.pdb"
+    temp_mol2_file = f"{MM_WORK_DIR}/H5J.mol2"
+
+    ai.run_antechamber(test_in_file, temp_mol2_file,
+                        net_charge=0, spin=1,
+                        charge_method="bcc")
+
+    assert os.path.exists(temp_mol2_file)
+    assert len(fs.lines_from_file(temp_mol2_file)) == 43
+    for temp_files in ["ATOMTYPE.INF","NEWPDB.PDB","PREP.INF","sqm.pdb","sqm.in","sqm.out"]:
+        assert not os.path.exists(temp_files)
+    assert not glob.glob("ANTECHAMBER*")
+    fs.safe_rm(temp_mol2_file)
+
+
+def test_run_antechamber_wrong(caplog):
+    """test the function works well reporting the error"""
+    ai = interface.amber
+    test_in_file = f"{MM_DATA_DIR}/H5J.pdb"
+    temp_mol2_file = f"{MM_WORK_DIR}/H5J.mol2"
+
+    with EnablePropagate(_LOGGER):
+        with pytest.raises(ValueError) as exe:
+            ai.run_antechamber(test_in_file, temp_mol2_file,
+                                net_charge=0, spin=1,
+                                charge_method="cm1")
+        assert "found unsupported charge method" in caplog.text
+
+        with pytest.raises(ValueError) as exe:
+            ai.run_antechamber(test_in_file, temp_mol2_file,
+                                net_charge=0, spin=1,
+                                charge_method="rc")
+        assert "no charge_file is provided" in caplog.text
+
+        with pytest.raises(ValueError) as exe:
+            ai.run_antechamber(test_in_file, temp_mol2_file,
+                                net_charge=0, spin=1,
+                                charge_method="resp")
+        assert "not gesp or gout" in caplog.text
+
+
+def test_antechamber_ncaa_to_moldesc():
+    """test the function works well"""
+    temp_mol2_path = f"{MM_WORK_DIR}/H5J_AM1BCC.mol2"
+    ai = interface.amber
+    test_stru = struct.PDBParser().get_structure(
+        f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb").ligands[0]
+    test_stru.net_charge = 0
+    test_stru.spin = 1
+
+    ai.antechamber_ncaa_to_moldesc(ncaa=test_stru,
+                                   out_path=temp_mol2_path,
+                                   gaff_type="GAFF",
+                                   charge_method="AM1BCC",)
+
+    assert os.path.exists(temp_mol2_path)
+    assert len(fs.lines_from_file(temp_mol2_path)) == 43
+    assert not os.path.exists("scratch/H5J.pdb")
+    fs.safe_rm(temp_mol2_path)
+
+
+def test_antechamber_ncaa_to_moldesc_wrong(caplog):
+    """test the function works well"""
+    temp_mol2_path = f"{MM_WORK_DIR}/H5J_AM1BCC.mol2"
+    ai = interface.amber
+    test_stru = struct.PDBParser().get_structure(
+        f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb").ligands[0]
+
+    with EnablePropagate(_LOGGER):
+        with pytest.raises(ValueError) as exe:
+            ai.antechamber_ncaa_to_moldesc(ncaa=test_stru,
+                                        out_path=temp_mol2_path,
+                                        gaff_type="GAFF",
+                                        charge_method="AM1BCC",)
+            assert "does not have charge and spin." in caplog.text
+
+
+def test_antechamber_ncaa_to_moldesc_resp(): #TODO
+    """test the function works well"""
+    temp_mol2_path = f"{MM_WORK_DIR}/H5J_RESP.mol2"
+    ai = interface.amber
+    test_stru = struct.PDBParser().get_structure(
+        f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb").ligands[0]
+    test_stru.net_charge = 0
+    test_stru.spin = 1
+
+    ai.antechamber_ncaa_to_moldesc(ncaa=test_stru,
+                                   out_path=temp_mol2_path,
+                                   gaff_type="GAFF",
+                                   charge_method="RESP",)
+
+    assert os.path.exists(temp_mol2_path)
+    assert len(fs.lines_from_file(temp_mol2_path)) == 43
+    assert not os.path.exists("scratch/H5J.pdb")
+    fs.safe_rm(temp_mol2_path)
+
 
 # region TODO
-
-def test_write_minimize_input_file():
-    """Testing that minimization input files are generated correctly."""
-    ai = interface.amber
-    assert not Path(MINIMIZE_INPUT_1).exists()
-    assert not Path(MINIMIZE_INPUT_2).exists()
-    ai.write_minimize_input_file(MINIMIZE_INPUT_1, 2000)
-    assert files_equivalent(MINIMIZE_INPUT_1, TARGET_MINIMIZE_INPUT_1)
-    ai.write_minimize_input_file(MINIMIZE_INPUT_2, 1000)
-    assert files_equivalent(MINIMIZE_INPUT_2, TARGET_MINIMIZE_INPUT_2)
-    fs.safe_rm(MINIMIZE_INPUT_1)
-    fs.safe_rm(MINIMIZE_INPUT_2)
-    assert not Path(MINIMIZE_INPUT_1).exists()
-    assert not Path(MINIMIZE_INPUT_2).exists()
-
-
-def test_build_param_files():
-    """Testing that the AmberInterface.build_param_files() method works correctly. Does not check that the 
-    actual output is correct, but only that the output is made.
-    """
-    ai = interface.amber
-    outdir = Path('demo/')
-    assert not outdir.is_dir()
-    test_file: str = f"{MM_BASE_DIR}/data/ff.pdb"
-    ai.build_param_files(test_file, str(outdir))
-
-    fnames: List[str] = ["ff_ff.pdb", "ff.inpcrd", "ff.prmtop", "leap.in", "leap.out"]
-
-    for fn in fnames:
-        assert (outdir / fn).exists()
-
-    shutil.rmtree(outdir)
-
-
-def test_build_param_files_does_not_exist():
-    """Testing that the AmberInterface.build_param_files() method with throw an error when the supplied .pdb file does NOT exist."""
-
-    dne = Path('dne.pdb')
-    work_dir = Path('work/')
-
-    assert not dne.exists()
-
-    ai = interface.amber
-    with pytest.raises(SystemExit) as exe:
-        ai.build_param_files(dne, work_dir)
-
-    shutil.rmtree(work_dir)
-
-    assert exe
-
 
 def test_parse_fmt_uppercase():
     """Testing that the AmberInterface.parse_fmt() method works correctly for uppercase inputs."""
@@ -354,40 +485,6 @@ def test_parse_fmt_bad_input():
 
     assert ai.parse_fmt('%FORMAT(20a4') == (None, -1)
 
-
-def test_remove_antechamber_temp_files_cwd():
-    """Testing that the AmberInterface.remove_antechamber_temp_files() method works when the current working directory is used."""
-    for acf in ANTECHAMBER_FNAMES:
-        touch(acf)
-        assert Path(acf).exists()
-
-    ai = interface.amber
-    ai.remove_antechamber_temp_files()
-
-    for acf in ANTECHAMBER_FNAMES:
-        assert not Path(acf).exists()
-
-
-def test_remove_antechamber_temp_files_non_cwd():
-    """Testing that the AmberInterface.remove_antechamber_temp_files() method works when a directory other than the current working directory is used."""
-    dirname = Path('ac-test-dir/')
-
-    assert not dirname.is_dir()
-    dirname.mkdir()
-
-    dir_ac_fnames = list(map(lambda ll: dirname / ll, ANTECHAMBER_FNAMES))
-
-    for acf in dir_ac_fnames:
-        touch(acf)
-        assert acf.exists()
-
-    ai = interface.amber
-    ai.remove_antechamber_temp_files(str(dirname))
-
-    for acf in dir_ac_fnames:
-        assert not acf.exists()
-
-    dirname.rmdir()
 
 
 def test_parse_prmtop():

@@ -37,13 +37,13 @@ Operation:
 
     Loading a structure from PDB:
         >>> import enzy_htp
-        >>> structure : enzy_htp.Structure = enzy_htp.structure_from_pdb("/path/to/pdb")
+        >>> structure : enzy_htp.Structure = enzy_htp.PDBParser().get_structure("/path/to/pdb")
 
     Surveying basic information:
         >>> structure.num_chains()
         2
-        >>> structure.residue_state
-        [("A","ASP",1),("A","ASP",2),("A","ASP",3),("B","ASP",1)] #@shaoqz:shouldn"t it be 1-letter name?
+        >>> structure.sequence
+        {"A": "HEHEHEAA", "B": "HEHEHEAA"}
         >>> structure.num_residues
         4
 
@@ -111,14 +111,15 @@ import enzy_htp.core.math_helper as mh
 from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
-from enzy_htp.chemical import convert_to_one_letter, ResidueType
+from enzy_htp.chemical import ResidueType
 
 from .atom import Atom
 from . import Chain
 from .residue import Residue
+from .noncanonical_base import NonCanonicalBase
 from .metal_atom import MetalUnit
-from .ligand import Ligand, residue_to_ligand
-from .solvent import Solvent, residue_to_solvent
+from .ligand import Ligand
+from .solvent import Solvent
 from .metal_atom import MetalUnit
 
 
@@ -301,7 +302,7 @@ class Structure(DoubleLinkedNode):
         TODO may need a class for them"""
         result: List[Residue] = list()
         for chain in self.chains:
-            result.extend(list(filter(lambda r: r.is_noncanonical(), chain)))
+            result.extend(list(filter(lambda r: r.is_modified(), chain)))
         return result
 
     @property
@@ -390,120 +391,23 @@ class Structure(DoubleLinkedNode):
 
         return result
 
+    def backbone_atoms(self, by_chain: bool=False) -> Union[List[Atom], Dict[str, List[Atom]]]:
+        """return all the backbone forming atoms {by_chain} or not"""
+        if by_chain:
+            result = defaultdict(list)
+        else:
+            result = []
+
+        for ch_id, ch in self.chain_mapper.items():
+            if ch.is_polypeptide():
+                for res in ch.residues:
+                    if by_chain:
+                        result[ch_id].extend(res.mainchain_atoms)
+                    else:
+                        result.append(res.mainchain_atoms)
+        return result
+
     # endregion
-
-    #region === Initiator === initiate date but not direct reture it 
-    def init_connect(self,
-                     ligand_fix: int = "antechamber",
-                     metal_fix: int = "isolate",
-                     ncaa_fix: int = "antechamber",
-                     solvent_fix: int = "caa") -> None:
-        """
-        Initiate connectivity for the Structure.
-        Save the connectivity to self._connect of each Atom().
-        Args:
-            ligand_fix:
-                the method that determines connectivity for ligand. (see details below)
-            metal_fix:
-                the method that determines connectivity for metal. (see details below)
-            ncaa_fix:
-                the method that determines connectivity for ncaa. (see details below)
-            solvent_fix:
-                the method that determines connectivity for solvent. (see details below)
-
-        Details:
-            polypeptide:
-                using documented connectivity for each canonical amino acid from Amber
-                library.
-            ligand:
-                fix = "antechamber":
-                    use antechamber to generated connectivity and read from prepin file.
-                    (according to https://ambermd.org/doc/prep.html the coordniate line will
-                    always start at the 11th line after 3 DUMM.)
-            metalatom:
-                fix = "isolate": treat as isolated atom
-                TODO fix = "mcpb": connect to donor atom (MCPB?)
-            non-canonical residues:
-                fix = "antechamber": same as above in ligand.
-            solvent:
-                fix = "caa": same as polypeptide part
-        """
-        # TODO(qz)(high_prior) finish all the called functions
-        self.init_connect_for_polypeptides(ncaa_fix=ncaa_fix)
-        self.init_connect_for_ligands(method=ligand_fix)
-        self.init_connect_for_metals(method=metal_fix)
-        self.init_connect_for_solvents(method=solvent_fix)
-        # check if all atoms are connected
-        for atm in self.atoms:
-            if not atm.is_connected():
-                _LOGGER.error(f"Atom {atm} doesn't have connect record after initiation.")
-                sys.exit(1)
-
-    def init_connect_for_polypeptides(self, ncaa_fix: str):
-        """initiate connectivity for polypeptides."""
-        for chain in self.polypeptides:
-            for res in chain.residues:
-                if res.is_noncanonical():
-                    res.init_connect_ncaa(method=ncaa_fix)
-                else:
-                    for atom in res.atoms:
-                        atom.init_connect_in_caa()
-
-    def init_connect_for_ligands(self, method: str):
-        """"""
-        # TODO(qz)(high_prior)
-        # TODO generate prepi by itself and store it to a global database path so that other
-        # process in the same workflow can share the generated file.
-        support_method_list = ["caa"]
-        # ligand
-        # init
-        for lig in self.ligands:
-            for atom in lig:
-                atom.connect = []
-        # fix 1
-        if ligand_fix == 1:
-            for lig in self.ligands:
-                # read prepin for each ligand
-                with open(prepi_path[lig.name]) as f:
-                    line_id = 0
-                    if_loop = 0
-                    for line in f:
-                        line_id += 1
-                        if line.strip() == "":
-                            if if_loop == 1:
-                                # switch off loop and break if first blank after LOOP encountered
-                                if_loop = 0
-                                break
-                            continue
-                        if if_loop:
-                            lp = line.strip().split()
-                            lig._find_atom_name(lp[0]).connect.append(lig._find_atom_name(lp[1]))
-                            continue
-                        # loop connect starts at LOOP
-                        if line.strip() == "LOOP":
-                            if_loop = 1
-                            continue
-                        # coord starts at 11th
-                        if line_id >= 11:
-                            lp = line.strip().split()
-                            atom_id = int(lp[0]) - 3
-                            atom_cnt = int(lp[4]) - 3
-                            if atom_cnt != 0:
-                                lig[atom_id - 1].connect.append(lig[atom_cnt - 1])
-                                lig[atom_cnt - 1].connect.append(lig[atom_id - 1])
-        if method not in support_method_list:
-            _LOGGER.error(f"Method {method} not in supported list: {support_method_list}")
-
-    def init_connect_for_metals(self, method: str):
-        """initiate connectivity for metals in the structure"""
-        for metal in self.metals:
-            metal.init_connect(method)
-
-    def init_connect_for_solvents(self, method: str):
-        """initiate connectivity for solvents in the structure"""
-        for sol in self.solvents:
-            sol.init_connect(method)
-    #endregion
 
     #region === Checker ===
     def has_charges(self) -> bool:
@@ -660,7 +564,7 @@ class Structure(DoubleLinkedNode):
         """add a residue into the structure."""
         res_type = target.rtype
         if res_type in [ResidueType.CANONICAL,
-                        ResidueType.NONCANONICAL]:
+                        ResidueType.MODIFIED]:
             _LOGGER.error("adding amino acid into the structure needs to be chain-specific. Please use Chain().add()")
             raise NameError
         elif res_type in [ResidueType.LIGAND,
@@ -670,7 +574,7 @@ class Structure(DoubleLinkedNode):
             # always make a new chain as they are not covalently connected
             if not chain_name:
                 chain_name = self._legal_new_chain_names()[0]
-            
+
             new_chain = Chain(
                 name=chain_name,
                 residues=[target,],
@@ -685,13 +589,28 @@ class Structure(DoubleLinkedNode):
 
     @dispatch
     def add(self, target: List[Residue], # pylint: disable=function-redefined
-            sort: bool = False) -> None: 
+            sort: bool = False) -> None:
         """add a list of residues into the structure."""
         for res in target:
             self.add(res, False)
         if sort:
             for ch in self:
                 ch.sort_residues()
+
+    def assign_ncaa_chargespin(self, net_charge_mapper: Dict[str, Tuple[int, int]]):
+        """assign net charges to NCAAs in Structure() based on net_charge_mapper
+        format: {"RES" : (charge, spin), ...}
+            RES is the 3-letter name of NCAAs
+            charge is the net charge
+            spin the 2S+1 number for multiplicity"""
+        for resname, (charge, spin) in net_charge_mapper.items():
+            for ncaa in self.find_residue_name(resname):
+                if not ncaa.is_noncanonical():
+                    _LOGGER.error(f"the assigning residue name {resname} is not a NCAA")
+                    raise ValueError
+                ncaa: NonCanonicalBase
+                ncaa.net_charge = charge
+                ncaa.multiplicity = spin
 
     #endregion
 
@@ -751,3 +670,9 @@ class Structure(DoubleLinkedNode):
         dummy method for dispatch
         """
         pass
+
+def convert_res_to_structure(residue: Residue) -> Structure:
+    """method that build a Structure that only contain 1 residue."""
+    chain = Chain(name="A", residues=[residue], parent=None)
+    stru = Structure(chains=[chain])
+    return stru

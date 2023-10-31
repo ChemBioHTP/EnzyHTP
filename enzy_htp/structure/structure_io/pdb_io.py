@@ -184,9 +184,9 @@ class PDBParser(StructureParserInterface):
 
     @classmethod
     @dispatch
-    def get_file_str(
+    def get_file_str(   # pylint: disable=function-redefined
             cls,
-            stru: Structure,  # pylint: disable=function-redefined
+            stru: Structure,  
             if_renumber: bool = True,
             if_fix_atomname: bool = True) -> str:
         """
@@ -590,7 +590,7 @@ class PDBParser(StructureParserInterface):
                             _LOGGER.error(
                                 f"a metal or solvent residue name is found in an peptide chain {chain_id}: {residue.idx} {residue.name}")
                             sys.exit(1)
-                        _LOGGER.debug(f"found noncanonical {chain_id} {residue.idx}")
+                        _LOGGER.debug(f"found modified residue {chain_id} {residue.idx}")
                         residue_mapper[chain_id][i] = residue_to_modified_residue(residue)
                 continue
             # non-peptide chain

@@ -1,5 +1,6 @@
 """Testing the enzy_htp.structure.Atom class.
-Author: Chris Jurich <chris.jurich@vanderbilt.edu
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Author: QZ Shao <shaoqz@icloud.com>
 Date: 2022-03-19
 """
 import itertools
@@ -14,12 +15,14 @@ import pytest
 from biopandas.pdb import PandasPdb
 
 from enzy_htp.core.file_system import lines_from_file
+from enzy_htp.core.logger import _LOGGER
 from enzy_htp.structure.atom import Atom
 from enzy_htp.structure.structure_io import PDBParser
+from enzy_htp.structure.structure_operation import init_connectivity
 
 CURR_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = f"{CURR_DIR}/data/"
-
+_LOGGER.propagate = 1
 
 def test_deepcopy():
     """test the hehavior of copy.deepcopy on Atom() under a Structure()
@@ -88,39 +91,11 @@ def test_radius():
     assert atom2.radius() == 1.32
 
 
-def test_get_connect_no_h(caplog):
-    """get connect with missing H atoms"""
-
-    original_level = enzy_htp._LOGGER.level
-    enzy_htp._LOGGER.setLevel(logging.DEBUG)
-
-    stru = PDBParser().get_structure(f"{DATA_DIR}1NVG.pdb")
-    atom1: Atom = stru["A"][0][0]  #N (Nter)
-    atom2: Atom = stru["A"][1][0]  #N
-    atom3: Atom = stru["A"][-1].find_atom_name("C")  #C (Cter)
-    assert len(atom1.init_connect_in_caa()) == 1
-    assert len(atom2.init_connect_in_caa()) == 2
-    assert len(atom3.init_connect_in_caa()) == 3
-    assert "missing connecting atom " in caplog.text
-
-    enzy_htp._LOGGER.setLevel(original_level)
-
-
-def test_get_connect_w_h():
-    """get connect with no missing H atoms"""
-    stru = PDBParser().get_structure(f"{DATA_DIR}1Q4T_peptide_protonated.pdb")
-    atom1: Atom = stru["A"][0][0]  #N (Nter)
-    atom2: Atom = stru["A"][1][0]  #N
-    atom3: Atom = stru["A"][-1].find_atom_name("C")  #N (Cter)
-    assert len(atom1.init_connect_in_caa()) == 4
-    assert len(atom2.init_connect_in_caa()) == 3
-    assert len(atom3.init_connect_in_caa()) == 3
-
-
 def test_attached_protons():
     """test if the function gives correct attached protons"""
     stru = PDBParser().get_structure(f"{DATA_DIR}1Q4T_peptide_protonated.pdb")
-    atom1 = stru["A"][0][0]  #N (Nter)
+    atom1: Atom = stru["A"][0][0]  #N (Nter)
+    init_connectivity(atom1)
     assert list(map(lambda a: a.name, atom1.attached_protons())) == ['H1', 'H2', 'H3']
 
 
@@ -161,7 +136,8 @@ def test_check_connect_setter_data_type_correct():
     atom1 = Atom({'x_coord': 0, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'DUMMY'})
     atom2 = Atom({'x_coord': 0, 'y_coord': 0, 'z_coord': 1, 'atom_name': 'DUMMY'})
 
-    atom1.connect = [[atom2, "s"]]
+    atom1.connect = [(atom2, "s")]
+    atom1.connect = [(atom2, None)]
 
 def test_check_connect_setter_data_type_wrong():
     """check using several wrong data type"""
@@ -169,7 +145,7 @@ def test_check_connect_setter_data_type_wrong():
     atom2 = Atom({'x_coord': 0, 'y_coord': 0, 'z_coord': 1, 'atom_name': 'DUMMY'})
 
     with pytest.raises(TypeError) as exe:
-        atom1.connect = [(atom2, "s")]
+        atom1.connect = [[atom2, "s"]]
     assert exe.value.args[0] == "Assigning wrong data type for connect. Correct data type: [[Atom(), 'bond_order_info'], ...]"
 
     with pytest.raises(TypeError):
@@ -179,4 +155,17 @@ def test_check_connect_setter_data_type_wrong():
         atom1.connect = [atom2]
 
     with pytest.raises(TypeError):
-        atom1.connect = [[atom2, "s"], atom2]
+        atom1.connect = [(atom2, "s"), atom2]
+
+def test_connect_to(caplog):
+    """test using example"""
+    _LOGGER.setLevel(logging.DEBUG)
+    atom1 = Atom({'x_coord': 0, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'DUMMY'})
+    atom2 = Atom({'x_coord': 0, 'y_coord': 0, 'z_coord': 1, 'atom_name': 'DUMMY'})
+
+    atom1.connect_to(atom2)
+    atom1.connect_to(atom2)
+    assert "already in connect" in caplog.text
+
+    assert atom2 in atom1.connect_atoms
+    assert atom1 in atom2.connect_atoms

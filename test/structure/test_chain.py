@@ -24,7 +24,7 @@ def test_sequence():
     assert stru[1].sequence == "GGNLP"
 
 
-def test_sequence_noncanonical():
+def test_sequence_modified():
     """test getting the sequence of the chain"""
     pdb_file_path = f"{DATA_DIR}5JT3_noncanonical_test.pdb"
     stru: Structure = sp.get_structure(pdb_file_path)

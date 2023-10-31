@@ -48,6 +48,13 @@ class AmberConfig(BaseConfig):
     """Environment variable for Amber's gpu engine"""
 
     # region == Default values for build_md_parameterizer() ==
+    DEFAULT_FORCE_FIELDS: List[str] = [
+        "leaprc.protein.ff14SB",
+        "leaprc.gaff2",
+        "leaprc.water.tip3p",
+    ]
+    """build_md_parameterizer: default force fields used for parameterization. Used in tleap.in, conform the tleap format"""
+
     DEFAULT_CHARGE_METHOD: str = "AM1BCC"
     """build_md_parameterizer: default method used for determine the atomic charge."""
 
@@ -57,7 +64,7 @@ class AmberConfig(BaseConfig):
     DEFAULT_RESP_LVL_OF_THEORY: str = "b3lyp/def2svp em=d3"
     """build_md_parameterizer: default level of theory for calculating the RESP charge."""
 
-    DEFAULT_NCAA_PARAM_LIB_PATH: str = "../ncaa_param"
+    DEFAULT_NCAA_PARAM_LIB_PATH: str = SystemConfig.NCAA_LIB_PATH
     """build_md_parameterizer: default path of the non-CAA parameter library."""
 
     DEFAULT_FORCE_RENEW_NCAA_PARAMETER: bool = False
@@ -69,7 +76,7 @@ class AmberConfig(BaseConfig):
     DEFAULT_NCAA_NET_CHARGE_PH: float = 7.0
     """build_md_parameterizer: default pH value used in determining the net charge of NCAA."""
 
-    DEFAULT_SOLVATE_BOX_TYPE: str = "box"
+    DEFAULT_SOLVATE_BOX_TYPE: str = "oct"
     """Solvation Box type. Allowed values are 'box' and 'oct'"""
 
     DEFAULT_SOLVATE_BOX_SIZE: float = 10.0

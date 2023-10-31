@@ -8,7 +8,7 @@ Date: 2022-03-19
 from __future__ import annotations
 import re
 import sys
-from typing import Any, List, Tuple
+from typing import Any, List, Tuple, Union, Dict
 from plum import dispatch
 
 import numpy as np
@@ -38,10 +38,11 @@ class Atom(DoubleLinkedNode):
         b_factor : A float representing the temperature factor (b factor).
         charge : Charge of the atom.
         element : Character representing element.
+        atom_type: a non-standard attribute of Atom(). It is specific to a force field or software.
         connect : the connectivity of this atom. (a list of reference of connected Atom objs)
     """
 
-    def __init__(self, ds: pd.Series, parent=None):
+    def __init__(self, ds: Union[Dict, pd.Series], parent=None):
         """Constructor of Atom(), where ds is of type pandas.Series"""
         # nessessary
         self._name = ds["atom_name"].strip()
@@ -64,7 +65,7 @@ class Atom(DoubleLinkedNode):
             self._element = ds["element_symbol"].strip()
         if "charge" in ds_keys and not np.isnan(ds["charge"]):
             self._charge = float(ds["charge"])
-        if "atom_type" in ds_keys and ds["atom_type"].strip() != "":
+        if "atom_type" in ds_keys and ds["atom_type"].strip() != "": #TODO(qz): find a way to unify
             self._atom_type = ds["atom_type"]
 
     #region === Getter-Attr (ref) ===
@@ -146,99 +147,81 @@ class Atom(DoubleLinkedNode):
         self._charge = val
 
     @property
-    def connect(self) -> List[Atom, str]:
+    def connect(self) -> List[Tuple[Atom, str]]:
         """getter for _connect, the list for (atoms, bond_type) it connects"""
         if not self.is_connected():
-            _LOGGER.warning(f"There are no connection info for {self}, Initiating it.")
-            self.init_connect_in_caa()  # TODO(qz): make this also works for non-caa
+            _LOGGER.error(f"There are no connection info for {self}. "
+                            "Please initiate it use structure.structure_operation.init_connectivity()")
+            raise AttributeError
         return self._connect
 
     @connect.setter
-    def connect(self, val: List[Atom, str]):
+    def connect(self, val: List[Tuple[Atom, str]]):
         """setter of connect is nessessary for residue level objects to set connectivity for atoms
-        raise an error if called by non allowed objects.
-        raise an error if the assigned val doesn't align with the format"""
-
-        # 1. check for caller
-        allowed_caller_class = ["Residue", "Atom"] # add allowed class here, prob also the adaptor class for RDKit
-        # determine caller class
-        caller_locals = sys._getframe(1).f_locals
-        if "self" in caller_locals:
-            caller_class = caller_locals["self"].__class__.__name__
-            if caller_class not in allowed_caller_class:
-                _LOGGER.error(f"only calling from methods from {allowed_caller_class} is allowed")
-                sys.exit(1)
-        
-        # 2. check for data format
+        raise an error if the assigned val doesn't align with the format"""        
+        # check for data format
         type(self)._check_assigning_connect_data_type(val)
 
-        # 3. assign the value if all passed
+        # assign the value if passed
         self._connect = val
 
-    @staticmethod
-    def _check_assigning_connect_data_type(val: Any) -> bool:
+    def connect_to(self, other: Atom, bond: str=None):
+        """connect {self} with {other}. add each other to .connect with {bond}"""
+        # connect self to other
+        if self._connect is None:
+            self._connect = []
+
+        if other in self.connect_atoms:
+            _LOGGER.debug(f"{other} already in connect of {self}. Doing nothing.")
+            return
+
+        connect_info = (other, bond)
+        type(self)._check_connect_element_data_type(connect_info)
+        self.connect.append(connect_info)
+
+        # connect other to self
+        if other._connect is None:
+            other._connect = []
+
+        if self in other.connect_atoms:
+            _LOGGER.debug(f"{self} already in connect of {other}. Doing nothing.")
+            return
+
+        connect_info = (self, bond)
+        type(other)._check_connect_element_data_type(connect_info)
+        other.connect.append(connect_info)
+
+    @classmethod
+    def _check_assigning_connect_data_type(cls, val: Any) -> bool:
         """Function used by the setter of connect. Check if the data format of val meetings the definiation.
         The format is defined in this function.
         Raise an error if the format is not met.
-        Format: [[Atom(), "bond_order_info"], ...]"""
+        Format: [(Atom(), "bond_order_info"), ...]"""
         check_pass = 1
         if isinstance(val, list):
             for i in val:
-                if isinstance(i, list):
-                    if isinstance(i[0], Atom):
-                        if isinstance(i[1], str): # TODO we can also check the format of bond info here (what format should we use?)
-                            continue
+                if cls._check_connect_element_data_type(i, raise_error=False):
+                    continue
                 check_pass *= 0
         if not check_pass:
             raise TypeError("Assigning wrong data type for connect. Correct data type: [[Atom(), 'bond_order_info'], ...]")
 
-    def init_connect_in_caa(self) -> None:  # this should actually go the residue class
-        """
-        Initiate connectivity for this atom in a canonical amino acid. (and common solvents)
-        find connect atom base on:
-        1. chem.residue.RESIDUE_CONNECTIVITY_MAP
-        2. parent residue name
-        * Using standard Amber atom names and C/N terminal name.
-          (TODO make this a standard and convert other atom name formats)
-        save found list of Atom object to self._connect (make the object to a connected state)
-        TODO(qz) make sure also leave space for bond order info
-        """
-        connect = []
-        parent_residue = self.parent
-        if parent_residue.name in chem.solvent.RD_SOLVENT_LIST:
-            cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP[parent_residue.name][self.name]
-        elif parent_residue.is_canonical():
-            r = parent_residue
-            r1 = parent_residue.chain[0]
-            rm1 = parent_residue.chain[-1]
-            if r is r1:
-                # N terminal
-                cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP_NTERMINAL[parent_residue.name][self.name]
-            else:
-                if r == rm1:
-                    # C terminal
-                    cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP_CTERMINAL[parent_residue.name][self.name]
-                else:
-                    cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP[parent_residue.name][self.name]
+    @classmethod
+    def _check_connect_element_data_type(cls, val: Any, raise_error: bool=True) -> bool:
+        """Function used by the setter of connect. Check if the data format of val meetings the definiation.
+        The format is defined in this function.
+        Raise an error if the format is not met.
+        Format: (Atom(), "bond_order_info")"""
+        check_pass = False
+        if isinstance(val, tuple):
+            if isinstance(val[0], Atom):
+                if isinstance(val[1], str) or (val[1] is None):
+                    check_pass = True
+        if raise_error:
+            if not check_pass:
+                raise TypeError("Adding wrong data type to connect. Correct data type: (Atom(), 'bond_order_info')")
         else:
-            _LOGGER.error(f"wrong method of getting connectivity of non-canonical residue {self.parent}. use Residue.init_connect_ncaa.")
-            sys.exit(1)
-
-        for name in cnt_atomnames:
-            try:
-                if name not in ["-1C", "+1N"]:
-                    cnt_atom = parent_residue.find_atom_name(name)
-                if name == "-1C":
-                    cnt_resi = parent_residue.chain.find_residue_idx(parent_residue.idx - 1)
-                    cnt_atom = cnt_resi.find_atom_name("C")
-                if name == "+1N":
-                    cnt_resi = parent_residue.chain.find_residue_idx(parent_residue.idx + 1)
-                    cnt_atom = cnt_resi.find_atom_name("N")
-                connect.append(cnt_atom)
-            except ResidueDontHaveAtom as e:
-                _LOGGER.warning(f"missing connecting atom {e.atom_name} of {self}. Structure maybe incomplete.")
-        self._connect = connect
-
+            return check_pass
     #endregion
 
     #region === Getter-Property (ref) ===
@@ -270,9 +253,18 @@ class Atom(DoubleLinkedNode):
 
     def attached_protons(self) -> List[Atom]:
         """find all protons attached to self"""
-        result = list(filter(lambda a: a.element == "H", self.connect))
+        result = list(filter(lambda a: a[0].element == "H", self.connect))
+        result = [cnt_atom for cnt_atom, bond in result]
         return result
 
+    @property
+    def connect_atoms(self) -> List[Atom]:
+        """get all atoms of connection without the bond info"""
+        if not self.is_connected():
+            _LOGGER.error(f"There are no connection info for {self}. "
+                            "Please initiate it use structure.structure_operation.init_connectivity()")
+            raise AttributeError
+        return [atom for atom, bond in self._connect]
     #endregion
 
     #region === Check ===

@@ -6,9 +6,13 @@ Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-08-01
 """
+from ._interface import StructureParserInterface
 from .pdb_io import PDBParser
-from _interface import StructureParserInterface
 from .mol2_io import Mol2Parser
+from .prepin_io import PrepinParser
+from .gjf_io import GJFParser
+from .prmtop_io import PrmtopParser
+
 # # import all modules under the dir to support user customization.
 # __all__ = []
 # for f in os.listdir(os.path.dirname(__file__)):

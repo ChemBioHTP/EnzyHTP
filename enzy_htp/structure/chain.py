@@ -6,6 +6,7 @@ Date: 2022-03-20
 """
 from __future__ import annotations
 from copy import deepcopy
+import math
 import sys
 from typing import Iterable, List, Tuple, Union
 
@@ -169,7 +170,7 @@ class Chain(DoubleLinkedNode):
         """
         if there is any non-aminoacid part in chain
         """
-        return not sum(list(map(lambda rr: (not rr.is_canonical()) and (not rr.is_noncanonical()), self._residues)))
+        return not sum(list(map(lambda rr: (not rr.is_canonical()) and (not rr.is_modified()), self._residues)))
 
     def has_metal(self) -> bool:
         """Checks if any metals are contained within the current chain."""
@@ -228,6 +229,9 @@ class Chain(DoubleLinkedNode):
                 return False
         return True
 
+    def is_connected(self) -> bool:
+        """check whether all atoms within the chain have connected initiated"""
+        return math.prod([atom.is_connected() for atom in self.atoms])
     #endregion
 
     #region === Editor ===
