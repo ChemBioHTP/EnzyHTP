@@ -38,10 +38,9 @@ from .core import (
 
 from ._config import config
 
-from .chemical import ResidueType
+from .chemical import ResidueType, parse_ec_number
 
 from ._interface import Interface, OpenPyMolSession
-
 
 interface = Interface(config)
 """Singleton interface for all softwares enzy_htp is capable of interfacing with. SHOULD NOT be used by

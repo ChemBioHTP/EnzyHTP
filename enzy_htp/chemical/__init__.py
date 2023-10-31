@@ -23,3 +23,5 @@ from .residue import (
     residue_polarity,
     non_polar,
 )
+
+from .enzyme_commission import parse_ec_number
