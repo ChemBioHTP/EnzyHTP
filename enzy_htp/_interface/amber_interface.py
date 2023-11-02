@@ -857,7 +857,7 @@ class AmberInterface(BaseInterface):
 
     def antechamber_ncaa_to_moldesc(self,
                                     ncaa: NonCanonicalBase,
-                                    out_path: str,
+                                    out_path: str = None,
                                     gaff_type: str = "GAFF",
                                     charge_method: str = "AM1BCC",
                                     cluster_job_config: Dict=None,) -> str:
@@ -877,6 +877,9 @@ class AmberInterface(BaseInterface):
                           " ALWAYS check and explicit assign it using"
                           " Structure.assign_ncaa_chargespin()")
             raise ValueError
+        # init_path
+        if out_path is None:
+            out_path = f"{eh_config['system.NCAA_LIB_PATH']}/{ncaa.name}_{charge_method}-{gaff_type}.prepin"
 
         # 1. make ligand PDB
         temp_dir = eh_config["system.SCRATCH_DIR"]
