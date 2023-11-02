@@ -298,8 +298,7 @@ class Structure(DoubleLinkedNode):
 
     @property
     def modified_residue(self) -> List[Residue]:
-        """Filters out the modified residue Residue()"s from the chains in the Structure().
-        TODO may need a class for them"""
+        """Filters out the modified residue Residue()"s from the chains in the Structure()."""
         result: List[Residue] = list()
         for chain in self.chains:
             result.extend(list(filter(lambda r: r.is_modified(), chain)))
@@ -328,6 +327,15 @@ class Structure(DoubleLinkedNode):
         result: List[Residue] = []
         for chain in self.chains:
             result.extend(list(filter(lambda r: r.is_metal_center(), chain.residues)))
+        return result
+
+    @property
+    def noncanonicals(self) -> List[Residue]:
+        """Filters out Residue()s that are ligand, modified residue, or metal in 
+        the Structure()."""
+        result: List[Residue] = list()
+        for chain in self.chains:
+            result.extend(list(filter(lambda r: r.is_noncanonical(), chain)))
         return result
 
     @property
@@ -600,11 +608,17 @@ class Structure(DoubleLinkedNode):
     def assign_ncaa_chargespin(self, net_charge_mapper: Dict[str, Tuple[int, int]]):
         """assign net charges to NCAAs in Structure() based on net_charge_mapper
         format: {"RES" : (charge, spin), ...}
-            RES is the 3-letter name of NCAAs
+            RES is the 3-letter name of NCAAs (or "LIGAND", "MODAA" for all of that kind)
             charge is the net charge
             spin the 2S+1 number for multiplicity"""
         for resname, (charge, spin) in net_charge_mapper.items():
-            for ncaa in self.find_residue_name(resname):
+            if resname == "LIGAND":
+                target_ncaa = self.ligands
+            elif resname == "MODAA":
+                target_ncaa = self.modified_residue
+            else:
+                target_ncaa = self.find_residue_name(resname)
+            for ncaa in target_ncaa:
                 if not ncaa.is_noncanonical():
                     _LOGGER.error(f"the assigning residue name {resname} is not a NCAA")
                     raise ValueError
