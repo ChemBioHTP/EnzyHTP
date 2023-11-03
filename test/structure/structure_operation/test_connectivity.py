@@ -107,7 +107,8 @@ def test_init_connectivity_lv_6():
     Test structure diversity:
     - 2 polypeptide chain
     - 1 substrate (CHONP)
-    - 1 modified amino acid (CHONP)"""
+    - 1 modified amino acid (CHON)
+    - 1 metal center (Cu)"""
     test_stru = PDBParser().get_structure(
         f"{DATA_DIR}/diversed_stru/tyna_clean.pdb")
     init_connectivity(test_stru)
