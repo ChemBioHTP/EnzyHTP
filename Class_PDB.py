@@ -1394,7 +1394,7 @@ class PDB():
         igb=None, 
         ifsolve=1,
         if_prm_only=0,
-        lig_net_charge_mapper=None,
+        lig_net_charge_mapper=None, # In new EnzyHTP, this is stored in each Ligand() instead
         maa_parm_file_path=None
         ):
         '''
@@ -1411,6 +1411,9 @@ class PDB():
         ligand: - less junk files if your workflow contains a protonation step in advance.  
         metal:
         '''
+        # init default
+        if maa_parm_file_path is None:
+            maa_parm_file_path = []
         # check and generate self.stru
         self.get_stru()
 
@@ -1533,12 +1536,14 @@ class PDB():
         '''
         if box_type == None:
             box_type = Config.Amber.box_type
+        if maa_parm_file_path is None:
+            maa_parm_file_path = []
             
         leap_path= self.cache_path+'/leap.in'
         sol_path= self.path_name+'_ff.pdb'
         with open(leap_path, 'w') as of:
             of.write('source leaprc.protein.ff14SB'+line_feed) # change to ff14SB due to suppport reason of OpenMM in the future
-            of.write('source leaprc.gaff2'+line_feed)
+            of.write('source leaprc.gaff'+line_feed) # need to change antechamber too if what to use gaff2
             of.write('source leaprc.water.tip3p'+line_feed)
             # ligands
             for prepi, frcmod in lig_parms:
