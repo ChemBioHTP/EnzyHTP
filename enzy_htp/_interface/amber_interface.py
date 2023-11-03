@@ -879,7 +879,7 @@ class AmberInterface(BaseInterface):
             raise ValueError
         # init_path
         if out_path is None:
-            out_path = f"{eh_config['system.NCAA_LIB_PATH']}/{ncaa.name}_{charge_method}-{gaff_type}.prepin"
+            out_path = f"{eh_config['system.NCAA_LIB_PATH']}/{ncaa.name}_{charge_method}-{gaff_type}.mol2"
 
         # 1. make ligand PDB
         temp_dir = eh_config["system.SCRATCH_DIR"]
