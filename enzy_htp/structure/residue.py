@@ -12,6 +12,8 @@ import sys
 import math
 from typing import Tuple, List
 
+
+import numpy as np
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
 from enzy_htp.core import _LOGGER
 from enzy_htp.core.exception import ResidueDontHaveAtom

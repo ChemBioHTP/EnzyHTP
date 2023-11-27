@@ -26,9 +26,12 @@ class AlphaFillConfig(BaseConfig):
     CONFIG_FILE: str = "alphafill.conf"
     """Path to the AlphaFill .conf file as a str()."""
 
+    MAXIT:str="maxit"
+    """Path to the maxit executable for converting .pdb files to mmCIF."""
+
     def required_executables(self) -> List[str]:
         """A hardcoded list of required executables for AlphaFill."""
-        return [self.ALPHAFILL_EXE]
+        return [self.ALPHAFILL_EXE, self.MAXIT]
 
     def required_env_vars(self) -> List[str]:
         """A hardcoded list of required enviornment variables for AlphaFill."""

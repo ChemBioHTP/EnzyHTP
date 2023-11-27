@@ -25,7 +25,15 @@ def safe_rm(fname: str) -> None:
         os.remove(fname)
 
 def safe_mv(src: str, dest: str) -> str:
-    """TODO(CJ)
+    """Robust move method that replicates shell 'mv' command. Creates temporary directories
+    when needed.
+    
+    Args:
+        src: Initial path to file object.
+        dest: Where the src will be placed. Either a new filename or destination directory.
+
+    Returns:
+        Path to the final location of the src file object.        
     """
     src = Path(src)
     dest = Path(dest)

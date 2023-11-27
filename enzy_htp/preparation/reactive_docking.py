@@ -23,7 +23,7 @@ from enzy_htp.structure import PDBParser, Mol2Parser, Structure, Ligand
 from enzy_htp.core import file_system as fs
 
 #TODO(CJ): I should go through and use existing values if cache mode is selected
-#TODO(CJ): need to be able to specify the size of the grid
+#:TODO(CJ): need to be able to specify the size of the grid
 
 def dock_reactants(structure: Structure,
                    constraints: List[RosettaCst] = None,
@@ -77,11 +77,13 @@ def dock_reactants(structure: Structure,
 
     fs.safe_mkdir(work_dir)
 
+    interface.rosetta.rename_atoms(structure)
+
     _log_settings(constraints, n_struct, cst_energy, clash_distance, clash_cutoff, max_sasa_ratio,
                 cluster_distance, use_cache, rng_seed, work_dir, save_work_dir)
     
     _validate_system( structure, constraints )
-   
+
     (param_files, charge_mapper) = _parameterize_system(structure, work_dir)
 
     df = _dock_system(structure, constraints, n_struct, param_files, charge_mapper, work_dir, rng_seed, use_cache )
@@ -147,7 +149,6 @@ def _validate_system( stru:Structure, constraints:List[RosettaCst] ) -> None:
         if not r2_found:
             msg += f"({cst.rchain_2}.{cst.rnum_2}.{cst.rname_2}),"
             error = True
-
 
     if error:
         _LOGGER.error(f"Errors while trying to validate the supplied system. Could not locate residues or had incorrect atom names: {msg[:-1]}")
@@ -434,7 +435,7 @@ def _make_options_file(pdb_file: str,
     """
     _LOGGER.info("Beginning creation of options file for Rosetta...")
     content: List[str] = [
-        #"-keep_input_protonation_state", TODO(CJ): get rid of this for now; but want it back someday
+        "-keep_input_protonation_state", #TODO(CJ): get rid of this for now; but want it back someday
         "-auto_setup_metals",
         "-run:constant_seed",
         f"-run:jran {int(rng_seed)}",
@@ -588,6 +589,7 @@ def _dock_system(structure: Structure,
 
 def _evaluate_SASA(df: pd.DataFrame, max_sasa_ratio:float) -> None:
     """TODO(CJ)
+    
     Args:
         df:
         max_sasa_ratio:
@@ -595,7 +597,10 @@ def _evaluate_SASA(df: pd.DataFrame, max_sasa_ratio:float) -> None:
     Returns:
         Nothing
     """
-    #TODO(CJ): put an error if the df is empty
+    if not df.selected.sum():
+        _LOGGER.error("No geometries still selected! Exiting...")
+        exit( 1 )
+
     _LOGGER.info(f"Beginning ligand SASA evaluation. {df.selected.sum()} geometries still selected...")
     parser = PDBParser()
     stru:Structure = parser.get_structure(df.iloc[0].description)
@@ -660,16 +665,16 @@ def _evaluate_csts(df: pd.DataFrame, csts: List[RosettaCst], cst_cutoff: int) ->
     df['cst_diff'] = cst_diff
     df['selected'] &= (df['cst_diff'] <= cst_cutoff)
 
-    #exit( 0 )
     _LOGGER.info(
         f"Finished RosettaCst evaluation. {df.selected.sum()} geometries have constraint tolerances <= {cst_cutoff:.3f} tolerance units")
 
 
 def _parameterize_system(stru:Structure, work_dir:str) -> Tuple[List[str], Dict[str, int]]:
-    """Given the input Structure(), parameterize 
+    """Given the input Structure(), parameterize everything needed to perform RosettaLigand docking.
+    
     Args:
-        reactants:
-        reactant_conformers:
+        stru: The Structure() to parameterize.
+        work_dir: Where temporary files will be saved.
 
     Returns:
         A Tuple() with the format (list(), dict()), holding the (.params file names, charge mapper ). 
@@ -684,6 +689,7 @@ def _parameterize_system(stru:Structure, work_dir:str) -> Tuple[List[str], Dict[
         conformers:str=None
         if type(res) != Ligand:
             continue
+        
         _LOGGER.info(f"Detected residue {res.name} in chain {res.parent.name}...")
         if res.n_conformers() == 1:
             _LOGGER.info(f"\tDetected no conformers!")
@@ -711,6 +717,7 @@ def _parameterize_system(stru:Structure, work_dir:str) -> Tuple[List[str], Dict[
             res.name,
             conformers
         )
+        pfile = fs.safe_mv( pfile, work_dir )
         _LOGGER.info(f"Information for reactant {res.name}:")
         _LOGGER.info(f"\tparam file: {pfile}")
         _LOGGER.info(f"\tcharge: {charge}")
@@ -723,53 +730,15 @@ def _parameterize_system(stru:Structure, work_dir:str) -> Tuple[List[str], Dict[
     return (param_files, charge_mapper)
 
 
-
-
-def _ligand_chain_names(stru:Structure) -> List[str]:
-    """TODO(CJ): 
+def _evaluate_clashes(df: pd.DataFrame, clash_distance: float, clash_cutoff: int) -> None:
+    """TODO(CJ):
+    
     Args:
 
     Returns:
+        Nothing.         
+
     """
-    #TODO(CJ): change to reactant names
-    _LOGGER.info(f"Quick analysis of reactant-enzyme system...")
-    result: List[str] = list()
-
-    _LOGGER.info("Detecting reactants:")
-    for chain in stru.chains:
-        for residue in chain.residues:
-            if residue.is_ligand():
-                _LOGGER.info(f"\treactant {residue.name} in chain {chain.name}")
-                result.append(chain.name)
-
-    return result
-
-def _place_reactants(structure: Structure, reactants: List[str], pdb_code) -> bool:
-    """TODO(CJ)"""
-
-    _LOGGER.info("Beginning placement of reactants into apo-enzyme...")
-
-    n_reactants: int = len(reactants)
-    reactants_left: Set = set([Path(rr).stem for rr in reactants])
-
-    for rr in structure.residues:
-        if rr.name in reactants_left:
-            reactants_left.remove(rr.name)
-
-    if not reactants_left:
-        _LOGGER.info("All reactants are present in complex! Continuing...")
-        return
-
-    if n_reactants == len(reactants_left):
-        _LOGGER.info("Reactants not present in complex! Beginning placement strategy...")
-        assert False, "Not implemented yet!!!!"
-    else:
-        _LOGGER.error("Some reactants are present in complex some are not. Must be all or nothing. Exiting...")
-        exit(1)
-
-
-def _evaluate_clashes(df: pd.DataFrame, clash_distance: float, clash_cutoff: int) -> None:
-    """TODO(CJ)"""
 
     _LOGGER.info(f"Beginning clash evaluation. {df.selected.sum()} geometries still selected...")
     session = interface.pymol.new_session()
@@ -803,55 +772,6 @@ def _evaluate_clashes(df: pd.DataFrame, clash_distance: float, clash_cutoff: int
 
     _LOGGER.info(
         f"Finished clash evaluation. {df.selected.sum()} geometries have <= {clash_cutoff} of distance {clash_distance:.3f} angstroms")
-
-
-def _create_binding_clusters(geometries: List[str], chain_names):
-    _LOGGER.info("Creating binding clusters...")
-
-    session = interface.pymol.new_session()
-
-    rms_mapper = dict()
-    sele_names = [Path(gg).stem for gg in geometries]
-
-    args = []
-    for gg in geometries:
-        args.append(('load', gg))
-
-    args.append(('remove', 'not ( ' + ' or '.join(map(lambda ll: f"chain {ll}", chain_names)) + ' ) '))
-    args.append(('save', 'temp.pse'))
-
-    interface.pymol.general_cmd(session, args)
-
-    n_geo: int = len(geometries)
-    chain_sele = "(" + " or ".join(map(lambda ll: f"chain {ll}", chain_names)) + ")"
-    for gidx1 in range(n_geo):
-        for gidx2 in range(gidx1 + 1, n_geo):
-            g1, g2 = geometries[gidx1], geometries[gidx2]
-            args = [('rms', f"{sele_names[gidx1]} and {chain_sele}", f"{sele_names[gidx2]} and {chain_sele}")]
-            rms_value: float = interface.pymol.general_cmd(session, args)[-1]
-            rms_mapper[(g1, g2)] = rms_value
-            rms_mapper[(g2, g1)] = rms_value
-    interface.pymol.general_cmd(session, [('delete', 'all')])
-
-    rms_clusters = list()
-
-    for gg in geometries:
-        placed = False
-        for grp in rms_clusters:
-            for member in grp:
-                if rms_mapper[(gg, member)] <= 2.0:  #TODO(CJ): paramterize this
-                    grp.add(gg)
-                    placed = True
-                if placed:
-                    break
-            if placed:
-                break
-        if not placed:
-            rms_clusters.append({gg})
-
-    _LOGGER.info(f"Created {len(rms_clusters)} clusters!")
-
-    return rms_clusters
 
 
 def _system_charge(df: pd.DataFrame, charge_mapper=None) -> int:
@@ -922,123 +842,6 @@ def _system_charge(df: pd.DataFrame, charge_mapper=None) -> int:
     _LOGGER.info(f"Total charge of enzyme system: {charge}")
 
     return charge
-
-
-def _define_binding_pockets(start_pdb: str, distance_cutoff, charge_mapper=None):
-    """TODO"""
-    #TODO(CJ): make this work for multiple reactants
-    session = interface.pymol.new_session()
-    res_names: List[str] = interface.pymol.collect(session, start_pdb, "resn".split()).resn.unique()
-    sele_names: Dict[str, str] = {}
-    binding_ddg: Dict[str, List[float]] = {}
-    charges: Dict[str, float] = {}
-
-    binding_pockets = list()
-
-    reactants = list()
-    for rn in res_names:
-        if rn.upper() in chem.METAL_CENTER_MAP or rn.upper() in chem.THREE_LETTER_AA_MAPPER:
-            continue
-        reactants.append(rn)
-
-    _LOGGER.info(f"Found {len(rn)} reactants: {', '.join(reactants)}")
-    _LOGGER.info("Analyzing binding pockets of each reactant...")
-
-    reactant_sele = " or ".join(map(lambda ll: f"resn {ll}", reactants))
-    for rn in reactants:
-
-        binding_pocket = dict()
-        _LOGGER.info(f"Analyzing reactant {rn}...")
-        atoms: pd.DataFrame = interface.pymol.collect(
-            session,
-            start_pdb,
-            "resi chain resn name".split(),
-            sele=f"(byres all within {distance_cutoff:.2f} of resn {rn}) and not ({reactant_sele})")
-
-        binding_pocket["receptor_charge"] = _system_charge(atoms, charge_mapper)
-        binding_pocket["probe_charge"] = charge_mapper[rn]
-        binding_pocket["sele"] = " or ".join(map(lambda pr: f"(resi {pr[0]} and chain {pr[1]})", set(zip(atoms.resi, atoms.chain))))
-        binding_pocket["resn"] = rn
-
-        _LOGGER.info(f"\tprobe charge: {binding_pocket['probe_charge']}")
-        _LOGGER.info(f"\treceptor charge {binding_pocket['receptor_charge']}")
-        _LOGGER.info(f"\tnumber of residues in receptor: {binding_pocket['sele'].count(' or ')+1}")
-
-        binding_pockets.append(binding_pocket)
-
-    return binding_pockets
-
-
-def _evaluate_binding(df: pd.DataFrame,
-                      start_pdb: str,
-                      binding_cutoff: int,
-                      chain_names,
-                      distance_cutoff: float = 4.0,
-                      use_rms: bool = True,
-                      charge_mapper=None) -> None:
-    """ """
-
-    _LOGGER.info(f"Beginning binding evaluation. {df.selected.sum()} geometries still selected...")
-
-    rms_clusters = _create_binding_clusters(df[df.selected].description.to_list(), chain_names)
-
-    binding_pockets: List[Set[str]] = _define_binding_pockets(start_pdb, distance_cutoff, charge_mapper)
-
-    clusters = dict()
-    cluster_mapper = dict()
-    resnames = set()
-    for cidx, rcluster in enumerate(rms_clusters):
-        cluster_name: str = f"cluster_{cidx:03d}"
-        cluster = {"name": cluster_name}
-        _LOGGER.info(f"Analyzing cluster {cidx+1} of {len(rms_clusters)}..")
-        molfile: str = list(rcluster)[0]
-        for rc in rcluster:
-            cluster_mapper[rc] = cluster_name
-
-        _LOGGER.info(f"Using file {molfile}")
-
-        for bp in binding_pockets:
-            #TODO(CJ): check if xtb failed for SCF iteration reasons and retry if so
-            _LOGGER.info(f"Calculating binding energy for {bp['resn']}...")
-            be: float = binding_energy(molfile,
-                                       f"resn {bp['resn']}",
-                                       bp['sele'],
-                                       bp['probe_charge'],
-                                       bp['receptor_charge'],
-                                       work_dir=config["system.SCRATCH_DIR"])
-            _LOGGER.info(f"Found binding energy of {be:.3f} hartrees")
-            cluster[bp['resn']] = be
-            resnames.add(bp['resn'])
-
-        clusters[cluster_name] = cluster
-
-    new_data = defaultdict(list)
-
-    for i, row in df.iterrows():
-        cluster_name: str = cluster_mapper.get(row.description, None)
-        new_data['cluster'].append(cluster_mapper.get(row.description, None))
-        for rn in resnames:
-            temp = clusters.get(cluster_name, None)
-            if temp is not None:
-                temp = temp.get(rn, None)
-            new_data[f"{rn}_ddg"].append(temp)
-
-    binding_log_sum = np.zeros(len(df))
-    for col_name, col_values in new_data.items():
-        df[col_name] = col_values
-
-        if col_name != 'cluster':
-            binding_log_sum += np.exp(df[col_name].to_numpy())
-
-    df['binding_ddg_log_sum'] = binding_log_sum
-
-    bls = df.binding_ddg_log_sum.to_numpy()
-    bls_is_nan = np.isnan(bls)
-    bls_cutoff = np.percentile(bls[~bls_is_nan], binding_cutoff)
-    df['selected'] = (df.selected) & (~bls_is_nan) & (bls <= bls_cutoff)
-
-    _LOGGER.info(f"Finished binding evaluation. {df.selected.sum()} geometries have been selected.")
-
 
 def _define_active_site(structure: Structure, distance_cutoff, charge_mapper=None):
     """TODO(CJ)"""
@@ -1114,7 +917,11 @@ def _qm_minimization(df:pd.DataFrame, charge_mapper, cluster_distance:float, con
 
     if work_dir is None:
         work_dir = config['system.SCRATCH_DIR']
-    _LOGGER.info(df.sort_values(by='qm_energy'))
+
+    if not df.selected.sum():
+        _LOGGER.error("No geometries still selected! Exiting...")
+        exit( 1 )
+
     infile:str=df[df.selected].sort_values(by='qm_energy').description.to_list()[0]
     
     session = interface.pymol.new_session()
@@ -1202,7 +1009,13 @@ def _evaluate_qm(df: pd.DataFrame, structure: Structure, charge_mapper, cluster_
 
         interface.pymol.general_cmd(session, [('delete', 'all')])
         interface.pymol.create_cluster(session, row.description, as_info['sele'], outfile='temp.xyz', cap_strategy='CH3')
-        qm_energy.append(interface.xtb.single_point('temp.xyz', charge=as_info['charge']))
+        energy:float = None
+        try:
+            energy = interface.xtb.single_point('temp.xyz', charge=as_info['charge'])
+        except: 
+            pass
+
+        qm_energy.append(energy)
 
         fs.safe_rm('temp.xyz')
         _LOGGER.info(row.description)
@@ -1227,6 +1040,16 @@ def _log_settings(
     """Logs settings for the current reactive docking run. Done at the INFO level.
 
     Args:
+        constraints: A List() of RosettaCst's defining the system at hand.
+        n_struct: How many geometries to sample as an int(). 
+        cst_energy: Rosetta Energy Unit cutoff for filtering geometries.
+        clash_distance: Heavy atom radius for clash counting as a float().
+        clash_cutoff: The number of clashes before a geometry is filtered as an int().
+        max_sasa_ratio: Maximum allowed SASA ratio for ligands in a geometry as a float().
+        use_cache: Should existing results be used when possible?
+        rng_seed: The seed for random number generation as an int(). 
+        work_dir: Directory where temporary files are written. 
+        save_work_dir: Should temporary files be deleted after reactive docking is run.?
 
     Returns:
         Nothing.

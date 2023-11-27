@@ -51,6 +51,10 @@ class Mole2Cavity:
         self.mesh_density_ = mesh_density
         self.com_ = com 
 
+    
+    def points(self) -> List[npt.NDArray]:
+        """TODO(CJ)"""
+        return self.points_
 
     def volume(self) -> float:
         """The volume of the cavity in A^3. Set at time of construction."""
@@ -69,6 +73,7 @@ class Mole2Cavity:
         Returns:
             If the point is contained by the mesh.
         """
+
         point = pv.PolyData([point])
         result = point.select_enclosed_points(
             self.mesh_,
@@ -76,6 +81,18 @@ class Mole2Cavity:
         )
         
         return bool(result['SelectedPoints'][0])
+
+    def contains_points(self, points: List[npt.NDArray]) -> bool:
+        """TODO(CJ): make this a dispatch and this will be the list version"""
+
+        points = pv.PolyData(points)
+        result = points.select_enclosed_points(
+            self.mesh_,
+            check_surface=False
+        )
+        
+        return result['SelectedPoints']
+
 
     def probe(self) -> float:
         """Getter for the probe radius in A"""
@@ -111,7 +128,8 @@ class Mole2Interface(BaseInterface):
                                 non_active_parts:List[Tuple[str,int]], 
                                 probe:float, 
                                 inner:float, 
-                                mesh_density:float
+                                mesh_density:float,
+                                ignore_hetatm:bool
                                 ) -> str:
         """Given settings for the mole2 run, writes an input .xml file for mole2. Always writes the file 
         to work_dir/__mole2_input.xml.
@@ -123,6 +141,7 @@ class Mole2Interface(BaseInterface):
             probe: Probe radius to use in A. Defaults to Mole2Config.PROBE if not supplied.
             inner: Inner radius to use in A. Defaults to Mole2Config.INNER if not supplied.
             mesh_density: Mesh density to use in A. Defaults to Mole2Config.MESH_DENSITY if not supplied.
+            ignore_hetam: TOOD(CJ)
 
         Returns:
             A str() with the filename of the .xml containing the mole2 input.
@@ -142,7 +161,7 @@ class Mole2Interface(BaseInterface):
 
         content.extend([
             "\t<Params>",
-           f"\t\t<Cavity ProbeRadius=\"{probe}\" InteriorThreshold=\"{inner}\" />",
+           f"\t\t<Cavity ProbeRadius=\"{probe}\" InteriorThreshold=\"{inner}\" IgnoreHETAtoms=\"{ignore_hetatm}\"/>",
             "\t</Params>",
             "\t<Export>",
             "\t\t<Formats Mesh=\"1\" />",
@@ -216,6 +235,7 @@ class Mole2Interface(BaseInterface):
                                 probe:float=None, 
                                 inner:float=None, 
                                 mesh_density:float=None,
+                                ignore_hetatm:bool=None,
                                 work_dir:str=None,
                                 use_mono:bool=True
                                 ) -> List[Mole2Cavity]:
@@ -228,6 +248,7 @@ class Mole2Interface(BaseInterface):
             probe: Probe radius to use in A. Defaults to Mole2Config.PROBE if not supplied.
             inner: Inner radius to use in A. Defaults to Mole2Config.INNER if not supplied.
             mesh_density: Mesh density to use in A. Defaults to Mole2Config.MESH_DENSITY if not supplied.
+            ignore_hetatm: TODO(CJ)
             work_dir: Directory to do work in. Defaults to system.SCATCH_DIR if not supplied.
             use_mono: Does mono need to be used during run time? Defaults to true.
 
@@ -247,13 +268,16 @@ class Mole2Interface(BaseInterface):
         if work_dir is None:
             work_dir = eh_config['system.SCRATCH_DIR']
 
+        if ignore_hetatm is None:
+            ignore_hetatm = self.config_.IGNORE_HETATM
+
         fs.safe_mkdir( work_dir )
 
         fs.safe_rmdir( f"{work_dir}/mesh/")
 
         fs.check_not_empty( molfile )
 
-        xml_file:str = self._write_xml_input(molfile, work_dir, non_active_parts, probe, inner, mesh_density)
+        xml_file:str = self._write_xml_input(molfile, work_dir, non_active_parts, probe, inner, mesh_density, ignore_hetatm)
 
         if use_mono:
             self.env_manager_.run_command(self.config_.MONO, [self.config_.MOLE2, xml_file])

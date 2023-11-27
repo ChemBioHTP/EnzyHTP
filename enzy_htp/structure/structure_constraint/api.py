@@ -12,6 +12,31 @@ from typing import List, Tuple
 from enzy_htp.core.logger import _LOGGER
 from ..structure import Structure, Solvent, Chain, Residue, Atom
 
+from abc import ABC
+
+
+class GeometricConstraint(ABC):
+
+    def __init__(self):
+        pass
+                                                        
+
+    def score_energy(self) -> float:
+        pass
+
+
+class CartesianFreeze(GeometricConstraint):
+    
+    def __init__(self, 
+     
+
+
+class AngleConstraint:
+    
+    def __init__(self, 
+
+
+
 class StructureConstraint:
     """This class describe a constrain of a structure (defined by the topology)
     Constructors:
@@ -32,12 +57,34 @@ class StructureConstraint:
         # init for check
         self._is_backbone_freeze = None
 
+        #self.distance
+
+
+    def add_angle_constraint(self, 
+
+
+    def set_topology(self, topology:Structure) -> None:
+        pass
+
     def is_backbone_freeze(self) -> bool:
         """this method saves effort when parsing to common Amber constrain"""
         if self._is_backbone_freeze is None:
             return set(self._topology.backbone_atoms()) == set(self._freeze_atoms)
         else:
             return self._is_backbone_freeze
+
+    def is_compatible(self, stru: Structure) -> bool:
+        """TODO(CJ)"""
+        pass
+
+
+    def energy_penalty(self) -> float:
+        pass
+
+
+
+def build_from_xml(file:str) -> StructureConstraint:
+    pass
 
 
 def build_from_preset(topology: Structure,

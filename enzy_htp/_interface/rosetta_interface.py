@@ -8,16 +8,21 @@ import re
 import shutil
 from pathlib import Path
 from copy import deepcopy
+from plum import dispatch
 from xml.dom import minidom
 import xml.etree.cElementTree as ET
 from collections import namedtuple
 from typing import Any, Dict, List, Tuple, Set, Union
 
+import numpy as np
 import pandas as pd
 
 from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import env_manager as em
+
+
+from enzy_htp.structure import Structure, PDBParser
 
 from enzy_htp._config.rosetta_config import RosettaConfig, default_rosetta_config
 
@@ -135,6 +140,60 @@ class RosettaCst:
 
         self.__dict__[key] = value
 
+    @dispatch
+    def evaluate(self, stru : Structure) -> List[float]:
+        """TODO(CJ)
+        Args:
+            stru:
+
+        Returns:
+            
+
+        """
+
+        res1:Residue = None            
+        res2:Residue = None            
+
+        for res in stru.residues:
+            if res.chain.name == self.rchain_1 and res.name == self.rname_1 and res.idx == self.rnum_1:
+                res1 = res
+
+            if res.chain.name == self.rchain_2 and res.name == self.rname_2 and res.idx == self.rnum_2:
+                res2 = res
+        
+        atoms1, atoms2 = list(), list()
+
+        for ra in self.ratoms_1:
+            for aa in res1.atoms:
+                if ra == aa.name:
+                    atoms1.append(aa)
+
+        for ra in self.ratoms_2:
+            for aa in res2.atoms:
+                if ra == aa.name:
+                    atoms2.append(aa)
+
+        energies = list()
+        for cst in self.constraints:
+            cst_type: str = cst[0]
+            target = cst[1]
+            tolerance = cst[2]
+            energy_penalty = cst[3]
+
+            if cst_type == 'distanceAB':    
+                dist:float = atoms1[0].distance_to(atoms2[0])
+                diff = abs(dist-target)
+                if diff <= tolerance:
+                    energies.append( 0.0 )
+                else:
+                    energies.append( (diff-tolerance)*energy_penalty)
+       
+       
+            #TODO(CJ): do for other types
+
+        return energies
+
+    @dispatch
     def evaluate(self, file: str) -> List[float]:
         """Evaluates the deviation between the RosettaCst and observed geometry in terms of tolerance units. For each
         constraint, there exists a target value x0 and allowed tolerance xtol. Evaluation in tolerance units is defined as:
@@ -311,6 +370,38 @@ class RosettaInterface(BaseInterface):
             Nothing.
         """
         fs.safe_rm('./ROSETTA_CRASH.log')
+
+    def rename_atoms(self, stru: Structure) -> None:
+        """Renames residues and atoms to be compatible with Rosetta naming and functions.
+        
+        Args:
+            stru: The Structure() to perform renaming on.
+
+        Returns:
+            Nothing. 
+        """
+        nterm_mapper:Dict = {"H1":"1H", "H2":"2H", "H3":"3H"}
+        his_mapper:Dict = {"HB2":"1HB", "HB3":"2HB"}
+        _LOGGER.info("Beginning renaming...")
+        changed_residues:int = 0
+        changed_atoms:int = 0
+        for res in stru.residues:
+            if not res.is_canonical():
+                continue
+            
+            if res.name in "HID HIS HIE".split():
+                res.name = "HIS"
+                changed_residues += 1
+                for aa in res.atoms:
+                    if aa.name in his_mapper:
+                        aa.name = his_mapper[aa.name]
+                        changed_atoms += 1
+
+            for aa in res.atoms:
+                if aa.name in nterm_mapper:
+                    aa.name = nterm_mapper[aa.name]
+                    changed_atoms += 1
+        _LOGGER.info(f"Finished renaming! Changed {changed_residues} residues and {changed_atoms} atoms.")
 
     def run_rosetta_scripts(self, opts: List[str], logfile: str = None) -> None:
         """Method that runs the rosettascripts executabl along with the supplied options. Optionally outputs

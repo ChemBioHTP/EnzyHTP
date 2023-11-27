@@ -22,7 +22,11 @@ class Mole2Config(BaseConfig):
         MESH_DENSITY: The mesh density to use in a run in A.
         MONO: The path to mono as a str().
         MOLE2: The path to Mole2 as a str().
+        IGNORE_HETATM: Should HETATM records be considered?
     """
+
+    IGNORE_HETATM:bool=False 
+    """Should HETATM records be considered?"""
 
     PROBE:float=3.5
     """The probe radius to use in a run in A."""
@@ -38,6 +42,7 @@ class Mole2Config(BaseConfig):
 
     MOLE2:str="~/Downloads/Mole2_plugin/MOLE25_binary/mole2.exe"
     """Path to Mole2 .exe as a str()."""
+
 
     def required_executables(self) -> List[str]:
         """A hardcoded list of required executables for Mole2."""
