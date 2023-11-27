@@ -16,16 +16,21 @@ SUB_MODULES=[
         'enzy_htp',
         'enzy_htp._config',
         'enzy_htp._interface',
+        'enzy_htp._interface.handle_types',
         'enzy_htp.analysis',
         'enzy_htp.core',
+        'enzy_htp.core.clusters',
         'enzy_htp.chemical',
         'enzy_htp.structure',
         'enzy_htp.structure.structure_io',
         'enzy_htp.structure.structure_operation',
         'enzy_htp.structure.structure_selection',
+        'enzy_htp.structure.structure_constraint',
         'enzy_htp.preparation',
         'enzy_htp.mutation',
         'enzy_htp.mutation.mutation_pattern',
+        'enzy_htp.geometry',
+        'enzy_htp.electronic_structure',
 ]
 
 if __name__ == '__main__':

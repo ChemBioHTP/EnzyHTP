@@ -221,7 +221,7 @@ class AmberParameterizer(MolDynParameterizer):
     def _parameterize_ligand(self, lig: Ligand, gaff_type: str) -> Tuple[str, List[str]]:
         """parameterize ligand for AmberMD, use ncaa_param_lib_path for customized
         parameters. Multiplicity and charge information can be set in Ligand objects.
-        TODO prob add a Structure method for batch assigning it
+        TODO add a method for auto-assigning charge and spin
         Returns:
             mol_desc_path, [frcmod_path, ...]"""
         # san check
