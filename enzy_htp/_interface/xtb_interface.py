@@ -60,9 +60,6 @@ class XTBInterface(BaseInterface):
         if n_proc == -1:
             n_proc = self.config_.N_PROC
 
-#        if work_dir is None: #TODO(CJ)
-#            work_dir = config['system.SCRATCH_DIR']
-
         results = self.env_manager_.run_command(
             self.config_.XTB_EXE,
             ["--chrg", str(charge), "--iterations",
@@ -88,8 +85,8 @@ class XTBInterface(BaseInterface):
                 constraints:List=None,
                 work_dir:str=None
                 ) -> Tuple[str, float]:
-        """
-            TODO(CJ)
+        """TODO(CJ)
+
         Args:
 
         Returns:
@@ -148,10 +145,8 @@ class XTBInterface(BaseInterface):
             if ll.find('TOTAL ENERGY') != -1:
                 energy = float(ll.split()[3])
 
-        #self._remove_temp_files(str(Path(fname).parent))
+        self._remove_temp_files("./")
     
-        #TODO(CJ): actually delete the temp files
-
         return (expected_output, energy)
 
 
@@ -167,7 +162,7 @@ class XTBInterface(BaseInterface):
             Nothing.
         """
 
-        for fname in "charges wbo xtbrestart xtbtopo.mol xtbopt.log xtbopt.pdb xtbopt.mol xtbopt.xyz".split():
+        for fname in "charges wbo xtbrestart xtbtopo.mol xtbopt.log xtbopt.pdb xtbopt.mol xtbopt.xyz .xtboptok".split():
             fs.safe_rm(f"{work_dir}/{fname}")
 
         if extra_files:

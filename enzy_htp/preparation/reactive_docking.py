@@ -158,45 +158,6 @@ def _validate_system( stru:Structure, constraints:List[RosettaCst] ) -> None:
         _LOGGER.info("Validation complete! Supplied constraints can be applied to the supplied Structure()") 
 
         
-
-def _parameterize_reactant(reactant: str, reactant_name: str, conformers: str = None) -> Tuple[str, int]:
-    """Parameterizes reactant for RosettaLigand docking. Adds both a conformers and formal charge
-    lines to the file.
-    
-    Args:
-        reactant: Path to the reactant.
-        reactant_name: 3 letter PDB style reactant name as a str().
-        conformers: Path to files containing conformers. Optional.
-    
-    Returns:
-        Path to the Rosetta .params file for the reactant.
-
-    """
-
-    if len(reactant_name) != 3:
-        _LOGGER.error(f"Invalid reactant name supplied: '{reactant_name}'. Must be alphanumeric and 3 letters long. Exiting...")
-        exit(1)
-
-    #TODO(CJ): create the conformers if there aren't any
-    session = interface.pymol.new_session()
-    (param_file, pdb_file) = interface.rosetta.parameterize_ligand(reactant, reactant_name, conformers=conformers)
-    fs.safe_rm(pdb_file)
-
-    sdf_file: str = interface.pymol.convert(session, reactant, new_ext=".sdf")
-    fcharge: int = interface.bcl.calculate_formal_charge(sdf_file)
-
-    fs.safe_rm(sdf_file)
-
-    lines: List[str] = fs.lines_from_file(param_file)
-
-    lines.append(f"NET_FORMAL_CHARGE {int(fcharge)}")
-
-    fs.safe_rm(param_file)
-    fs.write_lines(param_file, lines)
-
-    return (param_file, fcharge)
-
-
 def _integrate_csts(stru: Structure, csts: List[RosettaCst], work_dir: str, use_cache: bool) -> Tuple[str, str]:
     """
     
@@ -588,14 +549,16 @@ def _dock_system(structure: Structure,
     return df
 
 def _evaluate_SASA(df: pd.DataFrame, max_sasa_ratio:float) -> None:
-    """TODO(CJ)
+    """Evaluates and filters geometries using SASA ratio of ligands. Updates the 'selected'
+    column of the inputted DataFrame and sets the column to False if the SASA ratio of the ligand is above
+    the specified cutoff. Exits if no rows are selected at this point.
     
     Args:
-        df:
-        max_sasa_ratio:
+        df: pandas DataFrame with geometries derived from _dock_system().
+        max_sasa_ratio: The SASA cutoff for the ligand.
 
     Returns:
-        Nothing
+        Nothing.
     """
     if not df.selected.sum():
         _LOGGER.error("No geometries still selected! Exiting...")
@@ -691,39 +654,22 @@ def _parameterize_system(stru:Structure, work_dir:str) -> Tuple[List[str], Dict[
             continue
         
         _LOGGER.info(f"Detected residue {res.name} in chain {res.parent.name}...")
-        if res.n_conformers() == 1:
-            _LOGGER.info(f"\tDetected no conformers!")
-        else:
-            _parser = PDBParser()
-            
-            orig:List[Tuple[float,float,float]] = [aa.coord for aa in res.atoms]
 
-            content:List[str]=list()
-            for conf_coords in res.conformer_coords:                
-                for aidx, aa in enumerate(res.atoms):
-                    aa.coord = conf_coords[aidx]
-                content.extend(_parser.get_file_str(res, if_renumber=False).splitlines())
+        ligand_charge:int = charge_mapper.get(res.name, None)
 
-            for aidx, aa in enumerate(res.atoms):
-                aa.coord = orig[aidx]
-            
-            conformers = f"{work_dir}/{res.name}_conformers.pdb"
-            fs.write_lines(conformers, filter(lambda ll: not ll.startswith('TER'), content ) )
+        if ligand_charge is None:
+            ligand_charge = interface.bcl.calculate_formal_charge( res )
+            charge_mapper[res.name] = ligand_charge
+        _LOGGER.info(charge_mapper)
 
-        temp_rct:str = f"{work_dir}/__temp_rct.mol2"
-        parser.save_ligand(temp_rct, res)
-        (pfile, charge) = _parameterize_reactant(
-            temp_rct,
-            res.name,
-            conformers
-        )
-        pfile = fs.safe_mv( pfile, work_dir )
+        param_file:str = interface.rosetta.parameterize_ligand(res, charge=ligand_charge, work_dir=work_dir)
+        
         _LOGGER.info(f"Information for reactant {res.name}:")
-        _LOGGER.info(f"\tparam file: {pfile}")
-        _LOGGER.info(f"\tcharge: {charge}")
-        param_files.append(pfile)
+        _LOGGER.info(f"\tparam file: {param_file}")
+        _LOGGER.info(f"\tcharge: {ligand_charge}")
+        #TODO(CJ): put in the part about conformers
+        param_files.append(param_file)
         charge_mapper[res.name] = charge
-        fs.safe_rm( temp_rct )
 
     _LOGGER.info("Finished reactant preparation!")
 
@@ -731,14 +677,22 @@ def _parameterize_system(stru:Structure, work_dir:str) -> Tuple[List[str], Dict[
 
 
 def _evaluate_clashes(df: pd.DataFrame, clash_distance: float, clash_cutoff: int) -> None:
-    """TODO(CJ):
+    """Evaluates and filters geometries using clash count between each ligand and other ligands.
+    Updates the 'selected' column of the inputted DataFrame and sets the column to False if the 
+    ligand has more than the allowed number of clashes between heavy atoms. Exits if no rows are selected at this point.
     
     Args:
+        df: pandas DataFrame with geometries derived from _dock_system().
+        clash_distance: Allowed clash distance radius in Angstroms.
+        clash_cutoff: Allowed number of clashes.
 
     Returns:
         Nothing.         
-
     """
+
+    if not df.selected.sum():
+        _LOGGER.error("No geometries still selected! Exiting...")
+        exit( 1 )
 
     _LOGGER.info(f"Beginning clash evaluation. {df.selected.sum()} geometries still selected...")
     session = interface.pymol.new_session()
@@ -992,7 +946,18 @@ def _qm_minimization(df:pd.DataFrame, charge_mapper, cluster_distance:float, con
     return outfile
 
 def _evaluate_qm(df: pd.DataFrame, structure: Structure, charge_mapper, cluster_cutoff: float) -> None:
-    """TODO(CJ) """
+    """TODO(CJ)
+
+    Args:
+        df:
+        structure:
+        charge_mapper:
+        cluster_cutoff:
+
+    Returns:
+        Nothing.        
+
+    """
     # steps
     # 1. get system charge
     # 2. run through each cluster and do it
@@ -1012,8 +977,9 @@ def _evaluate_qm(df: pd.DataFrame, structure: Structure, charge_mapper, cluster_
         energy:float = None
         try:
             energy = interface.xtb.single_point('temp.xyz', charge=as_info['charge'])
-        except: 
-            pass
+        except:     
+            _LOGGER.warn("Failed single point energy calculation attempt! Continuing...")
+            #TODO(CJ): add some file cleanup
 
         qm_energy.append(energy)
 

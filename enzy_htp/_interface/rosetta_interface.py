@@ -22,7 +22,7 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core import env_manager as em
 
 
-from enzy_htp.structure import Structure, PDBParser
+from enzy_htp.structure import Structure, PDBParser, Mol2Parser, Ligand
 
 from enzy_htp._config.rosetta_config import RosettaConfig, default_rosetta_config
 
@@ -453,13 +453,13 @@ class RosettaInterface(BaseInterface):
 
         return df
 
-    def parameterize_ligand(self, molfile: str, res_name: str, outdir: str = None, conformers: str = None) -> Tuple[str, str]:
+    def parameterize_ligand(self, mol: Ligand, charge:int=None, work_dir:str=None) -> Tuple[str, str]:
         """Parameterizes the input ligand for use in the RosettaLigand protocol. Takes an input file with the ligand,
         as well as the name of the residue in PDB format (3 capitalized letters) as well as optionally where the output
         directory where the .params and .pdb files should be saved. The underlying script only supports .mol, .mol2, 
         and .sdf formats. Can also add conformers to end of .params file when conformers file is supplied. Function 
         exits on invalid inputs. 
-
+        TODO(CJ): fix this documentation            
         Args:
             molfile: The name of the input file as a str().
             res_name: The all-capitalized, three letter string of the ligand in PDB format.
@@ -470,49 +470,39 @@ class RosettaInterface(BaseInterface):
             A tuple() with the layout of (.params file, .pdb file)            
 
         """
-        #TODO(CJ): add in the ability to add a conformers file
-        fs.check_file_exists(molfile)
+        if work_dir is None:
+            work_dir = "./"
 
-        ALLOWED_FORMATS: List[str] = ".sdf .mol2 .mol".split()
-
-        if Path(molfile).suffix not in ALLOWED_FORMATS:
-            _LOGGER.error(
-                f"The supplied file '{molfile}' is of an unsupported file type. Supported types are {', '.join(ALLOWED_FORMATS)}. Exiting..."
-            )
-            exit(1)
-        #TODO(CJ): need to fix this. codes like 152 are valid  => only numbers
-        #if not res_name.isupper() or not len(res_name) == 3 or not res_name.isalpha():
-        #    _LOGGER.error(f"The supplied residue name '{res_name}' is invalid. It must be alphanumeric, capitalized, and have three characters. Exiting...")
-        #    exit( 1 )
-        #TODO(CJ): need to add some flags here -> potentially the charge one
+        res_name:str=mol.name
+        _LOGGER.info(res_name)
+        molfile:str = f"{work_dir}/{res_name}.mol2"
+        conformers:str=f"{work_dir}/{res_name}_conformers.pdb"
+        params_file:str=f"./{res_name}.params"
+        _parser = Mol2Parser()
+        _parser.save_ligand(molfile, mol)
         flags: List[str] = [self.config_.PARAMS_SCRIPT, f"{molfile}", f"--name={res_name}", "--clobber", "--keep-names"]
 
         self.env_manager_.run_command(self.config_.PY_2_7, flags)
+        params_file = fs.safe_mv(params_file, work_dir)
+        params_content:List[str]=fs.lines_from_file(params_file)
 
-        params_file: str = f"./{res_name}.params"
-        pdb_file: str = f"./{res_name}_0001.pdb"
+        if charge is not None:
+            params_content.append(
+                f"NET_FORMAL_CHARGE {charge}"
+            )
 
-        if outdir:
-            fs.safe_mkdir(outdir)
+        _LOGGER.info(params_file)
 
-            outdir = Path(outdir)
-            params_start = params_file
-            pdb_start = pdb_file
+        n_conformers:int=mol.n_conformers()
+        if n_conformers > 1:
+            _LOGGER.info(f"Detected {n_conformers} in ligand {res_name}")
+            #TODO(CJ)
+            raise TypeError()
+        _LOGGER.info("HERERERERE")
 
-            params_file = str(outdir / Path(params_start).name)
-            pdb_file = str(outdir / Path(pdb_start).name)
-            #TODO(CJ): use the safe_mv function here
-            shutil.move(params_start, params_file)
-            shutil.move(pdb_start, pdb_file)
-
-        fs.check_file_exists(params_file)
-        fs.check_file_exists(pdb_file)
-
-        if conformers:
-            #TODO(CJ): figure out exactly how I deal with the movment of conformer files
-            self.add_conformers(res_name, params_file, pdb_file, conformers)
-
-        return (params_file, pdb_file)
+        fs.write_lines(params_file, params_content)
+        
+        return params_file 
 
     def _fix_conformers(self, res_code: str, pdb_template: str, conformers_file: str) -> str:
         """TODO(CJ)"""

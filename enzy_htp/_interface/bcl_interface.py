@@ -20,6 +20,12 @@ from .base_interface import BaseInterface
 from enzy_htp._config.bcl_config import BCLConfig, default_bcl_config
 
 
+from enzy_htp.structure import Structure, PDBParser, Mol2Parser, Ligand
+
+from plum import dispatch
+
+
+
 class BCLInterface(BaseInterface):
     """Class that provides a direct interface for enzy_htp to utilize the BCL. Supported operations
     include conformer generation and formal charge calculation. Users should use this class as the only way to interact with any application
@@ -95,6 +101,7 @@ class BCLInterface(BaseInterface):
 
         return outfile
 
+    @dispatch
     def calculate_formal_charge(self, molfile: str) -> int:
         """Find the formal charge of the supplied molfile using molecule:Properties routine. Supplied
         file MUST be in format .sdf otherwise the script will exit.
@@ -122,4 +129,29 @@ class BCLInterface(BaseInterface):
 
         fs.safe_rm(temp_file)
 
-        return df.iloc[0].TotalFormalCharge
+        return int(df.iloc[0].TotalFormalCharge)
+
+    @dispatch
+    def calculate_formal_charge(self, mol : Ligand, work_dir:str="./" ) -> int:
+        """Find the formal charge of the supplied Ligand using molecule:Properties routine. Supplied mol
+        MUST be a Ligand(), otherwise will exit.
+        
+        Args:
+            mol: The Ligand() object to calculate the formal charge of.
+            work_dir: The temporary directory to do work in. Optional.
+
+        Returns:
+            The formal charge as an int().
+        """
+
+        temp_file:str = f"{work_dir}/__temp_bcl_molfile.mol2"
+        _parser = Mol2Parser()
+        _parser.save_ligand( temp_file, mol )
+        
+        session = self.parent().pymol.new_session()
+        sdf_file = self.parent().pymol.convert(session, temp_file, new_ext='.sdf')
+
+        fs.safe_rm( temp_file )
+
+        return self.calculate_formal_charge( sdf_file )
+
