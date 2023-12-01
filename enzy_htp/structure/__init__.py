@@ -22,3 +22,13 @@ from .chain import Chain
 from .structure import Structure
 from .structure_ensemble import StructureEnsemble
 from .structure_io import PDBParser, Mol2Parser, PrepinParser
+from .structure_constraint import (
+    StructureConstraint,
+    CartesianFreeze,
+    DistanceConstraint,
+    AngleConstraint,
+    DihedralConstraint,
+    ResiduePairConstraint,
+    create_residue_pair_constraint,
+    structure_constraints_from_xml 
+)

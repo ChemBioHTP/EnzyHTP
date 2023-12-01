@@ -482,7 +482,10 @@ class RosettaInterface(BaseInterface):
         _parser.save_ligand(molfile, mol)
         flags: List[str] = [self.config_.PARAMS_SCRIPT, f"{molfile}", f"--name={res_name}", "--clobber", "--keep-names"]
 
+
         self.env_manager_.run_command(self.config_.PY_2_7, flags)
+        fs.safe_rm(f"{res_name}_0001.pdb")
+        
         params_file = fs.safe_mv(params_file, work_dir)
         params_content:List[str]=fs.lines_from_file(params_file)
 
@@ -495,10 +498,26 @@ class RosettaInterface(BaseInterface):
 
         n_conformers:int=mol.n_conformers()
         if n_conformers > 1:
+            conformer_file_content:List[str] = list()
+            mol2_temp:str=f"{work_dir}/__temp_ligand_mol2.mol2"
             _LOGGER.info(f"Detected {n_conformers} in ligand {res_name}")
-            #TODO(CJ)
-            raise TypeError()
-        _LOGGER.info("HERERERERE")
+            _parser = Mol2Parser()
+            session = self.parent().pymol.new_session()
+            for cidx in range(1, n_conformers):
+                conf = mol.get_ligand_conformer(cidx)
+                fs.safe_rm(mol2_temp)
+                _parser.save_ligand(mol2_temp, conf)
+                pdb_conf:str=self.parent().pymol.convert(session, mol2_temp, new_ext='.pdb')
+                conformer_file_content.extend(fs.lines_from_file(pdb_conf))
+                fs.safe_rm(pdb_conf)
+
+            conformer_file_content = list(filter(lambda ll: ll.startswith('HETATM') or ll.startswith('END'), conformer_file_content))
+
+            fs.write_lines(conformers, conformer_file_content) 
+
+            params_content.append(f"PDB_ROTAMERS {conformers}")
+
+            fs.safe_rm(mol2_temp)
 
         fs.write_lines(params_file, params_content)
         

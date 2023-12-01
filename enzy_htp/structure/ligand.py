@@ -100,6 +100,22 @@ class Ligand(NonCanonicalBase):
 
         return self.n_conformers()
 
+    def get_ligand_conformer(self, idx:int) -> Ligand:
+        """TODO(CJ)"""
+        if idx == 0:
+            return self
+
+        idx -= 1
+        if idx >= len(self.conformer_coords):
+            #TODO(CJ): put an error here
+            pass
+
+        result = deepcopy( self )
+
+        for aidx, coord in enumerate( self.conformer_coords[idx] ):
+            result.atoms[aidx].coord = coord
+
+        return result
 
     def n_conformers(self) -> int:
         """How many conformers does this Ligand have?"""

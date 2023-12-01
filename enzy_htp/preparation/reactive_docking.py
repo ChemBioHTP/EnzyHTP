@@ -643,7 +643,6 @@ def _parameterize_system(stru:Structure, work_dir:str) -> Tuple[List[str], Dict[
         A Tuple() with the format (list(), dict()), holding the (.params file names, charge mapper ). 
     """
     _LOGGER.info("Beginning preparation of each reactant...")
-    #TODO(CJ): error if not enough conformers... then make the conformers
     param_files: List[str] = list()
     charge_mapper: Dict[str, int] = dict()
    
@@ -667,10 +666,10 @@ def _parameterize_system(stru:Structure, work_dir:str) -> Tuple[List[str], Dict[
         _LOGGER.info(f"Information for reactant {res.name}:")
         _LOGGER.info(f"\tparam file: {param_file}")
         _LOGGER.info(f"\tcharge: {ligand_charge}")
-        #TODO(CJ): put in the part about conformers
+        _LOGGER.info(f"\tnum conformers: {res.n_conformers()}")
+        
         param_files.append(param_file)
-        charge_mapper[res.name] = charge
-
+        charge_mapper[res.name] = ligand_charge
     _LOGGER.info("Finished reactant preparation!")
 
     return (param_files, charge_mapper)

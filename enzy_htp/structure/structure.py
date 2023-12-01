@@ -614,6 +614,36 @@ class Structure(DoubleLinkedNode):
 
     #endregion
 
+    def get_residue(self, key:str) -> Residue:
+        assert key.count('.') == 1                
+        chain, rnum = key.split('.')
+        rnum  = int(rnum) 
+
+        for res in self.residues:
+            if res.parent.name == chain and res.idx == rnum:
+                return res
+        else:
+            #TODO(CJ): put the error code here
+            assert False
+
+
+
+    def get_atom(self, key:str) -> Atom:
+        """TODO(CJ)"""        
+        assert key.count('.') == 2
+        raw_res, aname = key.rsplit('.', maxsplit=1)
+        residue  = self.get_residue( raw_res )
+        
+        for atom in residue.atoms:
+            if atom.name == aname:
+                return atom
+        else:
+            #TODO(CJ): put the error code here
+            assert False
+            
+
+
+
     #region === Special ===
     def __str__(self):
         """
@@ -640,6 +670,7 @@ class Structure(DoubleLinkedNode):
         if isinstance(key, str):
             return self.chain_mapper[key]
         raise KeyError("Structure() getitem only take int or str as key")
+
 
     def __delitem__(self, key: Union[int, str]):
         """support dictionary like delete"""

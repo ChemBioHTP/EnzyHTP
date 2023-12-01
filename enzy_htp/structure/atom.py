@@ -285,6 +285,18 @@ class Atom(DoubleLinkedNode):
         """check if self is in the connected state"""
         return self._connect is not None
 
+    @property
+    def key(self) -> str:
+        tokens = [self.parent.parent.name, str(self.parent.idx), self.parent.name, self.name]
+
+
+        tokens[1]  
+
+        return '.'.join(tokens)
+         
+
+
+
     #endregion
 
     #region == Special ==
