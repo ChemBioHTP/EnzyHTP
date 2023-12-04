@@ -1,14 +1,20 @@
-"""Defines the StructureConstraint abstract base class as well as the inheriting classes 
+"""Defines the StructureConstraint abstract base class as well as the inheriting classes that specialize it. 
+StructureConstraints are meant to define flexible, non-package specific relationships that can be translated 
+in between different software packages. Factory functions for constraints are also included. The contained 
+classes are:
 
-
-This class is one of the data structure of EnzyHTP.
-StructureConstraint stands for a coordinate constrain for the structure, including
-freeze coordinate and geometry constrain (distance, angle, dihedral).
+    + StructureConstraint: The abstract base class.
+    + CartesianFreeze: Specific atoms will be frozen.
+    + DistanceConstraint: Constraint that specifies a distance.
+    + AngleConstraint: Constraint that specifies an Angle.
+    + DihedralConstraint: Constraint that specifies a dihedral.
+    + ResiduePairConstraint: Specifies a constraint set between two residues in a style similar to Rosetta EnzDes.
 
 Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-10-28
 """
+from __future__ import annotations
 import copy
 from copy import deepcopy
 from typing import List, Tuple, Dict, Any
@@ -22,7 +28,9 @@ from abc import ABC, abstractmethod
 
 
 class StructureConstraint(ABC):
-    """Abstract base class defining the 
+    """Abstract base class defining the API for a constraint. Each primitive StructureConstraint defines exactly one 
+    type of interaction. StructureConstraints are meant to define flexible, non-package specific relationships that
+    can be translated in between different software packages.
 
     Attributes:
         atoms_: A List[Atom] containing all the atoms in the constraint.
@@ -47,6 +55,9 @@ class StructureConstraint(ABC):
             _LOGGER.error("Incorrect number of atoms supplied! Exiting...")
             exit( 1 )
 
+    def clone_current(self) -> StructureConstraint:
+        #TODO(CJ):
+        return self.__init__(atoms, self.current_value, deepcpy(self.params_))
 
     def is_cartesian_freeze(self) -> bool:
         """Is this a cartesian freeze constraint?"""
@@ -74,8 +85,7 @@ class StructureConstraint(ABC):
         pass
 
     def score_energy(self) -> float:
-        """
-        """
+        """Scores the energy penalty of the constraint. If the calc method is not specified, the method exits."""
         if self['calc_method'] == 'rosetta':
             penalty:float = self['penalty'] 
             tolerance:float = self['tolerance']
@@ -87,13 +97,12 @@ class StructureConstraint(ABC):
                 return penalty * (difference - tolerance)
 
         else:
-            raise TypeError()
-
-        pass
+            _LOGGER.error(f"Unspecified calculation method {self['calc_method']}. Supported include: rosetta. Exiting...")
+            exit( 1 )
 
     def change_topology(self, new_topolgy:Structure) -> None:
+        #TODO(CJ): finish this
         assert False
-        pass
 
     @abstractmethod
     def current_geometry(self) -> float:
@@ -112,67 +121,110 @@ class StructureConstraint(ABC):
         self.correct_num_atoms()
 
 
-    def atom_indices(self) -> List[int]: #TODO(CJ): make this an array
-        pass
+    def atom_indices(self) -> np.ndarray: #TODO(CJ): make this an array
+        """Get the indices of the atoms in the constraint.""" 
+        return np.array(
+            [aa.idx for aa in self.atoms]
+        )
 
     @property
     def target_value(self) -> float:
+        """Getter for the target value of the constrained geometry."""
         return self.target_value_
 
     @target_value.setter
     def target_value(self, val_in : float ) -> None:
+        """Change the stored target value of the constrained geometry.."""
         self.target_value_ = val_in
 
     @property
     def params(self) -> Dict[str, Any]:
+        """Getter for all the params in the constrained geometry."""
         return self.params_
 
     def __getitem__(self, key:str ) -> float:
+        """Bracket getter for the .params dict() in the structure constraint. Exits if the 
+        supplied key is not found in the .params dict().
+        
+        Args:
+            key: The str() key for the attribute we are trying to access.
+
+        Returns:
+            Value corresponding to the specified key.
+        """
 
         if key not in self.params_:
-            raise TypeError()
-            #TODO(CJ): error here
-            pass
-
+            _LOGGER.error(f"The attribute '{key}' is not in the constrained geometry params. Exiting...")
+            exit( 1 )
+        
         return self.params_[key]        
 
     def __setitem__(self, key:str, value:Any ) -> None:
+        """Bracket setter for the .params dict() in the structure constraint. Does not check if the supplied 
+        key exists and will overwrite existing values. 
+
+        Args:
+            key: The str() key to add to the .params dict().
+            value: Value to set in the .params dict().
         
+        Returns:
+            Nothing.
+        """
         self.params_[key] = value 
 
 class CartesianFreeze(StructureConstraint):
+    """
+    """
     
     def __init__(self, atoms:List[Atom] ):
         super().__init__(self, atoms, 0.0, dict())
      
+    def is_cartesian_freeze(self) -> bool:
+        """Is this a cartesian freeze constraint? Always True for this class."""
+        return False
 
     def correct_num_atoms(self) -> bool:
-        return len(atoms)
+        """True as long as there is at least one atom in the constraint."""
+        return len(self.atoms)
 
     def score_energy(self) -> float:
+        """Always returns 0.0. Not needed for this type of constraint."""
         return 0.0
 
     def current_geometry(self) -> float:
+        """Always returns 0.0. Not needed for this type of constraint."""
         return 0.0
 
 
 class DistanceConstraint(StructureConstraint):
-  
+    """
+    """
+    def is_distance_constraint(self) -> bool:
+        """Is this a distance constraint? Always True for this class."""
+        return True
+
     def correct_num_atoms(self) -> bool:
+        """A distance constraint should have two atoms."""
         return len(self.atoms) == 2
 
     def current_geometry(self) -> float:
+        """The cartesian distance between two 3D points."""
         return self.atoms[0].distance_to(self.atoms[1])
 
 
 class AngleConstraint(StructureConstraint):
-
+    """
+    """
+    def is_angle_constraint(self) -> bool:
+        """Is this an angle constraint? Always True for this class."""
+        return True 
 
     def correct_num_atoms(self) -> bool:
+        """An angle constraint should have three atoms."""
         return len(self.atoms) == 3
 
-
     def current_geometry(self) -> float:
+        """The angle between three 3D points using dot-product."""
         a = np.array(self.atoms[0].coord)
         b = np.array(self.atoms[1].coord)
         c = np.array(self.atoms[2].coord)
@@ -185,12 +237,18 @@ class AngleConstraint(StructureConstraint):
         
 
 class DihedralConstraint(StructureConstraint):
-    
+    """
+    """
+    def is_dihedral_constraint(self) -> bool:
+        """Is this a dihedral constraint?"""
+        return True 
 
     def correct_num_atoms(self) -> bool:
+        """A dihedral constraint should have 4 atoms."""
         return len(self.atoms) == 4
 
     def current_geometry(self) -> float:
+        """Measurement for the current dihedral between the 4 atoms in the constraint."""
         p0 = np.array(self.atoms[0])
         p1 = np.array(self.atoms[1])
         p2 = np.array(self.atoms[2])
@@ -247,12 +305,9 @@ class ResiduePairConstraint(StructureConstraint):
         self.torsionAB_ = torsionAB
 
         atoms = set()
-        for cst in [self.distanceAB_,self.angle_A_, self.angle_B_, self.torsion_A_, self.torsion_B_, self.torsionAB_]:
-            #TODO(CJ): should update the 
+        for cst in self.child_constraints:
             if cst is None:
                 continue
-            #print(cst)
-            #print(cst.atoms)
             atoms.update( cst.atoms)
         
         self.atoms_ = atoms
@@ -264,9 +319,12 @@ class ResiduePairConstraint(StructureConstraint):
         return True 
 
     def correct_num_atoms(self) -> bool:
+        """This type of composite residue needs 6 total atoms."""
         return len(self.atoms) == 6 
 
     def current_geometry(self) -> Dict[str, float]:
+        """
+        """
     
         result:Dict[str,float] = dict()
         
@@ -289,6 +347,8 @@ class ResiduePairConstraint(StructureConstraint):
 
         return energy
 
+    def clone_current(self) -> ResiduePairConstraint:
+        assert False
 
     @property
     def residue1_atoms(self):
@@ -414,9 +474,6 @@ def create_residue_pair_constraint(
                                 )
 
 
-
-
-
 def build_from_preset(topology: Structure,
                       keyword: str,) -> StructureConstraint:
     """constructor that allows building a StructureConstraint from a keyword.
@@ -436,4 +493,3 @@ def build_from_preset(topology: Structure,
         raise ValueError
 
     return result
-
