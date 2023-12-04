@@ -11,4 +11,3 @@ Date: 2022-07-12
 from .interface import Interface
 from .mole2_interface import Mole2Cavity
 from .pymol_interface import OpenPyMolSession
-from .rosetta_interface import RosettaCst

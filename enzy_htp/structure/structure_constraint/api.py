@@ -1,9 +1,12 @@
-"""Defines the StructureConstraint class.
+"""Defines the StructureConstraint abstract base class as well as the inheriting classes 
+
+
 This class is one of the data structure of EnzyHTP.
 StructureConstraint stands for a coordinate constrain for the structure, including
 freeze coordinate and geometry constrain (distance, angle, dihedral).
 
 Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-10-28
 """
 import copy
@@ -19,12 +22,20 @@ from abc import ABC, abstractmethod
 
 
 class StructureConstraint(ABC):
+    """Abstract base class defining the 
+
+    Attributes:
+        atoms_: A List[Atom] containing all the atoms in the constraint.
+        target_value_ : The float() target value for the constraint.
+        params_: A Dict[str,float] with arbitrary parameters.
+    """
 
     def __init__(self,
                 atoms:List[Atom],
                 target_value:float,
                 params:Dict[str, Any]
                 ):
+        """Ctor that exits if the supplied number of atoms is NOT correct."""
         
         self.atoms_ = atoms 
         self.target_value_ = target_value 
@@ -32,15 +43,39 @@ class StructureConstraint(ABC):
 
         self['calc_method'] = params.get('calc_method', 'rosetta')
 
-        assert self.correct_num_atoms()
+        if not self.correct_num_atoms():
+            _LOGGER.error("Incorrect number of atoms supplied! Exiting...")
+            exit( 1 )
 
-    #TODO(CJ): make the is_<type> functions
+
+    def is_cartesian_freeze(self) -> bool:
+        """Is this a cartesian freeze constraint?"""
+        return False
+
+    def is_distance_constraint(self) -> bool:
+        """Is this a distance constraint?"""
+        return False
+
+    def is_angle_constraint(self) -> bool:
+        """Is this an angle constraint?"""
+        return False
+
+    def is_dihedral_constraint(self) -> bool:
+        """Is this a dihedral constraint?"""
+        return False
+
+    def is_residue_pair_constraint(self) -> bool:
+        """Is this a residue pair constraint?"""
+        return False
 
     @abstractmethod
     def correct_num_atoms(self) -> bool:
+        """Does the given constraint have the correct number of atoms?"""
         pass
 
     def score_energy(self) -> float:
+        """
+        """
         if self['calc_method'] == 'rosetta':
             penalty:float = self['penalty'] 
             tolerance:float = self['tolerance']
@@ -56,21 +91,25 @@ class StructureConstraint(ABC):
 
         pass
 
-    def change_topology(self, new_topolgy:Structure)-> None:
+    def change_topology(self, new_topolgy:Structure) -> None:
         assert False
         pass
 
     @abstractmethod
     def current_geometry(self) -> float:
+        """The current geometry of the constrained atoms."""
         pass
 
     @property
     def atoms(self) -> List[Atom]:
+        """Accessor for the atoms involved in the constrained geometry."""
         return self.atoms_
 
     @atoms.setter
     def atoms(self, val_in : List[Atom] ) -> None:
+        """Setter for the atoms in the constrained geometry. Checks for the correct number of atoms."""
         self.atoms_ = val_in
+        self.correct_num_atoms()
 
 
     def atom_indices(self) -> List[int]: #TODO(CJ): make this an array
@@ -119,25 +158,12 @@ class CartesianFreeze(StructureConstraint):
 
 class DistanceConstraint(StructureConstraint):
   
-
     def correct_num_atoms(self) -> bool:
         return len(self.atoms) == 2
 
     def current_geometry(self) -> float:
         return self.atoms[0].distance_to(self.atoms[1])
 
-    def score_energy(self) -> float:
-        if self['calc_method'] == 'rosetta':
-            tolerance:float = self['tolerance']
-            difference:float = self.deviation()
-
-            if difference <= tolerance:
-                return 0.0
-            else:
-                return penalty * (difference - tolerance)
-
-        else:
-            raise TypeError()
 
 class AngleConstraint(StructureConstraint):
 
@@ -158,12 +184,11 @@ class AngleConstraint(StructureConstraint):
         return np.arccos(cosine_angle)
         
 
-
-#TODO(CJ): this
 class DihedralConstraint(StructureConstraint):
     
 
-    def correct_num_atoms(self) -> bool: return len(self.atoms) == 4
+    def correct_num_atoms(self) -> bool:
+        return len(self.atoms) == 4
 
     def current_geometry(self) -> float:
         p0 = np.array(self.atoms[0])
@@ -200,6 +225,8 @@ class ResiduePairConstraint(StructureConstraint):
     def __init__(self, 
         residue1:Residue,
         residue2:Residue,
+        residue1_atoms:List[Atom],
+        residue2_atoms:List[Atom],
         distanceAB:DistanceConstraint=None,
         angle_A:AngleConstraint=None,
         angle_B:AngleConstraint=None,
@@ -210,6 +237,8 @@ class ResiduePairConstraint(StructureConstraint):
         
         self.residue1_ = residue1
         self.residue2_ = residue2
+        self.residue1_atoms_ = residue1_atoms
+        self.residue2_atoms_ = residue2_atoms
         self.distanceAB_ = distanceAB
         self.angle_A_ = angle_A 
         self.angle_B_ = angle_B
@@ -225,28 +254,49 @@ class ResiduePairConstraint(StructureConstraint):
             #print(cst)
             #print(cst.atoms)
             atoms.update( cst.atoms)
-       
-        #print(len(atoms))
+        
+        self.atoms_ = atoms
+        self.correct_num_atoms()
 
         #TODO(CJ): should probably assemble atoms and call the correct_num_atoms?
-
+    def is_residue_pair_constraint(self) -> bool:
+        """Always True for this class."""
+        return True 
 
     def correct_num_atoms(self) -> bool:
         return len(self.atoms) == 6 
 
     def current_geometry(self) -> Dict[str, float]:
     
-        result = dict()
-        self.distanceAB_ = distanceAB
-        self.angle_A_ = angle_A 
-        self.angle_B_ = angle_B
-        self.torsion_A_ = torsion_A
-        self.torsion_B_ = torsion_B
-        self.torsion_AB_ = torsion_AB
+        result:Dict[str,float] = dict()
+        
+        result['distanceAB'] = self.distanceAB_.current_geometry()
+        result['angle_A'] = self.angle_A_.current_geometry()
+        result['angle_B'] = self.angle_B_.current_geometry()
+        result['torsion_A'] = self.torsion_A_.current_geometry()
+        result['torsion_B'] = self.torsion_B_.current_geometry()
+        result['torsion_AB'] = self.torsion_AB_.current_geometry()
+
+        return result
 
 
     def score_energy(self) -> float:
-        assert False
+
+        energy:float=0.0
+
+        for cst in self.child_constraints:
+            energy += cst.score_energy()
+
+        return energy
+
+
+    @property
+    def residue1_atoms(self):
+        return self.residue1_atoms_
+
+    @property
+    def residue2_atoms(self):
+        return self.residue2_atoms_
 
 
     @property
@@ -256,6 +306,18 @@ class ResiduePairConstraint(StructureConstraint):
     @property
     def residue2(self) -> Residue:
         return self.residue2_
+
+    @property
+    def child_constraints(self) -> List[StructureConstraint]:
+        return list(filter(
+            lambda pr: pr[-1] is not None,
+            [('distanceAB', self.distanceAB_),
+                ('angle_A', self.angle_A_),
+                ('angle_B', self.angle_B_),
+                ('torsion_A', self.torsion_A_),
+                ('torsion_B', self.torsion_B_),
+                ('torsionAB', self.torsionAB_)]
+        ))
 
 
 def create_residue_pair_constraint(
@@ -273,7 +335,17 @@ def create_residue_pair_constraint(
     """
     
     Args:
-        
+        topology:
+        r1_key:
+        r2_key:
+        r1_atoms:
+        r2_atoms:
+        distanceAB:
+        angle_A:
+        angle_B:
+        torsion_A:
+        torsion_B:
+        torsionAB:
 
     Returns:
         A ResiduePairConstraint object.
@@ -307,9 +379,12 @@ def create_residue_pair_constraint(
         for kw in 'target_value penalty tolerance'.split():
             assert kw in cst #TODO(CJ): put some kind of error code here
 
+        for cst_kk in cst.keys():
+            cst[cst_kk] = float(cst[cst_kk])
+
         ctor:StructureConstraint = None
         atom_list:List[Atom] = None
-        target_value:float = cst.pop('target_value')
+        target_value:float = float(cst.pop('target_value'))
         if cidx == 0:
             atom_list = [r1_atoms[0], r2_atoms[0]]
             ctor = DistanceConstraint
@@ -333,8 +408,11 @@ def create_residue_pair_constraint(
     return ResiduePairConstraint(
                                 residue1,
                                 residue2,
+                                r1_atoms,
+                                r2_atoms,
                                 *csts
                                 )
+
 
 
 

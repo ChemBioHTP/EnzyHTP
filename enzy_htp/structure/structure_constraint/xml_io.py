@@ -8,12 +8,13 @@ import xml.etree.ElementTree as ET
 
 from ..structure import Structure, Solvent, Chain, Residue, Atom
 
+from enzy_htp.core import _LOGGER
+
 from .api import (
     StructureConstraint,
     CartesianFreeze,
     DistanceConstraint,
-    AngleConstraint,
-    DihedralConstraint,
+    AngleConstraint, DihedralConstraint,
     ResiduePairConstraint,
     create_residue_pair_constraint
     )
@@ -37,9 +38,42 @@ def structure_constraints_from_xml(topology: Structure, file:str) -> List[Struct
 
     return result
 
+def check_valid_residue_node(data) -> None:
+    
+    error = False
+    msg = 'Residue tag missing attributes: '
+    for kw in 'chain idx atoms'.split():
+        if kw not in data:
+            msg += kw + ','
+            error = True
 
-def residue_pair_constraint_from_xml(topology, node):
+    msg = msg[:-1]
+    if error:
+        _LOGGER.error(f"Invalid Residue tag! {msg}")
+        _LOGGER.error("Exiting...")
+        exit( 1 )
 
+def check_valid_child_constraint(data) -> None:
+    
+    error = False
+
+    msg = 'Child constraint missing attributes: '
+    
+    for kw in 'penalty tolerance target_value'.split():
+        if kw not in data:
+            mgs += kw + ','
+            error = True
+
+    msg = msg[:-1]
+    if error:
+        _LOGGER.error(f"Invalid Child Constraint tag! {msg}")
+        _LOGGER.error("Exiting...")
+        exit( 1 )
+
+
+def residue_pair_constraint_from_xml(topology, node) -> ResiduePairConstraint:
+
+        
    
     r1_key = None
     r2_key = None
@@ -52,34 +86,40 @@ def residue_pair_constraint_from_xml(topology, node):
     torsion_B = None
     torsionAB = None
 
-
-
     for child in node:
         data = child.attrib
         if child.tag == 'Residue1':
+            check_valid_residue_node(data)
             r1_key = (data['chain'], int(data['idx']))
             r1_atoms = tuple(data['atoms'].split(','))
 
         if child.tag == 'Residue2':
+            check_valid_residue_node(data)
             r2_key = (data['chain'], int(data['idx']))
             r2_atoms = tuple(data['atoms'].split(','))
 
         if child.tag == 'distanceAB':
+            check_valid_child_constraint(data)
             distanceAB = deepcopy(data)
 
         if child.tag == 'angle_A':
+            check_valid_child_constraint(data)
             angle_A = deepcopy(data)
 
         if child.tag == 'angle_B':
+            check_valid_child_constraint(data)
             angle_B = deepcopy(data)
 
         if child.tag == 'torsion_A':
+            check_valid_child_constraint(data)
             torsion_A = deepcopy(data)
         
         if child.tag == 'torsion_B':
+            check_valid_child_constraint(data)
             torsion_B = deepcopy(data)
 
         if child.tag == 'torsionAB':
+            check_valid_child_constraint(data)
             torsionAB = deepcopy(data)
 
 

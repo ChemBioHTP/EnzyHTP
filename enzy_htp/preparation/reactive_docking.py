@@ -14,8 +14,8 @@ import numpy as np
 import pandas as pd
 
 from enzy_htp import interface, config, _LOGGER, binding_energy
-from enzy_htp._interface.rosetta_interface import RosettaCst
 import enzy_htp.structure.structure_operation as stru_oper
+from enzy_htp.structure.structure_constraint import StructureConstraint
 
 import enzy_htp.chemical as chem
 from enzy_htp import mutation as mm
@@ -26,7 +26,7 @@ from enzy_htp.core import file_system as fs
 #:TODO(CJ): need to be able to specify the size of the grid
 
 def dock_reactants(structure: Structure,
-                   constraints: List[RosettaCst] = None,
+                   constraints: List[StructureConstraint] = None,
                    n_struct: int = 1000,
                    cst_energy: float = None,
                    clash_distance: float = 2.0,
@@ -82,8 +82,6 @@ def dock_reactants(structure: Structure,
     _log_settings(constraints, n_struct, cst_energy, clash_distance, clash_cutoff, max_sasa_ratio,
                 cluster_distance, use_cache, rng_seed, work_dir, save_work_dir)
     
-    _validate_system( structure, constraints )
-
     (param_files, charge_mapper) = _parameterize_system(structure, work_dir)
 
     df = _dock_system(structure, constraints, n_struct, param_files, charge_mapper, work_dir, rng_seed, use_cache )
@@ -108,96 +106,6 @@ def dock_reactants(structure: Structure,
 
     return structure 
 
-def _validate_system( stru:Structure, constraints:List[RosettaCst] ) -> None:
-    """Checks if the supplied list of contraints exists and is compatible with the supplied Structure() object.
-    If it is not, a detailed error message is logged and the program exits.
-    
-    Args:
-        stru: The Structure() to validate the proposed constraints in.
-        constraints: A List[RosettaCst] objects 
-
-    Returns:
-        Nothing.
-    """
-    _LOGGER.info("Validating the supplied system...")
-    msg:str=''
-    error:bool = False
-    for cst in constraints:
-        r1_found, r2_found = False, False
-        for rr in stru.residues:
-            if rr.chain.name == cst.rchain_1 and rr.name == cst.rname_1 and rr.idx == cst.rnum_1:
-                atom_names:List[str] = [aa.name for aa in rr.atoms]
-                for aa in cst.ratoms_1:
-                    if aa not in atom_names:
-                        break
-                else:
-                    r1_found = True
-
-            if rr.chain.name == cst.rchain_2 and rr.name == cst.rname_2 and rr.idx == cst.rnum_2:
-                atom_names:List[str] = [aa.name for aa in rr.atoms]
-                for aa in cst.ratoms_2:
-                    if aa not in atom_names:
-                        break
-                else:
-                    r2_found = True
-
-        if not r1_found:
-            msg += f"({cst.rchain_1}.{cst.rnum_1}.{cst.rname_1}),"
-            error = True
-
-
-        if not r2_found:
-            msg += f"({cst.rchain_2}.{cst.rnum_2}.{cst.rname_2}),"
-            error = True
-
-    if error:
-        _LOGGER.error(f"Errors while trying to validate the supplied system. Could not locate residues or had incorrect atom names: {msg[:-1]}")
-        _LOGGER.error("Exiting...")
-        exit( 1 )
-    else:   
-        _LOGGER.info("Validation complete! Supplied constraints can be applied to the supplied Structure()") 
-
-        
-def _integrate_csts(stru: Structure, csts: List[RosettaCst], work_dir: str, use_cache: bool) -> Tuple[str, str]:
-    """
-    
-    Args:
-        stru:
-        csts:
-        work_dir:
-
-    Returns:
-        A Tuple() with the format (pdb file, .cst file).
-
-    """
-    _LOGGER.info("Beginning RosettaCst constraint integration...")
-    parser = PDBParser()
-    file_str = parser.get_file_str(stru, if_renumber=False, if_fix_atomname=False)
-
-    pdb_content: List[str] = ["HEADER                                            xx-MMM-xx"]
-    cst_content: List[str] = list()
-    for cidx, cst in enumerate(csts):
-        pdb_content.append(cst.create_pdb_line(cidx + 1))
-        cst_content.extend(cst.create_cst_lines())
-
-    pdb_file: str = f"{work_dir}/start.pdb"
-    cst_file: str = f"{work_dir}/rdock.cst"
-
-    if not use_cache:
-        fs.safe_rm(pdb_file)
-        fs.safe_rm(cst_file)
-
-    if not Path(pdb_file).exists():
-        fs.write_lines(pdb_file, pdb_content + file_str.splitlines())
-
-    if not Path(cst_file).exists():
-        fs.write_lines(cst_file, cst_content)
-
-    _LOGGER.info("RosettaCst constraint integration successful! Relevant files:")
-    _LOGGER.info(f"\t.pdb file: {Path(pdb_file).absolute()}")
-    _LOGGER.info(f"\t.cst file: {Path(cst_file).absolute()}")
-
-    return (pdb_file, cst_file)
 
 
 def _create_xml(stru:Structure, work_dir: str, use_cache: bool) -> str:
@@ -478,7 +386,7 @@ def _make_options_file(pdb_file: str,
 
 
 def _dock_system(structure: Structure,
-            constraints: List[RosettaCst],
+            constraints: List[StructureConstraint],
             n_struct:int,
             param_files:List[str],
             charge_mapper:Dict[str,int],
@@ -518,7 +426,7 @@ def _dock_system(structure: Structure,
         else:
             _LOGGER.info(f"{csv_file} not found. Continuing with standard run")
 
-    (start_pdb, cst_file) = _integrate_csts(structure, constraints, work_dir, use_cache)
+    (start_pdb, cst_file) = interface.rosetta.integrate_constraints(structure, constraints, work_dir)
 
     xml_file: str = _create_xml(structure, work_dir, use_cache)  #TODO(CJ): going to overhaul this
 
@@ -599,7 +507,7 @@ def _evaluate_SASA(df: pd.DataFrame, max_sasa_ratio:float) -> None:
     _LOGGER.info(f"Finished ligand SASA evaluation. {df.selected.sum()} geomtries have ligands with relative SASA <= {max_sasa_ratio:.3f}")
 
 
-def _evaluate_csts(df: pd.DataFrame, csts: List[RosettaCst], cst_cutoff: int) -> None:
+def _evaluate_csts(df: pd.DataFrame, csts: List[StructureConstraint], cst_cutoff: int) -> None:
     """Evaluates geometries of the .pdb files in the supplied DataFrame versus the specified constraints.
     Constraints are evaluted in terms of how many tolerance units each specified angle, distance, etc. is
     different than the idealized value. The 'selected' column in the DataFrame will be updated by the 
@@ -990,7 +898,7 @@ def _evaluate_qm(df: pd.DataFrame, structure: Structure, charge_mapper, cluster_
 
 
 def _log_settings(
-    constraints:List[RosettaCst],
+    constraints:List[StructureConstraint],
     n_struct: int,
     cst_energy:float,
     clash_distance:float,

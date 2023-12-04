@@ -615,16 +615,28 @@ class Structure(DoubleLinkedNode):
     #endregion
 
     def get_residue(self, key:str) -> Residue:
-        assert key.count('.') == 1                
+        """Returns the residue specified by a key with the format <chain_name>.<residue_index>. Function does not check
+        for identify of the Residue. Errors and exits if the format is incorrect or the specified Residue does not exist.
+
+        Args:
+            key: specification of the residue to select as a str().
+
+        Returns:
+            The specified Residue.
+        """
+        if key.count('.') != 1:
+            _LOGGER.error(f"Invalid key format in {key}. Expect <chain_name>.<residue_index>. Exiting...")
+            exit( 1 )
+        
         chain, rnum = key.split('.')
-        rnum  = int(rnum) 
+        rnum = int(rnum) 
 
         for res in self.residues:
             if res.parent.name == chain and res.idx == rnum:
                 return res
         else:
-            #TODO(CJ): put the error code here
-            assert False
+            _LOGGER.error(f"Unable to locate residue {key} in Structure. Exiting...")
+            exit( 1 )
 
 
 
