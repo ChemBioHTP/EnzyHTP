@@ -305,7 +305,7 @@ class ResiduePairConstraint(StructureConstraint):
         self.torsionAB_ = torsionAB
 
         atoms = set()
-        for cst in self.child_constraints:
+        for (cst_name,cst) in self.child_constraints:
             if cst is None:
                 continue
             atoms.update( cst.atoms)

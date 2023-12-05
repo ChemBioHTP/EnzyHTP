@@ -180,8 +180,18 @@ class RosettaInterface(BaseInterface):
         params_file:str=f"./{res_name}.params"
         _parser = Mol2Parser()
         _parser.save_ligand(molfile, mol)
-        flags: List[str] = [self.config_.PARAMS_SCRIPT, f"{molfile}", f"--name={res_name}", "--clobber", "--keep-names"]
-
+        flags: List[str] = [self.config_.PARAMS_SCRIPT, f"{molfile}", f"--name={res_name}", "--clobber", "--keep-names" ]
+       
+        indices = list()
+        for adix,aa in enumerate(mol.atoms):
+            _LOGGER.info(aa.element)
+            if aa.element == 'H':
+                continue
+            indices.append( aidx + 1 )
+            
+        if len(indices) <= 2:            
+            flags.append( f"--nbr_atom={indices[0]}" )
+        
 
         self.env_manager_.run_command(self.config_.PY_2_7, flags)
         fs.safe_rm(f"{res_name}_0001.pdb")
