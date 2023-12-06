@@ -24,18 +24,38 @@ For an in-depth description of EnzyHTP, please refer to [our paper](https://pubs
 and corresponding use cases under `/Test_file/FAcD_expanse`
 
 # Requirement
+
 ## External Program
+
 - AmberTool/Amber
 - Gaussian
 - Multiwfn (for wavefunction analysis)
+
 ## Python Package
+
 - python >= 3.6
 - numpy
 - pdb2pqr
 - openbabel
 
-# Installation 
-## Dependence
+# Installation
+
+## 1. Automated Installation
+
+From the base directory of the package, i.e., the same directory as this file's.
+
+1. Run the command `conda create --file environment.yml --yes`, or `conda create --file environment.yml --name <YOUR_ENV_NAME> --yes` if you want to have an environment name other than `enzyhtp`.
+2. (optional) Install Gaussian16.
+3. (optional) Install Multiwfn (install demo in author's [blog](http://bbs.keinsci.com/thread-12020-1-1.html): (The LMO func seems not working for WSL) (Note that run Multiwfn on ACCRE requires loading the GCC module).
+
+## 2. Automated Installation as a Dependency.
+
+As we are to install the EnzyHTP as a package, the installation of Gaussian16 and Multiwfn are omitted.
+
+Run the command `bash /path/to/EnzyHTP/dev-tools/conda-install --name <YOUR_ENV_NAME>`. If you don't specify the name, it will be installed to your current conda environment.
+
+## 3. Manual Installation
+
 1. Install conda & (optional) create an environment
 2. install numpy `conda install numpy`
 3. Install openbabel `conda install openbabel -c conda-forge`
@@ -47,5 +67,5 @@ pip install .
 ```
 5. Install [AmberTool](https://ambermd.org/AmberTools.php)
 6. (optional) Install RDKit `conda install -c conda-forge rdkit`
-7. (optional) Install Gaussian16 
-8. (optional) Install Multiwfn (install demo in author's [blog](http://bbs.keinsci.com/thread-12020-1-1.html): (The LMO func seems not working for WSL) (Note that run Multiwfn on ACCRE requires loading the GCC module) 
+7. (optional) Install Gaussian16.
+8. (optional) Install Multiwfn (install demo in author's [blog](http://bbs.keinsci.com/thread-12020-1-1.html): (The LMO func seems not working for WSL) (Note that run Multiwfn on ACCRE requires loading the GCC module).
