@@ -51,13 +51,6 @@ if [[ -d build ]]; then
     rm -r build;
 fi
 
-# Function to update the conda environment
-update_env() {
-    echo "Updating conda environment: $target_env_name"
-    conda env update -n "$target_env_name" --file environment.yml
-    conda develop .
-}
-
 # Function to activate the conda environment
 activate_env() {
     if type conda > /dev/null 2>&1; then
@@ -69,9 +62,17 @@ activate_env() {
     fi
 }
 
+# Function to update the conda environment
+update_env() {
+    echo "Updating conda environment: $target_env_name"
+    conda env update -n "$target_env_name" --file environment.yml
+    activate_env
+    conda develop .
+}
+
 # Check current conda environment and extract environment name.
-current_env=$(conda info --json | grep "\"default_prefix\":" | awk '{print $2}' | tr -d '",')
-current_env_name=$(basename "$current_env")
+current_env_path=$(conda info --json | grep "\"default_prefix\":" | awk '{print $2}' | tr -d '",')
+current_env_name=$(basename "$current_env_path")
 
 echo "Installing EnzyHTP to Conda environment: $target_env_name"
 
@@ -80,8 +81,7 @@ if [ "$current_env_name" = "$target_env_name" ]; then
     echo "Deactivating current environment $current_env_name"
     conda deactivate
     update_env
-    echo "Reactivating environment $target_env_name"
-    activate_env
 else
     update_env
+    conda deactivate
 fi
