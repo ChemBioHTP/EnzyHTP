@@ -9,4 +9,5 @@
 + Wook Shin <wook.shin@vanderbilt.edu>
 + Xinchun Ran <xinchun.ran@vanderbilt.edu>
 + Yiwen Chen <yiwen.chen@vanderbilt.edu>
++ Yinjie Zhong <yinjie.zhong@vanderbilt.edu>
 + Zhongyue Yang <zhongyue.yang@vanderbilt.edu>
