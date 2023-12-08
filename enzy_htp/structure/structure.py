@@ -73,24 +73,9 @@ Operation:
         4	
 
     Interfacing with Residue()"s:
-        >>> structure.residues()
-        ["A.ASP.1","A.ASP.2","A.ASP.3","B.ASP.1"]   # @shaoqz: shouldn"t this be Residue objects?
-        >>> structure.num_residues
-        4
         >>> res_cpy : enzy_htp.Residue = structure.get_residue( "B.ASP.1" ) # @shaoqz: @imp we should not use residue name and id together as the identifier. Either id only to pinpoint or name only to batch select
-        >>> structure.remove_residue( "B.ASP.1" )
-        >>> structure.residues()
-        ["A.ASP.1","A.ASP.2","A.ASP.3"]
-        >>> structure.num_residues
-        3
-        >>> structure.add_residue( res_cpy )
-        >>> structure.residues()
-        ["A.ASP.1","A.ASP.2","A.ASP.3","B.ASP.1"]
-        >>> structure.num_residues
-        4
 
     Saving the structure:
-        >>> structure.to_pdb( "/path/to/copy/of/pdb" )
 
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
@@ -638,11 +623,32 @@ class Structure(DoubleLinkedNode):
             _LOGGER.error(f"Unable to locate residue {key} in Structure. Exiting...")
             exit( 1 )
 
+    def has_residue(self, key:str) -> bool:
+        #TODO(CJ): the documentation 
+        chain, rnum = key.split('.')
+        rnum = int(rnum) 
 
+        for res in self.residues:
+            if res.parent.name == chain and res.idx == rnum:
+                return True
+
+        return False
 
     def get_atom(self, key:str) -> Atom:
-        """TODO(CJ)"""        
-        assert key.count('.') == 2
+        """Retrieves the Atom() object corresponding to the supplied atom key. The key
+        is a str with the format <chain_name>.<residue_num>.<atom_name>. (E.g. A.1.CA). 
+        Function will exit if the Atom cannot be specified. 
+
+        Args:
+            key: str specifying an Atom() with format <chain_name>.<residue_num>.<atom_name>
+
+        Returns:
+            The Atom() corresponding to the key.
+        """        
+        if key.count('.') != 2:
+            _LOGGER.error(f"The supplied key {key} is invalid. Must have format <chain_name>.<residue_num>.<atom_name>! Exiting...")
+            exit( 1 )
+
         raw_res, aname = key.rsplit('.', maxsplit=1)
         residue  = self.get_residue( raw_res )
         
@@ -650,8 +656,8 @@ class Structure(DoubleLinkedNode):
             if atom.name == aname:
                 return atom
         else:
-            #TODO(CJ): put the error code here
-            assert False
+            _LOGGER.error(f"Unable to find atom {key}! Exiting...")
+            exit( 1 )
             
 
 

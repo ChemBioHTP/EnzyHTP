@@ -124,7 +124,7 @@ class Atom(DoubleLinkedNode):
         if self._element is None:
             if self.name in chem.residue.RESIDUE_ELEMENT_MAP["Amber"].keys():
                 return chem.residue.RESIDUE_ELEMENT_MAP["Amber"][self.name]
-            elif self.parent.is_metal():
+            elif self.parent is not None and self.parent.is_metal():
                 return self.parent.element
             else:
                 # case: in ligand atoms are named like this H1
@@ -287,11 +287,19 @@ class Atom(DoubleLinkedNode):
 
     @property
     def key(self) -> str:
-        tokens = [self.parent.parent.name, str(self.parent.idx), self.parent.name, self.name]
+        """Gets the Atom()'s key which can be used in conjuection with the Structure.get_atom method.
+        Format is <chain_name>.<residue_index>.<atom_name>. If the atom does not have a parent residue or
+        chain, an empty value is given (e.g. "..CA")
+        """
+        
+        tokens:List[str] = ["", "", self.name]
 
-
-        tokens[1]  
-
+        if self.parent is not None:
+            tokens[1] = str(self.parent.idx)
+            
+            if self.parent.parent is not None:
+                tokens[0] = self.parent.parent.name
+    
         return '.'.join(tokens)
          
 

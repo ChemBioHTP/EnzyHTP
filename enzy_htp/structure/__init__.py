@@ -32,3 +32,8 @@ from .structure_constraint import (
     create_residue_pair_constraint,
     structure_constraints_from_xml 
 )
+
+from .structure_region import (
+    StructureRegion,
+    create_structure_region
+)

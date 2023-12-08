@@ -113,6 +113,17 @@ class Residue(DoubleLinkedNode):
         return (self.chain.name, self._idx)
 
     @property
+    def key_str(self) -> str:
+        """The Residue key as a str in the format <chain_name>.<residue_idx>. Note that if the given
+        Residue does not have a parent chain, it is left blank (e.g. ".1"."""
+        tokens:List[str] = ["", str(self.idx)]
+
+        if self.chain is not None:
+            tokens[0] = self.chain.name
+
+        return ".".join(tokens)
+
+    @property
     def num_atoms(self) -> int:
         """Number of atoms in the Residue."""
         return len(self._atoms)

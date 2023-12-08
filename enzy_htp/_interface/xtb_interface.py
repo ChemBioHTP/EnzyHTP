@@ -1,7 +1,6 @@
 """Defines an XTBInterface class that serves as a bridge for enzy_htp to utilize the xtb
 semi-empirical quantum mechanics (QM) package. Uses the XTBConfig class found in enzy_htp/_config/xtb_config.py.
 Supported operations include:
-
     + single point energy calculations
     + geometry optimization 
 
@@ -17,6 +16,7 @@ from .base_interface import BaseInterface
 from enzy_htp import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp._config.xtb_config import XTBConfig, default_xtb_config
+from enzy_htp.structure import Structure, Atom, StructureConstraint
 
 
 class XTBInterface(BaseInterface):
@@ -35,10 +35,16 @@ class XTBInterface(BaseInterface):
         """
         super().__init__(parent, config, default_xtb_config)
 
-    def single_point(self, fname: str, charge: int = 0, spin: int = 1, n_iter: int = -1, n_proc: int = -1, work_dir:str=None) -> float:
+    def single_point(self, stru: Structure,
+                            charge: int = 0,
+                            spin: int = 1,
+                            n_iter: int = -1,
+                            n_proc: int = -1,
+                            sele_str:str=None,
+                            work_dir:str=None) -> float:
         """Performs a single point energy calculation on the supplied file. Checks if the file exists and is one of the correct
         file formats. Errors if not. Returns a value in Hartrees. 
-
+        #TODO(CJ): update this stuff
         Args:
             fname: Name of the input file to use.
             charge: Optional charge of the system as an int(). Defaults to 0.
@@ -50,9 +56,10 @@ class XTBInterface(BaseInterface):
         Returns:
             Single point energy value in Hartrees.           
         """
-
-        fs.check_file_exists(fname)
         self._check_valid_extension(fname)
+
+        if work_dir is not None:
+            work_dir = "./"
 
         if n_iter == -1:
             n_iter = self.config_.N_ITER
@@ -60,12 +67,35 @@ class XTBInterface(BaseInterface):
         if n_proc == -1:
             n_proc = self.config_.N_PROC
 
+        fname:str=f"{work_dir}/__temp_xtb.xyz"
+        lines:List[str] = ["", "Title goes here"]
+
+        if sele_str is not None:
+            session = self.parent().pymol.new_sesion()
+            residue_list:self.parent().pymol.get_residue_list(session, stru, sele_str)
+            sr:StructureRegion = create_structure_region(stru, residue_list)
+            
+            lines[0] = str(len(sr.atoms))
+
+            for aa in sr.atoms:
+                (x,y,z) = aa.coord
+                lines.append(f"{aa.element} {x} {y} {z}\n")
+        else:
+            lines[0] = str(len(stru.atoms))
+
+            for aa in stru.atoms:
+                (x,y,z) = aa.coord
+                lines.append(f"{aa.element} {x} {y} {z}\n")
+
+        fs.write_lines(fname, lines)
+
         results = self.env_manager_.run_command(
             self.config_.XTB_EXE,
             ["--chrg", str(charge), "--iterations",
              str(n_iter), "--parallel",
              str(n_proc), "--norestart", "--sp", fname])
 
+        fs.safe_rm( fname )
         self._remove_temp_files(str(Path(fname).parent))
 
         for ll in results.stdout.splitlines():
@@ -76,13 +106,14 @@ class XTBInterface(BaseInterface):
         exit( 1 )
 
     def geo_opt(self,
-                fname: str,
+                stru:Structure,
                 charge: int = 0,
                 spin: int = 1,
                 n_iter: int = -1,
                 n_proc: int = -1,
-                freeze_atoms:List[int]=None,
-                constraints:List=None,
+                constraints:List[StructureConstraint]=None,
+                freeze_backbone:bool=True,
+                sele_str:str=None,
                 work_dir:str=None
                 ) -> Tuple[str, float]:
         """TODO(CJ)
@@ -92,11 +123,6 @@ class XTBInterface(BaseInterface):
         Returns:
             
         """
-        fs.check_file_exists(fname)
-        self._check_valid_extension(fname)
-
-        fs.check_file_exists(fname)
-        self._check_valid_extension(fname)
 
         if n_iter == -1:
             n_iter = self.config_.N_ITER

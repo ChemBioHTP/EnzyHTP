@@ -86,9 +86,9 @@ def dock_reactants(structure: Structure,
 
     df = _dock_system(structure, constraints, n_struct, param_files, charge_mapper, work_dir, rng_seed, use_cache )
     
-    _evaluate_SASA(df, max_sasa_ratio)
+    #_evaluate_SASA(df, max_sasa_ratio)#TODO(CJ): put this back in 
 
-    _evaluate_clashes(df, clash_distance, clash_cutoff)
+    #_evaluate_clashes(df, clash_distance, clash_cutoff)
 
     _evaluate_csts(df, constraints, cst_energy)
    
@@ -522,15 +522,18 @@ def _evaluate_csts(df: pd.DataFrame, csts: List[StructureConstraint], cst_cutoff
         Nothing.
     """
     _LOGGER.info(f"Beginning RosettaCst evaluation. {df.selected.sum()} geometries still selected...")
-
+    _parser = PDBParser()
     cst_diff = []
     for i, row in df.iterrows():
-        total = 0.0
+        if not row.selected:
+            cst_diff.append( None )
+            continue
+
+        total:float = 0.0
+        stru:Structure = _parser.get_structure(row.description)
         for cst in csts:
-            for tidx, tl in enumerate(cst.evaluate(row.description)):
-                penalty = cst.constraints[tidx][3]
-                if tl > 1.0:
-                    total += (tl-1)*penalty
+            cst.change_topology(stru)
+            total += cst.score_energy()
         cst_diff.append(total)
 
     df['cst_diff'] = cst_diff
@@ -596,7 +599,7 @@ def _evaluate_clashes(df: pd.DataFrame, clash_distance: float, clash_cutoff: int
     Returns:
         Nothing.         
     """
-
+    #TODO(CJ): there are problems with this since we are no longer using LXX format ligands 
     if not df.selected.sum():
         _LOGGER.error("No geometries still selected! Exiting...")
         exit( 1 )
@@ -869,18 +872,18 @@ def _evaluate_qm(df: pd.DataFrame, structure: Structure, charge_mapper, cluster_
     # 1. get system charge
     # 2. run through each cluster and do it
     _LOGGER.info(f"Beginning qm energy evaluation. {df.selected.sum()} geometries still selected...")
-    as_info = _define_active_site(structure, cluster_cutoff, charge_mapper)
-    session = interface.pymol.new_session()
+    as_info:Dict = _define_active_site(structure, cluster_cutoff, charge_mapper)
 
     qm_energy = []
+
+    _parser = PDBParser()
 
     for i, row in df.iterrows():
         if not row.selected:
             qm_energy.append(None)
             continue
 
-        interface.pymol.general_cmd(session, [('delete', 'all')])
-        interface.pymol.create_cluster(session, row.description, as_info['sele'], outfile='temp.xyz', cap_strategy='CH3')
+        #interface.pymol.create_cluster(session, row.description, as_info['sele'], outfile='temp.xyz', cap_strategy='CH3')
         energy:float = None
         try:
             energy = interface.xtb.single_point('temp.xyz', charge=as_info['charge'])
@@ -890,7 +893,6 @@ def _evaluate_qm(df: pd.DataFrame, structure: Structure, charge_mapper, cluster_
 
         qm_energy.append(energy)
 
-        fs.safe_rm('temp.xyz')
         _LOGGER.info(row.description)
 
     df['qm_energy'] = qm_energy
@@ -930,9 +932,9 @@ def _log_settings(
     _LOGGER.info("Beginning EnzyRCD Reactive docking run! Below are the run settings and characteristics:")
 
     if constraints is not None:
-        _LOGGER.info(f"\t{len(constraints)} RosettaConstraints")
+        _LOGGER.info(f"\t{len(constraints)} StructureConstraints")
     else:
-        _LOGGER.info("\t0 RosettaConstraints")
+        _LOGGER.info("\t0 StructureConstraints")
 
     _LOGGER.info(f"\t{n_struct=}")
     _LOGGER.info(f"\t{cst_energy=:.3f} rosetta energy units")

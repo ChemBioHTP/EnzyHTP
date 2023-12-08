@@ -174,7 +174,6 @@ class RosettaInterface(BaseInterface):
             work_dir = "./"
 
         res_name:str=mol.name
-        _LOGGER.info(res_name)
         molfile:str = f"{work_dir}/{res_name}.mol2"
         conformers:str=f"{work_dir}/{res_name}_conformers.pdb"
         params_file:str=f"./{res_name}.params"
@@ -183,8 +182,7 @@ class RosettaInterface(BaseInterface):
         flags: List[str] = [self.config_.PARAMS_SCRIPT, f"{molfile}", f"--name={res_name}", "--clobber", "--keep-names" ]
        
         indices = list()
-        for adix,aa in enumerate(mol.atoms):
-            _LOGGER.info(aa.element)
+        for aidx,aa in enumerate(mol.atoms):
             if aa.element == 'H':
                 continue
             indices.append( aidx + 1 )
@@ -232,78 +230,6 @@ class RosettaInterface(BaseInterface):
         fs.write_lines(params_file, params_content)
         
         return params_file 
-
-    def _fix_conformers(self, res_code: str, pdb_template: str, conformers_file: str) -> str:
-        """TODO(CJ)"""
-        session = self.parent().pymol.new_session()
-        self.parent().pymol.general_cmd(session, [("load", pdb_template)])
-        template_df: pd.DataFrame = self.parent().pymol.collect(session, "memory", "name elem x y z ID chain resn resi".split())
-
-        original: str = self.parent().pymol.general_cmd(session, [("delete", "all"), ("load", conformers_file),
-                                                                  ("get_object_list", 'all')])[-1]
-
-        #original = session.cmd.get_object_list()
-        assert len(original) == 1
-        split: List[str] = self.parent().pymol.general_cmd(session, [("split_states", "all"), ("get_object_list", "all")])[-1]
-        print(split)
-        #        original = original[0]
-        #        content: List[str] = list()
-        #        #TODO(CJ): figure out a way to get rid of the warnings
-        #        #redirect_stdout()
-        for oidx, oo in enumerate(split):
-            if oo == original:
-                continue
-            df: pd.DataFrame = self.parent().pymol.collect(session, "memory", "name elem x y z ID chain resn resi".split(), sele=oo)
-            assert len(df) == len(template_df), f"{len(df)} {len(template_df)}"
-            for (tidx, trow), (idx, row) in zip(template_df.iterrows(), df.iterrows()):
-                assert trow.elem == row.elem
-                self.parent().pymol.general_cmd(session, [
-                    ("alter", f"{oo} and ID {row.ID}", "name=" + trow["name"]),
-                    ("alter", f"{oo} and ID {row.ID}", f"chain='{trow.chain}'"),
-                    ("alter", f"{oo} and ID {row.ID}", f"resn='{res_code}'"),
-                ])
-
-            temp_fname = f"state_{oidx}.pdb"
-            self.parent().pymol.general_cmd(session, [("save", temp_name, oo)])
-
-            for ll in fs.lines_from_file(temp_fname):
-                if ll.startswith('HETATM') or ll.startswith('ATOM'):
-                    content.append(ll)
-
-            content.append('TER')
-            fs.safe_rm(temp_fname)
-
-        content.pop()
-        content.append('END')
-
-        outfile = Path(conformers).with_suffix('.pdb')
-        fs.write_lines(outfile, content)
-        print(outfile)
-        exit(0)
-        return str(outfile)
-
-    def add_conformers(self, res_code: str, param_file: str, pdb_template: str, conformers_file: str) -> None:
-        """TODO(CJ)"""
-
-        fs.check_file_exists(param_file)
-        fs.check_file_exists(conformers_file)
-
-        suffix: str = Path(conformers_file).suffix
-        if suffix != ".pdb":
-            if suffix in ".mol2 .mol .sdf".split():
-                #TODO(CJ): this does not work
-                conformers_file = self._fix_conformers(res_code, pdb_template, conformers_file)
-                pass
-            else:
-                _LOGGER.error(
-                    f"The supplied file '{conformers_file}' is not in the .pdb and cannot be converted from .mol2, .mol, or .sdf. Exiting..."
-                )
-                exit(1)
-
-        content: List[str] = fs.lines_from_file(param_file)
-        content.append(f"PDB_ROTAMERS {Path(conformers_file).absolute()}")
-        fs.safe_rm(param_file)
-        fs.write_lines(param_file, content)
 
     def relax(
         self,
@@ -863,6 +789,8 @@ class RosettaInterface(BaseInterface):
 
         for ridx, (rname, rule) in enumerate(cst.child_constraints):
             end = 0                
+            if rule.is_angle_constraint() or rule.is_dihedral_constraint():
+                end = 1
             cst_content.append(f"   CONSTRAINT::  {rname:>10}: {float(rule.target_value):6.2f} {float(rule.params['tolerance']):6.2f} {float(rule.params['penalty']):6.2f} {end}")
 
         cst_content.append("CST::END")

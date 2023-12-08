@@ -55,9 +55,18 @@ class StructureConstraint(ABC):
             _LOGGER.error("Incorrect number of atoms supplied! Exiting...")
             exit( 1 )
 
+
+    #TODO(CJ): add function that checks if topology and constraints are compatible
+    #TODO(CJ): will need to make a version of this that actually works for the ResiduePairConstraint
+
+    def clone(self) -> StructureConstraint:
+        """Clones the StructureConstraint with the original target_value."""
+        return self.__init__(atoms, self.target_value, deepcopy(self.params_))
+
     def clone_current(self) -> StructureConstraint:
-        #TODO(CJ):
-        return self.__init__(atoms, self.current_value, deepcpy(self.params_))
+        """Get a version of the StructureConstraint with the current value as the 
+        target value."""
+        return self.__init__(atoms, self.current_value, deepcopy(self.params_))
 
     def is_cartesian_freeze(self) -> bool:
         """Is this a cartesian freeze constraint?"""
@@ -100,9 +109,23 @@ class StructureConstraint(ABC):
             _LOGGER.error(f"Unspecified calculation method {self['calc_method']}. Supported include: rosetta. Exiting...")
             exit( 1 )
 
-    def change_topology(self, new_topolgy:Structure) -> None:
-        #TODO(CJ): finish this
-        assert False
+
+    def change_topology(self, new_topology:Structure) -> None:
+        """Switch the associated topology and atoms for a given Constraint. Maps the atom keys
+        as described in Atom.key() and Structure.get_atom().
+
+        Args:
+            new_topology: new structure to translate atoms to.
+
+        Returns:
+            Nothing.
+        """
+        new_atoms:List[Atom] = list()
+        for atom in self.atoms:
+            target_key:str=atom.key
+            new_atoms.append( new_topology.get_atom(target_key))
+    
+        self.atoms = new_atoms
 
     @abstractmethod
     def current_geometry(self) -> float:
@@ -116,12 +139,13 @@ class StructureConstraint(ABC):
 
     @atoms.setter
     def atoms(self, val_in : List[Atom] ) -> None:
-        """Setter for the atoms in the constrained geometry. Checks for the correct number of atoms."""
+        """Setter for the atoms in the constrained geometry. Checks for the correct number of atoms, errors if it is the incorrect number.."""
         self.atoms_ = val_in
-        self.correct_num_atoms()
+        if not self.correct_num_atoms():
+            _LOGGER.error(f"An incorrect number of atoms ({len(self.atoms)})was supplied! Exiting...")
+            exit( 1 )
 
-
-    def atom_indices(self) -> np.ndarray: #TODO(CJ): make this an array
+    def atom_indices(self) -> np.ndarray: 
         """Get the indices of the atoms in the constraint.""" 
         return np.array(
             [aa.idx for aa in self.atoms]
@@ -173,7 +197,8 @@ class StructureConstraint(ABC):
         self.params_[key] = value 
 
 class CartesianFreeze(StructureConstraint):
-    """
+    """Specialization of StructureConstraint() for Atoms() that are frozen in Cartesian space. Many
+    of the methods yield junk values since no measurement is needed for this Class.
     """
     
     def __init__(self, atoms:List[Atom] ):
@@ -197,8 +222,7 @@ class CartesianFreeze(StructureConstraint):
 
 
 class DistanceConstraint(StructureConstraint):
-    """
-    """
+    """Specialization of StructureConstraint() for the distance between two Atom()'s."""
     def is_distance_constraint(self) -> bool:
         """Is this a distance constraint? Always True for this class."""
         return True
@@ -213,8 +237,7 @@ class DistanceConstraint(StructureConstraint):
 
 
 class AngleConstraint(StructureConstraint):
-    """
-    """
+    """Specialization of StructureConstraint() for the angle between three Atom()'s."""
     def is_angle_constraint(self) -> bool:
         """Is this an angle constraint? Always True for this class."""
         return True 
@@ -233,12 +256,12 @@ class AngleConstraint(StructureConstraint):
         bc = c - b
         
         cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
-        return np.arccos(cosine_angle)
+        return np.degrees(np.arccos(cosine_angle))
         
 
 class DihedralConstraint(StructureConstraint):
-    """
-    """
+    """Specialization of StructureConstraint() for the dihedral angle between four Atom()'s"""
+    
     def is_dihedral_constraint(self) -> bool:
         """Is this a dihedral constraint?"""
         return True 
@@ -278,8 +301,11 @@ class DihedralConstraint(StructureConstraint):
 
 
 class ResiduePairConstraint(StructureConstraint):
-   
+    """Specialization of StructureConstraint() representing 
 
+    Attributes:
+        
+    """
     def __init__(self, 
         residue1:Residue,
         residue2:Residue,
@@ -310,7 +336,47 @@ class ResiduePairConstraint(StructureConstraint):
                 continue
             atoms.update( cst.atoms)
         
-        self.atoms_ = atoms
+        self.atoms_ = list(atoms)
+        self.correct_num_atoms()
+
+    def clone(self) -> ResiduePairConstraint:
+        """TODO(CJ)"""
+        return ResiduePairConstraint.__init__(
+                self.residue1_, 
+                self.residue2_,
+                self.residue1_atoms_,
+                self.residue2_atoms_,
+                self.distanceAB_,
+                self.angle_A_,
+                self.angle_B_,
+                self.torsion_A_,
+                self.torsion_B_,
+                self.torsionAB_
+                )
+        
+
+
+    def change_topology(self, new_topology:Stru) -> None:
+        """Same as StructureConstraint.change_topology() but with extra steps because of the composite 
+        nature of the class. First, the residue and residue atoms are mapped over. Next, the child constraints
+        are mapped over. Last, the atoms are mapped over."""
+        
+        self.residue1_ = new_topology.get_residue(self.residue1_.key_str)
+        self.residue2_ = new_topology.get_residue(self.residue2_.key_str)
+        self.residue1_atoms_ = [new_topology.get_atom(aa.key) for aa in self.residue1_atoms_]
+        self.residue2_atoms_ = [new_topology.get_atom(aa.key) for aa in self.residue2_atoms_]
+
+        for (cst_name, cst) in self.child_constraints:
+            if cst is not None:
+                cst.change_topology(new_topology)
+
+        atoms = set()
+        for (cst_name,cst) in self.child_constraints:
+            if cst is None:
+                continue
+            atoms.update( cst.atoms)
+        
+        self.atoms_ = list(atoms)
         self.correct_num_atoms()
 
         #TODO(CJ): should probably assemble atoms and call the correct_num_atoms?
@@ -323,7 +389,9 @@ class ResiduePairConstraint(StructureConstraint):
         return len(self.atoms) == 6 
 
     def current_geometry(self) -> Dict[str, float]:
-        """
+        """Current geometry for all of the child constraints. Packages the results in a dict() of 
+        (key, value) format (cst_name, value), where cst_name is a str with Rosetta EnzDes format.
+        These include: distanceAB, angle_A, angle_B, torsion_A, torsion_B, torsion_AB.
         """
     
         result:Dict[str,float] = dict()
@@ -339,36 +407,44 @@ class ResiduePairConstraint(StructureConstraint):
 
 
     def score_energy(self) -> float:
+        """Composite score energy for the """
 
         energy:float=0.0
 
-        for cst in self.child_constraints:
+        for (cst_name,cst) in self.child_constraints:
             energy += cst.score_energy()
 
         return energy
 
     def clone_current(self) -> ResiduePairConstraint:
+        """TODO(CJ)"""
         assert False
 
     @property
     def residue1_atoms(self):
+        """Getter for the 3 Atom() objects in residue 1."""
         return self.residue1_atoms_
 
     @property
     def residue2_atoms(self):
+        """Getter for the 3 Atom() objects in residue 2."""
         return self.residue2_atoms_
-
 
     @property
     def residue1(self) -> Residue:
+        """Getter for residue 1."""
         return self.residue1_
 
     @property
     def residue2(self) -> Residue:
+        """Getter for residue 2."""
         return self.residue2_
 
     @property
     def child_constraints(self) -> List[StructureConstraint]:
+        """Gets the child contraints that are not None.TODO(CJ) 
+
+        """
         return list(filter(
             lambda pr: pr[-1] is not None,
             [('distanceAB', self.distanceAB_),
@@ -392,7 +468,7 @@ def create_residue_pair_constraint(
                 torsion_A:Dict[str,float]=None,
                 torsion_B:Dict[str,float]=None,
                 torsionAB:Dict[str,float]=None) -> ResiduePairConstraint:
-    """
+    """Converts specified 
     
     Args:
         topology:
