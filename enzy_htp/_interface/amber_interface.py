@@ -429,7 +429,6 @@ class AmberMDStep(MolDynStep):
         pass
 
 
-
 class AmberInterface(BaseInterface):
     """Class that provides a direct inteface for enzy_htp to utilize AmberMD software.
     Main supported operations:

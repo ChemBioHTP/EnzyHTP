@@ -181,6 +181,10 @@ def md_simulation(stru: Structure,
             Free.
         - Gromacs (https://www.gromacs.org/)
             Free and open-source.
+        - M-Chem (https://pubmed.ncbi.nlm.nih.gov/37470065/)
+            Not Free.
+            Support good general force field for ligands
+            Support better implemtation of polarizable force field
     """
     supported_parallel_method = ["cluster_job"]
     # I. san check
