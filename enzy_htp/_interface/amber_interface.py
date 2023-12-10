@@ -28,6 +28,7 @@ from enzy_htp.core.mol_dyn_result import MolDynResult
 from enzy_htp.core.exception import UnsupportedMethod, tLEaPError
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
 from enzy_htp.structure.structure_io import pdb_io, prmtop_io
+from enzy_htp.structure.structure_constraint import StructureConstraint
 from enzy_htp.structure import (
     Structure,
     Ligand,
@@ -799,7 +800,7 @@ class AmberInterface(BaseInterface):
             additional_tleap_lines:
                 handle for adding additional tleap lines before generating the parameters."""
         # tool: write the below code
-        # print(AmberInterface._generate_default_assigning_lines_for_build_md_parameterizer(locals().items()))
+        # print(AmberInterface._generate_default_assigning_lines_for_build_md_parameterizer_or_step(locals().items()))
 
         # init default values
         type_hint_sticker: AmberConfig
@@ -843,7 +844,7 @@ class AmberInterface(BaseInterface):
             additional_tleap_lines,)
 
     @staticmethod
-    def _generate_default_assigning_lines_for_build_md_parameterizer(parameter_mapper: dict) -> str:
+    def _generate_default_assigning_lines_for_build_md_parameterizer_or_step(parameter_mapper: dict) -> str:
         """function only used for generate the code of the init default value section
         of build_md_parameterizer"""
         result = ""
@@ -947,11 +948,78 @@ class AmberInterface(BaseInterface):
         return temp_chg_file
 
     def build_md_step(self,
+                      # simulation
+                      length: float, # ns
+                      minimize: bool = False,
+                      temperature: Union[float, List[Tuple[float]]] = "default",
+                      thermostat: str = "default",
+                      constrain: StructureConstraint = None,
+                      # execution
+                      core_type: str = "default",
+                      cluster_job_config: Dict = "default",
+                      # output
                       if_report: bool = False,
+                      record_period: float = "default", # ns
                       work_dir: str = "default") -> AmberMDStep:
-        """the constructor for AmberMDStep"""
-        # TODO reference sampling.equi_md_sampling
-        return AmberMDStep() # TODO build methods first and determine what init info is needed
+        """the constructor for AmberMDStep
+        Args:
+            length:
+                the simulation length of this step (unit: ns)
+            minimize:
+                whether this md step is performing a minimization.
+            temperature: 
+                the temperature of the simulation. can be a list of 1d coordinates that indicate
+                a changing temperature. e.g.: [(0,0), (0.5,300)] the 1st element is time in ns and
+                the second is temperature at the time point.
+            thermostat:
+                the algorithm of the thermostat.
+                options: [constant_energy, berendsen, anderson, langevin, oin, sin-respa, bussi]
+            constrain:
+                the StructureConstraint object that indicates a geometry constrain in the step.
+            core_type:
+                the type of computing core that runs the MD. This will affect both the command
+                and the cluster_job config if cluster_job_config is not None.
+                options: [cpu, gpu]
+            cluster_job_config:
+                dictionary that assign arguments to ClusterJob.config_job and ClusterJob.wait_to_end
+                key list: [cluster, res_keywords, period]
+            if_report:
+                whether report result (i.e.: trajectory) of this step.
+            record_period:
+                if report is wanted, the simulation time period for recording a snapshot
+            work_dir:
+                the working dir that contains all the temp/result files.
+            """
+        # tool: write the below code
+        # print(AmberInterface._generate_default_assigning_lines_for_build_md_parameterizer_or_step(locals().items()))
+
+        # init default values
+        type_hint_sticker: AmberConfig
+        if temperature == "default":
+            temperature = self.config()["DEFAULT_MD_TEMPERATURE"]
+        if thermostat == "default":
+            thermostat = self.config()["DEFAULT_MD_THERMOSTAT"]
+        if core_type == "default":
+            core_type = self.config()["DEFAULT_MD_CORE_TYPE"]
+        if cluster_job_config == "default":
+            cluster_job_config = self.config()["DEFAULT_MD_CLUSTER_JOB_CONFIG"][core_type]
+        if record_period == "default":
+            record_period = self.config()["DEFAULT_MD_RECORD_PERIOD_FACTOR"] * length
+        if work_dir == "default":
+            work_dir = self.config()["DEFAULT_MD_WORK_DIR"]
+
+        return AmberMDStep(
+            length,
+            minimize,
+            temperature,
+            thermostat,
+            constrain,
+            core_type,
+            cluster_job_config,
+            if_report,
+            record_period,
+            work_dir,
+        )
 
     # region == TODO ==
     def write_minimize_input_file(self, fname: str, cycle: int) -> None:

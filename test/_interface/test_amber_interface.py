@@ -14,7 +14,9 @@ from enzy_htp.core.exception import tLEaPError
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.general import EnablePropagate
 from enzy_htp.core import file_system as fs
-from enzy_htp._interface.amber_interface import AmberParameterizer
+from enzy_htp._interface.amber_interface import (
+    AmberParameterizer,
+    AmberMDStep)
 import enzy_htp.structure as struct
 from enzy_htp import interface
 from enzy_htp import config as eh_config
@@ -449,6 +451,14 @@ def test_antechamber_ncaa_to_moldesc_resp(): #TODO
     assert not os.path.exists("scratch/H5J.pdb")
     fs.safe_rm(temp_mol2_path)
 
+
+def test_build_md_step_default():
+    """as said in the name. Assert a xxx default value
+    as a sample."""
+    ai = interface.amber
+    md_step: AmberMDStep = ai.build_md_step(length=0.01)
+    # assert md_step.temperature == 300.0
+   
 
 # region TODO
 
