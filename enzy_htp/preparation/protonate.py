@@ -112,7 +112,8 @@ def protonate_peptide_with_pdb2pqr(stru: Structure,
                                    ph: float = 7.0,
                                    int_pdb_path: Union[str, None] = None,
                                    int_pqr_path: Union[str, None] = None,
-                                   metal_fix_method: str = "deprotonate_all"):
+                                   metal_fix_method: str = "deprotonate_all",
+                                   **kwargs):
     """
     Add missing hydrogens and determine protonation state of the peptide part of protein
     using [PDB2PQR](https://www.poissonboltzmann.org/) via the pdb2pqr python [package](https://pdb2pqr.readthedocs.io/en/latest/).
@@ -231,7 +232,7 @@ METAL_FIX_METHODS = {"deprotonate_all": deprotonate_metal_donors}
 PEPTIDE_PROTONATION_METHODS = {"pdb2pqr": protonate_peptide_with_pdb2pqr}
 
 
-def protonate_ligand_with_pybel(stru: Structure, ph: float = 7.0, int_ligand_file_dir=None):
+def protonate_ligand_with_pybel(stru: Structure, ph: float = 7.0, int_ligand_file_dir=None, **kwargs):
     """
     the inteface for using PYBEL to protonate all ligands in {stru} with a given ph
     Args:
