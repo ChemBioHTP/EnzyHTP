@@ -14,7 +14,7 @@ class MolDynResult:
     simulation such as temperature, pressure, etc.
     2 can be calculated from 1 afterwards in most case but are calculated along the way too.
     
-    Add more when needed for 1. something that cannot be calculated from traj or
+    Add more when needed for 1. something that cannot be calculated from traj (could be velocity) or
     2. to avoid redundant heavy calculation.
     
     Attribute:
