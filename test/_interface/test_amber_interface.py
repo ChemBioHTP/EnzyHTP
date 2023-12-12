@@ -453,12 +453,15 @@ def test_antechamber_ncaa_to_moldesc_resp(): #TODO
 
 
 def test_build_md_step_default():
-    """as said in the name. Assert a xxx default value
+    """as said in the name. Assert a several default value
     as a sample."""
     ai = interface.amber
-    md_step: AmberMDStep = ai.build_md_step(length=0.01)
-    # assert md_step.temperature == 300.0
-   
+    md_step: AmberMDStep = ai.build_md_step(length=0.1, core_type="cpu")
+    assert md_step.temperature == 300.0
+    assert md_step.core_type == "cpu"
+    assert md_step.cluster_job_config["res_setting"]["core_type"] == "cpu"
+    assert md_step.length == 0.1
+    assert md_step.record_period == 0.0001
 
 # region TODO
 

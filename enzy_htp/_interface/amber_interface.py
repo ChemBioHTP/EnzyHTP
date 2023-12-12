@@ -247,15 +247,15 @@ class AmberParameterizer(MolDynParameterizer):
             # 1. generate mol2 if not found
             mol_desc_path = f"{self.ncaa_param_lib_path}/{lig.name}_{target_method}.mol2" # the search ensured no existing file named this
             self.parent_interface.antechamber_ncaa_to_moldesc(ncaa=lig,
-                                                        out_path=mol_desc_path,
-                                                        gaff_type=gaff_type)
+                                                              out_path=mol_desc_path,
+                                                              gaff_type=gaff_type)
 
         # 2. run parmchk2 on the PDB
         # (this also runs when mol_desc exsit but not frcmod)
         frcmod_path = f"{self.ncaa_param_lib_path}/{lig.name}_{target_method}.frcmod"
         self.parent_interface.run_parmchk2(in_file=mol_desc_path,
-                                     out_file=frcmod_path,
-                                     gaff_type=gaff_type)
+                                           out_file=frcmod_path,
+                                           gaff_type=gaff_type)
 
         return mol_desc_path, [frcmod_path]
 
@@ -396,12 +396,49 @@ class AmberParameterizer(MolDynParameterizer):
 
 class AmberMDStep(MolDynStep):
     """the modular MD step of Amber.
+    Constructer:
+        AmberInterface.build_md_step()
     Attributes: (necessary information of the modular MD step)
-        pass"""
-    # TODO also support build from .in file
-
-    def __init__(self, interface) -> None:
+        engine
+        parent_interface
+        length
+        minimize
+        temperature
+        thermostat
+        constrain
+        core_type
+        cluster_job_config
+        if_report
+        record_period
+        work_dir
+    Methods:
+        if_report()
+        make_job()
+        translate()
+        try_merge_job()"""
+    def __init__(self, 
+                 interface,
+                 length: float,
+                 minimize: bool,
+                 temperature: Union[float, List[Tuple[float]]],
+                 thermostat: str,
+                 constrain: StructureConstraint,
+                 core_type: str,
+                 cluster_job_config: Dict,
+                 if_report: bool,
+                 record_period: float,
+                 work_dir: str,) -> None:
         self._parent_interface = interface
+        self.length = length
+        self.minimize = minimize
+        self.temperature = temperature
+        self.thermostat = thermostat
+        self.constrain = constrain
+        self.core_type = core_type
+        self.cluster_job_config = cluster_job_config
+        self._if_report = if_report
+        self.record_period = record_period
+        self.work_dir = work_dir
 
     @property
     def engine(self) -> str:
@@ -414,7 +451,12 @@ class AmberMDStep(MolDynStep):
     @property
     def if_report(self) -> bool:
         """whether the step reports the output"""
-        pass
+        return self._if_report
+
+    @if_report.setter
+    def if_report(self, val: bool):
+        """setter for if_report"""
+        self._if_report = val
 
     def make_job(self) -> ClusterJob:
         """the method that make a ClusterJob that runs the step"""
@@ -458,6 +500,9 @@ class AmberInterface(BaseInterface):
         "rc" : "rc",
     }
     """dictionary that maps keywords to charge method that current supported in run_antechamber()"""
+
+    MDIN_KEYWORD_MAPPER = {}
+    """the dictionary that maps sander/pmemd input keywords to standarded names in EnzyHTP"""
 
     def __init__(self, parent, config: AmberConfig = None) -> None:
         """Simplistic constructor that optionally takes an AmberConfig object as its only argument.
@@ -675,9 +720,19 @@ class AmberInterface(BaseInterface):
 
     # -- cpptraj --
 
-    # -- sander --
+    # -- sander/pmemd --
+    def parse_from_mdin(self, mdin_file_path: str) -> Dict:
+        """the knowledge of the mdin format as the input of sander/pmemd.
+        return a dictionary that use standard keys according to MDIN_KEYWORD_MAPPER"""
+        _LOGGER.error("dont support this yet. contact developer if you have to use this.")
+        raise Exception
+        # TODO
+        # 1. parse to dict
+        _parse_from_mdin_to_raw_dict()
+        # 2. mapper keywords and build objects
 
-    # -- pmemd --
+    def parse_to_mdin(self):
+        pass
 
     # == engines ==
     # (engines for science APIs)
@@ -949,18 +1004,20 @@ class AmberInterface(BaseInterface):
 
     def build_md_step(self,
                       # simulation
-                      length: float, # ns
-                      minimize: bool = False,
+                      length: float = None, # ns
+                      minimize: bool = "default",
                       temperature: Union[float, List[Tuple[float]]] = "default",
                       thermostat: str = "default",
-                      constrain: StructureConstraint = None,
+                      constrain: StructureConstraint = "default",
+                      # simulation (alternative)
+                      amber_md_in_file: str = None,
                       # execution
                       core_type: str = "default",
                       cluster_job_config: Dict = "default",
                       # output
                       if_report: bool = False,
                       record_period: float = "default", # ns
-                      work_dir: str = "default") -> AmberMDStep:
+                      work_dir: str = "default",) -> AmberMDStep:
         """the constructor for AmberMDStep
         Args:
             length:
@@ -989,16 +1046,60 @@ class AmberInterface(BaseInterface):
                 if report is wanted, the simulation time period for recording a snapshot
             work_dir:
                 the working dir that contains all the temp/result files.
+            amber_md_in_file:
+                The mdin file in Amber format. (.in) These files configures Amber execution.
+                If used, settings are parsed to length,minimize,temperature,thermostat,record_period,constrain
+                Note that these parsed settings can be overwritten by explicitly assign arguments.
+                If `length` and `nstlim` are both specified in func argument and .in file, the value in `length`
+                will be used.
             """
+        # pirority: direct assign > mdin file > default
+
+        # support parse from mdin file
+        if amber_md_in_file is not None:
+            # parsed form {amber_md_in_file}
+            # they are parsed because AmberMDStep doesn't only for generating .in files but also needs to be parsed to
+            # other MolDynStep when needed. (e.g.: config OpenMM job using amber .in files)
+            mdin_config = self.parse_from_mdin(amber_md_in_file)
+            length_mdin = mdin_config.get("length", None)
+            minimize_mdin = mdin_config.get("minimize", None)
+            temperature_mdin = mdin_config.get("temperature", None)
+            thermostat_mdin = mdin_config.get("thermostat", None)
+            record_period_mdin = mdin_config.get("record_period", None)
+            constrain_mdin = mdin_config.get("constrain", None)
+
+            if length is None and length_mdin is not None:
+               length = length_mdin
+            if minimize == "default" and minimize_mdin is not None:
+               minimize = minimize_mdin
+            if temperature == "default" and temperature_mdin is not None:
+               temperature = temperature_mdin
+            if thermostat == "default" and thermostat_mdin is not None:
+               thermostat = thermostat_mdin
+            if record_period == "default" and record_period_mdin is not None:
+               record_period = record_period_mdin
+            if constrain == "default" and constrain_mdin is not None:
+               constrain = constrain_mdin
+
+        if length is None:
+            _LOGGER.error("At least one of `length` or `nstlim` (through `amber_md_in_file`) needs to be "
+                          "specified for the length of the simulation.")
+            raise TypeError
+
         # tool: write the below code
         # print(AmberInterface._generate_default_assigning_lines_for_build_md_parameterizer_or_step(locals().items()))
 
         # init default values
+        # make them unified in style so that amber_md_in_file block can judge if any value is explicitly assigned
         type_hint_sticker: AmberConfig
+        if minimize == "default":
+            minimize = self.config()["DEFAULT_MD_MINIMIZE"]
         if temperature == "default":
             temperature = self.config()["DEFAULT_MD_TEMPERATURE"]
         if thermostat == "default":
             thermostat = self.config()["DEFAULT_MD_THERMOSTAT"]
+        if constrain == "default":
+            constrain = self.config()["DEFAULT_MD_CONSTRAIN"]
         if core_type == "default":
             core_type = self.config()["DEFAULT_MD_CORE_TYPE"]
         if cluster_job_config == "default":
@@ -1009,6 +1110,7 @@ class AmberInterface(BaseInterface):
             work_dir = self.config()["DEFAULT_MD_WORK_DIR"]
 
         return AmberMDStep(
+            self,
             length,
             minimize,
             temperature,
@@ -1545,3 +1647,7 @@ class AmberInterface(BaseInterface):
 
 
 amber_interface = AmberInterface(None, eh_config._amber)
+"""The singleton of AmberInterface() that handles all Amber related operations in EnzyHTP
+Instantiated here so that other _interface subpackages can use it.
+An example of this concept this AmberInterface used Gaussian for calculating the RESP charge
+so it imports gaussian_interface that instantiated in the same fashion."""

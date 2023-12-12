@@ -20,6 +20,7 @@ from .armer_config import ARMerConfig
 from enzy_htp.core.clusters.accre import Accre
 from enzy_htp.core.general import get_str_for_print_class_var
 from enzy_htp.core.logger import _LOGGER
+from enzy_htp.structure.structure_constraint import StructureConstraint
 
 class AmberConfig(BaseConfig):
     """Class that holds default values for running Amber within enzy_htp and also creates
@@ -89,11 +90,17 @@ class AmberConfig(BaseConfig):
     # endregion
 
     # region == Default values for build_md_step() ==
+    DEFAULT_MD_MINIMIZE: bool = False
+    """The default value for whether md step is a minimization"""
+
     DEFAULT_MD_TEMPERATURE: float = 300.0
     """The default value for the temperature of the simulation."""
 
     DEFAULT_MD_THERMOSTAT: str = "langevin"
     """default value for the algorithm of the thermostat."""
+
+    DEFAULT_MD_CONSTRAIN: StructureConstraint = None
+    """The default value for the constraint applied in the md step"""
 
     DEFAULT_MD_CLUSTER_JOB_CONFIG: dict = {
         "gpu": {
