@@ -22,6 +22,8 @@ class MolDynResult:
         traj_parser
         traj_log_file
         traj_log_parser
+        last_frame_file # used for next step
+        last_frame_parser
     (Note: it is store in file and parser because in most cases you dont want to parse
     a traj because it is too large. Most cases traj uses a lazy parsing scheme that only
     parsed when have to.)
@@ -30,11 +32,15 @@ class MolDynResult:
                  traj_file: str,
                  traj_parser: Callable,
                  traj_log_file: str,
-                 traj_log_parser: Callable,):
+                 traj_log_parser: Callable,
+                 last_frame_file: str,
+                 last_frame_parser: Callable,):
         self._traj_file = traj_file
         self._traj_parser = traj_parser
         self._traj_log_file = traj_log_file
         self._traj_log_parser = traj_log_parser
+        self._last_frame_file = last_frame_file
+        self._last_frame_parser = last_frame_parser
 
     @property
     def traj_parser(self) -> str:
@@ -51,6 +57,14 @@ class MolDynResult:
     @property
     def traj_log_parser(self) -> Callable:
         return self._traj_log_parser
+
+    @property
+    def last_frame_file(self) -> str:
+        return self._last_frame_file
+
+    @property
+    def last_frame_parser(self) -> Callable:
+        return self._last_frame_parser
 
 
 class MolDynResultEgg(ABC):

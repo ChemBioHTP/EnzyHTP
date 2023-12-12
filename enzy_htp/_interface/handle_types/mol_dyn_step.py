@@ -8,11 +8,12 @@ Date: 2023-09-19
 """
 
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Tuple, Union
 from enzy_htp.core.job_manager import ClusterJob
-from enzy_htp.core.mol_dyn_result import MolDynResult
+from enzy_htp.core.mol_dyn_result import MolDynResult, MolDynResultEgg
 
 from ..base_interface import BaseInterface
+from .mol_dyn_parameterizer import MolDynParameter
 
 class MolDynStep(ABC):
     """A modular/indivisible step of Molecular Dynamics simulation.
@@ -39,8 +40,13 @@ class MolDynStep(ABC):
         pass
 
     @abstractmethod
-    def make_job(self) -> ClusterJob:
+    def make_job(self, input_data: Union[MolDynParameter, MolDynResultEgg]) -> Tuple[ClusterJob, MolDynResultEgg]:
         """the method that make a ClusterJob that runs the step"""
+        pass
+
+    @abstractmethod
+    def run(self, input_data: Union[MolDynParameter, MolDynResult]) -> MolDynResult:
+        """the method that runs the step"""
         pass
 
     @abstractmethod
