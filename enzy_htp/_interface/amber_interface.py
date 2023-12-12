@@ -24,7 +24,7 @@ from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import env_manager as em
 from enzy_htp.core.job_manager import ClusterJob
-from enzy_htp.core.mol_dyn_result import MolDynResult
+from enzy_htp.core.mol_dyn_result import MolDynResult, MolDynResultEgg
 from enzy_htp.core.exception import UnsupportedMethod, tLEaPError
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
 from enzy_htp.structure.structure_io import pdb_io, prmtop_io
@@ -438,7 +438,7 @@ class AmberMDStep(MolDynStep):
         self.cluster_job_config = cluster_job_config
         self._if_report = if_report
         self.record_period = record_period
-        self.work_dir = work_dir
+        self._work_dir = work_dir
 
     @property
     def engine(self) -> str:
@@ -458,8 +458,23 @@ class AmberMDStep(MolDynStep):
         """setter for if_report"""
         self._if_report = val
 
-    def make_job(self) -> ClusterJob:
+    @property
+    def work_dir(self) -> bool:
+        """the working directory"""
+        return self._work_dir
+
+    @work_dir.setter
+    def work_dir(self, val: bool):
+        """setter for work_dir"""
+        self.work_dir = val
+
+    # methods
+    def make_job(self, input_data: Union[AmberParameter, MolDynResultEgg]) -> Tuple[ClusterJob, MolDynResultEgg]:
         """the method that make a ClusterJob that runs the step"""
+        pass
+
+    def run(self, input_data: Union[MolDynParameter, MolDynResult]) -> MolDynResult:
+        """the method that runs the step"""
         pass
 
     def translate(self) -> MolDynResult:
@@ -471,6 +486,9 @@ class AmberMDStep(MolDynStep):
         """the classmethod that merge a list of jobs from MolDynStep to fewer jobs"""
         pass
 
+
+class AmberMDResultEgg:
+    """This class defines the data format of the MolDynResultEgg in Amber's case"""
 
 class AmberInterface(BaseInterface):
     """Class that provides a direct inteface for enzy_htp to utilize AmberMD software.

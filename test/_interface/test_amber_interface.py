@@ -453,8 +453,8 @@ def test_antechamber_ncaa_to_moldesc_resp(): #TODO
 
 
 def test_build_md_step_default():
-    """as said in the name. Assert a several default value
-    as a sample."""
+    """as said in the name. Assert several default values
+    as samples."""
     ai = interface.amber
     md_step: AmberMDStep = ai.build_md_step(length=0.1, core_type="cpu")
     assert md_step.temperature == 300.0
@@ -463,6 +463,11 @@ def test_build_md_step_default():
     assert md_step.length == 0.1
     assert md_step.record_period == 0.0001
 
+
+def test_amber_md_step_make_job():
+    """test to make sure AmberMDStep.make_job works as expected."""
+    ai = interface.amber
+    
 # region TODO
 
 def test_parse_fmt_uppercase():
