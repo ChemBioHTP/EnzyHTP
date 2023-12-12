@@ -16,6 +16,7 @@ from enzy_htp.core.general import EnablePropagate
 from enzy_htp.core import file_system as fs
 from enzy_htp._interface.amber_interface import (
     AmberParameterizer,
+    AmberParameter,
     AmberMDStep)
 import enzy_htp.structure as struct
 from enzy_htp import interface
@@ -464,10 +465,18 @@ def test_build_md_step_default():
     assert md_step.record_period == 0.0001
 
 
-def test_amber_md_step_make_job():
-    """test to make sure AmberMDStep.make_job works as expected."""
+def test_amber_md_step_make_job_lv_1():
+    """test to make sure AmberMDStep.make_job() works as expected.
+    lv1: w/o constraint."""
     ai = interface.amber
-    
+    md_step = ai.build_md_step(length=0.1)
+    test_inpcrd = f"{MM_DATA_DIR}/KE_07_R7_S.inpcrd"
+    test_prmtop = f"{MM_DATA_DIR}/KE_07_R7_S.prmtop"
+    test_params = AmberParameter(test_inpcrd, test_prmtop)
+    test_job, test_md_egg = md_step.make_job(test_params)
+
+    # fs.safe_rmdir(test_param_worker.parameterizer_temp_dir)
+
 # region TODO
 
 def test_parse_fmt_uppercase():
