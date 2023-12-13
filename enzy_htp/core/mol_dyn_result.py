@@ -71,7 +71,8 @@ class MolDynResultEgg(ABC):
     """This class defines the format of md result eggs.
     These eggs are md result place holders before the calculation.
     An example of eggs is file paths, so in Amber's case, it could be
-    the .nc file path.
+    the .nc file path etc. In general it should be some info to deduce
+    where the result will be.
     The motivation of having this class is when running MD through ARMer
     the jobs of non-1st-md-step needs to be configured before previous
     job finishes so that they can know where to find the result of the
