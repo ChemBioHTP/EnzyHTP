@@ -19,6 +19,7 @@ from enzy_htp._interface.amber_interface import (
     AmberParameter,
     AmberMDStep)
 import enzy_htp.structure as struct
+from enzy_htp.structure.structure_constraint import StructureConstraint
 from enzy_htp import interface
 from enzy_htp import config as eh_config
 
@@ -517,6 +518,128 @@ def test_write_to_mdin_from_raw_dict():
     ai._write_to_mdin_from_raw_dict(test_raw_dict, test_temp_mdin)
     assert files_equivalent(test_temp_mdin, answer_temp_mdin)
     fs.safe_rm(test_temp_mdin)
+
+def test_parse_md_config_dict_to_raw_wo_cons():
+    """test to make sure _parse_md_config_dict_to_raw() works as expected.
+    using a dict from old EnzyHTP Class_Conf.Amber.conf_heat as an example"""
+    answer_raw_dict = {
+        'title': 'Heat',
+        'namelists': [
+           {'type': 'cntrl',
+            'config': {
+                'imin': 0, 'ntx': 1, 'irest': 0,
+                'ntc': 2, 'ntf': 2,
+                'cut': 10.0,
+                'nstlim': 20000, 'dt': 0.002,
+                'tempi': 0.0, 'temp0': 300.0,
+                'ntpr': 200, 'ntwx': 20000,
+                'ntt': 3, 'gamma_ln': 5.0,
+                'ntb': 1, 'ntp':0,
+                'iwarp': 1,
+                'ig': -1,
+                }
+            },
+           {'type': 'wt',
+            'config': {
+                'type': 'TEMP0',
+                'istep1': 0, 'istep2': 18000,
+                'value1': 0.0, 'value2': 300.0,
+                }
+            },
+           {'type': 'wt',
+            'config': {
+                'type': 'TEMP0',
+                'istep1': 18001, 'istep2': 20000,
+                'value1': 300.0, 'value2': 300.0,
+                }
+            },
+           {'type': 'wt',
+            'config': {
+                'type': 'END',
+                }
+            },
+        ],
+        'file_redirection': {},
+        'group_info': [],
+    }
+    test_md_config_dict = {
+            "name" : "heat",
+            "length" : 0.04, # ns
+            "timestep" : 0.000002, # ns
+            "minimize" : True,
+            "temperature" : [(0.0, 0.0), (0.036, 300.0), (0.04, 300.0)],
+            "thermostat" : "langevin",
+            "constrain" : None,
+            "if_report" : True,
+            "record_period" : 0.0004,
+    }
+
+    ai = interface.amber
+    test_raw_dict = ai._parse_md_config_dict_to_raw(test_md_config_dict)
+    assert test_raw_dict == answer_raw_dict
+
+def test_parse_md_config_dict_to_raw_w_cons(): # TODO finish this after the PR
+    """test to make sure _parse_md_config_dict_to_raw() works as expected.
+    using a dict from old EnzyHTP Class_Conf.Amber.conf_heat as an example"""
+    answer_raw_dict = {
+        'title': 'Heat',
+        'namelists': [
+           {'type': 'cntrl',
+            'config': {
+                'imin': 0, 'ntx': 1, 'irest': 0,
+                'ntc': 2, 'ntf': 2,
+                'cut': 10.0,
+                'nstlim': 20000, 'dt': 0.002,
+                'tempi': 0.0, 'temp0': 300.0,
+                'ntpr': 200, 'ntwx': 20000,
+                'ntt': 3, 'gamma_ln': 5.0,
+                'ntb': 1, 'ntp':0,
+                'iwarp': 1,
+                'nmropt': 1,
+                'ig': -1,
+                'ntr': 1, 'restraint_wt': 2.0, 'restraintmask': "'@C,CA,N'",
+                }
+            },
+           {'type': 'wt',
+            'config': {
+                'type': 'TEMP0',
+                'istep1': 0, 'istep2': 18000,
+                'value1': 0.0, 'value2': 300.0,
+                }
+            },
+           {'type': 'wt',
+            'config': {
+                'type': 'TEMP0',
+                'istep1': 18001, 'istep2': 20000,
+                'value1': 300.0, 'value2': 300.0,
+                }
+            },
+           {'type': 'wt',
+            'config': {
+                'type': 'END',
+                }
+            },
+        ],
+        'file_redirection': {
+            'DISANG': './MD/0.rs' 
+        },
+        'group_info': [],
+    }
+    test_md_config_dict = {
+            "name" : "Heat",
+            "length" : 0.04, # ns
+            "timestep" : 0.000002, # ns
+            "minimize" : True,
+            "temperature" : [(0.0, 0.0), (0.036, 300.0), (0.04, 300.0)],
+            "thermostat" : "langevin",
+            "constrain" : StructureConstraint("TODO"),
+            "if_report" : True,
+            "record_period" : 0.0004,
+    }
+
+    ai = interface.amber
+    test_raw_dict = ai._parse_md_config_dict_to_raw(test_md_config_dict)
+    assert test_raw_dict == answer_raw_dict
 
 def test_amber_md_step_make_job_lv_1():
     """test to make sure AmberMDStep.make_job() works as expected.
