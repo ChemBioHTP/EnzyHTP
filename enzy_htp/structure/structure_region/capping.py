@@ -26,12 +26,14 @@ def get_h_atom(end:str) -> List[Atom]:
         aname = 'HP21'
 
     return [
-            Atom({'atom_name': aname, 'x_coord':0.000, 'y_coord': 0.000, 'z_coord':  0.000})
+            Atom({'atom_name': aname, 'x_coord':0.000, 'y_coord': 0.000, 'z_coord':  0.000, 'atom_number':1})
     ]
 
+class _ResidueDummy:
+    def __init__(self, name:str):
+        self.name = name
 
-
-def get_ch3_atoms(end:str) -> List[Atom]:
+def get_ch3_atoms(end:str, res_dummy:str) -> List[Atom]:
     """TODO(CJ)"""
     if end == 'nterm':
         anames = "CP1 HP11 HP12 HP13".split()
@@ -39,10 +41,10 @@ def get_ch3_atoms(end:str) -> List[Atom]:
         anames = "CP2 HP21 HP22 HP23".split()
 
     return [
-            Atom({'atom_name': anames[0], 'x_coord':0.000, 'y_coord': 0.000, 'z_coord':  0.000}),
-            Atom({'atom_name': anames[1], 'x_coord':0.360, 'y_coord':-1.029, 'z_coord':  0.000}),
-            Atom({'atom_name': anames[2], 'x_coord':0.360, 'y_coord': 0.514, 'z_coord':  0.891}),
-            Atom({'atom_name': anames[3], 'x_coord':0.360, 'y_coord': 0.514, 'z_coord': -0.891})
+            Atom({'atom_name': anames[0], 'x_coord':0.000, 'y_coord': 0.000, 'z_coord':  0.000,'atom_number':1},parent=res_dummy),
+            Atom({'atom_name': anames[1], 'x_coord':0.360, 'y_coord':-1.029, 'z_coord':  0.000,'atom_number':1},parent=res_dummy),
+            Atom({'atom_name': anames[2], 'x_coord':0.360, 'y_coord': 0.514, 'z_coord':  0.891,'atom_number':1},parent=res_dummy),
+            Atom({'atom_name': anames[3], 'x_coord':0.360, 'y_coord': 0.514, 'z_coord': -0.891,'atom_number':1},parent=res_dummy)
     ]
 
 def needs_nterm_capping(res:Residue, stru:Structure, residue_list:List[Tuple[str,int]]) -> bool:
@@ -75,7 +77,7 @@ def cap_residue(res:Residue, stru:Structure, strategy:str, side:str) -> List[Ato
     
     cap:List[Atom] = None
     if strategy == 'CH3':
-        cap = get_ch3_atoms(side)
+        cap = get_ch3_atoms(side, res)
     elif strategy == 'H':
         cap = get_h_atom(side)
    
@@ -88,7 +90,6 @@ def cap_residue(res:Residue, stru:Structure, strategy:str, side:str) -> List[Ato
         pt = np.transpose(np.matmul(rot_mat, np.transpose( pt  )))
         pt += (direction*bond_distance) + p1 
         aa.coord = pt
-
 
     return cap
 

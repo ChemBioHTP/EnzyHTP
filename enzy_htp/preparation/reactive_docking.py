@@ -86,25 +86,21 @@ def dock_reactants(structure: Structure,
 
     df = _dock_system(structure, constraints, n_struct, param_files, charge_mapper, work_dir, rng_seed, use_cache )
     
-    #_evaluate_SASA(df, max_sasa_ratio)#TODO(CJ): put this back in 
+    _evaluate_SASA(df, max_sasa_ratio)#TODO(CJ): put this back in 
 
-    #_evaluate_clashes(df, clash_distance, clash_cutoff)
+    _evaluate_clashes(df, clash_distance, clash_cutoff)
 
     _evaluate_csts(df, constraints, cst_energy)
-   
+    
     _evaluate_qm(df, structure, charge_mapper, cluster_distance)
 
-    final_geometry:str = _qm_minimization(df, charge_mapper, cluster_distance, constraints)
-    
-    parser = PDBParser()
-    final_stru = parser.get_structure(final_geometry)
-    stru_oper.update_residues(structure, final_stru)
+    final_geometry:Structure = _qm_minimization(df, charge_mapper, cluster_distance, constraints)
    
     if not save_work_dir:
         _LOGGER.info(f"save_work_dir set to False! Deleting {work_dir}")
         fs.safe_rmdir( work_dir )
 
-    return structure 
+    return final_geometry 
 
 
 
@@ -246,7 +242,9 @@ def _create_xml(stru:Structure, work_dir: str, use_cache: bool) -> str:
             'cycles': '1000',
             'repeats': '3',
             'temperature': '5',
-            'grid_set': rd['grid_name']
+            'grid_set': rd['grid_name'],
+            'use_constraints':'true',
+            'cst_fa_file':'./dock.cst'
         }])
         protocol_names.extend([dock])
 
@@ -541,7 +539,7 @@ def _evaluate_csts(df: pd.DataFrame, csts: List[StructureConstraint], cst_cutoff
 
     _LOGGER.info(
         f"Finished RosettaCst evaluation. {df.selected.sum()} geometries have constraint tolerances <= {cst_cutoff:.3f} tolerance units")
-
+    
 
 def _parameterize_system(stru:Structure, work_dir:str) -> Tuple[List[str], Dict[str, int]]:
     """Given the input Structure(), parameterize everything needed to perform RosettaLigand docking.
@@ -758,102 +756,24 @@ def _qm_minimization(df:pd.DataFrame, charge_mapper, cluster_distance:float, con
     Returns:
 
     """
-    def __map(asite, enzyme):
-        mapper = dict()
-
-        atom_mapper:Dict = dict(zip(
-            zip(enzyme.chain, enzyme.resn, enzyme.resi, enzyme['name']),enzyme['rank']
-        ))
-
-        for aidx, arow in asite.iterrows():
-            a_key = (arow.chain, arow.resn, arow.resi, arow['name'])
-
-            result = atom_mapper.get(a_key, None)
-            mapper[(arow.chain, arow.resn, int(arow.resi), arow['name'])] = arow['rank']
-
-            if result is None:
-                continue
-
-            #TODO(CJ): map more stuff
-            mapper[arow['rank']] = result
-
-        return mapper
-
     if work_dir is None:
         work_dir = config['system.SCRATCH_DIR']
 
     if not df.selected.sum():
         _LOGGER.error("No geometries still selected! Exiting...")
         exit( 1 )
+    
+    #TODO(CJ): add the xtb.geo_opt() here
 
     infile:str=df[df.selected].sort_values(by='qm_energy').description.to_list()[0]
+   
+    _parser = PDBParser()
+    final_stru = _parser.get_structure(infile)
+    as_info = _define_active_site(final_stru, cluster_distance, charge_mapper)
     
-    session = interface.pymol.new_session()
-    non_aa:pd.DataFrame = interface.pymol.collect(session, infile, 'chain resn resi'.split(), 'not polymer.protein')
-    
-    sele:str = " or ".join(
-        map(lambda pr: f"( byres all within {cluster_distance} of  (chain {pr[0]} and resn {pr[1]} and resi {pr[2]}) )",
-        set(zip(non_aa.chain, non_aa.resn, non_aa.resi))
-    ))
-    
-    full_system:pd.DataFrame = interface.pymol.collect(session, infile, 'chain resn resi name rank'.split())
-    
-    temp_pdb = f"{work_dir}/__qm_min_temp.pdb"
-    temp_mol = f"{work_dir}/__qm_min_temp.mol"
-    
-    temp_pdb = interface.pymol.create_cluster(session, infile, sele_str=sele, outfile=temp_pdb, cap_strategy='CH3')
-    active_site:pd.DataFrame = interface.pymol.collect(session, temp_pdb, 'chain resn resi name rank'.split(), sele)
+    interface.xtb.geo_opt(final_stru, charge=as_info['charge'], constraints=constraints, sele_str=as_info['sele'], work_dir=work_dir)
 
-    atom_mapper:Dict = __map(active_site, full_system)
-    charge:int = _system_charge(active_site, charge_mapper)
-
-    temp_df = interface.pymol.collect(interface.pymol.new_session(), temp_pdb, 'chain resn resi name rank'.split())
-    
-    freeze_atoms = interface.pymol.collect(interface.pymol.new_session(), temp_pdb, 'rank'.split(), 'bb.')['rank'].to_numpy() + 1
-
-    temp_sdf = interface.pymol.create_cluster(session, infile, sele_str=sele, outfile=temp_mol, cap_strategy='CH3')
-
-    mapped_constraints:List = list()
-    if constraints is not None:
-        for cst in constraints:
-            for raw_cst in cst.get_constraints():
-                mapped_atoms = list()
-                for ra in raw_cst['atoms']:
-                    mapped_atom = atom_mapper.get(ra, None)
-                    if mapped_atom is None:
-                        continue
-                    mapped_atoms.append(mapped_atom + 1)
-                if len(mapped_atoms) != len(raw_cst['atoms']):
-                    continue
-                mapped_constraints.append((raw_cst['generic_type'], raw_cst['ideal_value'], mapped_atoms))
-
-
-    (optimized_cluster, energy) = interface.xtb.geo_opt(
-        temp_mol,
-        charge=charge,
-        freeze_atoms=freeze_atoms,
-        constraints=mapped_constraints
-        )
-
-    optimized_df = interface.pymol.collect(interface.pymol.new_session(), optimized_cluster, 'x y z rank'.split())
-
-    args = [('load', infile)]
-    for i, row in optimized_df.iterrows():
-        mapped_index = atom_mapper.get(row['rank'])
-        if mapped_index is None:
-            continue
-
-        args.append((
-            'alter_state', 1, f'(rank {mapped_index})',f'(x,y,z)=({row["x"]},{row["y"]},{row["z"]})'
-        ))
-        
-    temp_path = Path(infile)
-    outfile = str(temp_path.parent / f"{temp_path.stem}_optimized.pdb")
-    args.append(('save', outfile))
-
-    session = interface.pymol.new_session()
-    interface.pymol.general_cmd(session, args)
-    return outfile
+    return final_stru
 
 def _evaluate_qm(df: pd.DataFrame, structure: Structure, charge_mapper, cluster_cutoff: float) -> None:
     """TODO(CJ)
@@ -883,17 +803,15 @@ def _evaluate_qm(df: pd.DataFrame, structure: Structure, charge_mapper, cluster_
             qm_energy.append(None)
             continue
 
-        #interface.pymol.create_cluster(session, row.description, as_info['sele'], outfile='temp.xyz', cap_strategy='CH3')
         energy:float = None
+        _df_stru = _parser.get_structure( row.description )
         try:
-            energy = interface.xtb.single_point('temp.xyz', charge=as_info['charge'])
+            energy = interface.xtb.single_point(_df_stru,charge=as_info['charge'],sele_str=as_info['sele'])
         except:     
             _LOGGER.warn("Failed single point energy calculation attempt! Continuing...")
             #TODO(CJ): add some file cleanup
 
         qm_energy.append(energy)
-
-        _LOGGER.info(row.description)
 
     df['qm_energy'] = qm_energy
     _LOGGER.info("Finished qm energy evaluation!")

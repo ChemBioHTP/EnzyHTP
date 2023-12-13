@@ -548,7 +548,10 @@ class PyMolInterface(BaseInterface):
         lines = list(filter(lambda ll: ll[0] != '>', lines))
         return ''.join(lines)
 
-    def _remove_ligand_bonding(self, session):
+    def remove_ligand_bonding(self, session): #TODO(CJ): bad name here
+
+        self.general_cmd(session, [('set', 'retain_order', 1)])       #NOTE(CJ): this solves so many problems
+        #TODO(CJ): need to add 
         def dist( p1, p2 ):
             return np.sqrt(np.sum((p1-p2)**2))
         #TODO(CJ): documentation
@@ -679,6 +682,30 @@ class PyMolInterface(BaseInterface):
             outfile = fs.safe_mv(outfile, f"{out_dir}/")
         #TODO(CJ): check if the file is downloaded
         return outfile
+
+    def get_residue_list(self, session, stru, sele_str:str='all', work_dir:str=None) -> List[Tuple[str,int]]:
+        #TODO(CJ): add this documentation + type hinting
+        if work_dir is None:
+            work_dir = './'
+
+        temp_file:str = f"{work_dir}/__temp_pymol.pdb"
+
+        _parser = PDBParser()
+        _parser.save_structure(temp_file, stru)
+
+        df = self.collect(session, temp_file, "chain resi".split(), sele=sele_str)
+        
+        fs.safe_rm( temp_file )
+        result = list()
+        result_set = set()
+
+        for i, row in df.iterrows():
+            new = (row['chain'], int(row['resi']))
+            if new not in result_set:
+                result.append( new )
+                result_set.add( new )
+
+        return result 
 
 
 class OpenPyMolSession:

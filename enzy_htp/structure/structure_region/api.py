@@ -1,7 +1,7 @@
 #TODO(CJ):
 
 
-
+import numpy as np
 
 
 from typing import List, Tuple, Union
@@ -21,14 +21,55 @@ class StructureRegion:
     def __init__(self, atoms: List[Atom]):
         
         self.atoms_ = atoms
+        self.atom_mapper_ = dict()
+        for aa in self.atoms_: 
+            self.atom_mapper_[aa.key] = aa
 
     @property
     def atoms(self) -> List[Atom]:
         return self.atoms_
 
+
+    def has_atoms(self, atoms:List[Atom] ) -> bool:
+        for aa in atoms:
+            if not self.has_atom( aa ):
+                return False
+        return True
+        
+    def has_atom(self, atom:Atom) -> bool:
+        return atom.key in self.atom_mapper_
+
     def get_atom(self, key:str ) -> Atom:
         #NOTE(CJ): need this part for the 
-        pass
+        return self.atom_mapper_[key]
+
+    def backbone_indices(self, index:int=0):
+        indices:List[str] = list()
+        for aidx,aa in enumerate(self.atoms):
+            if not aa.parent.is_canonical():
+                continue
+            
+            if aa.name in "N CA C CP1 CP2".split(): #TODO(CJ): 
+                indices.append( aidx + index )
+
+        return indices
+
+    def get_atom_index(self, atom:Atom, indexing:int=0) -> int:
+        target_key:str = atom.key
+        for aidx, aa in enumerate(self.atoms):
+            if aa.key == target_key:
+                return aidx+indexing
+        else:
+            assert False #TODO(CJ): better error logging here
+
+    def closest_heavy_atom(self, atom:Atom) -> Atom:
+        distances = list()
+        for aa in self.atoms:
+            if aa.element == 'H' or aa.parent != atom.parent:
+                distances.append(1000)
+            else:
+                distances.append( atom.distance_to(aa) )
+        return self.atoms[np.argmin(distances)]
 
 
     def __getitem__(self, key:int) -> Atom:
@@ -65,7 +106,6 @@ def create_structure_region(stru:Structure,
 
         if needs_cterm_capping(res, stru, residue_list):
             residue_atoms.extend(cap_residue(res, stru, cterm_cap, 'cterm'))
-
 
         atoms.extend( residue_atoms )
 

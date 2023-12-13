@@ -141,10 +141,11 @@ def _place_mole2(stru:Structure,
         for included, cp in zip(cc.contains_points(candidates), candidates):
             if included:
                 seed_locations.append(cp)
-   
-    best_energy:float = None 
-    best_point:Tuple[float,float,float] = None
-    
+
+
+    seed_locations = np.array(seed_locations)
+    scores = list()
+
     for sl in seed_locations:
         #TODO(CJ): this is where I put the actual energy/constraint evaluation
     
@@ -158,13 +159,35 @@ def _place_mole2(stru:Structure,
             if cst.is_residue_pair_constraint():
                 curr_energy += cst.distanceAB_.score_energy()
                 
+        scores.append( curr_energy )            
 
-        if best_energy is None or curr_energy <= best_energy:
-            best_energy = curr_energy
-            best_point = sl
+    scores = np.array(scores)
 
+    score_mask = np.isclose(scores, np.min(scores))
 
-    ligand.shift( best_point - ligand.geom_center)
+    clash_counts = list()
+    for sl in seed_locations[score_mask]:
+        lig_start = ligand.geom_center
+        shift = sl - lig_start
+
+        ligand.shift(shift)
+        clash_ct = 0
+
+        for res in stru.residues:
+            if res == ligand:
+                continue
+            clash_ct += res.clash_count( ligand )
+    
+        clash_counts.append( clash_ct ) 
+
+    clash_counts = np.array(clash_counts)
+
+    clash_mask = np.isclose(clash_counts, np.min(clash_counts))
+
+    final_locations = seed_locations[score_mask][clash_mask]
+    seed = final_locations[0]
+
+    ligand.shift( seed - ligand.geom_center)
 
 
 def _place_alphafill(stru: Structure,

@@ -816,7 +816,6 @@ class RosettaInterface(BaseInterface):
         for cidx, cst in enumerate(constraints):
             if cst.is_residue_pair_constraint():
                 pdb_content.append(self.create_cst_pdb_line(cst, counter))
-                print(pdb_content)
                 cst_content.extend(self.create_cst_lines(cst))
                 counter += 1
     
