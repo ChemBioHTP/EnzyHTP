@@ -107,6 +107,32 @@ def round_by(num: float, cutnum: float) -> int:
     return int(int_part)
 
 
+def is_integer(num: float, tolerance: float = 0.01) -> bool:
+    """determine whether a float is actually an integer within an error tolerance.
+    The tolerence must be smaller than 1.
+    Example: 1.999 is 2 by tolerance of 0.01"""
+    # san check
+    if tolerance > 1:
+        _LOGGER.error(f"tolerance must be smaller than 1. (input: {tolerance})")
+        raise ValueError
+
+    dec_part, int_part = math.modf(num)
+    return (dec_part < tolerance) or (dec_part > (1 - tolerance))
+
+
+def get_section_from_endpoint(endpoint_list: List[Tuple[int, int]]) -> List[Tuple[Tuple[int, int], Tuple[int, int]]]:
+    """get sections that does not share endpoints from a list of raw endpoints.
+    e.g.: [(1,1),(10,2),(15,5)] -> [((1,1),(10,2)), ((11,2),(15,2))]"""
+    result = [(endpoint_list[0], endpoint_list[1])]
+    last_point = endpoint_list[1]
+    for endpoint in endpoint_list[2:]:
+        x, y = last_point
+        non_share_point = (x+1, y)
+        result.append((non_share_point, endpoint))
+        last_point = endpoint
+    return result
+
+
 def calc_average_task_num(num_of_task: int, num_of_worker: int) -> List[int]:
     """calculate task number for each worker based on {num_of_task} and
     {num_of_worker}. Return a list of task numbers for each worker."""
