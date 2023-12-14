@@ -465,6 +465,7 @@ def test_build_md_step_default():
     assert md_step.length == 0.1
     assert md_step.record_period == 0.0001
 
+
 def test_write_to_mdin_from_raw_dict():
     """test to make sure _write_to_mdin_from_raw_dict() works as expected.
     using a dict from old EnzyHTP Class_Conf.Amber.conf_heat as an example"""
@@ -519,6 +520,7 @@ def test_write_to_mdin_from_raw_dict():
     assert files_equivalent(test_temp_mdin, answer_temp_mdin)
     fs.safe_rm(test_temp_mdin)
 
+
 def test_parse_md_config_dict_to_raw_wo_cons():
     """test to make sure _parse_md_config_dict_to_raw() works as expected.
     using a dict from old EnzyHTP Class_Conf.Amber.conf_heat as an example"""
@@ -532,7 +534,7 @@ def test_parse_md_config_dict_to_raw_wo_cons():
                 'cut': 10.0,
                 'nstlim': 20000, 'dt': 0.002,
                 'tempi': 0.0, 'temp0': 300.0,
-                'ntpr': 200, 'ntwx': 20000,
+                'ntpr': 200, 'ntwx': 200,
                 'ntt': 3, 'gamma_ln': 5.0,
                 'ntb': 1, 'ntp':0,
                 'iwarp': 1,
@@ -563,20 +565,23 @@ def test_parse_md_config_dict_to_raw_wo_cons():
         'group_info': [],
     }
     test_md_config_dict = {
-            "name" : "heat",
+            "name" : "Heat",
             "length" : 0.04, # ns
             "timestep" : 0.000002, # ns
-            "minimize" : True,
+            "minimize" : False,
             "temperature" : [(0.0, 0.0), (0.036, 300.0), (0.04, 300.0)],
             "thermostat" : "langevin",
+            "pressure_scaling" : "none",
             "constrain" : None,
+            "restart" : False,
             "if_report" : True,
-            "record_period" : 0.0004,
+            "record_period" : 0.0004, # ns
     }
 
     ai = interface.amber
     test_raw_dict = ai._parse_md_config_dict_to_raw(test_md_config_dict)
     assert test_raw_dict == answer_raw_dict
+
 
 def test_parse_md_config_dict_to_raw_w_cons(): # TODO finish this after the PR
     """test to make sure _parse_md_config_dict_to_raw() works as expected.
@@ -591,7 +596,7 @@ def test_parse_md_config_dict_to_raw_w_cons(): # TODO finish this after the PR
                 'cut': 10.0,
                 'nstlim': 20000, 'dt': 0.002,
                 'tempi': 0.0, 'temp0': 300.0,
-                'ntpr': 200, 'ntwx': 20000,
+                'ntpr': 200, 'ntwx': 200,
                 'ntt': 3, 'gamma_ln': 5.0,
                 'ntb': 1, 'ntp':0,
                 'iwarp': 1,
@@ -627,9 +632,11 @@ def test_parse_md_config_dict_to_raw_w_cons(): # TODO finish this after the PR
     }
     test_md_config_dict = {
             "name" : "Heat",
+            "minimize" : False,
+            "pressure_scaling" : "none",
+            "restart" : False,
             "length" : 0.04, # ns
             "timestep" : 0.000002, # ns
-            "minimize" : True,
             "temperature" : [(0.0, 0.0), (0.036, 300.0), (0.04, 300.0)],
             "thermostat" : "langevin",
             "constrain" : StructureConstraint("TODO"),
@@ -640,6 +647,7 @@ def test_parse_md_config_dict_to_raw_w_cons(): # TODO finish this after the PR
     ai = interface.amber
     test_raw_dict = ai._parse_md_config_dict_to_raw(test_md_config_dict)
     assert test_raw_dict == answer_raw_dict
+
 
 def test_amber_md_step_make_job_lv_1():
     """test to make sure AmberMDStep.make_job() works as expected.
@@ -652,6 +660,7 @@ def test_amber_md_step_make_job_lv_1():
     test_job, test_md_egg = md_step.make_job(test_params)
 
     # fs.safe_rmdir(test_param_worker.parameterizer_temp_dir)
+
 
 # region TODO
 

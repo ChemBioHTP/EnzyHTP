@@ -90,6 +90,12 @@ class AmberConfig(BaseConfig):
     # endregion
 
     # region == Default values for build_md_step() ==
+    DEFAULT_MD_NAME: bool = "md_step"
+    """The default value for the name tag of the md step"""
+
+    DEFAULT_MD_TIMESTEP: float = 0.000002 # ns
+    """The default value for the timestep the md step"""
+
     DEFAULT_MD_MINIMIZE: bool = False
     """The default value for whether md step is a minimization"""
 
@@ -99,8 +105,14 @@ class AmberConfig(BaseConfig):
     DEFAULT_MD_THERMOSTAT: str = "langevin"
     """default value for the algorithm of the thermostat."""
 
+    DEFAULT_MD_PRESSURE_SCALING: str = "isotropic"
+    """default value for the pressure scaling of the md step"""
+
     DEFAULT_MD_CONSTRAIN: StructureConstraint = None
     """The default value for the constraint applied in the md step"""
+
+    DEFAULT_MD_RESTART: bool = False
+    """The default value for whether restart using v from another md step"""
 
     DEFAULT_MD_CLUSTER_JOB_CONFIG: dict = {
         "gpu": {
@@ -130,18 +142,22 @@ class AmberConfig(BaseConfig):
     files. """
     # endregion
 
-    CONF_MIN: Dict = {
-        "ntc": 2,
-        "ntf": 2,
-        "cut": 10.0,
-        "maxcyc": 20000,
-        "ncyc_mult": 0.5,
-        "ntpr_mult": 0.01,
-        "ntr": 1,
-        "restraintmask": "'@C,CA,N'",
-        "restraint_wt": 2.0,
-    }
-    """dict() holding the settings for an Amber minimization."""
+    # region == hard coded MD options (only changable here) ==
+    HARDCODE_CUT = 10.0
+    """hard coded `cut` value"""
+
+    HARDCODE_NTPR_RATIO = 0.01
+    """hard coded `ntpr` ratio. nstlim * ratio = ntpr"""
+
+    HARDCODE_GAMMA_LN = 5.0
+    """hard coded `gamma_ln` value used when ntt=3"""
+
+    HARDCODE_IWARP = 1
+    """hard coded `iwarp` value"""
+
+    HARDCODE_IG = -1
+    """hard coded `ig` value"""
+    # endregion
 
     CONF_HEAT: Dict = {
         "ntc": 2,

@@ -14,6 +14,7 @@ import shutil
 from pathlib import Path
 from subprocess import CalledProcessError
 from typing import List, Tuple, Union, Dict, Any
+from dataclasses import dataclass
 
 from .base_interface import BaseInterface
 from .handle_types import MolDynParameterizer, MolDynParameter, MolDynStep
@@ -23,6 +24,7 @@ from .gaussian_interface import gaussian_interface
 from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import env_manager as em
+from enzy_htp.core import math_helper as mh
 from enzy_htp.core.job_manager import ClusterJob
 from enzy_htp.core.mol_dyn_result import MolDynResult, MolDynResultEgg
 from enzy_htp.core.exception import UnsupportedMethod, tLEaPError
@@ -71,6 +73,11 @@ class AmberParameter(MolDynParameter):
     def topology_parser(self) -> str:
         """return the parser object for topology_file"""
         return prmtop_io.PrmtopParser()
+
+    @property
+    def input_coordinate_file(self) -> str:
+        """return the path of the input_coordinate file that is the starting geom of the MD"""
+        return self._inpcrd
 
     #endregion
 
@@ -394,6 +401,15 @@ class AmberParameterizer(MolDynParameterizer):
         return None
 
 
+@dataclass
+class AmberMDResultEgg(MolDynResultEgg):
+    """This class defines the data format of the MolDynResultEgg in Amber's case"""
+    traj_path: str
+    traj_log_path: str
+    rst_path: str
+    prmtop_path: str
+
+
 class AmberMDStep(MolDynStep):
     """the modular MD step of Amber.
     Constructer:
@@ -402,10 +418,12 @@ class AmberMDStep(MolDynStep):
         engine
         parent_interface
         length
+        timestep
         minimize
         temperature
         thermostat
         constrain
+        restart
         core_type
         cluster_job_config
         if_report
@@ -418,26 +436,36 @@ class AmberMDStep(MolDynStep):
         try_merge_job()"""
     def __init__(self, 
                  interface,
+                 name: str, 
                  length: float,
+                 timestep: float,
                  minimize: bool,
                  temperature: Union[float, List[Tuple[float]]],
                  thermostat: str,
+                 pressure_scaling: str,
                  constrain: StructureConstraint,
+                 restart: bool,
                  core_type: str,
                  cluster_job_config: Dict,
                  if_report: bool,
                  record_period: float,
+                 keep_in_file: bool,
                  work_dir: str,) -> None:
         self._parent_interface = interface
+        self.name = name
         self.length = length
+        self.timestep = timestep
         self.minimize = minimize
         self.temperature = temperature
         self.thermostat = thermostat
+        self.pressure_scaling = pressure_scaling
         self.constrain = constrain
+        self.restart = restart
         self.core_type = core_type
         self.cluster_job_config = cluster_job_config
         self._if_report = if_report
         self.record_period = record_period
+        self.keep_in_file = keep_in_file
         self._work_dir = work_dir
 
     @property
@@ -468,17 +496,66 @@ class AmberMDStep(MolDynStep):
         """setter for work_dir"""
         self.work_dir = val
 
+    @property
+    def md_config_dict(self) -> Dict:
+        """get md configuration related attributes in a dictionary form"""
+        return {
+            "name" : self.name,
+            "length" : self.length,
+            "timestep" : self.timestep,
+            "minimize" : self.minimize,
+            "temperature" : self.temperature,
+            "thermostat" : self.thermostat,
+            "pressure_scaling" : self.pressure_scaling,
+            "constrain" : self.constrain,
+            "restart" : self.restart,
+            "if_report" : self.if_report,
+            "record_period" : self.record_period,
+        }
+
     # methods
-    def make_job(self, input_data: Union[AmberParameter, MolDynResultEgg]) -> Tuple[ClusterJob, MolDynResultEgg]:
+    def make_job(self, input_data: Union[AmberParameter, AmberMDResultEgg]) -> Tuple[ClusterJob, MolDynResultEgg]:
         """the method that make a ClusterJob that runs the step"""
-        pass
+        # 1. parse input
+        if isinstance(input_data, AmberParameter): # build from parameter
+            coord = input_data.input_coordinate_file
+            prmtop = input_data.topology_file
+        elif isinstance(input_data, AmberMDResultEgg): # build form previous step
+            coord = input_data.rst_path
+            prmtop = input_data.prmtop_path
+        else:
+            _LOGGER.error("only allow AmberParameter or AmberMDResultEgg as `input_data`")
+            raise TypeError
+
+        # 2. make .in file
+        self._make_mdin_file()
+
+        # 3. make cmd
+        step_cmd = f"TODO"
+
+        # 4. assemble ClusterJob
 
     def run(self, input_data: Union[MolDynParameter, MolDynResult]) -> MolDynResult:
         """the method that runs the step"""
         pass
 
+    def _make_mdin_file(self) -> str:
+        """make a temporary mdin file.
+        *path* is based on self.work_dir and self.name.
+        If the file exists, will change the filename to {self.name}_{index}.in
+        The index start from 1.
+        *content* is based on attributes of the instance.
+
+        Return: the path of the temp mdin file."""
+        # path
+        temp_mdin_file_path = fs.get_valid_temp_name(f"{self.work_dir}/{self.name}.in")
+        # content
+        self.parent_interface.write_to_mdin(self.md_config_dict, temp_mdin_file_path)
+        return temp_mdin_file_path
+
     def translate(self) -> MolDynResult:
-        """the method convert engine specific results to general output"""
+        """the method convert engine specific results to general output.
+        will also clean up temp files."""
         pass
 
     @classmethod
@@ -486,9 +563,6 @@ class AmberMDStep(MolDynStep):
         """the classmethod that merge a list of jobs from MolDynStep to fewer jobs"""
         pass
 
-
-class AmberMDResultEgg:
-    """This class defines the data format of the MolDynResultEgg in Amber's case"""
 
 class AmberInterface(BaseInterface):
     """Class that provides a direct inteface for enzy_htp to utilize AmberMD software.
@@ -519,8 +593,30 @@ class AmberInterface(BaseInterface):
     }
     """dictionary that maps keywords to charge method that current supported in run_antechamber()"""
 
-    MDIN_KEYWORD_MAPPER = {}
-    """the dictionary that maps sander/pmemd input keywords to standarded names in EnzyHTP"""
+    MD_THERMOSTAT_MAPPER = {
+        "constant_energy" : 0,
+        "berendsen" : 1,
+        "anderson" : 2,
+        "langevin" : 3,
+        "oin" : 9,
+        "sin-respa" : 10,
+        "bussi" : 11,
+    }
+    """The mapper for mapping thermostat names to Amber keyword numbers"""
+
+    MD_PRESSURE_SCALING_MAPPER = {
+        "none" : 0,
+        "isotropic" : 1,
+        "anisotropic" : 2,
+        "semiisotropic" : 3,
+    }
+    """The mapper for mapping pressure scaling names to Amber keyword numbers"""
+
+    MD_RESTART_MAPPER = {True: (5, 1), False: (1, 0)}
+    """The mapper for mapping restart - (ntx, irest) value"""
+
+    MD_TIMESTEP_SHAKE_MAPPER = {0.000002: (2, 2), 0.000001: (1, 1)}
+    """The mapper for mapping timestep - (ntc, ntf) value"""
 
     def __init__(self, parent, config: AmberConfig = None) -> None:
         """Simplistic constructor that optionally takes an AmberConfig object as its only argument.
@@ -547,8 +643,7 @@ class AmberInterface(BaseInterface):
         # cmd based
         if_ignore_start_up: bool = True,
         additional_search_path: List[str] = None,
-        tleap_out_path: str = None,
-    ) -> None:
+        tleap_out_path: str = None,) -> None:
         """the python wrapper of running tleap
         Args:
             tleap_in_str:
@@ -739,18 +834,178 @@ class AmberInterface(BaseInterface):
     # -- cpptraj --
 
     # -- sander/pmemd --
-    def parse_from_mdin(self, mdin_file_path: str) -> Dict:
+    # region - mdin file I/O -
+    def read_from_mdin(self, mdin_file_path: str) -> Dict:
         """the knowledge of the mdin format as the input of sander/pmemd.
-        return a dictionary that use standard keys according to MDIN_KEYWORD_MAPPER"""
+        return a dictionary that use standard keys according to AmberMDStep.md_config_dict"""
         _LOGGER.error("dont support this yet. contact developer if you have to use this.")
         raise Exception
         # TODO
         # 1. parse to dict
-        _parse_from_mdin_to_raw_dict()
+        _read_from_mdin_to_raw_dict()
         # 2. mapper keywords and build objects
 
-    def parse_to_mdin(self):
-        pass
+    def _read_from_mdin_to_raw_dict():
+        """read from mdin file and parse it to a raw dictionary
+        where key is Amber keywords as is. (defined in
+        _write_to_mdin_from_raw_dict())"""
+
+    def write_to_mdin(self, md_config_dict: Dict, out_path: str):
+        """parse a AmberMDStep.md_config_dict to a mdin file."""
+        # parse data_dict
+        raw_data_dict = self._parse_md_config_dict_to_raw(md_config_dict)
+        # write to file
+        self._write_to_mdin_from_raw_dict(raw_data_dict, out_path)
+
+    def _parse_md_config_dict_to_raw(self, md_config_dict: Dict) -> Dict:
+        """parse AmberMDStep.md_config_dict to the raw data dict for mdin
+        hypothesis: if file_redirection is involved a wt type=END is needed?
+
+        Return: the raw data dict."""
+        wt_list = []
+        file_redirection_dict = {}
+        group_info_list = []
+
+        # imin, ntx, irest, ntc, ntf
+        imin = int(md_config_dict["minimize"])
+        ntx, irest = self.MD_RESTART_MAPPER[md_config_dict["restart"]]
+        ntc, ntf = self.MD_TIMESTEP_SHAKE_MAPPER[md_config_dict["timestep"]]
+        # nstlim
+        timestep = md_config_dict["timestep"]
+        dt = timestep * 1000
+        raw_nstlim = md_config_dict["length"] / timestep
+        nstlim = mh.round_by(raw_nstlim, 0.5)
+        if not mh.is_integer(raw_nstlim):
+            _LOGGER.warning(f"length ({md_config_dict['length']}) is not divisible by"
+                            f" timestep ({md_config_dict['timestep']}). Setting nstlim"
+                            f" to {nstlim}. (i.e.:actual length={nstlim * timestep} ns)")
+        # temperture related keywords
+        temperature_data = md_config_dict["temperature"]
+        if isinstance(temperature_data, float):
+            temp_cntrl = {'temp0': temperature_data}
+        elif isinstance(temperature_data, list):
+            temp_wt_list = []
+            temp_cntrl = {'tempi': temperature_data[0][1], 'temp0': temperature_data[-1][1]}
+            temperature_data = [ (mh.round_by(x/timestep, 0.5), y) for x,y in temperature_data]
+            for (step0, temp0), (step1, temp1) in mh.get_section_from_endpoint(temperature_data):
+                temp_wt_list.append({
+                    'type': 'wt',
+                    'config': {
+                        'type': 'TEMP0',
+                        'istep1': step0, 'istep2': step1,
+                        'value1': temp0, 'value2': temp1,}
+                    })
+            wt_list.extend(temp_wt_list)
+        else:
+            _LOGGER.error("temperature can only be a float or a list")
+            raise TypeError
+        # ntpr
+        ntpr = max(int(self.config()["HARDCODE_NTPR_RATIO"] * nstlim), 1)
+        # ntwx
+        ntwx = 0
+        if md_config_dict["if_report"]:
+            ntwx = mh.round_by(md_config_dict["record_period"] / timestep, 0.5)
+        # ntt
+        ntt = self.MD_THERMOSTAT_MAPPER.get(md_config_dict["thermostat"], None)
+        if ntt is None:
+            _LOGGER.error(f"thermostat keyword: {md_config_dict['thermostat']} is not supported."
+                          f" Supported list: {self.MD_THERMOSTAT_MAPPER.keys()}")
+            raise ValueError
+        ntt_cntrl = {'ntt': ntt}
+        if ntt == 3:
+            ntt_cntrl.update({'gamma_ln': self.config()["HARDCODE_GAMMA_LN"],})
+        # ntp
+        if imin == 1:
+            ntp_cntrl = {}
+        else:
+            ntp = self.MD_PRESSURE_SCALING_MAPPER.get(md_config_dict["pressure_scaling"], None)
+            if ntp is None:
+                _LOGGER.error(f"pressure_scaling keyword: {md_config_dict['pressure_scaling']} is not supported."
+                            f" Supported list: {self.MD_PRESSURE_SCALING_MAPPER.keys()}")
+                raise ValueError
+            ntp_cntrl = {"ntp" : ntp}
+        # ntb
+        if imin == 1:
+            ntb_cntrl = {}
+        elif ntp == 0:
+            ntb_cntrl = {"ntb" : 1}
+        else:
+            ntb_cntrl = {"ntb" : 2}
+
+        # determine the &wt END
+        if wt_list or file_redirection_dict:
+            wt_list.append(
+                {'type': 'wt',
+                 'config': {'type': 'END',}},
+                )
+
+        # assemble namelists
+        namelists = [
+            {'type': 'cntrl',
+            'config': {
+                'imin': imin,
+                'ntx': ntx, 'irest': irest,
+                'ntc': ntc, 'ntf': ntf,
+                'cut': self.config()["HARDCODE_CUT"],
+                'nstlim': nstlim, 'dt': dt,
+                } | temp_cntrl | {
+                'ntpr': ntpr, 'ntwx': ntwx,
+                } | ntt_cntrl | ntb_cntrl | ntp_cntrl | {
+                'iwarp': self.config()["HARDCODE_IWARP"],
+                # 'nmropt': 1,
+                'ig': self.config()["HARDCODE_IG"],
+                # 'ntr': 1, 'restraint_wt': 2.0, 'restraintmask': "'@C,CA,N'",
+            }},
+        ] + wt_list
+
+        # compile the raw dict using md_config_dict
+        raw_dict = {
+            'title': md_config_dict["name"],
+            'namelists': namelists,
+            'file_redirection': file_redirection_dict,
+            'group_info': group_info_list,
+        }
+
+        return raw_dict
+
+    def _write_to_mdin_from_raw_dict(self, raw_dict: Dict, out_path: str):
+        """write to mdin file from a raw dictionary
+        where key is Amber keywords.
+        Based on section 19.5 of Amber20 manual.
+        Format of raw_dict:
+            {'title': 'heat',
+            'namelists': [
+                {'type': 'cntrl',
+                'config': {'k': v, ...}},
+                {'type': 'wt',
+                'config': {'k': v, ...}},],
+            'file_redirection': {
+                'DISANG': './MD/0.rs'},
+            'group_info': [],}
+            The 4 main keys are required.
+        (see example in test_amber_interface.py::test_write_to_mdin_from_raw_dict)"""
+        # title
+        mdin_lines: List[str] = [
+            f"{raw_dict['title']}",
+        ]
+        # namelists
+        for namelist in raw_dict["namelists"]:
+            mdin_lines.append(f" &{namelist['type']}")
+            for k, v in namelist['config'].items():
+                mdin_lines.append(f"  {k} = {v},")
+            mdin_lines.append(" /")
+        # file redirection
+        for k, v in raw_dict["file_redirection"].items():
+            mdin_lines.append(f" {k}={v}")
+        # group information
+        for group_info in raw_dict["group_info"]: #TODO cant find any example of how this looks like
+            _LOGGER.error("group info support not developed yet. contact author if you have to use this")
+            raise ValueError
+        # final empty line
+        mdin_lines.append("")
+
+        fs.write_lines(out_path, mdin_lines)
+    # endregion
 
     # == engines ==
     # (engines for science APIs)
@@ -760,8 +1015,7 @@ class AmberInterface(BaseInterface):
         input_pdb: str,
         out_path: str,
         if_align_index: bool = True,
-        amber_lib: str = "leaprc.protein.ff14SB",
-    ) -> None:
+        amber_lib: str = "leaprc.protein.ff14SB",) -> None:
         """Method that uses tleap to clean up {input_pdb} by loading and saving the PDB with
         the {amber_lib}.
         Typical changes are:
@@ -1021,12 +1275,16 @@ class AmberInterface(BaseInterface):
         return temp_chg_file
 
     def build_md_step(self,
+                      name: str = "default",
                       # simulation
                       length: float = None, # ns
+                      timestep: float = "default", # ns
                       minimize: bool = "default",
                       temperature: Union[float, List[Tuple[float]]] = "default",
                       thermostat: str = "default",
+                      pressure_scaling: str = "default",
                       constrain: StructureConstraint = "default",
+                      restart: bool = "default",
                       # simulation (alternative)
                       amber_md_in_file: str = None,
                       # execution
@@ -1035,11 +1293,16 @@ class AmberInterface(BaseInterface):
                       # output
                       if_report: bool = False,
                       record_period: float = "default", # ns
+                      keep_in_file: bool = False,
                       work_dir: str = "default",) -> AmberMDStep:
         """the constructor for AmberMDStep
         Args:
+            name:
+                the name of this md step. This will be used as the name tag in IO filenames.
             length:
                 the simulation length of this step (unit: ns)
+            timestep:
+                the timestep of the simulation. (unit: ns)
             minimize:
                 whether this md step is performing a minimization.
             temperature: 
@@ -1049,8 +1312,13 @@ class AmberInterface(BaseInterface):
             thermostat:
                 the algorithm of the thermostat.
                 options: [constant_energy, berendsen, anderson, langevin, oin, sin-respa, bussi]
+            pressure_scaling:
+                the scaling type for pressure
+                options: [none, isotropic, anisotropic, semiisotropic]
             constrain:
                 the StructureConstraint object that indicates a geometry constrain in the step.
+            restart:
+                whether restart this md from the volecity of a previous md step.
             core_type:
                 the type of computing core that runs the MD. This will affect both the command
                 and the cluster_job config if cluster_job_config is not None.
@@ -1070,7 +1338,21 @@ class AmberInterface(BaseInterface):
                 Note that these parsed settings can be overwritten by explicitly assign arguments.
                 If `length` and `nstlim` are both specified in func argument and .in file, the value in `length`
                 will be used.
-            """
+            keep_in_file:
+                whether the function will keep the .in file after completion.
+        Return:
+            AmberMDStep()
+        Note:
+            This function is written in a way that pro readibilty and sacrificed some ease to maintain.
+            If you want to add a new argument to this function make sure you update the following sections:
+                (this function)
+                    0. docstring
+                    1. if amber_md_in_file is not None: block
+                    2. default value block
+                    3. return block
+                (AmberMDStep.__init__)
+                    + docstring
+                (AmberMDStep.md_config_dict)"""
         # pirority: direct assign > mdin file > default
 
         # support parse from mdin file
@@ -1078,26 +1360,35 @@ class AmberInterface(BaseInterface):
             # parsed form {amber_md_in_file}
             # they are parsed because AmberMDStep doesn't only for generating .in files but also needs to be parsed to
             # other MolDynStep when needed. (e.g.: config OpenMM job using amber .in files)
-            mdin_config = self.parse_from_mdin(amber_md_in_file)
+            mdin_config = self.read_from_mdin(amber_md_in_file)
             length_mdin = mdin_config.get("length", None)
+            timestep_mdin = mdin_config.get("timestep", None)
             minimize_mdin = mdin_config.get("minimize", None)
             temperature_mdin = mdin_config.get("temperature", None)
             thermostat_mdin = mdin_config.get("thermostat", None)
+            pressure_scaling_mdin = mdin_config.get("pressure_scaling", None)
             record_period_mdin = mdin_config.get("record_period", None)
             constrain_mdin = mdin_config.get("constrain", None)
+            restart_mdin = mdin_config.get("restart", None)
 
             if length is None and length_mdin is not None:
                length = length_mdin
             if minimize == "default" and minimize_mdin is not None:
                minimize = minimize_mdin
+            if timestep == "default" and timestep_mdin is not None:
+               timestep = timestep_mdin
             if temperature == "default" and temperature_mdin is not None:
                temperature = temperature_mdin
             if thermostat == "default" and thermostat_mdin is not None:
                thermostat = thermostat_mdin
+            if pressure_scaling == "default" and pressure_scaling_mdin is not None:
+               pressure_scaling = pressure_scaling_mdin
             if record_period == "default" and record_period_mdin is not None:
                record_period = record_period_mdin
             if constrain == "default" and constrain_mdin is not None:
                constrain = constrain_mdin
+            if restart == "default" and restart_mdin is not None:
+               restart = restart_mdin
 
         if length is None:
             _LOGGER.error("At least one of `length` or `nstlim` (through `amber_md_in_file`) needs to be "
@@ -1110,14 +1401,22 @@ class AmberInterface(BaseInterface):
         # init default values
         # make them unified in style so that amber_md_in_file block can judge if any value is explicitly assigned
         type_hint_sticker: AmberConfig
+        if name == "default":
+            name = self.config()["DEFAULT_MD_NAME"]
+        if timestep == "default":
+            timestep = self.config()["DEFAULT_MD_TIMESTEP"]
         if minimize == "default":
             minimize = self.config()["DEFAULT_MD_MINIMIZE"]
         if temperature == "default":
             temperature = self.config()["DEFAULT_MD_TEMPERATURE"]
         if thermostat == "default":
             thermostat = self.config()["DEFAULT_MD_THERMOSTAT"]
+        if pressure_scaling == "default":
+            pressure_scaling = self.config()["DEFAULT_MD_PRESSURE_SCALING"]
         if constrain == "default":
             constrain = self.config()["DEFAULT_MD_CONSTRAIN"]
+        if restart == "default":
+            restart = self.config()["DEFAULT_MD_RESTART"]
         if core_type == "default":
             core_type = self.config()["DEFAULT_MD_CORE_TYPE"]
         if cluster_job_config == "default":
@@ -1128,41 +1427,25 @@ class AmberInterface(BaseInterface):
             work_dir = self.config()["DEFAULT_MD_WORK_DIR"]
 
         return AmberMDStep(
-            self,
-            length,
-            minimize,
-            temperature,
-            thermostat,
-            constrain,
-            core_type,
-            cluster_job_config,
-            if_report,
-            record_period,
-            work_dir,
+            interface = self,
+            name = name,
+            length = length,
+            timestep = timestep,
+            minimize = minimize,
+            temperature = temperature,
+            thermostat = thermostat,
+            pressure_scaling = pressure_scaling,
+            constrain = constrain,
+            restart = restart,
+            core_type = core_type,
+            cluster_job_config = cluster_job_config,
+            if_report = if_report,
+            record_period = record_period,
+            keep_in_file = keep_in_file,
+            work_dir = work_dir,
         )
 
     # region == TODO ==
-    def write_minimize_input_file(self, fname: str, cycle: int) -> None:
-        """Creates a minimization file to be used in an amber run. SHOULD NOT BE CALLED BY USERS DIRECTLY.
-        All parameters in the &ctrl block are hardcoded except for ncyc and ntpr, which are 0.5*cycle
-        and 0.2*cycle as integers, respectively.
-        """
-        minimize_lines: List[str] = [
-            "Minimize",
-            " &cntrl",
-            "  imin=1,",
-            "  ntx=1,",
-            "  irest=0,",
-            f"  maxcyc={str(cycle)},",
-            f"  ncyc={int(0.5 * cycle)},",
-            f"  ntpr={int(0.2 * cycle)},",
-            "  ntwx=0,",
-            "  cut=8.0,",
-            " /",
-            "",
-        ]
-        fs.write_lines(fname, minimize_lines)
-
     def minimize_structure(self, pdb: str, min_dir: str = "./", mode: str = "CPU", cycle: int = 2000) -> str:
         """Class method that minimizes the structure found in a supplied .pdb file, returning
         the path to the minimized file.
@@ -1199,190 +1482,6 @@ class AmberInterface(BaseInterface):
         )
         # yapf: enable
 
-        return outfile
-
-    def md_min_file(self, outfile: str) -> str:
-        """Using the settings specified by AmberConfig.CONF_MIN, creates a min.in file for an Amber minimization run.
-        These settings are updated by accessing the owned AmberConfig object through AmberInterface.config().
-        Args:
-            outfile: The name of the file to save the minimization input file to..
-        Returns:
-            Path to the minimization file.
-        """
-        config = self.config_.CONF_MIN
-
-        contents: List[str] = [
-            "Minimize",
-            " &cntrl",
-            "  imin  = 1,",
-            "  ntx   = 1,",
-            "  irest = 0,",
-            f"  ntc = {config['ntc']},",
-            f"  ntf = {config['ntf']},",
-            f"  cut   = {config['cut']},",
-            f"  maxcyc = {config['maxcyc']},",
-            f"  ncyc  = {int(config['ncyc_mult']*config['maxcyc'])},",
-            f"  ntpr = {int(config['ntpr_mult']*config['maxcyc'])},",
-            f"  ntwx = 0,",
-        ]
-
-        last_line: str = ""
-        if config["ntr"] == 1:
-            last_line = f"  ntr   = {config['ntr']}, restraint_wt = {config['restraint_wt']}, restraintmask = {config['restraintmask']},"
-
-        contents.append(last_line)
-        contents.extend(["/", ""])
-        fs.write_lines(outfile, contents)
-        return outfile
-
-    def md_heat_file(self, outfile: str) -> str:
-        """Using the settings specified by AmberConfig.CONF_HEAT, creates a heat.in file for an Amber heating run.
-        These settings are updated by accessing the owned AmberConfig object through AmberInterface.config().
-        Args:
-            outfile: The name of the file to save the heating input file to.
-        Returns:
-            Path to the heating input file.
-        """
-        config = self.config_.CONF_HEAT
-
-        contents: List[str] = [
-            "Heat",
-            " &cntrl",
-            "  imin = 0,",
-            "  ntx = 1,",
-            "  irest = 0,",
-            f"  ntc = {config['ntc']},",
-            f"  ntf = {config['ntf']},",
-            f"  cut = {config['cut']},",
-            f"  nstlim = {config['nstlim']},",
-            f"  dt = {config['dt']},",
-            f"  tempi = {config['tempi']},",
-            f"  temp0 = {config['temp0']},",
-            f"  ntpr =  {int(config['ntpr']*config['nstlim'])},",
-            f"  ntwx =  {int(config['ntwx']*config['nstlim'])},",
-            f"  ntt = {config['ntt']},",
-            f"  gamma_ln = {config['gamma_ln']},",
-            "  ntb = 1,",
-            "  ntp = 0,",
-            f"  iwrap = {config['iwrap']},",
-            "  nmropt = 1,",
-            "  ig = -1,",
-        ]
-
-        if config["ntr"] == 1:
-            contents.append(f"  ntr = {config['ntr']},")
-            contents.append(f"  restraint_wt = {config['restraint_wt']},")
-            contents.append(f"  restraintmask = {config['restraintmask']},")
-        contents[-1] = contents[-1][0:-1]
-        contents.extend([
-            " /",
-            " &wt",
-            "  type = 'TEMP0',",
-            "  istep1 = 0,",
-            f"  istep2 = {int(config['A_istep2']*config['nstlim'])},",
-            f"  value1 = {config['tempi']},",
-            f"  value2 = {config['temp0']},",
-            " /",
-            f" &wt",
-            "  type = 'TEMP0',",
-            f"  istep1 = {int(config['A_istep2']*config['nstlim'])+1},",
-            f"  istep2 = {config['nstlim']},",
-            f"  value1 = {config['temp0']},",
-            f"  value2 = {config['temp0']},",
-            " /",
-            " &wt",
-            "  type = 'END',",
-            " /",
-            "",
-        ])
-
-        fs.write_lines(outfile, contents)
-        return outfile
-
-    def md_equi_file(self, outfile: str) -> str:
-        """Using the settings specified by AmberConfig.CONF_EQUI, creates an input file for an Amber constant
-        equilibration run. These settings are updated by accessing the owned AmberConfig object through
-        AmberInterface.config().
-        Args:
-            outfile: The name of the file to save the constant pressure equilibration input.
-        Returns:
-            Path to the constant pressure equilibration input file.
-        """
-        config = self.config_.CONF_EQUI
-        contents: List[str] = [
-            "Equilibration:constant pressure",
-            " &cntrl",
-            "  imin = 0,",
-            f"  ntx = {config['ntx']},",
-            f"  irest = {config['irest']},",
-            f"  ntf = {config['ntf']},",
-            f"  ntc = {config['ntc']},",
-            f"  nstlim = {config['nstlim']},",
-            f"  dt = {config['dt']},",
-            f"  cut = {config['cut']},",
-            f"  temp0 = {config['temp0']},",
-            f"  ntpr = {int(config['ntpr']*config['nstlim'])},",
-            f"  ntwx = {config['ntwx']},",
-            f"  ntt = {config['ntt']},",
-            f"  gamma_ln = {config['gamma_ln']},",
-            "  ntb = 2,",
-            "  ntp = 1,",
-            f"  iwrap = {config['iwrap']},",
-            "  ig = -1,",
-        ]
-
-        if config["ntr"] == 1:
-            contents.extend([
-                f"  ntr   = {config['ntr']},",
-                f"  restraint_wt = {config['restraint_wt']},",
-                f"  restraintmask = {config['restraintmask']},",
-            ])
-
-        contents.extend(["/", ""])
-
-        fs.write_lines(outfile, contents)
-        return outfile
-
-    def md_prod_file(self, outfile: str) -> str:
-        """Using the settings specified by AmberConfig.CONF_PROD, creates an input file for an Amber production
-        md run. These settings are updated by accessing the owned AmberConfig object through
-        AmberInterface.config().
-        Args:
-            outfile: The name of the file to save the production md input.
-        Returns:
-            Path to the production md input file.
-        """
-        config = self.config_.CONF_PROD
-        contents: List[str] = [
-            "Production: constant pressure",
-            " &cntrl",
-            "  imin = 0,",
-            f"  ntx = {config['ntx']},",
-            f"  irest = {config['irest']},",
-            f"  ntf = {config['ntf']},",
-            f"  ntc = {config['ntc']},",
-            f"  nstlim = {config['nstlim']},",
-            f"  dt = {config['dt']},",
-            f"  cut = {config['cut']},",
-            f"  ntpr = {int(config['ntpr']*config['nstlim'])},",
-            f"  ntwx = {config['ntwx']},",
-            f"  ntt = {config['ntt']},",
-            f"  gamma_ln = {config['gamma_ln']},",
-            "  ntb = 2,",
-            "  ntp = 1,",
-            f"  iwrap = {config['iwrap']},",
-            "  ig = -1,",
-        ]
-
-        if config["ntr"] == 1:
-            contents.extend([
-                f"  ntr = {config['ntr']},",
-                f"  restraint_wt = {config['restraint_wt']},",
-                f"  restraintmask = {config['restraintmask']}",
-            ])
-
-        contents.extend(["/", ""])
-        fs.write_lines(outfile, contents)
         return outfile
 
     def md_run(self, prmtop: str, inpcrd: str, work_dir: str, mode: str = "CPU") -> str:
@@ -1454,7 +1553,6 @@ class AmberInterface(BaseInterface):
         # yapf: enable
 
         return prod_nc
-
 
     def nc2mdcrd(
         self,

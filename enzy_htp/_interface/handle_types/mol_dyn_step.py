@@ -11,6 +11,7 @@ from abc import ABC, abstractmethod
 from typing import List, Tuple, Union
 from enzy_htp.core.job_manager import ClusterJob
 from enzy_htp.core.mol_dyn_result import MolDynResult, MolDynResultEgg
+from enzy_htp.structure.structure_constraint import StructureConstraint
 
 from ..base_interface import BaseInterface
 from .mol_dyn_parameterizer import MolDynParameter
@@ -31,6 +32,38 @@ class MolDynStep(ABC):
     def parent_interface(self) -> BaseInterface:
         """the interface of the corresponding engine software.
         normally contains all the constructors"""
+        pass
+
+    @property
+    @abstractmethod
+    def length(self) -> float:
+        """the simulation length of this step (unit: ns)"""
+        pass
+
+    @property
+    @abstractmethod
+    def timestep(self) -> float:
+        """the timestep of the simulation. (unit: ns)"""
+        pass
+
+    @property
+    @abstractmethod
+    def temperature(self) -> Union[float, List[Tuple[float]]]:
+        """the temperature of the simulation. can be a list of 1d coordinates that indicate
+        a changing temperature. e.g.: [(0,0), (0.5,300)] the 1st element is time in ns and
+        the second is temperature at the time point."""
+        pass
+
+    @property
+    @abstractmethod
+    def thermostat(self) -> str:
+        """the algorithm of the thermostat."""
+        pass
+
+    @property
+    @abstractmethod
+    def constrain(self) -> StructureConstraint:
+        """the StructureConstraint object that indicates a geometry constrain in the step."""
         pass
 
     @property
