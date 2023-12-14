@@ -453,13 +453,13 @@ class AmberMDStep(MolDynStep):
                  work_dir: str,) -> None:
         self._parent_interface = interface
         self.name = name
-        self.length = length
-        self.timestep = timestep
+        self._length = length
+        self._timestep = timestep
         self.minimize = minimize
-        self.temperature = temperature
-        self.thermostat = thermostat
+        self._temperature = temperature
+        self._thermostat = thermostat
         self.pressure_scaling = pressure_scaling
-        self.constrain = constrain
+        self._constrain = constrain
         self.restart = restart
         self.core_type = core_type
         self.cluster_job_config = cluster_job_config
@@ -468,6 +468,7 @@ class AmberMDStep(MolDynStep):
         self.keep_in_file = keep_in_file
         self._work_dir = work_dir
 
+    # region == property == 
     @property
     def engine(self) -> str:
         return "Amber"
@@ -494,7 +495,47 @@ class AmberMDStep(MolDynStep):
     @work_dir.setter
     def work_dir(self, val: bool):
         """setter for work_dir"""
-        self.work_dir = val
+        self._work_dir = val
+
+    @property
+    def constrain(self) -> StructureConstraint:
+        return self._constrain
+
+    @constrain.setter
+    def constrain(self, val: StructureConstraint):
+        self._constrain = val
+
+    @property
+    def length(self) -> float:
+        return self._length
+
+    @length.setter
+    def length(self, val: float):
+        self._length = val
+
+    @property
+    def temperature(self) -> float:
+        return self._temperature
+
+    @temperature.setter
+    def temperature(self, val: float):
+        self._temperature = val
+
+    @property
+    def thermostat(self) -> str:
+        return self._thermostat
+
+    @thermostat.setter
+    def thermostat(self, val: str):
+        self._thermostat = val
+
+    @property
+    def timestep(self) -> float:
+        return self._timestep
+
+    @timestep.setter
+    def timestep(self, val: float):
+        self._timestep = val
 
     @property
     def md_config_dict(self) -> Dict:
@@ -512,6 +553,7 @@ class AmberMDStep(MolDynStep):
             "if_report" : self.if_report,
             "record_period" : self.record_period,
         }
+    # endregion
 
     # methods
     def make_job(self, input_data: Union[AmberParameter, AmberMDResultEgg]) -> Tuple[ClusterJob, MolDynResultEgg]:
@@ -528,12 +570,49 @@ class AmberMDStep(MolDynStep):
             raise TypeError
 
         # 2. make .in file
-        self._make_mdin_file()
+        fs.safe_mkdir(self.work_dir)
+        temp_mdin_file = self._make_mdin_file()
 
         # 3. make cmd
-        step_cmd = f"TODO"
+        num_cores = self.cluster_job_config["res_setting"]["node_cores"]
+        executable = self.parent_interface.get_md_executable(self.core_type, num_cores)
+        mdout_path = f"{self.work_dir}/{self.name}.out"
+        mdrst_path = f"{self.work_dir}/{self.name}.rst"
+        traj_path = f"{self.work_dir}/{self.name}.nc"
+        md_step_cmd= (
+            f"{executable} "
+            f"-O " # overwrite; note that AmberMDStep() with same name will overwrite each other
+            f"-i {temp_mdin_file} " # mdin file
+            f"-o {mdout_path} " # mdout file path
+            f"-p {prmtop} " # prmtop path
+            f"-c {coord} " # init coord
+            f"-r {mdrst_path} " # last frame coord
+            f"-ref {coord} " # reference coord used only when nmropt=1
+            f"-x {traj_path} " # the output md trajectory
+        )
 
         # 4. assemble ClusterJob
+        cluster = self.cluster_job_config["cluster"]
+        res_setting = self.cluster_job_config["res_setting"]
+        env_settings = cluster.AMBER_ENV[self.core_type.upper()]
+        job = ClusterJob.config_job(
+            commands = md_step_cmd,
+            cluster = cluster,
+            env_settings = env_settings,
+            res_keywords = res_setting,
+            sub_dir = "./", # because path are relative
+            sub_script_path = f"{self.work_dir}/submit_{self.name}_{self.core_type}.cmd"
+        )
+
+        # 5. make result egg
+        result_egg = AmberMDResultEgg(
+            traj_path=traj_path,
+            traj_log_path=mdout_path,
+            rst_path=mdrst_path,
+            prmtop_path=prmtop,
+        )
+
+        return (job, result_egg)
 
     def run(self, input_data: Union[MolDynParameter, MolDynResult]) -> MolDynResult:
         """the method that runs the step"""
@@ -560,7 +639,8 @@ class AmberMDStep(MolDynStep):
 
     @classmethod
     def try_merge_jobs(cls, job_list: List[ClusterJob]) -> List[ClusterJob]:
-        """the classmethod that merge a list of jobs from MolDynStep to fewer jobs"""
+        """the classmethod that merge a list of jobs from MolDynStep to fewer jobs.
+        Also check for jobs that overwrite each other."""
         pass
 
 
@@ -1006,6 +1086,15 @@ class AmberInterface(BaseInterface):
 
         fs.write_lines(out_path, mdin_lines)
     # endregion
+
+    def get_md_executable(self, core_type: str, num_cores: int) -> str:
+        """get the name of the md executable depending on core_type
+        return the executable and mpi prefix if needed."""
+        result = self.config()["HARDCODE_MD_ENGINE"][core_type]
+        if core_type == "cpu":
+            mpi_exec = eh_config._system.get_mpi_executable(num_cores)
+            result = f"{mpi_exec} {result}"
+        return result
 
     # == engines ==
     # (engines for science APIs)

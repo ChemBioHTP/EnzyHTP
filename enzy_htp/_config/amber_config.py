@@ -44,12 +44,6 @@ class AmberConfig(BaseConfig):
     HOME: str = "AMBERHOME"
     """Environment variable for Amber's HOME Directory"""
 
-    CPU_ENGINE: str = "sander"  # TODO(CJ): add in the .MPI? not sure about that
-    """Environment variable for Amber's cpu engine"""
-
-    GPU_ENGINE: str = "pmemd.cuda"
-    """Environment variable for Amber's gpu engine"""
-
     # region == Default values for build_md_parameterizer() ==
     DEFAULT_FORCE_FIELDS: List[str] = [
         "leaprc.protein.ff14SB",
@@ -90,7 +84,7 @@ class AmberConfig(BaseConfig):
     # endregion
 
     # region == Default values for build_md_step() ==
-    DEFAULT_MD_NAME: bool = "md_step"
+    DEFAULT_MD_NAME: bool = "amber_md_step"
     """The default value for the name tag of the md step"""
 
     DEFAULT_MD_TIMESTEP: float = 0.000002 # ns
@@ -117,12 +111,10 @@ class AmberConfig(BaseConfig):
     DEFAULT_MD_CLUSTER_JOB_CONFIG: dict = {
         "gpu": {
             "cluster" : Accre(),
-            "period" : 180, # s
             "res_setting" : ARMerConfig.MD_GPU_RES,
         },
         "cpu": {
             "cluster" : Accre(),
-            "period" : 180, # s
             "res_setting" : ARMerConfig.MD_CPU_RES,
         }
     }
@@ -157,6 +149,13 @@ class AmberConfig(BaseConfig):
 
     HARDCODE_IG = -1
     """hard coded `ig` value"""
+
+    HARDCODE_MD_ENGINE = {
+        "gpu" : "pmemd.cuda",
+        "cpu" : "sander.MPI",
+    }
+    """hard coded names of md engines of different core types. 
+    only changable by editing values here"""
     # endregion
 
     CONF_HEAT: Dict = {
@@ -234,8 +233,8 @@ class AmberConfig(BaseConfig):
     def required_executables(self) -> List[str]:
         """A hardcoded list of required executables for Amber."""
         return [
-            self.CPU_ENGINE,
-            self.GPU_ENGINE,
+            self.HARDCODE_MD_ENGINE["cpu"],
+            self.HARDCODE_MD_ENGINE["gpu"],
             "tleap",
             "ambpdb",
             "parmchk2",
