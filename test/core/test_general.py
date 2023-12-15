@@ -45,4 +45,13 @@ def test_swapped_dict():
         "2" : 2,
         "3" : 3,
     }
+
+def test_len_2d():
+    """as name"""
+    test_list_2d = [
+        [1,2,3],
+        [4,5],
+        [6,7,8,9]
+    ]
+    assert eg.len_2d(test_list_2d) == 9
     

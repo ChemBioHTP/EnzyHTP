@@ -144,6 +144,12 @@ def list_remove_adjacent_duplicates(target_list: list) -> list:
             result.append(target_list[i])
     return result
 
+
+def len_2d(list_2d: List[list]) -> int:
+    """counter the number of elements in a 2d list"""
+    return sum(map(lambda x: len(x), list_2d))
+
+
 # = Museum of Function =
 # This is an old slow but insteresting function so it kept it here
 # def _product_lists_w_each_empty_ele(list_of_lists: Iterable[list]) -> List[list]:

@@ -247,14 +247,14 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID""",
         for info_line in info_out_lines: 
             info_line_parts = info_line.strip().split()
             if len(info_line_parts) < 2:
-                _LOGGER.info(f"field: {field} is not supported in squeue. Switch to sacct.")
+                _LOGGER.debug(f"field: {field} is not supported in squeue. Switch to sacct.")
                 break
             if job_id in info_line:
                 job_field_info = info_line_parts[1].strip().strip("+")
                 return job_field_info
         # use sacct if squeue do not have info
         # wait a update gap
-        _LOGGER.info("No info from squeue. Switch to sacct")
+        _LOGGER.debug("No info from squeue. Switch to sacct")
         time.sleep(wait_time)
         cmd = f"{cls.INFO_CMD[1]} -j {job_id} -o {field}"
         info_run = ENV_MANAGER.run_command(exe=cmd.split()[0],
