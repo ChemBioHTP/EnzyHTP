@@ -254,7 +254,7 @@ def _parallelize_md_steps_with_cluster_job(
                 result_egg_ele.append((step, output))
         if not result_egg_ele:
             result_egg_ele = [(step, output)] # default add last step if non is specified
-        job_list = type(step).try_merge_jobs(job_list) # TODO this is a classmethod that try merging jobs of this type
+        job_list = type(step).try_merge_jobs(job_list)
 
         job_array.append(job_list)
         result_eggs.append(result_egg_ele)  # eggs are filenames that can be translated to give birth actual data

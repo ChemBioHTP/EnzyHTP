@@ -650,9 +650,9 @@ def test_parse_md_config_dict_to_raw_w_cons(): # TODO finish this after the PR
     assert test_raw_dict == answer_raw_dict
 
 
-def test_amber_md_step_make_job_lv_1():
+def test_amber_md_step_make_job():
     """test to make sure AmberMDStep.make_job() works as expected.
-    lv1: w/o constraint."""
+    w/o constraint."""
     ai = interface.amber
     md_step = ai.build_md_step(length=0.1) # 300K, NPT by default
     test_inpcrd = f"{MM_DATA_DIR}/KE_07_R7_S.inpcrd"
@@ -682,6 +682,31 @@ pmemd\.cuda -O -i \./MD/amber_md_step_?[0-9]*\.in -o \./MD/amber_md_step\.out -p
     assert test_md_egg.rst_path == './MD/amber_md_step.rst'
     assert test_md_egg.prmtop_path == '/panfs/accrepfs.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S.prmtop'
     fs.safe_rmdir(md_step.work_dir)
+
+
+def test_try_merge_jobs(caplog):
+    """test to make sure AmberMDStep.try_merge_jobs() works as expected."""
+    with EnablePropagate(_LOGGER):
+        ai = interface.amber
+        md_step_1 = ai.build_md_step(length=0.1) # 300K, NPT by default
+        md_step_2 = ai.build_md_step(length=0.1) # 300K, NPT by default
+        md_step_3 = ai.build_md_step(length=0.1, core_type="cpu") # 300K, NPT by default
+        test_inpcrd = f"{MM_DATA_DIR}/KE_07_R7_S.inpcrd"
+        test_prmtop = f"{MM_DATA_DIR}/KE_07_R7_S.prmtop"
+        test_params = AmberParameter(test_inpcrd, test_prmtop)
+        test_job_1, test_md_egg_1 = md_step_1.make_job(test_params)
+        test_job_2, test_md_egg_2 = md_step_2.make_job(test_md_egg_1)
+        test_job_3, test_md_egg_3 = md_step_3.make_job(test_md_egg_2)
+        merged_jobs = AmberMDStep.try_merge_jobs([test_job_1,test_job_2,test_job_3])
+        assert len(merged_jobs) == 2
+        for test, answer in zip(merged_jobs[0].mimo["commands"], [
+                'pmemd.cuda -O -i ./MD/amber_md_step_?[0-9]*.in -o ./MD/amber_md_step.out -p /panfs/accrepfs.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S.prmtop -c /panfs/accrepfs.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S.inpcrd -r ./MD/amber_md_step.rst -ref /panfs/accrepfs.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S.inpcrd -x ./MD/amber_md_step.nc ',
+                'pmemd.cuda -O -i ./MD/amber_md_step_?[0-9]*.in -o ./MD/amber_md_step.out -p /panfs/accrepfs.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S.prmtop -c ./MD/amber_md_step.rst -r ./MD/amber_md_step.rst -ref ./MD/amber_md_step.rst -x ./MD/amber_md_step.nc '
+                ]):
+            assert re.match(answer, test)
+        assert "Found md steps with same names!" in caplog.text
+    fs.safe_rmdir(md_step_1.work_dir)
+
 
 # region TODO
 

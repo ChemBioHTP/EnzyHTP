@@ -62,6 +62,7 @@ class ClusterJob():
         self.job_cluster_log: str = None
         self.job_id: str = None
         self.last_state: Tuple[Tuple[str, str], float] = None # ((canonical_state, cluster_specific_state), time_stamp)
+        self.mimo: dict = None # the handle for slightly customize the attribute of ClusterJob. (e.g.: AmberMDStep.try_merge_jobs use it to store command etc.)
 
     ### config (construct object) ###
     @classmethod

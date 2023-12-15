@@ -601,8 +601,16 @@ class AmberMDStep(MolDynStep):
             env_settings = env_settings,
             res_keywords = res_setting,
             sub_dir = "./", # because path are relative
-            sub_script_path = f"{self.work_dir}/submit_{self.name}_{self.core_type}.cmd"
+            sub_script_path = f"{self.work_dir}/submit_{self.name}.cmd"
         )
+        job.mimo = { # temp solution before having a 2nd MD engine
+            "commands" : [md_step_cmd,],
+            "env_settings" : env_settings,
+            "res_keywords" : res_setting,
+            "sub_dir" : "./",
+            "md_names" : [self.name],
+            "work_dir" : self.work_dir,
+        }
 
         # 5. make result egg
         result_egg = AmberMDResultEgg(
@@ -639,9 +647,64 @@ class AmberMDStep(MolDynStep):
 
     @classmethod
     def try_merge_jobs(cls, job_list: List[ClusterJob]) -> List[ClusterJob]:
-        """the classmethod that merge a list of jobs from MolDynStep to fewer jobs.
-        Also check for jobs that overwrite each other."""
-        pass
+        """the classmethod that merge a list of sequential jobs from MolDynStep to fewer jobs.
+        Also check for jobs that overwrite each other.
+        Jobs are mergable when they have identical environment and resource
+        and are sequential in steps. The merge specifically merges the command of each job.
+        Returns: a list of reduced jobs.
+        TODO: This is not a good design.
+            This method could be generalized in ClusterJob 
+            but need to develop parser of sub_script_str
+            we should probably do this when adding the 2nd MD engine."""
+        result = [job_list[0]]
+        for job in job_list[1:]:
+            merged_job = result.pop() # expose the job for merge
+            # check names
+            if not set(job.mimo["md_names"]).isdisjoint(set(merged_job.mimo["md_names"])):
+                _LOGGER.warning(f"Found md steps with same names! ({set(job.mimo['md_names'])} & {set(merged_job.mimo['md_names'])})"
+                                " Their results will overwrite each other."
+                                "We sugggest to change the name and make them unique if you care about their result.")
+            # try merge
+            mergable = (
+                job.mimo["env_settings"],
+                job.mimo["res_keywords"],
+                job.mimo["sub_dir"],                
+            )
+            exposed_mergable = (
+                merged_job.mimo["env_settings"],
+                merged_job.mimo["res_keywords"],
+                merged_job.mimo["sub_dir"],                
+            )
+            if mergable == exposed_mergable:
+                merged_cmds = merged_job.mimo["commands"] + job.mimo["commands"]
+                env_settings = merged_job.mimo["env_settings"]
+                res_setting = merged_job.mimo["res_keywords"]
+                sub_dir = merged_job.sub_dir
+                md_names = merged_job.mimo["md_names"] + job.mimo["md_names"]
+                work_dir = merged_job.mimo["work_dir"]
+                # update merged job
+                merged_job = ClusterJob.config_job(
+                    commands = merged_cmds,
+                    cluster = job.cluster,
+                    env_settings = env_settings,
+                    res_keywords = res_setting,
+                    sub_dir = sub_dir,
+                    sub_script_path = f"{work_dir}/submit_{'_'.join(md_names)}.cmd"
+                )
+                merged_job.mimo = {
+                    "commands" : merged_cmds,
+                    "env_settings" : env_settings,
+                    "res_keywords" : res_setting,
+                    "sub_dir" : sub_dir,
+                    "md_names" : md_names,
+                    "work_dir" : work_dir,
+                }
+                result.append(merged_job) # add the job back
+            else:
+                result.append(merged_job)
+                result.append(job) # add unmergable
+
+        return result
 
 
 class AmberInterface(BaseInterface):
