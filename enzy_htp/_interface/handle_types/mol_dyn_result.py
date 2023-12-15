@@ -45,11 +45,11 @@ class MolDynResult:
         self._last_frame_parser = last_frame_parser
 
     @property
-    def traj_parser(self) -> str:
+    def traj_file(self) -> str:
         return self._traj_file
 
     @property
-    def traj_file(self) -> Callable:
+    def traj_parser(self) -> Callable:
         return self._traj_parser
 
     @property

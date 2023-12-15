@@ -18,7 +18,8 @@ from enzy_htp.core import file_system as fs
 from enzy_htp._interface.amber_interface import (
     AmberParameterizer,
     AmberParameter,
-    AmberMDStep)
+    AmberMDStep,
+    AmberMDResultEgg,)
 import enzy_htp.structure as struct
 from enzy_htp.structure.structure_constraint import StructureConstraint
 from enzy_htp import interface
@@ -684,7 +685,7 @@ pmemd\.cuda -O -i \./MD/amber_md_step_?[0-9]*\.in -o \./MD/amber_md_step\.out -p
     fs.safe_rmdir(md_step.work_dir)
 
 
-def test_try_merge_jobs(caplog):
+def test_amber_md_step_try_merge_jobs(caplog):
     """test to make sure AmberMDStep.try_merge_jobs() works as expected."""
     with EnablePropagate(_LOGGER):
         ai = interface.amber
@@ -706,6 +707,23 @@ def test_try_merge_jobs(caplog):
             assert re.match(answer, test)
         assert "Found md steps with same names!" in caplog.text
     fs.safe_rmdir(md_step_1.work_dir)
+
+
+def test_amber_md_step_translate():
+    """use a fake test result egg to test the function"""
+    test_result_egg = AmberMDResultEgg(
+        traj_path = "traj_path",
+        traj_log_path = "traj_log_path",
+        rst_path = "rst_path",
+        prmtop_path = "prmtop_pat",
+    )
+    ai = interface.amber
+    test_step = ai.build_md_step(length=0.1)
+    result = test_step.translate(test_result_egg)
+
+    assert result.traj_file == "traj_path"
+    assert result.traj_log_file == "traj_log_path"
+    assert result.last_frame_file == "rst_path"
 
 
 # region TODO

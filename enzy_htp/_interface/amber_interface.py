@@ -679,15 +679,15 @@ class AmberMDStep(MolDynStep):
     def translate(self, result_egg: AmberMDResultEgg) -> MolDynResult:
         """the method convert engine specific results to general output.
         will also clean up temp files."""
-        traj_file = result_egg.traj_path,
+        traj_file = result_egg.traj_path
         traj_parser = AmberNCParser(
-            prmtop=result_egg.prmtop_path,
+            prmtop_file=result_egg.prmtop_path,
             interface=self.parent_interface), 
-        traj_log_file = result_egg.traj_log_path,
+        traj_log_file = result_egg.traj_log_path
         traj_log_parser = self.parent_interface.read_from_mdout, 
-        last_frame_file = result_egg.last_frame_file,
-        last_frame_parse = AmberRSTParser(
-            prmtop=result_egg.prmtop_path,
+        last_frame_file = result_egg.rst_path
+        last_frame_parser = AmberRSTParser(
+            prmtop_file=result_egg.prmtop_path,
             interface=self.parent_interface),
 
         return MolDynResult(
@@ -696,7 +696,7 @@ class AmberMDStep(MolDynStep):
             traj_log_file = traj_log_file,
             traj_log_parser = traj_log_parser, 
             last_frame_file = last_frame_file,
-            last_frame_parse = last_frame_parse,
+            last_frame_parser = last_frame_parser,
         )
 
     @classmethod
