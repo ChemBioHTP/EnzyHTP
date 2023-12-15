@@ -646,11 +646,11 @@ class AmberMDStep(MolDynStep):
         """the method convert engine specific results to general output.
         will also clean up temp files."""
         traj_file = result_egg.traj_path,
-        # traj_parser = self.parent_interface., 
+        traj_parser = self.parent_interface., 
         traj_log_file = result_egg.traj_log_path,
-        # traj_log_parser = , 
+        traj_log_parser = , 
         last_frame_file = result_egg.last_frame_file,
-        # last_frame_parse = ,
+        last_frame_parse = ,
 
         return MolDynResult(
             traj_file = traj_file,

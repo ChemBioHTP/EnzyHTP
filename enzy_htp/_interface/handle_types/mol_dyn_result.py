@@ -6,7 +6,9 @@ Author: QZ Shao, <shaoqz@icloud.com>
 Date: 2023-09-19
 """
 from abc import ABC, abstractmethod
-from typing import Callable
+from typing import Callable, Dict
+
+from enzy_htp.structure import Structure, StructureEnsemble
 
 class MolDynResult:
     """The unified format of MD result in EnzyHTP.
@@ -30,11 +32,11 @@ class MolDynResult:
     """
     def __init__(self,
                  traj_file: str,
-                 traj_parser: Callable,
+                 traj_parser: Callable[[str], StructureEnsemble],
                  traj_log_file: str,
-                 traj_log_parser: Callable,
+                 traj_log_parser: Callable[[str], Dict],
                  last_frame_file: str,
-                 last_frame_parser: Callable,):
+                 last_frame_parser: Callable[[str], Structure],):
         self._traj_file = traj_file
         self._traj_parser = traj_parser
         self._traj_log_file = traj_log_file
