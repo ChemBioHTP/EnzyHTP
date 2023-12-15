@@ -367,7 +367,7 @@ def test_ClusterJob_with_to_2d_array_end_ACCRE():
     for i, job_list_1d in enumerate(jobs):
         for job in job_list_1d:
             test_file_paths.extend([job.sub_script_path, job.job_cluster_log])
-    out_files = glob.glob(f"{test_sub_dir}/QM_test_*_{i}.out")
+    out_files = glob.glob(f"{test_sub_dir}/QM_test_*.out")
     if out_files:
         test_file_paths.extend(out_files)
     fs.clean_temp_file_n_dir(test_file_paths)
