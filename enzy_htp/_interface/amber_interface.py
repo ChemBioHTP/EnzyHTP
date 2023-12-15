@@ -38,8 +38,42 @@ from enzy_htp.structure import (
     Ligand,
     MetalUnit,
     ModifiedResidue,
-    NonCanonicalBase,)
+    NonCanonicalBase,
+    StructureEnsemble)
 from enzy_htp import config as eh_config
+class AmberNCParser():
+    """parser Amber .nc file to StructureEnsemble()
+    Attribute:
+        prmtop_file
+        parent_interface
+    
+    TODO figure out where should these types of structure parser be placed.
+    These parser relies on the interface. They can not be directly used by structure
+    modules such as structure_operations.
+    Can structure_io just be above _interface?? Seems ok."""
+    def __init__(self, prmtop_file: str, interface: BaseInterface):
+        self.prmtop_file = prmtop_file
+        self.parent_interface = interface
+    
+    def get_structure_ensemble(nc_file: str) -> StructureEnsemble:
+        """parse a nc file to a StructureEnsemble(). Intermediate files are created."""
+
+    def get_last_structure(nc_file: str) -> Structure:
+        """parse the last frame in a nc file to a Structure(). Intermediate files are created."""
+
+
+class AmberRSTParser():
+    """parser Amber .rst file to Structure()
+    Attribute:
+        prmtop_file
+        parent_interface"""
+    def __init__(self, prmtop_file: str, interface: BaseInterface):
+        self.prmtop_file = prmtop_file
+        self.parent_interface = interface
+    
+    def get_structure(rst_file: str) -> Structure:
+        """parse a rst file to a Structure()."""
+
 
 class AmberParameter(MolDynParameter):
     """the Amber format MD parameter. Enforce the Amber parameter format
@@ -646,11 +680,15 @@ class AmberMDStep(MolDynStep):
         """the method convert engine specific results to general output.
         will also clean up temp files."""
         traj_file = result_egg.traj_path,
-        traj_parser = self.parent_interface., 
+        traj_parser = AmberNCParser(
+            prmtop=result_egg.prmtop_path,
+            interface=self.parent_interface), 
         traj_log_file = result_egg.traj_log_path,
-        traj_log_parser = , 
+        traj_log_parser = self.parent_interface.read_from_mdout, 
         last_frame_file = result_egg.last_frame_file,
-        last_frame_parse = ,
+        last_frame_parse = AmberRSTParser(
+            prmtop=result_egg.prmtop_path,
+            interface=self.parent_interface),
 
         return MolDynResult(
             traj_file = traj_file,
@@ -993,7 +1031,7 @@ class AmberInterface(BaseInterface):
     # -- cpptraj --
 
     # -- sander/pmemd --
-    # region - mdin file I/O -
+    # region - mdin/mdout file I/O -
     def read_from_mdin(self, mdin_file_path: str) -> Dict:
         """the knowledge of the mdin format as the input of sander/pmemd.
         return a dictionary that use standard keys according to AmberMDStep.md_config_dict"""
@@ -1164,6 +1202,15 @@ class AmberInterface(BaseInterface):
         mdin_lines.append("")
 
         fs.write_lines(out_path, mdin_lines)
+
+    def read_from_mdout(self, mdout_file_path: str) -> Dict:
+        """the knowledge of the mdout format as the log of sander/pmemd.
+        return a dictionary."""
+        _LOGGER.error("dont support this yet. contact developer if you have to use this.")
+        raise Exception
+        # TODO
+        # 1. parse to dict
+        # 2. mapper keywords and build objects
     # endregion
 
     def get_md_executable(self, core_type: str, num_cores: int) -> str:
