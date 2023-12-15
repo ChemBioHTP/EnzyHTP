@@ -118,7 +118,7 @@ class RosettaInterface(BaseInterface):
         if logfile:
             opts.extend([">", str(logfile)])
 
-        self.env_manager_.run_command(self.config_.ROSETTA_SCRIPTS, opts)
+        self.env_manager_.run_command(self.config_.ROSETTA_SCRIPTS, opts, quiet_fail=True)
 
         if logfile:
             _LOGGER.info(f"Saved RosettaScripts log to '{Path(logfile).absolute}'.")
@@ -595,10 +595,17 @@ class RosettaInterface(BaseInterface):
 
             if child_nodes:
                 for cn in child_nodes:
+                    child_child_nodes = cn.pop('child_nodes', None)
                     tag_name = cn.pop('tag', None)
                     _ = cn.pop('parent', None)
                     #TODO(CJ): make this recursive so it actually works for super nested things
-                    _ = ET.SubElement(target_node, tag_name, attrib=cn)
+                    placed_child = ET.SubElement(target_node, tag_name, attrib=cn)
+
+                    if child_child_nodes:
+                        for ccn in child_child_nodes:
+                            tag_name = ccn.pop('tag', None)
+                            _ = ccn.pop('parent', None)
+                            _ = ET.SubElement(placed_child, tag_name, attrib=ccn)
 
         for rr in root:
             rr.text = "\n\t"
@@ -798,7 +805,45 @@ class RosettaInterface(BaseInterface):
         return cst_content
 
 
-    def integrate_constraints(self, stru:Structure, constraints:List[StructureConstraint], work_dir:str=None) -> Tuple[str,str]:
+    def write_constraint_file(self, stru:Structure, constraints:List[StructureConstraint], work_dir:str = None) -> str:
+        #TODO(CJ): this!
+        if work_dir is None:
+            work_dir = "./"
+    
+        lines:List[str] = list()
+        for cst in constraints:
+            if cst.is_distance_constraint():
+                assert False
+                pass
+            elif cst.is_angle_constraint():
+                assert False
+            elif cst.is_dihedral_constraint():
+                assert False
+            elif cst.is_residue_pair_constraint():
+                for (cst_name, child_cst) in cst.child_constraints:
+                    if child_cst.is_distance_constraint():
+                        ridx_1:int=stru.absolute_index(child_cst.atoms[0].parent, indexed=1)
+                        ridx_2:int=stru.absolute_index(child_cst.atoms[1].parent, indexed=1)
+                        lines.append(
+                            f"AtomPair {child_cst.atoms[0].name} {ridx_1} {child_cst.atoms[1].name} {ridx_2} LINEAR_PENALTY {child_cst.target_value:.2f} 0.00 {child_cst['tolerance']:.2f} {child_cst['penalty']:.2f}"
+                        )
+                    elif child_cst.is_angle_constraint():
+                        ridx_1:int=stru.absolute_index(child_cst.atoms[0].parent, indexed=1)
+                        ridx_2:int=stru.absolute_index(child_cst.atoms[1].parent, indexed=1)
+                        ridx_3:int=stru.absolute_index(child_cst.atoms[2].parent, indexed=1)
+                        lines.append(
+                            f"Angle {child_cst.atoms[0].name} {ridx_1} {child_cst.atoms[1].name} {ridx_2} {child_cst.atoms[2].name} {ridx_3} LINEAR_PENALTY {np.radians(child_cst.target_value):.2f} 0.00 {np.radians(child_cst['tolerance']):.2f} {child_cst['penalty']/np.radians(1):.2f}"
+                        )
+                    else:
+                        assert False
+
+        fs.safe_mkdir(work_dir)
+        fname:str = f"{work_dir}/constraints.cst"
+        fs.write_lines(fname, lines )
+        return fname 
+
+
+    def integrate_enzdes_constraints(self, stru:Structure, constraints:List[StructureConstraint], work_dir:str=None) -> Tuple[str,str]:
         #TODO(CJ): update this
 
         if work_dir is None:

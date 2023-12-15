@@ -46,6 +46,7 @@ class Ligand(NonCanonicalBase):
 
         self.bonds = kwargs.get('bonds', list())  # TODO change this to a more general represetation
         self.conformer_coords = list() # TODO change this to StructureEnsemble (we can leave a reference_var here tho)
+        self.placement_method_ = '' 
 
     # === Getter-Attr ===
 
@@ -53,6 +54,15 @@ class Ligand(NonCanonicalBase):
     def clone(self) -> Ligand:
         """Creates deecopy of self."""
         return deepcopy(self)
+
+    @property
+    def placement_method(self) -> str:
+        return self.placement_method_
+
+    @placement_method.setter
+    def placement_method(self, val_in:str) -> None:
+        self.placement_method_ = val_in
+
 
     # === Checker ===
     def is_ligand(self) -> bool:

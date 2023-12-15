@@ -582,6 +582,16 @@ class Structure(DoubleLinkedNode):
             for ch in self:
                 ch.sort_residues()
 
+    @dispatch
+    def absolute_index(self, target:Residue, indexed:int=0) -> int:
+
+        for ridx, res in enumerate(self.residues):
+            if res == target:
+                return ridx + indexed
+
+        else:
+            assert False
+
     def assign_ncaa_chargespin(self, net_charge_mapper: Dict[str, Tuple[int, int]]):
         """assign net charges to NCAAs in Structure() based on net_charge_mapper
         format: {"RES" : (charge, spin), ...}

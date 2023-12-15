@@ -27,16 +27,16 @@ from enzy_htp.core import file_system as fs
 
 def dock_reactants(structure: Structure,
                    constraints: List[StructureConstraint] = None,
-                   n_struct: int = 1000,
+                   n_struct: int = 100,
                    cst_energy: float = None,
+                   freeze_alphafill:bool = True,
                    clash_distance: float = 2.0,
-                   clash_cutoff: int = 1,
+                   clash_cutoff: int = 3,
                    max_sasa_ratio:float = 0.60,
                    cluster_distance: float = 2.0,
-                   use_cache: bool = True,
                    rng_seed: int = 1996,
                    work_dir: str = None,
-                   save_work_dir: bool = True
+                   save_work_dir: bool = True,
                    ) -> Structure:
     """Given a structure containing reactants and constraints defining a pre-reaction complex, perform reactive docking
     to produce the desired geometry. Function consists of the following steps:
@@ -79,16 +79,14 @@ def dock_reactants(structure: Structure,
 
     interface.rosetta.rename_atoms(structure)
 
-    _log_settings(constraints, n_struct, cst_energy, clash_distance, clash_cutoff, max_sasa_ratio,
-                cluster_distance, use_cache, rng_seed, work_dir, save_work_dir)
+#    _log_settings(constraints, n_struct, cst_energy, clash_distance, clash_cutoff, max_sasa_ratio,
+#                cluster_distance, use_cache, rng_seed, work_dir, save_work_dir) #TODO(CJ): fix this when ready
     
     (param_files, charge_mapper) = _parameterize_system(structure, work_dir)
 
-    df = _dock_system(structure, constraints, n_struct, param_files, charge_mapper, work_dir, rng_seed, use_cache )
+    df = _dock_system(structure, constraints, n_struct, clash_cutoff, param_files, charge_mapper, freeze_alphafill, work_dir, rng_seed )
     
     _evaluate_SASA(df, max_sasa_ratio)#TODO(CJ): put this back in 
-
-    _evaluate_clashes(df, clash_distance, clash_cutoff)
 
     _evaluate_csts(df, constraints, cst_energy)
     
@@ -104,7 +102,7 @@ def dock_reactants(structure: Structure,
 
 
 
-def _create_xml(stru:Structure, work_dir: str, use_cache: bool) -> str:
+def _create_xml(stru:Structure, cst_file:str, freeze_alphafill:bool, clash_cutoff:int, work_dir: str) -> str:
     """
 
     Args:
@@ -113,38 +111,9 @@ def _create_xml(stru:Structure, work_dir: str, use_cache: bool) -> str:
     Returns:
         The relative filepath of the RosettaScripts .xml file.
     """
-    parser = Mol2Parser()
-    temp_mol2:str=f"{work_dir}/__temp_mol2.mol2"
-    reactant_dicts = list()
-    for rr in stru.residues:
-        if not rr.is_ligand():
-            continue
-        temp = dict()
-        temp['resn'] = rr.name
-        temp['chain'] = rr.chain.name
-        parser.save_ligand(temp_mol2, rr )
-        temp['volume'] = interface.rdkit.volume(temp_mol2)
-        reactant_dicts.append( temp )
-        coords = [np.array(aa.coord) for aa in rr.atoms]
-        max_dist:float = -1.0
-        for c1 in coords:
-            for c2 in coords:
-                dist = np.sqrt(np.sum((c1-c2)**2))
-                if dist > max_dist:
-                    max_dist = dist
-        temp['length'] = max_dist
-    fs.safe_rm( temp_mol2 )
-
-    reactant_dicts.sort(key=lambda dd: dd['chain'])
     fname: str = f"{work_dir}/__script.xml"
-
-    if not use_cache:
-        fs.safe_rm(fname)
-
+    
     fpath = Path(fname)
-    if fpath.exists() and use_cache:
-        _LOGGER.info(f"Using cached RosettaScripts .xml file at {fpath.absolute()}")
-        return fname
 
     elements: List[Dict] = [
         {
@@ -191,19 +160,36 @@ def _create_xml(stru:Structure, work_dir: str, use_cache: bool) -> str:
         },
     ]
 
+    ligand_count:int=0
+    as_names:List[str] = list()
+    for res in stru.residues:
+        if not res.is_ligand():
+            continue
 
-    for ridx, rd in enumerate(reactant_dicts):
-        cc = rd['chain']
-        rd['grid_name'] = f"grid_{ridx+1}"
+        chain_name:str = res.parent.name        
+        rname:str=f"rs_{chain_name.lower()}"
+        transform_name:str=f"dock_{chain_name.lower()}"
+        elements.extend([
+            {'parent': 'RESIDUE_SELECTORS', 'tag':'Index', 'name':rname, 'resnums':f"{res.idx}{res.parent.name}"},
+            {'parent': 'RESIDUE_SELECTORS', 'tag':'CloseContact', 'name':f"{rname}_as", 'residue_selector':rname},
+        ])
 
+        as_names.append( f"{rname}_as" )
+
+        if freeze_alphafill and res.placement_method == "alphafill":
+            continue
+
+        ligand_count += 1
+        grid_name:str=f"grid_{ligand_count}"
+        clash_metric:str=f"clash_{chain_name.lower()}"
         elements.extend([
             {
                 'parent': 'ROSETTASCRIPTS',
                 'tag': 'SCORINGGRIDS',
-                'ligand_chain': cc.upper(),
-                'width': '20', 
+                'ligand_chain': res.parent.name,
+                'width': '30', 
                 'append_elements_only': True,
-                'name': rd['grid_name'],
+                'name': grid_name,
                 'child_nodes': [
                     {
                         'parent': 'SCORINGGRIDS',
@@ -213,64 +199,101 @@ def _create_xml(stru:Structure, work_dir: str, use_cache: bool) -> str:
                     },
                 ]
             },
+            {
+                'parent': 'MOVERS',
+                'tag': 'Transform',
+                'name': transform_name,
+                'chain': chain_name,
+                'box_size': f"{40.0:.2f}",
+                'move_distance': f'{20.0:.2f}',
+                'angle': '360',
+                'cycles': '1000',
+                'repeats': '3',
+                'temperature': '5',
+                'grid_set': grid_name,
+                'use_constraints':'true',
+                'cst_fa_file':f'{Path(cst_file).absolute()}'
+            },
+            {
+                'parent':'PROTOCOLS',
+                'tag': 'Add',
+                'mover_name': transform_name,
+            },
+            {
+                'parent': 'FILTERS', 
+                'tag': 'SimpleMetricFilter',
+                'name': f"{clash_metric}_filter",
+                'comparison_type':'lt_or_eq',
+                'cutoff':f"{clash_cutoff}",
+                'composite_action':'any',
+                'child_nodes':[
+                    {
+                        'parent':'SimpleMetricFilter',
+                        'tag':'PerResidueClashMetric',
+                        'name':clash_metric,
+                        'residue_selector': rname,
+                        'residue_selector2': f"{rname}_as"
+                    }
+                ]
+            },
+            { 
+                'parent': 'PROTOCOLS',
+                'tag': 'Add',
+                'filter': f"{clash_metric}_filter"
+            }
+
         ])
+
+    
+    elements.extend([
+        {'parent':'MOVERS',
+            'tag':'FastRelax',
+            'name':'frelax',
+            'scorefxn':'hard_rep',
+            'cst_file':f"{Path(cst_file).absolute()}",
+            'child_nodes': [
+                {
+                    'parent':'FastRelax',
+                    'tag':'MoveMap',
+                    'name':'full_enzyme',
+                    'bb':'true',
+                    'chi':'true',
+                    'jump':'false',
+                    'child_nodes':[
+                        {
+                            'parent':'MoveMap',
+                            'tag':'ResidueSelector',
+                            'selector':'as_selector',
+                            'bb':'true',
+                            'chi':'true',
+                            'bondangle':'true'
+                        },
+                        {
+                            'parent':'MoveMap',
+                            'tag':'ResidueSelector',
+                            'selector':'not_as_selector',
+                            'bb':'false',
+                            'chi':'true',
+                            'bondangle':'false'
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            'parent':'PROTOCOLS',
+            'tag':'Add',
+            'mover_name':'frelax'
+        }
+    ])
 
     elements.extend([
-        {'parent': 'MOVERS',
-        'tag': 'AddOrRemoveMatchCsts',
-        'name': 'cstadd', 'cst_instruction': 'add_new'},
-        {'parent': 'PROTOCOLS',
-            'tag': 'Add',
-            'mover_name': 'cstadd'}
-        ])
+        { 'parent': 'RESIDUE_SELECTORS', 'tag': 'Or', 'name':'as_selector', 'selectors':','.join(as_names)},
+        { 'parent': 'RESIDUE_SELECTORS', 'tag': 'Not', 'name':'not_as_selector', 'selector':'as_selector'}
 
-    protocol_names:List[str] = list()
-    for rd in reactant_dicts:
-        cc: str = rd['chain']
-        radius: float = rd['length']
-        predock:str=f'predock_{cc.lower()}'
-        dock:str=f'dock_{cc.lower()}'
-        elements.extend([
-        {
-            'parent': 'MOVERS',
-            'tag': 'Transform',
-            'name': dock,
-            'chain': f'{cc.upper()}',
-            'box_size': f'{0.5 * radius:.3f}',
-            'move_distance': '0.1',
-            'angle': '360',
-            'cycles': '1000',
-            'repeats': '3',
-            'temperature': '5',
-            'grid_set': rd['grid_name'],
-            'use_constraints':'true',
-            'cst_fa_file':'./dock.cst'
-        }])
-        protocol_names.extend([dock])
-
-    elements.extend(
-        [{'parent': 'PROTOCOLS', 'tag': 'Add', 'mover_name': pn } for pn in protocol_names] +
-        [{'parent': 'MOVERS',
-            'tag': 'EnzRepackMinimize',
-            'name':'cstopt',
-            'minimize_rb':'0', 
-            'cst_opt':'1',
-            'cycles':'3',
-            'scorefxn_repack': 'ligand_soft_rep',
-            'scorefxn_minimize': 'ligand_soft_rep',
-            'minimize_lig':'1',
-            'minimize_sc':'1',
-            'minimize_bb':'0',
-            'cycles':'3',
-            'min_in_stages':'0',},
-        {'parent': 'PROTOCOLS',
-            'tag': 'Add',
-            'mover_name': 'cstopt'},
-     ])
-                
+    ])
 
     interface.rosetta.write_script(fname, elements)
-
     _LOGGER.info(f"Saved new RosettaScripts .xml file at {fpath.absolute()}!")
     return fname
 
@@ -281,7 +304,6 @@ def _make_options_file(pdb_file: str,
                       work_dir: str,
                       rng_seed: int,
                       n_struct: int,
-                      use_cache: bool,
                       cst_file: str = None) -> str:
     """Makes the options.txt file that the docking run will actually use. Takes a variety of arguments and 
     can used cached values if needed. This function DOES NOT make any checks to the inputs.
@@ -353,16 +375,14 @@ def _make_options_file(pdb_file: str,
     fname = Path(work_dir) / "options.txt"
     score_file: str = f"{work_dir}/complexes/score.sc"
 
-    if not use_cache:
-        _LOGGER.info("Not using cache mode. Deleting the following (if they already exist):")
-        _LOGGER.info(f"\toptions file: {fname}")
-        _LOGGER.info(f"\tscore file: {score_file}")
-        _LOGGER.info(f"\tenzyme-reactant complexes directory: {work_dir}/complexes")
-        _LOGGER.info(f"\tqsar_gird directory: {qsar_grid}")
-        fs.safe_rm(fname)
-        fs.safe_rm(score_file)
-        fs.safe_rmdir(f"{work_dir}/complexes/")
-        fs.safe_rmdir(qsar_grid)
+    _LOGGER.info(f"\toptions file: {fname}")
+    _LOGGER.info(f"\tscore file: {score_file}")
+    _LOGGER.info(f"\tenzyme-reactant complexes directory: {work_dir}/complexes")
+    _LOGGER.info(f"\tqsar_gird directory: {qsar_grid}")
+    fs.safe_rm(fname)
+    fs.safe_rm(score_file)
+    fs.safe_rmdir(f"{work_dir}/complexes/")
+    fs.safe_rmdir(qsar_grid)
 
     fs.safe_mkdir(f"{work_dir}/complexes/")
     fs.safe_mkdir(qsar_grid)
@@ -386,11 +406,13 @@ def _make_options_file(pdb_file: str,
 def _dock_system(structure: Structure,
             constraints: List[StructureConstraint],
             n_struct:int,
+            clash_cutoff:int,
             param_files:List[str],
             charge_mapper:Dict[str,int],
+            freeze_alphafill:bool,
             work_dir:str,
             rng_seed:int,
-            use_cache:bool) -> pd.DataFrame:
+            ) -> pd.DataFrame:
     """
 
     Args:
@@ -404,31 +426,16 @@ def _dock_system(structure: Structure,
     Returns:
 
     """
-    
-    if use_cache:
-        csv_file = Path( f"{work_dir}/scores.csv")
-        _LOGGER.info(f"Cache mode enabled. Looking for {csv_file} ...")
-        if csv_file.exists():
-            df = pd.read_csv(csv_file)
-            df['selected'] = True
-            _LOGGER.info(f"Found file {csv_file}. Checking for existence of {len(df)} output .pdbs")
+    start_pdb:str = f"{work_dir}/start.pdb"
+    parser = PDBParser()
+    parser.save_structure(start_pdb, structure)
 
-            for i, row in df.iterrows():
-                if not Path(row.description).exists():
-                    _LOGGER.info(f"\t{row.description} is missing. Cannot use cached results!")
-                    break
-            else:
-                if len(df) == n_struct:
-                    _LOGGER.info("All cached .pdbs exist! Using cached RosettaLigand structures!")
-                    return df
-        else:
-            _LOGGER.info(f"{csv_file} not found. Continuing with standard run")
+    cst_file:str = interface.rosetta.write_constraint_file(structure, constraints, work_dir) #TODO(CJ): look at this; wrong constraint types!!
 
-    (start_pdb, cst_file) = interface.rosetta.integrate_constraints(structure, constraints, work_dir)
+    xml_file:str = _create_xml(structure, cst_file, freeze_alphafill, clash_cutoff, work_dir)  #TODO(CJ): going to overhaul this
 
-    xml_file: str = _create_xml(structure, work_dir, use_cache)  #TODO(CJ): going to overhaul this
-
-    options_file: str = _make_options_file(start_pdb, xml_file, param_files, work_dir, rng_seed, n_struct, use_cache, cst_file)
+    options_file: str = _make_options_file(start_pdb,
+                        xml_file, param_files, work_dir, rng_seed, n_struct, cst_file)
 
     opt_path = Path(options_file)
 
@@ -437,10 +444,15 @@ def _dock_system(structure: Structure,
     start_dir: str = os.getcwd()
     
     os.chdir(str(opt_path.parent))
-
-    interface.rosetta.run_rosetta_scripts([f"@{opt_path.name}"])
+    
+    try:
+        interface.rosetta.run_rosetta_scripts([f"@{opt_path.name}"])
+    except:
+        pass
 
     os.chdir(start_dir)
+
+    assert Path(str(opt_path.parent / "complexes/score.sc")).exists()
 
     df: pd.DataFrame = interface.rosetta.parse_score_file(str(opt_path.parent / "complexes/score.sc"))
 
@@ -582,58 +594,6 @@ def _parameterize_system(stru:Structure, work_dir:str) -> Tuple[List[str], Dict[
     _LOGGER.info("Finished reactant preparation!")
 
     return (param_files, charge_mapper)
-
-
-def _evaluate_clashes(df: pd.DataFrame, clash_distance: float, clash_cutoff: int) -> None:
-    """Evaluates and filters geometries using clash count between each ligand and other ligands.
-    Updates the 'selected' column of the inputted DataFrame and sets the column to False if the 
-    ligand has more than the allowed number of clashes between heavy atoms. Exits if no rows are selected at this point.
-    
-    Args:
-        df: pandas DataFrame with geometries derived from _dock_system().
-        clash_distance: Allowed clash distance radius in Angstroms.
-        clash_cutoff: Allowed number of clashes.
-
-    Returns:
-        Nothing.         
-    """
-    #TODO(CJ): there are problems with this since we are no longer using LXX format ligands 
-    if not df.selected.sum():
-        _LOGGER.error("No geometries still selected! Exiting...")
-        exit( 1 )
-
-    _LOGGER.info(f"Beginning clash evaluation. {df.selected.sum()} geometries still selected...")
-    session = interface.pymol.new_session()
-    clash_ct: List[int] = list()
-    for i, row in df.iterrows():
-
-        if not row.selected:
-            clash_ct.append(-1)
-            continue
-
-        atoms: pd.DataFrame = interface.pymol.collect(session, row.description, "elem resn vdw x y z".split())
-        atoms: pd.DataFrame = atoms[atoms.elem != 'H'].reset_index(drop=True)
-
-        ligand_names = list(filter(lambda rn: rn[0] == 'L' and rn[1].isnumeric() and rn[2].isnumeric(), atoms.resn.unique()))
-
-        other = atoms[~(atoms.resn.isin(ligand_names))].reset_index(drop=True)
-        o_xyz = np.transpose(np.array([other.x.to_numpy(), other.y.to_numpy(), other.z.to_numpy()]))
-
-        count: int = 0
-        for resn in ligand_names:
-            ligand = atoms[atoms.resn == resn].reset_index(drop=True)
-            l_xyz = np.transpose(np.array([ligand.x.to_numpy(), ligand.y.to_numpy(), ligand.z.to_numpy()]))
-
-            for ll in l_xyz:
-                if np.min(np.sqrt(np.sum(np.power(o_xyz - ll, 2), axis=1))) <= clash_distance:
-                    count += 1
-        clash_ct.append(count)
-
-    df['clash_ct'] = clash_ct
-    df['selected'] = (df.selected) & (df.clash_ct <= clash_cutoff)
-
-    _LOGGER.info(
-        f"Finished clash evaluation. {df.selected.sum()} geometries have <= {clash_cutoff} of distance {clash_distance:.3f} angstroms")
 
 
 def _system_charge(df: pd.DataFrame, charge_mapper=None) -> int:

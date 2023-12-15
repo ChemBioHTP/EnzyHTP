@@ -142,7 +142,9 @@ class EnvironmentManager:
                     try_time: int = 1,
                     wait_time: float = 3.0,
                     timeout: Union[None, float] = None,
-                    stdout_return_only: bool = False) -> Union[CompletedProcess, str]:
+                    stdout_return_only: bool = False,
+                    quiet_fail:bool = False
+                    ) -> Union[CompletedProcess, str]:
         """Interface to run a command with the exectuables specified by exe as well as a list of arguments.
         Args:
             exe:
@@ -162,6 +164,8 @@ class EnvironmentManager:
                 use this when the command is supposed to be fast like "squeue" but may take long time if there
                 are some unrepeatable error thus allow taking next retry earlier.)
                 (Unit: s)
+            quiet_fail:
+                #TODO(CJ)
 
         Returns:
             return the CompletedProcess object
@@ -191,8 +195,9 @@ class EnvironmentManager:
             except SubprocessError as e:
                 this_error = e
                 _LOGGER.warning(f"Error running {cmd}: {repr(e)}")
-                _LOGGER.warning(f"    stderr: {str(e.stderr).strip()}")
-                _LOGGER.warning(f"    stdout: {str(e.stdout).strip()}")
+                if not quiet_fail:
+                    _LOGGER.warning(f"    stderr: {str(e.stderr).strip()}")
+                    _LOGGER.warning(f"    stdout: {str(e.stdout).strip()}")
                 if try_time > 1:
                     _LOGGER.warning(f"trying again... ({i+1}/{try_time})")
             else:  # untill there's no error
