@@ -10,11 +10,11 @@ Date: 2023-09-19
 from abc import ABC, abstractmethod
 from typing import List, Tuple, Union
 from enzy_htp.core.job_manager import ClusterJob
-from enzy_htp.core.mol_dyn_result import MolDynResult, MolDynResultEgg
 from enzy_htp.structure.structure_constraint import StructureConstraint
 
 from ..base_interface import BaseInterface
 from .mol_dyn_parameterizer import MolDynParameter
+from .mol_dyn_result import MolDynResult, MolDynResultEgg
 
 class MolDynStep(ABC):
     """A modular/indivisible step of Molecular Dynamics simulation.

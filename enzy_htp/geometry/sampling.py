@@ -14,12 +14,12 @@ import enzy_htp.core.file_system as fs
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.exception import InconsistentMDEngine
 from enzy_htp.core import job_manager
-from enzy_htp.core.mol_dyn_result import MolDynResult
 from enzy_htp.structure import Structure, StructureEnsemble, structure_constraint
 from enzy_htp._interface.handle_types import (
     MolDynStep,
     MolDynParameterizer,
-    MolDynParameter)
+    MolDynParameter,
+    MolDynResult)
 
 def equi_md_sampling(stru: Structure,
                      param_method: MolDynParameterizer,

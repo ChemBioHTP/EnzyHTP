@@ -17,7 +17,10 @@ from typing import List, Tuple, Union, Dict, Any
 from dataclasses import dataclass
 
 from .base_interface import BaseInterface
-from .handle_types import MolDynParameterizer, MolDynParameter, MolDynStep
+from .handle_types import (
+    MolDynParameterizer, MolDynParameter,
+    MolDynStep,
+    MolDynResult, MolDynResultEgg,)
 from .ncaa_library import search_ncaa_parm_file
 from .gaussian_interface import gaussian_interface
 
@@ -26,7 +29,6 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core import env_manager as em
 from enzy_htp.core import math_helper as mh
 from enzy_htp.core.job_manager import ClusterJob
-from enzy_htp.core.mol_dyn_result import MolDynResult, MolDynResultEgg
 from enzy_htp.core.exception import UnsupportedMethod, tLEaPError
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
 from enzy_htp.structure.structure_io import pdb_io, prmtop_io
@@ -640,10 +642,24 @@ class AmberMDStep(MolDynStep):
         self.parent_interface.write_to_mdin(self.md_config_dict, temp_mdin_file_path)
         return temp_mdin_file_path
 
-    def translate(self) -> MolDynResult:
+    def translate(self, result_egg: AmberMDResultEgg) -> MolDynResult:
         """the method convert engine specific results to general output.
         will also clean up temp files."""
-        pass
+        traj_file = result_egg.traj_path,
+        # traj_parser = self.parent_interface., 
+        traj_log_file = result_egg.traj_log_path,
+        # traj_log_parser = , 
+        last_frame_file = result_egg.last_frame_file,
+        # last_frame_parse = ,
+
+        return MolDynResult(
+            traj_file = traj_file,
+            traj_parser = traj_parser, 
+            traj_log_file = traj_log_file,
+            traj_log_parser = traj_log_parser, 
+            last_frame_file = last_frame_file,
+            last_frame_parse = last_frame_parse,
+        )
 
     @classmethod
     def try_merge_jobs(cls, job_list: List[ClusterJob]) -> List[ClusterJob]:
