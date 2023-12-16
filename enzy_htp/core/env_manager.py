@@ -8,6 +8,7 @@ import os
 import time
 import shutil
 import importlib
+import logging
 from pathlib import Path
 from typing import List, Union
 from subprocess import CompletedProcess, SubprocessError, run
@@ -142,7 +143,8 @@ class EnvironmentManager:
                     try_time: int = 1,
                     wait_time: float = 3.0,
                     timeout: Union[None, float] = None,
-                    stdout_return_only: bool = False) -> Union[CompletedProcess, str]:
+                    stdout_return_only: bool = False,
+                    log_level: str = "info",) -> Union[CompletedProcess, str]:
         """Interface to run a command with the exectuables specified by exe as well as a list of arguments.
         Args:
             exe:
@@ -162,6 +164,7 @@ class EnvironmentManager:
                 use this when the command is supposed to be fast like "squeue" but may take long time if there
                 are some unrepeatable error thus allow taking next retry earlier.)
                 (Unit: s)
+            log_level: the logging level that non-error/warning loggings in this function goes to.
 
         Returns:
             return the CompletedProcess object
@@ -170,6 +173,11 @@ class EnvironmentManager:
             MissingEnvironmentElement
             SystemExit
             """
+        # init
+        log_level = getattr(logging, log_level.upper(), None)
+        if not log_level:
+            _LOGGER.error(f"log_level ({log_level}) not supported")
+
         if isinstance(args, list):
             args = " ".join(args)
         cmd = f"{self.mapper.get(exe,exe)} {args}"
@@ -183,7 +191,7 @@ class EnvironmentManager:
             _LOGGER.warning(f"    Please add it to corresponding config.required_executables if this is a long-term use")
 
         # run the command
-        _LOGGER.info(f"Running command: `{cmd}`...")
+        _LOGGER.log(log_level, f"Running command: `{cmd}`...") # TODO may provide an option for higher level
         for i in range(try_time):
             try:
                 this_run = run(cmd, timeout=timeout, check=True, text=True, shell=True, capture_output=True)
@@ -196,7 +204,7 @@ class EnvironmentManager:
                 if try_time > 1:
                     _LOGGER.warning(f"trying again... ({i+1}/{try_time})")
             else:  # untill there's no error
-                _LOGGER.info(f"finished `{cmd}` after {i+1} tries @{get_localtime()}")
+                _LOGGER.log(log_level, f"finished `{cmd}` after {i+1} tries @{get_localtime()}")
                 if stdout_return_only:
                     return str(this_run.stdout).strip()
                 else:
