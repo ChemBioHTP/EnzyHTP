@@ -726,6 +726,17 @@ def test_amber_md_step_translate():
     assert result.last_frame_file == "rst_path"
 
 
+def test_amber_md_step_run(): # TODO finish this
+    """test AmberMDStep().run()"""
+    ai = interface.amber
+    md_step = ai.build_md_step(length=0.1) # 300K, NPT by default
+    test_inpcrd = f"{MM_DATA_DIR}/KE_07_R7_S.inpcrd"
+    test_prmtop = f"{MM_DATA_DIR}/KE_07_R7_S.prmtop"
+    test_params = AmberParameter(test_inpcrd, test_prmtop)
+    test_md_result = md_step.run(test_params)
+    
+    assert False
+
 # region TODO
 
 def test_parse_fmt_uppercase():

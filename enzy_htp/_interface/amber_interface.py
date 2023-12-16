@@ -26,7 +26,6 @@ from .gaussian_interface import gaussian_interface
 
 from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
-from enzy_htp.core import env_manager as em
 from enzy_htp.core import math_helper as mh
 from enzy_htp.core.job_manager import ClusterJob
 from enzy_htp.core.exception import UnsupportedMethod, tLEaPError
@@ -436,7 +435,6 @@ class AmberParameterizer(MolDynParameterizer):
                 return pattern_match.group().upper()
         return None
 
-
 @dataclass
 class AmberMDResultEgg(MolDynResultEgg):
     """This class defines the data format of the MolDynResultEgg in Amber's case"""
@@ -610,22 +608,10 @@ class AmberMDStep(MolDynStep):
         temp_mdin_file = self._make_mdin_file()
 
         # 3. make cmd
-        num_cores = self.cluster_job_config["res_setting"]["node_cores"]
-        executable = self.parent_interface.get_md_executable(self.core_type, num_cores)
-        mdout_path = f"{self.work_dir}/{self.name}.out"
-        mdrst_path = f"{self.work_dir}/{self.name}.rst"
-        traj_path = f"{self.work_dir}/{self.name}.nc"
-        md_step_cmd= (
-            f"{executable} "
-            f"-O " # overwrite; note that AmberMDStep() with same name will overwrite each other
-            f"-i {temp_mdin_file} " # mdin file
-            f"-o {mdout_path} " # mdout file path
-            f"-p {prmtop} " # prmtop path
-            f"-c {coord} " # init coord
-            f"-r {mdrst_path} " # last frame coord
-            f"-ref {coord} " # reference coord used only when nmropt=1
-            f"-x {traj_path} " # the output md trajectory
-        )
+        md_step_cmd, traj_path, mdout_path, mdrst_path = self._make_md_cmd(
+            temp_mdin_file,
+            prmtop,
+            coord)
 
         # 4. assemble ClusterJob
         cluster = self.cluster_job_config["cluster"]
@@ -660,7 +646,56 @@ class AmberMDStep(MolDynStep):
 
     def run(self, input_data: Union[MolDynParameter, MolDynResult]) -> MolDynResult:
         """the method that runs the step"""
-        pass
+        # 1. parse input
+        if isinstance(input_data, AmberParameter): # build from parameter
+            coord = input_data.input_coordinate_file
+            prmtop = input_data.topology_file
+        elif isinstance(input_data, MolDynResult) and input_data.source == "amber": # build form previous step
+            coord = input_data.last_frame_file
+            prmtop = input_data.last_frame_parser.prmtop_file
+        else:
+            _LOGGER.error("only allow AmberParameter or MolDynResult(source='amber') as `input_data`")
+            raise TypeError
+
+        # 2. make .in file
+        fs.safe_mkdir(self.work_dir)
+        temp_mdin_file = self._make_mdin_file()
+
+        # 3. make cmd
+        md_step_cmd, traj_path, mdout_path, mdrst_path = self._make_md_cmd(
+            temp_mdin_file,
+            prmtop,
+            coord)
+
+        # 4. run cmd
+        md_cmd_exe = md_step_cmd.split(" ")[0]
+        md_cmd_args = md_step_cmd.split(" ")[1:]
+        parent_interface: AmberInterface = self.parent_interface
+        parent_interface.env_manager_.run_command(
+            exe=md_cmd_exe,
+            args=md_cmd_args,
+        )
+
+        # 5. make result
+        traj_parser = AmberNCParser(
+            prmtop_file=prmtop,
+            interface=self.parent_interface)
+        traj_log_parser = self.parent_interface.read_from_mdout
+        last_frame_parser = AmberRSTParser(
+            prmtop_file=prmtop,
+            interface=self.parent_interface)
+
+        result = MolDynResult(
+            traj_file = traj_path,
+            traj_parser = traj_parser, 
+            traj_log_file = mdout_path,
+            traj_log_parser = traj_log_parser, 
+            last_frame_file = mdrst_path,
+            last_frame_parser = last_frame_parser,
+            source="amber",
+        )
+
+        return result
 
     def _make_mdin_file(self) -> str:
         """make a temporary mdin file.
@@ -676,19 +711,39 @@ class AmberMDStep(MolDynStep):
         self.parent_interface.write_to_mdin(self.md_config_dict, temp_mdin_file_path)
         return temp_mdin_file_path
 
+    def _make_md_cmd(self, temp_mdin_file, prmtop, coord) -> str:
+        """compile the sander/pmemd cmd from config"""
+        num_cores = self.cluster_job_config["res_setting"]["node_cores"]
+        executable = self.parent_interface.get_md_executable(self.core_type, num_cores)
+        mdout_path = f"{self.work_dir}/{self.name}.out"
+        mdrst_path = f"{self.work_dir}/{self.name}.rst"
+        traj_path = f"{self.work_dir}/{self.name}.nc"
+        md_step_cmd= (
+            f"{executable} "
+            f"-O " # overwrite; note that AmberMDStep() with same name will overwrite each other
+            f"-i {temp_mdin_file} " # mdin file
+            f"-o {mdout_path} " # mdout file path
+            f"-p {prmtop} " # prmtop path
+            f"-c {coord} " # init coord
+            f"-r {mdrst_path} " # last frame coord
+            f"-ref {coord} " # reference coord used only when nmropt=1
+            f"-x {traj_path} " # the output md trajectory
+        )
+        return md_step_cmd, traj_path, mdout_path, mdrst_path
+
     def translate(self, result_egg: AmberMDResultEgg) -> MolDynResult:
         """the method convert engine specific results to general output.
         will also clean up temp files."""
         traj_file = result_egg.traj_path
         traj_parser = AmberNCParser(
             prmtop_file=result_egg.prmtop_path,
-            interface=self.parent_interface), 
+            interface=self.parent_interface)
         traj_log_file = result_egg.traj_log_path
-        traj_log_parser = self.parent_interface.read_from_mdout, 
+        traj_log_parser = self.parent_interface.read_from_mdout
         last_frame_file = result_egg.rst_path
         last_frame_parser = AmberRSTParser(
             prmtop_file=result_egg.prmtop_path,
-            interface=self.parent_interface),
+            interface=self.parent_interface)
 
         return MolDynResult(
             traj_file = traj_file,
@@ -697,6 +752,7 @@ class AmberMDStep(MolDynStep):
             traj_log_parser = traj_log_parser, 
             last_frame_file = last_frame_file,
             last_frame_parser = last_frame_parser,
+            source="amber",
         )
 
     @classmethod

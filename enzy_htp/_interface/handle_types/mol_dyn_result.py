@@ -36,13 +36,15 @@ class MolDynResult:
                  traj_log_file: str,
                  traj_log_parser: Callable[[str], Dict],
                  last_frame_file: str,
-                 last_frame_parser: Callable[[str], Structure],):
+                 last_frame_parser: Callable[[str], Structure],
+                 source: str,):
         self._traj_file = traj_file
         self._traj_parser = traj_parser
         self._traj_log_file = traj_log_file
         self._traj_log_parser = traj_log_parser
         self._last_frame_file = last_frame_file
         self._last_frame_parser = last_frame_parser
+        self._source = source
 
     @property
     def traj_file(self) -> str:
@@ -67,6 +69,10 @@ class MolDynResult:
     @property
     def last_frame_parser(self) -> Callable:
         return self._last_frame_parser
+
+    @property
+    def source(self) -> str:
+        return self._source
 
 
 class MolDynResultEgg(ABC):
