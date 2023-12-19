@@ -663,6 +663,8 @@ class AmberMDStep(MolDynStep):
         fs.safe_mkdir(self.work_dir)
         temp_mdin_file = self._make_mdin_file()
 
+        # TODO do we need to clear existing rst/nc files? to address issue #95? unit test it
+
         # 3. make cmd
         md_step_cmd, traj_path, mdout_path, mdrst_path = self._make_md_cmd(
             temp_mdin_file,
