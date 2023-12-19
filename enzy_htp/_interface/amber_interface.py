@@ -615,20 +615,20 @@ class AmberMDStep(MolDynStep):
 
         # 4. assemble ClusterJob
         cluster = self.cluster_job_config["cluster"]
-        res_setting = self.cluster_job_config["res_setting"]
+        res_keywords = self.cluster_job_config["res_keywords"]
         env_settings = cluster.AMBER_ENV[self.core_type.upper()]
         job = ClusterJob.config_job(
             commands = md_step_cmd,
             cluster = cluster,
             env_settings = env_settings,
-            res_keywords = res_setting,
+            res_keywords = res_keywords,
             sub_dir = "./", # because path are relative
             sub_script_path = f"{self.work_dir}/submit_{self.name}.cmd"
         )
         job.mimo = { # temp solution before having a 2nd MD engine
             "commands" : [md_step_cmd,],
             "env_settings" : env_settings,
-            "res_keywords" : res_setting,
+            "res_keywords" : res_keywords,
             "sub_dir" : "./",
             "md_names" : [self.name],
             "work_dir" : self.work_dir,
@@ -713,7 +713,7 @@ class AmberMDStep(MolDynStep):
 
     def _make_md_cmd(self, temp_mdin_file, prmtop, coord) -> str:
         """compile the sander/pmemd cmd from config"""
-        num_cores = self.cluster_job_config["res_setting"]["node_cores"]
+        num_cores = self.cluster_job_config["res_keywords"]["node_cores"]
         executable = self.parent_interface.get_md_executable(self.core_type, num_cores)
         mdout_path = f"{self.work_dir}/{self.name}.out"
         mdrst_path = f"{self.work_dir}/{self.name}.rst"
@@ -788,7 +788,7 @@ class AmberMDStep(MolDynStep):
             if mergable == exposed_mergable:
                 merged_cmds = merged_job.mimo["commands"] + job.mimo["commands"]
                 env_settings = merged_job.mimo["env_settings"]
-                res_setting = merged_job.mimo["res_keywords"]
+                res_keywords = merged_job.mimo["res_keywords"]
                 sub_dir = merged_job.sub_dir
                 md_names = merged_job.mimo["md_names"] + job.mimo["md_names"]
                 work_dir = merged_job.mimo["work_dir"]
@@ -797,14 +797,14 @@ class AmberMDStep(MolDynStep):
                     commands = merged_cmds,
                     cluster = job.cluster,
                     env_settings = env_settings,
-                    res_keywords = res_setting,
+                    res_keywords = res_keywords,
                     sub_dir = sub_dir,
                     sub_script_path = f"{work_dir}/submit_{'_'.join(md_names)}.cmd"
                 )
                 merged_job.mimo = {
                     "commands" : merged_cmds,
                     "env_settings" : env_settings,
-                    "res_keywords" : res_setting,
+                    "res_keywords" : res_keywords,
                     "sub_dir" : sub_dir,
                     "md_names" : md_names,
                     "work_dir" : work_dir,
@@ -1595,8 +1595,10 @@ class AmberInterface(BaseInterface):
                 and the cluster_job config if cluster_job_config is not None.
                 options: [cpu, gpu]
             cluster_job_config:
-                dictionary that assign arguments to ClusterJob.config_job and ClusterJob.wait_to_end
-                key list: [cluster, res_keywords, period]
+                dictionary that assign arguments for ClusterJob.config_job
+                For `res_keywords` it works as it updates the default dict in ARMerConfig.MD_GPU_RES or
+                ARMerConfig.MD_CPU_RES depending on the core_type.
+                key list: [cluster, res_keywords]
             if_report:
                 whether report result (i.e.: trajectory) of this step.
             record_period:
@@ -1691,7 +1693,12 @@ class AmberInterface(BaseInterface):
         if core_type == "default":
             core_type = self.config()["DEFAULT_MD_CORE_TYPE"]
         if cluster_job_config == "default":
-            cluster_job_config = self.config()["DEFAULT_MD_CLUSTER_JOB_CONFIG"][core_type]
+            cluster_job_config = self.config().get_default_md_cluster_job(core_type)
+        else:
+            # For res_keywords, it updates the default config
+            res_keywords_update = cluster_job_config["res_keywords"]
+            default_res_keywords = self.config().get_default_md_cluster_job_res_keywords(core_type)
+            cluster_job_config["res_keywords"] = default_res_keywords | res_keywords_update
         if record_period == "default":
             record_period = self.config()["DEFAULT_MD_RECORD_PERIOD_FACTOR"] * length
         if work_dir == "default":

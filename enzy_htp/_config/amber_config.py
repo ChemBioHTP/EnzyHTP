@@ -108,18 +108,31 @@ class AmberConfig(BaseConfig):
     DEFAULT_MD_RESTART: bool = False
     """The default value for whether restart using v from another md step"""
 
-    DEFAULT_MD_CLUSTER_JOB_CONFIG: dict = {
-        "gpu": {
-            "cluster" : Accre(),
-            "res_setting" : ARMerConfig.MD_GPU_RES,
-        },
-        "cpu": {
-            "cluster" : Accre(),
-            "res_setting" : ARMerConfig.MD_CPU_RES,
-        }
+    DEFAULT_MD_CLUSTER_JOB_RES_KEYWORDS = {
+        "gpu" :  ARMerConfig.MD_GPU_RES,
+        "cpu" : ARMerConfig.MD_CPU_RES,
     }
-    """The default value for dictionary that assign arguments to
-    ClusterJob.config_job and ClusterJob.wait_to_end during the MD step"""
+    """The default res_keywords for Amber MD jobs. This is used 1. when default
+    cluster_job_config is used/ or 2. when res_keywords in cluster_job_config is
+    specificed."""
+
+    def get_default_md_cluster_job_res_keywords(self, key: str) -> Dict:
+        """func used for lazy determination"""
+        return self.DEFAULT_MD_CLUSTER_JOB_RES_KEYWORDS[key]
+
+    def get_default_md_cluster_job(self, key: str) -> Dict:
+        """The default value for dictionary that assign arguments to
+        ClusterJob.config_job and ClusterJob.wait_to_end during the MD step"""
+        return {
+            "gpu": {
+                "cluster" : Accre(),
+                "res_keywords" : self.get_default_md_cluster_job_res_keywords("gpu"),
+            },
+            "cpu": {
+                "cluster" : Accre(),
+                "res_keywords" : self.get_default_md_cluster_job_res_keywords("cpu"),
+            }
+        }[key]
 
     DEFAULT_MD_CORE_TYPE: str = "gpu"
     """The default value for the type of computing core that runs the MD."""

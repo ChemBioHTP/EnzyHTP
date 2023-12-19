@@ -463,9 +463,30 @@ def test_build_md_step_default():
     md_step: AmberMDStep = ai.build_md_step(length=0.1, core_type="cpu")
     assert md_step.temperature == 300.0
     assert md_step.core_type == "cpu"
-    assert md_step.cluster_job_config["res_setting"]["core_type"] == "cpu"
+    assert md_step.cluster_job_config["res_keywords"]["core_type"] == "cpu"
     assert md_step.length == 0.1
     assert md_step.record_period == 0.0001
+
+
+def test_build_md_step_res_keywords():
+    """as said in the name. Assert several default values
+    as samples."""
+    ai = interface.amber
+    md_step: AmberMDStep = ai.build_md_step(length=0.1, core_type="cpu",
+                                            cluster_job_config={
+                                                "cluster" : None,
+                                                "res_keywords" : {"partition" : "production",
+                                                                  "account" : "yang_lab",}
+                                            })
+    assert md_step.cluster_job_config["cluster"] is None
+    assert md_step.cluster_job_config["res_keywords"]["core_type"] == "cpu"
+    assert md_step.cluster_job_config["res_keywords"]["partition"] == "production"
+    assert md_step.cluster_job_config["res_keywords"]["nodes"] == "1"
+    assert md_step.cluster_job_config["res_keywords"]["node_cores"] ==  "16"
+    assert md_step.cluster_job_config["res_keywords"]["job_name"] ==  "MD_EnzyHTP"
+    assert md_step.cluster_job_config["res_keywords"]["mem_per_core"] ==  "3G"
+    assert md_step.cluster_job_config["res_keywords"]["walltime"] ==  "1-00:00:00"
+    assert md_step.cluster_job_config["res_keywords"]["account"] ==  "yang_lab"
 
 
 def test_write_to_mdin_from_raw_dict():
