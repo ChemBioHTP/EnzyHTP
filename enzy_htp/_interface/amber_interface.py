@@ -12,7 +12,7 @@ import os
 import re
 import shutil
 from pathlib import Path
-from subprocess import CalledProcessError
+from subprocess import CalledProcessError, CompletedProcess, SubprocessError
 from typing import List, Tuple, Union, Dict, Any
 from dataclasses import dataclass
 
@@ -28,7 +28,7 @@ from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import math_helper as mh
 from enzy_htp.core.job_manager import ClusterJob
-from enzy_htp.core.exception import UnsupportedMethod, tLEaPError
+from enzy_htp.core.exception import UnsupportedMethod, tLEaPError, AmberMDError
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
 from enzy_htp.structure.structure_io import pdb_io, prmtop_io
 from enzy_htp.structure.structure_constraint import StructureConstraint
@@ -442,6 +442,7 @@ class AmberMDResultEgg(MolDynResultEgg):
     traj_log_path: str
     rst_path: str
     prmtop_path: str
+    parent_job: ClusterJob
 
 
 class AmberMDStep(MolDynStep):
@@ -640,6 +641,7 @@ class AmberMDStep(MolDynStep):
             traj_log_path=mdout_path,
             rst_path=mdrst_path,
             prmtop_path=prmtop,
+            parent_job=job,
         )
 
         return (job, result_egg)
@@ -671,10 +673,11 @@ class AmberMDStep(MolDynStep):
         md_cmd_exe = md_step_cmd.split(" ")[0]
         md_cmd_args = md_step_cmd.split(" ")[1:]
         parent_interface: AmberInterface = self.parent_interface
-        parent_interface.env_manager_.run_command(
+        this_md_run = parent_interface.env_manager_.run_command(
             exe=md_cmd_exe,
             args=md_cmd_args,
         )
+        self.check_md_error(traj_path, mdout_path, prmtop, this_md_run)
 
         # 5. make result
         traj_parser = AmberNCParser(
@@ -744,6 +747,9 @@ class AmberMDStep(MolDynStep):
         last_frame_parser = AmberRSTParser(
             prmtop_file=result_egg.prmtop_path,
             interface=self.parent_interface)
+        
+        # error check
+        self.check_md_error(traj_file, traj_log_file, result_egg.prmtop_path, result_egg.parent_job)
 
         return MolDynResult(
             traj_file = traj_file,
@@ -755,6 +761,48 @@ class AmberMDStep(MolDynStep):
             source="amber",
         )
 
+    def check_md_error( self,
+                        traj: str,
+                        traj_log: str,
+                        prmtop: str,
+                        stdstream_source: Union[ClusterJob,
+                                                CompletedProcess,
+                                                SubprocessError]):
+        """a check for whether an error occurs in MD is needed everytime before generating
+        a MolDynResult.
+        Possible Amber error info places:
+        1. stdout/stderr
+        2. mdout file
+        3. more analysis of comm problem from the traj (TODO) 
+        The ultimate goal is to summarize each error type and give suggestions.
+        Notes: designed here so that it can also checks based on config of the current step"""
+        # only when MD is not complete, there is an error
+        if not self.parent_interface.is_md_completed(traj_log):
+            # collect error info
+            error_info_list = []
+            # 1. stdout stderr
+            # error types: Fall of bus, periodic box has changed too much, illegel mem
+            if isinstance(stdstream_source, ClusterJob):
+                with open(stdstream_source.job_cluster_log) as f:
+                    stderr_stdout = f.read()
+                    error_info_list.append(f"stdout/stderr(from job log): {stderr_stdout}")
+            elif isinstance(stdstream_source, CompletedProcess):
+                error_info_list.append(f"stdout: {stdstream_source.stdout}")
+                error_info_list.append(f"stderr: {stdstream_source.stderr}")
+            elif isinstance(stdstream_source, SubprocessError):
+                error_info_list.append(f"stdout: {stdstream_source.stdout}")
+                error_info_list.append(f"stderr: {stdstream_source.stderr}")
+            else:
+                _LOGGER.error("Only allow ClusterJob, CompletedProcess, SubprocessError as input types for `stdstream_source`")
+                raise TypeError
+            # 2. mdout file
+            # have no experience that error pops here yet. Add when observed
+            # 3. traj analysis
+            # TODO
+
+            _LOGGER.error(f"Amber MD didn't finish normally. {os.linesep.join(error_info_list)}")
+            raise AmberMDError(error_info_list)
+    
     @classmethod
     def try_merge_jobs(cls, job_list: List[ClusterJob]) -> List[ClusterJob]:
         """the classmethod that merge a list of sequential jobs from MolDynStep to fewer jobs.
@@ -932,7 +980,7 @@ class AmberInterface(BaseInterface):
                 cmd_args = f"{cmd_args} -I {add_path}"
         try:
             self.env_manager_.run_command("tleap", cmd_args)
-        except CalledProcessError as e:
+        except CalledProcessError as e: # TODO(qz) seems run_command will never raise an error?
             if (not e.stderr.strip()) and (not e.stdout.strip()):  # empty stderr & stdout
                 # find the error information in tleap.out
                 new_e = self._find_tleap_error(tleap_out_path)
@@ -1277,6 +1325,19 @@ class AmberInterface(BaseInterface):
             mpi_exec = eh_config._system.get_mpi_executable(num_cores)
             result = f"{mpi_exec} {result}"
         return result
+
+    def is_md_completed(self, mdout_file: str) -> bool:
+        """check whether an Amber MD run is completed.
+        clues of incomplete:
+        1. no mdout file
+        2. no TIMINGS section in mdout file"""
+        if os.path.exists(mdout_file):
+            with open(mdout_file) as f:
+                return "5.  TIMINGS" in f.read() # TODO add more logic when needed.
+        else:
+            return False
+
+    # def run_sander/pmemd() >>> see AmberMDStep.run() or .make_job()
 
     # == engines ==
     # (engines for science APIs)
