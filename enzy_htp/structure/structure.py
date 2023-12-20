@@ -373,7 +373,12 @@ class Structure(DoubleLinkedNode):
             "ligand" : element_composition,
             "modified_residue" : element_composition,
             "metalcenters" : element_composition,
-            }"""
+            "solvents" : element_composition,
+            "nucleic_acid" : "",
+            }
+            
+        Note:
+            In current version, nucleic acid (NA) as counts as ligand. will change when support NA fully."""
         result = {}
         # polypeptide
         if self.contain_polypeptide():
@@ -396,6 +401,15 @@ class Structure(DoubleLinkedNode):
             for mc in self.metalcenters:
                 eles = eles.union(mc.element_composition)
             result.update({"metalcenters" : eles})
+        # solvent
+        if self.contain_solvent():
+            eles = set()
+            for sol in self.solvents:
+                eles = eles.union(sol.element_composition)
+            result.update({"solvents" : eles})
+        # nucleic acid
+        if self.contain_nucleic_acid():
+            result.update({"nucleic_acid" : ""})
 
         return result
 
@@ -483,6 +497,19 @@ class Structure(DoubleLinkedNode):
     def contain_metalcenters(self) -> bool:
         """check if there is a metal coordination ceneter in the structure"""
         return len(self.metalcenters) != 0
+
+    def contain_solvent(self) -> bool:
+        """check if there is a solvent in the structure"""
+        return len(self.solvents) != 0
+
+    def contain_nucleic_acid(self) -> bool:
+        """check if there is a nucleic_acid in the structure.
+        TODO change this after developed support for NA."""
+        nucleic_acid_names = ["A", "G", "C", "U", "DA", "DG", "DC", "DT"] # TODO move to chemcial
+        for lig in self.ligands:
+            if lig.name in nucleic_acid_names:
+                return True
+        return False
 
     def has_chain(self, chain_name: str) -> bool:
         """Checks if the Structure() has a chain with the specified chain_name."""
