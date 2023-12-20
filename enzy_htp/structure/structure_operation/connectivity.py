@@ -6,6 +6,7 @@ Date: 2023-10-17
 """
 # pylint: disable=function-redefined
 from plum import dispatch
+from typing import Union
 import sys
 
 from ...structure import (
@@ -27,11 +28,12 @@ from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.exception import ResidueDontHaveAtom
 import enzy_htp.chemical as chem
 from enzy_htp._interface.ncaa_library import search_ncaa_parm_file
+from enzy_htp import interface
 from enzy_htp import config as eh_config
 
 # == API ==
 @dispatch
-def init_connectivity(target: Atom, renew: bool = False,
+def init_connectivity(target: Atom, renew: bool = False, ncaa_lib: Union[str, None] = None,
         ligand_fix: str = "antechamber",
         maa_fix: str = "antechamber",
         solvent_fix: str = "caa",
@@ -49,13 +51,13 @@ def init_connectivity(target: Atom, renew: bool = False,
         if res.is_canonical():
             _connect_caa_atom(target)
         else:
-            _connect_res(res, maa_fix, ligand_fix, solvent_fix, metal_fix)
+            _connect_res(res, maa_fix, ligand_fix, solvent_fix, metal_fix, ncaa_lib)
     else:
         _LOGGER.error(f"{target} dont have a parent residue, and thus connectivity is ill-defined")
         raise AttributeError
 
 @dispatch
-def init_connectivity(target: Residue, renew: bool = False,
+def init_connectivity(target: Residue, renew: bool = False, ncaa_lib: Union[str, None] = None,
         ligand_fix: str = "antechamber",
         maa_fix: str = "antechamber",
         solvent_fix: str = "caa",
@@ -63,10 +65,10 @@ def init_connectivity(target: Residue, renew: bool = False,
     """init connectivty for Residue including all NCAAs."""
     if (not renew) and target.is_connected():
         return
-    _connect_res(target, maa_fix, ligand_fix, solvent_fix, metal_fix)
+    _connect_res(target, maa_fix, ligand_fix, solvent_fix, metal_fix, ncaa_lib)
 
 @dispatch
-def init_connectivity(target: Chain, renew: bool = False,
+def init_connectivity(target: Chain, renew: bool = False, ncaa_lib: Union[str, None] = None,
         ligand_fix: str = "antechamber",
         maa_fix: str = "antechamber",
         solvent_fix: str = "caa",
@@ -76,10 +78,10 @@ def init_connectivity(target: Chain, renew: bool = False,
         return
 
     for res in target:
-        _connect_res(res, maa_fix, ligand_fix, solvent_fix, metal_fix)
+        _connect_res(res, maa_fix, ligand_fix, solvent_fix, metal_fix, ncaa_lib)
 
 @dispatch
-def init_connectivity(target: Structure, renew: bool = False,
+def init_connectivity(target: Structure, renew: bool = False, ncaa_lib: Union[str, None] = None,
         ligand_fix: str = "antechamber",
         maa_fix: str = "antechamber",
         solvent_fix: str = "caa",
@@ -91,6 +93,10 @@ def init_connectivity(target: Structure, renew: bool = False,
         connectivity generation of NCAAs
 
     Args:
+        renew:
+            whether renew the existing connectivity
+        ncaa_lib:
+            the path of ncaa library for ligand/maa/metal_fix. (default: eh_config["system.NCAA_LIB_PATH"])
         ligand_fix:
             the method that determines connectivity for ligand. (see details below)
         metal_fix:
@@ -120,7 +126,7 @@ def init_connectivity(target: Structure, renew: bool = False,
     for res in target.residues:
         if (not renew) and res.is_connected():
             continue
-        _connect_res(res, maa_fix, ligand_fix, solvent_fix, metal_fix)
+        _connect_res(res, maa_fix, ligand_fix, solvent_fix, metal_fix, ncaa_lib)
 
     # check if all atoms are connected
     for atm in target.atoms:
@@ -141,21 +147,26 @@ def _connect_caa_atom(atom: Atom) -> None:
     """
     connect = []
     parent_residue = atom.parent
-    if parent_residue.name in chem.solvent.RD_SOLVENT_LIST:
-        cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP[parent_residue.name][atom.name]
+    res_name = parent_residue.name
+    if res_name == "HIS": # deal with HIS
+        _LOGGER.warning("HIS found in the target structure, treat as HIE by default."
+                        "(consider protonate the structure first using enzy_htp.preparation.protonate_stru())")
+        res_name = "HIE"
+    if res_name in chem.solvent.RD_SOLVENT_LIST:
+        cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP[res_name][atom.name]
     elif parent_residue.is_canonical():
         r = parent_residue
         r1 = parent_residue.chain[0]
         rm1 = parent_residue.chain[-1]
         if r is r1:
             # N terminal
-            cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP_NTERMINAL[parent_residue.name][atom.name]
+            cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP_NTERMINAL[res_name][atom.name]
         else:
             if r == rm1:
                 # C terminal
-                cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP_CTERMINAL[parent_residue.name][atom.name]
+                cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP_CTERMINAL[res_name][atom.name]
             else:
-                cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP[parent_residue.name][atom.name]
+                cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP[res_name][atom.name]
     else:
         _LOGGER.error(
             f"wrong method of getting connectivity of non-canonical residue {atom.parent}. Use connect_maa or connect_ligand etc.")
@@ -180,18 +191,19 @@ def _connect_res(res: Residue,
         maa_fix: str,
         ligand_fix: str,
         solvent_fix: str,
-        metal_fix: str,) -> None:
+        metal_fix: str,
+        ncaa_lib: str) -> None:
 
     if res.is_canonical():
         _connect_caa(res)
     elif res.is_modified():
-        _connect_maa(res, maa_fix)
+        _connect_maa(res, maa_fix, ncaa_lib)
     elif res.is_ligand():
-        _connect_ligand(res, ligand_fix)
+        _connect_ligand(res, ligand_fix, ncaa_lib)
     elif res.is_solvent():
         _connect_solvent(res, solvent_fix)
     elif res.is_metal():
-        _connect_metal(res, metal_fix)
+        _connect_metal(res, metal_fix, ncaa_lib)
 
 def _connect_caa(res: Residue) -> None:
     """connect atoms in a canonical residue"""
@@ -202,7 +214,7 @@ MOL_DESC_METHODS = ["antechamber"]
 """the list for method keywords that belongs to molecule description file based methods."""
 
 MOL_DESC_GEN_MAPPER = {
-    "antechamber" : None, # some func in amber interface
+    "antechamber" : interface.amber.antechamber_ncaa_to_moldesc,
 }
 """the mapper that interpret the method keyword to a function that generate mol describing file
 The functions needs to support both ligand and modified amino acid"""
@@ -214,42 +226,45 @@ MOL_DESC_PARSER_MAPPER = {
 }
 """the mapper that interpret the method keyword to a function that generate mol describing file"""
 
-def _connect_ligand(lig: Ligand, method: str) -> None:
+def _connect_ligand(lig: Ligand, method: str, ncaa_lib: str) -> None:
     """initiate connectivity for ligand"""
     support_method_list = ["antechamber"]
     if method in MOL_DESC_METHODS:
-        _mol_desc_based_ncaa_method(lig, method)
+        _mol_desc_based_ncaa_method(lig, method, ncaa_lib)
         return
 
     if method not in support_method_list:
         _LOGGER.error(f"Method {method} not in supported list: {support_method_list}")
 
-def _connect_maa(maa: ModifiedResidue, method: str) -> None:
+def _connect_maa(maa: ModifiedResidue, method: str, ncaa_lib: str) -> None:
     """initiate connectivity for modified residue"""
+    raise Exception("TODO") # TODO look into whether .ac is just enough
     support_method_list = ["antechamber"]
     if method in MOL_DESC_METHODS:
-        _mol_desc_based_ncaa_method(maa, method)
+        _mol_desc_based_ncaa_method(maa, method, ncaa_lib)
         return
 
     if method not in support_method_list:
         _LOGGER.error(f"Method {method} not in supported list: {support_method_list}")
 
-def _mol_desc_based_ncaa_method(ncaa: NonCanonicalBase, engine: str):
+def _mol_desc_based_ncaa_method(ncaa: NonCanonicalBase, engine: str, ncaa_lib: str):
     """mol desc based method to generate connectivty for ncaa"""
-    # 0. search lib for prepin/mol2 of maa
-    ncaa_lib = eh_config["system.NCAA_LIB_PATH"]
+    # 0. search lib for prepin/mol2 of ncaa
+    if ncaa_lib is None:
+        ncaa_lib = eh_config["system.NCAA_LIB_PATH"]
     fs.safe_mkdir(ncaa_lib)
     mol_desc_path = search_ncaa_parm_file(ncaa,
                         target_method="any",
                         ncaa_lib_path=ncaa_lib)[0]
 
-    # 1. make mol describing file for maa
+    # 1. make mol describing file for ncaa
     if not mol_desc_path:
-        mol_desc_path = MOL_DESC_GEN_MAPPER[engine](ncaa)
+        mol_desc_path = f"{ncaa_lib}/{ncaa.name}_any.prepin"  # swicth to mol2 after finish all unit tests of mol2_io
+        MOL_DESC_GEN_MAPPER[engine](ncaa=ncaa, out_path=mol_desc_path)
     # 2. parse mol describing and clone into connectivity
     cnt_stru = MOL_DESC_PARSER_MAPPER[fs.get_file_ext(mol_desc_path)](mol_desc_path)
-    cnt_maa = cnt_stru.residues[0]
-    ncaa.clone_connectivity(cnt_maa)
+    cnt_ncaa = cnt_stru.residues[0]
+    ncaa.clone_connectivity(cnt_ncaa)
 
 def _connect_solvent(sol: Solvent, method: str) -> None:
     """initate connectivity for solvent."""
@@ -265,7 +280,7 @@ def _connect_solvent(sol: Solvent, method: str) -> None:
         _LOGGER.error(f"Method {method} not in supported list: {support_method_list}")
         raise ValueError
 
-def _connect_metal(met: MetalUnit, method: str) -> None:
+def _connect_metal(met: MetalUnit, method: str, ncaa_lib: str) -> None:
     """initiate connectivity for metal"""
     support_method_list = ["isolate"]
     if method == "isolate":

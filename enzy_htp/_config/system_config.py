@@ -38,6 +38,12 @@ class SystemConfig(BaseConfig):
     MEM_PER_CORE: int = 2000
     """Memory in megabytes that each enzy_htp process has."""
 
+    MPI_EXECUTABLE: str = "mpirun"
+    """the name of the mpi executable."""
+
+    MPI_MULTIPROCESSOR_FLAG: str = "-np"
+    """the multiprocessor flag of the mpi executable."""
+
     WORK_DIR: str = os.getcwd()
     """Directory work is being done in by enzy_htp."""
 
@@ -65,7 +71,10 @@ class SystemConfig(BaseConfig):
     def required_py_modules(self) -> List[str]:
         """A list of all required environment python modules for SystemConfig."""
         return list()
-
+    
+    def get_mpi_executable(self, num_cores: int) -> str:
+        """return the str of mpi executable combined with the core specification."""
+        return f"{self.MPI_EXECUTABLE} {self.MPI_MULTIPROCESSOR_FLAG} {num_cores}"
 
 def default_system_config() -> SystemConfig:
     """Creates a deep-copied default version of the SystemConfig() class."""

@@ -524,3 +524,7 @@ class GaussianInterface(BaseInterface):
     # endregion
 
 gaussian_interface = GaussianInterface(None, eh_config._gaussian)
+"""The singleton of GaussianInterface() that handles all Gaussian related operations in EnzyHTP
+Instantiated here so that other _interface subpackages can use it.
+An example of this concept this AmberInterface used Gaussian for calculating the RESP charge
+so it imports gaussian_interface from here."""

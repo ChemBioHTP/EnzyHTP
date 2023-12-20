@@ -501,7 +501,7 @@ class PrepinParser(StructureParserInterface):
                 bond_atom = atoms[real_cnt_index]
                 this_atom.connect_to(bond_atom) # connect_to make sure it is not repeating
 
-        for name_1, name_2 in prepin_data["LOOP"]:
+        for name_1, name_2 in prepin_data.get("LOOP", []):
             atom_1 = atom_mapper[name_1]
             atom_2 = atom_mapper[name_2]
             atom_1.connect_to(atom_2)

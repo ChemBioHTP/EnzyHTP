@@ -173,7 +173,8 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID""",
         try:
             submit_cmd = ENV_MANAGER.run_command(exe=cls.SUBMIT_CMD,
                                                  args=[script_path],
-                                                 try_time=1440, wait_time=60, timeout=120) # 12 hrs
+                                                 try_time=1440, wait_time=60, timeout=120,
+                                                 log_level="debug") # 12 hrs
         finally:
             # TODO(shaoqz) timeout condition is hard to test
             os.chdir(cwd) # avoid messing up the dir
@@ -241,25 +242,27 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID""",
         cmd = f"{cls.INFO_CMD[0]} -u $USER -O JobID,{field}" # donot use the -j method to be more stable
         info_run = ENV_MANAGER.run_command(exe=cmd.split()[0],
                                            args=cmd.split()[1:],
-                                           try_time=2880, wait_time=120, timeout=120)
+                                           try_time=2880, wait_time=120, timeout=120,
+                                           log_level="debug")
         # if exist
         info_out_lines = info_run.stdout.strip().splitlines()
         for info_line in info_out_lines: 
             info_line_parts = info_line.strip().split()
             if len(info_line_parts) < 2:
-                _LOGGER.info(f"field: {field} is not supported in squeue. Switch to sacct.")
+                _LOGGER.debug(f"field: {field} is not supported in squeue. Switch to sacct.")
                 break
             if job_id in info_line:
                 job_field_info = info_line_parts[1].strip().strip("+")
                 return job_field_info
         # use sacct if squeue do not have info
         # wait a update gap
-        _LOGGER.info("No info from squeue. Switch to sacct")
+        _LOGGER.debug("No info from squeue. Switch to sacct")
         time.sleep(wait_time)
         cmd = f"{cls.INFO_CMD[1]} -j {job_id} -o {field}"
         info_run = ENV_MANAGER.run_command(exe=cmd.split()[0],
                                            args=cmd.split()[1:],
-                                           try_time=2880, wait_time=120, timeout=120)          
+                                           try_time=2880, wait_time=120, timeout=120,
+                                           log_level="debug")          
         # if exist
         info_out = info_run.stdout.strip().splitlines()
         if len(info_out) >= 3:
