@@ -23,7 +23,7 @@ from copy import deepcopy
 import os
 
 from .clusters import ClusterInterface
-from .general import get_localtime, len_2d
+from .general import get_localtime, num_ele_2d
 from enzy_htp.core.logger import _LOGGER, get_eh_logging_level
 from enzy_htp import config as eh_config
 # TODO fix more Config
@@ -509,11 +509,11 @@ class ClusterJob():
         if array_size == 0:
             array_size = len(jobs) # num of 1d job list
         # set up array job
-        total_job_num = len_2d(jobs)
+        total_job_num = num_ele_2d(jobs)
         total_1d_joblist_num = len(jobs)
         current_active_job = [[] for i in range(total_1d_joblist_num)]
         finished_job = [[] for i in range(total_1d_joblist_num)]
-        while len_2d(finished_job) < total_job_num:
+        while num_ele_2d(finished_job) < total_job_num:
             # before every job finishes, keep running
             # 0. determine how many 1d list are still not finished
             unfinished_1d_joblist_num = 0
@@ -521,7 +521,7 @@ class ClusterJob():
                 if len(job_1d) > len(finished_1d):
                     unfinished_1d_joblist_num += 1
             # 1. make up the running chunk to the array size                    
-            while len_2d(current_active_job) < min(array_size, unfinished_1d_joblist_num):
+            while num_ele_2d(current_active_job) < min(array_size, unfinished_1d_joblist_num):
                 # 1.1 find the 1st idle 1d job list
                 for active_list_1d, finish_list_1d, job_list_1d in zip(current_active_job, finished_job, jobs):
                     if len(active_list_1d) == 0 and (len(finish_list_1d) < len(job_list_1d)):

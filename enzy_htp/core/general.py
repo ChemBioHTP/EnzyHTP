@@ -145,7 +145,7 @@ def list_remove_adjacent_duplicates(target_list: list) -> list:
     return result
 
 
-def len_2d(list_2d: List[list]) -> int:
+def num_ele_2d(list_2d: List[list]) -> int:
     """counter the number of elements in a 2d list"""
     return sum(map(lambda x: len(x), list_2d))
 
