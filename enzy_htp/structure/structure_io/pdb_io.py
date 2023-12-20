@@ -597,6 +597,21 @@ class PDBParser(StructureParserInterface):
             for i, residue in enumerate(residues):
                 # if metal
                 if residue.name in chem.METAL_MAPPER:
+                    if residue.name == "U":
+                        _LOGGER.warning(f"found a residue named U ({chain_id} {residue.idx})."
+                                        " This could lead to a bug that it may be a metal or"
+                                        " a nucleotide.")
+                        if residue.num_atoms > 1:
+                            # make it a ligand for now. TODO: add support for NA
+                            _LOGGER.warning(f"found more than 1 atom in U ({chain_id} {residue.idx})."
+                                            " treating it as nucleotide. make sure this is what you want!")
+                            _LOGGER.debug(f"found ligand {chain_id} {residue.idx}")
+                            residue_mapper[chain_id][i] = residue_to_ligand(residue)
+                            continue
+                        else:
+                            _LOGGER.warning(f"found only 1 atom in U ({chain_id} {residue.idx})."
+                                            " treating it as metal. make sure this is what you want!")
+
                     _LOGGER.debug(f"found metal {chain_id} {residue.idx}")
                     residue_mapper[chain_id][i] = residue_to_metal(residue)
                     continue
