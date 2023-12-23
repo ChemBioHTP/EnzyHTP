@@ -128,15 +128,11 @@ class Atom(DoubleLinkedNode):
                 return self.parent.element
             else:
                 # case: in ligand atoms are named like this H1
+                temp_name:str = ""
                 for ch in self.name:
                     if not ch.isnumeric():
-                        return ch
-                #result = re.match("^[A-Z][a-z]?", self.name).group()
-                #if result is not None:
-                #    return result
-                #else:
-                #    result = re.match("?[A-Z][a-z]$", self.name).group()
-                #    return result
+                        temp_name += ch
+                return temp_name                    
 
         elif self.parent.is_metal():  # in pdb some metal's element name is wrong
             return self.parent.element
