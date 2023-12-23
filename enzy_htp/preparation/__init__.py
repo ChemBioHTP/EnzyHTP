@@ -11,6 +11,6 @@ from .pdb_line import PDBLine, read_pdb_lines
 from .conformer_generation import generate_conformers
 from .protonate import protonate_stru
 from .clean import remove_solvent
-from .reactive_docking import dock_reactants, _system_charge, _qm_minimization 
+from .reactive_docking import dock_reactants
 from .align_ligand import align_ligand
 from .place_ligand import place_ligand
