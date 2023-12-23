@@ -14,7 +14,6 @@ Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-10-28
 """
-from __future__ import annotations
 import copy
 from copy import deepcopy
 from typing import List, Tuple, Dict, Any
