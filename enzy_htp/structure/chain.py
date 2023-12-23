@@ -1,6 +1,7 @@
 """Definition for the Chain class. Chains primarily store Residue() objects and organize them
 within the overall structure of an enzyme.
-Author: Qianzhen (QZ) Shao <shaoqz@icloud.com> Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com> 
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-20
 """
 from __future__ import annotations
