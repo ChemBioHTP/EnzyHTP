@@ -111,7 +111,7 @@ class Ligand(NonCanonicalBase):
         return self.n_conformers()
 
     def get_ligand_conformer(self, idx:int) -> Ligand:
-        """TODO(CJ)"""
+        """TODO(CJ): This will become a part of StructureEnseble someday. """
         if idx == 0:
             return self
 
