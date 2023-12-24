@@ -58,11 +58,11 @@ class StructureConstraint(ABC):
     #TODO(CJ): add function that checks if topology and constraints are compatible
     #TODO(CJ): will need to make a version of this that actually works for the ResiduePairConstraint
 
-    def clone(self) -> StructureConstraint:
+    def clone(self) -> "StructureConstraint":
         """Clones the StructureConstraint with the original target_value."""
         return self.__init__(atoms, self.target_value, deepcopy(self.params_))
 
-    def clone_current(self) -> StructureConstraint:
+    def clone_current(self) -> "StructureConstraint":
         """Get a version of the StructureConstraint with the current value as the 
         target value."""
         return self.__init__(atoms, self.current_value, deepcopy(self.params_))
@@ -338,7 +338,7 @@ class ResiduePairConstraint(StructureConstraint):
         self.atoms_ = list(atoms)
         self.correct_num_atoms()
 
-    def clone(self) -> ResiduePairConstraint:
+    def clone(self) -> "ResiduePairConstraint":
         """TODO(CJ)"""
         return ResiduePairConstraint.__init__(
                 self.residue1_, 
@@ -355,7 +355,7 @@ class ResiduePairConstraint(StructureConstraint):
         
 
 
-    def change_topology(self, new_topology:Stru) -> None:
+    def change_topology(self, new_topology: Structure) -> None:
         """Same as StructureConstraint.change_topology() but with extra steps because of the composite 
         nature of the class. First, the residue and residue atoms are mapped over. Next, the child constraints
         are mapped over. Last, the atoms are mapped over."""
@@ -415,7 +415,7 @@ class ResiduePairConstraint(StructureConstraint):
 
         return energy
 
-    def clone_current(self) -> ResiduePairConstraint:
+    def clone_current(self) -> "ResiduePairConstraint":
         """TODO(CJ)"""
         assert False
 
