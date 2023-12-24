@@ -73,7 +73,7 @@ Operation:
         4	
 
     Interfacing with Residue()"s:
-        >>> res_cpy : enzy_htp.Residue = structure.get_residue( "B.ASP.1" ) # @shaoqz: @imp we should not use residue name and id together as the identifier. Either id only to pinpoint or name only to batch select
+        >>> res_cpy : enzy_htp.Residue = structure.get( "B.ASP.1" ) # @shaoqz: @imp we should not use residue name and id together as the identifier. Either id only to pinpoint or name only to batch select
 
     Saving the structure:
 
@@ -414,6 +414,41 @@ class Structure(DoubleLinkedNode):
                         result.append(res.mainchain_atoms)
         return result
 
+    def get(self, key: str) -> Union[Chain, Residue, Atom]:
+        """Returns the Residue/Atom/Chain specified by a key with the format <chain_name>.<residue_index>.<atom_name>. (E.g. A.1.CA or A or A.1)
+        Function does not check for identify of the Residue. Errors and exits if the format is incorrect or the specified Residue 
+        does not exist.
+
+        Args:
+            key: specification of the residue to select as a str().
+
+        Returns:
+            The specified Residue/Atom/Chain."""
+        key = key.strip()
+        section_count = key.count('.')
+        if section_count > 3:
+            _LOGGER.error(f"Invalid key format in {key}. Expect <chain_name>.<residue_index>.<atom_name>. Exiting...")
+            raise ValueError
+        # Chain
+        if section_count == 0:
+            result = self.get_chain(key)
+        
+        # Residue
+        if section_count == 1:
+            chain, res_idx = key.split('.')
+            result = self.find_residue_with_key((chain, res_idx))
+        
+        # Atom
+        if section_count == 2:
+            chain, res_idx, atom_name = key.split('.')
+            res = self.find_residue_with_key((chain, res_idx))
+            result = res.find_atom_name(atom_name)
+        
+        if not result:
+            _LOGGER.error(f"Unable to locate residue {key} in Structure. Exiting...")
+            exit( 1 )
+
+        return result
     # endregion
 
     #region === Checker ===
@@ -499,6 +534,18 @@ class Structure(DoubleLinkedNode):
     def has_chain(self, chain_name: str) -> bool:
         """Checks if the Structure() has a chain with the specified chain_name."""
         return chain_name in self.chain_mapper
+
+    def has_residue(self, key: str) -> bool:
+        """Checks if the Structure() has a chain with the specified key.
+        key format: chain_name.residue_idx"""
+        chain, rnum = key.split('.')
+        rnum = int(rnum) 
+
+        for res in self.residues:
+            if res.parent.name == chain and res.idx == rnum:
+                return True
+
+        return False
     #endregion
 
     #region === Editor ===
@@ -649,69 +696,6 @@ class Structure(DoubleLinkedNode):
                 ncaa.multiplicity = spin
 
     #endregion
-
-    def get_residue(self, key:str) -> Residue:
-        """Returns the residue specified by a key with the format <chain_name>.<residue_index>. Function does not check
-        for identify of the Residue. Errors and exits if the format is incorrect or the specified Residue does not exist.
-
-        Args:
-            key: specification of the residue to select as a str().
-
-        Returns:
-            The specified Residue.
-        """
-        if key.count('.') != 1:
-            _LOGGER.error(f"Invalid key format in {key}. Expect <chain_name>.<residue_index>. Exiting...")
-            exit( 1 )
-        
-        chain, rnum = key.split('.')
-        rnum = int(rnum) 
-
-        for res in self.residues:
-            if res.parent.name == chain and res.idx == rnum:
-                return res
-        else:
-            _LOGGER.error(f"Unable to locate residue {key} in Structure. Exiting...")
-            exit( 1 )
-
-    def has_residue(self, key:str) -> bool:
-        #TODO(CJ): the documentation 
-        chain, rnum = key.split('.')
-        rnum = int(rnum) 
-
-        for res in self.residues:
-            if res.parent.name == chain and res.idx == rnum:
-                return True
-
-        return False
-
-    def get_atom(self, key:str) -> Atom:
-        """Retrieves the Atom() object corresponding to the supplied atom key. The key
-        is a str with the format <chain_name>.<residue_num>.<atom_name>. (E.g. A.1.CA). 
-        Function will exit if the Atom cannot be specified. 
-
-        Args:
-            key: str specifying an Atom() with format <chain_name>.<residue_num>.<atom_name>
-
-        Returns:
-            The Atom() corresponding to the key.
-        """        
-        if key.count('.') != 2:
-            _LOGGER.error(f"The supplied key {key} is invalid. Must have format <chain_name>.<residue_num>.<atom_name>! Exiting...")
-            exit( 1 )
-
-        raw_res, aname = key.rsplit('.', maxsplit=1)
-        residue  = self.get_residue( raw_res )
-        
-        for atom in residue.atoms:
-            if atom.name == aname:
-                return atom
-        else:
-            _LOGGER.error(f"Unable to find atom {key}! Exiting...")
-            exit( 1 )
-            
-
-
 
     #region === Special ===
     def __str__(self):

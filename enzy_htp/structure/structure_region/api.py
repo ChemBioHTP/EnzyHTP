@@ -92,7 +92,7 @@ def create_structure_region(stru:Structure,
 
     for rl in residue_list:
 
-        res:Residue=stru.get_residue(f"{rl[0]}.{rl[1]}")
+        res:Residue=stru.get(f"{rl[0]}.{rl[1]}")
 
         residue_atoms:List[Atom] = list()
 

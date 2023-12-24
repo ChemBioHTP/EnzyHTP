@@ -66,8 +66,8 @@ def cap_residue(res:Residue, stru:Structure, strategy:str, side:str) -> List[Ato
         atom_key1 = f"{chain1}.{num1}.C"
         atom_key2 = f"{chain1}.{num1+1}.N"
 
-    start_atom:Atom = stru.get_atom(atom_key1)
-    end_atom:Atom = stru.get_atom(atom_key2)
+    start_atom:Atom = stru.get(atom_key1)
+    end_atom:Atom = stru.get(atom_key2)
 
     p1 = np.array(start_atom.coord)
     p2 = np.array(end_atom.coord)

@@ -112,7 +112,7 @@ class StructureConstraint(ABC):
 
     def change_topology(self, new_topology:Structure) -> None:
         """Switch the associated topology and atoms for a given Constraint. Maps the atom keys
-        as described in Atom.key() and Structure.get_atom().
+        as described in Atom.key() and Structure.get().
 
         Args:
             new_topology: new structure to translate atoms to.
@@ -123,7 +123,7 @@ class StructureConstraint(ABC):
         new_atoms:List[Atom] = list()
         for atom in self.atoms:
             target_key:str=atom.key
-            new_atoms.append( new_topology.get_atom(target_key))
+            new_atoms.append( new_topology.get(target_key))
     
         self.atoms = new_atoms
 
@@ -328,10 +328,10 @@ class ResiduePairConstraint(StructureConstraint):
         nature of the class. First, the residue and residue atoms are mapped over. Next, the child constraints
         are mapped over. Last, the atoms are mapped over."""
         
-        self.residue1_ = new_topology.get_residue(self.residue1_.key_str)
-        self.residue2_ = new_topology.get_residue(self.residue2_.key_str)
-        self.residue1_atoms_ = [new_topology.get_atom(aa.key) for aa in self.residue1_atoms_]
-        self.residue2_atoms_ = [new_topology.get_atom(aa.key) for aa in self.residue2_atoms_]
+        self.residue1_ = new_topology.get(self.residue1_.key_str)
+        self.residue2_ = new_topology.get(self.residue2_.key_str)
+        self.residue1_atoms_ = [new_topology.get(aa.key) for aa in self.residue1_atoms_]
+        self.residue2_atoms_ = [new_topology.get(aa.key) for aa in self.residue2_atoms_]
 
         for (cst_name, cst) in self.child_constraints:
             if cst is not None:
@@ -457,20 +457,20 @@ def create_residue_pair_constraint(
     r1_key_str = ".".join(map(str,r1_key))
     r2_key_str = ".".join(map(str,r2_key))
 
-    residue1:Residue = topology.get_residue(r1_key_str)
-    residue2:Residue = topology.get_residue(r2_key_str)
+    residue1:Residue = topology.get(r1_key_str)
+    residue2:Residue = topology.get(r2_key_str)
 
     temp = list()
     for r1 in r1_atoms:
         r1_key = r1_key_str + '.' + r1        
-        temp.append(topology.get_atom(r1_key) )
+        temp.append(topology.get(r1_key) )
 
     r1_atoms = temp
 
     temp = list()
     for r2 in r2_atoms:
         r2_key = r2_key_str + '.' + r2        
-        temp.append(topology.get_atom(r2_key) )
+        temp.append(topology.get(r2_key) )
 
     r2_atoms = temp
 

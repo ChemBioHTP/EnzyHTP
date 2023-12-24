@@ -109,7 +109,7 @@ def _place_mole2(stru:Structure,
     #TODO(CJ): rotate the ligand in the cavity
     #TODO(CJ): check how many atoms fit in the molecule
 
-    ligand:Ligand = stru.get_residue(f"{ligand_chain}.{ligand_idx}")
+    ligand:Ligand = stru.get(f"{ligand_chain}.{ligand_idx}")
     ligand.placement_method = "mole2"
     if not work_dir:
         work_dir = config['system.SCRATCH_DIR']
@@ -216,7 +216,7 @@ def _place_alphafill(stru: Structure,
     Returns:
         An aligned, deepcopied Ligand().
     """
-    ligand:Ligand = stru.get_residue(f"{ligand_chain}.{ligand_idx}")
+    ligand:Ligand = stru.get(f"{ligand_chain}.{ligand_idx}")
     ligand.placement_method = "alphafill"
     _LOGGER.info(f"Beginnning placement of ligand {ligand} into the structure...")
     _LOGGER.info(f"Calling out to AlphaFill to fill structure...")
