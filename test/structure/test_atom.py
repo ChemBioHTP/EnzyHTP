@@ -90,6 +90,13 @@ def test_element_non_canonical_ch3():
     assert test_atom.element == "C"
 
 
+def test_element_non_canonical_1h():
+    """test get atom element for CH3 from FAH"""
+    test_atom = Atom(
+        {'x_coord': 0, 'y_coord': 1, 'z_coord': 0, 'atom_name': '1H'})
+    assert test_atom.element == "H"
+
+
 def test_element_metal():
     """test get atom element for Zn from 1NVG"""
     stru = PDBParser().get_structure(f"{DATA_DIR}1NVG.pdb")

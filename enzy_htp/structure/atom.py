@@ -127,12 +127,13 @@ class Atom(DoubleLinkedNode):
             elif self.parent is not None and self.parent.is_metal():
                 return self.parent.element
             else:
-                # case: in ligand atoms are named like this H1
-                temp_name:str = ""
-                for ch in self.name:
-                    if not ch.isnumeric():
-                        temp_name += ch
-                return temp_name                    
+                # case: in ligand atoms are named like this H1/1H
+                # case: CH3 from FAH
+                # case: CL1 from DCE TODO (add a mapper for all 2-letter elements, 
+                # and give warning if it can be proven that current info is not enough
+                # to deduce the ele. e.g.: is CO1 C or Co)
+                clean_name = self.name.lstrip('0123456789').rstrip('0123456789')
+                return re.match("^[A-Z][a-z]?", clean_name).group()           
 
         elif self.parent.is_metal():  # in pdb some metal's element name is wrong
             return self.parent.element
