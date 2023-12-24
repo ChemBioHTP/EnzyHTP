@@ -228,6 +228,23 @@ class Atom(DoubleLinkedNode):
                 raise TypeError("Adding wrong data type to connect. Correct data type: (Atom(), 'bond_order_info')")
         else:
             return check_pass
+
+    @property
+    def key(self) -> str: # TODO change the name to key_str
+        """Gets the Atom()'s key which can be used in conjuection with the Structure.get_atom method.
+        Format is <chain_name>.<residue_index>.<atom_name>. If the atom does not have a parent residue or
+        chain, an empty value is given (e.g. "..CA")
+        """
+        
+        tokens:List[str] = ["", "", self.name]
+
+        if self.parent is not None:
+            tokens[1] = str(self.parent.idx)
+            
+            if self.parent.parent is not None:
+                tokens[0] = self.parent.parent.name
+    
+        return '.'.join(tokens)
     #endregion
 
     #region === Getter-Property (ref) ===
@@ -281,27 +298,6 @@ class Atom(DoubleLinkedNode):
     def is_connected(self) -> bool:
         """check if self is in the connected state"""
         return self._connect is not None
-
-    @property
-    def key(self) -> str:
-        """Gets the Atom()'s key which can be used in conjuection with the Structure.get_atom method.
-        Format is <chain_name>.<residue_index>.<atom_name>. If the atom does not have a parent residue or
-        chain, an empty value is given (e.g. "..CA")
-        """
-        
-        tokens:List[str] = ["", "", self.name]
-
-        if self.parent is not None:
-            tokens[1] = str(self.parent.idx)
-            
-            if self.parent.parent is not None:
-                tokens[0] = self.parent.parent.name
-    
-        return '.'.join(tokens)
-         
-
-
-
     #endregion
 
     #region == Special ==

@@ -189,6 +189,29 @@ class Residue(DoubleLinkedNode):
     # def clone(self) -> Residue: #TODO
     #     """Creates a deepcopy of self."""
     #     return deepcopy(self)
+
+    def clash_count(self, other:Residue, radius:float=2.0, ignore_H:bool=True) -> int:
+        #TODO(CJ): the documentation for this part
+        if self == other:
+            _LOGGER.warning("Attempted to count clashes between Residue and itself.")
+            return 0
+
+        count:int = 0
+        for aa in other.atoms:
+            if ignore_H and aa.element == 'H':
+                continue
+            else:
+                count += self.clashes(aa, radius)
+
+        return count
+            
+    def clashes(self, other:Atom, radius:float) -> bool:
+        #TODO(CJ): the documentation for this part
+        for aa in self.atoms:
+            if aa.distance_to(other) <= radius:
+                return True
+        return False
+
     #endregion
 
     #region === Checker ===
@@ -306,27 +329,6 @@ class Residue(DoubleLinkedNode):
             aa.coord = updated
 
     #endregion
-    #TODO(CJ): the documentation for this part
-    def clash_count(self, other:Residue, radius:float=2.0, ignore_H:bool=True) -> int:
-        if self == other:
-            _LOGGER.warning("Attempted to count clashes between Residue and itself.")
-            return 0
-
-        count:int = 0
-        for aa in other.atoms:
-            if ignore_H and aa.element == 'H':
-                continue
-            else:
-                count += self.clashes(aa, radius)
-
-        return count
-            
-
-    def clashes(self, other:Atom, radius:float) -> bool:
-        for aa in self.atoms:
-            if aa.distance_to(other) <= radius:
-                return True
-        return False
 
     #region === Special ===
     def __str__(self) -> str:
