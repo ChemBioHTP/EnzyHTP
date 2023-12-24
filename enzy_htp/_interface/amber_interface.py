@@ -1255,7 +1255,7 @@ class AmberInterface(BaseInterface):
                 } | temp_cntrl | {
                 'ntpr': ntpr, 'ntwx': ntwx,
                 } | ntt_cntrl | ntb_cntrl | ntp_cntrl | {
-                'iwarp': self.config()["HARDCODE_IWARP"],
+                'iwrap': self.config()["HARDCODE_IWRAP"],
                 # 'nmropt': 1, TODO finish this after PR
                 'ig': self.config()["HARDCODE_IG"],
                 # 'ntr': 1, 'restraint_wt': 2.0, 'restraintmask': "'@C,CA,N'",

@@ -157,8 +157,8 @@ class AmberConfig(BaseConfig):
     HARDCODE_GAMMA_LN = 5.0
     """hard coded `gamma_ln` value used when ntt=3"""
 
-    HARDCODE_IWARP = 1
-    """hard coded `iwarp` value"""
+    HARDCODE_IWRAP = 1
+    """hard coded `iwrap` value"""
 
     HARDCODE_IG = -1
     """hard coded `ig` value"""

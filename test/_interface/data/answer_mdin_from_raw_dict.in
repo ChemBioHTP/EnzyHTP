@@ -16,7 +16,7 @@ Heat
   gamma_ln = 5.0,
   ntb = 1,
   ntp = 0,
-  iwarp = 1,
+  iwrap = 1,
   nmropt = 1,
   ig = -1,
   ntr = 1,
