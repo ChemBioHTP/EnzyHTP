@@ -273,13 +273,23 @@ class Atom(DoubleLinkedNode):
     
     @dispatch
     def angle_with(self, point_1: Atom, point_2: Atom) -> float:
-        """Get the distance to the other atom or a point."""
+        """Get the angle to the other 2 atoms or 2 points."""
         return mh.get_angle(self.coord, point_1.coord, point_2.coord)
 
     @dispatch
     def angle_with(self, point_1: Tuple, point_2: Tuple) -> float: # pylint: disable=function-redefined
-        """Get the distance to the other atom or a point."""
+        """Get the angle to the other 2 atoms or 2 points."""
         return mh.get_angle(self.coord, point_1, point_2)
+
+    @dispatch
+    def dihedral_with(self, point_1: Atom, point_2: Atom, point_3: Atom) -> float:
+        """Get the dihedral to the other 3 atoms or 3 points."""
+        return mh.get_dihedral(self.coord, point_1.coord, point_2.coord, point_3.coord)
+
+    @dispatch
+    def dihedral_with(self, point_1: Tuple, point_2: Tuple, point_3: Tuple) -> float: # pylint: disable=function-redefined
+        """Get the dihedral to the other 3 atoms or 3 points."""
+        return mh.get_dihedral(self.coord, point_1, point_2, point_3)
 
     def attached_protons(self) -> List[Atom]:
         """find all protons attached to self"""
