@@ -14,6 +14,7 @@ from typing import Union
 from enzy_htp.core.exception import tLEaPError, AmberMDError
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.general import EnablePropagate
+from enzy_htp.core.job_manager import ClusterJob
 from enzy_htp.core import file_system as fs
 from enzy_htp._interface.amber_interface import (
     AmberParameterizer,
@@ -747,33 +748,45 @@ def test_amber_md_step_translate():
     assert result.last_frame_file == "rst_path"
 
 
+@pytest.mark.accre
+@pytest.mark.long
 def test_amber_md_step_run(): # TODO finish this
-    """test AmberMDStep().run()"""
+    """test AmberMDStep().run().
+    rely on check_md_error inside of run() for testing."""
     ai = interface.amber
-    md_step = ai.build_md_step(length=0.1) # 300K, NPT by default
+    md_step = ai.build_md_step(length=0.01) # 300K, NPT by default
     test_inpcrd = f"{MM_DATA_DIR}/KE_07_R7_S.inpcrd"
     test_prmtop = f"{MM_DATA_DIR}/KE_07_R7_S.prmtop"
     test_params = AmberParameter(test_inpcrd, test_prmtop)
     test_md_result = md_step.run(test_params)
-    
-    assert False
+    print(test_md_result)
 
 
-def test_amber_md_step_check_md_error(): # TODO finish this when accre is back
+def test_amber_md_step_check_md_error(caplog):
     """test this function using extract real example files from Amber runs"""
-    test_traj = ""
-    test_mdout = ""
-    test_clusterjob = ""
+    test_traj = f"{MM_DATA_DIR}md_errors/equi_error_1.nc"
+    test_mdout = f"{MM_DATA_DIR}md_errors/equi_error_1.out"
+    test_prmtop = f"{MM_DATA_DIR}md_errors/equi_error_1.prmtop"
+    test_clusterjob = ClusterJob(
+        cluster=None,
+        sub_script_str=None,
+    )
+    test_clusterjob.job_cluster_log = f"{MM_DATA_DIR}md_errors/equi_error_1.stdstream"
 
     ai = interface.amber
     md_step = ai.build_md_step(length=0.1) # 300K, NPT by default
 
-    with pytest.raises(AmberMDError) as e:
-        md_step.check_md_error(
-            traj=test_traj,
-            traj_log=test_mdout,
-            stdstream_source=test_clusterjob,
-        )
+    with EnablePropagate(_LOGGER):
+        with pytest.raises(AmberMDError) as e:
+            md_step.check_md_error(
+                traj=test_traj,
+                traj_log=test_mdout,
+                prmtop=test_prmtop,
+                stdstream_source=test_clusterjob,
+            )
+        assert "Amber MD didn't finish normally." in caplog.text
+        assert "ERROR: Calculation halted.  Periodic box dimensions have changed too much from their initial values." in caplog.text
+
 
 # region TODO
 

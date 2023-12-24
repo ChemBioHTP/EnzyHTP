@@ -73,6 +73,16 @@ class MolDynResult:
     @property
     def source(self) -> str:
         return self._source
+    
+    def __str__(self) -> str:
+        """the string represntation of self"""
+        return (f"MolDynResult(traj_file = {self._traj_file}, "
+                f"traj_parser = {self._traj_parser}, "
+                f"traj_log_file = {self._traj_log_file}, "
+                f"traj_log_parser = {self._traj_log_parser}, "
+                f"last_frame_file = {self._last_frame_file}, "
+                f"last_frame_parser = {self._last_frame_parser}, "
+                f"source = {self._source})")
 
 
 class MolDynResultEgg(ABC):

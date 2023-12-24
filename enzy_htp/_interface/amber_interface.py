@@ -787,13 +787,13 @@ class AmberMDStep(MolDynStep):
             if isinstance(stdstream_source, ClusterJob):
                 with open(stdstream_source.job_cluster_log) as f:
                     stderr_stdout = f.read()
-                    error_info_list.append(f"stdout/stderr(from job log): {stderr_stdout}")
+                    error_info_list.append(f"stdout/stderr(from job log):{os.linesep*2}{stderr_stdout}")
             elif isinstance(stdstream_source, CompletedProcess):
-                error_info_list.append(f"stdout: {stdstream_source.stdout}")
-                error_info_list.append(f"stderr: {stdstream_source.stderr}")
+                error_info_list.append(f"stdout:{os.linesep*2}{stdstream_source.stdout}")
+                error_info_list.append(f"stderr:{os.linesep*2}{stdstream_source.stderr}")
             elif isinstance(stdstream_source, SubprocessError):
-                error_info_list.append(f"stdout: {stdstream_source.stdout}")
-                error_info_list.append(f"stderr: {stdstream_source.stderr}")
+                error_info_list.append(f"stdout:{os.linesep*2}{stdstream_source.stdout}")
+                error_info_list.append(f"stderr:{os.linesep*2}{stdstream_source.stderr}")
             else:
                 _LOGGER.error("Only allow ClusterJob, CompletedProcess, SubprocessError as input types for `stdstream_source`")
                 raise TypeError
@@ -801,8 +801,9 @@ class AmberMDStep(MolDynStep):
             # have no experience that error pops here yet. Add when observed
             # 3. traj analysis
             # TODO
+            # TODO give suggestion for each detected types of errors.
 
-            _LOGGER.error(f"Amber MD didn't finish normally. {os.linesep.join(error_info_list)}")
+            _LOGGER.error(f"Amber MD didn't finish normally.{os.linesep}{os.linesep.join(error_info_list)}")
             raise AmberMDError(error_info_list)
     
     @classmethod
