@@ -283,8 +283,7 @@ class Structure(DoubleLinkedNode):
 
     @property
     def modified_residue(self) -> List[Residue]:
-        """Filters out the modified residue Residue()"s from the chains in the Structure().
-        TODO may need a class for them"""
+        """Filters out the modified residue Residue()"s from the chains in the Structure()."""
         result: List[Residue] = list()
         for chain in self.chains:
             result.extend(list(filter(lambda r: r.is_modified(), chain)))
@@ -313,6 +312,15 @@ class Structure(DoubleLinkedNode):
         result: List[Residue] = []
         for chain in self.chains:
             result.extend(list(filter(lambda r: r.is_metal_center(), chain.residues)))
+        return result
+
+    @property
+    def noncanonicals(self) -> List[Residue]:
+        """Filters out Residue()s that are ligand, modified residue, or metal in 
+        the Structure()."""
+        result: List[Residue] = list()
+        for chain in self.chains:
+            result.extend(list(filter(lambda r: r.is_noncanonical(), chain)))
         return result
 
     @property
@@ -350,7 +358,12 @@ class Structure(DoubleLinkedNode):
             "ligand" : element_composition,
             "modified_residue" : element_composition,
             "metalcenters" : element_composition,
-            }"""
+            "solvents" : element_composition,
+            "nucleic_acid" : "",
+            }
+            
+        Note:
+            In current version, nucleic acid (NA) as counts as ligand. will change when support NA fully."""
         result = {}
         # polypeptide
         if self.contain_polypeptide():
@@ -373,6 +386,15 @@ class Structure(DoubleLinkedNode):
             for mc in self.metalcenters:
                 eles = eles.union(mc.element_composition)
             result.update({"metalcenters" : eles})
+        # solvent
+        if self.contain_solvent():
+            eles = set()
+            for sol in self.solvents:
+                eles = eles.union(sol.element_composition)
+            result.update({"solvents" : eles})
+        # nucleic acid
+        if self.contain_nucleic_acid():
+            result.update({"nucleic_acid" : ""})
 
         return result
 
@@ -460,6 +482,19 @@ class Structure(DoubleLinkedNode):
     def contain_metalcenters(self) -> bool:
         """check if there is a metal coordination ceneter in the structure"""
         return len(self.metalcenters) != 0
+
+    def contain_solvent(self) -> bool:
+        """check if there is a solvent in the structure"""
+        return len(self.solvents) != 0
+
+    def contain_nucleic_acid(self) -> bool:
+        """check if there is a nucleic_acid in the structure.
+        TODO change this after developed support for NA."""
+        nucleic_acid_names = ["A", "G", "C", "U", "DA", "DG", "DC", "DT"] # TODO move to chemcial
+        for lig in self.ligands:
+            if lig.name in nucleic_acid_names:
+                return True
+        return False
 
     def has_chain(self, chain_name: str) -> bool:
         """Checks if the Structure() has a chain with the specified chain_name."""
@@ -595,11 +630,17 @@ class Structure(DoubleLinkedNode):
     def assign_ncaa_chargespin(self, net_charge_mapper: Dict[str, Tuple[int, int]]):
         """assign net charges to NCAAs in Structure() based on net_charge_mapper
         format: {"RES" : (charge, spin), ...}
-            RES is the 3-letter name of NCAAs
+            RES is the 3-letter name of NCAAs (or "LIGAND", "MODAA" for all of that kind)
             charge is the net charge
             spin the 2S+1 number for multiplicity"""
         for resname, (charge, spin) in net_charge_mapper.items():
-            for ncaa in self.find_residue_name(resname):
+            if resname == "LIGAND":
+                target_ncaa = self.ligands
+            elif resname == "MODAA":
+                target_ncaa = self.modified_residue
+            else:
+                target_ncaa = self.find_residue_name(resname)
+            for ncaa in target_ncaa:
                 if not ncaa.is_noncanonical():
                     _LOGGER.error(f"the assigning residue name {resname} is not a NCAA")
                     raise ValueError

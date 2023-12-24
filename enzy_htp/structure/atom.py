@@ -305,6 +305,12 @@ class Atom(DoubleLinkedNode):
                             "Please initiate it use structure.structure_operation.init_connectivity()")
             raise AttributeError
         return [atom for atom, bond in self._connect]
+    
+    @property
+    def connect_atom_names(self) -> List[str]:
+        """get all atom names of connection."""
+        return [atom.name for atom in self.connect_atoms]
+
     #endregion
 
     #region === Check ===
@@ -321,6 +327,8 @@ class Atom(DoubleLinkedNode):
     def __str__(self):
         return f"Atom({self._name}, {self._idx}, {self._coord}, {self._parent}, {self._b_factor}, {self._element}, {self._charge} )"
 
+    def __repr__(self):
+        return f"<{self} at {hex(id(self))}>"
     #endregion
 
     @dispatch

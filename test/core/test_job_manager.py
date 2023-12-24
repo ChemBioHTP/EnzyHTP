@@ -3,15 +3,18 @@ Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2023-09-20
 """
 # pylint: disable=invalid-name
+import glob
 from subprocess import run
 import re
 import pytest
 import os
 import logging
+import itertools
 
 from enzy_htp.core import clusters
 from enzy_htp.core.job_manager import ClusterJob
 from enzy_htp.core.logger import get_eh_logging_level, _LOGGER
+import enzy_htp.core.file_system as fs
 from enzy_htp import config as eh_config
 
 command_2_run = ["g16 < xxx.gjf > xxx.out"]
@@ -146,7 +149,7 @@ trap "rm -rf $TMPDIR/$SLURM_JOB_ID" EXIT"""
 def get_array_sub_str(idx):
     return f"""#!/bin/bash
 #SBATCH --partition=production
-#SBATCH --job-name=JM-test
+#SBATCH --job-name={idx}_JM_test
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=24
 #SBATCH --mem-per-cpu=2G
@@ -327,6 +330,47 @@ def test_ClusterJob_wait_to_array_end_ACCRE():
         assert job.job_id is not None
         assert job.last_state[0][0] in ("complete", "cancel", "error")
 
+    _LOGGER.setLevel(old_level)
+
+@pytest.mark.accre
+@pytest.mark.long
+def test_ClusterJob_with_to_2d_array_end_ACCRE():
+    """a mvp unit test for with_to_2d_array_end() on ACCRE.
+    This test makes sure:
+    - the function does not raise any exception
+    - all the jobs in the function is finished when function exits
+    This test does not make sure but needs manual checking: (e.g.: by cancelling jobs)
+    - jobs in each 1d job list are submitted sequentially.
+    - the function does not stucks in an inf loop."""
+    # make the test array
+    num_1d = 5
+    jobs = [[] for i in range(num_1d)]
+    j = itertools.cycle(range(num_1d)) # a cycle iter that assign job to list
+    for i in range(12):
+        list_1d_idx = next(j)
+        jobs[list_1d_idx].append(ClusterJob( clusters.accre.Accre(),
+                                sub_script_str=get_array_sub_str(f"{i}_{list_1d_idx}"),
+                                sub_dir=test_sub_dir,
+                                sub_script_path=f"{test_sub_dir}/test_{i}.cmd"))
+    # job array
+    old_level = get_eh_logging_level()
+    _LOGGER.setLevel(logging.DEBUG)
+
+    ClusterJob.wait_to_2d_array_end(jobs, period=3, array_size=4)
+
+    for job_list_1d in jobs:
+        for job in job_list_1d:
+            assert job.job_id is not None
+            assert job.last_state[0][0] in ("complete", "cancel", "error")
+
+    test_file_paths.append(f"{test_sub_dir}/submitted_job_ids.log")
+    for i, job_list_1d in enumerate(jobs):
+        for job in job_list_1d:
+            test_file_paths.extend([job.sub_script_path, job.job_cluster_log])
+    out_files = glob.glob(f"{test_sub_dir}/QM_test_*.out")
+    if out_files:
+        test_file_paths.extend(out_files)
+    fs.clean_temp_file_n_dir(test_file_paths)
     _LOGGER.setLevel(old_level)
 
 ### utilities ###

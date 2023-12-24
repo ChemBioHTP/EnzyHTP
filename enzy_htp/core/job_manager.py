@@ -17,13 +17,13 @@ Date: 2022-04-13"""
 
 import logging
 import time
-from typing import Tuple, Union
+from typing import List, Tuple, Union
 from plum import dispatch
 from copy import deepcopy
 import os
 
 from .clusters import ClusterInterface
-from .general import get_localtime
+from .general import get_localtime, num_ele_2d
 from enzy_htp.core.logger import _LOGGER, get_eh_logging_level
 from enzy_htp import config as eh_config
 # TODO fix more Config
@@ -62,6 +62,7 @@ class ClusterJob():
         self.job_cluster_log: str = None
         self.job_id: str = None
         self.last_state: Tuple[Tuple[str, str], float] = None # ((canonical_state, cluster_specific_state), time_stamp)
+        self.mimo: dict = None # the handle for slightly customize the attribute of ClusterJob. (e.g.: AmberMDStep.try_merge_jobs use it to store command etc.)
 
     ### config (construct object) ###
     @classmethod
@@ -396,7 +397,7 @@ class ClusterJob():
     @classmethod
     def wait_to_array_end(
             cls,
-            jobs: list["ClusterJob"],
+            jobs: List["ClusterJob"],
             period: int,
             array_size: int = 0,
             sub_dir = None,
@@ -463,6 +464,104 @@ class ClusterJob():
 
         return n_error + n_cancel
 
+    @classmethod
+    def wait_to_2d_array_end(
+            cls,
+            jobs: List[List["ClusterJob"]],
+            period: int,
+            array_size: int = 0,
+            sub_dir = None,
+            sub_scirpt_path = None
+        ) -> None:
+        """
+        submit an 2d array of jobs in a way that only {array_size} number of jobs is submitted simultaneously.
+        Jobs in the sub-1d-array are treated as they have sequential dependence and only submit new ones
+        after the previous one finishes. 
+        Wait until all job ends.
+
+        Args:
+        jobs:
+            a list of ClusterJob object to be execute
+        period:
+            the time cycle for update job state change (Unit: s)
+        array_size:
+            how many jobs are allowed to submit simultaneously. (default: 0 means all -> len(inp))
+            (e.g. 5 for 100 jobs means run 20 groups. All groups will be submitted and
+            in each group, submit the next job only after the previous one finishes.)
+        sub_dir: (default: self.sub_dir)
+            submission directory for all jobs in the array. Overwrite existing self.sub_dir in the job obj
+            * you can set the self value during config_job to make each job different
+        sub_scirpt_path: (default: self.sub_script_path)
+            path of the submission script. Overwrite existing self.sub_script_path in the job obj
+            * you can set the self value during config_job to make each job different
+
+        Return:
+        return a list of not completed job. (error + canceled)
+
+        Note: can we merge the 2 job arrary method? (pros: easy to maintain cons: hard to use and read.)
+        """
+        # san check
+        for job_list_1d in jobs:
+            for job in job_list_1d:
+                if job.cluster.NAME != jobs[0][0].cluster.NAME:
+                    raise TypeError(f"array job need to use the same cluster! while {job.cluster.NAME} and {jobs[0].cluster.NAME} are found.")
+        # default value
+        if array_size == 0:
+            array_size = len(jobs) # num of 1d job list
+        # set up array job
+        total_job_num = num_ele_2d(jobs)
+        total_1d_joblist_num = len(jobs)
+        current_active_job = [[] for i in range(total_1d_joblist_num)]
+        finished_job = [[] for i in range(total_1d_joblist_num)]
+        while num_ele_2d(finished_job) < total_job_num:
+            # before every job finishes, keep running
+            # 0. determine how many 1d list are still not finished
+            unfinished_1d_joblist_num = 0
+            for job_1d, finished_1d in zip(jobs, finished_job):
+                if len(job_1d) > len(finished_1d):
+                    unfinished_1d_joblist_num += 1
+            # 1. make up the running chunk to the array size                    
+            while num_ele_2d(current_active_job) < min(array_size, unfinished_1d_joblist_num):
+                # 1.1 find the 1st idle 1d job list
+                for active_list_1d, finish_list_1d, job_list_1d in zip(current_active_job, finished_job, jobs):
+                    if len(active_list_1d) == 0 and (len(finish_list_1d) < len(job_list_1d)):
+                        # 1.2 submit the next job in this list (not completely finished & not active)
+                        target_list_1d_idx = len(finish_list_1d)
+                        target_job = job_list_1d[target_list_1d_idx]
+                        target_job.submit(sub_dir, sub_scirpt_path)
+                        # 1.3 update active job
+                        active_list_1d.append(target_job)
+                        break                
+
+            # 2. check every job in the array to detect completion of jobs and deal with some error
+            for active_list_1d, finished_list_1d in zip(current_active_job, finished_job):
+                if active_list_1d:
+                    if len(active_list_1d) > 1:
+                        _LOGGER.error("Sequential jobs submitted at the same time. There is a bug in the code!")
+                        raise Exception
+                    job = active_list_1d[0]
+                    if job.get_state()[0] not in ["pend", "run"]:
+                        if get_eh_logging_level() <= logging.DEBUG:
+                            cls._action_end_with(job)
+                        finished_list_1d.append(job)
+                        del active_list_1d[0]
+            # 3. wait a period before next check TODO: add behavior that the more checking the longer time till a limit
+            time.sleep(period)
+
+        # summarize
+        n_complete = [list(filter(lambda x: x.last_state[0][0] == "complete", job_list_1d)) for job_list_1d in finished_job]
+        n_error = [list(filter(lambda x: x.last_state[0][0] == "error", job_list_1d)) for job_list_1d in finished_job]
+        n_cancel = [list(filter(lambda x: x.last_state[0][0] == "cancel", job_list_1d)) for job_list_1d in finished_job]
+        info_str = f"""2d job array finished:
+        1d idx:   {''.join(['{:<4}'.format(i) for i in range(len(jobs))])}
+        Complete: {''.join(['{:<4}'.format(len(i)) for i in n_complete])}
+        Error:    {''.join(['{:<4}'.format(len(i)) for i in n_error])}
+        Cancel:   {''.join(['{:<4}'.format(len(i)) for i in n_cancel])}"""
+
+        _LOGGER.info(info_str)
+
+        return n_error + n_cancel
+
     ### misc ###
     def require_job_id(self) -> None:
         """
@@ -470,6 +569,11 @@ class ClusterJob():
         """
         if self.job_id is None:
             raise AttributeError("Need to submit the job and get an job id!")
+
+    ### special ###
+    def __repr__(self) -> str:
+        """the standard representation of ClusterJob()"""
+        return f"<ClusterJob object at {hex(id(self))}>(job_id: {self.job_id})"
 
     @dispatch
     def _(self):

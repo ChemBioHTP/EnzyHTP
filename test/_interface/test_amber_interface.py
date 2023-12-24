@@ -5,17 +5,23 @@ Date: 2022-06-03
 """
 import glob
 import os
+import re
 import shutil
 import pytest
 from pathlib import Path
 from typing import Union
 
-from enzy_htp.core.exception import tLEaPError
+from enzy_htp.core.exception import tLEaPError, AmberMDError
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.general import EnablePropagate
 from enzy_htp.core import file_system as fs
-from enzy_htp._interface.amber_interface import AmberParameterizer
+from enzy_htp._interface.amber_interface import (
+    AmberParameterizer,
+    AmberParameter,
+    AmberMDStep,
+    AmberMDResultEgg,)
 import enzy_htp.structure as struct
+from enzy_htp.structure.structure_constraint import StructureConstraint
 from enzy_htp import interface
 from enzy_htp import config as eh_config
 
@@ -449,6 +455,325 @@ def test_antechamber_ncaa_to_moldesc_resp(): #TODO
     assert not os.path.exists("scratch/H5J.pdb")
     fs.safe_rm(temp_mol2_path)
 
+
+def test_build_md_step_default():
+    """as said in the name. Assert several default values
+    as samples."""
+    ai = interface.amber
+    md_step: AmberMDStep = ai.build_md_step(length=0.1, core_type="cpu")
+    assert md_step.temperature == 300.0
+    assert md_step.core_type == "cpu"
+    assert md_step.cluster_job_config["res_keywords"]["core_type"] == "cpu"
+    assert md_step.length == 0.1
+    assert md_step.record_period == 0.0001
+
+
+def test_build_md_step_res_keywords():
+    """as said in the name. Assert several default values
+    as samples."""
+    ai = interface.amber
+    md_step: AmberMDStep = ai.build_md_step(length=0.1, core_type="cpu",
+                                            cluster_job_config={
+                                                "cluster" : None,
+                                                "res_keywords" : {"partition" : "production",
+                                                                  "account" : "yang_lab",}
+                                            })
+    assert md_step.cluster_job_config["cluster"] is None
+    assert md_step.cluster_job_config["res_keywords"]["core_type"] == "cpu"
+    assert md_step.cluster_job_config["res_keywords"]["partition"] == "production"
+    assert md_step.cluster_job_config["res_keywords"]["nodes"] == "1"
+    assert md_step.cluster_job_config["res_keywords"]["node_cores"] ==  "16"
+    assert md_step.cluster_job_config["res_keywords"]["job_name"] ==  "MD_EnzyHTP"
+    assert md_step.cluster_job_config["res_keywords"]["mem_per_core"] ==  "3G"
+    assert md_step.cluster_job_config["res_keywords"]["walltime"] ==  "1-00:00:00"
+    assert md_step.cluster_job_config["res_keywords"]["account"] ==  "yang_lab"
+
+
+def test_write_to_mdin_from_raw_dict():
+    """test to make sure _write_to_mdin_from_raw_dict() works as expected.
+    using a dict from old EnzyHTP Class_Conf.Amber.conf_heat as an example"""
+    test_raw_dict = {
+        'title': 'Heat',
+        'namelists': [
+           {'type': 'cntrl',
+            'config': {
+                'imin': 0, 'ntx': 1, 'irest': 0,
+                'ntc': 2, 'ntf': 2,
+                'cut': 10.0,
+                'nstlim': 20000, 'dt': 0.002,
+                'tempi': 0.0, 'temp0': 300.0,
+                'ntpr': 200, 'ntwx': 20000,
+                'ntt': 3, 'gamma_ln': 5.0,
+                'ntb': 1, 'ntp':0,
+                'iwarp': 1,
+                'nmropt': 1,
+                'ig': -1,
+                'ntr': 1, 'restraint_wt': 2.0, 'restraintmask': "'@C,CA,N'",
+                }
+            },
+           {'type': 'wt',
+            'config': {
+                'type': 'TEMP0',
+                'istep1': 0, 'istep2': 18000,
+                'value1': 0.0, 'value2': 300.0,
+                }
+            },
+           {'type': 'wt',
+            'config': {
+                'type': 'TEMP0',
+                'istep1': 18001, 'istep2': 20000,
+                'value1': 300.0, 'value2': 300.0,
+                }
+            },
+           {'type': 'wt',
+            'config': {
+                'type': 'END',
+                }
+            },
+        ],
+        'file_redirection': {
+            'DISANG': './MD/0.rs' 
+        },
+        'group_info': [],
+    }
+    test_temp_mdin = f"{MM_WORK_DIR}/test_mdin_from_raw_dict.in"
+    answer_temp_mdin = f"{MM_DATA_DIR}/answer_mdin_from_raw_dict.in"
+    ai = interface.amber
+    ai._write_to_mdin_from_raw_dict(test_raw_dict, test_temp_mdin)
+    assert files_equivalent(test_temp_mdin, answer_temp_mdin)
+    fs.safe_rm(test_temp_mdin)
+
+
+def test_parse_md_config_dict_to_raw_wo_cons():
+    """test to make sure _parse_md_config_dict_to_raw() works as expected.
+    using a dict from old EnzyHTP Class_Conf.Amber.conf_heat as an example"""
+    answer_raw_dict = {
+        'title': 'Heat',
+        'namelists': [
+           {'type': 'cntrl',
+            'config': {
+                'imin': 0, 'ntx': 1, 'irest': 0,
+                'ntc': 2, 'ntf': 2,
+                'cut': 10.0,
+                'nstlim': 20000, 'dt': 0.002,
+                'tempi': 0.0, 'temp0': 300.0,
+                'ntpr': 200, 'ntwx': 200,
+                'ntt': 3, 'gamma_ln': 5.0,
+                'ntb': 1, 'ntp':0,
+                'iwarp': 1,
+                'ig': -1,
+                }
+            },
+           {'type': 'wt',
+            'config': {
+                'type': 'TEMP0',
+                'istep1': 0, 'istep2': 18000,
+                'value1': 0.0, 'value2': 300.0,
+                }
+            },
+           {'type': 'wt',
+            'config': {
+                'type': 'TEMP0',
+                'istep1': 18001, 'istep2': 20000,
+                'value1': 300.0, 'value2': 300.0,
+                }
+            },
+           {'type': 'wt',
+            'config': {
+                'type': 'END',
+                }
+            },
+        ],
+        'file_redirection': {},
+        'group_info': [],
+    }
+    test_md_config_dict = {
+            "name" : "Heat",
+            "length" : 0.04, # ns
+            "timestep" : 0.000002, # ns
+            "minimize" : False,
+            "temperature" : [(0.0, 0.0), (0.036, 300.0), (0.04, 300.0)],
+            "thermostat" : "langevin",
+            "pressure_scaling" : "none",
+            "constrain" : None,
+            "restart" : False,
+            "if_report" : True,
+            "record_period" : 0.0004, # ns
+    }
+
+    ai = interface.amber
+    test_raw_dict = ai._parse_md_config_dict_to_raw(test_md_config_dict)
+    assert test_raw_dict == answer_raw_dict
+
+
+def test_parse_md_config_dict_to_raw_w_cons(): # TODO finish this after the PR
+    """test to make sure _parse_md_config_dict_to_raw() works as expected.
+    using a dict from old EnzyHTP Class_Conf.Amber.conf_heat as an example"""
+    answer_raw_dict = {
+        'title': 'Heat',
+        'namelists': [
+           {'type': 'cntrl',
+            'config': {
+                'imin': 0, 'ntx': 1, 'irest': 0,
+                'ntc': 2, 'ntf': 2,
+                'cut': 10.0,
+                'nstlim': 20000, 'dt': 0.002,
+                'tempi': 0.0, 'temp0': 300.0,
+                'ntpr': 200, 'ntwx': 200,
+                'ntt': 3, 'gamma_ln': 5.0,
+                'ntb': 1, 'ntp':0,
+                'iwarp': 1,
+                'nmropt': 1,
+                'ig': -1,
+                'ntr': 1, 'restraint_wt': 2.0, 'restraintmask': "'@C,CA,N'",
+                }
+            },
+           {'type': 'wt',
+            'config': {
+                'type': 'TEMP0',
+                'istep1': 0, 'istep2': 18000,
+                'value1': 0.0, 'value2': 300.0,
+                }
+            },
+           {'type': 'wt',
+            'config': {
+                'type': 'TEMP0',
+                'istep1': 18001, 'istep2': 20000,
+                'value1': 300.0, 'value2': 300.0,
+                }
+            },
+           {'type': 'wt',
+            'config': {
+                'type': 'END',
+                }
+            },
+        ],
+        'file_redirection': {
+            'DISANG': './MD/0.rs' 
+        },
+        'group_info': [],
+    }
+    test_md_config_dict = {
+            "name" : "Heat",
+            "minimize" : False,
+            "pressure_scaling" : "none",
+            "restart" : False,
+            "length" : 0.04, # ns
+            "timestep" : 0.000002, # ns
+            "temperature" : [(0.0, 0.0), (0.036, 300.0), (0.04, 300.0)],
+            "thermostat" : "langevin",
+            "constrain" : StructureConstraint("TODO"),
+            "if_report" : True,
+            "record_period" : 0.0004,
+    }
+
+    ai = interface.amber
+    test_raw_dict = ai._parse_md_config_dict_to_raw(test_md_config_dict)
+    assert test_raw_dict == answer_raw_dict
+
+
+def test_amber_md_step_make_job():
+    """test to make sure AmberMDStep.make_job() works as expected.
+    w/o constraint."""
+    ai = interface.amber
+    md_step = ai.build_md_step(length=0.1) # 300K, NPT by default
+    test_inpcrd = f"{MM_DATA_DIR}/KE_07_R7_S.inpcrd"
+    test_prmtop = f"{MM_DATA_DIR}/KE_07_R7_S.prmtop"
+    test_params = AmberParameter(test_inpcrd, test_prmtop)
+    test_job, test_md_egg = md_step.make_job(test_params)
+    
+    answer_pattern = r"""#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:1
+#SBATCH --job-name=MD_EnzyHTP
+#SBATCH --partition=<fillthis>
+#SBATCH --mem=8G
+#SBATCH --time=3-00:00:00
+#SBATCH --account=<fillthis>
+#SBATCH --export=NONE
+
+# Script generated by EnzyHTP [0-9]\.[0-9]\.[0-9] in [0-9]+-[0-9]+-[0-9]+ [0-9]+:[0-9]+:[0-9]+
+
+source /home/shaoq1/bin/amber_env/amber22\.sh
+
+pmemd\.cuda -O -i \./MD/amber_md_step_?[0-9]*\.in -o \./MD/amber_md_step\.out -p /panfs/accrepfs\.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S\.prmtop -c /panfs/accrepfs\.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S\.inpcrd -r \./MD/amber_md_step\.rst -ref /panfs/accrepfs\.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S\.inpcrd -x \./MD/amber_md_step\.nc 
+"""
+    assert re.match(answer_pattern, test_job.sub_script_str)
+    assert test_md_egg.traj_path == './MD/amber_md_step.nc'
+    assert test_md_egg.traj_log_path == './MD/amber_md_step.out'
+    assert test_md_egg.rst_path == './MD/amber_md_step.rst'
+    assert test_md_egg.prmtop_path == '/panfs/accrepfs.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S.prmtop'
+    fs.safe_rmdir(md_step.work_dir)
+
+
+def test_amber_md_step_try_merge_jobs(caplog):
+    """test to make sure AmberMDStep.try_merge_jobs() works as expected."""
+    with EnablePropagate(_LOGGER):
+        ai = interface.amber
+        md_step_1 = ai.build_md_step(length=0.1) # 300K, NPT by default
+        md_step_2 = ai.build_md_step(length=0.1) # 300K, NPT by default
+        md_step_3 = ai.build_md_step(length=0.1, core_type="cpu") # 300K, NPT by default
+        test_inpcrd = f"{MM_DATA_DIR}/KE_07_R7_S.inpcrd"
+        test_prmtop = f"{MM_DATA_DIR}/KE_07_R7_S.prmtop"
+        test_params = AmberParameter(test_inpcrd, test_prmtop)
+        test_job_1, test_md_egg_1 = md_step_1.make_job(test_params)
+        test_job_2, test_md_egg_2 = md_step_2.make_job(test_md_egg_1)
+        test_job_3, test_md_egg_3 = md_step_3.make_job(test_md_egg_2)
+        merged_jobs = AmberMDStep.try_merge_jobs([test_job_1,test_job_2,test_job_3])
+        assert len(merged_jobs) == 2
+        for test, answer in zip(merged_jobs[0].mimo["commands"], [
+                'pmemd.cuda -O -i ./MD/amber_md_step_?[0-9]*.in -o ./MD/amber_md_step.out -p /panfs/accrepfs.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S.prmtop -c /panfs/accrepfs.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S.inpcrd -r ./MD/amber_md_step.rst -ref /panfs/accrepfs.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S.inpcrd -x ./MD/amber_md_step.nc ',
+                'pmemd.cuda -O -i ./MD/amber_md_step_?[0-9]*.in -o ./MD/amber_md_step.out -p /panfs/accrepfs.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S.prmtop -c ./MD/amber_md_step.rst -r ./MD/amber_md_step.rst -ref ./MD/amber_md_step.rst -x ./MD/amber_md_step.nc '
+                ]):
+            assert re.match(answer, test)
+        assert "Found md steps with same names!" in caplog.text
+    fs.safe_rmdir(md_step_1.work_dir)
+
+
+def test_amber_md_step_translate():
+    """use a fake test result egg to test the function"""
+    test_result_egg = AmberMDResultEgg(
+        traj_path = "traj_path",
+        traj_log_path = "traj_log_path",
+        rst_path = "rst_path",
+        prmtop_path = "prmtop_pat",
+    )
+    ai = interface.amber
+    test_step = ai.build_md_step(length=0.1)
+    result = test_step.translate(test_result_egg)
+
+    assert result.traj_file == "traj_path"
+    assert result.traj_log_file == "traj_log_path"
+    assert result.last_frame_file == "rst_path"
+
+
+def test_amber_md_step_run(): # TODO finish this
+    """test AmberMDStep().run()"""
+    ai = interface.amber
+    md_step = ai.build_md_step(length=0.1) # 300K, NPT by default
+    test_inpcrd = f"{MM_DATA_DIR}/KE_07_R7_S.inpcrd"
+    test_prmtop = f"{MM_DATA_DIR}/KE_07_R7_S.prmtop"
+    test_params = AmberParameter(test_inpcrd, test_prmtop)
+    test_md_result = md_step.run(test_params)
+    
+    assert False
+
+
+def test_amber_md_step_check_md_error(): # TODO finish this when accre is back
+    """test this function using extract real example files from Amber runs"""
+    test_traj = ""
+    test_mdout = ""
+    test_clusterjob = ""
+
+    ai = interface.amber
+    md_step = ai.build_md_step(length=0.1) # 300K, NPT by default
+
+    with pytest.raises(AmberMDError) as e:
+        md_step.check_md_error(
+            traj=test_traj,
+            traj_log=test_mdout,
+            stdstream_source=test_clusterjob,
+        )
 
 # region TODO
 
