@@ -206,7 +206,7 @@ class CartesianFreeze(StructureConstraint):
      
     def is_cartesian_freeze(self) -> bool:
         """Is this a cartesian freeze constraint? Always True for this class."""
-        return False
+        return True
 
     def correct_num_atoms(self) -> bool:
         """True as long as there is at least one atom in the constraint."""
