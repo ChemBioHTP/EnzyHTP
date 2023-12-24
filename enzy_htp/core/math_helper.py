@@ -45,6 +45,39 @@ def get_distance(p1: Union[tuple, list], p2: Union[tuple, list]) -> float:
     return D
 
 
+def get_angle(p1: Union[tuple, list],
+              p2: Union[tuple, list],
+              p3: Union[tuple, list],
+              rad_result: bool = False) -> float:
+    """get the angle between p1, p2, p3"""
+    p1 = np.array(p1)
+    p2 = np.array(p2)
+    p3 = np.array(p3)
+    
+    v21 = p1 - p2
+    v23 = p3 - p2
+    n1 = np.cross(v23, v21)
+    # consider collinear
+    if np.isclose(np.linalg.norm(n1), 0, atol=1e-9):
+        if np.dot(v21, v23) < 0:
+            result = np.pi
+        else:
+            result = 0.0
+    else:
+        x_unit = v23 / np.linalg.norm(v23)
+        y_unit = np.cross(n1, v23)
+        y_unit = y_unit / np.linalg.norm(y_unit)
+        x = np.dot(v21, x_unit)
+        y = np.dot(v21, y_unit) 
+
+        result = np.arctan2(y, x)
+
+    if not rad_result:
+        result = np.degrees(result)
+
+    return result
+
+
 def get_dihedral(p1: Union[tuple, list],
                  p2: Union[tuple, list],
                  p3: Union[tuple, list],
