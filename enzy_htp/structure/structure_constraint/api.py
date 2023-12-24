@@ -48,7 +48,8 @@ class StructureConstraint(ABC):
         self.target_value_ = target_value 
         self.params_ = deepcopy( params ) 
 
-        self['calc_method'] = params.get('calc_method', 'rosetta')
+        self['calc_method'] = params.get('calc_method', 'rosetta') # TODO this does not work in the case that multiple software in the same workflow needs to use a same set of constraints.
+        # https://github.com/ChemBioHTP/EnzyHTP/pull/147/#discussion_r1435735159
 
         if not self.correct_num_atoms():
             _LOGGER.error("Incorrect number of atoms supplied! Exiting...")
@@ -92,7 +93,7 @@ class StructureConstraint(ABC):
         """Does the given constraint have the correct number of atoms?"""
         pass
 
-    def score_energy(self) -> float:
+    def score_energy(self) -> float: # TODO move this to interface e.g.: RosettaInterface for current
         """Scores the energy penalty of the constraint. If the calc method is not specified, the method exits."""
         if self['calc_method'] == 'rosetta':
             penalty:float = self['penalty'] 
