@@ -267,12 +267,19 @@ class Atom(DoubleLinkedNode):
         return mh.get_distance(self.coord, point.coord)
 
     @dispatch
-    def distance_to(self, point: tuple) -> float:  # pylint: disable=function-redefined
+    def distance_to(self, point: Tuple) -> float:  # pylint: disable=function-redefined
         """Get the distance to the other atom or a point."""
-        if type(point) == tuple:
-            return mh.get_distance(self.coord, point)
-        else:
-            return mh.get_distance(self.coord, point.coord)
+        return mh.get_distance(self.coord, point)
+    
+    @dispatch
+    def angle_with(self, point_1: Atom, point_2: Atom) -> float:
+        """Get the distance to the other atom or a point."""
+        return mh.get_angle(self.coord, point_1.coord, point_2.coord)
+
+    @dispatch
+    def angle_with(self, point_1: Tuple, point_2: Tuple) -> float: # pylint: disable=function-redefined
+        """Get the distance to the other atom or a point."""
+        return mh.get_angle(self.coord, point_1, point_2)
 
     def attached_protons(self) -> List[Atom]:
         """find all protons attached to self"""
