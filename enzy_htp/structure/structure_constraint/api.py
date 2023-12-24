@@ -247,15 +247,7 @@ class AngleConstraint(StructureConstraint):
 
     def current_geometry(self) -> float:
         """The angle between three 3D points using dot-product."""
-        a = np.array(self.atoms[0].coord)
-        b = np.array(self.atoms[1].coord)
-        c = np.array(self.atoms[2].coord)
-        
-        ba = a - b
-        bc = c - b
-        
-        cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
-        return np.degrees(np.arccos(cosine_angle))
+        return self.atoms[0].angle_with(self.atoms[1], self.atoms[2])
         
 
 class DihedralConstraint(StructureConstraint):
@@ -271,32 +263,7 @@ class DihedralConstraint(StructureConstraint):
 
     def current_geometry(self) -> float:
         """Measurement for the current dihedral between the 4 atoms in the constraint."""
-        p0 = np.array(self.atoms[0])
-        p1 = np.array(self.atoms[1])
-        p2 = np.array(self.atoms[2])
-        p3 = np.array(self.atoms[3])
-
-        b0 = -1.0*(p1 - p0)
-        b1 = p2 - p1
-        b2 = p3 - p2
-
-        # normalize b1 so that it does not influence magnitude of vector
-        # rejections that come next
-        b1 /= np.linalg.norm(b1)
-
-        # vector rejections
-        # v = projection of b0 onto plane perpendicular to b1
-        #   = b0 minus component that aligns with b1
-        # w = projection of b2 onto plane perpendicular to b1
-        #   = b2 minus component that aligns with b1
-        v = b0 - np.dot(b0, b1)*b1
-        w = b2 - np.dot(b2, b1)*b1
-
-        # angle between v and w in a plane is the torsion angle
-        # v and w may not be normalized but that's fine since tan is y/x
-        x = np.dot(v, w)
-        y = np.dot(np.cross(b1, v), w)
-        return np.degrees(np.arctan2(y, x))
+        return self.atoms[0].dihedral_with(self.atoms[1], self.atoms[2], self.atoms[3])
 
 
 class ResiduePairConstraint(StructureConstraint):
