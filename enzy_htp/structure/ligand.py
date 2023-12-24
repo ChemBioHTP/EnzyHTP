@@ -46,7 +46,12 @@ class Ligand(NonCanonicalBase):
 
         self.bonds = kwargs.get('bonds', list())  # TODO change this to a more general represetation
         self.conformer_coords = list() # TODO change this to StructureEnsemble (we can leave a reference_var here tho)
-        self.placement_method_ = '' 
+        self.placement_method_ = None
+        # TODO: The idea for Structure and Ligand is to only have the math model recorded. 
+        # But I see there is not really a better place to record the source of placement. 
+        # Would a self.mimo attribute a good idea for these? So that we can distinguish those
+        # that should not assumed to exist but just used in some protocols.
+        # (similar to job_manager.ClusterJob)
 
     # === Getter-Attr ===
 
