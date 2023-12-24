@@ -750,7 +750,7 @@ def test_amber_md_step_translate():
 
 @pytest.mark.accre
 @pytest.mark.long
-def test_amber_md_step_run(): # TODO finish this
+def test_amber_md_step_run():
     """test AmberMDStep().run().
     rely on check_md_error inside of run() for testing."""
     ai = interface.amber
@@ -759,7 +759,13 @@ def test_amber_md_step_run(): # TODO finish this
     test_prmtop = f"{MM_DATA_DIR}/KE_07_R7_S.prmtop"
     test_params = AmberParameter(test_inpcrd, test_prmtop)
     test_md_result = md_step.run(test_params)
-    print(test_md_result)
+    
+    assert test_md_result.last_frame_file == "./MD/amber_md_step.rst"
+    fs.clean_temp_file_n_dir([
+        test_md_result.last_frame_file,
+        test_md_result.traj_log_file,
+        "./MD",
+    ])
 
 
 def test_amber_md_step_check_md_error(caplog):

@@ -670,6 +670,8 @@ class AmberMDStep(MolDynStep):
             temp_mdin_file,
             prmtop,
             coord)
+        if not self.if_report:
+            traj_path = None
 
         # 4. run cmd
         md_cmd_exe = md_step_cmd.split(" ")[0]
@@ -699,6 +701,12 @@ class AmberMDStep(MolDynStep):
             last_frame_parser = last_frame_parser,
             source="amber",
         )
+
+        # 6. clean up
+        fs.clean_temp_file_n_dir([
+            temp_mdin_file,
+            "./mdinfo"
+        ])
 
         return result
 
@@ -799,8 +807,9 @@ class AmberMDStep(MolDynStep):
                 raise TypeError
             # 2. mdout file
             # have no experience that error pops here yet. Add when observed
-            # 3. traj analysis
+            # 3. traj analysis 
             # TODO
+            # Note that if_report = 0 will make traj_path = None
             # TODO give suggestion for each detected types of errors.
 
             _LOGGER.error(f"Amber MD didn't finish normally.{os.linesep}{os.linesep.join(error_info_list)}")
