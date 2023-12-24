@@ -7,6 +7,8 @@
 #SBATCH --time=3-00:00:00
 #SBATCH --account=yang_lab_csb
 
+# ! NOTE ! dont change this file. copy this file and use it. This way it wont mess up the repo
+
 source /home/shaoq1/bin/amber_env/amber22.sh
 source ~/bin/miniconda3/bin/activate new_EnzyHTP
 
