@@ -144,7 +144,7 @@ class EnvironmentManager:
                     wait_time: float = 3.0,
                     timeout: Union[None, float] = None,
                     stdout_return_only: bool = False,
-                    quiet_fail:bool = False
+                    quiet_fail:bool = False,
                     log_level: str = "info",) -> Union[CompletedProcess, str]:
         """Interface to run a command with the exectuables specified by exe as well as a list of arguments.
         Args:
