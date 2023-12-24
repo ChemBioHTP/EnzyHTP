@@ -104,3 +104,7 @@ class AmberMDError(Exception):
     @property
     def error_info_str(self) -> str:
         return "\n".join(self.error_info_list)
+
+class WrongTopology(Exception):
+    """Exception corresponding to wrong topology. Mainly used in StructureConstraint"""
+    pass

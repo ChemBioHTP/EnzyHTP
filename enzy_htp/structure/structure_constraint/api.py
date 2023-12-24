@@ -21,6 +21,7 @@ from typing import List, Tuple, Dict, Any
 import numpy as np
 
 from enzy_htp.core.logger import _LOGGER
+from enzy_htp.core.exception import WrongTopology
 from ..structure import Structure, Solvent, Chain, Residue, Atom
 
 from abc import ABC, abstractmethod
@@ -38,16 +39,15 @@ class StructureConstraint(ABC):
     """
 
     def __init__(self,
-                atoms:List[Atom],
-                target_value:float,
-                params:Dict[str, Any]
-                ):
+                 atoms: List[Atom],
+                 target_value: float,
+                 params: Dict[str, Any]):
         """Ctor that exits if the supplied number of atoms is NOT correct."""
         
         self.atoms_ = atoms 
         self.target_value_ = target_value 
-        self.params_ = deepcopy( params ) 
 
+        self.params_ = deepcopy( params ) 
         self['calc_method'] = params.get('calc_method', 'rosetta') # TODO this does not work in the case that multiple software in the same workflow needs to use a same set of constraints.
         # https://github.com/ChemBioHTP/EnzyHTP/pull/147/#discussion_r1435735159
 
@@ -55,6 +55,46 @@ class StructureConstraint(ABC):
             _LOGGER.error("Incorrect number of atoms supplied! Exiting...")
             exit( 1 )
 
+    # region == property getter ==
+    @property
+    def atoms(self) -> List[Atom]:
+        """Accessor for the atoms involved in the constrained geometry."""
+        return self.atoms_
+
+    @atoms.setter
+    def atoms(self, val_in : List[Atom] ) -> None:
+        """Setter for the atoms in the constrained geometry. Checks for the correct number of atoms, errors if it is the incorrect number.."""
+        self.atoms_ = val_in
+        if not self.correct_num_atoms():
+            _LOGGER.error(f"An incorrect number of atoms ({len(self.atoms)})was supplied! Exiting...")
+            exit( 1 )
+
+    @property
+    def topology(self) -> Structure:
+        """get the current topology-context of the constraint"""
+        self.check_consistent_topology()
+        return self.atoms[0].root
+    # endregion
+
+    # region == checker ==
+    def check_consistent_topology(self) -> None:
+        """check whether Atom()s are from the same Structure()
+        raise an error if not."""
+        top = self.atoms[0].root
+        for atom in self.atoms:
+            current_top = atom.root
+            if not isinstance(current_top, Structure):
+                _LOGGER.error(
+                    f"Topology should be Structure(). ({atom} has {current_top})")
+                raise WrongTopology
+
+            if current_top is not top:
+                _LOGGER.error(
+                    "Atom()s in StructureConstraint() "
+                    "have inconsistent topology! "
+                    f"({self.atoms[0]} has {top} --vs-- {atom} has {current_top})")
+                raise WrongTopology
+    # endregion
 
     #TODO(CJ): add function that checks if topology and constraints are compatible
     #TODO(CJ): will need to make a version of this that actually works for the ResiduePairConstraint
@@ -132,18 +172,6 @@ class StructureConstraint(ABC):
         """The current geometry of the constrained atoms."""
         pass
 
-    @property
-    def atoms(self) -> List[Atom]:
-        """Accessor for the atoms involved in the constrained geometry."""
-        return self.atoms_
-
-    @atoms.setter
-    def atoms(self, val_in : List[Atom] ) -> None:
-        """Setter for the atoms in the constrained geometry. Checks for the correct number of atoms, errors if it is the incorrect number.."""
-        self.atoms_ = val_in
-        if not self.correct_num_atoms():
-            _LOGGER.error(f"An incorrect number of atoms ({len(self.atoms)})was supplied! Exiting...")
-            exit( 1 )
 
     def atom_indices(self) -> np.ndarray: 
         """Get the indices of the atoms in the constraint.""" 
@@ -195,6 +223,7 @@ class StructureConstraint(ABC):
             Nothing.
         """
         self.params_[key] = value 
+
 
 class CartesianFreeze(StructureConstraint):
     """Specialization of StructureConstraint() for Atoms() that are frozen in Cartesian space. Many
