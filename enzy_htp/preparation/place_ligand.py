@@ -4,6 +4,7 @@ ligands via one of the below methods:
 
     + alphafill: Uses the AlphaFill transplant algorithm to identify a location for a given ligand. Works best
     for common bi-molecular co-factors (i.e. SAM, ATP, etc). Assumes PDB style atom naming.
+    
     + mole2: Uses cavities identified by the Mole2 software suite to identify possible locations for a given 
     Ligand. Ranks possible locations/orientations using supplied geomtry constraints. Works best for non-co-factor
     substrates. More neutral to atom naming than alphafill.
@@ -11,6 +12,7 @@ ligands via one of the below methods:
 Author: Chris Jurich <chris.jurich@vanderbit.edu>
 Date: 2023-09-14
 """
+#TODO(CJ): update the documentation here
 import json
 from typing import List, Tuple, Dict, Set
 
@@ -29,20 +31,20 @@ from enzy_htp.core import _LOGGER
 
 import enzy_htp.chemical as chem
 from enzy_htp.structure import PDBParser, Structure, Ligand, Mol2Parser, Chain
-from enzy_htp._interface import RosettaCst, Mole2Cavity
+from enzy_htp.structure.structure_constraint import StructureConstraint
+from enzy_htp._interface import Mole2Cavity
 
 from .align_ligand import align_ligand
-from .constrained_docking import constrained_docking
+
 
 def place_ligand(stru : Structure,
-                 ligand: Ligand,
-                 new_res_key: Tuple[str, int, str],
-                 code: str = None,
-                 method: str = 'alphafill',
-                 work_dir: str = None,
-                 constraints: List[RosettaCst] = None,
-                 use_cache:bool = True,
-                 **kwargs) -> Structure:
+                    ligand_chain:str,
+                    ligand_idx:int,
+                    method: str = 'alphafill',
+                    work_dir: str = None,
+                    constraints: List[StructureConstraint] = None,
+                    use_cache:bool = True,
+                    **kwargs) -> Structure:
     """Protocol for placing a ligand into an enzyme in an unoptimized manner. Operates directly on the Structure and Ligand objects,
     and returns a new, deep-copied Structure object with the placed ligand. The Chain, residue index, and ligand name must be specified
     through the new_res_key Tuple with layout (chain, idx, name). The ligand placement strategy is specified with the 'method' keyword.
@@ -53,7 +55,6 @@ def place_ligand(stru : Structure,
         stru: Structure that the Ligand() will be placed within.
         ligand: Ligand() to be placed.
         new_res_key: Name of the new residue as a Tuple with format (chain, index, name).
-        code: The PDB code of the original structure. Optional.
         method: How the ligand will be placed in the Structure. Defaults to 'alphafill'
         work_dir: Where the work will be done and temporary files will be saved. Defaults to system.SCRATCH_DIR
         constraints: A List[RosettaCst] objects. Optional.
@@ -63,10 +64,6 @@ def place_ligand(stru : Structure,
     Returns:
         A deepcopied Structure() which contains the new Ligand() at the specified location.
     """
-    if len(new_res_key) != 3 or len(new_res_key[-1]) != 3:
-        _LOGGER.error(f"The new_res_key expects a tuple of size 3 with layout (chain name, index, residue name). Exiting...")
-        exit( 1 )
-
     if not work_dir:
         work_dir = config['system.SCRATCH_DIR']
 
@@ -75,35 +72,22 @@ def place_ligand(stru : Structure,
     placed_ligand: str = None
 
     if method == "alphafill":
-        if code is None:
-            _LOGGER.error(f"When using the alphafill method, you MUST supply a .pdb code for where the protein comes from. Exiting...")
-            exit( 1 )
-        placed_ligand = _place_alphafill(stru, ligand, code=code, work_dir=work_dir, **kwargs)
+        _place_alphafill(stru, ligand_chain, ligand_idx, work_dir=work_dir, **kwargs)
     elif method == "mole2":
-        placed_ligand = _place_mole2(stru, ligand, constraints=constraints, new_res_key=new_res_key, work_dir=work_dir, **kwargs)
+        _place_mole2(stru, ligand_chain, ligand_idx, constraints=constraints, work_dir=work_dir, **kwargs)
     else:
         _LOGGER.error(
             f"The supplied method placement method {method} is not supported. Allowed methods are 'alphafill' and 'mole2'. Exiting..."
         )
         exit(1)
 
-    placed_ligand.name = new_res_key[2]
-    placed_ligand.idx = new_res_key[1]
-        
-    for cc in stru.chains:
-        if cc.name == new_res_key[0]:
-            cc.add_residue( placed_ligand )
-            return deepcopy( stru )
-    else:        
-        copied_chains = [deepcopy(cc) for cc in stru.chains]
-        new_chain = Chain(new_res_key[0], [placed_ligand])
-        return Structure( copied_chains + [new_chain])
 
 def _place_mole2(stru:Structure,
-                    ligand:Ligand,
-                    constraints:List[RosettaCst],
-                    new_res_key:Tuple,
+                    ligand_chain:str,
+                    ligand_idx:int,
+                    constraints:List[StructureConstraint],
                     work_dir:str,
+                    delta:float = 0.75, 
                     **kwargs) -> Ligand:
     """Implementation function that places a specified ligand into a structure using the cavities generated by
     the Mole2 topological analysis software. SHOULD NOT be called directly by the user. Instead, call 
@@ -117,33 +101,21 @@ def _place_mole2(stru:Structure,
         constraints: A List[RosettaCst] that define the geometry involving the Ligand().
         new_res_key: Tuple specifying the (chain, idx, name) of the Ligand().
         work_dir: Directory where all temporary files will be saved.
+        float: TODO(CJ)
 
     Returns:
         An aligned, deecopied Ligand().
     """
     #TODO(CJ): rotate the ligand in the cavity
     #TODO(CJ): check how many atoms fit in the molecule
+
+    ligand:Ligand = stru.get(f"{ligand_chain}.{ligand_idx}")
+    ligand.placement_method = "mole2"
     if not work_dir:
         work_dir = config['system.SCRATCH_DIR']
 
     relevant_constraints: List[str] = list()
     
-    #TODO(CJ): probably need to deepcopy these
-    for cc in constraints:
-        if cc.contains(new_res_key[0], new_res_key[1]):
-            relevant_constraints.append(cc)
-
-    for rc in relevant_constraints:
-        rc.remove_constraint('angle_A')
-        rc.remove_constraint('angle_B')
-        rc.remove_constraint('torsion_A')
-        rc.remove_constraint('torsion_B')
-        rc.remove_constraint('torsion_AB')
-
-    anchors = list()        
-    for rc in relevant_constraints:
-        anchors.append(rc.other(new_res_key[0], new_res_key[1]))
-
     temp_pdb:str=f"{work_dir}/__temp.pdb"
     to_delete:List[str] = [ temp_pdb ]
 
@@ -151,29 +123,80 @@ def _place_mole2(stru:Structure,
     parser.save_structure( temp_pdb, stru )
     cavities:List[Mole2Cavity] = interface.mole2.identify_cavities(temp_pdb)
 
-    session = interface.pymol.new_session()
-    interface.pymol.general_cmd(session, [('load', temp_pdb)])
-    anchor_com = interface.pymol.center_of_mass(session, sele=f"chain {anchors[0][0]} and resi {anchors[0][1]}")
-   
-    distances = list()
+    seed_locations:List = list()
     for cc in cavities:
-        distances.append(np.sqrt(np.sum((cc.center_of_mass()-anchor_com)**2)))
-   
+        vert_matrix = np.array(cc.points())
+        (x_min, y_min, z_min) = np.min(vert_matrix,axis=0)
+        (x_max, y_max, z_max) = np.max(vert_matrix,axis=0)
+        contained_points = list()
+        x_vals = list(np.arange(x_min, x_max+delta, delta))
+        y_vals = list(np.arange(y_min, y_max+delta, delta))
+        z_vals = list(np.arange(z_min, z_max+delta, delta))
+        
+        candidates = list()
+        for x in x_vals:
+            for y in y_vals:
+                for z in z_vals:
+                    candidates.append(np.array([x, y, z]))
+        candidates = np.array(candidates)
+        for included, cp in zip(cc.contains_points(candidates), candidates):
+            if included:
+                seed_locations.append(cp)
 
-    target_cat = cavities[np.argmin(np.array(distances))]
-    target_com = target_cat.center_of_mass()
 
-    reactant_com = np.array(list(ligand.geom_center))
-    shift = target_com - reactant_com
-    ligand.shift(shift)
-    return ligand
+    seed_locations = np.array(seed_locations)
+    scores = list()
+
+    for sl in seed_locations:
+        #TODO(CJ): this is where I put the actual energy/constraint evaluation
+    
+        lig_start = ligand.geom_center
+        shift = sl - lig_start
+
+        ligand.shift(shift)
+
+        curr_energy = 0.0
+        for cst in constraints:
+            if cst.is_residue_pair_constraint():
+                curr_energy += cst.distanceAB_.score_energy()
+                
+        scores.append( curr_energy )            
+
+    scores = np.array(scores)
+
+    score_mask = np.isclose(scores, np.min(scores))
+
+    clash_counts = list()
+    for sl in seed_locations[score_mask]:
+        lig_start = ligand.geom_center
+        shift = sl - lig_start
+
+        ligand.shift(shift)
+        clash_ct = 0
+
+        for res in stru.residues:
+            if res == ligand:
+                continue
+            clash_ct += res.clash_count( ligand )
+    
+        clash_counts.append( clash_ct ) 
+
+    clash_counts = np.array(clash_counts)
+
+    clash_mask = np.isclose(clash_counts, np.min(clash_counts))
+
+    final_locations = seed_locations[score_mask][clash_mask]
+    seed = final_locations[0]
+
+    ligand.shift( seed - ligand.geom_center)
+
 
 def _place_alphafill(stru: Structure,
-                     ligand: Ligand,
-                     code: str,
+                    ligand_chain:str,
+                    ligand_idx:int,
                      work_dir: str,
-                     similarity_cutoff: float = 0.75,
-                     clash_radius: float = 2.0,
+                     #similarity_cutoff: float = 0.75,
+                     clash_radius: float = 2.0, #TODO(CJ); get rid of this
                      **kwargs) -> Ligand:
     """Implementation function that places a specified ligand into a structure using the alphafill 
     algorithm (https://doi.org/10.1038/s41592-022-01685-y). SHOULD NOT be called directly by the user. 
@@ -186,7 +209,6 @@ def _place_alphafill(stru: Structure,
     Args:
         stru: Structure() where the Ligand() will be added.
         ligand: The Ligand() object that is being placed.
-        code: The .pdb code to use for homology modelling.
         work_dir: Directory where all temporary files will be saved.
         similarity_cutoff: How similar a Ligand() and template must be to get considered.
         clash_radius: Radius cutoff (Angstroms) for clash counting between two heavy atoms.
@@ -194,10 +216,37 @@ def _place_alphafill(stru: Structure,
     Returns:
         An aligned, deepcopied Ligand().
     """
+    ligand:Ligand = stru.get(f"{ligand_chain}.{ligand_idx}")
+    ligand.placement_method = "alphafill"
     _LOGGER.info(f"Beginnning placement of ligand {ligand} into the structure...")
     _LOGGER.info(f"Calling out to AlphaFill to fill structure...")
-    filled_structure: str = interface.pymol.fetch(code, work_dir)
-    (filled_structure, transplant_info_fpath) = interface.alphafill.fill_structure(filled_structure)
+
+    structure_start:str=f"{work_dir}/__afill_temp.pdb"
+    fs.safe_rm(structure_start)
+
+    similarity_cutoff:float = kwargs.get('similarity_cutoff', 0.60)
+
+    parser = PDBParser()
+    parser.save_structure(structure_start, stru)
+
+
+    session = interface.pymol.new_session()
+    interface.pymol.general_cmd(session, [
+        ('load', structure_start),
+        ('remove', f'chain {ligand_chain} and resi {ligand_idx}'),
+        ('save', structure_start, 'polymer.protein'),
+        ('delete', 'all')
+    ])
+
+
+    lines:List[str]=fs.lines_from_file(structure_start)
+
+    for lidx, ll in enumerate(lines): #epic fix
+        lines[lidx] = ll[0:76]
+
+    fs.write_lines(structure_start, lines)
+
+    (filled_structure, transplant_info_fpath) = interface.alphafill.fill_structure(structure_start,use_cache=kwargs.get('use_cache',False))
     _LOGGER.info("Filled structure using AlphaFill!")
     
     transplant_info = json.load(open(transplant_info_fpath, 'r'))
@@ -214,7 +263,6 @@ def _place_alphafill(stru: Structure,
     df = pd.DataFrame(transplant_data)
     #TODO(CJ): add logging and actually use the similarity_cutoff 
     memo = dict()
-    session = interface.pymol.new_session()
     atom_names:List[List[str]] = list()
     for i, row in df.iterrows():
         if len(row.analogue_id) <= 2:
@@ -239,7 +287,13 @@ def _place_alphafill(stru: Structure,
         similarity_score.append(numerator/denominator)
 
     df['similarity_score'] = similarity_score
-    df = df[df.similarity_score >= similarity_cutoff].reset_index(drop=True)
+    similarity_mask = df.similarity_score >= similarity_cutoff
+
+    if not similarity_mask.sum():
+        _LOGGER.error(f"No transplants exist with similarity_cutoff of {similarity_cutoff:.3f}! Exiting...")
+        exit( 1 )
+    
+    df = df[similarity_mask].reset_index(drop=True)
     similarity = df.similarity_score.to_numpy()
     df = df[np.isclose(similarity, np.max(similarity))].reset_index(drop=True)
 
@@ -252,20 +306,28 @@ def _place_alphafill(stru: Structure,
     outfile:str=f"{work_dir}/__aligned_ligand.mol2"
     to_delete:List[str] = [molfile, reactant, template, outfile]
 
-    PDBParser().save_structure(molfile, stru)
+    parser.save_structure(molfile, stru)
 
     Mol2Parser().save_ligand(reactant, ligand)
+    
+    pp_chains:List[str] = list()
+    for cc in stru.chains:
+        if cc.is_polypeptide():
+            pp_chains.append(f"chain {cc.name}")
 
     interface.pymol.general_cmd(session, [('delete', 'all'), ("load", filled_structure), ("remove", "solvent"), ("load", molfile),
-                                          ("align", Path(filled_structure).stem, Path(molfile).stem),
+                                          ("align", f"{Path(filled_structure).stem} and ({' or '.join(pp_chains)})", f"{Path(molfile).stem} and ({' or '.join(pp_chains)})"),
                                           ("delete", Path(molfile).stem),
                                           ("save", template, f"chain {selected_id} and segi {selected_id}")])
 
     outfile:str=align_ligand(template, reactant, outfile=outfile)
     aligned_ligand:Ligand=Mol2Parser().get_ligand(outfile)
+    
+    for a1 in ligand.atoms:
+        for a2 in aligned_ligand.atoms:
+            if a1.name == a2.name:
+                a1.coord = a2.coord
 
     for td in to_delete:
         fs.safe_rm( td )
-
-    return aligned_ligand
 

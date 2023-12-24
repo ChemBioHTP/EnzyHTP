@@ -22,6 +22,7 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core import _LOGGER, check_var_type
 from enzy_htp._config.pymol_config import PyMolConfig, default_pymol_config
 from enzy_htp.structure import Structure, PDBParser
+import enzy_htp.chemical as chem
 
 from .base_interface import BaseInterface
 
@@ -547,6 +548,32 @@ class PyMolInterface(BaseInterface):
         lines = list(filter(lambda ll: ll[0] != '>', lines))
         return ''.join(lines)
 
+    def remove_ligand_bonding(self, session): #TODO(CJ): bad name here
+
+        self.general_cmd(session, [('set', 'retain_order', 1)])       #NOTE(CJ): this solves so many problems
+        #TODO(CJ): need to add 
+        def dist( p1, p2 ):
+            return np.sqrt(np.sum((p1-p2)**2))
+        #TODO(CJ): documentation
+        df: pd.DataFrame = self.collect(session, 'memory', "chain resi resn name x y z".split(), "not polymer.protein")
+        df['point'] = df.apply(lambda row: np.array([row.x, row.y, row.z]) ,axis = 1)
+        non_aa = set(list(zip(df.chain, df.resi, df.resn)))
+        sele_str = " or ".join(map(lambda pr: f"(chain {pr[0]} and resi {pr[1]} and resn {pr[2]})", non_aa))
+
+        df2 = self.collect(session, 'memory', 'chain resi resn name x y z'.split(), f'polymer.protein within 3 of {sele_str}')
+        df2['point'] = df2.apply(lambda row: np.array([row.x, row.y, row.z]) ,axis = 1)
+       
+        args = list()
+        for i, row in df.iterrows():
+            for i2, row2 in df2.iterrows():
+                if dist(row.point, row2.point) <= 2:
+                    args.append(('unbond',
+                        f"chain {row.chain} and resi {row.resi} and resn {row.resn}",
+                        f"chain {row2.chain} and resi {row2.resi} and resn {row2.resn}",
+                    ))
+        self.general_cmd(session, args)
+
+
     def create_cluster(self, session, fname: str, sele_str: str, outfile: str = None, cap_strategy: str = 'H', work_dir: str = None) -> str:
         """TODO(CJ)"""
 
@@ -564,6 +591,8 @@ class PyMolInterface(BaseInterface):
         self.general_cmd(session, [('delete', 'all'), ('load', fname), ('select', sele_str), ('create', obj_name, sele_str),
                                    ('delete', Path(fname).stem)])
 
+        self._remove_ligand_bonding(session)
+
         df: pd.DataFrame = self.collect(session, 'memory', "chain resi resn name".split())
 
         args = list()
@@ -571,7 +600,7 @@ class PyMolInterface(BaseInterface):
             if row['name'] not in "N C".split():
                 continue
 
-            if not row.resn in THREE_LETTER_AA_MAPPER:
+            if not row.resn in chem.THREE_LETTER_AA_MAPPER:
                 continue
 
             args.extend([('valence', 'guess', f"chain {row.chain} and resi {row.resi} and resn {row.resn} and name {row['name']}"),
@@ -606,7 +635,6 @@ class PyMolInterface(BaseInterface):
                 ])
 
             self.general_cmd(session, args)
-
             args = [('valence', 'guess', 'name C21 or name C22'), ('h_add', 'name C21'), ('h_add', 'name C22'), ("save", outfile, obj_name)]
             self.general_cmd(session, args)
 
@@ -654,6 +682,30 @@ class PyMolInterface(BaseInterface):
             outfile = fs.safe_mv(outfile, f"{out_dir}/")
         #TODO(CJ): check if the file is downloaded
         return outfile
+
+    def get_residue_list(self, session, stru, sele_str:str='all', work_dir:str=None) -> List[Tuple[str,int]]:
+        #TODO(CJ): add this documentation + type hinting
+        if work_dir is None:
+            work_dir = './'
+
+        temp_file:str = f"{work_dir}/__temp_pymol.pdb"
+
+        _parser = PDBParser()
+        _parser.save_structure(temp_file, stru)
+
+        df = self.collect(session, temp_file, "chain resi".split(), sele=sele_str)
+        
+        fs.safe_rm( temp_file )
+        result = list()
+        result_set = set()
+
+        for i, row in df.iterrows():
+            new = (row['chain'], int(row['resi']))
+            if new not in result_set:
+                result.append( new )
+                result_set.add( new )
+
+        return result 
 
 
 class OpenPyMolSession:

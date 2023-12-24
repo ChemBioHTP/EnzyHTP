@@ -124,11 +124,17 @@ class Atom(DoubleLinkedNode):
         if self._element is None:
             if self.name in chem.residue.RESIDUE_ELEMENT_MAP["Amber"].keys():
                 return chem.residue.RESIDUE_ELEMENT_MAP["Amber"][self.name]
-            elif self.parent.is_metal():
+            elif self.parent is not None and self.parent.is_metal():
                 return self.parent.element
             else:
-                # case: in ligand atoms are named like this H1
-                return re.match("^[A-Z][a-z]?", self.name).group()
+                # case: in ligand atoms are named like this H1/1H
+                # case: CH3 from FAH
+                # case: CL1 from DCE TODO (add a mapper for all 2-letter elements, 
+                # and give warning if it can be proven that current info is not enough
+                # to deduce the ele. e.g.: is CO1 C or Co)
+                clean_name = self.name.lstrip('0123456789').rstrip('0123456789')
+                return re.match("^[A-Z][a-z]?", clean_name).group()           
+
         elif self.parent.is_metal():  # in pdb some metal's element name is wrong
             return self.parent.element
         return self._element
@@ -222,6 +228,23 @@ class Atom(DoubleLinkedNode):
                 raise TypeError("Adding wrong data type to connect. Correct data type: (Atom(), 'bond_order_info')")
         else:
             return check_pass
+
+    @property
+    def key(self) -> str: # TODO change the name to key_str
+        """Gets the Atom()'s key which can be used in conjuection with the Structure.get_atom method.
+        Format is <chain_name>.<residue_index>.<atom_name>. If the atom does not have a parent residue or
+        chain, an empty value is given (e.g. "..CA")
+        """
+        
+        tokens:List[str] = ["", "", self.name]
+
+        if self.parent is not None:
+            tokens[1] = str(self.parent.idx)
+            
+            if self.parent.parent is not None:
+                tokens[0] = self.parent.parent.name
+    
+        return '.'.join(tokens)
     #endregion
 
     #region === Getter-Property (ref) ===
@@ -244,12 +267,29 @@ class Atom(DoubleLinkedNode):
         return mh.get_distance(self.coord, point.coord)
 
     @dispatch
-    def distance_to(self, point: tuple) -> float:  # pylint: disable=function-redefined
+    def distance_to(self, point: Tuple) -> float:  # pylint: disable=function-redefined
         """Get the distance to the other atom or a point."""
-        if type(point) == tuple:
-            return mh.get_distance(self.coord, point)
-        else:
-            return mh.get_distance(self.coord, point.coord)
+        return mh.get_distance(self.coord, point)
+    
+    @dispatch
+    def angle_with(self, point_1: Atom, point_2: Atom) -> float:
+        """Get the angle to the other 2 atoms or 2 points."""
+        return mh.get_angle(self.coord, point_1.coord, point_2.coord)
+
+    @dispatch
+    def angle_with(self, point_1: Tuple, point_2: Tuple) -> float: # pylint: disable=function-redefined
+        """Get the angle to the other 2 atoms or 2 points."""
+        return mh.get_angle(self.coord, point_1, point_2)
+
+    @dispatch
+    def dihedral_with(self, point_1: Atom, point_2: Atom, point_3: Atom) -> float:
+        """Get the dihedral to the other 3 atoms or 3 points."""
+        return mh.get_dihedral(self.coord, point_1.coord, point_2.coord, point_3.coord)
+
+    @dispatch
+    def dihedral_with(self, point_1: Tuple, point_2: Tuple, point_3: Tuple) -> float: # pylint: disable=function-redefined
+        """Get the dihedral to the other 3 atoms or 3 points."""
+        return mh.get_dihedral(self.coord, point_1, point_2, point_3)
 
     def attached_protons(self) -> List[Atom]:
         """find all protons attached to self"""
@@ -281,7 +321,6 @@ class Atom(DoubleLinkedNode):
     def is_connected(self) -> bool:
         """check if self is in the connected state"""
         return self._connect is not None
-
     #endregion
 
     #region == Special ==

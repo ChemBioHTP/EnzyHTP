@@ -38,10 +38,9 @@ from .core import (
 
 from ._config import config
 
-from .chemical import ResidueType
+from .chemical import ResidueType, parse_ec_number
 
 from ._interface import Interface, OpenPyMolSession
-
 
 interface = Interface(config)
 """Singleton interface for all softwares enzy_htp is capable of interfacing with. SHOULD NOT be used by
@@ -53,5 +52,4 @@ by end users and should be used to customize system settings for each environmen
 
 from .analysis import ( electric_field, binding_energy )
 
-from .preparation import PDBLine, read_pdb_lines, dock_reactants, generate_conformers
-
+from .preparation import PDBLine, read_pdb_lines, dock_reactants, generate_conformers #TODO(CJ): get rid of system charge

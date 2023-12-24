@@ -46,6 +46,12 @@ class Ligand(NonCanonicalBase):
 
         self.bonds = kwargs.get('bonds', list())  # TODO change this to a more general represetation
         self.conformer_coords = list() # TODO change this to StructureEnsemble (we can leave a reference_var here tho)
+        self.placement_method_ = None
+        # TODO: The idea for Structure and Ligand is to only have the math model recorded. 
+        # But I see there is not really a better place to record the source of placement. 
+        # Would a self.mimo attribute a good idea for these? So that we can distinguish those
+        # that should not assumed to exist but just used in some protocols.
+        # (similar to job_manager.ClusterJob)
 
     # === Getter-Attr ===
 
@@ -53,6 +59,15 @@ class Ligand(NonCanonicalBase):
     def clone(self) -> Ligand:
         """Creates deecopy of self."""
         return deepcopy(self)
+
+    @property
+    def placement_method(self) -> str:
+        return self.placement_method_
+
+    @placement_method.setter
+    def placement_method(self, val_in:str) -> None:
+        self.placement_method_ = val_in
+
 
     # === Checker ===
     def is_ligand(self) -> bool:
@@ -100,6 +115,22 @@ class Ligand(NonCanonicalBase):
 
         return self.n_conformers()
 
+    def get_ligand_conformer(self, idx:int) -> Ligand:
+        """TODO(CJ): This will become a part of StructureEnseble someday. """
+        if idx == 0:
+            return self
+
+        idx -= 1
+        if idx >= len(self.conformer_coords):
+            #TODO(CJ): put an error here
+            pass
+
+        result = deepcopy( self )
+
+        for aidx, coord in enumerate( self.conformer_coords[idx] ):
+            result.atoms[aidx].coord = coord
+
+        return result
 
     def n_conformers(self) -> int:
         """How many conformers does this Ligand have?"""

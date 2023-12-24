@@ -9,3 +9,5 @@ colorlog
 modeller
 pyvista
 rdkit
+editdistance
+beautifulsoup4

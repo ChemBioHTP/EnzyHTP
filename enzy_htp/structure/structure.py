@@ -73,24 +73,9 @@ Operation:
         4	
 
     Interfacing with Residue()"s:
-        >>> structure.residues()
-        ["A.ASP.1","A.ASP.2","A.ASP.3","B.ASP.1"]   # @shaoqz: shouldn"t this be Residue objects?
-        >>> structure.num_residues
-        4
-        >>> res_cpy : enzy_htp.Residue = structure.get_residue( "B.ASP.1" ) # @shaoqz: @imp we should not use residue name and id together as the identifier. Either id only to pinpoint or name only to batch select
-        >>> structure.remove_residue( "B.ASP.1" )
-        >>> structure.residues()
-        ["A.ASP.1","A.ASP.2","A.ASP.3"]
-        >>> structure.num_residues
-        3
-        >>> structure.add_residue( res_cpy )
-        >>> structure.residues()
-        ["A.ASP.1","A.ASP.2","A.ASP.3","B.ASP.1"]
-        >>> structure.num_residues
-        4
+        >>> res_cpy : enzy_htp.Residue = structure.get( "B.ASP.1" ) # @shaoqz: @imp we should not use residue name and id together as the identifier. Either id only to pinpoint or name only to batch select
 
     Saving the structure:
-        >>> structure.to_pdb( "/path/to/copy/of/pdb" )
 
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
@@ -429,6 +414,41 @@ class Structure(DoubleLinkedNode):
                         result.append(res.mainchain_atoms)
         return result
 
+    def get(self, key: str) -> Union[Chain, Residue, Atom]:
+        """Returns the Residue/Atom/Chain specified by a key with the format <chain_name>.<residue_index>.<atom_name>. (E.g. A.1.CA or A or A.1)
+        Function does not check for identify of the Residue. Errors and exits if the format is incorrect or the specified Residue 
+        does not exist.
+
+        Args:
+            key: specification of the residue to select as a str().
+
+        Returns:
+            The specified Residue/Atom/Chain."""
+        key = key.strip()
+        section_count = key.count('.')
+        if section_count > 3:
+            _LOGGER.error(f"Invalid key format in {key}. Expect <chain_name>.<residue_index>.<atom_name>. Exiting...")
+            raise ValueError
+        # Chain
+        if section_count == 0:
+            result = self.get_chain(key)
+        
+        # Residue
+        if section_count == 1:
+            chain, res_idx = key.split('.')
+            result = self.find_residue_with_key((chain, res_idx))
+        
+        # Atom
+        if section_count == 2:
+            chain, res_idx, atom_name = key.split('.')
+            res = self.find_residue_with_key((chain, res_idx))
+            result = res.find_atom_name(atom_name)
+        
+        if not result:
+            _LOGGER.error(f"Unable to locate residue {key} in Structure. Exiting...")
+            exit( 1 )
+
+        return result
     # endregion
 
     #region === Checker ===
@@ -514,6 +534,18 @@ class Structure(DoubleLinkedNode):
     def has_chain(self, chain_name: str) -> bool:
         """Checks if the Structure() has a chain with the specified chain_name."""
         return chain_name in self.chain_mapper
+
+    def has_residue(self, key: str) -> bool:
+        """Checks if the Structure() has a chain with the specified key.
+        key format: chain_name.residue_idx"""
+        chain, rnum = key.split('.')
+        rnum = int(rnum) 
+
+        for res in self.residues:
+            if res.parent.name == chain and res.idx == rnum:
+                return True
+
+        return False
     #endregion
 
     #region === Editor ===
@@ -632,6 +664,16 @@ class Structure(DoubleLinkedNode):
             for ch in self:
                 ch.sort_residues()
 
+    @dispatch
+    def absolute_index(self, target:Residue, indexed:int=0) -> int:
+
+        for ridx, res in enumerate(self.residues):
+            if res == target:
+                return ridx + indexed
+
+        else:
+            assert False
+
     def assign_ncaa_chargespin(self, net_charge_mapper: Dict[str, Tuple[int, int]]):
         """assign net charges to NCAAs in Structure() based on net_charge_mapper
         format: {"RES" : (charge, spin), ...}
@@ -681,6 +723,7 @@ class Structure(DoubleLinkedNode):
         if isinstance(key, str):
             return self.chain_mapper[key]
         raise KeyError("Structure() getitem only take int or str as key")
+
 
     def __delitem__(self, key: Union[int, str]):
         """support dictionary like delete"""

@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 from rdkit.Chem import AllChem
 
+from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp import interface, config
 from enzy_htp.structure import PDBParser, Mol2Parser, Structure, Ligand
@@ -45,6 +46,8 @@ def generate_conformers( ligand : Ligand, n_conformers:int=100, engine:str='bcl'
 
     if work_dir is None:
         work_dir = config['system.SCRATCH_DIR']
+
+    fs.safe_mkdir( work_dir )
 
     orig_count:int=ligand.n_conformers()
     METHOD_MAPPER[engine](ligand, n_conformers, work_dir)

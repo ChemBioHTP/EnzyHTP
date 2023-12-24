@@ -91,6 +91,9 @@ def align_ligand(template: str,
     updated_mat = _rchem.rdmolops.Get3DDistanceMatrix(l_info['mol'])
 
     for bond in l_info['bonded']:
+        bond_obj=l_info['bond_mapper'][bond]
+        if bond_obj.IsInRing():
+            continue
         idx1, idx2 = l_info['mapper'][bond[0]], l_info['mapper'][bond[1]]
         avg = (updated_mat[idx1][idx2] + orig_mat[idx1][idx2]) / 2
         if abs(updated_mat[idx1][idx2] - orig_mat[idx1][idx2]) / avg >= bond_tol:
@@ -184,13 +187,18 @@ def _molecule_info(fname: str, dist_tol: float) -> Dict:
 
     bonded = set()
 
+    bond_mapper = dict()
+
     for bond in mol.GetBonds():
         a1_idx, a2_idx = bond.GetBeginAtom().GetIdx(), bond.GetEndAtom().GetIdx()
         bonded.add((mapper[a1_idx], mapper[a2_idx]))
         bonded.add((mapper[a2_idx], mapper[a1_idx]))
+        bond_mapper[(mapper[a1_idx], mapper[a2_idx])] = bond
+        bond_mapper[(mapper[a2_idx], mapper[a1_idx])] = bond
 
     return {
         'mol': _rchem.RWMol(mol),
         'mapper': mapper,
         'bonded': bonded,
+        'bond_mapper': bond_mapper
     }

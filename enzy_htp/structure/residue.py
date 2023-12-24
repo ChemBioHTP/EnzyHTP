@@ -12,6 +12,8 @@ import sys
 import math
 from typing import Tuple, List
 
+
+import numpy as np
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
 from enzy_htp.core import _LOGGER
 from enzy_htp.core.exception import ResidueDontHaveAtom
@@ -111,6 +113,17 @@ class Residue(DoubleLinkedNode):
         return (self.chain.name, self._idx)
 
     @property
+    def key_str(self) -> str:
+        """The Residue key as a str in the format <chain_name>.<residue_idx>. Note that if the given
+        Residue does not have a parent chain, it is left blank (e.g. ".1"."""
+        tokens:List[str] = ["", str(self.idx)]
+
+        if self.chain is not None:
+            tokens[0] = self.chain.name
+
+        return ".".join(tokens)
+
+    @property
     def num_atoms(self) -> int:
         """Number of atoms in the Residue."""
         return len(self._atoms)
@@ -176,6 +189,29 @@ class Residue(DoubleLinkedNode):
     # def clone(self) -> Residue: #TODO
     #     """Creates a deepcopy of self."""
     #     return deepcopy(self)
+
+    def clash_count(self, other:Residue, radius:float=2.0, ignore_H:bool=True) -> int:
+        #TODO(CJ): the documentation for this part
+        if self == other:
+            _LOGGER.warning("Attempted to count clashes between Residue and itself.")
+            return 0
+
+        count:int = 0
+        for aa in other.atoms:
+            if ignore_H and aa.element == 'H':
+                continue
+            else:
+                count += self.clashes(aa, radius)
+
+        return count
+            
+    def clashes(self, other:Atom, radius:float) -> bool:
+        #TODO(CJ): the documentation for this part
+        for aa in self.atoms:
+            if aa.distance_to(other) <= radius:
+                return True
+        return False
+
     #endregion
 
     #region === Checker ===

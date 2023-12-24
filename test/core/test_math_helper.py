@@ -135,6 +135,29 @@ def test_internal_to_cartesian_from_1():
         for k,l in zip(i,j):
             assert np.isclose(k,l, atol=1e-3)
 
+def test_get_angle():
+    """test using an example data.
+    answer get from pymol"""
+    test_points = [
+        (-46.808998107910156, 52.667999267578125, -28.253999710083008),
+        (-47.63199996948242, 50.47800064086914, -28.195999145507812),
+        (-47.42100143432617, 51.42599868774414, -30.475000381469727),
+    ]
+    assert np.isclose(mh.get_angle(*test_points), 65.7414, atol=1e-3)
+    test_points = [
+        (-20.92099952697754, 38.88800048828125, -11.484000205993652),
+        (-20.18000030517578, 34.959999084472656, -12.663999557495117),
+        (-22.488000869750977, 34.05500030517578, -12.204000473022461),
+    ]
+    assert np.isclose(mh.get_angle(*test_points), 97.116, atol=1e-3)
+
+    test_points = [
+        (0, 2, 0),
+        (0, 0, 0),
+        (0, 1, 0),
+    ]
+    assert np.isclose(mh.get_angle(*test_points), 0.0, atol=1e-3)
+
 def test_is_integer():
     """as name"""
     test_num = 6.000001
