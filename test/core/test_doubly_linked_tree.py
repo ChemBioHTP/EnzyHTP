@@ -51,3 +51,15 @@ def test_deepcopy_more_than_once():
     assert id(new_new_parent) != id(new_parent)
     assert hasattr(new_new_parent[0], "mark_temp_1")
     assert hasattr(new_new_parent[0], "mark_temp_2")
+
+def test_root():
+    """test using a made up tree."""
+    child_1 = DoubleLinkedNode()
+    child_2 = DoubleLinkedNode()
+    parent_1 = DoubleLinkedNode(children=[child_1, child_2])
+    child_3 = DoubleLinkedNode()
+    child_4 = DoubleLinkedNode()
+    parent_2 = DoubleLinkedNode(children=[child_3, child_4])
+    root = DoubleLinkedNode(children=[parent_1, parent_2])
+
+    assert child_1.root is root

@@ -93,6 +93,13 @@ class DoubleLinkedNode():
     def parent(self, val):
         self.set_parent(val)
 
+    @property
+    def root(self):
+        """get the very parent object that has no parent"""
+        if self.parent is None:
+            return self
+        return self.parent.root
+
     #endregion
 
     #region === edit ===
