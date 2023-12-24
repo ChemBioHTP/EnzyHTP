@@ -14,12 +14,12 @@ import enzy_htp.core.file_system as fs
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.exception import InconsistentMDEngine
 from enzy_htp.core import job_manager
-from enzy_htp.core.mol_dyn_result import MolDynResult
 from enzy_htp.structure import Structure, StructureEnsemble, structure_constraint
 from enzy_htp._interface.handle_types import (
     MolDynStep,
     MolDynParameterizer,
-    MolDynParameter)
+    MolDynParameter,
+    MolDynResult)
 
 def equi_md_sampling(stru: Structure,
                      param_method: MolDynParameterizer,
@@ -29,8 +29,8 @@ def equi_md_sampling(stru: Structure,
                      # config for steps
                      prod_time: float= 50.0, # ns
                      prod_temperature: float = 300.0, #K
-                     record_period: float= 0.5, # ns
                      prod_constrain: structure_constraint.StructureConstraint= None,
+                     record_period: float= 0.5, # ns
                      cluster_job_config: Dict= None,
                      cpu_equi_step: bool= False,
                      cpu_equi_job_config: Dict= None,
@@ -38,15 +38,20 @@ def equi_md_sampling(stru: Structure,
     """This science API performs a production run of molecular dynamics simulation with the
     system equilibrated by several short md simulations from the starting {stru}
     (Basically md_simulation() with preset steps)
+    min (micro) -> heat (NVT) -> equi (NPT) -> prod (NPT)
     Args:
         stru: the starting structure
         param_method: the Parameterizer() used for parameterization. This determines the engine.
         parallel_runs: the number of desired parallel runs of the steps.
         parallel_method: the method to parallelize the multiple runs
+        work_dir: the directory that contains all the MD files input/intermediate/output
+        prod_time: the simulation time in production step (unit: ns)
+        prod_temperature: the production temperature
+        prod_constrain: the constrain applied in the production step
+        record_period: the simulation time period for recording the geom. (unit: ns)
         cluster_job_config: the config for cluster_job if it is used as the parallel method.
         cpu_equi_step: whether use cpu for equi step
         cpu_equi_job_config: the job config for the cpu equi step if specified
-        work_dir: the directory that contains all the MD files input/intermediate/output
     Returns:
         a list trajectories for each replica in StructureEnsemble format."""
     result = []
@@ -81,7 +86,7 @@ def equi_md_sampling(stru: Structure,
         length=0.05, # ns
         cluster_job_config=cluster_job_config,
         core_type="GPU",
-        temperature=((0, 0), (0.05*0.9, prod_temperature), (-1, prod_temperature)),
+        temperature=[(0, 0), (0.05*0.9, prod_temperature), (-1, prod_temperature)],
         constrain=[freeze_backbone, prod_constrain])
 
     equi_step = parent_interface.build_md_step(
@@ -181,6 +186,10 @@ def md_simulation(stru: Structure,
             Free.
         - Gromacs (https://www.gromacs.org/)
             Free and open-source.
+        - M-Chem (https://pubmed.ncbi.nlm.nih.gov/37470065/)
+            Not Free.
+            Support good general force field for ligands
+            Support better implemtation of polarizable force field
     """
     supported_parallel_method = ["cluster_job"]
     # I. san check
@@ -245,12 +254,12 @@ def _parallelize_md_steps_with_cluster_job(
                 result_egg_ele.append((step, output))
         if not result_egg_ele:
             result_egg_ele = [(step, output)] # default add last step if non is specified
-        job_list = type(step).try_merge_jobs(job_list) # TODO this is a classmethod that try merging jobs of this type
+        job_list = type(step).try_merge_jobs(job_list)
 
         job_array.append(job_list)
         result_eggs.append(result_egg_ele)  # eggs are filenames that can be translated to give birth actual data
 
-    job_manager.wait_to_2d_array_end(job_array) # TODO make this function that deal with job array that contain lists of serial jobs
+    job_manager.ClusterJob.wait_to_2d_array_end(job_array, period=210)
 
     for rep_md_result in result_eggs:
         rep_result_list = []

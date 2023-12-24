@@ -157,3 +157,18 @@ def test_get_angle():
         (0, 1, 0),
     ]
     assert np.isclose(mh.get_angle(*test_points), 0.0, atol=1e-3)
+
+def test_is_integer():
+    """as name"""
+    test_num = 6.000001
+    test_num_1 = 6.3
+    test_num_2 = 5.99999
+    assert mh.is_integer(test_num)
+    assert not mh.is_integer(test_num_1)
+    assert mh.is_integer(test_num_2)
+
+def test_get_section_from_endpoint():
+    """as name"""
+    test_list = [(1,1),(10,2),(15,5),(25,5)]
+    answer_list = [((1,1),(10,2)), ((11,2),(15,5)), ((16,5),(25,5))]
+    assert mh.get_section_from_endpoint(test_list) == answer_list

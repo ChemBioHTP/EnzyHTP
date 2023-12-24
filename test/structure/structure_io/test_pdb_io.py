@@ -555,6 +555,15 @@ def test_get_structure_allow_multichain_in_atom(caplog):
 
 
 @pytest.mark.interface
+def test_get_structure_contain_na():
+    """test get_structure() on a PDB that contains nucleic acid.
+    made sure this is not raise exceptions for now. NAs are treated
+    as Ligands. Add more assert when actually developed support for this."""
+    dna_rna_pdb = f"{DATA_DIR}/cas9_4oo8.pdb"
+    stru: Structure = sp.get_structure(dna_rna_pdb)
+
+
+@pytest.mark.interface
 def test_get_file_str():
     '''
     test for the getting pdb file from Structure()

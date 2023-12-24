@@ -29,13 +29,35 @@ class ARMerConfig(BaseConfig):
         'core_type' : 'cpu',
         'nodes':'1',
         'node_cores' : '8',
-        'job_name' : 'EnzyHTP_QMCluster',
-        'partition' : 'production',
+        'job_name' : 'QMCluster_EnzyHTP',
+        'partition' : '<fillthis>',
         'mem_per_core' : '3G', # in GB. Will used in gjf as downward round up after * 1024 and will - 1000 after multiple with cores
         'walltime' : '3-00:00:00',
-        'account' : 'yang_lab_csb',
+        'account' : '<fillthis>',
         }
     """Default resource settings for QM cluster jobs from `energy`"""
+
+    MD_CPU_RES: dict = {
+        'core_type' : 'cpu',
+        'nodes':'1',
+        'node_cores' : '16',
+        'job_name' : 'MD_EnzyHTP',
+        'partition' : '<fillthis>',
+        'mem_per_core' : '3G', # in GB
+        'walltime' : '1-00:00:00',
+        'account' : '<fillthis>'}
+    """Default resource settings for CPU MD jobs from `geometry`"""
+
+    MD_GPU_RES: dict = {
+        'core_type' : 'gpu',
+        'nodes':'1',
+        'node_cores' : '1',
+        'job_name' : 'MD_EnzyHTP',
+        'partition' : '<fillthis>',
+        'mem_per_core' : '8G', # in GB
+        'walltime' : '3-00:00:00',
+        'account' : '<fillthis>'}
+    """Default resource settings for GPU MD jobs from `geometry`"""
 
     def required_executables(self) -> List[str]:
         """A list of all required executables for ARMerConfig."""

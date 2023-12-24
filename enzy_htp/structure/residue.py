@@ -243,7 +243,7 @@ class Residue(DoubleLinkedNode):
     def is_metal_center(self):
         """determine if current metal is a coordination center.
         TODO more consistant way to determine for 'boundary' metals like Mg2+"""
-        return self.name in chem.METAL_CENTER_MAP
+        return self.is_metal() and self.name in chem.METAL_CENTER_MAP # fix the bug that it think U as nucleic_acid is also metal center
 
     def is_trash(self) -> bool:
         """Checks if the Residue() is an rd_non_ligand as defined by enzy_htp.chemical.solvent.RD_NON_LIGAND_LIST"""

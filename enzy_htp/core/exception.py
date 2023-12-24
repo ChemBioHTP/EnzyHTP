@@ -92,3 +92,15 @@ class FileFormatError(Exception):
     """Exception corresponding to wrong file format. Mainly used in file parsing in
     StructureParserInterface concrete classes"""
     pass
+
+class AmberMDError(Exception):
+    """Exception corresponding runtime error of sander/pmemd in enzy_htp._interface.amber_interface.AmberMDStep
+    contains a list of error information"""
+
+    def __init__(self, error_info_list, *args) -> None:
+        super().__init__(*args)
+        self.error_info_list = error_info_list
+
+    @property
+    def error_info_str(self) -> str:
+        return "\n".join(self.error_info_list)

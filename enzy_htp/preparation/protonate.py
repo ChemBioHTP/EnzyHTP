@@ -112,7 +112,8 @@ def protonate_peptide_with_pdb2pqr(stru: Structure,
                                    ph: float = 7.0,
                                    int_pdb_path: Union[str, None] = None,
                                    int_pqr_path: Union[str, None] = None,
-                                   metal_fix_method: str = "deprotonate_all"):
+                                   metal_fix_method: str = "deprotonate_all",
+                                   **kwargs):
     """
     Add missing hydrogens and determine protonation state of the peptide part of protein
     using [PDB2PQR](https://www.poissonboltzmann.org/) via the pdb2pqr python [package](https://pdb2pqr.readthedocs.io/en/latest/).
@@ -149,7 +150,7 @@ def protonate_peptide_with_pdb2pqr(stru: Structure,
     with open(int_pdb_path, "w") as of:
         of.write(sp.get_file_str(stru))  # give the whole structure as input here as PropKa can use ligand
     pdb2pqr_protonate_pdb(int_pdb_path, int_pqr_path, ph)
-    peptide_protonated_stru = sp.get_structure(int_pqr_path)
+    peptide_protonated_stru = sp.get_structure(int_pqr_path) # TODO(bug): pdb2pqr eraser all the chain ID along with all ligands. This cause a bug on PDB: 1M15. This can be fixed by aligning the chain id using residue idx
     stru_oper.remove_non_peptide(peptide_protonated_stru)  # keep the peptide only (sometime it has solvent)
     stru_oper.update_residues(stru, peptide_protonated_stru)
     protonate_peptide_fix_metal_donor(stru, method=metal_fix_method)
@@ -231,7 +232,7 @@ METAL_FIX_METHODS = {"deprotonate_all": deprotonate_metal_donors}
 PEPTIDE_PROTONATION_METHODS = {"pdb2pqr": protonate_peptide_with_pdb2pqr}
 
 
-def protonate_ligand_with_pybel(stru: Structure, ph: float = 7.0, int_ligand_file_dir=None):
+def protonate_ligand_with_pybel(stru: Structure, ph: float = 7.0, int_ligand_file_dir=None, **kwargs):
     """
     the inteface for using PYBEL to protonate all ligands in {stru} with a given ph
     Args:

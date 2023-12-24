@@ -58,6 +58,9 @@ def search_ncaa_parm_file(target_res: NonCanonicalBase, target_method: str,
                       "If you are not searching for a specific method, please use 'any'."
                       "To register it as a supported method - add it to ncaa_library.py::PARM_METHOD_LIST.")
         raise ValueError
+    if not Path(ncaa_lib_path).exists():
+        _LOGGER.error(f"supplied ncaa_lib_path does not exist: {ncaa_lib_path}")
+        raise ValueError
 
     # I. initiate a ncaa_lib_mapper {file : (res_name, method)} (1-time effort if no new files added)
     ncaa_lib_mapper = {}

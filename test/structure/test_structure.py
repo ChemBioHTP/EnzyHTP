@@ -176,13 +176,19 @@ def test_chemical_diversity_ligand():
     """test function works as expected"""
     pdb_file_path = f"{DATA_DIR}1Q4T_ligand_test.pdb"
     stru: Structure = sp.get_structure(pdb_file_path)
-    assert stru.chemical_diversity == {'polypeptide': 2, 'ligand': {'N', 'S', 'O', 'P', 'C'}}
+    assert stru.chemical_diversity == {'polypeptide': 2, 'ligand': {'N', 'S', 'O', 'P', 'C'}, 'solvents': {'O'}}
 
 def test_chemical_diversity_metal():
     """test function works as expected"""
     pdb_file_path = f"{DATA_DIR}1NVG.pdb"
     stru: Structure = sp.get_structure(pdb_file_path)
     assert stru.chemical_diversity == {'polypeptide': 1, 'metalcenters': {'Zn'}}
+
+def test_chemical_diversity_nucleic_acid():
+    """test function works as expected"""
+    pdb_file_path = f"{DATA_DIR}cas9_4oo8.pdb"
+    stru: Structure = sp.get_structure(pdb_file_path)
+    assert stru.chemical_diversity == {'polypeptide': 2, 'ligand': {'N', 'C', 'O', 'P'}, 'solvents': {'O'}, 'nucleic_acid': ''}
 
 def test_add_chain():
     """test function works as expected"""
