@@ -155,3 +155,7 @@ cython_debug/
 # Dont want to keep the files generated in testing
 test/preparation/work_dir/*
 .cache*
+
+# Always keeps the 1st version of the submission script template
+dev-tools/submit_test_long.sh
+dev-tools/submit_test.sh
