@@ -478,7 +478,7 @@ class AmberMDStep(MolDynStep):
                  temperature: Union[float, List[Tuple[float]]],
                  thermostat: str,
                  pressure_scaling: str,
-                 constrain: StructureConstraint,
+                 constrain: List[StructureConstraint],
                  restart: bool,
                  core_type: str,
                  cluster_job_config: Dict,
@@ -486,7 +486,7 @@ class AmberMDStep(MolDynStep):
                  record_period: float,
                  keep_in_file: bool,
                  work_dir: str,) -> None:
-        self._parent_interface = interface
+        self._parent_interface: AmberInterface = interface
         self.name = name
         self._length = length
         self._timestep = timestep
@@ -533,11 +533,11 @@ class AmberMDStep(MolDynStep):
         self._work_dir = val
 
     @property
-    def constrain(self) -> StructureConstraint:
+    def constrain(self) -> List[StructureConstraint]:
         return self._constrain
 
     @constrain.setter
-    def constrain(self, val: StructureConstraint):
+    def constrain(self, val: List[StructureConstraint]):
         self._constrain = val
 
     @property
@@ -1627,7 +1627,7 @@ class AmberInterface(BaseInterface):
                       temperature: Union[float, List[Tuple[float]]] = "default",
                       thermostat: str = "default",
                       pressure_scaling: str = "default",
-                      constrain: StructureConstraint = "default",
+                      constrain: List[StructureConstraint] = "default",
                       restart: bool = "default",
                       # simulation (alternative)
                       amber_md_in_file: str = None,
@@ -1660,7 +1660,7 @@ class AmberInterface(BaseInterface):
                 the scaling type for pressure
                 options: [none, isotropic, anisotropic, semiisotropic]
             constrain:
-                the StructureConstraint object that indicates a geometry constrain in the step.
+                a list of StructureConstraint objects that indicates geometry constrains in the step.
             restart:
                 whether restart this md from the volecity of a previous md step.
             core_type:
@@ -1761,6 +1761,8 @@ class AmberInterface(BaseInterface):
             pressure_scaling = self.config()["DEFAULT_MD_PRESSURE_SCALING"]
         if constrain == "default":
             constrain = self.config()["DEFAULT_MD_CONSTRAIN"]
+        elif isinstance(constrain, StructureConstraint): # dispatch for non list input
+            constrain = [constrain]
         if restart == "default":
             restart = self.config()["DEFAULT_MD_RESTART"]
         if core_type == "default":

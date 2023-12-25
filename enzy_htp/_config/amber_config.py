@@ -102,7 +102,7 @@ class AmberConfig(BaseConfig):
     DEFAULT_MD_PRESSURE_SCALING: str = "isotropic"
     """default value for the pressure scaling of the md step"""
 
-    DEFAULT_MD_CONSTRAIN: StructureConstraint = None
+    DEFAULT_MD_CONSTRAIN: StructureConstraint = []
     """The default value for the constraint applied in the md step"""
 
     DEFAULT_MD_RESTART: bool = False

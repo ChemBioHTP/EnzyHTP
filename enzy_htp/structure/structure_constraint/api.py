@@ -74,6 +74,11 @@ class StructureConstraint(ABC):
         """get the current topology-context of the constraint"""
         self.check_consistent_topology()
         return self.atoms[0].root
+
+    @property
+    def constraint_type(self) -> str:
+        """hard coded constraint type"""
+        return "general"
     # endregion
 
     # region == checker ==
@@ -232,7 +237,12 @@ class CartesianFreeze(StructureConstraint):
     
     def __init__(self, atoms:List[Atom] ):
         super().__init__(self, atoms, 0.0, dict())
-     
+
+    @property
+    def constraint_type(self) -> str:
+        """hard coded constraint type"""
+        return "cartesian_freeze"
+
     def is_cartesian_freeze(self) -> bool:
         """Is this a cartesian freeze constraint? Always True for this class."""
         return True
@@ -252,6 +262,12 @@ class CartesianFreeze(StructureConstraint):
 
 class DistanceConstraint(StructureConstraint):
     """Specialization of StructureConstraint() for the distance between two Atom()'s."""
+
+    @property
+    def constraint_type(self) -> str:
+        """hard coded constraint type"""
+        return "distance_constraint"
+
     def is_distance_constraint(self) -> bool:
         """Is this a distance constraint? Always True for this class."""
         return True
@@ -267,6 +283,12 @@ class DistanceConstraint(StructureConstraint):
 
 class AngleConstraint(StructureConstraint):
     """Specialization of StructureConstraint() for the angle between three Atom()'s."""
+
+    @property
+    def constraint_type(self) -> str:
+        """hard coded constraint type"""
+        return "angle_constraint"
+
     def is_angle_constraint(self) -> bool:
         """Is this an angle constraint? Always True for this class."""
         return True 
@@ -282,7 +304,12 @@ class AngleConstraint(StructureConstraint):
 
 class DihedralConstraint(StructureConstraint):
     """Specialization of StructureConstraint() for the dihedral angle between four Atom()'s"""
-    
+
+    @property
+    def constraint_type(self) -> str:
+        """hard coded constraint type"""
+        return "dihedral_constraint"
+
     def is_dihedral_constraint(self) -> bool:
         """Is this a dihedral constraint?"""
         return True 
@@ -335,6 +362,12 @@ class ResiduePairConstraint(StructureConstraint):
         self.atoms_ = list(atoms)
         self.correct_num_atoms()
 
+    @property
+    def constraint_type(self) -> str:
+        """hard coded constraint type"""
+        return "residue_pair_constraint"
+
+
     def clone(self) -> "ResiduePairConstraint":
         """TODO(CJ)"""
         return ResiduePairConstraint.__init__(
@@ -350,7 +383,6 @@ class ResiduePairConstraint(StructureConstraint):
                 self.torsionAB_
                 )
         
-
 
     def change_topology(self, new_topology: Structure) -> None:
         """Same as StructureConstraint.change_topology() but with extra steps because of the composite 
@@ -452,6 +484,16 @@ class ResiduePairConstraint(StructureConstraint):
         ))
 
 
+class BackBoneFreeze(CartesianFreeze):
+    """Specialization of CartesianFreeze() for constraining the movement of
+    backbone Atom()s"""
+
+    @property
+    def constraint_type(self) -> str:
+        """hard coded constraint type"""
+        return "backbone_freeze"
+
+# region == constructors ==
 def create_residue_pair_constraint(
                 topology:Structure,
                 r1_key:Tuple[str,int],
@@ -545,23 +587,11 @@ def create_residue_pair_constraint(
                                 *csts
                                 )
 
+def create_backbone_freeze(stru: Structure, force_constant: float = 100.0) -> BackBoneFreeze:
+    """constructor for BackboneFreeze"""
+    # TODO start here. Look into Amber manual and see what are the options for
+    # backbone constraint
 
-def build_from_preset(topology: Structure,
-                      keyword: str,) -> StructureConstraint:
-    """constructor that allows building a StructureConstraint from a keyword.
-    recommand combining this with functools.partial to make general constrains
-    that can apply to different structures
-    Args:
-        topology: the topology defined by a Structure()
-        keyword: the preset constrain keyword. Supported list:
-            freeze_backbone: freeze the coordinate of all backbone atoms"""
-    supported_keywords = ["freeze_backbone", "freeze_hydrogens"]
-    if keyword == "freeze_backbone":
-        freeze_atoms = topology.backbone_atoms()
-        result = StructureConstraint(topology, freeze_atoms, geom_constrain=[])
-        result._is_backbone_freeze = True
-    else:
-        _LOGGER.error(f"using unsupported keyword {keyword}. (Supported: {supported_keywords})")
-        raise ValueError
-
-    return result
+def create_distance_constraint() -> DistanceConstraint:
+    """constructor for DistanceConstraint"""
+# endregion
