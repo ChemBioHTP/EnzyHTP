@@ -411,7 +411,7 @@ class Structure(DoubleLinkedNode):
                     if by_chain:
                         result[ch_id].extend(res.mainchain_atoms)
                     else:
-                        result.append(res.mainchain_atoms)
+                        result.extend(res.mainchain_atoms)
         return result
 
     def get(self, key: str) -> Union[Chain, Residue, Atom]:

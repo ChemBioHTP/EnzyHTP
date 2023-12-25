@@ -10,8 +10,8 @@ from .api import (
     AngleConstraint,
     DihedralConstraint,
     ResiduePairConstraint,
-    build_from_preset,
-    create_residue_pair_constraint
+    create_residue_pair_constraint,
+    create_backbone_freeze,
     )
 
 

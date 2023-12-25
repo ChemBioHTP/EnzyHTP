@@ -16,13 +16,14 @@ Date: 2022-10-28
 """
 import copy
 from copy import deepcopy
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Dict, Any, Set
 
 import numpy as np
 
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.exception import WrongTopology
 from ..structure import Structure, Solvent, Chain, Residue, Atom
+from enzy_htp import config as eh_config
 
 from abc import ABC, abstractmethod
 
@@ -33,23 +34,32 @@ class StructureConstraint(ABC):
     can be translated in between different software packages.
 
     Attributes:
-        atoms_: A List[Atom] containing all the atoms in the constraint.
-        target_value_ : The float() target value for the constraint.
-        params_: A Dict[str,float] with arbitrary parameters.
+        atoms_:
+            A List[Atom] containing all the atoms in the constraint.
+        target_value_ :
+            The float() target value for the constraint.
+        params_:
+            A Dict[str,float] with a that contain parameters for EVERY software
+            that this constraint type support. user can just edit this mapper to
+            change the parameter.
+            example:
+            {
+            "rosetta" : {"XXX" : ###},
+            "amber" : {"XXX" : ###},
+            "xtb" : {"XXX" : ###},
+            }
     """
 
     def __init__(self,
                  atoms: List[Atom],
                  target_value: float,
-                 params: Dict[str, Any]):
+                 params: Dict[str, Dict[str, Any]],
+                 ):
         """Ctor that exits if the supplied number of atoms is NOT correct."""
         
         self.atoms_ = atoms 
         self.target_value_ = target_value 
-
         self.params_ = deepcopy( params ) 
-        self['calc_method'] = params.get('calc_method', 'rosetta') # TODO this does not work in the case that multiple software in the same workflow needs to use a same set of constraints.
-        # https://github.com/ChemBioHTP/EnzyHTP/pull/147/#discussion_r1435735159
 
         if not self.correct_num_atoms():
             _LOGGER.error("Incorrect number of atoms supplied! Exiting...")
@@ -70,6 +80,22 @@ class StructureConstraint(ABC):
             exit( 1 )
 
     @property
+    def target_value(self) -> float:
+        """Getter for the target value of the constrained geometry."""
+        return self.target_value_
+
+    @target_value.setter
+    def target_value(self, val_in : float ) -> None:
+        """Change the stored target value of the constrained geometry.."""
+        self.target_value_ = val_in
+
+    @property
+    def params(self) -> Dict[str, Any]:
+        """the mapper that contain parameters for all support software
+        of this type of constraint"""
+        return self.params_
+
+    @property
     def topology(self) -> Structure:
         """get the current topology-context of the constraint"""
         self.check_consistent_topology()
@@ -79,6 +105,34 @@ class StructureConstraint(ABC):
     def constraint_type(self) -> str:
         """hard coded constraint type"""
         return "general"
+
+    def clone(self) -> "StructureConstraint":
+        """Clones the StructureConstraint with the original target_value."""
+        return self.__init__(self.atoms, self.target_value, deepcopy(self.params_))
+
+    def clone_current(self) -> "StructureConstraint":
+        """Get a version of the StructureConstraint with the current value as the 
+        target value."""
+        return self.__init__(self.atoms, self.current_value, deepcopy(self.params_))
+
+    @abstractmethod
+    def current_geometry(self) -> float:
+        """The current geometry of the constrained atoms."""
+        pass
+
+    def atom_indices(self) -> np.ndarray: 
+        """Get the indices of the atoms in the constraint.""" 
+        return np.array(
+            [aa.idx for aa in self.atoms]
+        )
+    
+    @property
+    def atom_names(self) -> Set[str]:
+        """get all unique atom names of self.atoms"""
+        result = set()
+        for atom in self.atoms:
+            result.add(atom.name)
+        return result
     # endregion
 
     # region == checker ==
@@ -99,19 +153,6 @@ class StructureConstraint(ABC):
                     "have inconsistent topology! "
                     f"({self.atoms[0]} has {top} --vs-- {atom} has {current_top})")
                 raise WrongTopology
-    # endregion
-
-    #TODO(CJ): add function that checks if topology and constraints are compatible
-    #TODO(CJ): will need to make a version of this that actually works for the ResiduePairConstraint
-
-    def clone(self) -> "StructureConstraint":
-        """Clones the StructureConstraint with the original target_value."""
-        return self.__init__(atoms, self.target_value, deepcopy(self.params_))
-
-    def clone_current(self) -> "StructureConstraint":
-        """Get a version of the StructureConstraint with the current value as the 
-        target value."""
-        return self.__init__(atoms, self.current_value, deepcopy(self.params_))
 
     def is_cartesian_freeze(self) -> bool:
         """Is this a cartesian freeze constraint?"""
@@ -137,24 +178,9 @@ class StructureConstraint(ABC):
     def correct_num_atoms(self) -> bool:
         """Does the given constraint have the correct number of atoms?"""
         pass
+    # endregion
 
-    def score_energy(self) -> float: # TODO move this to interface e.g.: RosettaInterface for current
-        """Scores the energy penalty of the constraint. If the calc method is not specified, the method exits."""
-        if self['calc_method'] == 'rosetta':
-            penalty:float = self['penalty'] 
-            tolerance:float = self['tolerance']
-            difference:float = abs(self.current_geometry() - self.target_value)
-
-            if difference <= tolerance:
-                return 0.0
-            else:
-                return penalty * (difference - tolerance)
-
-        else:
-            _LOGGER.error(f"Unspecified calculation method {self['calc_method']}. Supported include: rosetta. Exiting...")
-            exit( 1 )
-
-
+    # region == editor ==
     def change_topology(self, new_topology:Structure) -> None:
         """Switch the associated topology and atoms for a given Constraint. Maps the atom keys
         as described in Atom.key() and Structure.get().
@@ -172,33 +198,9 @@ class StructureConstraint(ABC):
     
         self.atoms = new_atoms
 
-    @abstractmethod
-    def current_geometry(self) -> float:
-        """The current geometry of the constrained atoms."""
-        pass
+    # endregion
 
-
-    def atom_indices(self) -> np.ndarray: 
-        """Get the indices of the atoms in the constraint.""" 
-        return np.array(
-            [aa.idx for aa in self.atoms]
-        )
-
-    @property
-    def target_value(self) -> float:
-        """Getter for the target value of the constrained geometry."""
-        return self.target_value_
-
-    @target_value.setter
-    def target_value(self, val_in : float ) -> None:
-        """Change the stored target value of the constrained geometry.."""
-        self.target_value_ = val_in
-
-    @property
-    def params(self) -> Dict[str, Any]:
-        """Getter for all the params in the constrained geometry."""
-        return self.params_
-
+    # region == special ==
     def __getitem__(self, key:str ) -> float:
         """Bracket getter for the .params dict() in the structure constraint. Exits if the 
         supplied key is not found in the .params dict().
@@ -228,15 +230,42 @@ class StructureConstraint(ABC):
             Nothing.
         """
         self.params_[key] = value 
+    # endregion
+
+    #TODO(CJ): add function that checks if topology and constraints are compatible
+    #TODO(CJ): will need to make a version of this that actually works for the ResiduePairConstraint
+    
+    # TODO move this to interface e.g.: RosettaInterface for current
+    def score_energy(self) -> float: 
+        """Scores the energy penalty of the constraint. If the calc method is not specified, the method exits."""
+        if self['calc_method'] == 'rosetta':
+            penalty:float = self['penalty'] 
+            tolerance:float = self['tolerance']
+            difference:float = abs(self.current_geometry() - self.target_value)
+
+            if difference <= tolerance:
+                return 0.0
+            else:
+                return penalty * (difference - tolerance)
+
+        else:
+            _LOGGER.error(f"Unspecified calculation method {self['calc_method']}. Supported include: rosetta. Exiting...")
+            exit( 1 )
 
 
 class CartesianFreeze(StructureConstraint):
     """Specialization of StructureConstraint() for Atoms() that are frozen in Cartesian space. Many
     of the methods yield junk values since no measurement is needed for this Class.
     """
+
+    DEFAULT_PARAMS = {
+        "amber": {
+            "restraint_wt": eh_config["amber.DEFAULT_CARTESIAN_FREEZE_WEIGHT"],
+        },
+    }
     
-    def __init__(self, atoms:List[Atom] ):
-        super().__init__(self, atoms, 0.0, dict())
+    def __init__(self, atoms:List[Atom]):
+        super().__init__(atoms, 0.0, self.DEFAULT_PARAMS)
 
     @property
     def constraint_type(self) -> str:
@@ -251,12 +280,9 @@ class CartesianFreeze(StructureConstraint):
         """True as long as there is at least one atom in the constraint."""
         return len(self.atoms)
 
-    def score_energy(self) -> float:
-        """Always returns 0.0. Not needed for this type of constraint."""
-        return 0.0
-
     def current_geometry(self) -> float:
-        """Always returns 0.0. Not needed for this type of constraint."""
+        """Always returns 0.0. Not needed for this type of constraint.
+        TODO see if there will be a need"""
         return 0.0
 
 
@@ -488,6 +514,12 @@ class BackBoneFreeze(CartesianFreeze):
     """Specialization of CartesianFreeze() for constraining the movement of
     backbone Atom()s"""
 
+    DEFAULT_PARAMS = {
+        "amber": {
+            "restraint_wt": eh_config["amber.DEFAULT_CARTESIAN_FREEZE_WEIGHT"],
+        },
+    }
+
     @property
     def constraint_type(self) -> str:
         """hard coded constraint type"""
@@ -587,10 +619,10 @@ def create_residue_pair_constraint(
                                 *csts
                                 )
 
-def create_backbone_freeze(stru: Structure, force_constant: float = 100.0) -> BackBoneFreeze:
-    """constructor for BackboneFreeze"""
-    # TODO start here. Look into Amber manual and see what are the options for
-    # backbone constraint
+def create_backbone_freeze(stru: Structure) -> BackBoneFreeze:
+    """constructor for BackboneFreeze. Constrain only C,CA,N"""
+    atoms = stru.backbone_atoms()
+    return BackBoneFreeze(atoms=atoms)
 
 def create_distance_constraint() -> DistanceConstraint:
     """constructor for DistanceConstraint"""
