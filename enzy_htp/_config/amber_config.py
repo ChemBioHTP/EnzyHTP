@@ -20,7 +20,6 @@ from .armer_config import ARMerConfig
 from enzy_htp.core.clusters.accre import Accre
 from enzy_htp.core.general import get_str_for_print_class_var
 from enzy_htp.core.logger import _LOGGER
-from enzy_htp.structure.structure_constraint import StructureConstraint
 
 class AmberConfig(BaseConfig):
     """Class that holds default values for running Amber within enzy_htp and also creates
@@ -102,8 +101,9 @@ class AmberConfig(BaseConfig):
     DEFAULT_MD_PRESSURE_SCALING: str = "isotropic"
     """default value for the pressure scaling of the md step"""
 
-    DEFAULT_MD_CONSTRAIN: StructureConstraint = []
-    """The default value for the constraint applied in the md step"""
+    DEFAULT_MD_CONSTRAIN = []
+    """The default value for the constraint applied in the md step.
+    Has to be empty in the source code otherwise causes a circular import"""
 
     DEFAULT_MD_RESTART: bool = False
     """The default value for whether restart using v from another md step"""
@@ -147,6 +147,12 @@ class AmberConfig(BaseConfig):
     files. """
     # endregion
 
+    # region == Default values for StructureConstrain ==
+    DEFAULT_CARTESIAN_FREEZE_WEIGHT = 2.0
+    """the default value for restraint_wt that used in CartesianFreeze.
+    (unit: kcal*mol^-1*A^-2) (form: k(dx)^2 dx is the cartesian coord difference)"""
+    # endregion
+
     # region == hard coded MD options (only changable here) ==
     HARDCODE_CUT = 10.0
     """hard coded `cut` value"""
@@ -170,67 +176,6 @@ class AmberConfig(BaseConfig):
     """hard coded names of md engines of different core types. 
     only changable by editing values here"""
     # endregion
-
-    CONF_HEAT: Dict = {
-        "ntc": 2,
-        "ntf": 2,
-        "cut": 10.0,
-        "nstlim": 20000,
-        "dt": 0.002,
-        "tempi": 0.0,
-        "temp0": 300.0,
-        "ntpr": 0.01,
-        "ntwx": 1,
-        "ntt": 3,
-        "gamma_ln": 5.0,
-        "iwrap": 1,
-        "ntr": 1,
-        "restraintmask": "'@C,CA,N'",
-        "restraint_wt": "2.0",
-        "A_istep2": 0.9,
-        "B_istep1": "A_istep2+1",
-    }
-    """dict() holding the settings for an Amber heating."""
-
-    CONF_EQUI: Dict = {
-        "ntx": 5,
-        "irest": 1,
-        "ntc": 2,
-        "ntf": 2,
-        "cut": 10.0,
-        "nstlim": 500000,
-        "dt": 0.002,
-        "temp0": 300.0,
-        "ntpr": 0.002,
-        "ntwx": 5000,  # default 10ps (TODO support different power numbers)
-        "ntt": 3,
-        "gamma_ln": 5.0,
-        "iwrap": 1,
-        "ntr": 1,
-        "restraintmask": "'@C,CA,N'",
-        "restraint_wt": 2.0,  # the later two are only used when ntr = 1
-    }
-    """dict() holding the settings for an Amber constant pressure equilibration run."""
-
-    CONF_PROD: Dict = {
-        "ntx": 5,
-        "irest": 1,
-        "ntc": 2,
-        "ntf": 2,
-        "cut": 10.0,
-        "nstlim": 50000000,
-        "dt": 0.002,
-        "temp0": 300.0,
-        "ntpr": 0.001,
-        "ntwx": 5000,  # default 10ps
-        "ntt": 3,
-        "gamma_ln": 5.0,
-        "iwrap": 1,
-        "ntr": 0,
-        "restraintmask": None,
-        "restraint_wt": 2.0,  # the later two are only used when ntr = 1
-    }
-    """dict() holding the settings for an Amber constant pressure production run."""
 
     RADII_MAP: Dict = {'1': 'mbondi', '2': 'mbondi2', '5': 'mbondi2', '7': 'bondi', '8': 'mbondi3'}
     """dict() holding the radii mapping for the IGB solvation model."""
