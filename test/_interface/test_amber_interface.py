@@ -847,6 +847,26 @@ def test_amber_md_step_check_md_error(caplog):
         assert "ERROR: Calculation halted.  Periodic box dimensions have changed too much from their initial values." in caplog.text
 
 
+def test_get_restraintmask_bb_freeze():
+    """test using example restraints"""
+    ai = interface.amber
+    test_pdb = f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb"
+    test_stru = struct.PDBParser().get_structure(test_pdb)
+    cons = create_backbone_freeze(test_stru)
+    mask = ai.get_restraintmask(cons)
+    assert mask == "'@C,CA,N'"
+
+def test_get_restraintmask_bb_freeze(): # TODO do this after create_cartesian_freeze()
+    """test using example restraints"""
+    ai = interface.amber
+    test_pdb = f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb"
+    test_stru = struct.PDBParser().get_structure(test_pdb)
+    cons = create_cartesian_freeze(
+        atoms="resi 101 around 2",
+        topology=test_stru,)
+    mask = ai.get_restraintmask(cons)
+    assert mask == "'xxx'"
+
 # region TODO
 
 def test_parse_fmt_uppercase():
