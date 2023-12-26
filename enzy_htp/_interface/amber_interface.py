@@ -29,11 +29,18 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core import math_helper as mh
 from enzy_htp.core.job_manager import ClusterJob
 from enzy_htp.core.exception import UnsupportedMethod, tLEaPError, AmberMDError
+from enzy_htp.core.general import get_interval_str_from_list
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
 from enzy_htp.structure.structure_io import pdb_io, prmtop_io
-from enzy_htp.structure.structure_constraint import StructureConstraint
+from enzy_htp.structure.structure_constraint import (
+    StructureConstraint,
+    CartesianFreeze,
+    merge_cartesian_freeze)
+from enzy_htp.structure import StruSelection
 from enzy_htp.structure import (
     Structure,
+    Atom,
+    Residue,
     Ligand,
     MetalUnit,
     ModifiedResidue,
@@ -992,7 +999,7 @@ class AmberInterface(BaseInterface):
                 cmd_args = f"{cmd_args} -I {add_path}"
         try:
             self.env_manager_.run_command("tleap", cmd_args)
-        except CalledProcessError as e: # TODO(qz) seems run_command will never raise an error?
+        except CalledProcessError as e:
             if (not e.stderr.strip()) and (not e.stdout.strip()):  # empty stderr & stdout
                 # find the error information in tleap.out
                 new_e = self._find_tleap_error(tleap_out_path)
@@ -1146,6 +1153,91 @@ class AmberInterface(BaseInterface):
 
     # -- cpptraj --
 
+    # -- index mapping --
+    def get_amber_index_mapper(self, stru: Structure) -> Dict[str, Dict[Union[Residue, Atom], Union[int, tuple]]]:
+        """get a mapper for objects in {stru} and in Amberilzed PDB of stru
+        Use tLeap to get a PDB and align indexes.
+        Returns:
+            {
+            "residue" : {Residue(): amber_1_index_residue_idx_1, ...},
+            "atom" : {Atom(): amber_1_index_atom_idx_1}
+            }
+        TODO solve this for the 1Q4T case."""
+        # init files
+        fs.safe_mkdir(eh_config['system.SCRATCH_DIR'])
+        temp_pdb = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/amber_index_mapping_source.pdb")
+        temp_amber_pdb = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/amber_index_mapping_amber.pdb")
+        # init stru
+        pdb_io.PDBParser().save_structure(
+            temp_pdb, stru,
+            if_renumber=False, if_fix_atomname=False)
+        self.tleap_clean_up_stru(
+            input_pdb=temp_pdb,
+            out_path=temp_amber_pdb,
+            if_align_index=False,
+        )
+        # deduce mapping
+        ref_stru = pdb_io.PDBParser().get_structure(temp_amber_pdb)
+        ref_mapper = stru.get_residue_index_mapper(ref_stru)
+        result = {
+            "residue" : {},
+            "atom" : {},
+        }
+        for k, res in stru.residue_mapper.items():
+            amber_key = ref_mapper[k]
+            result["residue"][res] = amber_key
+            for atom in res.atoms:
+                amber_atom_idx = ref_stru.find_residue_with_key(amber_key).find_atom_name(atom.name).idx
+                result["atom"][atom] = amber_atom_idx
+
+        return result
+
+    def get_amber_atom_index(self, atoms: List[Atom]) -> List[int]:
+        """get atom index in an Amberized PDB of the Structre() containing these Atom()s"""
+        stru = atoms[0].root
+        aid_mapper = self.get_amber_index_mapper(stru)
+        return [aid_mapper["atom"][at] for at in atoms]
+
+    def get_amber_residue_index(self, residues: List[Atom]) -> List[int]:
+        """"""
+        raise Exception("TODO")
+
+    def get_amber_chain_index(self, chains: List[Atom]) -> List[str]:
+        """"""
+        raise Exception("TODO")
+
+    # -- amber mask --
+    # region Amber Mask I/O
+    def get_amber_mask(self, target: StruSelection, reduce: bool) -> str:
+        """get the Amber mask based on a StruSelection() described by the mask
+        Args:
+            target:
+                the target StruSelection() described by the mask
+            reduce:
+                whether the function reduces the mask for better readability
+        Ruturns:
+            the Amber Mask (e.g.: "'@C,CA,N'")
+        Notes:
+            reference: https://amberhub.chpc.utah.edu/atom-mask-selection-syntax/
+            There are several ways to represent the same set of Atom()s. If
+            not reduced, we use directly the atom numlist. It will be Structure()
+            specific and do not respond to mutation as Structure() is not the same."""
+        # san check
+        target.check_consistent_topology()
+
+        atom_idxes = self.get_amber_atom_index(target.atoms)
+        reduced_idxes = get_interval_str_from_list(atom_idxes)
+        mask = f"'@{reduced_idxes}'"
+
+        if reduce:
+            pass 
+            # TODO. reduce based on residue affilation etc. 
+            # use methods from StruSelection
+
+        return mask
+            
+    # endregion
+
     # -- sander/pmemd --
     # region - mdin/mdout file I/O -
     def read_from_mdin(self, mdin_file_path: str) -> Dict:
@@ -1245,11 +1337,31 @@ class AmberInterface(BaseInterface):
         else:
             ntb_cntrl = {"ntb" : 2}
 
+        # constraint
+        constraints = md_config_dict["constrain"]
+        cart_freeze = []
+        geom_cons = []
+        for cons in constraints:
+            cons: StructureConstraint
+            if cons.constraint_type in self.config()["SUPPORTED_CONSTRAINT_TYPE"]:
+                if cons.is_cartesian_freeze():
+                    cart_freeze.append(cons)
+                else:
+                    geom_cons.append(cons)
+            else:
+                _LOGGER.error(
+                    f"Dont support {cons.constraint_type} yet in AmberInterface. Supported: {self.config()['SUPPORTED_CONSTRAINT_TYPE']}")
+                raise ValueError
+
         # ntr and cartesian restraint
-        # TODO start here
-            
+        if cart_freeze:
+            ntr = 1
+        cons = merge_cartesian_freeze(cart_freeze)
+        restraintmask = self.get_restraintmask(cons, reduce=True)
+        restraint_wt = cons.params["amber"]["restraint_wt"]
+
         # nmropt
-        # TODO start here
+        # TODO
             
         # determine the &wt END
         if wt_list or file_redirection_dict:
@@ -1273,7 +1385,7 @@ class AmberInterface(BaseInterface):
                 'iwrap': self.config()["HARDCODE_IWRAP"],
                 # 'nmropt': 1, 
                 'ig': self.config()["HARDCODE_IG"],
-                # 'ntr': 1, 'restraint_wt': 2.0, 'restraintmask': "'@C,CA,N'",
+                'ntr': ntr, 'restraint_wt': restraint_wt, 'restraintmask': restraintmask,
             }},
         ] + wt_list
 
@@ -1286,6 +1398,21 @@ class AmberInterface(BaseInterface):
         }
 
         return raw_dict
+
+    def get_restraintmask(self, cons: CartesianFreeze, reduce: bool= True) -> str:
+        """get the str of restraintmask from CartesianFreeze().
+        Args:
+            cons: the target constriant
+            reduce: whether the function try to reduce the format of the mask
+        Returns:
+            the restraintmask"""
+        if reduce and cons.constraint_type == "backbone_freeze":
+            return "'@C,CA,N'"
+        else:
+            result = self.get_amber_mask(
+                StruSelection(cons.atoms),
+                reduce=reduce)
+            return result
 
     def _write_to_mdin_from_raw_dict(self, raw_dict: Dict, out_path: str):
         """write to mdin file from a raw dictionary

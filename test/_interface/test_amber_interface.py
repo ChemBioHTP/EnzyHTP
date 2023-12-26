@@ -24,6 +24,7 @@ from enzy_htp._interface.amber_interface import (
 import enzy_htp.structure as struct
 from enzy_htp.structure.structure_constraint import (
     StructureConstraint,
+    create_cartesian_freeze,
     create_backbone_freeze,
     create_distance_constraint,
     create_angle_constraint,)
@@ -856,16 +857,28 @@ def test_get_restraintmask_bb_freeze():
     mask = ai.get_restraintmask(cons)
     assert mask == "'@C,CA,N'"
 
-def test_get_restraintmask_bb_freeze(): # TODO do this after create_cartesian_freeze()
+def test_get_restraintmask():
     """test using example restraints"""
     ai = interface.amber
-    test_pdb = f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb"
+    test_pdb = f"{MM_DATA_DIR}/index_tweak.pdb"
     test_stru = struct.PDBParser().get_structure(test_pdb)
     cons = create_cartesian_freeze(
-        atoms="resi 101 around 2",
+        atoms=test_stru.atoms[1:20],
         topology=test_stru,)
     mask = ai.get_restraintmask(cons)
-    assert mask == "'xxx'"
+    assert mask == "'@2-20"
+
+def test_get_amber_mask(): # TODO
+    """"""
+    raise Exception("TODO")
+
+def test_get_amber_atom_index(): # TODO
+    """"""
+    raise Exception("TODO")
+
+def test_get_amber_index_mapper(): # TODO VIP
+    """this dont work for the 1Q4T case."""
+    raise Exception("TODO")
 
 # region TODO
 
