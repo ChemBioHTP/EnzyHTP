@@ -15,6 +15,7 @@ from .api import (
     create_distance_constraint,
     create_angle_constraint,
     create_dihedral_constraint,
+    merge_cartesian_freeze,
     )
 
 
