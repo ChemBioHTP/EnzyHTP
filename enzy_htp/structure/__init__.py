@@ -37,3 +37,5 @@ from .structure_region import (
     StructureRegion,
     create_structure_region
 )
+
+from .structure_selection_class import StruSelection

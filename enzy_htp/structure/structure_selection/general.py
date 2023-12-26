@@ -5,7 +5,7 @@ Date: 2023-02-15
 """
 from enzy_htp import interface, OpenPyMolSession
 from enzy_htp.structure import Structure
-from .stru_selection import StruSelection
+from ..structure_selection_class.stru_selection import StruSelection
 
 
 def select_stru(stru: Structure, pattern: str) -> StruSelection:
