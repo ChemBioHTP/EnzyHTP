@@ -751,5 +751,4 @@ def _dispatch_get_key(target: Union[str, Atom, Residue], stru: Structure) -> Uni
         target = stru.get(target)
     return target
 
-
 # endregion
