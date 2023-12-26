@@ -670,8 +670,20 @@ def create_residue_pair_constraint(
                                 *csts
                                 )
 
-def create_cartesian_freeze() -> CartesianFreeze:
+def create_cartesian_freeze(
+        atoms: Union[Atom, str],
+        topology: Structure= None,) -> CartesianFreeze:
     """constructor for CartesianFreeze."""
+    # if isinstance(target, str):
+    #     if not isinstance(topology, Structure):
+    #         _LOGGER.error("key str types of specification is used but reference "
+    #                       "topology (i.e.: structure) is not supplied. "
+    #                       f"(key: {target}, topology: {topology})")
+    #         raise TypeError
+    #     target = stru_sele.select_stru(atoms).atoms
+    # TODO figure out how to resolve this loop importing issue
+    # structure_constraint -> structure_selection -> interface -> structure_constraint
+    # probably make 2 interface component 1 high 1 low?
     raise Exception("TODO")
 
 def create_backbone_freeze(stru: Structure) -> BackBoneFreeze:
