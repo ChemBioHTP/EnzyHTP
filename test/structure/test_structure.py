@@ -8,6 +8,8 @@ import numpy as np
 from copy import deepcopy
 import enzy_htp.chemical as chem
 from enzy_htp.core import file_system as fs
+from enzy_htp.core.logger import _LOGGER
+from enzy_htp.core.general import EnablePropagate
 from enzy_htp.structure.structure_io.pdb_io import PDBParser
 from enzy_htp.structure import (
     Structure,
@@ -209,3 +211,20 @@ def test_add_residue():
         parent=None,)
     stru.add(new_res)
     assert stru["E"].residues[0] is new_res
+
+def test_get(caplog):
+    """test function works as expected"""
+    pdb_file_path = f"{DATA_DIR}1Q4T_ligand_test.pdb"
+    stru: Structure = sp.get_structure(pdb_file_path)
+    assert stru.get("A") is stru["A"]
+    assert stru.get("A.10") is stru["A"].find_residue_idx(10)
+    assert stru.get("A.10.CA") is stru["A"].find_residue_idx(10).find_atom_name("CA")
+    with EnablePropagate(_LOGGER):
+        with pytest.raises(ValueError) as e:
+            stru.get("A.1")
+        assert "Unable to locate " in caplog.text
+        with pytest.raises(ValueError) as e:
+            stru.get("A.10.X")
+        assert "Unable to locate " in caplog.text
+
+    

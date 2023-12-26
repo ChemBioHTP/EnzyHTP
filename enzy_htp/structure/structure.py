@@ -95,6 +95,7 @@ from collections import defaultdict
 import enzy_htp.core.math_helper as mh
 from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
+from enzy_htp.core.exception import ResidueDontHaveAtom
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
 from enzy_htp.chemical import ResidueType
 
@@ -444,11 +445,14 @@ class Structure(DoubleLinkedNode):
             chain, res_idx, atom_name = key.split('.')
             res_idx = int(res_idx)
             res = self.find_residue_with_key((chain, res_idx))
-            result = res.find_atom_name(atom_name)
+            try:
+                result = res.find_atom_name(atom_name)
+            except ResidueDontHaveAtom as e:
+                result = None
         
         if result is None:
-            _LOGGER.error(f"Unable to locate residue {key} in Structure. Exiting...")
-            exit( 1 )
+            _LOGGER.error(f"Unable to locate {key} in Structure. Exiting...")
+            raise ValueError
 
         return result
     # endregion
