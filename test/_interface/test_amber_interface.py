@@ -611,9 +611,11 @@ def test_parse_md_config_dict_to_raw_wo_cons():
     assert test_raw_dict == answer_raw_dict
 
 
-def test_parse_md_config_dict_to_raw_w_cons(): # TODO finish this after the PR
+def test_parse_md_config_dict_to_raw_w_cons(): # TODO start from here the PR
     """test to make sure _parse_md_config_dict_to_raw() works as expected.
     using a dict from old EnzyHTP Class_Conf.Amber.conf_heat as an example"""
+    test_pdb = f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb"
+    test_stru = struct.PDBParser().get_structure(test_pdb)
     answer_raw_dict = {
         'title': 'Heat',
         'namelists': [
@@ -659,17 +661,22 @@ def test_parse_md_config_dict_to_raw_w_cons(): # TODO finish this after the PR
         'group_info': [],
     }
     test_md_config_dict = {
-            "name" : "Heat",
-            "minimize" : False,
-            "pressure_scaling" : "none",
-            "restart" : False,
-            "length" : 0.04, # ns
-            "timestep" : 0.000002, # ns
-            "temperature" : [(0.0, 0.0), (0.036, 300.0), (0.04, 300.0)],
-            "thermostat" : "langevin",
-            "constrain" : StructureConstraint("TODO"),
-            "if_report" : True,
-            "record_period" : 0.0004,
+        "name" : "Heat",
+        "minimize" : False,
+        "pressure_scaling" : "none",
+        "restart" : False,
+        "length" : 0.04, # ns
+        "timestep" : 0.000002, # ns
+        "temperature" : [(0.0, 0.0), (0.036, 300.0), (0.04, 300.0)],
+        "thermostat" : "langevin",
+        "constrain" : [
+            create_backbone_freeze(test_stru),
+            create_distance_constraint(
+                "B.254.H2", "A.101.OE2", 2.4, test_stru),
+            create_angle_constraint(
+                "B.254.CAE", "B.254.H2", "A.101.OE2", 180.0, test_stru)],
+        "if_report" : True,
+        "record_period" : 0.0004,
     }
 
     ai = interface.amber
@@ -711,7 +718,7 @@ pmemd\.cuda -O -i \./MD/amber_md_step_?[0-9]*\.in -o \./MD/amber_md_step\.out -p
     fs.safe_rmdir(md_step.work_dir)
 
 
-def test_amber_md_step_make_job_w_cons(): # TODO start here after PR
+def test_amber_md_step_make_job_w_cons(): # TODO
     """test to make sure AmberMDStep.make_job() works as expected.
     w/ constraint."""
     test_inpcrd = f"{MM_DATA_DIR}/KE_07_R7_S.inpcrd"

@@ -1245,6 +1245,12 @@ class AmberInterface(BaseInterface):
         else:
             ntb_cntrl = {"ntb" : 2}
 
+        # ntr and cartesian restraint
+        # TODO start here
+            
+        # nmropt
+        # TODO start here
+            
         # determine the &wt END
         if wt_list or file_redirection_dict:
             wt_list.append(
@@ -1265,7 +1271,7 @@ class AmberInterface(BaseInterface):
                 'ntpr': ntpr, 'ntwx': ntwx,
                 } | ntt_cntrl | ntb_cntrl | ntp_cntrl | {
                 'iwrap': self.config()["HARDCODE_IWRAP"],
-                # 'nmropt': 1, TODO finish this after PR
+                # 'nmropt': 1, 
                 'ig': self.config()["HARDCODE_IG"],
                 # 'ntr': 1, 'restraint_wt': 2.0, 'restraintmask': "'@C,CA,N'",
             }},
