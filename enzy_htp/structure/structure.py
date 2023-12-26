@@ -232,7 +232,7 @@ class Structure(DoubleLinkedNode):
         """find residues base on its (chain_id, idx). Return the matching residues"""
         result = list(filter(lambda r: r.key() == key, self.residues))
         if len(result) == 0:
-            _LOGGER.info(f"Didn't find any residue with key: {key}")
+            _LOGGER.info(f"Didn't find any residue with key: {key} in {self}")
             return None
         if len(result) > 1:
             _LOGGER.warning(f"More than 1 residue with key: {key}. Only the first one is used. Check those residues:")
@@ -436,15 +436,17 @@ class Structure(DoubleLinkedNode):
         # Residue
         if section_count == 1:
             chain, res_idx = key.split('.')
+            res_idx = int(res_idx)
             result = self.find_residue_with_key((chain, res_idx))
         
         # Atom
         if section_count == 2:
             chain, res_idx, atom_name = key.split('.')
+            res_idx = int(res_idx)
             res = self.find_residue_with_key((chain, res_idx))
             result = res.find_atom_name(atom_name)
         
-        if not result:
+        if result is None:
             _LOGGER.error(f"Unable to locate residue {key} in Structure. Exiting...")
             exit( 1 )
 
