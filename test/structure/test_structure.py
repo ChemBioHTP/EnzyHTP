@@ -227,4 +227,8 @@ def test_get(caplog):
             stru.get("A.10.X")
         assert "Unable to locate " in caplog.text
 
-    
+def test_residue_index_mapper(): # TODO
+    """test function works as expected"""
+    pdb_file_path = f"{DATA_DIR}1Q4T_ligand_test.pdb"
+    stru: Structure = sp.get_structure(pdb_file_path)
+    raise Exception("TODO")

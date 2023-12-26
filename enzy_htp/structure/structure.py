@@ -95,7 +95,8 @@ from collections import defaultdict
 import enzy_htp.core.math_helper as mh
 from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
-from enzy_htp.core.exception import ResidueDontHaveAtom
+from enzy_htp.core.general import if_list_contain_repeating_element
+from enzy_htp.core.exception import ResidueDontHaveAtom, IndexMappingError
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
 from enzy_htp.chemical import ResidueType
 
@@ -455,6 +456,25 @@ class Structure(DoubleLinkedNode):
             raise ValueError
 
         return result
+
+    def get_residue_index_mapper(self, other: "Structure") -> Dict[tuple, tuple]:
+        """map residue index against another Strutcure().
+        Returns:
+            {self_residue_1_key: other_residue_1_key, ...}"""
+        okeys = self.residue_mapper.keys()
+        nkeys = other.residue_mapper.keys()
+        # san check
+        if len(okeys) != len(nkeys):
+            _LOGGER.error(f"Residue key number does not match between old and new Structure(). Index mapping is impossible")
+            raise IndexMappingError
+        if if_list_contain_repeating_element(okeys):
+            _LOGGER.error(f"Found repeating residue key in old Structure(). Index mapping is impossible")
+            raise IndexMappingError
+        if if_list_contain_repeating_element(nkeys):
+            _LOGGER.error(f"Found repeating residue key in new Structure(). Index mapping is impossible")
+            raise IndexMappingError
+        idx_mapper = dict(zip(okeys, nkeys))
+        return idx_mapper
     # endregion
 
     #region === Checker ===
