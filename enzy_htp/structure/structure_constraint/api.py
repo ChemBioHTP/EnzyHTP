@@ -675,8 +675,8 @@ def create_distance_constraint(
             the target distance of the constraint
         topology:
             the reference topology if keyword str is used for atom_1, atom_2."""
-    atom_1 = dispatch_get_key(atom_1, topology)
-    atom_2 = dispatch_get_key(atom_2, topology)
+    atom_1 = _dispatch_get_key(atom_1, topology)
+    atom_2 = _dispatch_get_key(atom_2, topology)
     result = DistanceConstraint(
         atoms=[atom_1, atom_2],
         target_value=target_value
@@ -700,9 +700,9 @@ def create_angle_constraint(
             the target angle of the constraint
         topology:
             the reference topology if keyword str is used for atom_1, atom_2, atom_3."""
-    atom_1 = dispatch_get_key(atom_1, topology)
-    atom_2 = dispatch_get_key(atom_2, topology)
-    atom_3 = dispatch_get_key(atom_3, topology)
+    atom_1 = _dispatch_get_key(atom_1, topology)
+    atom_2 = _dispatch_get_key(atom_2, topology)
+    atom_3 = _dispatch_get_key(atom_3, topology)
     result = AngleConstraint(
         atoms=[atom_1, atom_2, atom_3],
         target_value=target_value
@@ -728,10 +728,10 @@ def create_dihedral_constraint(
         topology:
             the reference topology if keyword str is used for
             atom_1, atom_2, atom_3, atom_4."""
-    atom_1 = dispatch_get_key(atom_1, topology)
-    atom_2 = dispatch_get_key(atom_2, topology)
-    atom_3 = dispatch_get_key(atom_3, topology)
-    atom_4 = dispatch_get_key(atom_4, topology)
+    atom_1 = _dispatch_get_key(atom_1, topology)
+    atom_2 = _dispatch_get_key(atom_2, topology)
+    atom_3 = _dispatch_get_key(atom_3, topology)
+    atom_4 = _dispatch_get_key(atom_4, topology)
     result = DihedralConstraint(
         atoms=[atom_1, atom_2, atom_3, atom_4],
         target_value=target_value
@@ -739,7 +739,7 @@ def create_dihedral_constraint(
     result.check_consistent_topology()
     return result
 
-def dispatch_get_key(target: Union[str, Atom, Residue], stru: Structure) -> Union[Atom, Residue]:
+def _dispatch_get_key(target: Union[str, Atom, Residue], stru: Structure) -> Union[Atom, Residue]:
     """apply the key with .get() that support a dispatch of using the
     object (e.g.: Atom()) itself"""
     if isinstance(target, str):
