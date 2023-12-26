@@ -6,6 +6,8 @@ import pytest
 import os
 
 from enzy_htp import PDBParser
+from enzy_htp.core.logger import _LOGGER
+from enzy_htp.core.general import EnablePropagate
 import enzy_htp.structure.structure_constraint as stru_cons
 
 CURR_FILE = os.path.abspath(__file__)
@@ -102,3 +104,29 @@ def test_distance_current_geom():
     test_cons = stru_cons.create_distance_constraint(
         "B.254.H2", "A.101.OE2", 2.4, test_stru)
     assert test_cons.current_geometry() == 2.0239901185529554
+
+def test_merge_cartesian_freeze():
+    """test a correct case"""
+    test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
+    test_stru = sp.get_structure(test_pdb)
+    test_cons_list = [
+        stru_cons.CartesianFreeze(atoms=test_stru.atoms[0:10]),
+        stru_cons.CartesianFreeze(atoms=test_stru.atoms[5:12]),
+        stru_cons.CartesianFreeze(atoms=test_stru.atoms[20:22]),]
+    merged_cons = stru_cons.merge_cartesian_freeze(test_cons_list)
+    assert set(merged_cons.atoms) == set(test_stru.atoms[0:12]+test_stru.atoms[20:22])
+    assert merged_cons.params == test_cons_list[0].params
+
+def test_merge_cartesian_freeze_wrong(caplog):
+    """test a correct case"""
+    test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
+    test_stru = sp.get_structure(test_pdb)
+    test_cons_list = [
+        stru_cons.CartesianFreeze(atoms=test_stru.atoms[0:10]),
+        stru_cons.CartesianFreeze(atoms=test_stru.atoms[5:12]),
+        stru_cons.CartesianFreeze(atoms=test_stru.atoms[20:22]),]
+    test_cons_list[0].params = {}
+    with EnablePropagate(_LOGGER):
+        with pytest.raises(ValueError) as e:    
+            merged_cons = stru_cons.merge_cartesian_freeze(test_cons_list)
+            assert "Inconsistent params" in caplog.text

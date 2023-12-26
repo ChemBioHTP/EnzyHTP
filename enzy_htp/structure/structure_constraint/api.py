@@ -95,6 +95,11 @@ class StructureConstraint(ABC):
         of this type of constraint"""
         return self.params_
 
+    @params.setter
+    def params(self, val: Dict) -> None:
+        """the setter for params"""
+        self.params_ = val
+
     @property
     def topology(self) -> Structure:
         """get the current topology-context of the constraint"""
@@ -108,12 +113,20 @@ class StructureConstraint(ABC):
 
     def clone(self) -> "StructureConstraint":
         """Clones the StructureConstraint with the original target_value."""
-        return self.__init__(self.atoms, self.target_value, deepcopy(self.params_))
+        result = type(self).__new__(type(self))
+        result.atoms = self.atoms
+        result.target_value = self.target_value
+        result.params = deepcopy(self.params)
+        return result
 
     def clone_current(self) -> "StructureConstraint":
         """Get a version of the StructureConstraint with the current value as the 
         target value."""
-        return self.__init__(self.atoms, self.current_value, deepcopy(self.params_))
+        result = type(self).__new__(type(self))
+        result.atoms = self.atoms
+        result.target_value = self.current_geometry
+        result.params = deepcopy(self.params)
+        return result
 
     @abstractmethod
     def current_geometry(self) -> float:
@@ -751,4 +764,27 @@ def _dispatch_get_key(target: Union[str, Atom, Residue], stru: Structure) -> Uni
         target = stru.get(target)
     return target
 
+# endregion
+
+# region == tools that operations on list/dict of StructureConstraint ==
+def merge_cartesian_freeze(cart_freeze_list: List[CartesianFreeze]) -> CartesianFreeze:
+    """try to merge a list of cartesian freeze into 1 single
+    Cartesian Freeze object. Raise error when they can't merge"""
+    # check consistency
+    ref_cons = cart_freeze_list[0]
+    result = ref_cons.clone()
+    for cons in cart_freeze_list:
+        if not cons.is_cartesian_freeze:
+            _LOGGER.error(f"this function only take List[CartesianFreeze]. Found: {type(cons)}")
+            raise TypeError
+        if cons.params != ref_cons.params:
+            _LOGGER.error(f"Inconsistent params in the target list. {cons.params} -vs- {ref_cons.params} ")
+            raise ValueError
+        if cons.topology is not ref_cons.topology:
+            _LOGGER.error(f"Inconsistent topology in the target list. {cons.topology} -vs- {ref_cons.topology} ")
+            raise ValueError
+    # merge atoms
+        result.atoms.extend(cons.atoms)
+    result.atoms = list(set(result.atoms))
+    return result
 # endregion
