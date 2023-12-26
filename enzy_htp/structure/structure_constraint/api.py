@@ -298,6 +298,14 @@ class CartesianFreeze(StructureConstraint):
         TODO see if there will be a need"""
         return 0.0
 
+    @classmethod
+    def clone_from(cls, other: "CartesianFreeze") -> "CartesianFreeze":
+        """clone from another CartesianFreeze instance"""
+        result = cls.__new__(cls)
+        result.atoms = other.atoms
+        result.target_value = other.target_value
+        result.params = deepcopy(other.params)
+        return result
 
 class DistanceConstraint(StructureConstraint):
     """Specialization of StructureConstraint() for the distance between two Atom()'s."""
@@ -770,9 +778,19 @@ def _dispatch_get_key(target: Union[str, Atom, Residue], stru: Structure) -> Uni
 def merge_cartesian_freeze(cart_freeze_list: List[CartesianFreeze]) -> CartesianFreeze:
     """try to merge a list of cartesian freeze into 1 single
     Cartesian Freeze object. Raise error when they can't merge"""
+
+    # the case only backbone_freeze exists
+    temp_iter = iter(cart_freeze_list)
+    ref_cons = next(temp_iter)
+    try:
+        while ref_cons.constraint_type == "backbone_freeze":
+            ref_cons = next(temp_iter)
+    except StopIteration:
+        _LOGGER.debug(f"Only found specialized backbone_freeze. Returning just BackboneFreeze")
+        return ref_cons
+
     # check consistency
-    ref_cons = cart_freeze_list[0]
-    result = ref_cons.clone()
+    result = CartesianFreeze.clone_from(ref_cons)
     for cons in cart_freeze_list:
         if not cons.is_cartesian_freeze:
             _LOGGER.error(f"this function only take List[CartesianFreeze]. Found: {type(cons)}")
