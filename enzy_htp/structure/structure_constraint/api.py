@@ -379,7 +379,7 @@ class DihedralConstraint(StructureConstraint):
         return self.atoms[0].dihedral_with(self.atoms[1], self.atoms[2], self.atoms[3])
 
 
-class ResiduePairConstraint(StructureConstraint):
+class ResiduePairConstraint(StructureConstraint): # TODO unified the design of self.params
     """Specialization of StructureConstraint() representing 
 
     Attributes:
