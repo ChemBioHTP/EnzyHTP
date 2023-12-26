@@ -74,7 +74,7 @@ def equi_md_sampling(stru: Structure,
             _LOGGER.error("cpu_equi_step is used but cpu_equi_job_config is not given!")
             raise ValueError
 
-    freeze_backbone = structure_constraint.build_from_preset(stru, "freeze_backbone")
+    freeze_backbone = structure_constraint.create_backbone_freeze(stru)
     min_step  = parent_interface.build_md_step(
         minimize=True,
         length=20000, # cycle
