@@ -151,6 +151,66 @@ class AmberConfig(BaseConfig):
     DEFAULT_CARTESIAN_FREEZE_WEIGHT = 2.0
     """the default value for restraint_wt that used in CartesianFreeze.
     (unit: kcal*mol^-1*A^-2) (form: k(dx)^2 dx is the cartesian coord difference)"""
+
+    DEFAULT_DISANG_FILENAME = "0.rs"
+    """the default name for DISANG file in geometry(nmropt) constraint. (Amber20 manual 27.1)"""
+    
+    DEFAULT_DISTANCE_CONSTRAINT_SETTING = {
+        "ialtd" : 0,
+        "r1" : "x-0.25",
+        "r2" : "x-0.05",
+        "r3" : "x+0.05",
+        "r4" : "x+0.25",
+        "rk2": "200.0", "rk3": "200.0",
+    }
+    """the default settings for distance constraint in Amber. (Amber20 manual 27.1)
+    Default using flat-welled linear-edge parabola with flat region span +-0.05A the target distance.
+
+    Supported constraint energy functions (pmemd):
+        (ialtd = 0)
+        >  r1, r2, r3, r4 define a flat-welled parabola which becomes linear beyond a specified distance. i.e.
+        >
+        >     \                       /
+        >      \                     /
+        >       \                   /
+        >        .                 .
+        >          .             .
+        >             ._______.
+        >
+        >       r1    r2      r3   r4
+        >
+        >  "\" = lower bound linear response region 
+        >  "/" = lower bound linear response region 
+        >  "." = parobola (left: rk2(r-r2)^2, rk3(r-r3)^2)
+        >  "_" = flat region
+        >  (from https://ambermd.org/Questions/constraints.html)
+
+        In EnzyHTP, when 'x-###' format is used. The r value is calulated from the target distance d.
+        Otherwise the absolute value is applied.
+
+        TODO add more when used"""
+
+    DEFAULT_ANGLE_CONSTRAINT_SETTING = {
+        "ialtd" : 0,
+        "r1" : "x-30.0",
+        "r2" : "x-10.0",
+        "r3" : "x+10.0",
+        "r4" : "x+30.0",
+        "rk2": "200.0", "rk3": "200.0",
+    }
+    """the default settings for angle constraint in Amber.
+    (see DEFAULT_DISTANCE_CONSTRAINT_SETTING for more details)"""
+
+    DEFAULT_DIHEDRAL_CONSTRAINT_SETTING = {
+        "ialtd" : 0,
+        "r1" : "x-30.0",
+        "r2" : "x-10.0",
+        "r3" : "x+10.0",
+        "r4" : "x+30.0",
+        "rk2": "200.0", "rk3": "200.0",
+    }
+    """the default settings for dihedral constraint in Amber.
+    (see DEFAULT_DISTANCE_CONSTRAINT_SETTING for more details)"""
     # endregion
 
     # region == hard coded MD options (only changable here) ==

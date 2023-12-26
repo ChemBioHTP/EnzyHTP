@@ -16,7 +16,7 @@ Date: 2022-10-28
 """
 import copy
 from copy import deepcopy
-from typing import List, Tuple, Dict, Any, Set
+from typing import List, Tuple, Dict, Any, Set, Union
 
 import numpy as np
 
@@ -289,6 +289,16 @@ class CartesianFreeze(StructureConstraint):
 class DistanceConstraint(StructureConstraint):
     """Specialization of StructureConstraint() for the distance between two Atom()'s."""
 
+    DEFAULT_PARAMS = {
+        "amber": {
+            "rs_filename": eh_config["amber.DEFAULT_DISANG_FILENAME"],
+        } | eh_config["amber.DEFAULT_DISTANCE_CONSTRAINT_SETTING"],
+    }
+    
+    def __init__(self, atoms:List[Atom], target_value: float):
+        """init for applying default params"""
+        super().__init__(atoms, target_value, self.DEFAULT_PARAMS)
+
     @property
     def constraint_type(self) -> str:
         """hard coded constraint type"""
@@ -310,6 +320,16 @@ class DistanceConstraint(StructureConstraint):
 class AngleConstraint(StructureConstraint):
     """Specialization of StructureConstraint() for the angle between three Atom()'s."""
 
+    DEFAULT_PARAMS = {
+        "amber": {
+            "rs_filename": eh_config["amber.DEFAULT_DISANG_FILENAME"],
+        } | eh_config["amber.DEFAULT_ANGLE_CONSTRAINT_SETTING"],
+    }
+    
+    def __init__(self, atoms:List[Atom], target_value: float):
+        """init for applying default params"""
+        super().__init__(atoms, target_value, self.DEFAULT_PARAMS)
+
     @property
     def constraint_type(self) -> str:
         """hard coded constraint type"""
@@ -330,6 +350,16 @@ class AngleConstraint(StructureConstraint):
 
 class DihedralConstraint(StructureConstraint):
     """Specialization of StructureConstraint() for the dihedral angle between four Atom()'s"""
+
+    DEFAULT_PARAMS = {
+        "amber": {
+            "rs_filename": eh_config["amber.DEFAULT_DISANG_FILENAME"],
+        } | eh_config["amber.DEFAULT_DIHEDRAL_CONSTRAINT_SETTING"],
+    }
+    
+    def __init__(self, atoms:List[Atom], target_value: float):
+        """init for applying default params"""
+        super().__init__(atoms, target_value, self.DEFAULT_PARAMS)
 
     @property
     def constraint_type(self) -> str:
@@ -619,11 +649,107 @@ def create_residue_pair_constraint(
                                 *csts
                                 )
 
+def create_cartesian_freeze() -> CartesianFreeze:
+    """constructor for CartesianFreeze."""
+    raise Exception("TODO")
+
 def create_backbone_freeze(stru: Structure) -> BackBoneFreeze:
-    """constructor for BackboneFreeze. Constrain only C,CA,N"""
+    """constructor for BackboneFreeze. Constrain only C,CA,N.
+    Args:
+        stru: the target structure"""
     atoms = stru.backbone_atoms()
     return BackBoneFreeze(atoms=atoms)
 
-def create_distance_constraint() -> DistanceConstraint:
-    """constructor for DistanceConstraint"""
+def create_distance_constraint(
+        atom_1: Union[Atom, str],
+        atom_2: Union[Atom, str],
+        target_value: float,
+        topology: Structure= None,) -> DistanceConstraint:
+    """constructor for DistanceConstraint between atoms.
+    Args:
+        atom_1, atom_2:
+            the 2 atoms of the distance constraint. they can be specified
+            either through Atom() objects or keyword str of Structure().get()
+            combining with a Structure() (e.g.: A.100.CA)
+        target_value:
+            the target distance of the constraint
+        topology:
+            the reference topology if keyword str is used for atom_1, atom_2."""
+    atom_1 = dispatch_get_key(atom_1, topology)
+    atom_2 = dispatch_get_key(atom_2, topology)
+    result = DistanceConstraint(
+        atoms=[atom_1, atom_2],
+        target_value=target_value
+    )
+    result.check_consistent_topology()
+    return result
+
+def create_angle_constraint(
+        atom_1: Union[Atom, str],
+        atom_2: Union[Atom, str],
+        atom_3: Union[Atom, str],
+        target_value: float,
+        topology: Structure= None,) -> AngleConstraint:
+    """constructor for AngleConstraint between atoms.
+    Args:
+        atom_1, atom_2, atom_3:
+            the 3 atoms of the angle constraint. they can be specified
+            either through Atom() objects or keyword str of Structure().get()
+            combining with a Structure() (e.g.: A.100.CA)
+        target_value:
+            the target angle of the constraint
+        topology:
+            the reference topology if keyword str is used for atom_1, atom_2, atom_3."""
+    atom_1 = dispatch_get_key(atom_1, topology)
+    atom_2 = dispatch_get_key(atom_2, topology)
+    atom_3 = dispatch_get_key(atom_3, topology)
+    result = AngleConstraint(
+        atoms=[atom_1, atom_2, atom_3],
+        target_value=target_value
+    )
+    result.check_consistent_topology()
+    return result
+
+def create_dihedral_constraint(
+        atom_1: Union[Atom, str],
+        atom_2: Union[Atom, str],
+        atom_3: Union[Atom, str],
+        atom_4: Union[Atom, str],
+        target_value: float,
+        topology: Structure= None,) -> DihedralConstraint:
+    """constructor for DihedralConstraint between atoms.
+    Args:
+        atom_1, atom_2, atom_3, atom_4:
+            the 4 atoms of the dihedral constraint. they can be specified
+            either through Atom() objects or keyword str of Structure().get()
+            combining with a Structure() (e.g.: A.100.CA)
+        target_value:
+            the target dihedral of the constraint
+        topology:
+            the reference topology if keyword str is used for
+            atom_1, atom_2, atom_3, atom_4."""
+    atom_1 = dispatch_get_key(atom_1, topology)
+    atom_2 = dispatch_get_key(atom_2, topology)
+    atom_3 = dispatch_get_key(atom_3, topology)
+    atom_4 = dispatch_get_key(atom_4, topology)
+    result = DihedralConstraint(
+        atoms=[atom_1, atom_2, atom_3, atom_4],
+        target_value=target_value
+    )
+    result.check_consistent_topology()
+    return result
+
+def dispatch_get_key(target: Union[str, Atom, Residue], stru: Structure) -> Union[Atom, Residue]:
+    """apply the key with .get() that support a dispatch of using the
+    object (e.g.: Atom()) itself"""
+    if isinstance(target, str):
+        if not isinstance(stru, Structure):
+            _LOGGER.error("key str types of specification is used but reference "
+                          "topology (i.e.: structure) is not supplied. "
+                          f"(key: {target}, topology: {stru})")
+            raise TypeError
+        target = stru.get(target)
+    return target
+
+
 # endregion
