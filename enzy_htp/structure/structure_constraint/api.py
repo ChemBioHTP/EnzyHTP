@@ -312,7 +312,7 @@ class DistanceConstraint(StructureConstraint):
 
     DEFAULT_PARAMS = {
         "amber": {
-            "rs_filename": eh_config["amber.DEFAULT_DISANG_FILENAME"],
+            "rs_filepath": eh_config["amber.DEFAULT_DISANG_FILEPATH"],
         } | eh_config["amber.DEFAULT_DISTANCE_CONSTRAINT_SETTING"],
     }
     
@@ -343,7 +343,7 @@ class AngleConstraint(StructureConstraint):
 
     DEFAULT_PARAMS = {
         "amber": {
-            "rs_filename": eh_config["amber.DEFAULT_DISANG_FILENAME"],
+            "rs_filepath": eh_config["amber.DEFAULT_DISANG_FILEPATH"],
         } | eh_config["amber.DEFAULT_ANGLE_CONSTRAINT_SETTING"],
     }
     
@@ -374,7 +374,7 @@ class DihedralConstraint(StructureConstraint):
 
     DEFAULT_PARAMS = {
         "amber": {
-            "rs_filename": eh_config["amber.DEFAULT_DISANG_FILENAME"],
+            "rs_filepath": eh_config["amber.DEFAULT_DISANG_FILEPATH"],
         } | eh_config["amber.DEFAULT_DIHEDRAL_CONSTRAINT_SETTING"],
     }
     

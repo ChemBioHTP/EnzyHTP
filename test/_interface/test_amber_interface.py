@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import pytest
+import numpy as np
 from pathlib import Path
 from typing import Union
 
@@ -538,7 +539,9 @@ def test_write_to_mdin_from_raw_dict():
             },
         ],
         'file_redirection': {
-            'DISANG': './MD/0.rs' 
+            'DISANG': {
+                'path': './MD/0.rs',
+                'content': []} 
         },
         'group_info': [],
     }
@@ -605,6 +608,7 @@ def test_parse_md_config_dict_to_raw_wo_cons():
             "restart" : False,
             "if_report" : True,
             "record_period" : 0.0004, # ns
+            "mdstep_dir" : "./MD",
     }
 
     ai = interface.amber
@@ -612,7 +616,7 @@ def test_parse_md_config_dict_to_raw_wo_cons():
     assert test_raw_dict == answer_raw_dict
 
 
-def test_parse_md_config_dict_to_raw_w_cons(): # TODO start from here the PR
+def test_parse_md_config_dict_to_raw_w_cons():
     """test to make sure _parse_md_config_dict_to_raw() works as expected.
     using a dict from old EnzyHTP Class_Conf.Amber.conf_heat as an example"""
     test_pdb = f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb"
@@ -657,7 +661,26 @@ def test_parse_md_config_dict_to_raw_w_cons(): # TODO start from here the PR
             },
         ],
         'file_redirection': {
-            'DISANG': './MD/0.rs' 
+            'DISANG': {
+                'path': './MD//0.rs',
+                'content': [
+                    {'ialtd': 0,
+                    'iat': [3976, 1579],
+                    'r1': 2.150,
+                    'r2': 2.350,
+                    'r3': 2.450,
+                    'r4': 2.650,
+                    'rk2': 200.0,
+                    'rk3': 200.0},
+                    {'ialtd': 0,
+                    'iat': [3975,3976,1579],
+                    'r1': 150.0,
+                    'r2': 170.0,
+                    'r3': 190.0,
+                    'r4': 210.0,
+                    'rk2': 200.0,
+                    'rk3': 200.0}
+                ]} 
         },
         'group_info': [],
     }
@@ -678,6 +701,7 @@ def test_parse_md_config_dict_to_raw_w_cons(): # TODO start from here the PR
                 "B.254.CAE", "B.254.H2", "A.101.OE2", 180.0, test_stru)],
         "if_report" : True,
         "record_period" : 0.0004,
+        "mdstep_dir" : "./MD",
     }
 
     ai = interface.amber
@@ -857,6 +881,7 @@ def test_get_restraintmask_bb_freeze():
     mask = ai.get_restraintmask(cons)
     assert mask == "'@C,CA,N'"
 
+
 def test_get_restraintmask():
     """test using example restraints"""
     ai = interface.amber
@@ -866,19 +891,47 @@ def test_get_restraintmask():
         atoms=test_stru.atoms[1:20],
         topology=test_stru,)
     mask = ai.get_restraintmask(cons)
-    assert mask == "'@2-20"
+    assert mask == "'@2-20'"
+
 
 def test_get_amber_mask(): # TODO
     """"""
     raise Exception("TODO")
 
+
 def test_get_amber_atom_index(): # TODO
     """"""
     raise Exception("TODO")
 
+
 def test_get_amber_index_mapper(): # TODO VIP
     """this dont work for the 1Q4T case."""
     raise Exception("TODO")
+
+
+def test_parse_cons_to_raw_rs_dict():
+    """test using KE and example cons"""
+    test_pdb = f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb"
+    test_stru = struct.PDBParser().get_structure(test_pdb)
+    test_cons = create_distance_constraint(
+        "B.254.H2", "A.101.OE2", 2.4, test_stru)
+    answer_raw_dict = {
+        'ialtd': 0,
+        'iat': [3976, 1579],
+        'r1': 2.15,
+        'r2': 2.35,
+        'r3': 2.45,
+        'r4': 2.65,
+        'rk2': 200.0,
+        'rk3': 200.0}
+    ai = interface.amber
+    test_raw_dict = ai._parse_cons_to_raw_rs_dict(test_cons)
+    for k, v in test_raw_dict.items():
+        if k in "r1 r2 r3 r4".split():
+            assert np.isclose(v, answer_raw_dict[k], atol=1e-3)
+        else:
+            assert v == answer_raw_dict[k]
+
 
 # region TODO
 
@@ -1008,7 +1061,7 @@ def test_add_charges_bad_file():
 
     with pytest.raises(SystemExit) as exe:
         ai.add_charges(ss, f"{MM_BASE_DIR}/data/bad_label_prmtop")
-
+    
     assert exe
 
 # endregion TODO

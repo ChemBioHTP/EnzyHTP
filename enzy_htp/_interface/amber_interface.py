@@ -15,6 +15,7 @@ from pathlib import Path
 from subprocess import CalledProcessError, CompletedProcess, SubprocessError
 from typing import List, Tuple, Union, Dict, Any
 from dataclasses import dataclass
+from sympy import sympify
 
 from .base_interface import BaseInterface
 from .handle_types import (
@@ -594,6 +595,7 @@ class AmberMDStep(MolDynStep):
             "restart" : self.restart,
             "if_report" : self.if_report,
             "record_period" : self.record_period,
+            "mdstep_dir" : self.work_dir,
         }
     # endregion
 
@@ -1164,9 +1166,10 @@ class AmberInterface(BaseInterface):
             }
         TODO solve this for the 1Q4T case."""
         # init files
-        fs.safe_mkdir(eh_config['system.SCRATCH_DIR'])
-        temp_pdb = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/amber_index_mapping_source.pdb")
-        temp_amber_pdb = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/amber_index_mapping_amber.pdb")
+        temp_dir = eh_config['system.SCRATCH_DIR']
+        fs.safe_mkdir(temp_dir)
+        temp_pdb = fs.get_valid_temp_name(f"{temp_dir}/amber_index_mapping_source.pdb")
+        temp_amber_pdb = fs.get_valid_temp_name(f"{temp_dir}/amber_index_mapping_amber.pdb")
         # init stru
         pdb_io.PDBParser().save_structure(
             temp_pdb, stru,
@@ -1189,7 +1192,12 @@ class AmberInterface(BaseInterface):
             for atom in res.atoms:
                 amber_atom_idx = ref_stru.find_residue_with_key(amber_key).find_atom_name(atom.name).idx
                 result["atom"][atom] = amber_atom_idx
-
+        fs.clean_temp_file_n_dir([
+            temp_dir,
+            temp_pdb,
+            temp_amber_pdb,
+        ])
+        # TODO add a cache mechanism
         return result
 
     def get_amber_atom_index(self, atoms: List[Atom]) -> List[int]:
@@ -1254,6 +1262,13 @@ class AmberInterface(BaseInterface):
         """read from mdin file and parse it to a raw dictionary
         where key is Amber keywords as is. (defined in
         _write_to_mdin_from_raw_dict())"""
+
+    def write_disang_file(raw_rs_dict: Dict, rs_path: str):
+        """write {raw_rs_dict} to {rs_path}"""
+
+    REDIRECTION_FILE_WRITER = {
+        "DISANG" : write_disang_file,
+    }
 
     def write_to_mdin(self, md_config_dict: Dict, out_path: str):
         """parse a AmberMDStep.md_config_dict to a mdin file."""
@@ -1341,27 +1356,50 @@ class AmberInterface(BaseInterface):
         constraints = md_config_dict["constrain"]
         cart_freeze = []
         geom_cons = []
-        for cons in constraints:
-            cons: StructureConstraint
-            if cons.constraint_type in self.config()["SUPPORTED_CONSTRAINT_TYPE"]:
-                if cons.is_cartesian_freeze():
-                    cart_freeze.append(cons)
+        if constraints:
+            for cons in constraints:
+                cons: StructureConstraint
+                if cons.constraint_type in self.config()["SUPPORTED_CONSTRAINT_TYPE"]:
+                    if cons.is_cartesian_freeze():
+                        cart_freeze.append(cons)
+                    else:
+                        geom_cons.append(cons)
                 else:
-                    geom_cons.append(cons)
-            else:
-                _LOGGER.error(
-                    f"Dont support {cons.constraint_type} yet in AmberInterface. Supported: {self.config()['SUPPORTED_CONSTRAINT_TYPE']}")
-                raise ValueError
+                    _LOGGER.error(
+                        f"Dont support {cons.constraint_type} yet in AmberInterface. Supported: {self.config()['SUPPORTED_CONSTRAINT_TYPE']}")
+                    raise ValueError
 
         # ntr and cartesian restraint
+        ntr_cntrl = {}
         if cart_freeze:
-            ntr = 1
-        cons = merge_cartesian_freeze(cart_freeze)
-        restraintmask = self.get_restraintmask(cons, reduce=True)
-        restraint_wt = cons.params["amber"]["restraint_wt"]
+            cons = merge_cartesian_freeze(cart_freeze)
+            restraintmask = self.get_restraintmask(cons, reduce=True)
+            restraint_wt = cons.params["amber"]["restraint_wt"]
+            ntr_cntrl = {"ntr": 1,
+                         'restraint_wt': restraint_wt,
+                         'restraintmask': restraintmask,}
 
         # nmropt
-        # TODO
+        nmropt_cntrl = {}
+        if geom_cons:
+            geom_cons: List[StructureConstraint]
+            nmropt_cntrl = {'nmropt': 1}
+            # figure out path
+            disang_path: str = geom_cons[0].params["amber"]["rs_filepath"]
+            if disang_path.startswith("{mdstep_dir}"):
+                disang_path = disang_path.lstrip("{mdstep_dir}")
+                disang_path = f"{md_config_dict['mdstep_dir']}/{disang_path}"
+            # figure out content
+            disang_content_list = []
+            for cons in geom_cons:
+                raw_rs_dict = self._parse_cons_to_raw_rs_dict(cons)
+                disang_content_list.append(raw_rs_dict)
+            # assemble
+            nmropt_file_redirection = {
+                "DISANG" : {
+                    "path": disang_path, "content": disang_content_list}
+            }
+            file_redirection_dict.update(nmropt_file_redirection)
             
         # determine the &wt END
         if wt_list or file_redirection_dict:
@@ -1383,9 +1421,8 @@ class AmberInterface(BaseInterface):
                 'ntpr': ntpr, 'ntwx': ntwx,
                 } | ntt_cntrl | ntb_cntrl | ntp_cntrl | {
                 'iwrap': self.config()["HARDCODE_IWRAP"],
-                # 'nmropt': 1, 
                 'ig': self.config()["HARDCODE_IG"],
-                'ntr': ntr, 'restraint_wt': restraint_wt, 'restraintmask': restraintmask,
+                } | ntr_cntrl | nmropt_cntrl | {
             }},
         ] + wt_list
 
@@ -1398,6 +1435,40 @@ class AmberInterface(BaseInterface):
         }
 
         return raw_dict
+
+    def _parse_cons_to_raw_rs_dict(self, cons: StructureConstraint) -> Dict:
+        """parse StructureConstraint() to a raw dict for writing the DISANG file.
+        Expression containing value are also parsed in this function.
+        (based on section 27.1 in Amber20 manual)
+        Example rs dict
+        {
+        'iat':[100,101],
+        'r1': 0.50,'r2': 0.96,'r3': 2.50,'r4': 3.50,
+        'rk2':0.0,'rk3':100.0,'ir6':1,'ialtd':0
+        }"""
+        target_keys = "r1 r2 r3 r4 rk2 rk3 ir6 ialtd ifvari".split() # TODO add more when needed
+        source_dict = cons.params["amber"]
+        # iat
+        atom_idxes = self.get_amber_atom_index(cons.atoms)
+        result = {"iat": atom_idxes}
+
+        # other keys
+        for k in target_keys:
+            if k in source_dict:
+                v = source_dict[k] 
+    
+                # parse x containing value
+                if k in "r1 r2 r3 r4".split():
+                    if isinstance(v, str) and v.count("x") > 0:
+                        expr = sympify(v)
+                        v = round(
+                                float(expr.subs("x", cons.target_value)),
+                                ndigits=3
+                            )
+
+                result[k] = v
+        
+        return result
 
     def get_restraintmask(self, cons: CartesianFreeze, reduce: bool= True) -> str:
         """get the str of restraintmask from CartesianFreeze().
@@ -1442,7 +1513,13 @@ class AmberInterface(BaseInterface):
             mdin_lines.append(" /")
         # file redirection
         for k, v in raw_dict["file_redirection"].items():
-            mdin_lines.append(f" {k}={v}")
+            v_path = v["path"]
+            v_content = v["content"]
+            # add the redirection line
+            mdin_lines.append(f" {k}={v_path}")
+            # write the redirection file
+            if v_content:
+                self.REDIRECTION_FILE_WRITER[k](v_content, v_path)
         # group information
         for group_info in raw_dict["group_info"]: #TODO cant find any example of how this looks like
             _LOGGER.error("group info support not developed yet. contact author if you have to use this")

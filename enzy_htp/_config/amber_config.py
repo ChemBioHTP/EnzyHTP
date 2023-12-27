@@ -155,8 +155,10 @@ class AmberConfig(BaseConfig):
     """the default value for restraint_wt that used in CartesianFreeze.
     (unit: kcal*mol^-1*A^-2) (form: k(dx)^2 dx is the cartesian coord difference)"""
 
-    DEFAULT_DISANG_FILENAME = "0.rs"
-    """the default name for DISANG file in geometry(nmropt) constraint. (Amber20 manual 27.1)"""
+    DEFAULT_DISANG_FILEPATH = "{mdstep_dir}/0.rs"
+    """the default path for DISANG file in geometry(nmropt) constraint.
+    {mdstep_dir} means it will be replaced my the actually mdstep_dir when 
+    used in a real step"""
     
     DEFAULT_DISTANCE_CONSTRAINT_SETTING = {
         "ialtd" : 0,
@@ -164,7 +166,7 @@ class AmberConfig(BaseConfig):
         "r2" : "x-0.05",
         "r3" : "x+0.05",
         "r4" : "x+0.25",
-        "rk2": "200.0", "rk3": "200.0",
+        "rk2": 200.0, "rk3": 200.0,
     }
     """the default settings for distance constraint in Amber. (Amber20 manual 27.1)
     Default using flat-welled linear-edge parabola with flat region span +-0.05A the target distance.
@@ -199,7 +201,7 @@ class AmberConfig(BaseConfig):
         "r2" : "x-10.0",
         "r3" : "x+10.0",
         "r4" : "x+30.0",
-        "rk2": "200.0", "rk3": "200.0",
+        "rk2": 200.0, "rk3": 200.0,
     }
     """the default settings for angle constraint in Amber.
     (see DEFAULT_DISTANCE_CONSTRAINT_SETTING for more details)"""
@@ -210,7 +212,7 @@ class AmberConfig(BaseConfig):
         "r2" : "x-10.0",
         "r3" : "x+10.0",
         "r4" : "x+30.0",
-        "rk2": "200.0", "rk3": "200.0",
+        "rk2": 200.0, "rk3": 200.0,
     }
     """the default settings for dihedral constraint in Amber.
     (see DEFAULT_DISTANCE_CONSTRAINT_SETTING for more details)"""

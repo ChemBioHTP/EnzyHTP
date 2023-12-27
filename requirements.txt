@@ -11,3 +11,4 @@ pyvista
 rdkit
 editdistance
 beautifulsoup4
+sympy
