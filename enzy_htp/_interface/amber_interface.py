@@ -642,6 +642,7 @@ class AmberMDStep(MolDynStep):
             "sub_dir" : "./",
             "md_names" : [self.name],
             "work_dir" : self.work_dir,
+            "temp_mdin": [temp_mdin_file],
         }
 
         # 5. make result egg
@@ -712,10 +713,10 @@ class AmberMDStep(MolDynStep):
         )
 
         # 6. clean up
-        fs.clean_temp_file_n_dir([
-            temp_mdin_file,
-            "./mdinfo"
-        ])
+        clean_up_target = ["./mdinfo"]
+        if not self.keep_in_file:
+            clean_up_target.append(temp_mdin_file)
+        fs.clean_temp_file_n_dir(clean_up_target)
 
         return result
 
@@ -769,6 +770,12 @@ class AmberMDStep(MolDynStep):
         
         # error check
         self.check_md_error(traj_file, traj_log_file, result_egg.prmtop_path, result_egg.parent_job)
+
+        # clean up
+        clean_up_target = ["./mdinfo"]
+        if not self.keep_in_file:
+            clean_up_target.extend(result_egg.parent_job["temp_mdin"])
+        fs.clean_temp_file_n_dir(clean_up_target)
 
         return MolDynResult(
             traj_file = traj_file,
@@ -861,6 +868,7 @@ class AmberMDStep(MolDynStep):
                 sub_dir = merged_job.sub_dir
                 md_names = merged_job.mimo["md_names"] + job.mimo["md_names"]
                 work_dir = merged_job.mimo["work_dir"]
+                merged_mdin = merged_job.mimo["temp_mdin"] + job.mimo["temp_mdin"]
                 # update merged job
                 merged_job = ClusterJob.config_job(
                     commands = merged_cmds,
@@ -877,6 +885,7 @@ class AmberMDStep(MolDynStep):
                     "sub_dir" : sub_dir,
                     "md_names" : md_names,
                     "work_dir" : work_dir,
+                    "temp_mdin" : merged_mdin,
                 }
                 result.append(merged_job) # add the job back
             else:

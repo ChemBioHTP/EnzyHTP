@@ -96,7 +96,8 @@ class AmberConfig(BaseConfig):
     """The default value for the temperature of the simulation."""
 
     DEFAULT_MD_THERMOSTAT: str = "langevin"
-    """default value for the algorithm of the thermostat."""
+    """default value for the algorithm of the thermostat.
+    Change HARDCODE_GAMMA_LN for non-default gamma_ln value"""
 
     DEFAULT_MD_PRESSURE_SCALING: str = "isotropic"
     """default value for the pressure scaling of the md step"""
