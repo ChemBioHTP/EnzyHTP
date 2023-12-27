@@ -786,9 +786,9 @@ pmemd\.cuda -O -i \./MD/amber_md_step_?[0-9]*\.in -o \./MD/amber_md_step\.out -p
     fs.safe_rmdir(md_step.work_dir)
 
 
-def test_amber_md_step_make_job_w_cons(): # TODO
+def test_amber_md_step_make_job_w_cons():
     """test to make sure AmberMDStep.make_job() works as expected.
-    w/ constraint."""
+    w/ constraint. Just make sure no exceptions are raised"""
     test_inpcrd = f"{MM_DATA_DIR}/KE_07_R7_S.inpcrd"
     test_prmtop = f"{MM_DATA_DIR}/KE_07_R7_S.prmtop"
     test_pdb = f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb"
@@ -824,7 +824,6 @@ source /home/shaoq1/bin/amber_env/amber22\.sh
 pmemd\.cuda -O -i \./MD/amber_md_step_?[0-9]*\.in -o \./MD/amber_md_step\.out -p /panfs/accrepfs\.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S\.prmtop -c /panfs/accrepfs\.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S\.inpcrd -r \./MD/amber_md_step\.rst -ref /panfs/accrepfs\.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S\.inpcrd -x \./MD/amber_md_step\.nc 
 """
     assert re.match(answer_pattern, test_job.sub_script_str)
-    # TODO assert rs file
     fs.safe_rmdir(md_step.work_dir)
 
 

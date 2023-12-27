@@ -1536,7 +1536,7 @@ class AmberInterface(BaseInterface):
             mdin_lines.append(f" {k}={v_path}")
             # write the redirection file
             if v_content:
-                self.REDIRECTION_FILE_WRITER[k](v_content, v_path)
+                self.REDIRECTION_FILE_WRITER[k](self, v_content, v_path)
         # group information
         for group_info in raw_dict["group_info"]: #TODO cant find any example of how this looks like
             _LOGGER.error("group info support not developed yet. contact author if you have to use this")
