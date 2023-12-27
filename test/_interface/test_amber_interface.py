@@ -540,8 +540,25 @@ def test_write_to_mdin_from_raw_dict():
         ],
         'file_redirection': {
             'DISANG': {
-                'path': './MD/0.rs',
-                'content': []} 
+                'path': './MD//0.rs',
+                'content': [
+                    {'ialtd': 0,
+                    'iat': [3976, 1579],
+                    'r1': 2.150,
+                    'r2': 2.350,
+                    'r3': 2.450,
+                    'r4': 2.650,
+                    'rk2': 200.0,
+                    'rk3': 200.0},
+                    {'ialtd': 0,
+                    'iat': [3975,3976,1579],
+                    'r1': 150.0,
+                    'r2': 170.0,
+                    'r3': 190.0,
+                    'r4': 210.0,
+                    'rk2': 200.0,
+                    'rk3': 200.0}
+                ]}
         },
         'group_info': [],
     }
@@ -551,6 +568,32 @@ def test_write_to_mdin_from_raw_dict():
     ai._write_to_mdin_from_raw_dict(test_raw_dict, test_temp_mdin)
     assert files_equivalent(test_temp_mdin, answer_temp_mdin)
     fs.safe_rm(test_temp_mdin)
+
+
+def test_write_disang_file():
+    """test using an example raw dict list"""
+    test_dict_list = [
+        {'ialtd': 0,
+        'iat': [3976, 1579],
+        'r1': 2.150,
+        'r2': 2.350,
+        'r3': 2.450,
+        'r4': 2.650,
+        'rk2': 200.0,
+        'rk3': 200.0},
+        {'ialtd': 0,
+        'iat': [3975,3976,1579],
+        'r1': 150.0,
+        'r2': 170.0,
+        'r3': 190.0,
+        'r4': 210.0,
+        'rk2': 200.0,
+        'rk3': 200.0}]
+    test_disang = f"{MM_WORK_DIR}/test_disang_from_raw_dict.rs"
+    answer_disang = f"{MM_DATA_DIR}/answer_disang_from_raw_dict.rs"
+    ai = interface.amber
+    ai.write_disang_file(test_dict_list, test_disang)
+    assert files_equivalent(test_disang, answer_disang)
 
 
 def test_parse_md_config_dict_to_raw_wo_cons():

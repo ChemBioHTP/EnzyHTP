@@ -1263,8 +1263,25 @@ class AmberInterface(BaseInterface):
         where key is Amber keywords as is. (defined in
         _write_to_mdin_from_raw_dict())"""
 
-    def write_disang_file(raw_rs_dict: Dict, rs_path: str):
+    def write_disang_file(self, raw_rs_dict_list: List[dict], rs_path: str):
         """write {raw_rs_dict} to {rs_path}"""
+        disang_lines = []
+        for raw_dict in raw_rs_dict_list:
+            cons_lines = [
+                "&rst"
+            ]
+            for k, v in raw_dict.items():
+                if k == "iat":
+                    v = map(str, v)
+                    cons_lines.append(f" {k}={','.join(v)},")
+                else:
+                    cons_lines.append(f" {k}={v},")
+            cons_lines = cons_lines + [
+                "&end",
+            ]
+            disang_lines.extend(cons_lines)
+        disang_lines.append("")
+        fs.write_lines(rs_path, disang_lines)
 
     REDIRECTION_FILE_WRITER = {
         "DISANG" : write_disang_file,
