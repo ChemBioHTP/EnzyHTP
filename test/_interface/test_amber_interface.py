@@ -520,21 +520,21 @@ def test_write_to_mdin_from_raw_dict():
             },
            {'type': 'wt',
             'config': {
-                'type': 'TEMP0',
+                'type': "'TEMP0'",
                 'istep1': 0, 'istep2': 18000,
                 'value1': 0.0, 'value2': 300.0,
                 }
             },
            {'type': 'wt',
             'config': {
-                'type': 'TEMP0',
+                'type': "'TEMP0'",
                 'istep1': 18001, 'istep2': 20000,
                 'value1': 300.0, 'value2': 300.0,
                 }
             },
            {'type': 'wt',
             'config': {
-                'type': 'END',
+                'type': "'END'",
                 }
             },
         ],
@@ -568,6 +568,7 @@ def test_write_to_mdin_from_raw_dict():
     ai._write_to_mdin_from_raw_dict(test_raw_dict, test_temp_mdin)
     assert files_equivalent(test_temp_mdin, answer_temp_mdin)
     fs.safe_rm(test_temp_mdin)
+    fs.safe_rm("MD/0.rs")
 
 
 def test_write_disang_file():
@@ -618,21 +619,21 @@ def test_parse_md_config_dict_to_raw_wo_cons():
             },
            {'type': 'wt',
             'config': {
-                'type': 'TEMP0',
+                'type': "'TEMP0'",
                 'istep1': 0, 'istep2': 18000,
                 'value1': 0.0, 'value2': 300.0,
                 }
             },
            {'type': 'wt',
             'config': {
-                'type': 'TEMP0',
+                'type': "'TEMP0'",
                 'istep1': 18001, 'istep2': 20000,
                 'value1': 300.0, 'value2': 300.0,
                 }
             },
            {'type': 'wt',
             'config': {
-                'type': 'END',
+                'type': "'END'",
                 }
             },
         ],
@@ -724,21 +725,21 @@ def test_parse_md_config_dict_to_raw_w_cons():
             },
            {'type': 'wt',
             'config': {
-                'type': 'TEMP0',
+                'type': "'TEMP0'",
                 'istep1': 0, 'istep2': 18000,
                 'value1': 0.0, 'value2': 300.0,
                 }
             },
            {'type': 'wt',
             'config': {
-                'type': 'TEMP0',
+                'type': "'TEMP0'",
                 'istep1': 18001, 'istep2': 20000,
                 'value1': 300.0, 'value2': 300.0,
                 }
             },
            {'type': 'wt',
             'config': {
-                'type': 'END',
+                'type': "'END'",
                 }
             },
         ],

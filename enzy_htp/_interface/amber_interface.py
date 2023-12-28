@@ -1353,7 +1353,7 @@ class AmberInterface(BaseInterface):
                     temp_wt_list.append({
                         'type': 'wt',
                         'config': {
-                            'type': 'TEMP0',
+                            'type': "'TEMP0'",
                             'istep1': step0, 'istep2': step1,
                             'value1': temp0, 'value2': temp1,}
                         })
@@ -1468,7 +1468,7 @@ class AmberInterface(BaseInterface):
         if wt_list or file_redirection_dict:
             wt_list.append(
                 {'type': 'wt',
-                 'config': {'type': 'END',}},
+                 'config': {'type': "'END'",}},
                 )
 
         # assemble namelists
