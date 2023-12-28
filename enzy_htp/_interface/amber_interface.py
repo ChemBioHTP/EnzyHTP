@@ -775,6 +775,8 @@ class AmberMDStep(MolDynStep):
         clean_up_target = ["./mdinfo"]
         if not self.keep_in_file:
             clean_up_target.extend(result_egg.parent_job.mimo["temp_mdin"])
+            # TODO also clean up .rs file but how to obtain it?
+            # parse mdin file?
         fs.clean_temp_file_n_dir(clean_up_target)
 
         return MolDynResult(
@@ -1451,6 +1453,7 @@ class AmberInterface(BaseInterface):
             if disang_path.startswith("{mdstep_dir}"):
                 disang_path = disang_path.lstrip("{mdstep_dir}")
                 disang_path = f"{md_config_dict['mdstep_dir']}/{disang_path}"
+            disang_path = fs.get_valid_temp_name(disang_path)
             # figure out content
             disang_content_list = []
             for cons in geom_cons:
