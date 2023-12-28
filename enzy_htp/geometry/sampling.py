@@ -129,7 +129,8 @@ def md_simulation(stru: Structure,
                   steps: List[MolDynStep],
                   parallel_runs: int=1,
                   parallel_method: str="cluster_job",
-                  work_dir: str="./MD") -> Tuple[MolDynParameter, List[List[MolDynResult]]]:
+                  work_dir: str="./MD",
+                  job_check_period: int=210,) -> Tuple[MolDynParameter, List[List[MolDynResult]]]:
     """This science API perform Molecular Dynamics simulation.
 
     The starting structure {stru} will be parameterized by the {param_method} and
@@ -138,16 +139,25 @@ def md_simulation(stru: Structure,
     a list.
 
     Args:
-        stru: the starting structure
-        param_method: the Parameterizer() used for parameterization. This is a
+        stru:
+            the starting structure
+        param_method:
+            the Parameterizer() used for parameterization. This is a
             special step that covert enzy_htp.Structure() to the input format
             MolDynStep takes. Normally it will be topology, initial coordinate,
             and MM parameters etc.
-        steps: a list of steps each is a MolDynStep() that defines a molecular
+        steps:
+            a list of steps each is a MolDynStep() that defines a molecular
             dynamics step.
-        parallel_runs: the number of desired parallel runs of the steps.
-        parallel_method: the method to parallelize the multiple runs
-        work_dir: the directory that contains all the MD files input/intermediate/output
+        parallel_runs:
+            the number of desired parallel runs of the steps.
+        parallel_method:
+            the method to parallelize the multiple runs
+        work_dir:
+            the directory that contains all the MD files input/intermediate/output
+        job_check_period:
+            the check period for wait_to_2d_array_end. Used when parallel_method='cluster_job'.
+            (Unit: s, default: 210s)
 
     Return:
         Tuple[
@@ -214,9 +224,9 @@ def md_simulation(stru: Structure,
     # IV. run MD steps
     ## parallelize
     if parallel_method == "cluster_job":
-        results = _parallelize_md_steps_with_cluster_job(parallel_runs, work_dir, steps, params)
+        results = _parallelize_md_steps_with_cluster_job(parallel_runs, work_dir, steps, params, job_check_period)
     ## sequential
-    if parallel_method is None or parallel_runs == 1:
+    if parallel_method is None:
         results = _serial_md_steps(parallel_runs, work_dir, steps, params)
 
     return params, results
@@ -225,7 +235,8 @@ def _parallelize_md_steps_with_cluster_job(
         parallel_runs: int,
         work_dir: str,
         steps: List[MolDynStep],
-        params,
+        params: MolDynParameter,
+        period: int,
         ):
     """The MD parallelization method: cluster_job. (only used in md_simulation())
     This method will utilize ARMer@EnzyHTP and make each MD steps a ClusterJob and
@@ -249,23 +260,30 @@ def _parallelize_md_steps_with_cluster_job(
             else: # the 1st step
                 job, output = step.make_job(params)
             job_list.append(job)
-            # 2. make output
-            if step.if_report:
-                result_egg_ele.append((step, output))
-        if not result_egg_ele:
-            result_egg_ele = [(step, output)] # default add last step if non is specified
+            # 2. make output (we need to translate all since error checking and cleaning is needed)
+            result_egg_ele.append((step, output))
+
         job_list = type(step).try_merge_jobs(job_list)
 
         job_array.append(job_list)
         result_eggs.append(result_egg_ele)  # eggs are filenames that can be translated to give birth actual data
 
-    job_manager.ClusterJob.wait_to_2d_array_end(job_array, period=210)
+    job_manager.ClusterJob.wait_to_2d_array_end(job_array, period=period)
 
     for rep_md_result in result_eggs:
         rep_result_list = []
         for step, output in rep_md_result:
             rep_result_list.append(step.translate(output))
         results.append(rep_result_list)
+
+    # clean up
+    job_temp_files = set()
+    for job_list in job_array:
+        for job in job_list:
+            job: job_manager.ClusterJob
+            job_temp_files.add(job.sub_script_path)
+            # job_temp_files.add(job.job_cluster_log) probably not.
+    fs.clean_temp_file_n_dir(list(job_temp_files))
 
     return results
 
