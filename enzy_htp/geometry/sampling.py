@@ -14,7 +14,8 @@ import enzy_htp.core.file_system as fs
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.exception import InconsistentMDEngine
 from enzy_htp.core import job_manager
-from enzy_htp.structure import Structure, StructureEnsemble, structure_constraint
+from enzy_htp.structure import Structure, StructureEnsemble
+from enzy_htp.structure import structure_constraint as stru_cons
 from enzy_htp._interface.handle_types import (
     MolDynStep,
     MolDynParameterizer,
@@ -29,7 +30,7 @@ def equi_md_sampling(stru: Structure,
                      # config for steps
                      prod_time: float= 50.0, # ns
                      prod_temperature: float = 300.0, #K
-                     prod_constrain: structure_constraint.StructureConstraint= None,
+                     prod_constrain: List[stru_cons.StructureConstraint]= None,
                      record_period: float= 0.5, # ns
                      cluster_job_config: Dict= None,
                      cpu_equi_step: bool= False,
@@ -78,9 +79,16 @@ def equi_md_sampling(stru: Structure,
                           "You need to at least specify the account and partition. "
                           "See test/geometry/test_sampling.py::test_equi_md_sampling_lv1() for an example.")
             raise ValueError
-    # init
     if prod_constrain is None:
         prod_constrain = []
+    for cons in prod_constrain:
+        if cons.topology is not stru:
+            # TODO probably can also support a eq-like checker in Structure()
+            # that checks for the same topology and indexing.
+            _LOGGER.error("inconsistency between constraint and stru. "
+                          f"constraint topology: {cons.topology} "
+                          f"stru: {stru} ")
+            raise ValueError
 
     # 1. build steps
     parent_interface = param_method.parent_interface
@@ -96,7 +104,7 @@ def equi_md_sampling(stru: Structure,
                           "You need to at least specify the account and partition. ")
             raise ValueError
 
-    freeze_backbone = structure_constraint.create_backbone_freeze(stru)
+    freeze_backbone = stru_cons.create_backbone_freeze(stru)
     min_step  = parent_interface.build_md_step(
         name="min_micro",
         minimize=True,

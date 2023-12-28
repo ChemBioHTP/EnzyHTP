@@ -309,8 +309,15 @@ def test_equi_md_sampling_lv1():
         job_check_period=10,
         # shorter sim for test
         prod_time=0.5,
-        record_period=0.05,)
-    
+        record_period=0.05,
+        work_dir=f"{WORK_DIR}MD/")
+
+    # clean up
+    # fs.safe_rmdir(f"{WORK_DIR}MD/")
+    # fs.clean_temp_file_n_dir([
+    # ] + glob.glob("slurm-*.out")
+    # + glob.glob("scratch/amber_parameterizer/*")
+    # + glob.glob(f"{WORK_DIR}/ncaa_lib/H5J*"))
 
 
 @pytest.mark.accre
@@ -321,15 +328,61 @@ def test_equi_md_sampling_lv2():
     test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
     test_stru.assign_ncaa_chargespin({"H5J" : (0,1)})
     test_param_method = amber_interface.build_md_parameterizer(
-        ncaa_param_lib_path=f"{DATA_DIR}/ncaa_lib_empty",
+        ncaa_param_lib_path=f"{WORK_DIR}/ncaa_lib",
     )
-    test_prod_constrain = None
     cluster_job_config = {
         "cluster" : Accre(),
-        "period" : 600,
-        "res_keywords" : {"account" : "csb_gpu_acc"}
+        "res_keywords" : {"account" : "csb_gpu_acc",
+                         "partition" : "turing"}
     }
-    equi_md_sampling(stru = test_stru,
-                     param_method = test_param_method,
-                     prod_constrain = test_prod_constrain,
-                     cluster_job_config = cluster_job_config,)
+    constrain = [stru_cons.create_distance_constraint(
+                    "B.254.H2", "A.101.OE2", 2.4, test_stru),
+                 stru_cons.create_angle_constraint(
+                    "B.254.CAE", "B.254.H2", "A.101.OE2", 180.0, test_stru),]
+    md_result = equi_md_sampling(
+        stru = test_stru,
+        param_method = test_param_method,
+        cluster_job_config = cluster_job_config,
+        job_check_period=10,
+        prod_constrain=constrain,
+        # shorter sim for test
+        prod_time=0.5,
+        record_period=0.05,
+        work_dir=f"{WORK_DIR}MD/")
+
+    # clean up
+    fs.safe_rmdir(f"{WORK_DIR}MD/")
+    fs.clean_temp_file_n_dir([
+    ] + glob.glob("slurm-*.out")
+    + glob.glob("scratch/amber_parameterizer/*")
+    + glob.glob(f"{WORK_DIR}/ncaa_lib/H5J*"))
+
+def test_equi_md_sampling_wrong_cons():
+    """test for equi_md_sampling that uses wrong constraints"""
+    test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
+    test_stru_2 = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S_mut.pdb")
+    test_stru.assign_ncaa_chargespin({"H5J" : (0,1)})
+    test_param_method = amber_interface.build_md_parameterizer(
+        ncaa_param_lib_path=f"{WORK_DIR}/ncaa_lib",
+    )
+    cluster_job_config = {
+        "cluster" : Accre(),
+        "res_keywords" : {"account" : "csb_gpu_acc",
+                         "partition" : "turing"}
+    }
+    constrain = [stru_cons.create_distance_constraint(
+                    "B.254.H2", "A.101.OE2", 2.4, test_stru_2),
+                 stru_cons.create_angle_constraint(
+                    "B.254.CAE", "B.254.H2", "A.101.OE2", 180.0, test_stru_2),]
+
+    with pytest.raises(ValueError) as e:
+        md_result = equi_md_sampling(
+            stru = test_stru,
+            param_method = test_param_method,
+            cluster_job_config = cluster_job_config,
+            job_check_period=10,
+            prod_constrain=constrain,
+            # shorter sim for test
+            prod_time=0.5,
+            record_period=0.05,
+            work_dir=f"{WORK_DIR}MD/")
