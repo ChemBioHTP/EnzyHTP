@@ -162,8 +162,9 @@ def md_simulation(stru: Structure,
     Return:
         Tuple[
             the parameter object,
-            a list of results that each results from the last step (unless specificed in the any step) of a parallel run
+            a list of results of each step from each parallel run
         ]
+        example: (params, [[MolDynResult, MolDynResult, ...], ...])
 
     Details:
         Molecular Dynamics (MD) simulate the motion of enzymes based on Newton's equation of motion.
