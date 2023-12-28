@@ -287,22 +287,30 @@ def test_md_simulation_amber_3_repeat():
     + glob.glob(f"{WORK_DIR}/ncaa_lib/H5J*"))
 
 @pytest.mark.accre
+@pytest.mark.long
+@pytest.mark.temp
 def test_equi_md_sampling_lv1():
     """test for equi_md_sampling
-    level 1:"""
+    level 1: no constraint"""
     test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
-    test_stru.assign_ncaa_chargespin({"H5J" : (0,1)}) # this should be explicitly set
+    test_stru.assign_ncaa_chargespin({"H5J" : (0,1)})
     test_param_method = amber_interface.build_md_parameterizer(
-        ncaa_param_lib_path=f"{DATA_DIR}/ncaa_lib_empty",
+        ncaa_param_lib_path=f"{WORK_DIR}/ncaa_lib",
     )
     cluster_job_config = {
         "cluster" : Accre(),
-        "period" : 600,
-        "res_keywords" : {"account" : "csb_gpu_acc"}
+        "res_keywords" : {"account" : "csb_gpu_acc",
+                         "partition" : "turing"}
     }
-    equi_md_sampling(stru = test_stru,
-                     param_method = test_param_method,
-                     cluster_job_config = cluster_job_config,)
+    md_result = equi_md_sampling(
+        stru = test_stru,
+        param_method = test_param_method,
+        cluster_job_config = cluster_job_config,
+        job_check_period=10,
+        # shorter sim for test
+        prod_time=0.5,
+        record_period=0.05,)
+    
 
 
 @pytest.mark.accre
