@@ -104,7 +104,7 @@ class StructureConstraint(ABC):
     def topology(self) -> Structure:
         """get the current topology-context of the constraint"""
         self.check_consistent_topology()
-        return self.atoms[0].root
+        return self.atoms[0].root()
 
     @property
     def constraint_type(self) -> str:
@@ -152,9 +152,9 @@ class StructureConstraint(ABC):
     def check_consistent_topology(self) -> None:
         """check whether Atom()s are from the same Structure()
         raise an error if not."""
-        top = self.atoms[0].root
+        top = self.atoms[0].root()
         for atom in self.atoms:
-            current_top = atom.root
+            current_top = atom.root()
             if not isinstance(current_top, Structure):
                 _LOGGER.error(
                     f"Topology should be Structure(). ({atom} has {current_top})")

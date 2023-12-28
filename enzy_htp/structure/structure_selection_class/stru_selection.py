@@ -83,9 +83,9 @@ class StruSelection:
         raise an error if not.
         TODO this might suggestion StruSelection() and the attribute of
         StructureConstraint should have a common base class?"""
-        top = self.atoms[0].root
+        top = self.atoms[0].root()
         for atom in self.atoms:
-            current_top = atom.root
+            current_top = atom.root()
             if not isinstance(current_top, Structure):
                 _LOGGER.error(
                     f"Topology should be Structure(). ({atom} has {current_top})")

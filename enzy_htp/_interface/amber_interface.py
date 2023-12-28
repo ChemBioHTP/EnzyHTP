@@ -1211,7 +1211,7 @@ class AmberInterface(BaseInterface):
 
     def get_amber_atom_index(self, atoms: List[Atom]) -> List[int]:
         """get atom index in an Amberized PDB of the Structre() containing these Atom()s"""
-        stru = atoms[0].root
+        stru = atoms[0].root()
         aid_mapper = self.get_amber_index_mapper(stru)
         return [aid_mapper["atom"][at] for at in atoms]
 

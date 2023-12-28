@@ -5,8 +5,11 @@ Date: 2022-09-22
 """
 
 import copy
+import pytest
 
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
+from enzy_htp.core.general import EnablePropagate
+from enzy_htp.core.logger import _LOGGER
 
 
 def test_delete_from_parent():
@@ -62,4 +65,21 @@ def test_root():
     parent_2 = DoubleLinkedNode(children=[child_3, child_4])
     root = DoubleLinkedNode(children=[parent_1, parent_2])
 
-    assert child_1.root is root
+    assert child_1.root() is root
+
+def test_root_inf_loop(caplog):
+    """test using a made up tree containing a inf loop"""
+    child_1 = DoubleLinkedNode()
+    child_2 = DoubleLinkedNode()
+    parent_1 = DoubleLinkedNode(children=[child_1, child_2])
+    child_3 = DoubleLinkedNode()
+    child_4 = DoubleLinkedNode()
+    parent_2 = DoubleLinkedNode(children=[child_3, child_4])
+    root = DoubleLinkedNode(children=[parent_1, parent_2])
+    root.parent = child_1
+
+    with EnablePropagate(_LOGGER):
+        with pytest.raises(RuntimeError) as e:
+            child_1.root()
+            assert "inf" in caplog.text
+
