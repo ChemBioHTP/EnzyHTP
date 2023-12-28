@@ -659,6 +659,45 @@ def test_parse_md_config_dict_to_raw_wo_cons():
     assert test_raw_dict == answer_raw_dict
 
 
+def test_parse_md_config_dict_to_raw_minimize():
+    """test to make sure _parse_md_config_dict_to_raw() works as expected.
+    using a dict from old EnzyHTP Class_Conf.Amber.conf_min as an example"""
+    answer_raw_dict = {
+        'title': 'Min',
+        'namelists': [
+           {'type': 'cntrl',
+            'config': {
+                'imin': 1, 'ntx': 1, 'irest': 0,
+                'ntc': 2, 'ntf': 2,
+                'cut': 10.0,
+                'maxcyc': 20000, 'ncyc': 10000,
+                'ntpr': 200, 'ntwx': 0,
+                }
+            },
+        ],
+        'file_redirection': {},
+        'group_info': [],
+    }
+    test_md_config_dict = {
+            "name" : "Min",
+            "length" : 20000, # cycle
+            "timestep" : 0.000002, # ns
+            "minimize" : True,
+            "temperature" : 300.0,
+            "thermostat" : "langevin",
+            "pressure_scaling" : "none",
+            "constrain" : None,
+            "restart" : False,
+            "if_report" : True,
+            "record_period" : 0.0004, # ns
+            "mdstep_dir" : "./MD",
+    }
+
+    ai = interface.amber
+    test_raw_dict = ai._parse_md_config_dict_to_raw(test_md_config_dict)
+    assert test_raw_dict == answer_raw_dict
+
+
 def test_parse_md_config_dict_to_raw_w_cons():
     """test to make sure _parse_md_config_dict_to_raw() works as expected.
     using a dict from old EnzyHTP Class_Conf.Amber.conf_heat as an example"""

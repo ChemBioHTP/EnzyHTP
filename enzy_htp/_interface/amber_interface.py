@@ -774,7 +774,7 @@ class AmberMDStep(MolDynStep):
         # clean up
         clean_up_target = ["./mdinfo"]
         if not self.keep_in_file:
-            clean_up_target.extend(result_egg.parent_job["temp_mdin"])
+            clean_up_target.extend(result_egg.parent_job.mimo["temp_mdin"])
         fs.clean_temp_file_n_dir(clean_up_target)
 
         return MolDynResult(
@@ -1316,69 +1316,105 @@ class AmberInterface(BaseInterface):
         imin = int(md_config_dict["minimize"])
         ntx, irest = self.MD_RESTART_MAPPER[md_config_dict["restart"]]
         ntc, ntf = self.MD_TIMESTEP_SHAKE_MAPPER[md_config_dict["timestep"]]
-        # nstlim
-        timestep = md_config_dict["timestep"]
-        dt = timestep * 1000
-        raw_nstlim = md_config_dict["length"] / timestep
-        nstlim = mh.round_by(raw_nstlim, 0.5)
-        if not mh.is_integer(raw_nstlim):
-            _LOGGER.warning(f"length ({md_config_dict['length']}) is not divisible by"
-                            f" timestep ({md_config_dict['timestep']}). Setting nstlim"
-                            f" to {nstlim}. (i.e.:actual length={nstlim * timestep} ns)")
-        # temperture related keywords
-        temperature_data = md_config_dict["temperature"]
-        if isinstance(temperature_data, float):
-            temp_cntrl = {'temp0': temperature_data}
-        elif isinstance(temperature_data, list):
-            temp_wt_list = []
-            temp_cntrl = {'tempi': temperature_data[0][1], 'temp0': temperature_data[-1][1]}
-            temperature_data = [ (mh.round_by(x/timestep, 0.5), y) for x,y in temperature_data]
-            for (step0, temp0), (step1, temp1) in mh.get_section_from_endpoint(temperature_data):
-                temp_wt_list.append({
-                    'type': 'wt',
-                    'config': {
-                        'type': 'TEMP0',
-                        'istep1': step0, 'istep2': step1,
-                        'value1': temp0, 'value2': temp1,}
-                    })
-            wt_list.extend(temp_wt_list)
-        else:
-            _LOGGER.error("temperature can only be a float or a list")
-            raise TypeError
-        # ntpr
-        ntpr = max(int(self.config()["HARDCODE_NTPR_RATIO"] * nstlim), 1)
-        # ntwx
-        ntwx = 0
-        if md_config_dict["if_report"]:
-            ntwx = mh.round_by(md_config_dict["record_period"] / timestep, 0.5)
-        # ntt
-        ntt = self.MD_THERMOSTAT_MAPPER.get(md_config_dict["thermostat"], None)
-        if ntt is None:
-            _LOGGER.error(f"thermostat keyword: {md_config_dict['thermostat']} is not supported."
-                          f" Supported list: {self.MD_THERMOSTAT_MAPPER.keys()}")
-            raise ValueError
-        ntt_cntrl = {'ntt': ntt}
-        if ntt == 3:
-            ntt_cntrl.update({'gamma_ln': self.config()["HARDCODE_GAMMA_LN"],})
-        # ntp
-        if imin == 1:
-            ntp_cntrl = {}
-        else:
-            ntp = self.MD_PRESSURE_SCALING_MAPPER.get(md_config_dict["pressure_scaling"], None)
-            if ntp is None:
-                _LOGGER.error(f"pressure_scaling keyword: {md_config_dict['pressure_scaling']} is not supported."
-                            f" Supported list: {self.MD_PRESSURE_SCALING_MAPPER.keys()}")
-                raise ValueError
-            ntp_cntrl = {"ntp" : ntp}
-        # ntb
-        if imin == 1:
-            ntb_cntrl = {}
-        elif ntp == 0:
-            ntb_cntrl = {"ntb" : 1}
-        else:
-            ntb_cntrl = {"ntb" : 2}
 
-        # constraint
+        # region == imin variant == (some keyword dont work when imin=1 or 0 each)
+        imin_or_not_cntrl = {
+            "imin" : imin,
+        }
+
+        if imin == 0: # MD
+            # nstlim
+            timestep = md_config_dict["timestep"]
+            dt = timestep * 1000
+            raw_nstlim = md_config_dict["length"] / timestep
+            nstlim = mh.round_by(raw_nstlim, 0.5)
+            if not mh.is_integer(raw_nstlim):
+                _LOGGER.warning(f"length ({md_config_dict['length']}) is not divisible by"
+                                f" timestep ({md_config_dict['timestep']}). Setting nstlim"
+                                f" to {nstlim}. (i.e.:actual length={nstlim * timestep} ns)")
+
+            # ntpr
+            ntpr = max(int(self.config()["HARDCODE_NTPR_RATIO"] * nstlim), 1)
+
+            # ntwx
+            ntwx = 0
+            if md_config_dict["if_report"]:
+                ntwx = mh.round_by(md_config_dict["record_period"] / timestep, 0.5)
+
+            # region == temperture related keywords ==
+            temperature_data = md_config_dict["temperature"]
+            if isinstance(temperature_data, float):
+                temp_cntrl = {'temp0': temperature_data}
+            elif isinstance(temperature_data, list):
+                temp_wt_list = []
+                temp_cntrl = {'tempi': temperature_data[0][1], 'temp0': temperature_data[-1][1]}
+                temperature_data = [ (mh.round_by(x/timestep, 0.5), y) for x,y in temperature_data]
+                for (step0, temp0), (step1, temp1) in mh.get_section_from_endpoint(temperature_data):
+                    temp_wt_list.append({
+                        'type': 'wt',
+                        'config': {
+                            'type': 'TEMP0',
+                            'istep1': step0, 'istep2': step1,
+                            'value1': temp0, 'value2': temp1,}
+                        })
+                wt_list.extend(temp_wt_list)
+            else:
+                _LOGGER.error("temperature can only be a float or a list")
+                raise TypeError
+            # endregion
+
+            # ntt
+            ntt = self.MD_THERMOSTAT_MAPPER.get(md_config_dict["thermostat"], None)
+            if ntt is None:
+                _LOGGER.error(f"thermostat keyword: {md_config_dict['thermostat']} is not supported."
+                            f" Supported list: {self.MD_THERMOSTAT_MAPPER.keys()}")
+                raise ValueError
+            ntt_cntrl = {'ntt': ntt}
+            if ntt == 3:
+                ntt_cntrl.update({'gamma_ln': self.config()["HARDCODE_GAMMA_LN"],})
+            
+            # ntp
+            if imin == 1:
+                ntp_cntrl = {}
+            else:
+                ntp = self.MD_PRESSURE_SCALING_MAPPER.get(md_config_dict["pressure_scaling"], None)
+                if ntp is None:
+                    _LOGGER.error(f"pressure_scaling keyword: {md_config_dict['pressure_scaling']} is not supported."
+                                f" Supported list: {self.MD_PRESSURE_SCALING_MAPPER.keys()}")
+                    raise ValueError
+                ntp_cntrl = {"ntp" : ntp}
+            
+            # ntb
+            if imin == 1:
+                ntb_cntrl = {}
+            elif ntp == 0:
+                ntb_cntrl = {"ntb" : 1}
+            else:
+                ntb_cntrl = {"ntb" : 2}
+
+            imin_or_not_cntrl = imin_or_not_cntrl | {
+                'nstlim': nstlim, 'dt': dt,
+                } | temp_cntrl | ntt_cntrl | ntb_cntrl | ntp_cntrl | {
+                'iwrap': self.config()["HARDCODE_IWRAP"],
+                'ig': self.config()["HARDCODE_IG"],
+                }
+
+        else: # minimization
+            # maxcyc, ncyc
+            maxcyc = md_config_dict["length"]
+            ncyc = max(mh.round_by(maxcyc * self.config()["HARDCODE_NCYC_RATIO"], 0.5), 1)
+            # ntpr
+            ntpr = max(int(self.config()["HARDCODE_NTPR_RATIO"] * maxcyc), 1)
+            # ntwx
+            ntwx = 0
+
+            imin_or_not_cntrl = imin_or_not_cntrl | {
+                "maxcyc" : maxcyc,
+                "ncyc" : ncyc,
+            }
+        # endregion
+
+        # region == constraint ==
         constraints = md_config_dict["constrain"]
         cart_freeze = []
         geom_cons = []
@@ -1426,7 +1462,8 @@ class AmberInterface(BaseInterface):
                     "path": disang_path, "content": disang_content_list}
             }
             file_redirection_dict.update(nmropt_file_redirection)
-            
+        # endregion
+
         # determine the &wt END
         if wt_list or file_redirection_dict:
             wt_list.append(
@@ -1437,17 +1474,11 @@ class AmberInterface(BaseInterface):
         # assemble namelists
         namelists = [
             {'type': 'cntrl',
-            'config': {
-                'imin': imin,
+            'config': imin_or_not_cntrl | {
                 'ntx': ntx, 'irest': irest,
                 'ntc': ntc, 'ntf': ntf,
                 'cut': self.config()["HARDCODE_CUT"],
-                'nstlim': nstlim, 'dt': dt,
-                } | temp_cntrl | {
                 'ntpr': ntpr, 'ntwx': ntwx,
-                } | ntt_cntrl | ntb_cntrl | ntp_cntrl | {
-                'iwrap': self.config()["HARDCODE_IWRAP"],
-                'ig': self.config()["HARDCODE_IG"],
                 } | ntr_cntrl | nmropt_cntrl | {
             }},
         ] + wt_list
