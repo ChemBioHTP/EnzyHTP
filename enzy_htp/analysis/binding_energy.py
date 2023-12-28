@@ -38,7 +38,7 @@ def binding_energy(fname: str,
 def xtb_binding_energy(fname: str, probe: str, receptor: str, probe_charge: int, receptor_charge: int, work_dir: str, save_temp_files: bool,
                        **kwargs) -> float:
     """
-
+    TODO this needs to change to either be in the electronic_structure module or use APIs from the module
     """
 
     probe_xyz: str = f"{work_dir}/probe.xyz"

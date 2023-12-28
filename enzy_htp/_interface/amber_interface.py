@@ -1263,6 +1263,7 @@ class AmberInterface(BaseInterface):
         """the knowledge of the mdin format as the input of sander/pmemd.
         return a dictionary that use standard keys according to AmberMDStep.md_config_dict"""
         _LOGGER.error("dont support this yet. contact developer if you have to use this.")
+        # TODO make raw_dict a class when work on this.
         raise Exception
         # TODO
         # 1. parse to dict
@@ -1309,7 +1310,8 @@ class AmberInterface(BaseInterface):
         """parse AmberMDStep.md_config_dict to the raw data dict for mdin
         hypothesis: if file_redirection is involved a wt type=END is needed?
 
-        Return: the raw data dict."""
+        Return: the raw data dict.
+        TODO should make the raw dict a class to strictly define it."""
         wt_list = []
         file_redirection_dict = {}
         group_info_list = []
