@@ -78,6 +78,9 @@ def equi_md_sampling(stru: Structure,
                           "You need to at least specify the account and partition. "
                           "See test/geometry/test_sampling.py::test_equi_md_sampling_lv1() for an example.")
             raise ValueError
+    # init
+    if prod_constrain is None:
+        prod_constrain = []
 
     # 1. build steps
     parent_interface = param_method.parent_interface
@@ -100,7 +103,7 @@ def equi_md_sampling(stru: Structure,
         length=20000, # cycle
         cluster_job_config=cluster_job_config,
         core_type="gpu",
-        constrain=[freeze_backbone, prod_constrain])
+        constrain=[freeze_backbone] + prod_constrain)
 
     heat_step = parent_interface.build_md_step(
         name="heat_nvt",
@@ -108,7 +111,7 @@ def equi_md_sampling(stru: Structure,
         cluster_job_config=cluster_job_config,
         core_type="gpu",
         temperature=[(0, 0), (0.05*0.9, prod_temperature), (-1, prod_temperature)],
-        constrain=[freeze_backbone, prod_constrain])
+        constrain=[freeze_backbone] + prod_constrain)
 
     equi_step = parent_interface.build_md_step(
         name="equi_npt",
@@ -116,7 +119,7 @@ def equi_md_sampling(stru: Structure,
         cluster_job_config=equi_job_config,
         core_type=equi_core,
         temperature=prod_temperature,
-        constrain=[freeze_backbone, prod_constrain])
+        constrain=[freeze_backbone] + prod_constrain)
 
     equi_step = parent_interface.build_md_step(
         name="equi_npt_free_bb",
@@ -124,7 +127,7 @@ def equi_md_sampling(stru: Structure,
         cluster_job_config=equi_job_config,
         core_type=equi_core,
         temperature=prod_temperature,
-        constrain=[prod_constrain])
+        constrain=prod_constrain)
 
     prod_step = parent_interface.build_md_step(
         name="prod_npt",
@@ -135,7 +138,7 @@ def equi_md_sampling(stru: Structure,
         if_report=True,
         temperature=prod_temperature,
         record_period=record_period,
-        constrain=[prod_constrain])
+        constrain=prod_constrain)
 
     # 2. run simulation
     params, md_result = md_simulation(
