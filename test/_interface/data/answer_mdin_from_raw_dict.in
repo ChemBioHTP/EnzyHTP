@@ -16,7 +16,7 @@ Heat
   gamma_ln = 5.0,
   ntb = 1,
   ntp = 0,
-  iwarp = 1,
+  iwrap = 1,
   nmropt = 1,
   ig = -1,
   ntr = 1,
@@ -24,20 +24,20 @@ Heat
   restraintmask = '@C,CA,N',
  /
  &wt
-  type = TEMP0,
+  type = 'TEMP0',
   istep1 = 0,
   istep2 = 18000,
   value1 = 0.0,
   value2 = 300.0,
  /
  &wt
-  type = TEMP0,
+  type = 'TEMP0',
   istep1 = 18001,
   istep2 = 20000,
   value1 = 300.0,
   value2 = 300.0,
  /
  &wt
-  type = END,
+  type = 'END',
  /
- DISANG=./MD/0.rs
+ DISANG=./MD//0.rs

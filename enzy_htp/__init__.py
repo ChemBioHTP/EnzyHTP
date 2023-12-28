@@ -16,6 +16,18 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-26
 """
 
+from .core import (
+    EnvironmentManager,
+    MissingEnvironmentElement,
+    InvalidResidueCode,
+    _LOGGER,
+    write_data,
+)
+
+from .chemical import ResidueType, parse_ec_number
+
+from ._config import config
+
 from .structure import (
     Structure,
     Chain,
@@ -27,18 +39,6 @@ from .structure import (
     PDBParser,
     Mol2Parser
 )
-
-from .core import (
-    EnvironmentManager,
-    MissingEnvironmentElement,
-    InvalidResidueCode,
-    _LOGGER,
-    write_data,
-)
-
-from ._config import config
-
-from .chemical import ResidueType, parse_ec_number
 
 from ._interface import Interface, OpenPyMolSession
 

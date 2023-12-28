@@ -8,12 +8,14 @@ import os
 import re
 import shutil
 import pytest
+import numpy as np
 from pathlib import Path
 from typing import Union
 
 from enzy_htp.core.exception import tLEaPError, AmberMDError
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.general import EnablePropagate
+from enzy_htp.core.job_manager import ClusterJob
 from enzy_htp.core import file_system as fs
 from enzy_htp._interface.amber_interface import (
     AmberParameterizer,
@@ -21,7 +23,12 @@ from enzy_htp._interface.amber_interface import (
     AmberMDStep,
     AmberMDResultEgg,)
 import enzy_htp.structure as struct
-from enzy_htp.structure.structure_constraint import StructureConstraint
+from enzy_htp.structure.structure_constraint import (
+    StructureConstraint,
+    create_cartesian_freeze,
+    create_backbone_freeze,
+    create_distance_constraint,
+    create_angle_constraint,)
 from enzy_htp import interface
 from enzy_htp import config as eh_config
 
@@ -505,7 +512,7 @@ def test_write_to_mdin_from_raw_dict():
                 'ntpr': 200, 'ntwx': 20000,
                 'ntt': 3, 'gamma_ln': 5.0,
                 'ntb': 1, 'ntp':0,
-                'iwarp': 1,
+                'iwrap': 1,
                 'nmropt': 1,
                 'ig': -1,
                 'ntr': 1, 'restraint_wt': 2.0, 'restraintmask': "'@C,CA,N'",
@@ -513,26 +520,45 @@ def test_write_to_mdin_from_raw_dict():
             },
            {'type': 'wt',
             'config': {
-                'type': 'TEMP0',
+                'type': "'TEMP0'",
                 'istep1': 0, 'istep2': 18000,
                 'value1': 0.0, 'value2': 300.0,
                 }
             },
            {'type': 'wt',
             'config': {
-                'type': 'TEMP0',
+                'type': "'TEMP0'",
                 'istep1': 18001, 'istep2': 20000,
                 'value1': 300.0, 'value2': 300.0,
                 }
             },
            {'type': 'wt',
             'config': {
-                'type': 'END',
+                'type': "'END'",
                 }
             },
         ],
         'file_redirection': {
-            'DISANG': './MD/0.rs' 
+            'DISANG': {
+                'path': './MD//0.rs',
+                'content': [
+                    {'ialtd': 0,
+                    'iat': [3976, 1579],
+                    'r1': 2.150,
+                    'r2': 2.350,
+                    'r3': 2.450,
+                    'r4': 2.650,
+                    'rk2': 200.0,
+                    'rk3': 200.0},
+                    {'ialtd': 0,
+                    'iat': [3975,3976,1579],
+                    'r1': 150.0,
+                    'r2': 170.0,
+                    'r3': 190.0,
+                    'r4': 210.0,
+                    'rk2': 200.0,
+                    'rk3': 200.0}
+                ]}
         },
         'group_info': [],
     }
@@ -542,6 +568,33 @@ def test_write_to_mdin_from_raw_dict():
     ai._write_to_mdin_from_raw_dict(test_raw_dict, test_temp_mdin)
     assert files_equivalent(test_temp_mdin, answer_temp_mdin)
     fs.safe_rm(test_temp_mdin)
+    fs.safe_rm("MD/0.rs")
+
+
+def test_write_disang_file():
+    """test using an example raw dict list"""
+    test_dict_list = [
+        {'ialtd': 0,
+        'iat': [3976, 1579],
+        'r1': 2.150,
+        'r2': 2.350,
+        'r3': 2.450,
+        'r4': 2.650,
+        'rk2': 200.0,
+        'rk3': 200.0},
+        {'ialtd': 0,
+        'iat': [3975,3976,1579],
+        'r1': 150.0,
+        'r2': 170.0,
+        'r3': 190.0,
+        'r4': 210.0,
+        'rk2': 200.0,
+        'rk3': 200.0}]
+    test_disang = f"{MM_WORK_DIR}/test_disang_from_raw_dict.rs"
+    answer_disang = f"{MM_DATA_DIR}/answer_disang_from_raw_dict.rs"
+    ai = interface.amber
+    ai.write_disang_file(test_dict_list, test_disang)
+    assert files_equivalent(test_disang, answer_disang)
 
 
 def test_parse_md_config_dict_to_raw_wo_cons():
@@ -560,27 +613,27 @@ def test_parse_md_config_dict_to_raw_wo_cons():
                 'ntpr': 200, 'ntwx': 200,
                 'ntt': 3, 'gamma_ln': 5.0,
                 'ntb': 1, 'ntp':0,
-                'iwarp': 1,
+                'iwrap': 1,
                 'ig': -1,
                 }
             },
            {'type': 'wt',
             'config': {
-                'type': 'TEMP0',
+                'type': "'TEMP0'",
                 'istep1': 0, 'istep2': 18000,
                 'value1': 0.0, 'value2': 300.0,
                 }
             },
            {'type': 'wt',
             'config': {
-                'type': 'TEMP0',
+                'type': "'TEMP0'",
                 'istep1': 18001, 'istep2': 20000,
                 'value1': 300.0, 'value2': 300.0,
                 }
             },
            {'type': 'wt',
             'config': {
-                'type': 'END',
+                'type': "'END'",
                 }
             },
         ],
@@ -599,6 +652,7 @@ def test_parse_md_config_dict_to_raw_wo_cons():
             "restart" : False,
             "if_report" : True,
             "record_period" : 0.0004, # ns
+            "mdstep_dir" : "./MD",
     }
 
     ai = interface.amber
@@ -606,9 +660,50 @@ def test_parse_md_config_dict_to_raw_wo_cons():
     assert test_raw_dict == answer_raw_dict
 
 
-def test_parse_md_config_dict_to_raw_w_cons(): # TODO finish this after the PR
+def test_parse_md_config_dict_to_raw_minimize():
+    """test to make sure _parse_md_config_dict_to_raw() works as expected.
+    using a dict from old EnzyHTP Class_Conf.Amber.conf_min as an example"""
+    answer_raw_dict = {
+        'title': 'Min',
+        'namelists': [
+           {'type': 'cntrl',
+            'config': {
+                'imin': 1, 'ntx': 1, 'irest': 0,
+                'ntc': 2, 'ntf': 2,
+                'cut': 10.0,
+                'maxcyc': 20000, 'ncyc': 10000,
+                'ntpr': 200, 'ntwx': 0,
+                }
+            },
+        ],
+        'file_redirection': {},
+        'group_info': [],
+    }
+    test_md_config_dict = {
+            "name" : "Min",
+            "length" : 20000, # cycle
+            "timestep" : 0.000002, # ns
+            "minimize" : True,
+            "temperature" : 300.0,
+            "thermostat" : "langevin",
+            "pressure_scaling" : "none",
+            "constrain" : None,
+            "restart" : False,
+            "if_report" : True,
+            "record_period" : 0.0004, # ns
+            "mdstep_dir" : "./MD",
+    }
+
+    ai = interface.amber
+    test_raw_dict = ai._parse_md_config_dict_to_raw(test_md_config_dict)
+    assert test_raw_dict == answer_raw_dict
+
+
+def test_parse_md_config_dict_to_raw_w_cons():
     """test to make sure _parse_md_config_dict_to_raw() works as expected.
     using a dict from old EnzyHTP Class_Conf.Amber.conf_heat as an example"""
+    test_pdb = f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb"
+    test_stru = struct.PDBParser().get_structure(test_pdb)
     answer_raw_dict = {
         'title': 'Heat',
         'namelists': [
@@ -622,7 +717,7 @@ def test_parse_md_config_dict_to_raw_w_cons(): # TODO finish this after the PR
                 'ntpr': 200, 'ntwx': 200,
                 'ntt': 3, 'gamma_ln': 5.0,
                 'ntb': 1, 'ntp':0,
-                'iwarp': 1,
+                'iwrap': 1,
                 'nmropt': 1,
                 'ig': -1,
                 'ntr': 1, 'restraint_wt': 2.0, 'restraintmask': "'@C,CA,N'",
@@ -630,41 +725,66 @@ def test_parse_md_config_dict_to_raw_w_cons(): # TODO finish this after the PR
             },
            {'type': 'wt',
             'config': {
-                'type': 'TEMP0',
+                'type': "'TEMP0'",
                 'istep1': 0, 'istep2': 18000,
                 'value1': 0.0, 'value2': 300.0,
                 }
             },
            {'type': 'wt',
             'config': {
-                'type': 'TEMP0',
+                'type': "'TEMP0'",
                 'istep1': 18001, 'istep2': 20000,
                 'value1': 300.0, 'value2': 300.0,
                 }
             },
            {'type': 'wt',
             'config': {
-                'type': 'END',
+                'type': "'END'",
                 }
             },
         ],
         'file_redirection': {
-            'DISANG': './MD/0.rs' 
+            'DISANG': {
+                'path': './MD//0.rs',
+                'content': [
+                    {'ialtd': 0,
+                    'iat': [3976, 1579],
+                    'r1': 2.150,
+                    'r2': 2.350,
+                    'r3': 2.450,
+                    'r4': 2.650,
+                    'rk2': 200.0,
+                    'rk3': 200.0},
+                    {'ialtd': 0,
+                    'iat': [3975,3976,1579],
+                    'r1': 150.0,
+                    'r2': 170.0,
+                    'r3': 190.0,
+                    'r4': 210.0,
+                    'rk2': 200.0,
+                    'rk3': 200.0}
+                ]} 
         },
         'group_info': [],
     }
     test_md_config_dict = {
-            "name" : "Heat",
-            "minimize" : False,
-            "pressure_scaling" : "none",
-            "restart" : False,
-            "length" : 0.04, # ns
-            "timestep" : 0.000002, # ns
-            "temperature" : [(0.0, 0.0), (0.036, 300.0), (0.04, 300.0)],
-            "thermostat" : "langevin",
-            "constrain" : StructureConstraint("TODO"),
-            "if_report" : True,
-            "record_period" : 0.0004,
+        "name" : "Heat",
+        "minimize" : False,
+        "pressure_scaling" : "none",
+        "restart" : False,
+        "length" : 0.04, # ns
+        "timestep" : 0.000002, # ns
+        "temperature" : [(0.0, 0.0), (0.036, 300.0), (0.04, 300.0)],
+        "thermostat" : "langevin",
+        "constrain" : [
+            create_backbone_freeze(test_stru),
+            create_distance_constraint(
+                "B.254.H2", "A.101.OE2", 2.4, test_stru),
+            create_angle_constraint(
+                "B.254.CAE", "B.254.H2", "A.101.OE2", 180.0, test_stru)],
+        "if_report" : True,
+        "record_period" : 0.0004,
+        "mdstep_dir" : "./MD",
     }
 
     ai = interface.amber
@@ -706,6 +826,47 @@ pmemd\.cuda -O -i \./MD/amber_md_step_?[0-9]*\.in -o \./MD/amber_md_step\.out -p
     fs.safe_rmdir(md_step.work_dir)
 
 
+def test_amber_md_step_make_job_w_cons():
+    """test to make sure AmberMDStep.make_job() works as expected.
+    w/ constraint. Just make sure no exceptions are raised"""
+    test_inpcrd = f"{MM_DATA_DIR}/KE_07_R7_S.inpcrd"
+    test_prmtop = f"{MM_DATA_DIR}/KE_07_R7_S.prmtop"
+    test_pdb = f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb"
+    test_stru = struct.PDBParser().get_structure(test_pdb)
+    test_constrains = [
+        create_backbone_freeze(test_stru),
+        create_distance_constraint(
+            "B.254.H2", "A.101.OE2", 2.4, test_stru),
+        create_angle_constraint(
+            "B.254.CAE", "B.254.H2", "A.101.OE2", 180.0, test_stru)
+    ]
+    ai = interface.amber
+    md_step = ai.build_md_step(
+        length=0.1,
+        constrain=test_constrains)
+    test_params = AmberParameter(test_inpcrd, test_prmtop)
+    test_job, test_md_egg = md_step.make_job(test_params)
+    
+    answer_pattern = r"""#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:1
+#SBATCH --job-name=MD_EnzyHTP
+#SBATCH --partition=<fillthis>
+#SBATCH --mem=8G
+#SBATCH --time=3-00:00:00
+#SBATCH --account=<fillthis>
+#SBATCH --export=NONE
+
+# Script generated by EnzyHTP [0-9]\.[0-9]\.[0-9] in [0-9]+-[0-9]+-[0-9]+ [0-9]+:[0-9]+:[0-9]+
+
+source /home/shaoq1/bin/amber_env/amber22\.sh
+
+pmemd\.cuda -O -i \./MD/amber_md_step_?[0-9]*\.in -o \./MD/amber_md_step\.out -p /panfs/accrepfs\.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S\.prmtop -c /panfs/accrepfs\.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S\.inpcrd -r \./MD/amber_md_step\.rst -ref /panfs/accrepfs\.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S\.inpcrd -x \./MD/amber_md_step\.nc 
+"""
+    assert re.match(answer_pattern, test_job.sub_script_str)
+    fs.safe_rmdir(md_step.work_dir)
+
+
 def test_amber_md_step_try_merge_jobs(caplog):
     """test to make sure AmberMDStep.try_merge_jobs() works as expected."""
     with EnablePropagate(_LOGGER):
@@ -726,6 +887,7 @@ def test_amber_md_step_try_merge_jobs(caplog):
                 'pmemd.cuda -O -i ./MD/amber_md_step_?[0-9]*.in -o ./MD/amber_md_step.out -p /panfs/accrepfs.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S.prmtop -c ./MD/amber_md_step.rst -r ./MD/amber_md_step.rst -ref ./MD/amber_md_step.rst -x ./MD/amber_md_step.nc '
                 ]):
             assert re.match(answer, test)
+        assert len(merged_jobs[0].mimo["temp_mdin"]) == 2
         assert "Found md steps with same names!" in caplog.text
     fs.safe_rmdir(md_step_1.work_dir)
 
@@ -747,33 +909,112 @@ def test_amber_md_step_translate():
     assert result.last_frame_file == "rst_path"
 
 
-def test_amber_md_step_run(): # TODO finish this
-    """test AmberMDStep().run()"""
+@pytest.mark.accre
+@pytest.mark.long
+def test_amber_md_step_run():
+    """test AmberMDStep().run().
+    rely on check_md_error inside of run() for testing."""
     ai = interface.amber
-    md_step = ai.build_md_step(length=0.1) # 300K, NPT by default
+    md_step = ai.build_md_step(length=0.01) # 300K, NPT by default
     test_inpcrd = f"{MM_DATA_DIR}/KE_07_R7_S.inpcrd"
     test_prmtop = f"{MM_DATA_DIR}/KE_07_R7_S.prmtop"
     test_params = AmberParameter(test_inpcrd, test_prmtop)
     test_md_result = md_step.run(test_params)
     
-    assert False
+    assert test_md_result.last_frame_file == "./MD/amber_md_step.rst"
+    fs.clean_temp_file_n_dir([
+        test_md_result.last_frame_file,
+        test_md_result.traj_log_file,
+        "./MD",
+    ])
 
 
-def test_amber_md_step_check_md_error(): # TODO finish this when accre is back
+def test_amber_md_step_check_md_error(caplog):
     """test this function using extract real example files from Amber runs"""
-    test_traj = ""
-    test_mdout = ""
-    test_clusterjob = ""
+    test_traj = f"{MM_DATA_DIR}md_errors/equi_error_1.nc"
+    test_mdout = f"{MM_DATA_DIR}md_errors/equi_error_1.out"
+    test_prmtop = f"{MM_DATA_DIR}md_errors/equi_error_1.prmtop"
+    test_clusterjob = ClusterJob(
+        cluster=None,
+        sub_script_str=None,
+    )
+    test_clusterjob.job_cluster_log = f"{MM_DATA_DIR}md_errors/equi_error_1.stdstream"
 
     ai = interface.amber
     md_step = ai.build_md_step(length=0.1) # 300K, NPT by default
 
-    with pytest.raises(AmberMDError) as e:
-        md_step.check_md_error(
-            traj=test_traj,
-            traj_log=test_mdout,
-            stdstream_source=test_clusterjob,
-        )
+    with EnablePropagate(_LOGGER):
+        with pytest.raises(AmberMDError) as e:
+            md_step.check_md_error(
+                traj=test_traj,
+                traj_log=test_mdout,
+                prmtop=test_prmtop,
+                stdstream_source=test_clusterjob,
+            )
+        assert "Amber MD didn't finish normally." in caplog.text
+        assert "ERROR: Calculation halted.  Periodic box dimensions have changed too much from their initial values." in caplog.text
+
+
+def test_get_restraintmask_bb_freeze():
+    """test using example restraints"""
+    ai = interface.amber
+    test_pdb = f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb"
+    test_stru = struct.PDBParser().get_structure(test_pdb)
+    cons = create_backbone_freeze(test_stru)
+    mask = ai.get_restraintmask(cons)
+    assert mask == "'@C,CA,N'"
+
+
+def test_get_restraintmask():
+    """test using example restraints"""
+    ai = interface.amber
+    test_pdb = f"{MM_DATA_DIR}/index_tweak.pdb"
+    test_stru = struct.PDBParser().get_structure(test_pdb)
+    cons = create_cartesian_freeze(
+        atoms=test_stru.atoms[1:20],
+        topology=test_stru,)
+    mask = ai.get_restraintmask(cons)
+    assert mask == "'@2-20'"
+
+
+def test_get_amber_mask(): # TODO
+    """"""
+    raise Exception("TODO")
+
+
+def test_get_amber_atom_index(): # TODO
+    """"""
+    raise Exception("TODO")
+
+
+def test_get_amber_index_mapper(): # TODO VIP
+    """this dont work for the 1Q4T case."""
+    raise Exception("TODO")
+
+
+def test_parse_cons_to_raw_rs_dict():
+    """test using KE and example cons"""
+    test_pdb = f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb"
+    test_stru = struct.PDBParser().get_structure(test_pdb)
+    test_cons = create_distance_constraint(
+        "B.254.H2", "A.101.OE2", 2.4, test_stru)
+    answer_raw_dict = {
+        'ialtd': 0,
+        'iat': [3976, 1579],
+        'r1': 2.15,
+        'r2': 2.35,
+        'r3': 2.45,
+        'r4': 2.65,
+        'rk2': 200.0,
+        'rk3': 200.0}
+    ai = interface.amber
+    test_raw_dict = ai._parse_cons_to_raw_rs_dict(test_cons)
+    for k, v in test_raw_dict.items():
+        if k in "r1 r2 r3 r4".split():
+            assert np.isclose(v, answer_raw_dict[k], atol=1e-3)
+        else:
+            assert v == answer_raw_dict[k]
+
 
 # region TODO
 
@@ -903,7 +1144,7 @@ def test_add_charges_bad_file():
 
     with pytest.raises(SystemExit) as exe:
         ai.add_charges(ss, f"{MM_BASE_DIR}/data/bad_label_prmtop")
-
+    
     assert exe
 
 # endregion TODO

@@ -19,6 +19,7 @@ Date: 2022-09-14
 import copy
 from typing import Any, Dict, List, Union
 from .general import delete_base_on_id
+from .logger import _LOGGER
 
 
 class DoubleLinkedNode():
@@ -92,6 +93,16 @@ class DoubleLinkedNode():
     @parent.setter
     def parent(self, val):
         self.set_parent(val)
+
+    def root(self, _count: int = 0):
+        """get the very parent object that has no parent"""
+        count = 0
+        if count > 10:
+            _LOGGER.error("recursive root() more than 10 times. infinite loop detected.")
+            raise RuntimeError
+        if self.parent is None:
+            return self
+        return self.parent.root(count+1)
 
     #endregion
 

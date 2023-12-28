@@ -10,8 +10,13 @@ from .api import (
     AngleConstraint,
     DihedralConstraint,
     ResiduePairConstraint,
-    build_from_preset,
-    create_residue_pair_constraint
+    create_residue_pair_constraint,
+    create_cartesian_freeze,
+    create_backbone_freeze,
+    create_distance_constraint,
+    create_angle_constraint,
+    create_dihedral_constraint,
+    merge_cartesian_freeze,
     )
 
 

@@ -15,6 +15,7 @@ from pathlib import Path
 from subprocess import CalledProcessError, CompletedProcess, SubprocessError
 from typing import List, Tuple, Union, Dict, Any
 from dataclasses import dataclass
+from sympy import sympify
 
 from .base_interface import BaseInterface
 from .handle_types import (
@@ -29,11 +30,18 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core import math_helper as mh
 from enzy_htp.core.job_manager import ClusterJob
 from enzy_htp.core.exception import UnsupportedMethod, tLEaPError, AmberMDError
+from enzy_htp.core.general import get_interval_str_from_list
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
 from enzy_htp.structure.structure_io import pdb_io, prmtop_io
-from enzy_htp.structure.structure_constraint import StructureConstraint
+from enzy_htp.structure.structure_constraint import (
+    StructureConstraint,
+    CartesianFreeze,
+    merge_cartesian_freeze)
+from enzy_htp.structure import StruSelection
 from enzy_htp.structure import (
     Structure,
+    Atom,
+    Residue,
     Ligand,
     MetalUnit,
     ModifiedResidue,
@@ -478,7 +486,7 @@ class AmberMDStep(MolDynStep):
                  temperature: Union[float, List[Tuple[float]]],
                  thermostat: str,
                  pressure_scaling: str,
-                 constrain: StructureConstraint,
+                 constrain: List[StructureConstraint],
                  restart: bool,
                  core_type: str,
                  cluster_job_config: Dict,
@@ -486,7 +494,7 @@ class AmberMDStep(MolDynStep):
                  record_period: float,
                  keep_in_file: bool,
                  work_dir: str,) -> None:
-        self._parent_interface = interface
+        self._parent_interface: AmberInterface = interface
         self.name = name
         self._length = length
         self._timestep = timestep
@@ -533,11 +541,11 @@ class AmberMDStep(MolDynStep):
         self._work_dir = val
 
     @property
-    def constrain(self) -> StructureConstraint:
+    def constrain(self) -> List[StructureConstraint]:
         return self._constrain
 
     @constrain.setter
-    def constrain(self, val: StructureConstraint):
+    def constrain(self, val: List[StructureConstraint]):
         self._constrain = val
 
     @property
@@ -587,6 +595,7 @@ class AmberMDStep(MolDynStep):
             "restart" : self.restart,
             "if_report" : self.if_report,
             "record_period" : self.record_period,
+            "mdstep_dir" : self.work_dir,
         }
     # endregion
 
@@ -633,6 +642,7 @@ class AmberMDStep(MolDynStep):
             "sub_dir" : "./",
             "md_names" : [self.name],
             "work_dir" : self.work_dir,
+            "temp_mdin": [temp_mdin_file],
         }
 
         # 5. make result egg
@@ -670,6 +680,8 @@ class AmberMDStep(MolDynStep):
             temp_mdin_file,
             prmtop,
             coord)
+        if not self.if_report:
+            traj_path = None
 
         # 4. run cmd
         md_cmd_exe = md_step_cmd.split(" ")[0]
@@ -699,6 +711,12 @@ class AmberMDStep(MolDynStep):
             last_frame_parser = last_frame_parser,
             source="amber",
         )
+
+        # 6. clean up
+        clean_up_target = ["./mdinfo"]
+        if not self.keep_in_file:
+            clean_up_target.append(temp_mdin_file)
+        fs.clean_temp_file_n_dir(clean_up_target)
 
         return result
 
@@ -753,6 +771,14 @@ class AmberMDStep(MolDynStep):
         # error check
         self.check_md_error(traj_file, traj_log_file, result_egg.prmtop_path, result_egg.parent_job)
 
+        # clean up
+        clean_up_target = ["./mdinfo"]
+        if not self.keep_in_file:
+            clean_up_target.extend(result_egg.parent_job.mimo["temp_mdin"])
+            # TODO also clean up .rs file but how to obtain it?
+            # parse mdin file?
+        fs.clean_temp_file_n_dir(clean_up_target)
+
         return MolDynResult(
             traj_file = traj_file,
             traj_parser = traj_parser, 
@@ -787,22 +813,24 @@ class AmberMDStep(MolDynStep):
             if isinstance(stdstream_source, ClusterJob):
                 with open(stdstream_source.job_cluster_log) as f:
                     stderr_stdout = f.read()
-                    error_info_list.append(f"stdout/stderr(from job log): {stderr_stdout}")
+                    error_info_list.append(f"stdout/stderr(from job log):{os.linesep*2}{stderr_stdout}")
             elif isinstance(stdstream_source, CompletedProcess):
-                error_info_list.append(f"stdout: {stdstream_source.stdout}")
-                error_info_list.append(f"stderr: {stdstream_source.stderr}")
+                error_info_list.append(f"stdout:{os.linesep*2}{stdstream_source.stdout}")
+                error_info_list.append(f"stderr:{os.linesep*2}{stdstream_source.stderr}")
             elif isinstance(stdstream_source, SubprocessError):
-                error_info_list.append(f"stdout: {stdstream_source.stdout}")
-                error_info_list.append(f"stderr: {stdstream_source.stderr}")
+                error_info_list.append(f"stdout:{os.linesep*2}{stdstream_source.stdout}")
+                error_info_list.append(f"stderr:{os.linesep*2}{stdstream_source.stderr}")
             else:
                 _LOGGER.error("Only allow ClusterJob, CompletedProcess, SubprocessError as input types for `stdstream_source`")
                 raise TypeError
             # 2. mdout file
             # have no experience that error pops here yet. Add when observed
-            # 3. traj analysis
+            # 3. traj analysis 
             # TODO
+            # Note that if_report = 0 will make traj_path = None
+            # TODO give suggestion for each detected types of errors.
 
-            _LOGGER.error(f"Amber MD didn't finish normally. {os.linesep.join(error_info_list)}")
+            _LOGGER.error(f"Amber MD didn't finish normally.{os.linesep}{os.linesep.join(error_info_list)}")
             raise AmberMDError(error_info_list)
     
     @classmethod
@@ -842,6 +870,7 @@ class AmberMDStep(MolDynStep):
                 sub_dir = merged_job.sub_dir
                 md_names = merged_job.mimo["md_names"] + job.mimo["md_names"]
                 work_dir = merged_job.mimo["work_dir"]
+                merged_mdin = merged_job.mimo["temp_mdin"] + job.mimo["temp_mdin"]
                 # update merged job
                 merged_job = ClusterJob.config_job(
                     commands = merged_cmds,
@@ -858,6 +887,7 @@ class AmberMDStep(MolDynStep):
                     "sub_dir" : sub_dir,
                     "md_names" : md_names,
                     "work_dir" : work_dir,
+                    "temp_mdin" : merged_mdin,
                 }
                 result.append(merged_job) # add the job back
             else:
@@ -982,7 +1012,7 @@ class AmberInterface(BaseInterface):
                 cmd_args = f"{cmd_args} -I {add_path}"
         try:
             self.env_manager_.run_command("tleap", cmd_args)
-        except CalledProcessError as e: # TODO(qz) seems run_command will never raise an error?
+        except CalledProcessError as e:
             if (not e.stderr.strip()) and (not e.stdout.strip()):  # empty stderr & stdout
                 # find the error information in tleap.out
                 new_e = self._find_tleap_error(tleap_out_path)
@@ -1136,6 +1166,97 @@ class AmberInterface(BaseInterface):
 
     # -- cpptraj --
 
+    # -- index mapping --
+    def get_amber_index_mapper(self, stru: Structure) -> Dict[str, Dict[Union[Residue, Atom], Union[int, tuple]]]:
+        """get a mapper for objects in {stru} and in Amberilzed PDB of stru
+        Use tLeap to get a PDB and align indexes.
+        Returns:
+            {
+            "residue" : {Residue(): amber_1_index_residue_idx_1, ...},
+            "atom" : {Atom(): amber_1_index_atom_idx_1}
+            }
+        TODO solve this for the 1Q4T case."""
+        # init files
+        temp_dir = eh_config['system.SCRATCH_DIR']
+        fs.safe_mkdir(temp_dir)
+        temp_pdb = fs.get_valid_temp_name(f"{temp_dir}/amber_index_mapping_source.pdb")
+        temp_amber_pdb = fs.get_valid_temp_name(f"{temp_dir}/amber_index_mapping_amber.pdb")
+        # init stru
+        pdb_io.PDBParser().save_structure(
+            temp_pdb, stru,
+            if_renumber=False, if_fix_atomname=False)
+        self.tleap_clean_up_stru(
+            input_pdb=temp_pdb,
+            out_path=temp_amber_pdb,
+            if_align_index=False,
+        )
+        # deduce mapping
+        ref_stru = pdb_io.PDBParser().get_structure(temp_amber_pdb)
+        ref_mapper = stru.get_residue_index_mapper(ref_stru)
+        result = {
+            "residue" : {},
+            "atom" : {},
+        }
+        for k, res in stru.residue_mapper.items():
+            amber_key = ref_mapper[k]
+            result["residue"][res] = amber_key
+            for atom in res.atoms:
+                amber_atom_idx = ref_stru.find_residue_with_key(amber_key).find_atom_name(atom.name).idx
+                result["atom"][atom] = amber_atom_idx
+        fs.clean_temp_file_n_dir([
+            temp_dir,
+            temp_pdb,
+            temp_amber_pdb,
+        ])
+        # TODO add a cache mechanism
+        return result
+
+    def get_amber_atom_index(self, atoms: List[Atom]) -> List[int]:
+        """get atom index in an Amberized PDB of the Structre() containing these Atom()s"""
+        stru = atoms[0].root()
+        aid_mapper = self.get_amber_index_mapper(stru)
+        return [aid_mapper["atom"][at] for at in atoms]
+
+    def get_amber_residue_index(self, residues: List[Atom]) -> List[int]:
+        """"""
+        raise Exception("TODO")
+
+    def get_amber_chain_index(self, chains: List[Atom]) -> List[str]:
+        """"""
+        raise Exception("TODO")
+
+    # -- amber mask --
+    # region Amber Mask I/O
+    def get_amber_mask(self, target: StruSelection, reduce: bool) -> str:
+        """get the Amber mask based on a StruSelection() described by the mask
+        Args:
+            target:
+                the target StruSelection() described by the mask
+            reduce:
+                whether the function reduces the mask for better readability
+        Ruturns:
+            the Amber Mask (e.g.: "'@C,CA,N'")
+        Notes:
+            reference: https://amberhub.chpc.utah.edu/atom-mask-selection-syntax/
+            There are several ways to represent the same set of Atom()s. If
+            not reduced, we use directly the atom numlist. It will be Structure()
+            specific and do not respond to mutation as Structure() is not the same."""
+        # san check
+        target.check_consistent_topology()
+
+        atom_idxes = self.get_amber_atom_index(target.atoms)
+        reduced_idxes = get_interval_str_from_list(atom_idxes)
+        mask = f"'@{reduced_idxes}'"
+
+        if reduce:
+            pass 
+            # TODO. reduce based on residue affilation etc. 
+            # use methods from StruSelection
+
+        return mask
+            
+    # endregion
+
     # -- sander/pmemd --
     # region - mdin/mdout file I/O -
     def read_from_mdin(self, mdin_file_path: str) -> Dict:
@@ -1152,6 +1273,30 @@ class AmberInterface(BaseInterface):
         """read from mdin file and parse it to a raw dictionary
         where key is Amber keywords as is. (defined in
         _write_to_mdin_from_raw_dict())"""
+
+    def write_disang_file(self, raw_rs_dict_list: List[dict], rs_path: str):
+        """write {raw_rs_dict} to {rs_path}"""
+        disang_lines = []
+        for raw_dict in raw_rs_dict_list:
+            cons_lines = [
+                "&rst"
+            ]
+            for k, v in raw_dict.items():
+                if k == "iat":
+                    v = map(str, v)
+                    cons_lines.append(f" {k}={','.join(v)},")
+                else:
+                    cons_lines.append(f" {k}={v},")
+            cons_lines = cons_lines + [
+                "&end",
+            ]
+            disang_lines.extend(cons_lines)
+        disang_lines.append("")
+        fs.write_lines(rs_path, disang_lines)
+
+    REDIRECTION_FILE_WRITER = {
+        "DISANG" : write_disang_file,
+    }
 
     def write_to_mdin(self, md_config_dict: Dict, out_path: str):
         """parse a AmberMDStep.md_config_dict to a mdin file."""
@@ -1173,91 +1318,171 @@ class AmberInterface(BaseInterface):
         imin = int(md_config_dict["minimize"])
         ntx, irest = self.MD_RESTART_MAPPER[md_config_dict["restart"]]
         ntc, ntf = self.MD_TIMESTEP_SHAKE_MAPPER[md_config_dict["timestep"]]
-        # nstlim
-        timestep = md_config_dict["timestep"]
-        dt = timestep * 1000
-        raw_nstlim = md_config_dict["length"] / timestep
-        nstlim = mh.round_by(raw_nstlim, 0.5)
-        if not mh.is_integer(raw_nstlim):
-            _LOGGER.warning(f"length ({md_config_dict['length']}) is not divisible by"
-                            f" timestep ({md_config_dict['timestep']}). Setting nstlim"
-                            f" to {nstlim}. (i.e.:actual length={nstlim * timestep} ns)")
-        # temperture related keywords
-        temperature_data = md_config_dict["temperature"]
-        if isinstance(temperature_data, float):
-            temp_cntrl = {'temp0': temperature_data}
-        elif isinstance(temperature_data, list):
-            temp_wt_list = []
-            temp_cntrl = {'tempi': temperature_data[0][1], 'temp0': temperature_data[-1][1]}
-            temperature_data = [ (mh.round_by(x/timestep, 0.5), y) for x,y in temperature_data]
-            for (step0, temp0), (step1, temp1) in mh.get_section_from_endpoint(temperature_data):
-                temp_wt_list.append({
-                    'type': 'wt',
-                    'config': {
-                        'type': 'TEMP0',
-                        'istep1': step0, 'istep2': step1,
-                        'value1': temp0, 'value2': temp1,}
-                    })
-            wt_list.extend(temp_wt_list)
-        else:
-            _LOGGER.error("temperature can only be a float or a list")
-            raise TypeError
-        # ntpr
-        ntpr = max(int(self.config()["HARDCODE_NTPR_RATIO"] * nstlim), 1)
-        # ntwx
-        ntwx = 0
-        if md_config_dict["if_report"]:
-            ntwx = mh.round_by(md_config_dict["record_period"] / timestep, 0.5)
-        # ntt
-        ntt = self.MD_THERMOSTAT_MAPPER.get(md_config_dict["thermostat"], None)
-        if ntt is None:
-            _LOGGER.error(f"thermostat keyword: {md_config_dict['thermostat']} is not supported."
-                          f" Supported list: {self.MD_THERMOSTAT_MAPPER.keys()}")
-            raise ValueError
-        ntt_cntrl = {'ntt': ntt}
-        if ntt == 3:
-            ntt_cntrl.update({'gamma_ln': self.config()["HARDCODE_GAMMA_LN"],})
-        # ntp
-        if imin == 1:
-            ntp_cntrl = {}
-        else:
-            ntp = self.MD_PRESSURE_SCALING_MAPPER.get(md_config_dict["pressure_scaling"], None)
-            if ntp is None:
-                _LOGGER.error(f"pressure_scaling keyword: {md_config_dict['pressure_scaling']} is not supported."
-                            f" Supported list: {self.MD_PRESSURE_SCALING_MAPPER.keys()}")
+
+        # region == imin variant == (some keyword dont work when imin=1 or 0 each)
+        imin_or_not_cntrl = {
+            "imin" : imin,
+        }
+
+        if imin == 0: # MD
+            # nstlim
+            timestep = md_config_dict["timestep"]
+            dt = timestep * 1000
+            raw_nstlim = md_config_dict["length"] / timestep
+            nstlim = mh.round_by(raw_nstlim, 0.5)
+            if not mh.is_integer(raw_nstlim):
+                _LOGGER.warning(f"length ({md_config_dict['length']}) is not divisible by"
+                                f" timestep ({md_config_dict['timestep']}). Setting nstlim"
+                                f" to {nstlim}. (i.e.:actual length={nstlim * timestep} ns)")
+
+            # ntpr
+            ntpr = max(int(self.config()["HARDCODE_NTPR_RATIO"] * nstlim), 1)
+
+            # ntwx
+            ntwx = 0
+            if md_config_dict["if_report"]:
+                ntwx = mh.round_by(md_config_dict["record_period"] / timestep, 0.5)
+
+            # region == temperture related keywords ==
+            temperature_data = md_config_dict["temperature"]
+            if isinstance(temperature_data, float):
+                temp_cntrl = {'temp0': temperature_data}
+            elif isinstance(temperature_data, list):
+                temp_wt_list = []
+                temp_cntrl = {'tempi': temperature_data[0][1], 'temp0': temperature_data[-1][1]}
+                temperature_data = [ (mh.round_by(x/timestep, 0.5), y) for x,y in temperature_data]
+                for (step0, temp0), (step1, temp1) in mh.get_section_from_endpoint(temperature_data):
+                    temp_wt_list.append({
+                        'type': 'wt',
+                        'config': {
+                            'type': "'TEMP0'",
+                            'istep1': step0, 'istep2': step1,
+                            'value1': temp0, 'value2': temp1,}
+                        })
+                wt_list.extend(temp_wt_list)
+            else:
+                _LOGGER.error("temperature can only be a float or a list")
+                raise TypeError
+            # endregion
+
+            # ntt
+            ntt = self.MD_THERMOSTAT_MAPPER.get(md_config_dict["thermostat"], None)
+            if ntt is None:
+                _LOGGER.error(f"thermostat keyword: {md_config_dict['thermostat']} is not supported."
+                            f" Supported list: {self.MD_THERMOSTAT_MAPPER.keys()}")
                 raise ValueError
-            ntp_cntrl = {"ntp" : ntp}
-        # ntb
-        if imin == 1:
-            ntb_cntrl = {}
-        elif ntp == 0:
-            ntb_cntrl = {"ntb" : 1}
-        else:
-            ntb_cntrl = {"ntb" : 2}
+            ntt_cntrl = {'ntt': ntt}
+            if ntt == 3:
+                ntt_cntrl.update({'gamma_ln': self.config()["HARDCODE_GAMMA_LN"],})
+            
+            # ntp
+            if imin == 1:
+                ntp_cntrl = {}
+            else:
+                ntp = self.MD_PRESSURE_SCALING_MAPPER.get(md_config_dict["pressure_scaling"], None)
+                if ntp is None:
+                    _LOGGER.error(f"pressure_scaling keyword: {md_config_dict['pressure_scaling']} is not supported."
+                                f" Supported list: {self.MD_PRESSURE_SCALING_MAPPER.keys()}")
+                    raise ValueError
+                ntp_cntrl = {"ntp" : ntp}
+            
+            # ntb
+            if imin == 1:
+                ntb_cntrl = {}
+            elif ntp == 0:
+                ntb_cntrl = {"ntb" : 1}
+            else:
+                ntb_cntrl = {"ntb" : 2}
+
+            imin_or_not_cntrl = imin_or_not_cntrl | {
+                'nstlim': nstlim, 'dt': dt,
+                } | temp_cntrl | ntt_cntrl | ntb_cntrl | ntp_cntrl | {
+                'iwrap': self.config()["HARDCODE_IWRAP"],
+                'ig': self.config()["HARDCODE_IG"],
+                }
+
+        else: # minimization
+            # maxcyc, ncyc
+            maxcyc = md_config_dict["length"]
+            ncyc = max(mh.round_by(maxcyc * self.config()["HARDCODE_NCYC_RATIO"], 0.5), 1)
+            # ntpr
+            ntpr = max(int(self.config()["HARDCODE_NTPR_RATIO"] * maxcyc), 1)
+            # ntwx
+            ntwx = 0
+
+            imin_or_not_cntrl = imin_or_not_cntrl | {
+                "maxcyc" : maxcyc,
+                "ncyc" : ncyc,
+            }
+        # endregion
+
+        # region == constraint ==
+        constraints = md_config_dict["constrain"]
+        cart_freeze = []
+        geom_cons = []
+        if constraints:
+            for cons in constraints:
+                cons: StructureConstraint
+                if cons.constraint_type in self.config()["SUPPORTED_CONSTRAINT_TYPE"]:
+                    if cons.is_cartesian_freeze():
+                        cart_freeze.append(cons)
+                    else:
+                        geom_cons.append(cons)
+                else:
+                    _LOGGER.error(
+                        f"Dont support {cons.constraint_type} yet in AmberInterface. Supported: {self.config()['SUPPORTED_CONSTRAINT_TYPE']}")
+                    raise ValueError
+
+        # ntr and cartesian restraint
+        ntr_cntrl = {}
+        if cart_freeze:
+            cons = merge_cartesian_freeze(cart_freeze)
+            restraintmask = self.get_restraintmask(cons, reduce=True)
+            restraint_wt = cons.params["amber"]["restraint_wt"]
+            ntr_cntrl = {"ntr": 1,
+                         'restraint_wt': restraint_wt,
+                         'restraintmask': restraintmask,}
+
+        # nmropt
+        nmropt_cntrl = {}
+        if geom_cons:
+            geom_cons: List[StructureConstraint]
+            nmropt_cntrl = {'nmropt': 1}
+            # figure out path
+            disang_path: str = geom_cons[0].params["amber"]["rs_filepath"]
+            if disang_path.startswith("{mdstep_dir}"):
+                disang_path = disang_path.lstrip("{mdstep_dir}")
+                disang_path = f"{md_config_dict['mdstep_dir']}/{disang_path}"
+            disang_path = fs.get_valid_temp_name(disang_path)
+            # figure out content
+            disang_content_list = []
+            for cons in geom_cons:
+                raw_rs_dict = self._parse_cons_to_raw_rs_dict(cons)
+                disang_content_list.append(raw_rs_dict)
+            # assemble
+            nmropt_file_redirection = {
+                "DISANG" : {
+                    "path": disang_path, "content": disang_content_list}
+            }
+            file_redirection_dict.update(nmropt_file_redirection)
+        # endregion
 
         # determine the &wt END
         if wt_list or file_redirection_dict:
             wt_list.append(
                 {'type': 'wt',
-                 'config': {'type': 'END',}},
+                 'config': {'type': "'END'",}},
                 )
 
         # assemble namelists
         namelists = [
             {'type': 'cntrl',
-            'config': {
-                'imin': imin,
+            'config': imin_or_not_cntrl | {
                 'ntx': ntx, 'irest': irest,
                 'ntc': ntc, 'ntf': ntf,
                 'cut': self.config()["HARDCODE_CUT"],
-                'nstlim': nstlim, 'dt': dt,
-                } | temp_cntrl | {
                 'ntpr': ntpr, 'ntwx': ntwx,
-                } | ntt_cntrl | ntb_cntrl | ntp_cntrl | {
-                'iwarp': self.config()["HARDCODE_IWARP"],
-                # 'nmropt': 1, TODO finish this after PR
-                'ig': self.config()["HARDCODE_IG"],
-                # 'ntr': 1, 'restraint_wt': 2.0, 'restraintmask': "'@C,CA,N'",
+                } | ntr_cntrl | nmropt_cntrl | {
             }},
         ] + wt_list
 
@@ -1270,6 +1495,55 @@ class AmberInterface(BaseInterface):
         }
 
         return raw_dict
+
+    def _parse_cons_to_raw_rs_dict(self, cons: StructureConstraint) -> Dict:
+        """parse StructureConstraint() to a raw dict for writing the DISANG file.
+        Expression containing value are also parsed in this function.
+        (based on section 27.1 in Amber20 manual)
+        Example rs dict
+        {
+        'iat':[100,101],
+        'r1': 0.50,'r2': 0.96,'r3': 2.50,'r4': 3.50,
+        'rk2':0.0,'rk3':100.0,'ir6':1,'ialtd':0
+        }"""
+        target_keys = "r1 r2 r3 r4 rk2 rk3 ir6 ialtd ifvari".split() # TODO add more when needed
+        source_dict = cons.params["amber"]
+        # iat
+        atom_idxes = self.get_amber_atom_index(cons.atoms)
+        result = {"iat": atom_idxes}
+
+        # other keys
+        for k in target_keys:
+            if k in source_dict:
+                v = source_dict[k] 
+    
+                # parse x containing value
+                if k in "r1 r2 r3 r4".split():
+                    if isinstance(v, str) and v.count("x") > 0:
+                        expr = sympify(v)
+                        v = round(
+                                float(expr.subs("x", cons.target_value)),
+                                ndigits=3
+                            )
+
+                result[k] = v
+        
+        return result
+
+    def get_restraintmask(self, cons: CartesianFreeze, reduce: bool= True) -> str:
+        """get the str of restraintmask from CartesianFreeze().
+        Args:
+            cons: the target constriant
+            reduce: whether the function try to reduce the format of the mask
+        Returns:
+            the restraintmask"""
+        if reduce and cons.constraint_type == "backbone_freeze":
+            return "'@C,CA,N'"
+        else:
+            result = self.get_amber_mask(
+                StruSelection(cons.atoms),
+                reduce=reduce)
+            return result
 
     def _write_to_mdin_from_raw_dict(self, raw_dict: Dict, out_path: str):
         """write to mdin file from a raw dictionary
@@ -1299,7 +1573,13 @@ class AmberInterface(BaseInterface):
             mdin_lines.append(" /")
         # file redirection
         for k, v in raw_dict["file_redirection"].items():
-            mdin_lines.append(f" {k}={v}")
+            v_path = v["path"]
+            v_content = v["content"]
+            # add the redirection line
+            mdin_lines.append(f" {k}={v_path}")
+            # write the redirection file
+            if v_content:
+                self.REDIRECTION_FILE_WRITER[k](self, v_content, v_path)
         # group information
         for group_info in raw_dict["group_info"]: #TODO cant find any example of how this looks like
             _LOGGER.error("group info support not developed yet. contact author if you have to use this")
@@ -1617,7 +1897,7 @@ class AmberInterface(BaseInterface):
                       temperature: Union[float, List[Tuple[float]]] = "default",
                       thermostat: str = "default",
                       pressure_scaling: str = "default",
-                      constrain: StructureConstraint = "default",
+                      constrain: List[StructureConstraint] = "default",
                       restart: bool = "default",
                       # simulation (alternative)
                       amber_md_in_file: str = None,
@@ -1650,7 +1930,7 @@ class AmberInterface(BaseInterface):
                 the scaling type for pressure
                 options: [none, isotropic, anisotropic, semiisotropic]
             constrain:
-                the StructureConstraint object that indicates a geometry constrain in the step.
+                a list of StructureConstraint objects that indicates geometry constrains in the step.
             restart:
                 whether restart this md from the volecity of a previous md step.
             core_type:
@@ -1751,6 +2031,8 @@ class AmberInterface(BaseInterface):
             pressure_scaling = self.config()["DEFAULT_MD_PRESSURE_SCALING"]
         if constrain == "default":
             constrain = self.config()["DEFAULT_MD_CONSTRAIN"]
+        elif isinstance(constrain, StructureConstraint): # dispatch for non list input
+            constrain = [constrain]
         if restart == "default":
             restart = self.config()["DEFAULT_MD_RESTART"]
         if core_type == "default":

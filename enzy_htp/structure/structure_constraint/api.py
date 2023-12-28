@@ -16,12 +16,14 @@ Date: 2022-10-28
 """
 import copy
 from copy import deepcopy
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Dict, Any, Set, Union
 
 import numpy as np
 
 from enzy_htp.core.logger import _LOGGER
+from enzy_htp.core.exception import WrongTopology
 from ..structure import Structure, Solvent, Chain, Residue, Atom
+from enzy_htp import config as eh_config
 
 from abc import ABC, abstractmethod
 
@@ -32,41 +34,138 @@ class StructureConstraint(ABC):
     can be translated in between different software packages.
 
     Attributes:
-        atoms_: A List[Atom] containing all the atoms in the constraint.
-        target_value_ : The float() target value for the constraint.
-        params_: A Dict[str,float] with arbitrary parameters.
+        atoms_:
+            A List[Atom] containing all the atoms in the constraint.
+        target_value_ :
+            The float() target value for the constraint.
+        params_:
+            A Dict[str,float] with a that contain parameters for EVERY software
+            that this constraint type support. user can just edit this mapper to
+            change the parameter.
+            example:
+            {
+            "rosetta" : {"XXX" : ###},
+            "amber" : {"XXX" : ###},
+            "xtb" : {"XXX" : ###},
+            }
     """
 
     def __init__(self,
-                atoms:List[Atom],
-                target_value:float,
-                params:Dict[str, Any]
-                ):
+                 atoms: List[Atom],
+                 target_value: float,
+                 params: Dict[str, Dict[str, Any]],
+                 ):
         """Ctor that exits if the supplied number of atoms is NOT correct."""
         
         self.atoms_ = atoms 
         self.target_value_ = target_value 
         self.params_ = deepcopy( params ) 
 
-        self['calc_method'] = params.get('calc_method', 'rosetta') # TODO this does not work in the case that multiple software in the same workflow needs to use a same set of constraints.
-        # https://github.com/ChemBioHTP/EnzyHTP/pull/147/#discussion_r1435735159
-
         if not self.correct_num_atoms():
             _LOGGER.error("Incorrect number of atoms supplied! Exiting...")
             exit( 1 )
 
+    # region == property getter ==
+    @property
+    def atoms(self) -> List[Atom]:
+        """Accessor for the atoms involved in the constrained geometry."""
+        return self.atoms_
 
-    #TODO(CJ): add function that checks if topology and constraints are compatible
-    #TODO(CJ): will need to make a version of this that actually works for the ResiduePairConstraint
+    @atoms.setter
+    def atoms(self, val_in : List[Atom] ) -> None:
+        """Setter for the atoms in the constrained geometry. Checks for the correct number of atoms, errors if it is the incorrect number.."""
+        self.atoms_ = val_in
+        if not self.correct_num_atoms():
+            _LOGGER.error(f"An incorrect number of atoms ({len(self.atoms)})was supplied! Exiting...")
+            exit( 1 )
+
+    @property
+    def target_value(self) -> float:
+        """Getter for the target value of the constrained geometry."""
+        return self.target_value_
+
+    @target_value.setter
+    def target_value(self, val_in : float ) -> None:
+        """Change the stored target value of the constrained geometry.."""
+        self.target_value_ = val_in
+
+    @property
+    def params(self) -> Dict[str, Any]:
+        """the mapper that contain parameters for all support software
+        of this type of constraint"""
+        return self.params_
+
+    @params.setter
+    def params(self, val: Dict) -> None:
+        """the setter for params"""
+        self.params_ = val
+
+    @property
+    def topology(self) -> Structure:
+        """get the current topology-context of the constraint"""
+        self.check_consistent_topology()
+        return self.atoms[0].root()
+
+    @property
+    def constraint_type(self) -> str:
+        """hard coded constraint type"""
+        return "general"
 
     def clone(self) -> "StructureConstraint":
         """Clones the StructureConstraint with the original target_value."""
-        return self.__init__(atoms, self.target_value, deepcopy(self.params_))
+        result = type(self).__new__(type(self))
+        result.atoms = self.atoms
+        result.target_value = self.target_value
+        result.params = deepcopy(self.params)
+        return result
 
     def clone_current(self) -> "StructureConstraint":
         """Get a version of the StructureConstraint with the current value as the 
         target value."""
-        return self.__init__(atoms, self.current_value, deepcopy(self.params_))
+        result = type(self).__new__(type(self))
+        result.atoms = self.atoms
+        result.target_value = self.current_geometry
+        result.params = deepcopy(self.params)
+        return result
+
+    @abstractmethod
+    def current_geometry(self) -> float:
+        """The current geometry of the constrained atoms."""
+        pass
+
+    def atom_indices(self) -> np.ndarray: 
+        """Get the indices of the atoms in the constraint.""" 
+        return np.array(
+            [aa.idx for aa in self.atoms]
+        )
+    
+    @property
+    def atom_names(self) -> Set[str]:
+        """get all unique atom names of self.atoms"""
+        result = set()
+        for atom in self.atoms:
+            result.add(atom.name)
+        return result
+    # endregion
+
+    # region == checker ==
+    def check_consistent_topology(self) -> None:
+        """check whether Atom()s are from the same Structure()
+        raise an error if not."""
+        top = self.atoms[0].root()
+        for atom in self.atoms:
+            current_top = atom.root()
+            if not isinstance(current_top, Structure):
+                _LOGGER.error(
+                    f"Topology should be Structure(). ({atom} has {current_top})")
+                raise WrongTopology
+
+            if current_top is not top:
+                _LOGGER.error(
+                    "Atom()s in StructureConstraint() "
+                    "have inconsistent topology! "
+                    f"({self.atoms[0]} has {top} --vs-- {atom} has {current_top})")
+                raise WrongTopology
 
     def is_cartesian_freeze(self) -> bool:
         """Is this a cartesian freeze constraint?"""
@@ -92,24 +191,9 @@ class StructureConstraint(ABC):
     def correct_num_atoms(self) -> bool:
         """Does the given constraint have the correct number of atoms?"""
         pass
+    # endregion
 
-    def score_energy(self) -> float: # TODO move this to interface e.g.: RosettaInterface for current
-        """Scores the energy penalty of the constraint. If the calc method is not specified, the method exits."""
-        if self['calc_method'] == 'rosetta':
-            penalty:float = self['penalty'] 
-            tolerance:float = self['tolerance']
-            difference:float = abs(self.current_geometry() - self.target_value)
-
-            if difference <= tolerance:
-                return 0.0
-            else:
-                return penalty * (difference - tolerance)
-
-        else:
-            _LOGGER.error(f"Unspecified calculation method {self['calc_method']}. Supported include: rosetta. Exiting...")
-            exit( 1 )
-
-
+    # region == editor ==
     def change_topology(self, new_topology:Structure) -> None:
         """Switch the associated topology and atoms for a given Constraint. Maps the atom keys
         as described in Atom.key() and Structure.get().
@@ -127,45 +211,9 @@ class StructureConstraint(ABC):
     
         self.atoms = new_atoms
 
-    @abstractmethod
-    def current_geometry(self) -> float:
-        """The current geometry of the constrained atoms."""
-        pass
+    # endregion
 
-    @property
-    def atoms(self) -> List[Atom]:
-        """Accessor for the atoms involved in the constrained geometry."""
-        return self.atoms_
-
-    @atoms.setter
-    def atoms(self, val_in : List[Atom] ) -> None:
-        """Setter for the atoms in the constrained geometry. Checks for the correct number of atoms, errors if it is the incorrect number.."""
-        self.atoms_ = val_in
-        if not self.correct_num_atoms():
-            _LOGGER.error(f"An incorrect number of atoms ({len(self.atoms)})was supplied! Exiting...")
-            exit( 1 )
-
-    def atom_indices(self) -> np.ndarray: 
-        """Get the indices of the atoms in the constraint.""" 
-        return np.array(
-            [aa.idx for aa in self.atoms]
-        )
-
-    @property
-    def target_value(self) -> float:
-        """Getter for the target value of the constrained geometry."""
-        return self.target_value_
-
-    @target_value.setter
-    def target_value(self, val_in : float ) -> None:
-        """Change the stored target value of the constrained geometry.."""
-        self.target_value_ = val_in
-
-    @property
-    def params(self) -> Dict[str, Any]:
-        """Getter for all the params in the constrained geometry."""
-        return self.params_
-
+    # region == special ==
     def __getitem__(self, key:str ) -> float:
         """Bracket getter for the .params dict() in the structure constraint. Exits if the 
         supplied key is not found in the .params dict().
@@ -195,15 +243,48 @@ class StructureConstraint(ABC):
             Nothing.
         """
         self.params_[key] = value 
+    # endregion
+
+    #TODO(CJ): add function that checks if topology and constraints are compatible
+    #TODO(CJ): will need to make a version of this that actually works for the ResiduePairConstraint
+    
+    # TODO move this to interface e.g.: RosettaInterface for current
+    def score_energy(self) -> float: 
+        """Scores the energy penalty of the constraint. If the calc method is not specified, the method exits."""
+        if self['calc_method'] == 'rosetta':
+            penalty:float = self['penalty'] 
+            tolerance:float = self['tolerance']
+            difference:float = abs(self.current_geometry() - self.target_value)
+
+            if difference <= tolerance:
+                return 0.0
+            else:
+                return penalty * (difference - tolerance)
+
+        else:
+            _LOGGER.error(f"Unspecified calculation method {self['calc_method']}. Supported include: rosetta. Exiting...")
+            exit( 1 )
+
 
 class CartesianFreeze(StructureConstraint):
     """Specialization of StructureConstraint() for Atoms() that are frozen in Cartesian space. Many
     of the methods yield junk values since no measurement is needed for this Class.
     """
+
+    DEFAULT_PARAMS = {
+        "amber": {
+            "restraint_wt": eh_config["amber.DEFAULT_CARTESIAN_FREEZE_WEIGHT"],
+        },
+    }
     
-    def __init__(self, atoms:List[Atom] ):
-        super().__init__(self, atoms, 0.0, dict())
-     
+    def __init__(self, atoms:List[Atom]):
+        super().__init__(atoms, 0.0, self.DEFAULT_PARAMS)
+
+    @property
+    def constraint_type(self) -> str:
+        """hard coded constraint type"""
+        return "cartesian_freeze"
+
     def is_cartesian_freeze(self) -> bool:
         """Is this a cartesian freeze constraint? Always True for this class."""
         return True
@@ -212,17 +293,38 @@ class CartesianFreeze(StructureConstraint):
         """True as long as there is at least one atom in the constraint."""
         return len(self.atoms)
 
-    def score_energy(self) -> float:
-        """Always returns 0.0. Not needed for this type of constraint."""
-        return 0.0
-
     def current_geometry(self) -> float:
-        """Always returns 0.0. Not needed for this type of constraint."""
+        """Always returns 0.0. Not needed for this type of constraint.
+        TODO see if there will be a need"""
         return 0.0
 
+    @classmethod
+    def clone_from(cls, other: "CartesianFreeze") -> "CartesianFreeze":
+        """clone from another CartesianFreeze instance"""
+        result = cls.__new__(cls)
+        result.atoms = other.atoms
+        result.target_value = other.target_value
+        result.params = deepcopy(other.params)
+        return result
 
 class DistanceConstraint(StructureConstraint):
     """Specialization of StructureConstraint() for the distance between two Atom()'s."""
+
+    DEFAULT_PARAMS = {
+        "amber": {
+            "rs_filepath": eh_config["amber.DEFAULT_DISANG_FILEPATH"],
+        } | eh_config["amber.DEFAULT_DISTANCE_CONSTRAINT_SETTING"],
+    }
+    
+    def __init__(self, atoms:List[Atom], target_value: float):
+        """init for applying default params"""
+        super().__init__(atoms, target_value, self.DEFAULT_PARAMS)
+
+    @property
+    def constraint_type(self) -> str:
+        """hard coded constraint type"""
+        return "distance_constraint"
+
     def is_distance_constraint(self) -> bool:
         """Is this a distance constraint? Always True for this class."""
         return True
@@ -238,6 +340,22 @@ class DistanceConstraint(StructureConstraint):
 
 class AngleConstraint(StructureConstraint):
     """Specialization of StructureConstraint() for the angle between three Atom()'s."""
+
+    DEFAULT_PARAMS = {
+        "amber": {
+            "rs_filepath": eh_config["amber.DEFAULT_DISANG_FILEPATH"],
+        } | eh_config["amber.DEFAULT_ANGLE_CONSTRAINT_SETTING"],
+    }
+    
+    def __init__(self, atoms:List[Atom], target_value: float):
+        """init for applying default params"""
+        super().__init__(atoms, target_value, self.DEFAULT_PARAMS)
+
+    @property
+    def constraint_type(self) -> str:
+        """hard coded constraint type"""
+        return "angle_constraint"
+
     def is_angle_constraint(self) -> bool:
         """Is this an angle constraint? Always True for this class."""
         return True 
@@ -253,7 +371,22 @@ class AngleConstraint(StructureConstraint):
 
 class DihedralConstraint(StructureConstraint):
     """Specialization of StructureConstraint() for the dihedral angle between four Atom()'s"""
+
+    DEFAULT_PARAMS = {
+        "amber": {
+            "rs_filepath": eh_config["amber.DEFAULT_DISANG_FILEPATH"],
+        } | eh_config["amber.DEFAULT_DIHEDRAL_CONSTRAINT_SETTING"],
+    }
     
+    def __init__(self, atoms:List[Atom], target_value: float):
+        """init for applying default params"""
+        super().__init__(atoms, target_value, self.DEFAULT_PARAMS)
+
+    @property
+    def constraint_type(self) -> str:
+        """hard coded constraint type"""
+        return "dihedral_constraint"
+
     def is_dihedral_constraint(self) -> bool:
         """Is this a dihedral constraint?"""
         return True 
@@ -267,7 +400,7 @@ class DihedralConstraint(StructureConstraint):
         return self.atoms[0].dihedral_with(self.atoms[1], self.atoms[2], self.atoms[3])
 
 
-class ResiduePairConstraint(StructureConstraint):
+class ResiduePairConstraint(StructureConstraint): # TODO unified the design of self.params
     """Specialization of StructureConstraint() representing 
 
     Attributes:
@@ -306,6 +439,12 @@ class ResiduePairConstraint(StructureConstraint):
         self.atoms_ = list(atoms)
         self.correct_num_atoms()
 
+    @property
+    def constraint_type(self) -> str:
+        """hard coded constraint type"""
+        return "residue_pair_constraint"
+
+
     def clone(self) -> "ResiduePairConstraint":
         """TODO(CJ)"""
         return ResiduePairConstraint.__init__(
@@ -321,7 +460,6 @@ class ResiduePairConstraint(StructureConstraint):
                 self.torsionAB_
                 )
         
-
 
     def change_topology(self, new_topology: Structure) -> None:
         """Same as StructureConstraint.change_topology() but with extra steps because of the composite 
@@ -423,6 +561,22 @@ class ResiduePairConstraint(StructureConstraint):
         ))
 
 
+class BackBoneFreeze(CartesianFreeze):
+    """Specialization of CartesianFreeze() for constraining the movement of
+    backbone Atom()s"""
+
+    DEFAULT_PARAMS = {
+        "amber": {
+            "restraint_wt": eh_config["amber.DEFAULT_CARTESIAN_FREEZE_WEIGHT"],
+        },
+    }
+
+    @property
+    def constraint_type(self) -> str:
+        """hard coded constraint type"""
+        return "backbone_freeze"
+
+# region == constructors ==
 def create_residue_pair_constraint(
                 topology:Structure,
                 r1_key:Tuple[str,int],
@@ -516,23 +670,154 @@ def create_residue_pair_constraint(
                                 *csts
                                 )
 
-
-def build_from_preset(topology: Structure,
-                      keyword: str,) -> StructureConstraint:
-    """constructor that allows building a StructureConstraint from a keyword.
-    recommand combining this with functools.partial to make general constrains
-    that can apply to different structures
-    Args:
-        topology: the topology defined by a Structure()
-        keyword: the preset constrain keyword. Supported list:
-            freeze_backbone: freeze the coordinate of all backbone atoms"""
-    supported_keywords = ["freeze_backbone", "freeze_hydrogens"]
-    if keyword == "freeze_backbone":
-        freeze_atoms = topology.backbone_atoms()
-        result = StructureConstraint(topology, freeze_atoms, geom_constrain=[])
-        result._is_backbone_freeze = True
-    else:
-        _LOGGER.error(f"using unsupported keyword {keyword}. (Supported: {supported_keywords})")
-        raise ValueError
-
+def create_cartesian_freeze(
+        atoms: Union[Atom, str],
+        topology: Structure= None,) -> CartesianFreeze:
+    """constructor for CartesianFreeze."""
+    if isinstance(atoms, str):
+        if not isinstance(topology, Structure):
+            _LOGGER.error("key str types of specification is used but reference "
+                          "topology (i.e.: structure) is not supplied. "
+                          f"(key: {atoms}, topology: {topology})")
+            raise TypeError
+        # atoms = stru_sele.select_stru(atoms).atoms
+        # TODO figure out how to resolve this loop importing issue
+        # structure_constraint -> structure_selection -> interface -> structure_constraint
+        # probably make 2 interface component 1 high 1 low?
+        raise Exception("TODO")
+    result = CartesianFreeze(atoms=atoms)
+    result.check_consistent_topology()
     return result
+
+def create_backbone_freeze(stru: Structure) -> BackBoneFreeze:
+    """constructor for BackboneFreeze. Constrain only C,CA,N.
+    Args:
+        stru: the target structure"""
+    atoms = stru.backbone_atoms()
+    return BackBoneFreeze(atoms=atoms)
+
+def create_distance_constraint(
+        atom_1: Union[Atom, str],
+        atom_2: Union[Atom, str],
+        target_value: float,
+        topology: Structure= None,) -> DistanceConstraint:
+    """constructor for DistanceConstraint between atoms.
+    Args:
+        atom_1, atom_2:
+            the 2 atoms of the distance constraint. they can be specified
+            either through Atom() objects or keyword str of Structure().get()
+            combining with a Structure() (e.g.: A.100.CA)
+        target_value:
+            the target distance of the constraint
+        topology:
+            the reference topology if keyword str is used for atom_1, atom_2."""
+    atom_1 = _dispatch_get_key(atom_1, topology)
+    atom_2 = _dispatch_get_key(atom_2, topology)
+    result = DistanceConstraint(
+        atoms=[atom_1, atom_2],
+        target_value=target_value
+    )
+    result.check_consistent_topology()
+    return result
+
+def create_angle_constraint(
+        atom_1: Union[Atom, str],
+        atom_2: Union[Atom, str],
+        atom_3: Union[Atom, str],
+        target_value: float,
+        topology: Structure= None,) -> AngleConstraint:
+    """constructor for AngleConstraint between atoms.
+    Args:
+        atom_1, atom_2, atom_3:
+            the 3 atoms of the angle constraint. they can be specified
+            either through Atom() objects or keyword str of Structure().get()
+            combining with a Structure() (e.g.: A.100.CA)
+        target_value:
+            the target angle of the constraint
+        topology:
+            the reference topology if keyword str is used for atom_1, atom_2, atom_3."""
+    atom_1 = _dispatch_get_key(atom_1, topology)
+    atom_2 = _dispatch_get_key(atom_2, topology)
+    atom_3 = _dispatch_get_key(atom_3, topology)
+    result = AngleConstraint(
+        atoms=[atom_1, atom_2, atom_3],
+        target_value=target_value
+    )
+    result.check_consistent_topology()
+    return result
+
+def create_dihedral_constraint(
+        atom_1: Union[Atom, str],
+        atom_2: Union[Atom, str],
+        atom_3: Union[Atom, str],
+        atom_4: Union[Atom, str],
+        target_value: float,
+        topology: Structure= None,) -> DihedralConstraint:
+    """constructor for DihedralConstraint between atoms.
+    Args:
+        atom_1, atom_2, atom_3, atom_4:
+            the 4 atoms of the dihedral constraint. they can be specified
+            either through Atom() objects or keyword str of Structure().get()
+            combining with a Structure() (e.g.: A.100.CA)
+        target_value:
+            the target dihedral of the constraint
+        topology:
+            the reference topology if keyword str is used for
+            atom_1, atom_2, atom_3, atom_4."""
+    atom_1 = _dispatch_get_key(atom_1, topology)
+    atom_2 = _dispatch_get_key(atom_2, topology)
+    atom_3 = _dispatch_get_key(atom_3, topology)
+    atom_4 = _dispatch_get_key(atom_4, topology)
+    result = DihedralConstraint(
+        atoms=[atom_1, atom_2, atom_3, atom_4],
+        target_value=target_value
+    )
+    result.check_consistent_topology()
+    return result
+
+def _dispatch_get_key(target: Union[str, Atom, Residue], stru: Structure) -> Union[Atom, Residue]:
+    """apply the key with .get() that support a dispatch of using the
+    object (e.g.: Atom()) itself"""
+    if isinstance(target, str):
+        if not isinstance(stru, Structure):
+            _LOGGER.error("key str types of specification is used but reference "
+                          "topology (i.e.: structure) is not supplied. "
+                          f"(key: {target}, topology: {stru})")
+            raise TypeError
+        target = stru.get(target)
+    return target
+
+# endregion
+
+# region == tools that operations on list/dict of StructureConstraint ==
+def merge_cartesian_freeze(cart_freeze_list: List[CartesianFreeze]) -> CartesianFreeze:
+    """try to merge a list of cartesian freeze into 1 single
+    Cartesian Freeze object. Raise error when they can't merge"""
+
+    # the case only backbone_freeze exists
+    temp_iter = iter(cart_freeze_list)
+    ref_cons = next(temp_iter)
+    try:
+        while ref_cons.constraint_type == "backbone_freeze":
+            ref_cons = next(temp_iter)
+    except StopIteration:
+        _LOGGER.debug(f"Only found specialized backbone_freeze. Returning just BackboneFreeze")
+        return ref_cons
+
+    # check consistency
+    result = CartesianFreeze.clone_from(ref_cons)
+    for cons in cart_freeze_list:
+        if not cons.is_cartesian_freeze:
+            _LOGGER.error(f"this function only take List[CartesianFreeze]. Found: {type(cons)}")
+            raise TypeError
+        if cons.params != ref_cons.params:
+            _LOGGER.error(f"Inconsistent params in the target list. {cons.params} -vs- {ref_cons.params} ")
+            raise ValueError
+        if cons.topology is not ref_cons.topology:
+            _LOGGER.error(f"Inconsistent topology in the target list. {cons.topology} -vs- {ref_cons.topology} ")
+            raise ValueError
+    # merge atoms
+        result.atoms.extend(cons.atoms)
+    result.atoms = list(set(result.atoms))
+    return result
+# endregion

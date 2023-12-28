@@ -10,6 +10,7 @@ from typing import List, Union
 
 from enzy_htp.core import _LOGGER
 from enzy_htp.core.general import get_interval_str_from_list
+from enzy_htp.core.exception import WrongTopology
 from enzy_htp.structure import Structure, Atom, Residue, Chain
 
 
@@ -32,6 +33,7 @@ class StruSelection:
         """carry a list of Atom references of the Structure of selection"""
         self._atoms = atoms
 
+    # region == getter attr ==
     @property
     def atoms(self) -> List[Atom]:
         """getter for _atoms."""
@@ -42,7 +44,9 @@ class StruSelection:
         """Normally this should not be set"""
         _LOGGER.error("StruSelection atoms should not change once constructed")
         raise Exception("StruSelection atoms should not change once constructed")
+    # endregion
 
+    # region == getter prop ==
     @property
     def involved_residues(self) -> List[Residue]:
         """return a list of residues involved in holding atoms"""
@@ -71,7 +75,31 @@ class StruSelection:
         """return a list of chain name involved in holding atoms"""
         result = list(map(lambda x: x.name, self.involved_chains))
         return result
+    # endregion
 
+    # region == checker ==
+    def check_consistent_topology(self) -> None:
+        """check whether Atom()s are from the same Structure()
+        raise an error if not.
+        TODO this might suggestion StruSelection() and the attribute of
+        StructureConstraint should have a common base class?"""
+        top = self.atoms[0].root()
+        for atom in self.atoms:
+            current_top = atom.root()
+            if not isinstance(current_top, Structure):
+                _LOGGER.error(
+                    f"Topology should be Structure(). ({atom} has {current_top})")
+                raise WrongTopology
+
+            if current_top is not top:
+                _LOGGER.error(
+                    "Atom()s in StructureConstraint() "
+                    "have inconsistent topology! "
+                    f"({self.atoms[0]} has {top} --vs-- {atom} has {current_top})")
+                raise WrongTopology
+    # endregion
+
+    # region == special ==
     def __str__(self) -> str:
         """the string represetation of the selection"""
         result_line = []
@@ -80,6 +108,7 @@ class StruSelection:
         result_line.append(f"Involve chains: {','.join(self.involved_chain_name())}")
 
         return f"{os.linesep}".join(result_line)
+    # endregion
 
     # == constructor ==
     @classmethod

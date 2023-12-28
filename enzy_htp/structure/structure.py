@@ -95,6 +95,8 @@ from collections import defaultdict
 import enzy_htp.core.math_helper as mh
 from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
+from enzy_htp.core.general import if_list_contain_repeating_element
+from enzy_htp.core.exception import ResidueDontHaveAtom, IndexMappingError
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
 from enzy_htp.chemical import ResidueType
 
@@ -232,7 +234,7 @@ class Structure(DoubleLinkedNode):
         """find residues base on its (chain_id, idx). Return the matching residues"""
         result = list(filter(lambda r: r.key() == key, self.residues))
         if len(result) == 0:
-            _LOGGER.info(f"Didn't find any residue with key: {key}")
+            _LOGGER.info(f"Didn't find any residue with key: {key} in {self}")
             return None
         if len(result) > 1:
             _LOGGER.warning(f"More than 1 residue with key: {key}. Only the first one is used. Check those residues:")
@@ -411,7 +413,7 @@ class Structure(DoubleLinkedNode):
                     if by_chain:
                         result[ch_id].extend(res.mainchain_atoms)
                     else:
-                        result.append(res.mainchain_atoms)
+                        result.extend(res.mainchain_atoms)
         return result
 
     def get(self, key: str) -> Union[Chain, Residue, Atom]:
@@ -436,19 +438,43 @@ class Structure(DoubleLinkedNode):
         # Residue
         if section_count == 1:
             chain, res_idx = key.split('.')
+            res_idx = int(res_idx)
             result = self.find_residue_with_key((chain, res_idx))
         
         # Atom
         if section_count == 2:
             chain, res_idx, atom_name = key.split('.')
+            res_idx = int(res_idx)
             res = self.find_residue_with_key((chain, res_idx))
-            result = res.find_atom_name(atom_name)
+            try:
+                result = res.find_atom_name(atom_name)
+            except ResidueDontHaveAtom as e:
+                result = None
         
-        if not result:
-            _LOGGER.error(f"Unable to locate residue {key} in Structure. Exiting...")
-            exit( 1 )
+        if result is None:
+            _LOGGER.error(f"Unable to locate {key} in Structure. Exiting...")
+            raise ValueError
 
         return result
+
+    def get_residue_index_mapper(self, other: "Structure") -> Dict[tuple, tuple]:
+        """map residue index against another Strutcure().
+        Returns:
+            {self_residue_1_key: other_residue_1_key, ...}"""
+        okeys = self.residue_mapper.keys()
+        nkeys = other.residue_mapper.keys()
+        # san check
+        if len(okeys) != len(nkeys):
+            _LOGGER.error(f"Residue key number does not match between old and new Structure(). Index mapping is impossible")
+            raise IndexMappingError
+        if if_list_contain_repeating_element(okeys):
+            _LOGGER.error(f"Found repeating residue key in old Structure(). Index mapping is impossible")
+            raise IndexMappingError
+        if if_list_contain_repeating_element(nkeys):
+            _LOGGER.error(f"Found repeating residue key in new Structure(). Index mapping is impossible")
+            raise IndexMappingError
+        idx_mapper = dict(zip(okeys, nkeys))
+        return idx_mapper
     # endregion
 
     #region === Checker ===

@@ -14,7 +14,8 @@ import enzy_htp.core.file_system as fs
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.exception import InconsistentMDEngine
 from enzy_htp.core import job_manager
-from enzy_htp.structure import Structure, StructureEnsemble, structure_constraint
+from enzy_htp.structure import Structure, StructureEnsemble
+from enzy_htp.structure import structure_constraint as stru_cons
 from enzy_htp._interface.handle_types import (
     MolDynStep,
     MolDynParameterizer,
@@ -29,81 +30,123 @@ def equi_md_sampling(stru: Structure,
                      # config for steps
                      prod_time: float= 50.0, # ns
                      prod_temperature: float = 300.0, #K
-                     prod_constrain: structure_constraint.StructureConstraint= None,
+                     prod_constrain: List[stru_cons.StructureConstraint]= None,
                      record_period: float= 0.5, # ns
                      cluster_job_config: Dict= None,
                      cpu_equi_step: bool= False,
                      cpu_equi_job_config: Dict= None,
+                     job_check_period: int=210, # s
                      ) -> List[StructureEnsemble]:
     """This science API performs a production run of molecular dynamics simulation with the
     system equilibrated by several short md simulations from the starting {stru}
     (Basically md_simulation() with preset steps)
     min (micro) -> heat (NVT) -> equi (NPT) -> prod (NPT)
     Args:
-        stru: the starting structure
-        param_method: the Parameterizer() used for parameterization. This determines the engine.
-        parallel_runs: the number of desired parallel runs of the steps.
-        parallel_method: the method to parallelize the multiple runs
-        work_dir: the directory that contains all the MD files input/intermediate/output
-        prod_time: the simulation time in production step (unit: ns)
-        prod_temperature: the production temperature
-        prod_constrain: the constrain applied in the production step
-        record_period: the simulation time period for recording the geom. (unit: ns)
-        cluster_job_config: the config for cluster_job if it is used as the parallel method.
-        cpu_equi_step: whether use cpu for equi step
-        cpu_equi_job_config: the job config for the cpu equi step if specified
+        stru: 
+            the starting structure
+        param_method: 
+            the Parameterizer() used for parameterization. This determines the engine.
+        parallel_runs: 
+            the number of desired parallel runs of the steps.
+        parallel_method: 
+            the method to parallelize the multiple runs
+        work_dir: 
+            the directory that contains all the MD files input/intermediate/output
+        prod_time: 
+            the simulation time in production step (unit: ns)
+        prod_temperature: 
+            the production temperature
+        prod_constrain: 
+            the constrain applied in the production step
+        record_period: 
+            the simulation time period for recording the geom. (unit: ns)
+        cluster_job_config: 
+            the config for cluster_job if it is used as the parallel method.
+        cpu_equi_step: 
+            whether use cpu for equi step
+        cpu_equi_job_config: 
+            the job config for the cpu equi step if specified
+        job_check_period:
+            the check period for wait_to_2d_array_end. Used when parallel_method='cluster_job'.
+            (Unit: s, default: 210s)
     Returns:
         a list trajectories for each replica in StructureEnsemble format."""
     result = []
     # san check
     if parallel_method == "cluster_job":
         if not cluster_job_config:
-            _LOGGER.error("cluster_job is used but cluster_job_config is not given!")
+            _LOGGER.error("cluster_job is used but cluster_job_config is not given! "
+                          "You need to at least specify the account and partition. "
+                          "See test/geometry/test_sampling.py::test_equi_md_sampling_lv1() for an example.")
+            raise ValueError
+    if prod_constrain is None:
+        prod_constrain = []
+    for cons in prod_constrain:
+        if cons.topology is not stru:
+            # TODO probably can also support a eq-like checker in Structure()
+            # that checks for the same topology and indexing.
+            _LOGGER.error("inconsistency between constraint and stru. "
+                          f"constraint topology: {cons.topology} "
+                          f"stru: {stru} ")
             raise ValueError
 
     # 1. build steps
     parent_interface = param_method.parent_interface
 
     # 1.1 equi core
-    equi_core = "GPU"
+    equi_core = "gpu"
     equi_job_config = cluster_job_config
     if cpu_equi_step:
-        equi_core = "CPU"
+        equi_core = "cpu"
         equi_job_config = cpu_equi_job_config
         if not cpu_equi_job_config:
-            _LOGGER.error("cpu_equi_step is used but cpu_equi_job_config is not given!")
+            _LOGGER.error("cpu_equi_step is used but cpu_equi_job_config is not given! "
+                          "You need to at least specify the account and partition. ")
             raise ValueError
 
-    freeze_backbone = structure_constraint.build_from_preset(stru, "freeze_backbone")
+    freeze_backbone = stru_cons.create_backbone_freeze(stru)
     min_step  = parent_interface.build_md_step(
+        name="min_micro",
         minimize=True,
         length=20000, # cycle
         cluster_job_config=cluster_job_config,
-        core_type="GPU",
-        constrain=[freeze_backbone, prod_constrain])
+        core_type="gpu",
+        constrain=[freeze_backbone] + prod_constrain)
 
     heat_step = parent_interface.build_md_step(
+        name="heat_nvt",
         length=0.05, # ns
         cluster_job_config=cluster_job_config,
-        core_type="GPU",
+        core_type="gpu",
         temperature=[(0, 0), (0.05*0.9, prod_temperature), (-1, prod_temperature)],
-        constrain=[freeze_backbone, prod_constrain])
+        constrain=[freeze_backbone] + prod_constrain)
 
     equi_step = parent_interface.build_md_step(
+        name="equi_npt",
         length=prod_time * 0.01,
         cluster_job_config=equi_job_config,
         core_type=equi_core,
         temperature=prod_temperature,
-        constrain=[freeze_backbone, prod_constrain])
+        constrain=[freeze_backbone] + prod_constrain)
+
+    equi_step = parent_interface.build_md_step(
+        name="equi_npt_free_bb",
+        length=prod_time * 0.01,
+        cluster_job_config=equi_job_config,
+        core_type=equi_core,
+        temperature=prod_temperature,
+        constrain=prod_constrain)
 
     prod_step = parent_interface.build_md_step(
+        name="prod_npt",
         length=prod_time,
         cluster_job_config=cluster_job_config,
-        core_type="GPU",
+        core_type="gpu",
+        restart=True,
         if_report=True,
         temperature=prod_temperature,
         record_period=record_period,
-        constrain=[prod_constrain])
+        constrain=prod_constrain)
 
     # 2. run simulation
     params, md_result = md_simulation(
@@ -111,15 +154,17 @@ def equi_md_sampling(stru: Structure,
         steps=[min_step, heat_step, equi_step, prod_step],
         parallel_runs=parallel_runs,
         parallel_method=parallel_method,
-        work_dir=work_dir)
+        work_dir=work_dir,
+        job_check_period=job_check_period,)
 
     # 3. format output
     for rep_result in md_result:
+        prod_result = rep_result[-1]
         result.append(StructureEnsemble(
             topology=params.topology_file,
             top_parser=params.topology_parser,
-            coordinate_list=rep_result.traj_file,
-            coord_parser=rep_result.traj_parser,))
+            coordinate_list=prod_result.traj_file,
+            coord_parser=prod_result.traj_parser,))
 
     return result
 
@@ -129,7 +174,8 @@ def md_simulation(stru: Structure,
                   steps: List[MolDynStep],
                   parallel_runs: int=1,
                   parallel_method: str="cluster_job",
-                  work_dir: str="./MD") -> Tuple[MolDynParameter, List[List[MolDynResult]]]:
+                  work_dir: str="./MD",
+                  job_check_period: int=210,) -> Tuple[MolDynParameter, List[List[MolDynResult]]]:
     """This science API perform Molecular Dynamics simulation.
 
     The starting structure {stru} will be parameterized by the {param_method} and
@@ -138,22 +184,32 @@ def md_simulation(stru: Structure,
     a list.
 
     Args:
-        stru: the starting structure
-        param_method: the Parameterizer() used for parameterization. This is a
+        stru:
+            the starting structure
+        param_method:
+            the Parameterizer() used for parameterization. This is a
             special step that covert enzy_htp.Structure() to the input format
             MolDynStep takes. Normally it will be topology, initial coordinate,
             and MM parameters etc.
-        steps: a list of steps each is a MolDynStep() that defines a molecular
+        steps:
+            a list of steps each is a MolDynStep() that defines a molecular
             dynamics step.
-        parallel_runs: the number of desired parallel runs of the steps.
-        parallel_method: the method to parallelize the multiple runs
-        work_dir: the directory that contains all the MD files input/intermediate/output
+        parallel_runs:
+            the number of desired parallel runs of the steps.
+        parallel_method:
+            the method to parallelize the multiple runs
+        work_dir:
+            the directory that contains all the MD files input/intermediate/output
+        job_check_period:
+            the check period for wait_to_2d_array_end. Used when parallel_method='cluster_job'.
+            (Unit: s, default: 210s)
 
     Return:
         Tuple[
             the parameter object,
-            a list of results that each results from the last step (unless specificed in the any step) of a parallel run
+            a list of results of each step from each parallel run
         ]
+        example: (params, [[MolDynResult, MolDynResult, ...], ...])
 
     Details:
         Molecular Dynamics (MD) simulate the motion of enzymes based on Newton's equation of motion.
@@ -214,9 +270,9 @@ def md_simulation(stru: Structure,
     # IV. run MD steps
     ## parallelize
     if parallel_method == "cluster_job":
-        results = _parallelize_md_steps_with_cluster_job(parallel_runs, work_dir, steps, params)
+        results = _parallelize_md_steps_with_cluster_job(parallel_runs, work_dir, steps, params, job_check_period)
     ## sequential
-    if parallel_method is None or parallel_runs == 1:
+    if parallel_method is None:
         results = _serial_md_steps(parallel_runs, work_dir, steps, params)
 
     return params, results
@@ -225,7 +281,8 @@ def _parallelize_md_steps_with_cluster_job(
         parallel_runs: int,
         work_dir: str,
         steps: List[MolDynStep],
-        params,
+        params: MolDynParameter,
+        period: int,
         ):
     """The MD parallelization method: cluster_job. (only used in md_simulation())
     This method will utilize ARMer@EnzyHTP and make each MD steps a ClusterJob and
@@ -249,23 +306,30 @@ def _parallelize_md_steps_with_cluster_job(
             else: # the 1st step
                 job, output = step.make_job(params)
             job_list.append(job)
-            # 2. make output
-            if step.if_report:
-                result_egg_ele.append((step, output))
-        if not result_egg_ele:
-            result_egg_ele = [(step, output)] # default add last step if non is specified
+            # 2. make output (we need to translate all since error checking and cleaning is needed)
+            result_egg_ele.append((step, output))
+
         job_list = type(step).try_merge_jobs(job_list)
 
         job_array.append(job_list)
         result_eggs.append(result_egg_ele)  # eggs are filenames that can be translated to give birth actual data
 
-    job_manager.ClusterJob.wait_to_2d_array_end(job_array, period=210)
+    job_manager.ClusterJob.wait_to_2d_array_end(job_array, period=period)
 
     for rep_md_result in result_eggs:
         rep_result_list = []
         for step, output in rep_md_result:
             rep_result_list.append(step.translate(output))
         results.append(rep_result_list)
+
+    # clean up
+    job_temp_files = set()
+    for job_list in job_array:
+        for job in job_list:
+            job: job_manager.ClusterJob
+            job_temp_files.add(job.sub_script_path)
+            # job_temp_files.add(job.job_cluster_log) probably not.
+    fs.clean_temp_file_n_dir(list(job_temp_files))
 
     return results
 

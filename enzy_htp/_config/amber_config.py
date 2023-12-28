@@ -20,7 +20,6 @@ from .armer_config import ARMerConfig
 from enzy_htp.core.clusters.accre import Accre
 from enzy_htp.core.general import get_str_for_print_class_var
 from enzy_htp.core.logger import _LOGGER
-from enzy_htp.structure.structure_constraint import StructureConstraint
 
 class AmberConfig(BaseConfig):
     """Class that holds default values for running Amber within enzy_htp and also creates
@@ -97,13 +96,15 @@ class AmberConfig(BaseConfig):
     """The default value for the temperature of the simulation."""
 
     DEFAULT_MD_THERMOSTAT: str = "langevin"
-    """default value for the algorithm of the thermostat."""
+    """default value for the algorithm of the thermostat.
+    Change HARDCODE_GAMMA_LN for non-default gamma_ln value"""
 
     DEFAULT_MD_PRESSURE_SCALING: str = "isotropic"
     """default value for the pressure scaling of the md step"""
 
-    DEFAULT_MD_CONSTRAIN: StructureConstraint = None
-    """The default value for the constraint applied in the md step"""
+    DEFAULT_MD_CONSTRAIN = []
+    """The default value for the constraint applied in the md step.
+    Has to be empty in the source code otherwise causes a circular import"""
 
     DEFAULT_MD_RESTART: bool = False
     """The default value for whether restart using v from another md step"""
@@ -147,9 +148,83 @@ class AmberConfig(BaseConfig):
     files. """
     # endregion
 
+    # region == Default values for StructureConstrain ==
+    SUPPORTED_CONSTRAINT_TYPE = ["cartesian_freeze", "backbone_freeze", "distance_constraint",
+                                 "angle_constraint", "dihedral_constraint"]
+
+    DEFAULT_CARTESIAN_FREEZE_WEIGHT = 2.0
+    """the default value for restraint_wt that used in CartesianFreeze.
+    (unit: kcal*mol^-1*A^-2) (form: k(dx)^2 dx is the cartesian coord difference)"""
+
+    DEFAULT_DISANG_FILEPATH = "{mdstep_dir}/0.rs"
+    """the default path for DISANG file in geometry(nmropt) constraint.
+    {mdstep_dir} means it will be replaced my the actually mdstep_dir when 
+    used in a real step"""
+    
+    DEFAULT_DISTANCE_CONSTRAINT_SETTING = {
+        "ialtd" : 0,
+        "r1" : "x-0.25",
+        "r2" : "x-0.05",
+        "r3" : "x+0.05",
+        "r4" : "x+0.25",
+        "rk2": 200.0, "rk3": 200.0,
+    }
+    """the default settings for distance constraint in Amber. (Amber20 manual 27.1)
+    Default using flat-welled linear-edge parabola with flat region span +-0.05A the target distance.
+
+    Supported constraint energy functions (pmemd):
+        (ialtd = 0)
+        >  r1, r2, r3, r4 define a flat-welled parabola which becomes linear beyond a specified distance. i.e.
+        >
+        >     \                       /
+        >      \                     /
+        >       \                   /
+        >        .                 .
+        >          .             .
+        >             ._______.
+        >
+        >       r1    r2      r3   r4
+        >
+        >  "\" = lower bound linear response region 
+        >  "/" = lower bound linear response region 
+        >  "." = parobola (left: rk2(r-r2)^2, rk3(r-r3)^2)
+        >  "_" = flat region
+        >  (from https://ambermd.org/Questions/constraints.html)
+
+        In EnzyHTP, when 'x-###' format is used. The r value is calulated from the target distance d.
+        Otherwise the absolute value is applied.
+
+        TODO add more when used"""
+
+    DEFAULT_ANGLE_CONSTRAINT_SETTING = {
+        "ialtd" : 0,
+        "r1" : "x-30.0",
+        "r2" : "x-10.0",
+        "r3" : "x+10.0",
+        "r4" : "x+30.0",
+        "rk2": 200.0, "rk3": 200.0,
+    }
+    """the default settings for angle constraint in Amber.
+    (see DEFAULT_DISTANCE_CONSTRAINT_SETTING for more details)"""
+
+    DEFAULT_DIHEDRAL_CONSTRAINT_SETTING = {
+        "ialtd" : 0,
+        "r1" : "x-30.0",
+        "r2" : "x-10.0",
+        "r3" : "x+10.0",
+        "r4" : "x+30.0",
+        "rk2": 200.0, "rk3": 200.0,
+    }
+    """the default settings for dihedral constraint in Amber.
+    (see DEFAULT_DISTANCE_CONSTRAINT_SETTING for more details)"""
+    # endregion
+
     # region == hard coded MD options (only changable here) ==
     HARDCODE_CUT = 10.0
     """hard coded `cut` value"""
+
+    HARDCODE_NCYC_RATIO = 0.5
+    """hard coded `ncyc` ratio. ncyc = ratio * maxcyc"""
 
     HARDCODE_NTPR_RATIO = 0.01
     """hard coded `ntpr` ratio. nstlim * ratio = ntpr"""
@@ -157,8 +232,8 @@ class AmberConfig(BaseConfig):
     HARDCODE_GAMMA_LN = 5.0
     """hard coded `gamma_ln` value used when ntt=3"""
 
-    HARDCODE_IWARP = 1
-    """hard coded `iwarp` value"""
+    HARDCODE_IWRAP = 1
+    """hard coded `iwrap` value"""
 
     HARDCODE_IG = -1
     """hard coded `ig` value"""
@@ -170,67 +245,6 @@ class AmberConfig(BaseConfig):
     """hard coded names of md engines of different core types. 
     only changable by editing values here"""
     # endregion
-
-    CONF_HEAT: Dict = {
-        "ntc": 2,
-        "ntf": 2,
-        "cut": 10.0,
-        "nstlim": 20000,
-        "dt": 0.002,
-        "tempi": 0.0,
-        "temp0": 300.0,
-        "ntpr": 0.01,
-        "ntwx": 1,
-        "ntt": 3,
-        "gamma_ln": 5.0,
-        "iwrap": 1,
-        "ntr": 1,
-        "restraintmask": "'@C,CA,N'",
-        "restraint_wt": "2.0",
-        "A_istep2": 0.9,
-        "B_istep1": "A_istep2+1",
-    }
-    """dict() holding the settings for an Amber heating."""
-
-    CONF_EQUI: Dict = {
-        "ntx": 5,
-        "irest": 1,
-        "ntc": 2,
-        "ntf": 2,
-        "cut": 10.0,
-        "nstlim": 500000,
-        "dt": 0.002,
-        "temp0": 300.0,
-        "ntpr": 0.002,
-        "ntwx": 5000,  # default 10ps (TODO support different power numbers)
-        "ntt": 3,
-        "gamma_ln": 5.0,
-        "iwrap": 1,
-        "ntr": 1,
-        "restraintmask": "'@C,CA,N'",
-        "restraint_wt": 2.0,  # the later two are only used when ntr = 1
-    }
-    """dict() holding the settings for an Amber constant pressure equilibration run."""
-
-    CONF_PROD: Dict = {
-        "ntx": 5,
-        "irest": 1,
-        "ntc": 2,
-        "ntf": 2,
-        "cut": 10.0,
-        "nstlim": 50000000,
-        "dt": 0.002,
-        "temp0": 300.0,
-        "ntpr": 0.001,
-        "ntwx": 5000,  # default 10ps
-        "ntt": 3,
-        "gamma_ln": 5.0,
-        "iwrap": 1,
-        "ntr": 0,
-        "restraintmask": None,
-        "restraint_wt": 2.0,  # the later two are only used when ntr = 1
-    }
-    """dict() holding the settings for an Amber constant pressure production run."""
 
     RADII_MAP: Dict = {'1': 'mbondi', '2': 'mbondi2', '5': 'mbondi2', '7': 'bondi', '8': 'mbondi3'}
     """dict() holding the radii mapping for the IGB solvation model."""
