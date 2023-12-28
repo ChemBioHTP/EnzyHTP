@@ -223,6 +223,9 @@ class AmberConfig(BaseConfig):
     HARDCODE_CUT = 10.0
     """hard coded `cut` value"""
 
+    HARDCODE_NCYC_RATIO = 0.5
+    """hard coded `ncyc` ratio. ncyc = ratio * maxcyc"""
+
     HARDCODE_NTPR_RATIO = 0.01
     """hard coded `ntpr` ratio. nstlim * ratio = ntpr"""
 
