@@ -27,6 +27,7 @@ SUB_MODULES=[
         'enzy_htp.structure.structure_operation',
         'enzy_htp.structure.structure_region',
         'enzy_htp.structure.structure_selection',
+        'enzy_htp.structure.structure_selection_class',
         'enzy_htp.structure.structure_constraint',
         'enzy_htp.preparation',
         'enzy_htp.mutation',
@@ -39,7 +40,7 @@ if __name__ == '__main__':
     #TODO add entry points for executables
     setup(
         name='enzy_htp',
-        version='0.1.1',
+        version='0.2.0',
         description='TODO',
         author='EnzyHTP Authors',
         author_email='zhongyue.yang@vanderbilt.edu',
