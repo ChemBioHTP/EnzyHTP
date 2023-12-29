@@ -83,7 +83,7 @@ class MolDynStep(ABC):
         pass
 
     @abstractmethod
-    def translate(self) -> MolDynResult:
+    def translate(self, egg: MolDynResultEgg) -> MolDynResult:
         """the method convert engine specific results to general output"""
         pass
 
