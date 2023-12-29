@@ -12,7 +12,12 @@ from typing import Any, Union, List, Dict, Callable
 
 from enzy_htp._interface.handle_types import QMSinglePointEngine, QMOptimizeEngine
 from enzy_htp.electronic_structure import EletronicStructure
-from enzy_htp.structure import Structure, StructureEnsemble, StructureRegion
+from enzy_htp.structure import (
+    Structure,
+    StructureEnsemble,
+    StructureRegion,
+    StructureConstraint
+)
 from enzy_htp.chemical import QMLevelofTheory, LevelofTheory
 from enzy_htp.core.logger import _LOGGER
 import enzy_htp.core.job_manager as armer
@@ -22,6 +27,7 @@ def single_point(
         engine: str, # always acknowledge the engine
         # single region case option
         method: QMLevelofTheory = None, # single region has to be QM
+        constraints: List[StructureConstraint] = None,
         # multi region case option
         regions: List[str]= None,
         region_methods: List[LevelofTheory]= None,
@@ -144,6 +150,7 @@ def single_point(
         qm_engine: QMSinglePointEngine = qm_engine_ctor(
                                             region=qm_region,
                                             method=qm_method,
+                                            constraints=constraints,
                                             keep_geom=True,
                                             cluster_job_config=cluster_job_config,
                                         )
@@ -156,6 +163,7 @@ def single_point(
                         regions=regions,
                         region_methods=region_methods,
                         embedding_method=embedding_method,
+                        constraints=constraints,
                         keep_geom=True,
                         cluster_job_config=cluster_job_config,
                     )
