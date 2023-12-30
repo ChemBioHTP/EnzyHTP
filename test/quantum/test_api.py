@@ -47,7 +47,7 @@ def test_single_point_gaussian_lv1():
         method=test_method,
         cluster_job_config=cluster_job_config,
         job_check_period=10,
-        )
+    )
 
 @pytest.mark.accre
 def test_single_point_gaussian_lv2():

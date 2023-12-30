@@ -10,6 +10,7 @@ Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2023-10-28"""
 from typing import Any, Union, List, Dict, Callable
 
+from enzy_htp import interface
 from enzy_htp._interface.handle_types import QMSinglePointEngine, QMOptimizeEngine
 from enzy_htp.electronic_structure import EletronicStructure
 from enzy_htp.structure import (
@@ -207,9 +208,10 @@ def optimize(stru: Structure):
 
 
 SINGLE_REGION_SINGLE_POINT_ENGINE: Dict[str, Callable] = {
-    "g16": "",
-    "gaussian": "",
-    "gaussian16": ""}
+    "g16": interface.gaussian.build_single_point_engine,
+    "gaussian": interface.gaussian.build_single_point_engine,
+    "gaussian16": interface.gaussian.build_single_point_engine
+}
 """constructors of QMSinglePointEngine for single_point() when only
 1 region is used. full QM."""
 
@@ -217,9 +219,10 @@ SINGLE_REGION_SINGLE_POINT_ENGINE: Dict[str, Callable] = {
 MULTI_REGION_SINGLE_POINT_ENGINE: Dict[str, Callable] = {
     "chemshell": "TODO",
     "chemsh": "TODO",
-    "g16": "",
-    "gaussian": "",
-    "gaussian16": ""}
+    "g16": interface.gaussian.build_qmmm_single_point_engine,
+    "gaussian": interface.gaussian.build_qmmm_single_point_engine,
+    "gaussian16": interface.gaussian.build_qmmm_single_point_engine,
+}
 """constructors of QMSinglePointEngine for single_point() when more than
 1 region is used. multiscale QM."""
 
