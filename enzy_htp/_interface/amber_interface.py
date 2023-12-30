@@ -1944,6 +1944,7 @@ class AmberInterface(BaseInterface):
                 dictionary that assign arguments for ClusterJob.config_job
                 For `res_keywords` it works as it updates the default dict in ARMerConfig.MD_GPU_RES or
                 ARMerConfig.MD_CPU_RES depending on the core_type.
+                NOTE that it is also used to config resources even if local run is specified.
                 key list: [cluster, res_keywords]
             if_report:
                 whether report result (i.e.: trajectory) of this step.
