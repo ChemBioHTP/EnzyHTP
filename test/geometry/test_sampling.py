@@ -1,6 +1,6 @@
 """Testing enzy_htp.geometry.sampling.py
-Author
-Date
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
+Date: 2023-09-25
 """
 
 import glob
