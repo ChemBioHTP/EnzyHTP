@@ -97,12 +97,23 @@ def single_point(
 
     Engines that we plan (or already) to support:
         Gaussian:
+            + best optimization method, fast convergence.
+            + stable and robust
+            + huge community
         XTB:
+            + gfn-xTB series methods fast and relatively accurate.
+            + crest conformational search tool.
         Orca:
+            + DLPNO-CCSD(T) practicable gold standard method
+            + NEB for double ended TS search
         pySCF:
+            + python interface
+            + fastest SCF
         QChem:
+            + EDA
         ChemShell:
-        TODO can we really comment on them as we did for other APIs?"""
+            + Multiscale QM/MM
+            + python interface"""
     
     # init
     # dispatch: stru -> stru_esm
