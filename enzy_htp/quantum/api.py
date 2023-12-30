@@ -28,7 +28,6 @@ def single_point(
         engine: str, # always acknowledge the engine
         # single region case option
         method: QMLevelofTheory = None, # single region has to be QM
-        constraints: List[StructureConstraint] = None,
         # multi region case option
         regions: List[str]= None,
         region_methods: List[LevelofTheory]= None,
@@ -155,14 +154,13 @@ def single_point(
         # stru_region
         if not regions:
             # whole
-            qm_region = StructureRegion.from_whole_stru(stru_esm.topology)
+            qm_region = None
         else:
             qm_region = StructureRegion.from_selection_pattern(regions[0], stru_esm.topology)
 
         qm_engine: QMSinglePointEngine = qm_engine_ctor(
                                             region=qm_region,
                                             method=qm_method,
-                                            constraints=constraints,
                                             keep_geom=True,
                                             cluster_job_config=cluster_job_config,
                                         )
@@ -175,7 +173,6 @@ def single_point(
                         regions=regions,
                         region_methods=region_methods,
                         embedding_method=embedding_method,
-                        constraints=constraints,
                         keep_geom=True,
                         cluster_job_config=cluster_job_config,
                     )

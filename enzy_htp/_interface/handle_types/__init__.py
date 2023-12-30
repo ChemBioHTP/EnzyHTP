@@ -10,4 +10,4 @@ Date: 2023-09-19
 from .mol_dyn_step import MolDynStep
 from .mol_dyn_parameterizer import MolDynParameterizer, MolDynParameter
 from .mol_dyn_result import MolDynResult, MolDynResultEgg
-from .qm_engine import QMOptimizeEngine, QMSinglePointEngine
+from .qm_engine import QMOptimizeEngine, QMSinglePointEngine, QMResultEgg

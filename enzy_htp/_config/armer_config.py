@@ -25,11 +25,11 @@ class ARMerConfig(BaseConfig):
         QMCLUSTER_CPU_RES: dict() default resource settings for QM cluster jobs.
     """
 
-    QMCLUSTER_CPU_RES: dict = {
+    QM_SPE_CPU_RES: dict = {
         'core_type' : 'cpu',
         'nodes':'1',
         'node_cores' : '8',
-        'job_name' : 'QMCluster_EnzyHTP',
+        'job_name' : 'QM_SPE_EnzyHTP',
         'partition' : '<fillthis>',
         'mem_per_core' : '3G', # in GB. Will used in gjf as downward round up after * 1024 and will - 1000 after multiple with cores
         'walltime' : '3-00:00:00',

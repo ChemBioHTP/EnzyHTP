@@ -8,7 +8,8 @@ from dataclasses import dataclass
 
 @dataclass
 class LevelofTheory:
-    _type: str
+    def lot_type(self) -> str:
+        return None
 
 @dataclass
 class QMLevelofTheory(LevelofTheory):
@@ -16,10 +17,14 @@ class QMLevelofTheory(LevelofTheory):
     method: str
     solvent: str
     solv_method: str
-    _type: str = "qm"
+
+    def lot_type(self) -> str:
+        return "qm"
 
 @dataclass
 class MMLevelofTheory(LevelofTheory):
     force_field: str
     ligand_method: str
-    _type: str = "mm"
+
+    def lot_type(self) -> str:
+        return "mm"

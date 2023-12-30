@@ -1,7 +1,18 @@
-"""Defines a GaussianInterface class that serves as a bridge for enzy_htp to utilize Gaussian software. This serves
-as a wrapper for all functionality provided by the Gaussian software package. Behavior is partially controlled by 
-the GaussianConfig class owned by the interface. Supported operations include:
-	+ QM Clustering
+"""Defines a GaussianInterface class that serves as a bridge for enzy_htp to 
+utilize Gaussian software. This serves as a wrapper for all functionality provided
+by the Gaussian software package. Behavior is partially controlled by the 
+GaussianConfig class owned by the interface. Supported operations include:
+	+ build_single_point_engine
+
+Note that this interface is designed for Gaussian 16. The support for Gaussian 09
+is uncertain. Major difference:
+(new)
+- opt=recalc
+- MN15 functional
+- geom=GIC
+(default change)
+- int=ACC2E=12 int=UltraFine 
+
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-11
@@ -11,19 +22,130 @@ from typing import List, Tuple, Dict, Union
 from plum import dispatch
 
 from .base_interface import BaseInterface
+from .handle_types import (
+    QMSinglePointEngine,
+    QMOptimizeEngine,
+    QMResultEgg
+)
 
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import env_manager as em
 from enzy_htp.core.logger import _LOGGER
-from enzy_htp.structure import Structure, PDBParser, Residue
+from enzy_htp.core.job_manager import ClusterJob
+from enzy_htp.chemical import QMLevelofTheory, MMLevelofTheory
+from enzy_htp.electronic_structure import EletronicStructure
+from enzy_htp.structure import (
+    Structure, 
+    PDBParser, 
+    Residue,
+    StructureConstraint,
+    StructureRegion,
+)
 from enzy_htp._config.gaussian_config import GaussianConfig, default_gaussian_config
 from enzy_htp import config as eh_config
 
 
+class GaussianSinglePointEngine(QMSinglePointEngine):
+    """The single point engine of Gaussian. QM only. Configures with
+    method:
+        the level of theory as QMLevelofTheory()
+    region:
+        the qm region as a StructureRegion()
+    keep_geom:
+        whether keep/store the geometry in the result.
+    cluster_job_config:
+        used to make ClusterJob.
+    """
+    def __init__(self,
+                interface,
+                method: QMLevelofTheory,
+                region: StructureRegion,
+                keep_geom: bool,
+                name: str,
+                capping_method: str,
+                cluster_job_config: Dict,
+                keep_in_file: bool,
+                work_dir: str,
+                ):
+        self._parent_interface = interface
+        self._method = method
+        self._region = region
+        self._keep_geom = keep_geom
+        self._name = name
+        self._capping_method = capping_method
+        self._cluster_job_config = cluster_job_config
+        self._keep_in_file = keep_in_file
+        self._work_dir = work_dir
+
+    # region == attribute ==
+    @property
+    def engine(self) -> str:
+        """the engine name that should be hardcoded in each concrete class"""
+        return "gaussian16"
+
+    @property
+    def parent_interface(self):
+        """getter for _parent_interface"""
+        return self._parent_interface
+
+    @property
+    def method(self) -> QMLevelofTheory:
+        """getter for _method"""
+        return self._method
+
+    @property
+    def region(self) -> StructureRegion:
+        """getter for _region"""
+        return self._region
+
+    @property
+    def keep_geom(self) -> bool:
+        """getter for _keep_geom"""
+        return self._keep_geom
+
+    @property
+    def name(self) -> str:
+        """getter for _name"""
+        return self._name
+
+    @property
+    def capping_method(self) -> str:
+        """getter for _capping_method"""
+        return self._capping_method
+
+    @property
+    def cluster_job_config(self) -> Dict:
+        """getter for _cluster_job_config"""
+        return self._cluster_job_config
+
+    @property
+    def keep_in_file(self) -> bool:
+        """getter for _keep_in_file"""
+        return self._keep_in_file
+
+    @property
+    def work_dir(self) -> str:
+        """getter for _work_dir"""
+        return self._work_dir
+    # endregion
+
+    def make_job(self, stru: Structure) -> Tuple[ClusterJob, QMResultEgg]:
+        """the method that make a ClusterJob that runs the QM"""
+        pass
+
+    def run(self, stru: Structure) -> EletronicStructure:
+        """the method that runs the QM"""
+        pass
+
+    def translate(self, egg: QMResultEgg) -> EletronicStructure:
+        """the method convert engine specific results to general output"""
+        pass
+
 class GaussianInterface(BaseInterface):
-    """TODO(CJ)
+    """The interface between Gaussian16 and EnzyHTP.
+
     Attributes:
-        config_:
+        config_: the configuration of the interface.
         env_manager_ : The EnvironmentManager() class which ensure all required environment elements exist.
         compatible_env_ : A bool() indicating if the current environment is compatible with the object itself.
     """
@@ -37,11 +159,125 @@ class GaussianInterface(BaseInterface):
     # region == general Gaussian app interface ==
 
     def run_gaussian(self):
+        """interface for running g16"""
         pass
-    
+
+    def make_gaussian_cmd(self):
+        """function for making the command line that use g16.
+        Used for both running locally and make_job in different engines."""
+        pass
+
+    def run_formchk(self):
+        """interface for running formchk"""
+        raise Exception("TODO")
+
+    def run_cubegen(self):
+        """interface for running cubegen"""
+        raise Exception("TODO")
+
     # endregion
 
     # region == engines ==
+    def build_single_point_engine(
+            self,
+            # calculation config
+            method: QMLevelofTheory = "default",
+            region: StructureRegion = None,
+            keep_geom: bool = "default",
+            # calculation config (alternative)
+            gjf_file: str = None,
+            # execution config
+            name: str = "default",
+            capping_method: str = "default",
+            cluster_job_config: Dict = "default",
+            keep_in_file: bool = False,
+            work_dir: str = "default",
+        ) -> GaussianSinglePointEngine:
+        """constructor for GaussianSinglePointEngine(). Config everything for a single
+        point calculation besides the actual geometry.
+        Args:
+            method:
+                the level of theory as QMLevelofTheory()
+            region:
+                the qm region as a StructureRegion()
+            keep_geom:
+                whether keep/store the geometry in the result.
+            gjf_file:
+                The input file in Gaussian format. (.gjf) These files configures Gaussian execution.
+                If used, settings are parsed to
+                    method
+                    region
+                    keep_geom
+                Note that these parsed settings can be overwritten by explicitly assign arguments.
+            cluster_job_config:
+                dictionary that assign arguments for ClusterJob.config_job
+                For `res_keywords` it works as it updates the default dict in ARMerConfig.MD_GPU_RES or
+                ARMerConfig.MD_CPU_RES depending on the core_type.
+                NOTE that it is also used to config resources (num cores, core type) even if local run is specified.
+                key list: [cluster, res_keywords]
+            keep_in_file:
+                whether the function will keep the .gjf file after completion.
+            work_dir:
+                the working dir that contains all the temp/result files.
+        Return:
+            GaussianSinglePointEngine()"""
+        # TODO support parse from gjf file
+        if gjf_file is not None:
+            # parsed form {gjf_file}
+            # they are parsed because GaussianInterface doesn't only use it for generating .gjf files
+            # but also needs to be parsed to other QMEngine when needed.
+            # (e.g.: config XTB job using Gaussian .gjf files)
+            gjf_config = self.read_from_gjf(gjf_file)
+            method_gjf = gjf_config.get("method", None)
+            region_gjf = gjf_config.get("region", None)
+            keep_geom_gjf = gjf_config.get("keep_geom", None)
+
+            # only use when not explicitly specified
+            if method == "default" and method_gjf is not None:
+               method = method_gjf
+            if region is None and region_gjf is not None:
+               region = region_gjf
+            if keep_geom == "default" and keep_geom_gjf is not None:
+               keep_geom = keep_geom_gjf
+        
+        # init default values
+        type_hint_sticker: GaussianConfig
+        if name == "default":
+            name = self.config()["DEFAULT_SPE_NAME"]
+        if method == "default":
+            method = self.config()["DEFAULT_SPE_METHOD"]
+        if keep_geom == "default":
+            keep_geom = self.config()["DEFAULT_SPE_KEEP_GEOM"]
+        if capping_method == "default":
+            capping_method = self.config()["DEFAULT_SPE_CAPPING_METHOD"]
+        if cluster_job_config == "default":
+            cluster_job_config = self.config().get_default_qm_spe_cluster_job()
+        else:
+            # For res_keywords, it updates the default config
+            res_keywords_update = cluster_job_config["res_keywords"]
+            default_res_keywords = self.config().get_default_qm_spe_cluster_job_res_keywords()
+            cluster_job_config["res_keywords"] = default_res_keywords | res_keywords_update
+        if work_dir == "default":
+            work_dir = self.config()["DEFAULT_SPE_WORK_DIR"]
+
+        return GaussianSinglePointEngine(
+            interface = self,
+            method = method,
+            region = region,
+            keep_geom = keep_geom,
+            name = name,
+            capping_method = capping_method,
+            cluster_job_config = cluster_job_config,
+            keep_in_file = keep_in_file,
+            work_dir = work_dir,
+        )        
+
+    def build_qmmm_single_point_engine():
+        raise Exception("TODO")
+
+    # endregion
+
+    # region == TODO ==
     @dispatch
     def gaussain_optimize(self, stru: str, *args, **kwargs) -> str:
         """dispatch for using gout file as input"""
@@ -66,40 +302,6 @@ class GaussianInterface(BaseInterface):
         """"""
         raise Exception("TODO")
 
-
-    @dispatch
-    def gaussain_single_point(self, stru: str, *args, **kwargs) -> str:
-        """dispatch for using gout file as input"""
-        # san check
-        supported_format = [".log",".out"]
-        if not Path(stru).exists():
-            _LOGGER.error(f"file dont exist: {stru}")
-            raise ValueError
-        if fs.get_file_ext(stru) not in supported_format:
-            _LOGGER.error(f"file type not support: {stru} (supported: {supported_format})")
-            raise ValueError
-        
-        # stru = GOUTParser.get_structure(stru, frame="last")
-        raise Exception("TODO")
-
-
-    @dispatch
-    def gaussain_single_point(self, stru: Union[Residue, Structure],
-                          out_file: str, method: str,
-                          cluster_job_config: Dict,
-                          addition_output: bool=False,) -> str:
-        """"""
-        raise Exception("TODO")
-    # endregion
-
-
-    @dispatch
-    def _(self):
-        """
-        dummy method for dispatch
-        """
-        pass
-    # region == TODO ==
     def PDB2QMMM(
         self,
         o_dir="",
@@ -146,7 +348,7 @@ class GaussianInterface(BaseInterface):
         n_cores     : Cores for gaussian job (higher pirority)
         max_core    : Per core memory in MB for gaussian job (higher pirority)
         keywords    : a list of keywords that joined together when build
-        layer_preset：default preset id copied to self.layer_preset
+        layer_preset: default preset id copied to self.layer_preset
         layer_atoms : default layer_atoms copied to self.layer_atoms
         *om_lvl     : *(can only be edit manually before loading the module) oniom method level
         """
@@ -522,6 +724,14 @@ class GaussianInterface(BaseInterface):
 
         return (cluster_inputs, chk_outputs)
     # endregion
+
+    @dispatch
+    def _(self):
+        """
+        dummy method for dispatch
+        """
+        pass
+
 
 gaussian_interface = GaussianInterface(None, eh_config._gaussian)
 """The singleton of GaussianInterface() that handles all Gaussian related operations in EnzyHTP
