@@ -596,6 +596,8 @@ def test_write_disang_file():
     ai.write_disang_file(test_dict_list, test_disang)
     assert files_equivalent(test_disang, answer_disang)
 
+    fs.safe_rm(test_disang)
+
 
 def test_parse_md_config_dict_to_raw_wo_cons():
     """test to make sure _parse_md_config_dict_to_raw() works as expected.

@@ -675,6 +675,7 @@ class AmberMDStep(MolDynStep):
 
         # TODO do we need to clear existing rst/nc files? to address issue #95? unit test it
 
+        # TODO running sander/pmemd should go inside AmberInterface. Apply when another function needs it.
         # 3. make cmd
         md_step_cmd, traj_path, mdout_path, mdrst_path = self._make_md_cmd(
             temp_mdin_file,
