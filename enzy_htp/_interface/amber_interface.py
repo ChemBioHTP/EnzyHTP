@@ -627,13 +627,14 @@ class AmberMDStep(MolDynStep):
         cluster = self.cluster_job_config["cluster"]
         res_keywords = self.cluster_job_config["res_keywords"]
         env_settings = cluster.AMBER_ENV[self.core_type.upper()]
+        sub_script_path = fs.get_valid_temp_name(f"{self.work_dir}/submit_{self.name}.cmd")
         job = ClusterJob.config_job(
             commands = md_step_cmd,
             cluster = cluster,
             env_settings = env_settings,
             res_keywords = res_keywords,
             sub_dir = "./", # because path are relative
-            sub_script_path = f"{self.work_dir}/submit_{self.name}.cmd"
+            sub_script_path = sub_script_path,
         )
         job.mimo = { # temp solution before having a 2nd MD engine
             "commands" : [md_step_cmd,],
@@ -872,6 +873,7 @@ class AmberMDStep(MolDynStep):
                 md_names = merged_job.mimo["md_names"] + job.mimo["md_names"]
                 work_dir = merged_job.mimo["work_dir"]
                 merged_mdin = merged_job.mimo["temp_mdin"] + job.mimo["temp_mdin"]
+                sub_script_path = fs.get_valid_temp_name(f"{work_dir}/submit_{'_'.join(md_names)}.cmd")
                 # update merged job
                 merged_job = ClusterJob.config_job(
                     commands = merged_cmds,
@@ -879,7 +881,7 @@ class AmberMDStep(MolDynStep):
                     env_settings = env_settings,
                     res_keywords = res_keywords,
                     sub_dir = sub_dir,
-                    sub_script_path = f"{work_dir}/submit_{'_'.join(md_names)}.cmd"
+                    sub_script_path = sub_script_path,
                 )
                 merged_job.mimo = {
                     "commands" : merged_cmds,
