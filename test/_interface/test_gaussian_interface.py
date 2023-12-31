@@ -82,3 +82,25 @@ def test_build_single_point_engine_res_keywords():
     assert md_step.cluster_job_config["res_keywords"]["mem_per_core"] ==  "3G"
     assert md_step.cluster_job_config["res_keywords"]["walltime"] ==  "3-00:00:00"
     assert md_step.cluster_job_config["res_keywords"]["account"] ==  "yang_lab"
+
+def test_get_method_keyword_from_name():
+    """as name"""
+    test_name = "b3lyp-d3"
+    answer_kw = "b3lyp em=gd3"
+    test_kw = gi.get_method_keyword_from_name(test_name)
+    assert answer_kw == test_kw
+
+    test_name = "b3lyp-d3bj"
+    answer_kw = "b3lyp em=gd3bj"
+    test_kw = gi.get_method_keyword_from_name(test_name)
+    assert answer_kw == test_kw
+
+    test_name = "b3lyp-D3(BJ)"
+    answer_kw = "b3lyp em=gd3bj"
+    test_kw = gi.get_method_keyword_from_name(test_name)
+    assert answer_kw == test_kw
+
+    test_name = "pbe0-D3(BJ)"
+    answer_kw = "pbe1pbe em=gd3bj"
+    test_kw = gi.get_method_keyword_from_name(test_name)
+    assert answer_kw == test_kw
