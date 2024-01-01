@@ -1,9 +1,35 @@
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 from typing import List, Tuple, Dict
-from ..structure import Structure, Residue, Atom
+from ..structure import Structure, Residue, Atom, ResidueDummy
 
 #TODO(CJ): add methylamide -> cterm, acetate -> nterm
+
+# region == APIs ==
+
+def cap_residue_terminals(raw_region, nterm_cap:str=None, cterm_cap:str=None):
+    """cap the raw region composed by whole residues
+    only. In this case, capping only on the terminal
+    of the residue.
+    Args:
+        raw_region: the target StructureRegion object
+        nterm_cap: the cap added to the N-ter
+        cterm_cap: the cap added to the C-ter
+    Return:
+        capped_region: the StructureRegion after capping."""
+    # init
+    if nterm_cap is None:
+        nterm_cap = "CH3"
+
+    if cterm_cap is None:
+        cterm_cap = "CH3"
+
+    # san check (only allow whole residues in the region)
+    for atom in raw_region:
+        pass
+
+
+# endregion
 
 def rotation_matrix_from_vectors(vec1, vec2):
     """ Find the rotation matrix that aligns vec1 to vec2
@@ -28,10 +54,6 @@ def get_h_atom(end:str) -> List[Atom]:
     return [
             Atom({'atom_name': aname, 'x_coord':0.000, 'y_coord': 0.000, 'z_coord':  0.000, 'atom_number':1})
     ]
-
-class _ResidueDummy:
-    def __init__(self, name:str):
-        self.name = name
 
 def get_ch3_atoms(end:str, res_dummy:str) -> List[Atom]:
     """TODO(CJ)"""
