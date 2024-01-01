@@ -61,7 +61,7 @@ def test_build_single_point_engine_default():
     assert md_step.region == None
     assert md_step.cluster_job_config["res_keywords"] == ARMerConfig.QM_SPE_CPU_RES
     assert md_step.keep_geom == True
-    assert md_step.capping_method == "h_cap"
+    assert md_step.capping_method == "res_ter_cap"
 
 def test_build_single_point_engine_res_keywords():
     """as said in the name. Assert several default values
@@ -116,3 +116,29 @@ def test_lot_to_keyword():
     answer_kw = ("HF 6-31G(d) scrf=(SMD, solvent=water)", [], [])
     test_kw = gi.lot_to_keyword(test_lot)
     assert answer_kw == test_kw
+
+def test_get_geom_lines():
+    """as name.
+    answer confirmed using GaussView manually"""
+    test_atoms = sp.get_structure(f"{DATA_DIR}H5J.pdb").atoms
+    answer_lines = [
+        "O         26.31000000     -2.47500000    -48.71100000",
+        "N         26.99300000     -2.19100000    -49.70300000",
+        "O         28.21800000     -1.97000000    -49.63900000",
+        "C         26.34700000     -2.11100000    -50.99500000",
+        "C         24.96800000     -2.35600000    -51.09900000",
+        "H         24.35300000     -2.60600000    -50.24700000",
+        "C         27.13100000     -1.78700000    -52.12100000",
+        "H         28.18900000     -1.61100000    -51.99600000",
+        "C         26.56500000     -1.69700000    -53.38000000",
+        "H         27.16700000     -1.44800000    -54.24200000",
+        "C         25.17500000     -1.93700000    -53.52700000",
+        "C         24.40200000     -2.26500000    -52.36300000",
+        "C         23.03800000     -2.45000000    -52.83000000",
+        "H         22.29200000     -2.70700000    -52.09200000",
+        "N         22.84300000     -2.29500000    -54.05600000",
+        "O         24.50900000     -1.89000000    -54.63400000",
+    ]
+    geom_lines = gi.get_geom_lines(test_atoms, [])
+
+    assert geom_lines == answer_lines
