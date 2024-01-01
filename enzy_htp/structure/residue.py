@@ -338,3 +338,13 @@ class Residue(DoubleLinkedNode):
         return str(self)
 
     #endregion
+
+class ResidueDummy(DoubleLinkedNode):
+    """the residue dummy that link to the real corresponding
+    Residue while not having the children atoms actually in
+    that Residue.
+    This is mainly used in handling cases like capping atoms that
+    does not exists in the real structure."""
+    def __init__(self, real_residue: Residue, atoms: List[Atom]):
+        self.real_residue = real_residue
+        self.atoms = atoms
