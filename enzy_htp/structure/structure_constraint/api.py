@@ -461,8 +461,8 @@ class ResiduePairConstraint(StructureConstraint): # TODO unified the design of s
                 )
         
 
-    def change_topology(self, new_topology: Structure) -> None:
-        """Same as StructureConstraint.change_topology() but with extra steps because of the composite 
+    def change_topology(self, new_topology: Structure) -> None: # TODO this should be change geometry
+        """Same as StructureConstraint.change_topology() (?) but with extra steps because of the composite 
         nature of the class. First, the residue and residue atoms are mapped over. Next, the child constraints
         are mapped over. Last, the atoms are mapped over."""
         

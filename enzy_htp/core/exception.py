@@ -108,3 +108,15 @@ class AmberMDError(Exception):
 class WrongTopology(Exception):
     """Exception corresponding to wrong topology. Mainly used in StructureConstraint"""
     pass
+
+class GaussianError(Exception):
+    """Exception corresponding runtime error of g16 in enzy_htp._interface.gaussian_interface
+    contains a list of error information"""
+
+    def __init__(self, error_info_list, *args) -> None:
+        super().__init__(*args)
+        self.error_info_list = error_info_list
+
+    @property
+    def error_info_str(self) -> str:
+        return "\n".join(self.error_info_list)

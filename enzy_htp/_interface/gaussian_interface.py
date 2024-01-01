@@ -17,9 +17,13 @@ Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-11
 """
+import os
+import re
 from pathlib import Path
 from typing import List, Tuple, Dict, Union
+from dataclasses import dataclass
 from plum import dispatch
+from subprocess import CompletedProcess, SubprocessError
 
 from .base_interface import BaseInterface
 from .handle_types import (
@@ -28,21 +32,49 @@ from .handle_types import (
     QMResultEgg
 )
 
+from enzy_htp.core.exception import GaussianError
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import env_manager as em
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.job_manager import ClusterJob
-from enzy_htp.chemical import QMLevelofTheory, MMLevelofTheory
+from enzy_htp.chemical import QMLevelofTheory, MMLevelofTheory, LevelofTheory
 from enzy_htp.electronic_structure import EletronicStructure
 from enzy_htp.structure import (
     Structure, 
     PDBParser, 
     Residue,
+    Atom,
     StructureConstraint,
+    CartesianFreeze,
     StructureRegion,
 )
 from enzy_htp._config.gaussian_config import GaussianConfig, default_gaussian_config
 from enzy_htp import config as eh_config
+
+@dataclass
+class GaussianQMResultEgg(QMResultEgg):
+    """This class define the result egg of gaussian"""
+    gout_path: str
+    gchk_path: str
+    stru: Structure
+    parent_job: ClusterJob
+
+
+class GaussianChkParser():
+    """parser Gaussian .chk file to wavefunctions
+    Attribute:
+        parent_interface"""
+    def __init__(self, interface: BaseInterface):
+        self.parent_interface = interface
+    
+    def get_mo_coeff(chk_file: str) -> List[List[float]]:
+        """parse MO coefficients information from the chk file"""
+
+    def get_mo_occ(chk_file: str) -> List[float]:
+        """parse MO occupancy information from the chk file"""
+
+    def get_basis_set(chk_file: str) -> str:
+        """extract the basis set information from the chk file"""
 
 
 class GaussianSinglePointEngine(QMSinglePointEngine):
@@ -55,14 +87,22 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
         whether keep/store the geometry in the result.
     cluster_job_config:
         used to make ClusterJob.
-    """
+    engine:
+        Gaussian16
+    parent_interface:
+        GaussianInterface
+    name:
+        the spe task name. Will be part of the file path.
+    keep_in_file:
+        keep gjf file or not
+    work_dir:
+        the working directory"""
     def __init__(self,
                 interface,
                 method: QMLevelofTheory,
                 region: StructureRegion,
                 keep_geom: bool,
                 name: str,
-                capping_method: str,
                 cluster_job_config: Dict,
                 keep_in_file: bool,
                 work_dir: str,
@@ -72,7 +112,6 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
         self._region = region
         self._keep_geom = keep_geom
         self._name = name
-        self._capping_method = capping_method
         self._cluster_job_config = cluster_job_config
         self._keep_in_file = keep_in_file
         self._work_dir = work_dir
@@ -109,11 +148,6 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
         return self._name
 
     @property
-    def capping_method(self) -> str:
-        """getter for _capping_method"""
-        return self._capping_method
-
-    @property
     def cluster_job_config(self) -> Dict:
         """getter for _cluster_job_config"""
         return self._cluster_job_config
@@ -129,17 +163,191 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
         return self._work_dir
     # endregion
 
-    def make_job(self, stru: Structure) -> Tuple[ClusterJob, QMResultEgg]:
-        """the method that make a ClusterJob that runs the QM"""
-        pass
+    def make_job(self, stru: Structure) -> Tuple[ClusterJob, GaussianQMResultEgg]:
+        """the method that makes a ClusterJob that runs the QM"""
+        # 1. input
+        if not isinstance(stru, Structure):
+            _LOGGER.error("only allow Structure as `stru`")
+            raise TypeError
+
+        # 2. make .gjf file
+        fs.safe_mkdir(self.work_dir)
+        temp_gjf_file, gchk_path = self._make_gjf_file(stru)
+
+        # 3. make cmd
+        spe_cmd, gout_path = self.parent_interface.make_spe_cmd(temp_gjf_file)
+
+        # 4. assemble ClusterJob
+        cluster = self.cluster_job_config["cluster"]
+        res_keywords = self.cluster_job_config["res_keywords"]
+        env_settings = cluster.G16_ENV[self.core_type.upper()]
+        sub_script_path = fs.get_valid_temp_name(f"{self.work_dir}/submit_{self.name}.cmd")
+        job = ClusterJob.config_job(
+            commands = spe_cmd,
+            cluster = cluster,
+            env_settings = env_settings,
+            res_keywords = res_keywords,
+            sub_dir = "./", # because path are relative
+            sub_script_path = sub_script_path
+        )
+        job.mimo = { # only used for translate clean up
+            "temp_gin": temp_gjf_file,
+        }
+
+        # 5. make result egg
+        result_egg = QMResultEgg(
+            gout_path = gout_path,
+            gchk_path = gchk_path,
+            stru=stru,
+            parent_job = job,
+        )
+
+        return (job, result_egg)
 
     def run(self, stru: Structure) -> EletronicStructure:
         """the method that runs the QM"""
-        pass
+        # 1. input
+        if not isinstance(stru, Structure):
+            _LOGGER.error("only allow Structure as `stru`")
+            raise TypeError
 
-    def translate(self, egg: QMResultEgg) -> EletronicStructure:
+        # 2. make .gjf file
+        fs.safe_mkdir(self.work_dir)
+        temp_gjf_file, gchk_path = self._make_gjf_file(stru)
+
+        # 3. make cmd
+        spe_cmd, gout_path = self.parent_interface.make_spe_cmd(temp_gjf_file)
+
+        # 4. run cmd
+        spe_cmd_exe = spe_cmd.split(" ")[0]
+        spe_cmd_args = spe_cmd.split(" ")[1:]
+        parent_interface = self.parent_interface
+        this_spe_run = parent_interface.env_manager_.run_command(
+            exe=spe_cmd_exe,
+            args=spe_cmd_args,
+        )
+        self.check_spe_error(gout_path, this_spe_run)
+
+        # 5. make result
+        mo_parser = GaussianChkParser(
+            interface=self.parent_interface)
+        energy_0 = self.get_energy_0(gout_path)
+
+        result = EletronicStructure(
+            energy_0 = energy_0,
+            geometry = stru, 
+            mo = gchk_path,
+            mo_parser = mo_parser, 
+            source="gaussian16",
+        )
+
+        # 6. clean up
+        clean_up_target = []
+        if not self.keep_in_file:
+            clean_up_target.append(temp_gjf_file)
+        fs.clean_temp_file_n_dir(clean_up_target)
+
+        return result
+
+    def translate(self, result_egg: GaussianQMResultEgg) -> EletronicStructure:
         """the method convert engine specific results to general output"""
-        pass
+        gout_path = result_egg.gout_path
+        gchk_path = result_egg.gchk_path
+        parent_job = result_egg.parent_job
+        stru = result_egg.stru
+        mo_parser = GaussianChkParser(
+            interface=self.parent_interface)
+        energy_0 = self.get_energy_0(gout_path)
+
+        # error check
+        self.check_spe_error(gout_path, result_egg.parent_job)
+
+        # clean up
+        clean_up_target = []
+        if not self.keep_in_file:
+            clean_up_target.extend(parent_job.mimo["temp_gin"])
+        fs.clean_temp_file_n_dir(clean_up_target)
+
+        return EletronicStructure(
+            energy_0 = energy_0,
+            geometry = stru, 
+            mo = gchk_path,
+            mo_parser = mo_parser, 
+            source="gaussian16",
+        )
+
+    def check_spe_error(self,
+                        gout_file: str,
+                        stdstream_source: Union[ClusterJob,
+                                                CompletedProcess,
+                                                SubprocessError]):
+        """a check for whether an error occurs in spe is needed everytime before generating
+        a EletronicStructure.
+        Possible Gaussian error info places:
+        1. stdout/stderr
+        2. gout file
+        The ultimate goal is to summarize each error type and give suggestions."""
+        if not self.parent_interface.is_gaussian_completed(gout_file):
+            # collect error info
+            error_info_list = []
+            # 1. stdout stderr
+            # error types: Fall of bus, periodic box has changed too much, illegel mem
+            if isinstance(stdstream_source, ClusterJob):
+                with open(stdstream_source.job_cluster_log) as f:
+                    stderr_stdout = f.read()
+                    error_info_list.append(f"stdout/stderr(from job log):{os.linesep*2}{stderr_stdout}")
+            elif isinstance(stdstream_source, CompletedProcess):
+                error_info_list.append(f"stdout:{os.linesep*2}{stdstream_source.stdout}")
+                error_info_list.append(f"stderr:{os.linesep*2}{stdstream_source.stderr}")
+            elif isinstance(stdstream_source, SubprocessError):
+                error_info_list.append(f"stdout:{os.linesep*2}{stdstream_source.stdout}")
+                error_info_list.append(f"stderr:{os.linesep*2}{stdstream_source.stderr}")
+            else:
+                _LOGGER.error("Only allow ClusterJob, CompletedProcess, SubprocessError as input types for `stdstream_source`")
+                raise TypeError
+            # 2. gout file
+            # TODO finish this with a real example
+
+            _LOGGER.error(f"Gaussian SPE didn't finish normally.{os.linesep}{os.linesep.join(error_info_list)}")
+            raise GaussianError(error_info_list)
+
+    def _make_gjf_file(self, stru: Structure) -> Tuple[str]:
+        """make a temporary gjf file.
+        *path* is based on self.work_dir and self.name.
+        If the file exists, will change the filename to {self.name}_{index}.in
+        The index start from 1.
+        *content* is based on attributes of the instance.
+
+        Return: the path of the temp gjf file."""
+        # path
+        temp_gjf_file_path = fs.get_valid_temp_name(f"{self.work_dir}/{self.name}.gjf")
+        temp_chk_file_path = temp_gjf_file_path.replace(".gjf",".chk")
+
+        # content
+        res_keywords = self.cluster_job_config["res_keywords"]
+        num_core = int(res_keywords["node_cores"])
+        mem_per_core = int(res_keywords["mem_per_core"].rstrip('GB')) 
+        mem = (num_core * mem_per_core) - 1 # GB
+        if mem < 1:
+            _LOGGER.error(f"You need at least 1 GB memory to run a Gaussian job.")
+            raise ValueError
+        additional_keywords = []
+        if self.keep_geom:
+            additional_keywords = ["nosymm"]
+
+        self.parent_interface.write_to_gjf(
+            out_path = temp_gjf_file_path,
+            gchk_path = temp_chk_file_path,
+            num_core = num_core,
+            mem = mem,
+            method = self.method,
+            job_type = "spe",
+            additional_keyword = additional_keywords,
+            stru = stru,
+        )
+
+        return temp_gjf_file_path, temp_chk_file_path
+
 
 class GaussianInterface(BaseInterface):
     """The interface between Gaussian16 and EnzyHTP.
@@ -156,21 +364,348 @@ class GaussianInterface(BaseInterface):
         """
         super().__init__(parent, config, default_gaussian_config)
 
+    # region == mappers ==
+    METHOD_KEYWORD_MAPPER = {
+        "pbe0" : "pbe1pbe",
+    }
+    """map Schrodinger eq. solving method name to gaussian keyword. mostly record special ones."""
+
+    BASIS_SET_KEYWORD_MAPPER = {
+    }
+    """map basis set name to gaussian keyword."""
+
+    SOLVENT_KEYWORD_MAPPER = {
+    }
+    """map solvent name to gaussian solvent name."""
+
+    SOLV_MODEL_KEYWORD_MAPPER = {
+        "SMD" : "SMD",
+    }
+    """map solvation model name to gaussian keyword."""
+
+    JOB_TYPE_KEYWORD_MAPPER = {
+        "spe" : "",
+        "single_point" : "",
+        "optimization" : "opt",
+        "opt" : "opt",
+        "frequency" : "freq",
+        "freq" : "freq",
+    }
+    """map job_type to gaussian keyword."""
+
+    TAIL_SECTIONS = [
+        "basis_set_spec",
+        "pcm_solv_model",
+    ]
+    "sections after molecule specification in their orders. based on https://gaussian.com/input/?tabid=0 section ordering"
+
+    def get_method_keyword_from_name(self, name: str) -> str:
+        """map Schrodinger eq. solving method name to gaussian keyword.
+        return the name itself if not in the mapper"""
+        # em
+        em_part = ""
+        d3_pattern = r"-[dD]3$"
+        d3bj_pattern = r"-[dD]3\(?[bB][jJ]\)?$"
+        name = name.strip()
+        if re.search(d3_pattern, name):
+            name = re.sub(d3_pattern, "", name)
+            em_part = " em=gd3"
+        elif re.search(d3bj_pattern, name):
+            name = re.sub(d3bj_pattern, "", name)
+            em_part = " em=gd3bj"
+
+        result = self.METHOD_KEYWORD_MAPPER.get(name, None)
+        if result is None:
+            result = name
+        result = result + em_part
+
+        return result
+
+    def get_basis_set_keyword_from_name(self, name: str) -> Tuple[str, List[str]]:
+        """map basis set name to gaussian keyword.
+        return the name itself if not in the mapper
+        https://gaussian.com/basissets/
+        http://sobereva.com/60
+        https://www.basissetexchange.org/
+        Returns:
+            the route component
+            the tailing Gen section"""
+        # TODO figure out the design of using gen and genecp when needed
+        # we can use the @filepath function
+        gen_section_lines = []
+
+        result = self.BASIS_SET_KEYWORD_MAPPER.get(name, None)
+        if result is None:
+            result = name
+
+        return result, gen_section_lines
+
+    def get_solvation_keyword_from_name(self, solvent: str, method: str) -> Tuple[str, List[str]]:
+        """map solvation setting to gaussian keyword
+        http://gaussian.com/scrf/?tabid=7
+        http://sobereva.com/327"""
+        # TODO figure out the design of using scrf=read probably allow mix solvent or
+        # gaussian non-support solvent
+        # probably fetch the supported solvent list
+        # we can use the @filepath function?
+        sol_read_line = []
+
+        if solvent is None:
+            result = ""
+        else:
+            result_sol = self.SOLVENT_KEYWORD_MAPPER.get(solvent, None)
+            if result_sol is None:
+                result_sol = solvent
+            if method is None:
+                method = self.config()["DEFAULT_SOLVENT_MODEL"]
+                _LOGGER.info(f"using default solvent model: {method}")
+            result_sol_method = self.SOLV_MODEL_KEYWORD_MAPPER.get(method, None)
+            if result_sol_method is None:
+                result_sol_method = method
+            result = f"scrf=({result_sol_method}, solvent={result_sol})"
+
+        return result, sol_read_line
+    # endregion
+
     # region == general Gaussian app interface ==
+    # -- g16 --
+    def get_gaussian_executable(self) -> str:
+        return self.config()["GAUSSIAN_EXE"]
 
-    def run_gaussian(self):
-        """interface for running g16"""
-        pass
+    def make_gaussian_cmd(self, temp_gjf_file_path) -> Tuple[str]:
+        """compile the g16 cmd from config. This is general for all gaussian
+        job types.
+        TODO add more options when needed."""
+        executable = self.parent_interface.get_gaussian_executable()
+        temp_gout_file_path = temp_gjf_file_path.replace(".gjf",".out") # overwrite existing since gjf have unique name
+        cmd = (
+            f"{executable} < {temp_gjf_file_path} > {temp_gout_file_path}"
+        )
+        return cmd, temp_gout_file_path
 
-    def make_gaussian_cmd(self):
-        """function for making the command line that use g16.
-        Used for both running locally and make_job in different engines."""
-        pass
+    def write_to_gjf(
+            self,
+            out_path: str,
+            methods: List[LevelofTheory], # route too
+            # mol spec
+            stru: Structure,
+            stru_regions: List[StructureRegion],
+            constraints: List[StructureConstraint] = None,
+            # link0
+            num_core: str = None,
+            mem: str = None,
+            gchk_path: str = None,
+            # route
+            job_type: str = None,
+            job_type_additional_keyword: List[str] = None,
+            additional_keywords: List[str] = None,
+            geom_all_check: bool = False,
+            # title
+            title: str = "Title",
+            # TODO add more when needed.
+            # be the interface between actual syntax and general concept
+        ) -> str:
+        """function for writing the gaussian input file .gjf
+        format reference: https://gaussian.com/input/?tabid=0
+        This function is used in a general manner for SPE, OPT, and QMMM.
+        Args:
+            out_path:
+                the outputing gjf path.
+            method:
+                the level of theory.
+            stru:
+                the target molecule described by Structure().
+            stru_region:
+                the QM region of the target molecule described by StructureRegion().
+            num_core:
+                the number of cpu used
+            mem:
+                the total memory used
+            gchk_path:
+                the path of the chk file
+            job_type:
+                lowercase job type name
+                defined here: https://gaussian.com/capabilities/?tabid=1
+            job_type_additional_keyword:
+                job type specific keywords that dont have a good general name
+                for example: the stepsize for optimization. 
+            additional_keywords:
+                place holder for keywords that dont have a good general name
+            title:
+                the title
+        Return:
+            (write content to out_path)
+            the gjf file path"""
+        gjf_lines = []
+        tail_sections = {}
 
+        # link 0
+        if num_core:
+            gjf_lines.append(
+                f"%nprocshared={num_core}")
+        if mem:
+            gjf_lines.append(
+                f"%mem={mem}")
+        if gchk_path:
+            gjf_lines.append(
+                f"%chk={gchk_path}")
+        
+        # route
+        if job_type_additional_keyword is None:
+            job_type_additional_keyword = []
+        if additional_keywords is None:
+            additional_keywords = []
+
+        route_line, tail_sections_from_route = self._make_route_line(
+            methods=methods,
+            job_type=job_type,
+            job_type_additional_keyword=job_type_additional_keyword,
+            additional_keywords=additional_keywords,
+            geom_all_check=geom_all_check,
+        )
+        gjf_lines.extend([
+            route_line,
+            "", # need file blank line
+        ])
+        tail_sections = tail_sections | tail_sections_from_route
+
+        if constraints is None:
+            constraints = []
+
+        if not geom_all_check:
+        # title
+            gjf_lines.extend([
+                title,
+                "", # need file blank line
+            ])
+        
+        # mol spec
+            mol_spec_lines = self._make_mol_spec(
+                stru=stru,
+                stru_region=stru_regions,
+                constraints=constraints,
+            )
+            gjf_lines.extend(mol_spec_lines)
+            gjf_lines.append("")
+
+        # TODO tailing section
+        for tail_sec in self.TAIL_SECTIONS:
+            sec_line = tail_sections.get(tail_sec, None)
+            if sec_line is not None:
+                gjf_lines.extend(sec_line)
+
+        fs.write_lines(gjf_lines, out_path)
+
+        return out_path
+
+    def _make_route_line(
+            self,
+            methods: List[LevelofTheory],
+            job_type: str,
+            job_type_additional_keyword: List[str],
+            additional_keywords: str,
+            geom_all_check: bool,
+        ) -> Tuple[str, Dict[str, List]]:
+        """make the route line for args. Only used in write_to_gjf()
+        Return:
+            route_line,
+            tail_sections,"""
+        if len(method) > 1:
+            _LOGGER.error("dont support QMMM & specifying multiple method yet. TODO")
+            raise Exception("TODO")
+        else:
+            # lot_kw
+            method = methods[0]
+            lot_kw, bs_gen_lines, sol_read_line = self.lot_to_keyword(method)
+            # job_type_kw
+            if job_type in self.JOB_TYPE_KEYWORD_MAPPER:
+                job_type_kw = self.JOB_TYPE_KEYWORD_MAPPER[job_type]
+            else:
+                _LOGGER.error(f"specified job_type {job_type} is not supported. Supported list: {self.JOB_TYPE_KEYWORD_MAPPER.keys()}")
+                raise ValueError
+            add_jobtype_kw_section = ""
+            if job_type_additional_keyword:
+                add_jobtype_kw_section = ",".join(job_type_additional_keyword)
+                add_jobtype_kw_section = f"=({add_jobtype_kw_section})"
+            # add_kw
+            add_kw = " ".join(additional_keywords)
+            # result
+            route_line = f"{job_type_kw}{add_jobtype_kw_section} {lot_kw} {add_kw}"
+            if geom_all_check:
+                route_line = f"{route_line} geom=allcheck"
+
+            tail_sections = {
+                "basis_set_spec" : bs_gen_lines,
+                "pcm_solv_model" : sol_read_line,
+            }
+
+            return route_line, tail_sections
+
+    def lot_to_keyword(self, lot: LevelofTheory) -> Tuple[str, List[str], List[str]]:
+        """convert a single level of theory object to gaussian keywords"""
+        bs_gen_lines = []
+        sol_read_line = []
+        if lot.lot_type == "mm":
+            raise Exception("TODO")
+        else:
+            lot: QMLevelofTheory
+            method_kw = self.get_method_keyword_from_name(lot.method)
+            bs_kw, bs_gen_lines = self.get_basis_set_keyword_from_name(lot.basis_set)
+            sol_kw, sol_read_line = self.get_solvation_keyword_from_name(lot.solvent, lot.solv_method)
+            lot_kw = f"{method_kw} {bs_kw} {sol_kw}"
+
+        return lot_kw, bs_gen_lines, sol_read_line
+
+    def _make_mol_spec(
+            self,
+            stru: Structure,
+            stru_region: StructureRegion,
+            constraints: StructureConstraint
+        ) -> List[str]:
+        """only cartesian freeze from constraints is relevent in this part"""
+        mol_spec_lines = []
+        # chrg spin
+        charge = stru_region.get_net_charge # TODO start here
+        spin = stru_region.get_spin
+        mol_spec_lines.append(f"{charge} {spin}")
+        # geom
+        # deal with constraint
+        cart_freeze = []
+        for cons in constraints:
+            if cons.is_cartesian_freeze:
+                cart_freeze.append(cons)
+        atoms = stru_region.atoms_from_geom(stru)
+        geom_lines = self.get_geom_lines(atoms, cart_freeze)
+        mol_spec_lines.extend(geom_lines)
+
+        return mol_spec_lines
+
+    def get_geom_lines(atoms: List[Atom], cart_freeze: List[CartesianFreeze]) -> List[str]:
+        """get the geometry lines of the mol spec section
+        from a list of atoms. add -1 if it is freeezed"""
+        geom_lines = []
+        if cart_freeze:
+            raise Exception("TODO")
+            cons = merge_cartesian_freeze(cart_freeze)
+            for atom in atoms:
+                if cons.has_atom(atom, geom=atom.root):
+                    atom_line = f"{atom.element:<5} -1 {atom.coord[0]:>15.8f} {atom.coord[1]:>15.8f} {atom.coord[2]:>15.8f}"
+                else:
+                    atom_line = f"{atom.element:<5} {atom.coord[0]:>15.8f} {atom.coord[1]:>15.8f} {atom.coord[2]:>15.8f}"
+                geom_lines.append(atom_line)
+        
+        for atom in atoms: # TODO also support QMMM format
+            atom_line = f"{atom.element:<5} {atom.coord[0]:>15.8f} {atom.coord[1]:>15.8f} {atom.coord[2]:>15.8f}"
+            geom_lines.append(atom_line)
+
+        return geom_lines
+
+    # -- formchk --
     def run_formchk(self):
         """interface for running formchk"""
         raise Exception("TODO")
 
+    # -- cubegen --
     def run_cubegen(self):
         """interface for running cubegen"""
         raise Exception("TODO")
@@ -188,7 +723,6 @@ class GaussianInterface(BaseInterface):
             gjf_file: str = None,
             # execution config
             name: str = "default",
-            capping_method: str = "default",
             cluster_job_config: Dict = "default",
             keep_in_file: bool = False,
             work_dir: str = "default",
@@ -248,8 +782,6 @@ class GaussianInterface(BaseInterface):
             method = self.config()["DEFAULT_SPE_METHOD"]
         if keep_geom == "default":
             keep_geom = self.config()["DEFAULT_SPE_KEEP_GEOM"]
-        if capping_method == "default":
-            capping_method = self.config()["DEFAULT_SPE_CAPPING_METHOD"]
         if cluster_job_config == "default":
             cluster_job_config = self.config().get_default_qm_spe_cluster_job()
         else:
@@ -266,7 +798,6 @@ class GaussianInterface(BaseInterface):
             region = region,
             keep_geom = keep_geom,
             name = name,
-            capping_method = capping_method,
             cluster_job_config = cluster_job_config,
             keep_in_file = keep_in_file,
             work_dir = work_dir,

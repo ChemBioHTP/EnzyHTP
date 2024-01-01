@@ -321,6 +321,18 @@ class Atom(DoubleLinkedNode):
     def is_connected(self) -> bool:
         """check if self is in the connected state"""
         return self._connect is not None
+    
+    def is_mainchain_atom(self) -> bool:
+        """check if self is a mainchain atom.
+        (i.e.: N CA C)"""
+        if self.residue.is_canonical():
+            if self.name in "N CA C".split():
+                return True
+        elif self.residue.is_modified():
+            raise Exception("TODO prob determine start/end atom and deduce mainchain")
+
+        return False
+
     #endregion
 
     #region == Special ==

@@ -37,11 +37,13 @@ class EletronicStructure:
         energy_0: float,
         geometry: Structure,
         mo: str,
-        mo_parser: Any,):
+        mo_parser: Any,
+        source: str = None,):
         self._energy_0 = energy_0
         self._geometry = geometry
         self._mo = mo
         self._mo_parser = mo_parser
+        self._source = source
 
     @property
     def energy_0(self) -> float:
@@ -74,4 +76,7 @@ class EletronicStructure:
         """the basis function set"""
         return self._mo_parser.get_basis_set(self._mo)
     
-    
+    @property
+    def source(self) -> str:
+        """the source of this result"""
+        return self._source

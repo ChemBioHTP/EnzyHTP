@@ -181,7 +181,7 @@ class Residue(DoubleLinkedNode):
         if self.is_modified():
             raise Exception("TODO prob determine start/end atom and deduce mainchain")
         else:
-            atom_names = "C CA N".split()
+            atom_names = "C CA N".split() # TODO do we add CP1 CP2?
             for name in atom_names:
                 result.append(self.find_atom_name(name))
         return result

@@ -104,3 +104,15 @@ def test_get_method_keyword_from_name():
     answer_kw = "pbe1pbe em=gd3bj"
     test_kw = gi.get_method_keyword_from_name(test_name)
     assert answer_kw == test_kw
+
+def test_lot_to_keyword():
+    """as name"""
+    test_lot = QMLevelofTheory(
+        basis_set="6-31G(d)",
+        method="HF",
+        solvent="water",
+        solv_method="SMD",
+    )
+    answer_kw = ("HF 6-31G(d) scrf=(SMD, solvent=water)", [], [])
+    test_kw = gi.lot_to_keyword(test_lot)
+    assert answer_kw == test_kw

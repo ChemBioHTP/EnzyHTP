@@ -31,6 +31,7 @@ def single_point(
         # multi region case option
         regions: List[str]= None,
         region_methods: List[LevelofTheory]= None,
+        capping_method: str = "res_ter_cap",
         embedding_method: str= "mechanical", # TODO probably not a good default choice
         parallel_method: str="cluster_job",
         cluster_job_config: Dict= None,
@@ -58,6 +59,8 @@ def single_point(
             The level of theory of each region.
             This is used when more than 1 region is specified.
             The region and the method is align based on the order.
+        capping_method:
+            the free valence capping method.
         embedding_method:
             The embedding method of multiscale simulation.
             This is used when more than 1 region is specified.
@@ -156,7 +159,10 @@ def single_point(
             # whole
             qm_region = None
         else:
-            qm_region = StructureRegion.from_selection_pattern(regions[0], stru_esm.topology)
+            qm_region = StructureRegion.from_selection_pattern(
+                regions[0],
+                stru_esm.topology,
+                capping_method)
 
         qm_engine: QMSinglePointEngine = qm_engine_ctor(
                                             region=qm_region,

@@ -32,6 +32,12 @@ class GaussianConfig(BaseConfig):
         LAYER_PRESET : int() default ONIOM level for simulation.
         LAYER_ATOMS : list() holding the atom names.
     """
+    DEFAULT_SOLVENT_MODEL: str = "SMD"
+    """default solvent model when a solvent is specificed but not solvent model"""
+
+    GAUSSIAN_EXE: str = "g16"
+    """Variable for the g16 version of Gaussian."""
+
     # region == Default values for build_single_point_engine() ==
     DEFAULT_SPE_NAME: str = "gaussian_spe"
     """The default value for the name tag of the SPE engine"""
@@ -74,12 +80,6 @@ class GaussianConfig(BaseConfig):
     # endregion
 
     # region == TODO ==
-    G16_EXE: str = "g16"
-    """Variable for the g16 version of Gaussian."""
-
-    G09_EXE: str = "g09"
-    """Variable for the g09 version of Gaussian."""
-
     OM_LVL: List[str] = [
         "wb97xd/6-31g(d)",
         "amber=hardfirst",
