@@ -10,6 +10,7 @@ import enzy_htp.core.file_system as fs
 from enzy_htp.chemical.level_of_theory import QMLevelofTheory, MMLevelofTheory
 from enzy_htp._config.armer_config import ARMerConfig
 from enzy_htp.structure import structure_constraint as stru_cons
+from enzy_htp.structure.structure_region import create_region_from_selection_pattern
 from enzy_htp import PDBParser
 from enzy_htp import interface
 from enzy_htp._interface.gaussian_interface import GaussianSinglePointEngine
@@ -143,7 +144,7 @@ def test_get_geom_lines():
 
     assert geom_lines == answer_lines
 
-def test_get_geom_lines_w_cons(): # TODO
+def test_get_geom_lines_w_cons(): # TODO finish this when needed
     """as name.
     answer confirmed using GaussView manually"""
     test_atoms = sp.get_structure(f"{DATA_DIR}H5J.pdb").atoms
@@ -155,7 +156,9 @@ def test_get_geom_lines_w_cons(): # TODO
 def test_make_mol_spec():
     """as name"""
     test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
-    test_stru_region = "TODO"
+    test_stru_region = create_region_from_selection_pattern(
+        "br. (resi 254 around 5)", test_stru
+    )
     constraints = []
     answer = [
 
