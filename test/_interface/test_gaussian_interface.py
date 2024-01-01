@@ -142,3 +142,28 @@ def test_get_geom_lines():
     geom_lines = gi.get_geom_lines(test_atoms, [])
 
     assert geom_lines == answer_lines
+
+def test_get_geom_lines_w_cons(): # TODO
+    """as name.
+    answer confirmed using GaussView manually"""
+    test_atoms = sp.get_structure(f"{DATA_DIR}H5J.pdb").atoms
+    answer_lines = [
+    ]
+    geom_lines = gi.get_geom_lines(test_atoms, ["TODO"])
+    assert False
+
+def test_make_mol_spec():
+    """as name"""
+    test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
+    test_stru_region = "TODO"
+    constraints = []
+    answer = [
+
+    ]
+    test_result = gi._make_mol_spec(
+        test_stru,
+        test_stru_region,
+        constraints,
+    )
+    print(*test_result, sep="\n")
+    # assert test_result == answer
