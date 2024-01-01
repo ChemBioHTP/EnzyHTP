@@ -272,6 +272,7 @@ class Residue(DoubleLinkedNode):
     def is_connected(self) -> bool:
         """check if every atom in the residue have a connect record"""
         return math.prod([atom.is_connected() for atom in self.atoms])
+
     #endregion
 
     #region === Editor ===
@@ -348,3 +349,4 @@ class ResidueDummy(DoubleLinkedNode):
     def __init__(self, real_residue: Residue, atoms: List[Atom]):
         self.real_residue = real_residue
         self.atoms = atoms
+        self.set_children(atoms)

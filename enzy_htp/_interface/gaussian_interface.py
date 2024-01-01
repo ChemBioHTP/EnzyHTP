@@ -594,7 +594,7 @@ class GaussianInterface(BaseInterface):
             if sec_line is not None:
                 gjf_lines.extend(sec_line)
 
-        fs.write_lines(gjf_lines, out_path)
+        fs.write_lines(out_path, gjf_lines)
 
         return out_path
 
@@ -656,7 +656,7 @@ class GaussianInterface(BaseInterface):
 
         return lot_kw, bs_gen_lines, sol_read_line
 
-    def _make_mol_spec(
+    def _make_mol_spec( # TODO start here
             self,
             stru: Structure,
             stru_region: StructureRegion,
@@ -665,7 +665,7 @@ class GaussianInterface(BaseInterface):
         """only cartesian freeze from constraints is relevent in this part"""
         mol_spec_lines = []
         # chrg spin
-        charge = stru_region.get_net_charge # TODO start here
+        charge = stru_region.get_net_charge
         spin = stru_region.get_spin
         mol_spec_lines.append(f"{charge} {spin}")
         # geom
@@ -680,7 +680,7 @@ class GaussianInterface(BaseInterface):
 
         return mol_spec_lines
 
-    def get_geom_lines(atoms: List[Atom], cart_freeze: List[CartesianFreeze]) -> List[str]:
+    def get_geom_lines(self, atoms: List[Atom], cart_freeze: List[CartesianFreeze]) -> List[str]:
         """get the geometry lines of the mol spec section
         from a list of atoms. add -1 if it is freeezed"""
         geom_lines = []

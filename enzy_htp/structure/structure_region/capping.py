@@ -1,7 +1,8 @@
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 from typing import List, Tuple, Dict
-from ..structure import Structure, Residue, Atom, ResidueDummy
+from ..structure import Structure, Residue, Atom
+from ..residue import ResidueDummy
 
 #TODO(CJ): add methylamide -> cterm, acetate -> nterm
 
