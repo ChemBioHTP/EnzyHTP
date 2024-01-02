@@ -17,8 +17,10 @@ from enzy_htp.structure import (
     Structure,
     StructureEnsemble,
     StructureRegion,
-    StructureConstraint
+    StructureConstraint,
+    create_region_from_selection_pattern
 )
+from enzy_htp.structure.structure_operation import init_charge
 from enzy_htp.chemical import QMLevelofTheory, LevelofTheory
 from enzy_htp.core.logger import _LOGGER
 import enzy_htp.core.job_manager as armer
@@ -159,11 +161,12 @@ def single_point(
             # whole
             qm_region = None
         else:
-            qm_region = StructureRegion.from_selection_pattern(
+            qm_region = create_region_from_selection_pattern(
                 regions[0],
                 stru_esm.topology,
                 capping_method)
 
+        init_charge(qm_region)
         qm_engine: QMSinglePointEngine = qm_engine_ctor(
                                             region=qm_region,
                                             method=qm_method,
@@ -174,7 +177,7 @@ def single_point(
         # multiscale
         raise Exception("TODO")
         qm_engine = MULTI_REGION_SINGLE_POINT_ENGINE[engine]
-        regions = [StructureRegion.from_selection_pattern(i, stru_esm.topology) for i in regions]
+        regions = [create_region_from_selection_pattern(i, stru_esm.topology) for i in regions]
         qm_engine = qm_engine_ctor(
                         regions=regions,
                         region_methods=region_methods,
