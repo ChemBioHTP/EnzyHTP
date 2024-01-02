@@ -14,6 +14,7 @@ from ..residue import Residue, ResidueDummy
 from .capping import (
     capping_with_residue_terminals,
     )
+from ..structure_operation.charge import init_charge
 
 from enzy_htp.core.logger import _LOGGER
 
@@ -169,12 +170,15 @@ class StructureRegion:
         }
         region_residues = self.involved_residues
         for res in region_residues:
-            c_side_res = res.c_side_residue()
-            n_side_res = res.n_side_residue()
-            if c_side_res is not None and c_side_res not in region_residues:
-                result["c_ter"].append(res)
-            if n_side_res is not None and n_side_res not in region_residues:
-                result["n_ter"].append(res)
+            if res.is_canonical() or res.is_modified():
+                c_side_res = res.c_side_residue()
+                n_side_res = res.n_side_residue()
+                if c_side_res is not None and c_side_res not in region_residues:
+                    result["c_ter"].append(res)
+                if n_side_res is not None and n_side_res not in region_residues:
+                    result["n_ter"].append(res)
+            else:
+                _LOGGER.warning(f"{res._rtype} found. Not considered")
         return result
 
     def clone(self):
@@ -183,6 +187,16 @@ class StructureRegion:
         result.atoms = [at for at in self.atoms] # same atom but new list
         return result
 
+    def get_net_charge(self) -> int:
+        """get the net charge of the region"""
+        # ncaa: user needs to define
+        # caa: use a mapper from ff14SB)
+        for res in self.involved_residues:
+            pass
+    
+    def get_spin(self) -> int:
+        """get the spin of the region"""
+        pass
     # endregion
 
     # region == checker ==
