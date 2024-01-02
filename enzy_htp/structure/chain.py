@@ -133,6 +133,16 @@ class Chain(DoubleLinkedNode):
         return list(map(lambda x: x.idx, self._residues))
 
     @property
+    def largest_res_idx(self) -> int:
+        """return the largest residue index in the chain"""
+        return max(self.residue_idxs)
+
+    @property
+    def smallest_res_idx(self) -> int:
+        """return the smallest residue index in the chain"""
+        return min(self.residue_idxs)
+
+    @property
     def chain_type(self) -> str:
         """
         Returns:

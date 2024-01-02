@@ -212,6 +212,27 @@ class Residue(DoubleLinkedNode):
                 return True
         return False
 
+    def c_side_residue(self):
+        """get the sibling Residue that connects to the C atom.
+        return None if reached the chain terminal."""
+        result = self.chain.find_residue_idx(self.idx + 1)
+        if result is None:
+            if self.chain.largest_res_idx > self.idx:
+                _LOGGER.warning(f"{self} have no C-side residue but it is not a C-ter."
+                                " Something wrong in your residue indexing. "
+                                "It could be your index is not continous")
+        return result
+
+    def n_side_residue(self):
+        """get the sibling Residue that connects to the N atom
+        return None if reached the chain terminal."""
+        result = self.chain.find_residue_idx(self.idx - 1)
+        if result is None:
+            if self.chain.smallest_res_idx < self.idx:
+                _LOGGER.warning(f"{self} have no N-side residue but it is not a N-ter."
+                                " Something wrong in your residue indexing. "
+                                "It could be your index is not continous")
+        return result
     #endregion
 
     #region === Checker ===

@@ -20,7 +20,8 @@ from enzy_htp.core.math_helper import rotation_matrix_from_vectors
 def capping_with_residue_terminals(raw_region,
                                    nterm_cap:str=None,
                                    cterm_cap:str=None,
-                                   return_copy: bool= False):
+                                   return_copy: bool= False,
+                                   **kwargs):
     """cap the raw region composed by whole residues
     only. In this case, capping only on the terminal
     of the residue. (keyword: res_ter_cap)
@@ -28,6 +29,7 @@ def capping_with_residue_terminals(raw_region,
         raw_region: the target StructureRegion object
         nterm_cap: the cap added to the N-ter
         cterm_cap: the cap added to the C-ter
+        return_copy: whether edit in place or return an capped copy
     Return:
         (if not return_copu, change the region in place)
         capped_region: the StructureRegion after capping."""

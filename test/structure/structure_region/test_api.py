@@ -17,10 +17,10 @@ DATA_DIR = f"{CURR_DIR}/../data/"
 sp = PDBParser()
 
 def test_create_region_from_selection_pattern():
-    """as name"""
+    """as name. TODO complete assert part"""
     test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
     test_stru_region = stru_regi.create_region_from_selection_pattern(
-        "br. (resi 254 around 5)", test_stru
+        test_stru, "br. (resi 254 around 5)"
     )
 
 def test_is_whole_residue_only():

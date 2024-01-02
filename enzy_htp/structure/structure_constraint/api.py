@@ -114,7 +114,7 @@ class StructureConstraint(ABC):
     def clone(self) -> "StructureConstraint":
         """Clones the StructureConstraint with the original target_value."""
         result = type(self).__new__(type(self))
-        result.atoms = self.atoms
+        result.atoms = [at for at in self.atoms]
         result.target_value = self.target_value
         result.params = deepcopy(self.params)
         return result
@@ -123,7 +123,7 @@ class StructureConstraint(ABC):
         """Get a version of the StructureConstraint with the current value as the 
         target value."""
         result = type(self).__new__(type(self))
-        result.atoms = self.atoms
+        result.atoms = [at for at in self.atoms]
         result.target_value = self.current_geometry
         result.params = deepcopy(self.params)
         return result
@@ -302,7 +302,7 @@ class CartesianFreeze(StructureConstraint):
     def clone_from(cls, other: "CartesianFreeze") -> "CartesianFreeze":
         """clone from another CartesianFreeze instance"""
         result = cls.__new__(cls)
-        result.atoms = other.atoms
+        result.atoms = [at for at in other.atoms]
         result.target_value = other.target_value
         result.params = deepcopy(other.params)
         return result

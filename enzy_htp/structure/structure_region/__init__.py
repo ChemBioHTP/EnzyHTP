@@ -3,5 +3,5 @@
 from .api import (
     StructureRegion,
     create_region_from_selection_pattern,
-    create_region_from_residues,
+    create_region_from_residue_keys,
 )

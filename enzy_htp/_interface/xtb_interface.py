@@ -17,7 +17,7 @@ from enzy_htp import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp._config.xtb_config import XTBConfig, default_xtb_config
 from enzy_htp.structure import Structure, Atom, StructureConstraint, PDBParser
-from enzy_htp.structure.structure_region import StructureRegion, create_region_from_residues
+from enzy_htp.structure.structure_region import StructureRegion, create_region_from_residue_keys
 from enzy_htp.structure.structure_constraint import (
     CartesianFreeze,
     DistanceConstraint,
