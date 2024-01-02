@@ -146,6 +146,10 @@ class Atom(DoubleLinkedNode):
     @property
     def charge(self):
         """getter for _charge"""
+        if not self.has_init_charge():
+            _LOGGER.error(f"There are no charge info for {self}. "
+                            "Please initiate it use structure.structure_operation.init_charge()")
+            raise AttributeError
         return self._charge
 
     @charge.setter
@@ -332,6 +336,10 @@ class Atom(DoubleLinkedNode):
             raise Exception("TODO prob determine start/end atom and deduce mainchain")
 
         return False
+    
+    def has_init_charge(self) -> bool:
+        """check if self has charge"""
+        return self._charge is not None        
 
     #endregion
 

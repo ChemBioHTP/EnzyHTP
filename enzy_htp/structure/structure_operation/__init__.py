@@ -20,3 +20,5 @@ from .residue import (
 from .connectivity import (
     init_connectivity
 )
+
+from .charge import init_charge

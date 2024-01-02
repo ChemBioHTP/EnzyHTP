@@ -656,7 +656,7 @@ class GaussianInterface(BaseInterface):
 
         return lot_kw, bs_gen_lines, sol_read_line
 
-    def _make_mol_spec( # TODO start here
+    def _make_mol_spec(
             self,
             stru: Structure,
             stru_region: StructureRegion,
@@ -665,8 +665,8 @@ class GaussianInterface(BaseInterface):
         """only cartesian freeze from constraints is relevent in this part"""
         mol_spec_lines = []
         # chrg spin
-        charge = stru_region.get_net_charge
-        spin = stru_region.get_spin
+        charge = stru_region.get_net_charge()
+        spin = stru_region.get_spin()
         mol_spec_lines.append(f"{charge} {spin}")
         # geom
         # deal with constraint
