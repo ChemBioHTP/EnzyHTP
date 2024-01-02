@@ -38,3 +38,40 @@ def test_is_whole_residue_only_false():
         test_stru, "resi 254 around 5")
     test_raw_region = stru_regi.StructureRegion(atoms=sele.atoms)
     assert not test_raw_region.is_whole_residue_only()
+
+def test_involved_residues_with_free_terminal():
+    """as name"""
+    test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
+    sele = stru_sele.select_stru(
+        test_stru, "resi 2+3+4")
+    test_raw_region = stru_regi.StructureRegion(atoms=sele.atoms)
+    result = test_raw_region.involved_residues_with_free_terminal()
+    assert result["c_ter"] == [test_stru.get("A.4")]
+    assert result["n_ter"] == [test_stru.get("A.2")]
+
+def test_involved_residues_with_free_terminal_double():
+    """test the case that contains residues that have both
+    C and N ter exposed"""
+    test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
+    sele = stru_sele.select_stru(
+        test_stru, "resi 2+5+7")
+    test_raw_region = stru_regi.StructureRegion(atoms=sele.atoms)
+    answer = set([
+        test_stru.get("A.2"),
+        test_stru.get("A.5"),
+        test_stru.get("A.7"),
+    ]
+    )
+    result = test_raw_region.involved_residues_with_free_terminal()
+    assert set(result["c_ter"]) == answer
+    assert set(result["n_ter"]) == answer
+
+def test_involved_residues_with_free_terminal_ter():
+    """test the case using chain terminal residues"""
+    test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
+    sele = stru_sele.select_stru(
+        test_stru, "resi 1+253")
+    test_raw_region = stru_regi.StructureRegion(atoms=sele.atoms)
+    result = test_raw_region.involved_residues_with_free_terminal()
+    assert result["c_ter"] == [test_stru.get("A.1")]
+    assert result["n_ter"] == [test_stru.get("A.253")]
