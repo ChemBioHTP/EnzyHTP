@@ -22,6 +22,7 @@ def test_create_region_from_selection_pattern():
     test_stru_region = stru_regi.create_region_from_selection_pattern(
         test_stru, "br. (resi 254 around 5)"
     )
+    assert len(test_stru_region.atoms) == 335
 
 def test_is_whole_residue_only():
     """as name"""
@@ -75,3 +76,13 @@ def test_involved_residues_with_free_terminal_ter():
     result = test_raw_region.involved_residues_with_free_terminal()
     assert result["c_ter"] == [test_stru.get("A.1")]
     assert result["n_ter"] == [test_stru.get("A.253")]
+
+def test_get_net_charge():
+    """as name"""
+
+def test_atoms_by_residue():
+    "as name. TODO finish this"
+    test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
+    test_stru_region = stru_regi.create_region_from_selection_pattern(
+        test_stru, "br. (resi 254 around 5) or resi 254"
+    )
