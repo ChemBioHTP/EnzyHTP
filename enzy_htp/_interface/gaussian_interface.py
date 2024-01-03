@@ -40,8 +40,8 @@ from enzy_htp.core.job_manager import ClusterJob
 from enzy_htp.chemical import QMLevelofTheory, MMLevelofTheory, LevelofTheory
 from enzy_htp.electronic_structure import EletronicStructure
 from enzy_htp.structure import (
-    Structure, 
-    PDBParser, 
+    Structure,
+    PDBParser,
     Residue,
     Atom,
     StructureConstraint,
@@ -67,7 +67,7 @@ class GaussianChkParser():
         parent_interface"""
     def __init__(self, interface: BaseInterface):
         self.parent_interface = interface
-    
+
     def get_mo_coeff(chk_file: str) -> List[List[float]]:
         """parse MO coefficients information from the chk file"""
 
@@ -236,9 +236,9 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
 
         result = EletronicStructure(
             energy_0 = energy_0,
-            geometry = stru, 
+            geometry = stru,
             mo = gchk_path,
-            mo_parser = mo_parser, 
+            mo_parser = mo_parser,
             source="gaussian16",
         )
 
@@ -271,9 +271,9 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
 
         return EletronicStructure(
             energy_0 = energy_0,
-            geometry = stru, 
+            geometry = stru,
             mo = gchk_path,
-            mo_parser = mo_parser, 
+            mo_parser = mo_parser,
             source="gaussian16",
         )
 
@@ -327,7 +327,7 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
         # content
         res_keywords = self.cluster_job_config["res_keywords"]
         num_core = int(res_keywords["node_cores"])
-        mem_per_core = int(res_keywords["mem_per_core"].rstrip('GB')) 
+        mem_per_core = int(res_keywords["mem_per_core"].rstrip('GB'))
         mem = (num_core * mem_per_core) - 1 # GB
         if mem < 1:
             _LOGGER.error(f"You need at least 1 GB memory to run a Gaussian job.")
@@ -369,30 +369,28 @@ class GaussianInterface(BaseInterface):
 
     # region == mappers ==
     METHOD_KEYWORD_MAPPER = {
-        "pbe0" : "pbe1pbe",
+        "pbe0": "pbe1pbe",
     }
     """map Schrodinger eq. solving method name to gaussian keyword. mostly record special ones."""
 
-    BASIS_SET_KEYWORD_MAPPER = {
-    }
+    BASIS_SET_KEYWORD_MAPPER = {}
     """map basis set name to gaussian keyword."""
 
-    SOLVENT_KEYWORD_MAPPER = {
-    }
+    SOLVENT_KEYWORD_MAPPER = {}
     """map solvent name to gaussian solvent name."""
 
     SOLV_MODEL_KEYWORD_MAPPER = {
-        "SMD" : "SMD",
+        "SMD": "SMD",
     }
     """map solvation model name to gaussian keyword."""
 
     JOB_TYPE_KEYWORD_MAPPER = {
-        "spe" : "",
-        "single_point" : "",
-        "optimization" : "opt",
-        "opt" : "opt",
-        "frequency" : "freq",
-        "freq" : "freq",
+        "spe": "",
+        "single_point": "",
+        "optimization": "opt",
+        "opt": "opt",
+        "frequency": "freq",
+        "freq": "freq",
     }
     """map job_type to gaussian keyword."""
 
@@ -468,6 +466,7 @@ class GaussianInterface(BaseInterface):
             result = f"scrf=({result_sol_method}, solvent={result_sol})"
 
         return result, sol_read_line
+
     # endregion
 
     # region == general Gaussian app interface ==
@@ -480,34 +479,32 @@ class GaussianInterface(BaseInterface):
         job types.
         TODO add more options when needed."""
         executable = self.get_gaussian_executable()
-        temp_gout_file_path = temp_gjf_file_path.replace(".gjf",".out") # overwrite existing since gjf have unique name
-        cmd = (
-            f"{executable} < {temp_gjf_file_path} > {temp_gout_file_path}"
-        )
+        temp_gout_file_path = temp_gjf_file_path.replace(".gjf", ".out")  # overwrite existing since gjf have unique name
+        cmd = (f"{executable} < {temp_gjf_file_path} > {temp_gout_file_path}")
         return cmd, temp_gout_file_path
 
     def write_to_gjf(
-            self,
-            out_path: str,
-            methods: List[LevelofTheory], # route too
-            # mol spec
-            stru: Structure,
-            stru_regions: List[StructureRegion],
-            constraints: List[StructureConstraint] = None,
-            # link0
-            num_core: str = None,
-            mem: str = None,
-            gchk_path: str = None,
-            # route
-            job_type: str = None,
-            job_type_additional_keyword: List[str] = None,
-            additional_keywords: List[str] = None,
-            geom_all_check: bool = False,
-            # title
-            title: str = "Title",
-            # TODO add more when needed.
-            # be the interface between actual syntax and general concept
-        ) -> str:
+        self,
+        out_path: str,
+        methods: List[LevelofTheory],  # route too
+        # mol spec
+        stru: Structure,
+        stru_regions: List[StructureRegion],
+        constraints: List[StructureConstraint] = None,
+        # link0
+        num_core: str = None,
+        mem: str = None,
+        gchk_path: str = None,
+        # route
+        job_type: str = None,
+        job_type_additional_keyword: List[str] = None,
+        additional_keywords: List[str] = None,
+        geom_all_check: bool = False,
+        # title
+        title: str = "Title",
+        # TODO add more when needed.
+        # be the interface between actual syntax and general concept
+    ) -> str:
         """function for writing the gaussian input file .gjf
         format reference: https://gaussian.com/input/?tabid=0
         This function is used in a general manner for SPE, OPT, and QMMM.
@@ -544,15 +541,12 @@ class GaussianInterface(BaseInterface):
 
         # link 0
         if num_core:
-            gjf_lines.append(
-                f"%nprocshared={num_core}")
+            gjf_lines.append(f"%nprocshared={num_core}")
         if mem:
-            gjf_lines.append(
-                f"%mem={mem}GB")
+            gjf_lines.append(f"%mem={mem}GB")
         if gchk_path:
-            gjf_lines.append(
-                f"%chk={gchk_path}")
-        
+            gjf_lines.append(f"%chk={gchk_path}")
+
         # route
         if job_type_additional_keyword is None:
             job_type_additional_keyword = []
@@ -568,7 +562,7 @@ class GaussianInterface(BaseInterface):
         )
         gjf_lines.extend([
             route_line,
-            "", # need file blank line
+            "",  # need file blank line
         ])
         tail_sections = tail_sections | tail_sections_from_route
 
@@ -576,13 +570,13 @@ class GaussianInterface(BaseInterface):
             constraints = []
 
         if not geom_all_check:
-        # title
+            # title
             gjf_lines.extend([
                 title,
-                "", # need file blank line
+                "",  # need file blank line
             ])
-        
-        # mol spec
+
+            # mol spec
             mol_spec_lines = self._make_mol_spec(
                 stru=stru,
                 stru_regions=stru_regions,
@@ -602,13 +596,13 @@ class GaussianInterface(BaseInterface):
         return out_path
 
     def _make_route_line(
-            self,
-            methods: List[LevelofTheory],
-            job_type: str,
-            job_type_additional_keyword: List[str],
-            additional_keywords: str,
-            geom_all_check: bool,
-        ) -> Tuple[str, Dict[str, List]]:
+        self,
+        methods: List[LevelofTheory],
+        job_type: str,
+        job_type_additional_keyword: List[str],
+        additional_keywords: str,
+        geom_all_check: bool,
+    ) -> Tuple[str, Dict[str, List]]:
         """make the route line for args. Only used in write_to_gjf()
         Return:
             route_line,
@@ -638,8 +632,8 @@ class GaussianInterface(BaseInterface):
                 route_line = f"{route_line} geom=allcheck"
 
             tail_sections = {
-                "basis_set_spec" : bs_gen_lines,
-                "pcm_solv_model" : sol_read_line,
+                "basis_set_spec": bs_gen_lines,
+                "pcm_solv_model": sol_read_line,
             }
 
             return route_line, tail_sections
@@ -659,12 +653,7 @@ class GaussianInterface(BaseInterface):
 
         return lot_kw, bs_gen_lines, sol_read_line
 
-    def _make_mol_spec(
-            self,
-            stru: Structure,
-            stru_regions: StructureRegion,
-            constraints: StructureConstraint
-        ) -> List[str]:
+    def _make_mol_spec(self, stru: Structure, stru_regions: StructureRegion, constraints: StructureConstraint) -> List[str]:
         """only cartesian freeze from constraints is relevent in this part"""
         mol_spec_lines = []
         if len(stru_regions) > 1:
@@ -673,7 +662,7 @@ class GaussianInterface(BaseInterface):
         else:
             stru_region = stru_regions[0]
             if stru_region is None:
-                stru_region = create_region_from_full_stru(stru) 
+                stru_region = create_region_from_full_stru(stru)
             # chrg spin
             charge = stru_region.get_net_charge()
             spin = stru_region.get_spin()
@@ -703,12 +692,21 @@ class GaussianInterface(BaseInterface):
                 else:
                     atom_line = f"{atom.element:<5} {atom.coord[0]:>15.8f} {atom.coord[1]:>15.8f} {atom.coord[2]:>15.8f}"
                 geom_lines.append(atom_line)
-        
-        for atom in atoms: # TODO also support QMMM format
+
+        for atom in atoms:  # TODO also support QMMM format
             atom_line = f"{atom.element:<5} {atom.coord[0]:>15.8f} {atom.coord[1]:>15.8f} {atom.coord[2]:>15.8f}"
             geom_lines.append(atom_line)
 
         return geom_lines
+
+    def is_gaussian_completed(self, gout_file: str) -> bool:
+        """determine whether a Gaussian Job is terminated normally.
+        1. check for 'Normal termination'"""
+        if os.path.exists(gout_file):
+            with open(gout_file) as f:
+                return "Normal termination of Gaussian" in f.read()
+        else:
+            return False
 
     # -- formchk --
     def run_formchk(self):
@@ -724,19 +722,19 @@ class GaussianInterface(BaseInterface):
 
     # region == engines ==
     def build_single_point_engine(
-            self,
-            # calculation config
-            method: QMLevelofTheory = "default",
-            region: StructureRegion = None,
-            keep_geom: bool = "default",
-            # calculation config (alternative)
-            gjf_file: str = None,
-            # execution config
-            name: str = "default",
-            cluster_job_config: Dict = "default",
-            keep_in_file: bool = False,
-            work_dir: str = "default",
-        ) -> GaussianSinglePointEngine:
+        self,
+        # calculation config
+        method: QMLevelofTheory = "default",
+        region: StructureRegion = None,
+        keep_geom: bool = "default",
+        # calculation config (alternative)
+        gjf_file: str = None,
+        # execution config
+        name: str = "default",
+        cluster_job_config: Dict = "default",
+        keep_in_file: bool = False,
+        work_dir: str = "default",
+    ) -> GaussianSinglePointEngine:
         """constructor for GaussianSinglePointEngine(). Config everything for a single
         point calculation besides the actual geometry.
         Args:
@@ -778,12 +776,12 @@ class GaussianInterface(BaseInterface):
 
             # only use when not explicitly specified
             if method == "default" and method_gjf is not None:
-               method = method_gjf
+                method = method_gjf
             if region is None and region_gjf is not None:
-               region = region_gjf
+                region = region_gjf
             if keep_geom == "default" and keep_geom_gjf is not None:
-               keep_geom = keep_geom_gjf
-        
+                keep_geom = keep_geom_gjf
+
         # init default values
         type_hint_sticker: GaussianConfig
         if name == "default":
@@ -803,15 +801,15 @@ class GaussianInterface(BaseInterface):
             work_dir = self.config()["DEFAULT_SPE_WORK_DIR"]
 
         return GaussianSinglePointEngine(
-            interface = self,
-            method = method,
-            region = region,
-            keep_geom = keep_geom,
-            name = name,
-            cluster_job_config = cluster_job_config,
-            keep_in_file = keep_in_file,
-            work_dir = work_dir,
-        )        
+            interface=self,
+            method=method,
+            region=region,
+            keep_geom=keep_geom,
+            name=name,
+            cluster_job_config=cluster_job_config,
+            keep_in_file=keep_in_file,
+            work_dir=work_dir,
+        )
 
     def build_qmmm_single_point_engine():
         raise Exception("TODO")
@@ -823,23 +821,26 @@ class GaussianInterface(BaseInterface):
     def gaussain_optimize(self, stru: str, *args, **kwargs) -> str:
         """dispatch for using gout file as input"""
         # san check
-        supported_format = [".log",".out"]
+        supported_format = [".log", ".out"]
         if not Path(stru).exists():
             _LOGGER.error(f"file dont exist: {stru}")
             raise ValueError
         if fs.get_file_ext(stru) not in supported_format:
             _LOGGER.error(f"file type not support: {stru} (supported: {supported_format})")
             raise ValueError
-        
+
         # stru = GOUTParser.get_structure(stru, frame="last")
         raise Exception("TODO")
 
-
     @dispatch
-    def gaussain_optimize(self, stru: Union[Residue, Structure],
-                          out_file: str, method: str,
-                          cluster_job_config: Dict,
-                          addition_output: bool=False,) -> str:
+    def gaussain_optimize(
+        self,
+        stru: Union[Residue, Structure],
+        out_file: str,
+        method: str,
+        cluster_job_config: Dict,
+        addition_output: bool = False,
+    ) -> str:
         """"""
         raise Exception("TODO")
 
@@ -1264,6 +1265,7 @@ class GaussianInterface(BaseInterface):
             self.env_manager_.run_command(self.config_.G16_EXE, ["<", ci, ">", outfile])
 
         return (cluster_inputs, chk_outputs)
+
     # endregion
 
     @dispatch

@@ -41,7 +41,7 @@ def test_single_point_make_job_lv1():
         "res_keywords" : {"account" : "yang_lab_csb",
                          "partition" : "production"}
     }
-    
+
     qm_engine = gi.build_single_point_engine(
         region=None,
         method=test_method,
@@ -535,3 +535,12 @@ def test_make_mol_spec():
         constraints,
     )
     assert set(test_result) == set(answer)
+
+
+def test_is_gaussian_completed():
+    """test as name"""
+    test_gout = f"{DATA_DIR}complete_spe.out"
+    assert gi.is_gaussian_completed(test_gout)
+
+    test_gout = f"{DATA_DIR}incomplete_spe.out"
+    assert not gi.is_gaussian_completed(test_gout)
