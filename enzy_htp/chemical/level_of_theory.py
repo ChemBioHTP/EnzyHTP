@@ -15,8 +15,8 @@ class LevelofTheory:
 class QMLevelofTheory(LevelofTheory):
     basis_set: str
     method: str
-    solvent: str
-    solv_method: str
+    solvent: str = None
+    solv_method: str = None
 
     def lot_type(self) -> str:
         return "qm"
