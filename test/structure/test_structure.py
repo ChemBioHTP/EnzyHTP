@@ -232,3 +232,9 @@ def test_residue_index_mapper(): # TODO
     pdb_file_path = f"{DATA_DIR}1Q4T_ligand_test.pdb"
     stru: Structure = sp.get_structure(pdb_file_path)
     raise Exception("TODO")
+
+def test_is_same_topology():
+    """as name"""
+    test_other = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S_geom_1.pdb")
+    test_self = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
+    assert test_self.is_same_topology(test_other)

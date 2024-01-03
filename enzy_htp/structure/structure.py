@@ -225,6 +225,14 @@ class Structure(DoubleLinkedNode):
             result[residue.key()] = residue
         return result
 
+    @property
+    def residue_mapper_w_name(self) -> Dict[Tuple[str, int, str], Residue]:
+        """return a mapper of {(chain_id, residue_idx, residue_name): Residue (reference)}"""
+        result = {}
+        for residue in self.residues:
+            result[residue.key(if_name=True)] = residue
+        return result
+
     def find_residue_name(self, name) -> List[Residue]:
         """find residues base on its name. Return a list of matching residues"""
         result = list(filter(lambda r: r.name == name, self.residues))
@@ -571,6 +579,25 @@ class Structure(DoubleLinkedNode):
             if res.parent.name == chain and res.idx == rnum:
                 return True
 
+        return False
+
+    def is_same_topology(self, other: Structure) -> bool:
+        """check whether self and other have the same topology.
+        i.e.: the same atom composition, connectivity, and indexing.
+        current algroithm:
+            - (unsorted) same residue order (chain order)
+            - same residue name in order (sequence) 
+            - same atom name in each residue
+
+        NOTE that indexing is redundant but we will have another method
+        to do indexing free mapping/checking."""
+        # same sequences TODO make it more general
+        if self.residue_mapper_w_name.keys() == other.residue_mapper_w_name.keys():
+            for self_res, other_res in zip(self.residues, other.residues):
+                self_atom_names = set(self_res.atom_name_list)
+                other_atom_names = set(other_res.atom_name_list)
+                if self_atom_names == other_atom_names:
+                    return True
         return False
     #endregion
 
