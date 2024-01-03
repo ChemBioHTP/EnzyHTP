@@ -90,6 +90,18 @@ def test_get_net_charge():
     init_charge(test_stru_region)
     assert test_stru_region.get_net_charge() == 0
 
+def test_get_spin():
+    """as name"""
+    test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
+    test_stru.assign_ncaa_chargespin(
+        {"H5J": (0,1)}
+    )
+    test_stru_region = stru_regi.create_region_from_selection_pattern(
+        test_stru, "br. (resi 254 around 5) or resi 254"
+    )
+    # init_spin(test_stru_region)
+    assert test_stru_region.get_spin() == 1
+
 def test_atoms_by_residue(): # TODO
     "as name. TODO finish this"
     test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")

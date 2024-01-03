@@ -210,7 +210,6 @@ class StructureRegion:
         This design is because external software are used for init_charge
         and thus it needs to be above _interface which can only called by
         the Science API layer."""
-        # caa: use a mapper from ff14SB
         net_charge = 0
         for res, atoms in self.atoms_by_residue.items():
             if res.is_noncanonical():
@@ -228,7 +227,7 @@ class StructureRegion:
             for atom in atoms:
                 atom: Atom
                 if not atom.has_init_charge():
-                    _LOGGER.error("Please init_charge(stru_region) before using this function")
+                    _LOGGER.error(f" {atom} dont have charge. Please init_charge(stru_region) before using this function.")
                     raise ValueError
                 net_charge += atom.charge
     
@@ -236,7 +235,21 @@ class StructureRegion:
     
     def get_spin(self) -> int:
         """get the spin of the region"""
-        pass
+        spin = 1
+        if not self.is_whole_residue_only():
+            raise Exception("TODO. add support for init_spin")
+        else:
+            for res in self.involved_residues:
+                if res.is_noncanonical():
+                    res: NonCanonicalBase
+                    if res.multiplicity is None:
+                        _LOGGER.error(
+                            f"NCAA ({res.name}) does not have spin."
+                            " ALWAYS check and explicit assign it using"
+                            " Structure.assign_ncaa_chargespin()")
+                        raise ValueError
+                    spin += res.multiplicity - 1 # m = 2S + 1 = 2S_0 + 2S' + 1 = m_0 + m' - 1
+        return spin
     # endregion
 
     # region == checker ==
