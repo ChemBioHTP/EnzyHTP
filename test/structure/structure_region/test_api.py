@@ -8,6 +8,7 @@ import os
 from enzy_htp import PDBParser
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.general import EnablePropagate
+import enzy_htp.core.file_system as fs
 import enzy_htp.structure.structure_region as stru_regi
 import enzy_htp.structure.structure_selection as stru_sele
 from enzy_htp.structure.structure_operation import init_charge
@@ -15,6 +16,7 @@ from enzy_htp.structure.structure_operation import init_charge
 CURR_FILE = os.path.abspath(__file__)
 CURR_DIR = os.path.dirname(CURR_FILE)
 DATA_DIR = f"{CURR_DIR}/../data/"
+WORK_DIR = f"{CURR_DIR}/../work_dir/"
 sp = PDBParser()
 
 def test_create_region_from_selection_pattern():
@@ -113,3 +115,28 @@ def test_atoms_by_residue(): # TODO
     )
     assert test_stru_region.atoms_by_residue
     assert False
+
+def test_atoms_from_geom(helpers):
+    """as name"""
+    test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
+    test_stru_region = stru_regi.create_region_from_selection_pattern(
+        test_stru, "resi 2+3+4"
+    )
+    test_geom = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S_geom_1.pdb")
+
+    result = test_stru_region.atoms_from_geom(test_geom)
+
+    # test TODO refine this after xyz interface
+    atoms = test_stru_region.atoms
+    test_file = f"{WORK_DIR}test_atom_from_geom_1.xyz"
+    # answer_file = f"{DATA_DIR}answer_atom_from_geom_1.xyz"
+    lines = [
+        str(len(atoms)),
+        "",]
+    for at in atoms:
+        lines.append(f"{at.element} {at.coord[0]} {at.coord[1]} {at.coord[2]}")
+    fs.write_lines(test_file, lines)
+    # assert helpers.equiv_files(test_file, answer_file, consider_order=False)
+
+    # fs.safe_rm(test_file)
+
