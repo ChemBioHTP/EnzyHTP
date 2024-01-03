@@ -4,9 +4,9 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
 Date: 2023-12-30"""
 
+from collections import defaultdict
 from copy import deepcopy
 import numpy as np
-from itertools import groupby
 from typing import Callable, Dict, List, Tuple, Union
 
 from ..structure import Structure, Atom
@@ -18,6 +18,7 @@ from .capping import (
     )
 
 from enzy_htp.core.logger import _LOGGER
+from enzy_htp.core.math_helper import round_by, is_integer
 
 class StructureRegion:
     """this class defines a region inside of Structure()
@@ -26,7 +27,8 @@ class StructureRegion:
     could be capping atoms that does not exist in the original
     Structure().
     This class mainly serves as the abstract model of QM region or
-    regions in multiscale QM/MM.
+    regions in multiscale QM/MM. And note it is a topology level concept
+    that is designed to combine with a set of geometries.
     It handles free valence capping during its creation using .capping
     submodule.
     It handles charge spin determination and atom index mapping. (i.e.: the index in
@@ -140,9 +142,27 @@ class StructureRegion:
         class is only topology related. If create an obj for
         each geom (i.e.: Structure()), we will need to repeat
         those topology operations."""
-        # topology check
-        if self.is_same_topology(geom):
-            pass
+        result = []
+
+        # 1. topology check
+        if not self.is_same_topology(geom):
+            _LOGGER.error(f"geometry ({geom}) does not match region topology!")
+            raise ValueError
+        
+        # 2. find corresponding atoms from geom
+        for res, atoms in self.atoms_by_residue.items():
+            if not res.is_residue_cap():
+                geom_res = geom.residue_mapper[res.key()]
+                for atom in atoms:
+                    geom_atom = geom_res.find_atom_name(atom.name)
+                    result.append(geom_atom)
+
+        # 3. copy caps and align the based on linked residues
+        for cap in self.caps:
+            geom_cap = cap.apply_to_geom(geom)
+            result.extend(geom_cap.atoms)
+
+        return result
     
     @property
     def involved_residues(self) -> List[Residue]:
@@ -167,7 +187,10 @@ class StructureRegion:
     @property
     def atoms_by_residue(self) -> Dict[Residue, List[Atom]]:
         """group atoms in the region by containing residues."""
-        return dict(groupby(self.atoms, key=lambda x: x.parent))
+        result = defaultdict(list)
+        for atom in self.atoms:
+            result[atom.parent].append(atom)
+        return result
 
     def involved_residues_with_free_terminal(self) -> Dict[str, List[Residue]]:
         """get all involved residue that have a terminal free valance
@@ -230,7 +253,12 @@ class StructureRegion:
                     _LOGGER.error(f" {atom} dont have charge. Please init_charge(stru_region) before using this function.")
                     raise ValueError
                 net_charge += atom.charge
-    
+        if is_integer(net_charge, tolerance=0.01):
+            net_charge = round_by(net_charge, 0.5)
+        else:
+            _LOGGER.error(f"getting a non-integer net_charge {net_charge}!")
+            raise ValueError
+
         return net_charge
     
     def get_spin(self) -> int:
@@ -250,6 +278,13 @@ class StructureRegion:
                         raise ValueError
                     spin += res.multiplicity - 1 # m = 2S + 1 = 2S_0 + 2S' + 1 = m_0 + m' - 1
         return spin
+    
+    @property
+    def topology(self) -> Structure:
+        """get the correpsonding Structure() of self"""
+        for atom in self.atoms:
+            if not atom.parent.is_residue_cap():
+                return atom.root()
     # endregion
 
     # region == checker ==
@@ -272,8 +307,7 @@ class StructureRegion:
 
     def is_same_topology(self, geom: Structure) -> bool:
         """determine if the geometry have the same topology with self"""
-        self_top = self.atoms[0].root
-        return self_top.is_same_topology(geom) # TODO add this in Structure
+        return self.topology.is_same_topology(geom)
 
     def is_whole_residue_only(self) -> bool:
         """check whether self contain atoms that composes whole residues

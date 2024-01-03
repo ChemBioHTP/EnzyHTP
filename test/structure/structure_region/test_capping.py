@@ -47,9 +47,12 @@ def test_residue_cap_deepcopy():
     """test the behavior of deepcopy for residue cap"""
     test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
     test_res = test_stru.residues[0]
-    test_ch3 = capping.get_ch3_cap("cterm", test_res)
+    test_res_2 = test_stru.residues[1]
+    test_ch3 = capping.get_ch3_cap("cterm", test_res, test_res.atoms[0], test_res_2.atoms[0])
 
     ch3_copy = deepcopy(test_ch3)
 
     assert ch3_copy.link_residue is not test_res
     assert ch3_copy.link_residue.parent is None
+    assert ch3_copy.plug_atom in ch3_copy.atoms
+    assert ch3_copy.link_atom in ch3_copy.link_residue.atoms

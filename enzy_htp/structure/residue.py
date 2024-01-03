@@ -270,6 +270,10 @@ class Residue(DoubleLinkedNode):
         """Checks if the Residue() is an rd_non_ligand as defined by enzy_htp.chemical.solvent.RD_NON_LIGAND_LIST"""
         return self._rtype == chem.ResidueType.TRASH
 
+    def is_residue_cap(self) -> bool:
+        """Checks if the Residue() is residue_cap"""
+        return self._rtype == chem.ResidueType.RESIDUECAP
+
     def is_missing_chain(self) -> bool:
         """Whether the Residue() lacks a chain parent"""
         return self._parent is None

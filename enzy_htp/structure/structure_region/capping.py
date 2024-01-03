@@ -3,6 +3,8 @@
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
 Date: 2024-1-1"""
+from __future__ import annotations
+from copy import deepcopy
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 from typing import List, Tuple, Dict
@@ -80,14 +82,33 @@ class ResidueCap(Residue):
         link_residue
         children/atoms
         parent = None
+        link_atom:
+            the linking atom in original res
+        socket_atom:
+            the socket from original stru to pluging the cap.
+            the cap is replacing the atom.
+        plug_atom:
+            the pluging in atom in the cap
     
     Property:
         cap_type"""
-    def __init__(self, link_residue: Residue, atoms: List[Atom]):
+    def __init__(self, link_residue: Residue,
+                 link_atom: Atom, socket_atom: Atom,
+                 atoms: List[Atom], plug_atom: Atom):
         self.link_residue = link_residue
+        self.link_atom = link_atom
+        self.socket_atom = socket_atom
+        if link_atom not in link_residue.atoms:
+            _LOGGER.error("link atom must be one of the link residue atoms")
+            raise ValueError
         self.atoms = atoms
+        self.plug_atom = plug_atom
+        if plug_atom not in self.atoms:
+            _LOGGER.error("plug atom must be one of the atoms")
+            raise ValueError
 
         self._idx = None
+        self._name = None
         self._rtype = chem.ResidueType.RESIDUECAP
         self.set_ghost_parent()
         self.set_children(atoms)
@@ -98,11 +119,48 @@ class ResidueCap(Residue):
         _LOGGER.error("using abstract method.")
         raise AttributeError
 
+    @property
+    def cap_bond_vector(self) -> np.array:
+        """return a vector that defines the direction of the capping bond"""
+        result = np.array(self.socket_atom.coord) - np.array(self.link_atom.coord)
+        result /= np.linalg.norm(result)
+        return result
+
     def init_fixed_atomic_charges(self) -> str:
         """init hard coded fixed atomic charges.
         Used when init_charge and fixed charge stragety is used."""
         for atom in self.atoms:
             atom.charge = self.FIXED_CHARGE_MAP[atom.name]
+
+    def is_residue_cap(self) -> bool:
+        """hard coded yes"""
+        return True
+    
+    def restore_default_coord(self):
+        for atom in self.atoms:
+            atom.coord = self.DEFAULT_COORDS[atom.name]
+
+    def apply_to_geom(self, geom: Structure) -> ResidueCap:
+        """make a copy of the cap for geom."""
+        geom_cap = deepcopy(self)
+        geom_cap.link_residue = geom.residue_mapper[self.link_residue.key()]    
+        geom_cap.link_atom = geom_cap.link_residue.find_atom_name(self.link_atom.name)
+        geom_cap.socket_atom = geom.get(self.socket_atom.key)
+        geom_cap.restore_default_coord()
+        # align to the linked residue TODO unify this. also unify the 1,0,0 state somewhere
+        direction = geom_cap.cap_bond_vector
+        p1 = np.array(geom_cap.link_atom.coord)
+        rot_mat = rotation_matrix_from_vectors(np.array([1,0,0]), direction) # TODO is this only works for 1,0,0??
+        bond_distance = self.CAP_BOND_DISTANCE[geom_cap.link_atom.name]
+        for aa in geom_cap.atoms:
+            pt = np.array(aa.coord)
+            # rotation
+            pt = np.transpose(np.matmul(rot_mat, np.transpose( pt  )))
+            aa.coord = pt
+            # transform
+            pt += (direction*bond_distance) + p1
+
+        return geom_cap
 
 
 class CH3Cap(ResidueCap):
@@ -123,6 +181,24 @@ class CH3Cap(ResidueCap):
     } # TODO improve this for non ter.
     """fixed charge for a -CH3 attached to the N/C-ter
     of a residue. Modified from NME and ACE in aminon/ct12.lib"""
+
+    CAP_BOND_DISTANCE = {
+        "N" : 1.5,
+        "C" : 1.5,
+    }
+    """map the name of the link_atom to bond distance"""
+
+    DEFAULT_COORDS = {
+        "CP2"  : (0.000,  0.000,  0.000),
+        "HP21" : (0.360, -1.029,  0.000),
+        "HP22" : (0.360,  0.514,  0.891),
+        "HP23" : (0.360,  0.514, -0.891),
+        "CP1"  : (0.000,  0.000,  0.000),
+        "HP11" : (0.360, -1.029,  0.000),
+        "HP12" : (0.360,  0.514,  0.891),
+        "HP13" : (0.360,  0.514, -0.891),
+    }
+    """TODO improve this"""
 
     @property
     def cap_type(self) -> str:
@@ -147,6 +223,12 @@ class HCap(ResidueCap):
     } # improve this
     """fixed charge for a -H attached to the N/C-ter
     of a residue."""
+
+    CAP_BOND_DISTANCE = {
+        "N" : 1.1,
+        "C" : 1.0,
+    }
+    """map the name of the link_atom to bond distance"""
 
     @property
     def cap_type(self) -> str:
@@ -187,10 +269,12 @@ def cap_residue_free_terminal(
     if cap_name not in SUPPORTED_CAPS:
         _LOGGER.error(f"cap_name {cap_name} not supported. Supported name: {SUPPORTED_CAPS.keys()}")
         raise ValueError
-    cap_atoms = SUPPORTED_CAPS[cap_name](terminal_type, res).atoms
+    cap_atoms = SUPPORTED_CAPS[cap_name](
+        terminal_type, res, start_atom, end_atom).atoms
     cap_bond_distance = get_bond_distance(cap_name, terminal_type)
 
-    # TODO put these in core and strutcure
+    # TODO put these in core and strutcure and in cap classes
+    # TODO make this a method in cap classes
     p1 = np.array(start_atom.coord)
     p2 = np.array(end_atom.coord)
     direction = p2 - p1
@@ -226,13 +310,18 @@ def get_bond_distance(strategy:str, side:str) -> float:
 
     return result
 
-def get_h_cap(end: str, res: Residue) -> HCap:
+def get_h_cap(end: str, res: Residue, 
+              link_atom: Atom, socket_atom: Atom) -> HCap:
     """Args:
     end:
         the pattern of the end it conencts
         This determine the atom name
     res:
         the original residue.
+    link_atom:
+        the linking atom in original res
+    socket_atom:
+        the socket from original stru to pluging the cap
     
     Returns:
         a list of Atom()s in the cap"""
@@ -240,25 +329,34 @@ def get_h_cap(end: str, res: Residue) -> HCap:
         aname = 'HP11'
     elif end == 'cterm':
         aname = 'HP21'
+    atoms = [
+        Atom(
+            {'atom_name': aname,
+            'x_coord':0.000, 'y_coord': 0.000, 'z_coord':  0.000,
+            'element_symbol': "H"},
+        )
+    ]
 
     return HCap(
         link_residue=res,
-        atoms = [
-            Atom(
-                {'atom_name': aname,
-                'x_coord':0.000, 'y_coord': 0.000, 'z_coord':  0.000,
-                'element_symbol': "H"},
-            )
-        ]
+        link_atom=link_atom,
+        socket_atom = socket_atom,
+        plug_atom = atoms[0],
+        atoms = atoms,
     )
 
-def get_ch3_cap(end: str, res: Residue) -> CH3Cap:
+def get_ch3_cap(end: str, res: Residue,
+                link_atom: Atom, socket_atom: Atom) -> CH3Cap:
     """Args:
     end:
         the pattern of the end it conencts
         This determine the atom name
     res:
         the original residue.
+    link_atom:
+        the linking atom in original res
+    socket_atom:
+        the socket from original stru to pluging the cap
     
     Returns:
         a list of Atom()s in the cap"""
@@ -266,15 +364,19 @@ def get_ch3_cap(end: str, res: Residue) -> CH3Cap:
         anames = "CP1 HP11 HP12 HP13".split()
     elif end == 'cterm':
         anames = "CP2 HP21 HP22 HP23".split()
-
+    atoms = [
+        Atom({'atom_name': anames[0], 'x_coord':0.000, 'y_coord': 0.000, 'z_coord':  0.000,'element_symbol': "C"}),
+        Atom({'atom_name': anames[1], 'x_coord':0.360, 'y_coord':-1.029, 'z_coord':  0.000,'element_symbol': "H"}),
+        Atom({'atom_name': anames[2], 'x_coord':0.360, 'y_coord': 0.514, 'z_coord':  0.891,'element_symbol': "H"}),
+        Atom({'atom_name': anames[3], 'x_coord':0.360, 'y_coord': 0.514, 'z_coord': -0.891,'element_symbol': "H"})
+    ]
     return CH3Cap(
         link_residue=res,
-        atoms = [
-            Atom({'atom_name': anames[0], 'x_coord':0.000, 'y_coord': 0.000, 'z_coord':  0.000,'element_symbol': "C"}),
-            Atom({'atom_name': anames[1], 'x_coord':0.360, 'y_coord':-1.029, 'z_coord':  0.000,'element_symbol': "H"}),
-            Atom({'atom_name': anames[2], 'x_coord':0.360, 'y_coord': 0.514, 'z_coord':  0.891,'element_symbol': "H"}),
-            Atom({'atom_name': anames[3], 'x_coord':0.360, 'y_coord': 0.514, 'z_coord': -0.891,'element_symbol': "H"})
-    ])
+        link_atom=link_atom,
+        socket_atom = socket_atom,
+        plug_atom = atoms[0],
+        atoms = atoms,
+    )
 
 SUPPORTED_CAPS: Dict[str, callable] = {
     "CH3" : get_ch3_cap,
