@@ -4,6 +4,7 @@ Date: 2023-12-31
 """
 import pytest
 import os
+from copy import deepcopy
 
 from enzy_htp import PDBParser
 from enzy_htp.core.logger import _LOGGER
@@ -41,3 +42,14 @@ def test_capping_with_residue_terminals(helpers):
     assert helpers.equiv_files(test_file, answer_file, consider_order=False)
 
     fs.safe_rm(test_file)
+
+def test_residue_cap_deepcopy():
+    """test the behavior of deepcopy for residue cap"""
+    test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
+    test_res = test_stru.residues[0]
+    test_ch3 = capping.get_ch3_cap("cterm", test_res)
+
+    ch3_copy = deepcopy(test_ch3)
+
+    assert ch3_copy.link_residue is not test_res
+    assert ch3_copy.link_residue.parent is None
