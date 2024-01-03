@@ -90,10 +90,10 @@ def init_charge(target: Chain, renew: bool = False, ncaa_lib: Union[str, None] =
 @dispatch
 def init_charge(target: StructureRegion, renew: bool = False, ncaa_lib: Union[str, None] = None,
         caa_fix: str = "ff19sb",
-        ligand_fix: str = "bcc",
-        maa_fix: str = "bcc",
+        ligand_fix: str = "skip",
+        maa_fix: str = "skip",
         solvent_fix: str = "ff19sb",
-        metal_fix: str = "formal_charge",
+        metal_fix: str = "skip",
         cap_fix: str = "fixed_charge",
     ) -> None:
     for res in target.involved_residues:
@@ -111,8 +111,7 @@ def init_charge(target: StructureRegion, renew: bool = False, ncaa_lib: Union[st
     # check if all atoms have charge
     for atm in target.atoms:
         if not atm.has_init_charge():
-            _LOGGER.error(f"Atom {atm} doesn't have charge record after initiation.")
-            sys.exit(1)
+            _LOGGER.warning(f"Atom {atm} doesn't have charge record after initiation. Make sure you want this.")
 
 @dispatch
 def init_charge(target: Structure, renew: bool = False, ncaa_lib: Union[str, None] = None,
@@ -270,6 +269,8 @@ CHG_FILE_PARSER_MAPPER = {
 
 def _init_charge_ligand(lig: Ligand, method: str, ncaa_lib: str) -> None:
     """initiate charge for ligand"""
+    if method == "skip":
+        return
     support_method_list = ["bcc", "resp"]
     if method not in support_method_list:
         _LOGGER.error(f"Method {method} not in supported list: {support_method_list}")
@@ -278,6 +279,8 @@ def _init_charge_ligand(lig: Ligand, method: str, ncaa_lib: str) -> None:
 
 def _init_charge_maa(maa: ModifiedResidue, method: str, ncaa_lib: str) -> None:
     """initiate charge for modified residue"""
+    if method == "skip":
+        return
     raise Exception("TODO") # TODO look into whether .ac is just enough
     support_method_list = ["antechamber"]
     if method not in support_method_list:
@@ -321,6 +324,8 @@ def _init_charge_metal(met: MetalUnit, method: str, ncaa_lib: str) -> None:
     """initiate charge for metal
     formal_charge:
         just use formal charge of the metal from user assignment"""
+    if method == "skip":
+        return
     raise Exception("TODO")
     support_method_list = ["formal_charge"]
     if method == "isolate":
