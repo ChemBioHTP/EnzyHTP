@@ -162,8 +162,8 @@ def single_point(
             qm_region = None
         else:
             qm_region = create_region_from_selection_pattern(
-                regions[0],
                 stru_esm.topology,
+                regions[0],
                 capping_method)
 
         init_charge(qm_region)
@@ -177,7 +177,7 @@ def single_point(
         # multiscale
         raise Exception("TODO")
         qm_engine = MULTI_REGION_SINGLE_POINT_ENGINE[engine]
-        regions = [create_region_from_selection_pattern(i, stru_esm.topology) for i in regions]
+        regions = [create_region_from_selection_pattern(stru_esm.topology, i) for i in regions]
         qm_engine = qm_engine_ctor(
                         regions=regions,
                         region_methods=region_methods,
