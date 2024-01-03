@@ -288,7 +288,6 @@ def test_md_simulation_amber_3_repeat():
 
 @pytest.mark.accre
 @pytest.mark.long
-@pytest.mark.temp
 def test_equi_md_sampling_lv1():
     """test for equi_md_sampling
     level 1: no constraint"""
