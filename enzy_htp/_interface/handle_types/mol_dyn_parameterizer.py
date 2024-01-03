@@ -29,7 +29,7 @@ class MolDynParameter(ABC):
         pass
 
     @property
-    def topology_parser(self) -> str:
+    def topology_parser(self) -> callable:
         """return the parser object for topology_file"""
         pass
 

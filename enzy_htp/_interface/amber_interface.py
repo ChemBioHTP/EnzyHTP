@@ -62,8 +62,8 @@ class AmberNCParser():
         self.prmtop_file = prmtop_file
         self.parent_interface = interface
     
-    def get_structure_ensemble(nc_file: str) -> StructureEnsemble:
-        """parse a nc file to a StructureEnsemble(). Intermediate files are created."""
+    def get_structures(nc_file: str) -> List[Structure]:
+        """parse a nc file to a Structure(). Intermediate files are created."""
 
     def get_last_structure(nc_file: str) -> Structure:
         """parse the last frame in a nc file to a Structure(). Intermediate files are created."""
@@ -113,9 +113,9 @@ class AmberParameter(MolDynParameter):
         return self._prmtop
 
     @property
-    def topology_parser(self) -> str:
+    def topology_parser(self) -> callable:
         """return the parser object for topology_file"""
-        return prmtop_io.PrmtopParser()
+        return prmtop_io.PrmtopParser().get_structure()
 
     @property
     def input_coordinate_file(self) -> str:
@@ -698,11 +698,11 @@ class AmberMDStep(MolDynStep):
         # 5. make result
         traj_parser = AmberNCParser(
             prmtop_file=prmtop,
-            interface=self.parent_interface)
+            interface=self.parent_interface).get_structures
         traj_log_parser = self.parent_interface.read_from_mdout
         last_frame_parser = AmberRSTParser(
             prmtop_file=prmtop,
-            interface=self.parent_interface)
+            interface=self.parent_interface).get_structure
 
         result = MolDynResult(
             traj_file = traj_path,
@@ -762,13 +762,13 @@ class AmberMDStep(MolDynStep):
         traj_file = result_egg.traj_path
         traj_parser = AmberNCParser(
             prmtop_file=result_egg.prmtop_path,
-            interface=self.parent_interface)
+            interface=self.parent_interface).get_structures
         traj_log_file = result_egg.traj_log_path
         traj_log_parser = self.parent_interface.read_from_mdout
         last_frame_file = result_egg.rst_path
         last_frame_parser = AmberRSTParser(
             prmtop_file=result_egg.prmtop_path,
-            interface=self.parent_interface)
+            interface=self.parent_interface).get_structure
         
         # error check
         self.check_md_error(traj_file, traj_log_file, result_egg.prmtop_path, result_egg.parent_job)

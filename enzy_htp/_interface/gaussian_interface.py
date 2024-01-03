@@ -308,6 +308,7 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
                 raise TypeError
             # 2. gout file
             # TODO finish this with a real example
+            # normally will be a Error termination of Gaussian
 
             _LOGGER.error(f"Gaussian SPE didn't finish normally.{os.linesep}{os.linesep.join(error_info_list)}")
             raise GaussianError(error_info_list)
