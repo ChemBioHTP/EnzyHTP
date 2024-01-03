@@ -144,7 +144,7 @@ def test_lot_to_keyword():
         solvent="water",
         solv_method="SMD",
     )
-    answer_kw = ("HF 6-31G(d) scrf=(SMD, solvent=water)", [], [])
+    answer_kw = ("HF 6-31G(d) scrf=(SMD,solvent=water)", [], [])
     test_kw = gi.lot_to_keyword(test_lot)
     assert answer_kw == test_kw
 

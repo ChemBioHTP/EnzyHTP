@@ -464,7 +464,7 @@ class GaussianInterface(BaseInterface):
             result_sol_method = self.SOLV_MODEL_KEYWORD_MAPPER.get(method, None)
             if result_sol_method is None:
                 result_sol_method = method
-            result = f"scrf=({result_sol_method}, solvent={result_sol})"
+            result = f"scrf=({result_sol_method},solvent={result_sol})"
 
         return result, sol_read_line
 
