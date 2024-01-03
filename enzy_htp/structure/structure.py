@@ -259,6 +259,11 @@ class Structure(DoubleLinkedNode):
                 result.extend(residue.atoms)
         return result
 
+    @property
+    def num_atoms(self) -> int:
+        """number of Atom()s"""
+        return len(self.atoms)
+
     def find_atoms_in_range(self, center: Union[Atom, Tuple[float, float, float]], range_distance: float) -> List[Atom]:
         """find atoms in {range} of {center}. return a list of atoms found"""
         result = []
@@ -747,6 +752,24 @@ class Structure(DoubleLinkedNode):
                 ncaa: NonCanonicalBase
                 ncaa.net_charge = charge
                 ncaa.multiplicity = spin
+
+    @dispatch
+    def apply_geom(self, source: List[Union[List[float], Tuple[float]]]):
+        """apply atomic coordinate from source. assume atom have same order.
+        This is parser/indexing sensitive"""
+        if self.num_atoms != len(source):
+            _LOGGER.error("Coordinate number not match!")
+            raise ValueError
+        for atom, new_coord in zip(self.atoms, source):
+            atom.coord = new_coord
+
+    @dispatch
+    def apply_geom(self, source: Structure):
+        """apply atomic coordinate from source"""
+        raise Exception("TODO")
+        # 1. topology check
+        if not self.is_same_topology_atomic(source):
+            raise Exception("TODO")
 
     #endregion
 

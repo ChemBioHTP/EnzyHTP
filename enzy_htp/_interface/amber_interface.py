@@ -13,7 +13,7 @@ import re
 import shutil
 from pathlib import Path
 from subprocess import CalledProcessError, CompletedProcess, SubprocessError
-from typing import List, Tuple, Union, Dict, Any
+from typing import Generator, List, Tuple, Union, Dict, Any
 from dataclasses import dataclass
 from sympy import sympify
 
@@ -48,39 +48,6 @@ from enzy_htp.structure import (
     NonCanonicalBase,
     StructureEnsemble)
 from enzy_htp import config as eh_config
-class AmberNCParser():
-    """parser Amber .nc file to StructureEnsemble()
-    Attribute:
-        prmtop_file
-        parent_interface
-    
-    TODO figure out where should these types of structure parser be placed.
-    These parser relies on the interface. They can not be directly used by structure
-    modules such as structure_operations.
-    Can structure_io just be above _interface?? Seems ok."""
-    def __init__(self, prmtop_file: str, interface: BaseInterface):
-        self.prmtop_file = prmtop_file
-        self.parent_interface = interface
-    
-    def get_structures(nc_file: str) -> List[Structure]:
-        """parse a nc file to a Structure(). Intermediate files are created."""
-
-    def get_last_structure(nc_file: str) -> Structure:
-        """parse the last frame in a nc file to a Structure(). Intermediate files are created."""
-
-
-class AmberRSTParser():
-    """parser Amber .rst file to Structure()
-    Attribute:
-        prmtop_file
-        parent_interface"""
-    def __init__(self, prmtop_file: str, interface: BaseInterface):
-        self.prmtop_file = prmtop_file
-        self.parent_interface = interface
-    
-    def get_structure(rst_file: str) -> Structure:
-        """parse a rst file to a Structure()."""
-
 
 class AmberParameter(MolDynParameter):
     """the Amber format MD parameter. Enforce the Amber parameter format
@@ -115,7 +82,7 @@ class AmberParameter(MolDynParameter):
     @property
     def topology_parser(self) -> callable:
         """return the parser object for topology_file"""
-        return prmtop_io.PrmtopParser().get_structure()
+        return prmtop_io.PrmtopParser().get_structure
 
     @property
     def input_coordinate_file(self) -> str:
@@ -698,7 +665,7 @@ class AmberMDStep(MolDynStep):
         # 5. make result
         traj_parser = AmberNCParser(
             prmtop_file=prmtop,
-            interface=self.parent_interface).get_structures
+            interface=self.parent_interface).get_coordinates
         traj_log_parser = self.parent_interface.read_from_mdout
         last_frame_parser = AmberRSTParser(
             prmtop_file=prmtop,
@@ -762,7 +729,7 @@ class AmberMDStep(MolDynStep):
         traj_file = result_egg.traj_path
         traj_parser = AmberNCParser(
             prmtop_file=result_egg.prmtop_path,
-            interface=self.parent_interface).get_structures
+            interface=self.parent_interface).get_coordinates
         traj_log_file = result_egg.traj_log_path
         traj_log_parser = self.parent_interface.read_from_mdout
         last_frame_file = result_egg.rst_path
@@ -2396,3 +2363,131 @@ amber_interface = AmberInterface(None, eh_config._amber)
 Instantiated here so that other _interface subpackages can use it.
 An example of this concept this AmberInterface used Gaussian for calculating the RESP charge
 so it imports gaussian_interface that instantiated in the same fashion."""
+
+class AmberNCParser():
+    """parser Amber .nc file
+    Attribute:
+        prmtop_file
+        parent_interface
+    
+    TODO figure out where should these types of structure parser be placed.
+    These parser relies on the interface. They can not be directly used by structure
+    modules such as structure_operations.
+    Can structure_io just be above _interface?? Seems ok."""
+    def __init__(self, prmtop_file: str, interface: BaseInterface = amber_interface):
+        self.prmtop_file = prmtop_file
+        self.parent_interface = interface
+    
+    def get_coordinates(self, nc_file: str) -> Generator[List[List[float]], None, None]:
+        """parse a nc file to a Generator of coordinates. Intermediate files are created."""
+
+    def get_structures(self, nc_file: str) -> Generator[Structure, None, None]:
+        pass
+
+    def get_last_structure(self, nc_file: str) -> Structure:
+        """parse the last frame in a nc file to a Structure(). Intermediate files are created."""
+
+
+class AmberMDCRDParser():
+    """parser Amber .mdcrd file
+    Attribute:
+        prmtop_file
+        parent_interface"""
+    def __init__(self, prmtop_file: str, interface: BaseInterface = amber_interface):
+        self.prmtop_file = prmtop_file
+        self.parent_interface = interface
+    
+    def get_coordinates(self, mdcrd: str) -> Generator[List[List[float]], None, None]:
+        """parse a mdcrd file to a Generator of coordinates. Intermediate files are created."""
+        coord = [] # coords of 1 frame
+        atom_coord = [] # coord of 1 atom
+        counter = 1 # collect coord every 3 count
+        end_flag_1 = 0
+        fake_end_flag = 0
+        line_feed = os.linesep
+        digit_pattern = r'[ ,\-,0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][0-9]' # a number
+        frame_sep_pattern = digit_pattern * 3 + line_feed
+        with open(mdcrd) as f:
+            while True:
+                # use the while True format to detect the EOF
+                line=f.readline()            
+
+                if re.match(digit_pattern, line) == None:
+                    # not data line
+                    if not end_flag_1 and not fake_end_flag:
+                        # last line is not end line & 
+                        continue
+                
+                if fake_end_flag:
+                    # this line is an end line
+                    # if next line of end is the file end
+                    fake_end_flag = 0
+                    if line == '':
+                        break
+
+                if end_flag_1:
+                    # last line is an end line
+                    if re.match(frame_sep_pattern, line) != None:
+                        # this line is an end line -> last line is a fake end line
+                        coord.append(holder)
+                        yield coord
+                        # empty for next loop
+                        coord = []
+                        end_flag_1 = 0
+                        fake_end_flag = 1
+                        continue
+                    else:                        
+                        # last line is a real end line
+                        yield coord
+                        # empty for next loop
+                        coord = []
+                        end_flag_1 = 0
+                        if line == '':
+                            #the last line
+                            break
+                        if line == line_feed:
+                            _LOGGER.warning("unexpected empty line detected. Treat as EOF. exit reading")
+                            break
+                        # do not skip if normal next line
+
+                else:
+                    if re.match(frame_sep_pattern, line) != None:
+                        # find line that mark the end of a frame // possible fake line
+                        # store the last frame and empty the holder
+                        end_flag_1 = 1 
+                        lp = re.split(' +', line.strip())
+                        # hold the info
+                        holder = [float(lp[0]), float(lp[1]), float(lp[2])]
+                        continue
+
+                # normal data lines
+                lp = re.split(' +', line.strip())
+                for i in lp:
+                    if counter < 3:
+                        atom_coord.append(float(i))
+                        counter = counter + 1
+                    else:
+                        atom_coord.append(float(i))
+                        coord.append(atom_coord)
+                        # empty for next atom
+                        atom_coord = []        
+                        counter = 1
+
+    def get_structures(self, mdcrd: str) -> Generator[Structure, None, None]:
+        pass
+
+    def get_last_structure(self, mdcrd: str) -> Structure:
+        """parse the last frame in a mdcrd file to a Structure(). Intermediate files are created."""
+        pass
+
+class AmberRSTParser():
+    """parser Amber .rst file to Structure()
+    Attribute:
+        prmtop_file
+        parent_interface"""
+    def __init__(self, prmtop_file: str, interface: BaseInterface = amber_interface):
+        self.prmtop_file = prmtop_file
+        self.parent_interface = interface
+    
+    def get_structure(self, rst_file: str) -> Structure:
+        """parse a rst file to a Structure()."""

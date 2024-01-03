@@ -7,7 +7,9 @@ Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2023-10-28
 """
 from __future__ import annotations
-from typing import List, Iterator
+from typing import List, Generator, Callable, Tuple
+from copy import deepcopy
+
 from .structure import Structure
 from .structure_io import StructureParserInterface
 
@@ -28,30 +30,46 @@ class StructureEnsemble:
 
     """
 
-    def __init__(self, topology, top_parser: StructureParserInterface, coordinate_list: List,
-                 coord_parser: StructureParserInterface) -> None:
+    def __init__(
+        self,
+        topology: str, 
+        top_parser: Callable[[str], Structure], 
+        coordinate_list: str,
+        coord_parser: Callable[[str], Generator[List[Tuple[float]], None, None]]
+    ) -> None:
         self._topology = topology
         self.top_parser = top_parser
         self.coordinate_list = coordinate_list
         self.coord_parser = coord_parser
 
     @property
-    def structures(self) -> Iterator[Structure]:
-        """get a iterator of all geometries in the ensemble
+    def structures(self) -> Generator[Structure]:
+        """get a Generator of all geometries in the ensemble
         as Structure()s"""
-        pass
+        for this_coord in self.coord_parser(self.coordinate_list):
+            result = deepcopy(self.topology)
+            result.apply_geom(this_coord)
+            yield result
 
     @property
     def topology(self) -> Structure:
         """getter for topology"""
-        return self.top_parser.get_structure(self._topology)
+        if isinstance(self._topology, Structure):
+            return self._topology
+        else:
+            return self.top_parser(self._topology)
 
     @classmethod
-    def from_single_stru(cls, stru: Structure) -> List[StructureEnsemble]:
+    def from_single_stru(cls, stru: Structure) -> StructureEnsemble:
         """create an ensemble of 1 snapshot from a stru"""
         return cls(
             topology=stru,
-            topology_parser=None,
+            topology_parser=lambda x: x,
             coordinate_list=[stru],
-            coord_parser=None,
+            coord_parser=lambda x: x,
         )
+
+    # region == special ==
+    def __iter__(self):
+        return self.structures
+    # endregion

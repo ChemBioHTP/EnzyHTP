@@ -1,5 +1,6 @@
 """Testing the Structure() class. 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Author: QZ Shao <shaoqz@icloud.com>
 Date: 2022-04-03
 """
 import os
