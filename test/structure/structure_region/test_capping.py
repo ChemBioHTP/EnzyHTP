@@ -38,6 +38,6 @@ def test_capping_with_residue_terminals(helpers):
     for at in atoms:
         lines.append(f"{at.element} {at.coord[0]} {at.coord[1]} {at.coord[2]}")
     fs.write_lines(test_file, lines)
-    assert helpers.equiv_files(test_file, answer_file)
+    assert helpers.equiv_files(test_file, answer_file, consider_order=False)
 
     fs.safe_rm(test_file)

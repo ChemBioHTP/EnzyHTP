@@ -12,6 +12,7 @@ from ..structure import Structure, Residue, Atom
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
 from enzy_htp.core.math_helper import rotation_matrix_from_vectors
+from enzy_htp import chemical as chem
 
 #TODO(CJ): add methylamide -> cterm, acetate -> nterm
 
@@ -69,7 +70,7 @@ def capping_with_residue_terminals(raw_region,
 
 # endregion
 
-class ResidueCap(DoubleLinkedNode):
+class ResidueCap(Residue):
     """the residue cap that link to the corresponding
     Residue while not having the children atoms actually in
     that Residue.
@@ -85,6 +86,10 @@ class ResidueCap(DoubleLinkedNode):
     def __init__(self, link_residue: Residue, atoms: List[Atom]):
         self.link_residue = link_residue
         self.atoms = atoms
+
+        self._idx = None
+        self._rtype = chem.ResidueType.RESIDUECAP
+        self.set_ghost_parent()
         self.set_children(atoms)
     
     @property
