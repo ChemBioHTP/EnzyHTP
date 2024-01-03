@@ -10,6 +10,7 @@ from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.general import EnablePropagate
 import enzy_htp.structure.structure_region as stru_regi
 import enzy_htp.structure.structure_selection as stru_sele
+from enzy_htp.structure.structure_operation import init_charge
 
 CURR_FILE = os.path.abspath(__file__)
 CURR_DIR = os.path.dirname(CURR_FILE)
@@ -80,9 +81,13 @@ def test_involved_residues_with_free_terminal_ter():
 def test_get_net_charge():
     """as name"""
     test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
+    test_stru.assign_ncaa_chargespin(
+        {"H5J": (0,1)}
+    )
     test_stru_region = stru_regi.create_region_from_selection_pattern(
         test_stru, "br. (resi 254 around 5) or resi 254"
     )
+    init_charge(test_stru_region)
     assert test_stru_region.get_net_charge() == 0
 
 def test_atoms_by_residue(): # TODO

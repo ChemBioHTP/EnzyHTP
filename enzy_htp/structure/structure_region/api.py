@@ -6,15 +6,16 @@ Date: 2023-12-30"""
 
 from copy import deepcopy
 import numpy as np
-
+from itertools import groupby
 from typing import Callable, Dict, List, Tuple, Union
 
 from ..structure import Structure, Atom
-from ..residue import Residue, ResidueDummy
+from ..residue import Residue
+from ..noncanonical_base import NonCanonicalBase
 from .capping import (
     capping_with_residue_terminals,
+    ResidueCap,
     )
-from ..structure_operation.charge import init_charge
 
 from enzy_htp.core.logger import _LOGGER
 
@@ -149,10 +150,25 @@ class StructureRegion:
         result = set()
         for atom in self.atoms:
             res = atom.parent
-            if not isinstance(res, ResidueDummy):
+            if not isinstance(res, ResidueCap):
                 result.add(res)
         return list(result)
-        
+
+    @property
+    def caps(self) -> List[ResidueCap]:
+        """get all involved residue caps in the region"""
+        result = set()
+        for atom in self.atoms:
+            res = atom.parent
+            if isinstance(res, ResidueCap):
+                result.add(res)
+        return list(result)
+
+    @property
+    def atoms_by_residue(self) -> Dict[Residue, List[Atom]]:
+        """group atoms in the region by containing residues."""
+        return dict(groupby(self.atoms, key=lambda x: x.parent))
+
     def involved_residues_with_free_terminal(self) -> Dict[str, List[Residue]]:
         """get all involved residue that have a terminal free valance
         i.e.: to determine whether the C-side or N-side terminal is in
@@ -188,11 +204,35 @@ class StructureRegion:
         return result
 
     def get_net_charge(self) -> int:
-        """get the net charge of the region"""
-        # ncaa: user needs to define
-        # caa: use a mapper from ff14SB)
-        for res in self.involved_residues:
-            pass
+        """get the net charge of the region.
+        Need to init_charge before using it. 
+        
+        This design is because external software are used for init_charge
+        and thus it needs to be above _interface which can only called by
+        the Science API layer."""
+        # caa: use a mapper from ff14SB
+        net_charge = 0
+        for res, atoms in self.atoms_by_residue.items():
+            if res.is_noncanonical():
+                res: NonCanonicalBase
+                if self.has_whole_residue(res):
+                    if res.net_charge is None:
+                        _LOGGER.error(
+                            f"NCAA ({res.name}) does not have charge."
+                            " ALWAYS check and explicit assign it using"
+                            " Structure.assign_ncaa_chargespin()")
+                        raise ValueError
+                    net_charge += res.net_charge
+                    continue
+    
+            for atom in atoms:
+                atom: Atom
+                if not atom.has_init_charge():
+                    _LOGGER.error("Please init_charge(stru_region) before using this function")
+                    raise ValueError
+                net_charge += atom.charge
+    
+        return net_charge
     
     def get_spin(self) -> int:
         """get the spin of the region"""
@@ -213,6 +253,10 @@ class StructureRegion:
         the given Atom()"""
         return atom in self.atoms_
 
+    def has_whole_residue(self, res: Residue) -> bool:
+        """whether self have every atoms in {res}"""
+        return self.has_atoms(res.atoms)
+
     def is_same_topology(self, geom: Structure) -> bool:
         """determine if the geometry have the same topology with self"""
         self_top = self.atoms[0].root
@@ -221,9 +265,8 @@ class StructureRegion:
     def is_whole_residue_only(self) -> bool:
         """check whether self contain atoms that composes whole residues
         only"""
-        # it means all involved residues has all its atoms in the region
         for res in self.involved_residues:
-            if not self.has_atoms(res.atoms):
+            if not self.has_whole_residue(res):
                 return False
         return True
     # endregion
@@ -286,9 +329,9 @@ def create_region_from_selection_pattern(
         _LOGGER.error(f"capping method ({capping_method}) not supported. Supported: {CAPPING_METHOD_MAPPER.keys()}")
         raise ValueError
     capping_func = CAPPING_METHOD_MAPPER[capping_method]
-    capped_region = capping_func(raw_region, **kwargs)
+    capping_func(raw_region, **kwargs)
 
-    return capped_region
+    return raw_region
 
 CAPPING_METHOD_MAPPER: Dict[str, Callable[[StructureRegion], StructureRegion]] = {
     "res_ter_cap" : capping_with_residue_terminals,
