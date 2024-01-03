@@ -36,7 +36,8 @@ from .structure_constraint import (
 from .structure_region import (
     StructureRegion,
     create_region_from_selection_pattern,
-    create_region_from_residue_keys
+    create_region_from_residue_keys,
+    create_region_from_full_stru,
 )
 
 from .structure_selection_class import StruSelection

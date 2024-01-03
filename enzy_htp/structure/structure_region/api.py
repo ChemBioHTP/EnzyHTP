@@ -380,6 +380,15 @@ def create_region_from_selection_pattern(
 
     return raw_region
 
+def create_region_from_full_stru(stru: Structure):
+    """create StructureRegion of the full structure
+
+    Returns:
+        the StructureRegion"""
+    return StructureRegion(
+        atoms = stru.atoms
+    )
+
 CAPPING_METHOD_MAPPER: Dict[str, Callable[[StructureRegion], StructureRegion]] = {
     "res_ter_cap" : capping_with_residue_terminals,
     "residue_terminal_capping" : capping_with_residue_terminals,

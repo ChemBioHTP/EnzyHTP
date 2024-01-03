@@ -47,6 +47,7 @@ from enzy_htp.structure import (
     StructureConstraint,
     CartesianFreeze,
     StructureRegion,
+    create_region_from_full_stru,
 )
 from enzy_htp._config.gaussian_config import GaussianConfig, default_gaussian_config
 from enzy_htp import config as eh_config
@@ -175,12 +176,12 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
         temp_gjf_file, gchk_path = self._make_gjf_file(stru)
 
         # 3. make cmd
-        spe_cmd, gout_path = self.parent_interface.make_spe_cmd(temp_gjf_file)
+        spe_cmd, gout_path = self.parent_interface.make_gaussian_cmd(temp_gjf_file)
 
         # 4. assemble ClusterJob
         cluster = self.cluster_job_config["cluster"]
         res_keywords = self.cluster_job_config["res_keywords"]
-        env_settings = cluster.G16_ENV[self.core_type.upper()]
+        env_settings = cluster.G16_ENV["CPU"]
         sub_script_path = fs.get_valid_temp_name(f"{self.work_dir}/submit_{self.name}.cmd")
         job = ClusterJob.config_job(
             commands = spe_cmd,
@@ -195,7 +196,7 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
         }
 
         # 5. make result egg
-        result_egg = QMResultEgg(
+        result_egg = GaussianQMResultEgg(
             gout_path = gout_path,
             gchk_path = gchk_path,
             stru=stru,
@@ -340,10 +341,12 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
             gchk_path = temp_chk_file_path,
             num_core = num_core,
             mem = mem,
-            method = self.method,
+            methods = [self.method],
             job_type = "spe",
-            additional_keyword = additional_keywords,
+            additional_keywords = additional_keywords,
             stru = stru,
+            stru_regions = [self.region],
+            title = self.name,
         )
 
         return temp_gjf_file_path, temp_chk_file_path
@@ -476,7 +479,7 @@ class GaussianInterface(BaseInterface):
         """compile the g16 cmd from config. This is general for all gaussian
         job types.
         TODO add more options when needed."""
-        executable = self.parent_interface.get_gaussian_executable()
+        executable = self.get_gaussian_executable()
         temp_gout_file_path = temp_gjf_file_path.replace(".gjf",".out") # overwrite existing since gjf have unique name
         cmd = (
             f"{executable} < {temp_gjf_file_path} > {temp_gout_file_path}"
@@ -545,7 +548,7 @@ class GaussianInterface(BaseInterface):
                 f"%nprocshared={num_core}")
         if mem:
             gjf_lines.append(
-                f"%mem={mem}")
+                f"%mem={mem}GB")
         if gchk_path:
             gjf_lines.append(
                 f"%chk={gchk_path}")
@@ -582,7 +585,7 @@ class GaussianInterface(BaseInterface):
         # mol spec
             mol_spec_lines = self._make_mol_spec(
                 stru=stru,
-                stru_region=stru_regions,
+                stru_regions=stru_regions,
                 constraints=constraints,
             )
             gjf_lines.extend(mol_spec_lines)
@@ -610,7 +613,7 @@ class GaussianInterface(BaseInterface):
         Return:
             route_line,
             tail_sections,"""
-        if len(method) > 1:
+        if len(methods) > 1:
             _LOGGER.error("dont support QMMM & specifying multiple method yet. TODO")
             raise Exception("TODO")
         else:
@@ -630,7 +633,7 @@ class GaussianInterface(BaseInterface):
             # add_kw
             add_kw = " ".join(additional_keywords)
             # result
-            route_line = f"{job_type_kw}{add_jobtype_kw_section} {lot_kw} {add_kw}"
+            route_line = f"#{job_type_kw}{add_jobtype_kw_section} {lot_kw} {add_kw}"
             if geom_all_check:
                 route_line = f"{route_line} geom=allcheck"
 
@@ -659,24 +662,31 @@ class GaussianInterface(BaseInterface):
     def _make_mol_spec(
             self,
             stru: Structure,
-            stru_region: StructureRegion,
+            stru_regions: StructureRegion,
             constraints: StructureConstraint
         ) -> List[str]:
         """only cartesian freeze from constraints is relevent in this part"""
         mol_spec_lines = []
-        # chrg spin
-        charge = stru_region.get_net_charge()
-        spin = stru_region.get_spin()
-        mol_spec_lines.append(f"{charge} {spin}")
-        # geom
-        # deal with constraint
-        cart_freeze = []
-        for cons in constraints:
-            if cons.is_cartesian_freeze:
-                cart_freeze.append(cons)
-        atoms = stru_region.atoms_from_geom(stru)
-        geom_lines = self.get_geom_lines(atoms, cart_freeze)
-        mol_spec_lines.extend(geom_lines)
+        if len(stru_regions) > 1:
+            _LOGGER.error("dont support QMMM & specifying multiple region yet. TODO")
+            raise Exception("TODO")
+        else:
+            stru_region = stru_regions[0]
+            if stru_region is None:
+                stru_region = create_region_from_full_stru(stru) 
+            # chrg spin
+            charge = stru_region.get_net_charge()
+            spin = stru_region.get_spin()
+            mol_spec_lines.append(f"{charge} {spin}")
+            # geom
+            # deal with constraint
+            cart_freeze = []
+            for cons in constraints:
+                if cons.is_cartesian_freeze:
+                    cart_freeze.append(cons)
+            atoms = stru_region.atoms_from_geom(stru)
+            geom_lines = self.get_geom_lines(atoms, cart_freeze)
+            mol_spec_lines.extend(geom_lines)
 
         return mol_spec_lines
 
