@@ -601,9 +601,18 @@ class Structure(DoubleLinkedNode):
             for self_res, other_res in zip(self.residues, other.residues):
                 self_atom_names = set(self_res.atom_name_list)
                 other_atom_names = set(other_res.atom_name_list)
-                if self_atom_names == other_atom_names:
-                    return True
+                if not self_atom_names == other_atom_names:
+                    return False
+            return True
         return False
+
+    def is_same_topology_atomic(self, other: Structure) -> bool:
+        """check whether self and other have the same topology.
+        i.e.: same atoms order"""
+        for self_atom, other_atom in zip(self.atoms, other.atoms):
+            if self_atom.key != other_atom.key:
+                return False
+        return True
     #endregion
 
     #region === Editor ===
@@ -766,10 +775,12 @@ class Structure(DoubleLinkedNode):
     @dispatch
     def apply_geom(self, source: Structure):
         """apply atomic coordinate from source"""
-        raise Exception("TODO")
         # 1. topology check
         if not self.is_same_topology_atomic(source):
             raise Exception("TODO")
+        else:
+            for atom, source_atom in zip(self.atoms, source.atoms):
+                atom.coord = source_atom.coord
 
     #endregion
 
