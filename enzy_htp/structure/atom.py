@@ -147,9 +147,8 @@ class Atom(DoubleLinkedNode):
     def charge(self):
         """getter for _charge"""
         if not self.has_init_charge():
-            _LOGGER.error(f"There are no charge info for {self}. "
+            _LOGGER.debug(f"There are no charge info for {self}. "
                             "Please initiate it use structure.structure_operation.init_charge()")
-            raise AttributeError
         return self._charge
 
     @charge.setter
