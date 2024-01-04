@@ -5,14 +5,17 @@ Date: 2023-12-29
 
 import pytest
 import os
+from enzy_htp._interface.amber_interface import AmberMDCRDParser
 
 from enzy_htp.core.clusters.accre import Accre
 import enzy_htp.core.file_system as fs
 from enzy_htp.chemical.level_of_theory import QMLevelofTheory, MMLevelofTheory
+from enzy_htp.core.general import get_itself
 from enzy_htp.structure import structure_constraint as stru_cons
 from enzy_htp import interface
 from enzy_htp import PDBParser
 from enzy_htp.quantum import single_point
+from enzy_htp.structure.structure_ensemble import StructureEnsemble
 from enzy_htp.structure.structure_region.api import create_region_from_selection_pattern
 
 DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/data/"
@@ -96,7 +99,18 @@ def test_single_point_gaussian_lv3():
     level 3:
     - 1 structure region
     - 100 snapshots"""
-    test_stru = sp.get_structure(f"{DATA_DIR}H5J.pdb")
+    test_stru = sp.get_structure(f"{STRU_DATA_DIR}KE_07_R7_2_S.pdb")
+    test_traj = f"{DATA_DIR}KE_07_R7_2_S_10f.mdcrd"
+    test_prmtop = f"{DATA_DIR}KE_07_R7_2_S_10f.prmtop"
+    test_esm = StructureEnsemble(
+        topology=test_stru,
+        top_parser=get_itself,
+        coordinate_list=test_traj,
+        coord_parser=AmberMDCRDParser(test_prmtop).get_coordinates,
+    )
+    test_stru_region = create_region_from_selection_pattern(
+        test_stru, "br. (resi 254 around 2)"
+    )
     test_stru.assign_ncaa_chargespin({"H5J" : (0,1)})
     test_method = QMLevelofTheory(
         basis_set="3-21G",
@@ -111,11 +125,11 @@ def test_single_point_gaussian_lv3():
         }
     }
 
-
     qm_result = single_point(
-        stru=test_stru,
+        stru=test_esm,
         engine="gaussian",
         method=test_method,
+        region=[test_stru_region],
         cluster_job_config=cluster_job_config,
         job_check_period=10,
         )
@@ -127,6 +141,7 @@ def test_single_point_gaussian_lv4():
     level 4:
     - 2 structure region QM/MM
     - 100 snapshots"""
+    assert False
     test_stru = sp.get_structure(f"{DATA_DIR}H5J.pdb")
     test_stru.assign_ncaa_chargespin({"H5J": (0, 1)})
     test_method = QMLevelofTheory(
