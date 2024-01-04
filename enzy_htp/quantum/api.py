@@ -165,8 +165,8 @@ def single_point(
                 stru_esm.topology,
                 regions[0],
                 capping_method)
-
-        init_charge(qm_region)
+            init_charge(qm_region)
+        
         qm_engine: QMSinglePointEngine = qm_engine_ctor(
                                             region=qm_region,
                                             method=qm_method,

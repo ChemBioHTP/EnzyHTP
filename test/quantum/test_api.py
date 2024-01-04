@@ -13,14 +13,17 @@ from enzy_htp.structure import structure_constraint as stru_cons
 from enzy_htp import interface
 from enzy_htp import PDBParser
 from enzy_htp.quantum import single_point
+from enzy_htp.structure.structure_region.api import create_region_from_selection_pattern
 
 DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/data/"
+STRU_DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/../structure/data/"
 WORK_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/work_dir/"
 sp = PDBParser()
 gi = interface.gaussian
 
 
 @pytest.mark.accre
+@pytest.mark.temp
 def test_single_point_gaussian_lv1():
     """Test running a QM single point.
     Using Gaussian & Accre as an example engine
@@ -30,17 +33,20 @@ def test_single_point_gaussian_lv1():
     test_stru = sp.get_structure(f"{DATA_DIR}H5J.pdb")
     test_stru.assign_ncaa_chargespin({"H5J" : (0,1)})
     test_method = QMLevelofTheory(
-        basis_set="def2-SVP",
-        method="PBE0",
+        basis_set="3-21G",
+        method="HF",
         solvent="water",
         solv_method="SMD",
     )
     cluster_job_config = {
         "cluster" : Accre(),
-        "res_keywords" : {"account" : "yang_lab_csb",
-                         "partition" : "production"}
+        "res_keywords" : {
+            "account" : "yang_lab_csb",
+            "partition" : "production",
+            'walltime' : '30:00',
+        }
     }
-    
+
     qm_result = single_point(
         stru=test_stru,
         engine="gaussian",
@@ -56,24 +62,29 @@ def test_single_point_gaussian_lv2():
     level 2:
     - structure region
     - single snapshot"""
-    test_stru = sp.get_structure(f"{DATA_DIR}H5J.pdb")
+    test_stru = sp.get_structure(f"{STRU_DATA_DIR}KE_07_R7_2_S.pdb")
+    test_stru_region = create_region_from_selection_pattern(
+        test_stru, "br. (resi 254 around 2)"
+    )
     test_stru.assign_ncaa_chargespin({"H5J" : (0,1)})
     test_method = QMLevelofTheory(
-        basis_set="def2-SVP",
-        method="PBE0",
-        solvent="water",
-        solv_method="SMD",
+        basis_set="3-21G",
+        method="HF",
     )
     cluster_job_config = {
         "cluster" : Accre(),
-        "res_keywords" : {"account" : "yang_lab_csb",
-                         "partition" : "production"}
+        "res_keywords" : {
+            "account" : "yang_lab_csb",
+            "partition" : "production", # cant use debug that accre only have a node that dont have Gaussian
+            'walltime' : '30:00',
+        }
     }
-    
+
     qm_result = single_point(
         stru=test_stru,
         engine="gaussian",
         method=test_method,
+        region=[test_stru_region],
         cluster_job_config=cluster_job_config,
         job_check_period=10,
         )
@@ -88,17 +99,19 @@ def test_single_point_gaussian_lv3():
     test_stru = sp.get_structure(f"{DATA_DIR}H5J.pdb")
     test_stru.assign_ncaa_chargespin({"H5J" : (0,1)})
     test_method = QMLevelofTheory(
-        basis_set="def2-SVP",
-        method="PBE0",
-        solvent="water",
-        solv_method="SMD",
+        basis_set="3-21G",
+        method="HF",
     )
     cluster_job_config = {
         "cluster" : Accre(),
-        "res_keywords" : {"account" : "yang_lab_csb",
-                         "partition" : "production"}
+        "res_keywords" : {
+            "account" : "yang_lab_csb",
+            "partition" : "production",
+            'walltime' : '30:00',
+        }
     }
-    
+
+
     qm_result = single_point(
         stru=test_stru,
         engine="gaussian",
@@ -115,26 +128,25 @@ def test_single_point_gaussian_lv4():
     - 2 structure region QM/MM
     - 100 snapshots"""
     test_stru = sp.get_structure(f"{DATA_DIR}H5J.pdb")
-    test_stru.assign_ncaa_chargespin({"H5J" : (0,1)})
+    test_stru.assign_ncaa_chargespin({"H5J": (0, 1)})
     test_method = QMLevelofTheory(
-        basis_set="def2-SVP",
-        method="PBE0",
-        solvent="water",
-        solv_method="SMD",
+        basis_set="3-21G",
+        method="HF",
     )
     cluster_job_config = {
         "cluster" : Accre(),
-        "res_keywords" : {"account" : "yang_lab_csb",
-                         "partition" : "production"}
+        "res_keywords" : {
+            "account" : "yang_lab_csb",
+            "partition" : "production",
+            'walltime' : '30:00',
+        }
     }
-    
+
+
     qm_result = single_point(
         stru=test_stru,
         engine="gaussian",
         method=test_method,
         cluster_job_config=cluster_job_config,
         job_check_period=10,
-        )
-
-
-
+    )

@@ -12,6 +12,7 @@ from copy import deepcopy
 
 from .structure import Structure
 from .structure_io import StructureParserInterface
+from enzy_htp.core.general import get_itself
 
 
 class StructureEnsemble:
@@ -64,9 +65,9 @@ class StructureEnsemble:
         """create an ensemble of 1 snapshot from a stru"""
         return cls(
             topology=stru,
-            topology_parser=lambda x: x,
+            top_parser=get_itself,
             coordinate_list=[stru],
-            coord_parser=lambda x: x,
+            coord_parser=get_itself,
         )
 
     # region == special ==
