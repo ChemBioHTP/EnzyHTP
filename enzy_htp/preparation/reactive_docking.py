@@ -7,7 +7,7 @@ Date: 2023-07-28
 import os
 from pathlib import Path
 from collections import defaultdict
-from typing import List, Tuple, Set, Dict
+from typing import List, Tuple, Set, Dict, Any
 from copy import deepcopy
 
 import numpy as np
@@ -22,13 +22,31 @@ from enzy_htp import mutation as mm
 from enzy_htp.structure import PDBParser, Mol2Parser, Structure, Ligand
 from enzy_htp.core import file_system as fs
 
+from dataclasses import dataclass
+
 #TODO(CJ): I should go through and use existing values if cache mode is selected
 #:TODO(CJ): need to be able to specify the size of the grid
+
+@dataclass(frozen=True)
+class ReactiveDockingParams:
+    n_struct:int
+    cst_energy:float
+    use_qm:bool
+    freeze_alphafill:bool
+    clash_distance:float
+    clash_cutoff:int
+    max_sasa_ratio:float
+    cluster_distance:float
+    rng_seed:int
+    work_dir:str
+    save_work_dir:bool
+        
 
 def dock_reactants(structure: Structure,
                    constraints: List[StructureConstraint] = None,
                    n_struct: int = 100,
                    cst_energy: float = None,
+                   use_qm:bool=True,
                    freeze_alphafill:bool = True,
                    clash_distance: float = 2.0,
                    clash_cutoff: int = 3,
@@ -66,7 +84,6 @@ def dock_reactants(structure: Structure,
 
     Returns:
         A Structure() with the specified, constrained geometry. 
-
     """
 
     if work_dir is None:
@@ -79,21 +96,27 @@ def dock_reactants(structure: Structure,
 
     interface.rosetta.rename_atoms(structure)
 
+    params = ReactiveDockingParams(n_struct, cst_energy, use_qm, freeze_alphafill, clash_distance, clash_cutoff, max_sasa_ratio, cluster_distance, rng_seed, work_dir, save_work_dir)
+
 #    _log_settings(constraints, n_struct, cst_energy, clash_distance, clash_cutoff, max_sasa_ratio,
 #                cluster_distance, use_cache, rng_seed, work_dir, save_work_dir) #TODO(CJ): fix this when ready
     
-    (param_files, charge_mapper) = _parameterize_system(structure, work_dir)
+    (param_files, charge_mapper) = _parameterize_system(structure,  params)
 
-    df = _dock_system(structure, constraints, n_struct, clash_cutoff, param_files, charge_mapper, freeze_alphafill, work_dir, rng_seed )
-    
-    _evaluate_SASA(df, max_sasa_ratio)#TODO(CJ): put this back in 
+    df = _dock_system(structure, constraints, charge_mapper, param_files, params)
+   
+    select_geometry(df, structure, charge_mapper, params)
 
-    _evaluate_csts(df, constraints, cst_energy)
-    
-    _evaluate_qm(df, structure, charge_mapper, cluster_distance)
+#    _evaluate_SASA(df, max_sasa_ratio)#TODO(CJ): put this back in 
+#
+#    _evaluate_csts(df, constraints, cst_energy)
+#    
+#    _evaluate_qm(df, structure, charge_mapper, cluster_distance)
 
     final_geometry:Structure = _qm_minimization(df, charge_mapper, cluster_distance, constraints)
-   
+  
+    #TODO(CJ): need to do the minimization in place    
+
     if not save_work_dir:
         _LOGGER.info(f"save_work_dir set to False! Deleting {work_dir}")
         fs.safe_rmdir( work_dir )
@@ -102,7 +125,8 @@ def dock_reactants(structure: Structure,
 
 
 
-def _create_xml(stru:Structure, cst_file:str, freeze_alphafill:bool, clash_cutoff:int, work_dir: str) -> str:
+def _create_xml(stru:Structure, cst_file:str,
+    params:ReactiveDockingParams) -> str:
     """
 
     Args:
@@ -405,13 +429,9 @@ def _make_options_file(pdb_file: str,
 
 def _dock_system(structure: Structure,
             constraints: List[StructureConstraint],
-            n_struct:int,
-            clash_cutoff:int,
-            param_files:List[str],
             charge_mapper:Dict[str,int],
-            freeze_alphafill:bool,
-            work_dir:str,
-            rng_seed:int,
+            param_files:List[str],
+            params:ReactiveDockingParams
             ) -> pd.DataFrame:
     """
 
@@ -430,9 +450,9 @@ def _dock_system(structure: Structure,
     parser = PDBParser()
     parser.save_structure(start_pdb, structure)
 
-    cst_file:str = interface.rosetta.write_constraint_file(structure, constraints, work_dir) #TODO(CJ): look at this; wrong constraint types!!
+    cst_file:str = interface.rosetta.write_constraint_file(structure, constraints, params.work_dir) #TODO(CJ): look at this; wrong constraint types!!
 
-    xml_file:str = _create_xml(structure, cst_file, freeze_alphafill, clash_cutoff, work_dir)  #TODO(CJ): going to overhaul this
+    xml_file:str = _create_xml(structure, cst_file, params)  #TODO(CJ): going to overhaul this
 
     options_file: str = _make_options_file(start_pdb,
                         xml_file, param_files, work_dir, rng_seed, n_struct, cst_file)
@@ -543,7 +563,7 @@ def _evaluate_csts(df: pd.DataFrame, csts: List[StructureConstraint], cst_cutoff
         stru:Structure = _parser.get_structure(row.description)
         for cst in csts:
             cst.change_topology(stru)
-            total += cst.score_energy()
+            total += cst.score_energy() #TODO(CJ): this has to later become scoring it with the interface. ugh... 
         cst_diff.append(total)
 
     df['cst_diff'] = cst_diff
@@ -553,13 +573,10 @@ def _evaluate_csts(df: pd.DataFrame, csts: List[StructureConstraint], cst_cutoff
         f"Finished RosettaCst evaluation. {df.selected.sum()} geometries have constraint tolerances <= {cst_cutoff:.3f} tolerance units")
     
 
-def _parameterize_system(stru:Structure, work_dir:str) -> Tuple[List[str], Dict[str, int]]:
+def _parameterize_system(stru:Structure, params:ReactiveDockingParams) -> Tuple[List[str], Dict[str, int]]:
     """Given the input Structure(), parameterize everything needed to perform RosettaLigand docking.
     
-    Args:
-        stru: The Structure() to parameterize.
-        work_dir: Where temporary files will be saved.
-
+    #TODO(CJ): fix this
     Returns:
         A Tuple() with the format (list(), dict()), holding the (.params file names, charge mapper ). 
     """
@@ -582,7 +599,7 @@ def _parameterize_system(stru:Structure, work_dir:str) -> Tuple[List[str], Dict[
             charge_mapper[res.name] = ligand_charge
         _LOGGER.info(charge_mapper)
 
-        param_file:str = interface.rosetta.parameterize_ligand(res, charge=ligand_charge, work_dir=work_dir)
+        param_file:str = interface.rosetta.parameterize_ligand(res, charge=ligand_charge, work_dir=params.work_dir)
         
         _LOGGER.info(f"Information for reactant {res.name}:")
         _LOGGER.info(f"\tparam file: {param_file}")

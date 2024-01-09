@@ -1,6 +1,19 @@
-from typing import List
+"""Portion of the enzy_htp.structure.structure_constraint submodule that is responsible for creating
+StructureConstraint objects from .xml files. This is generally the preferred way to create new StructureConstraint objects.
+Functions included are:
 
-#TODO(CJ): documentation
+    + structure_constraints_from_xml()
+    + cartesian_freeze_from_xml()
+    + distance_constraint_from_xml()
+    + angle_constraint_from_xml()
+    + dihedral_constraint_from_xml()
+    + residue_pair_constraint_from_xml()
+
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Date: 2024-01-01
+"""
+
+from typing import List
 
 from copy import deepcopy
 
@@ -9,6 +22,7 @@ import xml.etree.ElementTree as ET
 from ..structure import Structure, Solvent, Chain, Residue, Atom
 
 from enzy_htp.core import _LOGGER
+from enzy_htp.core import file_system as fs
 
 from .api import (
     StructureConstraint,
@@ -16,25 +30,53 @@ from .api import (
     DistanceConstraint,
     AngleConstraint, DihedralConstraint,
     ResiduePairConstraint,
-    create_residue_pair_constraint
     )
 
 
-#TODOC(CJ): generally need more checks and everying in this thing
-
+from .create_constraint import (
+    create_residue_pair_constraint,
+    create_cartesian_freeze,
+    create_backbone_freeze,
+    create_distance_constraint,
+    create_angle_constraint,
+    create_dihedral_constraint,
+    merge_cartesian_freeze,
+    )
 
 def structure_constraints_from_xml(topology: Structure, file:str) -> List[StructureConstraint]:
-    """TODO(CJ)"""
+    """Creates a List[StructureConstraint] from a .xml file describing the constrained geometry. The 
+    constraints are applied/mapped to a supplied Structure object. Basic checks are performed on the 
+    .xml file, the syntax of the supplied constraints, and the compatibility of the Constraints and 
+    the Structure object.
+    
+    Args:
+        topology: The Structure object where the StructureConstraint objects will be applied.
+        file: The .xml file to get the constraints from.
+
+    Returns:
+        A List[StructureConstraint] objects described in the .xml file.
+    """
+
+    fs.check_not_empty( file )
 
     tree = ET.parse(file)
     root = tree.getroot()
-   
 
     result = list()
     for rr in root:
         if rr.tag == 'ResiduePairConstraint':
             result.append(residue_pair_constraint_from_xml(topology, rr))
-    #TODO(CJ): some kind of check with file system 
+        elif rr.tag == 'CartesianFreeze':
+            result.append(cartesian_freeze_from_xml(topology, rr))
+        elif rr.tag == 'DistanceConstraint':
+            result.append(distance_constraint_from_xml(topology, rr))
+        elif rr.tag == 'AngleConstraint':
+            result.append(angle_constraint_from_xml(topology, rr))
+        elif rr.tag == 'DihedralConstraint':
+            result.append(dihedral_constraint_from_xml(topology, rr))
+        else:
+            _LOGGER.error(f"The supplied constraint {rr.tag} is not supported! Exiting...")
+            exit( 1 ) 
 
     return result
 
@@ -71,9 +113,8 @@ def check_valid_child_constraint(data) -> None:
         exit( 1 )
 
 
-def residue_pair_constraint_from_xml(topology, node) -> ResiduePairConstraint:
-
-        
+def residue_pair_constraint_from_xml(topology:Structure, node) -> ResiduePairConstraint:
+    """TODO(CJ)"""
    
     r1_key = None
     r2_key = None

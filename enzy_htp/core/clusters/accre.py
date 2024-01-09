@@ -33,8 +33,8 @@ class Accre(ClusterInterface):
 
     # environment presets #
     AMBER_ENV = {
-        "CPU": "source /home/shaoq1/bin/amber_env/amber22.sh",
-        "GPU": "source /home/shaoq1/bin/amber_env/amber22.sh",
+        "CPU": "source ~/setup-accre.sh",
+        "GPU": "source ~/setup-accre.sh",
     }
 
     G16_ENV = {
@@ -53,7 +53,7 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID""",
     # command for submission
     SUBMIT_CMD = "sbatch"
     # regex pattern for extracting job id from stdout
-    JOB_ID_PATTERN = r"Submitted batch job ([0-9]+)"
+    JOB_ID_PATTERN = r"Submitted batch job ([0-9]+)" #NOTE(CJ): can this also have 
     # command for control & monitor
     KILL_CMD = "scancel"
     HOLD_CMD = "scontrol hold"

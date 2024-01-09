@@ -470,7 +470,13 @@ class PyMolInterface(BaseInterface):
             cmd_str: str = f"{cmd_name}({','.join(map(str, cmd_args))})"
             try:
                 fxn = getattr(session.cmd, cmd_name)
-                if len(cmd_set) > 1:
+                if cmd_name == 'alter' and len(cmd_set) == 3:
+                    #TODO(CJ): add some more checking here
+                    result.append(session.cmd.alter(
+                        cmd_set[1], cmd_set[2]
+                    ))
+                elif len(cmd_set) > 1:
+                    
                     result.append(fxn(*cmd_args))
                 else:
                     result.append(fxn())

@@ -1,6 +1,12 @@
-"""Submodule defining StructureConstraints
+"""Submodule defining StructureConstraints that are applied to Structure objects. This module contains
+three general subsections:
+
+    + defining actual constraints
+    + factory functions for the constraints
+    + input for constraints through .xml files
 
 Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-10-28
 """
 from .api import (
@@ -10,6 +16,9 @@ from .api import (
     AngleConstraint,
     DihedralConstraint,
     ResiduePairConstraint,
+    )
+
+from .create_constraint import (
     create_residue_pair_constraint,
     create_cartesian_freeze,
     create_backbone_freeze,
@@ -19,5 +28,6 @@ from .api import (
     merge_cartesian_freeze,
     )
 
-
-from .xml_io import structure_constraints_from_xml
+from .xml_io import (
+    structure_constraints_from_xml
+    )

@@ -71,6 +71,22 @@ class ARMerConfig(BaseConfig):
         """A list of all required environment python modules for ARMerConfig."""
         return list()
 
+    def __getitem__(self, key: str) -> Any:
+        """Getter that enables [] accession of ARMerConfig() attributes."""
+        if key.count("."):
+            key1, key2 = key.split(".", 1)
+            return getattr(self, key1)[key2]
+        else:
+            return getattr(self, key)
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        """Setter that enables [] accession of ARMerConfig() attributes with value validation."""
+        if key.count("."):
+            key1, key2 = key.split(".")
+            ARMerConfig.__dict__[key1][key2] = value
+        else:
+            setattr(self, key, value)
+
 
 def default_armer_config() -> ARMerConfig:
     """Creates a deep-copied default version of the ARMerConfig() class."""

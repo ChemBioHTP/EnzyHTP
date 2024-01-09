@@ -132,7 +132,7 @@ class AmberParameter(MolDynParameter):
         result *= Path(self._inpcrd).exists()
         result *= Path(self._prmtop).exists()
         # file size not zero
-        result *= os.path.getsize(self._inpcrd) != 0
+        result *= os.path.getsize(self._inpcrd) != 0 #TODO(CJ): use the function I already implemented for this
         result *= os.path.getsize(self._prmtop) != 0
         # TODO add upon need
         return bool(result)
@@ -668,7 +668,6 @@ class AmberMDStep(MolDynStep):
         else:
             _LOGGER.error("only allow AmberParameter or MolDynResult(source='amber') as `input_data`")
             raise TypeError
-
         # 2. make .in file
         fs.safe_mkdir(self.work_dir)
         temp_mdin_file = self._make_mdin_file()
@@ -702,14 +701,12 @@ class AmberMDStep(MolDynStep):
             prmtop_file=prmtop,
             interface=self.parent_interface)
 
-        result = MolDynResult(
-            traj_file = traj_path,
-            traj_parser = traj_parser, 
-            traj_log_file = mdout_path,
-            traj_log_parser = traj_log_parser, 
-            last_frame_file = mdrst_path,
-            last_frame_parser = last_frame_parser,
-            source="amber",
+        result = AmberMDResultEgg(
+            traj_path=traj_path,
+            traj_log_path=mdout_path,
+            rst_path=mdrst_path,
+            prmtop_path=prmtop,
+            parent_job=None
         )
 
         # 6. clean up
@@ -774,7 +771,8 @@ class AmberMDStep(MolDynStep):
         # clean up
         clean_up_target = ["./mdinfo"]
         if not self.keep_in_file:
-            clean_up_target.extend(result_egg.parent_job.mimo["temp_mdin"])
+            if result_egg.parent_job is not None:
+                clean_up_target.extend(result_egg.parent_job.mimo["temp_mdin"])
             # TODO also clean up .rs file but how to obtain it?
             # parse mdin file?
         fs.clean_temp_file_n_dir(clean_up_target)
@@ -1217,6 +1215,42 @@ class AmberInterface(BaseInterface):
         aid_mapper = self.get_amber_index_mapper(stru)
         return [aid_mapper["atom"][at] for at in atoms]
 
+
+    def rename_atoms(self, stru: Structure) -> None:
+        """Renames residues and atoms to be compatible with Amber naming and functions.
+        
+        Args:
+            stru: The Structure() to perform renaming on.
+
+        Returns:
+            Nothing. 
+        """
+        nterm_mapper:Dict = {"H1":"1H", "H2":"2H", "H3":"3H"}
+        leu_mapper:Dict = {
+            "1HD1":"HD11",
+            "2HD1":"HD12",
+            "3HD1":"HD13",
+            "1HD2":"HD21",
+            "2HD2":"HD22",
+            "3HD2":"HD23",
+            }
+        _LOGGER.info("Beginning renaming...")
+        changed_residues:int = 0
+        changed_atoms:int = 0
+        for res in stru.residues:
+            if not res.is_canonical():
+                continue
+            
+
+            if res.name == 'LEU':
+                for aa in res.atoms:
+                    if aa.name in leu_mapper:
+                        aa.name = leu_mapper[aa.name]
+                        changed_atoms += 1                            
+        
+        _LOGGER.info(f"Finished renaming! Changed {changed_residues} residues and {changed_atoms} atoms.")
+
+
     def get_amber_residue_index(self, residues: List[Atom]) -> List[int]:
         """"""
         raise Exception("TODO")
@@ -1449,7 +1483,15 @@ class AmberInterface(BaseInterface):
             geom_cons: List[StructureConstraint]
             nmropt_cntrl = {'nmropt': 1}
             # figure out path
-            disang_path: str = geom_cons[0].params["amber"]["rs_filepath"]
+            if geom_cons[0].is_residue_pair_constraint():
+                for (_, cst) in geom_cons[0].child_constraints:
+                    disang_path: str = cst.params["amber"]["rs_filepath"]
+                    break
+                else:
+                    assert False
+                    #TODO(CJ): figure this out
+            else:
+                disang_path: str = geom_cons[0].params["amber"]["rs_filepath"]
             if disang_path.startswith("{mdstep_dir}"):
                 disang_path = disang_path.lstrip("{mdstep_dir}")
                 disang_path = f"{md_config_dict['mdstep_dir']}/{disang_path}"
@@ -1457,8 +1499,12 @@ class AmberInterface(BaseInterface):
             # figure out content
             disang_content_list = []
             for cons in geom_cons:
-                raw_rs_dict = self._parse_cons_to_raw_rs_dict(cons)
-                disang_content_list.append(raw_rs_dict)
+                if cons.is_residue_pair_constraint():
+                    for (_, cst) in cons.child_constraints:
+                        disang_content_list.append( self._parse_cons_to_raw_rs_dict(cst) )
+                else:                    
+                    raw_rs_dict = self._parse_cons_to_raw_rs_dict(cons)
+                    disang_content_list.append(raw_rs_dict)
             # assemble
             nmropt_file_redirection = {
                 "DISANG" : {
@@ -1604,6 +1650,7 @@ class AmberInterface(BaseInterface):
         return the executable and mpi prefix if needed."""
         result = self.config()["HARDCODE_MD_ENGINE"][core_type]
         if core_type == "cpu":
+            
             mpi_exec = eh_config._system.get_mpi_executable(num_cores)
             result = f"{mpi_exec} {result}"
         return result
@@ -2048,6 +2095,7 @@ class AmberInterface(BaseInterface):
             record_period = self.config()["DEFAULT_MD_RECORD_PERIOD_FACTOR"] * length
         if work_dir == "default":
             work_dir = self.config()["DEFAULT_MD_WORK_DIR"]
+            
 
         return AmberMDStep(
             interface = self,
@@ -2067,45 +2115,6 @@ class AmberInterface(BaseInterface):
             keep_in_file = keep_in_file,
             work_dir = work_dir,
         )
-
-    # region == TODO ==
-    def minimize_structure(self, pdb: str, min_dir: str = "./", mode: str = "CPU", cycle: int = 2000) -> str:
-        """Class method that minimizes the structure found in a supplied .pdb file, returning
-        the path to the minimized file.
-        Args:
-            pdb: The .pdb file with the structure to be minimized.
-            mode: Which version of Amber to use. Allowed values are "CPU" and "GPU".
-            min_dir: Work directory where the paramter files and output are saved.
-            cycle: Number of steps in the steepest descent of the cycle.
-        Returns:
-            Path to the minimized structure in a .pdb file.
-        """
-        # TODO(CJ): add some checks for inputs
-        inpath = Path(pdb)
-        if min_dir == "./":
-            min_dir = f"{inpath.parent}/pdb_min/"
-
-        fs.safe_mkdir(min_dir)
-        outfile = f"{min_dir}/{inpath.stem}_min.pdb"
-        min_in = f"{min_dir}/min.in"
-        min_out = f"{min_dir}/min.out"
-        min_rst = f"{min_dir}/min.ncrst"
-        (prmtop, inpcrd) = self.build_param_files(str(inpath), min_dir)
-        self.write_minimize_input_file(min_in, cycle)
-        engine = self.config_.get_engine(mode)
-
-        # yapf: disable
-        self.env_manager_.run_command(
-            engine, ["-O", "-i", min_in, "-o", min_out, "-p", prmtop, "-c", inpcrd, "-r", min_rst],
-
-        )
-
-        self.env_manager_.run_command(
-            "ambpdb",[f"-p", prmtop, "-c", min_rst, ">", outfile]
-        )
-        # yapf: enable
-
-        return outfile
 
     def md_run(self, prmtop: str, inpcrd: str, work_dir: str, mode: str = "CPU") -> str:
         """Runs a full MD simulation using the suplied prmtop and inpcrd files. Simulation is composed

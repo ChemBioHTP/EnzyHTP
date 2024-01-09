@@ -40,6 +40,22 @@ class RosettaConfig(BaseConfig):
     PY_2_7: str = "python2.7"
     """TODO(CJ)"""
 
+
+    DEFAULT_DISTANCE_CONSTRAINT_SETTING = {
+        'tolerance': 0.5,
+        'penalty': 500.0
+
+    }
+    """TODO(CJ)"""
+
+    DEFAULT_ANGLE_CONSTRAINT_SETTING = {
+        'tolerance': 20.0,
+        'penalty': 50.0
+
+    }
+    """TODO(CJ)"""
+
+
     def required_executables(self) -> List[str]:
         """A hardcoded list of required executables for Rosetta."""
         return [self.ROSETTA_SCRIPTS, self.PARAMS_SCRIPT, self.PY_2_7]

@@ -653,7 +653,7 @@ class Structure(DoubleLinkedNode):
 
     @dispatch
     def add(self, target: Residue, # pylint: disable=function-redefined
-            sort: bool = False, chain_name:str=None) -> None: 
+            sort: bool = False, chain_name:str=None, net_charge:int=None, multiplicity:int=None) -> None: 
         """add a residue into the structure."""
         res_type = target.rtype
         if res_type in [ResidueType.CANONICAL,
@@ -665,6 +665,13 @@ class Structure(DoubleLinkedNode):
                           ResidueType.SOLVENT,
                           ResidueType.UNKNOWN]:
             # always make a new chain as they are not covalently connected
+            if res_type == ResidueType.LIGAND:
+                if net_charge is not None:
+                    target.net_charge = net_charge                    
+                
+                if multiplicity is not None:
+                    target.multiplicity = multiplicity
+                
             if not chain_name:
                 chain_name = self._legal_new_chain_names()[0]
 

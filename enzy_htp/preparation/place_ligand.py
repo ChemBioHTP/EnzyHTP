@@ -159,6 +159,7 @@ def _place_mole2(stru:Structure,
         for cst in constraints:
             if cst.is_residue_pair_constraint():
                 curr_energy += cst.distanceAB_.score_energy()
+            #TODO(CJ): add in the regular distance constraints
                 
         scores.append( curr_energy )            
 

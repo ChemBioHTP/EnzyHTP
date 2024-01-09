@@ -17,6 +17,7 @@ SUB_MODULES=[
         'enzy_htp._config',
         'enzy_htp._interface',
         'enzy_htp._interface.handle_types',
+        'enzy_htp.geometry',
         'enzy_htp.analysis',
         'enzy_htp.core',
         'enzy_htp.core.clusters',
