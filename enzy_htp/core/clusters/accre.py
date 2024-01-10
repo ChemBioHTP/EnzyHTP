@@ -145,7 +145,7 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID""",
             res_line = f"#SBATCH --{k}{v}\n"
             res_str += res_line
         res_str += "#SBATCH --export=NONE\n"
-        # res_str += "#SBATCH --exclude=gpu0051,gpu0033,cn428\n"
+        # res_str += "#SBATCH --exclude=gpu0051,gpu0033\n"
         return res_str
     
     @classmethod
