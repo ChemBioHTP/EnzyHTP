@@ -39,6 +39,7 @@ def single_point(
         cluster_job_config: Dict= None,
         job_check_period: int= 210, # s
         job_array_size: int= 20,
+        work_dir: str="./QM_SPE",
         ) -> List[EletronicStructure]:
     """The QM single point calculation. This function calculates the molecular orbitals (MOs)
     give a molecule with a specific geometry. If an ensemble of geometry is give, 
@@ -172,6 +173,7 @@ def single_point(
                                             method=qm_method,
                                             keep_geom=True,
                                             cluster_job_config=cluster_job_config,
+                                            work_dir=work_dir,
                                         )
     else:
         # multiscale
@@ -184,6 +186,7 @@ def single_point(
                         embedding_method=embedding_method,
                         keep_geom=True,
                         cluster_job_config=cluster_job_config,
+                        work_dir=work_dir,
                     )
 
     # parallel methods

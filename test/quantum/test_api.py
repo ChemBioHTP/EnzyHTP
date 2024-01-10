@@ -3,6 +3,7 @@ Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2023-12-29
 """
 
+import numpy as np
 import pytest
 import os
 from enzy_htp._interface.amber_interface import AmberMDCRDParser
@@ -45,7 +46,7 @@ def test_single_point_gaussian_lv1():
         "cluster" : Accre(),
         "res_keywords" : {
             "account" : "yang_lab_csb",
-            "partition" : "production",
+            "partition" : "debug",
             'walltime' : '30:00',
         }
     }
@@ -56,7 +57,15 @@ def test_single_point_gaussian_lv1():
         method=test_method,
         cluster_job_config=cluster_job_config,
         job_check_period=10,
-    )
+        work_dir=f"{WORK_DIR}/QM_SPE/"
+    )[0]
+
+    assert np.isclose(qm_result.energy_0, -597.293275805, atol=1e-3)
+    assert not os.path.exists(f"{WORK_DIR}/QM_SPE/gaussian_spe.gjf")
+
+    fs.safe_rm(f"{WORK_DIR}/QM_SPE/gaussian_spe.out")
+    fs.safe_rm(f"{WORK_DIR}/QM_SPE/gaussian_spe.chk")
+    fs.safe_rmdir(f"{WORK_DIR}/QM_SPE/", True)
 
 @pytest.mark.accre
 def test_single_point_gaussian_lv2():
@@ -78,7 +87,7 @@ def test_single_point_gaussian_lv2():
         "cluster" : Accre(),
         "res_keywords" : {
             "account" : "yang_lab_csb",
-            "partition" : "production", # cant use debug that accre only have a node that dont have Gaussian
+            "partition" : "debug", # cant use debug that accre only have a node that dont have Gaussian
             'walltime' : '30:00',
         }
     }
@@ -87,7 +96,7 @@ def test_single_point_gaussian_lv2():
         stru=test_stru,
         engine="gaussian",
         method=test_method,
-        region=[test_stru_region],
+        regions=[test_stru_region],
         cluster_job_config=cluster_job_config,
         job_check_period=10,
         )
@@ -120,7 +129,7 @@ def test_single_point_gaussian_lv3():
         "cluster" : Accre(),
         "res_keywords" : {
             "account" : "yang_lab_csb",
-            "partition" : "production",
+            "partition" : "debug",
             'walltime' : '30:00',
         }
     }
@@ -129,7 +138,7 @@ def test_single_point_gaussian_lv3():
         stru=test_esm,
         engine="gaussian",
         method=test_method,
-        region=[test_stru_region],
+        regions=[test_stru_region],
         cluster_job_config=cluster_job_config,
         job_check_period=10,
         )
@@ -152,7 +161,7 @@ def test_single_point_gaussian_lv4():
         "cluster" : Accre(),
         "res_keywords" : {
             "account" : "yang_lab_csb",
-            "partition" : "production",
+            "partition" : "debug",
             'walltime' : '30:00',
         }
     }

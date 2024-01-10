@@ -3,6 +3,7 @@ for electronic structure/wavefunctions of a molecule decribed by Structure().
 
 Author: QZ Shao <shaoqz@icloud.com>
 Date: 2023-12-28"""
+import os
 from typing import List, Any
 
 from enzy_htp.structure import Structure
@@ -80,3 +81,17 @@ class EletronicStructure:
     def source(self) -> str:
         """the source of this result"""
         return self._source
+    
+    # region == Special ==
+    def __str__(self) -> str:
+        out_line = [
+            f"<ElectronicStructure object at {hex(id(self))}>",
+        ]
+        out_line.append("ElectronicStructure(")
+        out_line.append(f"    energy_0: {self.energy_0}")
+        out_line.append(f"    MO source: {self.mo}")
+        out_line.append(f"    MO parser: {self._mo_parser}")
+        out_line.append(")")
+        return os.linesep.join(out_line)
+
+    # endregion

@@ -17,6 +17,7 @@ Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-11
 """
+from __future__ import annotations
 import os
 import re
 from pathlib import Path
@@ -24,6 +25,7 @@ from typing import List, Tuple, Dict, Union
 from dataclasses import dataclass
 from plum import dispatch
 from subprocess import CompletedProcess, SubprocessError
+import goodvibes.io as gvio
 
 from .base_interface import BaseInterface
 from .handle_types import (
@@ -124,7 +126,7 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
         return "gaussian16"
 
     @property
-    def parent_interface(self):
+    def parent_interface(self) -> GaussianInterface:
         """getter for _parent_interface"""
         return self._parent_interface
 
@@ -192,7 +194,7 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
             sub_script_path = sub_script_path
         )
         job.mimo = { # only used for translate clean up
-            "temp_gin": temp_gjf_file,
+            "temp_gin": [temp_gjf_file],
         }
 
         # 5. make result egg
@@ -255,16 +257,18 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
         gout_path = result_egg.gout_path
         gchk_path = result_egg.gchk_path
         parent_job = result_egg.parent_job
+
+        # error check
+        self.check_spe_error(gout_path, result_egg.parent_job)
+
         stru = result_egg.stru
         mo_parser = GaussianChkParser(
             interface=self.parent_interface)
         energy_0 = self.get_energy_0(gout_path)
 
-        # error check
-        self.check_spe_error(gout_path, result_egg.parent_job)
-
         # clean up
-        clean_up_target = []
+        clean_up_target = [result_egg.parent_job.job_cluster_log,
+                           result_egg.parent_job.sub_script_path]
         if not self.keep_in_file:
             clean_up_target.extend(parent_job.mimo["temp_gin"])
         fs.clean_temp_file_n_dir(clean_up_target)
@@ -351,6 +355,11 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
         )
 
         return temp_gjf_file_path, temp_chk_file_path
+
+    def get_energy_0(self, gout_file: str) -> float:
+        """get ground state energy from the gaussian output file"""
+        gout_data = self.parent_interface.read_from_gout_spe(gout_file)
+        return gout_data["energy_0"]
 
 
 class GaussianInterface(BaseInterface):
@@ -712,6 +721,39 @@ class GaussianInterface(BaseInterface):
         else:
             return False
 
+    def read_from_gout_spe(self, gout: str) -> Dict:
+        """read a data dictionary from a gaussian output file for a
+        single point based calculation. This function is placed here
+        since it will be used by other read_from_gout_xxx functions.
+        
+        NOTE: use GoodVibes 3.2 for now.
+        
+        Returns;
+        {   "energy_0" : ...,
+            "charge" : ..., 
+            "multiplicity" : ..., }"""
+
+        (sp_energy,
+         program, 
+         version_program, 
+         solvation_model, 
+         file, 
+         charge, 
+         empirical_dispersion, 
+         multiplicity) = gvio.parse_data(gout)
+        
+        result = {
+            "energy_0" : sp_energy,
+            "charge" : charge, 
+            "multiplicity" : multiplicity, 
+        }
+
+        return result
+
+    def read_from_gin(self, gin: str) -> Dict:
+        """read a data dictionary from a gaussian input file"""
+        raise Exception("TODO")
+
     # -- formchk --
     def run_formchk(self):
         """interface for running formchk"""
@@ -773,7 +815,7 @@ class GaussianInterface(BaseInterface):
             # they are parsed because GaussianInterface doesn't only use it for generating .gjf files
             # but also needs to be parsed to other QMEngine when needed.
             # (e.g.: config XTB job using Gaussian .gjf files)
-            gjf_config = self.read_from_gjf(gjf_file)
+            gjf_config = self.read_from_gin(gjf_file)
             method_gjf = gjf_config.get("method", None)
             region_gjf = gjf_config.get("region", None)
             keep_geom_gjf = gjf_config.get("keep_geom", None)
