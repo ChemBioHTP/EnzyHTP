@@ -198,7 +198,7 @@ def single_point(
             job_check_period,
             job_array_size,
         )
-    if parallel_method is None:
+    elif parallel_method is None:
         result = _serial_qm(
             stru_esm, qm_engine,
         )
