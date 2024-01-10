@@ -40,6 +40,7 @@ def single_point(
         job_check_period: int= 210, # s
         job_array_size: int= 20,
         work_dir: str="./QM_SPE",
+        keep_in_file: bool=False,
         ) -> List[EletronicStructure]:
     """The QM single point calculation. This function calculates the molecular orbitals (MOs)
     give a molecule with a specific geometry. If an ensemble of geometry is give, 
@@ -76,6 +77,10 @@ def single_point(
             how many jobs are allowed to submit simultaneously. (0 means all -> len(inp))
             (e.g. 5 for 100 jobs means run 20 groups. All groups will be submitted and
             in each group, submit the next job only after the previous one finishes.)
+        work_dir:
+            the working dir that contains all the files in the SPE process
+        keep_in_file:
+            whether keep the input file of the calculation
     Returns:
         A list of ElectronicStructure for each frame
         [ElectronicStructure(), ...]
@@ -138,8 +143,9 @@ def single_point(
         region_methods = []
 
     if len(regions) != len(region_methods):
-        _LOGGER.error(f"Number of region methods ({len(region_methods)}) do not match number of regions ({len(regions)}).")
-        raise ValueError
+        if not len(regions) == 1:
+            _LOGGER.error(f"Number of region methods ({len(region_methods)}) do not match number of regions ({len(regions)}).")
+            raise ValueError
     
     if len(regions) < 2:
         # QM only
@@ -174,6 +180,7 @@ def single_point(
                                             keep_geom=True,
                                             cluster_job_config=cluster_job_config,
                                             work_dir=work_dir,
+                                            keep_in_file=keep_in_file,
                                         )
     else:
         # multiscale
@@ -187,6 +194,7 @@ def single_point(
                         keep_geom=True,
                         cluster_job_config=cluster_job_config,
                         work_dir=work_dir,
+                        keep_in_file=keep_in_file,
                     )
 
     # parallel methods

@@ -448,6 +448,7 @@ class GaussianInterface(BaseInterface):
         result = self.BASIS_SET_KEYWORD_MAPPER.get(name, None)
         if result is None:
             result = name
+        result = " "+result
 
         return result, gen_section_lines
 
@@ -473,7 +474,7 @@ class GaussianInterface(BaseInterface):
             result_sol_method = self.SOLV_MODEL_KEYWORD_MAPPER.get(method, None)
             if result_sol_method is None:
                 result_sol_method = method
-            result = f"scrf=({result_sol_method},solvent={result_sol})"
+            result = f" scrf=({result_sol_method},solvent={result_sol})"
 
         return result, sol_read_line
 
@@ -659,7 +660,7 @@ class GaussianInterface(BaseInterface):
             method_kw = self.get_method_keyword_from_name(lot.method)
             bs_kw, bs_gen_lines = self.get_basis_set_keyword_from_name(lot.basis_set)
             sol_kw, sol_read_line = self.get_solvation_keyword_from_name(lot.solvent, lot.solv_method)
-            lot_kw = f"{method_kw} {bs_kw} {sol_kw}"
+            lot_kw = f"{method_kw}{bs_kw}{sol_kw}"
 
         return lot_kw, bs_gen_lines, sol_read_line
 

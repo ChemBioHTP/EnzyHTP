@@ -27,7 +27,6 @@ gi = interface.gaussian
 
 
 @pytest.mark.accre
-@pytest.mark.temp
 def test_single_point_gaussian_lv1():
     """Test running a QM single point.
     Using Gaussian & Accre as an example engine
@@ -68,6 +67,7 @@ def test_single_point_gaussian_lv1():
     fs.safe_rmdir(f"{WORK_DIR}/QM_SPE/", True)
 
 @pytest.mark.accre
+@pytest.mark.temp
 def test_single_point_gaussian_lv2():
     """Test running a QM single point.
     Using Gaussian & Accre as an example engine
@@ -75,9 +75,6 @@ def test_single_point_gaussian_lv2():
     - structure region
     - single snapshot"""
     test_stru = sp.get_structure(f"{STRU_DATA_DIR}KE_07_R7_2_S.pdb")
-    test_stru_region = create_region_from_selection_pattern(
-        test_stru, "br. (resi 254 around 2)"
-    )
     test_stru.assign_ncaa_chargespin({"H5J" : (0,1)})
     test_method = QMLevelofTheory(
         basis_set="3-21G",
@@ -96,10 +93,18 @@ def test_single_point_gaussian_lv2():
         stru=test_stru,
         engine="gaussian",
         method=test_method,
-        regions=[test_stru_region],
+        regions=["br. (resi 254 around 2)"],
         cluster_job_config=cluster_job_config,
         job_check_period=10,
-        )
+        work_dir=f"{WORK_DIR}/QM_SPE/",
+        )[0]
+
+    assert np.isclose(qm_result.energy_0, -1668.68154951, atol=1e-3)
+    assert not os.path.exists(f"{WORK_DIR}/QM_SPE/gaussian_spe.gjf")
+
+    fs.safe_rm(f"{WORK_DIR}/QM_SPE/gaussian_spe.out")
+    fs.safe_rm(f"{WORK_DIR}/QM_SPE/gaussian_spe.chk")
+    fs.safe_rmdir(f"{WORK_DIR}/QM_SPE/", True)
 
 @pytest.mark.accre
 def test_single_point_gaussian_lv3():
@@ -116,9 +121,6 @@ def test_single_point_gaussian_lv3():
         top_parser=get_itself,
         coordinate_list=test_traj,
         coord_parser=AmberMDCRDParser(test_prmtop).get_coordinates,
-    )
-    test_stru_region = create_region_from_selection_pattern(
-        test_stru, "br. (resi 254 around 2)"
     )
     test_stru.assign_ncaa_chargespin({"H5J" : (0,1)})
     test_method = QMLevelofTheory(
@@ -138,7 +140,7 @@ def test_single_point_gaussian_lv3():
         stru=test_esm,
         engine="gaussian",
         method=test_method,
-        regions=[test_stru_region],
+        regions=["br. (resi 254 around 2)"],
         cluster_job_config=cluster_job_config,
         job_check_period=10,
         )
