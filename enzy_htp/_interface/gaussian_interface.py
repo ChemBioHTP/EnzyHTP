@@ -678,6 +678,9 @@ class GaussianInterface(BaseInterface):
             geom_lines = self.get_geom_lines(atoms, cart_freeze)
             mol_spec_lines.extend(geom_lines)
 
+        # final new line
+        mol_spec_lines.append("")
+
         return mol_spec_lines
 
     def get_geom_lines(self, atoms: List[Atom], cart_freeze: List[CartesianFreeze]) -> List[str]:
