@@ -67,7 +67,6 @@ def test_single_point_gaussian_lv1():
     fs.safe_rmdir(f"{WORK_DIR}/QM_SPE/", True)
 
 @pytest.mark.accre
-@pytest.mark.temp
 def test_single_point_gaussian_lv2():
     """Test running a QM single point.
     Using Gaussian & Accre as an example engine
@@ -107,6 +106,7 @@ def test_single_point_gaussian_lv2():
     fs.safe_rmdir(f"{WORK_DIR}/QM_SPE/", True)
 
 @pytest.mark.accre
+@pytest.mark.temp
 def test_single_point_gaussian_lv3():
     """Test running a QM single point.
     Using Gaussian & Accre as an example engine
@@ -114,8 +114,8 @@ def test_single_point_gaussian_lv3():
     - 1 structure region
     - 100 snapshots"""
     test_stru = sp.get_structure(f"{STRU_DATA_DIR}KE_07_R7_2_S.pdb")
-    test_traj = f"{DATA_DIR}KE_07_R7_2_S_10f.mdcrd"
-    test_prmtop = f"{DATA_DIR}KE_07_R7_2_S_10f.prmtop"
+    test_traj = f"{STRU_DATA_DIR}KE_07_R7_2_S_10f.mdcrd"
+    test_prmtop = f"{STRU_DATA_DIR}KE_07_R7_2_S_10f.prmtop"
     test_esm = StructureEnsemble(
         topology=test_stru,
         top_parser=get_itself,
@@ -136,14 +136,20 @@ def test_single_point_gaussian_lv3():
         }
     }
 
-    qm_result = single_point(
+    qm_results = single_point(
         stru=test_esm,
         engine="gaussian",
         method=test_method,
         regions=["br. (resi 254 around 2)"],
         cluster_job_config=cluster_job_config,
         job_check_period=10,
+        job_array_size=5,
+        work_dir=f"{WORK_DIR}/QM_SPE/",
         )
+
+    for qm_result in qm_results:
+        assert np.isclose(qm_result.energy_0, -1668, atol=5)
+    fs.safe_rmdir(f"{WORK_DIR}/QM_SPE/")
 
 @pytest.mark.accre
 def test_single_point_gaussian_lv4():
