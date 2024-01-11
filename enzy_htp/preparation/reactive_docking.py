@@ -7,7 +7,7 @@ Date: 2023-07-28
 import os
 from pathlib import Path
 from collections import defaultdict
-from typing import List, Tuple, Set, Dict, Any
+from typing import List, Tuple, Set, Dict
 from copy import deepcopy
 
 import numpy as np
@@ -22,31 +22,14 @@ from enzy_htp import mutation as mm
 from enzy_htp.structure import PDBParser, Mol2Parser, Structure, Ligand
 from enzy_htp.core import file_system as fs
 
-from dataclasses import dataclass
-
 #TODO(CJ): I should go through and use existing values if cache mode is selected
 #:TODO(CJ): need to be able to specify the size of the grid
-
-@dataclass(frozen=True)
-class ReactiveDockingParams:
-    n_struct:int
-    cst_energy:float
-    use_qm:bool
-    freeze_alphafill:bool
-    clash_distance:float
-    clash_cutoff:int
-    max_sasa_ratio:float
-    cluster_distance:float
-    rng_seed:int
-    work_dir:str
-    save_work_dir:bool
-        
 
 def dock_reactants(structure: Structure,
                    constraints: List[StructureConstraint] = None,
                    n_struct: int = 100,
                    cst_energy: float = None,
-                   use_qm:bool=True,
+                   use_qm: bool = True,
                    freeze_alphafill:bool = True,
                    clash_distance: float = 2.0,
                    clash_cutoff: int = 3,
@@ -73,6 +56,7 @@ def dock_reactants(structure: Structure,
         constraints:
         n_struct:
         cst_energy:
+        use_qm:
         clash_distance:
         clash_cutoff:
         max_sasa_ratio:
@@ -84,6 +68,7 @@ def dock_reactants(structure: Structure,
 
     Returns:
         A Structure() with the specified, constrained geometry. 
+
     """
 
     if work_dir is None:
@@ -95,38 +80,29 @@ def dock_reactants(structure: Structure,
     fs.safe_mkdir(work_dir)
 
     interface.rosetta.rename_atoms(structure)
-
-    params = ReactiveDockingParams(n_struct, cst_energy, use_qm, freeze_alphafill, clash_distance, clash_cutoff, max_sasa_ratio, cluster_distance, rng_seed, work_dir, save_work_dir)
-
-#    _log_settings(constraints, n_struct, cst_energy, clash_distance, clash_cutoff, max_sasa_ratio,
-#                cluster_distance, use_cache, rng_seed, work_dir, save_work_dir) #TODO(CJ): fix this when ready
     
-    (param_files, charge_mapper) = _parameterize_system(structure,  params)
+    (param_files, charge_mapper) = _parameterize_system(structure, work_dir)
 
-    df = _dock_system(structure, constraints, charge_mapper, param_files, params)
-   
-    select_geometry(df, structure, charge_mapper, params)
+    geometry_df = generate_geometries(structure, constraints, n_struct, clash_cutoff, param_files, charge_mapper, freeze_alphafill, work_dir, rng_seed )
 
-#    _evaluate_SASA(df, max_sasa_ratio)#TODO(CJ): put this back in 
-#
-#    _evaluate_csts(df, constraints, cst_energy)
-#    
-#    _evaluate_qm(df, structure, charge_mapper, cluster_distance)
+    select_geometry(structure, geometry_df, max_sasa_ratio, constraints, cst_energy, charge_mapper, cluster_distance)
 
-    final_geometry:Structure = _qm_minimization(df, charge_mapper, cluster_distance, constraints)
-  
-    #TODO(CJ): need to do the minimization in place    
+    if use_qm:
+        qm_minimization(structure, charge_mapper, cluster_distance, constraints)
+
+    mm_minimization(structure, cluster_distance, constraints, param_files, work_dir)
+
+    if use_qm:
+        qm_minimization(structure, charge_mapper, cluster_distance, [])
 
     if not save_work_dir:
         _LOGGER.info(f"save_work_dir set to False! Deleting {work_dir}")
         fs.safe_rmdir( work_dir )
 
-    return final_geometry 
+    return structure 
 
 
-
-def _create_xml(stru:Structure, cst_file:str,
-    params:ReactiveDockingParams) -> str:
+def _create_xml(stru:Structure, cst_file:str, freeze_alphafill:bool, clash_cutoff:int, work_dir: str) -> str:
     """
 
     Args:
@@ -138,52 +114,17 @@ def _create_xml(stru:Structure, cst_file:str,
     fname: str = f"{work_dir}/__script.xml"
     
     fpath = Path(fname)
-
-    elements: List[Dict] = [
-        {
-            'parent': 'SCOREFXNS',
-            'tag': 'ScoreFunction',
-            'name': 'ligand_soft_rep',
-            'weights': 'ligand_soft_rep'
-        },
-        {
-            'parent': 'SCOREFXNS',
-            'tag': 'ScoreFunction',
-            'name': 'hard_rep',
-            'weights': 'ligand'
-        },
-        {
-            'parent': 'SCOREFXNS.ScoreFunction',
-            'tag': 'Reweight',
-            'scoretype': 'coordinate_constraint',
-            'weight': '1.0'
-        },
-        {
-            'parent': 'SCOREFXNS.ScoreFunction',
-            'tag': 'Reweight',
-            'scoretype': 'atom_pair_constraint',
-            'weight': '1.0'
-        },
-        {
-            'parent': 'SCOREFXNS.ScoreFunction',
-            'tag': 'Reweight',
-            'scoretype': 'angle_constraint',
-            'weight': '1.0'
-        },
-        {
-            'parent': 'SCOREFXNS.ScoreFunction',
-            'tag': 'Reweight',
-            'scoretype': 'dihedral_constraint',
-            'weight': '1.0'
-        },
-        {
-            'parent': 'SCOREFXNS.ScoreFunction',
-            'tag': 'Reweight',
-            'scoretype': 'chainbreak',
-            'weight': '1.0'
-        },
+#yapf: disable
+    elements: List[Dict[str,str]] = [
+        {'parent': 'SCOREFXNS', 'tag': 'ScoreFunction', 'name': 'ligand_soft_rep', 'weights': 'ligand_soft_rep'},
+        {'parent': 'SCOREFXNS', 'tag': 'ScoreFunction', 'name': 'hard_rep', 'weights': 'ligand'},
+        {'parent': 'SCOREFXNS.ScoreFunction', 'tag': 'Reweight', 'scoretype': 'coordinate_constraint',  'weight': '1.0'},
+        {'parent': 'SCOREFXNS.ScoreFunction', 'tag': 'Reweight', 'scoretype': 'atom_pair_constraint',   'weight': '1.0'},
+        {'parent': 'SCOREFXNS.ScoreFunction', 'tag': 'Reweight', 'scoretype': 'angle_constraint',       'weight': '1.0'},
+        {'parent': 'SCOREFXNS.ScoreFunction', 'tag': 'Reweight', 'scoretype': 'dihedral_constraint',    'weight': '1.0'},
+        {'parent': 'SCOREFXNS.ScoreFunction', 'tag': 'Reweight', 'scoretype': 'chainbreak',             'weight': '1.0'},
     ]
-
+#yapf: enable
     ligand_count:int=0
     as_names:List[str] = list()
     for res in stru.residues:
@@ -207,108 +148,24 @@ def _create_xml(stru:Structure, cst_file:str,
         grid_name:str=f"grid_{ligand_count}"
         clash_metric:str=f"clash_{chain_name.lower()}"
         elements.extend([
-            {
-                'parent': 'ROSETTASCRIPTS',
-                'tag': 'SCORINGGRIDS',
-                'ligand_chain': res.parent.name,
-                'width': '30', 
-                'append_elements_only': True,
-                'name': grid_name,
-                'child_nodes': [
-                    {
-                        'parent': 'SCORINGGRIDS',
-                        'tag': 'ClassicGrid',
-                        'grid_name': 'classic',
-                        'weight': '1.0'
-                    },
-                ]
+            {'parent': 'ROSETTASCRIPTS', 'tag': 'SCORINGGRIDS', 'ligand_chain': res.parent.name, 'width': '30', 'append_elements_only': True, 'name': grid_name, 'child_nodes':
+                 [{'parent': 'SCORINGGRIDS', 'tag': 'ClassicGrid', 'grid_name': 'classic', 'weight': '1.0'},]},
+            {'parent': 'MOVERS', 'tag': 'Transform', 'name': transform_name, 'chain': chain_name, 'box_size': f"{40.0:.2f}", 'move_distance': f'{20.0:.2f}', 'angle': '360',
+                'cycles': '1000', 'repeats': '3', 'temperature': '5', 'grid_set': grid_name, 'use_constraints':'true', 'cst_fa_file':f'{Path(cst_file).absolute()}'},
+            {'parent':'PROTOCOLS', 'tag': 'Add', 'mover_name': transform_name,},
+            {'parent': 'FILTERS', 'tag': 'SimpleMetricFilter', 'name': f"{clash_metric}_filter", 'comparison_type':'lt_or_eq', 'cutoff':f"{clash_cutoff}", 'composite_action':'any', 'child_nodes':
+                [{ 'parent':'SimpleMetricFilter', 'tag':'PerResidueClashMetric', 'name':clash_metric, 'residue_selector': rname, 'residue_selector2': f"{rname}_as"}]
             },
-            {
-                'parent': 'MOVERS',
-                'tag': 'Transform',
-                'name': transform_name,
-                'chain': chain_name,
-                'box_size': f"{40.0:.2f}",
-                'move_distance': f'{20.0:.2f}',
-                'angle': '360',
-                'cycles': '1000',
-                'repeats': '3',
-                'temperature': '5',
-                'grid_set': grid_name,
-                'use_constraints':'true',
-                'cst_fa_file':f'{Path(cst_file).absolute()}'
-            },
-            {
-                'parent':'PROTOCOLS',
-                'tag': 'Add',
-                'mover_name': transform_name,
-            },
-            {
-                'parent': 'FILTERS', 
-                'tag': 'SimpleMetricFilter',
-                'name': f"{clash_metric}_filter",
-                'comparison_type':'lt_or_eq',
-                'cutoff':f"{clash_cutoff}",
-                'composite_action':'any',
-                'child_nodes':[
-                    {
-                        'parent':'SimpleMetricFilter',
-                        'tag':'PerResidueClashMetric',
-                        'name':clash_metric,
-                        'residue_selector': rname,
-                        'residue_selector2': f"{rname}_as"
-                    }
-                ]
-            },
-            { 
-                'parent': 'PROTOCOLS',
-                'tag': 'Add',
-                'filter': f"{clash_metric}_filter"
-            }
-
+            { 'parent': 'PROTOCOLS', 'tag': 'Add', 'filter': f"{clash_metric}_filter" }
         ])
 
-    
     elements.extend([
-        {'parent':'MOVERS',
-            'tag':'FastRelax',
-            'name':'frelax',
-            'scorefxn':'hard_rep',
-            'cst_file':f"{Path(cst_file).absolute()}",
-            'child_nodes': [
-                {
-                    'parent':'FastRelax',
-                    'tag':'MoveMap',
-                    'name':'full_enzyme',
-                    'bb':'true',
-                    'chi':'true',
-                    'jump':'false',
-                    'child_nodes':[
-                        {
-                            'parent':'MoveMap',
-                            'tag':'ResidueSelector',
-                            'selector':'as_selector',
-                            'bb':'true',
-                            'chi':'true',
-                            'bondangle':'true'
-                        },
-                        {
-                            'parent':'MoveMap',
-                            'tag':'ResidueSelector',
-                            'selector':'not_as_selector',
-                            'bb':'false',
-                            'chi':'true',
-                            'bondangle':'false'
-                        }
-                    ]
-                }
-            ]
+        {'parent':'MOVERS', 'tag':'FastRelax', 'name':'frelax', 'scorefxn':'hard_rep', 'cst_file':f"{Path(cst_file).absolute()}", 'child_nodes': [
+                {'parent':'FastRelax', 'tag':'MoveMap', 'name':'full_enzyme', 'bb':'true', 'chi':'true', 'jump':'false','child_nodes':[
+                        {'parent':'MoveMap','tag':'ResidueSelector', 'selector':'as_selector', 'bb':'true', 'chi':'true', 'bondangle':'true'},
+                        {'parent':'MoveMap', 'tag':'ResidueSelector', 'selector':'not_as_selector', 'bb':'false', 'chi':'true', 'bondangle':'false'},]}]
         },
-        {
-            'parent':'PROTOCOLS',
-            'tag':'Add',
-            'mover_name':'frelax'
-        }
+        {'parent':'PROTOCOLS', 'tag':'Add', 'mover_name':'frelax'}
     ])
 
     elements.extend([
@@ -327,8 +184,7 @@ def _make_options_file(pdb_file: str,
                       param_files: List[str],
                       work_dir: str,
                       rng_seed: int,
-                      n_struct: int,
-                      cst_file: str = None) -> str:
+                      n_struct: int,) -> str:
     """Makes the options.txt file that the docking run will actually use. Takes a variety of arguments and 
     can used cached values if needed. This function DOES NOT make any checks to the inputs.
     
@@ -340,7 +196,6 @@ def _make_options_file(pdb_file: str,
         rng_seed: rng seed to be used during dcking.
         n_struct: Number of strutures to make as an int().
         use_cache: Should we used cached values? 
-        cst_file: The contraints file to be used. Optional. 
 
     Returns:
         Path to the options.txt file with all the Rosetta options.
@@ -373,15 +228,6 @@ def _make_options_file(pdb_file: str,
         "    -no_optH false",
         "    -flip_HNQ true",
         "    -ignore_ligand_chi true",
-        "-enzdes:minimize_all_ligand_torsions 5.0",
-    ])
-
-    if cst_file:
-        content.extend([f"-enzdes:cstfile '{Path(cst_file).absolute()}'"])
-    else:
-        _LOGGER.warning("No constraints supplied! This will hurt reaction complex accuracy!")
-
-    content.extend([
         "-parser",
         f"   -protocol {Path(xml_file).absolute()}",
         "-out",
@@ -427,11 +273,15 @@ def _make_options_file(pdb_file: str,
     return str(fname)
 
 
-def _dock_system(structure: Structure,
+def generate_geometries(structure: Structure,
             constraints: List[StructureConstraint],
-            charge_mapper:Dict[str,int],
+            n_struct:int,
+            clash_cutoff:int,
             param_files:List[str],
-            params:ReactiveDockingParams
+            charge_mapper:Dict[str,int],
+            freeze_alphafill:bool,
+            work_dir:str,
+            rng_seed:int,
             ) -> pd.DataFrame:
     """
 
@@ -450,12 +300,12 @@ def _dock_system(structure: Structure,
     parser = PDBParser()
     parser.save_structure(start_pdb, structure)
 
-    cst_file:str = interface.rosetta.write_constraint_file(structure, constraints, params.work_dir) #TODO(CJ): look at this; wrong constraint types!!
+    cst_file:str = interface.rosetta.write_constraint_file(structure, constraints, work_dir) #TODO(CJ): look at this; wrong constraint types!!
 
-    xml_file:str = _create_xml(structure, cst_file, params)  #TODO(CJ): going to overhaul this
+    xml_file:str = _create_xml(structure, cst_file, freeze_alphafill, clash_cutoff, work_dir)  #TODO(CJ): going to overhaul this
 
     options_file: str = _make_options_file(start_pdb,
-                        xml_file, param_files, work_dir, rng_seed, n_struct, cst_file)
+                        xml_file, param_files, work_dir, rng_seed, n_struct)
 
     opt_path = Path(options_file)
 
@@ -472,7 +322,7 @@ def _dock_system(structure: Structure,
 
     os.chdir(start_dir)
 
-    assert Path(str(opt_path.parent / "complexes/score.sc")).exists()
+    assert Path(str((opt_path.parent / "complexes/score.sc").absolute())).exists()
 
     df: pd.DataFrame = interface.rosetta.parse_score_file(str(opt_path.parent / "complexes/score.sc"))
 
@@ -563,7 +413,7 @@ def _evaluate_csts(df: pd.DataFrame, csts: List[StructureConstraint], cst_cutoff
         stru:Structure = _parser.get_structure(row.description)
         for cst in csts:
             cst.change_topology(stru)
-            total += cst.score_energy() #TODO(CJ): this has to later become scoring it with the interface. ugh... 
+            total += cst.score_energy()
         cst_diff.append(total)
 
     df['cst_diff'] = cst_diff
@@ -573,10 +423,13 @@ def _evaluate_csts(df: pd.DataFrame, csts: List[StructureConstraint], cst_cutoff
         f"Finished RosettaCst evaluation. {df.selected.sum()} geometries have constraint tolerances <= {cst_cutoff:.3f} tolerance units")
     
 
-def _parameterize_system(stru:Structure, params:ReactiveDockingParams) -> Tuple[List[str], Dict[str, int]]:
+def _parameterize_system(stru:Structure, work_dir:str) -> Tuple[List[str], Dict[str, int]]:
     """Given the input Structure(), parameterize everything needed to perform RosettaLigand docking.
     
-    #TODO(CJ): fix this
+    Args:
+        stru: The Structure() to parameterize.
+        work_dir: Where temporary files will be saved.
+
     Returns:
         A Tuple() with the format (list(), dict()), holding the (.params file names, charge mapper ). 
     """
@@ -599,7 +452,7 @@ def _parameterize_system(stru:Structure, params:ReactiveDockingParams) -> Tuple[
             charge_mapper[res.name] = ligand_charge
         _LOGGER.info(charge_mapper)
 
-        param_file:str = interface.rosetta.parameterize_ligand(res, charge=ligand_charge, work_dir=params.work_dir)
+        param_file:str = interface.rosetta.parameterize_ligand(res, charge=ligand_charge, work_dir=work_dir)
         
         _LOGGER.info(f"Information for reactant {res.name}:")
         _LOGGER.info(f"\tparam file: {param_file}")
@@ -720,7 +573,7 @@ def _define_active_site(structure: Structure, distance_cutoff, charge_mapper=Non
     return {"sele": sele_str, "charge": charge}
 
 
-def _qm_minimization(df:pd.DataFrame, charge_mapper, cluster_distance:float, constraints=None, work_dir:str=None) -> str:
+def qm_minimization(structure:Structure, charge_mapper, cluster_distance:float, constraints:List[StructureConstraint]=None, work_dir:str=None):
     """TODO(CJ)
     
     Args:
@@ -736,21 +589,10 @@ def _qm_minimization(df:pd.DataFrame, charge_mapper, cluster_distance:float, con
     if work_dir is None:
         work_dir = config['system.SCRATCH_DIR']
 
-    if not df.selected.sum():
-        _LOGGER.error("No geometries still selected! Exiting...")
-        exit( 1 )
+    #TODO(CJ): check if the constraints belong to the Structure 
+    as_info = _define_active_site(structure, cluster_distance, charge_mapper)
     
-    #TODO(CJ): add the xtb.geo_opt() here
-
-    infile:str=df[df.selected].sort_values(by='qm_energy').description.to_list()[0]
-   
-    _parser = PDBParser()
-    final_stru = _parser.get_structure(infile)
-    as_info = _define_active_site(final_stru, cluster_distance, charge_mapper)
-    
-    interface.xtb.geo_opt(final_stru, charge=as_info['charge'], constraints=constraints, sele_str=as_info['sele'], work_dir=work_dir)
-
-    return final_stru
+    interface.xtb.geo_opt(structure, charge=as_info['charge'], constraints=constraints, sele_str=as_info['sele'], work_dir=work_dir)
 
 def _evaluate_qm(df: pd.DataFrame, structure: Structure, charge_mapper, cluster_cutoff: float) -> None:
     """TODO(CJ)
@@ -793,52 +635,98 @@ def _evaluate_qm(df: pd.DataFrame, structure: Structure, charge_mapper, cluster_
     df['qm_energy'] = qm_energy
     _LOGGER.info("Finished qm energy evaluation!")
 
+def select_geometry( structure, df, max_sasa_ratio, constraints, cst_energy, charge_mapper, cluster_distance) -> None:
+    """TODO(CJ)"""
+    _evaluate_SASA(df, max_sasa_ratio)#TODO(CJ): put this back in 
 
-def _log_settings(
-    constraints:List[StructureConstraint],
-    n_struct: int,
-    cst_energy:float,
-    clash_distance:float,
-    clash_cutoff:int,
-    max_sasa_ratio:float,
-    cluster_distance:float,
-    use_cache:bool,
-    rng_seed:int,
-    work_dir:str,
-    save_work_dir:bool
-):
-    """Logs settings for the current reactive docking run. Done at the INFO level.
+    _evaluate_csts(df, constraints, cst_energy)
+    
+    _evaluate_qm(df, structure, charge_mapper, cluster_distance)
 
-    Args:
-        constraints: A List() of RosettaCst's defining the system at hand.
-        n_struct: How many geometries to sample as an int(). 
-        cst_energy: Rosetta Energy Unit cutoff for filtering geometries.
-        clash_distance: Heavy atom radius for clash counting as a float().
-        clash_cutoff: The number of clashes before a geometry is filtered as an int().
-        max_sasa_ratio: Maximum allowed SASA ratio for ligands in a geometry as a float().
-        use_cache: Should existing results be used when possible?
-        rng_seed: The seed for random number generation as an int(). 
-        work_dir: Directory where temporary files are written. 
-        save_work_dir: Should temporary files be deleted after reactive docking is run.?
+    infile:str=df[df.selected].sort_values(by='qm_energy').description.to_list()[0]
 
-    Returns:
-        Nothing.
+    _parser = PDBParser()
+    ref_stru = _parser.get_structure(infile)
+    stru_oper.update_residues(structure, ref_stru)
+
+def mm_minimization(structure:Structure, cluster_distance:float, constraints:List[StructureConstraint], param_files:List[str], work_dir:str) -> None:
+    """TODO(CJ)
     """
-    _LOGGER.info("Beginning EnzyRCD Reactive docking run! Below are the run settings and characteristics:")
 
-    if constraints is not None:
-        _LOGGER.info(f"\t{len(constraints)} StructureConstraints")
-    else:
-        _LOGGER.info("\t0 StructureConstraints")
+    cst_file:str = interface.rosetta.write_constraint_file(structure, constraints, work_dir) #TODO(CJ): look at this; wrong constraint types!!
+    xml_file:str = f"{work_dir}/__script.xml"
+    pdb_file:str = f"{work_dir}/__temp_mm_min.pdb"
+    option_file:str = f"{work_dir}/__mm_min_options.txt"
+#yapf: disable
+    elements: List[Dict[str,str]] = [
+        {'parent': 'SCOREFXNS', 'tag': 'ScoreFunction', 'name': 'ligand_soft_rep', 'weights': 'ligand_soft_rep'},
+        {'parent': 'SCOREFXNS', 'tag': 'ScoreFunction', 'name': 'hard_rep', 'weights': 'ligand'},
+        {'parent': 'SCOREFXNS.ScoreFunction', 'tag': 'Reweight', 'scoretype': 'coordinate_constraint',  'weight': '1.0'},
+        {'parent': 'SCOREFXNS.ScoreFunction', 'tag': 'Reweight', 'scoretype': 'atom_pair_constraint',   'weight': '1.0'},
+        {'parent': 'SCOREFXNS.ScoreFunction', 'tag': 'Reweight', 'scoretype': 'angle_constraint',       'weight': '1.0'},
+        {'parent': 'SCOREFXNS.ScoreFunction', 'tag': 'Reweight', 'scoretype': 'dihedral_constraint',    'weight': '1.0'},
+        {'parent': 'SCOREFXNS.ScoreFunction', 'tag': 'Reweight', 'scoretype': 'chainbreak',             'weight': '1.0'},
+        {'parent':'MOVERS', 'tag':'FastRelax', 'name':'frelax', 'scorefxn':'hard_rep', 'cst_file':f"{Path(cst_file).absolute()}", 'ramp_down_constraints':'true', 'repeats':'20', 'child_nodes': [
+                {'parent':'FastRelax', 'tag':'MoveMap', 'name':'full_enzyme', 'bb':'true', 'chi':'true', 'jump':'false','child_nodes':[
+                        {'parent':'MoveMap','tag':'ResidueSelector', 'selector':'as_selector', 'bb':'true', 'chi':'true', 'bondangle':'true'},
+                        {'parent':'MoveMap', 'tag':'ResidueSelector', 'selector':'not_as_selector', 'bb':'false', 'chi':'true', 'bondangle':'false'},]}]
+        },
+        {'parent':'PROTOCOLS', 'tag':'Add', 'mover_name':'frelax'}
+    ]
+    interface.rosetta.write_script(xml_file, elements)
+#yapf: enable
+    _parser = PDBParser()
+    _parser.save_structure(pdb_file, structure)
 
-    _LOGGER.info(f"\t{n_struct=}")
-    _LOGGER.info(f"\t{cst_energy=:.3f} rosetta energy units")
-    _LOGGER.info(f"\t{clash_distance=:.3f} angstroms")
-    _LOGGER.info(f"\t{clash_cutoff=} clashes")
-    _LOGGER.info(f"\t{max_sasa_ratio=:.3f} maximum allowed SASA ratio")
-    _LOGGER.info(f"\t{cluster_distance=:.3f} angstroms")
+    content: List[str] = [
+        "-keep_input_protonation_state", #TODO(CJ): get rid of this for now; but want it back someday
+        "-auto_setup_metals",
+        "-run:constant_seed",
+        f"-run:jran {int(rng_seed)}",
+        "-in:file",
+        f"    -s '{Path(pdb_file).name}'",
+    ]
+    for pf in param_files:
+        content.append(f"    -extra_res_fa '{Path(pf).absolute()}'")
 
-    _LOGGER.info(f"\t{use_cache=}")
-    _LOGGER.info(f"\t{rng_seed=}")
-    _LOGGER.info(f"\t{work_dir=}")
-    _LOGGER.info(f"\t{save_work_dir=}")
+    stub_parent: str = os.path.expandvars(
+        f"${config['rosetta.ROSETTA3']}/database/chemical/residue_type_sets/fa_standard/residue_types/protonation_states/")
+    for stub in "GLU_P1.params GLU_P2.params LYS_D.params ASP_P1.params TYR_D.params HIS_P.params ASP_P2.params".split():
+        content.append(f"    -extra_res_fa '{stub_parent}/{stub}'")
+
+    content.extend([
+        "-run:preserve_header",
+        "-packing",
+        "    -ex1",
+        "    -ex2aro",
+        "    -ex2 ",
+        "    -no_optH false",
+        "    -flip_HNQ true",
+        "    -ignore_ligand_chi true",
+        "-parser",
+        f"   -protocol {Path(xml_file).absolute()}",
+        "-out",
+        f"   -file:scorefile 'score.sc'",
+        "   -level 200",
+        "   -overwrite",
+        "   -path",
+        f"       -all './rosetta_mm_min'",
+
+    ])
+
+    fs.write_lines(option_file, content)
+
+    start_dir:str = Path(os.getcwd()).aboslute()
+    os.chdir( work_dir )
+    interface.rosetta.run_rosetta_scripts([f"@{opt_path.name}"])
+    os.chdir(start_dir)
+
+    score_sc:str=f"{work_dir}/rosetta_mm_min/score.sc"
+    assert Path(score_sc).exists()
+
+    df: pd.DataFrame = interface.rosetta.parse_score_file(score_sc)
+    df = df.sort_values(by='total_energy').reset_index(drop=True)
+    ref_stru = _parser.get_structure( "{work_dir}/rosetta_mm_min/{df.iloc[0].description}" )
+    stru_oper.update_residues(structure, ref_stru)
+    #CURRENT    
+

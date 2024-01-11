@@ -2,7 +2,7 @@
 the target start structure on the energy surface defined by a certain energy function.
 
 Science API:
-    + md_simulation
+    + md_simulation()
     + equi_md_sampling()
 
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>

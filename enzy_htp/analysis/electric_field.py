@@ -13,6 +13,7 @@ import pandas as pd
 
 from enzy_htp.core import _LOGGER
 from enzy_htp.structure import Structure, Atom
+from enzy_htp import interface
 
 
 def electric_field(stru: Structure,
@@ -46,14 +47,21 @@ def electric_field(stru: Structure,
         exit(1)
         pass
 
+    if mask is not None:
+        session = interface.pymol.new_session()
+        mask = interface.pymol.get_atom_mask(session, stru, mask)
+
     if type(p1) == Atom:
-        p1 = p1.coord()
+        p1 = p1.coord
 
     if type(p2) == Atom:
-        p2 = p2.coord()
+        p2 = p2.coord
 
-    p1 = p1.astype(float)
-    p2 = p2.astype(float)
+    #p1 = p1.astype(float) #TODO(CJ): maybe change this to just convert the elements to floats?
+    #p2 = p2.astype(float)
+
+    p1 = np.array(p1)
+    p2 = np.array(p2)
 
     direction = p2 - p1
 
@@ -69,8 +77,11 @@ def electric_field(stru: Structure,
     result: float = 0.0
     k: float = 332.4
 
-    for atom in stru.atoms:
-        #TODO(CJ): add in the masking of the structure
+    for aidx, atom in enumerate(stru.atoms):
+        
+        if mask and not mask[aidx]:
+            continue
+
         p0: np.ndarray = np.array(atom.coord)
         r: np.ndarray = p1 - p0
         r_m: float = np.linalg.norm(r)

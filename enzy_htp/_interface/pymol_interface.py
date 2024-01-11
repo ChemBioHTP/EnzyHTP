@@ -713,6 +713,35 @@ class PyMolInterface(BaseInterface):
 
         return result 
 
+    
+    def get_atom_mask(self, session, stru:Structure, sele_str:str=None, work_dir:str=None) -> List[bool]:
+        #TODO(CJ): this stuff
+
+        
+        if work_dir is None:
+            work_dir = './'
+
+        temp_file:str = f"{work_dir}/__temp_pymol.pdb"
+        _parser = PDBParser()
+        _parser.save_structure(temp_file, stru)
+
+        session = self.new_session()
+
+        df:pd.DataFrame = self.collect(session, temp_file, "chain resi name".split(), sele=sele_str)
+        
+        fs.safe_rm( temp_file )
+
+        sele_set = set()
+
+        for i, row in df.iterrows():
+            sele_set.add(f"{row['chain']}.{row['resi']}.{row['name']}")
+
+        mask:List[bool] = list()
+
+        for atom in stru.atoms:
+            mask.append( atom.key in sele_set )            
+
+        return mask
 
 class OpenPyMolSession:
     """a context manager that open a pymol session once enter and close once exit"""

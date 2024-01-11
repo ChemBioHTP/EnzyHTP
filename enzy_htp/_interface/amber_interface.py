@@ -2232,51 +2232,6 @@ class AmberInterface(BaseInterface):
 
         return mdcrd
 
-    def get_frames(
-        self,
-        nc_in: str,
-        prmtop: str,
-        point: Union[int, None] = None,
-        start: int = 1,
-        end: Union[int, str] = "last",
-        step: int = 1,
-    ) -> str:
-        """Converts the supplied .nc file to an .mdcrd file. Scope of trajectory conversion can be
-        TODO(CJ): update this
-        """
-        outfile: str = f"{Path(prmtop).parent}/cpptraj_frames.pdb"
-        config = self.config_.CONF_PROD
-        if point is not None:
-            step: int = int((int(config["nstlim"]) / int(config["ntwx"])) / point)
-
-        cpptraj_in = "./cpptraj_nc2mdcrd.in"
-        cpptraj_out = "./cpptraj_nc2mdcrd.out"
-        contents: List[str] = [
-            f"parm {prmtop}",
-            f"trajin {nc_in} {start} {end} {step}",
-            "strip :WAT",
-            "strip :Na+,Cl-",
-            f"trajout {outfile} conect",
-            "run",
-            "quit",
-        ]
-        fs.write_lines(cpptraj_in, contents)
-        self.env_manager_.run_command("cpptraj", ["-i", cpptraj_in, ">", cpptraj_out])
-        #fs.safe_rm(cpptraj_in)
-        fs.safe_rm(cpptraj_out)
-        charges = read_charge_list(prmtop)
-        result = frames_from_pdb(outfile)
-
-        if not len(result):
-            return result
-
-        num_atoms = len(result[0].atoms)
-        charges = charges[0:num_atoms]
-        for fidx, frame in enumerate(result):
-            result[fidx].update_charges(charges)
-
-        return result
-
     def parse_fmt(self, fmt: str) -> Tuple[Any, int]:
         """Private helper function that parses a %FORMAT() string from an amber .prmtop file.
         Identifies both the type and width of the format. Supplied string can contain whitespace.
