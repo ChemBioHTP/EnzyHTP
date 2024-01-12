@@ -347,10 +347,14 @@ class Structure(DoubleLinkedNode):
         result: List[Chain] = list(filter(lambda c: c.is_polypeptide(), self._chains))
         return result
 
-    @property
-    def hydrogens(self) -> List[Atom]:
+    def hydrogens(self, polypeptide_only: bool=False) -> List[Atom]:
         """return all the hydrogens in the Structure"""
-        result: List[Atom] = list(filter(lambda a: a.is_hydrogen(), self.atoms))
+        if polypeptide_only:
+            result = []
+            for ch in self.polypeptides:
+                result.extend(list(filter(lambda a: a.is_hydrogen(), ch.atoms)))
+        else:
+            result: List[Atom] = list(filter(lambda a: a.is_hydrogen(), self.atoms))
         return result
 
     @property

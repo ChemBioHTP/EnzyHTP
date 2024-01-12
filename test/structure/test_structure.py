@@ -241,6 +241,11 @@ def test_is_same_topology():
     assert test_self.is_same_topology(test_other)
 
 def test_hydrogens():
+    """as nam. result verified by pymol"""
+    test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
+    assert len(test_stru.hydrogens()) == 2000
+
+def test_hydrogens_polypeptide_only():
     """as name"""
     test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
-    assert len(test_stru.hydrogens) == 2000
+    assert len(test_stru.hydrogens(polypeptide_only=True)) == 1996

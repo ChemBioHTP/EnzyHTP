@@ -36,11 +36,13 @@ def remove_solvent(stru: Structure, protect: str = None) -> Structure:
     return stru
 
 
-def remove_hydrogens(stru: Structure, in_place: bool=True) -> Structure:
+def remove_hydrogens(stru: Structure, polypeptide_only: bool=True, in_place: bool=True) -> Structure:
     """Method that removes hydrogens from the supplied structure.
     
     Args:
         stru: the Structure object that the hydrogens need to be removed from.
+        polypeptide_only: whether only remove Hs from polypeptide
+        in_place: apply the change in place or in a copy
 
     Returns:
         The Structure object with no hydrogens. (a copy if in_place=False)
@@ -48,6 +50,6 @@ def remove_hydrogens(stru: Structure, in_place: bool=True) -> Structure:
     if not in_place:
         stru = copy.deepcopy(stru)
 
-    stru_oper.remove_hydrogens(stru)
+    stru_oper.remove_hydrogens(stru, polypeptide_only)
 
     return stru
