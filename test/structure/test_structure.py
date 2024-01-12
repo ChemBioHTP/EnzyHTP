@@ -239,3 +239,8 @@ def test_is_same_topology():
     test_other = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S_geom_1.pdb")
     test_self = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
     assert test_self.is_same_topology(test_other)
+
+def test_hydrogens():
+    """as name"""
+    test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
+    assert len(test_stru.hydrogens) == 2000

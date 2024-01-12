@@ -316,10 +316,14 @@ class Atom(DoubleLinkedNode):
 
     #endregion
 
-    #region === Check ===
+    #region === Checker ===
     def is_donor_atom(self) -> bool:
         """check if the atom is a donor atom to a coordination center"""
         return self.name in chem.metal.DONOR_ATOM_LIST
+
+    def is_hydrogen(self) -> bool:
+        """check if the atom is a hydrogen"""
+        return self.element == "H"
 
     def is_connected(self) -> bool:
         """check if self is in the connected state"""

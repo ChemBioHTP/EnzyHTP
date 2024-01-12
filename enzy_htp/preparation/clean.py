@@ -5,6 +5,7 @@ Science API:
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2022-09-22
 """
+import copy
 from enzy_htp.structure import Structure, Residue
 import enzy_htp.structure.structure_operation as stru_oper
 
@@ -35,13 +36,18 @@ def remove_solvent(stru: Structure, protect: str = None) -> Structure:
     return stru
 
 
-def remove_h(stru: Structure) -> Structure:
+def remove_h(stru: Structure, in_place: bool=True) -> Structure:
     """Method that removes hydrogens from the supplied structure.
     
     Args:
         stru: the Structure object that the hydrogens need to be removed from.
 
     Returns:
-        The Structure object with no hydrogens.
+        The Structure object with no hydrogens. (a copy if in_place=False)
     """
-    pass
+    if not in_place:
+        stru = copy.deepcopy(stru)
+
+    stru_oper.remove_hydrogens(stru)
+
+    return stru

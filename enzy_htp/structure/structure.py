@@ -348,6 +348,12 @@ class Structure(DoubleLinkedNode):
         return result
 
     @property
+    def hydrogens(self) -> List[Atom]:
+        """return all the hydrogens in the Structure"""
+        result: List[Atom] = list(filter(lambda a: a.is_hydrogen(), self.atoms))
+        return result
+
+    @property
     def sequence(self) -> Dict[str, str]:
         """return a dictionary of {'chain_id':'chain_sequence'}"""
         result = {}
