@@ -8,7 +8,7 @@ import os
 
 from enzy_htp.core.clusters.accre import Accre
 import enzy_htp.core.file_system as fs
-from enzy_htp.chemical.level_of_theory import QMLevelofTheory, MMLevelofTheory
+from enzy_htp.chemical.level_of_theory import QMLevelOfTheory, MMLevelOfTheory
 from enzy_htp._config.armer_config import ARMerConfig
 from enzy_htp.structure import structure_constraint as stru_cons
 from enzy_htp.structure.structure_region import create_region_from_selection_pattern
@@ -30,7 +30,7 @@ def test_single_point_make_job_lv1():
     - full structure (only 1 ligand)"""
     test_stru = sp.get_structure(f"{DATA_DIR}H5J.pdb")
     test_stru.assign_ncaa_chargespin({"H5J" : (0,1)})
-    test_method = QMLevelofTheory(
+    test_method = QMLevelOfTheory(
         basis_set="6-31G(d)",
         method="HF",
         solvent="water",
@@ -83,7 +83,7 @@ def test_build_single_point_engine_default():
     as samples."""
     gi = interface.gaussian
     md_step: GaussianSinglePointEngine = gi.build_single_point_engine()
-    assert md_step.method == QMLevelofTheory(
+    assert md_step.method == QMLevelOfTheory(
         basis_set = "def2-svp",
         method = "pbe0",
         solvent = None,
@@ -138,7 +138,7 @@ def test_get_method_keyword_from_name():
 
 def test_lot_to_keyword():
     """as name"""
-    test_lot = QMLevelofTheory(
+    test_lot = QMLevelOfTheory(
         basis_set="6-31G(d)",
         method="HF",
         solvent="water",

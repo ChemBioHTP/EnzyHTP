@@ -39,7 +39,7 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core import env_manager as em
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.job_manager import ClusterJob
-from enzy_htp.chemical import QMLevelofTheory, MMLevelofTheory, LevelofTheory
+from enzy_htp.chemical import QMLevelOfTheory, MMLevelOfTheory, LevelOfTheory
 from enzy_htp.electronic_structure import EletronicStructure
 from enzy_htp.structure import (
     Structure,
@@ -83,7 +83,7 @@ class GaussianChkParser():
 class GaussianSinglePointEngine(QMSinglePointEngine):
     """The single point engine of Gaussian. QM only. Configures with
     method:
-        the level of theory as QMLevelofTheory()
+        the level of theory as QMLevelOfTheory()
     region:
         the qm region as a StructureRegion()
     keep_geom:
@@ -102,7 +102,7 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
         the working directory"""
     def __init__(self,
                 interface,
-                method: QMLevelofTheory,
+                method: QMLevelOfTheory,
                 region: StructureRegion,
                 keep_geom: bool,
                 name: str,
@@ -131,7 +131,7 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
         return self._parent_interface
 
     @property
-    def method(self) -> QMLevelofTheory:
+    def method(self) -> QMLevelOfTheory:
         """getter for _method"""
         return self._method
 
@@ -497,7 +497,7 @@ class GaussianInterface(BaseInterface):
     def write_to_gjf(
         self,
         out_path: str,
-        methods: List[LevelofTheory],  # route too
+        methods: List[LevelOfTheory],  # route too
         # mol spec
         stru: Structure,
         stru_regions: List[StructureRegion],
@@ -608,7 +608,7 @@ class GaussianInterface(BaseInterface):
 
     def _make_route_line(
         self,
-        methods: List[LevelofTheory],
+        methods: List[LevelOfTheory],
         job_type: str,
         job_type_additional_keyword: List[str],
         additional_keywords: str,
@@ -649,14 +649,14 @@ class GaussianInterface(BaseInterface):
 
             return route_line, tail_sections
 
-    def lot_to_keyword(self, lot: LevelofTheory) -> Tuple[str, List[str], List[str]]:
+    def lot_to_keyword(self, lot: LevelOfTheory) -> Tuple[str, List[str], List[str]]:
         """convert a single level of theory object to gaussian keywords"""
         bs_gen_lines = []
         sol_read_line = []
         if lot.lot_type == "mm":
             raise Exception("TODO")
         else:
-            lot: QMLevelofTheory
+            lot: QMLevelOfTheory
             method_kw = self.get_method_keyword_from_name(lot.method)
             bs_kw, bs_gen_lines = self.get_basis_set_keyword_from_name(lot.basis_set)
             sol_kw, sol_read_line = self.get_solvation_keyword_from_name(lot.solvent, lot.solv_method)
@@ -771,7 +771,7 @@ class GaussianInterface(BaseInterface):
     def build_single_point_engine(
         self,
         # calculation config
-        method: QMLevelofTheory = "default",
+        method: QMLevelOfTheory = "default",
         region: StructureRegion = None,
         keep_geom: bool = "default",
         # calculation config (alternative)
@@ -786,7 +786,7 @@ class GaussianInterface(BaseInterface):
         point calculation besides the actual geometry.
         Args:
             method:
-                the level of theory as QMLevelofTheory()
+                the level of theory as QMLevelOfTheory()
             region:
                 the qm region as a StructureRegion()
             keep_geom:

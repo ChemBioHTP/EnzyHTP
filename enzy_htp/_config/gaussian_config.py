@@ -15,7 +15,7 @@ from typing import Any, List, Dict
 from .base_config import BaseConfig
 from .armer_config import ARMerConfig
 
-from enzy_htp.chemical import QMLevelofTheory, MMLevelofTheory
+from enzy_htp.chemical import QMLevelOfTheory, MMLevelOfTheory
 from enzy_htp.core.clusters.accre import Accre
 
 class GaussianConfig(BaseConfig):
@@ -42,7 +42,7 @@ class GaussianConfig(BaseConfig):
     DEFAULT_SPE_NAME: str = "gaussian_spe"
     """The default value for the name tag of the SPE engine"""
 
-    DEFAULT_SPE_METHOD: QMLevelofTheory = QMLevelofTheory(
+    DEFAULT_SPE_METHOD: QMLevelOfTheory = QMLevelOfTheory(
         basis_set = "def2-svp",
         method = "pbe0",
         solvent = None,
