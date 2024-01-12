@@ -226,7 +226,7 @@ class Structure(DoubleLinkedNode):
         return result
 
     @property
-    def residue_mapper_w_name(self) -> Dict[Tuple[str, int, str], Residue]:
+    def residue_namedkey_mapper(self) -> Dict[Tuple[str, int, str], Residue]:
         """return a mapper of {(chain_id, residue_idx, residue_name): Residue (reference)}"""
         result = {}
         for residue in self.residues:
@@ -597,7 +597,7 @@ class Structure(DoubleLinkedNode):
         NOTE that indexing is redundant but we will have another method
         to do indexing free mapping/checking."""
         # same sequences TODO make it more general
-        if self.residue_mapper_w_name.keys() == other.residue_mapper_w_name.keys():
+        if self.residue_namedkey_mapper.keys() == other.residue_namedkey_mapper.keys():
             for self_res, other_res in zip(self.residues, other.residues):
                 self_atom_names = set(self_res.atom_name_list)
                 other_atom_names = set(other_res.atom_name_list)
