@@ -50,7 +50,7 @@ class QMSinglePointEngine(ABC):
         pass
 
 
-class QMOptimizeEngine(ABC):
+class QMOptimizationEngine(ABC):
     """the qm engine that performs geometry optimization"""
 
     @property

@@ -11,7 +11,7 @@ Date: 2023-10-28"""
 from typing import Any, Union, List, Dict, Callable
 
 from enzy_htp import interface
-from enzy_htp._interface.handle_types import QMSinglePointEngine, QMOptimizeEngine
+from enzy_htp._interface.handle_types import QMSinglePointEngine, QMOptimizationEngine
 from enzy_htp.electronic_structure import EletronicStructure
 from enzy_htp.structure import (
     Structure,
@@ -246,7 +246,7 @@ MULTI_REGION_SINGLE_POINT_ENGINE: Dict[str, Callable] = {
 
 def _parallelize_qm_with_cluster_job(
         stru_esm: StructureEnsemble,
-        qm_engine: Union[QMSinglePointEngine, QMOptimizeEngine],
+        qm_engine: Union[QMSinglePointEngine, QMOptimizationEngine],
         job_check_period: int,
         array_size: int,
         ) -> List[StructureEnsemble]:
@@ -280,7 +280,7 @@ def _parallelize_qm_with_cluster_job(
 
 def _serial_qm(
         stru_esm: StructureEnsemble,
-        qm_engine: Union[QMSinglePointEngine, QMOptimizeEngine],
+        qm_engine: Union[QMSinglePointEngine, QMOptimizationEngine],
         ) -> List[StructureEnsemble]:
     """The QM serial running method
     This method runs QMs in a serial manner locally."""

@@ -30,7 +30,7 @@ import goodvibes.io as gvio
 from .base_interface import BaseInterface
 from .handle_types import (
     QMSinglePointEngine,
-    QMOptimizeEngine,
+    QMOptimizationEngine,
     QMResultEgg
 )
 
