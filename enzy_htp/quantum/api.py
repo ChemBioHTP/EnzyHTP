@@ -21,7 +21,7 @@ from enzy_htp.structure import (
     create_region_from_selection_pattern
 )
 from enzy_htp.structure.structure_operation import init_charge
-from enzy_htp.chemical import QMLevelofTheory, LevelofTheory
+from enzy_htp.chemical import QMLevelOfTheory, LevelOfTheory
 from enzy_htp.core.logger import _LOGGER
 import enzy_htp.core.job_manager as armer
 
@@ -29,10 +29,10 @@ def single_point(
         stru: Union[Structure, StructureEnsemble],
         engine: str, # always acknowledge the engine
         # single region case option
-        method: QMLevelofTheory = None, # single region has to be QM
+        method: QMLevelOfTheory = None, # single region has to be QM
         # multi region case option
         regions: List[str]= None,
-        region_methods: List[LevelofTheory]= None,
+        region_methods: List[LevelOfTheory]= None,
         capping_method: str = "res_ter_cap",
         embedding_method: str= "mechanical", # TODO probably not a good default choice
         parallel_method: str="cluster_job",
@@ -53,7 +53,7 @@ def single_point(
         engine:
             the QM or QM/MM engine.
         method:
-            the level of theory of this calculation as a LevelofTheory().
+            the level of theory of this calculation as a LevelOfTheory().
             This is used when there is only 1 or less region specified.
         regions:
             This option allows you to define different region and apply different
@@ -154,11 +154,11 @@ def single_point(
         qm_engine_ctor = SINGLE_REGION_SINGLE_POINT_ENGINE[engine]
         # qm_method
         if region_methods:
-            if not isinstance(region_methods[0], QMLevelofTheory):
-                _LOGGER.error(f"Only 1 or less region specified. Have to be a QMLevelofTheory. Got: {region_methods[0]}")
+            if not isinstance(region_methods[0], QMLevelOfTheory):
+                _LOGGER.error(f"Only 1 or less region specified. Have to be a QMLevelOfTheory. Got: {region_methods[0]}")
                 raise TypeError
             qm_method = region_methods[0]
-        elif not isinstance(method, QMLevelofTheory):
+        elif not isinstance(method, QMLevelOfTheory):
             _LOGGER.error(f"Have to specify a QM level of theory in `method` or `region_methods` Got: {method}")
             raise TypeError
         else:
