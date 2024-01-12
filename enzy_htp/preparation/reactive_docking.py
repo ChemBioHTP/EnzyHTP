@@ -82,8 +82,11 @@ def dock_reactants(structure: Structure,
     interface.rosetta.rename_atoms(structure)
     
     (param_files, charge_mapper) = _parameterize_system(structure, work_dir)
+    
+    geometry_df = pd.read_csv("scratch/scores.csv")
 
-    geometry_df = generate_geometries(structure, constraints, n_struct, clash_cutoff, param_files, charge_mapper, freeze_alphafill, work_dir, rng_seed )
+    if False:
+        geometry_df = generate_geometries(structure, constraints, n_struct, clash_cutoff, param_files, charge_mapper, freeze_alphafill, work_dir, rng_seed )
 
     select_geometry(structure, geometry_df, max_sasa_ratio, constraints, cst_energy, charge_mapper, cluster_distance)
 
@@ -243,6 +246,7 @@ def _make_options_file(pdb_file: str,
     content.append(f"-qsar:grid_dir {qsar_grid}")
 
     fname = Path(work_dir) / "options.txt"
+    return fname #TODO(CJ): fix this!
     score_file: str = f"{work_dir}/complexes/score.sc"
 
     _LOGGER.info(f"\toptions file: {fname}")
