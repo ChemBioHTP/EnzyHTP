@@ -15,7 +15,8 @@ class ResidueType(IntEnum):
     METAL = 3
     LIGAND = 4
     TRASH = 5
-    UNKNOWN = 6
+    RESIDUECAP = 6
+    UNKNOWN = 7
 
 
 RESIDUE_TYPE_MAPPER = {
@@ -25,5 +26,6 @@ RESIDUE_TYPE_MAPPER = {
     ResidueType.METAL: "METAL",
     ResidueType.LIGAND: "LIGAND",
     ResidueType.TRASH: "TRASH",
+    ResidueType.RESIDUECAP: "RESIDUECAP",
     ResidueType.UNKNOWN: "UNKNOWN",
 }

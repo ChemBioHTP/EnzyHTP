@@ -34,7 +34,7 @@ import sys
 import logging
 import time
 import numpy as np
-from typing import List, Iterable, Tuple, Dict
+from typing import Any, List, Iterable, Tuple, Dict
 import itertools
 
 from .logger import _LOGGER
@@ -177,6 +177,7 @@ def get_copy_of_deleted_dict(orig_dict: Dict, del_key) -> Dict:
 
     return dict_copy
 
+
 def swapped_dict(orig_dict: Dict) -> Dict:
     """get a swapped dictionary based on the original dictionary. The key and value are swapped
     in the new dictionary."""
@@ -278,3 +279,8 @@ def get_localtime(time_stamp: float = None) -> str:
         return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     else:
         return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time_stamp))
+
+
+def get_itself(input: Any) -> Any:
+    """a function that return the input itself"""
+    return input

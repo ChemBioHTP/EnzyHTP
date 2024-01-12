@@ -146,6 +146,9 @@ class Atom(DoubleLinkedNode):
     @property
     def charge(self):
         """getter for _charge"""
+        if not self.has_init_charge():
+            _LOGGER.debug(f"There are no charge info for {self}. "
+                            "Please initiate it use structure.structure_operation.init_charge()")
         return self._charge
 
     @charge.setter
@@ -321,6 +324,22 @@ class Atom(DoubleLinkedNode):
     def is_connected(self) -> bool:
         """check if self is in the connected state"""
         return self._connect is not None
+    
+    def is_mainchain_atom(self) -> bool:
+        """check if self is a mainchain atom.
+        (i.e.: N CA C)"""
+        if self.residue.is_canonical():
+            if self.name in "N CA C".split():
+                return True
+        elif self.residue.is_modified():
+            raise Exception("TODO prob determine start/end atom and deduce mainchain")
+
+        return False
+    
+    def has_init_charge(self) -> bool:
+        """check if self has charge"""
+        return self._charge is not None        
+
     #endregion
 
     #region == Special ==

@@ -114,7 +114,7 @@ class StructureConstraint(ABC):
     def clone(self) -> "StructureConstraint":
         """Clones the StructureConstraint with the original target_value."""
         result = type(self).__new__(type(self))
-        result.atoms = self.atoms
+        result.atoms = [at for at in self.atoms]
         result.target_value = self.target_value
         result.params = deepcopy(self.params)
         return result
@@ -123,7 +123,7 @@ class StructureConstraint(ABC):
         """Get a version of the StructureConstraint with the current value as the 
         target value."""
         result = type(self).__new__(type(self))
-        result.atoms = self.atoms
+        result.atoms = [at for at in self.atoms]
         result.target_value = self.current_geometry
         result.params = deepcopy(self.params)
         return result
@@ -302,7 +302,7 @@ class CartesianFreeze(StructureConstraint):
     def clone_from(cls, other: "CartesianFreeze") -> "CartesianFreeze":
         """clone from another CartesianFreeze instance"""
         result = cls.__new__(cls)
-        result.atoms = other.atoms
+        result.atoms = [at for at in other.atoms]
         result.target_value = other.target_value
         result.params = deepcopy(other.params)
         return result
@@ -461,8 +461,8 @@ class ResiduePairConstraint(StructureConstraint): # TODO unified the design of s
                 )
         
 
-    def change_topology(self, new_topology: Structure) -> None:
-        """Same as StructureConstraint.change_topology() but with extra steps because of the composite 
+    def change_topology(self, new_topology: Structure) -> None: # TODO this should be change geometry
+        """Same as StructureConstraint.change_topology() (?) but with extra steps because of the composite 
         nature of the class. First, the residue and residue atoms are mapped over. Next, the child constraints
         are mapped over. Last, the atoms are mapped over."""
         

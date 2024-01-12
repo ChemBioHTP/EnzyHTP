@@ -31,7 +31,7 @@ MOL_DESC_FILE_EXT = [".prepin", ".prepi", ".mol2"]
 MM_PARM_FILE_EXT = [".frcmod"]
 """extensions of parameter file types"""
 
-PARM_METHOD_LIST = ["AM1BCC-GAFF2", "RESP-GAFF2", "AM1BCC-GAFF", "RESP-GAFF", "MCPB", "any"]
+PARM_METHOD_LIST = ["AM1BCC-GAFF2", "RESP-GAFF2", "AM1BCC-GAFF", "RESP-GAFF", "MCPB", "any", "CHGONLY-BCC", "CHGONLY-RESP"]
 """a list of keywords for supported parm_method as a search target. If 'any' is used, any method
 will be matched including None or ''. * GAFF is used if not specificed."""
 
@@ -114,6 +114,8 @@ def search_ncaa_parm_file(target_res: NonCanonicalBase, target_method: str,
                 # seems frcmod file wont contain residue name in file
                 res_name = _get_res_name_from_filename(parm_file)
                 parm_method = _get_parm_method_from_filename(parm_file)
+
+            # TODO support .gout and .chg
             else:
                 _LOGGER.warning(
                     f"The file: {parm_file} in ncaa_parm_lib have an unknown extension."

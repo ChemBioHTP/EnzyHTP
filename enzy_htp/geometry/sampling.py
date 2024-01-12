@@ -23,7 +23,7 @@ from enzy_htp._interface.handle_types import (
     MolDynResult)
 
 def equi_md_sampling(stru: Structure,
-                     param_method: MolDynParameterizer,
+                     param_method: MolDynParameterizer, # TODO support using engine + kwarg to specify
                      parallel_runs: int= 3,
                      parallel_method: str= "cluster_job", # TODO prepare_only for just export files and cmd
                      work_dir: str="./MD",

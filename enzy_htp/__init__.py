@@ -40,6 +40,8 @@ from .structure import (
     Mol2Parser
 )
 
+from .electronic_structure import EletronicStructure
+
 from ._interface import Interface, OpenPyMolSession
 
 interface = Interface(config)
@@ -53,3 +55,5 @@ by end users and should be used to customize system settings for each environmen
 from .analysis import ( electric_field, binding_energy )
 
 from .preparation import PDBLine, read_pdb_lines, dock_reactants, generate_conformers #TODO(CJ): get rid of system charge
+
+from .geometry import equi_md_sampling, md_simulation
