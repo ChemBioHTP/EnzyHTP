@@ -225,6 +225,17 @@ class Structure(DoubleLinkedNode):
             result[residue.key()] = residue
         return result
 
+    @property
+    def residue_namedkey_mapper(self) -> Dict[Tuple[str, int, str], Residue]:
+        """This function maps residue key to a reference of Residue() in the strutcure.
+        In this variant, the residue name is also contained in the residue key.
+        Returns:
+            {(chain_id, residue_idx, residue_name): Residue(), ...}."""
+        result = {}
+        for residue in self.residues:
+            result[residue.key(if_name=True)] = residue
+        return result
+
     def find_residue_name(self, name) -> List[Residue]:
         """find residues base on its name. Return a list of matching residues"""
         result = list(filter(lambda r: r.name == name, self.residues))
@@ -250,6 +261,11 @@ class Structure(DoubleLinkedNode):
             for residue in chain:
                 result.extend(residue.atoms)
         return result
+
+    @property
+    def num_atoms(self) -> int:
+        """number of Atom()s"""
+        return len(self.atoms)
 
     def find_atoms_in_range(self, center: Union[Atom, Tuple[float, float, float]], range_distance: float) -> List[Atom]:
         """find atoms in {range} of {center}. return a list of atoms found"""
@@ -572,6 +588,34 @@ class Structure(DoubleLinkedNode):
                 return True
 
         return False
+
+    def is_same_topology(self, other: Structure) -> bool:
+        """check whether self and other have the same topology.
+        i.e.: the same atom composition, connectivity, and indexing.
+        current algroithm:
+            - (unsorted) same residue order (chain order)
+            - same residue name in order (sequence) 
+            - same atom name in each residue
+
+        NOTE that indexing is redundant but we will have another method
+        to do indexing free mapping/checking."""
+        # same sequences TODO make it more general
+        if self.residue_namedkey_mapper.keys() == other.residue_namedkey_mapper.keys():
+            for self_res, other_res in zip(self.residues, other.residues):
+                self_atom_names = set(self_res.atom_name_list)
+                other_atom_names = set(other_res.atom_name_list)
+                if not self_atom_names == other_atom_names:
+                    return False
+            return True
+        return False
+
+    def is_same_topology_atomic(self, other: Structure) -> bool:
+        """check whether self and other have the same topology.
+        i.e.: same atoms order"""
+        for self_atom, other_atom in zip(self.atoms, other.atoms):
+            if self_atom.key != other_atom.key:
+                return False
+        return True
     #endregion
 
     #region === Editor ===
@@ -727,6 +771,26 @@ class Structure(DoubleLinkedNode):
                 ncaa: NonCanonicalBase
                 ncaa.net_charge = charge
                 ncaa.multiplicity = spin
+
+    @dispatch
+    def apply_geom(self, source: List[Union[List[float], Tuple[float]]]):
+        """apply atomic coordinate from source. assume atom have same order.
+        This is parser/indexing sensitive"""
+        if self.num_atoms != len(source):
+            _LOGGER.error("Coordinate number not match!")
+            raise ValueError
+        for atom, new_coord in zip(self.atoms, source):
+            atom.coord = new_coord
+
+    @dispatch
+    def apply_geom(self, source: Structure):
+        """apply atomic coordinate from source"""
+        # 1. topology check
+        if not self.is_same_topology_atomic(source):
+            raise Exception("TODO")
+        else:
+            for atom, source_atom in zip(self.atoms, source.atoms):
+                atom.coord = source_atom.coord
 
     #endregion
 

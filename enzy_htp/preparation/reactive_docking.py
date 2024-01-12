@@ -13,7 +13,7 @@ from copy import deepcopy
 import numpy as np
 import pandas as pd
 
-from enzy_htp import interface, config, _LOGGER, binding_energy
+from enzy_htp import interface, config, _LOGGER
 import enzy_htp.structure.structure_operation as stru_oper
 from enzy_htp.structure.structure_constraint import StructureConstraint
 

@@ -12,3 +12,5 @@ rdkit
 editdistance
 beautifulsoup4
 sympy
+goodvibes
+biopython==1.83 # asked by goodvibes

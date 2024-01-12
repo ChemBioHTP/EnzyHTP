@@ -1,6 +1,6 @@
 """
-chemical module for enzy_htp. Responsibilities include identification and mapping of residues, metals and solvents
-as well as providing infrastructure to store relevanta chemical information in a databse at enzy_htp/chemical/chemical-database.json.
+knowledge module for enzy_htp. This is all the basic science knowledge database 
+of EnzyHTP. Responsibilities include identification and mapping of residues, metals and solvents
 
 
 Author: Chris Jurich <chris.jurich@vanerbilt.edu>
@@ -25,3 +25,9 @@ from .residue import (
 )
 
 from .enzyme_commission import parse_ec_number
+
+from .level_of_theory import (
+    LevelOfTheory,
+    QMLevelOfTheory,
+    MMLevelOfTheory,
+)

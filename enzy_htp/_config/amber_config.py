@@ -9,7 +9,6 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 
 Date: 2022-06-02
 """
-import os
 from copy import deepcopy
 from typing import Any, List, Dict
 
@@ -110,8 +109,8 @@ class AmberConfig(BaseConfig):
     """The default value for whether restart using v from another md step"""
 
     DEFAULT_MD_CLUSTER_JOB_RES_KEYWORDS = {
-        "gpu" :  ARMerConfig.MD_GPU_RES,
-        "cpu" : ARMerConfig.MD_CPU_RES,
+        "gpu" :  deepcopy(ARMerConfig.MD_GPU_RES),
+        "cpu" : deepcopy(ARMerConfig.MD_CPU_RES),
     }
     """The default res_keywords for Amber MD jobs. This is used 1. when default
     cluster_job_config is used/ or 2. when res_keywords in cluster_job_config is
@@ -119,7 +118,7 @@ class AmberConfig(BaseConfig):
 
     def get_default_md_cluster_job_res_keywords(self, key: str) -> Dict:
         """func used for lazy determination"""
-        return self.DEFAULT_MD_CLUSTER_JOB_RES_KEYWORDS[key]
+        return deepcopy(self.DEFAULT_MD_CLUSTER_JOB_RES_KEYWORDS[key])
 
     def get_default_md_cluster_job(self, key: str) -> Dict:
         """The default value for dictionary that assign arguments to

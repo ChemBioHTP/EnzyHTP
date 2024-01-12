@@ -133,6 +133,25 @@ class Chain(DoubleLinkedNode):
         return list(map(lambda x: x.idx, self._residues))
 
     @property
+    def largest_res_idx(self) -> int:
+        """return the largest residue index in the chain"""
+        return max(self.residue_idxs)
+
+    @property
+    def smallest_res_idx(self) -> int:
+        """return the smallest residue index in the chain"""
+        return min(self.residue_idxs)
+
+    def c_ter_residue(self) -> Residue:
+        """get the C-ter residue of the self chain.
+        TODO this needs to be more general same as nter"""
+        return self.residues[-1]
+
+    def n_ter_residue(self) -> Residue:
+        """get the N-ter residue of the self chain"""
+        return self.residues[0]
+
+    @property
     def chain_type(self) -> str:
         """
         Returns:
@@ -232,6 +251,10 @@ class Chain(DoubleLinkedNode):
     def is_connected(self) -> bool:
         """check whether all atoms within the chain have connected initiated"""
         return math.prod([atom.is_connected() for atom in self.atoms])
+
+    def has_init_charge(self) -> bool:
+        """check if self has charge"""
+        return math.prod([atom.has_init_charge() for atom in self.atoms])  
     #endregion
 
     #region === Editor ===

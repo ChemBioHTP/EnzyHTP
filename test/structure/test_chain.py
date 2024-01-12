@@ -1,5 +1,6 @@
 """Testing the functionality of the enzy_htp.structure.Chain class.
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Author: QZ Shao <shaoqz@icloud.com>
 Date: 2022-03-20
 """
 from copy import deepcopy

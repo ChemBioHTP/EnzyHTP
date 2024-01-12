@@ -8,4 +8,3 @@ Date: 2022-11-06
 """
 from .electric_field import electric_field
 
-from .binding_energy import binding_energy

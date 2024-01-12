@@ -156,8 +156,8 @@ def _connect_caa_atom(atom: Atom) -> None:
         cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP[res_name][atom.name]
     elif parent_residue.is_canonical():
         r = parent_residue
-        r1 = parent_residue.chain[0]
-        rm1 = parent_residue.chain[-1]
+        r1 = parent_residue.chain.n_ter_residue()
+        rm1 = parent_residue.chain.c_ter_residue()
         if r is r1:
             # N terminal
             cnt_atomnames = chem.residue.RESIDUE_CONNECTIVITY_MAP_NTERMINAL[res_name][atom.name]

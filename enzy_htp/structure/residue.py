@@ -190,7 +190,7 @@ class Residue(DoubleLinkedNode):
         if self.is_modified():
             raise Exception("TODO prob determine start/end atom and deduce mainchain")
         else:
-            atom_names = "C CA N".split()
+            atom_names = "C CA N".split() # TODO do we add CP1 CP2?
             for name in atom_names:
                 result.append(self.find_atom_name(name))
         return result
@@ -221,6 +221,27 @@ class Residue(DoubleLinkedNode):
                 return True
         return False
 
+    def c_side_residue(self):
+        """get the sibling Residue that connects to the C atom.
+        return None if reached the chain terminal."""
+        result = self.chain.find_residue_idx(self.idx + 1)
+        if result is None:
+            if self.chain.largest_res_idx > self.idx:
+                _LOGGER.warning(f"{self} have no C-side residue but it is not a C-ter."
+                                " Something wrong in your residue indexing. "
+                                "It could be your index is not continous")
+        return result
+
+    def n_side_residue(self):
+        """get the sibling Residue that connects to the N atom
+        return None if reached the chain terminal."""
+        result = self.chain.find_residue_idx(self.idx - 1)
+        if result is None:
+            if self.chain.smallest_res_idx < self.idx:
+                _LOGGER.warning(f"{self} have no N-side residue but it is not a N-ter."
+                                " Something wrong in your residue indexing. "
+                                "It could be your index is not continous")
+        return result
     #endregion
 
     #region === Checker ===
@@ -258,6 +279,10 @@ class Residue(DoubleLinkedNode):
         """Checks if the Residue() is an rd_non_ligand as defined by enzy_htp.chemical.solvent.RD_NON_LIGAND_LIST"""
         return self._rtype == chem.ResidueType.TRASH
 
+    def is_residue_cap(self) -> bool:
+        """Checks if the Residue() is residue_cap"""
+        return self._rtype == chem.ResidueType.RESIDUECAP
+
     def is_missing_chain(self) -> bool:
         """Whether the Residue() lacks a chain parent"""
         return self._parent is None
@@ -281,6 +306,10 @@ class Residue(DoubleLinkedNode):
     def is_connected(self) -> bool:
         """check if every atom in the residue have a connect record"""
         return math.prod([atom.is_connected() for atom in self.atoms])
+
+    def has_init_charge(self) -> bool:
+        """check if self has charge"""
+        return math.prod([atom.has_init_charge() for atom in self.atoms])  
     #endregion
 
     #region === Editor ===
