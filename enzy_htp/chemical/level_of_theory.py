@@ -19,6 +19,16 @@ class LevelOfTheory(ABC):
 
 @dataclass
 class QMLevelOfTheory(LevelOfTheory):
+    """the level of theory of a QM simulation.
+    basis_set: 
+        the basis function set.
+    method: 
+        the method for solving the Schrödinger equation. (e.g.: HF, wb97xd, ...)
+    solvent: 
+        the name of the solvent or a dictionary that specific the parameters
+        of the solvent. It needs to be consistent with the solvation model.
+    solv_method:
+        the name of the solvation model."""
     basis_set: str
     method: str
     solvent: Union[str, dict] = None
@@ -29,6 +39,11 @@ class QMLevelOfTheory(LevelOfTheory):
 
 @dataclass
 class MMLevelOfTheory(LevelOfTheory):
+    """the level of theory of a MM based simulation.
+    force_field: 
+        the name of the force field
+    ligand_method: 
+        the method parameterizating the ligand"""
     force_field: str
     ligand_method: str
 
