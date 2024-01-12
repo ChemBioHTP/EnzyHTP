@@ -27,7 +27,7 @@ from .residue import (
 from .enzyme_commission import parse_ec_number
 
 from .level_of_theory import (
-    LevelofTheory,
-    QMLevelofTheory,
-    MMLevelofTheory,
+    LevelOfTheory,
+    QMLevelOfTheory,
+    MMLevelOfTheory,
 )
