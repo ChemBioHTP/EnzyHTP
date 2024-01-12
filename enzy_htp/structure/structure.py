@@ -227,7 +227,10 @@ class Structure(DoubleLinkedNode):
 
     @property
     def residue_namedkey_mapper(self) -> Dict[Tuple[str, int, str], Residue]:
-        """return a mapper of {(chain_id, residue_idx, residue_name): Residue (reference)}"""
+        """This function maps residue key to a reference of Residue() in the strutcure.
+        In this variant, the residue name is also contained in the residue key.
+        Returns:
+            {(chain_id, residue_idx, residue_name): Residue(), ...}."""
         result = {}
         for residue in self.residues:
             result[residue.key(if_name=True)] = residue
