@@ -36,7 +36,7 @@ def remove_solvent(stru: Structure, protect: str = None) -> Structure:
     return stru
 
 
-def remove_h(stru: Structure, in_place: bool=True) -> Structure:
+def remove_hydrogens(stru: Structure, in_place: bool=True) -> Structure:
     """Method that removes hydrogens from the supplied structure.
     
     Args:
