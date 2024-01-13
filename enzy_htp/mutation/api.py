@@ -78,7 +78,7 @@ def assign_mutant(
         sections are used, {} is needed to group those sections.
         "{section_a1,section_a2,section_a3},{section_b1,section_b2,section_b3},..."
         Each section can be one of the format below:
-        1. direct indication                    : XA###Y
+        1. direct indication                    : XA###Y ('WT' for just wild type)
         2. random M, N-point mutation in a set  : r:N[mutation_esm_patterns]*M
                                                   or r:NR[mutation_esm_patterns]*MR
                                                   (N and M are int,
