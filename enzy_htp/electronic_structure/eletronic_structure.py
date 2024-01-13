@@ -6,7 +6,7 @@ Date: 2023-12-28"""
 import os
 from typing import List, Any
 
-from enzy_htp.structure import Structure
+from enzy_htp.structure import StructureRegion
 
 class EletronicStructure:
     """This class defines electronic structure/wavefunctions of a 
@@ -36,7 +36,7 @@ class EletronicStructure:
         TODO"""
     def __init__(self,
         energy_0: float,
-        geometry: Structure,
+        geometry: StructureRegion,
         mo: str,
         mo_parser: Any,
         source: str = None,):
@@ -52,7 +52,7 @@ class EletronicStructure:
         return self._energy_0
 
     @property
-    def geometry(self) -> Structure:
+    def geometry(self) -> StructureRegion:
         """geometry"""
         return self._geometry
 

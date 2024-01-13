@@ -3,7 +3,7 @@
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
 Date: 2023-12-30"""
-
+from __future__ import annotations
 from collections import defaultdict
 from copy import deepcopy
 import numpy as np
@@ -224,6 +224,12 @@ class StructureRegion:
         """return a clone of self"""
         result = type(self).__new__(type(self))
         result.atoms = [at for at in self.atoms] # same atom but new list
+        return result
+
+    def clone_to_geometry(self, geom: Structure) -> StructureRegion:
+        """return a clone of self that applys a specific geometry"""
+        result = self.clone()
+        result.apply_to_geom(geom)
         return result
 
     def get_net_charge(self) -> int:

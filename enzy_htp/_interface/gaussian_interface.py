@@ -235,10 +235,11 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
         mo_parser = GaussianChkParser(
             interface=self.parent_interface)
         energy_0 = self.get_energy_0(gout_path)
+        geometry = self.region.clone_to_geometry(stru)
 
         result = EletronicStructure(
             energy_0 = energy_0,
-            geometry = stru,
+            geometry = geometry,
             mo = gchk_path,
             mo_parser = mo_parser,
             source="gaussian16",
@@ -265,6 +266,7 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
         mo_parser = GaussianChkParser(
             interface=self.parent_interface)
         energy_0 = self.get_energy_0(gout_path)
+        geometry = self.region.clone_to_geometry(stru)
 
         # clean up
         clean_up_target = [result_egg.parent_job.job_cluster_log,
@@ -275,7 +277,7 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
 
         return EletronicStructure(
             energy_0 = energy_0,
-            geometry = stru,
+            geometry = geometry,
             mo = gchk_path,
             mo_parser = mo_parser,
             source="gaussian16",
