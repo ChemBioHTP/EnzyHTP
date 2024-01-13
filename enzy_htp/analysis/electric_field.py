@@ -2,6 +2,7 @@
 axis. Calculates field strength for an enzyme using Amber RESP charges. 
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Author: QZ Shao <shaoqz@icloud.com>
 
 Date: 2022-11-06
 """
