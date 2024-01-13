@@ -183,7 +183,7 @@ def sync_mutation_over_chains(mutants: List[List[Mutation]],
 
 def mutate_stru(stru: Structure,
                 mutant: List[Mutation],
-                engine: str = "tleap_min",
+                engine: str = "pymol",
                 in_place: bool = False,
                 if_check_mutant_stru: bool = True,
                 checker_config: Dict[str, Dict[str, Any]] = None,
@@ -511,7 +511,11 @@ def mutate_stru_with_rosetta(stru: Structure, mutant: List[Mutation], in_place: 
     return stru_cpy
 
 
-MUTATE_STRU_ENGINE = {"tleap_min": mutate_stru_with_tleap, "pymol": mutate_stru_with_pymol, "rosetta": mutate_stru_with_rosetta}
+MUTATE_STRU_ENGINE = {
+    "tleap_min": mutate_stru_with_tleap, 
+    "pymol": mutate_stru_with_pymol, 
+    "rosetta": mutate_stru_with_rosetta
+}
 """engines for mutate_stru()"""
 
 
