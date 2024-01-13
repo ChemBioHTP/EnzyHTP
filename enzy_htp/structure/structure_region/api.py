@@ -138,6 +138,8 @@ class StructureRegion:
     def atoms_from_geom(self, geom: Structure) -> List[Atom]:
         """get the corresponding atoms from a specific geometry
         with the same topology
+        Returns:
+            a list of Atom()s in the same order
         Note: this design is because many operations in this
         class is only topology related. If create an obj for
         each geom (i.e.: Structure()), we will need to repeat
@@ -149,18 +151,24 @@ class StructureRegion:
             _LOGGER.error(f"geometry ({geom}) does not match region topology!")
             raise ValueError
         
-        # 2. find corresponding atoms from geom
-        for res, atoms in self.atoms_by_residue.items():
-            if not res.is_residue_cap():
-                geom_res = geom.residue_mapper[res.key()]
-                for atom in atoms:
-                    geom_atom = geom_res.find_atom_name(atom.name)
-                    result.append(geom_atom)
-
-        # 3. copy caps and align the based on linked residues
+        # 2. copy caps and align the based on linked residues
+        geom_cap_mapper = {}
         for cap in self.caps:
-            geom_cap = cap.apply_to_geom(geom)
-            result.extend(geom_cap.atoms)
+            geom_cap_mapper[cap] = cap.apply_to_geom(geom)
+        
+        # 3. find corresponding atoms from geom
+        for atom in self.atoms:
+            # cap: find from geom caps
+            if atom.parent.is_residue_cap():
+                geom_cap = geom_cap_mapper[atom.parent]
+                geom_atom = geom_cap.find_atom_name(atom.name)
+                result.append(geom_atom)
+            
+            # non-cap: find from geom
+            else:
+                geom_res = geom.residue_mapper[atom.parent.key()]
+                geom_atom = geom_res.find_atom_name(atom.name)
+                result.append(geom_atom)
 
         return result
     
