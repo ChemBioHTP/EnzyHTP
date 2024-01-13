@@ -8,7 +8,7 @@ Science API:
 
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2023-10-28"""
-from typing import Any, Union, List, Dict, Callable
+from typing import Union, List, Dict, Callable
 
 from enzy_htp import interface
 from enzy_htp._interface.handle_types import QMSinglePointEngine, QMOptimizationEngine
@@ -16,8 +16,6 @@ from enzy_htp.electronic_structure import EletronicStructure
 from enzy_htp.structure import (
     Structure,
     StructureEnsemble,
-    StructureRegion,
-    StructureConstraint,
     create_region_from_selection_pattern
 )
 from enzy_htp.structure.structure_operation import init_charge
@@ -249,7 +247,7 @@ def _parallelize_qm_with_cluster_job(
         qm_engine: Union[QMSinglePointEngine, QMOptimizationEngine],
         job_check_period: int,
         array_size: int,
-        ) -> List[StructureEnsemble]:
+        ) -> List[EletronicStructure]:
     """The QM parallelization method: cluster_job.
     This method will utilize ARMer@EnzyHTP and make each QM calculation a ClusterJob and
     parallalize them in a job array
@@ -281,7 +279,7 @@ def _parallelize_qm_with_cluster_job(
 def _serial_qm(
         stru_esm: StructureEnsemble,
         qm_engine: Union[QMSinglePointEngine, QMOptimizationEngine],
-        ) -> List[StructureEnsemble]:
+        ) -> List[EletronicStructure]:
     """The QM serial running method
     This method runs QMs in a serial manner locally."""
     result = []
