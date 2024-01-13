@@ -237,7 +237,7 @@ class StructureRegion:
     def clone_to_geometry(self, geom: Structure) -> StructureRegion:
         """return a clone of self that applys a specific geometry"""
         result = self.clone()
-        result.apply_to_geom(geom)
+        result.atoms = self.atoms_from_geom(geom)
         return result
 
     def get_net_charge(self) -> int:
