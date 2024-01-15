@@ -40,7 +40,7 @@ from .structure import (
     Mol2Parser
 )
 
-from .electronic_structure import EletronicStructure
+from .electronic_structure import ElectronicStructure
 
 from ._interface import Interface, OpenPyMolSession
 

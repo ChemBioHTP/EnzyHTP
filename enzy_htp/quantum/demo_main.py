@@ -9,7 +9,7 @@ from enzy_htp.structure import StructureEnsemble
 from enzy_htp import PDBParser, Structure
 
 
-class EletronicStructure:
+class ElectronicStructure:
     # attribute
     energy_0: float
     geometry: Structure
@@ -44,7 +44,7 @@ stru_esm: List[StructureEnsemble] = equi_md_sampling(
                                             "partition" : "turing"})
 
 # single point can take 1 stru
-ele_stru: EletronicStructure = single_point(
+ele_stru: ElectronicStructure = single_point(
     stru,
     QMLevelOfTheory(
         basis_set="def2-svp", method="b3lyp-d3",
@@ -53,7 +53,7 @@ ele_stru: EletronicStructure = single_point(
     use_symmetry=False,)
 
 # single point can take an ensemble
-ele_stru: EletronicStructure = single_point(
+ele_stru: ElectronicStructure = single_point(
     stru_esm,
     QMLevelOfTheory(
         basis_set="def2-svp", method="b3lyp-d3",
@@ -62,7 +62,7 @@ ele_stru: EletronicStructure = single_point(
     use_symmetry=False,)
 
 # single point can take an ensemble and calculate only a region of it.
-ele_stru: EletronicStructure = single_point(
+ele_stru: ElectronicStructure = single_point(
     stru_esm,
     regions=["resi 101+254"],
     region_methods = [
@@ -74,7 +74,7 @@ ele_stru: EletronicStructure = single_point(
     engine="g16",)
 
 # single point can take an ensemble and calculate in a multiscale manner.
-ele_stru: EletronicStructure = single_point(
+ele_stru: ElectronicStructure = single_point(
     stru_esm,
     regions=["resi 101+254", "else"],
     region_methods = [

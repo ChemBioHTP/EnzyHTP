@@ -12,7 +12,7 @@ from typing import Any, Union, List, Dict, Callable
 
 from enzy_htp import interface
 from enzy_htp._interface.handle_types import QMSinglePointEngine, QMOptimizationEngine
-from enzy_htp.electronic_structure import EletronicStructure
+from enzy_htp.electronic_structure import ElectronicStructure
 from enzy_htp.structure import (
     Structure,
     StructureEnsemble,
@@ -41,7 +41,7 @@ def single_point(
         job_array_size: int= 20,
         work_dir: str="./QM_SPE",
         keep_in_file: bool=False,
-        ) -> List[EletronicStructure]:
+        ) -> List[ElectronicStructure]:
     """The QM single point calculation. This function calculates the molecular orbitals (MOs)
     give a molecule with a specific geometry. If an ensemble of geometry is give, 
     calculation is applied to each snapshot in this ensemble.
