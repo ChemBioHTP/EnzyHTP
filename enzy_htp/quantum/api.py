@@ -12,7 +12,7 @@ from typing import Union, List, Dict, Callable
 
 from enzy_htp import interface
 from enzy_htp._interface.handle_types import QMSinglePointEngine, QMOptimizationEngine
-from enzy_htp.electronic_structure import EletronicStructure
+from enzy_htp.electronic_structure import ElectronicStructure
 from enzy_htp.structure import (
     Structure,
     StructureEnsemble,
@@ -39,7 +39,7 @@ def single_point(
         job_array_size: int= 20,
         work_dir: str="./QM_SPE",
         keep_in_file: bool=False,
-        ) -> List[EletronicStructure]:
+        ) -> List[ElectronicStructure]:
     """The QM single point calculation. This function calculates the molecular orbitals (MOs)
     give a molecule with a specific geometry. If an ensemble of geometry is give, 
     calculation is applied to each snapshot in this ensemble.
@@ -247,7 +247,7 @@ def _parallelize_qm_with_cluster_job(
         qm_engine: Union[QMSinglePointEngine, QMOptimizationEngine],
         job_check_period: int,
         array_size: int,
-        ) -> List[EletronicStructure]:
+        ) -> List[ElectronicStructure]:
     """The QM parallelization method: cluster_job.
     This method will utilize ARMer@EnzyHTP and make each QM calculation a ClusterJob and
     parallalize them in a job array
@@ -279,7 +279,7 @@ def _parallelize_qm_with_cluster_job(
 def _serial_qm(
         stru_esm: StructureEnsemble,
         qm_engine: Union[QMSinglePointEngine, QMOptimizationEngine],
-        ) -> List[EletronicStructure]:
+        ) -> List[ElectronicStructure]:
     """The QM serial running method
     This method runs QMs in a serial manner locally."""
     result = []

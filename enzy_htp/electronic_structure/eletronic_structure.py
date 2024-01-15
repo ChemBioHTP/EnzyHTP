@@ -1,4 +1,4 @@
-"""electronic structure module of EnzyHTP. Defines the EletronicStructure
+"""electronic structure module of EnzyHTP. Defines the ElectronicStructure
 for electronic structure/wavefunctions of a molecule decribed by Structure().
 
 Author: QZ Shao <shaoqz@icloud.com>
@@ -8,7 +8,7 @@ from typing import List, Any
 
 from enzy_htp.structure import StructureRegion
 
-class EletronicStructure:
+class ElectronicStructure:
     """This class defines electronic structure/wavefunctions of a 
     molecule decribed by Structure() in EnzyHTP. It is stored in a
     form of files as the number and size of them could go very large.

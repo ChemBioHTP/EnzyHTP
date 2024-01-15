@@ -40,7 +40,7 @@ from enzy_htp.core import env_manager as em
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.job_manager import ClusterJob
 from enzy_htp.chemical import QMLevelOfTheory, MMLevelOfTheory, LevelOfTheory
-from enzy_htp.electronic_structure import EletronicStructure
+from enzy_htp.electronic_structure import ElectronicStructure
 from enzy_htp.structure import (
     Structure,
     PDBParser,
@@ -207,7 +207,7 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
 
         return (job, result_egg)
 
-    def run(self, stru: Structure) -> EletronicStructure:
+    def run(self, stru: Structure) -> ElectronicStructure:
         """the method that runs the QM"""
         # 1. input
         if not isinstance(stru, Structure):
@@ -237,7 +237,7 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
         energy_0 = self.get_energy_0(gout_path)
         geometry = self.region.clone_to_geometry(stru)
 
-        result = EletronicStructure(
+        result = ElectronicStructure(
             energy_0 = energy_0,
             geometry = geometry,
             mo = gchk_path,
@@ -253,7 +253,7 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
 
         return result
 
-    def translate(self, result_egg: GaussianQMResultEgg) -> EletronicStructure:
+    def translate(self, result_egg: GaussianQMResultEgg) -> ElectronicStructure:
         """the method convert engine specific results to general output"""
         gout_path = result_egg.gout_path
         gchk_path = result_egg.gchk_path
@@ -275,7 +275,7 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
             clean_up_target.extend(parent_job.mimo["temp_gin"])
         fs.clean_temp_file_n_dir(clean_up_target)
 
-        return EletronicStructure(
+        return ElectronicStructure(
             energy_0 = energy_0,
             geometry = geometry,
             mo = gchk_path,
@@ -289,7 +289,7 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
                                                 CompletedProcess,
                                                 SubprocessError]):
         """a check for whether an error occurs in spe is needed everytime before generating
-        a EletronicStructure.
+        a ElectronicStructure.
         Possible Gaussian error info places:
         1. stdout/stderr
         2. gout file

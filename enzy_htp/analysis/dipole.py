@@ -10,11 +10,11 @@ Date: 2024-01-12
 from typing import Tuple
 import numpy as np
 
-from enzy_htp.electronic_structure import EletronicStructure
+from enzy_htp.electronic_structure import ElectronicStructure
 from enzy_htp.structure import Atom
 
 def bond_dipole(
-        ele_stru: EletronicStructure, # use geom: StructureRegion here.
+        ele_stru: ElectronicStructure, # use geom: StructureRegion here.
         atom_1: Atom,
         atom_2: Atom,
         method: str = "LMO-Multiwfn",) -> Tuple[float, np.array]:
