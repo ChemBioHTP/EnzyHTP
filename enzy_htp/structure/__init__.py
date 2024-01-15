@@ -16,7 +16,28 @@ from .ligand import Ligand
 from .residue import Residue
 from .solvent import Solvent, residue_to_solvent
 from .metal_atom import MetalUnit, residue_to_metal
+from .modified_residue import ModifiedResidue, residue_to_modified_residue
+from .noncanonical_base import NonCanonicalBase
 from .chain import Chain
-from .structure import Structure, compare_structures, merge_right
-from .structure_io import PDBParser
-from .structure_parser import structure_from_pdb, ligand_from_pdb  # TODO remove later
+from .structure import Structure
+from .structure_ensemble import StructureEnsemble
+from .structure_io import PDBParser, Mol2Parser, PrepinParser
+from .structure_constraint import (
+    StructureConstraint,
+    CartesianFreeze,
+    DistanceConstraint,
+    AngleConstraint,
+    DihedralConstraint,
+    ResiduePairConstraint,
+    create_residue_pair_constraint,
+    structure_constraints_from_xml 
+)
+
+from .structure_region import (
+    StructureRegion,
+    create_region_from_selection_pattern,
+    create_region_from_residue_keys,
+    create_region_from_full_stru,
+)
+
+from .structure_selection_class import StruSelection

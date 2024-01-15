@@ -4,3 +4,13 @@ plum-dispatch
 numpy
 # openbabel
 pandas
+# pymol
+colorlog
+modeller
+pyvista
+rdkit
+editdistance
+beautifulsoup4
+sympy
+goodvibes
+biopython==1.83 # asked by goodvibes

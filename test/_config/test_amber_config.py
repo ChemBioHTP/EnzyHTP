@@ -1,10 +1,12 @@
-"""Testing the enzy_htp.molecular_mechanics.AmberConfig class.
+"""Testing the enzy_htp._config.AmberConfig class.
+
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-03
 """
+
+from pathlib import Path
 from enzy_htp._config import amber_config
 import pytest
-from pathlib import Path
 import enzy_htp._config.amber_config as ac
 
 
@@ -51,9 +53,7 @@ def test_valid_box_type():
 def test_required_executables():
     """Checking that the AmberConfig.required_executables() has the correct values."""
     ac1: ac.AmberConfig = ac.default_amber_config()
-    assert ac1.required_executables() == [
-        "sander", "pmemd.cuda", "tleap", "ampdb", "parmchk2", "antechamber", "cpptraj"
-    ]
+    assert ac1.required_executables() == ["sander", "pmemd.cuda", "tleap", "ambpdb", "parmchk2", "antechamber", "cpptraj"]
 
 
 def test_required_env_vars():

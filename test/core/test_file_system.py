@@ -3,7 +3,9 @@
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-19
 """
+import multiprocessing
 import os
+import time
 
 import enzy_htp.core.file_system as fs
 
@@ -155,5 +157,62 @@ def test_get_valid_temp_name():
     fs.safe_rm(fname1)
     assert not os.path.exists(fname1)
 
+
+def test_clean_temp_file_n_dir():
+    temp_dir_path = f"{CURR_DIR}/temp/"
+    temp_path_list = [temp_dir_path]
+    fs.safe_mkdir(temp_dir_path)
+    for i in range(3):
+        temp_file = fs.get_valid_temp_name(f"{temp_dir_path}/temp.txt")
+        with open(temp_file, "w") as of:
+            of.write("test")
+        temp_path_list.append(temp_file)
+    for temp_path in temp_path_list:
+        assert os.path.exists(temp_path)
+    fs.clean_temp_file_n_dir(temp_path_list)
+    for temp_path in temp_path_list:
+        assert not os.path.exists(temp_path)
+
+
+def test_all_file_in_dir():
+    """test the function using dummy folder and files"""
+    test_dirname = f"{CURR_DIR}/data/dummy_dir"
+    recursive_files = fs.all_file_in_dir(test_dirname, recursive=True)
+    assert len(recursive_files) == 2
+
+    nonrecursive_files = fs.all_file_in_dir(test_dirname, recursive=False)
+    assert len(nonrecursive_files) == 1
+
+
+def test_lock():
+    """test the homemade file lock"""
+    def worker_1():
+        f = open("test.file", "wb")
+        fs.lock(f)
+        f.write(b"Hi")
+        time.sleep(5)
+        fs.unlock(f)
+        f.close()
+
+    def worker_2(result_queue):
+        f = open("test.file", "rb")
+        while fs.is_locked(f):
+            print(1)
+            time.sleep(0.5)
+        content = f.read()
+        result_queue.put(content)
+        f.close()
+
+    result_queue = multiprocessing.Queue()
+    process1 = multiprocessing.Process(target=worker_1)
+    process2 = multiprocessing.Process(target=worker_2, args=(result_queue,))
+    process1.start()
+    time.sleep(0.1)
+    process2.start()
+    process1.join()
+    process2.join()
+    fs.safe_rm("test.file")
+
+    assert result_queue.get() == b"Hi"
 
 # TODO(CJ) add tests for remove_ext

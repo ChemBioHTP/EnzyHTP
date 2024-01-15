@@ -5,6 +5,7 @@ Date: 2022-09-22
 
 import logging
 import os
+
 from enzy_htp.structure import PDBParser, Structure
 import enzy_htp.structure.structure_operation as stru_oper
 from enzy_htp.core import _LOGGER
@@ -29,8 +30,9 @@ def test_remove_empty_chain():
     stru: Structure = sp.get_structure(pdb_file_path)
 
     stru[1].residues = []
+    stru[2].residues = []  # be careful when delete element from a iterable
     stru_oper.remove_empty_chain(stru)
-    assert len(stru) == 3
+    assert len(stru) == 2
 
 
 def test_remove_non_peptide():
@@ -57,33 +59,20 @@ def test_update_residues():
                               ")")
 
 
-def test_deprotonate_residue():
-    """test deprotonate_residue considered CYS on SG and HID on NE2 and ND1"""
-    pdb_file_path = f"{DATA_DIR}1Q4T_peptide_protonated.pdb"
+def test_align_atom_order_in_each_residue():
+    """test updating the atom order in each residue of an enzyme"""
+    pdb_file_path = f"{DATA_DIR}KE_07_R7_2_S_mut.pdb"
     stru: Structure = sp.get_structure(pdb_file_path)
-    # CYS A69
-    residue = stru["A"].find_residue_idx(69)
-    target_atom = residue.find_atom_name("SG")
-    stru_oper.deprotonate_residue(residue, target_atom)
-    assert residue.name == "CYM"
-    assert len(residue) == 10
-    # HID A21 (already no H)
-    ## case where no need to deproton
-    residue = stru["A"].find_residue_idx(21)
-    target_atom = residue.find_atom_name("NE2")
-    stru_oper.deprotonate_residue(residue, target_atom)
-    assert residue.name == "HID"
-    assert len(residue) == 17
+    pdb_file_path_2 = f"{DATA_DIR}KE_07_R7_2_S.pdb"
+    stru_2: Structure = sp.get_structure(pdb_file_path_2)
+    stru_oper.align_atom_order_in_each_residue(stru, stru_2)
+    
+    for new_res, old_res in zip(stru.residues, stru_2.residues):
+        if new_res.idx == 154:
+            assert new_res.name == "TRP"
+            assert len(new_res.atoms) == 24
+        else:
+            for new_atom, old_atom in zip(new_res.atoms, old_res.atoms):
+                assert new_atom.name == old_atom.name and new_atom.idx == old_atom.idx
 
-
-def test_deprotonate_residue_switch():
-    """test deprotonate_residue considered CYS on SG and HID on NE2 and ND1"""
-    pdb_file_path = f"{DATA_DIR}1Q4T_peptide_protonated.pdb"
-    stru: Structure = sp.get_structure(pdb_file_path)
-    ## case where it is a switch
-    residue = stru["A"].find_residue_idx(21)
-    target_atom = residue.find_atom_name("ND1")
-    stru_oper.deprotonate_residue(residue, target_atom)
-    assert residue.name == "HIE"
-    assert len(residue) == 17
-    # TODO add test with completion of LYS treatment etc.
+    

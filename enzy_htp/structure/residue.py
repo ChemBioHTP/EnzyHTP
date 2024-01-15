@@ -1,22 +1,24 @@
 """Definition for the Residue class. Residues are the most common unit of function within 
 enzy_htp. A Residue() can be canonincal, non-canonical, solvent, or ligand. It is essentially
 the catch all for PDB objects.
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-19
 """
 # TODO(CJ): figure out how to inherit docstrings to the children classes.
 from __future__ import annotations
+import copy
 import sys
-import numpy as np
-from collections import defaultdict
-from plum import dispatch
-from typing import Tuple, List, Dict
+import math
+from typing import Tuple, List
 
+
+import numpy as np
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
 from enzy_htp.core import _LOGGER
 from enzy_htp.core.exception import ResidueDontHaveAtom
 import enzy_htp.chemical as chem
+from enzy_htp.core.math_helper import get_geom_center
 
 from .atom import Atom
 
@@ -27,7 +29,7 @@ class Residue(DoubleLinkedNode):
     Attributes:
         (nessessary)
         children/atoms : A list of Atom() objects that make up the Residue().
-        name : Residue name.
+        name : Residue name. (3-letter code)
         idx : The index of the Residue within the chain.
         parent/chain : Parent chain name.
         rtype : The ResidueType of the Residue().
@@ -36,11 +38,7 @@ class Residue(DoubleLinkedNode):
         num_atoms: number of belonging Atom()s
     """
 
-    def __init__(self,
-                 residue_idx: int,
-                 residue_name: str,
-                 atoms: List[Atom],
-                 parent=None):
+    def __init__(self, residue_idx: int, residue_name: str, atoms: List[Atom], parent=None):
         """Constructor for the Residue() object"""
         self._name = residue_name
         self._idx = residue_idx
@@ -96,7 +94,7 @@ class Residue(DoubleLinkedNode):
 
     @property
     def name(self) -> str:
-        """Getter for the Residue()'s name."""
+        """Getter for the Residue()'s name. (3-letter code)"""
         return self._name
 
     @name.setter
@@ -115,6 +113,17 @@ class Residue(DoubleLinkedNode):
         return (self.chain.name, self._idx)
 
     @property
+    def key_str(self) -> str:
+        """The Residue key as a str in the format <chain_name>.<residue_idx>. Note that if the given
+        Residue does not have a parent chain, it is left blank (e.g. ".1"."""
+        tokens:List[str] = ["", str(self.idx)]
+
+        if self.chain is not None:
+            tokens[0] = self.chain.name
+
+        return ".".join(tokens)
+
+    @property
     def num_atoms(self) -> int:
         """Number of atoms in the Residue."""
         return len(self._atoms)
@@ -126,7 +135,7 @@ class Residue(DoubleLinkedNode):
             return chem.convert_to_one_letter(self.name)
         return f" {self.name} "
 
-    def find_atom_name(self, name: str) -> List[Atom]:
+    def find_atom_name(self, name: str) -> Atom:
         """find child Atom base on its name"""
         result = list(filter(lambda a: a.name == name, self.atoms))
         if len(result) > 1:
@@ -141,9 +150,89 @@ class Residue(DoubleLinkedNode):
         """get a list of atom names in the residue"""
         return list(map(lambda a: a.name, self.atoms))
 
+    @property
+    def atom_idx_list(self) -> List[int]:
+        """get a list of atom indexes in the residue"""
+        return list(map(lambda a: a.idx, self.atoms))
+
+    @property
+    def ca_coord(self) -> Tuple[float, float, float]:
+        """get the C-Alpha coordinate of the residue"""
+        atom_ca = self.find_atom_name("CA")
+        return atom_ca.coord
+
+    @property
+    def geom_center(self) -> Tuple[float, float, float]:
+        """get the geom_center coordinate of the residue"""
+        return get_geom_center([i.coord for i in self.atoms])
+
+    @property
+    def element_composition(self) -> set:
+        """get the element composition of the residue"""
+        result = set()
+        for atom in self.atoms:
+            result.add(atom.element)
+        return result
+
+    @property
+    def mainchain_atoms(self) -> List[Atom]:
+        """return a list of mainchain atoms"""
+        result = []
+        if self.is_modified():
+            raise Exception("TODO prob determine start/end atom and deduce mainchain")
+        else:
+            atom_names = "C CA N".split() # TODO do we add CP1 CP2?
+            for name in atom_names:
+                result.append(self.find_atom_name(name))
+        return result
+
     # def clone(self) -> Residue: #TODO
     #     """Creates a deepcopy of self."""
     #     return deepcopy(self)
+
+    def clash_count(self, other:Residue, radius:float=2.0, ignore_H:bool=True) -> int:
+        #TODO(CJ): the documentation for this part
+        if self == other:
+            _LOGGER.warning("Attempted to count clashes between Residue and itself.")
+            return 0
+
+        count:int = 0
+        for aa in other.atoms:
+            if ignore_H and aa.element == 'H':
+                continue
+            else:
+                count += self.clashes(aa, radius)
+
+        return count
+            
+    def clashes(self, other:Atom, radius:float) -> bool:
+        #TODO(CJ): the documentation for this part
+        for aa in self.atoms:
+            if aa.distance_to(other) <= radius:
+                return True
+        return False
+
+    def c_side_residue(self):
+        """get the sibling Residue that connects to the C atom.
+        return None if reached the chain terminal."""
+        result = self.chain.find_residue_idx(self.idx + 1)
+        if result is None:
+            if self.chain.largest_res_idx > self.idx:
+                _LOGGER.warning(f"{self} have no C-side residue but it is not a C-ter."
+                                " Something wrong in your residue indexing. "
+                                "It could be your index is not continous")
+        return result
+
+    def n_side_residue(self):
+        """get the sibling Residue that connects to the N atom
+        return None if reached the chain terminal."""
+        result = self.chain.find_residue_idx(self.idx - 1)
+        if result is None:
+            if self.chain.smallest_res_idx < self.idx:
+                _LOGGER.warning(f"{self} have no N-side residue but it is not a N-ter."
+                                " Something wrong in your residue indexing. "
+                                "It could be your index is not continous")
+        return result
     #endregion
 
     #region === Checker ===
@@ -153,7 +242,12 @@ class Residue(DoubleLinkedNode):
 
     def is_noncanonical(self) -> bool:
         """Checks if Residue() is canonical. Inherited by children."""
-        return self._rtype == chem.ResidueType.NONCANONICAL
+        return (self.is_modified() or self.is_ligand() or self.is_metal())
+
+    def is_modified(self) -> bool:
+        """Checks if Residue() is a modified residue. Inherited by children.
+        TODO: would MODIFIED a better name?"""
+        return self._rtype == chem.ResidueType.MODIFIED
 
     def is_ligand(self) -> bool:
         """Checks if Residue() is a ligand. Inherited by children."""
@@ -170,11 +264,15 @@ class Residue(DoubleLinkedNode):
     def is_metal_center(self):
         """determine if current metal is a coordination center.
         TODO more consistant way to determine for 'boundary' metals like Mg2+"""
-        return self.name in chem.METAL_CENTER_MAP
+        return self.is_metal() and self.name in chem.METAL_CENTER_MAP # fix the bug that it think U as nucleic_acid is also metal center
 
     def is_trash(self) -> bool:
         """Checks if the Residue() is an rd_non_ligand as defined by enzy_htp.chemical.solvent.RD_NON_LIGAND_LIST"""
         return self._rtype == chem.ResidueType.TRASH
+
+    def is_residue_cap(self) -> bool:
+        """Checks if the Residue() is residue_cap"""
+        return self._rtype == chem.ResidueType.RESIDUECAP
 
     def is_missing_chain(self) -> bool:
         """Whether the Residue() lacks a chain parent"""
@@ -196,6 +294,13 @@ class Residue(DoubleLinkedNode):
         """check if the residue contain no acidic proton on side chain hetero atoms"""
         return self.name in chem.residue.NOPROTON_LIST
 
+    def is_connected(self) -> bool:
+        """check if every atom in the residue have a connect record"""
+        return math.prod([atom.is_connected() for atom in self.atoms])
+
+    def has_init_charge(self) -> bool:
+        """check if self has charge"""
+        return math.prod([atom.has_init_charge() for atom in self.atoms])  
     #endregion
 
     #region === Editor ===
@@ -217,21 +322,40 @@ class Residue(DoubleLinkedNode):
         """
         raise Exception  #TODO need to figure out how to determine the connectivity without the name
 
-    def renumber_atoms(self, start: int = 1) -> int:  # TODO
-        """Renumbers the Residue()'s Atom()'s beginning with "start" paramter, defaulted to 1. Returns the index of the last Atom().
-        NOTE: errors if "start" is <= 0.
+    def renumber_atoms(self, atom_idx_list: List[int]) -> None:  # TODO
+        """Renumbers the Residue()'s Atom()'s to match atom_idx_list
         """
-        if start <= 0:
-            _LOGGER.error(
-                f"Illegal start number '{start}'. Value must be >= 0. Exiting...")
-            exit(1)
-        aa: Atom
-        self._atoms.sort(
-            key=lambda aa: aa.idx)  #@shaoqz: maybe use .sort to keep the reference.
+        idx = 0
+        for atom in self._atoms:
+            atom._idx = atom_idx_list[idx]
+            idx += 1
 
-        for idx, aa in enumerate(self._atoms):
-            self._atoms[idx].atom_number = idx + start  #@shaoqz: why dont use aa?
-        return idx + start
+    def remove_atoms_not_in_list(self, keep_name_list: List[str]):
+        """remove atoms that do not in the name list of keeping.
+        Make change in place"""
+        ref_atom_list: List[Atom] = copy.copy(self.atoms)
+        for atom in ref_atom_list:
+            if atom.name not in keep_name_list:
+                _LOGGER.debug(f"deleting {atom}")
+                atom.delete_from_parent()
+
+    def shift(self, point:List[float] ) -> None:
+        """Shift all atoms by the supplied vector. Checks if the input is the correct
+        size and throws if not.
+        
+        Args:
+            point: An iterable, indexable object containing 3 floats().
+
+        Returns:
+            Nothing.
+        """
+        if len(point) != 3:
+            raise TypeError(f"The supplied point is NOT of length 3 ({point})")
+
+        for aa in self.atoms:
+            orig = aa.coord
+            updated = (orig[0]+point[0], orig[1]+point[1], orig[2]+point[2])
+            aa.coord = updated
 
     #endregion
 

@@ -1,0 +1,20 @@
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_UNDERFLOW_FLAG IEEE_DENORMAL
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_OVERFLOW_FLAG IEEE_UNDERFLOW_FLAG IEEE_DENORMAL
+ERROR: Calculation halted.  Periodic box dimensions have changed too much from their initial values.
+  Your system density has likely changed by a large amount, probably from
+  starting the simulation from a structure a long way from equilibrium.
+
+  [Although this error can also occur if the simulation has blown up for some reason]
+
+  The GPU code does not automatically reorganize grid cells and thus you
+  will need to restart the calculation from the previous restart file.
+  This will generate new grid cells and allow the calculation to continue.
+  It may be necessary to repeat this restarting multiple times if your system
+  is a long way from an equilibrated density.
+
+  Alternatively you can run with the CPU code until the density has converged
+  and then switch back to the GPU code.
+
+
+  Unit    9 Error on OPEN: ./MD/equi.rst                                                                                                                                                                                                                                                   
+STOP PMEMD Terminated Abnormally!

@@ -1,16 +1,18 @@
 """Definition for the Chain class. Chains primarily store Residue() objects and organize them
 within the overall structure of an enzyme.
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com> 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-20
 """
 from __future__ import annotations
 from copy import deepcopy
-import itertools
+import math
 import sys
-from enzy_htp.core import _LOGGER
 from typing import Iterable, List, Tuple, Union
+
+from enzy_htp.core import _LOGGER
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
+from enzy_htp.core.general import get_interval_from_list
 
 from enzy_htp.structure.atom import Atom
 import enzy_htp.chemical as chem
@@ -80,17 +82,14 @@ class Chain(DoubleLinkedNode):
             _LOGGER.error(f"chain {self} have more than 1 residue on {idx}")
             sys.exit(1)
         if len(result) == 0:
-            _LOGGER.warning(f"residue idx {idx} out of chain's range {self}"
-                            )  #TODO may be make this an error
+            _LOGGER.warning(f"residue idx {idx} out of chain's range {self}")  #TODO may be make this an error
             return None
         return result[0]
 
     #endregion
 
     #region === Getter-Prop ===
-    def residue_idx_interval(self,
-                             if_str: bool = True
-                             ) -> Union[str, Iterable[Tuple[int, int]]]:
+    def residue_idx_interval(self, if_str: bool = True) -> Union[str, Iterable[Tuple[int, int]]]:
         """
         a range representation of containing residue indexes
         Args & Returns:
@@ -100,8 +99,11 @@ class Chain(DoubleLinkedNode):
         """
         interval_list = get_interval_from_list(self.residue_idxs)
         if if_str:
-            range_strs = map(lambda x: f"{x[0]}-{x[1]}", interval_list)
-            return ",".join(range_strs)
+            contain_list = [f"{x[0]}-{x[1]}" if x[0] != x[1] else f"{x[0]}" for x in interval_list]
+            if len(contain_list) == 1:
+                return contain_list[0]
+            range_strs = ",".join(contain_list)
+            return range_strs
         return interval_list
 
     @property
@@ -131,6 +133,25 @@ class Chain(DoubleLinkedNode):
         return list(map(lambda x: x.idx, self._residues))
 
     @property
+    def largest_res_idx(self) -> int:
+        """return the largest residue index in the chain"""
+        return max(self.residue_idxs)
+
+    @property
+    def smallest_res_idx(self) -> int:
+        """return the smallest residue index in the chain"""
+        return min(self.residue_idxs)
+
+    def c_ter_residue(self) -> Residue:
+        """get the C-ter residue of the self chain.
+        TODO this needs to be more general same as nter"""
+        return self.residues[-1]
+
+    def n_ter_residue(self) -> Residue:
+        """get the N-ter residue of the self chain"""
+        return self.residues[0]
+
+    @property
     def chain_type(self) -> str:
         """
         Returns:
@@ -139,8 +160,8 @@ class Chain(DoubleLinkedNode):
                 Any composition from metal, ligand, solvent, trash
         """
         chain_type = []
-        if self.is_peptide():
-            return "peptide"
+        if self.is_polypeptide():
+            return "polypeptide"
         if self.has_metal():
             chain_type.append("metal")
         if self.has_ligand():
@@ -164,14 +185,11 @@ class Chain(DoubleLinkedNode):
     #endregion
 
     #region === Checker ===
-    def is_peptide(self) -> bool:
+    def is_polypeptide(self) -> bool:
         """
-        if there is any residue not canonical
+        if there is any non-aminoacid part in chain
         """
-        return not sum(
-            list(
-                map(lambda rr: (not rr.is_canonical()) and
-                    (not rr.is_noncanonical()), self._residues)))
+        return not sum(list(map(lambda rr: (not rr.is_canonical()) and (not rr.is_modified()), self._residues)))
 
     def has_metal(self) -> bool:
         """Checks if any metals are contained within the current chain."""
@@ -230,9 +248,16 @@ class Chain(DoubleLinkedNode):
                 return False
         return True
 
+    def is_connected(self) -> bool:
+        """check whether all atoms within the chain have connected initiated"""
+        return math.prod([atom.is_connected() for atom in self.atoms])
+
+    def has_init_charge(self) -> bool:
+        """check if self has charge"""
+        return math.prod([atom.has_init_charge() for atom in self.atoms])  
     #endregion
 
-    # === Editor ===
+    #region === Editor ===
     def remove_trash(self):
         """
         remove trash ligands in the chain
@@ -250,77 +275,37 @@ class Chain(DoubleLinkedNode):
         """
         self._children.sort(key=lambda x: x.idx)
 
-    def add_residue(
-        self,
-        new_res: Residue,
-        sort_after: bool = True,
-        overwrite: bool = False
-    ) -> None:  # TODO#@shaoqz: @imp overwriting a residue is rarely a demand but instead inserting one with same name and index but different stru is.
-        """Allows for insertion of a new Residue() object into the Chain. If the new Residue() is an exact # TODO work on overwriting
-        copy, it fully overwrites the existing value. The sort_after flag specifies if the Residue()"s should
-        be sorted by residue_number after the insertion.
-        """
-        for ridx, res in enumerate(self._residues):
-            if new_res.name == res.name and new_res.num_ == res.num_:  #@shaoqz: @imp should not work like this. Imaging the case where both residue is called LIG but they are different ligands. They are neither the same nor should be overwritten.
-                self._residues[ridx] = deepcopy(new_res)
-                break
+    def add(self, new_res: Residue,
+            overwrite: bool = False, sort: bool = True,) -> None:
+        """Method that adds a new residue based on the idx. If idx is None it is added in the end by default.
+        Args:
+            overwrite: if overwrite when residue same idx. if not overwrite the new
+                res will be inserted after the idx (which will cause the idx change of all following residues).
+            sort: if sort after adding"""
+        new_res.parent = self
+        push_number = 0
+        if (new_res.idx is None) or (new_res.idx not in self.residue_idxs):
+            self.residues.append(new_res)
         else:
-            self._residues.append(new_res)
+            for i, res in enumerate(self.residues):
+                if res.idx == new_res.idx:
+                    if overwrite:
+                        self.residues[i] = new_res
+                    else:
+                        self.residues.insert(i, new_res)
+                        push_number = 1
+                    break
 
-        self.rename(
-            self._name)  #@shaoqz: maybe better to change this residue attribute only?
+        if push_number:
+            push_idx = new_res.idx
+            for res in self.residues:
+                if res.idx > push_idx:
+                    res.idx += 1
+            new_res.idx += 1
 
-        if sort_after:
-            self._residues.sort(
-                key=lambda r: r.idx()
-            )  #@shaoqz: @imp this does not work when two different residue have the same index which often happens when you want to add a ligand to the structure.
-
-    def remove_residue(
-        self, target_key: str
-    ) -> None:  # TODO#@shaoqz: @imp2 target key should not require the name. We should minimize the prerequisite of any input since its for HTP.
-        """Given a target_key str of the Residue() residue_key ( "chain_id.residue_name.residue_number" ) format,
-        the Residue() is removed if it currently exists in the Chain() object."""
-        for ridx, res in enumerate(self._residues):
-            if res.residue_key == target_key:
-                break
-        else:
-            return
-
-        del self._residues[ridx]  #@shaoqz: why not move this line inside the loop?
-
-    def rename(
-        self, new_name: str
-    ) -> None:  # TODO#@shaoqz: using the 2-way link sheet will get rid of functions like this but both works.
-        """Renames the chain and propagates the new chain name to all child Residue()"s."""
-        self._name = new_name
-        res: Residue
-        for ridx, res in enumerate(self._residues):
-            self._residues[ridx].set_chain(new_name)  #@shaoqz: why not just use res?
-
-    def renumber_atoms(
-        self,
-        start: int = 1
-    ) -> int:  # TODO#@shaoqz: @imp need to record the mapping of the index  #@shaoqz: also need one for residues
-        """Renumbers the Atom()"s inside the chain beginning with "start" value and returns index of the last atom.
-        Exits if start index <= 0.
-        """
-        if start <= 0:
-            _LOGGER.error(
-                f"Illegal start number '{start}'. Value must be >= 0. Exiting...")
-            exit(1)
-        self._residues = sorted(self._residues, key=lambda r: r.idx())
-        idx = start
-        num_residues: int = self.num_residues
-        for ridx, res in enumerate(self._residues):
-            idx = self._residues[ridx].renumber_atoms(idx)
-            idx += 1
-            terminal = (ridx < (num_residues - 1)) and (
-                res.is_canonical() and not self._residues[ridx + 1].is_canonical(
-                )  #@shaoqz: @imp what does this mean? the TER line?
-            )
-            if terminal:
-                idx += 1
-        return idx - 1
+        if sort:
+            self.sort_residues()
+    #endregion
 
     #region === Special ===
     def __str__(self):
@@ -330,24 +315,3 @@ class Chain(DoubleLinkedNode):
         return f"Chain({self._name}, residue: {self.residue_idx_interval()})"
 
     #endregion
-
-
-# TODO go to core
-def get_interval_from_list(target_list: List[int]) -> Iterable[Tuple[int, int]]:
-    """
-    convert a list of int to the interval/range representation
-    Returns:
-        a generater of tuples with each indicating the start/end of the interval
-    Example:
-        >>> list(get_interval_from_list([1,2,3,6,7,8]))
-        [(1,3),(6,8)]
-    reference: https://stackoverflow.com/questions/4628333
-    """
-    # clean input
-    target_list = sorted(set(target_list))
-    # here use enum id as a ref sequence and group by the deviation
-    for i, j in itertools.groupby(
-            enumerate(target_list),
-            lambda ref_vs_target: ref_vs_target[1] - ref_vs_target[0]):
-        j = list(j)
-        yield j[0][1], j[-1][1]

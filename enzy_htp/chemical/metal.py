@@ -1,6 +1,6 @@
 """Stores mappers and definitions for different types of metals often found in PDBs.
 
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 """
 
@@ -120,6 +120,8 @@ IONIC_RADII: Dict[str, Union[int, None]] = {
     "Fe": 0.92,  # +2 hs / PDB disctance based (5HIO) / can not handel really well
     "Mn": 0.90,  # +2 / modified based on PDB (1K20)
     "Ca": 1.14,
+    "Cu": 0.87,  # +2
+    "Hg": 1.10,
 }
 """Mapping of metal elements to ionic radii. Value is 'None' if non-existent. Reference: doi:10.1107/S0567739476001551 """
 
@@ -151,8 +153,7 @@ VDW_RADII = {
 """Mapping of metal elements to Van-Der Waals (VDW) radii. Value is 'None' if non-existent."""
 
 DONOR_ATOM_LIST = [
-    "NH2", "NE", "NH1", "ND1", "NE2", "NZ", "OD1", 'OD2', "OE1", 'OE2', "OG", "OG1",
-    "ND2", "OD1", "OE1", "NE2", "SG", "SD", "OH", "NE1"
+    "NH2", "NE", "NH1", "ND1", "NE2", "NZ", "OD1", 'OD2', "OE1", 'OE2', "OG", "OG1", "ND2", "OD1", "OE1", "NE2", "SG", "SD", "OH", "NE1"
 ]
 """List for atom names that can be a qaulify electron donor atom to a coordination center
 The dictionary key here was for the parsing logic of atom names. Current the PDB format
@@ -170,13 +171,10 @@ def get_atom_radii(element: str, method: str = "ionic") -> float:
     elif method == "vdw":
         result = VDW_RADII.get(element, None)
     else:
-        _LOGGER.error(
-            f"The radii method '{method}' is not allowed. Only 'ionic' and 'vdw' are supported. Exiting..."
-        )
+        _LOGGER.error(f"The radii method '{method}' is not allowed. Only 'ionic' and 'vdw' are supported. Exiting...")
         sys.exit(1)
     if result is None:
-        _LOGGER.error(
-            f"query element {element} not in {method} mapper. Consider add it in.")
+        _LOGGER.error(f"query element {element} not in {method} mapper. Consider add it in.")
         sys.exit(1)
     return result
 

@@ -1,5 +1,6 @@
 """Testing the functionality of the enzy_htp.structure.Chain class.
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Author: QZ Shao <shaoqz@icloud.com>
 Date: 2022-03-20
 """
 from copy import deepcopy
@@ -24,11 +25,23 @@ def test_sequence():
     assert stru[1].sequence == "GGNLP"
 
 
-def test_sequence_noncanonical():
+def test_sequence_modified():
     """test getting the sequence of the chain"""
     pdb_file_path = f"{DATA_DIR}5JT3_noncanonical_test.pdb"
     stru: Structure = sp.get_structure(pdb_file_path)
     assert stru[0].sequence == "KRMLNTGYSLNNVHIDYVPTV TPO A"
+
+
+def test_residue_idx_interval():
+    """test residue_idx_interval of the chain"""
+    pdb_file_path = f"{DATA_DIR}two_chain.pdb"
+    stru: Structure = sp.get_structure(pdb_file_path)
+    assert stru[0].residue_idx_interval() == "10-11"
+    stru[1].residues[2].delete_from_parent()
+    assert stru[1].residue_idx_interval() == "12-13,15-16"
+    # one number behavior
+    stru[1].residues[2].delete_from_parent()
+    assert stru[1].residue_idx_interval() == "12-13,16"
 
 
 def test_is_same_coord():
@@ -38,8 +51,7 @@ def test_is_same_coord():
     ch1, ch2 = deepcopy(stru.chains[0]), deepcopy(stru.chains[0])
     assert ch1.is_same_coord(ch2)
     assert ch2.is_same_coord(ch1)
-    ch2.atoms[0].coord = (ch2.atoms[0].coord[0] + 0.05, ch2.atoms[0].coord[1],
-                          ch2.atoms[0].coord[2])
+    ch2.atoms[0].coord = (ch2.atoms[0].coord[0] + 0.05, ch2.atoms[0].coord[1], ch2.atoms[0].coord[2])
     assert not ch1.is_same_coord(ch2)
     assert ch1.is_same_coord(ch2, 0.10)
 

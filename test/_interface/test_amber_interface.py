@@ -1,20 +1,58 @@
-"""Testing the enzy_htp.molecular_mechanics.AmberInterface class.
+"""Testing the enzy_htp._interface.AmberInterface class.
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Author: QZ Shao <shaoqz@icloud.com>
 Date: 2022-06-03
 """
+import glob
 import os
+import re
 import shutil
+import pytest
+import numpy as np
 from pathlib import Path
+from typing import Union
 
+from enzy_htp.core.exception import tLEaPError, AmberMDError
+from enzy_htp.core.logger import _LOGGER
+from enzy_htp.core.general import EnablePropagate
+from enzy_htp.core.job_manager import ClusterJob
 from enzy_htp.core import file_system as fs
+from enzy_htp._interface.amber_interface import (
+    AmberParameterizer,
+    AmberParameter,
+    AmberMDStep,
+    AmberMDResultEgg,)
+import enzy_htp.structure as struct
+from enzy_htp.structure.structure_constraint import (
+    StructureConstraint,
+    create_cartesian_freeze,
+    create_backbone_freeze,
+    create_distance_constraint,
+    create_angle_constraint,)
 from enzy_htp import interface
+from enzy_htp import config as eh_config
 
 MM_BASE_DIR = Path(__file__).absolute().parent
 MM_DATA_DIR = f"{MM_BASE_DIR}/data/"
+MM_WORK_DIR = f"{MM_BASE_DIR}/work_dir/"
 MINIMIZE_INPUT_1 = f"{MM_DATA_DIR}/min_1.inp"
 TARGET_MINIMIZE_INPUT_1 = f"{MM_DATA_DIR}/target_min_1.inp"
 MINIMIZE_INPUT_2 = f"{MM_DATA_DIR}/min_2.inp"
 TARGET_MINIMIZE_INPUT_2 = f"{MM_DATA_DIR}/target_min_2.inp"
+
+ANTECHAMBER_FNAMES = "ANTECHAMBER_AC.AC ANTECHAMBER_AC.AC0 ANTECHAMBER_AM1BCC.AC ANTECHAMBER_AM1BCC_PRE.AC ANTECHAMBER_BOND_TYPE.AC ANTECHAMBER_BOND_TYPE.AC0 ANTECHAMBER_PREP.AC ANTECHAMBER_PREP.AC0 ATOMTYPE.INF NEWPDB.PDB PREP.INF sqm.in sqm.out sqm.pdb".split(
+)
+
+# region Tools
+def touch(fname: Union[str, Path]):
+    if not isinstance(fname, Path):
+        fpath = Path(fname)
+    else:
+        fpath = fname
+
+    if not fpath.exists():
+        fh = open(fpath, 'w')
+        fh.close()
 
 
 def exe_exists(exe: str) -> bool:
@@ -34,44 +72,1081 @@ def files_equivalent(fname1: str, fname2: str) -> bool:
             return False
 
     return True
+# endregion Tools
 
-
-def test_write_minimize_input_file():
-    """Testing that minimization input files are generated correctly."""
+def test_run_tleap():
+    """test function runs as expected"""
     ai = interface.amber
-    assert not Path(MINIMIZE_INPUT_1).exists()
-    assert not Path(MINIMIZE_INPUT_2).exists()
-    ai.write_minimize_input_file(MINIMIZE_INPUT_1, 2000)
-    assert files_equivalent(MINIMIZE_INPUT_1, TARGET_MINIMIZE_INPUT_1)
-    ai.write_minimize_input_file(MINIMIZE_INPUT_2, 1000)
-    assert files_equivalent(MINIMIZE_INPUT_2, TARGET_MINIMIZE_INPUT_2)
-    fs.safe_rm(MINIMIZE_INPUT_1)
-    fs.safe_rm(MINIMIZE_INPUT_2)
-    assert not Path(MINIMIZE_INPUT_1).exists()
-    assert not Path(MINIMIZE_INPUT_2).exists()
+    temp_test_file = f"{MM_BASE_DIR}/work_dir/test_run_tleap.pdb"
+    tleap_in_str = f"""source leaprc.protein.ff14SB
+a = loadpdb {MM_DATA_DIR}KE_07_R7_2_S.pdb
+savepdb a {temp_test_file}
+quit
+"""
+
+    ai.run_tleap(tleap_in_str)
+
+    assert os.path.exists(temp_test_file)
+    with open(temp_test_file) as f:
+        assert len(f.readlines()) == 3981
+    if _LOGGER.level > 10:
+        assert not os.path.exists(f"{eh_config['system.SCRATCH_DIR']}/tleap.out")
+        assert not os.path.exists(f"{eh_config['system.SCRATCH_DIR']}/tleap.in")
+    fs.safe_rm(temp_test_file)
 
 
-def test_minimize_structure():
-    """Testing that a structure can be minimized with the AmberInterface.minimize_structure() method."""
-    assert True
-
-
-def test_build_param_files():
-    """Testing that the AmberInterface.build_param_files() method works correctly."""
+def test_run_tleap_dev():
+    """develop use test function. Dont do any assert"""
     ai = interface.amber
-    assert True
+    test_input_pdb = f"{MM_DATA_DIR}KE_07_R7_2_S.pdb"
+    temp_test_file = f"{MM_BASE_DIR}/work_dir/test_run_tleap.pdb"
+    tleap_in_str = f"""source leaprc.protein.ff14SB
+a = loadpdb {test_input_pdb}
+savepdb a {temp_test_file}
+quit
+"""
+
+    ai.run_tleap(tleap_in_str, additional_search_path=["./", "../"])
+    fs.safe_rm(temp_test_file)
 
 
-def test_build_ligand_param_files():
-    """Testing that the AmberInterface.build_ligand_param_files() method works correctly."""
-    #TODO(CJ): at present this only checks if the files are made, not if they are correct
-    lig_frcmod = f"{MM_DATA_DIR}/atp.frcmod"
-    lig_prepin = f"{MM_DATA_DIR}/atp.prepin"
-    fs.safe_rm(lig_frcmod)
-    fs.safe_rm(lig_prepin)
+def test_run_tleap_w_error(caplog):
+    """test if the function captures the a errored run of tleap"""
     ai = interface.amber
-    ai.build_ligand_param_files([str(f"{MM_BASE_DIR}/data/atp.pdb")], [0])
-    assert os.path.exists(lig_frcmod)
-    assert os.path.exists(lig_prepin)
-    fs.safe_rm(lig_frcmod)
-    fs.safe_rm(lig_prepin)
+    temp_test_pdb = f"{MM_BASE_DIR}/work_dir/test_run_tleap.pdb"
+    temp_test_prmtop = f"{MM_BASE_DIR}/work_dir/test_run_tleap.prmtop"
+    temp_test_inpcrd = f"{MM_BASE_DIR}/work_dir/test_run_tleap.inpcrd"
+    # e1
+    tleap_in_str = f"""source leaprc.protein.ff24SB
+a = loadpdb {MM_DATA_DIR}KE_07_R7_2_S.pdb
+savepdb a {temp_test_pdb}
+quit
+"""
+    with pytest.raises(tLEaPError) as e:
+        ai.run_tleap(tleap_in_str)
+    assert "Could not open file leaprc.protein.ff24SB: not found" in caplog.text
+    # e2
+    tleap_in_str = f"""source leaprc.protein.ff14SB
+a = loadpdb {MM_DATA_DIR}KE_07_R7_2_R.pdb
+savepdb a {temp_test_pdb}
+quit
+"""
+    with pytest.raises(tLEaPError) as e:
+        ai.run_tleap(tleap_in_str)
+    assert "KE_07_R7_2_R.pdb: No such file or directory" in caplog.text
+    # e3
+    tleap_in_str = f"""source leaprc.protein.ff14SB
+a = loadpdb {MM_DATA_DIR}KE_07_R7_2_S.pdb
+saveamberparm a {temp_test_prmtop} {temp_test_inpcrd}
+quit
+"""
+    with pytest.raises(tLEaPError) as e:
+        ai.run_tleap(tleap_in_str)
+
+    fs.safe_rm(temp_test_pdb)
+    fs.safe_rm(temp_test_prmtop)
+    fs.safe_rm(temp_test_inpcrd)
+
+
+def test_find_tleap_error():
+    """make sure the function correctly find all the errors in example files"""
+    ai = interface.amber
+    ERR_EXP_DIR = f"{MM_DATA_DIR}tleap_errors/"
+    error_example_and_reason = [
+        (f"{ERR_EXP_DIR}e1.out", ["Could not open file leaprc.protein.ff24SB: not found"]),
+        (f"{ERR_EXP_DIR}e2.out", ["FATAL:  Atom .R<H5J 254>.A<NAL 2> does not have a type.", "Failed to generate parameters"]),
+    ]
+
+    for error_file, error_key_list in error_example_and_reason:
+        tleap_error = ai._find_tleap_error(error_file)
+        for error_key in error_key_list:
+            assert error_key in tleap_error.error_info_str
+
+
+def test_tleap_clean_up_stru(helpers):
+    """make sure the function correctly find all the errors in example files.
+    the test file is a truncated KE pdb also deleted the side chain atoms of residue 4
+    and changed its name to TRP mimiking a mutation sceniro."""
+    ai = interface.amber
+    test_input_pdb = f"{MM_DATA_DIR}tleap_clean_up_test_KE.pdb"
+    test_out_path = f"{MM_WORK_DIR}tleap_clean_up_out.pdb"
+    test_answer_path = f"{MM_DATA_DIR}tleap_clean_up_answer_KE.pdb"
+
+    ai.tleap_clean_up_stru(test_input_pdb, test_out_path, if_align_index=True)
+
+    assert helpers.equiv_files(test_out_path, test_answer_path)
+    fs.safe_rm(test_out_path)
+
+
+def test_build_md_parameterizer_default_value():
+    """as said in the name. Assert a charge_method default value
+    as a sample."""
+    ai = interface.amber
+    param_worker: AmberParameterizer = ai.build_md_parameterizer()
+    assert param_worker.charge_method == "AM1BCC"
+
+
+def test_amber_parameterizer_engine():
+    """as said in the name."""
+    ai = interface.amber
+    test_param_worker: AmberParameterizer = ai.build_md_parameterizer()
+    assert test_param_worker.engine == "Amber"
+
+
+def test_amber_parameterizer_run_lv_1():
+    """level 1 test of the parameterizer.
+    Test structure diversity:
+    - single polypeptide chain"""
+    ai = interface.amber
+    test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
+        ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib_empty"
+    )
+    test_stru = struct.PDBParser().get_structure(
+        f"{MM_DATA_DIR}/KE_wo_S.pdb")
+    params = test_param_worker.run(test_stru)
+    assert params.is_valid()
+    for f in params.file_list:
+        fs.safe_rm(f)
+    fs.safe_rmdir(test_param_worker.parameterizer_temp_dir)
+    fs.safe_rmdir(eh_config["system.SCRATCH_DIR"])
+
+
+def test_amber_parameterizer_run_lv_2():
+    """level 2 test of the parameterizer.
+    Test structure diversity:
+    - single polypeptide chain
+    - single substrate (CHON)
+    ** use existing parm files for ligand"""
+    ai = interface.amber
+    test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
+        ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib",
+        force_fields=[
+            "leaprc.protein.ff14SB",
+            "leaprc.gaff",
+            "leaprc.water.tip3p",
+        ]
+    )
+    test_stru = struct.PDBParser().get_structure(
+        f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb")
+    params = test_param_worker.run(test_stru)
+    assert params.is_valid()
+    for f in params.file_list:
+        fs.safe_rm(f)
+    fs.safe_rmdir(test_param_worker.parameterizer_temp_dir)
+    fs.safe_rmdir(eh_config["system.SCRATCH_DIR"])
+
+
+def test_amber_parameterizer_run_lv_3():
+    """level 3 test of the parameterizer.
+    Test structure diversity:
+    - single polypeptide chain
+    - single substrate (CHON)"""
+    temp_mol2_path = f"{MM_DATA_DIR}/ncaa_lib_empty/H5J_AM1BCC-GAFF2.mol2"
+    temp_frcmod_path = f"{MM_DATA_DIR}/ncaa_lib_empty/H5J_AM1BCC-GAFF2.frcmod"
+    ai = interface.amber
+    test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
+        ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib_empty"
+    )
+    test_stru = struct.PDBParser().get_structure(
+        f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb")
+    test_stru.assign_ncaa_chargespin({"H5J" : (0,1)})
+    params = test_param_worker.run(test_stru)
+    assert params.is_valid()
+
+    for f in params.file_list:
+        fs.safe_rm(f)
+    fs.safe_rm(temp_mol2_path)
+    fs.safe_rm(temp_frcmod_path)
+    fs.safe_rmdir(test_param_worker.parameterizer_temp_dir)
+    fs.safe_rmdir(eh_config["system.SCRATCH_DIR"])
+
+
+def test_amber_parameterizer_run_lv_4():
+    """level 4 test of the parameterizer.
+    Test structure diversity:
+    - 2 polypeptide chain
+    - 2 substrate (CHN, CHONP), special net charge
+    * use lib to make test faster"""
+    temp_mol2_path = f"{MM_DATA_DIR}/ncaa_lib_empty/PUT_AM1BCC-GAFF.mol2"
+    temp_frcmod_path = f"{MM_DATA_DIR}/ncaa_lib_empty/PUT_AM1BCC-GAFF.frcmod"
+    ai = interface.amber
+    test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
+        ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib_empty",
+        force_fields=[
+            "leaprc.protein.ff14SB",
+            "leaprc.gaff",
+            "leaprc.water.tip3p",
+        ]
+    )
+    test_stru = struct.PDBParser().get_structure(
+        f"{MM_DATA_DIR}/puo_put.pdb")
+    test_stru.assign_ncaa_chargespin({"PUT" : (1,1),
+                                      "FAD" : (0,1)})
+    params = test_param_worker.run(test_stru)
+    assert params.is_valid()
+
+    for f in params.file_list:
+        fs.safe_rm(f)
+    fs.safe_rm(temp_mol2_path)
+    fs.safe_rm(temp_frcmod_path)
+    fs.safe_rmdir(test_param_worker.parameterizer_temp_dir)
+    fs.safe_rmdir(eh_config["system.SCRATCH_DIR"])
+
+
+def test_amber_parameterizer_run_lv_5(): #TODO
+    """level 5 test of the parameterizer.
+    Test structure diversity:
+    - 2 polypeptide chain
+    - 1 substrate (CHONP)
+    - 1 modified amino acid (CHONP)"""
+    ai = interface.amber
+    test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
+        ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib_empty"
+    )
+    test_stru = struct.PDBParser().get_structure(
+        f"{MM_DATA_DIR}/3cfr-slp-pea_ah.pdb")
+    test_param_worker.run(test_stru)
+
+
+def test_amber_parameterizer_run_lv_6(): #TODO
+    """level 6 test of the parameterizer.
+    Test structure diversity:
+    - 2 polypeptide chain
+    - 1 substrate (CHONP)
+    - 1 modified amino acid (CHONP)"""
+    ai = interface.amber
+    test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
+        ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib_empty"
+    )
+    test_stru = struct.PDBParser().get_structure(
+        f"{MM_DATA_DIR}/tyna_clean.pdb")
+    test_param_worker.run(test_stru)
+
+
+def test_check_gaff_type():
+    """test _check_gaff_type in AmberParameterizer"""
+    ai = interface.amber
+    test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
+        ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib_empty",
+        force_fields=[
+            "leaprc.protein.ff14SB",
+            "leaprc.gaff2",
+            "leaprc.water.tip3p",
+        ]
+    )
+    assert test_param_worker._check_gaff_type() == "GAFF2"
+
+    test_param_worker.force_fields = [
+            "leaprc.protein.ff14SB",
+            "leaprc.gaff",
+            "leaprc.water.tip3p",
+        ]
+    assert test_param_worker._check_gaff_type() == "GAFF"
+
+    test_param_worker.force_fields = [
+            "leaprc.protein.ff14SB",
+            "leaprc.water.tip3p",
+        ]
+    assert test_param_worker._check_gaff_type() is None
+
+
+def test_run_parmchk2():
+    """test the function works well"""
+    ai = interface.amber
+    test_in_file = f"{MM_DATA_DIR}/ncaa_lib/H5J_AM1BCC-GAFF.prepin"
+    temp_frcmod_file = f"{MM_WORK_DIR}/frcmod"
+
+    ai.run_parmchk2(test_in_file, temp_frcmod_file, gaff_type="GAFF")
+
+    assert os.path.exists(temp_frcmod_file)
+    assert len(fs.lines_from_file(temp_frcmod_file)) == 23
+    fs.safe_rm(temp_frcmod_file)
+
+
+def test_run_antechamber():
+    """test the function works well"""
+    ai = interface.amber
+    test_in_file = f"{MM_DATA_DIR}/H5J.pdb"
+    temp_mol2_file = f"{MM_WORK_DIR}/H5J.mol2"
+
+    ai.run_antechamber(test_in_file, temp_mol2_file,
+                        net_charge=0, spin=1,
+                        charge_method="bcc")
+
+    assert os.path.exists(temp_mol2_file)
+    assert len(fs.lines_from_file(temp_mol2_file)) == 43
+    for temp_files in ["ATOMTYPE.INF","NEWPDB.PDB","PREP.INF","sqm.pdb","sqm.in","sqm.out"]:
+        assert not os.path.exists(temp_files)
+    assert not glob.glob("ANTECHAMBER*")
+    fs.safe_rm(temp_mol2_file)
+
+
+def test_run_antechamber_wrong(caplog):
+    """test the function works well reporting the error"""
+    ai = interface.amber
+    test_in_file = f"{MM_DATA_DIR}/H5J.pdb"
+    temp_mol2_file = f"{MM_WORK_DIR}/H5J.mol2"
+
+    with EnablePropagate(_LOGGER):
+        with pytest.raises(ValueError) as exe:
+            ai.run_antechamber(test_in_file, temp_mol2_file,
+                                net_charge=0, spin=1,
+                                charge_method="cm1")
+        assert "found unsupported charge method" in caplog.text
+
+        with pytest.raises(ValueError) as exe:
+            ai.run_antechamber(test_in_file, temp_mol2_file,
+                                net_charge=0, spin=1,
+                                charge_method="rc")
+        assert "no charge_file is provided" in caplog.text
+
+        with pytest.raises(ValueError) as exe:
+            ai.run_antechamber(test_in_file, temp_mol2_file,
+                                net_charge=0, spin=1,
+                                charge_method="resp")
+        assert "not gesp or gout" in caplog.text
+
+
+def test_antechamber_ncaa_to_moldesc():
+    """test the function works well"""
+    temp_mol2_path = f"{MM_WORK_DIR}/H5J_AM1BCC.mol2"
+    ai = interface.amber
+    test_stru = struct.PDBParser().get_structure(
+        f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb").ligands[0]
+    test_stru.net_charge = 0
+    test_stru.spin = 1
+
+    ai.antechamber_ncaa_to_moldesc(ncaa=test_stru,
+                                   out_path=temp_mol2_path,
+                                   gaff_type="GAFF",
+                                   charge_method="AM1BCC",)
+
+    assert os.path.exists(temp_mol2_path)
+    assert len(fs.lines_from_file(temp_mol2_path)) == 43
+    assert not os.path.exists("scratch/H5J.pdb")
+    fs.safe_rm(temp_mol2_path)
+
+
+def test_antechamber_ncaa_to_moldesc_wrong(caplog):
+    """test the function works well"""
+    temp_mol2_path = f"{MM_WORK_DIR}/H5J_AM1BCC.mol2"
+    ai = interface.amber
+    test_stru = struct.PDBParser().get_structure(
+        f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb").ligands[0]
+
+    with EnablePropagate(_LOGGER):
+        with pytest.raises(ValueError) as exe:
+            ai.antechamber_ncaa_to_moldesc(ncaa=test_stru,
+                                        out_path=temp_mol2_path,
+                                        gaff_type="GAFF",
+                                        charge_method="AM1BCC",)
+            assert "does not have charge and spin." in caplog.text
+
+
+def test_antechamber_ncaa_to_moldesc_resp(): #TODO
+    """test the function works well"""
+    temp_mol2_path = f"{MM_WORK_DIR}/H5J_RESP.mol2"
+    ai = interface.amber
+    test_stru = struct.PDBParser().get_structure(
+        f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb").ligands[0]
+    test_stru.net_charge = 0
+    test_stru.spin = 1
+
+    ai.antechamber_ncaa_to_moldesc(ncaa=test_stru,
+                                   out_path=temp_mol2_path,
+                                   gaff_type="GAFF",
+                                   charge_method="RESP",)
+
+    assert os.path.exists(temp_mol2_path)
+    assert len(fs.lines_from_file(temp_mol2_path)) == 43
+    assert not os.path.exists("scratch/H5J.pdb")
+    fs.safe_rm(temp_mol2_path)
+
+
+def test_build_md_step_default():
+    """as said in the name. Assert several default values
+    as samples."""
+    ai = interface.amber
+    md_step: AmberMDStep = ai.build_md_step(length=0.1, core_type="cpu")
+    assert md_step.temperature == 300.0
+    assert md_step.core_type == "cpu"
+    assert md_step.cluster_job_config["res_keywords"]["core_type"] == "cpu"
+    assert md_step.length == 0.1
+    assert md_step.record_period == 0.0001
+
+
+def test_build_md_step_res_keywords():
+    """as said in the name. Assert several default values
+    as samples."""
+    ai = interface.amber
+    md_step: AmberMDStep = ai.build_md_step(length=0.1, core_type="cpu",
+                                            cluster_job_config={
+                                                "cluster" : None,
+                                                "res_keywords" : {"partition" : "production",
+                                                                  "account" : "yang_lab",}
+                                            })
+    assert md_step.cluster_job_config["cluster"] is None
+    assert md_step.cluster_job_config["res_keywords"]["core_type"] == "cpu"
+    assert md_step.cluster_job_config["res_keywords"]["partition"] == "production"
+    assert md_step.cluster_job_config["res_keywords"]["nodes"] == "1"
+    assert md_step.cluster_job_config["res_keywords"]["node_cores"] ==  "16"
+    assert md_step.cluster_job_config["res_keywords"]["job_name"] ==  "MD_EnzyHTP"
+    assert md_step.cluster_job_config["res_keywords"]["mem_per_core"] ==  "3G"
+    assert md_step.cluster_job_config["res_keywords"]["walltime"] ==  "1-00:00:00"
+    assert md_step.cluster_job_config["res_keywords"]["account"] ==  "yang_lab"
+
+
+def test_write_to_mdin_from_raw_dict():
+    """test to make sure _write_to_mdin_from_raw_dict() works as expected.
+    using a dict from old EnzyHTP Class_Conf.Amber.conf_heat as an example"""
+    test_raw_dict = {
+        'title': 'Heat',
+        'namelists': [
+           {'type': 'cntrl',
+            'config': {
+                'imin': 0, 'ntx': 1, 'irest': 0,
+                'ntc': 2, 'ntf': 2,
+                'cut': 10.0,
+                'nstlim': 20000, 'dt': 0.002,
+                'tempi': 0.0, 'temp0': 300.0,
+                'ntpr': 200, 'ntwx': 20000,
+                'ntt': 3, 'gamma_ln': 5.0,
+                'ntb': 1, 'ntp':0,
+                'iwrap': 1,
+                'nmropt': 1,
+                'ig': -1,
+                'ntr': 1, 'restraint_wt': 2.0, 'restraintmask': "'@C,CA,N'",
+                }
+            },
+           {'type': 'wt',
+            'config': {
+                'type': "'TEMP0'",
+                'istep1': 0, 'istep2': 18000,
+                'value1': 0.0, 'value2': 300.0,
+                }
+            },
+           {'type': 'wt',
+            'config': {
+                'type': "'TEMP0'",
+                'istep1': 18001, 'istep2': 20000,
+                'value1': 300.0, 'value2': 300.0,
+                }
+            },
+           {'type': 'wt',
+            'config': {
+                'type': "'END'",
+                }
+            },
+        ],
+        'file_redirection': {
+            'DISANG': {
+                'path': './MD//0.rs',
+                'content': [
+                    {'ialtd': 0,
+                    'iat': [3976, 1579],
+                    'r1': 2.150,
+                    'r2': 2.350,
+                    'r3': 2.450,
+                    'r4': 2.650,
+                    'rk2': 200.0,
+                    'rk3': 200.0},
+                    {'ialtd': 0,
+                    'iat': [3975,3976,1579],
+                    'r1': 150.0,
+                    'r2': 170.0,
+                    'r3': 190.0,
+                    'r4': 210.0,
+                    'rk2': 200.0,
+                    'rk3': 200.0}
+                ]}
+        },
+        'group_info': [],
+    }
+    test_temp_mdin = f"{MM_WORK_DIR}/test_mdin_from_raw_dict.in"
+    answer_temp_mdin = f"{MM_DATA_DIR}/answer_mdin_from_raw_dict.in"
+    ai = interface.amber
+    ai._write_to_mdin_from_raw_dict(test_raw_dict, test_temp_mdin)
+    assert files_equivalent(test_temp_mdin, answer_temp_mdin)
+    fs.safe_rm(test_temp_mdin)
+    fs.safe_rm("MD/0.rs")
+
+
+def test_write_disang_file():
+    """test using an example raw dict list"""
+    test_dict_list = [
+        {'ialtd': 0,
+        'iat': [3976, 1579],
+        'r1': 2.150,
+        'r2': 2.350,
+        'r3': 2.450,
+        'r4': 2.650,
+        'rk2': 200.0,
+        'rk3': 200.0},
+        {'ialtd': 0,
+        'iat': [3975,3976,1579],
+        'r1': 150.0,
+        'r2': 170.0,
+        'r3': 190.0,
+        'r4': 210.0,
+        'rk2': 200.0,
+        'rk3': 200.0}]
+    test_disang = f"{MM_WORK_DIR}/test_disang_from_raw_dict.rs"
+    answer_disang = f"{MM_DATA_DIR}/answer_disang_from_raw_dict.rs"
+    ai = interface.amber
+    ai.write_disang_file(test_dict_list, test_disang)
+    assert files_equivalent(test_disang, answer_disang)
+
+    fs.safe_rm(test_disang)
+
+
+def test_parse_md_config_dict_to_raw_wo_cons():
+    """test to make sure _parse_md_config_dict_to_raw() works as expected.
+    using a dict from old EnzyHTP Class_Conf.Amber.conf_heat as an example"""
+    answer_raw_dict = {
+        'title': 'Heat',
+        'namelists': [
+           {'type': 'cntrl',
+            'config': {
+                'imin': 0, 'ntx': 1, 'irest': 0,
+                'ntc': 2, 'ntf': 2,
+                'cut': 10.0,
+                'nstlim': 20000, 'dt': 0.002,
+                'tempi': 0.0, 'temp0': 300.0,
+                'ntpr': 200, 'ntwx': 200,
+                'ntt': 3, 'gamma_ln': 5.0,
+                'ntb': 1, 'ntp':0,
+                'iwrap': 1,
+                'ig': -1,
+                }
+            },
+           {'type': 'wt',
+            'config': {
+                'type': "'TEMP0'",
+                'istep1': 0, 'istep2': 18000,
+                'value1': 0.0, 'value2': 300.0,
+                }
+            },
+           {'type': 'wt',
+            'config': {
+                'type': "'TEMP0'",
+                'istep1': 18001, 'istep2': 20000,
+                'value1': 300.0, 'value2': 300.0,
+                }
+            },
+           {'type': 'wt',
+            'config': {
+                'type': "'END'",
+                }
+            },
+        ],
+        'file_redirection': {},
+        'group_info': [],
+    }
+    test_md_config_dict = {
+            "name" : "Heat",
+            "length" : 0.04, # ns
+            "timestep" : 0.000002, # ns
+            "minimize" : False,
+            "temperature" : [(0.0, 0.0), (0.036, 300.0), (0.04, 300.0)],
+            "thermostat" : "langevin",
+            "pressure_scaling" : "none",
+            "constrain" : None,
+            "restart" : False,
+            "if_report" : True,
+            "record_period" : 0.0004, # ns
+            "mdstep_dir" : "./MD",
+    }
+
+    ai = interface.amber
+    test_raw_dict = ai._parse_md_config_dict_to_raw(test_md_config_dict)
+    assert test_raw_dict == answer_raw_dict
+
+
+def test_parse_md_config_dict_to_raw_minimize():
+    """test to make sure _parse_md_config_dict_to_raw() works as expected.
+    using a dict from old EnzyHTP Class_Conf.Amber.conf_min as an example"""
+    answer_raw_dict = {
+        'title': 'Min',
+        'namelists': [
+           {'type': 'cntrl',
+            'config': {
+                'imin': 1, 'ntx': 1, 'irest': 0,
+                'ntc': 2, 'ntf': 2,
+                'cut': 10.0,
+                'maxcyc': 20000, 'ncyc': 10000,
+                'ntpr': 200, 'ntwx': 0,
+                }
+            },
+        ],
+        'file_redirection': {},
+        'group_info': [],
+    }
+    test_md_config_dict = {
+            "name" : "Min",
+            "length" : 20000, # cycle
+            "timestep" : 0.000002, # ns
+            "minimize" : True,
+            "temperature" : 300.0,
+            "thermostat" : "langevin",
+            "pressure_scaling" : "none",
+            "constrain" : None,
+            "restart" : False,
+            "if_report" : True,
+            "record_period" : 0.0004, # ns
+            "mdstep_dir" : "./MD",
+    }
+
+    ai = interface.amber
+    test_raw_dict = ai._parse_md_config_dict_to_raw(test_md_config_dict)
+    assert test_raw_dict == answer_raw_dict
+
+
+def test_parse_md_config_dict_to_raw_w_cons():
+    """test to make sure _parse_md_config_dict_to_raw() works as expected.
+    using a dict from old EnzyHTP Class_Conf.Amber.conf_heat as an example"""
+    test_pdb = f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb"
+    test_stru = struct.PDBParser().get_structure(test_pdb)
+    answer_raw_dict = {
+        'title': 'Heat',
+        'namelists': [
+           {'type': 'cntrl',
+            'config': {
+                'imin': 0, 'ntx': 1, 'irest': 0,
+                'ntc': 2, 'ntf': 2,
+                'cut': 10.0,
+                'nstlim': 20000, 'dt': 0.002,
+                'tempi': 0.0, 'temp0': 300.0,
+                'ntpr': 200, 'ntwx': 200,
+                'ntt': 3, 'gamma_ln': 5.0,
+                'ntb': 1, 'ntp':0,
+                'iwrap': 1,
+                'nmropt': 1,
+                'ig': -1,
+                'ntr': 1, 'restraint_wt': 2.0, 'restraintmask': "'@C,CA,N'",
+                }
+            },
+           {'type': 'wt',
+            'config': {
+                'type': "'TEMP0'",
+                'istep1': 0, 'istep2': 18000,
+                'value1': 0.0, 'value2': 300.0,
+                }
+            },
+           {'type': 'wt',
+            'config': {
+                'type': "'TEMP0'",
+                'istep1': 18001, 'istep2': 20000,
+                'value1': 300.0, 'value2': 300.0,
+                }
+            },
+           {'type': 'wt',
+            'config': {
+                'type': "'END'",
+                }
+            },
+        ],
+        'file_redirection': {
+            'DISANG': {
+                'path': './MD//0.rs',
+                'content': [
+                    {'ialtd': 0,
+                    'iat': [3976, 1579],
+                    'r1': 2.150,
+                    'r2': 2.350,
+                    'r3': 2.450,
+                    'r4': 2.650,
+                    'rk2': 200.0,
+                    'rk3': 200.0},
+                    {'ialtd': 0,
+                    'iat': [3975,3976,1579],
+                    'r1': 150.0,
+                    'r2': 170.0,
+                    'r3': 190.0,
+                    'r4': 210.0,
+                    'rk2': 200.0,
+                    'rk3': 200.0}
+                ]} 
+        },
+        'group_info': [],
+    }
+    test_md_config_dict = {
+        "name" : "Heat",
+        "minimize" : False,
+        "pressure_scaling" : "none",
+        "restart" : False,
+        "length" : 0.04, # ns
+        "timestep" : 0.000002, # ns
+        "temperature" : [(0.0, 0.0), (0.036, 300.0), (0.04, 300.0)],
+        "thermostat" : "langevin",
+        "constrain" : [
+            create_backbone_freeze(test_stru),
+            create_distance_constraint(
+                "B.254.H2", "A.101.OE2", 2.4, test_stru),
+            create_angle_constraint(
+                "B.254.CAE", "B.254.H2", "A.101.OE2", 180.0, test_stru)],
+        "if_report" : True,
+        "record_period" : 0.0004,
+        "mdstep_dir" : "./MD",
+    }
+
+    ai = interface.amber
+    test_raw_dict = ai._parse_md_config_dict_to_raw(test_md_config_dict)
+    assert test_raw_dict == answer_raw_dict
+
+
+def test_amber_md_step_make_job():
+    """test to make sure AmberMDStep.make_job() works as expected.
+    w/o constraint."""
+    ai = interface.amber
+    md_step = ai.build_md_step(length=0.1) # 300K, NPT by default
+    test_inpcrd = f"{MM_DATA_DIR}/KE_07_R7_S.inpcrd"
+    test_prmtop = f"{MM_DATA_DIR}/KE_07_R7_S.prmtop"
+    test_params = AmberParameter(test_inpcrd, test_prmtop)
+    test_job, test_md_egg = md_step.make_job(test_params)
+    
+    answer_pattern = r"""#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:1
+#SBATCH --job-name=MD_EnzyHTP
+#SBATCH --partition=<fillthis>
+#SBATCH --mem=8G
+#SBATCH --time=3-00:00:00
+#SBATCH --account=<fillthis>
+#SBATCH --export=NONE
+
+# Script generated by EnzyHTP [0-9]\.[0-9]\.[0-9] in [0-9]+-[0-9]+-[0-9]+ [0-9]+:[0-9]+:[0-9]+
+
+source /home/shaoq1/bin/amber_env/amber22\.sh
+
+pmemd\.cuda -O -i \./MD/amber_md_step_?[0-9]*\.in -o \./MD/amber_md_step\.out -p /panfs/accrepfs\.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S\.prmtop -c /panfs/accrepfs\.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S\.inpcrd -r \./MD/amber_md_step\.rst -ref /panfs/accrepfs\.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S\.inpcrd -x \./MD/amber_md_step\.nc 
+"""
+    assert re.match(answer_pattern, test_job.sub_script_str)
+    assert test_md_egg.traj_path == './MD/amber_md_step.nc'
+    assert test_md_egg.traj_log_path == './MD/amber_md_step.out'
+    assert test_md_egg.rst_path == './MD/amber_md_step.rst'
+    assert test_md_egg.prmtop_path == '/panfs/accrepfs.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S.prmtop'
+    fs.safe_rmdir(md_step.work_dir)
+
+
+def test_amber_md_step_make_job_w_cons():
+    """test to make sure AmberMDStep.make_job() works as expected.
+    w/ constraint. Just make sure no exceptions are raised"""
+    test_inpcrd = f"{MM_DATA_DIR}/KE_07_R7_S.inpcrd"
+    test_prmtop = f"{MM_DATA_DIR}/KE_07_R7_S.prmtop"
+    test_pdb = f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb"
+    test_stru = struct.PDBParser().get_structure(test_pdb)
+    test_constrains = [
+        create_backbone_freeze(test_stru),
+        create_distance_constraint(
+            "B.254.H2", "A.101.OE2", 2.4, test_stru),
+        create_angle_constraint(
+            "B.254.CAE", "B.254.H2", "A.101.OE2", 180.0, test_stru)
+    ]
+    ai = interface.amber
+    md_step = ai.build_md_step(
+        length=0.1,
+        constrain=test_constrains)
+    test_params = AmberParameter(test_inpcrd, test_prmtop)
+    test_job, test_md_egg = md_step.make_job(test_params)
+    
+    answer_pattern = r"""#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:1
+#SBATCH --job-name=MD_EnzyHTP
+#SBATCH --partition=<fillthis>
+#SBATCH --mem=8G
+#SBATCH --time=3-00:00:00
+#SBATCH --account=<fillthis>
+#SBATCH --export=NONE
+
+# Script generated by EnzyHTP [0-9]\.[0-9]\.[0-9] in [0-9]+-[0-9]+-[0-9]+ [0-9]+:[0-9]+:[0-9]+
+
+source /home/shaoq1/bin/amber_env/amber22\.sh
+
+pmemd\.cuda -O -i \./MD/amber_md_step_?[0-9]*\.in -o \./MD/amber_md_step\.out -p /panfs/accrepfs\.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S\.prmtop -c /panfs/accrepfs\.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S\.inpcrd -r \./MD/amber_md_step\.rst -ref /panfs/accrepfs\.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S\.inpcrd -x \./MD/amber_md_step\.nc 
+"""
+    assert re.match(answer_pattern, test_job.sub_script_str)
+    fs.safe_rmdir(md_step.work_dir)
+
+
+def test_amber_md_step_try_merge_jobs(caplog):
+    """test to make sure AmberMDStep.try_merge_jobs() works as expected."""
+    with EnablePropagate(_LOGGER):
+        ai = interface.amber
+        md_step_1 = ai.build_md_step(length=0.1) # 300K, NPT by default
+        md_step_2 = ai.build_md_step(length=0.1) # 300K, NPT by default
+        md_step_3 = ai.build_md_step(length=0.1, core_type="cpu") # 300K, NPT by default
+        test_inpcrd = f"{MM_DATA_DIR}/KE_07_R7_S.inpcrd"
+        test_prmtop = f"{MM_DATA_DIR}/KE_07_R7_S.prmtop"
+        test_params = AmberParameter(test_inpcrd, test_prmtop)
+        test_job_1, test_md_egg_1 = md_step_1.make_job(test_params)
+        test_job_2, test_md_egg_2 = md_step_2.make_job(test_md_egg_1)
+        test_job_3, test_md_egg_3 = md_step_3.make_job(test_md_egg_2)
+        merged_jobs = AmberMDStep.try_merge_jobs([test_job_1,test_job_2,test_job_3])
+        assert len(merged_jobs) == 2
+        for test, answer in zip(merged_jobs[0].mimo["commands"], [
+                'pmemd.cuda -O -i ./MD/amber_md_step_?[0-9]*.in -o ./MD/amber_md_step.out -p /panfs/accrepfs.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S.prmtop -c /panfs/accrepfs.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S.inpcrd -r ./MD/amber_md_step.rst -ref /panfs/accrepfs.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S.inpcrd -x ./MD/amber_md_step.nc ',
+                'pmemd.cuda -O -i ./MD/amber_md_step_?[0-9]*.in -o ./MD/amber_md_step.out -p /panfs/accrepfs.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test/_interface/data//KE_07_R7_S.prmtop -c ./MD/amber_md_step.rst -r ./MD/amber_md_step.rst -ref ./MD/amber_md_step.rst -x ./MD/amber_md_step.nc '
+                ]):
+            assert re.match(answer, test)
+        assert len(merged_jobs[0].mimo["temp_mdin"]) == 2
+        assert "Found md steps with same names!" in caplog.text
+    fs.safe_rmdir(md_step_1.work_dir)
+
+
+def test_amber_md_step_translate():
+    """use a fake test result egg to test the function"""
+    test_result_egg = AmberMDResultEgg(
+        traj_path = "traj_path",
+        traj_log_path = "traj_log_path",
+        rst_path = "rst_path",
+        prmtop_path = "prmtop_pat",
+    )
+    ai = interface.amber
+    test_step = ai.build_md_step(length=0.1)
+    result = test_step.translate(test_result_egg)
+
+    assert result.traj_file == "traj_path"
+    assert result.traj_log_file == "traj_log_path"
+    assert result.last_frame_file == "rst_path"
+
+
+@pytest.mark.accre
+@pytest.mark.long
+def test_amber_md_step_run():
+    """test AmberMDStep().run().
+    rely on check_md_error inside of run() for testing."""
+    ai = interface.amber
+    md_step = ai.build_md_step(length=0.01) # 300K, NPT by default
+    test_inpcrd = f"{MM_DATA_DIR}/KE_07_R7_S.inpcrd"
+    test_prmtop = f"{MM_DATA_DIR}/KE_07_R7_S.prmtop"
+    test_params = AmberParameter(test_inpcrd, test_prmtop)
+    test_md_result = md_step.run(test_params)
+    
+    assert test_md_result.last_frame_file == "./MD/amber_md_step.rst"
+    fs.clean_temp_file_n_dir([
+        test_md_result.last_frame_file,
+        test_md_result.traj_log_file,
+        "./MD",
+    ])
+
+
+def test_amber_md_step_check_md_error(caplog):
+    """test this function using extract real example files from Amber runs"""
+    test_traj = f"{MM_DATA_DIR}md_errors/equi_error_1.nc"
+    test_mdout = f"{MM_DATA_DIR}md_errors/equi_error_1.out"
+    test_prmtop = f"{MM_DATA_DIR}md_errors/equi_error_1.prmtop"
+    test_clusterjob = ClusterJob(
+        cluster=None,
+        sub_script_str=None,
+    )
+    test_clusterjob.job_cluster_log = f"{MM_DATA_DIR}md_errors/equi_error_1.stdstream"
+
+    ai = interface.amber
+    md_step = ai.build_md_step(length=0.1) # 300K, NPT by default
+
+    with EnablePropagate(_LOGGER):
+        with pytest.raises(AmberMDError) as e:
+            md_step.check_md_error(
+                traj=test_traj,
+                traj_log=test_mdout,
+                prmtop=test_prmtop,
+                stdstream_source=test_clusterjob,
+            )
+        assert "Amber MD didn't finish normally." in caplog.text
+        assert "ERROR: Calculation halted.  Periodic box dimensions have changed too much from their initial values." in caplog.text
+
+
+def test_get_restraintmask_bb_freeze():
+    """test using example restraints"""
+    ai = interface.amber
+    test_pdb = f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb"
+    test_stru = struct.PDBParser().get_structure(test_pdb)
+    cons = create_backbone_freeze(test_stru)
+    mask = ai.get_restraintmask(cons)
+    assert mask == "'@C,CA,N'"
+
+
+def test_get_restraintmask():
+    """test using example restraints"""
+    ai = interface.amber
+    test_pdb = f"{MM_DATA_DIR}/index_tweak.pdb"
+    test_stru = struct.PDBParser().get_structure(test_pdb)
+    cons = create_cartesian_freeze(
+        atoms=test_stru.atoms[1:20],
+        topology=test_stru,)
+    mask = ai.get_restraintmask(cons)
+    assert mask == "'@2-20'"
+
+
+def test_get_amber_mask(): # TODO
+    """"""
+    raise Exception("TODO")
+
+
+def test_get_amber_atom_index(): # TODO
+    """"""
+    raise Exception("TODO")
+
+
+def test_get_amber_index_mapper(): # TODO VIP
+    """this dont work for the 1Q4T case."""
+    raise Exception("TODO")
+
+
+def test_parse_cons_to_raw_rs_dict():
+    """test using KE and example cons"""
+    test_pdb = f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb"
+    test_stru = struct.PDBParser().get_structure(test_pdb)
+    test_cons = create_distance_constraint(
+        "B.254.H2", "A.101.OE2", 2.4, test_stru)
+    answer_raw_dict = {
+        'ialtd': 0,
+        'iat': [3976, 1579],
+        'r1': 2.15,
+        'r2': 2.35,
+        'r3': 2.45,
+        'r4': 2.65,
+        'rk2': 200.0,
+        'rk3': 200.0}
+    ai = interface.amber
+    test_raw_dict = ai._parse_cons_to_raw_rs_dict(test_cons)
+    for k, v in test_raw_dict.items():
+        if k in "r1 r2 r3 r4".split():
+            assert np.isclose(v, answer_raw_dict[k], atol=1e-3)
+        else:
+            assert v == answer_raw_dict[k]
+
+
+# region TODO
+
+def test_parse_fmt_uppercase():
+    """Testing that the AmberInterface.parse_fmt() method works correctly for uppercase inputs."""
+    ai = interface.amber
+    assert ai.parse_fmt('%FORMAT(20A4)') == (str, 4)
+
+    assert ai.parse_fmt('%FORMAT(5E16.8)') == (float, 16)
+
+    assert ai.parse_fmt('%FORMAT(10I8)') == (int, 8)
+
+
+def test_parse_fmt_lowercase():
+    """Testing that the AmberInterface.parse_fmt() method works correctly for lowercase inputs."""
+    ai = interface.amber
+    assert ai.parse_fmt('%FORMAT(20a4)') == (str, 4)
+
+    assert ai.parse_fmt('%FORMAT(5e16.8)') == (float, 16)
+
+    assert ai.parse_fmt('%FORMAT(10i8)') == (int, 8)
+
+
+def test_parse_fmt_bad_input():
+    """Testing that the AmberInterface.parse_fmt() method returns the correct (None,-1) for bad inputs."""
+
+    ai = interface.amber
+
+    assert ai.parse_fmt('') == (None, -1)
+
+    assert ai.parse_fmt('20a4') == (None, -1)
+
+    assert ai.parse_fmt('FORMAT(20a4)') == (None, -1)
+
+    assert ai.parse_fmt('%FORMAT(20a4') == (None, -1)
+
+
+
+def test_parse_prmtop():
+    """Testing that AmberInterface.parse_prmtop() method works. It essentially loads the supplied
+    prmtop file and ensures that the correct number of items are extracted for the majority of keys.
+    """
+    ai = interface.amber
+    data = ai.parse_prmtop(f"{MM_DATA_DIR}/prmtop_1")
+
+    assert data
+
+    n_atoms: int = 23231
+    num_bond: int = 85
+    num_ang: int = 186
+    n_ptra: int = 190
+    n_types: int = 19
+    n_bond_h: int = 21805
+    n_bond_a: int = 1450
+    n_thet: int = 3319
+    n_phi: int = 6138
+    n_phi_h: int = 6551
+    nnb: int = 43036
+    n_phb: int = 1
+    n_res: int = 6967
+
+    assert len(data['ATOM_NAME']) == n_atoms
+    assert len(data['CHARGE']) == n_atoms
+    assert len(data['ATOMIC_NUMBER']) == n_atoms
+    assert len(data['MASS']) == n_atoms
+    assert len(data['ATOM_TYPE_INDEX']) == n_atoms
+    assert len(data['NUMBER_EXCLUDED_ATOMS']) == n_atoms
+    assert len(data['NONBONDED_PARM_INDEX']) == n_types**2
+    assert len(data['RESIDUE_LABEL']) == n_res
+    assert len(data['RESIDUE_POINTER']) == n_res
+    assert len(data['BOND_FORCE_CONSTANT']) == num_bond
+    assert len(data['BOND_EQUIL_VALUE']) == num_bond
+    assert len(data['ANGLE_FORCE_CONSTANT']) == num_ang
+    assert len(data['ANGLE_EQUIL_VALUE']) == num_ang
+    assert len(data['DIHEDRAL_FORCE_CONSTANT']) == n_ptra
+    assert len(data['DIHEDRAL_PERIODICITY']) == n_ptra
+    assert len(data['DIHEDRAL_PHASE']) == n_ptra
+    assert len(data['SCEE_SCALE_FACTOR']) == n_ptra
+    assert len(data['SOLTY']) == 52
+    assert len(data['LENNARD_JONES_ACOEF']) == (n_types * (n_types + 1)) / 2
+    assert len(data['LENNARD_JONES_BCOEF']) == (n_types * (n_types + 1)) / 2
+    assert len(data['BONDS_INC_HYDROGEN']) == 3 * n_bond_h
+    assert len(data['BONDS_WITHOUT_HYDROGEN']) == 3 * n_bond_a
+    assert len(data['ANGLES_INC_HYDROGEN']) == 4 * n_thet
+    assert len(data['DIHEDRALS_INC_HYDROGEN']) == 5 * n_phi_h
+    assert len(data['DIHEDRALS_WITHOUT_HYDROGEN']) == 5 * n_phi
+    assert len(data['EXCLUDED_ATOMS_LIST']) == nnb
+    assert len(data['HBOND_ACOEF']) == n_phb
+    assert len(data['HBOND_BCOEF']) == n_phb
+    assert len(data['HBCUT']) == n_phb
+    assert len(data['AMBER_ATOM_TYPE']) == n_atoms
+    assert len(data['TREE_CHAIN_CLASSIFICATION']) == n_atoms
+    assert len(data['JOIN_ARRAY']) == n_atoms
+    assert len(data['IROTAT']) == n_atoms
+    assert len(data['RADII']) == n_atoms
+
+
+def test_parse_prmtop_no_file():
+    """Checking that AmberInteface.parse_prmtop() throws an error if the listed file does not exist."""
+
+    dne = Path('./dne')
+
+    assert not dne.exists()
+
+    ai = interface.amber
+    with pytest.raises(SystemExit) as exe:
+        ai.parse_prmtop(dne)
+
+    assert exe
+
+
+def test_add_charges():
+    """Checking that the AmberInterface.add_charges() method works correctly."""
+
+    ai = interface.amber
+    ss = struct.PDBParser.get_structure(f"{MM_BASE_DIR}/data/1h1d.pdb")
+    assert not ss.has_charges()
+    ai.add_charges(ss, f"{MM_BASE_DIR}/data/1h1d_prmtop")
+    assert ss.has_charges()
+
+
+def test_add_charges_bad_file():
+    """Checking that the AmberInterface.add_charge() method throws an error for bad inputs."""
+
+    ai = interface.amber
+    ss = struct.PDBParser.get_structure(f"{MM_BASE_DIR}/data/1h1d.pdb")
+
+    with pytest.raises(SystemExit) as exe:
+        ai.add_charges(ss, f"{MM_BASE_DIR}/data/bad_label_prmtop")
+    
+    assert exe
+
+# endregion TODO

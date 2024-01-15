@@ -15,11 +15,7 @@ def init_logger(
     start: bool = False,
 ) -> logging.Logger:
     """Function for creating the formatted logger. Taken from https://github.com/jyesselm/dreem/dreem/logger.py."""
-    log_format = ("[%(asctime)s "
-                  "%(name)s "
-                  "%(funcName)s] "
-                  "%(levelname)s "
-                  "%(message)s")
+    log_format = ("[%(asctime)s " "%(name)s " "%(funcName)s] " "%(levelname)s " "%(message)s")
 
     bold_seq = "\033[1m"
     colorlog_format = f"{bold_seq}" "%(log_color)s" f"{log_format}"
@@ -59,3 +55,8 @@ def init_logger(
 
 _LOGGER = init_logger("EnzyHTP", None, start=True)
 """Singleton logging object to log to throught enzy_htp."""
+_LOGGER.propagate = False # want to make sure EnzyHTP logger is not affected by root logger
+
+def get_eh_logging_level() -> int:
+    """Lazy determination of the logging level of the EnzyHTP _LOGGER."""
+    return _LOGGER.getEffectiveLevel()

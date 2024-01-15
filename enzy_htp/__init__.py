@@ -11,10 +11,22 @@ state, addition of missing residues, performing an amino acid substitution, and 
 Most enzyme modeling practices use similar structural operations but rely on manual curation, which is 
 highly inefficient and hampers reproducibility. EnzyHTP, a high-throughput enzyme simulation tool, bypasses 
 these issues through automation of molecular model construction, mutation, sampling and energy calculation.
-uthor: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-26
 """
+
+from .core import (
+    EnvironmentManager,
+    MissingEnvironmentElement,
+    InvalidResidueCode,
+    _LOGGER,
+    write_data,
+)
+
+from .chemical import ResidueType, parse_ec_number
+
+from ._config import config
 
 from .structure import (
     Structure,
@@ -25,22 +37,23 @@ from .structure import (
     MetalUnit,
     Solvent,
     PDBParser,
-)
-from .core import (
-    EnvironmentManager,
-    MissingEnvironmentElement,
-    InvalidResidueCode,
-    _LOGGER,
-    write_data,
+    Mol2Parser
 )
 
-from ._config import config
+from .electronic_structure import EletronicStructure
 
-from .preparation import PDBLine, PDBPrepper, read_pdb_lines
-from .chemical import ResidueType
-
-from ._interface import Interface
+from ._interface import Interface, OpenPyMolSession
 
 interface = Interface(config)
+"""Singleton interface for all softwares enzy_htp is capable of interfacing with. SHOULD NOT be used by
+end users and instead exists for developers to access external software. See enzy_htp/_interface/interface.py
+for full class defintion."""
 
-#TODO(CJ): add docstrings for global variables
+config.__doc__="""Singleton interface for the config settings for all software packages and the system settings in enzy_htp. Can be accessed
+by end users and should be used to customize system settings for each environment they are working in."""
+
+from .analysis import ( electric_field )
+
+from .preparation import PDBLine, read_pdb_lines, dock_reactants, generate_conformers #TODO(CJ): get rid of system charge
+
+from .geometry import equi_md_sampling, md_simulation

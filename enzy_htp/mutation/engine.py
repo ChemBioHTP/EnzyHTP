@@ -2,29 +2,34 @@
 method which gives users the ability to mutate a .pdb file and specify all relevant aspects of this process.
 Mutation is carried out by an underlying engine and the supported engines currently include:
     + Amber/tleap
+    + PyMOL
+
 Note that the current implementation will mutate the .pdb file and keep the residue indicies and chain names 
 consistent.
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-15
 """
+
+#TODO(CJ): This doesn't currently work for tleap. Get it working
+
 import hashlib
+from pathlib import Path
+from copy import deepcopy
 from string import ascii_uppercase
 from collections import defaultdict
 from typing import List, Dict, Union, Any
-from pathlib import Path
-from copy import deepcopy
 
 import numpy as np
 import pandas as pd
 from biopandas.pdb import PandasPdb
 
-import enzy_htp.chemical as chem
-import enzy_htp.structure as struct
-import enzy_htp.preparation as prep
-from enzy_htp import interface
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import _LOGGER, UnsupportedMethod
+import enzy_htp.chemical as chem
+import enzy_htp.structure as struct
+from enzy_htp import interface
+import enzy_htp.preparation as prep
 
 from .mutation_restrictions import MutationRestrictions, restriction_object
 from .mutation import generate_all_mutations, Mutation
@@ -36,7 +41,7 @@ def mutate_pdb(
     mutations: List[Mutation] = list(),
     restrictions: MutationRestrictions = None,
     engine: str = "tleap",
-    out_dir: str = None,
+    out_dir: str = None,  #N/A
     random_state: int = 100,
 ) -> str:
     """Top level method that users should call to mutated a given .pdb file. Function gives the ability to
@@ -51,6 +56,7 @@ def mutate_pdb(
     >>> mutated_pdb:str = mutate_pdb("enzy.pdb")
     >>> mutated_pdb
     "enzy_A10G.pdb"
+
     Args:
         pdb: The name of the base .pdb file. Only required value.
         n_mutations: The number of desired mutations as an int(). Default value is 1.
@@ -69,7 +75,7 @@ def mutate_pdb(
     def unique_by_pos(muts) -> List[Mutation]:
         holder = defaultdict(list)
         for mm in muts:
-            holder[(mm.chain_id, mm.res_num)].append(deepcopy(mm))
+            holder[(mm.chain_id, mm.res_idx)].append(deepcopy(mm))
         result = list()
         for mlist in holder.values():
             result.append(mlist.pop())
@@ -78,15 +84,10 @@ def mutate_pdb(
     mutations = unique_by_pos(mutations)
     needed: int = n_mutations - len(mutations)
     if needed > 0:
-        mutations.extend(get_mutations(pdb, needed, mutations, random_state,
-                                       restrictions))
+        mutations.extend(get_mutations(pdb, needed, mutations, random_state, restrictions))
     else:
-        _LOGGER.warning(
-            f"{len(mutations)} unique mutations were provided but only {n_mutations} were requested."
-        )
-        _LOGGER.warning(
-            f"The first {n_mutations} will be used. To change this behavior, increase n_mutations."
-        )
+        _LOGGER.warning(f"{len(mutations)} unique mutations were provided but only {n_mutations} were requested.")
+        _LOGGER.warning(f"The first {n_mutations} will be used. To change this behavior, increase n_mutations.")
         mutations = sorted(mutations)[0:n_mutations]
 
     if out_dir is not None:
@@ -94,12 +95,11 @@ def mutate_pdb(
 
     outfile: str = mutated_name(pdb, out_dir, mutations)
 
-    IMPLEMENTATION: Dict = {"tleap": _mutate_tleap}
+    IMPLEMENTATION: Dict = {"tleap": _mutate_tleap, "pymol": _mutate_pymol, "rosetta": _mutate_rosetta}
 
     if engine not in IMPLEMENTATION:
         raise UnsupportedMethod(
-            f"'{engine}' is not a supported mutation engine. Allowed values are {', '.join(list(IMPLEMENTATION.keys()))}"
-        )
+            f"'{engine}' is not a supported mutation engine. Allowed values are {', '.join(list(IMPLEMENTATION.keys()))}")
 
     IMPLEMENTATION[engine](pdb, outfile, mutations)
 
@@ -141,7 +141,7 @@ def get_mutations(
     mut_dict: Dict[Tuple[Str, int], List[Mutation]] = generate_all_mutations(structure)
 
     for mut in mutations:
-        restrictions.lock_residue((mut.chain_id, mut.res_num))
+        restrictions.lock_residue((mut.chain_id, mut.res_idx))
 
     mut_dict = restrictions.apply(mut_dict)
 
@@ -152,14 +152,12 @@ def get_mutations(
     while len(result) < needed:
 
         if not len(mut_dict):
-            raise Exception(
-                "Could not generate enough Mutation namedtuple()'s. This is likely due to too many restrictions being present."
-            )
+            raise Exception("Could not generate enough Mutation namedtuple()'s. This is likely due to too many restrictions being present.")
 
         md_keys = list(mut_dict.keys())
-        chosen = random_list_elem(md_keys)
+        chosen = random_list_elem(md_keys)  # random over position
         if len(mut_dict[chosen]):
-            result.append(random_list_elem(sorted(mut_dict[chosen])))
+            result.append(random_list_elem(sorted(mut_dict[chosen])))  # random over targets (why sorted)
         del mut_dict[chosen]
 
     return result
@@ -180,7 +178,7 @@ def mutated_name(pdb: str, outdir: str, mutations: List[Mutation]) -> str:
 
     def deduce_original(mm: Mutation, df: pd.DataFrame) -> str:
         for i, row in df.iterrows():
-            if row.chain_id == mm.chain_id and row.residue_number == mm.res_num:
+            if row.chain_id == mm.chain_id and row.residue_number == mm.res_idx:
                 return chem.convert_to_one_letter(row.residue_name)
         else:
             # TODO(CJ): improve this
@@ -191,18 +189,37 @@ def mutated_name(pdb: str, outdir: str, mutations: List[Mutation]) -> str:
         outdir = str(pdb_path.parent)
 
     name_stem: str = pdb_path.stem
-    mutations = sorted(mutations, key=lambda m: (m.chain_id, m.res_num))
+    mutations = sorted(mutations, key=lambda m: (m.chain_id, m.res_idx))
     for mut in mutations:
         if mut.orig == "X":
             orig_name: str = deduce_original(mut, pdb_df)
         else:
             orig_name: str = mut.orig
-        name_stem += f"_{orig_name}{mut.res_num}{mut.target}"
+        name_stem += f"_{orig_name}{mut.res_idx}{mut.target}"
     return f"{outdir}/{name_stem}.pdb"
 
 
+def _mutate_pymol(pdb: str, outfile: str, mutations: List[Mutation]) -> None:
+    """Underlying implementation of mutation with pymol. Serves as implementation only, SHOULD NOT
+    BE CALLED BY USERS DIRECTLY. Follows generalized function signature taking the name of the .pdb,
+    the outfile to save the mutated version to and a list() of mutations. Function assumes that the 
+    supplied mutations are valid. Procedure utilizes the cmd.wizard() api exposed by the pymol python 
+    package.
+    
+    Args:
+        pdb: The name of the original .pdb file as a str().
+        outfile: Name of the file to save the mutated structure to.
+        mutations: A list() of Mutation namedtuple()'s to apply.
+    Returns:
+        Nothing.
+
+    """
+    #TODO(CJ): finish this
+    pass
+
+
 def _mutate_tleap(pdb: str, outfile: str, mutations: List[Mutation]) -> None:
-    """Underlying implementation of mutation with tleap. Serves as impelementation only, SHOULD NOT
+    """Underlying implementation of mutation with tleap. Serves as implementation only, SHOULD NOT
     BE CALLED BY USERS DIRECTLY. Follows generalized function signature taking the name of the .pdb,
     the oufile to save the mutated version to and a list() of mutations. Function assumes that the
     supplied mutations are valid. Procedure is to replace backbone atoms and their names in the .pdb
@@ -245,7 +262,7 @@ def _mutate_tleap(pdb: str, outfile: str, mutations: List[Mutation]) -> None:
         for mf in mutations:
             # Test for every Flag for every lines
 
-            if curr_chain == mf.chain_id and pdb_l.resi_id == mf.res_num:
+            if curr_chain == mf.chain_id and pdb_l.resi_id == mf.res_idx:
                 # fix for mutations of Gly & Pro
                 old_atoms: List[str] = {
                     "G": ["N", "H", "CA", "C", "O"],
@@ -269,8 +286,7 @@ def _mutate_tleap(pdb: str, outfile: str, mutations: List[Mutation]) -> None:
             if rkey not in backup:
                 continue
             tmp_file = f"/tmp/ligand.{rkey}.tmp.pdb"
-            fs.write_lines(tmp_file,
-                           list(map(lambda ll: ll.line, backup[rkey])) + ['END'])
+            fs.write_lines(tmp_file, list(map(lambda ll: ll.line, backup[rkey])) + ['END'])
             lig: struct.Ligand = struct.ligand_from_pdb(tmp_file)
             (cname, rname, rnum) = rkey.split('.')
             rnum = int(rnum)

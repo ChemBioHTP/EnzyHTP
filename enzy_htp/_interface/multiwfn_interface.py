@@ -2,11 +2,12 @@
 serves as a wrapper for all associated Multiwfin functionality though this behavior is also partially controlled
 by the MultiwfnConfig class owned by the interface. Supported operations include:
     + bond dipole calculations
-Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-07-01
 """
 import re
+import pandas as pd
 from pathlib import Path
 from typing import List, Dict, Tuple
 
@@ -15,31 +16,36 @@ import numpy as np
 from enzy_htp.core import env_manager as em
 from enzy_htp.core import file_system as fs
 
-# from .multiwfn_config import MultiwfnConfig, default_multiwfn_config
+from enzy_htp._config.multiwfn_config import MultiwfnConfig, default_multiwfn_config
 
-# TODO(CJ): add .config() getter
+from .base_interface import BaseInterface
 
 
-class MultiwfnInterface:
+class MultiwfnInterface(BaseInterface):
     """
     Attributes:
         env_manager_:
         compatible_env_:
     """
 
-    def __init__(self, config=None):
-        """ """
+    def __init__(self, parent, config: MultiwfnConfig = None) -> None:
+        """Simplistic constructor that optionally takes an MultiwfnConfig object as its only argument.
+        Calls parent class.
+        """
+        super().__init__(parent, config, default_multiwfn_config)
         self.config_ = config
         if not self.config_:
             self.config_ = default_multiwfn_config()
         self.env_manager_ = em.EnvironmentManager(
             env_vars=self.config_.required_env_vars(),
-            exectubles=self.config_.required_executables(),
+            executables=self.config_.required_executables(),
         )
         self.env_manager_.check_environment()
         self.compatible_env_ = self.env_manager_.is_missing()
 
     def parse_two_center_dp_moments(self, fname) -> List[Tuple[Tuple, Tuple]]:
+
+        fs.check_file_exists(fname)
 
         def digits_only(raw: str) -> str:
             return re.sub(r"[a-z:/]", "", raw.lower())
@@ -106,9 +112,7 @@ class MultiwfnInterface:
 
         # self.init_Multiwfn()
         infile = f"{Path(fchks[0]).parent}/dipole_settings.in"
-        settings: List[str] = (
-            "19 -8 1 y q".split()
-        )  # TODO(CJ): paramterize this so that it is controlled by MultiwfnConfig
+        settings: List[str] = ("19 -8 1 y q".split())  # TODO(CJ): paramterize this so that it is controlled by MultiwfnConfig
         fs.write_lines(infile, settings)
 
         for fchk in fchks:
@@ -118,8 +122,7 @@ class MultiwfnInterface:
 
             # Run Multiwfn
             outfile = str(Path(fchk).with_suffix(".dip"))
-            self.env_manager_.run_command(
-                self.config_.EXE, [fchk, "<", infile, "&&", "mv", "LMOdip.txt", outfile])
+            self.env_manager_.run_command(self.config_.EXE, [fchk, "<", infile, "&&", "mv", "LMOdip.txt", outfile])
             fs.safe_rm("LMOcen.txt")
             fs.safe_rm("new.fch")
             dp_moments = self.parse_two_center_dp_moments(outfile)

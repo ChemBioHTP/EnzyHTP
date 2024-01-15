@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+
+# Store the initial working directory
+initial_dir=$(pwd)
+
+# Change the working directory to the parent directory of this script
+cd "$(dirname "$0")"/..
+
+# Set a default environment name
+target_env_name=$CONDA_DEFAULT_ENV
+
+# Function to display help message
+show_help() {
+    echo "Usage: ${0##*/} [-n|--name ENV_NAME]"
+    echo
+    echo "Install EnzyHTP to your conda environment."
+    echo
+    echo "   -n, --name    Specify the name of the conda environment. Defaults to current environment."
+    echo "   -h, --help    Display this help and exit."
+}
+
+# Define the options
+OPTS=$(getopt -o hn: --long help,name: -- "$@")
+
+# Exit if the options have not been correctly specified.
+if [ $? != 0 ]; then exit 1; fi
+
+# Extract options and their arguments into variables.
+eval set -- "$OPTS"
+
+while true; do
+    case "$1" in
+        -h|--help)
+            show_help
+            exit 0;;
+        -n|--name)
+            target_env_name="$2"; shift 2;;
+        --)
+            shift; break;;
+        *)
+            break;;
+    esac
+done
+
+# Get the conda version
+CONDA_VERSION=$(conda --version | cut -d' ' -f2)
+echo "Conda Version: $CONDA_VERSION"
+
+# Remove the build directory if it exists
+if [[ -d build ]]; then
+    rm -r build;
+fi
+
+# Function to activate the conda environment
+activate_env() {
+    if type conda > /dev/null 2>&1; then
+        echo "Activating environment using conda"
+        conda activate "$target_env_name"
+    else
+        echo "Activating environment using source"
+        source activate "$target_env_name"
+    fi
+}
+
+# Function to update the conda environment
+update_env() {
+    echo "Updating conda environment: $target_env_name"
+    conda env update -n "$target_env_name" --file environment.yml
+    activate_env
+    conda develop .
+}
+
+# Check current conda environment and extract environment name.
+current_env_path=$(conda info --json | grep "\"default_prefix\":" | awk '{print $2}' | tr -d '",')
+current_env_name=$(basename "$current_env_path")
+
+echo "Installing EnzyHTP to Conda environment: $target_env_name"
+
+# Compare current environment with env_name
+if [ "$current_env_name" = "$target_env_name" ]; then
+    echo "Deactivating current environment $current_env_name"
+    conda deactivate
+    update_env
+else
+    update_env
+    conda deactivate
+fi

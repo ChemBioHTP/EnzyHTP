@@ -1,4 +1,4 @@
-"""Testing the enzy_htp.mutation.mutate.poy submodule.
+"""Testing the enzy_htp.mutation.mutate.py submodule.
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-16
 """
@@ -21,12 +21,8 @@ DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/data/"
 def test_get_mutations_random_state_works():
     """Checking that the random_state function parameter is effective for controlling output in the get_mutations() method."""
     ONE_RES: str = f"{DATA_DIR}/one_res.pdb"
-    assert mut.engine.get_mutations(ONE_RES, 1, list(), 100,
-                                    None) == mut.engine.get_mutations(
-                                        ONE_RES, 1, list(), 100, None)
-    assert mut.engine.get_mutations(ONE_RES, 1, list(), 99,
-                                    None) != mut.engine.get_mutations(
-                                        ONE_RES, 1, list(), 100, None)
+    assert mut.engine.get_mutations(ONE_RES, 1, list(), 100, None) == mut.engine.get_mutations(ONE_RES, 1, list(), 100, None)
+    assert mut.engine.get_mutations(ONE_RES, 1, list(), 99, None) != mut.engine.get_mutations(ONE_RES, 1, list(), 100, None)
 
 
 def test_get_mutations_raises():
@@ -48,8 +44,7 @@ def test_mutated_name():
     """Method that tests that mutated_name() is working correctly."""
     ONE_RES: str = f"{DATA_DIR}/one_res.pdb"
     target = "dne/one_res_P1G.pdb"
-    actual = mut.engine.mutated_name(
-        ONE_RES, "dne", [mut.Mutation(orig='P', target='G', chain_id='A', res_num=1)])
+    actual = mut.engine.mutated_name(ONE_RES, "dne", [mut.Mutation(orig='P', target='G', chain_id='A', res_idx=1)])
     assert actual == target
 
 
@@ -57,8 +52,7 @@ def test_mutated_name_can_deduce():
     """Method that tests that mutated_name() is working correctly and can specifically deduce when no original residue code is given."""
     ONE_RES: str = f"{DATA_DIR}/one_res.pdb"
     target = "dne/one_res_P1G.pdb"
-    actual = mut.engine.mutated_name(
-        ONE_RES, "dne", [mut.Mutation(orig='X', target='G', chain_id='A', res_num=1)])
+    actual = mut.engine.mutated_name(ONE_RES, "dne", [mut.Mutation(orig='X', target='G', chain_id='A', res_idx=1)])
     assert actual == target
 
 
@@ -93,9 +87,7 @@ def test_mutate_pdb_specified_mutation_tleap():
     target = f"{DATA_DIR}/one_res_P1G.pdb"
     fs.safe_rm(target)
     assert not os.path.exists(target)
-    mutated = mut.mutate_pdb(
-        ONE_RES, 1, [mut.Mutation(orig='P', target='G', chain_id='A', res_num=1)], None,
-        "tleap", None, 100)
+    mutated = mut.mutate_pdb(ONE_RES, 1, [mut.Mutation(orig='P', target='G', chain_id='A', res_idx=1)], None, "tleap", None, 100)
     assert os.path.exists(target)
 
     lines: List[str] = fs.lines_from_file(target)
