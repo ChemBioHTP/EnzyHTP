@@ -114,7 +114,7 @@ class StructureRegion:
         else:
             # apply geometry first
             geom_atoms = self.atoms_from_geom(geom)
-            for aidx, aa in enumerate(self.geom_atoms):
+            for aidx, aa in enumerate(geom_atoms):
                 if aa is atom:
                     result = aidx + indexing
         
