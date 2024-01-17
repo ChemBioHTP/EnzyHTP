@@ -7,131 +7,86 @@ Author: QZ Shao <shaoqz@icloud.com>
 
 Date: 2024-01-12
 """
-from typing import Tuple
+from typing import Tuple, Dict
 import numpy as np
 
+from enzy_htp.core.logger import _LOGGER
 from enzy_htp.electronic_structure import ElectronicStructure
 from enzy_htp.structure import Atom
+from enzy_htp import interface
 
 def bond_dipole(
         ele_stru: ElectronicStructure, # use geom: StructureRegion here.
         atom_1: Atom,
         atom_2: Atom,
-        method: str = "LMO-Multiwfn",) -> Tuple[float, np.array]:
-    """"""
-    # TODO start here
-
-def get_bond_dipole(cls, qm_fch_paths, a1, a2, prog='Multiwfn'):
-    '''
-    get bond dipole using wfn analysis with fchk files.
-    -----------
-    Args:
-        qm_fch_paths: paths of fchk files 
-                    * requires correponding out files with only ext difference
-                    * (if want to compare resulting coord to original mdcrd/gjf stru)
-                        requires nosymm in gaussian input that generate the fch file.
-        a1          : QM I/O id of atom 1 of the target bond
-        a2          : QM I/O id of atom 2 of the target bond
-        prog        : program for wfn analysis (default: multiwfn)
-                        **Multiwfn workflow**
-                        1. Multiwfn xxx.fchk < parameter_file > output
-                        the result will be in ./LMOdip.txt 
-                        2. extract value and project to the bond accordingly
-    Returns:
-        Dipoles     : A list of dipole data in a form of [(dipole_norm_signed, dipole_vec), ...]
-                        *dipole_norm_signed* is the signed norm of the dipole according to its projection
-                                            to be bond vector.
-                        *dipole_vec* is the vector of the dipole
-    -----------
-    LMO bond dipole: 
-    (Method: Multiwfn manual 3.22/4.19.4)
-    2-center LMO dipole is defined by the deviation of the eletronic mass center relative to the bond center.
-    Dipole positive Direction: negative(-) to positive(+).
-    Result direction: a1 -> a2
+        method: str = "LMO-Multiwfn",
+        # execution config
+        work_dir: str="./bond_dipole",
+        keep_in_file: bool=False,
+        # armer config
+        cluster_job_config: Dict = None,
+        job_check_period: int= 30, # s
+        **kwargs,
+        ) -> Tuple[float, np.array]:
+    """calculate bond dipole based on an ElectronicStructure.
+    (TODO in the case of using AMOEBA, probably also stru instead?)
     
-    REF: Lu, T.; Chen, F., Multiwfn: A multifunctional wavefunction analyzer. J. Comput. Chem. 2012, 33 (5), 580-592.
-    ''' # TODO support array job
-    Dipoles = []
+    Args:
+        ele_stru:
+            the ElectronicStructure of a QM region containing the
+            target bond.
+        atom_1:
+            the 1st atom defining target bond (in the region)
+        atom_2:
+            the 2st atom defining target bond (in the region)
+        method:
+            the method keyword specifying the algorithm & software
+            of the dipole calculation. (see Details for supported)
+        work_dir:
+            the working dir that contains all the files in the SPE process
+        keep_in_file:
+            whether keep the input file of the calculation
+        cluster_job_config: 
+            the config for cluster_job. If None is used, the calculation
+            will be run locally.
+        job_check_period:
+            the time cycle for update job state change (Unit: s)
 
-    if prog == 'Multiwfn':
-        # self.init_Multiwfn()
-        ref_path = qm_fch_paths[0]
-        mltwfn_in_path = ref_path[:-(len(ref_path.split('.')[-1])+1)]+'_dipole.in'
+        (see more options in detailed engines)
+    
+    Returns:
+        (dipole_norm_signed, dipole_vec)
+            *dipole_norm_signed*
+                is the signed norm of the dipole according to its projection
+                to be bond vector.
+            *dipole_vec*
+                is the vector of the dipole
 
-        with open(mltwfn_in_path, 'w') as of:
-            of.write('19'+line_feed)
-            of.write('-8'+line_feed)
-            of.write('1'+line_feed)
-            of.write('y'+line_feed)
-            of.write('q'+line_feed)
+            Dipole positive Direction: negative(-) to positive(+).
+            Result direction: atom_1 -> atom_2
 
-        bond_id_pattern = r'\( *([0-9]+)[A-Z][A-z]? *- *([0-9]+)[A-Z][A-z]? *\)'
-        bond_data_pattern = r'X\/Y\/Z: *([0-9\.\-]+) *([0-9\.\-]+) *([0-9\.\-]+) *Norm: *([0-9\.]+)'
-        
-        for fchk in qm_fch_paths:
-            # get a1->a2 vector from .out (update to using fchk TODO)
-            G_out_path = fchk[:-len(fchk.split('.')[-1])]+'out'
-            with open(G_out_path) as f0:
-                coord_flag = 0
-                skip_flag = 0
-                for line0 in f0:
-                    if 'Input orientation' in line0:
-                        coord_flag = 1
-                        continue
-                    if coord_flag:
-                        # skip first 4 lines
-                        if skip_flag <= 3:
-                            skip_flag += 1
-                            continue
-                        if '-------------------------' in line0:
-                            break
-                        l_p = line0.strip().split()
-                        if str(a1) == l_p[0]:
-                            coord_a1 = np.array((float(l_p[3]), float(l_p[4]), float(l_p[5])))
-                        if str(a2) == l_p[0]:
-                            coord_a2 = np.array((float(l_p[3]), float(l_p[4]), float(l_p[5])))
-            Bond_vec = (coord_a2 - coord_a1)
-            
-            # Run Multiwfn
-            mltwfn_out_path = fchk[:-len(fchk.split('.')[-1])]+'dip'
-            if Config.debug >= 2:
-                print('Running: '+Config.Multiwfn.exe+' '+fchk+' < '+mltwfn_in_path)
-            run(Config.Multiwfn.exe+' '+fchk+' < '+mltwfn_in_path, check=True, text=True, shell=True, capture_output=True)
-            run('mv LMOdip.txt '+mltwfn_out_path, check=True, text=True, shell=True, capture_output=True)
-            run('rm LMOcen.txt new.fch', check=True, text=True, shell=True, capture_output=True)
-            
-            # get dipole
-            with open(mltwfn_out_path) as f:
-                read_flag = 0
-                for line in f:
-                    if line.strip() == 'Two-center bond dipole moments (a.u.):':
-                        read_flag = 1
-                        continue
-                    if read_flag:
-                        if 'Sum' in line:
-                            raise Exception('Cannot find bond:'+str(a1)+'-'+str(a2)+line_feed)
-                        Bond_id = re.search(bond_id_pattern, line).groups()
-                        # find target bond
-                        if str(a1) in Bond_id and str(a2) in Bond_id:
-                            Bond_data = re.search(bond_data_pattern, line).groups()
-                            dipole_vec = (float(Bond_data[0]) ,float(Bond_data[1]) ,float(Bond_data[2]))
-                            # determine sign
-                            if np.dot(np.array(dipole_vec), Bond_vec) > 0:
-                                dipole_norm_signed = float(Bond_data[3])
-                            else:
-                                dipole_norm_signed = -float(Bond_data[3])
-                            break
-            Dipoles.append((dipole_norm_signed, dipole_vec))
+    Details:
+        Supported methods:
+            "LMO-Multiwfn"
+            > Multiwfn manual 3.22/4.19.4
+            > Lu, T.; Chen, F., Multiwfn: A multifunctional wavefunction analyzer. J. Comput. Chem. 2012, 33 (5), 580-592.
+            2-center LMO dipole is defined by the deviation of the eletronic mass center
+            relative to the bond center."""
+    # san check
+    if not isinstance(ele_stru, ElectronicStructure):
+        _LOGGER.error(f"ele_stru can only be an ElectronicStructure(). found: {ele_stru}")
+        raise TypeError
+    if method not in BOND_DIPOLE_METHODS:
+        _LOGGER.error(f"method ({method}) not supported. Supported: {BOND_DIPOLE_METHODS.keys()}")
+        raise ValueError
 
-    return Dipoles
+    result = BOND_DIPOLE_METHODS[method](
+        ele_stru, atom_1, atom_2, work_dir, keep_in_file,
+        cluster_job_config = cluster_job_config, 
+        job_check_period = job_check_period,
+        **kwargs)
 
-def init_Multiwfn(cls, n_cores=None):
-    '''
-    initiate Multiwfn with settings in Config
-    '''
-    # set nthreads
-    if n_cores == None:
-        n_cores = str(Config.n_cores)
-    if Config.debug >= 1:
-        print("Running: "+"sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  "+n_cores+"/' "+Config.Multiwfn.DIR+"/settings.ini")
-    run("sed -i 's/nthreads= *[0-9][0-9]*/nthreads=  "+n_cores+"/' "+Config.Multiwfn.DIR+"/settings.ini", check=True, text=True, shell=True, capture_output=True)
+    return result
+
+BOND_DIPOLE_METHODS = {"LMO-Multiwfn": interface.multiwfn.get_bond_dipole}
+"""the method keyword mapping for bond dipole calculations."""

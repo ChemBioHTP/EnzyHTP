@@ -7,3 +7,4 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-11-06
 """
 from .electric_field import electric_field
+from .dipole import bond_dipole, get_bond_dipole
