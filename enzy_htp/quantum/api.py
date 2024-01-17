@@ -69,6 +69,8 @@ def single_point(
         parallel_method:
             the method to parallelize the multiple runs when more
             than 1 geometry is in the input StructureEnsemble
+        cluster_job_config: 
+            the config for cluster_job if it is used as the parallel method.
         job_check_period:
             the time cycle for update job state change (Unit: s)
         job_array_size:

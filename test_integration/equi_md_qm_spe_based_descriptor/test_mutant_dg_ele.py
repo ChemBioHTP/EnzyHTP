@@ -1,5 +1,8 @@
 """This file contain integration tests that calculates the change of electrostatic
-stablization energy upon mutants for different systems."""
+stablization energy upon mutants for different systems.
+
+Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
+Date: 2023-09-25"""
 import pytest
 import os
 import pickle
