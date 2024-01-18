@@ -16,7 +16,7 @@ from enzy_htp.structure import Atom
 from enzy_htp import interface
 
 def bond_dipole(
-        ele_stru: ElectronicStructure, # use geom: StructureRegion here.
+        ele_stru: ElectronicStructure,
         atom_1: Atom,
         atom_2: Atom,
         method: str = "LMO-Multiwfn",
