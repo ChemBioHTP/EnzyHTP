@@ -21,6 +21,7 @@ import enzy_htp.chemical as chem
 from enzy_htp import mutation as mm
 from enzy_htp.structure import PDBParser, Mol2Parser, Structure, Ligand
 from enzy_htp.core import file_system as fs
+from enzy_htp.quantum import single_point
 
 #TODO(CJ): I should go through and use existing values if cache mode is selected
 #:TODO(CJ): need to be able to specify the size of the grid
@@ -86,14 +87,14 @@ def dock_reactants(structure: Structure,
     geometry_df = pd.read_csv("scratch/scores.csv")
 
     if False:
-        geometry_df = generate_geometries(structure, constraints, n_struct, clash_cutoff, param_files, charge_mapper, freeze_alphafill, work_dir, rng_seed )
+        geometry_df = generate_geometries(structure, constraints, n_struct, clash_cutoff, param_files, charge_mapper, freeze_alphafill, rng_seed, work_dir )
 
     select_geometry(structure, geometry_df, max_sasa_ratio, constraints, cst_energy, charge_mapper, cluster_distance)
 
     if use_qm:
         qm_minimization(structure, charge_mapper, cluster_distance, constraints)
 
-    mm_minimization(structure, cluster_distance, constraints, param_files, work_dir)
+    mm_minimization(structure, cluster_distance, constraints, param_files, rng_seed, work_dir)
 
     if use_qm:
         qm_minimization(structure, charge_mapper, cluster_distance, [])
@@ -128,7 +129,7 @@ def _create_xml(stru:Structure, cst_file:str, freeze_alphafill:bool, clash_cutof
         {'parent': 'SCOREFXNS.ScoreFunction', 'tag': 'Reweight', 'scoretype': 'chainbreak',             'weight': '1.0'},
     ]
 #yapf: enable
-    ligand_count:int=0
+    
     as_names:List[str] = list()
     for res in stru.residues:
         if not res.is_ligand():
@@ -144,37 +145,15 @@ def _create_xml(stru:Structure, cst_file:str, freeze_alphafill:bool, clash_cutof
 
         as_names.append( f"{rname}_as" )
 
-        if freeze_alphafill and res.placement_method == "alphafill":
-            continue
-
-        ligand_count += 1
-        grid_name:str=f"grid_{ligand_count}"
-        clash_metric:str=f"clash_{chain_name.lower()}"
-        elements.extend([
-            {'parent': 'ROSETTASCRIPTS', 'tag': 'SCORINGGRIDS', 'ligand_chain': res.parent.name, 'width': '30', 'append_elements_only': True, 'name': grid_name, 'child_nodes':
-                 [{'parent': 'SCORINGGRIDS', 'tag': 'ClassicGrid', 'grid_name': 'classic', 'weight': '1.0'},]},
-            {'parent': 'MOVERS', 'tag': 'Transform', 'name': transform_name, 'chain': chain_name, 'box_size': f"{40.0:.2f}", 'move_distance': f'{20.0:.2f}', 'angle': '360',
-                'cycles': '1000', 'repeats': '3', 'temperature': '5', 'grid_set': grid_name, 'use_constraints':'true', 'cst_fa_file':f'{Path(cst_file).absolute()}'},
-            {'parent':'PROTOCOLS', 'tag': 'Add', 'mover_name': transform_name,},
-            {'parent': 'FILTERS', 'tag': 'SimpleMetricFilter', 'name': f"{clash_metric}_filter", 'comparison_type':'lt_or_eq', 'cutoff':f"{clash_cutoff}", 'composite_action':'any', 'child_nodes':
-                [{ 'parent':'SimpleMetricFilter', 'tag':'PerResidueClashMetric', 'name':clash_metric, 'residue_selector': rname, 'residue_selector2': f"{rname}_as"}]
-            },
-            { 'parent': 'PROTOCOLS', 'tag': 'Add', 'filter': f"{clash_metric}_filter" }
-        ])
-
     elements.extend([
+        { 'parent': 'RESIDUE_SELECTORS', 'tag': 'Or', 'name':'as_selector', 'selectors':','.join(as_names)},
+        { 'parent': 'RESIDUE_SELECTORS', 'tag': 'Not', 'name':'not_as_selector', 'selector':'as_selector'},
         {'parent':'MOVERS', 'tag':'FastRelax', 'name':'frelax', 'scorefxn':'hard_rep', 'cst_file':f"{Path(cst_file).absolute()}", 'child_nodes': [
                 {'parent':'FastRelax', 'tag':'MoveMap', 'name':'full_enzyme', 'bb':'true', 'chi':'true', 'jump':'false','child_nodes':[
                         {'parent':'MoveMap','tag':'ResidueSelector', 'selector':'as_selector', 'bb':'true', 'chi':'true', 'bondangle':'true'},
                         {'parent':'MoveMap', 'tag':'ResidueSelector', 'selector':'not_as_selector', 'bb':'false', 'chi':'true', 'bondangle':'false'},]}]
         },
         {'parent':'PROTOCOLS', 'tag':'Add', 'mover_name':'frelax'}
-    ])
-
-    elements.extend([
-        { 'parent': 'RESIDUE_SELECTORS', 'tag': 'Or', 'name':'as_selector', 'selectors':','.join(as_names)},
-        { 'parent': 'RESIDUE_SELECTORS', 'tag': 'Not', 'name':'not_as_selector', 'selector':'as_selector'}
-
     ])
 
     interface.rosetta.write_script(fname, elements)
@@ -284,8 +263,8 @@ def generate_geometries(structure: Structure,
             param_files:List[str],
             charge_mapper:Dict[str,int],
             freeze_alphafill:bool,
-            work_dir:str,
             rng_seed:int,
+            work_dir:str,
             ) -> pd.DataFrame:
     """
 
@@ -454,7 +433,6 @@ def _parameterize_system(stru:Structure, work_dir:str) -> Tuple[List[str], Dict[
         if ligand_charge is None:
             ligand_charge = interface.bcl.calculate_formal_charge( res )
             charge_mapper[res.name] = ligand_charge
-        _LOGGER.info(charge_mapper)
 
         param_file:str = interface.rosetta.parameterize_ligand(res, charge=ligand_charge, work_dir=work_dir)
         
@@ -470,8 +448,17 @@ def _parameterize_system(stru:Structure, work_dir:str) -> Tuple[List[str], Dict[
     return (param_files, charge_mapper)
 
 
-def _system_charge(df: pd.DataFrame, charge_mapper=None) -> int:
-    """TODO(CJ) """
+def _system_charge(df: pd.DataFrame, charge_mapper:Dict[str,int]=None) -> int:
+    """Given a pd.DataFrame with the columns chain, resi, resn, and name, find the charge. Needs a charge
+    mapper for non-standard residues. If the charge mapper is missing, may be inaccurate.
+
+    Args:
+        df: The dataframe containing the chain, resi, resn, and name attributes for each atom in the selection.
+        charge_mapper: Optional. A dict() that maps three letter residues to their charges.
+
+    Returns:
+        The system's charge as an int().
+    """
     _LOGGER.info("Beginning enzyme system charge deduction...")
     charge = 0
 
@@ -479,7 +466,7 @@ def _system_charge(df: pd.DataFrame, charge_mapper=None) -> int:
     _LOGGER.info(f"Found {len(residues)} residues in enzyme system!")
 
     for (chain, resi, resn) in residues:
-        atoms = df[(df.chain == chain) & (df.resi == resi)].name.to_list()
+        atoms = df[(df.chain == chain) & (df.resi == resi)]['name'].to_list()
 
         charge_str = str()
         residue_charge: int = 0
@@ -539,8 +526,14 @@ def _system_charge(df: pd.DataFrame, charge_mapper=None) -> int:
 
     return charge
 
-def _define_active_site(structure: Structure, distance_cutoff, charge_mapper=None):
-    """TODO(CJ)"""
+def _define_active_site(structure: Structure, distance_cutoff:float, charge_mapper:Dict[str,int]=None) -> Dict:
+    """
+    
+    Args:
+        
+    Returns:
+
+    """
 
     parser = PDBParser()
     start_pdb:str=f"{config['system.SCRATCH_DIR']}/__temp_as.pdb"
@@ -575,7 +568,6 @@ def _define_active_site(structure: Structure, distance_cutoff, charge_mapper=Non
     sele_str = " or ".join(map(lambda pr: f"(chain {pr[0]} and resi {pr[1]})", residues))
 
     return {"sele": sele_str, "charge": charge}
-
 
 def qm_minimization(structure:Structure, charge_mapper, cluster_distance:float, constraints:List[StructureConstraint]=None, work_dir:str=None):
     """TODO(CJ)
@@ -616,7 +608,6 @@ def _evaluate_qm(df: pd.DataFrame, structure: Structure, charge_mapper, cluster_
     # 2. run through each cluster and do it
     _LOGGER.info(f"Beginning qm energy evaluation. {df.selected.sum()} geometries still selected...")
     as_info:Dict = _define_active_site(structure, cluster_cutoff, charge_mapper)
-
     qm_energy = []
 
     _parser = PDBParser()
@@ -628,23 +619,31 @@ def _evaluate_qm(df: pd.DataFrame, structure: Structure, charge_mapper, cluster_
 
         energy:float = None
         _df_stru = _parser.get_structure( row.description )
-        try:
-            energy = interface.xtb.single_point(_df_stru,charge=as_info['charge'],sele_str=as_info['sele'])
-        except:     
-            _LOGGER.warn("Failed single point energy calculation attempt! Continuing...")
-            #TODO(CJ): add some file cleanup
-
-        qm_energy.append(energy)
+        for res in structure.residues:
+            if res.is_canonical():
+                continue
+            _df_stru.get(res.key_str).net_charge = res.net_charge
+            _df_stru.get(res.key_str).multiplicity = res.multiplicity
+            for atom in _df_stru.get(res.key_str):
+                atom.charge = 0.0
+        lot = chem.QMLevelOfTheory(basis_set='',method='GFN2', solvent='', solv_method='')
+        es = single_point(
+            _df_stru,
+            engine='xtb',
+            region_methods=[lot],
+            parallel_method=None,
+            regions=[as_info['sele']])
+        qm_energy.append(es[0].energy_0)
 
     df['qm_energy'] = qm_energy
     _LOGGER.info("Finished qm energy evaluation!")
 
 def select_geometry( structure, df, max_sasa_ratio, constraints, cst_energy, charge_mapper, cluster_distance) -> None:
     """TODO(CJ)"""
-    _evaluate_SASA(df, max_sasa_ratio)#TODO(CJ): put this back in 
+    #_evaluate_SASA(df, max_sasa_ratio)#TODO(CJ): put this back in 
 
-    _evaluate_csts(df, constraints, cst_energy)
-    
+    #_evaluate_csts(df, constraints, cst_energy)
+    #TODO(CJ): add use_qm flag 
     _evaluate_qm(df, structure, charge_mapper, cluster_distance)
 
     infile:str=df[df.selected].sort_values(by='qm_energy').description.to_list()[0]
@@ -653,7 +652,10 @@ def select_geometry( structure, df, max_sasa_ratio, constraints, cst_energy, cha
     ref_stru = _parser.get_structure(infile)
     stru_oper.update_residues(structure, ref_stru)
 
-def mm_minimization(structure:Structure, cluster_distance:float, constraints:List[StructureConstraint], param_files:List[str], work_dir:str) -> None:
+    for cst in constraints:
+        cst.change_topology(structure)
+
+def mm_minimization(structure:Structure, cluster_distance:float, constraints:List[StructureConstraint], param_files:List[str], rng_seed:int, work_dir:str) -> None:
     """TODO(CJ)
     """
 
@@ -670,13 +672,33 @@ def mm_minimization(structure:Structure, cluster_distance:float, constraints:Lis
         {'parent': 'SCOREFXNS.ScoreFunction', 'tag': 'Reweight', 'scoretype': 'angle_constraint',       'weight': '1.0'},
         {'parent': 'SCOREFXNS.ScoreFunction', 'tag': 'Reweight', 'scoretype': 'dihedral_constraint',    'weight': '1.0'},
         {'parent': 'SCOREFXNS.ScoreFunction', 'tag': 'Reweight', 'scoretype': 'chainbreak',             'weight': '1.0'},
-        {'parent':'MOVERS', 'tag':'FastRelax', 'name':'frelax', 'scorefxn':'hard_rep', 'cst_file':f"{Path(cst_file).absolute()}", 'ramp_down_constraints':'true', 'repeats':'20', 'child_nodes': [
-                {'parent':'FastRelax', 'tag':'MoveMap', 'name':'full_enzyme', 'bb':'true', 'chi':'true', 'jump':'false','child_nodes':[
-                        {'parent':'MoveMap','tag':'ResidueSelector', 'selector':'as_selector', 'bb':'true', 'chi':'true', 'bondangle':'true'},
-                        {'parent':'MoveMap', 'tag':'ResidueSelector', 'selector':'not_as_selector', 'bb':'false', 'chi':'true', 'bondangle':'false'},]}]
-        },
-        {'parent':'PROTOCOLS', 'tag':'Add', 'mover_name':'frelax'}
     ]
+
+    as_names:List[str] = list()
+    for res in structure.residues:
+        if not res.is_ligand():
+            continue
+
+        chain_name:str = res.parent.name        
+        rname:str=f"rs_{chain_name.lower()}"
+        transform_name:str=f"dock_{chain_name.lower()}"
+        elements.extend([
+            {'parent': 'RESIDUE_SELECTORS', 'tag':'Index', 'name':rname, 'resnums':f"{res.idx}{res.parent.name}"},
+            {'parent': 'RESIDUE_SELECTORS', 'tag':'CloseContact', 'name':f"{rname}_as", 'residue_selector':rname},
+        ])
+
+        as_names.append( f"{rname}_as" )
+
+    elements.extend([    
+        { 'parent': 'RESIDUE_SELECTORS', 'tag': 'Or', 'name':'as_selector', 'selectors':','.join(as_names)},
+        { 'parent': 'RESIDUE_SELECTORS', 'tag': 'Not', 'name':'not_as_selector', 'selector':'as_selector'},
+        {'parent':'MOVERS', 'tag':'FastRelax', 'name':'frelax', 'scorefxn':'hard_rep', 'cst_file':f"{Path(cst_file).absolute()}", 'ramp_down_constraints':'true', 'repeats':'5', 'child_nodes': [
+                {'parent':'FastRelax', 'tag':'MoveMap', 'name':'full_enzyme', 'bb':'false', 'chi':'false', 'jump':'false','child_nodes':[
+                        {'parent':'MoveMap','tag':'ResidueSelector', 'selector':'as_selector', 'bb':'true', 'chi':'true', 'bondangle':'true'},
+                ]
+        },]},
+        {'parent':'PROTOCOLS', 'tag':'Add', 'mover_name':'frelax'},
+    ])
     interface.rosetta.write_script(xml_file, elements)
 #yapf: enable
     _parser = PDBParser()
@@ -712,6 +734,7 @@ def mm_minimization(structure:Structure, cluster_distance:float, constraints:Lis
         "-out",
         f"   -file:scorefile 'score.sc'",
         "   -level 200",
+        "   -nstruct 10",
         "   -overwrite",
         "   -path",
         f"       -all './rosetta_mm_min'",
@@ -719,18 +742,27 @@ def mm_minimization(structure:Structure, cluster_distance:float, constraints:Lis
     ])
 
     fs.write_lines(option_file, content)
+    
+    fs.safe_rmdir(f"{work_dir}/rosetta_mm_min/")
+    fs.safe_mkdir(f"{work_dir}/rosetta_mm_min/")
 
-    start_dir:str = Path(os.getcwd()).aboslute()
+    start_dir:str = Path(os.getcwd()).absolute()
     os.chdir( work_dir )
-    interface.rosetta.run_rosetta_scripts([f"@{opt_path.name}"])
+    interface.rosetta.run_rosetta_scripts([f"@{Path(option_file).name}"])
     os.chdir(start_dir)
+
 
     score_sc:str=f"{work_dir}/rosetta_mm_min/score.sc"
     assert Path(score_sc).exists()
 
     df: pd.DataFrame = interface.rosetta.parse_score_file(score_sc)
-    df = df.sort_values(by='total_energy').reset_index(drop=True)
-    ref_stru = _parser.get_structure( "{work_dir}/rosetta_mm_min/{df.iloc[0].description}" )
+    df = df.sort_values(by='total_score').reset_index(drop=True)
+    ref_stru = _parser.get_structure( f"{work_dir}/rosetta_mm_min/{df.iloc[0].description}.pdb" )
     stru_oper.update_residues(structure, ref_stru)
-    #CURRENT    
+
+    for cst in constraints:
+        cst.change_topology(structure)
+
+
+#CURRENT    
 

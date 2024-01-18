@@ -114,6 +114,18 @@ class ResidueCap(Residue):
         self.set_children(atoms)
     
     @property
+    def idx(self) -> int:
+        return self.link_atom.idx
+
+    @property
+    def chain(self) -> Chain:
+        return self.link_residue.parent
+
+    @property
+    def name(self) -> str:
+        return self.link_residue.name
+
+    @property
     def cap_type(self) -> str:
         """hard coded cap type"""
         _LOGGER.error("using abstract method.")
@@ -210,6 +222,29 @@ class CH3Cap(ResidueCap):
         """hard coded net charge"""
         return 0
 
+class NHCH3Cap(ResidueCap):
+    """Methylamide, good for c term"""
+    pass
+    DEFAULT_COORDS = {
+        "NP1": (0.000, 0.000, 0.000),
+        "HP11": (),
+        "CP1": (),
+        "CP11" : (),
+        "CP12": (),
+        "CP12" : (),
+        "NP2": (0.000, 0.000, 0.000),
+        "HP21": (),
+        "CP2": (),
+        "CP21" : (),
+        "CP22": (),
+        "CP22" : (),
+
+    }
+
+
+class COCH3(ResidueCap):
+    """Acetyl, good for n term"""
+    pass
 
 class HCap(ResidueCap):
     """the H cap
@@ -377,6 +412,7 @@ def get_ch3_cap(end: str, res: Residue,
         plug_atom = atoms[0],
         atoms = atoms,
     )
+
 
 SUPPORTED_CAPS: Dict[str, callable] = {
     "CH3" : get_ch3_cap,

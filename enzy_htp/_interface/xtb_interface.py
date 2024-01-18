@@ -8,9 +8,13 @@ Supported operations include:
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-08-17
 """
+from __future__ import annotations
+import os
 from pathlib import Path
-from typing import Tuple, List
+from typing import Tuple, List, Dict
 
+
+from dataclasses import dataclass
 from .base_interface import BaseInterface
 
 from enzy_htp import _LOGGER
@@ -26,10 +30,94 @@ from enzy_htp.structure.structure_constraint import (
     ResiduePairConstraint
 )
 
+from enzy_htp.electronic_structure import EletronicStructure
+
+from enzy_htp.chemical import QMLevelOfTheory, MMLevelOfTheory, LevelOfTheory
+
+from .handle_types import (
+    QMSinglePointEngine,
+    QMOptimizationEngine,
+    QMResultEgg
+)
 
 
+from enzy_htp.core.job_manager import ClusterJob
 
 from plum import dispatch
+from enzy_htp import config as eh_config
+
+@dataclass
+class XTBQMResultEgg(QMResultEgg):
+    """Class defining the ResultEgg for an XTB run."""
+    charge_path:str
+    wbo_path: str
+    stru: Structure
+    parent_job: ClusterJob
+
+
+class XTBSinglePointEngine(QMSinglePointEngine):
+    def __init__(self,
+                interface,
+                method: QMLevelOfTheory,
+                region: StructureRegion,
+                keep_geom: bool,
+                name: str,
+                cluster_job_config: Dict,
+                keep_in_file: bool,
+                work_dir: str,
+                ):
+        self._parent_interface = interface
+        self._method = method
+        self._region = region
+        self._keep_geom = keep_geom
+        self._name = name
+        self._cluster_job_config = cluster_job_config
+        self._keep_in_file = keep_in_file
+        self._work_dir = work_dir
+
+    @property
+    def parent_interface(self) -> XTBInterface:
+        return self._parent_interface
+
+    @property
+    def method(self) -> QMLevelOfTheory:
+        return self._method
+
+    @property
+    def work_dir(self) -> str:
+        return self._work_dir
+
+    @property
+    def region(self) -> StructureRegion:
+        return self._region
+
+    @property
+    def engine(self) -> str:
+        return "xtb"
+
+    def make_job(self, stru: Structure) -> Tuple[ClusterJob, XTBQMResultEgg]:
+        assert False
+
+    def run(self, stru: Structure) -> EletronicStructure:
+        """Method that actually runs the XTB single point calculation. Returns results of calculation as an ElectronicStructure() object."""
+        if not isinstance(stru, Structure):
+            _LOGGER.error("Supplied stru is not of type Structure()")
+            raise TypeError()
+        
+        fs.safe_mkdir(self.work_dir)
+
+        sr = self.region
+        if sr is None:
+            assert False, "Need to fix this logic"
+
+        return self.parent_interface.do_xtb_run(
+            sr,
+            geo_opt=False,
+            work_dir=self.work_dir,
+        )
+
+    def translate(self, result_egg: XTBQMResultEgg) -> EletronicStructure:
+        assert False
 
 class XTBInterface(BaseInterface):
     """Class that provdes a direct interface for enzy_htp to utilize the xtb semi empirical method. Supported methods
@@ -47,15 +135,123 @@ class XTBInterface(BaseInterface):
         """
         super().__init__(parent, config, default_xtb_config)
 
-    def single_point(self, stru: Structure,
+    def do_xtb_run(self,
+        stru:Union[Structure, StructureRegion],
+        geo_opt:bool = False,
+        charge:int = None,
+        spin:int = None,
+        constraints:List[StructureConstraint]=None,
+        n_iter: int = None,
+        n_proc: int = None,
+        work_dir:str=None
+        ) -> ElectronicStructure:
+        """TODO(CJ)"""
+
+        if not isinstance(stru, StructureRegion):
+            pass
+            print('no structure')
+            exit( 0 )
+
+        if charge is None:
+            charge = stru.get_net_charge()
+
+        if spin is None:
+            spin = 1
+
+        if n_iter is None:
+            n_iter = self.config().N_ITER
+
+        if n_proc is None:
+            n_proc = self.config().N_PROC
+
+        coord_file:str = self.write_coord_file(stru, work_dir)
+
+        args:List[str] = list()
+        if geo_opt:
+            #TODO(CJ): write the .inp file and other stuff
+            assert False
+        else:
+            args = ["--chrg", str(charge), "--iterations",
+                 str(n_iter), "--parallel",
+                 str(n_proc), "--norestart", "--sp", str(Path(coord_file).absolute())]
+        
+        start_dir:str = os.getcwd()
+        os.chdir( work_dir )
+        results = self.env_manager_.run_command(
+           self.config_.XTB_EXE, args )
+        
+        os.chdir(start_dir)
+
+        energy_0:float = None
+        for ll in results.stdout.splitlines():
+            if ll.find('TOTAL ENERGY') != -1:
+                energy_0 = float(ll.split()[3])
+                break
+        else:
+            _LOGGER.error("Unable to find total spe energy in xtb output!")
+            raise TypeError("Unable to find total spe energy in xtb output!")
+
+        return EletronicStructure(
+            energy_0 = energy_0,
+            geometry = stru,
+            mo = None,
+            mo_parser = None,
+            source="xtb",
+        )
+
+    def write_coord_file(self, sr:StructureRegion, work_dir) -> str:
+        
+        temp_pdb:str = f"{work_dir}/temp_xtb_pdb.pdb"
+        coord_file:str = f"{work_dir}/xtb_coords.mol"
+        _parser = PDBParser()
+
+        pdb_lines:List[str] = list()
+        for aidx,aa in enumerate(sr.atoms):
+            aa.idx = aidx
+            pdb_lines.append( _parser._write_pdb_atom( aa ).replace('\n',''))
+        
+        fs.write_lines(temp_pdb, pdb_lines)
+        session = self.parent().pymol.new_session()
+        self.parent().pymol.general_cmd(session, [('delete', 'all'), ('load', temp_pdb)])
+        self.parent().pymol.remove_ligand_bonding(session)
+        fs.safe_rm(temp_pdb)
+        
+        self.parent().pymol.general_cmd(session, [("save", coord_file)])
+
+        return coord_file
+
+
+    def build_single_point_engine(
+        self,
+        # calculation config
+        method: QMLevelOfTheory = "default",
+        region: StructureRegion = None,
+        keep_geom: bool = "default",
+        # calculation config (alternative)
+        name: str = "default",
+        cluster_job_config: Dict = "default",
+        keep_in_file: bool = False,
+        work_dir: str = None,) -> XTBSinglePointEngine:
+            
+
+        return XTBSinglePointEngine(
+            interface=self,
+            method=method,
+            region=region,
+            keep_geom=keep_geom,
+            name=name,
+            cluster_job_config=cluster_job_config,
+            keep_in_file=keep_in_file,
+            work_dir=work_dir)
+
+    def write_to_inp(self, out_path,
+                            stru: StructureRegion,
                             charge: int = 0,
                             spin: int = 1,
                             n_iter: int = -1,
                             n_proc: int = -1,
-                            sele_str:str=None,
                             work_dir:str=None,
-                            cterm_cap:str=None,
-                            nterm_cap:str=None,
+                            constraints=None,
                             **kwargs
                             ) -> float:
         """Performs a single point energy calculation on the supplied file. Checks if the file exists and is one of the correct
@@ -84,30 +280,15 @@ class XTBInterface(BaseInterface):
         fname:str=f"{work_dir}/__temp_xtb.xyz"
         lines:List[str] = ["", "Title goes here"]
 
-        if sele_str is not None:
-            session = self.parent().pymol.new_session()
-            residue_list=self.parent().pymol.get_residue_list(session, stru, sele_str=sele_str, work_dir=work_dir)
-            sr:StructureRegion = create_structure_region(stru, residue_list, nterm_cap=nterm_cap, cterm_cap=cterm_cap)
-            
-            lines[0] = str(len(sr.atoms))
+        for aa in stru.atoms:
+            (x,y,z) = aa.coord
+            lines.append(f"{aa.element} {x} {y} {z}")
 
-            for aa in sr.atoms:
-                (x,y,z) = aa.coord
-                lines.append(f"{aa.element} {x} {y} {z}")
-        else:
-            lines[0] = str(len(stru.atoms))
-
-            for aa in stru.atoms:
-                (x,y,z) = aa.coord
-                lines.append(f"{aa.element} {x} {y} {z}")
+        lines[0] = str(len(stru.atoms))
 
         fs.write_lines(fname, lines)
+        return
 
-        results = self.env_manager_.run_command(
-            self.config_.XTB_EXE,
-            ["--chrg", str(charge), "--iterations",
-             str(n_iter), "--parallel",
-             str(n_proc), "--norestart", "--sp", fname])
         
         fs.safe_rm( fname )
         self._remove_temp_files(str(Path(fname).parent))
@@ -168,7 +349,7 @@ class XTBInterface(BaseInterface):
         if sele_str is not None:
             session = self.parent().pymol.new_session()
             residue_list=self.parent().pymol.get_residue_list(session, stru, sele_str=sele_str, work_dir=work_dir)
-            sr:StructureRegion = create_structure_region(stru, residue_list, nterm_cap=nterm_cap, cterm_cap=cterm_cap)
+            sr:StructureRegion = create_region_from_residue_keys(stru, residue_list, nterm_cap=nterm_cap, cterm_cap=cterm_cap)
             
             pdb_lines:List[str] = list()
             for aa in sr.atoms:
@@ -333,3 +514,9 @@ class XTBInterface(BaseInterface):
         
         return [f"   distance: {mapped_indices[0]}, {mapped_indices[1]}, {cst.target_value:.3f}"]
 
+
+xtb_interface = XTBInterface(None, eh_config._xtb)
+"""The singleton of XTBInterface() that handles all XTB related operations in EnzyHTP
+Instantiated here so that other _interface subpackages can use it.
+An example of this concept this AmberInterface used Gaussian for calculating the RESP charge
+so it imports gaussian_interface from here."""

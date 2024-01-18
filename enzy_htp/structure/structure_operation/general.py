@@ -2,6 +2,7 @@
 operations on it. Place holder for uncategorized functions.
 
 Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-09-19
 """
 
@@ -72,6 +73,7 @@ def update_residues(stru: Structure, ref_stru: Structure) -> Structure:
         if self_res.name != ref_res.name:
             _LOGGER.info(f"updating {self_res.key()} {self_res.name} to {ref_res.name}")
             self_res.name = ref_res.name
+        
         self_res.atoms = copy.deepcopy(ref_res.atoms)  # this will also set self_res as parent
     stru.renumber_atoms()
     return stru
@@ -112,3 +114,18 @@ def align_atom_order_in_each_residue(stru: Structure, ref_stru: Structure) -> No
             atom_indexes.sort()
             res.renumber_atoms(atom_indexes)
     return stru
+
+
+def update_coordinates(stru:Structure, ref_stru:Structure, allow_index_mismatch:bool=True) -> None:
+    #TODO(CJ): update documenation
+
+    for schain, rchain in zip(stru.chains, ref_stru.chains):
+        for sres, rres in zip(schain.residues, rchain.residues):        
+            for ratom in rres.atoms:
+                for satom in sres.atoms:
+                    if ratom.name == satom.name:
+                        satom.coord = ratom.coord
+                        break
+                else:
+                    assert False
+                

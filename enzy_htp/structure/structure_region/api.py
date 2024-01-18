@@ -216,8 +216,10 @@ class StructureRegion:
                     result["c_ter"].append(res)
                 if n_side_res is not None and n_side_res not in region_residues:
                     result["n_ter"].append(res)
+            elif res.is_ligand():
+                continue
             else:
-                _LOGGER.warning(f"{res._rtype} found. Not considered")
+                _LOGGER.warning(f"{res.name} found. Not considered")
         return result
 
     def clone(self):
@@ -333,16 +335,20 @@ def create_region_from_residue_keys(stru:Structure,
     for res_key in residue_keys:
         res:Residue=stru.find_residue_with_key(res_key)
         res_atoms.extend(res.atoms)
+    
     raw_region = StructureRegion(res_atoms)
+
+    if method_caps is None:
+        method_caps = dict()
 
     # capping
     if capping_method not in CAPPING_METHOD_MAPPER:
         _LOGGER.error(f"capping method ({capping_method}) not supported. Supported: {CAPPING_METHOD_MAPPER.keys()}")
         raise ValueError
     capping_func = CAPPING_METHOD_MAPPER[capping_method]
-    capped_region = capping_func(raw_region, method_caps)
+    capping_func(raw_region, nterm_cap=method_caps.get("nterm_cap", None), cterm_cap=method_caps.get("cterm_cap", None))
 
-    return capped_region
+    return raw_region 
 
 def create_region_from_selection_pattern(
         stru: Structure,
@@ -370,7 +376,6 @@ def create_region_from_selection_pattern(
     # select
     stru_sele = select_stru(stru, pattern)
     raw_region = StructureRegion(atoms=stru_sele.atoms)
-
     # capping
     if capping_method not in CAPPING_METHOD_MAPPER:
         _LOGGER.error(f"capping method ({capping_method}) not supported. Supported: {CAPPING_METHOD_MAPPER.keys()}")

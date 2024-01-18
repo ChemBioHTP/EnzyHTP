@@ -743,13 +743,22 @@ class Structure(DoubleLinkedNode):
 
     @dispatch
     def absolute_index(self, target:Residue, indexed:int=0) -> int:
+        """Find the absolute index of a given Residue with a given indexing convention. Exits when the supplied target
+        Residue cannot be found.
 
+        Args:
+            target: The Residue whose index you want to find.
+            indexed: What is the indexing convention you want? (i.e. 0 vs 1).
+
+        Returns:
+            The specified index of the target residue, if present. 
+        """
         for ridx, res in enumerate(self.residues):
             if res == target:
                 return ridx + indexed
-
         else:
-            assert False
+            _LOGGER.error(f"The supplied target residue {target} is not part of this Structure. You may have copied your Structure at some point! Exiting...")
+            exit( 1 )
 
     def assign_ncaa_chargespin(self, net_charge_mapper: Dict[str, Tuple[int, int]]):
         """assign net charges to NCAAs in Structure() based on net_charge_mapper
