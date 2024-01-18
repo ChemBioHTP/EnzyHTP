@@ -49,15 +49,27 @@ def test_parse_two_center_dp_moments():
     ])
 
 def test_get_bond_dipole():
-    """as name."""
-    test_stru = sp.get_structure(f"{STRU_DATA_DIR}KE_07_R7_2_S.pdb")
+    """as name. the test stru is extracted from a real simulation traj.
+    The test_ele_stru is based on the corresponding fchk file.
+    The answer is get from the result of the old EnzyHTP"""
+    test_stru = sp.get_structure(
+        f"{DATA_DIR}../../analysis/data/KE_mutant_101_254_frame_0.pdb")
     test_stru.assign_ncaa_chargespin({"H5J": (0, 1)})
-    test_region = create_region_from_selection_pattern(test_stru, "resi 101+254")
+    test_region = create_region_from_selection_pattern(
+        test_stru, "resi 101+254",
+        nterm_cap = "H",
+        cterm_cap = "H",)
+    # adjust to align with the atom order in the example
+    cap_h_1 = test_region.atoms.pop(-2)
+    test_region.atoms.insert(1, cap_h_1)
+    cap_h_2 = test_region.atoms.pop(-1)
+    test_region.atoms.insert(15, cap_h_2)
+
     target_bond = (test_stru.ligands[0].find_atom_name("CAE"), test_stru.ligands[0].find_atom_name("H2"))
     test_ele_stru = ElectronicStructure(
         energy_0=0.0,
         geometry=test_region,
-        mo=f"{DATA_DIR}../../analysis/data/KE_07_R7_2_S_101_254.chk",
+        mo=f"{DATA_DIR}../../analysis/data/KE_mutant_101_254_frame_0.fchk",
         mo_parser=None,
         source="gaussian16",
     )
@@ -79,4 +91,5 @@ def test_get_bond_dipole():
         job_check_period=3,
     )
 
-    assert result == (0.39995, np.array(0.33744, -0.21187, -0.03473))
+    assert np.isclose(result[0], 0.39995, atol=0.0001)
+    assert np.array_equal(result[1], np.array((0.33744, -0.21187, -0.03473)))

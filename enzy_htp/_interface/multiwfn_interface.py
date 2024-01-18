@@ -7,6 +7,7 @@ Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-07-01
 """
+from collections import defaultdict
 import re
 import pandas as pd
 from pathlib import Path
@@ -22,6 +23,7 @@ from enzy_htp._config.multiwfn_config import MultiwfnConfig, default_multiwfn_co
 from enzy_htp import config as eh_config
 from enzy_htp.electronic_structure import ElectronicStructure
 from enzy_htp.structure import Atom
+
 
 class MultiwfnInterface(BaseInterface):
     """
@@ -41,13 +43,13 @@ class MultiwfnInterface(BaseInterface):
         return self.config()["EXE"]
 
     def run_multiwfn(
-            self,
-            wfn_file: str, 
-            instr_file: str, 
-            log_path: str,
-            cluster_job_config: Union[None, Dict],
-            job_check_period: int = None,
-            ) -> Union[None, ClusterJob]:
+        self,
+        wfn_file: str,
+        instr_file: str,
+        log_path: str,
+        cluster_job_config: Union[None, Dict],
+        job_check_period: int = None,
+    ) -> Union[None, ClusterJob]:
         """execute Multiwfn. Also handle the ARMer or not dispatch
         Args:
             wfn_file
@@ -75,7 +77,7 @@ class MultiwfnInterface(BaseInterface):
         multiwfn_exe = self.get_multiwfn_executable()
         multiwfn_args = f"{wfn_file} < {instr_file} > {log_path}"
         multiwfn_cmd = f"{multiwfn_exe} {multiwfn_args}"
-        
+
         if cluster_job_config is None:
             # running locally
             this_spe_run = self.env_manager_.run_command(
@@ -91,38 +93,39 @@ class MultiwfnInterface(BaseInterface):
             raise ValueError
         else:
             # make job
-            cluster = self.cluster_job_config["cluster"]
-            res_keywords = self.cluster_job_config["res_keywords"]
+            cluster = cluster_job_config["cluster"]
+            res_keywords = cluster_job_config["res_keywords"]
             env_settings = cluster.MULTIWFN_ENV["CPU"]
-            sub_script_path = fs.get_valid_temp_name(
-                f"{eh_config['system.SCRATCH_DIR']}/submit_multiwfn.cmd")
+            sub_script_path = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/submit_multiwfn.cmd")
+            fs.safe_mkdir(eh_config['system.SCRATCH_DIR'])
             job = ClusterJob.config_job(
-                commands = multiwfn_cmd,
-                cluster = cluster,
-                env_settings = env_settings,
-                res_keywords = res_keywords,
-                sub_dir = "./", # because path are relative
-                sub_script_path = sub_script_path
-            )
+                commands=multiwfn_cmd,
+                cluster=cluster,
+                env_settings=env_settings,
+                res_keywords=res_keywords,
+                sub_dir="./",  # because path are relative
+                sub_script_path=sub_script_path)
             return job
 
     def check_multiwfn_error(self, out_file, stdstream_source):
         """TODO make this error checker when encounters a need."""
         pass
+
     # endregion
 
     #region engines
-    def get_bond_dipole(
-            self,
-            ele_stru: ElectronicStructure,
-            atom_1: Atom,
-            atom_2: Atom,
-            work_dir: str,
-            keep_in_file: bool,
-            cluster_job_config: Dict = "default",
-            job_check_period: int = 60,
-            **kwargs) -> List[float]:
+    def get_bond_dipole(self,
+                        ele_stru: ElectronicStructure,
+                        atom_1: Atom,
+                        atom_2: Atom,
+                        work_dir: str,
+                        keep_in_file: bool,
+                        cluster_job_config: Dict = "default",
+                        job_check_period: int = 60,
+                        **kwargs) -> Tuple[float, Tuple[float]]:
         """get bond dipole using wfn analysis with fchk files.
+        TODO we also want to support single-center in some day?
+
         Args:
             ele_stru:
                 the ElectronicStructure of a QM region containing the
@@ -160,92 +163,114 @@ class MultiwfnInterface(BaseInterface):
             2-center LMO dipole is defined by the deviation of the eletronic mass center relative to the bond center.
             Dipole positive Direction: negative(-) to positive(+).
             Result direction: a1 -> a2
+            For non-single bond, the final dipole is the sum of all bond dipoles between the 2 atoms.
+            TODO is this really what we want for a double bond case?
             REF: Lu, T.; Chen, F., Multiwfn: A multifunctional wavefunction analyzer. J. Comput. Chem. 2012, 33 (5), 580-592.
         """
-        
+        clean_targets = []
         # init cluster_job_config
+        type_hint_sticker: MultiwfnConfig
         if cluster_job_config == "default":
             cluster_job_config = self.config().get_default_bond_dipole_cluster_job_config()
         elif cluster_job_config is not None:
             # For res_keywords, it updates the default config
             res_keywords_update = cluster_job_config["res_keywords"]
-            default_res_keywords = self.config().get_default_qm_spe_cluster_job_res_keywords()
+            default_res_keywords = self.config().get_default_bond_dipole_res_keywords()
             cluster_job_config["res_keywords"] = default_res_keywords | res_keywords_update
-        
+
         # prepare path
         wfn_file = ele_stru.mo
-        log_path = fs.get_valid_temp_name(
-            f"{work_dir}/{Path(wfn_file).with_suffix('wfnlog')}")
-        result_file = fs.get_valid_temp_name(
-            f"{work_dir}/{Path(wfn_file).with_suffix('wfndip')}")
+        instr_file = fs.get_valid_temp_name(f"{work_dir}/{Path(wfn_file).with_suffix('.wfnin').name}")
+        log_path = fs.get_valid_temp_name(str(Path(instr_file).with_suffix('.wfnlog')))
+        result_file = fs.get_valid_temp_name(str(Path(instr_file).with_suffix('.wfndip')))
         # make instr file
-        instr_file = fs.get_valid_temp_name(
-            f"{work_dir}/{Path(wfn_file).with_suffix('wfnin')}")
         settings = [
             "19",
             "-8",
             "1",
             "y",
             "q",
-            "", # final new line
+            "",  # final new line
         ]
         fs.write_lines(instr_file, settings)
 
         # run Multiwfn
-        self.run_multiwfn(
+        job = self.run_multiwfn(
             wfn_file=wfn_file,
             instr_file=instr_file,
             log_path=log_path,
             cluster_job_config=cluster_job_config,
             job_check_period=job_check_period,
         )
+        if job is not None:
+            job.submit()
+            job.wait_to_end(period=job_check_period) # wont return and do array since this is pretty fast
+            self.check_multiwfn_error(log_path, job)
+            clean_targets.append(job.job_cluster_log)
+            clean_targets.append(job.sub_script_path)
 
         # collect the ./LMOdip.txt file and clean up
         fs.safe_mv("LMOdip.txt", result_file)
-        fs.clean_temp_file_n_dir(
-            ["LMOcen.txt", "new.fch", log_path]
-        )
+        fs.clean_temp_file_n_dir(["LMOcen.txt", "new.fch", log_path] + clean_targets)
         if not keep_in_file:
-            fs.clean_temp_file_n_dir(
-                [instr_file]
-            )
+            fs.clean_temp_file_n_dir([instr_file])
 
         # get a1->a2 vector
         bond_vec = np.array(atom_2.coord) - np.array(atom_1.coord)
 
-        # parse the dipole result TODO start here
-        dipoles = self.parse_two_center_dp_moments(result_file)
-        for ((b1, b2), (x, y, z, norm)) in dipoles:
-            if (atom_1, atom_2) != (b1, b2):
-                continue
-            dipole_vec = (x, y, z)
-            if np.dot(np.array(dipole_vec), bond_vec) <= 0:
-                norm *= -1
+        # parse the dipole result
+        dipoles_data = self.parse_two_center_dp_moments(result_file)
+        atom_1_id = ele_stru.geometry.get_atom_index(atom_1, indexing=1)
+        atom_2_id = ele_stru.geometry.get_atom_index(atom_2, indexing=1)
 
-        return dipoles
+        dipole_vec = np.array((0.0, 0.0, 0.0))
+        target_dipoles = dipoles_data[(atom_1_id, atom_2_id)]
+        if len(target_dipoles) > 1:
+            _LOGGER.warning(f"found multiple LMO-based bond dipole for bond {(atom_1_id, atom_2_id)}. "
+                            "The final bond dipole will be sum of all these dipole vectors. "
+                            "Make sure this is what you want!")
 
-    def parse_two_center_dp_moments(self, fname: str) -> List[Tuple[Tuple, Tuple]]:
+        for this_dipole_vec in target_dipoles:
+            dipole_vec += this_dipole_vec
+
+        dipole_norm = np.linalg.norm(dipole_vec)
+        if np.dot(dipole_vec, bond_vec) <= 0:
+            dipole_norm *= -1
+
+        return dipole_norm, dipole_vec
+    
+    def parse_two_center_dp_moments(self, fname: str) -> Dict[Tuple[float], List[np.array]]:
         """parse the content of LMOdip.txt file from Multiwfn LMO
-        bond dipole calculation."""
+        bond dipole calculation.
+        
+        Returns:
+            a dictionary that maps bond-forming atom-index-pair to bond dipole data
+            {(atom_1_id, atom_2_id) : [np.array(dp_x, dp_y, dp_z), ...], ...}
+            Note that the same bond could have multiple LMO dipole as there could be
+            more than the single bond"""
         # san check
         fs.check_file_exists(fname)
 
-        def digits_only(raw: str) -> str:
-            return re.sub(r"[a-z:/]", "", raw.lower())
+        lines = fs.lines_from_file(fname)
 
-        lines: List[str] = fs.lines_from_file(fname)
-        idx: int = 0
-        while lines[idx].find("Two-center bond dipole moments (a.u.):") == -1:
+        bond_id_pattern = r'\( *([0-9]+)[A-Z][A-z]? *- *([0-9]+)[A-Z][A-z]? *\)'
+        bond_data_pattern = r'X\/Y\/Z: *([0-9\.\-]+) *([0-9\.\-]+) *([0-9\.\-]+) *Norm:'
+
+        # locate the target section
+        idx = 0
+        while lines[idx].strip() != "Two-center bond dipole moments (a.u.):":
             idx += 1
         idx += 1
         end: int = idx + 1
         while lines[end].find("Sum") == -1:
             end += 1
 
-        result = list()
+        # parse from the target section
+        result = defaultdict(list)
         for ll in lines[idx:end]:
-            tks = digits_only(ll).split()
-            result.append(((int(tks[2]), int(tks[4])), tuple(map(float, tks[-4:]))))
+            atom_1_id, atom_2_id = re.search(bond_id_pattern, ll).groups()
+            dp_x, dp_y, dp_z = re.search(bond_data_pattern, ll).groups()
+            result[(int(atom_1_id), int(atom_2_id))].append(np.array((dp_x, dp_y, dp_z), dtype=np.float64))
 
         return result
     #endregion
