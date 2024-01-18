@@ -22,7 +22,9 @@ sp = PDBParser()
 
 def test_bond_dipole():
     """Test running bond_dipole calculation
-    Using LMO-Multiwfn & Accre as an example set up"""
+    Using LMO-Multiwfn & Accre as an example set up
+    
+    Note: need 4 CPUs to run this."""
     test_stru = sp.get_structure(f"{DATA_DIR}KE_mutant_101_254_frame_0.pdb")
     test_stru.assign_ncaa_chargespin({"H5J" : (0,1)})
 
