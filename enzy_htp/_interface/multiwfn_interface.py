@@ -75,7 +75,7 @@ class MultiwfnInterface(BaseInterface):
             the result location depends on the app.
             (e.g.: for bond dipole it will be in ./LMOdip.txt)"""
         multiwfn_exe = self.get_multiwfn_executable()
-        multiwfn_args = f"{wfn_file} < {instr_file} > {log_path}"
+        multiwfn_args = f"{wfn_file} < {instr_file} > {log_path} 2>&1"
         multiwfn_cmd = f"{multiwfn_exe} {multiwfn_args}"
 
         if cluster_job_config is None:
