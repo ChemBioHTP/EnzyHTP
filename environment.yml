@@ -1,4 +1,4 @@
-name: enzyhtp_refactor
+name: enzyhtp
 channels:
   - salilab
   - conda-forge
