@@ -5,49 +5,72 @@ Date: 2022-05-12
 """
 from typing import Union, Tuple, List
 import numpy as np
+from numpy.typing import ArrayLike
 
+from enzy_htp.core.logger import _LOGGER
 
-def get_ele_field_strength_value(p0: Union[Tuple, List],
-                                 c0: float,
-                                 p1: Union[Tuple, List],
-                                 p2: Union[Tuple, List] = None,
-                                 d1: Union[Tuple, List] = None) -> float:
-    '''
-    return field strength E of *p0(c0)* at *p1* in direction of *p2-p1* or *d1*
+def electric_field_strength(
+        p0: ArrayLike,
+        c0: float,
+        p1: ArrayLike, 
+        d1: ArrayLike = None,
+        unit: str = "kcal/(mol*e*Ang)",
+    ) -> float:
+    """return field strength E of source charge *p0(c0)* at *p1* in direction of *d1*
+    Args:
+        p0:
+            position of charge of field source (unit: Ang)
+        c0:
+            point charge in p0 (unit: e)
+        p1:
+            the query position to calculate the field strength (unit: Ang)
+        d1:
+            the vector that defines the direction of field strength projection
+        unit:
+            the unit of the result (default: kcal/(mol*e*Ang))
+
+    Returns:
+        the field strength at the point along the direction
+
     Details:
-        -- E = kq/r^2 -- (Unit: kcal/(mol*e*Ang))
+        -- E = kq/r^2 --
         point charge:   c0 in p0 
         point:          p1
-        direction:      p2-p1 or d1
+        direction:      d1"""
 
-    Args:
-        p0: position of charge of field source
-        c0: point charge in p0
-        p1: the query position to calculate the field strength
-        p2: the point that defines the direction of field strength projection by p2-p1
-        d1: the vector that defines the direction of field strength projection
-    Returns:
-        e_ele_d: the field strength on the direction
-    '''
     # Unit
+    A = 10**-8 #cm
+    Na = 6.02*10**23
+    kcal = 4184 #J 
+    e = 1.602*10**-19 #C     
+    unit_scale_mapper = {
+        "kcal/(mol*e*Ang)" : 1.0,
+        "MV/cm" : kcal/(A*e*Na*10**6),
+    }
+    """map units to its scaling factor from `kcal/(mol*e*Ang)`"""
+
+    # san check
+    if unit not in unit_scale_mapper:
+        _LOGGER.error(f"unit {unit} is not supported. (supported list: {unit_scale_mapper.keys()})")
+        raise ValueError
+
+    # init variables
     k = 332.4  # kcal*Ang/(mol*e^2) = (10^10)*(4.184^-1)*(Na)*(10^-3)*(1.602*10^-19)^2 * 9.0*10^-9 N*m^2/C^2
     q = c0  # e
     p0 = np.array(p0)  # Ang
     p1 = np.array(p1)  # Ang
-    if d1 is None:
-        d1 = np.array(p2) - p1
-    else:
-        d1 = np.array(d1)
     d1 = d1 / np.linalg.norm(d1)  # Ang
 
     # Get r
     r = p1 - p0
-    r_m = np.linalg.norm(r)
-    r_u = r / r_m
+    r_m = np.linalg.norm(r)  # magnitude of r
+    r_u = r / r_m  # direction of r
 
-    # Get E
+    # Get E at p1
     e_ele = (k * q / (r_m**2)) * r_u
-    # Get E in direction
+    # Get E at p1 along d1
     e_ele_d = np.dot(e_ele, d1)  # kcal/(mol*e*Ang)
+
+    e_ele_d = e_ele_d * unit_scale_mapper[unit]
 
     return e_ele_d
