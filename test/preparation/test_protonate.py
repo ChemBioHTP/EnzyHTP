@@ -17,8 +17,8 @@ from enzy_htp.preparation import protonate as prot
 
 CURR_FILE = os.path.abspath(__file__)
 CURR_DIR = os.path.dirname(CURR_FILE)
-DATA_DIR = f"{CURR_DIR}/data"
-WORK_DIR = f"{CURR_DIR}/work_dir"
+DATA_DIR = f"{CURR_DIR}/data/"
+WORK_DIR = f"{CURR_DIR}/work_dir/"
 config["system.SCRATCH_DIR"] = WORK_DIR
 sp = struct.PDBParser()
 
@@ -200,19 +200,16 @@ def test_protonate_ligand_with_pybel():
 
 def test_protonate_ligand_with_pybel_7si9():
     """Test the protonation to ligands in a structure instance"""
-    # _LOGGER.setLevel(0)
 
-    file_prefix = '7SI9_rm_water_disconnected_rmH_aH_EA166Q_ff_min_rmW_rmH'
-    pdb_file = f"{DATA_DIR}/{file_prefix}.pdb"
+    file_prefix = '7SI9_E166Q_protonated'
+    pdb_file = f"{DATA_DIR}{file_prefix}.pdb"
     int_ligand_file_dir=f"{WORK_DIR}"
-    out_pdb_file = f"{WORK_DIR}/{file_prefix}_stru_output.pdb"
     
     stru = sp.get_structure(pdb_file)
     prot.protonate_ligand_with_pybel(stru=stru, int_ligand_file_dir=int_ligand_file_dir)
     
     for atom in stru.ligands[0].atoms:
         element_from_name = atom.name[:len(atom.element)]   # The name of the atom should start with the element symbol.
-        # print(f'Name: {element_from_name}; Element: {atom.element}')
         assert element_from_name.upper() == atom.element.upper()
     
 
@@ -265,24 +262,12 @@ def test_pybel_protonate_pdb_ligand_4CO():
     # fs.safe_rm(out_ligand_path)
     # assert not os.path.isdir(out_ligand_path)
 
-def test_pybel_protonate_pdb_ligand_4WI():
-    """Test ligand protonation (pybel)."""
-
-    _LOGGER.setLevel(0)
-
-    file_prefix = 'ligand_test_4WI'
-    pdb_file = f"{DATA_DIR}/{file_prefix}.pdb"
-    out_pdb_file = f"{WORK_DIR}/{file_prefix}_aH.pdb"
-
-    prot.pybel_protonate_pdb_ligand(in_path=pdb_file, out_path=out_pdb_file)
-
-
 def test_fix_pybel_output():
     """test an exception case for fixing pybel output"""
-    ligand_path = f"{DATA_DIR}/ligand_test_HEZ_pybel_badname.pdb"
-    ref_ligand_path = f"{DATA_DIR}/ligand_test_HEZ.pdb"
-    out_ligand_path = f"{WORK_DIR}/ligand_test_HEZ_pybel.pdb"
-    answer_ligand_path = f"{DATA_DIR}/ligand_test_HEZ_pybel.pdb"
+    ligand_path = f"{DATA_DIR}ligand_test_HEZ_pybel_badname.pdb"
+    ref_ligand_path = f"{DATA_DIR}ligand_test_HEZ.pdb"
+    out_ligand_path = f"{WORK_DIR}ligand_test_HEZ_pybel.pdb"
+    answer_ligand_path = f"{DATA_DIR}ligand_test_HEZ_pybel.pdb"
     assert not os.path.isdir(out_ligand_path)
 
     prot._fix_pybel_output(ligand_path, out_ligand_path, ref_ligand_path)
@@ -293,14 +278,13 @@ def test_fix_pybel_output():
 
 def test_fix_pybel_output_4WI(caplog):
     """Test protonated ligand (pybel) name fixing."""
-    # _LOGGER.setLevel(0)
 
-    file_prefix = 'ligand_test_4WI'
-    pdb_file = f"{DATA_DIR}/{file_prefix}.pdb"
-    intermediate_pdb_file = f"{DATA_DIR}/{file_prefix}_pybel_badname.pdb"
-    out_pdb_file = f"{WORK_DIR}/{file_prefix}_pybel.pdb"
+    file_prefix = 'ligand_test_4WI_protonated'
+    pdb_file = f"{DATA_DIR}{file_prefix}.pdb"
+    intermediate_pdb_file = f"{DATA_DIR}{file_prefix}_pybel_badname.pdb"
+    out_pdb_file = f"{WORK_DIR}{file_prefix}_pybel.pdb"
 
-    with pytest.raises(ValueError) as e:    # The value error is expected to raised when unexpected Hydrogen atom(s) is detected.
+    with pytest.raises(ValueError) as e:    # The value error is expected to be raised when unexpected Hydrogen atom(s) is detected.
         prot._fix_pybel_output(pdb_path=intermediate_pdb_file, out_path=out_pdb_file, ref_name_path=pdb_file)
     assert "The PDB file passed via `ref_name_path` should not contain Hydrogen atom(s)." in caplog.text
     # TODO (Zhong): The best way to do this in the _fix_pybel_output is: 
@@ -321,28 +305,3 @@ def test_protonate_stru_imputed():
     prot.protonate_stru(stru)
 
     assert stru
-
-def test_pdb2pqr_pybel_protonate_pdb_7SI9():
-    """Test pepitide protonation (pdb2pqr) and ligand protonation (pybel)."""
-
-    _LOGGER.setLevel(0)
-
-    file_prefix = '7SI9_rm_water_disconnected_rmH_aH_EA166Q_ff_min_rmW_rmH'
-    pdb_file = f"{DATA_DIR}/{file_prefix}.pdb"
-    int_pqr_path = f"{WORK_DIR}/{file_prefix}_pdb2pqr_output.pdb"
-    int_pdb_path = f"{WORK_DIR}/{file_prefix}_pdb2pqr_output.pqr"
-    int_ligand_file_dir=f"{WORK_DIR}"
-    out_pdb_file = f"{WORK_DIR}/{file_prefix}_stru_output.pdb"
-    stru = sp.get_structure(pdb_file)
-
-    prot.protonate_stru(stru=stru)
-
-    # prot.protonate_peptide_with_pdb2pqr(stru=stru, int_pqr_path=int_pqr_path, int_pdb_path=int_pdb_path)
-    # prot.protonate_ligand_with_pybel(stru=stru, int_ligand_file_dir=int_ligand_file_dir)
-
-    sp.save_structure(outfile=out_pdb_file, stru=stru)
-
-
-if __name__ == '__main__':
-    # test_protonate_ligand_with_pybel_7si9()
-    pass
