@@ -12,7 +12,7 @@ from enzy_htp.preparation import protonate_stru, remove_hydrogens
 from enzy_htp.mutation import assign_mutant, mutate_stru
 from enzy_htp.geometry import equi_md_sampling
 from enzy_htp.quantum import single_point
-from enzy_htp.analysis import bond_dipole, electric_field, ele_stab_energy
+from enzy_htp.analysis import bond_dipole, field_strength_at, ele_stab_energy
 from enzy_htp import interface
 import enzy_htp.structure.structure_constraint as stru_cons
 from enzy_htp.structure import (
@@ -129,8 +129,8 @@ def workflow(
             for ele_stru in qm_results:
                 dipole = bond_dipole(
                     ele_stru, bond_p1, bond_p2)
-                field_strength = electric_field(
-                    mutant_stru, bond_p1, bond_p2, region=ef_region_pattern)
+                field_strength = field_strength_at(
+                    ele_stru.geometry.topology, bond_p1, bond_p2, region=ef_region_pattern)
                 dg_ele = ele_stab_energy(dipole, field_strength)
 
                 replica_result.append((dg_ele, dipole, field_strength))

@@ -1,5 +1,6 @@
-"""Submodule contains code for calculating the electric field strength in an enzyme system along a specified
-axis. Calculates field strength for an enzyme using Amber RESP charges. 
+"""Submodule contains code for charactization of the internal electric field of the enzyme.
++ field_strength_at()
+    field strength at and along a specified bond. 
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Author: QZ Shao <shaoqz@icloud.com>
@@ -16,26 +17,35 @@ from enzy_htp.core import _LOGGER
 from enzy_htp.structure import Structure, Atom
 
 
-def electric_field(stru: Structure,
-                   p1: Union[ArrayLike, Atom],
-                   p2: Union[ArrayLike, Atom],
-                   location: str = 'center',
-                   mask: str = None) -> float:
-    """Top level method for calculating the electric field strength of an enzyme, given an atom mask, two points or atoms,
-    and the location between the two points or atoms. Note that only the stru and p1/p2 are required. Performs basic checks
-    that the supplied Structure has charges. Output units are MV/cm.
+def field_strength_at(
+        stru: Structure,
+        p1: Union[ArrayLike, Atom],
+        p2: Union[ArrayLike, Atom],
+        d1: ArrayLike,
+        location: str = 'center',
+        region: str = None) -> float:
+    """calculate the electric field strength of the internel electric field of an enzyme at
+    a target bond or 2 points or 1 point and a direction (along the bond, at the {location}).
+    Performs basic checks that the supplied Structure has charges. Output units are MV/cm.
 
     Args:
-        stru: The Structure to use. MUST have charges.
-        p1: The point or Atom to use as the first point for the direction vector.
-        p2: The point or atom to use as the second point for the direction vector.
-        location: Location to take the electric field strength at along the direction vector. Allowed values are p1, p2, and center.
-        mask: The selection mask to use. If not supplied, all atoms are used.
+        stru:
+            the structure of the target enzyme. MUST have charges initialized.
+        p1, p2, d1:
+            define the direction of the E projection
+            and the point of measuring E.
+            only 2 out of the 3 is needed. Allowed combinations are: (p1, p2), (p1, d1)
+            p1, p2 can either be an Atom() or a point in the cartesian space.
+        location:
+            the location of the measurement when 2 points are specified.
+            when it is (p1, d1), the p1 will be the position
+            supported keywords: [center, p1] TODO add dipole_center
+        region:
+            the region in the structure that is considered as field source charges.
+            use pymol selection syntax.
 
     Returns:
-        The specified field strength in MV/cm.
-
-    """
+        The specified field strength in MV/cm."""
 
     allowed_locs: List[str] = 'p1 p2 center'.split()
     if location not in allowed_locs:
@@ -79,3 +89,6 @@ def electric_field(stru: Structure,
         result += np.dot(((k * atom.charge) / (r_m**2)) * r_u, direction)
 
     return result
+
+def ele_stab_energy() -> float:
+    """"""
