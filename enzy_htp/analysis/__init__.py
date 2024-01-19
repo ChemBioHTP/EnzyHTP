@@ -6,5 +6,5 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 
 Date: 2022-11-06
 """
-from .electric_field import field_strength_at
+from .electric_field import ele_field_strength_at, ele_stab_energy
 from .dipole import bond_dipole

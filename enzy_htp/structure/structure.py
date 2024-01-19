@@ -511,7 +511,7 @@ class Structure(DoubleLinkedNode):
             Whether the Structure object has non-None charges for all atoms.
         """
         for aa in self.atoms:
-            if aa.charge is None:
+            if not aa.has_init_charge():
                 return False
         return True
 
