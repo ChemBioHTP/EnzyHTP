@@ -5,7 +5,7 @@ Date: 2024-01-18"""
 import os
 import numpy as np
 
-from enzy_htp.analysis import ele_field_strength_at
+from enzy_htp.analysis import ele_field_strength_at_along
 from enzy_htp import PDBParser
 
 DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/data/"
@@ -23,7 +23,7 @@ def test_ele_field_strength_at():
         test_stru.ligands[0].find_atom_name("H2")
     )
 
-    result = ele_field_strength_at(
+    result = ele_field_strength_at_along(
         test_stru, 
         *target_bond, 
         region_pattern="chain A and (not resi 101)",
