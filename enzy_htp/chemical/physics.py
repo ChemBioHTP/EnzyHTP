@@ -15,8 +15,8 @@ def electric_field_strength(
         p1: ArrayLike, 
         d1: ArrayLike = None,
         unit: str = "kcal/(mol*e*Ang)",
-    ) -> float:
-    """return field strength E of source charge *p0(c0)* at *p1* in direction of *d1*
+    ) -> Union[float, ArrayLike]:
+    """return field strength E of source charge *p0(c0)* at *p1* in direction of *d1* if given
     Args:
         p0:
             position of charge of field source (unit: Ang)
@@ -24,13 +24,13 @@ def electric_field_strength(
             point charge in p0 (unit: e)
         p1:
             the query position to calculate the field strength (unit: Ang)
-        d1:
+        d1: (optional)
             the vector that defines the direction of field strength projection
         unit:
             the unit of the result (default: kcal/(mol*e*Ang))
 
     Returns:
-        the field strength at the point along the direction
+        the field strength at the point (along the direction if provided)
 
     Details:
         -- E = kq/r^2 --
@@ -59,7 +59,6 @@ def electric_field_strength(
     q = c0  # e
     p0 = np.array(p0)  # Ang
     p1 = np.array(p1)  # Ang
-    d1 = d1 / np.linalg.norm(d1)  # Ang
 
     # Get r
     r = p1 - p0
@@ -67,9 +66,12 @@ def electric_field_strength(
     r_u = r / r_m  # direction of r
 
     # Get E at p1
-    e_ele = (k * q / (r_m**2)) * r_u
-    # Get E at p1 along d1
-    e_ele_d = np.dot(e_ele, d1)  # kcal/(mol*e*Ang)
+    e_ele_d = (k * q / (r_m**2)) * r_u # kcal/(mol*e*Ang)
+    
+    if d1 is not None:
+        d1 = d1 / np.linalg.norm(d1)  # Ang
+        # Get E along d1
+        e_ele_d = np.dot(e_ele_d, d1)
 
     e_ele_d = e_ele_d * unit_scale_mapper[unit]
 
