@@ -15,13 +15,14 @@ import pandas as pd
 
 from enzy_htp import interface, config, _LOGGER
 import enzy_htp.structure.structure_operation as stru_oper
-from enzy_htp.structure.structure_constraint import StructureConstraint
+from enzy_htp.structure.structure_constraint import StructureConstraint, CartesianFreeze
 
 import enzy_htp.chemical as chem
 from enzy_htp import mutation as mm
 from enzy_htp.structure import PDBParser, Mol2Parser, Structure, Ligand
 from enzy_htp.core import file_system as fs
 from enzy_htp.quantum import single_point
+from enzy_htp.quantum import optimize as qm_optimize 
 
 #TODO(CJ): I should go through and use existing values if cache mode is selected
 #:TODO(CJ): need to be able to specify the size of the grid
@@ -89,15 +90,15 @@ def dock_reactants(structure: Structure,
     if False:
         geometry_df = generate_geometries(structure, constraints, n_struct, clash_cutoff, param_files, charge_mapper, freeze_alphafill, rng_seed, work_dir )
 
-    select_geometry(structure, geometry_df, max_sasa_ratio, constraints, cst_energy, charge_mapper, cluster_distance)
+    select_geometry(structure, constraints, geometry_df, max_sasa_ratio, cst_energy, cluster_distance, use_qm)
 
     if use_qm:
-        qm_minimization(structure, charge_mapper, cluster_distance, constraints)
+        qm_minimization(structure, constraints, cluster_distance, work_dir)
 
     mm_minimization(structure, cluster_distance, constraints, param_files, rng_seed, work_dir)
 
     if use_qm:
-        qm_minimization(structure, charge_mapper, cluster_distance, [])
+        qm_minimization(structure, [], cluster_distance, work_dir)
 
     if not save_work_dir:
         _LOGGER.info(f"save_work_dir set to False! Deleting {work_dir}")
@@ -526,7 +527,7 @@ def _system_charge(df: pd.DataFrame, charge_mapper:Dict[str,int]=None) -> int:
 
     return charge
 
-def _define_active_site(structure: Structure, distance_cutoff:float, charge_mapper:Dict[str,int]=None) -> Dict:
+def _define_active_site(structure: Structure, distance_cutoff:float) -> str:
     """
     
     Args:
@@ -535,41 +536,43 @@ def _define_active_site(structure: Structure, distance_cutoff:float, charge_mapp
 
     """
 
+    _LOGGER.info("Analyzing enzyme active site...")
+    #for res in structure.residues:
+    ligand_residue_keys = set()
+    for res in structure.residues:
+        if res.is_ligand():
+            ligand_residue_keys.add(res.key())
+
     parser = PDBParser()
-    start_pdb:str=f"{config['system.SCRATCH_DIR']}/__temp_as.pdb"
+    start_pdb:str=f"{config['system.SCRATCH_DIR']}/active_site_selection.pdb"
     parser.save_structure(start_pdb, structure)
+   
+    ligand_sele:str = f"byres ( {'or '.join(map(lambda lrk: f'(all within {distance_cutoff} of chain {lrk[0]} and resi {lrk[1]})', ligand_residue_keys))}  )"
+    ligand_sele:str = " or ".join(map(
+        lambda lrk: f"((byres all within {distance_cutoff:.2f} of (chain {lrk[0]} and resi {lrk[1]})) or (metals within  {2*distance_cutoff:.2f} of( chain {lrk[0]} and resi {lrk[1]})))",
+        ligand_residue_keys
+    ))
 
     session = interface.pymol.new_session()
-    res_names: List[str] = interface.pymol.collect(session, start_pdb, "resn".split()).resn.unique()
-    sele_names: Dict[str, str] = {}
-    binding_ddg: Dict[str, List[float]] = {}
-    charges: Dict[str, float] = {}
-
-    binding_pockets = list()
-
-    _LOGGER.info("Analyzing enzyme active site...")
-    reactants = list()
-    sele = []
-    for rn in res_names:
-        if rn.upper() in chem.METAL_CENTER_MAP or rn.upper() in chem.THREE_LETTER_AA_MAPPER:
-            continue
-        reactants.append(rn)
-        sele.append(f"((byres all within {distance_cutoff:.2f} of resn {rn}) or (metals within  {2*distance_cutoff:.2f} of resn {rn}))")
-    sele_str = " or ".join(sele)
-    atoms: pd.DataFrame = interface.pymol.collect(session, start_pdb, "resi chain resn name".split(), sele=sele_str)
-    residues = sorted(list(set(zip(atoms.chain, atoms.resi))))
-    charge = _system_charge(atoms, charge_mapper)
-    _LOGGER.info(f"Found {len(residues)} residues within {distance_cutoff} angstroms of reactants. Active site info:")
-    _LOGGER.info(f"\tresidues: {len(residues)}")
-    _LOGGER.info(f"\tcharge: {charge}")
+    df = interface.pymol.collect(session, start_pdb, "chain resi".split(), sele=ligand_sele)
 
     fs.safe_rm(start_pdb)
 
-    sele_str = " or ".join(map(lambda pr: f"(chain {pr[0]} and resi {pr[1]})", residues))
+    result = set()
+    for i, row in df.iterrows():
+        result.add((row['chain'], row['resi']))
+    
+    _LOGGER.info(f"Found {len(result)} residues within {distance_cutoff} angstroms of reactants!")
+    
+    return " or ".join(map(
+        lambda rr: f"( chain {rr[0]} and resi {rr[1]})",
+        result
+    ))
 
-    return {"sele": sele_str, "charge": charge}
-
-def qm_minimization(structure:Structure, charge_mapper, cluster_distance:float, constraints:List[StructureConstraint]=None, work_dir:str=None):
+def qm_minimization(structure:Structure,
+                constraints:List[StructureConstraint],
+                cluster_distance:float,
+                work_dir:str=None):
     """TODO(CJ)
     
     Args:
@@ -586,11 +589,29 @@ def qm_minimization(structure:Structure, charge_mapper, cluster_distance:float, 
         work_dir = config['system.SCRATCH_DIR']
 
     #TODO(CJ): check if the constraints belong to the Structure 
-    as_info = _define_active_site(structure, cluster_distance, charge_mapper)
+    as_sele = _define_active_site(structure, cluster_distance)
     
-    interface.xtb.geo_opt(structure, charge=as_info['charge'], constraints=constraints, sele_str=as_info['sele'], work_dir=work_dir)
+    #interface.xtb.geo_opt(structure, charge=as_info['charge'], constraints=constraints, sele_str=as_info['sele'], work_dir=work_dir)
+    for res in structure.residues:
+        if res.is_canonical():
+            continue
+        for atom in res.atoms:
+            atom.charge = 0.0
+   
+    backbone_freeze = CartesianFreeze(structure.backbone_atoms())
 
-def _evaluate_qm(df: pd.DataFrame, structure: Structure, charge_mapper, cluster_cutoff: float) -> None:
+    parser = PDBParser()
+    parser.save_structure('pre_opt.pdb', structure)
+    es = qm_optimize(structure,
+            engine="xtb",
+            constraints=constraints + [backbone_freeze],
+            regions=[as_sele],
+            region_methods=[chem.QMLevelOfTheory(basis_set='',method='GFN2', solvent='water', solv_method='ALPB')],
+            parallel_method=None)[0]
+
+    parser.save_structure('post_opt.pdb', structure)
+
+def _evaluate_qm(df: pd.DataFrame, structure: Structure, cluster_cutoff: float) -> None:
     """TODO(CJ)
 
     Args:
@@ -607,12 +628,16 @@ def _evaluate_qm(df: pd.DataFrame, structure: Structure, charge_mapper, cluster_
     # 1. get system charge
     # 2. run through each cluster and do it
     _LOGGER.info(f"Beginning qm energy evaluation. {df.selected.sum()} geometries still selected...")
-    as_info:Dict = _define_active_site(structure, cluster_cutoff, charge_mapper)
+    as_sele:str = _define_active_site(structure, cluster_cutoff)
     qm_energy = []
 
     _parser = PDBParser()
-
+    qm_run = False
     for i, row in df.iterrows():
+        if qm_run:
+            qm_energy.append(None)
+            continue
+
         if not row.selected:
             qm_energy.append(None)
             continue
@@ -626,25 +651,32 @@ def _evaluate_qm(df: pd.DataFrame, structure: Structure, charge_mapper, cluster_
             _df_stru.get(res.key_str).multiplicity = res.multiplicity
             for atom in _df_stru.get(res.key_str):
                 atom.charge = 0.0
-        lot = chem.QMLevelOfTheory(basis_set='',method='GFN2', solvent='', solv_method='')
         es = single_point(
             _df_stru,
             engine='xtb',
-            region_methods=[lot],
+            region_methods=[chem.QMLevelOfTheory(basis_set='',method='GFN2', solvent='water', solv_method='ALPB')],
             parallel_method=None,
-            regions=[as_info['sele']])
+            regions=[as_sele])
         qm_energy.append(es[0].energy_0)
+        qm_run = True
 
     df['qm_energy'] = qm_energy
     _LOGGER.info("Finished qm energy evaluation!")
 
-def select_geometry( structure, df, max_sasa_ratio, constraints, cst_energy, charge_mapper, cluster_distance) -> None:
+def select_geometry( structure:Structure,
+                        constraints:List[StructureConstraint],
+                        df:pd.DataFrame,
+                        max_sasa_ratio:float,
+                        cst_energy:float,
+                        cluster_distance:float,
+                        use_qm:bool = False) -> None:
     """TODO(CJ)"""
     #_evaluate_SASA(df, max_sasa_ratio)#TODO(CJ): put this back in 
 
     #_evaluate_csts(df, constraints, cst_energy)
     #TODO(CJ): add use_qm flag 
-    _evaluate_qm(df, structure, charge_mapper, cluster_distance)
+    if use_qm or True:
+        _evaluate_qm(df, structure, cluster_distance)
 
     infile:str=df[df.selected].sort_values(by='qm_energy').description.to_list()[0]
 
@@ -660,9 +692,9 @@ def mm_minimization(structure:Structure, cluster_distance:float, constraints:Lis
     """
 
     cst_file:str = interface.rosetta.write_constraint_file(structure, constraints, work_dir) #TODO(CJ): look at this; wrong constraint types!!
-    xml_file:str = f"{work_dir}/__script.xml"
-    pdb_file:str = f"{work_dir}/__temp_mm_min.pdb"
-    option_file:str = f"{work_dir}/__mm_min_options.txt"
+    xml_file:str = f"{work_dir}/mm_script.xml"
+    pdb_file:str = f"{work_dir}/temp_mm_min.pdb"
+    option_file:str = f"{work_dir}/mm_min_options.txt"
 #yapf: disable
     elements: List[Dict[str,str]] = [
         {'parent': 'SCOREFXNS', 'tag': 'ScoreFunction', 'name': 'ligand_soft_rep', 'weights': 'ligand_soft_rep'},

@@ -220,7 +220,118 @@ def single_point(
     return result
 
 
-def optimize(stru: Structure):
+def optimize(stru: Union[Structure, StructureEnsemble],
+        engine: str, # always acknowledge the engine
+        # single region case option
+        method: QMLevelOfTheory = None, # single region has to be QM
+        # multi region case option
+        regions: List[str]= None,
+        region_methods: List[LevelOfTheory]= None,
+        constraints:List[StructureConstraint] = None,
+        capping_method: str = "res_ter_cap",
+        embedding_method: str= "mechanical", # TODO probably not a good default choice
+        parallel_method: str="cluster_job",
+        cluster_job_config: Dict= None,
+        job_check_period: int= 210, # s
+        job_array_size: int= 20,
+        work_dir: str="./QM_OPT",
+        keep_in_file: bool=False,
+        ) -> List[EletronicStructure]:
+    if isinstance(stru, Structure):
+        stru_esm = StructureEnsemble.from_single_stru(stru)
+    elif isinstance(stru, StructureEnsemble):
+        stru_esm = stru
+    else:
+        _LOGGER.error(f"only accept Structure() or StructureEnsemble(). Got: {stru}")
+        raise TypeError
+
+    # dispatch: region, region_methods, method -> qm_engine
+    if regions is None:
+        regions = []
+    if region_methods is None:
+        region_methods = []
+
+    if len(regions) != len(region_methods):
+        if not len(regions) == 1:
+            _LOGGER.error(f"Number of region methods ({len(region_methods)}) do not match number of regions ({len(regions)}).")
+            raise ValueError
+    
+    if len(regions) < 2:
+        # QM only
+        # init
+        # qm_engine
+        qm_engine_ctor = SINGLE_REGION_OPTIMIZATION_ENGINE[engine]
+        # qm_method
+        if region_methods:
+            if not isinstance(region_methods[0], QMLevelOfTheory):
+                _LOGGER.error(f"Only 1 or less region specified. Have to be a QMLevelofTheory. Got: {region_methods[0]}")
+                raise TypeError
+            qm_method = region_methods[0]
+        elif not isinstance(method, QMLevelOfTheory):
+            _LOGGER.error(f"Have to specify a QM level of theory in `method` or `region_methods` Got: {method}")
+            raise TypeError
+        else:
+            qm_method = method
+        # stru_region
+        if not regions:
+            # whole
+            qm_region = None
+        else:
+            qm_region = create_region_from_selection_pattern(
+                stru_esm.topology,
+                regions[0],
+                capping_method)
+            init_charge(qm_region)
+        
+        qm_engine: QMOptimizationEngine = qm_engine_ctor(
+                                            region=qm_region,
+                                            method=qm_method,
+                                            constraints=constraints,
+                                            keep_geom=True,
+                                            cluster_job_config=cluster_job_config,
+                                            work_dir=work_dir,
+                                            keep_in_file=keep_in_file,
+                                        )
+                                        #TODO(CJ): these keywords that are part of the ctor should be in the ABC __init__ class
+
+    else:
+        # multiscale
+        raise Exception("TODO")
+        qm_engine = MULTI_REGION_SINGLE_POINT_ENGINE[engine]
+        regions = [create_region_from_selection_pattern(stru_esm.topology, i) for i in regions]
+        qm_engine = qm_engine_ctor(
+                        regions=regions,
+                        region_methods=region_methods,
+                        embedding_method=embedding_method,
+                        keep_geom=True,
+                        cluster_job_config=cluster_job_config,
+                        work_dir=work_dir,
+                        keep_in_file=keep_in_file,
+                    )
+
+    # parallel methods
+    if parallel_method == "cluster_job":
+        if not cluster_job_config:
+            _LOGGER.error("cluster_job is used but cluster_job_config is not given! "
+                        "You need to at least specify the account and partition. "
+                        "See test/geometry/test_sampling.py::test_equi_md_sampling_lv1() for an example.")
+            raise ValueError
+        result = _parallelize_qm_with_cluster_job(
+            stru_esm, qm_engine,
+            job_check_period,
+            job_array_size,
+        )
+    elif parallel_method is None:
+        result = _serial_qm(
+            stru_esm, qm_engine,
+        )
+    else:
+        _LOGGER.error(f"{parallel_method} is not a supported parallel_method")
+        raise ValueError        
+
+    return result
+
+
     raise Exception("TODO")
 
 
@@ -244,6 +355,9 @@ MULTI_REGION_SINGLE_POINT_ENGINE: Dict[str, Callable] = {
 """constructors of QMSinglePointEngine for single_point() when more than
 1 region is used. multiscale QM."""
 
+SINGLE_REGION_OPTIMIZATION_ENGINE: Dict[str, Callable] = {
+    "xtb": interface.xtb.build_optimization_engine
+}
 
 def _parallelize_qm_with_cluster_job(
         stru_esm: StructureEnsemble,

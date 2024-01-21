@@ -12,7 +12,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from typing import Tuple, List, Dict
-
+import numpy as np
 
 from dataclasses import dataclass
 from .base_interface import BaseInterface
@@ -21,7 +21,11 @@ from enzy_htp import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp._config.xtb_config import XTBConfig, default_xtb_config
 from enzy_htp.structure import Structure, Atom, StructureConstraint, PDBParser
-from enzy_htp.structure.structure_region import StructureRegion, create_region_from_residue_keys
+from enzy_htp.structure.structure_region import (
+    StructureRegion,
+    create_region_from_residue_keys,
+    create_region_from_full_stru
+)
 from enzy_htp.structure.structure_constraint import (
     CartesianFreeze,
     DistanceConstraint,
@@ -56,6 +60,7 @@ class XTBQMResultEgg(QMResultEgg):
 
 
 class XTBSinglePointEngine(QMSinglePointEngine):
+    #TODO(CJ): documentation
     def __init__(self,
                 interface,
                 method: QMLevelOfTheory,
@@ -69,19 +74,27 @@ class XTBSinglePointEngine(QMSinglePointEngine):
         self._parent_interface = interface
         self._method = method
         self._region = region
-        self._keep_geom = keep_geom
         self._name = name
         self._cluster_job_config = cluster_job_config
         self._keep_in_file = keep_in_file
         self._work_dir = work_dir
-
-    @property
-    def parent_interface(self) -> XTBInterface:
-        return self._parent_interface
+        self._geo_opt = False
+        self._constraints = list()
 
     @property
     def method(self) -> QMLevelOfTheory:
+        """Getter for the QMLevelOfTheory dictating the Engine's theoretical behavior."""
         return self._method
+
+    @property
+    def geo_opt(self) -> bool:
+        """Is this a QMGeometryOptimizationEngine?"""
+        return self._geo_opt
+
+    @property
+    def parent_interface(self) -> XTBInterface:
+        """Getter for the Engine's parent interface."""
+        return self._parent_interface
 
     @property
     def work_dir(self) -> str:
@@ -89,13 +102,60 @@ class XTBSinglePointEngine(QMSinglePointEngine):
 
     @property
     def region(self) -> StructureRegion:
+        """Getter for the StructureRegion """
         return self._region
 
     @property
     def engine(self) -> str:
+        """Name of the engine. Hardcoded to 'xtb'"""
         return "xtb"
 
+    @property
+    def constraints(self) -> List[StructureConstraint]:
+        """Getter for the StructureConstraints owned by the Engine."""
+        return self._constraints
+
     def make_job(self, stru: Structure) -> Tuple[ClusterJob, XTBQMResultEgg]:
+        """The method that makes a ClusterJob that runs the QM."""
+        # 1. input
+        if not isinstance(stru, Structure):
+            _LOGGER.error("The supplied variable stru MUST be a Structure()")
+            raise TypeError
+        assert False, "TODO(CJ): translate for xtb"
+        # 2. make .gjf file
+        fs.safe_mkdir(self.work_dir)
+        #temp_gjf_file, gchk_path = self._make_gjf_file(stru)
+
+        # 3. make cmd
+        spe_cmd, gout_path = self.parent_interface.make_gaussian_cmd(temp_gjf_file)
+
+        # 4. assemble ClusterJob
+        cluster = self.cluster_job_config["cluster"]
+        res_keywords = self.cluster_job_config["res_keywords"]
+        env_settings = cluster.G16_ENV["CPU"]
+        sub_script_path = fs.get_valid_temp_name(f"{self.work_dir}/submit_{self.name}.cmd")
+        job = ClusterJob.config_job(
+            commands = spe_cmd,
+            cluster = cluster,
+            env_settings = env_settings,
+            res_keywords = res_keywords,
+            sub_dir = "./", # because path are relative
+            sub_script_path = sub_script_path
+        )
+        job.mimo = { # only used for translate clean up
+            "temp_gin": [temp_gjf_file],
+        }
+
+        # 5. make result egg
+#        result_egg = GaussianQMResultEgg(
+#            gout_path = gout_path,
+#            gchk_path = gchk_path,
+#            stru=stru,
+#            parent_job = job,
+#        )
+
+        return (job, result_egg)
+
         assert False
 
     def run(self, stru: Structure) -> EletronicStructure:
@@ -109,15 +169,105 @@ class XTBSinglePointEngine(QMSinglePointEngine):
         sr = self.region
         if sr is None:
             assert False, "Need to fix this logic"
-
-        return self.parent_interface.do_xtb_run(
+        
+        run_info:Dict = self.parent_interface.setup_xtb_run(
             sr,
-            geo_opt=False,
+            constraints=self.constraints,
+            lot=self.method,
+            geo_opt=self.geo_opt,
             work_dir=self.work_dir,
         )
 
+        start_dir:str = os.getcwd()
+        os.chdir(run_info['work_dir'])
+
+        results = self.parent_interface.env_manager_.run_command(
+                self.parent_interface.config()['XTB_EXE'],
+                run_info['args'])
+
+        os.chdir(start_dir)
+
+        lines:List[str] = fs.lines_from_file(run_info['xtb_outfile'])
+
+        return  EletronicStructure(
+            energy_0 = self.parent_interface.parse_spe(lines),
+            geometry = stru,
+            mo = '',
+            mo_parser = '',
+            source="xtb",
+        )
+
     def translate(self, result_egg: XTBQMResultEgg) -> EletronicStructure:
+        """TODO(CJ)"""
+
         assert False
+
+class XTBOptimizationEngine(XTBSinglePointEngine, QMOptimizationEngine):
+    def __init__(self,
+                interface,
+                method: QMLevelOfTheory,
+                region: StructureRegion,
+                constraints: List[StructureConstraint],
+                keep_geom: bool,
+                name: str,
+                cluster_job_config: Dict,
+                keep_in_file: bool,
+                work_dir: str,
+                ):
+        
+        self._constraints = constraints
+        self._parent_interface = interface
+        self._method = method
+        self._region = region
+        self._name = name
+        self._cluster_job_config = cluster_job_config
+        self._keep_in_file = keep_in_file
+        self._work_dir = work_dir
+        self._geo_opt = True 
+
+
+    def run(self, stru: Structure) -> EletronicStructure:
+        """Method that actually runs the XTB single point calculation. Returns results of calculation as an ElectronicStructure() object."""
+        if not isinstance(stru, Structure):
+            _LOGGER.error("Supplied stru is not of type Structure()")
+            raise TypeError()
+        
+        fs.safe_mkdir(self.work_dir)
+
+        sr = self.region
+        if sr is None:
+            sr = create_region_from_full_stru( stru )
+        
+        run_info:Dict = self.parent_interface.setup_xtb_run(
+            sr,
+            constraints=self.constraints,
+            lot=self.method,
+            geo_opt=self.geo_opt,
+            work_dir=self.work_dir,
+        )
+
+        start_dir:str = os.getcwd()
+        os.chdir(run_info['work_dir'])
+
+        results = self.parent_interface.env_manager_.run_command(
+                self.parent_interface.config()['XTB_EXE'],
+                run_info['args'])
+
+        os.chdir(start_dir)
+
+        self.parent_interface.update_coords(sr, run_info['expected_outfile'])
+
+        lines:List[str] = fs.lines_from_file(run_info['xtb_outfile'])
+
+        return  EletronicStructure(
+            energy_0 = self.parent_interface.parse_spe(lines),
+            geometry = stru,
+            mo = '',
+            mo_parser = '',
+            source="xtb",
+        )
+
+
 
 class XTBInterface(BaseInterface):
     """Class that provdes a direct interface for enzy_htp to utilize the xtb semi empirical method. Supported methods
@@ -135,28 +285,43 @@ class XTBInterface(BaseInterface):
         """
         super().__init__(parent, config, default_xtb_config)
 
-    def do_xtb_run(self,
-        stru:Union[Structure, StructureRegion],
+    def setup_xtb_run(self,
+        stru:Union[StructureRegion],
+        lot:QMLevelOfTheory, 
         geo_opt:bool = False,
         charge:int = None,
-        spin:int = None,
+        spin:int = 1,
         constraints:List[StructureConstraint]=None,
         n_iter: int = None,
         n_proc: int = None,
         work_dir:str=None
-        ) -> ElectronicStructure:
-        """TODO(CJ)"""
+        ) -> Dict:
+        """This method does the majority of the leg work before an xtb calculation is performed. All relevant variables are stored in 
+        the result dict(). Note that the same method is used for both single point energy calculations and geometry optimizations. 
+
+        Args:
+            stru:
+            lot:
+            geo_opt:
+            charge:
+            spin:
+            constraints:
+            n_iter:
+            n_proc:
+            work_dir:
+
+        Returns:
+
+        """
 
         if not isinstance(stru, StructureRegion):
-            pass
-            print('no structure')
-            exit( 0 )
+            _LOGGER.error("The supplied geometry must be of type StructureRegion()")
+            raise TypeError()
+    
+        self.check_valid_lot(lot)
 
         if charge is None:
             charge = stru.get_net_charge()
-
-        if spin is None:
-            spin = 1
 
         if n_iter is None:
             n_iter = self.config().N_ITER
@@ -164,43 +329,72 @@ class XTBInterface(BaseInterface):
         if n_proc is None:
             n_proc = self.config().N_PROC
 
+        result = dict()
+
         coord_file:str = self.write_coord_file(stru, work_dir)
+        coord_path = Path(coord_file)
+        result['coord_file'] = coord_file
+        
+        work_dir_abs:str=f"{Path(work_dir).absolute()}"
+        result['work_dir'] = work_dir_abs 
+        
+        xtb_outfile:str=f"{work_dir_abs}/xtb_log.txt"
+        result['xtb_outfile'] = xtb_outfile
 
-        args:List[str] = list()
+        args:List[str] = ["--chrg", str(charge), "--iterations",
+                        str(n_iter), "--parallel",
+                        str(n_proc), "--norestart", ]
         if geo_opt:
-            #TODO(CJ): write the .inp file and other stuff
-            assert False
-        else:
-            args = ["--chrg", str(charge), "--iterations",
-                 str(n_iter), "--parallel",
-                 str(n_proc), "--norestart", "--sp", str(Path(coord_file).absolute())]
-        
-        start_dir:str = os.getcwd()
-        os.chdir( work_dir )
-        results = self.env_manager_.run_command(
-           self.config_.XTB_EXE, args )
-        
-        os.chdir(start_dir)
+            if constraints:
+                xtb_inp_file:str=f"{work_dir_abs}/xtb_settings.inp"
+                self.write_inp_file(xtb_inp_file, stru, constraints)
+                result['xtb_inp_file'] = xtb_inp_file
+            
+                args.extend(["--input", xtb_inp_file])
 
-        energy_0:float = None
-        for ll in results.stdout.splitlines():
+            args.extend(["--opt", "normal"]) #TODO(CJ): fix this later
+
+            result['expected_outfile'] = str( coord_path.parent / f"xtbopt{coord_path.suffix}" )
+
+        else:
+            args.append( "--sp" )
+
+        args.extend([str(coord_path.absolute()), ">", xtb_outfile])
+       
+        result['args'] = args
+
+        return result
+
+    def parse_spe(self, lines:List[str]) -> float:
+        """Given the output lines from an xtb run, parse and return the single 
+        point energy as a float(). Throws an error if not found.
+
+        Args:
+            lines: The List[str] with the results of the xtb run.
+
+        Returns:
+            The single point energy as a float in hartree units. 
+
+        """
+        for ll in lines:
             if ll.find('TOTAL ENERGY') != -1:
-                energy_0 = float(ll.split()[3])
-                break
+                return float(ll.split()[3])
         else:
-            _LOGGER.error("Unable to find total spe energy in xtb output!")
-            raise TypeError("Unable to find total spe energy in xtb output!")
+            raise TypeError("No total energy value in xtb output!")
 
-        return EletronicStructure(
-            energy_0 = energy_0,
-            geometry = stru,
-            mo = None,
-            mo_parser = None,
-            source="xtb",
-        )
 
-    def write_coord_file(self, sr:StructureRegion, work_dir) -> str:
-        
+    def write_coord_file(self, sr:StructureRegion, work_dir:str) -> str:
+        """Given a StructureRegion and work_dir, write the xtb coords of the region. The path it will be written
+        to is work_dir/xtb_coords.mol.
+
+        Args:
+            sr: The StructureRegion describing the QM region of the system.
+            work_dir: The str() of the directory to write the coords file.
+
+        Returns:
+            The path of the coords .mol file.
+
+        """
         temp_pdb:str = f"{work_dir}/temp_xtb_pdb.pdb"
         coord_file:str = f"{work_dir}/xtb_coords.mol"
         _parser = PDBParser()
@@ -226,13 +420,13 @@ class XTBInterface(BaseInterface):
         # calculation config
         method: QMLevelOfTheory = "default",
         region: StructureRegion = None,
-        keep_geom: bool = "default",
+        keep_geom:bool = "default",
         # calculation config (alternative)
         name: str = "default",
         cluster_job_config: Dict = "default",
         keep_in_file: bool = False,
         work_dir: str = None,) -> XTBSinglePointEngine:
-            
+        """Simple constructor that builds the XTBSinglePointEngine. Designed to work with quantum.single_point() API."""
 
         return XTBSinglePointEngine(
             interface=self,
@@ -242,210 +436,77 @@ class XTBInterface(BaseInterface):
             name=name,
             cluster_job_config=cluster_job_config,
             keep_in_file=keep_in_file,
-            work_dir=work_dir)
+            work_dir=work_dir
+        )
 
-    def write_to_inp(self, out_path,
-                            stru: StructureRegion,
-                            charge: int = 0,
-                            spin: int = 1,
-                            n_iter: int = -1,
-                            n_proc: int = -1,
-                            work_dir:str=None,
-                            constraints=None,
-                            **kwargs
-                            ) -> float:
-        """Performs a single point energy calculation on the supplied file. Checks if the file exists and is one of the correct
-        file formats. Errors if not. Returns a value in Hartrees. 
-        #TODO(CJ): update this stuff
-        Args:
-            fname: Name of the input file to use.
-            charge: Optional charge of the system as an int(). Defaults to 0.
-            spin: Optional spin of the system as an int(). Defaults to 0.
-            n_iter: Number of SCF iterations. Optional, if not specified uses value in XTBConfig.
-            n_proc: Number of processes to use in calculation. Optional, if not specified uses value in XTBConfig.
-            work_dir:TODO(CJ)
 
-        Returns:
-            Single point energy value in Hartrees.           
-        """
-        if work_dir is None:
-            work_dir = "./"
-
-        if n_iter == -1:
-            n_iter = self.config_.N_ITER
-
-        if n_proc == -1:
-            n_proc = self.config_.N_PROC
-
-        fname:str=f"{work_dir}/__temp_xtb.xyz"
-        lines:List[str] = ["", "Title goes here"]
-
-        for aa in stru.atoms:
-            (x,y,z) = aa.coord
-            lines.append(f"{aa.element} {x} {y} {z}")
-
-        lines[0] = str(len(stru.atoms))
-
-        fs.write_lines(fname, lines)
-        return
-
+    def build_optimization_engine(
+        self,
+        method:QMLevelOfTheory,
+        region:StructureRegion,
+        constraints:List[StructureConstraint] = None,
+        keep_geom: bool = "default", 
+        name: str = "default",
+        cluster_job_config: Dict = "default",
+        keep_in_file: bool = False,
+        work_dir:str = None,) -> XTBOptimizationEngine:
+        """Simple constructor that builds the XTBOptimizationEngine. Designed to work with the quantum.optimization() API."""
         
-        fs.safe_rm( fname )
-        self._remove_temp_files(str(Path(fname).parent))
+        return XTBOptimizationEngine(
+            interface=self,
+            method=method,
+            region=region,
+            constraints=constraints,
+            keep_geom=keep_geom,
+            name=name,
+            cluster_job_config=cluster_job_config,
+            keep_in_file=keep_in_file,
+            work_dir=work_dir
+        )
+            
 
-        for ll in results.stdout.splitlines():
-            if ll.find('TOTAL ENERGY') != -1:
-                return float(ll.split()[3])
 
-        _LOGGER.error(f"ERROR: Single point energy calculation for file '{fname}' did not contain energy value. Exiting...")
-        exit( 1 )
-
-    def geo_opt(self,
-                stru:Structure,
-                charge: int = 0,
-                spin: int = 1,
-                n_iter: int = -1,
-                n_proc: int = -1,
-                constraints:List[StructureConstraint]=None,
-                freeze_backbone:bool=True,
-                freeze_hydrogens:bool=True,
-                sele_str:str=None,
-                work_dir:str=None,
-                nterm_cap:str=None,
-                cterm_cap:str=None,
-                **kwargs
-                ) -> float:
-        """TODO(CJ)
+    def write_inp_file(self, out_path:str,
+                            stru: StructureRegion,
+                            constraints:List[StructureConstraint],
+                            ) -> str:
+        """Writes a .inp file
 
         Args:
 
         Returns:
-            
+
         """
-
-        if n_iter == -1:
-            n_iter = self.config_.N_ITER
-
-        if n_proc == -1:
-            n_proc = self.config_.N_PROC
-
-        if work_dir is None:
-            work_dir = "./"
-
-        cmd_args:List[str] = [
-                        "--chrg", str(charge),
-                        "--iterations", str(n_iter),
-                        "--parallel", str(n_proc),
-                        "--norestart"
-        ]
-        input_lines:List[str]=list()
-
-        _parser = PDBParser()
-        fname:str = f"{work_dir}/__temp_xtb.pdb"
-
-        freeze_indices:List[int] = list()
         constraint_lines:List[str] = list()
+        frozen_indices:List[int] = list()
 
-        if sele_str is not None:
-            session = self.parent().pymol.new_session()
-            residue_list=self.parent().pymol.get_residue_list(session, stru, sele_str=sele_str, work_dir=work_dir)
-            sr:StructureRegion = create_region_from_residue_keys(stru, residue_list, nterm_cap=nterm_cap, cterm_cap=cterm_cap)
-            
-            pdb_lines:List[str] = list()
-            for aa in sr.atoms:
-                pdb_lines.append( _parser._write_pdb_atom( aa ).replace('\n',''))
-            
-            fs.write_lines(fname, pdb_lines)
-            self.parent().pymol.general_cmd(session, [('delete', 'all'), ('load', fname)])
-            self.parent().pymol.remove_ligand_bonding(session)
-            fs.safe_rm(fname)
-            fname = str(Path(fname).with_suffix('.mol'))
-            
-            self.parent().pymol.general_cmd(session, [("save", fname)])
-            
-            if freeze_backbone:
-                freeze_indices.extend( sr.backbone_indices(index=1))
+        for cst in constraints:
+            if cst.is_cartesian_freeze():
+                for aa in cst.atoms:
+                    if stru.has_atom(aa):
+                        frozen_indices.append( stru.get_atom_index(aa, indexing=1) )
 
-            if freeze_hydrogens:
-                for aa in sr.atoms:
-                    if aa.element == 'H':
-                        ha_parent = sr.closest_heavy_atom(aa)
-                        dist = ha_parent.distance_to(aa)
-                        constraint_lines.append(
-                            f"   distance: {sr.get_atom_index(aa, 1)}, {sr.get_atom_index(ha_parent, 1)}, {dist:.3f}"         
-                        )
-
-            if constraints:
-                for cst in constraints:
-                    constraint_lines.extend( 
-                        self.convert_constraint(sr, cst )
-                    )
-
-        else:
-
-            if freeze_backbone:
-                pass
-    #            #TODO(CJ): add another constraint here
-    #            pass
-    #            input_lines.extend([
-    #                '$fix',
-    #               f'   atoms: {",".join(map(str,freeze_atoms))}',
-    #                '$end'
-    #            ])
-    
-            if constraints is not None:
-                pass
-    #            input_lines.append('$constrain')
-    #            for cst in constraints:
-    #                input_lines.append(
-    #                f'   {cst[0]}: {", ".join(map(lambda ff: str(int(ff)), cst[-1]))}, {cst[1]:.2f}'
-    #                )
-    #            input_lines.append('$end')
-
-
-            _parser.save_structure(fname, stru) 
-
-        if freeze_indices:
-            input_lines.extend([
-                '$fix',
-               f'   atoms: {",".join(map(str,sorted(freeze_indices)))}',
-                '$end'
+            else:
+                constraint_lines.extend( 
+                    self.convert_constraint(stru, cst )
+                )
+        
+        inp_lines = list()
+        if frozen_indices:
+            frozen_indices.sort()
+            fi_str = ",".join(map(str,frozen_indices))
+            inp_lines.extend([            
+            "$fix",
+            f"   atoms: {fi_str}",
+            "$end"
             ])
 
-
         if constraint_lines:
-            input_lines.extend(["$constrain"] + constraint_lines + ["$end"])
+            inp_lines.extend(["$constrain"] + constraint_lines + ["$end"])
 
-        geom_input:str=None
-        if input_lines:
-            temp_path = Path(fname)
-            geom_input = str(temp_path.parent / f"__geo_opt.inp")
-            fs.write_lines(geom_input, input_lines)
-            cmd_args.extend(["--input", geom_input ]) 
+        fs.write_lines(out_path, inp_lines )
 
-        cmd_args.extend([fname, "--opt" ])
-        ext:str=fs.get_file_ext(fname)
-        expected_output:str=f"xtbopt{ext}"
-        results = self.env_manager_.run_command(
-                self.config_.XTB_EXE,
-                cmd_args)
-        
-        energy:float=None
-        for ll in results.stdout.splitlines():
-            if ll.find('TOTAL ENERGY') != -1:
-                energy = float(ll.split()[3])
-
-        session = self.parent().pymol.new_session()
-        self.parent().pymol.general_cmd(session, [('set', 'retain_order', 1), ('load', expected_output)])
-        df = self.parent().pymol.collect(session, 'memory', 'elem rank x y z'.split())
-        self._remove_temp_files( str(Path(fname).parent) )
-        self._remove_temp_files("./")
-        for i, row in df.iterrows():
-            point = (row.x, row.y, row.z)
-            sr[i].coord = point
-        
-        return energy
-
+        return out_path
 
     def _remove_temp_files(self, work_dir: str, extra_files:List[str]=None) -> None:
         """Removes the expected temp files created in the working directory of the input file. Deletes the file safely and 
@@ -514,6 +575,42 @@ class XTBInterface(BaseInterface):
         
         return [f"   distance: {mapped_indices[0]}, {mapped_indices[1]}, {cst.target_value:.3f}"]
 
+    def check_valid_lot(self, lot: QMLevelOfTheory) -> None:
+        """Helper method that checks if the given QMLevelOfTheory is valid. Throws an error if not.
+        Args:
+            lot: The QMLevelOfTheory to check.
+
+        Returns:
+            Nothing.
+        """
+        if lot.method and lot.method not in self.config()['SUPPORTED_XTB_THEORY_LEVELS']:
+            _LOGGER.error(f"The method {lot.method} is not supported. Allowed values are: {', '.join(self.config()['SUPPORTED_XTB_THEORY_LEVELS'])}")
+            raise TypeError()
+
+        if lot.solv_method and lot.solv_method not in self.config()['SOLVATION_METHODS']:
+            _LOGGER.error(f"The solvation method {lot.solv_method} is not supported. Allowed values are: {', '.join(self.config()['SOLVATION_METHODS'])}")
+            raise TypeError()
+
+        if lot.solv_method == 'ALPB':
+            if lot.solvent not in self.config()['ALPB_SOLVENTS']:
+                _LOGGER.error(f"The solvent {lot.solvent} is not supported in the ALPB model. Allowed values are: {', '.join(self.config()['ALPB_SOLVENTS'])}")
+                raise TypeError()
+        
+        elif lot.solv_method == 'GBSA':
+            if lot.solvent not in self.config()['ALPB_SOLVENTS']:
+                _LOGGER.error(f"The solvent {lot.solvent} is not supported in the GBSA model. Allowed values are: {', '.join(self.config()['ALPB_SOLVENTS'])}")
+                raise TypeError()
+
+
+    def update_coords(self, sr, coord_file:str) -> None:
+        """TODO(CJ)"""
+        session = self.parent().pymol.new_session()
+        df:pd.DataFrame = self.parent().pymol.collect(session, coord_file, "x y z rank elem".split())
+        df.sort_values(by='rank', inplace=True)
+        #TODO(CJ): add some checks in here
+        for aa, (i, row) in zip(sr.atoms, df.iterrows()):
+            assert aa.element == row['elem']
+            aa.coord = np.array([row['x'], row['y'], row['z']])
 
 xtb_interface = XTBInterface(None, eh_config._xtb)
 """The singleton of XTBInterface() that handles all XTB related operations in EnzyHTP
