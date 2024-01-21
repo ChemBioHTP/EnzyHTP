@@ -6,7 +6,8 @@ Date: 2023-09-25"""
 import pytest
 import os
 import pickle
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Callable
+from functools import partial
 
 from enzy_htp.preparation import protonate_stru, remove_hydrogens
 from enzy_htp.mutation import assign_mutant, mutate_stru
@@ -34,7 +35,8 @@ sp = PDBParser()
 def workflow(
         wt_stru: Structure,
         mutant_pattern: str,
-        md_constraint: List[StructureConstraint],
+        ligand_chrg_spin_mapper: Dict,
+        md_constraints: List[Callable[[Structure], StructureConstraint]],
         md_length: float,
         qm_region_pattern: str,
         qm_level_of_theory: QMLevelOfTheory,
@@ -80,7 +82,8 @@ def workflow(
         if tuple(mut) in result_dict:
             continue
         mutant_result = []
-        mutant_stru = mutate_stru(wt_stru, engine="pymol")
+        mutant_stru = mutate_stru(wt_stru, mut, engine="pymol")
+        mutant_stru.assign_ncaa_chargespin(ligand_chrg_spin_mapper)
         remove_hydrogens(mutant_stru, polypeptide_only=True)
         protonate_stru(mutant_stru, protonate_ligand=False)
 
@@ -92,17 +95,21 @@ def workflow(
             "cluster" : Accre(),
             "res_keywords" : {
                 "account" : "csb_gpu_acc",
-                "partition" : "turing"
+                "partition" : "maxwell"
             }
         }
+        mut_constraints = []
+        for cons in md_constraints:
+            mut_constraints.append(cons(mutant_stru))
+
         md_result = equi_md_sampling(
             stru = mutant_stru,
             param_method = param_method,
             cluster_job_config = md_cluster_job_config,
             job_check_period=10,
-            prod_constrain=md_constraint,
+            prod_constrain=mut_constraints,
             prod_time=md_length,
-            record_period=md_constraint*0.01,
+            record_period=md_length*0.01,
             work_dir=f"{WORK_DIR}MD/"
         )        
 
@@ -156,10 +163,10 @@ def test_kemp_elimiase():
     wt_stru = sp.get_structure(f"{STRU_DATA_DIR}/KE_07_R7_2_S.pdb")
     mutant_pattern = "WT, r:2[resi 254 around 4: all not self]*2"
     md_constraint = [
-        stru_cons.create_distance_constraint(
-            "B.254.H2", "A.101.OE2", 2.4, wt_stru),
-        stru_cons.create_angle_constraint(
-            "B.254.CAE", "B.254.H2", "A.101.OE2", 180.0, wt_stru),]
+        partial(stru_cons.create_distance_constraint,
+            "B.254.H2", "A.101.OE2", 2.4),
+        partial(stru_cons.create_angle_constraint,
+            "B.254.CAE", "B.254.H2", "A.101.OE2", 180.0),]
     qm_level_of_theory = QMLevelOfTheory(
         basis_set="def2svp",
         method="pbe0",        
@@ -172,7 +179,8 @@ def test_kemp_elimiase():
     workflow(
         wt_stru = wt_stru,
         mutant_pattern = mutant_pattern,
-        md_constraint = md_constraint,
+        ligand_chrg_spin_mapper = {"H5J" : (0,1)},
+        md_constraints = md_constraint,
         md_length = 1.0, #ns
         qm_region_pattern = "resi 101+254",
         qm_level_of_theory = qm_level_of_theory,
