@@ -77,7 +77,7 @@ def workflow(
     # mutation
     mutants = assign_mutant(wt_stru, mutant_pattern, chain_sync_list, chain_index_mapper)
     for mut in mutants:
-        if mut in result_dict:
+        if tuple(mut) in result_dict:
             continue
         mutant_result = []
         mutant_stru = mutate_stru(wt_stru, engine="pymol")
@@ -143,7 +143,7 @@ def workflow(
 
             mutant_result.append(replica_result)
 
-        result_dict[mut] = mutant_result
+        result_dict[tuple(mut)] = mutant_result
 
         # update the pickle
         with open(result_path, "wb") as of:
