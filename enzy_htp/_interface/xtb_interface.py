@@ -53,7 +53,8 @@ from enzy_htp import config as eh_config
 @dataclass
 class XTBQMResultEgg(QMResultEgg):
     """Class defining the ResultEgg for an XTB run."""
-    charge_path:str
+    charge_path: str
+    output_geom: str 
     wbo_path: str
     stru: Structure
     parent_job: ClusterJob
@@ -98,6 +99,7 @@ class XTBSinglePointEngine(QMSinglePointEngine):
 
     @property
     def work_dir(self) -> str:
+        """Getter for the work_dir where temporarily files are saved and commands are run."""
         return self._work_dir
 
     @property
@@ -117,46 +119,11 @@ class XTBSinglePointEngine(QMSinglePointEngine):
 
     def make_job(self, stru: Structure) -> Tuple[ClusterJob, XTBQMResultEgg]:
         """The method that makes a ClusterJob that runs the QM."""
-        # 1. input
         if not isinstance(stru, Structure):
             _LOGGER.error("The supplied variable stru MUST be a Structure()")
             raise TypeError
-        assert False, "TODO(CJ): translate for xtb"
-        # 2. make .gjf file
-        fs.safe_mkdir(self.work_dir)
-        #temp_gjf_file, gchk_path = self._make_gjf_file(stru)
-
-        # 3. make cmd
-        spe_cmd, gout_path = self.parent_interface.make_gaussian_cmd(temp_gjf_file)
-
-        # 4. assemble ClusterJob
-        cluster = self.cluster_job_config["cluster"]
-        res_keywords = self.cluster_job_config["res_keywords"]
-        env_settings = cluster.G16_ENV["CPU"]
-        sub_script_path = fs.get_valid_temp_name(f"{self.work_dir}/submit_{self.name}.cmd")
-        job = ClusterJob.config_job(
-            commands = spe_cmd,
-            cluster = cluster,
-            env_settings = env_settings,
-            res_keywords = res_keywords,
-            sub_dir = "./", # because path are relative
-            sub_script_path = sub_script_path
-        )
-        job.mimo = { # only used for translate clean up
-            "temp_gin": [temp_gjf_file],
-        }
-
-        # 5. make result egg
-#        result_egg = GaussianQMResultEgg(
-#            gout_path = gout_path,
-#            gchk_path = gchk_path,
-#            stru=stru,
-#            parent_job = job,
-#        )
-
-        return (job, result_egg)
-
-        assert False
+        
+        assert False, "Idk how to do this -CJ"
 
     def run(self, stru: Structure) -> EletronicStructure:
         """Method that actually runs the XTB single point calculation. Returns results of calculation as an ElectronicStructure() object."""
@@ -168,7 +135,7 @@ class XTBSinglePointEngine(QMSinglePointEngine):
 
         sr = self.region
         if sr is None:
-            assert False, "Need to fix this logic"
+            sr = create_region_from_full_stru( stru )
         
         run_info:Dict = self.parent_interface.setup_xtb_run(
             sr,
@@ -470,12 +437,16 @@ class XTBInterface(BaseInterface):
                             stru: StructureRegion,
                             constraints:List[StructureConstraint],
                             ) -> str:
-        """Writes a .inp file
+        """Writes a .inp file containing constraints and fixed atoms specified by the supplied constraints.
+        Performs validation checks to ensure that the supplied StructureRegion and constraints are compatible.
 
         Args:
+            out_path: Name of the .inp file to write content to.
+            stru: The StructureRegion being used.
+            constraints: A List[StructureConstraint] to write to the .inp file.
 
         Returns:
-
+            The path as a str() to the completed .inp file.
         """
         constraint_lines:List[str] = list()
         frozen_indices:List[int] = list()
@@ -508,49 +479,27 @@ class XTBInterface(BaseInterface):
 
         return out_path
 
-    def _remove_temp_files(self, work_dir: str, extra_files:List[str]=None) -> None:
-        """Removes the expected temp files created in the working directory of the input file. Deletes the file safely and 
-        silently.
-
-        Args:
-            work_dir: Name of the directory to search for the files in.
-            extra_files: A List[str] containing extra files to delete in the function.
-
-        Returns:
-            Nothing.
-        """
-
-        for fname in "charges wbo xtbrestart xtbtopo.mol xtbopt.log xtbopt.pdb xtbopt.mol xtbopt.xyz .xtboptok".split():
-            fs.safe_rm(f"{work_dir}/{fname}")
-
-        if extra_files:
-            for ef in extra_files:
-                fs.safe_rm(ef)
-
-    def _check_valid_extension(self, fname: str) -> None:
-        """Does the supplied file have a supported file extension? Logs an error
-        and exits if not."""
-        ext: str = fs.get_file_ext(str(fname))
-        if ext in self.config_.SUPPORTED_EXTENSIONS:
-            return
-
-        _LOGGER.error(
-            f"The supplied file '{fname}' has an unsupported extension of '{ext}'. Supported include {', '.join(self.config_.SUPPORTED_EXTENSIONS)}. Exiting..."
-        )
-        exit(1)
-
 
     @dispatch
-    def convert_constraint( self, sr, cst: ResiduePairConstraint) -> List[str]:
+    def convert_constraint( self, sr:StructureRegion, cst: ResiduePairConstraint) -> List[str]:
+        """Creates constraint lines from a ResiduePairConstraint that can be used in a .inp file. Performs validation
+        checks to ensure that the supplied StructureRegion and constraints are compatible.
+        
+        Args:
+            sr:
+            cst:
+
+
+
+        """
     
         result = list()
         for (cst_name, child_cst) in cst.child_constraints:
             result.extend(self.convert_constraint(sr, child_cst ))
-
         return result
 
     @dispatch
-    def convert_constraint( self, sr, cst:AngleConstraint) -> List[str]:
+    def convert_constraint( self, sr:StructureRegion, cst:AngleConstraint) -> List[str]:
         #TODO(CJ): put in notes when the constraints are not present. Probably log a warning 
         result:List[str] = list()
         if not sr.has_atoms(cst.atoms):
@@ -565,7 +514,7 @@ class XTBInterface(BaseInterface):
 
 
     @dispatch
-    def convert_constraint( self, sr, cst:DistanceConstraint) -> List[str]:
+    def convert_constraint( self, sr:StructureRegion, cst:DistanceConstraint) -> List[str]:
         result:List[str] = list()
         if not sr.has_atoms(cst.atoms):
             return list()
@@ -602,8 +551,17 @@ class XTBInterface(BaseInterface):
                 raise TypeError()
 
 
-    def update_coords(self, sr, coord_file:str) -> None:
-        """TODO(CJ)"""
+    def update_coords(self, sr:StructureRegion, coord_file:str) -> None:
+        """Given an output coord file, update the original atoms in the StructureRegion class. Performs some basic checks.
+
+        Args:
+            sr: The StructureRegion used in the geometry run.
+            coord_file: The path to the output coord/geometry from the xtb geometry optimization run.
+
+        Returns:
+            Nothing.
+
+        """
         session = self.parent().pymol.new_session()
         df:pd.DataFrame = self.parent().pymol.collect(session, coord_file, "x y z rank elem".split())
         df.sort_values(by='rank', inplace=True)

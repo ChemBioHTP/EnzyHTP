@@ -24,9 +24,6 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.quantum import single_point
 from enzy_htp.quantum import optimize as qm_optimize 
 
-#TODO(CJ): I should go through and use existing values if cache mode is selected
-#:TODO(CJ): need to be able to specify the size of the grid
-
 def dock_reactants(structure: Structure,
                    constraints: List[StructureConstraint] = None,
                    n_struct: int = 100,
@@ -40,37 +37,45 @@ def dock_reactants(structure: Structure,
                    rng_seed: int = 1996,
                    work_dir: str = None,
                    save_work_dir: bool = True,
-                   ) -> Structure:
-    """Given a structure containing reactants and constraints defining a pre-reaction complex, perform reactive docking
-    to produce the desired geometry. Function consists of the following steps:
+                   ) -> None:
+    """Takes a Structure() containing Ligand() objects and tries to create a complex with an optimized geometry 
+    consistent with that described in the supplied constraints. Does all work inplace on the supplied Structure().
+    Below is the workflow of the function:
 
-    1. system validation
-    2. low-resolution geometry sampling and minimization
-    3. geometry pruning
-        a. SASA ratio filtering
-        b. clash count filtering
-        c. constraint energy filtering
-        d. QM energy ranking
-    4. QM-active site optimization
-
+    1. Generate constrained geometries with RosettaLigand()
+    2. Filter down and select a target geometry
+        a. Filter out if too many clashes
+        b. Filter out if ligands have too much SASA
+        c. Filter out if ligands do not satisfy constraints
+        d. Select geometry with:
+            i. Lowest QM energy, if use_qm is True
+            ii. Lowest RosettaLigand energy, if use_qm is False
+    3. Rosetta FastRelax minimization 1
+        a. use constraints
+        b. allow backbone flexibility in active site
+    4. constrained QM minimization of active site with xtb (if use_qm is True)
+    5. Rosetta FastRelax minimization 2
+        a. ramp down constraints
+        b. oly sidechain flexibility in active site
+    6. un-constrained QM minimization of active site with xtb (if use_qm is True)
+    
     Args:
-        structure:
-        constraints:
-        n_struct:
-        cst_energy:
-        use_qm:
-        clash_distance:
-        clash_cutoff:
-        max_sasa_ratio:
-        cluster_distance:
-        use_cache:
-        rng_seed:
-        work_dir:
-        save_work_dir:
+        structure: The Structure() to perform reactive docking on. Contains both Ligand()'s and protein chains.
+        constraints: A List[StructureConstraint] describing the reaction geometry.
+        n_struct: How many geometries should we make with RosettaLigand? Default is 100.
+        cst_energy: The energy penalty cutoff for keeping a given geometry. In REU and assuming Rosetta constraint scoring.
+        use_qm: Shoud QM be used for both geometry filtration and geometry minimization? Default is True.
+        freeze_alphafill: If a Ligand() was placed with AlphaFill, should it be frozen during initial geometry sampling. Default is True.
+        clash_distance: How close can two heavy atoms be before they are considered "clashing"? Default is 2.0 Angstroms.
+        clash_cutoff: How many heavy atom clashes are allowed in a given geometry? Default is 3.
+        max_sasa_ratio: What percentage of a Ligand()'s surface area can be solvent accessible?  Default is 0.60.
+        cluster_distance: How close should a residue be to the Ligand()'s to be included in the QM region? Default is 2.0 Angstroms.
+        rng_seed: Random number generation integer seed. Default value is 1996.
+        work_dir: Where is the work being done/where should the scratch files be made?
+        save_work_dir: Should temporary files be saved? Default is True.
 
     Returns:
-        A Structure() with the specified, constrained geometry. 
-
+        Nothing.
     """
 
     if work_dir is None:
@@ -83,12 +88,9 @@ def dock_reactants(structure: Structure,
 
     interface.rosetta.rename_atoms(structure)
     
-    (param_files, charge_mapper) = _parameterize_system(structure, work_dir)
+    param_files:List[str] = generate_ligand_params(structure, work_dir)
     
-    geometry_df = pd.read_csv("scratch/scores.csv")
-
-    if False:
-        geometry_df = generate_geometries(structure, constraints, n_struct, clash_cutoff, param_files, charge_mapper, freeze_alphafill, rng_seed, work_dir )
+    geometry_df:pd.DataFrame = generate_geometries(structure, constraints, n_struct, clash_distance, clash_cutoff, param_files, freeze_alphafill, rng_seed, work_dir )
 
     select_geometry(structure, constraints, geometry_df, max_sasa_ratio, cst_energy, cluster_distance, use_qm)
 
@@ -104,19 +106,22 @@ def dock_reactants(structure: Structure,
         _LOGGER.info(f"save_work_dir set to False! Deleting {work_dir}")
         fs.safe_rmdir( work_dir )
 
-    return structure 
 
-
-def _create_xml(stru:Structure, cst_file:str, freeze_alphafill:bool, clash_cutoff:int, work_dir: str) -> str:
-    """
+def create_docking_xml(stru:Structure, cst_file:str, freeze_alphafill:bool, clash_distance:float, clash_cutoff:int, work_dir: str) -> str:
+    """Creates the docking .xml RosettaScripts File that will be used for creating the reactive complex geometries.
 
     Args:
-        
+        stru: The Structure() that the geometry sampling will occur on.
+        cst_file: The .cst file containing the atom constraints which define the system.
+        freeze_alphafill: Should Ligand()'s that were placed by AlphaFill be frozen?
+        clash_distance: How close can two heavy atoms be before they are "clashing"?
+        clash_cutoff: How many heavy atom clashes are allowed for each geometry?
+        work_dir: Where the temporary file will be written.
 
     Returns:
         The relative filepath of the RosettaScripts .xml file.
     """
-    fname: str = f"{work_dir}/__script.xml"
+    fname: str = f"{work_dir}/docking_script.xml"
     
     fpath = Path(fname)
 #yapf: disable
@@ -132,10 +137,11 @@ def _create_xml(stru:Structure, cst_file:str, freeze_alphafill:bool, clash_cutof
 #yapf: enable
     
     as_names:List[str] = list()
+    grid_index:int = 1
     for res in stru.residues:
         if not res.is_ligand():
             continue
-
+        
         chain_name:str = res.parent.name        
         rname:str=f"rs_{chain_name.lower()}"
         transform_name:str=f"dock_{chain_name.lower()}"
@@ -145,11 +151,32 @@ def _create_xml(stru:Structure, cst_file:str, freeze_alphafill:bool, clash_cutof
         ])
 
         as_names.append( f"{rname}_as" )
+        if freeze_alphafill and res.placement_method == 'alphafill':
+            continue
+        
+        grid_name:str=f'grid_{grid_index}'
+        grid_index += 1
+        dock:str = f"dock_{chain_name}"
+        elements.extend([{'parent': 'ROSETTASCRIPTS', 'tag': 'SCORINGGRIDS', 'ligand_chain': chain_name, 'width': '20', 'append_elements_only': True, 'name': grid_name, 'child_nodes': [
+                    {
+                        'parent': 'SCORINGGRIDS',
+                        'tag': 'ClassicGrid',
+                        'grid_name': 'classic',
+                        'weight': '1.0'
+                    },
+                ]
+            },
+            { 'parent': 'MOVERS', 'tag': 'Transform', 'name': dock, 'chain': chain_name, 'box_size': str(50), 'move_distance': '0.1', 'angle': '360', 'cycles': '1000', 'repeats': '3', 'temperature': '5',
+                'grid_set': grid_name, 'use_constraints':'true', 'cst_fa_file':str(Path(cst_file).absolute())},
+            {'parent': 'PROTOCOLS', 'tag': 'Add', 'mover_name':  dock }
+            ])
 
     elements.extend([
+        { 'parent': 'FILTERS', 'tag': 'ClashCheck', 'name': 'check_clashes','clash_dist':f"{clash_distance:3f}", 'cutoff':str(clash_cutoff)},
+        { 'parent': 'PROTOCOLS', 'tag': 'Add', 'filter_name':'check_clashes'},
         { 'parent': 'RESIDUE_SELECTORS', 'tag': 'Or', 'name':'as_selector', 'selectors':','.join(as_names)},
         { 'parent': 'RESIDUE_SELECTORS', 'tag': 'Not', 'name':'not_as_selector', 'selector':'as_selector'},
-        {'parent':'MOVERS', 'tag':'FastRelax', 'name':'frelax', 'scorefxn':'hard_rep', 'cst_file':f"{Path(cst_file).absolute()}", 'child_nodes': [
+        { 'parent': 'MOVERS', 'tag': 'FastRelax', 'name':' frelax', 'scorefxn': 'hard_rep', 'cst_file':f"{Path(cst_file).absolute()}", 'child_nodes': [
                 {'parent':'FastRelax', 'tag':'MoveMap', 'name':'full_enzyme', 'bb':'true', 'chi':'true', 'jump':'false','child_nodes':[
                         {'parent':'MoveMap','tag':'ResidueSelector', 'selector':'as_selector', 'bb':'true', 'chi':'true', 'bondangle':'true'},
                         {'parent':'MoveMap', 'tag':'ResidueSelector', 'selector':'not_as_selector', 'bb':'false', 'chi':'true', 'bondangle':'false'},]}]
@@ -162,14 +189,13 @@ def _create_xml(stru:Structure, cst_file:str, freeze_alphafill:bool, clash_cutof
     return fname
 
 
-def _make_options_file(pdb_file: str,
+def create_docking_options_file(pdb_file: str,
                       xml_file: str,
                       param_files: List[str],
                       work_dir: str,
                       rng_seed: int,
                       n_struct: int,) -> str:
-    """Makes the options.txt file that the docking run will actually use. Takes a variety of arguments and 
-    can used cached values if needed. This function DOES NOT make any checks to the inputs.
+    """Makes the docking_options.txt file that the docking run will actually use. This function DOES NOT make any checks to the inputs.
     
     Args:
         pdb_file: The .pdb file (with constraints) to use. 
@@ -178,15 +204,13 @@ def _make_options_file(pdb_file: str,
         work_dir: The working directory 
         rng_seed: rng seed to be used during dcking.
         n_struct: Number of strutures to make as an int().
-        use_cache: Should we used cached values? 
 
     Returns:
-        Path to the options.txt file with all the Rosetta options.
-
+        Path to the docking_options.txt file with all the Rosetta options.
     """
     _LOGGER.info("Beginning creation of options file for Rosetta...")
     content: List[str] = [
-        "-keep_input_protonation_state", #TODO(CJ): get rid of this for now; but want it back someday
+        "-keep_input_protonation_state", 
         "-auto_setup_metals",
         "-run:constant_seed",
         f"-run:jran {int(rng_seed)}",
@@ -226,13 +250,13 @@ def _make_options_file(pdb_file: str,
     content.append(f"-qsar:grid_dir {qsar_grid}")
 
     fname = Path(work_dir) / "options.txt"
-    return fname #TODO(CJ): fix this!
     score_file: str = f"{work_dir}/complexes/score.sc"
 
     _LOGGER.info(f"\toptions file: {fname}")
     _LOGGER.info(f"\tscore file: {score_file}")
     _LOGGER.info(f"\tenzyme-reactant complexes directory: {work_dir}/complexes")
     _LOGGER.info(f"\tqsar_gird directory: {qsar_grid}")
+    
     fs.safe_rm(fname)
     fs.safe_rm(score_file)
     fs.safe_rmdir(f"{work_dir}/complexes/")
@@ -241,16 +265,10 @@ def _make_options_file(pdb_file: str,
     fs.safe_mkdir(f"{work_dir}/complexes/")
     fs.safe_mkdir(qsar_grid)
 
-    if not fname.exists():
-        _LOGGER.info(f"Wrote the below settings to {fname}:")
-        for ll in content:
-            _LOGGER.info(f"\t{ll}")
-        fs.write_lines(fname, content)
-    else:
-        _LOGGER.info(f"Cache mode enabled. Using below settings from {fname}:")
-        content: List[str] = fs.lines_from_file(fname)
-        for ll in content:
-            _LOGGER.info(f"\t{ll}")
+    _LOGGER.info(f"Wrote the below settings to {fname}:")
+    for ll in content:
+        _LOGGER.info(f"\t{ll}")
+    fs.write_lines(fname, content)
 
     option_file = fname.absolute()
 
@@ -260,24 +278,30 @@ def _make_options_file(pdb_file: str,
 def generate_geometries(structure: Structure,
             constraints: List[StructureConstraint],
             n_struct:int,
+            clash_distance:float, 
             clash_cutoff:int,
             param_files:List[str],
-            charge_mapper:Dict[str,int],
             freeze_alphafill:bool,
             rng_seed:int,
             work_dir:str,
             ) -> pd.DataFrame:
-    """
+    """Geometry generation engine that leverages RosettaLigand to create the specified number of geometries. Also filters out
+    geometries with too many clashes. Returns the contents of the Rosetta score.sc file as a pandas DataFrame where description
+    is subbed out to be the absolute path of the corresponding .pdb file. 
 
     Args:
-        structure:
-        constraints:
-        n_struct:
-        work_dir:
-        rng_seed:
-        use_cache:
+        structure: The Structure() object to generate geometries with.
+        constraints: The List[StructureConstraint] that defines the reactive complex geometry.
+        n_struct: How many geometries should be created?
+        clash_distance: How close can two heavy atoms be before they are clashing?
+        clash_cutoff: How many clashes are allowed to be in each geometry before they are removed.
+        param_files: A List[str] containing .params files for use in Rosetta.
+        freeze_alphafill: Should Ligand()'s placed with AlphaFill be frozen during geometry generation.
+        rng_seed: The integer random number generation seed to use during geometry generation.
+        work_dir: The path to where all the work should be done.
 
     Returns:
+        A pandas DataFrame that contains the contents of the score.sc file. The description column contains 
 
     """
     start_pdb:str = f"{work_dir}/start.pdb"
@@ -286,9 +310,9 @@ def generate_geometries(structure: Structure,
 
     cst_file:str = interface.rosetta.write_constraint_file(structure, constraints, work_dir) #TODO(CJ): look at this; wrong constraint types!!
 
-    xml_file:str = _create_xml(structure, cst_file, freeze_alphafill, clash_cutoff, work_dir)  #TODO(CJ): going to overhaul this
+    xml_file:str = create_docking_xml(structure, cst_file, freeze_alphafill, clash_distance, clash_cutoff, work_dir)  #TODO(CJ): going to overhaul this
 
-    options_file: str = _make_options_file(start_pdb,
+    options_file: str = create_docking_options_file(start_pdb,
                         xml_file, param_files, work_dir, rng_seed, n_struct)
 
     opt_path = Path(options_file)
@@ -306,21 +330,21 @@ def generate_geometries(structure: Structure,
 
     os.chdir(start_dir)
 
-    assert Path(str((opt_path.parent / "complexes/score.sc").absolute())).exists()
+    scores_file:str = str(opt_path.parent / "complexes/score.sc").absolute())
+    
+    fs.check_file_exists(scores_file, exit_script = False )
 
-    df: pd.DataFrame = interface.rosetta.parse_score_file(str(opt_path.parent / "complexes/score.sc"))
+    df: pd.DataFrame = interface.rosetta.parse_score_file(scores_file)
 
     df['description'] = df.apply(lambda row: f"{opt_path.parent}/complexes/{row.description}.pdb", axis=1)
 
     df['selected'] = True
 
-    df.to_csv(str(opt_path.parent / "scores.csv"), index=False)
-
     _LOGGER.info("Completed RosettaLigand geometry sampling!")
 
     return df
 
-def _evaluate_SASA(df: pd.DataFrame, max_sasa_ratio:float) -> None:
+def evaluate_geometry_SASA(df: pd.DataFrame, max_sasa_ratio:float) -> None:
     """Evaluates and filters geometries using SASA ratio of ligands. Updates the 'selected'
     column of the inputted DataFrame and sets the column to False if the SASA ratio of the ligand is above
     the specified cutoff. Exits if no rows are selected at this point.
@@ -334,7 +358,7 @@ def _evaluate_SASA(df: pd.DataFrame, max_sasa_ratio:float) -> None:
     """
     if not df.selected.sum():
         _LOGGER.error("No geometries still selected! Exiting...")
-        exit( 1 )
+        raise TypeError()
 
     _LOGGER.info(f"Beginning ligand SASA evaluation. {df.selected.sum()} geometries still selected...")
     parser = PDBParser()
@@ -365,13 +389,12 @@ def _evaluate_SASA(df: pd.DataFrame, max_sasa_ratio:float) -> None:
                         good = False
             good_sasa.append(good)
 
-
     df['good_sasa'] = good_sasa
     df['selected'] = (df.selected) & (df.good_sasa)
     _LOGGER.info(f"Finished ligand SASA evaluation. {df.selected.sum()} geomtries have ligands with relative SASA <= {max_sasa_ratio:.3f}")
 
 
-def _evaluate_csts(df: pd.DataFrame, csts: List[StructureConstraint], cst_cutoff: int) -> None:
+def evaluate_geometry_csts(df: pd.DataFrame, csts: List[StructureConstraint], cst_cutoff: int) -> None:
     """Evaluates geometries of the .pdb files in the supplied DataFrame versus the specified constraints.
     Constraints are evaluted in terms of how many tolerance units each specified angle, distance, etc. is
     different than the idealized value. The 'selected' column in the DataFrame will be updated by the 
@@ -407,19 +430,19 @@ def _evaluate_csts(df: pd.DataFrame, csts: List[StructureConstraint], cst_cutoff
         f"Finished RosettaCst evaluation. {df.selected.sum()} geometries have constraint tolerances <= {cst_cutoff:.3f} tolerance units")
     
 
-def _parameterize_system(stru:Structure, work_dir:str) -> Tuple[List[str], Dict[str, int]]:
-    """Given the input Structure(), parameterize everything needed to perform RosettaLigand docking.
+def generate_ligand_params(stru:Structure, work_dir:str) -> List[str]:
+    """Given the input Structure(), parameterize everything needed to use the Ligand()'s in Rosetta.
     
     Args:
         stru: The Structure() to parameterize.
         work_dir: Where temporary files will be saved.
 
     Returns:
-        A Tuple() with the format (list(), dict()), holding the (.params file names, charge mapper ). 
+        A List[str] with ligand .params files.         
     """
+    #TODO(CJ): probably move this to the RosettaInterface
     _LOGGER.info("Beginning preparation of each reactant...")
     param_files: List[str] = list()
-    charge_mapper: Dict[str, int] = dict()
    
     parser = Mol2Parser()
     for res in stru.residues:
@@ -429,111 +452,33 @@ def _parameterize_system(stru:Structure, work_dir:str) -> Tuple[List[str], Dict[
         
         _LOGGER.info(f"Detected residue {res.name} in chain {res.parent.name}...")
 
-        ligand_charge:int = charge_mapper.get(res.name, None)
+        if res.net_charge is None:
+            res.net_charge = interface.bcl.calculate_formal_charge( res )
 
-        if ligand_charge is None:
-            ligand_charge = interface.bcl.calculate_formal_charge( res )
-            charge_mapper[res.name] = ligand_charge
-
-        param_file:str = interface.rosetta.parameterize_ligand(res, charge=ligand_charge, work_dir=work_dir)
+        param_file:str = interface.rosetta.parameterize_ligand(res, charge=res.net_charge, work_dir=work_dir)
         
         _LOGGER.info(f"Information for reactant {res.name}:")
         _LOGGER.info(f"\tparam file: {param_file}")
-        _LOGGER.info(f"\tcharge: {ligand_charge}")
+        _LOGGER.info(f"\tcharge: {res.net_charge}")
         _LOGGER.info(f"\tnum conformers: {res.n_conformers()}")
         
         param_files.append(param_file)
-        charge_mapper[res.name] = ligand_charge
     _LOGGER.info("Finished reactant preparation!")
 
-    return (param_files, charge_mapper)
+    return param_files
 
 
-def _system_charge(df: pd.DataFrame, charge_mapper:Dict[str,int]=None) -> int:
-    """Given a pd.DataFrame with the columns chain, resi, resn, and name, find the charge. Needs a charge
-    mapper for non-standard residues. If the charge mapper is missing, may be inaccurate.
-
-    Args:
-        df: The dataframe containing the chain, resi, resn, and name attributes for each atom in the selection.
-        charge_mapper: Optional. A dict() that maps three letter residues to their charges.
-
-    Returns:
-        The system's charge as an int().
-    """
-    _LOGGER.info("Beginning enzyme system charge deduction...")
-    charge = 0
-
-    residues = sorted(list(set(zip(df.chain, df.resi, df.resn))))
-    _LOGGER.info(f"Found {len(residues)} residues in enzyme system!")
-
-    for (chain, resi, resn) in residues:
-        atoms = df[(df.chain == chain) & (df.resi == resi)]['name'].to_list()
-
-        charge_str = str()
-        residue_charge: int = 0
-        if resn in chem.AA_CHARGE_MAPPER:
-            residue_charge = chem.AA_CHARGE_MAPPER[resn]
-            charge_str = f"Detected {resn} with charge: {residue_charge}"
-        elif resn in charge_mapper:
-            residue_charge = charge_mapper[resn]
-            charge_str = f"Detected {resn} with charge: {residue_charge}"
-        elif resn.upper() == "MG":  #TODO(CJ): add more charges
-            residue_charge = 2
-            charge_str = f"Detected metal ion {resn} with charge: {residue_charge}"
-        else:
-            _LOGGER.error(f"Unable to assign charge to {resn}. Exiting...")
-            exit(1)
-
-        # correcting titratable residues
-        special_titration: bool = False
-        if resn == "GLU":
-            if "HE2" in atoms:
-                residue_charge += 1
-                special_titration = True
-            if "HE1" in atoms:
-                residue_charge += 1
-                special_titration = True
-
-        if resn == "LYS":
-            if "3HZ" not in atoms:
-                residue_charge -= 1
-                special_titration = True
-
-        if resn == "ASP":
-            if "HD2" in atoms:
-                residue_charge += 1
-                special_titration = True
-            if "HD1" in atoms:
-                residue_charge += 1
-                special_titration = True
-
-        if resn == "TYR":
-            if "HH" not in atoms:
-                residue_charge -= 1
-                special_titration = True
-
-        if resn == "HIS":
-            if "HD1" in atoms and "HE2" in atoms:
-                residue_charge += 1
-                special_titration = True
-
-        if special_titration:
-            charge_str = f"Detected special protonation state of {resn}. New charge: {residue_charge}"
-
-        charge += residue_charge
-        _LOGGER.info(charge_str)
-
-    _LOGGER.info(f"Total charge of enzyme system: {charge}")
-
-    return charge
-
-def _define_active_site(structure: Structure, distance_cutoff:float) -> str:
-    """
+def get_active_site_sele(structure: Structure, distance_cutoff:float) -> str:
+    """Creates a pymol-compatible sele for the active site of the supplied Structure(). Basic structure
+    is to select all residues within the specified cutoff of the Ligand()'s in the structure. Metal ions up to
+    2*distance_cutoff from the Ligand()'s are also selected.
     
     Args:
+        structure: The Structure() to be used as a template for the active site.
+        distance_cutoff: The cutoff in Angstroms for a Residue() to be included in the active site.  
         
     Returns:
-
+        Selection string in pymol format which defines the enzyme active site.        
     """
 
     _LOGGER.info("Analyzing enzyme active site...")
@@ -572,71 +517,55 @@ def _define_active_site(structure: Structure, distance_cutoff:float) -> str:
 def qm_minimization(structure:Structure,
                 constraints:List[StructureConstraint],
                 cluster_distance:float,
-                work_dir:str=None):
-    """TODO(CJ)
+                work_dir:str) -> None:
+    """Performs QM minimization of the enzyme active site using xtb. Assumes that backbone atoms of the Residue()'s should be 
+    frozen. Is capable of converting supplied constraints to xtb format. Updates coordinates in place. 
     
     Args:
-        df:
-        charge_mapper:
-        cluster_distance:
-        constraints:
-        work_dir:
+        structure: The Structure() object to optimize.
+        constraints: The List[StructureConstraint] which define the enzyme active site geometry.
+        cluster_distance: The cutoff in angstroms for inclusion of a Residue() in the active site.
+        work_dir: The temporary directory to do all work.
 
     Returns:
-
+        Nothing.
     """
-    if work_dir is None:
-        work_dir = config['system.SCRATCH_DIR']
 
-    #TODO(CJ): check if the constraints belong to the Structure 
-    as_sele = _define_active_site(structure, cluster_distance)
+    as_sele = get_active_site_sele(structure, cluster_distance)
     
-    #interface.xtb.geo_opt(structure, charge=as_info['charge'], constraints=constraints, sele_str=as_info['sele'], work_dir=work_dir)
     for res in structure.residues:
         if res.is_canonical():
             continue
+        
         for atom in res.atoms:
             atom.charge = 0.0
    
-    backbone_freeze = CartesianFreeze(structure.backbone_atoms())
-
-    parser = PDBParser()
-    parser.save_structure('pre_opt.pdb', structure)
     es = qm_optimize(structure,
             engine="xtb",
-            constraints=constraints + [backbone_freeze],
+            constraints=constraints + [CartesianFreeze(structure.backbone_atoms())],
             regions=[as_sele],
             region_methods=[chem.QMLevelOfTheory(basis_set='',method='GFN2', solvent='water', solv_method='ALPB')],
             parallel_method=None)[0]
 
-    parser.save_structure('post_opt.pdb', structure)
-
-def _evaluate_qm(df: pd.DataFrame, structure: Structure, cluster_cutoff: float) -> None:
-    """TODO(CJ)
+def evaluate_geometry_qm_energy(df: pd.DataFrame, structure: Structure, cluster_cutoff: float) -> None:
+    """Aids in ranking and selection of candidate geometries through a semi-empirical QM single point energy
+    calculation with xtb. Creates a capped active site by using a specified cluster_cutoff parameter to specify
+    the enzyme's active site.
 
     Args:
-        df:
-        structure:
-        charge_mapper:
-        cluster_cutoff:
+        df: The geometry DataFrame containing all information  
+        structure: The reference Structure() in use.
+        cluster_cutoff: The cutoff in Angstroms for a Residue() to be included in the QM region. 
 
     Returns:
         Nothing.        
-
     """
-    # steps
-    # 1. get system charge
-    # 2. run through each cluster and do it
     _LOGGER.info(f"Beginning qm energy evaluation. {df.selected.sum()} geometries still selected...")
-    as_sele:str = _define_active_site(structure, cluster_cutoff)
+    as_sele:str = get_active_site_ele(structure, cluster_cutoff)
     qm_energy = []
 
     _parser = PDBParser()
-    qm_run = False
     for i, row in df.iterrows():
-        if qm_run:
-            qm_energy.append(None)
-            continue
 
         if not row.selected:
             qm_energy.append(None)
@@ -658,7 +587,6 @@ def _evaluate_qm(df: pd.DataFrame, structure: Structure, cluster_cutoff: float) 
             parallel_method=None,
             regions=[as_sele])
         qm_energy.append(es[0].energy_0)
-        qm_run = True
 
     df['qm_energy'] = qm_energy
     _LOGGER.info("Finished qm energy evaluation!")
@@ -669,16 +597,42 @@ def select_geometry( structure:Structure,
                         max_sasa_ratio:float,
                         cst_energy:float,
                         cluster_distance:float,
-                        use_qm:bool = False) -> None:
-    """TODO(CJ)"""
-    #_evaluate_SASA(df, max_sasa_ratio)#TODO(CJ): put this back in 
+                        use_qm:bool) -> None:
+    """Method that takes the results from the generate_geometries() function and selects the geometry to move forward with. The coordinates
+    from the selected geometry are applied directly to the supplied Structure(), in place. The function filters out candidate geometries
+    if the ligands have too much SASA (as specified by the user) or the actual geometry deviates too much from the geometry specified by the
+    StructureConstraint. The selected geometry is determined by an energy ranking. If use_qm=True, then an active site calculation is performed
+    with xtb, else the total energy metric from the RosettaLigand run is used.
 
-    #_evaluate_csts(df, constraints, cst_energy)
-    #TODO(CJ): add use_qm flag 
-    if use_qm or True:
-        _evaluate_qm(df, structure, cluster_distance)
+    Args:
+        structure: The Structure() to apply the selected geometry to.
+        constraints: A List[StructureConstraint] which define the reacting geometry.
+        df: The pd.DataFrame from the generate_geometries() function.
+        max_sasa_ratio: The maximum SASA ratio the ligands may have. 
+        cst_energy: The maximum constraint energy penalty allowed in the geometry.
+        cluster_distance: How far away can Residue()'s be in the active site?
+        use_qm: Should QM energies be used to finally select the geometry? 
 
-    infile:str=df[df.selected].sort_values(by='qm_energy').description.to_list()[0]
+    Returns:
+        Nothing.
+    """
+    evaluate_geometry_SASA(df, max_sasa_ratio)#TODO(CJ): put this back in 
+
+    evaluate_geometry_csts(df, constraints, cst_energy)
+   
+    energy_key:str=None
+    
+    if use_qm:
+        evaluate_geometry_qm_energy(df, structure, cluster_distance)
+        energy_key = 'qm_energy'
+    else:
+        energy_key = 'total_score'
+   
+    if not df.selected.sum():
+        _LOGGER.error("No geometries satisfy all selection criteria!")
+        raise TypeError()
+
+    infile:str=df[df.selected].sort_values(by=energy_key).description.to_list()[0]
 
     _parser = PDBParser()
     ref_stru = _parser.get_structure(infile)
@@ -688,10 +642,23 @@ def select_geometry( structure:Structure,
         cst.change_topology(structure)
 
 def mm_minimization(structure:Structure, cluster_distance:float, constraints:List[StructureConstraint], param_files:List[str], rng_seed:int, work_dir:str) -> None:
-    """TODO(CJ)
+    """Uses Rosetta's FastRelax protocol to perform a minimization with constraints that ramp-down over the course of the minimization. Updates the coordinates
+    of the Structre() inplace. Residues are given differing levels of flexibility where there is no backbone or sidechain for all of the enzyme except for the
+    active site. In the active site there is sidechain and bond angle flexibility. The geometry with the lowest total_score is selected.
+
+    Args:
+        structure: The Structure() to operate on.
+        cluster_distance: The distance cutoff in Angstroms to be an "active site" residue.
+        constraints: The List[StructureConstraint] which define the reactive complex geometry.
+        param_files: A List[str] of .params files for use in Rosetta.
+        rng_seed: An int() seed for Rosetta's random number generator.
+        work_dir: The directory where temporary files and directories will be written. 
+
+    Returns:
+        Nothing.
     """
 
-    cst_file:str = interface.rosetta.write_constraint_file(structure, constraints, work_dir) #TODO(CJ): look at this; wrong constraint types!!
+    cst_file:str = interface.rosetta.write_constraint_file(structure, constraints, work_dir) 
     xml_file:str = f"{work_dir}/mm_script.xml"
     pdb_file:str = f"{work_dir}/temp_mm_min.pdb"
     option_file:str = f"{work_dir}/mm_min_options.txt"
@@ -726,7 +693,7 @@ def mm_minimization(structure:Structure, cluster_distance:float, constraints:Lis
         { 'parent': 'RESIDUE_SELECTORS', 'tag': 'Not', 'name':'not_as_selector', 'selector':'as_selector'},
         {'parent':'MOVERS', 'tag':'FastRelax', 'name':'frelax', 'scorefxn':'hard_rep', 'cst_file':f"{Path(cst_file).absolute()}", 'ramp_down_constraints':'true', 'repeats':'5', 'child_nodes': [
                 {'parent':'FastRelax', 'tag':'MoveMap', 'name':'full_enzyme', 'bb':'false', 'chi':'false', 'jump':'false','child_nodes':[
-                        {'parent':'MoveMap','tag':'ResidueSelector', 'selector':'as_selector', 'bb':'true', 'chi':'true', 'bondangle':'true'},
+                        {'parent':'MoveMap','tag':'ResidueSelector', 'selector':'as_selector', 'bb':'false', 'chi':'true', 'bondangle':'true'},
                 ]
         },]},
         {'parent':'PROTOCOLS', 'tag':'Add', 'mover_name':'frelax'},
@@ -794,7 +761,4 @@ def mm_minimization(structure:Structure, cluster_distance:float, constraints:Lis
 
     for cst in constraints:
         cst.change_topology(structure)
-
-
-#CURRENT    
 
