@@ -564,11 +564,13 @@ def test_write_to_mdin_from_raw_dict():
     }
     test_temp_mdin = f"{MM_WORK_DIR}/test_mdin_from_raw_dict.in"
     answer_temp_mdin = f"{MM_DATA_DIR}/answer_mdin_from_raw_dict.in"
+    fs.safe_mkdir("MD/")
     ai = interface.amber
     ai._write_to_mdin_from_raw_dict(test_raw_dict, test_temp_mdin)
     assert files_equivalent(test_temp_mdin, answer_temp_mdin)
     fs.safe_rm(test_temp_mdin)
     fs.safe_rm("MD/0.rs")
+    fs.safe_rmdir("MD/")
 
 
 def test_write_disang_file():
