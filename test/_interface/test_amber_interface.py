@@ -1018,6 +1018,15 @@ def test_parse_cons_to_raw_rs_dict():
             assert v == answer_raw_dict[k]
 
 
+def test_reduce_path_in_mdin():
+    """test using an path that is too long"""
+    test_path = "/panfs/accrepfs.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test_integration/equi_md_qm_spe_based_descriptor/work_dir/MD/rep_0/0.rs"
+    ai = interface.amber
+
+    result = ai._reduce_path_in_mdin(test_path)
+    assert len(result) <= 70
+
+
 # region TODO
 
 def test_parse_fmt_uppercase():

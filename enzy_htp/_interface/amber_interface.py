@@ -1546,6 +1546,7 @@ class AmberInterface(BaseInterface):
         # file redirection
         for k, v in raw_dict["file_redirection"].items():
             v_path = v["path"]
+            v_path = self._reduce_path_in_mdin(v_path)
             v_content = v["content"]
             # add the redirection line
             mdin_lines.append(f" {k}={v_path}")
@@ -1559,7 +1560,60 @@ class AmberInterface(BaseInterface):
         # final empty line
         mdin_lines.append("")
 
+        # security check
+        for line in mdin_lines:
+            if len(line.strip()) > 80:
+                _LOGGER.warning("found mdin line exceed 80 characters.\n"
+                                f"{line.strip()}\n"
+                                " PMEMD may not be happy about this."
+                                " Consider this bug from Amber if you get 'STOP PMEMD Terminated Abnormally'")
+
         fs.write_lines(out_path, mdin_lines)
+
+    def _reduce_path_in_mdin(self, target_path: str) -> str:
+        """compress the paths that >70 characters to be shorted than 70 characters.
+        (we dont use 80 because the line limitation also counts in the variable name like
+        DISANG etc.)"""
+        if len(target_path) <= 70:
+            return target_path
+        else:
+            _LOGGER.info("found file path exceeding length limit of mdin. reducing it.")
+
+            # 1. relative path
+            target_path: Path = Path(target_path)
+            result = target_path.relative_to(Path.cwd())
+            if len(str(result)) <= 70:
+                return str(result)
+
+            # 2. symlink in SCRATCH
+            _LOGGER.debug("1st attempt using relative path failed. making it symlink.")
+            result = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/{target_path.name}.lnk", is_symlink=True)
+            if len(result) <= 70:
+                fs.safe_mkdir(eh_config['system.SCRATCH_DIR'])
+                Path(result).symlink_to(target_path)
+                return result
+            
+            # 3. symlink in SCRATCH relative
+            _LOGGER.debug("2nd attempt failed. making the symlink using relative path.")             
+            result = Path(result).relative_to(Path.cwd())
+            if len(str(result)) <= 70:
+                fs.safe_mkdir(eh_config['system.SCRATCH_DIR'])
+                Path(result).symlink_to(target_path)
+                return str(result)
+
+            # 4. symlink in ./
+            _LOGGER.debug("3nd attempt failed. making the symlink under cwd.")
+            result = fs.get_valid_temp_name(f"./{target_path.name}.lnk", is_symlink=True)
+            if len(result) <= 70:
+                Path(result).symlink_to(target_path)
+                return result
+            
+            # 5. shortest symlink that have to work
+            result = fs.get_valid_temp_name(f"./symlink.lnk", is_symlink=True)
+            _LOGGER.warning(f"4nd attempt failed. making {result} for {target_path}.")
+            Path(result).symlink_to(target_path)
+            return result
+
 
     def read_from_mdout(self, mdout_file_path: str) -> Dict:
         """the knowledge of the mdout format as the log of sander/pmemd.
@@ -2042,114 +2096,6 @@ class AmberInterface(BaseInterface):
         )
 
     # region == TODO ==
-    def minimize_structure(self, pdb: str, min_dir: str = "./", mode: str = "CPU", cycle: int = 2000) -> str:
-        """Class method that minimizes the structure found in a supplied .pdb file, returning
-        the path to the minimized file.
-        Args:
-            pdb: The .pdb file with the structure to be minimized.
-            mode: Which version of Amber to use. Allowed values are "CPU" and "GPU".
-            min_dir: Work directory where the paramter files and output are saved.
-            cycle: Number of steps in the steepest descent of the cycle.
-        Returns:
-            Path to the minimized structure in a .pdb file.
-        """
-        # TODO(CJ): add some checks for inputs
-        inpath = Path(pdb)
-        if min_dir == "./":
-            min_dir = f"{inpath.parent}/pdb_min/"
-
-        fs.safe_mkdir(min_dir)
-        outfile = f"{min_dir}/{inpath.stem}_min.pdb"
-        min_in = f"{min_dir}/min.in"
-        min_out = f"{min_dir}/min.out"
-        min_rst = f"{min_dir}/min.ncrst"
-        (prmtop, inpcrd) = self.build_param_files(str(inpath), min_dir)
-        self.write_minimize_input_file(min_in, cycle)
-        engine = self.config_.get_engine(mode)
-
-        # yapf: disable
-        self.env_manager_.run_command(
-            engine, ["-O", "-i", min_in, "-o", min_out, "-p", prmtop, "-c", inpcrd, "-r", min_rst],
-
-        )
-
-        self.env_manager_.run_command(
-            "ambpdb",[f"-p", prmtop, "-c", min_rst, ">", outfile]
-        )
-        # yapf: enable
-
-        return outfile
-
-    def md_run(self, prmtop: str, inpcrd: str, work_dir: str, mode: str = "CPU") -> str:
-        """Runs a full MD simulation using the suplied prmtop and inpcrd files. Simulation is composed
-        of four steps:
-                1. minimization
-                2. heating
-                3. equilibration
-                4. production
-        The parameter files for these steps are created by AmberInterface.md_min_file(), AmberInterface.md_heat_file(),
-        AmberInterface.md_equi_file() and AmberInterface.md_prod_file(), respectively. All work is done in the supplied
-        work_dir location.
-        Args:
-            prmtop: str() with a path to a .prmtop file generated by AmberInterface.build_param_files().
-            inpcrd: str() with a path to a .inpcrd file generated by AmberInterface.build_param_files().
-            work_dir: Directory where the temporary files should be stored.
-            mode: The mode to use for calculations. Only "CPU" and "GPU" are allowed.
-        Returns:
-            Path to the production .nc file.
-        """
-        fs.safe_mkdir(work_dir)
-
-        min_in: str = self.md_min_file(f"{work_dir}/min.in")
-        heat_in: str = self.md_heat_file(f"{work_dir}/heat.in")
-        equi_in: str = self.md_equi_file(f"{work_dir}/equi.in")
-        prod_in: str = self.md_prod_file(f"{work_dir}/prod.in")
-        engine = self.config_.get_engine(mode)
-
-        min_out: str = f"{work_dir}/min.out"
-        min_rst: str = f"{work_dir}/min.rst"
-
-        #yapf: disable
-        self.env_manager_.run_command(
-            engine,
-            ["-O", "-i", min_in, "-o", min_out, "-p", prmtop, "-c", inpcrd, "-r", min_rst, "-ref", inpcrd, ],
-        )
-        #yapf: enable
-
-        heat_out: str = f"{work_dir}/heat.out"
-        heat_rst: str = f"{work_dir}/heat.rst"
-
-        #yapf: disable
-        self.env_manager_.run_command(
-            engine,
-            ["-O", "-i", heat_in, "-o", heat_out, "-p", prmtop, "-c", min_rst, "-ref", min_rst, "-r", heat_rst, ],
-        )
-        #yapf: enable
-
-        equi_out: str = f"{work_dir}/equi.out"
-        equi_rst: str = f"{work_dir}/equi.rst"
-        equi_nc: str = f"{work_dir}/equi.nc"
-
-        # yapf: disable
-        self.env_manager_.run_command(
-            engine,
-            ["-O", "-i", equi_in, "-o", equi_out, "-p", prmtop, "-c", heat_rst, "-ref", heat_rst, "-r", equi_rst, "-x", equi_nc, ],
-        )
-        # yapf: enable
-
-        prod_out: str = f"{work_dir}/prod.out"
-        prod_rst: str = f"{work_dir}/prod.rst"
-        prod_nc: str = f"{work_dir}/prod.nc"
-
-        # yapf: disable
-        self.env_manager_.run_command(
-            engine,
-            ["-O",  "-i",  prod_in,  "-o",  prod_out,  "-p",  prmtop,  "-c",  equi_rst,  "-ref",  equi_rst,  "-r",  prod_rst,  "-x",  prod_nc, ],
-        )
-        # yapf: enable
-
-        return prod_nc
-
     def nc2mdcrd(
         self,
         nc_in: str,
@@ -2479,6 +2425,7 @@ class AmberMDCRDParser():
     def get_last_structure(self, mdcrd: str) -> Structure:
         """parse the last frame in a mdcrd file to a Structure(). Intermediate files are created."""
         pass
+
 
 class AmberRSTParser():
     """parser Amber .rst file to Structure()
