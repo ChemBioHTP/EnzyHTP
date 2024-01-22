@@ -30,7 +30,6 @@ def dock_reactants(structure: Structure,
                    cst_energy: float = None,
                    use_qm: bool = True,
                    freeze_alphafill:bool = True,
-                   clash_distance: float = 2.0,
                    clash_cutoff: int = 3,
                    max_sasa_ratio:float = 0.60,
                    cluster_distance: float = 2.0,
@@ -66,7 +65,6 @@ def dock_reactants(structure: Structure,
         cst_energy: The energy penalty cutoff for keeping a given geometry. In REU and assuming Rosetta constraint scoring.
         use_qm: Shoud QM be used for both geometry filtration and geometry minimization? Default is True.
         freeze_alphafill: If a Ligand() was placed with AlphaFill, should it be frozen during initial geometry sampling. Default is True.
-        clash_distance: How close can two heavy atoms be before they are considered "clashing"? Default is 2.0 Angstroms.
         clash_cutoff: How many heavy atom clashes are allowed in a given geometry? Default is 3.
         max_sasa_ratio: What percentage of a Ligand()'s surface area can be solvent accessible?  Default is 0.60.
         cluster_distance: How close should a residue be to the Ligand()'s to be included in the QM region? Default is 2.0 Angstroms.
@@ -90,7 +88,7 @@ def dock_reactants(structure: Structure,
     
     param_files:List[str] = generate_ligand_params(structure, work_dir)
     
-    geometry_df:pd.DataFrame = generate_geometries(structure, constraints, n_struct, clash_distance, clash_cutoff, param_files, freeze_alphafill, rng_seed, work_dir )
+    geometry_df:pd.DataFrame = generate_geometries(structure, constraints, n_struct, clash_cutoff, param_files, freeze_alphafill, rng_seed, work_dir )
 
     select_geometry(structure, constraints, geometry_df, max_sasa_ratio, cst_energy, cluster_distance, use_qm)
 
@@ -107,14 +105,13 @@ def dock_reactants(structure: Structure,
         fs.safe_rmdir( work_dir )
 
 
-def create_docking_xml(stru:Structure, cst_file:str, freeze_alphafill:bool, clash_distance:float, clash_cutoff:int, work_dir: str) -> str:
+def create_docking_xml(stru:Structure, cst_file:str, freeze_alphafill:bool, clash_cutoff:int, work_dir: str) -> str:
     """Creates the docking .xml RosettaScripts File that will be used for creating the reactive complex geometries.
 
     Args:
         stru: The Structure() that the geometry sampling will occur on.
         cst_file: The .cst file containing the atom constraints which define the system.
         freeze_alphafill: Should Ligand()'s that were placed by AlphaFill be frozen?
-        clash_distance: How close can two heavy atoms be before they are "clashing"?
         clash_cutoff: How many heavy atom clashes are allowed for each geometry?
         work_dir: Where the temporary file will be written.
 
@@ -157,6 +154,8 @@ def create_docking_xml(stru:Structure, cst_file:str, freeze_alphafill:bool, clas
         grid_name:str=f'grid_{grid_index}'
         grid_index += 1
         dock:str = f"dock_{chain_name}"
+        clash_metric:str=f"clash_{chain_name.lower()}"
+        clash_filter:str=f"{clash_metric}_filter"
         elements.extend([{'parent': 'ROSETTASCRIPTS', 'tag': 'SCORINGGRIDS', 'ligand_chain': chain_name, 'width': '20', 'append_elements_only': True, 'name': grid_name, 'child_nodes': [
                     {
                         'parent': 'SCORINGGRIDS',
@@ -166,17 +165,19 @@ def create_docking_xml(stru:Structure, cst_file:str, freeze_alphafill:bool, clas
                     },
                 ]
             },
-            { 'parent': 'MOVERS', 'tag': 'Transform', 'name': dock, 'chain': chain_name, 'box_size': str(50), 'move_distance': '0.1', 'angle': '360', 'cycles': '1000', 'repeats': '3', 'temperature': '5',
+            { 'parent': 'MOVERS', 'tag': 'Transform', 'name': dock, 'chain': chain_name, 'box_size': str(50), 'move_distance': '20.0', 'angle': '360', 'cycles': '1000', 'repeats': '3', 'temperature': '5',
                 'grid_set': grid_name, 'use_constraints':'true', 'cst_fa_file':str(Path(cst_file).absolute())},
-            {'parent': 'PROTOCOLS', 'tag': 'Add', 'mover_name':  dock }
+            {'parent': 'PROTOCOLS', 'tag': 'Add', 'mover_name':  dock },
+            {'parent': 'FILTERS', 'tag':'SimpleMetricFilter', 'name':clash_filter, 'comparison_type':'lt_or_eq', 'cutoff':f"{clash_cutoff}", 'composite_action':'any', 'child_nodes':[
+                {'parent':'SimpleMetricFilter', 'tag':'PerResidueClashMetric', 'name':clash_metric, 'residue_selector':rname, 'residue_selector2': f"{rname}_as"}
+            ]},
+            {'parent':'PROTOCOLS', 'tag':'Add', 'filter':clash_filter}
             ])
 
     elements.extend([
-        { 'parent': 'FILTERS', 'tag': 'ClashCheck', 'name': 'check_clashes','clash_dist':f"{clash_distance:3f}", 'cutoff':str(clash_cutoff)},
-        { 'parent': 'PROTOCOLS', 'tag': 'Add', 'filter_name':'check_clashes'},
         { 'parent': 'RESIDUE_SELECTORS', 'tag': 'Or', 'name':'as_selector', 'selectors':','.join(as_names)},
         { 'parent': 'RESIDUE_SELECTORS', 'tag': 'Not', 'name':'not_as_selector', 'selector':'as_selector'},
-        { 'parent': 'MOVERS', 'tag': 'FastRelax', 'name':' frelax', 'scorefxn': 'hard_rep', 'cst_file':f"{Path(cst_file).absolute()}", 'child_nodes': [
+        { 'parent': 'MOVERS', 'tag': 'FastRelax', 'name': 'frelax', 'scorefxn': 'hard_rep', 'cst_file':f"{Path(cst_file).absolute()}", 'child_nodes': [
                 {'parent':'FastRelax', 'tag':'MoveMap', 'name':'full_enzyme', 'bb':'true', 'chi':'true', 'jump':'false','child_nodes':[
                         {'parent':'MoveMap','tag':'ResidueSelector', 'selector':'as_selector', 'bb':'true', 'chi':'true', 'bondangle':'true'},
                         {'parent':'MoveMap', 'tag':'ResidueSelector', 'selector':'not_as_selector', 'bb':'false', 'chi':'true', 'bondangle':'false'},]}]
@@ -278,7 +279,6 @@ def create_docking_options_file(pdb_file: str,
 def generate_geometries(structure: Structure,
             constraints: List[StructureConstraint],
             n_struct:int,
-            clash_distance:float, 
             clash_cutoff:int,
             param_files:List[str],
             freeze_alphafill:bool,
@@ -293,7 +293,6 @@ def generate_geometries(structure: Structure,
         structure: The Structure() object to generate geometries with.
         constraints: The List[StructureConstraint] that defines the reactive complex geometry.
         n_struct: How many geometries should be created?
-        clash_distance: How close can two heavy atoms be before they are clashing?
         clash_cutoff: How many clashes are allowed to be in each geometry before they are removed.
         param_files: A List[str] containing .params files for use in Rosetta.
         freeze_alphafill: Should Ligand()'s placed with AlphaFill be frozen during geometry generation.
@@ -310,7 +309,7 @@ def generate_geometries(structure: Structure,
 
     cst_file:str = interface.rosetta.write_constraint_file(structure, constraints, work_dir) #TODO(CJ): look at this; wrong constraint types!!
 
-    xml_file:str = create_docking_xml(structure, cst_file, freeze_alphafill, clash_distance, clash_cutoff, work_dir)  #TODO(CJ): going to overhaul this
+    xml_file:str = create_docking_xml(structure, cst_file, freeze_alphafill, clash_cutoff, work_dir)  #TODO(CJ): going to overhaul this
 
     options_file: str = create_docking_options_file(start_pdb,
                         xml_file, param_files, work_dir, rng_seed, n_struct)
@@ -330,7 +329,7 @@ def generate_geometries(structure: Structure,
 
     os.chdir(start_dir)
 
-    scores_file:str = str(opt_path.parent / "complexes/score.sc").absolute())
+    scores_file:str = str((opt_path.parent / "complexes/score.sc").absolute())
     
     fs.check_file_exists(scores_file, exit_script = False )
 
@@ -560,8 +559,12 @@ def evaluate_geometry_qm_energy(df: pd.DataFrame, structure: Structure, cluster_
     Returns:
         Nothing.        
     """
+    if not df.selected.sum():
+        _LOGGER.error("No geometries are still selected!")
+        raise TypeError()
+
     _LOGGER.info(f"Beginning qm energy evaluation. {df.selected.sum()} geometries still selected...")
-    as_sele:str = get_active_site_ele(structure, cluster_cutoff)
+    as_sele:str = get_active_site_sele(structure, cluster_cutoff)
     qm_energy = []
 
     _parser = PDBParser()

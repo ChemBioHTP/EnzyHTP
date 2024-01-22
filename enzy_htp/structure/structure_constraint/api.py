@@ -76,8 +76,9 @@ class StructureConstraint(ABC):
         """Setter for the atoms in the constrained geometry. Checks for the correct number of atoms, errors if it is the incorrect number.."""
         self.atoms_ = val_in
         if not self.correct_num_atoms():
-            _LOGGER.error(f"An incorrect number of atoms ({len(self.atoms)})was supplied! Exiting...")
-            exit( 1 )
+            err_msg:str=f"An incorrect number of atoms ({len(self.atoms)}) was supplied! Exiting..."
+            _LOGGER.error(err_msg)
+            raise TypeError(err_msg)
 
     @property
     def target_value(self) -> float:
@@ -88,6 +89,15 @@ class StructureConstraint(ABC):
     def target_value(self, val_in : float ) -> None:
         """Change the stored target value of the constrained geometry.."""
         self.target_value_ = val_in
+
+    def update_params(self, new_params:Dict) -> None:
+        """Update the existing StructureConstraint params with new params in the same format."""
+        if not isinstance(new_params,dict):
+            err_msg:str=f"new_params has invalid type of '{type(new_params)}'. Expected dict()"
+            _LOGGER.error(err_msg)
+            raise TypeError(err_msg)
+            
+        self.params.update(new_params)
 
     @property
     def params(self) -> Dict[str, Any]:
@@ -171,6 +181,11 @@ class StructureConstraint(ABC):
         """Is this a cartesian freeze constraint?"""
         return False
 
+    def is_backbone_freeze(self) -> bool:
+        """Is this a backbone freeze constraint?"""
+        return False
+
+
     def is_distance_constraint(self) -> bool:
         """Is this a distance constraint?"""
         return False
@@ -186,6 +201,7 @@ class StructureConstraint(ABC):
     def is_residue_pair_constraint(self) -> bool:
         """Is this a residue pair constraint?"""
         return False
+
 
     @abstractmethod
     def correct_num_atoms(self) -> bool:
@@ -578,4 +594,6 @@ class BackBoneFreeze(CartesianFreeze):
         """hard coded constraint type"""
         return "backbone_freeze"
 
-
+    def is_backbone_freeze(self) -> bool:
+        """This is a backbone freeze constraint."""
+        return True
