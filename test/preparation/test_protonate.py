@@ -278,15 +278,15 @@ def test_fix_pybel_output():
 
 def test_fix_pybel_output_4WI(caplog):
     """Test protonated ligand (pybel) name fixing."""
-
     file_prefix = 'ligand_test_4WI_protonated'
     pdb_file = f"{DATA_DIR}{file_prefix}.pdb"
     intermediate_pdb_file = f"{DATA_DIR}{file_prefix}_pybel_badname.pdb"
     out_pdb_file = f"{WORK_DIR}{file_prefix}_pybel.pdb"
 
     with pytest.raises(ValueError) as e:    # The value error is expected to be raised when unexpected Hydrogen atom(s) is detected.
+        _LOGGER.propagate = True
         prot._fix_pybel_output(pdb_path=intermediate_pdb_file, out_path=out_pdb_file, ref_name_path=pdb_file)
-    assert "The PDB file passed via `ref_name_path` should not contain Hydrogen atom(s)." in caplog.text
+    assert 'ref_name_path' in caplog.text
     # TODO (Zhong): The best way to do this in the _fix_pybel_output is: 
     # detect if there are any hydrogen interspersed in the middle of the file,
     # if the hydrogen atoms are all at the end of the file, it will not cause a problem.

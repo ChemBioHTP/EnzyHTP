@@ -256,7 +256,14 @@ def protonate_ligand_with_pybel(stru: Structure, ph: float = 7.0, int_ligand_fil
         int_pybel_file_path = fs.get_valid_temp_name(f"{int_ligand_file_path.removesuffix('.pdb')}_pybel.pdb")
         # file interface with pybel
         ligand.fix_atom_names()  # make sure original ligand have all unique names
-        with open(int_ligand_file_path, "w") as of:
+
+        # TODO (Zhong): Add a detection and raise a warning if Hydrogen atom(s) is detected.
+        # TODO: Delete Hydrogen here.
+        if (ligand.has_hydrogen()):
+            _LOGGER.warning('The hydrogen atoms in the ligand is detected.')
+            ligand = stru_oper.remove_hydrogens(ligand)
+        
+        with open(int_ligand_file_path, "w") as of: 
             of.write(sp.get_file_str(ligand))
         pybel_protonate_pdb_ligand(int_ligand_file_path, int_pybel_file_path, ph=ph)
         ref_ligand = sp.get_structure(int_pybel_file_path).ligands[0]
@@ -310,6 +317,23 @@ def _fix_pybel_output(pdb_path: str, out_path: str, ref_name_path: str = None) -
         ref_ligand.read_pdb(ref_name_path)
         ref_ligand_df: pd.DataFrame = pd.concat((ref_ligand.df["ATOM"], ref_ligand.df["HETATM"]), ignore_index=True)
         ref_ligand_df.sort_values("line_idx", inplace=True)  # make sure lines are aligned
+
+        # TODO (Zhong): Finds the first hydrogen atom in the element column
+        # and throws a ValueError if it is followed by any heavy atom anywhere.
+        element_symbols = ref_ligand_df['element_symbol'].to_list()
+        if ('H' in element_symbols):
+            hydrogen_index = element_symbols.index('H')
+            for element in element_symbols[hydrogen_index:]:
+                if element != 'H':
+                    from os.path import basename
+                    ref_name_basename = basename(ref_name_path)
+                    exception_msg = f'{ref_name_basename}: In the PDB file passed via `ref_name_path`, there should not be any hydrogen atom in the middle, i.e., the hydrogen atom(s) should be absent or at the end of the file.'
+                    _LOGGER.exception(exception_msg)
+                    raise ValueError(exception_msg)
+                continue
+        else:
+            pass
+
         ref_resi_name = ref_ligand_df.iloc[0]["residue_name"].strip()
         for i, atom_df in ref_ligand_df.iterrows():
             ref_atom_names.append(atom_df["atom_name"].strip())

@@ -233,6 +233,11 @@ class Residue(DoubleLinkedNode):
                                 " Something wrong in your residue indexing. "
                                 "It could be your index is not continous")
         return result
+    
+    def hydrogens(self):
+        """Return all the hydrogen atoms in the Residue/Ligand."""
+        result: List[Atom] = list(filter(lambda atom: (atom.element == 'H'), self.atoms))
+        return result
     #endregion
 
     #region === Checker ===
@@ -301,6 +306,12 @@ class Residue(DoubleLinkedNode):
     def has_init_charge(self) -> bool:
         """check if self has charge"""
         return math.prod([atom.has_init_charge() for atom in self.atoms])  
+    
+    def has_hydrogen(self) -> bool:
+        """Check if self has hydrogen atom(s)."""
+        element_list = self.element_composition
+        return ('H' in element_list)
+
     #endregion
 
     #region === Editor ===
