@@ -1,4 +1,9 @@
-#TODO(CJ): documentation!
+"""TODO(CJ)
+
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Date: 2024-01-22
+"""
+
 
 from .api import (
     StructureRegion,

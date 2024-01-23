@@ -115,7 +115,7 @@ class ResidueCap(Residue):
     
     @property
     def idx(self) -> int:
-        return self.link_atom.idx
+        return self.link_residue.idx
 
     @property
     def chain(self) -> Chain:
@@ -175,6 +175,9 @@ class ResidueCap(Residue):
         return geom_cap
 
 
+
+
+
 class CH3Cap(ResidueCap):
     """the CH3 cap
     TODO move the default atom coord in?
@@ -224,7 +227,6 @@ class CH3Cap(ResidueCap):
 
 class NHCH3Cap(ResidueCap):
     """Methylamide, good for c term"""
-    pass
     DEFAULT_COORDS = {
         "NP1": (0.000, 0.000, 0.000),
         "HP11": (),
@@ -238,7 +240,6 @@ class NHCH3Cap(ResidueCap):
         "CP21" : (),
         "CP22": (),
         "CP22" : (),
-
     }
 
 
