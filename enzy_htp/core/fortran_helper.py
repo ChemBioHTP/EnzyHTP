@@ -44,7 +44,10 @@ def parse_data(fmt: str, data: str, reduce: bool = False) -> List[List]:
                     _LOGGER.debug("repeat not fullfilled in data. make sure it is what you want")
                     break
                 raw_data_ele = raw_data[idx: idx + width].strip()
-                result_data.append(type_ctor(raw_data_ele))
+                if raw_data_ele:
+                    result_data.append(type_ctor(raw_data_ele))
+                else:
+                    result_data.append(None)
                 repeat -= 1
                 idx += width
         if reduce and len(result_data) == 1:
