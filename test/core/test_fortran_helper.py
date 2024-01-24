@@ -42,3 +42,34 @@ def test_parse_format_bad_input():
 
     assert fh.parse_format('FORMAT(20a4') == (-1, None, -1, -1)
 
+def test_parse_data():
+    """as name"""
+    test_data = ("    3978      15    2000    2009    4555    2708    9050    8604"
+    "       0       0   21922     254    2009    2708    8604      72     161"
+    "     184      42       0       0       0       0       0       0       0"
+    "       0       2      24       0       0")
+    test_fmt = "FORMAT(10I8)"
+
+    result = fh.parse_data(test_fmt, test_data)
+    assert result == [
+        [3978, 15, 2000, 2009, 4555, 2708, 9050, 8604, 0, 0],
+        [21922, 254, 2009, 2708, 8604, 72, 161, 184, 42, 0],
+        [0,   0,   0,   0,   0,   0,   0,   2,  24,   0],   [0]
+    ]
+
+    test_data = ("    3978      15N   H1      2000    2009N   H1  ")
+    test_fmt = "FORMAT(2I8, 2a4)"
+
+    result = fh.parse_data(test_fmt, test_data)
+    assert result == [
+        [3978, 15, "N", "H1"],
+        [2000, 2009, "N", "H1"],
+    ]
+
+    test_data = ("default_name ")
+    test_fmt = "FORMAT(20a4)"
+
+    result = fh.parse_data(test_fmt, test_data)
+    assert result == [
+        ["defa", "ult_", "name"],
+    ]

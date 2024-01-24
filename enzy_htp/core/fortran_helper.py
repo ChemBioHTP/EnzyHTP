@@ -9,7 +9,6 @@ import re
 
 from .logger import _LOGGER
 
-
 def parse_data(fmt: str, data: str, reduce: bool = False) -> List[List]:
     """helper function that parses a data section from a Fortran-based data file.
     (e.g.: the prmtop file from Amber MD)
@@ -34,22 +33,25 @@ def parse_data(fmt: str, data: str, reduce: bool = False) -> List[List]:
 
     raw_data_list: List[str] = list()
     for idx in range(0, len(data), total_width):
-        raw_data_list.append(data[idx:idx + total_width].strip())
+        raw_data_list.append(data[idx:idx + total_width])
 
     for raw_data in raw_data_list:
         idx = 0
         result_data = []
         for repeat, type_ctor, width, digit in format_list:
             while repeat > 0:
-                raw_data_ele = raw_data[idx: idx + width]
+                if idx + width > len(raw_data):
+                    _LOGGER.info("repeat not fullfilled in data. make sure it is what you want")
+                    break
+                raw_data_ele = raw_data[idx: idx + width].strip()
                 result_data.append(type_ctor(raw_data_ele))
                 repeat -= 1
+                idx += width
         if reduce and len(result_data) == 1:
             result_data = result_data[0]
         result.append(result_data)
     
     return result
-
 
 def parse_format(fmt: str) -> List[Tuple[Any, int]]:
     """helper function that parses a FORMAT() notation from a Fortran-based data file.
@@ -122,5 +124,13 @@ def parse_single_format(fmt: str) -> Tuple[Any, int]:
 
     return int(repeat), type_ctor, int(width), int(digit)
 
-def get_total_width():
-    """"""
+def get_total_width(fmt_list: List[Tuple]) -> int:
+    """determine the total width of a datapoint composed by
+    a list of data elements that each have a width.
+    the total width is the sum of the width of each element"""
+    result = 0
+    for repeat, ctor, width, digit in fmt_list:
+        while repeat > 0:
+            result += width
+            repeat -= 1
+    return result
