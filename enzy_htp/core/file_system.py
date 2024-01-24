@@ -1,6 +1,7 @@
 """Module holds functions for manipulation of files, directories and other system related items. 
 
 Author: Chris Jurich, <chris.jurich@vanderbilt.edu>
+Author: QZ Shao, <shaoqz@icloud.com>
 Date: 2022-03-14
 """
 from io import IOBase

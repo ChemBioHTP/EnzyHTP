@@ -51,6 +51,9 @@ def parse_data(fmt: str, data: str, reduce: bool = False) -> List[List]:
             result_data = result_data[0]
         result.append(result_data)
     
+    if reduce and len(result) == 1:
+        result = result[0]
+
     return result
 
 def parse_format(fmt: str) -> List[Tuple[Any, int]]:

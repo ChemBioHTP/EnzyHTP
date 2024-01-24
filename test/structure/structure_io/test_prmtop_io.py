@@ -34,6 +34,25 @@ def test_parse_title():
         "TITLE" : "default_name"
     }
 
+def test_parse_atom_name():
+    """test using content from an example file: {DATA_DIR}/KE_07_R7_2_S_10f.prmtop"""
+    test_content = """ ATOM_NAME                                                                 
+%FORMAT(20a4)                                                                   
+N   H1  H2  H3  CA  HA  CB  HB2 HB3 CG  HG2 HG3 SD  CE  HE1 HE2 HE3 C   O   N   
+H   CA  HA  CB  HB2 HB3 CG  HG  CD1 HD11HD12HD13CD2 HD21HD22HD23C   O   N   H   
+CA  HA  CB  HB1 HB2 HB3 C   O   N   H   CA  HA  CB  HB2 HB3 CG  HG2 HG3 CD  HD2 
+HD3 CE  HE2 HE3 NZ  HZ1 HZ2 HZ3 C   O   N   H   CA  HA  CB  HB2 HB3 CG  HG2 HG3 
+CD  HD2 HD3 NE  HE  CZ  NH1 HH11HH12NH2 HH21HH22C   O   N   H   CA  HA  CB  HB  
+CG2 HG21HG22HG23CG1 HG12HG13CD1 HD11HD12HD13C   O   N   H   CA  HA  CB  HB2 HB3 
+CG  OD1 OD2 C   O   N   H   CA  HA  CB  HB1 HB2 HB3 C   O   N   H   CA  HA  CB  
+HB1 HB2 HB3 C   O   N   H   CA  HA  CB  HB2 HB3 CG  HG  CD1 HD11HD12HD13CD2 HD21
+HD22HD23C   O   N   H   CA  HA  CB  HB  CG2 HG21HG22HG23CG1 HG12HG13CD1 HD11HD12
+HD13C   O   N   H   CA  HA  CB  HB2 HB3 CG  HG2 HG3 SD  CE  HE1 HE2 HE3 C   O   
+N   H   CA  HA  CB  HB2 HB3 CG  HG2 HG3 CD  HD2 HD3 CE  HE2 HE3 NZ  HZ1 HZ2 HZ3 
+C   O   N   H   CA  HA  CB  HB2 HB3 CG  OD1 OD2 C   O   N   H   CA  HA2 """
+
+    assert len(PrmtopParser._parse_atom_name(test_content)["ATOM_NAME"]) == 238
+
 def test_parse_prmtop_file():
     """test using an example file"""
     test_prmtop = f"{DATA_DIR}/KE_07_R7_2_S_10f.prmtop"
