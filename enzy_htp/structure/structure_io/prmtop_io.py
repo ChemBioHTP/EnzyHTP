@@ -33,7 +33,15 @@ class PrmtopParser(StructureParserInterface):
                 the file path of the prmtop file
         Return:
             Structure()"""
-        pass # TODO: add when need
+        data = cls._parse_prmtop_file(path)
+
+        # build atoms (contain charge)
+
+        # build residues
+
+        # build chains
+
+        # build structure
 
     @classmethod
     def get_file_str(cls, stru: Structure) -> str:
@@ -65,7 +73,7 @@ class PrmtopParser(StructureParserInterface):
 
         result = {}
         content: str = fs.content_from_file( path )
-        sections = content.split("%FLAG")
+        sections = re.split(r"^%FLAG", content, flags=re.MULTILINE)
 
         for sec in sections:
             if sec.find("%VERSION") != -1:
@@ -127,6 +135,12 @@ class PrmtopParser(StructureParserInterface):
             "CAP_INFO2" : cls._parse_cap_info2,
             "POLARIZABILITY" : cls._parse_polarizability,
             "IPOL" : cls._parse_ipol,
+            "ATOM_NUMBER" : cls._parse_atom_number,
+            "ATOM_BFACTOR" : cls._parse_atom_bfactor,
+            "ATOM_OCCUPANCY" : cls._parse_atom_occupancy,
+            "ATOM_ELEMENT" : cls._parse_atom_element,
+            "RESIDUE_CHAINID" : cls._parse_residue_chainid,
+            "RESIDUE_NUMBER" : cls._parse_residue_number,
         }
 
     @classmethod
@@ -153,43 +167,106 @@ class PrmtopParser(StructureParserInterface):
         return {key : data}
 
     @classmethod
+    def _remove_comments(cls, content: str) -> str:
+        """remove comment lines from the content"""
+        content = content.splitlines()
+        content = [i for i in content if "COMMENT" not in i ]
+        result = "\n".join(content)
+        print(result)
+        return result
+
+    @classmethod
+    def _remove_empty_data(cls, content_dict: str) -> str:
+        """remove None s from the parsed content"""
+        for k in content_dict:
+            content_dict[k] = [i for i in content_dict[k] if i is not None ]
+
+    @classmethod
     def _parse_title(cls, content: str) -> Dict:
         """parse the 'title' section of prmtop file format."""
         result = cls._parse_general(content)
-        result["TITLE"] = "".join(result["TITLE"])
+        result["TITLE"] = "".join([i for i in result["TITLE"] if i])
         return result
 
     @classmethod
     def _parse_atom_name(cls, content: str) -> Dict:
         """parse the 'atom_name' section of prmtop file format."""
         result = cls._parse_general(content)
+        cls._remove_empty_data(result)
         return result
 
     @classmethod
     def _parse_charge(cls, content: str) -> Dict:
         """parse the 'charge' section of prmtop file format."""
         result = cls._parse_general(content)
+        cls._remove_empty_data(result)
         return result
 
     @classmethod
     def _parse_atomic_number(cls, content: str) -> Dict:
         """parse the 'atomic_number' section of prmtop file format."""
         result = cls._parse_general(content)
+        cls._remove_empty_data(result)
         return result
 
     @classmethod
     def _parse_residue_label(cls, content: str) -> Dict:
         """parse the 'residue_label' section of prmtop file format."""
         result = cls._parse_general(content)
+        cls._remove_empty_data(result)
         return result
 
     @classmethod
     def _parse_residue_pointer(cls, content: str) -> Dict:
         """parse the 'residue_pointer' section of prmtop file format. TODO"""
         result = cls._parse_general(content)
+        cls._remove_empty_data(result)
+        return result
+
+    @classmethod
+    def _parse_residue_number(cls, content: str) -> Dict:
+        """parse the 'residue_number' section of prmtop file format."""
+        content = cls._remove_comments(content)
+        result = cls._parse_general(content)
+        cls._remove_empty_data(result)
+        return result
+
+    @classmethod
+    def _parse_atom_number(cls, content: str) -> Dict:
+        """parse the 'atom_number' section of prmtop file format. TODO"""
+        content = cls._remove_comments(content)
+        result = cls._parse_general(content)
+        return result
+
+    @classmethod
+    def _parse_atom_element(cls, content: str) -> Dict:
+        """parse the 'atom_element' section of prmtop file format. TODO"""
+        content = cls._remove_comments(content)
+        result = cls._parse_general(content)
+        return result
+
+    @classmethod
+    def _parse_residue_chainid(cls, content: str) -> Dict:
+        """parse the 'residue_chainid' section of prmtop file format. TODO"""
+        content = cls._remove_comments(content)
+        result = cls._parse_general(content)
         return result
 
     # region unfullfilled TODO finish these when needed. I didnt make them directly use _parse_general because we dont want to store too much we dont need in the mem.
+    @classmethod
+    def _parse_atom_bfactor(cls, content: str) -> Dict:
+        """parse the 'atom_bfactor' section of prmtop file format. TODO"""
+        result = {}
+
+        return result
+
+    @classmethod
+    def _parse_atom_occupancy(cls, content: str) -> Dict:
+        """parse the 'atom_occupancy' section of prmtop file format. TODO"""
+        result = {}
+
+        return result
+
     @classmethod
     def _parse_pointers(cls, content: str) -> Dict:
         """parse the 'pointers' section of prmtop file format. TODO"""
