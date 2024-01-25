@@ -262,8 +262,6 @@ def constraint_params_from_element(topology:Structure, elem:ET.Element, n_atoms:
         result['atoms'].append(topology.get(atom_key))
         to_remove.append( atom_name )
 
-        #if atom_name ont in )
-   
     target_value_raw:str = elem.attrib.get('target_value', None) 
     to_remove.append('target_value')
 
@@ -293,11 +291,12 @@ def distance_constraint_from_xml(topology:Structure, elem:ET.Element) -> Distanc
         A prepared DistanceConstraint.
     """
     element_params:Dict=constraint_params_from_element(topology, elem, 2)
-    d_cst = DistanceConstraint(element_params['atoms'], element_params['target_value'])
-    d_cst.update_params(element_params['params'])
-    
-    return d_cst
-
+    return create_distance_constraint( 
+        element_params['atoms'][0],
+        element_params['atoms'][1],
+        element_params['target_value'],
+        topology=topology,
+        params=element_params['params'])
 
 def angle_constraint_from_xml(topology:Structure, elem:ET.Element) -> AngleConstraint:
     """Creates a AngleConstraint from an Element found in a .xml file. Performs validation
@@ -311,10 +310,13 @@ def angle_constraint_from_xml(topology:Structure, elem:ET.Element) -> AngleConst
         A prepared AngleConstraint.
     """
     element_params:Dict=constraint_params_from_element(topology, elem, 3)
-    a_cst = AngleConstraint(element_params['atoms'], element_params['target_value'])
-    a_cst.update_params(element_params['params'])
-    return a_cst
-
+    return create_angle_constraint( 
+        element_params['atoms'][0],
+        element_params['atoms'][1],
+        element_params['atoms'][2],
+        element_params['target_value'],
+        topology=topology,
+        params=element_params['params'])
 
 def dihedral_constraint_from_xml(topology:Structure, elem:ET.Element) -> DihedralConstraint:
     """Creates a DihedralConstraint from an Element found in a .xml file. Performs validation
@@ -328,9 +330,14 @@ def dihedral_constraint_from_xml(topology:Structure, elem:ET.Element) -> Dihedra
         A prepared DihedralConstraint.
     """
     element_params:Dict=constraint_params_from_element(topology, elem, 4)
-    d_cst = DihedralConstraint(element_params['atoms'], element_params['target_value'])
-    d_cst.update_params(element_params['params'])
-    return d_cst
+    return create_dihedral_constraint( 
+        element_params['atoms'][0],
+        element_params['atoms'][1],
+        element_params['atoms'][2],
+        element_params['atoms'][3],
+        element_params['target_value'],
+        topology=topology,
+        params=element_params['params'])
 
 
 def cartesian_freeze_from_xml(topology:Structure, elem:ET.Element) -> CartesianFreeze:
@@ -372,8 +379,5 @@ def backbone_freeze_from_xml(topology:Structure, elem:ET.Element) -> BackBoneFre
     Returns:
         A prepared BackBoneFreeze.
     """
-    atoms:List[Atom] = topology.backbone_atoms()
-    bbf = BackBoneFreeze(atoms)
-    bbf.update_params( energy_params_from_element(elem) )
-    return bbf 
+    return create_backbone_freeze(topology, params=energy_params_from_element(elem ))
 

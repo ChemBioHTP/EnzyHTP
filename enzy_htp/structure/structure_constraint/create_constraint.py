@@ -144,18 +144,23 @@ def create_cartesian_freeze(
     result.check_consistent_topology()
     return result
 
-def create_backbone_freeze(stru: Structure) -> BackBoneFreeze:
+def create_backbone_freeze(stru: Structure, params:Dict) -> BackBoneFreeze:
     """constructor for BackboneFreeze. Constrain only C,CA,N.
     Args:
         stru: the target structure"""
     atoms = stru.backbone_atoms()
-    return BackBoneFreeze(atoms=atoms)
+    result = BackBoneFreeze(atoms=atoms)
+    if params is not None:
+        result.update_params( params )
+    return result
 
 def create_distance_constraint(
         atom_1: Union[Atom, str],
         atom_2: Union[Atom, str],
         target_value: float,
-        topology: Structure= None,) -> DistanceConstraint:
+        topology: Structure= None,
+        params:Dict=None
+        ) -> DistanceConstraint:
     """constructor for DistanceConstraint between atoms.
     Args:
         atom_1, atom_2:
@@ -173,6 +178,8 @@ def create_distance_constraint(
         target_value=target_value
     )
     result.check_consistent_topology()
+    if params is not None:
+        result.update_params(params)
     return result
 
 def create_angle_constraint(
@@ -180,7 +187,9 @@ def create_angle_constraint(
         atom_2: Union[Atom, str],
         atom_3: Union[Atom, str],
         target_value: float,
-        topology: Structure= None,) -> AngleConstraint:
+        topology: Structure= None,
+        params:Dict=None
+        ) -> AngleConstraint:
     """constructor for AngleConstraint between atoms.
     Args:
         atom_1, atom_2, atom_3:
@@ -199,6 +208,8 @@ def create_angle_constraint(
         target_value=target_value
     )
     result.check_consistent_topology()
+    if params is not None:
+        result.update_params(params)
     return result
 
 def create_dihedral_constraint(
@@ -207,7 +218,9 @@ def create_dihedral_constraint(
         atom_3: Union[Atom, str],
         atom_4: Union[Atom, str],
         target_value: float,
-        topology: Structure= None,) -> DihedralConstraint:
+        topology: Structure= None,
+        params:Dict=None
+        ) -> DihedralConstraint:
     """constructor for DihedralConstraint between atoms.
     Args:
         atom_1, atom_2, atom_3, atom_4:
@@ -228,6 +241,9 @@ def create_dihedral_constraint(
         target_value=target_value
     )
     result.check_consistent_topology()
+    if params is not None:
+        result.update_params(params)
+
     return result
 
 def _dispatch_get_key(target: Union[str, Atom, Residue], stru: Structure) -> Union[Atom, Residue]:

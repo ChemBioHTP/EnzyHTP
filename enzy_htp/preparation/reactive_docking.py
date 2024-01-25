@@ -95,10 +95,10 @@ def dock_reactants(structure: Structure,
     if use_qm:
         qm_minimization(structure, constraints, cluster_distance, work_dir)
 
-    mm_minimization(structure, cluster_distance, constraints, param_files, rng_seed, work_dir)
-
-    if use_qm:
-        qm_minimization(structure, [], cluster_distance, work_dir)
+#    mm_minimization(structure, cluster_distance, constraints, param_files, rng_seed, work_dir)
+#
+#    if use_qm:
+#        qm_minimization(structure, [], cluster_distance, work_dir)
 
     if not save_work_dir:
         _LOGGER.info(f"save_work_dir set to False! Deleting {work_dir}")
