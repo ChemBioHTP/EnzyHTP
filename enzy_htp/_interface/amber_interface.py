@@ -46,7 +46,8 @@ from enzy_htp.structure import (
     MetalUnit,
     ModifiedResidue,
     NonCanonicalBase,
-    StructureEnsemble)
+    StructureEnsemble,
+    PDBParser)
 from enzy_htp import config as eh_config
 
 class AmberParameter(MolDynParameter):
@@ -182,6 +183,8 @@ class AmberParameterizer(MolDynParameterizer):
         # 0. set up paths
         result_inpcrd = fs.get_valid_temp_name(f"{self.parameterizer_temp_dir}/amber_parm.inpcrd")
         result_prmtop = fs.get_valid_temp_name(f"{self.parameterizer_temp_dir}/amber_parm.prmtop")
+        temp_prmtop = fs.get_valid_temp_name(f"{self.parameterizer_temp_dir}/amber_parm_missing_pdb_info.prmtop")
+        temp_ref_pdb = fs.get_valid_temp_name(f"{self.parameterizer_temp_dir}/amber_parm_ref_pdb.pdb")
         fs.safe_mkdir(self.parameterizer_temp_dir)
 
         # 1. check stru diversity
@@ -223,14 +226,20 @@ class AmberParameterizer(MolDynParameterizer):
                                             maa_parms,
                                             metalcenter_parms,
                                             result_inpcrd,
-                                            result_prmtop,)
+                                            temp_prmtop,)
 
         # 4. run tleap
         self.parent_interface.run_tleap(tleap_content)
 
-        # 5. clean up
+        # 5. run add_pdb
+        PDBParser().save_structure(temp_ref_pdb, stru, if_renumber=False, if_fix_atomname=False)
+        self.parent_interface.run_add_pdb(temp_prmtop, result_prmtop, temp_ref_pdb)
+
+        # 6. clean up
         fs.clean_temp_file_n_dir([
             temp_dry_pdb,
+            temp_prmtop,
+            temp_ref_pdb,
             self.parameterizer_temp_dir,
         ])
 
@@ -1133,6 +1142,25 @@ class AmberInterface(BaseInterface):
                 cmd_args.extend(["-pf", "2"])
 
         self.env_manager_.run_command("parmchk2", cmd_args)
+
+    # -- add_pdb --
+    def run_add_pdb(self, in_prmtop: str, out_path: str, ref_pdb: str, guess: bool = False):
+        """the python wrapper of running add_pdb
+        Args:
+            in_prmtop:
+                the path of the input prmtop
+            out_prmtop:
+                the target output path of the modified prmtop
+            ref_pdb:
+                the reference pdb to add to prmtop
+            guess:
+                Guess atomic elements when absent from the PDB file.
+                (default assumes proper element-aligned names)"""
+        # run tleap command
+        cmd_args = f"-i {in_prmtop} -p {ref_pdb} -o {out_path}"
+        if guess:
+            cmd_args = f"{cmd_args} -guess"
+        self.env_manager_.run_command("add_pdb", cmd_args)
 
     # -- cpptraj --
 
@@ -2234,7 +2262,7 @@ Instantiated here so that other _interface subpackages can use it.
 An example of this concept this AmberInterface used Gaussian for calculating the RESP charge
 so it imports gaussian_interface that instantiated in the same fashion."""
 
-class AmberNCParser():
+class AmberNCParser(): # TODO finish this.
     """parser Amber .nc file
     Attribute:
         prmtop_file
