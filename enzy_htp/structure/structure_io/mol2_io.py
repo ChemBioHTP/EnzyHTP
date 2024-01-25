@@ -84,7 +84,7 @@ class Mol2Parser(StructureParserInterface):
             for ll in labels:
                 temp[ll] = aa[ll]
             
-            atoms.append( Atom(temp) )
+            atoms.append( Atom.from_biopandas(temp) )
             atoms[-1].idx = aa['atom_id']
             atoms[-1].element = aa['atom_type'].split('.')[0]
 
