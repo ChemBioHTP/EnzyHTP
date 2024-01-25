@@ -15,7 +15,7 @@ DATA_DIR = f"{BASE_DIR}/../data"
 
 def test_prmtop_parser_get_stru():
     """make sure function works as expected"""
-    test_prmtop = f"{DATA_DIR}/KE_07_R7_2_S_10f.prmtop"
+    test_prmtop = f"{DATA_DIR}/KE_07_R7_2_S_sol_addpdb.prmtop"
     test_stru = PrmtopParser().get_structure(test_prmtop)
     assert test_stru.residues
 

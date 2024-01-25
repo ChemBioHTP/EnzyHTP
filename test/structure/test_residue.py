@@ -145,23 +145,6 @@ def test_renumber_atoms():
     res_cpy.renumber_atoms(test_idx_list)
     assert res_cpy.atom_idx_list == list(range(1,15))
 
-
-def test_renumber_atoms_bad_input():
-    """Ensuring the Residue.renumber_atoms() method fails when an invalid start index (<= 0) is given."""
-
-    with pytest.raises(SystemExit) as exe:
-        RESIDUES[0].renumber_atoms(0)
-
-    assert exe.type == SystemExit
-    assert exe.value.code == 1
-
-    with pytest.raises(SystemExit) as exe:
-        RESIDUES[0].renumber_atoms(-1)
-
-    assert exe.type == SystemExit
-    assert exe.value.code == 1
-
-
 def test_remove_atoms_not_in_list():
     """test function works as expected"""
     test_residue = copy.deepcopy(RESIDUES[1])

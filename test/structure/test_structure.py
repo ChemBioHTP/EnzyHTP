@@ -59,8 +59,8 @@ def equiv_files(fname1: str, fname2: str, width: int = None) -> bool:
 
 def test_structure_ctor_bad_input():
     """Testing that the Structure() ctor fails when given duplicate chains."""
-    Atom_1 = Atom({"atom_name": "X", "x_coord": 1, "y_coord": 2, "z_coord": 3})
-    Atom_2 = Atom({"atom_name": "X", "x_coord": 3, "y_coord": 2, "z_coord": 1})
+    Atom_1 = Atom.from_biopandas({"atom_name": "X", "x_coord": 1, "y_coord": 2, "z_coord": 3})
+    Atom_2 = Atom.from_biopandas({"atom_name": "X", "x_coord": 3, "y_coord": 2, "z_coord": 1})
     chain1 = Chain("A", [Residue(1, "XXX", [Atom_1])])
     chain2 = Chain("B", [Residue(2, "XXX", [Atom_2])])
     chain3 = Chain("A", [Residue(3, "XXX", [Atom_1])])
