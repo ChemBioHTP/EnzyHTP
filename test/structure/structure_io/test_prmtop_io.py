@@ -17,7 +17,16 @@ def test_prmtop_parser_get_stru():
     """make sure function works as expected"""
     test_prmtop = f"{DATA_DIR}/KE_07_R7_2_S_sol_addpdb.prmtop"
     test_stru = PrmtopParser().get_structure(test_prmtop)
-    assert test_stru.residues
+    assert test_stru.residues[0].num_atoms == 19
+    assert test_stru.residues[0].find_atom_name("N").charge == 0.1592
+    assert test_stru.residues[-1].idx == 6700
+    assert test_stru.residues[-1].name == "WAT"
+    assert set(test_stru.residues[253].atom_name_list) == set([
+        "OAB","NAL","OAA","CAI","CAF","H1",
+        "CAC","H4","CAD","H3","CAK","CAJ",
+        "CAE","H2","NAG","OAH",
+    ])
+    assert test_stru.atoms[-1].charge == 0.417
 
 def test_parse_version():
     """test using content from an example file: {DATA_DIR}/KE_07_R7_2_S_10f.prmtop"""

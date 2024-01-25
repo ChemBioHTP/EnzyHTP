@@ -214,7 +214,6 @@ class Structure(DoubleLinkedNode):
     def residues(self) -> List[Residue]:
         """Return a list of the residues in the Structure() object sorted by (chain_id, residue_id)"""
         result = list(itertools.chain.from_iterable(self._chains))
-        result.sort(key=lambda r: r.key())
         return result
 
     @property

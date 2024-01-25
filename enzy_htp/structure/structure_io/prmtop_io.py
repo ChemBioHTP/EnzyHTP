@@ -5,13 +5,17 @@ this parser only. The PrmtopParser has no private data and serves as a namespace
 Author: Qianzhen Shao <shaoqz@icloud.com>
 Date: 2023-10-28
 """
+from collections import defaultdict
 from typing import Dict, List
 import re
 from itertools import chain
+import periodictable
 
 from ._interface import StructureParserInterface
-from ..structure import Structure, convert_res_to_structure
+from ..structure import Structure, Atom, Residue, Chain
+from .pdb_io import PDBParser
 
+from enzy_htp.chemical.solvent import RD_SOLVENT_LIST
 import enzy_htp.core.file_system as fs
 import enzy_htp.core.fortran_helper as fh
 from enzy_htp.core.logger import _LOGGER
@@ -24,25 +28,120 @@ class PrmtopParser(StructureParserInterface):
         pass
 
     @classmethod
-    def get_structure(cls, path: str) -> Structure:
+    def get_structure(
+            cls,
+            path: str,
+            add_solvent_list: List = None,
+            add_ligand_list: List = None,
+        ) -> Structure:
         """Converting a .prmtop file (as its path) into the Structure()
         also assign charges as prmtop contains.
         NOTE that this structure dont have actual coordinates/geometry
         Arg:
             path:
                 the file path of the prmtop file
+            add_solvent_list:
+                (used for categorize residues) additional 
+                solvents are recognized by matching names 
+                non-polypeptide chains:
+                    chem.RD_SOLVENT_LIST + add_solvent_lis
+            add_ligand_list:
+                (used for categorize residues) additional 
+                ligands are recognized by not matching nam
+                in non-polypeptide chains:
+                    1. chem.RD_SOLVENT_LIST + add_solvent_
+                    2. chem.RD_NON_LIGAND_LIST - add_ligan
+                    * solvent list have higher pirority
         Return:
             Structure()"""
+        _LOGGER.debug(f"Building Structure() from prmtop ({path}) ")
+        if add_solvent_list is None:
+            add_solvent_list = []
         data = cls._parse_prmtop_file(path)
 
+        # san check
+        essential = ["ATOM_NUMBER", "RESIDUE_CHAINID", "RESIDUE_NUMBER"]
+        for ess in essential:
+            if ess not in data:
+                _LOGGER.error(f"{ess} not in prmtop. ({path}) You need a prmtop after `add_pdb`.")
+                raise ValueError
+        
         # build atoms (contain charge)
+        atoms = []
+        atom_data_list = zip(data["ATOM_NAME"], data["CHARGE"], data["ATOMIC_NUMBER"], data["ATOM_NUMBER"])
+        for name, charge, ele_num, idx in atom_data_list:
+            charge = charge / 18.2223 # unit: e
+            atom = Atom(
+                name = name,
+                coord = (None, None, None),
+                idx = idx,
+                element = periodictable.elements[ele_num],
+                charge = charge,
+            )
+            atoms.append(atom)
 
         # build residues
+        residue_mapper = defaultdict(list)
+        next_pointers = data["RESIDUE_POINTER"][1:] + [None]
+        residue_data_list = zip(data["RESIDUE_LABEL"], data["RESIDUE_POINTER"], next_pointers, data["RESIDUE_CHAINID"], data["RESIDUE_NUMBER"])
+        taken_ch_ids = set(data["RESIDUE_CHAINID"])
+        legal_ch_ids = PDBParser._get_legal_pdb_chain_ids(taken_ch_ids)
+        legal_res_idx = cls._get_legal_residue_idx(data["RESIDUE_NUMBER"])
+        solvent_list = ["Na+", "Cl-"] + RD_SOLVENT_LIST + add_solvent_list
+        for name, pointer, next_pointer, chain_id, idx in residue_data_list:
+            # resolve chain id
+            if chain_id is None:
+                if name in solvent_list:
+                    chain_id = legal_ch_ids.pop()
+                    _LOGGER.debug("Found solvent with out chain id in prmtop. "
+                                  f"Assigning new chain: {chain_id}.")
+                else:
+                    _LOGGER.error("chain id lost in prmtop! "
+                                  f"residue {name} from {path} dont have a chain id.")
+                    raise ValueError
+            # resolve pointer
+            res_atoms = cls._resolve_residue_pointer(pointer, next_pointer, atoms)
+            # resolve missing residue index
+            if idx == 0:
+                if name in solvent_list:
+                    idx = legal_res_idx.pop()
+                else:
+                    _LOGGER.warning(f"found non-solvent residue index 0 from prmtop. make sure it is correct. ({path})")
+            
+            residue = Residue(
+                residue_name=name,
+                residue_idx=idx,
+                atoms = res_atoms,
+            )
+            residue_mapper[chain_id].append(residue)  # here it is {"chain_id": Residue()}
+
+        # categorize_residue
+        PDBParser._categorize_pdb_residue(residue_mapper, add_solvent_list, add_ligand_list)
 
         # build chains
+        chains = PDBParser._build_chains(residue_mapper, False)
 
         # build structure
+        return Structure(chains)
 
+    @classmethod
+    def _resolve_residue_pointer(cls, pointer: int, next_pointer: int, atoms: List[Atom]) -> List[Atom]:
+        """resolve residue pointers from prmtop
+        return a list of Atom()s of indicated by the pointer"""
+        pointer = pointer - 1
+        if next_pointer is None:
+            return atoms[pointer:]
+        else:
+            next_pointer = next_pointer - 1
+            return atoms[pointer:next_pointer]
+ 
+    @classmethod
+    def _get_legal_residue_idx(cls, taken_ids: List) -> List:
+        """get legal residue indexes"""
+        max_id = max(taken_ids)
+        result = list(range(max_id+1, max_id+10000))
+        return list(reversed(result))
+    
     @classmethod
     def get_file_str(cls, stru: Structure) -> str:
         """convert a Structure() to .prmtop file content."""
@@ -172,7 +271,6 @@ class PrmtopParser(StructureParserInterface):
         content = content.splitlines()
         content = [i for i in content if "COMMENT" not in i ]
         result = "\n".join(content)
-        print(result)
         return result
 
     @classmethod
@@ -197,7 +295,8 @@ class PrmtopParser(StructureParserInterface):
 
     @classmethod
     def _parse_charge(cls, content: str) -> Dict:
-        """parse the 'charge' section of prmtop file format."""
+        """parse the 'charge' section of prmtop file format.
+        NOTE that it is in Amber unit i.e. 18.2223e """
         result = cls._parse_general(content)
         cls._remove_empty_data(result)
         return result
