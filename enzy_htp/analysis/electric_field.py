@@ -24,7 +24,7 @@ from enzy_htp.structure.structure_selection import select_stru
 
 def ele_field_strength_at_along(
         stru: Structure,
-        p1: Union[ArrayLike, Atom],
+        p1: Union[ArrayLike, Atom], #TODO support atom key
         p2: Union[ArrayLike, Atom] = None,
         d1: ArrayLike = None,
         location: str = 'center',
