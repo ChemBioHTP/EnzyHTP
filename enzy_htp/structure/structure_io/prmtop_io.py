@@ -75,7 +75,7 @@ class PrmtopParser(StructureParserInterface):
                 name = name,
                 coord = (None, None, None),
                 idx = idx,
-                element = periodictable.elements[ele_num],
+                element = str(periodictable.elements[ele_num]),
                 charge = charge,
             )
             atoms.append(atom)
