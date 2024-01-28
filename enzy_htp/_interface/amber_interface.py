@@ -2240,25 +2240,18 @@ Instantiated here so that other _interface subpackages can use it.
 An example of this concept this AmberInterface used Gaussian for calculating the RESP charge
 so it imports gaussian_interface that instantiated in the same fashion."""
 
-class AmberNCParser(): # TODO finish
-    """parser Amber .nc file
+
+class AmberRSTParser():
+    """parser Amber .rst file to Structure()
     Attribute:
         prmtop_file
         parent_interface"""
     def __init__(self, prmtop_file: str, interface: BaseInterface = amber_interface):
         self.prmtop_file = prmtop_file
-        self.parent_interface: AmberInterface = interface
+        self.parent_interface = interface
     
-    def get_coordinates(self, nc_file: str) -> Generator[List[List[float]], None, None]:
-        """parse a nc file to a Generator of coordinates. Intermediate files are created."""
-        # 1. convert to a temp mdcrd file
-        self.parent_interface
-
-    def get_structures(self, nc_file: str) -> Generator[Structure, None, None]:
-        pass
-
-    def get_last_structure(self, nc_file: str) -> Structure:
-        """parse the last frame in a nc file to a Structure(). Intermediate files are created."""
+    def get_structure(self, rst_file: str) -> Structure:
+        """parse a rst file to a Structure()."""
 
 
 class AmberMDCRDParser():
@@ -2354,14 +2347,43 @@ class AmberMDCRDParser():
         pass
 
 
-class AmberRSTParser():
-    """parser Amber .rst file to Structure()
+class AmberNCParser():
+    """parser Amber .nc file
     Attribute:
         prmtop_file
         parent_interface"""
     def __init__(self, prmtop_file: str, interface: BaseInterface = amber_interface):
         self.prmtop_file = prmtop_file
-        self.parent_interface = interface
+        self.parent_interface: AmberInterface = interface
     
-    def get_structure(self, rst_file: str) -> Structure:
-        """parse a rst file to a Structure()."""
+    def mdcrd_parser(self) -> AmberMDCRDParser:
+        """get an associated mdcrd parser"""
+        return AmberMDCRDParser(prmtop_file=self.prmtop_file)
+
+    def get_coordinates(
+            self,
+            nc_file: str,
+            autoimage: bool=True) -> Generator[List[List[float]], None, None]:
+        """parse a nc file to a Generator of coordinates. Intermediate mdcrd file is created."""
+        # 0. init temp path
+        temp_dir = eh_config["system.SCRATCH_DIR"]
+        fs.safe_mkdir(temp_dir)
+        temp_mdcrd = fs.get_valid_temp_name(f"{temp_dir}/nc_parser_temp.mdcrd")
+
+        # 1. convert to a temp mdcrd file
+        self.parent_interface.convert_nc_to_mdcrd(
+            nc_path=nc_file,
+            prmtop_path=self.prmtop_file,
+            out_path=temp_mdcrd,
+            autoimage=autoimage,
+        )
+
+        # 2. parse mdcrd file
+        return self.mdcrd_parser().get_coordinates(temp_mdcrd)
+
+    def get_structures(self, nc_file: str) -> Generator[Structure, None, None]:
+        pass
+
+    def get_last_structure(self, nc_file: str) -> Structure:
+        """parse the last frame in a nc file to a Structure(). Intermediate files are created."""
+
