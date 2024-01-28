@@ -1163,6 +1163,39 @@ class AmberInterface(BaseInterface):
         self.env_manager_.run_command("add_pdb", cmd_args)
 
     # -- cpptraj --
+    def run_cpptraj(
+            self,
+            instr_str: str,
+            log_path: str = None,
+        ):
+        """the python wrapper of running cpptraj.
+        Based on https://amberhub.chpc.utah.edu/command-line-syntax/.
+        Args:
+            instr_str:
+                the str content of cpptraj.in instruction file
+            log_path:
+                path for the logging from cpptraj.
+                (default: {eh_config['system.SCRATCH_DIR']}/cpptraj.out)
+            TODO add more when needed"""
+        temp_path_list = []
+        # init file paths
+        fs.safe_mkdir(eh_config["system.SCRATCH_DIR"])
+        in_path = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/cpptraj.in")
+        temp_path_list.extend([eh_config["system.SCRATCH_DIR"], in_path])
+        if log_path is None:
+            log_path = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/cpptraj.out")
+            temp_path_list.append(log_path)
+
+        # write cpptraj.in
+        with open(in_path, "w") as of:
+            of.write(instr_str)
+
+        # run cpptraj command
+        cmd_args = f"-i {in_path} > {log_path}"
+        self.env_manager_.run_command("cpptraj", cmd_args)
+
+        # clean up temp file if success
+        fs.clean_temp_file_n_dir(temp_path_list)
 
     # -- index mapping --
     def get_amber_index_mapper(self, stru: Structure) -> Dict[str, Dict[Union[Residue, Atom], Union[int, tuple]]]:
@@ -2123,98 +2156,43 @@ class AmberInterface(BaseInterface):
             work_dir = work_dir,
         )
 
-    # region == TODO ==
-    def nc2mdcrd(
-        self,
-        nc_in: str,
-        prmtop: str,
-        point: Union[int, None] = None,
-        start: int = 1,
-        end: Union[int, str] = "last",
-        step: int = 1,
-        engine: str = "cpptraj",
-    ) -> str:
-        """Converts the supplied .nc file to an .mdcrd file. Scope of trajectory conversion can be
-        specified though by default all available frames are selected.
+    def convert_nc_to_mdcrd(
+            self,
+            nc_path: str,
+            prmtop_path: str,
+            out_path: str,
+            autoimage: bool = True,
+            start: int = 1,
+            end: int = "last",
+            step: int = 1,
+            ) -> None:
+        """convert a NC file to a MDCRD file using cpptraj
         Args:
-            nc_in: The path to the .nc file as a str().
-            prmtop: The path to the prmtop file as  str().
-            point: If not None, step is (nstlim/ntwx)/point. Default is None, but value should be int() when given.
+            nc_path: The path to the .nc file as a str().
+            prmtop_path: The path to the prmtop file as str().
+            out_path: the output MDCRD file path.
             start: 1-indexed starting point. Default value is 1.
             end: 1-indexed ending point. By default uses "last"
+            step: the step size of sampling points. default is 1.
             engine: The engine to convert the .nc file. Default value is "cpptraj".
-        Returns:
-            The name of the converted .mdcrd file.
         """
-        mdcrd: str = str(Path(nc_in).with_suffix(".mdcrd"))
-        config = self.config_.CONF_PROD
-        if point is not None:
-            step: int = int((int(config["nstlim"]) / int(config["ntwx"])) / point)
-
-        if engine == "cpptraj":
-            cpptraj_in = "./cpptraj_nc2mdcrd.in"
-            cpptraj_out = "./cpptraj_nc2mdcrd.out"
-            contents: List[str] = [
-                f"parm {prmtop}",
-                f"trajin {nc_in} {start} {end} {step}",
-                f"trajout {mdcrd}",
-                "run",
-                "quit",
-            ]
-            fs.write_lines(cpptraj_in, contents)
-            self.env_manager_.run_command("cpptraj", ["-i", cpptraj_in, ">", cpptraj_out])
-            #fs.safe_rm(cpptraj_in)
-            #fs.safe_rm(cpptraj_out)
-        else:
-            raise UnsupportedMethod(f"'{engine}' is not a supported method for AmberInteface.nc2mdcrd(). Allowed methods are: 'cpptraj'.")
-
-        return mdcrd
-
-    def get_frames(
-        self,
-        nc_in: str,
-        prmtop: str,
-        point: Union[int, None] = None,
-        start: int = 1,
-        end: Union[int, str] = "last",
-        step: int = 1,
-    ) -> str:
-        """Converts the supplied .nc file to an .mdcrd file. Scope of trajectory conversion can be
-        TODO(CJ): update this
-        """
-        outfile: str = f"{Path(prmtop).parent}/cpptraj_frames.pdb"
-        config = self.config_.CONF_PROD
-        if point is not None:
-            step: int = int((int(config["nstlim"]) / int(config["ntwx"])) / point)
-
-        cpptraj_in = "./cpptraj_nc2mdcrd.in"
-        cpptraj_out = "./cpptraj_nc2mdcrd.out"
         contents: List[str] = [
-            f"parm {prmtop}",
-            f"trajin {nc_in} {start} {end} {step}",
-            "strip :WAT",
-            "strip :Na+,Cl-",
-            f"trajout {outfile} conect",
+            f"parm {prmtop_path}",
+            f"trajin {nc_path} {start} {end} {step}",
+        ]
+        if autoimage:
+            contents += [
+                "autoimage"
+            ]
+        contents += [
+            f"trajout {out_path}",
             "run",
             "quit",
         ]
-        fs.write_lines(cpptraj_in, contents)
-        self.env_manager_.run_command("cpptraj", ["-i", cpptraj_in, ">", cpptraj_out])
-        #fs.safe_rm(cpptraj_in)
-        fs.safe_rm(cpptraj_out)
-        charges = read_charge_list(prmtop)
-        result = frames_from_pdb(outfile)
+        contents = "\n".join(contents)
+        self.run_cpptraj(contents)
 
-        if not len(result):
-            return result
-
-        num_atoms = len(result[0].atoms)
-        charges = charges[0:num_atoms]
-        for fidx, frame in enumerate(result):
-            result[fidx].update_charges(charges)
-
-        return result
-
+    # region == TODO ==
     def add_charges(self, stru: Structure, prmtop: str) -> None:
         """Method that adds RESP charges from a .prmtop file to the supplied Structure object. If the supplied prmtop
         file does not line up with the structure, an error is thrown. Performs operation in place.
@@ -2262,22 +2240,19 @@ Instantiated here so that other _interface subpackages can use it.
 An example of this concept this AmberInterface used Gaussian for calculating the RESP charge
 so it imports gaussian_interface that instantiated in the same fashion."""
 
-class AmberNCParser(): # TODO finish this.
+class AmberNCParser(): # TODO finish
     """parser Amber .nc file
     Attribute:
         prmtop_file
-        parent_interface
-    
-    TODO figure out where should these types of structure parser be placed.
-    These parser relies on the interface. They can not be directly used by structure
-    modules such as structure_operations.
-    Can structure_io just be above _interface?? Seems ok."""
+        parent_interface"""
     def __init__(self, prmtop_file: str, interface: BaseInterface = amber_interface):
         self.prmtop_file = prmtop_file
-        self.parent_interface = interface
+        self.parent_interface: AmberInterface = interface
     
     def get_coordinates(self, nc_file: str) -> Generator[List[List[float]], None, None]:
         """parse a nc file to a Generator of coordinates. Intermediate files are created."""
+        # 1. convert to a temp mdcrd file
+        self.parent_interface
 
     def get_structures(self, nc_file: str) -> Generator[Structure, None, None]:
         pass
