@@ -249,7 +249,7 @@ class StructureRegion:
         the Science API layer."""
         net_charge = 0
         for res, atoms in self.atoms_by_residue.items():
-            if res.is_noncanonical():
+            if (not res.has_init_charge()) and res.is_noncanonical():
                 res: NonCanonicalBase
                 if self.has_whole_residue(res):
                     if res.net_charge is None:
