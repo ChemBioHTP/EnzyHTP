@@ -249,3 +249,9 @@ def test_hydrogens_polypeptide_only():
     """as name"""
     test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
     assert len(test_stru.hydrogens(polypeptide_only=True)) == 1996
+
+def test_net_chrgspin_mapper():
+    """as name"""
+    test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
+    test_stru.assign_ncaa_chargespin({"H5J" : (0,1)})
+    assert test_stru.ncaa_chrgspin_mapper == {"H5J" : (0,1)}

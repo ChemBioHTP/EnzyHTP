@@ -57,9 +57,12 @@ class AmberParameter(MolDynParameter):
         inpcrd: the path of the .inpcrd input coordinate file
         prmtop: the path of the .prmtop parameter topology file"""
 
-    def __init__(self, inpcrd_path: str, prmtop_path: str):
+    def __init__(self, inpcrd_path: str, prmtop_path: str, ncaa_chrgspin_mapper: Dict = None):
         self._inpcrd = inpcrd_path
         self._prmtop = prmtop_path
+        if ncaa_chrgspin_mapper is None:
+            ncaa_chrgspin_mapper = {}
+        self.ncaa_chrgspin_mapper = ncaa_chrgspin_mapper
 
     #region == property ==
     @property
@@ -83,7 +86,7 @@ class AmberParameter(MolDynParameter):
     @property
     def topology_parser(self) -> callable:
         """return the parser object for topology_file"""
-        return prmtop_io.PrmtopParser().get_structure
+        return prmtop_io.PrmtopParser(self.ncaa_chrgspin_mapper).get_structure
 
     @property
     def input_coordinate_file(self) -> str:
@@ -243,7 +246,7 @@ class AmberParameterizer(MolDynParameterizer):
             self.parameterizer_temp_dir,
         ])
 
-        return AmberParameter(result_inpcrd, result_prmtop)
+        return AmberParameter(result_inpcrd, result_prmtop, stru.ncaa_chrgspin_mapper)
 
     def _parameterize_ligand(self, lig: Ligand, gaff_type: str) -> Tuple[str, List[str]]:
         """parameterize ligand for AmberMD, use ncaa_param_lib_path for customized

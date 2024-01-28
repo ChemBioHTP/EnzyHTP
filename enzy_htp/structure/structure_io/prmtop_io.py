@@ -23,13 +23,13 @@ from enzy_htp.core.exception import FileFormatError
 
 class PrmtopParser(StructureParserInterface):
     """the parser for Gaussian prmtop files"""
-    def __init__(self) -> None:  # pylint: disable=super-init-not-called
-        """pass"""
-        pass
+    def __init__(self, ncaa_chrgspin_mapper: Dict = None) -> None:  # pylint: disable=super-init-not-called
+        if ncaa_chrgspin_mapper is None:
+            ncaa_chrgspin_mapper = {}
+        self.ncaa_chrgspin_mapper = ncaa_chrgspin_mapper
 
-    @classmethod
     def get_structure(
-            cls,
+            self,
             path: str,
             add_solvent_list: List = None,
             add_ligand_list: List = None,
@@ -57,7 +57,7 @@ class PrmtopParser(StructureParserInterface):
         _LOGGER.debug(f"Building Structure() from prmtop ({path}) ")
         if add_solvent_list is None:
             add_solvent_list = []
-        data = cls._parse_prmtop_file(path)
+        data = type(self)._parse_prmtop_file(path)
 
         # san check
         essential = ["ATOM_NUMBER", "RESIDUE_CHAINID", "RESIDUE_NUMBER"]
@@ -86,7 +86,7 @@ class PrmtopParser(StructureParserInterface):
         residue_data_list = zip(data["RESIDUE_LABEL"], data["RESIDUE_POINTER"], next_pointers, data["RESIDUE_CHAINID"], data["RESIDUE_NUMBER"])
         taken_ch_ids = set(data["RESIDUE_CHAINID"])
         legal_ch_ids = PDBParser._get_legal_pdb_chain_ids(taken_ch_ids)
-        legal_res_idx = cls._get_legal_residue_idx(data["RESIDUE_NUMBER"])
+        legal_res_idx = type(self)._get_legal_residue_idx(data["RESIDUE_NUMBER"])
         solvent_list = ["Na+", "Cl-"] + RD_SOLVENT_LIST + add_solvent_list
         for name, pointer, next_pointer, chain_id, idx in residue_data_list:
             # resolve chain id
@@ -100,7 +100,7 @@ class PrmtopParser(StructureParserInterface):
                                   f"residue {name} from {path} dont have a chain id.")
                     raise ValueError
             # resolve pointer
-            res_atoms = cls._resolve_residue_pointer(pointer, next_pointer, atoms)
+            res_atoms = type(self)._resolve_residue_pointer(pointer, next_pointer, atoms)
             # resolve missing residue index
             if idx == 0:
                 if name in solvent_list:
@@ -122,7 +122,10 @@ class PrmtopParser(StructureParserInterface):
         chains = PDBParser._build_chains(residue_mapper, False)
 
         # build structure
-        return Structure(chains)
+        result = Structure(chains)
+        result.assign_ncaa_chargespin(self.ncaa_chrgspin_mapper)
+
+        return result
 
     @classmethod
     def _resolve_residue_pointer(cls, pointer: int, next_pointer: int, atoms: List[Atom]) -> List[Atom]:

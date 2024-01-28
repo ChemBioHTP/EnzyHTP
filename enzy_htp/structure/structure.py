@@ -332,7 +332,7 @@ class Structure(DoubleLinkedNode):
         return result
 
     @property
-    def noncanonicals(self) -> List[Residue]:
+    def noncanonicals(self) -> List[NonCanonicalBase]:
         """Filters out Residue()s that are ligand, modified residue, or metal in 
         the Structure()."""
         result: List[Residue] = list()
@@ -500,6 +500,28 @@ class Structure(DoubleLinkedNode):
             raise IndexMappingError
         idx_mapper = dict(zip(okeys, nkeys))
         return idx_mapper
+
+    @property
+    def ncaa_chrgspin_mapper(self) -> Dict[str, Tuple[int, int]]:
+        """the charge spin mapper for each NCAA in the structure.
+        3-letter name is used as the key, 
+        if your structure contains say metal with same name but
+        different spin, you should name them differently."""
+        result = {}
+        for ncaa in self.noncanonicals:
+            if ncaa.name in result:
+                exist_record = result[ncaa.name]
+                pending_record = (ncaa.net_charge, ncaa.multiplicity)
+                if exist_record != pending_record:
+                    if None in pending_record:
+                        continue
+                    elif None not in exist_record:
+                        _LOGGER.error("found NCAA with same name but different charge spin. You should name them differently")
+                        raise Exception
+            result[ncaa.name] = (ncaa.net_charge, ncaa.multiplicity)
+
+        return result
+
     # endregion
 
     #region === Checker ===
