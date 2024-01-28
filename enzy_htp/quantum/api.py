@@ -57,6 +57,8 @@ def single_point(
             This option allows you to define different region and apply different
             level of theory to each region.
             e.g.: defining 2 regions and perform QM/MM.
+            the regions are defined by a list of selection patterns.
+            the pattern is applied to the 1st frame.
         region_methods:
             The level of theory of each region.
             This is used when more than 1 region is specified.
