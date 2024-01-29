@@ -8,6 +8,7 @@ Supported operations include:
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-08-17
 """
+#TODO(CJ): add some logic here to lock the hydrogen bonds into place
 from __future__ import annotations
 import os
 from pathlib import Path
@@ -31,7 +32,8 @@ from enzy_htp.structure.structure_constraint import (
     DistanceConstraint,
     AngleConstraint,
     DihedralConstraint,
-    ResiduePairConstraint
+    ResiduePairConstraint,
+    freeze_hydrogen_bonds
 )
 
 from enzy_htp.electronic_structure import EletronicStructure
@@ -170,6 +172,7 @@ class XTBSinglePointEngine(QMSinglePointEngine):
         assert False
 
 class XTBOptimizationEngine(XTBSinglePointEngine, QMOptimizationEngine):
+    """TODO(CJ)"""
     def __init__(self,
                 interface,
                 method: QMLevelOfTheory,
@@ -181,8 +184,11 @@ class XTBOptimizationEngine(XTBSinglePointEngine, QMOptimizationEngine):
                 keep_in_file: bool,
                 work_dir: str,
                 ):
-        
-        self._constraints = constraints
+      
+        if constraints is not None:
+            self._constraints = constraints
+        else:
+            self._constraints = list()
         self._parent_interface = interface
         self._method = method
         self._region = region
@@ -204,10 +210,13 @@ class XTBOptimizationEngine(XTBSinglePointEngine, QMOptimizationEngine):
         sr = self.region
         if sr is None:
             sr = create_region_from_full_stru( stru )
-        
+
+        frozen_h_bonds:List[DistanceConstraint] = freeze_hydrogen_bonds(sr)
+
+
         run_info:Dict = self.parent_interface.setup_xtb_run(
             sr,
-            constraints=self.constraints,
+            constraints=self.constraints + frozen_h_bonds,
             lot=self.method,
             geo_opt=self.geo_opt,
             work_dir=self.work_dir,
@@ -278,7 +287,7 @@ class XTBInterface(BaseInterface):
             work_dir:
 
         Returns:
-
+            TODO(CJ)
         """
 
         if not isinstance(stru, StructureRegion):
@@ -368,7 +377,7 @@ class XTBInterface(BaseInterface):
 
         pdb_lines:List[str] = list()
         for aidx,aa in enumerate(sr.atoms):
-            aa.idx = aidx
+            aa.idx = aidx + 1
             pdb_lines.append( _parser._write_pdb_atom( aa ).replace('\n',''))
         
         fs.write_lines(temp_pdb, pdb_lines)

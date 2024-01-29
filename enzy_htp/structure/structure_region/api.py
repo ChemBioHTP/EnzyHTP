@@ -61,9 +61,24 @@ class StructureRegion:
         return self.atoms_
 
     @atoms.setter
-    def atoms(self, val: List[Atom]):
+    def atoms(self, val: List[Atom]) -> None:
         """setter for atoms_"""
         self.atoms_ = val
+
+        for atom in self.atoms:
+            if atom.parent.parent is None:
+                atom.parent.parent = self
+        #TODO(CJ): set the parent.
+
+    def add_atoms(self, new_atoms:List[Atom]) -> None:
+        #TODO(CJ): documentation!
+
+        self.atoms.extend(new_atoms)
+
+        for atom in self.atoms:
+            if atom.parent.parent is None:
+                atom.parent.set_parent(self)               
+        
 
     # region == prop getter ==
     @property
@@ -129,10 +144,11 @@ class StructureRegion:
         and from the same residue. TODO change name add capping."""
         distances = list()
         for aa in self.atoms:
-            if aa.element == 'H' or aa.parent != atom.parent:
+            if aa.element == 'H':
                 distances.append(1000)
             else:
                 distances.append( atom.distance_to(aa) )
+
         return self.atoms[np.argmin(distances)]
 
     def atoms_from_geom(self, geom: Structure) -> List[Atom]:
@@ -166,13 +182,19 @@ class StructureRegion:
     
     @property
     def involved_residues(self) -> List[Residue]:
-        """get all involved residues in the region"""
-        result = set()
+        """Get all involved residues in the region"""
+        result:List[Residue] = list()
+        unique = set()
         for atom in self.atoms:
             res = atom.parent
-            if not isinstance(res, ResidueCap):
-                result.add(res)
-        return list(result)
+            if isinstance(res, ResidueCap):
+                continue
+
+            if res not in unique:
+                unique.add(res)
+                result.append(res)
+        
+        return result
 
     @property
     def caps(self) -> List[ResidueCap]:
@@ -222,6 +244,28 @@ class StructureRegion:
                 _LOGGER.warning(f"{res.name} found. Not considered")
         return result
 
+
+    def needs_nterm_cap(self, res: Residue) -> bool:
+
+        if res.is_ligand():
+            return False
+
+        region_residues = self.involved_residues
+        n_side_res = res.n_side_residue()
+
+        return n_side_res is not None and n_side_res not in region_residues
+
+    def needs_cterm_cap(self, res: Residue) -> bool:
+
+        if res.is_ligand():
+            return False
+
+        region_residues = self.involved_residues
+        c_side_res = res.c_side_residue()
+
+        return c_side_res is not None and c_side_res not in region_residues
+
+
     def clone(self):
         """return a clone of self"""
         result = type(self).__new__(type(self))
@@ -264,8 +308,8 @@ class StructureRegion:
         return net_charge
     
     def get_spin(self) -> int:
-        """get the spin of the region"""
-        spin = 1
+        """Spin of the StructurRegion"""
+        spin:int = 1
         if not self.is_whole_residue_only():
             raise Exception("TODO. add support for init_spin")
         else:
@@ -288,6 +332,10 @@ class StructureRegion:
             if not atom.parent.is_residue_cap():
                 return atom.root()
     # endregion
+
+
+    def root(self, n):
+        return self.topology
 
     # region == checker ==
     def has_atoms(self, atoms:List[Atom] ) -> bool:

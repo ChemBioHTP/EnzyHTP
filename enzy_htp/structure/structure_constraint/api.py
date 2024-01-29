@@ -22,6 +22,7 @@ import numpy as np
 
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.exception import WrongTopology
+from ..structure_region import StructureRegion, ResidueCap
 from ..structure import Structure, Solvent, Chain, Residue, Atom
 from enzy_htp import config as eh_config
 
@@ -165,6 +166,13 @@ class StructureConstraint(ABC):
         top = self.atoms[0].root()
         for atom in self.atoms:
             current_top = atom.root()
+           
+            if isinstance(current_top, ResidueCap):
+                current_top = current_top.parent                
+
+            if isinstance(current_top, StructureRegion):
+                current_top = curren_top.topology()
+
             if not isinstance(current_top, Structure):
                 _LOGGER.error(
                     f"Topology should be Structure(). ({atom} has {current_top})")

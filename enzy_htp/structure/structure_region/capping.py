@@ -1,9 +1,23 @@
-"""This module handles free valence capping for StructureRegion 
+"""This module handles free valence capping for StructureRegion.
+
+This submodule includes the following functions:
+
+    + capping_with_residue_terminals()
+    + cap_residue_free_terminal()
+
+And the following classes:
+
+    + ResidueCap
+    + HCap
+    + CH3Cap
+    + COCH3Cap
+    + NHCH3Cap
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
 Date: 2024-1-1"""
 from __future__ import annotations
+from abc import abstractmethod, ABC
 from copy import deepcopy
 import numpy as np
 from scipy.spatial.transform import Rotation as R
@@ -15,8 +29,6 @@ from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
 from enzy_htp.core.math_helper import rotation_matrix_from_vectors
 from enzy_htp import chemical as chem
-
-#TODO(CJ): add methylamide -> cterm, acetate -> nterm
 
 # region == APIs ==
 
@@ -30,18 +42,18 @@ def capping_with_residue_terminals(raw_region,
     of the residue. (keyword: res_ter_cap)
     Args:
         raw_region: the target StructureRegion object
-        nterm_cap: the cap added to the N-ter
-        cterm_cap: the cap added to the C-ter
-        return_copy: whether edit in place or return an capped copy
+        nterm_cap: the cap added to the N-ter. Defaults to acetate if None.
+        cterm_cap: the cap added to the C-ter. Defaults to methylamide if None.
+        return_copy: whether edit in place or return an capped copy.
     Return:
         (if not return_copu, change the region in place)
         capped_region: the StructureRegion after capping."""
     # init
     if nterm_cap is None:
-        nterm_cap = "CH3"
+        nterm_cap = "COCH3"
 
     if cterm_cap is None:
-        cterm_cap = "CH3"
+        cterm_cap = "NHCH3"
 
     # san check (only allow whole residues in the region)
     if not raw_region.is_whole_residue_only():
@@ -50,139 +62,219 @@ def capping_with_residue_terminals(raw_region,
                       " composed by whole residues only.")
         raise ValueError
 
-    free_res_mapper = raw_region.involved_residues_with_free_terminal()
-    free_nter_res = free_res_mapper["n_ter"]
-    free_cter_res = free_res_mapper["c_ter"]
-    
-    add_atoms = []
-    for res in free_nter_res:
-        cap_atoms = cap_residue_free_terminal(res, nterm_cap, "nterm")
-        add_atoms.extend(cap_atoms)
+    new_atoms:List[Atom] = list()
+    for res in raw_region.involved_residues:
+        
+        if raw_region.needs_nterm_cap(res):
+            new_atoms.extend(cap_residue_free_terminal(res, nterm_cap, "nterm"))
 
-    for res in free_cter_res:
-        cap_atoms = cap_residue_free_terminal(res, cterm_cap, "cterm")
-        add_atoms.extend(cap_atoms)
-    
+        new_atoms.extend(res.atoms)
+
+        if raw_region.needs_cterm_cap(res):
+            new_atoms.extend(cap_residue_free_terminal(res, cterm_cap, "cterm"))
+
     if return_copy:
         new_region = raw_region.clone()
-        new_region.atoms.extend(add_atoms)
+        new_region.atoms = new_atoms 
         return new_region
     else:
-        raw_region.atoms.extend(add_atoms)
+        raw_region.atoms = new_atoms 
 
-# endregion
-
-class ResidueCap(Residue):
-    """the residue cap that link to the corresponding
+class ResidueCap(Residue, ABC):
+    """The residue cap that link to the corresponding
     Residue while not having the children atoms actually in
-    that Residue.
+    that Residue. It ensures that given the defined terminal atom, it can 
+    generate a realistic geometry.
+
     This is mainly used in handling cases like capping atoms that
-    does not exists in the real structure.
-    Attribute:
-        link_residue
-        children/atoms
-        parent = None
-        link_atom:
-            the linking atom in original res
-        socket_atom:
-            the socket from original stru to pluging the cap.
-            the cap is replacing the atom.
-        plug_atom:
-            the pluging in atom in the cap
+    do not exist in the real structure.
+
+    Attributes:
+        link_residue: The Residue() being capped.
+        link_atom: THe terminal Atom() that needs capping specifically.
+        socket_atom: Atom() that connects to the link_atom in the normal Structure().
+        _terminal_type: What type of terminal is it? n-term, c-term, etc.
+        atoms: A List[Atom] of the Atom()'s in the ResidueCap.
     
-    Property:
-        cap_type"""
+    Properties:
+        idx: The idx of the Residue() being capped.
+        chain: The chain name of the Residue() being capped.
+        name: The residue name of the Residue() being capped.
+        term_type: The property getter of _terminal_type
+        net_charge: The net charge of the ResidueCap() chemical group.
+        """
     def __init__(self, link_residue: Residue,
                  link_atom: Atom, socket_atom: Atom,
-                 atoms: List[Atom], plug_atom: Atom):
+                    terminal_type:str):
+        """Simplistic ctor. Will throw if link_atom is NOT in link_residue."""
         self.link_residue = link_residue
         self.link_atom = link_atom
         self.socket_atom = socket_atom
         if link_atom not in link_residue.atoms:
             _LOGGER.error("link atom must be one of the link residue atoms")
             raise ValueError
-        self.atoms = atoms
-        self.plug_atom = plug_atom
-        if plug_atom not in self.atoms:
-            _LOGGER.error("plug atom must be one of the atoms")
-            raise ValueError
 
-        self._idx = None
-        self._name = None
         self._rtype = chem.ResidueType.RESIDUECAP
+        self._terminal_type = terminal_type 
+
+        if self.term_type == 'nterm':
+            self.atoms = self.get_nterm_atoms()
+        elif self.term_type == 'cterm':
+            self.atoms = self.get_cterm_atoms()
+
         self.set_ghost_parent()
-        self.set_children(atoms)
-    
+
+        self.anchor()
+
+    @property
+    @abstractmethod
+    def FIXED_CHARGE_MAP(self) -> Dict[str, float]:
+        """Each specialization must have a charge map.""" 
+        pass
+
+    @property
+    @abstractmethod
+    def CAP_BOND_DISTANCE(self) -> Dict[str, float]:
+        """Each specialization must have a charge map.""" 
+        pass
+
+    @abstractmethod
+    def cap_type(self) -> str:
+        """What type of cap is this? Hardcoded value specific to each specialization."""
+        pass
+
+    @abstractmethod
+    def anchor(self) -> None:
+        """Function that moves the ResidueCap()'s Atom()'s to be in the correct position for the type of Cap that it is."""
+        pass
+
+    @abstractmethod
+    def get_nterm_atoms(self) -> List[Atom]:
+        """Create the default Atom() objects with default names and coordinates for n-terminal verison of the Cap."""
+        pass
+
+    @abstractmethod
+    def get_cterm_atoms(self) -> List[Atom]:
+        """Create the default Atom() objects with default names and coordinates for c-terminal verison of the Cap."""
+        pass
+
+    @property
+    @abstractmethod
+    def net_charge(self) -> int:
+        """The int() net charge of the ResidueCap()."""
+        pass
+
     @property
     def idx(self) -> int:
+        """Gets the index of the link_residue."""
         return self.link_residue.idx
 
     @property
     def chain(self) -> Chain:
+        """Gets the chain name of the link_residue."""
         return self.link_residue.parent
 
     @property
     def name(self) -> str:
+        """Gets the residue name of the link_residue."""
         return self.link_residue.name
-
+    
     @property
-    def cap_type(self) -> str:
-        """hard coded cap type"""
-        _LOGGER.error("using abstract method.")
-        raise AttributeError
+    def term_type(self) -> str:
+        """What type of capping is this? n-term, c-term, etc."""
+        return self._terminal_type
 
-    @property
-    def cap_bond_vector(self) -> np.array:
-        """return a vector that defines the direction of the capping bond"""
-        result = np.array(self.socket_atom.coord) - np.array(self.link_atom.coord)
-        result /= np.linalg.norm(result)
-        return result
+    @term_type.setter
+    def term_type(self, val_in:str) -> None:
+        """Setter for the terminal type of the ResidueCap(). Does not perform validation."""
+        self._terminal_type = val_in
 
-    def init_fixed_atomic_charges(self) -> str:
+    def init_fixed_atomic_charges(self) -> None:
         """init hard coded fixed atomic charges.
         Used when init_charge and fixed charge stragety is used."""
         for atom in self.atoms:
             atom.charge = self.FIXED_CHARGE_MAP[atom.name]
 
     def is_residue_cap(self) -> bool:
-        """hard coded yes"""
+        """Does this class cap a Residue? Always True."""
         return True
+
+    def is_nterm_cap(self) -> bool:
+        """Does this ResidueCap attach to the n-terminal end of an amino acid Residue?"""
+        return self.term_type == "nterm"
+
+    def is_cterm_cap(self) -> bool:
+        """Does this ResidueCap attach to the c-terminal end of an amino acid Residue?"""
+        return self.term_type == "cterm"
+
+    def __str__(self) -> str:
+        """str() rep of the ResidueCap() that shows its chemical type as well as what Atom()'s it is linked to."""
+        return f"{self.cap_type()}Cap(link_atom={self.link_atom.name},link_residue={self.link_residue.key_str})"
+
+
+class HCap(ResidueCap):
+    """A ResidueCap() which uses a -H (hydrogen) as a cap. Adds a total of 1 atom1, with the 
     
-    def restore_default_coord(self):
-        for atom in self.atoms:
-            atom.coord = self.DEFAULT_COORDS[atom.name]
+    n-terminal version having atom names:       HP11 
+    and c-terminal version having atom names:   HP21
 
-    def apply_to_geom(self, geom: Structure) -> ResidueCap:
-        """make a copy of the cap for geom."""
-        geom_cap = deepcopy(self)
-        geom_cap.link_residue = geom.residue_mapper[self.link_residue.key()]    
-        geom_cap.link_atom = geom_cap.link_residue.find_atom_name(self.link_atom.name)
-        geom_cap.socket_atom = geom.get(self.socket_atom.key)
-        geom_cap.restore_default_coord()
-        # align to the linked residue TODO unify this. also unify the 1,0,0 state somewhere
-        direction = geom_cap.cap_bond_vector
-        p1 = np.array(geom_cap.link_atom.coord)
-        rot_mat = rotation_matrix_from_vectors(np.array([1,0,0]), direction) # TODO is this only works for 1,0,0??
-        bond_distance = self.CAP_BOND_DISTANCE[geom_cap.link_atom.name]
-        for aa in geom_cap.atoms:
-            pt = np.array(aa.coord)
-            # rotation
-            pt = np.transpose(np.matmul(rot_mat, np.transpose( pt  )))
-            aa.coord = pt
-            # transform
-            pt += (direction*bond_distance) + p1
+    Can generally be used for both n-terminal/c-teriminal and other non-amino acid bonds
+    """
+    FIXED_CHARGE_MAP = {
+        # C-ter
+        "HP21" : 0.0,
+        # N-ter
+        "HP11" : 0.0,
+    } # improve this
+    """Fixed charge for a -H attached to the N/C-ter
+    of a residue."""
 
-        return geom_cap
+    CAP_BOND_DISTANCE:Dict[str, float] = {
+        "N" : 1.1,
+        "C" : 1.0,
+    }
+    """Maps the name of the link_atom to appropriate bond distance."""
 
+    @property
+    def cap_type(self) -> str:
+        """hard coded cap type"""
+        return "H"
 
+    @property
+    def net_charge(self) -> str:
+        """hard coded net charge"""
+        return 0
 
+    def anchor(self) -> None:
+        """Straightforward anchoring that is identical for both n-terminal and c-terminal capping."""
+        p1 = np.array(self.link_atom.coord)
+        p2 = np.array(self.socket_atom.coord)
+
+        direction = p2 - p1
+        direction /= np.linalg.norm(direction)
+    
+        cap_bond_distance = self.CAP_BOND_DISTANCE[self.link_atom.name]
+
+        self.atoms[0].coord = p1 + cap_bond_distance*direction
+
+    def get_nterm_atoms(self) -> List[Atom]:
+        """Create the default n-terminal version of the HCap with appropriate names."""
+        return [Atom({ 'atom_name':'HP11', 'x_coord':0.0, 'y_coord':0.0, 'z_coord':0.0, 'element_symbol':'H' })]
+
+    def get_cterm_atoms(self) -> List[Atom]:
+        """Create the default c-terminal version of the HCap with appropriate names."""
+        return [Atom({ 'atom_name':'HP21', 'x_coord':0.0, 'y_coord':0.0, 'z_coord':0.0, 'element_symbol':'H' })]
 
 
 class CH3Cap(ResidueCap):
-    """the CH3 cap
-    TODO move the default atom coord in?
-    TODO move bond distance in."""
-    FIXED_CHARGE_MAP = {
+    """A ResidueCap() which uses a -CH3 (methyl) as a cap. Adds a total of 4 atoms, with the 
+    
+    n-terminal version having atom names:       CP1, HP11, HP12, HP13
+    and c-terminal version having atom names:   CP2, HP21, HP22, HP23
+
+    Can generally be used for both n-terminal/c-teriminal and other non-amino acid bonds
+    """
+    FIXED_CHARGE_MAP:Dict[str, float] = {
         # C-ter
         "CP2" : -0.292800,
         "HP21" : 0.097600,
@@ -194,93 +286,270 @@ class CH3Cap(ResidueCap):
         "HP12" : 0.112300,
         "HP13" : 0.112300,
     } # TODO improve this for non ter.
-    """fixed charge for a -CH3 attached to the N/C-ter
+    """Fixed charge for a -CH3 attached to the N/C-ter
     of a residue. Modified from NME and ACE in aminon/ct12.lib"""
 
-    CAP_BOND_DISTANCE = {
+    CAP_BOND_DISTANCE:Dict[str, float] = {
         "N" : 1.5,
         "C" : 1.5,
     }
-    """map the name of the link_atom to bond distance"""
+    """Maps the name of the link_atom to appropriate bond distance."""
 
-    DEFAULT_COORDS = {
-        "CP2"  : (0.000,  0.000,  0.000),
-        "HP21" : (0.360, -1.029,  0.000),
-        "HP22" : (0.360,  0.514,  0.891),
-        "HP23" : (0.360,  0.514, -0.891),
-        "CP1"  : (0.000,  0.000,  0.000),
-        "HP11" : (0.360, -1.029,  0.000),
-        "HP12" : (0.360,  0.514,  0.891),
-        "HP13" : (0.360,  0.514, -0.891),
-    }
-    """TODO improve this"""
+    def get_nterm_atoms(self) -> List[Atom]:
+        """Create the default n-terminal version of the CH3Cap with appropriate names."""
+        return [
+        Atom({'atom_name':"CP1" , 'x_coord':0.000, 'y_coord':  0.000, 'z_coord':  0.000, 'element_symbol':'C'}),
+        Atom({'atom_name':"HP11", 'x_coord':0.360, 'y_coord': -1.029, 'z_coord':  0.000, 'element_symbol':'H'}),
+        Atom({'atom_name':"HP12", 'x_coord':0.360, 'y_coord':  0.514, 'z_coord':  0.891, 'element_symbol':'H'}),
+        Atom({'atom_name':"HP13", 'x_coord':0.360, 'y_coord':  0.514, 'z_coord': -0.891, 'element_symbol':'H'}),]
+        
+    def get_cterm_atoms(self) -> List[Atom]:
+        """Create the default c-terminal version of the CH3Cap with appropriate names."""
+        return [
+        Atom({'atom_name':"CP2" , 'x_coord':0.000, 'y_coord':  0.000, 'z_coord':  0.000, 'element_symbol':'C'}),
+        Atom({'atom_name':"HP21", 'x_coord':0.360, 'y_coord': -1.029, 'z_coord':  0.000, 'element_symbol':'H'}),
+        Atom({'atom_name':"HP22", 'x_coord':0.360, 'y_coord':  0.514, 'z_coord':  0.891, 'element_symbol':'H'}),
+        Atom({'atom_name':"HP23", 'x_coord':0.360, 'y_coord':  0.514, 'z_coord': -0.891, 'element_symbol':'H'}),]
 
     @property
     def cap_type(self) -> str:
-        """hard coded cap type"""
+        """What type of """
         return "CH3"
 
     @property
     def net_charge(self) -> str:
         """hard coded net charge"""
         return 0
+
+    def anchor(self) -> None:
+        """Straightforward anchoring that is identical for both n-terminal and c-terminal capping."""
+        
+        p1 = np.array(self.link_atom.coord)
+        p2 = np.array(self.socket_atom.coord)
+
+        direction = p2 - p1
+        direction /= np.linalg.norm(direction)
+        rot_mat = rotation_matrix_from_vectors(np.array([1,0,0]), direction)
+        cap_bond_distance = self.CAP_BOND_DISTANCE[self.link_atom.name]
+
+        for aa in self.atoms:
+            pt = np.array(aa.coord)
+            pt = np.transpose(np.matmul(rot_mat, np.transpose( pt  )))
+            pt += (direction*cap_bond_distance) + p1 
+            aa.coord = pt
+
 
 class NHCH3Cap(ResidueCap):
-    """Methylamide, good for c term"""
-    DEFAULT_COORDS = {
-        "NP1": (0.000, 0.000, 0.000),
-        "HP11": (),
-        "CP1": (),
-        "CP11" : (),
-        "CP12": (),
-        "CP12" : (),
-        "NP2": (0.000, 0.000, 0.000),
-        "HP21": (),
-        "CP2": (),
-        "CP21" : (),
-        "CP22": (),
-        "CP22" : (),
+    """A ResidueCap() which uses a -NHCH3 (methyl-amide) as a cap. Adds a total of 6 atoms, with the 
+    
+    n-terminal version having atom names:       NP1, HP1, CP1, HP11, HP12, HP13 
+    and c-terminal version having atom names:   NP2, HP2, CP2, HP21, HP22, HP23
+
+    Should really only be used for c-teriminal capping.
+    """
+
+    FIXED_CHARGE_MAP:Dict[str, float] = {
+        # N-terminal
+        'NP1': 0.0,
+        'HP1': 0.0,
+        'CP1': 0.0,
+        'HP11': 0.0,
+        'HP12': 0.0,
+        'HP12': 0.0,
+        # C-terminal
+        "NP2": 0.0,
+        "HP2": 0.0,
+        "CP2": 0.0,
+        "HP21": 0.0,
+        "HP22": 0.0,
+        "HP23": 0.0,
     }
+    """Fixed charge for a NHCH3 attached to the N/C-ter of a Residue()."""
 
 
-class COCH3(ResidueCap):
-    """Acetyl, good for n term"""
-    pass
-
-class HCap(ResidueCap):
-    """the H cap
-    TODO move the default atom coord in?
-    TODO move bond distance in."""
-    FIXED_CHARGE_MAP = {
-        # C-ter
-        "HP21" : 0.0,
-        # N-ter
-        "HP11" : 0.0,
-    } # improve this
-    """fixed charge for a -H attached to the N/C-ter
-    of a residue."""
-
-    CAP_BOND_DISTANCE = {
-        "N" : 1.1,
-        "C" : 1.0,
+    CAP_BOND_DISTANCE:Dict[str, float] = {
+        'N': 1.33,
+        'C': 1.33
     }
-    """map the name of the link_atom to bond distance"""
+    """Maps the name of the link_atom to appropriate bond distance."""
 
-    @property
-    def cap_type(self) -> str:
-        """hard coded cap type"""
-        return "CH3"
+    def get_nterm_atoms(self) -> List[Atom]:
+        """Create the default n-terminal version of the NHCH3Cap with appropriate names."""
+        return [
+            Atom({'atom_name': 'NP1',  'x_coord': 0.000, 'y_coord':  0.000, 'z_coord': 0.000, 'element_symbol':'N'}),
+            Atom({'atom_name': 'HP1',  'x_coord': -0.5,  'y_coord': -0.860, 'z_coord': 0.000, 'element_symbol':'H'}),
+            Atom({'atom_name': 'CP1',  'x_coord': 1.500, 'y_coord':  0.000, 'z_coord': 0.000, 'element_symbol':'C'}),
+            Atom({'atom_name': 'HP11', 'x_coord': 1.864, 'y_coord':  0.000, 'z_coord':-1.027, 'element_symbol':'H'}),
+            Atom({'atom_name': 'HP12', 'x_coord': 1.864, 'y_coord': -0.889, 'z_coord': 0.515, 'element_symbol':'H'}),
+            Atom({'atom_name': 'HP12', 'x_coord': 1.864, 'y_coord':  0.889, 'z_coord': 0.515, 'element_symbol':'H'}),
+        ]
 
-    @property
-    def net_charge(self) -> str:
-        """hard coded net charge"""
+
+    def get_cterm_atoms(self) -> List[Atom]:
+        """Create the default c-terminal version of the NHCH3Cap with appropriate names."""
+        return [
+            Atom({'atom_name': 'NP2',  'x_coord': 0.000, 'y_coord': 0.000, 'z_coord': 0.000, 'element_symbol':'N'}),
+            Atom({'atom_name': 'HP2',  'x_coord': -0.5, 'y_coord': -0.860, 'z_coord': 0.000, 'element_symbol':'H'}),
+            Atom({'atom_name': 'CP2',  'x_coord': 1.500, 'y_coord': 0.000, 'z_coord': 0.000, 'element_symbol':'C'}),
+            Atom({'atom_name': 'HP21', 'x_coord': 1.864, 'y_coord': 0.000, 'z_coord':-1.027, 'element_symbol':'H'}),
+            Atom({'atom_name': 'HP22', 'x_coord': 1.864, 'y_coord':-0.889, 'z_coord': 0.515, 'element_symbol':'H'}),
+            Atom({'atom_name': 'HP22', 'x_coord': 1.864, 'y_coord': 0.889, 'z_coord': 0.515, 'element_symbol':'H'}),
+        ]
+
+    def net_charge(self) -> int:
+        """Net charge always zero for this neutral group."""
         return 0
+
+    def anchor(self) -> None:
+        """Straightforward anchoring that is mostly identifcal for both n-terminal and c-terminal capping. Will warn when 
+        user attempts to cap with NHCH3 on n-terminal side as this creates an unusual and unrealistic NH-NH bond."""
+
+        if self.is_nterm_cap():
+            _LOGGER.warning("WARNING: You are trying to add a methylamide cap on the n-terminal side of an amino acid!")
+        
+        p0 = np.array(self.link_atom.coord)
+        p1 = np.array(self.socket_atom.coord)
+        p2 = np.array(self.socket_atom.parent.find_atom_name('CA').coord)
+
+        direction0 = p1 - p0        
+        direction0 /= np.linalg.norm(direction0)
+        
+        direction = p2 - p1
+        direction /= np.linalg.norm(direction)
+        rot_mat = rotation_matrix_from_vectors(np.array([1,0,0]), direction)
+        
+        cap_bond_distance = self.CAP_BOND_DISTANCE[self.link_atom.name]
+
+        for aa in self.atoms:
+            pt = np.array(aa.coord)
+            pt = np.transpose(np.matmul(rot_mat, np.transpose( pt  )))
+            pt += (direction0*cap_bond_distance) + p0
+            aa.coord = pt
+
+
+    def cap_type(self) -> str:
+        """This is the NHCH3/methylamide ResidueCap."""
+        return "NHCH3"
+
+
+class COCH3Cap(ResidueCap):
+    """A ResidueCap() which uses a -COCH3 (acetyl) as a cap. Adds a total of 6 atoms, with the 
+    
+    n-terminal version having atom names:       CP0, OP1, CP1, HP11, HP12, HP13 
+    and c-terminal version having atom names:   CP2, OP2, CP2, HP21, HP22, HP23
+
+    Should really only be used for n-teriminal capping.
+    """
+    FIXED_CHARGE_MAP:Dict[str,float] = {
+        # n-terminal
+        'CP0': 0.0,
+        'OP1': 0.0,
+        'CP1': 0.0,
+        'HP11': 0.0,
+        'HP12': 0.0,
+        'HP13': 0.0,
+        # c-terminal
+        'CP2': 0.0,
+        'OP2': 0.0,
+        'CP3': 0.0,
+        'HP31': 0.0,
+        'HP32': 0.0,
+        'HP33': 0.0, 
+    }
+    """Fixed charge for a NHCH3 attached to the N/C-ter of a Residue()."""
+
+    CAP_BOND_DISTANCE:Dict[str, float] = {
+        "N" : 1.33,
+        "C" : 1.33,
+    }
+    """Maps the name of the link_atom to appropriate bond distance."""
+
+    def cap_type(self) -> str:
+        """This is the COCH3/acetyl ResidueCap."""
+        return "COCH3"
+
+
+    def anchor(self) -> None:
+        """Straightforward anchoring that is mostly identifcal for both n-terminal and c-terminal capping. Will warn when 
+        user attempts to cap with COCH3 on c-terminal side as this creates an unusual and unrealistic CO-CO bond."""
+
+        if self.is_cterm_cap():
+            _LOGGER.warning("WARNING: You are trying to add an acetyl cap on the c-terminal side of an amino acid!")
+            self.atoms[0].coord = self.socket_atom.parent.find_atom_name('N').coord
+            self.atoms[1].coord =  self.socket_atom.parent.find_atom_name('H').coord
+            direction =  np.array(self.atoms[1].coord) - np.array(self.atoms[0].coord)
+            direction /= np.linalg.norm(direction)
+            self.atoms[1].coord = 1.2*direction + np.array(self.atoms[0].coord)
+            p0 = np.array(self.link_atom.coord)
+            p1 = np.array(self.socket_atom.coord)
+            p2 = np.array(self.socket_atom.parent.find_atom_name('CA').coord)
+
+            direction0 = p1 - p0        
+            direction0 /= np.linalg.norm(direction0)
+            
+            direction = p2 - p1
+            direction /= np.linalg.norm(direction)
+            rot_mat = rotation_matrix_from_vectors(np.array([1,0,0]), direction)
+            
+            cap_bond_distance = self.CAP_BOND_DISTNCE[self.link_atom.name]
+
+            for aa in self.atoms[2:]:
+                pt = np.array(aa.coord)
+                pt = np.transpose(np.matmul(rot_mat, np.transpose( pt  )))
+                pt += (direction0*cap_bond_distance) + p0
+                aa.coord = pt
+
+        elif self.is_nterm_cap():
+            self.atoms[0].coord = self.socket_atom.parent.find_atom_name('C').coord
+            self.atoms[1].coord = self.socket_atom.parent.find_atom_name('O').coord
+   
+            p0 = np.array(self.socket_atom.parent.find_atom_name('C').coord)
+            p1 = np.array(self.socket_atom.parent.find_atom_name('CA').coord)
+
+            direction0 = p1 - p0
+            direction0 /= np.linalg.norm(direction0)
+            rot_mat = rotation_matrix_from_vectors(np.array([1,0,0]), direction0)
+            cap_bond_distance = self.CAP_BOND_DISTANCE[self.link_atom.name]
+
+            for aa in self.atoms[2:]:
+                pt = np.array(aa.coord)
+                pt = np.transpose(np.matmul(rot_mat, np.transpose( pt  )))
+                pt += p0
+                aa.coord = pt
+
+
+    def net_charge(self) -> int:
+        """Net charge always zero for this neutral group."""
+        return 0
+
+    def get_nterm_atoms(self) -> List[Atom]:
+        """Create the default n-terminal version of the COCH3Cap with appropriate names."""
+        return [
+            Atom({'atom_name':'CP0',  'x_coord': 0.000 , 'y_coord':  0.000, 'z_coord':  0.000, 'element_symbol': 'C'}),
+            Atom({'atom_name':'OP1',  'x_coord':-0.610 , 'y_coord':  1.056, 'z_coord':  0.000, 'element_symbol': 'O'}),
+            Atom({'atom_name':'CP1',  'x_coord': 1.507 , 'y_coord':  0.000, 'z_coord':  0.000, 'element_symbol': 'C'}),
+            Atom({'atom_name':'HP11', 'x_coord': 1.871 , 'y_coord':  0.000, 'z_coord':  1.028, 'element_symbol': 'H'}),
+            Atom({'atom_name':'HP12', 'x_coord': 1.871 , 'y_coord': -0.890, 'z_coord': -0.514, 'element_symbol': 'H'}),
+            Atom({'atom_name':'HP13', 'x_coord': 1.871 , 'y_coord':  0.890, 'z_coord': -0.514, 'element_symbol': 'H'}),
+        ]
+    
+    def get_cterm_atoms(self) -> List[Atom]:
+        """Create the default c-terminal version of the COCH3Cap with appropriate names."""
+        return [
+            Atom({'atom_name':'CP2',  'x_coord': 0.000, 'y_coord':   0.000, 'z_coord':  0.000, 'element_symbol': 'C'}),
+            Atom({'atom_name':'OP2',  'x_coord':-0.610, 'y_coord':   1.056, 'z_coord':  0.000, 'element_symbol': 'O'}),
+            Atom({'atom_name':'CP3',  'x_coord': 1.507, 'y_coord':   0.000, 'z_coord':  0.000, 'element_symbol': 'C'}),
+            Atom({'atom_name':'HP31', 'x_coord': 1.871, 'y_coord':   0.000, 'z_coord':  1.028, 'element_symbol': 'H'}),
+            Atom({'atom_name':'HP32', 'x_coord': 1.871, 'y_coord':  -0.890, 'z_coord': -0.514, 'element_symbol': 'H'}),
+            Atom({'atom_name':'HP33', 'x_coord': 1.871, 'y_coord':   0.890, 'z_coord': -0.514, 'element_symbol': 'H'}),
+        ]
+
 
 
 def cap_residue_free_terminal(
         res: Residue, cap_name: str, terminal_type: str) -> List[Atom]:
-    """cap the free terminal of {terminal_type} of the give residue {res}
-    using cap of {cap_name}
+    """Cap the free terminal of {terminal_type} of the give residue {res}
+    using cap of {cap_name}. Implementatino function NOT TO BE CALLED BY USERS DIRECTLY. 
     Args:
         res:
             the target residue
@@ -290,7 +559,7 @@ def cap_residue_free_terminal(
             the free terminal type.
             options: [nterm, cterm]
     Returns:
-        a list of capping atoms
+        The List[Atom] of capping atoms.
     """
     if terminal_type == 'nterm':
         start_atom:Atom = res.find_atom_name("N")
@@ -301,121 +570,24 @@ def cap_residue_free_terminal(
     else:
         _LOGGER.error(f"terminal_type can only be nterm or cterm. Given {terminal_type}")
         raise ValueError
-
+    
     if cap_name not in SUPPORTED_CAPS:
         _LOGGER.error(f"cap_name {cap_name} not supported. Supported name: {SUPPORTED_CAPS.keys()}")
         raise ValueError
-    cap_atoms = SUPPORTED_CAPS[cap_name](
-        terminal_type, res, start_atom, end_atom).atoms
-    cap_bond_distance = get_bond_distance(cap_name, terminal_type)
-
-    # TODO put these in core and strutcure and in cap classes
-    # TODO make this a method in cap classes
-    p1 = np.array(start_atom.coord)
-    p2 = np.array(end_atom.coord)
-    direction = p2 - p1
-    direction /= np.linalg.norm(direction)
-    rot_mat = rotation_matrix_from_vectors(np.array([1,0,0]), direction)
-    for aa in cap_atoms:
-        pt = np.array(aa.coord)
-        pt = np.transpose(np.matmul(rot_mat, np.transpose( pt  )))
-        pt += (direction*cap_bond_distance) + p1 
-        aa.coord = pt
-
-    return cap_atoms
-
-def get_bond_distance(strategy:str, side:str) -> float:
-    """ """
-    #TODO(CJ): update this: need methylamide and acetyl
-    _BOND_DISTANCE_MAPPER:Dict[Tuple[str,str], float] = {
-        ('H', 'nterm'):1.1,
-        ('H', 'cterm'):1.0,
-        ('CH3', 'nterm'):1.5,
-        ('CH3', 'cterm'):1.5,
-    }
-
-
-    result:float = _BOND_DISTANCE_MAPPER.get((strategy, side), None)
-
-    if result is None:
-        _LOGGER.error(f"No bond distance for {strategy}-capping strategy on {side} side. Supported methods include:")
-        for (strat, side_name) in _BOND_DISTANCE_MAPPER.keys():
-            _LOGGER.error(f"strategy: {strat}, side: {side_name}")
-        _LOGGER.error("Exiting...")
-        exit( 1 )
-
-    return result
-
-def get_h_cap(end: str, res: Residue, 
-              link_atom: Atom, socket_atom: Atom) -> HCap:
-    """Args:
-    end:
-        the pattern of the end it conencts
-        This determine the atom name
-    res:
-        the original residue.
-    link_atom:
-        the linking atom in original res
-    socket_atom:
-        the socket from original stru to pluging the cap
+    residue_cap:ResidueCap = SUPPORTED_CAPS[cap_name](res, start_atom, end_atom, terminal_type)
     
-    Returns:
-        a list of Atom()s in the cap"""
-    if end == 'nterm':
-        aname = 'HP11'
-    elif end == 'cterm':
-        aname = 'HP21'
-    atoms = [
-        Atom(
-            {'atom_name': aname,
-            'x_coord':0.000, 'y_coord': 0.000, 'z_coord':  0.000,
-            'element_symbol': "H"},
-        )
-    ]
-
-    return HCap(
-        link_residue=res,
-        link_atom=link_atom,
-        socket_atom = socket_atom,
-        plug_atom = atoms[0],
-        atoms = atoms,
-    )
-
-def get_ch3_cap(end: str, res: Residue,
-                link_atom: Atom, socket_atom: Atom) -> CH3Cap:
-    """Args:
-    end:
-        the pattern of the end it conencts
-        This determine the atom name
-    res:
-        the original residue.
-    link_atom:
-        the linking atom in original res
-    socket_atom:
-        the socket from original stru to pluging the cap
-    
-    Returns:
-        a list of Atom()s in the cap"""
-    if end == 'nterm':
-        anames = "CP1 HP11 HP12 HP13".split()
-    elif end == 'cterm':
-        anames = "CP2 HP21 HP22 HP23".split()
-    atoms = [
-        Atom({'atom_name': anames[0], 'x_coord':0.000, 'y_coord': 0.000, 'z_coord':  0.000,'element_symbol': "C"}),
-        Atom({'atom_name': anames[1], 'x_coord':0.360, 'y_coord':-1.029, 'z_coord':  0.000,'element_symbol': "H"}),
-        Atom({'atom_name': anames[2], 'x_coord':0.360, 'y_coord': 0.514, 'z_coord':  0.891,'element_symbol': "H"}),
-        Atom({'atom_name': anames[3], 'x_coord':0.360, 'y_coord': 0.514, 'z_coord': -0.891,'element_symbol': "H"})
-    ]
-    return CH3Cap(
-        link_residue=res,
-        link_atom=link_atom,
-        socket_atom = socket_atom,
-        plug_atom = atoms[0],
-        atoms = atoms,
-    )
-
+    return residue_cap.atoms
 
 SUPPORTED_CAPS: Dict[str, callable] = {
-    "CH3" : get_ch3_cap,
-    "H" : get_h_cap,
+    # chemical formulas first
+    "CH3" : CH3Cap,
+    "H" : HCap,
+    "NHCH3": NHCH3Cap,
+    "COCH3": COCH3Cap,
+    # common names for redundancy
+    "methyl": CH3Cap,
+    "hydrogen": HCap,
+    "methylamide": NHCH3Cap,
+    "acetate": COCH3Cap
 }
+"""Mapper that converts a cap name into a constructor. Both the chemical formula and common names for each method are provided."""

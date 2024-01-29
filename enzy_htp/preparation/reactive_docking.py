@@ -53,10 +53,6 @@ def dock_reactants(structure: Structure,
         a. use constraints
         b. allow backbone flexibility in active site
     4. constrained QM minimization of active site with xtb (if use_qm is True)
-    5. Rosetta FastRelax minimization 2
-        a. ramp down constraints
-        b. oly sidechain flexibility in active site
-    6. un-constrained QM minimization of active site with xtb (if use_qm is True)
     
     Args:
         structure: The Structure() to perform reactive docking on. Contains both Ligand()'s and protein chains.
@@ -94,11 +90,6 @@ def dock_reactants(structure: Structure,
 
     if use_qm:
         qm_minimization(structure, constraints, cluster_distance, work_dir)
-
-#    mm_minimization(structure, cluster_distance, constraints, param_files, rng_seed, work_dir)
-#
-#    if use_qm:
-#        qm_minimization(structure, [], cluster_distance, work_dir)
 
     if not save_work_dir:
         _LOGGER.info(f"save_work_dir set to False! Deleting {work_dir}")
@@ -639,127 +630,6 @@ def select_geometry( structure:Structure,
 
     _parser = PDBParser()
     ref_stru = _parser.get_structure(infile)
-    stru_oper.update_residues(structure, ref_stru)
-
-    for cst in constraints:
-        cst.change_topology(structure)
-
-def mm_minimization(structure:Structure, cluster_distance:float, constraints:List[StructureConstraint], param_files:List[str], rng_seed:int, work_dir:str) -> None:
-    """Uses Rosetta's FastRelax protocol to perform a minimization with constraints that ramp-down over the course of the minimization. Updates the coordinates
-    of the Structre() inplace. Residues are given differing levels of flexibility where there is no backbone or sidechain for all of the enzyme except for the
-    active site. In the active site there is sidechain and bond angle flexibility. The geometry with the lowest total_score is selected.
-
-    Args:
-        structure: The Structure() to operate on.
-        cluster_distance: The distance cutoff in Angstroms to be an "active site" residue.
-        constraints: The List[StructureConstraint] which define the reactive complex geometry.
-        param_files: A List[str] of .params files for use in Rosetta.
-        rng_seed: An int() seed for Rosetta's random number generator.
-        work_dir: The directory where temporary files and directories will be written. 
-
-    Returns:
-        Nothing.
-    """
-
-    cst_file:str = interface.rosetta.write_constraint_file(structure, constraints, work_dir) 
-    xml_file:str = f"{work_dir}/mm_script.xml"
-    pdb_file:str = f"{work_dir}/temp_mm_min.pdb"
-    option_file:str = f"{work_dir}/mm_min_options.txt"
-#yapf: disable
-    elements: List[Dict[str,str]] = [
-        {'parent': 'SCOREFXNS', 'tag': 'ScoreFunction', 'name': 'ligand_soft_rep', 'weights': 'ligand_soft_rep'},
-        {'parent': 'SCOREFXNS', 'tag': 'ScoreFunction', 'name': 'hard_rep', 'weights': 'ligand'},
-        {'parent': 'SCOREFXNS.ScoreFunction', 'tag': 'Reweight', 'scoretype': 'coordinate_constraint',  'weight': '1.0'},
-        {'parent': 'SCOREFXNS.ScoreFunction', 'tag': 'Reweight', 'scoretype': 'atom_pair_constraint',   'weight': '1.0'},
-        {'parent': 'SCOREFXNS.ScoreFunction', 'tag': 'Reweight', 'scoretype': 'angle_constraint',       'weight': '1.0'},
-        {'parent': 'SCOREFXNS.ScoreFunction', 'tag': 'Reweight', 'scoretype': 'dihedral_constraint',    'weight': '1.0'},
-        {'parent': 'SCOREFXNS.ScoreFunction', 'tag': 'Reweight', 'scoretype': 'chainbreak',             'weight': '1.0'},
-    ]
-
-    as_names:List[str] = list()
-    for res in structure.residues:
-        if not res.is_ligand():
-            continue
-
-        chain_name:str = res.parent.name        
-        rname:str=f"rs_{chain_name.lower()}"
-        transform_name:str=f"dock_{chain_name.lower()}"
-        elements.extend([
-            {'parent': 'RESIDUE_SELECTORS', 'tag':'Index', 'name':rname, 'resnums':f"{res.idx}{res.parent.name}"},
-            {'parent': 'RESIDUE_SELECTORS', 'tag':'CloseContact', 'name':f"{rname}_as", 'residue_selector':rname},
-        ])
-
-        as_names.append( f"{rname}_as" )
-
-    elements.extend([    
-        { 'parent': 'RESIDUE_SELECTORS', 'tag': 'Or', 'name':'as_selector', 'selectors':','.join(as_names)},
-        { 'parent': 'RESIDUE_SELECTORS', 'tag': 'Not', 'name':'not_as_selector', 'selector':'as_selector'},
-        {'parent':'MOVERS', 'tag':'FastRelax', 'name':'frelax', 'scorefxn':'hard_rep', 'cst_file':f"{Path(cst_file).absolute()}", 'ramp_down_constraints':'true', 'repeats':'5', 'child_nodes': [
-                {'parent':'FastRelax', 'tag':'MoveMap', 'name':'full_enzyme', 'bb':'false', 'chi':'false', 'jump':'false','child_nodes':[
-                        {'parent':'MoveMap','tag':'ResidueSelector', 'selector':'as_selector', 'bb':'false', 'chi':'true', 'bondangle':'true'},
-                ]
-        },]},
-        {'parent':'PROTOCOLS', 'tag':'Add', 'mover_name':'frelax'},
-    ])
-    interface.rosetta.write_script(xml_file, elements)
-#yapf: enable
-    _parser = PDBParser()
-    _parser.save_structure(pdb_file, structure)
-
-    content: List[str] = [
-        "-keep_input_protonation_state", #TODO(CJ): get rid of this for now; but want it back someday
-        "-auto_setup_metals",
-        "-run:constant_seed",
-        f"-run:jran {int(rng_seed)}",
-        "-in:file",
-        f"    -s '{Path(pdb_file).name}'",
-    ]
-    for pf in param_files:
-        content.append(f"    -extra_res_fa '{Path(pf).absolute()}'")
-
-    stub_parent: str = os.path.expandvars(
-        f"${config['rosetta.ROSETTA3']}/database/chemical/residue_type_sets/fa_standard/residue_types/protonation_states/")
-    for stub in "GLU_P1.params GLU_P2.params LYS_D.params ASP_P1.params TYR_D.params HIS_P.params ASP_P2.params".split():
-        content.append(f"    -extra_res_fa '{stub_parent}/{stub}'")
-
-    content.extend([
-        "-run:preserve_header",
-        "-packing",
-        "    -ex1",
-        "    -ex2aro",
-        "    -ex2 ",
-        "    -no_optH false",
-        "    -flip_HNQ true",
-        "    -ignore_ligand_chi true",
-        "-parser",
-        f"   -protocol {Path(xml_file).absolute()}",
-        "-out",
-        f"   -file:scorefile 'score.sc'",
-        "   -level 200",
-        "   -nstruct 10",
-        "   -overwrite",
-        "   -path",
-        f"       -all './rosetta_mm_min'",
-
-    ])
-
-    fs.write_lines(option_file, content)
-    
-    fs.safe_rmdir(f"{work_dir}/rosetta_mm_min/")
-    fs.safe_mkdir(f"{work_dir}/rosetta_mm_min/")
-
-    start_dir:str = Path(os.getcwd()).absolute()
-    os.chdir( work_dir )
-    interface.rosetta.run_rosetta_scripts([f"@{Path(option_file).name}"])
-    os.chdir(start_dir)
-
-
-    score_sc:str=f"{work_dir}/rosetta_mm_min/score.sc"
-    assert Path(score_sc).exists()
-
-    df: pd.DataFrame = interface.rosetta.parse_score_file(score_sc)
-    df = df.sort_values(by='total_score').reset_index(drop=True)
-    ref_stru = _parser.get_structure( f"{work_dir}/rosetta_mm_min/{df.iloc[0].description}.pdb" )
     stru_oper.update_residues(structure, ref_stru)
 
     for cst in constraints:

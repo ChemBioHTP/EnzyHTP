@@ -14,6 +14,7 @@ import numpy as np
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.exception import WrongTopology
 from ..structure import Structure, Solvent, Chain, Residue, Atom
+from ..structure_region import StructureRegion, ResidueCap
 from enzy_htp import config as eh_config
 
 from abc import ABC, abstractmethod
@@ -28,7 +29,6 @@ from .api import (
     ResiduePairConstraint,
     BackBoneFreeze
     )
-
 
 
 # region == constructors ==
@@ -178,6 +178,7 @@ def create_distance_constraint(
         target_value=target_value
     )
     result.check_consistent_topology()
+
     if params is not None:
         result.update_params(params)
     return result
@@ -292,3 +293,18 @@ def merge_cartesian_freeze(cart_freeze_list: List[CartesianFreeze]) -> Cartesian
     result.atoms = list(set(result.atoms))
     return result
 # endregion
+
+
+def freeze_hydrogen_bonds(sr:StructureRegion, params:Dict=None ) -> List[DistanceConstraint]:
+    """TODO(CJ)"""
+    result:List[DistanceConstraint] = list()
+    
+    for atom in sr.atoms:
+        if atom.element != 'H':
+            continue
+        
+        closest_atom:Atom=sr.closest_heavy_atom(atom)
+        target_dist:float=atom.distance_to(closest_atom)
+        result.append(create_distance_constraint(atom, closest_atom, target_value=target_dist, params=params))
+    
+    return result
