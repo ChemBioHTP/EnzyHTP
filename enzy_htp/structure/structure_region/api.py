@@ -247,6 +247,7 @@ class StructureRegion:
         This design is because external software are used for init_charge
         and thus it needs to be above _interface which can only called by
         the Science API layer."""
+        import pdb; pdb.set_trace()
         net_charge = 0
         for res, atoms in self.atoms_by_residue.items():
             if (not res.has_init_charge()) and res.is_noncanonical():
@@ -267,6 +268,7 @@ class StructureRegion:
                     _LOGGER.error(f" {atom} dont have charge. Please init_charge(stru_region) before using this function.")
                     raise ValueError
                 net_charge += atom.charge
+        import pdb; pdb.set_trace()
         if is_integer(net_charge, tolerance=0.01):
             net_charge = round_by(net_charge, 0.5)
         else:
