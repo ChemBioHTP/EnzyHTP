@@ -180,6 +180,7 @@ class MultiwfnInterface(BaseInterface):
 
         # prepare path
         wfn_file = ele_stru.mo
+        fs.safe_mkdir(work_dir)
         instr_file = fs.get_valid_temp_name(f"{work_dir}/{Path(wfn_file).with_suffix('.wfnin').name}")
         log_path = fs.get_valid_temp_name(str(Path(instr_file).with_suffix('.wfnlog')))
         result_file = fs.get_valid_temp_name(str(Path(instr_file).with_suffix('.wfndip')))
@@ -204,7 +205,7 @@ class MultiwfnInterface(BaseInterface):
         )
         if job is not None:
             job.submit()
-            job.wait_to_end(period=job_check_period) # wont return and do array since this is pretty fast
+            job.wait_to_end(period=job_check_period)  # wont return and do array since this is pretty fast
             self.check_multiwfn_error(log_path, job)
             clean_targets.append(job.job_cluster_log)
             clean_targets.append(job.sub_script_path)
@@ -238,7 +239,7 @@ class MultiwfnInterface(BaseInterface):
             dipole_norm *= -1
 
         return dipole_norm, dipole_vec
-    
+
     def parse_two_center_dp_moments(self, fname: str) -> Dict[Tuple[float], List[np.array]]:
         """parse the content of LMOdip.txt file from Multiwfn LMO
         bond dipole calculation.
