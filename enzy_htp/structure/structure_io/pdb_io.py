@@ -6,6 +6,7 @@ Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
 Date: 2022-08-01
 """
 from collections import defaultdict
+import copy
 import os
 import string
 import sys
@@ -200,6 +201,7 @@ class PDBParser(StructureParserInterface):
         Return:
             a string of the PDB file
         """
+        stru = copy.deepcopy(stru)
         stru.sort_chains()
         if if_renumber:
             stru.renumber_atoms()

@@ -133,6 +133,10 @@ class Structure(DoubleLinkedNode):
         chain_names
     """
 
+    REFERENCE_CHAIN_ORDER = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',
+                             'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',
+                             'U', 'V', 'W', 'X', 'Y', 'Z',] + [str(x) for x in range(50000)]
+
     def __init__(self, chains: List[Chain]):
         """Constructor that takes just a list of Chain() objects as input."""
         self.set_children(chains)
@@ -655,7 +659,7 @@ class Structure(DoubleLinkedNode):
         sort children chains with their chain name
         sorted is always better than not but Structure() is being lazy here
         """
-        self._chains.sort(key=lambda x: x.name)
+        self._chains.sort(key=lambda x: self.REFERENCE_CHAIN_ORDER.index(x.name))
 
     def sort_everything(self) -> None:
         """sort all object in structure"""

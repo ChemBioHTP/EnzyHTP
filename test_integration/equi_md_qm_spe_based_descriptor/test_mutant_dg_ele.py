@@ -181,7 +181,7 @@ def test_kemp_elimiase():
         mutant_pattern = mutant_pattern,
         ligand_chrg_spin_mapper = {"H5J" : (0,1)},
         md_constraints = md_constraint,
-        md_length = 1.0, #ns
+        md_length = 0.1, #ns
         qm_region_pattern = "resi 101+254",
         qm_level_of_theory = qm_level_of_theory,
         target_bond = target_bond,

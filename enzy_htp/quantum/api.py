@@ -170,12 +170,13 @@ def single_point(
             # whole
             qm_region = None
         else:
+            import pdb; pdb.set_trace()        
             qm_region = create_region_from_selection_pattern(
                 stru_esm.structure_0,
                 regions[0],
                 capping_method)
             init_charge(qm_region)
-        
+
         qm_engine: QMSinglePointEngine = qm_engine_ctor(
                                             region=qm_region,
                                             method=qm_method,
