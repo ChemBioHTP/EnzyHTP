@@ -158,7 +158,7 @@ class AmberParameterizer(MolDynParameterizer):
             gb_radii: int,
             parameterizer_temp_dir: str,
             additional_tleap_lines: List[str],) -> None:
-        self._parent_interface = interface
+        self._parent_interface: AmberInterface = interface
         self.force_fields = force_fields
         self.charge_method = charge_method
         self.resp_engine = resp_engine
