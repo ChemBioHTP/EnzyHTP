@@ -89,7 +89,12 @@ def workflow(
 
     # sampling
         param_method = interface.amber.build_md_parameterizer(
-            ncaa_param_lib_path=f"{WORK_DIR}ncaa_lib",
+            ncaa_param_lib_path=f"{DATA_DIR}ncaa_lib",
+            force_fields=[
+                "leaprc.protein.ff14SB",
+                "leaprc.gaff",
+                "leaprc.water.tip3p",
+            ],
         )
         md_cluster_job_config = {
             "cluster" : Accre(),
@@ -168,8 +173,8 @@ def test_kemp_elimiase():
         partial(stru_cons.create_angle_constraint,
             "B.254.CAE", "B.254.H2", "A.101.OE2", 180.0),]
     qm_level_of_theory = QMLevelOfTheory(
-        basis_set="def2svp",
-        method="pbe0",        
+        basis_set="3-21G",
+        method="hf",        
     )
     target_bond = (
         wt_stru.ligands[0].find_atom_name("CAE"),
