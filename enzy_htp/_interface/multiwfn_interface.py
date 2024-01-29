@@ -9,7 +9,7 @@ Date: 2022-07-01
 """
 from collections import defaultdict
 import re
-import pandas as pd
+import shutil
 from pathlib import Path
 from typing import List, Dict, Tuple, Union
 import numpy as np
@@ -49,6 +49,7 @@ class MultiwfnInterface(BaseInterface):
         log_path: str,
         cluster_job_config: Union[None, Dict],
         job_check_period: int = None,
+        additional_settings: List[str] = None,
     ) -> Union[None, ClusterJob]:
         """execute Multiwfn. Also handle the ARMer or not dispatch
         Args:
@@ -63,6 +64,9 @@ class MultiwfnInterface(BaseInterface):
             will be run locally.
         job_check_period:
             the time cycle for update job state change (Unit: s)
+        additional_settings:
+            these settings will be writing to settings.ini under the work dir during
+            runtime.
 
         Returns:
             cluster_job_config = None
@@ -78,6 +82,19 @@ class MultiwfnInterface(BaseInterface):
         multiwfn_args = f"{wfn_file} < {instr_file} > {log_path} 2>&1"
         multiwfn_cmd = f"{multiwfn_exe} {multiwfn_args}"
 
+        # make settings.ini
+        multiwfn_settings = "settings.ini"
+        if Path(multiwfn_settings).exists():
+            with open(multiwfn_settings, "r+") as f:
+                if "formchkpath" not in f.read():
+                    f.write(f'formchkpath= "{shutil.which("formchk")}"')
+        else:
+            with open(multiwfn_settings, "w") as f:
+                f.write(f'formchkpath= "{shutil.which("formchk")}"')     
+        if additional_settings:
+            raise Exception("TODO")
+
+        # dispatch for running types
         if cluster_job_config is None:
             # running locally
             this_spe_run = self.env_manager_.run_command(
