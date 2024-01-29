@@ -225,7 +225,7 @@ class StructureRegion:
                 if n_side_res is not None and n_side_res not in region_residues:
                     result["n_ter"].append(res)
             else:
-                _LOGGER.warning(f"{res._rtype} found. Not considered")
+                _LOGGER.warning(f"{res._rtype.name} found. Not considered")
         return result
 
     def clone(self):
