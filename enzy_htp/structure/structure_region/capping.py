@@ -126,22 +126,6 @@ class ResidueCap(Residue, ABC):
 
         self.anchor()
 
-    @property
-    @abstractmethod
-    def FIXED_CHARGE_MAP(self) -> Dict[str, float]:
-        """Each specialization must have a charge map.""" 
-        pass
-
-    @property
-    @abstractmethod
-    def CAP_BOND_DISTANCE(self) -> Dict[str, float]:
-        """Each specialization must have a charge map.""" 
-        pass
-
-    @abstractmethod
-    def cap_type(self) -> str:
-        """What type of cap is this? Hardcoded value specific to each specialization."""
-        pass
 
     @abstractmethod
     def anchor(self) -> None:
@@ -157,6 +141,25 @@ class ResidueCap(Residue, ABC):
     def get_cterm_atoms(self) -> List[Atom]:
         """Create the default Atom() objects with default names and coordinates for c-terminal verison of the Cap."""
         pass
+
+    @property
+    @abstractmethod
+    def FIXED_CHARGE_MAP(self) -> Dict[str, float]:
+        """Each specialization must have a charge map.""" 
+        pass
+
+    @property
+    @abstractmethod
+    def CAP_BOND_DISTANCE(self) -> Dict[str, float]:
+        """Each specialization must have a charge map.""" 
+        pass
+
+    @property
+    @abstractmethod
+    def cap_type(self) -> str:
+        """What type of cap is this? Hardcoded value specific to each specialization."""
+        pass
+
 
     @property
     @abstractmethod
@@ -209,7 +212,7 @@ class ResidueCap(Residue, ABC):
 
     def __str__(self) -> str:
         """str() rep of the ResidueCap() that shows its chemical type as well as what Atom()'s it is linked to."""
-        return f"{self.cap_type()}Cap(link_atom={self.link_atom.name},link_residue={self.link_residue.key_str})"
+        return f"{self.cap_type}Cap(link_atom={self.link_atom.name},link_residue={self.link_residue.key_str})"
 
 
 class HCap(ResidueCap):
@@ -355,7 +358,7 @@ class NHCH3Cap(ResidueCap):
         'CP1': 0.0,
         'HP11': 0.0,
         'HP12': 0.0,
-        'HP12': 0.0,
+        'HP13': 0.0,
         # C-terminal
         "NP2": 0.0,
         "HP2": 0.0,
@@ -381,7 +384,7 @@ class NHCH3Cap(ResidueCap):
             Atom({'atom_name': 'CP1',  'x_coord': 1.500, 'y_coord':  0.000, 'z_coord': 0.000, 'element_symbol':'C'}),
             Atom({'atom_name': 'HP11', 'x_coord': 1.864, 'y_coord':  0.000, 'z_coord':-1.027, 'element_symbol':'H'}),
             Atom({'atom_name': 'HP12', 'x_coord': 1.864, 'y_coord': -0.889, 'z_coord': 0.515, 'element_symbol':'H'}),
-            Atom({'atom_name': 'HP12', 'x_coord': 1.864, 'y_coord':  0.889, 'z_coord': 0.515, 'element_symbol':'H'}),
+            Atom({'atom_name': 'HP13', 'x_coord': 1.864, 'y_coord':  0.889, 'z_coord': 0.515, 'element_symbol':'H'}),
         ]
 
 
@@ -393,7 +396,7 @@ class NHCH3Cap(ResidueCap):
             Atom({'atom_name': 'CP2',  'x_coord': 1.500, 'y_coord': 0.000, 'z_coord': 0.000, 'element_symbol':'C'}),
             Atom({'atom_name': 'HP21', 'x_coord': 1.864, 'y_coord': 0.000, 'z_coord':-1.027, 'element_symbol':'H'}),
             Atom({'atom_name': 'HP22', 'x_coord': 1.864, 'y_coord':-0.889, 'z_coord': 0.515, 'element_symbol':'H'}),
-            Atom({'atom_name': 'HP22', 'x_coord': 1.864, 'y_coord': 0.889, 'z_coord': 0.515, 'element_symbol':'H'}),
+            Atom({'atom_name': 'HP23', 'x_coord': 1.864, 'y_coord': 0.889, 'z_coord': 0.515, 'element_symbol':'H'}),
         ]
 
     def net_charge(self) -> int:
@@ -426,7 +429,7 @@ class NHCH3Cap(ResidueCap):
             pt += (direction0*cap_bond_distance) + p0
             aa.coord = pt
 
-
+    @property
     def cap_type(self) -> str:
         """This is the NHCH3/methylamide ResidueCap."""
         return "NHCH3"
@@ -464,6 +467,7 @@ class COCH3Cap(ResidueCap):
     }
     """Maps the name of the link_atom to appropriate bond distance."""
 
+    @property
     def cap_type(self) -> str:
         """This is the COCH3/acetyl ResidueCap."""
         return "COCH3"
@@ -491,7 +495,7 @@ class COCH3Cap(ResidueCap):
             direction /= np.linalg.norm(direction)
             rot_mat = rotation_matrix_from_vectors(np.array([1,0,0]), direction)
             
-            cap_bond_distance = self.CAP_BOND_DISTNCE[self.link_atom.name]
+            cap_bond_distance = self.CAP_BOND_DISTANCE[self.link_atom.name]
 
             for aa in self.atoms[2:]:
                 pt = np.array(aa.coord)
