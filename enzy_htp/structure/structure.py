@@ -526,6 +526,16 @@ class Structure(DoubleLinkedNode):
 
         return result
 
+    def get_corresponding_atom(self, other_atom: Atom) -> Atom:
+        """get the corresponding atom based on an Atom from another 
+        Structure with the same/subset topology"""
+        # 1. san check TODO figure out a way to check this.
+
+        # 2. find atom
+        result = self.get(other_atom.key)
+
+        return result
+
     # endregion
 
     #region === Checker ===
@@ -651,6 +661,30 @@ class Structure(DoubleLinkedNode):
             if self_atom.key != other_atom.key:
                 return False
         return True
+
+    def is_topology_subset(self, other: Structure) -> bool:
+        """determine whether other is in a subset topology
+        of self"""
+        result = 1
+        for name, chain in other.chain_mapper.items():
+            if name in self.chain_mapper:
+                self_chain = self.chain_mapper[name]
+                for res in chain.residues:
+                    self_res = self_chain.find_residue_idx(res.idx)
+                    if self_res:
+                        if self_res.name == res.name:
+                            for atom in res.atoms:
+                                self_atom = self_res.find_atom_name(atom.name)
+                                if not self_atom: # need to have the same atom
+                                    return False
+                        else: # need to be the same residue under the index
+                            return False
+                    else: # need to have same residue index
+                        return False
+            else: # need to have same chain id
+                return False
+        return True                      
+
     #endregion
 
     #region === Editor ===

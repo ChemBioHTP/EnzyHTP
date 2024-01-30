@@ -213,6 +213,9 @@ class MultiwfnInterface(BaseInterface):
             res_keywords_update = cluster_job_config["res_keywords"]
             default_res_keywords = self.config().get_default_bond_dipole_res_keywords()
             cluster_job_config["res_keywords"] = default_res_keywords | res_keywords_update
+        # init for atoms
+        atom_1 = ele_stru.geometry.topology.get_corresponding_atom(atom_1)
+        atom_2 = ele_stru.geometry.topology.get_corresponding_atom(atom_2)
 
         # prepare path
         wfn_file = ele_stru.mo
