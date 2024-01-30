@@ -291,6 +291,20 @@ def test_fix_pybel_output_4WI(caplog):
     # detect if there are any hydrogen interspersed in the middle of the file,
     # if the hydrogen atoms are all at the end of the file, it will not cause a problem.
 
+def test_fix_pybel_output_4WI_H_end():
+    """Test protonated ligand (pybel) name fixing.
+    All the hydrogen atoms in the file of `ref_name` is at the end.
+    The output file should be generated, pass the assert check and then be deleted.
+    """
+    file_prefix = 'ligand_test_4WI_protonated'
+    pdb_file = f"{DATA_DIR}{file_prefix}_H_end.pdb"
+    intermediate_pdb_file = f"{DATA_DIR}{file_prefix}_pybel_badname.pdb"
+    out_pdb_file = f"{WORK_DIR}{file_prefix}_pybel.pdb"
+    prot._fix_pybel_output(pdb_path=intermediate_pdb_file, out_path=out_pdb_file, ref_name_path=pdb_file)
+    assert os.path.isfile(out_pdb_file)
+    fs.clean_temp_file_n_dir([out_pdb_file])
+
+
 def test_protonate_stru_imputed():
     """Testing the protonate_stru() method for a structure that has been imputed.
     TODO: those files are missing @CJ"""

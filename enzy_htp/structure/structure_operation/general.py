@@ -52,10 +52,13 @@ def remove_non_peptide(stru: Structure) -> Structure:
 @dispatch
 def remove_hydrogens(residue: Residue) -> Residue:
     """Remove all hydrogen atom(s) from {residue}.
-    Make changes in-place and return a reference of the changed original object.
+    Make changes in-place and return a reference of the changed original Residue / NonCanonicalBase / Ligand.
 
     Args:
         residue: An instance of Residue / NonCanonicalBase / Ligand.
+    
+    Returns:
+        The reference of the changed original Residue / NonCanonicalBase / Ligand
     """
     hydrogens = residue.hydrogens()
     if len(hydrogens) >= 1:
