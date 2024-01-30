@@ -149,7 +149,7 @@ def workflow(
                     })
                 field_strength = ele_field_strength_at_along(
                     ele_stru.geometry.topology, bond_p1, bond_p2, region_pattern=ef_region_pattern)
-                dg_ele = ele_stab_energy_of_bond(dipole, field_strength)
+                dg_ele = ele_stab_energy_of_bond(dipole[0], field_strength)
 
                 replica_result.append((dg_ele, dipole, field_strength))
 
