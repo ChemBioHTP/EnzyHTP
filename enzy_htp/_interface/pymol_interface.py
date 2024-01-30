@@ -173,7 +173,7 @@ class PyMolInterface(BaseInterface):
         
         pymol_obj_name:str = self.general_cmd(session, [('get_unused_name',)])[0] 
         
-        self.general_cmd(session, [('read_pdb_str', pdb_str, pymol_obj_name)])
+        self.general_cmd(session, [('read_pdbstr', pdb_str, pymol_obj_name)])
 
 
         return (pymol_obj_name, session)
