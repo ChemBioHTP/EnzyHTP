@@ -236,7 +236,7 @@ class Residue(DoubleLinkedNode):
     
     def hydrogens(self):
         """Return all the hydrogen atoms in the Residue/Ligand."""
-        result: List[Atom] = list(filter(lambda atom: (atom.element == 'H'), self.atoms))
+        result: List[Atom] = list(filter(lambda atom: atom.is_hydrogen() , self.atoms))
         return result
     #endregion
 
