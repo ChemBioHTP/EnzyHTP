@@ -12,6 +12,7 @@ from typing import Any, List, Tuple, Union, Dict
 from plum import dispatch
 
 import numpy as np
+from numpy.typing import ArrayLike
 import pandas as pd
 
 import enzy_htp.chemical as chem
@@ -42,31 +43,67 @@ class Atom(DoubleLinkedNode):
         connect : the connectivity of this atom. (a list of reference of connected Atom objs)
     """
 
-    def __init__(self, ds: Union[Dict, pd.Series], parent=None):
-        """Constructor of Atom(), where ds is of type pandas.Series"""
+    def __init__(
+            self, 
+            name: str,
+            coord: ArrayLike,
+            parent: DoubleLinkedNode = None,
+            idx: int = None,
+            b_factor: float = None,
+            element: str = None,
+            charge: float = None,
+            atom_type: str = None,
+        ): # TODO change this to from_biopandas
+        """Constructor of Atom()"""
         # nessessary
-        self._name = ds["atom_name"].strip()
-        self._coord = (ds["x_coord"], ds["y_coord"], ds["z_coord"])
+        self._name = name
+        self._coord = coord
         self.set_parent(parent)
         self.set_ghost_children()
         # optional
-        self._idx = None
-        self._b_factor = None
-        self._element = None
-        self._charge = None
+        self._idx = idx
+        self._b_factor = b_factor
+        self._element = element
+        self._charge = charge
+        self._atom_type = atom_type
+        # init for check
         self._connect = None
-        self._atom_type = None
+
+    @classmethod
+    def from_biopandas(cls, ds: Union[Dict, pd.Series], parent=None) -> Atom: # TODO change this to from_biopandas
+        """Constructor of Atom(), where ds is of type pandas.Series"""
+        # nessessary
+        _name = ds["atom_name"].strip()
+        _coord = (ds["x_coord"], ds["y_coord"], ds["z_coord"])
+        # optional
+        _idx = None
+        _b_factor = None
+        _element = None
+        _charge = None
+        _connect = None
+        _atom_type = None
         ds_keys = ds.keys()
         if "atom_number" in ds_keys and not np.isnan(ds["atom_number"]):
-            self._idx = ds["atom_number"]
+            _idx = ds["atom_number"]
         if "b_factor" in ds_keys and not np.isnan(ds["b_factor"]):
-            self._b_factor = ds["b_factor"]
+            _b_factor = ds["b_factor"]
         if "element_symbol" in ds_keys and ds["element_symbol"].strip() != "":
-            self._element = ds["element_symbol"].strip()
+            _element = ds["element_symbol"].strip()
         if "charge" in ds_keys and not np.isnan(ds["charge"]):
-            self._charge = float(ds["charge"])
+            _charge = float(ds["charge"])
         if "atom_type" in ds_keys and ds["atom_type"].strip() != "": #TODO(qz): find a way to unify
-            self._atom_type = ds["atom_type"]
+            _atom_type = ds["atom_type"]
+
+        return cls(
+            name = _name,
+            coord = _coord,
+            parent = parent,
+            idx = _idx,
+            b_factor = _b_factor,
+            element = _element,
+            charge = _charge,
+            atom_type = _atom_type,
+        )
 
     #region === Getter-Attr (ref) ===
     @property
@@ -316,10 +353,14 @@ class Atom(DoubleLinkedNode):
 
     #endregion
 
-    #region === Check ===
+    #region === Checker ===
     def is_donor_atom(self) -> bool:
         """check if the atom is a donor atom to a coordination center"""
         return self.name in chem.metal.DONOR_ATOM_LIST
+
+    def is_hydrogen(self) -> bool:
+        """check if the atom is a hydrogen"""
+        return self.element == "H"
 
     def is_connected(self) -> bool:
         """check if self is in the connected state"""

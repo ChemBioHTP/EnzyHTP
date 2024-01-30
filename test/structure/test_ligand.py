@@ -41,13 +41,13 @@ def test_net_charge():
 def test_clone():
     """Checking that the Ligand.clone() method returns a deepcopy of the current Ligand()."""
     dummy_atoms = [
-        Atom({
+        Atom.from_biopandas({
             'x_coord': 0,
             'y_coord': 0,
             'z_coord': 0,
             'atom_name': 'dummy'
         }),
-        Atom({
+        Atom.from_biopandas({
             'x_coord': 0,
             'y_coord': 0,
             'z_coord': 0,

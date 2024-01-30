@@ -330,7 +330,7 @@ def get_h_cap(end: str, res: Residue,
     elif end == 'cterm':
         aname = 'HP21'
     atoms = [
-        Atom(
+        Atom.from_biopandas(
             {'atom_name': aname,
             'x_coord':0.000, 'y_coord': 0.000, 'z_coord':  0.000,
             'element_symbol': "H"},
@@ -365,10 +365,10 @@ def get_ch3_cap(end: str, res: Residue,
     elif end == 'cterm':
         anames = "CP2 HP21 HP22 HP23".split()
     atoms = [
-        Atom({'atom_name': anames[0], 'x_coord':0.000, 'y_coord': 0.000, 'z_coord':  0.000,'element_symbol': "C"}),
-        Atom({'atom_name': anames[1], 'x_coord':0.360, 'y_coord':-1.029, 'z_coord':  0.000,'element_symbol': "H"}),
-        Atom({'atom_name': anames[2], 'x_coord':0.360, 'y_coord': 0.514, 'z_coord':  0.891,'element_symbol': "H"}),
-        Atom({'atom_name': anames[3], 'x_coord':0.360, 'y_coord': 0.514, 'z_coord': -0.891,'element_symbol': "H"})
+        Atom.from_biopandas({'atom_name': anames[0], 'x_coord':0.000, 'y_coord': 0.000, 'z_coord':  0.000,'element_symbol': "C"}),
+        Atom.from_biopandas({'atom_name': anames[1], 'x_coord':0.360, 'y_coord':-1.029, 'z_coord':  0.000,'element_symbol': "H"}),
+        Atom.from_biopandas({'atom_name': anames[2], 'x_coord':0.360, 'y_coord': 0.514, 'z_coord':  0.891,'element_symbol': "H"}),
+        Atom.from_biopandas({'atom_name': anames[3], 'x_coord':0.360, 'y_coord': 0.514, 'z_coord': -0.891,'element_symbol': "H"})
     ]
     return CH3Cap(
         link_residue=res,

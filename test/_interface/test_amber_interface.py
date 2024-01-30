@@ -564,11 +564,13 @@ def test_write_to_mdin_from_raw_dict():
     }
     test_temp_mdin = f"{MM_WORK_DIR}/test_mdin_from_raw_dict.in"
     answer_temp_mdin = f"{MM_DATA_DIR}/answer_mdin_from_raw_dict.in"
+    fs.safe_mkdir("MD/")
     ai = interface.amber
     ai._write_to_mdin_from_raw_dict(test_raw_dict, test_temp_mdin)
     assert files_equivalent(test_temp_mdin, answer_temp_mdin)
     fs.safe_rm(test_temp_mdin)
     fs.safe_rm("MD/0.rs")
+    fs.safe_rmdir("MD/")
 
 
 def test_write_disang_file():
@@ -1018,115 +1020,16 @@ def test_parse_cons_to_raw_rs_dict():
             assert v == answer_raw_dict[k]
 
 
+def test_reduce_path_in_mdin():
+    """test using an path that is too long"""
+    test_path = "/panfs/accrepfs.vampire/home/shaoq1/bin/dev_test/EnzyHTP-refactor/test_integration/equi_md_qm_spe_based_descriptor/work_dir/MD/rep_0/0.rs"
+    ai = interface.amber
+
+    result = ai._reduce_path_in_mdin(test_path)
+    assert len(result) <= 70
+
+
 # region TODO
-
-def test_parse_fmt_uppercase():
-    """Testing that the AmberInterface.parse_fmt() method works correctly for uppercase inputs."""
-    ai = interface.amber
-    assert ai.parse_fmt('%FORMAT(20A4)') == (str, 4)
-
-    assert ai.parse_fmt('%FORMAT(5E16.8)') == (float, 16)
-
-    assert ai.parse_fmt('%FORMAT(10I8)') == (int, 8)
-
-
-def test_parse_fmt_lowercase():
-    """Testing that the AmberInterface.parse_fmt() method works correctly for lowercase inputs."""
-    ai = interface.amber
-    assert ai.parse_fmt('%FORMAT(20a4)') == (str, 4)
-
-    assert ai.parse_fmt('%FORMAT(5e16.8)') == (float, 16)
-
-    assert ai.parse_fmt('%FORMAT(10i8)') == (int, 8)
-
-
-def test_parse_fmt_bad_input():
-    """Testing that the AmberInterface.parse_fmt() method returns the correct (None,-1) for bad inputs."""
-
-    ai = interface.amber
-
-    assert ai.parse_fmt('') == (None, -1)
-
-    assert ai.parse_fmt('20a4') == (None, -1)
-
-    assert ai.parse_fmt('FORMAT(20a4)') == (None, -1)
-
-    assert ai.parse_fmt('%FORMAT(20a4') == (None, -1)
-
-
-
-def test_parse_prmtop():
-    """Testing that AmberInterface.parse_prmtop() method works. It essentially loads the supplied
-    prmtop file and ensures that the correct number of items are extracted for the majority of keys.
-    """
-    ai = interface.amber
-    data = ai.parse_prmtop(f"{MM_DATA_DIR}/prmtop_1")
-
-    assert data
-
-    n_atoms: int = 23231
-    num_bond: int = 85
-    num_ang: int = 186
-    n_ptra: int = 190
-    n_types: int = 19
-    n_bond_h: int = 21805
-    n_bond_a: int = 1450
-    n_thet: int = 3319
-    n_phi: int = 6138
-    n_phi_h: int = 6551
-    nnb: int = 43036
-    n_phb: int = 1
-    n_res: int = 6967
-
-    assert len(data['ATOM_NAME']) == n_atoms
-    assert len(data['CHARGE']) == n_atoms
-    assert len(data['ATOMIC_NUMBER']) == n_atoms
-    assert len(data['MASS']) == n_atoms
-    assert len(data['ATOM_TYPE_INDEX']) == n_atoms
-    assert len(data['NUMBER_EXCLUDED_ATOMS']) == n_atoms
-    assert len(data['NONBONDED_PARM_INDEX']) == n_types**2
-    assert len(data['RESIDUE_LABEL']) == n_res
-    assert len(data['RESIDUE_POINTER']) == n_res
-    assert len(data['BOND_FORCE_CONSTANT']) == num_bond
-    assert len(data['BOND_EQUIL_VALUE']) == num_bond
-    assert len(data['ANGLE_FORCE_CONSTANT']) == num_ang
-    assert len(data['ANGLE_EQUIL_VALUE']) == num_ang
-    assert len(data['DIHEDRAL_FORCE_CONSTANT']) == n_ptra
-    assert len(data['DIHEDRAL_PERIODICITY']) == n_ptra
-    assert len(data['DIHEDRAL_PHASE']) == n_ptra
-    assert len(data['SCEE_SCALE_FACTOR']) == n_ptra
-    assert len(data['SOLTY']) == 52
-    assert len(data['LENNARD_JONES_ACOEF']) == (n_types * (n_types + 1)) / 2
-    assert len(data['LENNARD_JONES_BCOEF']) == (n_types * (n_types + 1)) / 2
-    assert len(data['BONDS_INC_HYDROGEN']) == 3 * n_bond_h
-    assert len(data['BONDS_WITHOUT_HYDROGEN']) == 3 * n_bond_a
-    assert len(data['ANGLES_INC_HYDROGEN']) == 4 * n_thet
-    assert len(data['DIHEDRALS_INC_HYDROGEN']) == 5 * n_phi_h
-    assert len(data['DIHEDRALS_WITHOUT_HYDROGEN']) == 5 * n_phi
-    assert len(data['EXCLUDED_ATOMS_LIST']) == nnb
-    assert len(data['HBOND_ACOEF']) == n_phb
-    assert len(data['HBOND_BCOEF']) == n_phb
-    assert len(data['HBCUT']) == n_phb
-    assert len(data['AMBER_ATOM_TYPE']) == n_atoms
-    assert len(data['TREE_CHAIN_CLASSIFICATION']) == n_atoms
-    assert len(data['JOIN_ARRAY']) == n_atoms
-    assert len(data['IROTAT']) == n_atoms
-    assert len(data['RADII']) == n_atoms
-
-
-def test_parse_prmtop_no_file():
-    """Checking that AmberInteface.parse_prmtop() throws an error if the listed file does not exist."""
-
-    dne = Path('./dne')
-
-    assert not dne.exists()
-
-    ai = interface.amber
-    with pytest.raises(SystemExit) as exe:
-        ai.parse_prmtop(dne)
-
-    assert exe
-
 
 def test_add_charges():
     """Checking that the AmberInterface.add_charges() method works correctly."""

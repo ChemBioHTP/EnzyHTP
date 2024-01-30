@@ -122,6 +122,9 @@ class MetalUnit(NonCanonicalBase):
     def clone(self) -> MetalUnit:
         """Creates deepcopy of self."""
         return deepcopy(self)
+
+    def radius(self, method: str = "ionic") -> float:
+        return self.atom.radius(method)
     #endregion
 
     #region === Checker ===

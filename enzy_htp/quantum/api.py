@@ -8,7 +8,7 @@ Science API:
 
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2023-10-28"""
-from typing import Any, Union, List, Dict, Callable
+from typing import Union, List, Dict, Callable
 
 from enzy_htp import interface
 from enzy_htp._interface.handle_types import QMSinglePointEngine, QMOptimizationEngine
@@ -16,8 +16,6 @@ from enzy_htp.electronic_structure import ElectronicStructure
 from enzy_htp.structure import (
     Structure,
     StructureEnsemble,
-    StructureRegion,
-    StructureConstraint,
     create_region_from_selection_pattern
 )
 from enzy_htp.structure.structure_operation import init_charge
@@ -59,6 +57,8 @@ def single_point(
             This option allows you to define different region and apply different
             level of theory to each region.
             e.g.: defining 2 regions and perform QM/MM.
+            the regions are defined by a list of selection patterns.
+            the pattern is applied to the 1st frame.
         region_methods:
             The level of theory of each region.
             This is used when more than 1 region is specified.
@@ -71,6 +71,8 @@ def single_point(
         parallel_method:
             the method to parallelize the multiple runs when more
             than 1 geometry is in the input StructureEnsemble
+        cluster_job_config: 
+            the config for cluster_job if it is used as the parallel method.
         job_check_period:
             the time cycle for update job state change (Unit: s)
         job_array_size:
@@ -169,11 +171,11 @@ def single_point(
             qm_region = None
         else:
             qm_region = create_region_from_selection_pattern(
-                stru_esm.topology,
+                stru_esm.structure_0,
                 regions[0],
                 capping_method)
             init_charge(qm_region)
-        
+
         qm_engine: QMSinglePointEngine = qm_engine_ctor(
                                             region=qm_region,
                                             method=qm_method,
@@ -186,7 +188,7 @@ def single_point(
         # multiscale
         raise Exception("TODO")
         qm_engine = MULTI_REGION_SINGLE_POINT_ENGINE[engine]
-        regions = [create_region_from_selection_pattern(stru_esm.topology, i) for i in regions]
+        regions = [create_region_from_selection_pattern(stru_esm.structure_0, i) for i in regions]
         qm_engine = qm_engine_ctor(
                         regions=regions,
                         region_methods=region_methods,
@@ -249,7 +251,7 @@ def _parallelize_qm_with_cluster_job(
         qm_engine: Union[QMSinglePointEngine, QMOptimizationEngine],
         job_check_period: int,
         array_size: int,
-        ) -> List[StructureEnsemble]:
+        ) -> List[ElectronicStructure]:
     """The QM parallelization method: cluster_job.
     This method will utilize ARMer@EnzyHTP and make each QM calculation a ClusterJob and
     parallalize them in a job array
@@ -281,7 +283,7 @@ def _parallelize_qm_with_cluster_job(
 def _serial_qm(
         stru_esm: StructureEnsemble,
         qm_engine: Union[QMSinglePointEngine, QMOptimizationEngine],
-        ) -> List[StructureEnsemble]:
+        ) -> List[ElectronicStructure]:
     """The QM serial running method
     This method runs QMs in a serial manner locally."""
     result = []

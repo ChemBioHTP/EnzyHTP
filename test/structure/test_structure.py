@@ -59,8 +59,8 @@ def equiv_files(fname1: str, fname2: str, width: int = None) -> bool:
 
 def test_structure_ctor_bad_input():
     """Testing that the Structure() ctor fails when given duplicate chains."""
-    Atom_1 = Atom({"atom_name": "X", "x_coord": 1, "y_coord": 2, "z_coord": 3})
-    Atom_2 = Atom({"atom_name": "X", "x_coord": 3, "y_coord": 2, "z_coord": 1})
+    Atom_1 = Atom.from_biopandas({"atom_name": "X", "x_coord": 1, "y_coord": 2, "z_coord": 3})
+    Atom_2 = Atom.from_biopandas({"atom_name": "X", "x_coord": 3, "y_coord": 2, "z_coord": 1})
     chain1 = Chain("A", [Residue(1, "XXX", [Atom_1])])
     chain2 = Chain("B", [Residue(2, "XXX", [Atom_2])])
     chain3 = Chain("A", [Residue(3, "XXX", [Atom_1])])
@@ -239,3 +239,19 @@ def test_is_same_topology():
     test_other = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S_geom_1.pdb")
     test_self = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
     assert test_self.is_same_topology(test_other)
+
+def test_hydrogens():
+    """as nam. result verified by pymol"""
+    test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
+    assert len(test_stru.hydrogens()) == 2000
+
+def test_hydrogens_polypeptide_only():
+    """as name"""
+    test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
+    assert len(test_stru.hydrogens(polypeptide_only=True)) == 1996
+
+def test_net_chrgspin_mapper():
+    """as name"""
+    test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
+    test_stru.assign_ncaa_chargespin({"H5J" : (0,1)})
+    assert test_stru.ncaa_chrgspin_mapper == {"H5J" : (0,1)}

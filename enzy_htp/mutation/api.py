@@ -78,7 +78,7 @@ def assign_mutant(
         sections are used, {} is needed to group those sections.
         "{section_a1,section_a2,section_a3},{section_b1,section_b2,section_b3},..."
         Each section can be one of the format below:
-        1. direct indication                    : XA###Y
+        1. direct indication                    : XA###Y ('WT' for just wild type)
         2. random M, N-point mutation in a set  : r:N[mutation_esm_patterns]*M
                                                   or r:NR[mutation_esm_patterns]*MR
                                                   (N and M are int,
@@ -183,7 +183,7 @@ def sync_mutation_over_chains(mutants: List[List[Mutation]],
 
 def mutate_stru(stru: Structure,
                 mutant: List[Mutation],
-                engine: str = "tleap_min",
+                engine: str = "pymol",
                 in_place: bool = False,
                 if_check_mutant_stru: bool = True,
                 checker_config: Dict[str, Dict[str, Any]] = None,
@@ -511,7 +511,11 @@ def mutate_stru_with_rosetta(stru: Structure, mutant: List[Mutation], in_place: 
     return stru_cpy
 
 
-MUTATE_STRU_ENGINE = {"tleap_min": mutate_stru_with_tleap, "pymol": mutate_stru_with_pymol, "rosetta": mutate_stru_with_rosetta}
+MUTATE_STRU_ENGINE = {
+    "tleap_min": mutate_stru_with_tleap, 
+    "pymol": mutate_stru_with_pymol, 
+    "rosetta": mutate_stru_with_rosetta
+}
 """engines for mutate_stru()"""
 
 

@@ -21,7 +21,9 @@ sp = PDBParser()
 
 def test_assign_mutant():
     """test function works as expected using KE07"""
-    test_mutation_pattern = ("KA162A, {RA154W, HA201A}," " {L10A, r:2[resi 254 around 3:all not self]*5}")
+    test_mutation_pattern = (
+        "KA162A, {RA154W, HA201A},"
+        " {L10A, r:2[resi 254 around 3:all not self]*5}")
     test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
     test_stru = sp.get_structure(test_pdb)
 
@@ -86,63 +88,6 @@ def test_check_mutant_stru():
     mutant_stru = sp.get_structure(mutant_pdb)
 
     mapi.check_mutant_stru(mutant_stru, mutant)
-
-
-# ==TODO==
-def test_mutate_pdb_one_letter_tleap():
-    """Checking that mutate_pdb() works on a pdb structure with a single letter specifically for tleap's mutation.
-    Note to developers: This should be replicated for each and every new package added."""
-    ONE_RES: str = f"{DATA_DIR}/one_res.pdb"
-    target = f"{DATA_DIR}/one_res_P1K.pdb"
-
-    fs.safe_rm(target)
-
-    assert not os.path.exists(target)
-    mutated = mut.mutate_pdb(ONE_RES, 1, list(), None, "tleap", None, 100)
-    assert os.path.exists(target)
-
-    lines: List[str] = fs.lines_from_file(target)
-    lines = list(filter(lambda ll: ll.startswith('ATOM'), lines))
-
-    for ll in lines:
-        assert 'LYS' in ll
-
-    fs.safe_rm(target)
-    assert not os.path.exists(target)
-
-
-def test_mutate_pdb_specified_mutation_tleap():
-    """Checking that mutate_pdb() works on a pdb structure with a single letter specifically for tleap's mutation 
-    when that mutation has been manually specified. Note to developers: This should be replicated for each and 
-    every new package added."""
-
-    ONE_RES: str = f"{DATA_DIR}/one_res.pdb"
-    target = f"{DATA_DIR}/one_res_P1G.pdb"
-    fs.safe_rm(target)
-    assert not os.path.exists(target)
-    mutated = mut.mutate_pdb(ONE_RES, 1, [mut.Mutation(orig='P', target='G', chain_id='A', res_idx=1)], None, "tleap", None, 100)
-    assert os.path.exists(target)
-
-    lines: List[str] = fs.lines_from_file(target)
-    lines = list(filter(lambda ll: ll.startswith('ATOM'), lines))
-
-    for ll in lines:
-        assert 'GLY' in ll
-
-    fs.safe_rm(target)
-    assert not os.path.exists(target)
-
-
-def test_mutate_pdb_raises_unsupported_method_exception():
-    """Testing that the mutate_pdb() method will raise an UnsupportedMethod() Excpetion when given a nonsense 
-    value for the engine."""
-
-    ONE_RES: str = f"{DATA_DIR}/one_res.pdb"
-    with pytest.raises(UnsupportedMethod) as exe:
-        mut.mutate_pdb(ONE_RES, 1, list(), None, "doesnt-exist")
-
-    assert exe
-    assert exe.type == UnsupportedMethod
 
 
 def test_mutate_stru_with_pymol():

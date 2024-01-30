@@ -26,6 +26,21 @@ def remove_solvent(stru: Structure) -> Structure:
     return stru
 
 
+def remove_hydrogens(stru: Structure, polypeptide_only: bool) -> Structure:
+    """
+    remove all hydrogen Atom()s for {stru}.
+    Make changes in-place and return a reference of the changed
+    original object.
+    """
+    hydrogens = stru.hydrogens(polypeptide_only=polypeptide_only)
+    _LOGGER.debug(f"removing {len(hydrogens)} hydrogens")
+    for h in hydrogens:
+        h: Atom
+        h.delete_from_parent()
+
+    return stru
+
+
 def remove_empty_chain(stru: Structure) -> Structure:
     """
     remove empty chains

@@ -7,6 +7,7 @@ import logging
 from pathlib import Path
 
 import enzy_htp.core.file_system as fs
+from enzy_htp.core.general import EnablePropagate
 from enzy_htp.structure import Atom, Structure
 from enzy_htp.structure.structure_operation import init_connectivity
 from enzy_htp import _LOGGER
@@ -38,6 +39,7 @@ def test_init_connectivity_lv_2():
     - single polypeptide chain
     - single substrate (CHON)
     ** use existing parm files for ligand"""
+    fs.safe_rmdir("../ncaa_lib")
     test_stru = PDBParser().get_structure(
         f"{DATA_DIR}/diversed_stru/KE_07_R7_2_S.pdb")
     test_stru.assign_ncaa_chargespin({"LIGAND" : (0, 1)})
@@ -120,24 +122,25 @@ def test_init_connectivity_atom_missing_h(caplog):
     original_level = _LOGGER.level
     _LOGGER.setLevel(logging.DEBUG)
 
-    stru = PDBParser().get_structure(f"{STRU_DATA_DIR}1NVG.pdb")
-    atom1: Atom = stru["A"][0][0]  #N (Nter)
-    atom2: Atom = stru["A"][1][0]  #N
-    atom3: Atom = stru["A"][-1].find_atom_name("C")  #C (Cter)
-    init_connectivity(atom1)
-    init_connectivity(atom2)
-    init_connectivity(atom3)
-    assert len(atom1.connect) == 1
-    assert len(atom2.connect) == 2
-    assert len(atom3.connect) == 3
-    assert "missing connecting atom " in caplog.text
+    with EnablePropagate(_LOGGER):
+        stru = PDBParser().get_structure(f"{STRU_DATA_DIR}/1NVG.pdb")
+        atom1: Atom = stru["A"][0][0]  #N (Nter)
+        atom2: Atom = stru["A"][1][0]  #N
+        atom3: Atom = stru["A"][-1].find_atom_name("C")  #C (Cter)
+        init_connectivity(atom1)
+        init_connectivity(atom2)
+        init_connectivity(atom3)
+        assert len(atom1.connect) == 1
+        assert len(atom2.connect) == 2
+        assert len(atom3.connect) == 3
+        assert "missing connecting atom " in caplog.text
 
     _LOGGER.setLevel(original_level)
 
 
 def test_init_connectivity_atom_w_h():
     """get connect with no missing H atoms"""
-    stru = PDBParser().get_structure(f"{STRU_DATA_DIR}1Q4T_peptide_protonated.pdb")
+    stru = PDBParser().get_structure(f"{STRU_DATA_DIR}/1Q4T_peptide_protonated.pdb")
     atom1: Atom = stru["A"][0][0]  #N (Nter)
     atom2: Atom = stru["A"][1][0]  #N
     atom3: Atom = stru["A"][-1].find_atom_name("C")  #N (Cter)

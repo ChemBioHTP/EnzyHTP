@@ -106,7 +106,6 @@ def test_single_point_gaussian_lv2():
     fs.safe_rmdir(f"{WORK_DIR}/QM_SPE/", True)
 
 @pytest.mark.accre
-@pytest.mark.temp
 def test_single_point_gaussian_lv3():
     """Test running a QM single point.
     Using Gaussian & Accre as an example engine

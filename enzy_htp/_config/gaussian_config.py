@@ -66,7 +66,7 @@ class GaussianConfig(BaseConfig):
         """function for lazy resolution."""
         return copy.deepcopy(self.DEFAULT_SPE_RES_KEYWORDS)
 
-    def get_default_qm_spe_cluster_job(self) -> Dict:
+    def get_default_qm_spe_cluster_job_config(self) -> Dict:
         """The default value for dictionary that assign arguments to
         ClusterJob.config_job and ClusterJob.wait_to_end during the QM SPE"""
         return {

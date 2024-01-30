@@ -133,6 +133,10 @@ class Structure(DoubleLinkedNode):
         chain_names
     """
 
+    REFERENCE_CHAIN_ORDER = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',
+                             'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',
+                             'U', 'V', 'W', 'X', 'Y', 'Z',] + [str(x) for x in range(50000)]
+
     def __init__(self, chains: List[Chain]):
         """Constructor that takes just a list of Chain() objects as input."""
         self.set_children(chains)
@@ -214,7 +218,6 @@ class Structure(DoubleLinkedNode):
     def residues(self) -> List[Residue]:
         """Return a list of the residues in the Structure() object sorted by (chain_id, residue_id)"""
         result = list(itertools.chain.from_iterable(self._chains))
-        result.sort(key=lambda r: r.key())
         return result
 
     @property
@@ -333,7 +336,7 @@ class Structure(DoubleLinkedNode):
         return result
 
     @property
-    def noncanonicals(self) -> List[Residue]:
+    def noncanonicals(self) -> List[NonCanonicalBase]:
         """Filters out Residue()s that are ligand, modified residue, or metal in 
         the Structure()."""
         result: List[Residue] = list()
@@ -345,6 +348,16 @@ class Structure(DoubleLinkedNode):
     def polypeptides(self) -> List[Chain]:
         """return the peptide part of current Structure() as a list of chains"""
         result: List[Chain] = list(filter(lambda c: c.is_polypeptide(), self._chains))
+        return result
+
+    def hydrogens(self, polypeptide_only: bool=False) -> List[Atom]:
+        """return all the hydrogens in the Structure"""
+        if polypeptide_only:
+            result = []
+            for ch in self.polypeptides:
+                result.extend(list(filter(lambda a: a.is_hydrogen(), ch.atoms)))
+        else:
+            result: List[Atom] = list(filter(lambda a: a.is_hydrogen(), self.atoms))
         return result
 
     @property
@@ -491,6 +504,28 @@ class Structure(DoubleLinkedNode):
             raise IndexMappingError
         idx_mapper = dict(zip(okeys, nkeys))
         return idx_mapper
+
+    @property
+    def ncaa_chrgspin_mapper(self) -> Dict[str, Tuple[int, int]]:
+        """the charge spin mapper for each NCAA in the structure.
+        3-letter name is used as the key, 
+        if your structure contains say metal with same name but
+        different spin, you should name them differently."""
+        result = {}
+        for ncaa in self.noncanonicals:
+            if ncaa.name in result:
+                exist_record = result[ncaa.name]
+                pending_record = (ncaa.net_charge, ncaa.multiplicity)
+                if exist_record != pending_record:
+                    if None in pending_record:
+                        continue
+                    elif None not in exist_record:
+                        _LOGGER.error("found NCAA with same name but different charge spin. You should name them differently")
+                        raise Exception
+            result[ncaa.name] = (ncaa.net_charge, ncaa.multiplicity)
+
+        return result
+
     # endregion
 
     #region === Checker ===
@@ -501,7 +536,7 @@ class Structure(DoubleLinkedNode):
             Whether the Structure object has non-None charges for all atoms.
         """
         for aa in self.atoms:
-            if aa.charge is None:
+            if not aa.has_init_charge():
                 return False
         return True
 
@@ -624,7 +659,7 @@ class Structure(DoubleLinkedNode):
         sort children chains with their chain name
         sorted is always better than not but Structure() is being lazy here
         """
-        self._chains.sort(key=lambda x: x.name)
+        self._chains.sort(key=lambda x: self.REFERENCE_CHAIN_ORDER.index(x.name))
 
     def sort_everything(self) -> None:
         """sort all object in structure"""
