@@ -69,9 +69,11 @@ def ele_field_strength_at_along(
     # initialize variables
     stru_sele = select_stru(stru, region_pattern)
     if isinstance(p1, Atom):
+        p1 = stru.get_corresponding_atom(p1)
         p1 = np.array(p1.coord, dtype=float)
     if p2 is not None:
         if isinstance(p2, Atom):
+            p2 = stru.get_corresponding_atom(p2)
             p2 = np.array(p2.coord, dtype=float)
         d1 = p2 - p1
     d1 /= np.linalg.norm(d1)
