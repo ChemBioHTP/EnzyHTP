@@ -554,7 +554,17 @@ class PyMolInterface(BaseInterface):
         lines = list(filter(lambda ll: ll[0] != '>', lines))
         return ''.join(lines)
 
-    def remove_ligand_bonding(self, session): #TODO(CJ): bad name here
+    def remove_ligand_bonding(self, session: pymol2.PyMOL, clash_cutoff:float=2.0) -> None: #TODO(CJ): bad name here
+        """Given a session with some already present molecule, remove the bonding in between residues presumably due
+        to clashes. Essentially loops through all atoms and unbonds if they are within the specified clash_cutoff.
+
+        Args:
+            session: The pymol session all molecular information is stored inside of.
+            clash_cutoff: How close can two atoms be before they are bonded? Default is 2.0 angstroms.
+
+        Returns:
+            Nothing.
+        """
 
         self.general_cmd(session, [('set', 'retain_order', 1)])       #NOTE(CJ): this solves so many problems
         #TODO(CJ): need to add 
@@ -572,7 +582,7 @@ class PyMolInterface(BaseInterface):
         args = list()
         for i, row in df.iterrows():
             for i2, row2 in df2.iterrows():
-                if dist(row.point, row2.point) <= 2:
+                if dist(row.point, row2.point) <= clash_cutoff:
                     args.append(('unbond',
                         f"chain {row.chain} and resi {row.resi} and resn {row.resn}",
                         f"chain {row2.chain} and resi {row2.resi} and resn {row2.resn}",
@@ -664,7 +674,7 @@ class PyMolInterface(BaseInterface):
         return np.mean(np.array([df.x.to_numpy(), df.y.to_numpy(), df.z.to_numpy()]),axis=1)
 
     def fetch(self, code: str, out_dir: str = None) -> str:
-        """
+        """Given a 
 
         Args:
             code:
@@ -688,6 +698,9 @@ class PyMolInterface(BaseInterface):
             outfile = fs.safe_mv(outfile, f"{out_dir}/")
         #TODO(CJ): check if the file is downloaded
         return outfile
+
+
+    
 
     def get_residue_list(self, session, stru, sele_str:str='all', work_dir:str=None) -> List[Tuple[str,int]]:
         #TODO(CJ): add this documentation + type hinting
