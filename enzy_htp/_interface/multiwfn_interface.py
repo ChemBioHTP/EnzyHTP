@@ -15,6 +15,7 @@ from typing import List, Dict, Tuple, Union
 import numpy as np
 
 from .base_interface import BaseInterface
+from .gaussian_interface import gaussian_interface
 
 from enzy_htp.core import file_system as fs
 from enzy_htp.core.logger import _LOGGER
@@ -78,21 +79,35 @@ class MultiwfnInterface(BaseInterface):
             Multiwfn {wfn_file} < {instr_file} > output
             the result location depends on the app.
             (e.g.: for bond dipole it will be in ./LMOdip.txt)"""
+        # deal with non-accepting wfn_files
+        temp_path_list = []
+        if fs.get_file_ext(wfn_file) == ".chk":
+            temp_dir = eh_config['system.SCRATCH_DIR']
+            fs.safe_mkdir(temp_dir)
+            temp_fchk_file = fs.get_valid_temp_name(f"{temp_dir}/temp_for_multiwfn.fchk")
+            wfn_file = gaussian_interface.run_formchk(wfn_file, temp_fchk_file)
+            temp_path_list.extend([temp_fchk_file, temp_dir])
+
+        # make settings.ini
+
+        # region deprocated NOTE we didnt use this for fchk conversion because multiwfn have a string length limit I guess so
+        # it mess up with the cmd when the path is too long.
+        # multiwfn_settings = "settings.ini"
+        # if Path(multiwfn_settings).exists():
+        #     with open(multiwfn_settings, "r+") as f:
+        #         if "formchkpath" not in f.read():
+        #             f.write(f'formchkpath= "{shutil.which("formchk")}"')
+        # else:
+        #     with open(multiwfn_settings, "w") as f:
+        #         f.write(f'formchkpath= "{shutil.which("formchk")}"')
+        # endregion
+
+        if additional_settings:
+            raise Exception("TODO")
+
         multiwfn_exe = self.get_multiwfn_executable()
         multiwfn_args = f"{wfn_file} < {instr_file} > {log_path} 2>&1"
         multiwfn_cmd = f"{multiwfn_exe} {multiwfn_args}"
-
-        # make settings.ini
-        multiwfn_settings = "settings.ini"
-        if Path(multiwfn_settings).exists():
-            with open(multiwfn_settings, "r+") as f:
-                if "formchkpath" not in f.read():
-                    f.write(f'formchkpath= "{shutil.which("formchk")}"')
-        else:
-            with open(multiwfn_settings, "w") as f:
-                f.write(f'formchkpath= "{shutil.which("formchk")}"')     
-        if additional_settings:
-            raise Exception("TODO")
 
         # dispatch for running types
         if cluster_job_config is None:
@@ -102,7 +117,8 @@ class MultiwfnInterface(BaseInterface):
                 args=multiwfn_args,
             )
             self.check_multiwfn_error(log_path, this_spe_run)
-
+            # clean up
+            fs.clean_temp_file_n_dir(temp_path_list)
             return None
 
         elif job_check_period is None:
@@ -122,6 +138,9 @@ class MultiwfnInterface(BaseInterface):
                 res_keywords=res_keywords,
                 sub_dir="./",  # because path are relative
                 sub_script_path=sub_script_path)
+            job.mimo = {
+                "temp_path_list" : temp_path_list
+            }
             return job
 
     def check_multiwfn_error(self, out_file, stdstream_source):
@@ -226,6 +245,7 @@ class MultiwfnInterface(BaseInterface):
             self.check_multiwfn_error(log_path, job)
             clean_targets.append(job.job_cluster_log)
             clean_targets.append(job.sub_script_path)
+            clean_targets.extend(job.mimo["temp_path_list"])
 
         # collect the ./LMOdip.txt file and clean up
         fs.safe_mv("LMOdip.txt", result_file)

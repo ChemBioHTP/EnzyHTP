@@ -758,9 +758,11 @@ class GaussianInterface(BaseInterface):
         raise Exception("TODO")
 
     # -- formchk --
-    def run_formchk(self):
-        """interface for running formchk"""
-        raise Exception("TODO")
+    def run_formchk(self, chk_file: str, out_path: str) -> str:
+        """interface for running formchk
+        return the out_path"""
+        self.env_manager_.run_command("formchk", [chk_file, out_path])
+        return out_path
 
     # -- cubegen --
     def run_cubegen(self):
@@ -1233,16 +1235,6 @@ class GaussianInterface(BaseInterface):
         # 4
 
         return add_prm
-
-    def get_fchk(self, chks: List[str]) -> List[str]:
-        """TODO"""
-        result: List[str] = list()
-        for chk in chks:
-            fchk = str(Path(chk).with_suffix(".fchk"))
-            result.append(fchk)
-            self.env_manager_.run_command("formchk", [chk, fchk])
-
-        return result
 
     # endregion
 
