@@ -307,8 +307,8 @@ class Residue(DoubleLinkedNode):
         """check if self has charge"""
         return math.prod([atom.has_init_charge() for atom in self.atoms])  
     
-    def has_hydrogen(self) -> bool:
-        """Check if self has hydrogen atom(s)."""
+    def has_hydrogens(self) -> bool:
+        """Does the residue contain hydrogen atoms?"""
         element_list = self.element_composition
         return ('H' in element_list)
 
