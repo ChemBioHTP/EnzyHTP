@@ -8,7 +8,6 @@ Supported operations include:
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-08-17
 """
-#TODO(CJ): add some logic here to lock the hydrogen bonds into place
 from __future__ import annotations
 import os
 from pathlib import Path
