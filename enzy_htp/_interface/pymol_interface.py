@@ -159,29 +159,22 @@ class PyMolInterface(BaseInterface):
 
     # == intra-session modular functions == (requires a session and wont close it)
     def load_enzy_htp_stru(self, session: pymol2.PyMOL, stru: Structure) -> Tuple[str, pymol2.PyMOL]:
-        """convert enzy_htp.Structure into a pymol object in a
-        pymol2.PyMOL() session. 
-        Using cmd.load and mediate by PDB format
+        """convert enzy_htp.Structure into a pymol object in a pymol2.PyMOL() session. Performs 
+        operation without writing to disk.
         
         Returns:
             (pymol_obj_name, session) since the name is only valid in the session
             
         Note: pymol wont reset residue idx or chain names but will reset atom index from 1"""
 
-        # create temp PDB
         self.check_pymol2_installed()
-        pdb_str = PDBParser().get_file_str(stru, if_renumber=False)
-        temp_dir = eh_config["system.SCRATCH_DIR"]
-        temp_pdb_path = fs.get_valid_temp_name(f"{temp_dir}/temp_pymol_interface.pdb")
-        fs.safe_mkdir(temp_dir)
-        with open(temp_pdb_path, "w") as f:
-            f.write(pdb_str)
-        # create pymol obj
-        pymol_obj_name = session.cmd.get_unused_name("enzy_htp_stru")
-        session.cmd.load(temp_pdb_path, pymol_obj_name)
+        
+        pdb_str:str = PDBParser().get_file_str(stru, if_renumber=False)
+        
+        pymol_obj_name:str = self.general_cmd(session, [('get_unused_name',)])[0] 
+        
+        self.general_cmd(session, [('read_pdb_str', pdb_str, pymol_obj_name)])
 
-        # clean up temp PDB
-        fs.clean_temp_file_n_dir([temp_dir, temp_pdb_path])
 
         return (pymol_obj_name, session)
 
