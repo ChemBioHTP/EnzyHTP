@@ -16,8 +16,10 @@ from enzy_htp.electronic_structure import ElectronicStructure
 from enzy_htp.structure import (
     Structure,
     StructureEnsemble,
-    create_region_from_selection_pattern
+    create_region_from_selection_pattern,
+    StructureConstraint
 )
+
 from enzy_htp.structure.structure_operation import init_charge
 from enzy_htp.chemical import QMLevelOfTheory, LevelOfTheory
 from enzy_htp.core.logger import _LOGGER
@@ -238,7 +240,7 @@ def optimize(stru: Union[Structure, StructureEnsemble],
         job_array_size: int= 20,
         work_dir: str="./QM_OPT",
         keep_in_file: bool=False,
-        ) -> List[EletronicStructure]:
+        ) -> List[ElectronicStructure]:
     if isinstance(stru, Structure):
         stru_esm = StructureEnsemble.from_single_stru(stru)
     elif isinstance(stru, StructureEnsemble):

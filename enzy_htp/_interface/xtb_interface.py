@@ -36,7 +36,7 @@ from enzy_htp.structure.structure_constraint import (
     freeze_hydrogen_bonds
 )
 
-from enzy_htp.electronic_structure import EletronicStructure
+from enzy_htp.electronic_structure import ElectronicStructure
 
 from enzy_htp.chemical import QMLevelOfTheory, MMLevelOfTheory, LevelOfTheory
 
@@ -127,7 +127,7 @@ class XTBSinglePointEngine(QMSinglePointEngine):
         
         assert False, "Idk how to do this -CJ"
 
-    def run(self, stru: Structure) -> EletronicStructure:
+    def run(self, stru: Structure) -> ElectronicStructure:
         """Method that actually runs the XTB single point calculation. Returns results of calculation as an ElectronicStructure() object."""
         if not isinstance(stru, Structure):
             _LOGGER.error("Supplied stru is not of type Structure()")
@@ -158,7 +158,7 @@ class XTBSinglePointEngine(QMSinglePointEngine):
 
         lines:List[str] = fs.lines_from_file(run_info['xtb_outfile'])
 
-        return  EletronicStructure(
+        return  ElectronicStructure(
             energy_0 = self.parent_interface.parse_spe(lines),
             geometry = stru,
             mo = '',
@@ -166,7 +166,7 @@ class XTBSinglePointEngine(QMSinglePointEngine):
             source="xtb",
         )
 
-    def translate(self, result_egg: XTBQMResultEgg) -> EletronicStructure:
+    def translate(self, result_egg: XTBQMResultEgg) -> ElectronicStructure:
         """TODO(CJ)"""
 
         assert False
@@ -199,7 +199,7 @@ class XTBOptimizationEngine(XTBSinglePointEngine, QMOptimizationEngine):
         self._geo_opt = True 
 
 
-    def run(self, stru: Structure) -> EletronicStructure:
+    def run(self, stru: Structure) -> ElectronicStructure:
         """Method that actually runs the XTB single point calculation. Returns results of calculation as an ElectronicStructure() object."""
         if not isinstance(stru, Structure):
             _LOGGER.error("Supplied stru is not of type Structure()")
@@ -235,7 +235,7 @@ class XTBOptimizationEngine(XTBSinglePointEngine, QMOptimizationEngine):
 
         lines:List[str] = fs.lines_from_file(run_info['xtb_outfile'])
 
-        return  EletronicStructure(
+        return  ElectronicStructure(
             energy_0 = self.parent_interface.parse_spe(lines),
             geometry = stru,
             mo = '',
