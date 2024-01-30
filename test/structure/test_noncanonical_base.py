@@ -11,16 +11,16 @@ from enzy_htp.structure import (
 def test_clone_connectivity():
     """test the function using fake objects"""
     # 123 are connected
-    a1 = Atom({"x_coord": 0, "y_coord": 0, "z_coord": 0, "atom_name": "O"})
-    a2 = Atom({"x_coord": 0.96, "y_coord": 0, "z_coord": 0, "atom_name": "D1"})
-    a3 = Atom({"x_coord": -0.24, "y_coord": 0.93, "z_coord": 1, "atom_name": "D2"})
+    a1 = Atom.from_biopandas({"x_coord": 0, "y_coord": 0, "z_coord": 0, "atom_name": "O"})
+    a2 = Atom.from_biopandas({"x_coord": 0.96, "y_coord": 0, "z_coord": 0, "atom_name": "D1"})
+    a3 = Atom.from_biopandas({"x_coord": -0.24, "y_coord": 0.93, "z_coord": 1, "atom_name": "D2"})
     a1.connect = [(a2, "s"), (a3, "s")]
     a2.connect = [(a1, "s")]
     a3.connect = [(a1, "s")]
     # 456 are not connected
-    a4 = Atom({"x_coord": 0, "y_coord": 0, "z_coord": 0, "atom_name": "O"})
-    a5 = Atom({"x_coord": 0.96, "y_coord": 0, "z_coord": 0, "atom_name": "D1"})
-    a6 = Atom({"x_coord": -0.24, "y_coord": 0.93, "z_coord": 1, "atom_name": "D2"})
+    a4 = Atom.from_biopandas({"x_coord": 0, "y_coord": 0, "z_coord": 0, "atom_name": "O"})
+    a5 = Atom.from_biopandas({"x_coord": 0.96, "y_coord": 0, "z_coord": 0, "atom_name": "D1"})
+    a6 = Atom.from_biopandas({"x_coord": -0.24, "y_coord": 0.93, "z_coord": 1, "atom_name": "D2"})
 
     ncaa_1 = NonCanonicalBase(
         residue_idx=1,

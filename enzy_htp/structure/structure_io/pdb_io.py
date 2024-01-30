@@ -6,6 +6,7 @@ Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
 Date: 2022-08-01
 """
 from collections import defaultdict
+import copy
 import os
 import string
 import sys
@@ -200,6 +201,7 @@ class PDBParser(StructureParserInterface):
         Return:
             a string of the PDB file
         """
+        stru = copy.deepcopy(stru)
         stru.sort_chains()
         if if_renumber:
             stru.renumber_atoms()
@@ -530,7 +532,7 @@ class PDBParser(StructureParserInterface):
         atom_mapper = defaultdict(list)
         df.sort_values("line_idx", inplace=True)
         for i, row in df.iterrows():
-            atom_obj = Atom(row)
+            atom_obj = Atom.from_biopandas(row)
             residue_key = (row["chain_id"].strip(), row["residue_number"], row["residue_name"].strip())
             atom_mapper[residue_key].append(atom_obj)
         return atom_mapper

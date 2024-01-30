@@ -3,7 +3,7 @@
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
 Date: 2023-12-30"""
-
+from __future__ import annotations
 from collections import defaultdict
 from copy import deepcopy
 import numpy as np
@@ -114,7 +114,7 @@ class StructureRegion:
         else:
             # apply geometry first
             geom_atoms = self.atoms_from_geom(geom)
-            for aidx, aa in enumerate(self.geom_atoms):
+            for aidx, aa in enumerate(geom_atoms):
                 if aa is atom:
                     result = aidx + indexing
         
@@ -138,6 +138,8 @@ class StructureRegion:
     def atoms_from_geom(self, geom: Structure) -> List[Atom]:
         """get the corresponding atoms from a specific geometry
         with the same topology
+        Returns:
+            a list of Atom()s in the same order
         Note: this design is because many operations in this
         class is only topology related. If create an obj for
         each geom (i.e.: Structure()), we will need to repeat
@@ -149,18 +151,24 @@ class StructureRegion:
             _LOGGER.error(f"geometry ({geom}) does not match region topology!")
             raise ValueError
         
-        # 2. find corresponding atoms from geom
-        for res, atoms in self.atoms_by_residue.items():
-            if not res.is_residue_cap():
-                geom_res = geom.residue_mapper[res.key()]
-                for atom in atoms:
-                    geom_atom = geom_res.find_atom_name(atom.name)
-                    result.append(geom_atom)
-
-        # 3. copy caps and align the based on linked residues
+        # 2. copy caps and align the based on linked residues
+        geom_cap_mapper = {}
         for cap in self.caps:
-            geom_cap = cap.apply_to_geom(geom)
-            result.extend(geom_cap.atoms)
+            geom_cap_mapper[cap] = cap.apply_to_geom(geom)
+        
+        # 3. find corresponding atoms from geom
+        for atom in self.atoms:
+            # cap: find from geom caps
+            if atom.parent.is_residue_cap():
+                geom_cap = geom_cap_mapper[atom.parent]
+                geom_atom = geom_cap.find_atom_name(atom.name)
+                result.append(geom_atom)
+            
+            # non-cap: find from geom
+            else:
+                geom_res = geom.residue_mapper[atom.parent.key()]
+                geom_atom = geom_res.find_atom_name(atom.name)
+                result.append(geom_atom)
 
         return result
     
@@ -217,13 +225,19 @@ class StructureRegion:
                 if n_side_res is not None and n_side_res not in region_residues:
                     result["n_ter"].append(res)
             else:
-                _LOGGER.warning(f"{res._rtype} found. Not considered")
+                _LOGGER.warning(f"{res._rtype.name} found. Not considered")
         return result
 
     def clone(self):
         """return a clone of self"""
         result = type(self).__new__(type(self))
         result.atoms = [at for at in self.atoms] # same atom but new list
+        return result
+
+    def clone_to_geometry(self, geom: Structure) -> StructureRegion:
+        """return a clone of self that applys a specific geometry"""
+        result = self.clone()
+        result.atoms = self.atoms_from_geom(geom)
         return result
 
     def get_net_charge(self) -> int:
@@ -233,9 +247,10 @@ class StructureRegion:
         This design is because external software are used for init_charge
         and thus it needs to be above _interface which can only called by
         the Science API layer."""
+
         net_charge = 0
         for res, atoms in self.atoms_by_residue.items():
-            if res.is_noncanonical():
+            if (not res.has_init_charge()) and res.is_noncanonical():
                 res: NonCanonicalBase
                 if self.has_whole_residue(res):
                     if res.net_charge is None:
@@ -253,6 +268,7 @@ class StructureRegion:
                     _LOGGER.error(f" {atom} dont have charge. Please init_charge(stru_region) before using this function.")
                     raise ValueError
                 net_charge += atom.charge
+
         if is_integer(net_charge, tolerance=0.01):
             net_charge = round_by(net_charge, 0.5)
         else:

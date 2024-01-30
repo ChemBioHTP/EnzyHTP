@@ -8,6 +8,7 @@ MetalUnit() and Solvent() derived classes.
 Structures are loaded through the PDBParser().get_structure() method defined in enzy_htp.structure_io.pdb_io.py
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Author: QZ Shao <shaoqz@icloud.com>
 Date: 2022-03-19
 """
 

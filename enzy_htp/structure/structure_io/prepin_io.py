@@ -479,7 +479,7 @@ class PrepinParser(StructureParserInterface):
                 atom_dict = {}
                 for ik, ok in zip(iformat_keys, oformat_keys):
                     atom_dict[ok] = atom_data[ik]
-                atom = Atom(atom_dict)
+                atom = Atom.from_biopandas(atom_dict)
                 result.append(atom)
         return result
 

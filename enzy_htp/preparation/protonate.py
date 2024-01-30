@@ -307,8 +307,9 @@ def _fix_pybel_output(pdb_path: str, out_path: str, ref_name_path: str = None) -
     """
     pybel will mess up atom names and residue names. This function fix those names
     fix atom label in {pdb_path} and write fixed to {out_path}
-    use {ref_name_path} as reference for atom names and residue name (if provided)
+    use {ref_name_path} to maximumly keep original atom names and residue name (if provided)
     * this fix is based on all newly added atoms from pybel will be under original ones
+    * i.e.: assume the original atoms is a subset of the final atoms and in its original order
 
     Args:
         pdb_path: Protonated PDB filepath with messed up atom names and residue names.

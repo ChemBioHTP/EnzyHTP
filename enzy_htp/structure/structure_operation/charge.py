@@ -162,12 +162,6 @@ def init_charge(target: Structure, renew: bool = False, ncaa_lib: Union[str, Non
             continue
         _init_charge_res(res,caa_fix, maa_fix, ligand_fix, solvent_fix, metal_fix, ncaa_lib)
 
-    # check if all atoms have charge
-    for atm in target.atoms:
-        if not atm.has_init_charge():
-            _LOGGER.error(f"Atom {atm} doesn't have charge record after initiation.")
-            sys.exit(1)
-
 # == parts ==
 def _init_charge_caa_atom(atom: Atom, force_field: str) -> None:
     """

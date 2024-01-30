@@ -18,6 +18,7 @@ from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
 import enzy_htp.chemical as chem
 from enzy_htp.core.exception import IndexMappingError
+from enzy_htp.core.general import EnablePropagate
 from enzy_htp.structure.structure_io.pdb_io import (PDBParser, restore_pdb_index, get_index_mapper_from_pdb, get_pdb_index_key)
 from enzy_htp.structure.structure_io._interface import StructureParserInterface
 from enzy_htp.structure import (
@@ -442,7 +443,7 @@ def test_categorize_residue_metal():
     input_pdb = PandasPdb()
     input_pdb.read_pdb(pdb_file_path)
     row = input_pdb.df['HETATM'].iloc[0]
-    zn_atom = Atom(row)
+    zn_atom = Atom.from_biopandas(row)
     res_mapper = defaultdict(list)
     res_key = (row['chain_id'].strip(), row['residue_number'], row['residue_name'].strip(), row['record_name'].strip())
     res_mapper[res_key[0]].append(Residue(int(res_key[1]), res_key[2], [zn_atom]))
@@ -543,8 +544,9 @@ def test_get_structure_ligand():
 @pytest.mark.interface
 def test_get_structure_allow_multichain_in_atom(caplog):
     messed_pdb = f"{DATA_DIR}/pymol_messed_output.pdb"
-    stru: Structure = sp.get_structure(messed_pdb, allow_multichain_in_atom=True)
-    assert "Found multiple chain id in 1 ATOM chain. Allowed by the user option." in caplog.text
+    with EnablePropagate(_LOGGER):
+        stru: Structure = sp.get_structure(messed_pdb, allow_multichain_in_atom=True)
+        assert "Found multiple chain id in 1 ATOM chain. Allowed by the user option." in caplog.text
     assert list(stru.chain_mapper.keys()) == ["A", "B", "C", "D", "E", "F"]
     assert list(stru["A"].residue_idx_interval(if_str=False)) == [(1, 450)]
     assert list(stru["B"].residue_idx_interval(if_str=False)) == [(451, 900)]
@@ -671,10 +673,11 @@ def test_get_index_mapper_from_pdb_duplicated_key(caplog):
     test_opdb = f"{DATA_DIR}index_test_duplicated_key.pdb"
     test_npdb = f"{DATA_DIR}index_test_duplicated_key_tleap.pdb"
 
-    with pytest.raises(IndexMappingError) as e:
-        idx_map = get_index_mapper_from_pdb(test_npdb, test_opdb)
+    with EnablePropagate(_LOGGER):
+        with pytest.raises(IndexMappingError) as e:
+            idx_map = get_index_mapper_from_pdb(test_npdb, test_opdb)
 
-    assert "ERROR Found repeating residue key in old pdb" in caplog.text
+        assert "Found repeating residue key in old pdb" in caplog.text
 
 
 def test_get_pdb_index_key():

@@ -53,7 +53,7 @@ def get_angle(p1: Union[tuple, list],
     p1 = np.array(p1)
     p2 = np.array(p2)
     p3 = np.array(p3)
-    
+
     v21 = p1 - p2
     v23 = p3 - p2
     n1 = np.cross(v23, v21)
@@ -68,7 +68,7 @@ def get_angle(p1: Union[tuple, list],
         y_unit = np.cross(n1, v23)
         y_unit = y_unit / np.linalg.norm(y_unit)
         x = np.dot(v21, x_unit)
-        y = np.dot(v21, y_unit) 
+        y = np.dot(v21, y_unit)
 
         result = np.arctan2(y, x)
 
@@ -135,8 +135,11 @@ def round_by(num: float, cutnum: float) -> int:
     otherwise round down
     """
     dec_part, int_part = math.modf(num)
-    if dec_part > cutnum:
-        int_part += 1
+    if abs(dec_part) > cutnum:
+        if dec_part > 0:
+            int_part += 1
+        else:
+            int_part -= 1
     return int(int_part)
 
 

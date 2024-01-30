@@ -6,6 +6,7 @@ Date: 2022-03-19
 import multiprocessing
 import os
 import time
+from pathlib import Path
 
 import enzy_htp.core.file_system as fs
 
@@ -157,6 +158,14 @@ def test_get_valid_temp_name():
     fs.safe_rm(fname1)
     assert not os.path.exists(fname1)
 
+def test_get_valid_temp_name_symlink():
+    sym_fname1 = f"{CURR_DIR}/test.test.test.py.lnk"
+    fname1 = f"{CURR_DIR}/test.test.test.py"
+    Path(sym_fname1).symlink_to(fname1)
+    
+    assert fs.get_valid_temp_name(sym_fname1, is_symlink=True) == f"{CURR_DIR}/test_1.test.test.py.lnk"
+    fs.safe_rm(sym_fname1)
+    assert not os.path.lexists(sym_fname1)
 
 def test_clean_temp_file_n_dir():
     temp_dir_path = f"{CURR_DIR}/temp/"

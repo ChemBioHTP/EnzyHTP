@@ -31,3 +31,5 @@ from .level_of_theory import (
     QMLevelOfTheory,
     MMLevelOfTheory,
 )
+
+from .physics import electric_field_strength

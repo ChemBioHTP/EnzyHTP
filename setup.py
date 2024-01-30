@@ -29,11 +29,13 @@ SUB_MODULES=[
         'enzy_htp.structure.structure_selection',
         'enzy_htp.structure.structure_selection_class',
         'enzy_htp.structure.structure_constraint',
+        'enzy_htp.electronic_structure',
         'enzy_htp.preparation',
         'enzy_htp.mutation',
         'enzy_htp.mutation.mutation_pattern',
         'enzy_htp.geometry',
-        'enzy_htp.electronic_structure',
+        'enzy_htp.quantum',
+        'enzy_htp.analysis',
 ]
 
 if __name__ == '__main__':

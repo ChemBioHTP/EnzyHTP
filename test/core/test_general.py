@@ -5,7 +5,7 @@ Date: 2023-02-03
 
 import numpy as np
 from enzy_htp.core import general as eg
-
+from enzy_htp.core import _LOGGER
 
 def test_pop_random_list_elem():
     """test function works as expected"""
@@ -54,4 +54,16 @@ def test_num_ele_2d():
         [6,7,8,9]
     ]
     assert eg.num_ele_2d(test_list_2d) == 9
+
+def test_capture_logging(capfd):
+    """as name"""
+    with eg.CaptureLogging(_LOGGER) as log_str:
+        _LOGGER.error("redirect test")
     
+    assert log_str.getvalue() == "redirect test\n"
+    # test handlers restored
+    _LOGGER.error("restore test")
+
+    captured = capfd.readouterr()
+    assert "redirect" not in captured.err
+    assert "restore" in captured.err

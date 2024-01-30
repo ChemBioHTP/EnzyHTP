@@ -16,7 +16,7 @@ DATA_DIR = f"{CURR_DIR}/data/"
 
 def test_constant_data():
     """Making sure the constant data specialization for MetalUnit() is correct."""
-    ma = MetalUnit(1, "A", [])
+    ma = MetalUnit(1, "ZN", [])
 
     assert not ma.is_ligand()
     assert ma.is_metal()
@@ -53,11 +53,11 @@ def test_get_radii_method_good_input():
     """Ensuring the MetalUnit.get_radii() method works correctly."""
     pdb_file = f"{DATA_DIR}/1NVG.pdb"
     metals: List[MetalUnit] = PDBParser().get_structure(pdb_file).metals
-    assert np.isclose(metals[0].get_radii(), 0.88)
-    assert np.isclose(metals[0].get_radii("vdw"), 1.39)
+    assert np.isclose(metals[0].radius(), 0.88)
+    assert np.isclose(metals[0].radius("vdw"), 1.39)
 
-    assert np.isclose(metals[0].get_radii(), metals[1].get_radii())
-    assert np.isclose(metals[0].get_radii("vdw"), metals[1].get_radii("vdw"))
+    assert np.isclose(metals[0].radius(), metals[1].radius())
+    assert np.isclose(metals[0].radius("vdw"), metals[1].radius("vdw"))
 
 
 def test_residue_to_metal():

@@ -58,10 +58,10 @@ def test_update_residues():
     # this truncated the part with mem id
     assert str(stru)[37:] == ("Structure(\n"
                               "chains: (sorted, original [\'A\', \'B\', \'C\', \'D\'])\n"
-                              "    A(peptide): residue: 10-151 atom_count: 2127\n"
-                              "    B(peptide): residue: 12-151 atom_count: 2103\n"
-                              "    C(ligand): residue: 370-370 atom_count: 58\n"
-                              "    D(ligand): residue: 371-371 atom_count: 58\n"
+                              "    A(polypeptide): residue: 10-151 atom_count: 2127\n"
+                              "    B(polypeptide): residue: 12-151 atom_count: 2103\n"
+                              "    C(ligand): residue: 370 atom_count: 58\n"
+                              "    D(ligand): residue: 371 atom_count: 58\n"
                               ")")
 
 

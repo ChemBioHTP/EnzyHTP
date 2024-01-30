@@ -46,7 +46,8 @@ from enzy_htp.structure import (
     MetalUnit,
     ModifiedResidue,
     NonCanonicalBase,
-    StructureEnsemble)
+    StructureEnsemble,
+    PDBParser)
 from enzy_htp import config as eh_config
 
 class AmberParameter(MolDynParameter):
@@ -56,9 +57,12 @@ class AmberParameter(MolDynParameter):
         inpcrd: the path of the .inpcrd input coordinate file
         prmtop: the path of the .prmtop parameter topology file"""
 
-    def __init__(self, inpcrd_path: str, prmtop_path: str):
+    def __init__(self, inpcrd_path: str, prmtop_path: str, ncaa_chrgspin_mapper: Dict = None):
         self._inpcrd = inpcrd_path
         self._prmtop = prmtop_path
+        if ncaa_chrgspin_mapper is None:
+            ncaa_chrgspin_mapper = {}
+        self.ncaa_chrgspin_mapper = ncaa_chrgspin_mapper
 
     #region == property ==
     @property
@@ -82,7 +86,7 @@ class AmberParameter(MolDynParameter):
     @property
     def topology_parser(self) -> callable:
         """return the parser object for topology_file"""
-        return prmtop_io.PrmtopParser().get_structure
+        return prmtop_io.PrmtopParser(self.ncaa_chrgspin_mapper).get_structure
 
     @property
     def input_coordinate_file(self) -> str:
@@ -154,7 +158,7 @@ class AmberParameterizer(MolDynParameterizer):
             gb_radii: int,
             parameterizer_temp_dir: str,
             additional_tleap_lines: List[str],) -> None:
-        self._parent_interface = interface
+        self._parent_interface: AmberInterface = interface
         self.force_fields = force_fields
         self.charge_method = charge_method
         self.resp_engine = resp_engine
@@ -182,6 +186,8 @@ class AmberParameterizer(MolDynParameterizer):
         # 0. set up paths
         result_inpcrd = fs.get_valid_temp_name(f"{self.parameterizer_temp_dir}/amber_parm.inpcrd")
         result_prmtop = fs.get_valid_temp_name(f"{self.parameterizer_temp_dir}/amber_parm.prmtop")
+        temp_prmtop = fs.get_valid_temp_name(f"{self.parameterizer_temp_dir}/amber_parm_missing_pdb_info.prmtop")
+        temp_ref_pdb = fs.get_valid_temp_name(f"{self.parameterizer_temp_dir}/amber_parm_ref_pdb.pdb")
         fs.safe_mkdir(self.parameterizer_temp_dir)
 
         # 1. check stru diversity
@@ -223,18 +229,24 @@ class AmberParameterizer(MolDynParameterizer):
                                             maa_parms,
                                             metalcenter_parms,
                                             result_inpcrd,
-                                            result_prmtop,)
+                                            temp_prmtop,)
 
         # 4. run tleap
         self.parent_interface.run_tleap(tleap_content)
 
-        # 5. clean up
+        # 5. run add_pdb
+        PDBParser().save_structure(temp_ref_pdb, stru, if_renumber=False, if_fix_atomname=False)
+        self.parent_interface.run_add_pdb(temp_prmtop, result_prmtop, temp_ref_pdb)
+
+        # 6. clean up
         fs.clean_temp_file_n_dir([
             temp_dry_pdb,
+            temp_prmtop,
+            temp_ref_pdb,
             self.parameterizer_temp_dir,
         ])
 
-        return AmberParameter(result_inpcrd, result_prmtop)
+        return AmberParameter(result_inpcrd, result_prmtop, stru.ncaa_chrgspin_mapper)
 
     def _parameterize_ligand(self, lig: Ligand, gaff_type: str) -> Tuple[str, List[str]]:
         """parameterize ligand for AmberMD, use ncaa_param_lib_path for customized
@@ -1134,7 +1146,59 @@ class AmberInterface(BaseInterface):
 
         self.env_manager_.run_command("parmchk2", cmd_args)
 
+    # -- add_pdb --
+    def run_add_pdb(self, in_prmtop: str, out_path: str, ref_pdb: str, guess: bool = False):
+        """the python wrapper of running add_pdb
+        Args:
+            in_prmtop:
+                the path of the input prmtop
+            out_prmtop:
+                the target output path of the modified prmtop
+            ref_pdb:
+                the reference pdb to add to prmtop
+            guess:
+                Guess atomic elements when absent from the PDB file.
+                (default assumes proper element-aligned names)"""
+        # run tleap command
+        cmd_args = f"-i {in_prmtop} -p {ref_pdb} -o {out_path}"
+        if guess:
+            cmd_args = f"{cmd_args} -guess"
+        self.env_manager_.run_command("add_pdb", cmd_args)
+
     # -- cpptraj --
+    def run_cpptraj(
+            self,
+            instr_str: str,
+            log_path: str = None,
+        ):
+        """the python wrapper of running cpptraj.
+        Based on https://amberhub.chpc.utah.edu/command-line-syntax/.
+        Args:
+            instr_str:
+                the str content of cpptraj.in instruction file
+            log_path:
+                path for the logging from cpptraj.
+                (default: {eh_config['system.SCRATCH_DIR']}/cpptraj.out)
+            TODO add more when needed"""
+        temp_path_list = []
+        # init file paths
+        fs.safe_mkdir(eh_config["system.SCRATCH_DIR"])
+        in_path = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/cpptraj.in")
+        temp_path_list.extend([eh_config["system.SCRATCH_DIR"], in_path])
+        if log_path is None:
+            log_path = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/cpptraj.out")
+            temp_path_list.append(log_path)
+
+        # write cpptraj.in
+        with open(in_path, "w") as of:
+            of.write(instr_str)
+
+        # run cpptraj command
+        cmd_args = f"-i {in_path} > {log_path}"
+        self.env_manager_.run_command("cpptraj", cmd_args)
+
+        # clean up temp file if success
+        fs.clean_temp_file_n_dir(temp_path_list)
 
     # -- index mapping --
     def get_amber_index_mapper(self, stru: Structure) -> Dict[str, Dict[Union[Residue, Atom], Union[int, tuple]]]:
@@ -1546,6 +1610,7 @@ class AmberInterface(BaseInterface):
         # file redirection
         for k, v in raw_dict["file_redirection"].items():
             v_path = v["path"]
+            v_path = self._reduce_path_in_mdin(v_path)
             v_content = v["content"]
             # add the redirection line
             mdin_lines.append(f" {k}={v_path}")
@@ -1559,7 +1624,60 @@ class AmberInterface(BaseInterface):
         # final empty line
         mdin_lines.append("")
 
+        # security check
+        for line in mdin_lines:
+            if len(line.strip()) > 80:
+                _LOGGER.warning("found mdin line exceed 80 characters.\n"
+                                f"{line.strip()}\n"
+                                " PMEMD may not be happy about this."
+                                " Consider this bug from Amber if you get 'STOP PMEMD Terminated Abnormally'")
+
         fs.write_lines(out_path, mdin_lines)
+
+    def _reduce_path_in_mdin(self, target_path: str) -> str:
+        """compress the paths that >70 characters to be shorted than 70 characters.
+        (we dont use 80 because the line limitation also counts in the variable name like
+        DISANG etc.)"""
+        if len(target_path) <= 70:
+            return target_path
+        else:
+            _LOGGER.info("found file path exceeding length limit of mdin. reducing it.")
+
+            # 1. relative path
+            target_path: Path = Path(target_path)
+            result = target_path.relative_to(Path.cwd())
+            if len(str(result)) <= 70:
+                return str(result)
+
+            # 2. symlink in SCRATCH
+            _LOGGER.debug("1st attempt using relative path failed. making it symlink.")
+            result = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/{target_path.name}.lnk", is_symlink=True)
+            if len(result) <= 70:
+                fs.safe_mkdir(eh_config['system.SCRATCH_DIR'])
+                Path(result).symlink_to(target_path)
+                return result
+            
+            # 3. symlink in SCRATCH relative
+            _LOGGER.debug("2nd attempt failed. making the symlink using relative path.")             
+            result = Path(result).relative_to(Path.cwd())
+            if len(str(result)) <= 70:
+                fs.safe_mkdir(eh_config['system.SCRATCH_DIR'])
+                Path(result).symlink_to(target_path)
+                return str(result)
+
+            # 4. symlink in ./
+            _LOGGER.debug("3nd attempt failed. making the symlink under cwd.")
+            result = fs.get_valid_temp_name(f"./{target_path.name}.lnk", is_symlink=True)
+            if len(result) <= 70:
+                Path(result).symlink_to(target_path)
+                return result
+            
+            # 5. shortest symlink that have to work
+            result = fs.get_valid_temp_name(f"./symlink.lnk", is_symlink=True)
+            _LOGGER.warning(f"4nd attempt failed. making {result} for {target_path}.")
+            Path(result).symlink_to(target_path)
+            return result
+
 
     def read_from_mdout(self, mdout_file_path: str) -> Dict:
         """the knowledge of the mdout format as the log of sander/pmemd.
@@ -2041,282 +2159,43 @@ class AmberInterface(BaseInterface):
             work_dir = work_dir,
         )
 
-    # region == TODO ==
-    def minimize_structure(self, pdb: str, min_dir: str = "./", mode: str = "CPU", cycle: int = 2000) -> str:
-        """Class method that minimizes the structure found in a supplied .pdb file, returning
-        the path to the minimized file.
+    def convert_nc_to_mdcrd(
+            self,
+            nc_path: str,
+            prmtop_path: str,
+            out_path: str,
+            autoimage: bool = True,
+            start: int = 1,
+            end: int = "last",
+            step: int = 1,
+            ) -> None:
+        """convert a NC file to a MDCRD file using cpptraj
         Args:
-            pdb: The .pdb file with the structure to be minimized.
-            mode: Which version of Amber to use. Allowed values are "CPU" and "GPU".
-            min_dir: Work directory where the paramter files and output are saved.
-            cycle: Number of steps in the steepest descent of the cycle.
-        Returns:
-            Path to the minimized structure in a .pdb file.
-        """
-        # TODO(CJ): add some checks for inputs
-        inpath = Path(pdb)
-        if min_dir == "./":
-            min_dir = f"{inpath.parent}/pdb_min/"
-
-        fs.safe_mkdir(min_dir)
-        outfile = f"{min_dir}/{inpath.stem}_min.pdb"
-        min_in = f"{min_dir}/min.in"
-        min_out = f"{min_dir}/min.out"
-        min_rst = f"{min_dir}/min.ncrst"
-        (prmtop, inpcrd) = self.build_param_files(str(inpath), min_dir)
-        self.write_minimize_input_file(min_in, cycle)
-        engine = self.config_.get_engine(mode)
-
-        # yapf: disable
-        self.env_manager_.run_command(
-            engine, ["-O", "-i", min_in, "-o", min_out, "-p", prmtop, "-c", inpcrd, "-r", min_rst],
-
-        )
-
-        self.env_manager_.run_command(
-            "ambpdb",[f"-p", prmtop, "-c", min_rst, ">", outfile]
-        )
-        # yapf: enable
-
-        return outfile
-
-    def md_run(self, prmtop: str, inpcrd: str, work_dir: str, mode: str = "CPU") -> str:
-        """Runs a full MD simulation using the suplied prmtop and inpcrd files. Simulation is composed
-        of four steps:
-                1. minimization
-                2. heating
-                3. equilibration
-                4. production
-        The parameter files for these steps are created by AmberInterface.md_min_file(), AmberInterface.md_heat_file(),
-        AmberInterface.md_equi_file() and AmberInterface.md_prod_file(), respectively. All work is done in the supplied
-        work_dir location.
-        Args:
-            prmtop: str() with a path to a .prmtop file generated by AmberInterface.build_param_files().
-            inpcrd: str() with a path to a .inpcrd file generated by AmberInterface.build_param_files().
-            work_dir: Directory where the temporary files should be stored.
-            mode: The mode to use for calculations. Only "CPU" and "GPU" are allowed.
-        Returns:
-            Path to the production .nc file.
-        """
-        fs.safe_mkdir(work_dir)
-
-        min_in: str = self.md_min_file(f"{work_dir}/min.in")
-        heat_in: str = self.md_heat_file(f"{work_dir}/heat.in")
-        equi_in: str = self.md_equi_file(f"{work_dir}/equi.in")
-        prod_in: str = self.md_prod_file(f"{work_dir}/prod.in")
-        engine = self.config_.get_engine(mode)
-
-        min_out: str = f"{work_dir}/min.out"
-        min_rst: str = f"{work_dir}/min.rst"
-
-        #yapf: disable
-        self.env_manager_.run_command(
-            engine,
-            ["-O", "-i", min_in, "-o", min_out, "-p", prmtop, "-c", inpcrd, "-r", min_rst, "-ref", inpcrd, ],
-        )
-        #yapf: enable
-
-        heat_out: str = f"{work_dir}/heat.out"
-        heat_rst: str = f"{work_dir}/heat.rst"
-
-        #yapf: disable
-        self.env_manager_.run_command(
-            engine,
-            ["-O", "-i", heat_in, "-o", heat_out, "-p", prmtop, "-c", min_rst, "-ref", min_rst, "-r", heat_rst, ],
-        )
-        #yapf: enable
-
-        equi_out: str = f"{work_dir}/equi.out"
-        equi_rst: str = f"{work_dir}/equi.rst"
-        equi_nc: str = f"{work_dir}/equi.nc"
-
-        # yapf: disable
-        self.env_manager_.run_command(
-            engine,
-            ["-O", "-i", equi_in, "-o", equi_out, "-p", prmtop, "-c", heat_rst, "-ref", heat_rst, "-r", equi_rst, "-x", equi_nc, ],
-        )
-        # yapf: enable
-
-        prod_out: str = f"{work_dir}/prod.out"
-        prod_rst: str = f"{work_dir}/prod.rst"
-        prod_nc: str = f"{work_dir}/prod.nc"
-
-        # yapf: disable
-        self.env_manager_.run_command(
-            engine,
-            ["-O",  "-i",  prod_in,  "-o",  prod_out,  "-p",  prmtop,  "-c",  equi_rst,  "-ref",  equi_rst,  "-r",  prod_rst,  "-x",  prod_nc, ],
-        )
-        # yapf: enable
-
-        return prod_nc
-
-    def nc2mdcrd(
-        self,
-        nc_in: str,
-        prmtop: str,
-        point: Union[int, None] = None,
-        start: int = 1,
-        end: Union[int, str] = "last",
-        step: int = 1,
-        engine: str = "cpptraj",
-    ) -> str:
-        """Converts the supplied .nc file to an .mdcrd file. Scope of trajectory conversion can be
-        specified though by default all available frames are selected.
-        Args:
-            nc_in: The path to the .nc file as a str().
-            prmtop: The path to the prmtop file as  str().
-            point: If not None, step is (nstlim/ntwx)/point. Default is None, but value should be int() when given.
+            nc_path: The path to the .nc file as a str().
+            prmtop_path: The path to the prmtop file as str().
+            out_path: the output MDCRD file path.
             start: 1-indexed starting point. Default value is 1.
             end: 1-indexed ending point. By default uses "last"
+            step: the step size of sampling points. default is 1.
             engine: The engine to convert the .nc file. Default value is "cpptraj".
-        Returns:
-            The name of the converted .mdcrd file.
         """
-        mdcrd: str = str(Path(nc_in).with_suffix(".mdcrd"))
-        config = self.config_.CONF_PROD
-        if point is not None:
-            step: int = int((int(config["nstlim"]) / int(config["ntwx"])) / point)
-
-        if engine == "cpptraj":
-            cpptraj_in = "./cpptraj_nc2mdcrd.in"
-            cpptraj_out = "./cpptraj_nc2mdcrd.out"
-            contents: List[str] = [
-                f"parm {prmtop}",
-                f"trajin {nc_in} {start} {end} {step}",
-                f"trajout {mdcrd}",
-                "run",
-                "quit",
-            ]
-            fs.write_lines(cpptraj_in, contents)
-            self.env_manager_.run_command("cpptraj", ["-i", cpptraj_in, ">", cpptraj_out])
-            #fs.safe_rm(cpptraj_in)
-            #fs.safe_rm(cpptraj_out)
-        else:
-            raise UnsupportedMethod(f"'{engine}' is not a supported method for AmberInteface.nc2mdcrd(). Allowed methods are: 'cpptraj'.")
-
-        return mdcrd
-
-    def get_frames(
-        self,
-        nc_in: str,
-        prmtop: str,
-        point: Union[int, None] = None,
-        start: int = 1,
-        end: Union[int, str] = "last",
-        step: int = 1,
-    ) -> str:
-        """Converts the supplied .nc file to an .mdcrd file. Scope of trajectory conversion can be
-        TODO(CJ): update this
-        """
-        outfile: str = f"{Path(prmtop).parent}/cpptraj_frames.pdb"
-        config = self.config_.CONF_PROD
-        if point is not None:
-            step: int = int((int(config["nstlim"]) / int(config["ntwx"])) / point)
-
-        cpptraj_in = "./cpptraj_nc2mdcrd.in"
-        cpptraj_out = "./cpptraj_nc2mdcrd.out"
         contents: List[str] = [
-            f"parm {prmtop}",
-            f"trajin {nc_in} {start} {end} {step}",
-            "strip :WAT",
-            "strip :Na+,Cl-",
-            f"trajout {outfile} conect",
+            f"parm {prmtop_path}",
+            f"trajin {nc_path} {start} {end} {step}",
+        ]
+        if autoimage:
+            contents += [
+                "autoimage"
+            ]
+        contents += [
+            f"trajout {out_path}",
             "run",
             "quit",
         ]
-        fs.write_lines(cpptraj_in, contents)
-        self.env_manager_.run_command("cpptraj", ["-i", cpptraj_in, ">", cpptraj_out])
-        #fs.safe_rm(cpptraj_in)
-        fs.safe_rm(cpptraj_out)
-        charges = read_charge_list(prmtop)
-        result = frames_from_pdb(outfile)
+        contents = "\n".join(contents)
+        self.run_cpptraj(contents)
 
-        if not len(result):
-            return result
-
-        num_atoms = len(result[0].atoms)
-        charges = charges[0:num_atoms]
-        for fidx, frame in enumerate(result):
-            result[fidx].update_charges(charges)
-
-        return result
-
-    def parse_fmt(self, fmt: str) -> Tuple[Any, int]:
-        """Private helper function that parses a %FORMAT() string from an amber .prmtop file.
-        Identifies both the type and width of the format. Supplied string can contain whitespace.
-        In the case that the supplied format string does not contain the pattern '%FORMAT(<>)',
-        the result (None, -1) is returned.
-
-        Args:
-            fmt: the %FORMAT() line from a .prmtop as a str().
-
-        Returns:
-            A tuple() of length 2 containing the (type ctor, width as an int()).
-        """
-
-        if fmt.find('%FORMAT(') == -1 or fmt.find(')') == -1:
-            return (None, -1)
-
-        fmt = fmt.strip().replace('%FORMAT(', '').replace(')', '')
-
-        idx = 0
-
-        while fmt[idx].isnumeric():
-            idx += 1
-
-        dtype = None
-
-        type_string = fmt[idx].upper()
-
-        if type_string == 'A':
-            dtype = str
-        elif type_string == 'I':
-            dtype = int
-        elif type_string == 'E':
-            dtype = float
-
-        width = int(fmt[idx + 1:].split('.')[0])
-
-        return (dtype, width)
-
-    def parse_prmtop(self, prmtop: str) -> Dict:
-        """Parses a .prmtop file into a dict() with the pattern of (key, value) being (keyword after %FLAG, following values). 
-        Takes the specified %FORMAT() into account. Checks if the supplied file exists, exiting if it does not.
-
-        Args:
-            prmtop: str() holding the path to a .prmtop file.
-
-        Returns:
-            A dict() with (key, value) pairs of (keyword, formatted/typed values).
-
-        """
-        #TODO(CJ): unit tests
-
-        if not Path(prmtop).exists():
-            _LOGGER.error(f"The file '{prmtop}' does not exist. Exiting...")
-            exit(1)
-
-        raw: str = fs.content_from_file(prmtop)
-
-        result = dict()
-
-        for chunk in raw.split('%FLAG'):
-            if chunk.find('%VERSION') != -1:
-                #TODO(CJ): figure out what I want to do with version info
-                continue
-
-            (key, fmt, body) = chunk.split('\n', 2)
-            body = re.sub('\n', '', body)
-            (dtype, width) = self.parse_fmt(fmt)
-
-            raw: List[str] = list()
-            for idx in range(0, len(body), width):
-                raw.append(body[idx:idx + width].strip())
-
-            result[key.strip()] = list(map(dtype, raw))
-
-        return result
-
+    # region == TODO ==
     def add_charges(self, stru: Structure, prmtop: str) -> None:
         """Method that adds RESP charges from a .prmtop file to the supplied Structure object. If the supplied prmtop
         file does not line up with the structure, an error is thrown. Performs operation in place.
@@ -2364,28 +2243,18 @@ Instantiated here so that other _interface subpackages can use it.
 An example of this concept this AmberInterface used Gaussian for calculating the RESP charge
 so it imports gaussian_interface that instantiated in the same fashion."""
 
-class AmberNCParser():
-    """parser Amber .nc file
+
+class AmberRSTParser():
+    """parser Amber .rst file to Structure()
     Attribute:
         prmtop_file
-        parent_interface
-    
-    TODO figure out where should these types of structure parser be placed.
-    These parser relies on the interface. They can not be directly used by structure
-    modules such as structure_operations.
-    Can structure_io just be above _interface?? Seems ok."""
+        parent_interface"""
     def __init__(self, prmtop_file: str, interface: BaseInterface = amber_interface):
         self.prmtop_file = prmtop_file
         self.parent_interface = interface
     
-    def get_coordinates(self, nc_file: str) -> Generator[List[List[float]], None, None]:
-        """parse a nc file to a Generator of coordinates. Intermediate files are created."""
-
-    def get_structures(self, nc_file: str) -> Generator[Structure, None, None]:
-        pass
-
-    def get_last_structure(self, nc_file: str) -> Structure:
-        """parse the last frame in a nc file to a Structure(). Intermediate files are created."""
+    def get_structure(self, rst_file: str) -> Structure:
+        """parse a rst file to a Structure()."""
 
 
 class AmberMDCRDParser():
@@ -2480,14 +2349,50 @@ class AmberMDCRDParser():
         """parse the last frame in a mdcrd file to a Structure(). Intermediate files are created."""
         pass
 
-class AmberRSTParser():
-    """parser Amber .rst file to Structure()
+
+class AmberNCParser():
+    """parser Amber .nc file
     Attribute:
         prmtop_file
         parent_interface"""
     def __init__(self, prmtop_file: str, interface: BaseInterface = amber_interface):
         self.prmtop_file = prmtop_file
-        self.parent_interface = interface
+        self.parent_interface: AmberInterface = interface
+
+        self.mdcrd = None
     
-    def get_structure(self, rst_file: str) -> Structure:
-        """parse a rst file to a Structure()."""
+    def mdcrd_parser(self) -> AmberMDCRDParser:
+        """get an associated mdcrd parser"""
+        return AmberMDCRDParser(prmtop_file=self.prmtop_file)
+
+    def get_coordinates(
+            self,
+            nc_file: str,
+            autoimage: bool=True) -> Generator[List[List[float]], None, None]:
+        """parse a nc file to a Generator of coordinates. Intermediate mdcrd file is created."""
+        # 0. init temp path
+        if self.mdcrd is None:
+            temp_dir = eh_config["system.SCRATCH_DIR"]
+            fs.safe_mkdir(temp_dir)
+            temp_mdcrd = fs.get_valid_temp_name(f"{temp_dir}/nc_parser_temp.mdcrd")
+
+            # 1. convert to a temp mdcrd file
+            self.parent_interface.convert_nc_to_mdcrd(
+                nc_path=nc_file,
+                prmtop_path=self.prmtop_file,
+                out_path=temp_mdcrd,
+                autoimage=autoimage,
+            )
+
+            # 2. store for future use
+            self.mdcrd = temp_mdcrd        
+
+        # 3. parse mdcrd file
+        return self.mdcrd_parser().get_coordinates(self.mdcrd)
+
+    def get_structures(self, nc_file: str) -> Generator[Structure, None, None]:
+        pass
+
+    def get_last_structure(self, nc_file: str) -> Structure:
+        """parse the last frame in a nc file to a Structure(). Intermediate files are created."""
+
