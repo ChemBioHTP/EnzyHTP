@@ -29,7 +29,8 @@ BRENDA_MAPPER :Dict[str,str] = {
 }
 """TODO(CJ)"""
 
-_DF = pickle.load(open('/panfs/accrepfs.vampire/home/jurichc/EnzyHTP/enzy_htp/chemical/db.pickle', 'rb'))
+# _DF = pickle.load(open('/panfs/accrepfs.vampire/home/jurichc/EnzyHTP/enzy_htp/chemical/db.pickle', 'rb'))
+_DF = {}
 """TODO(CJ)"""
 
 def map_to_pdb(ligand_dict) -> str:

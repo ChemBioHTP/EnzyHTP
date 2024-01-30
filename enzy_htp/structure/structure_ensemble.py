@@ -60,6 +60,14 @@ class StructureEnsemble:
         else:
             return self.top_parser(self._topology)
 
+    @property
+    def structure_0(self) -> Structure:
+        """getter for the 1st structure in the ensemble"""
+        coord_0 = next(self.coord_parser(self.coordinate_list))
+        result = deepcopy(self.topology)
+        result.apply_geom(coord_0)
+        return result    
+
     @classmethod
     def from_single_stru(cls, stru: Structure) -> StructureEnsemble:
         """create an ensemble of 1 snapshot from a stru"""

@@ -67,7 +67,7 @@ def make_residues(pdbname: str) -> List[Residue]:
     p_df: pd.DataFrame = PandasPdb().read_pdb(pdbname).df["ATOM"]
 
     for i, row in p_df.iterrows():
-        atom: Atom = Atom(**row)
+        atom: Atom = Atom.from_biopandas(**row)
         holder[atom.residue_key()].append(atom)
 
     residues = []
@@ -137,29 +137,13 @@ def test_renumber_atoms():
     """Ensuring the Residue.renumber_atoms() method works and returns the correct offset number."""
 
     res_cpy = deepcopy(RESIDUES[0])
-    assert res_cpy.renumber_atoms(1) == 16
-    assert [aa.atom_number for aa in res_cpy._atoms] == list(range(1, 17))
+    test_idx_list = list(range(1,21))
+    res_cpy.renumber_atoms(test_idx_list)
+    assert res_cpy.atom_idx_list == list(range(1,17))
 
     res_cpy = deepcopy(RESIDUES[1])
-    assert res_cpy.renumber_atoms(10) == 23
-    assert [aa.atom_number for aa in res_cpy._atoms] == list(range(10, 24))
-
-
-def test_renumber_atoms_bad_input():
-    """Ensuring the Residue.renumber_atoms() method fails when an invalid start index (<= 0) is given."""
-
-    with pytest.raises(SystemExit) as exe:
-        RESIDUES[0].renumber_atoms(0)
-
-    assert exe.type == SystemExit
-    assert exe.value.code == 1
-
-    with pytest.raises(SystemExit) as exe:
-        RESIDUES[0].renumber_atoms(-1)
-
-    assert exe.type == SystemExit
-    assert exe.value.code == 1
-
+    res_cpy.renumber_atoms(test_idx_list)
+    assert res_cpy.atom_idx_list == list(range(1,15))
 
 def test_remove_atoms_not_in_list():
     """test function works as expected"""

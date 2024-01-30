@@ -10,6 +10,7 @@ from enzy_htp import core as cc
 from enzy_htp.core import file_system as fs
 from enzy_htp import config
 from enzy_htp.core.logger import _LOGGER
+import logging
 import enzy_htp.structure as struct
 import enzy_htp.structure.structure_operation as stru_oper
 from enzy_htp.preparation import protonate as prot
@@ -197,6 +198,20 @@ def test_protonate_ligand_with_pybel():
 
     assert not os.path.isdir(int_lig_dir)
 
+def test_protonate_ligand_with_pybel_7si9():
+    """Test the protonation to ligands in a structure instance"""
+
+    file_prefix = '7SI9_E166Q_protonated'
+    pdb_file = f"{DATA_DIR}{file_prefix}.pdb"
+    int_ligand_file_dir=f"{WORK_DIR}"
+    
+    stru = sp.get_structure(pdb_file)
+    prot.protonate_ligand_with_pybel(stru=stru, int_ligand_file_dir=int_ligand_file_dir)
+    
+    for atom in stru.ligands[0].atoms:
+        element_from_name = atom.name[:len(atom.element)]   # The name of the atom should start with the element symbol.
+        assert element_from_name.upper() == atom.element.upper()
+    
 
 def test_protonate_ligand_with_pybel_2_ligand():
     """test that protonate_ligand_with_pybel() works without exceptions using 1Q4T
@@ -247,13 +262,12 @@ def test_pybel_protonate_pdb_ligand_4CO():
     # fs.safe_rm(out_ligand_path)
     # assert not os.path.isdir(out_ligand_path)
 
-
 def test_fix_pybel_output():
     """test an exception case for fixing pybel output"""
-    ligand_path = f"{DATA_DIR}/ligand_test_HEZ_pybel_badname.pdb"
-    ref_ligand_path = f"{DATA_DIR}/ligand_test_HEZ.pdb"
-    out_ligand_path = f"{WORK_DIR}/ligand_test_HEZ_pybel.pdb"
-    answer_ligand_path = f"{DATA_DIR}/ligand_test_HEZ_pybel.pdb"
+    ligand_path = f"{DATA_DIR}ligand_test_HEZ_pybel_badname.pdb"
+    ref_ligand_path = f"{DATA_DIR}ligand_test_HEZ.pdb"
+    out_ligand_path = f"{WORK_DIR}ligand_test_HEZ_pybel.pdb"
+    answer_ligand_path = f"{DATA_DIR}ligand_test_HEZ_pybel.pdb"
     assert not os.path.isdir(out_ligand_path)
 
     prot._fix_pybel_output(ligand_path, out_ligand_path, ref_ligand_path)
@@ -262,6 +276,20 @@ def test_fix_pybel_output():
     fs.safe_rm(out_ligand_path)
     assert not os.path.isdir(out_ligand_path)
 
+def test_fix_pybel_output_4WI(caplog):
+    """Test protonated ligand (pybel) name fixing."""
+
+    file_prefix = 'ligand_test_4WI_protonated'
+    pdb_file = f"{DATA_DIR}{file_prefix}.pdb"
+    intermediate_pdb_file = f"{DATA_DIR}{file_prefix}_pybel_badname.pdb"
+    out_pdb_file = f"{WORK_DIR}{file_prefix}_pybel.pdb"
+
+    with pytest.raises(ValueError) as e:    # The value error is expected to be raised when unexpected Hydrogen atom(s) is detected.
+        prot._fix_pybel_output(pdb_path=intermediate_pdb_file, out_path=out_pdb_file, ref_name_path=pdb_file)
+    assert "The PDB file passed via `ref_name_path` should not contain Hydrogen atom(s)." in caplog.text
+    # TODO (Zhong): The best way to do this in the _fix_pybel_output is: 
+    # detect if there are any hydrogen interspersed in the middle of the file,
+    # if the hydrogen atoms are all at the end of the file, it will not cause a problem.
 
 def test_protonate_stru_imputed():
     """Testing the protonate_stru() method for a structure that has been imputed.

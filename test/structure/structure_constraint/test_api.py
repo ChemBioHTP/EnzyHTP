@@ -31,13 +31,13 @@ def test_create_distance_constraint():
     test_cons = stru_cons.create_distance_constraint(
         "B.254.H2", "A.101.OE2", 2.4, test_stru)
     assert test_cons.params["amber"] == {
-        "rs_filename": "0.rs",
+        "rs_filepath": "{mdstep_dir}/0.rs",
         "ialtd" : 0,
         "r1" : "x-0.25",
         "r2" : "x-0.05",
         "r3" : "x+0.05",
         "r4" : "x+0.25",
-        "rk2": "200.0", "rk3": "200.0",
+        "rk2": 200.0, "rk3": 200.,
     }
     assert test_cons.constraint_type == "distance_constraint"
     assert test_cons.atom_names == {"H2", "OE2"}
@@ -50,13 +50,13 @@ def test_create_angle_constraint():
     test_cons = stru_cons.create_angle_constraint(
         "B.254.CAE", "B.254.H2", "A.101.OE2", 180.0, test_stru)
     assert test_cons.params["amber"] == {
-        "rs_filename": "0.rs",
+        "rs_filepath": "{mdstep_dir}/0.rs",
         "ialtd" : 0,
         "r1" : "x-30.0",
         "r2" : "x-10.0",
         "r3" : "x+10.0",
         "r4" : "x+30.0",
-        "rk2": "200.0", "rk3": "200.0",
+        "rk2": 200.0, "rk3": 200.0,
     }
     assert test_cons.constraint_type == "angle_constraint"
     assert test_cons.atom_names == {"H2", "OE2", "CAE"}
@@ -69,13 +69,13 @@ def test_create_dihedral_constraint():
     test_cons = stru_cons.create_dihedral_constraint(
         "B.254.CAE", "B.254.H2", "A.101.OE2", "A.101.CA", 0.0, test_stru)
     assert test_cons.params["amber"] == {
-        "rs_filename": "0.rs",
+        "rs_filepath": "{mdstep_dir}/0.rs",
         "ialtd" : 0,
         "r1" : "x-30.0",
         "r2" : "x-10.0",
         "r3" : "x+10.0",
         "r4" : "x+30.0",
-        "rk2": "200.0", "rk3": "200.0",
+        "rk2": 200.0, "rk3": 200.0,
     }
     assert test_cons.constraint_type == "dihedral_constraint"
     assert test_cons.atom_names == {"H2", "OE2", "CAE", "CA"}

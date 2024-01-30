@@ -9,7 +9,7 @@ from enzy_htp.structure import StructureEnsemble
 from enzy_htp import PDBParser, Structure
 
 
-class EletronicStructure:
+class ElectronicStructure:
     # attribute
     energy_0: float
     geometry: Structure
@@ -20,16 +20,16 @@ class EletronicStructure:
     mo_occ: List[float]
     basis_set: str
 
-class LevelofTheory:
+class LevelOfTheory:
     _type: str
 
-class QMLevelofTheory(LevelofTheory):
+class QMLevelOfTheory(LevelOfTheory):
     basis_set: str
     method: str
     solvent: str
     solv_method: str
 
-class MMLevelofTheory(LevelofTheory):
+class MMLevelOfTheory(LevelOfTheory):
     force_field: str
     ligand_method: str
 
@@ -44,29 +44,29 @@ stru_esm: List[StructureEnsemble] = equi_md_sampling(
                                             "partition" : "turing"})
 
 # single point can take 1 stru
-ele_stru: EletronicStructure = single_point(
+ele_stru: ElectronicStructure = single_point(
     stru,
-    QMLevelofTheory(
+    QMLevelOfTheory(
         basis_set="def2-svp", method="b3lyp-d3",
         solvent="h2o", solv_method="smd",
     ),
     use_symmetry=False,)
 
 # single point can take an ensemble
-ele_stru: EletronicStructure = single_point(
+ele_stru: ElectronicStructure = single_point(
     stru_esm,
-    QMLevelofTheory(
+    QMLevelOfTheory(
         basis_set="def2-svp", method="b3lyp-d3",
         solvent="h2o", solv_method="smd",
     ),
     use_symmetry=False,)
 
 # single point can take an ensemble and calculate only a region of it.
-ele_stru: EletronicStructure = single_point(
+ele_stru: ElectronicStructure = single_point(
     stru_esm,
     regions=["resi 101+254"],
     region_methods = [
-        QMLevelofTheory(
+        QMLevelOfTheory(
             basis_set="def2-svp", method="b3lyp-d3",
             solvent="h2o", solv_method="smd",
         ),
@@ -74,15 +74,15 @@ ele_stru: EletronicStructure = single_point(
     engine="g16",)
 
 # single point can take an ensemble and calculate in a multiscale manner.
-ele_stru: EletronicStructure = single_point(
+ele_stru: ElectronicStructure = single_point(
     stru_esm,
     regions=["resi 101+254", "else"],
     region_methods = [
-        QMLevelofTheory(
+        QMLevelOfTheory(
             basis_set="def2-svp", method="b3lyp-d3",
             solvent="h2o", solv_method="smd",
         ),
-        MMLevelofTheory(
+        MMLevelOfTheory(
             force_field=["ff14sb", "gaff2"],
             ligand_method="gaff2-resp"
         ),

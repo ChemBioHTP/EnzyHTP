@@ -578,9 +578,120 @@ def cap_residue_free_terminal(
     if cap_name not in SUPPORTED_CAPS:
         _LOGGER.error(f"cap_name {cap_name} not supported. Supported name: {SUPPORTED_CAPS.keys()}")
         raise ValueError
+<<<<<<< HEAD
     residue_cap:ResidueCap = SUPPORTED_CAPS[cap_name](res, start_atom, end_atom, terminal_type)
     
     return residue_cap.atoms
+=======
+    cap_atoms = SUPPORTED_CAPS[cap_name](
+        terminal_type, res, start_atom, end_atom).atoms
+    cap_bond_distance = get_bond_distance(cap_name, terminal_type)
+
+    # TODO put these in core and strutcure and in cap classes
+    # TODO make this a method in cap classes
+    p1 = np.array(start_atom.coord)
+    p2 = np.array(end_atom.coord)
+    direction = p2 - p1
+    direction /= np.linalg.norm(direction)
+    rot_mat = rotation_matrix_from_vectors(np.array([1,0,0]), direction)
+    for aa in cap_atoms:
+        pt = np.array(aa.coord)
+        pt = np.transpose(np.matmul(rot_mat, np.transpose( pt  )))
+        pt += (direction*cap_bond_distance) + p1 
+        aa.coord = pt
+
+    return cap_atoms
+
+def get_bond_distance(strategy:str, side:str) -> float:
+    """ """
+    #TODO(CJ): update this: need methylamide and acetyl
+    _BOND_DISTANCE_MAPPER:Dict[Tuple[str,str], float] = {
+        ('H', 'nterm'):1.1,
+        ('H', 'cterm'):1.0,
+        ('CH3', 'nterm'):1.5,
+        ('CH3', 'cterm'):1.5,
+    }
+
+
+    result:float = _BOND_DISTANCE_MAPPER.get((strategy, side), None)
+
+    if result is None:
+        _LOGGER.error(f"No bond distance for {strategy}-capping strategy on {side} side. Supported methods include:")
+        for (strat, side_name) in _BOND_DISTANCE_MAPPER.keys():
+            _LOGGER.error(f"strategy: {strat}, side: {side_name}")
+        _LOGGER.error("Exiting...")
+        exit( 1 )
+
+    return result
+
+def get_h_cap(end: str, res: Residue, 
+              link_atom: Atom, socket_atom: Atom) -> HCap:
+    """Args:
+    end:
+        the pattern of the end it conencts
+        This determine the atom name
+    res:
+        the original residue.
+    link_atom:
+        the linking atom in original res
+    socket_atom:
+        the socket from original stru to pluging the cap
+    
+    Returns:
+        a list of Atom()s in the cap"""
+    if end == 'nterm':
+        aname = 'HP11'
+    elif end == 'cterm':
+        aname = 'HP21'
+    atoms = [
+        Atom.from_biopandas(
+            {'atom_name': aname,
+            'x_coord':0.000, 'y_coord': 0.000, 'z_coord':  0.000,
+            'element_symbol': "H"},
+        )
+    ]
+
+    return HCap(
+        link_residue=res,
+        link_atom=link_atom,
+        socket_atom = socket_atom,
+        plug_atom = atoms[0],
+        atoms = atoms,
+    )
+
+def get_ch3_cap(end: str, res: Residue,
+                link_atom: Atom, socket_atom: Atom) -> CH3Cap:
+    """Args:
+    end:
+        the pattern of the end it conencts
+        This determine the atom name
+    res:
+        the original residue.
+    link_atom:
+        the linking atom in original res
+    socket_atom:
+        the socket from original stru to pluging the cap
+    
+    Returns:
+        a list of Atom()s in the cap"""
+    if end == 'nterm':
+        anames = "CP1 HP11 HP12 HP13".split()
+    elif end == 'cterm':
+        anames = "CP2 HP21 HP22 HP23".split()
+    atoms = [
+        Atom.from_biopandas({'atom_name': anames[0], 'x_coord':0.000, 'y_coord': 0.000, 'z_coord':  0.000,'element_symbol': "C"}),
+        Atom.from_biopandas({'atom_name': anames[1], 'x_coord':0.360, 'y_coord':-1.029, 'z_coord':  0.000,'element_symbol': "H"}),
+        Atom.from_biopandas({'atom_name': anames[2], 'x_coord':0.360, 'y_coord': 0.514, 'z_coord':  0.891,'element_symbol': "H"}),
+        Atom.from_biopandas({'atom_name': anames[3], 'x_coord':0.360, 'y_coord': 0.514, 'z_coord': -0.891,'element_symbol': "H"})
+    ]
+    return CH3Cap(
+        link_residue=res,
+        link_atom=link_atom,
+        socket_atom = socket_atom,
+        plug_atom = atoms[0],
+        atoms = atoms,
+    )
+>>>>>>> develop_refactor
 
 SUPPORTED_CAPS: Dict[str, callable] = {
     # chemical formulas first

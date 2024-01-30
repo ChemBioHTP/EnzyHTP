@@ -6,5 +6,15 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 
 Date: 2022-11-06
 """
+<<<<<<< HEAD
 from .electric_field import electric_field
 
+=======
+from .electric_field import (
+    ele_field_strength_at_along,
+    ele_field_strength_at,
+    ele_stab_energy_of_bond,
+    ele_stab_energy_of_dipole
+)
+from .dipole import bond_dipole
+>>>>>>> develop_refactor

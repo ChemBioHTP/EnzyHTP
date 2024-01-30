@@ -53,8 +53,16 @@ export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID""",
                 "tail" : """rm -rf $TMPDIR/$SLURM_JOB_ID"""},
         "GPU": None
     }
+
     BCL_ENV = {
-        "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/dors/meilerlab/apps//Linux2/x86_64/lib64/:/dors/meilerlab/apps/Linux2/x86_64/lib/"
+        "CPU" : "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/dors/meilerlab/apps//Linux2/x86_64/lib64/:/dors/meilerlab/apps/Linux2/x86_64/lib/"
+    }
+
+    MULTIWFN_ENV = {
+        "CPU" : """module load GCC/6.4.0-2.28  OpenMPI/2.1.1
+export KMP_STACKSIZE=200000000
+export Multiwfnpath=/home/jiany37/Software_installed/Multiwfn_3.7_bin_Linux_noGUI
+export PATH=$PATH:$Multiwfnpath"""
     }
     #############################
     ### Internal use constant ###

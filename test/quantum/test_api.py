@@ -10,7 +10,7 @@ from enzy_htp._interface.amber_interface import AmberMDCRDParser
 
 from enzy_htp.core.clusters.accre import Accre
 import enzy_htp.core.file_system as fs
-from enzy_htp.chemical.level_of_theory import QMLevelofTheory, MMLevelofTheory
+from enzy_htp.chemical.level_of_theory import QMLevelOfTheory, MMLevelOfTheory
 from enzy_htp.core.general import get_itself
 from enzy_htp.structure import structure_constraint as stru_cons
 from enzy_htp import interface
@@ -35,7 +35,7 @@ def test_single_point_gaussian_lv1():
     - single snapshot"""
     test_stru = sp.get_structure(f"{DATA_DIR}H5J.pdb")
     test_stru.assign_ncaa_chargespin({"H5J" : (0,1)})
-    test_method = QMLevelofTheory(
+    test_method = QMLevelOfTheory(
         basis_set="3-21G",
         method="HF",
         solvent="water",
@@ -75,7 +75,7 @@ def test_single_point_gaussian_lv2():
     - single snapshot"""
     test_stru = sp.get_structure(f"{STRU_DATA_DIR}KE_07_R7_2_S.pdb")
     test_stru.assign_ncaa_chargespin({"H5J" : (0,1)})
-    test_method = QMLevelofTheory(
+    test_method = QMLevelOfTheory(
         basis_set="3-21G",
         method="HF",
     )
@@ -106,7 +106,6 @@ def test_single_point_gaussian_lv2():
     fs.safe_rmdir(f"{WORK_DIR}/QM_SPE/", True)
 
 @pytest.mark.accre
-@pytest.mark.temp
 def test_single_point_gaussian_lv3():
     """Test running a QM single point.
     Using Gaussian & Accre as an example engine
@@ -123,7 +122,7 @@ def test_single_point_gaussian_lv3():
         coord_parser=AmberMDCRDParser(test_prmtop).get_coordinates,
     )
     test_stru.assign_ncaa_chargespin({"H5J" : (0,1)})
-    test_method = QMLevelofTheory(
+    test_method = QMLevelOfTheory(
         basis_set="3-21G",
         method="HF",
     )
@@ -161,7 +160,7 @@ def test_single_point_gaussian_lv4():
     assert False
     test_stru = sp.get_structure(f"{DATA_DIR}H5J.pdb")
     test_stru.assign_ncaa_chargespin({"H5J": (0, 1)})
-    test_method = QMLevelofTheory(
+    test_method = QMLevelOfTheory(
         basis_set="3-21G",
         method="HF",
     )

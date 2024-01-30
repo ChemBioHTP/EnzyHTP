@@ -78,21 +78,21 @@ def test_element_non_canonical():
 
 def test_element_non_canonical_cl():
     """test get atom element for CL from e.g.: DCE"""
-    test_atom = Atom(
+    test_atom = Atom.from_biopandas( # TODO this does not work for now. ok to fail. just something to improve
         {'x_coord': 0, 'y_coord': 1, 'z_coord': 0, 'atom_name': 'CL1'})
     assert test_atom.element == "Cl"
 
 
 def test_element_non_canonical_ch3():
     """test get atom element for CH3 from FAH"""
-    test_atom = Atom(
+    test_atom = Atom.from_biopandas(
         {'x_coord': 0, 'y_coord': 1, 'z_coord': 0, 'atom_name': 'CH3'})
     assert test_atom.element == "C"
 
 
 def test_element_non_canonical_1h():
     """test get atom element for CH3 from FAH"""
-    test_atom = Atom(
+    test_atom = Atom.from_biopandas(
         {'x_coord': 0, 'y_coord': 1, 'z_coord': 0, 'atom_name': '1H'})
     assert test_atom.element == "H"
 
@@ -122,48 +122,48 @@ def test_attached_protons():
 
 def test_distance_to():
     """Making sure that the .distance_to() method works."""
-    atom1 = Atom({'x_coord': 0, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'DUMMY'})
+    atom1 = Atom.from_biopandas({'x_coord': 0, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'DUMMY'})
 
-    atom2 = Atom({'x_coord': 0, 'y_coord': 0, 'z_coord': 1, 'atom_name': 'DUMMY'})
+    atom2 = Atom.from_biopandas({'x_coord': 0, 'y_coord': 0, 'z_coord': 1, 'atom_name': 'DUMMY'})
     assert np.isclose(atom1.distance_to(atom2), 1)
     assert np.isclose(atom2.distance_to(atom1), 1)
 
-    atom2 = Atom({'x_coord': 0, 'y_coord': 1, 'z_coord': 0, 'atom_name': 'DUMMY'})
+    atom2 = Atom.from_biopandas({'x_coord': 0, 'y_coord': 1, 'z_coord': 0, 'atom_name': 'DUMMY'})
     assert np.isclose(atom1.distance_to(atom2), 1)
     assert np.isclose(atom2.distance_to(atom1), 1)
 
-    atom2 = Atom({'x_coord': 1, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'DUMMY'})
+    atom2 = Atom.from_biopandas({'x_coord': 1, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'DUMMY'})
     assert np.isclose(atom1.distance_to(atom2), 1)
     assert np.isclose(atom2.distance_to(atom1), 1)
 
-    atom2 = Atom({'x_coord': -1, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'DUMMY'})
+    atom2 = Atom.from_biopandas({'x_coord': -1, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'DUMMY'})
     assert np.isclose(atom1.distance_to(atom2), 1)
     assert np.isclose(atom2.distance_to(atom1), 1)
 
-    atom2 = Atom({'x_coord': 0, 'y_coord': -1, 'z_coord': 0, 'atom_name': 'DUMMY'})
+    atom2 = Atom.from_biopandas({'x_coord': 0, 'y_coord': -1, 'z_coord': 0, 'atom_name': 'DUMMY'})
     assert np.isclose(atom1.distance_to(atom2), 1)
     assert np.isclose(atom2.distance_to(atom1), 1)
 
-    atom2 = Atom({'x_coord': 0, 'y_coord': 0, 'z_coord': -1, 'atom_name': 'DUMMY'})
+    atom2 = Atom.from_biopandas({'x_coord': 0, 'y_coord': 0, 'z_coord': -1, 'atom_name': 'DUMMY'})
     assert np.isclose(atom1.distance_to(atom2), 1)
     assert np.isclose(atom2.distance_to(atom1), 1)
 
-    atom2 = Atom({'x_coord': 0, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'DUMMY'})
+    atom2 = Atom.from_biopandas({'x_coord': 0, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'DUMMY'})
     assert np.isclose(atom1.distance_to(atom2), 0)
     assert np.isclose(atom2.distance_to(atom1), 0)
 
 def test_check_connect_setter_data_type_correct():
     """check using correct data type"""
-    atom1 = Atom({'x_coord': 0, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'DUMMY'})
-    atom2 = Atom({'x_coord': 0, 'y_coord': 0, 'z_coord': 1, 'atom_name': 'DUMMY'})
+    atom1 = Atom.from_biopandas({'x_coord': 0, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'DUMMY'})
+    atom2 = Atom.from_biopandas({'x_coord': 0, 'y_coord': 0, 'z_coord': 1, 'atom_name': 'DUMMY'})
 
     atom1.connect = [(atom2, "s")]
     atom1.connect = [(atom2, None)]
 
 def test_check_connect_setter_data_type_wrong():
     """check using several wrong data type"""
-    atom1 = Atom({'x_coord': 0, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'DUMMY'})
-    atom2 = Atom({'x_coord': 0, 'y_coord': 0, 'z_coord': 1, 'atom_name': 'DUMMY'})
+    atom1 = Atom.from_biopandas({'x_coord': 0, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'DUMMY'})
+    atom2 = Atom.from_biopandas({'x_coord': 0, 'y_coord': 0, 'z_coord': 1, 'atom_name': 'DUMMY'})
 
     with pytest.raises(TypeError) as exe:
         atom1.connect = [[atom2, "s"]]
@@ -181,8 +181,8 @@ def test_check_connect_setter_data_type_wrong():
 def test_connect_to(caplog):
     """test using example"""
     _LOGGER.setLevel(logging.DEBUG)
-    atom1 = Atom({'x_coord': 0, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'DUMMY'})
-    atom2 = Atom({'x_coord': 0, 'y_coord': 0, 'z_coord': 1, 'atom_name': 'DUMMY'})
+    atom1 = Atom.from_biopandas({'x_coord': 0, 'y_coord': 0, 'z_coord': 0, 'atom_name': 'DUMMY'})
+    atom2 = Atom.from_biopandas({'x_coord': 0, 'y_coord': 0, 'z_coord': 1, 'atom_name': 'DUMMY'})
 
     atom1.connect_to(atom2)
     atom1.connect_to(atom2)

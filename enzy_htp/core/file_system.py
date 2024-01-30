@@ -1,6 +1,7 @@
 """Module holds functions for manipulation of files, directories and other system related items. 
 
 Author: Chris Jurich, <chris.jurich@vanderbilt.edu>
+Author: QZ Shao, <shaoqz@icloud.com>
 Date: 2022-03-14
 """
 from io import IOBase
@@ -21,7 +22,7 @@ def safe_rm(fname: str) -> None:
         _LOGGER.warning(f"The supplied path '{fname}' is a directory and cannot be removed by enzy_htp.core.file_system.safe_rm()")
         return
 
-    if os.path.exists(fname):
+    if os.path.lexists(fname):
         os.remove(fname)
 
 def safe_mv(src: str, dest: str) -> str:
@@ -146,19 +147,25 @@ def write_data(outfile: str, tag: Any, data: Dict) -> str:
     return outfile
 
 
-def get_valid_temp_name(fname: str) -> str:
+def get_valid_temp_name(fname: str, is_symlink: bool = False) -> str:
     """find a vaild name for a temporary file of {fname}. 
     If {fname} exists, add a index after it.
     Args:
         fname: the filename of need.
+        is_symlink: whether the target filename is a symlink
     Return:
         result_fname: the valid filename that is unique to use"""
     idx = 0
     suffix = ''.join(Path(fname).suffixes)
     result_fname = fname
-    while os.path.isfile(result_fname):
-        idx += 1
-        result_fname = f"{fname[:-len(suffix)]}_{str(idx)}{suffix}"
+    if is_symlink:
+        while Path(result_fname).is_symlink():
+            idx += 1
+            result_fname = f"{fname[:-len(suffix)]}_{str(idx)}{suffix}"
+    else:
+        while os.path.isfile(result_fname):
+            idx += 1
+            result_fname = f"{fname[:-len(suffix)]}_{str(idx)}{suffix}"
     return result_fname
 
 

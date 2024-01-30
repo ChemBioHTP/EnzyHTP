@@ -10,7 +10,7 @@ from typing import Union, List, Tuple
 
 from ..base_interface import BaseInterface
 
-from enzy_htp.electronic_structure import EletronicStructure
+from enzy_htp.electronic_structure import ElectronicStructure
 from enzy_htp.structure import Structure
 from enzy_htp.core.job_manager import ClusterJob
 
@@ -40,12 +40,12 @@ class QMSinglePointEngine(ABC):
         pass
 
     @abstractmethod
-    def run(self, stru: Structure) -> EletronicStructure:
+    def run(self, stru: Structure) -> ElectronicStructure:
         """the method that runs the QM"""
         pass
 
     @abstractmethod
-    def translate(self, egg: QMResultEgg) -> EletronicStructure:
+    def translate(self, egg: QMResultEgg) -> ElectronicStructure:
         """the method convert engine specific results to general output"""
         pass
 

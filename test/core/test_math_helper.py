@@ -172,3 +172,12 @@ def test_get_section_from_endpoint():
     test_list = [(1,1),(10,2),(15,5),(25,5)]
     answer_list = [((1,1),(10,2)), ((11,2),(15,5)), ((16,5),(25,5))]
     assert mh.get_section_from_endpoint(test_list) == answer_list
+
+
+def test_round_by():
+    """as name"""
+
+    assert mh.round_by(1.4, 0.5) == 1.0
+    assert mh.round_by(-1.4, 0.5) == -1.0
+    assert mh.round_by(-1.4, 0.3) == -2.0
+    assert mh.round_by(1.4, 0.3) == 2.0

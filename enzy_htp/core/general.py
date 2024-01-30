@@ -29,6 +29,7 @@ Author: QZ Shao, <shaoqz@icloud.com>
 Date: 2022-10-21
 """
 import copy
+from io import StringIO
 import os
 import sys
 import logging
@@ -255,6 +256,25 @@ class EnablePropagate:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.logger.propagate = False
+
+
+class CaptureLogging:
+    """redirect logging to a variable in the block"""
+    def __init__(self, logger: logging.Logger) -> None:
+        self.logger = logger
+
+    def __enter__(self,):
+        self.log_stream = StringIO()
+        self.stream_handler = logging.StreamHandler(self.log_stream)
+        self.old_handlers = self.logger.handlers[:]
+        self.logger.handlers = [self.stream_handler]
+        return self.log_stream
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # restore handlers
+        self.logger.handlers = self.old_handlers
+        # set position for read
+        self.log_stream.seek(0)
 
 
 # == misc ===

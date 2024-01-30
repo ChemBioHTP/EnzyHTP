@@ -1,4 +1,4 @@
-"""electronic structure module of EnzyHTP. Defines the EletronicStructure
+"""electronic structure module of EnzyHTP. Defines the ElectronicStructure
 for electronic structure/wavefunctions of a molecule decribed by Structure().
 
 Author: QZ Shao <shaoqz@icloud.com>
@@ -6,9 +6,9 @@ Date: 2023-12-28"""
 import os
 from typing import List, Any
 
-from enzy_htp.structure import Structure
+from enzy_htp.structure import StructureRegion
 
-class EletronicStructure:
+class ElectronicStructure:
     """This class defines electronic structure/wavefunctions of a 
     molecule decribed by Structure() in EnzyHTP. It is stored in a
     form of files as the number and size of them could go very large.
@@ -36,7 +36,7 @@ class EletronicStructure:
         TODO"""
     def __init__(self,
         energy_0: float,
-        geometry: Structure,
+        geometry: StructureRegion,
         mo: str,
         mo_parser: Any,
         source: str = None,):
@@ -52,7 +52,7 @@ class EletronicStructure:
         return self._energy_0
 
     @property
-    def geometry(self) -> Structure:
+    def geometry(self) -> StructureRegion:
         """geometry"""
         return self._geometry
 

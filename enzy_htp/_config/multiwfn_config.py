@@ -10,9 +10,11 @@ Date: 2022-07-01
 """
 
 from copy import deepcopy
-from typing import Any, List
+from typing import Any, List, Dict
 
 from .base_config import BaseConfig
+
+from enzy_htp.core.clusters.accre import Accre
 
 
 class MultiwfnConfig(BaseConfig):
@@ -25,9 +27,34 @@ class MultiwfnConfig(BaseConfig):
     """
 
     EXE: str = "Multiwfn"
-    """Name of the """
+    """path of the multiwfn executable"""
 
     DIR: str = "Multiwfnpath"
+
+    DEFAULT_BOND_DIPOLE_RES_KEYWORDS: Dict = {
+        'core_type' : 'cpu',
+        'nodes':'1',
+        'node_cores' : '4',
+        'job_name' : 'bond_dipole_Multiwfn_EnzyHTP',
+        'partition' : '<fillthis>',
+        'mem_per_core' : '2G', # in GB.
+        'walltime' : '5:00:00',
+        'account' : '<fillthis>',
+        }
+    """The default value for the resource configuration of bond dipole calculation."""
+
+    def get_default_bond_dipole_res_keywords(self) -> Dict:
+        """function for lazy resolution."""
+        return deepcopy(self.DEFAULT_BOND_DIPOLE_RES_KEYWORDS)
+
+    def get_default_bond_dipole_cluster_job_config(self) -> Dict:
+        """The default value for dictionary that assign arguments to
+        ClusterJob.config_job and ClusterJob.wait_to_end during 
+        the bond dipole calculation."""
+        return {
+            "cluster" : Accre(),
+            "res_keywords" : self.get_default_bond_dipole_res_keywords(),
+        }
 
     def required_executables(self) -> List[str]:
         """ """
