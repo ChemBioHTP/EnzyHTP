@@ -157,11 +157,7 @@ def single_point(
         # qm_method
         if region_methods:
             if not isinstance(region_methods[0], QMLevelOfTheory):
-<<<<<<< HEAD
-                _LOGGER.error(f"Only 1 or less region specified. Have to be a QMLevelofTheory. Got: {region_methods[0]}")
-=======
                 _LOGGER.error(f"Only 1 or less region specified. Have to be a QMLevelOfTheory. Got: {region_methods[0]}")
->>>>>>> develop_refactor
                 raise TypeError
             qm_method = region_methods[0]
         elif not isinstance(method, QMLevelOfTheory):

@@ -18,19 +18,7 @@ import numpy as np
 from enzy_htp.core import _LOGGER
 from enzy_htp.chemical import electric_field_strength
 from enzy_htp.structure import Structure, Atom
-<<<<<<< HEAD
-from enzy_htp import interface
 
-
-def electric_field(stru: Structure,
-                   p1: Union[ArrayLike, Atom],
-                   p2: Union[ArrayLike, Atom],
-                   location: str = 'center',
-                   mask: str = None) -> float:
-    """Top level method for calculating the electric field strength of an enzyme, given an atom mask, two points or atoms,
-    and the location between the two points or atoms. Note that only the stru and p1/p2 are required. Performs basic checks
-    that the supplied Structure has charges. Output units are MV/cm.
-=======
 from enzy_htp.structure.structure_operation.charge import init_charge
 from enzy_htp.structure.structure_selection import select_stru
 
@@ -47,7 +35,6 @@ def ele_field_strength_at_along(
     calculate the electric field strength of the internel electric field of an enzyme at
     a target bond or 2 points or 1 point and a direction (along the bond, at the {location}).
     Performs basic checks that the supplied Structure has charges.
->>>>>>> develop_refactor
 
     Args:
         stru:
@@ -75,31 +62,6 @@ def ele_field_strength_at_along(
         _LOGGER.error(f"The supplied location {location} is valid. Acceptable values include: '{', '.join(allowed_locs)}'")
         raise ValueError
     if not stru.has_charges():
-<<<<<<< HEAD
-        _LOGGER.error("The supplied structure DOES NOT have charges. Exiting...")
-        exit(1)
-        pass
-
-    if mask is not None:
-        session = interface.pymol.new_session()
-        mask = interface.pymol.get_atom_mask(session, stru, mask)
-
-    if type(p1) == Atom:
-        p1 = p1.coord
-
-    if type(p2) == Atom:
-        p2 = p2.coord
-
-    #p1 = p1.astype(float) #TODO(CJ): maybe change this to just convert the elements to floats?
-    #p2 = p2.astype(float)
-
-    p1 = np.array(p1)
-    p2 = np.array(p2)
-
-    direction = p2 - p1
-
-    direction /= np.linalg.norm(direction)
-=======
         _LOGGER.info("The supplied structure DOES NOT have charges. Initializing...")
         init_charge(stru, ligand_fix="skip") #TODO finish ligand
     if p2 is None and d1 is None:
@@ -114,7 +76,6 @@ def ele_field_strength_at_along(
             p2 = np.array(p2.coord, dtype=float)
         d1 = p2 - p1
     d1 /= np.linalg.norm(d1)
->>>>>>> develop_refactor
 
     if location == 'center':
         p1 = (p1 + p2) / 2
@@ -187,18 +148,6 @@ def ele_field_strength_at(
             p2 = np.array(p2.coord, dtype=float)
         p1 = (p1 + p2) / 2
 
-<<<<<<< HEAD
-    for aidx, atom in enumerate(stru.atoms):
-        
-        if mask and not mask[aidx]:
-            continue
-
-        p0: np.ndarray = np.array(atom.coord)
-        r: np.ndarray = p1 - p0
-        r_m: float = np.linalg.norm(r)
-        r_u: np.ndarray = r / r_m
-        result += np.dot(((k * atom.charge) / (r_m**2)) * r_u, direction)
-=======
     # calculate result
     result: float = np.array((0.0, 0.0, 0.0))
     for atom in stru_sele.atoms:
@@ -210,7 +159,6 @@ def ele_field_strength_at(
             raise Exception
 
         result += electric_field_strength(source_coord, source_charge, p1, unit=unit)
->>>>>>> develop_refactor
 
     return result
 

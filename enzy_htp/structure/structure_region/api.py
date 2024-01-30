@@ -20,6 +20,8 @@ from .capping import (
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.math_helper import round_by, is_integer
 
+#TODO(CJ): add more documentation
+
 class StructureRegion:
     """this class defines a region inside of Structure()
     by a list of Atom()s. The idea is similar to StruSelection
@@ -249,11 +251,7 @@ class StructureRegion:
             elif res.is_ligand():
                 continue
             else:
-<<<<<<< HEAD
                 _LOGGER.warning(f"{res.name} found. Not considered")
-=======
-                _LOGGER.warning(f"{res._rtype.name} found. Not considered")
->>>>>>> develop_refactor
         return result
 
 

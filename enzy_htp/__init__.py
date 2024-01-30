@@ -52,11 +52,6 @@ for full class defintion."""
 config.__doc__="""Singleton interface for the config settings for all software packages and the system settings in enzy_htp. Can be accessed
 by end users and should be used to customize system settings for each environment they are working in."""
 
-<<<<<<< HEAD
-from .analysis import ( electric_field )
-
-=======
->>>>>>> develop_refactor
 from .preparation import PDBLine, read_pdb_lines, dock_reactants, generate_conformers #TODO(CJ): get rid of system charge
 
 from .geometry import equi_md_sampling, md_simulation
