@@ -648,6 +648,7 @@ class AmberMDStep(MolDynStep):
         else:
             _LOGGER.error("only allow AmberParameter or MolDynResult(source='amber') as `input_data`")
             raise TypeError
+
         # 2. make .in file
         fs.safe_mkdir(self.work_dir)
         temp_mdin_file = self._make_mdin_file()
@@ -682,12 +683,14 @@ class AmberMDStep(MolDynStep):
             prmtop_file=prmtop,
             interface=self.parent_interface).get_structure
 
-        result = AmberMDResultEgg(
-            traj_path=traj_path,
-            traj_log_path=mdout_path,
-            rst_path=mdrst_path,
-            prmtop_path=prmtop,
-            parent_job=None
+        result = MolDynResult(
+            traj_file = traj_path,
+            traj_parser = traj_parser, 
+            traj_log_file = mdout_path,
+            traj_log_parser = traj_log_parser, 
+            last_frame_file = mdrst_path,
+            last_frame_parser = last_frame_parser,
+            source="amber",
         )
 
         # 6. clean up
@@ -697,6 +700,7 @@ class AmberMDStep(MolDynStep):
         fs.clean_temp_file_n_dir(clean_up_target)
 
         return result
+
 
     def _make_mdin_file(self) -> str:
         """make a temporary mdin file.
@@ -752,8 +756,7 @@ class AmberMDStep(MolDynStep):
         # clean up
         clean_up_target = ["./mdinfo"]
         if not self.keep_in_file:
-            if result_egg.parent_job is not None:
-                clean_up_target.extend(result_egg.parent_job.mimo["temp_mdin"])
+            clean_up_target.extend(result_egg.parent_job.mimo["temp_mdin"])
             # TODO also clean up .rs file but how to obtain it?
             # parse mdin file?
         fs.clean_temp_file_n_dir(clean_up_target)
@@ -1519,15 +1522,7 @@ class AmberInterface(BaseInterface):
             geom_cons: List[StructureConstraint]
             nmropt_cntrl = {'nmropt': 1}
             # figure out path
-            if geom_cons[0].is_residue_pair_constraint():
-                for (_, cst) in geom_cons[0].child_constraints:
-                    disang_path: str = cst.params["amber"]["rs_filepath"]
-                    break
-                else:
-                    assert False
-                    #TODO(CJ): figure this out
-            else:
-                disang_path: str = geom_cons[0].params["amber"]["rs_filepath"]
+            disang_path: str = geom_cons[0].params["amber"]["rs_filepath"]
             if disang_path.startswith("{mdstep_dir}"):
                 disang_path = disang_path.lstrip("{mdstep_dir}")
                 disang_path = f"{md_config_dict['mdstep_dir']}/{disang_path}"
@@ -1535,12 +1530,8 @@ class AmberInterface(BaseInterface):
             # figure out content
             disang_content_list = []
             for cons in geom_cons:
-                if cons.is_residue_pair_constraint():
-                    for (_, cst) in cons.child_constraints:
-                        disang_content_list.append( self._parse_cons_to_raw_rs_dict(cst) )
-                else:                    
-                    raw_rs_dict = self._parse_cons_to_raw_rs_dict(cons)
-                    disang_content_list.append(raw_rs_dict)
+                raw_rs_dict = self._parse_cons_to_raw_rs_dict(cons)
+                disang_content_list.append(raw_rs_dict)
             # assemble
             nmropt_file_redirection = {
                 "DISANG" : {
@@ -1577,7 +1568,6 @@ class AmberInterface(BaseInterface):
         }
 
         return raw_dict
-
     def _parse_cons_to_raw_rs_dict(self, cons: StructureConstraint) -> Dict:
         """parse StructureConstraint() to a raw dict for writing the DISANG file.
         Expression containing value are also parsed in this function.
