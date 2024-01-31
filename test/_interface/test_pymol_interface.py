@@ -23,7 +23,7 @@ def test_load_enzy_htp_stru():
     pi = interface.pymol
     test_session = pi.new_session()
     pymol_obj_name, session = pi.load_enzy_htp_stru(test_session, test_stru)
-    assert pymol_obj_name == "enzy_htp_stru01"
+    assert pymol_obj_name == "tmp01"
     assert pymol_obj_name in session.cmd.get_object_list()
     assert test_stru.chain_names == session.cmd.get_chains(pymol_obj_name)
     assert len(session.cmd.get_model(pymol_obj_name).get_residues()) == test_stru.num_residues
@@ -39,7 +39,7 @@ def test_load_enzy_htp_stru_not_start_from_one():
     pi = interface.pymol
     test_session = pi.new_session()
     pymol_obj_name, session = pi.load_enzy_htp_stru(test_session, test_stru)
-    assert pymol_obj_name == "enzy_htp_stru01"
+    assert pymol_obj_name == "tmp01"
     assert pymol_obj_name in session.cmd.get_object_list()
     assert test_stru.chain_names == session.cmd.get_chains(pymol_obj_name)
     assert len(session.cmd.get_model(pymol_obj_name).get_residues()) == test_stru.num_residues
