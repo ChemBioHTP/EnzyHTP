@@ -42,8 +42,8 @@ class Accre(ClusterInterface):
 
     # environment presets #
     AMBER_ENV = {
-        "CPU": "source ~/setup-accre.sh",
-        "GPU": "source ~/setup-accre.sh",
+        "CPU": "source /home/shaoq1/bin/amber_env/amber22.sh",
+        "GPU": "source /home/shaoq1/bin/amber_env/amber22.sh",
     }
 
     G16_ENV = {
@@ -70,7 +70,7 @@ export PATH=$PATH:$Multiwfnpath"""
     # command for submission
     SUBMIT_CMD = "sbatch"
     # regex pattern for extracting job id from stdout
-    JOB_ID_PATTERN = r"Submitted batch job ([0-9]+)" #NOTE(CJ): can this also have 
+    JOB_ID_PATTERN = r"Submitted batch job ([0-9]+)"
     # command for control & monitor
     KILL_CMD = "scancel"
     HOLD_CMD = "scontrol hold"
