@@ -185,6 +185,12 @@ class Residue(DoubleLinkedNode):
             for name in atom_names:
                 result.append(self.find_atom_name(name))
         return result
+    
+    @property
+    def hydrogens(self) -> List[Atom]:
+        """Return all the hydrogen atoms in the Residue/Ligand."""
+        result: List[Atom] = list(filter(lambda atom: atom.is_hydrogen() , self.atoms))
+        return result
 
     # def clone(self) -> Residue: #TODO
     #     """Creates a deepcopy of self."""
@@ -232,11 +238,6 @@ class Residue(DoubleLinkedNode):
                 _LOGGER.warning(f"{self} have no N-side residue but it is not a N-ter."
                                 " Something wrong in your residue indexing. "
                                 "It could be your index is not continous")
-        return result
-    
-    def hydrogens(self):
-        """Return all the hydrogen atoms in the Residue/Ligand."""
-        result: List[Atom] = list(filter(lambda atom: atom.is_hydrogen() , self.atoms))
         return result
     #endregion
 

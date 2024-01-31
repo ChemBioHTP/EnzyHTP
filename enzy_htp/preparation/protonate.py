@@ -329,21 +329,21 @@ def _fix_pybel_output(pdb_path: str, out_path: str, ref_name_path: str = None) -
         # (Zhong) Find the first hydrogen atom in the element column
         # and throws a ValueError if it is followed by any heavy atom anywhere.
         if 'element_symbol' not in ref_ligand_df.columns:
-            exception_msg = f'{ref_name_path}: Element Symbol field does not exist in the PDB file passed via `ref_name_path`'
-            _LOGGER.exception(exception_msg)
-            raise IndexError()
+            logger_msg = f'{ref_name_path}: Element Symbol field does not exist in the PDB file passed via `ref_name_path`'
+            _LOGGER.error(logger_msg)
+            raise ValueError()
         element_symbols = ref_ligand_df['element_symbol'].to_list()
         if ('H' in element_symbols):
             hydrogen_index = element_symbols.index('H')
             subsequent_element_set = set(element_symbols[hydrogen_index:])  # A set containing elements after first hydrogen.
             subsequent_element_set.discard('H') # Discard Hydrogen from the set.
             if (len(subsequent_element_set) > 0):
-                exception_msg = f'{ref_name_path}: In the PDB file passed via `ref_name_path`, there should not be any hydrogen atom in the middle, i.e., the hydrogen atom(s) should be absent or at the end of the file.'
-                _LOGGER.exception(exception_msg)
+                logger_msg = f'{ref_name_path}: In the PDB file passed via `ref_name_path`, there should not be any hydrogen atom in the middle, i.e., the hydrogen atom(s) should be absent or at the end of the file.'
+                _LOGGER.error(logger_msg)
                 raise ValueError()
-        else:   # If no hydrogen atom exists, pass.
+        else:   # If no hydrogen atom exists in the middle, pass.
             logger_msg = f'{ref_name_path}: In the PDB file passed via `ref_name_path`, Hydrogen atoms are only present at the end of the file, check passes.'
-            _LOGGER.info(logger_msg)
+            _LOGGER.debug(logger_msg)
 
         ref_resi_name = ref_ligand_df.iloc[0]["residue_name"].strip()
         for i, atom_df in ref_ligand_df.iterrows():

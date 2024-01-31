@@ -10,6 +10,7 @@ from enzy_htp import core as cc
 from enzy_htp.core import file_system as fs
 from enzy_htp import config
 from enzy_htp.core.logger import _LOGGER
+from enzy_htp.core.general import EnablePropagate
 import logging
 import enzy_htp.structure as struct
 import enzy_htp.structure.structure_operation as stru_oper
@@ -284,12 +285,10 @@ def test_fix_pybel_output_4WI(caplog):
     out_pdb_file = f"{WORK_DIR}{file_prefix}_pybel.pdb"
 
     with pytest.raises(ValueError) as e:    # The value error is expected to be raised when unexpected Hydrogen atom(s) is detected.
-        _LOGGER.propagate = True
-        prot._fix_pybel_output(pdb_path=intermediate_pdb_file, out_path=out_pdb_file, ref_name_path=pdb_file)
+            with EnablePropagate(_LOGGER):
+                prot._fix_pybel_output(pdb_path=intermediate_pdb_file, out_path=out_pdb_file, ref_name_path=pdb_file)
     assert 'ref_name_path' in caplog.text
-    # TODO (Zhong): The best way to do this in the _fix_pybel_output is: 
-    # detect if there are any hydrogen interspersed in the middle of the file,
-    # if the hydrogen atoms are all at the end of the file, it will not cause a problem.
+    # If the hydrogen atoms are all at the end of the file, it will not cause a problem.
 
 def test_fix_pybel_output_4WI_H_end():
     """Test protonated ligand (pybel) name fixing.
