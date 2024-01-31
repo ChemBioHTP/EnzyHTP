@@ -181,7 +181,7 @@ def ele_stab_energy_of_bond(
     Returns:
         g_ele = - E * u (unit: kcal/mol)
             the electrostatic stablization energy"""
-    A0 = physical_constants["atomic unit of length"] # m
+    A0 = physical_constants["atomic unit of length"][0] # m
     A = 10**-10 # m
     g_ele = -bond_dipole * bond_field_strength * A0/A
 
@@ -203,7 +203,7 @@ def ele_stab_energy_of_dipole(
     Returns:
         g_ele = - E * u (unit: kcal/mol)
             the electrostatic stablization energy"""
-    A0 = physical_constants["atomic unit of length"] # m
+    A0 = physical_constants["atomic unit of length"][0] # m
     A = 10**-10 # m
     g_ele = - np.dot(dipole, field_strength) * A0/A
 
