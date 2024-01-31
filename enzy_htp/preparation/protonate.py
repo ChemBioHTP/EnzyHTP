@@ -258,7 +258,7 @@ def protonate_ligand_with_pybel(stru: Structure, ph: float = 7.0, int_ligand_fil
         ligand.fix_atom_names()  # make sure original ligand have all unique names
 
         # Detect and raise an info if Hydrogen atom(s) is detected, then remove hydrogen atoms.
-        if (ligand.has_hydrogen()):
+        if (ligand.has_hydrogens()):
             _LOGGER.info('The hydrogen atoms in the ligand is detected. Removing...')
             ligand = stru_oper.remove_hydrogens(ligand)
         

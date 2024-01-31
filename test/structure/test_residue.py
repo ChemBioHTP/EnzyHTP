@@ -23,21 +23,21 @@ DATA_DIR = f"{CURR_DIR}/data/"
 TEST_PDB_FILE = f"{CURR_DIR}/data/3NIR.pdb"
 RESIDUES = so.remove_solvent(PDBParser().get_structure(TEST_PDB_FILE)).residues
 
-def test_has_hydrogen_FAH():
+def test_has_hydrogens_FAH():
     """Test if hydrogen atoms can be properly detected."""
     file_prefix = 'FAcD-FA-ASP_rmW'
     pdb_file = f"{DATA_DIR}{file_prefix}.pdb"
     stru = PDBParser().get_structure(pdb_file)
     ligand = stru.ligands[0]
-    assert ligand.has_hydrogen()
+    assert ligand.has_hydrogens()
 
-def test_has_hydrogen_4CO():
+def test_has_hydrogens_4CO():
     """Test whether a ligand that does not contain a hydrogen atom can get the correct return value (False is expected)."""
     file_prefix = '1Q4T_residue_update_test'
     pdb_file = f"{DATA_DIR}{file_prefix}.pdb"
     stru = PDBParser().get_structure(pdb_file)
     ligand = stru.ligands[0]
-    assert not ligand.has_hydrogen()
+    assert not ligand.has_hydrogens()
     
 
 def test_deepcopy():

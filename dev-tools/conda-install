@@ -117,3 +117,5 @@ else
     update_env
     conda deactivate
 fi
+
+cd $initial_dir

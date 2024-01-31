@@ -46,7 +46,7 @@ def test_remove_hydrogens(caplog):
     stru: Structure = sp.get_structure(pdb_file_path)
     ligand = stru.ligands[0]
     ligand = stru_oper.remove_hydrogens(ligand)
-    assert not ligand.has_hydrogen()
+    assert not ligand.has_hydrogens()
 
 def test_update_residues():
     """test updating residues from a protonated structure"""
