@@ -45,7 +45,7 @@ class ResidueCap(Residue, ABC):
 
     Attributes:
         link_residue: The Residue() being capped.
-        link_atom: THe terminal Atom() that needs capping specifically.
+        link_atom: The terminal Atom() that needs capping specifically.
         socket_atom: Atom() that connects to the link_atom in the normal Structure().
         _terminal_type: What type of terminal is it? n-term, c-term, etc.
         atoms: A List[Atom] of the Atom()'s in the ResidueCap.
@@ -81,15 +81,38 @@ class ResidueCap(Residue, ABC):
         self.anchor()
 
 
-    def root(self, _count: int = 0 ):
-        
-        return self.link_atom.root()
+    def apply_to_geom(self, geom:Structure) -> ResidueCap:
+        """Create a copy of the current ResidueCap specialization and attach it to the same 
+        link/socket Atom()'s and link Residue() in a different Structure() with all of those
+        structural features. Typically used with a StructureEnsemble.
 
+        Args:
+            geom: The Structure() to apply the ResidueCap() to.
+
+        Returns:
+            A copy of the ResidueCap() specialization applied to the supplied Structure().
+        """
+        result = deepcopy(self) 
+        link_residue_cpy:Residue    = geom.residue_mapper[self.link_residue.key()]
+        link_atom_cpy:Atom          = link_residue_cpy.find_atom_name(self.link_atom.name)
+        socket_atom_cpy:Atom        = geom.get(self.socket_atom.key)
+
+        result.__init__(link_residue_cpy, link_atom_cpy, socket_atom_cpy, self.term_type)
+
+        return result
 
 
     @abstractmethod
     def anchor(self) -> None:
-        """Function that moves the ResidueCap()'s Atom()'s to be in the correct position for the type of Cap that it is."""
+        """Function that moves the ResidueCap()'s Atom()'s to be in the correct position given:
+            
+            + The location of the link_atom and socket_atom
+            + Whether the ResidueCap is n- or c-terminal 
+            + What chemical group the ResidueCap is
+
+        Method should be fairly unique to each ResidueCap specialization and will sometimes vary with 
+        which type of terminal it is capping. 
+        """
         pass
 
     @abstractmethod

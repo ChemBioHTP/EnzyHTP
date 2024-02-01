@@ -164,6 +164,10 @@ class StructureConstraint(ABC):
         """check whether Atom()s are from the same Structure()
         raise an error if not."""
         top = self.atoms[0].root()
+        
+        if isinstance(top, ResidueCap):
+            top = top.link_atom.root()
+
         for atom in self.atoms:
             current_top = atom.root()
           

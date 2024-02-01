@@ -14,6 +14,7 @@ import enzy_htp.core.file_system as fs
 import enzy_htp.structure.structure_region.capping as capping
 import enzy_htp.structure.structure_region as stru_regi
 import enzy_htp.structure.structure_selection as stru_sele
+from enzy_htp.structure.structure_region.residue_caps import SUPPORTED_CAPS, ResidueCap
 
 CURR_FILE = os.path.abspath(__file__)
 CURR_DIR = os.path.dirname(CURR_FILE)
@@ -44,7 +45,7 @@ def test_all_cap_types_supported():
     sele = stru_sele.select_stru(
         test_stru, "resi 2")
 
-    cap_types:List[str] = list(capping.SUPPORTED_CAPS.keys())
+    cap_types:List[str] = list(SUPPORTED_CAPS.keys())
 
     for nterm_cap in cap_types:
         for cterm_cap in cap_types:
@@ -63,7 +64,7 @@ def test_all_cap_types_unique_names():
     sele = stru_sele.select_stru(
         test_stru, "resi 2")
 
-    cap_types:List[str] = list(capping.SUPPORTED_CAPS.keys())
+    cap_types:List[str] = list(SUPPORTED_CAPS.keys())
 
     for nterm_cap in cap_types:
         for cterm_cap in cap_types:
@@ -84,7 +85,7 @@ def test_all_cap_types_have_realistic_bond_distances():
     sele = stru_sele.select_stru(
         test_stru, "resi 2")
 
-    cap_types:List[str] = list(capping.SUPPORTED_CAPS.keys())
+    cap_types:List[str] = list(SUPPORTED_CAPS.keys())
 
     for nterm_cap in cap_types:
         for cterm_cap in cap_types:
@@ -92,7 +93,7 @@ def test_all_cap_types_have_realistic_bond_distances():
             capping.capping_with_residue_terminals(test_region, nterm_cap=nterm_cap, cterm_cap=cterm_cap)
          
             for atom in test_region.atoms:
-                if not isinstance(atom.parent, capping.ResidueCap):
+                if not isinstance(atom.parent, ResidueCap):
                     continue
                 link_distance:float=atom.parent.link_atom.distance_to(atom.parent.socket_atom)
                 assert link_distance >= 1.0 and link_distance <= 1.50
@@ -113,7 +114,7 @@ def test_correct_num_caps():
     capping.capping_with_residue_terminals(test_region)
 
     for atom in test_region.atoms:
-        if not isinstance(atom.parent, capping.ResidueCap):
+        if not isinstance(atom.parent, ResidueCap):
             continue
         caps.add(atom.parent)
 
@@ -130,7 +131,7 @@ def test_correct_num_caps():
     capping.capping_with_residue_terminals(test_region)
 
     for atom in test_region.atoms:
-        if not isinstance(atom.parent, capping.ResidueCap):
+        if not isinstance(atom.parent, ResidueCap):
             continue
         caps.add(atom.parent)
 
@@ -147,7 +148,7 @@ def test_correct_num_caps():
     capping.capping_with_residue_terminals(test_region)
 
     for atom in test_region.atoms:
-        if not isinstance(atom.parent, capping.ResidueCap):
+        if not isinstance(atom.parent, ResidueCap):
             continue
         caps.add(atom.parent)
 
@@ -164,7 +165,7 @@ def test_correct_num_caps():
     capping.capping_with_residue_terminals(test_region)
 
     for atom in test_region.atoms:
-        if not isinstance(atom.parent, capping.ResidueCap):
+        if not isinstance(atom.parent, ResidueCap):
             continue
         caps.add(atom.parent)
 
@@ -182,7 +183,7 @@ def test_correct_num_caps():
     capping.capping_with_residue_terminals(test_region)
 
     for atom in test_region.atoms:
-        if not isinstance(atom.parent, capping.ResidueCap):
+        if not isinstance(atom.parent, ResidueCap):
             continue
         caps.add(atom.parent)
 
@@ -199,7 +200,7 @@ def test_correct_num_caps():
     capping.capping_with_residue_terminals(test_region)
 
     for atom in test_region.atoms:
-        if not isinstance(atom.parent, capping.ResidueCap):
+        if not isinstance(atom.parent, ResidueCap):
             continue
         caps.add(atom.parent)
 
@@ -233,13 +234,18 @@ def test_residue_cap_deepcopy():
     test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
     test_res = test_stru.residues[0]
     test_res_2 = test_stru.residues[1]
-    test_ch3 = capping.get_ch3_cap("cterm", test_res, test_res.atoms[0], test_res_2.atoms[0])
+    #test_ch3 = capping.capping_with_residue_terminals(
+    #        "cterm", test_res, test_res.atoms[0], test_res_2.atoms[0],
+    #        nterm_cap="CH3", cterm_cap="CH3"
+    #        )
+    #(test_
+    #nterm_cap="CH3", cterm_cap="CH3"
+    #ch3_copy = deepcopy(test_ch3)
 
-    ch3_copy = deepcopy(test_ch3)
-
-    test_region = stru_regi.StructureRegion(atoms=test_res.atoms) #return_copy
-    capping.capping_with_residue_terminals(test_region, return_copy=True)
-    assert ch3_copy.link_residue is not test_res
-    assert ch3_copy.link_residue.parent is None
-    assert ch3_copy.plug_atom in ch3_copy.atoms
-    assert ch3_copy.link_atom in ch3_copy.link_residue.atoms
+    #test_region = stru_regi.StructureRegion(atoms=test_res.atoms) #return_copy
+    #capping.capping_with_residue_terminals(test_region, return_copy=True)
+    #assert ch3_copy.link_residue is not test_res
+    #assert ch3_copy.link_residue.parent is None
+    #assert ch3_copy.plug_atom in ch3_copy.atoms
+    #assert ch3_copy.link_atom in ch3_copy.link_residue.atoms
+    assert False

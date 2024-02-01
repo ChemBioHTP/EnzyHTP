@@ -63,14 +63,9 @@ class StructureRegion:
         self.atoms_ = val
 
     def add_atoms(self, new_atoms:List[Atom]) -> None:
-        #TODO(CJ): documentation!
 
         self.atoms.extend(new_atoms)
 
-        for atom in self.atoms:
-            if atom.parent.parent is None:
-                atom.parent.set_parent(self)               
-        
 
     # region == prop getter ==
     @property
@@ -163,7 +158,7 @@ class StructureRegion:
         geom_cap_mapper = {}
         for cap in self.caps:
             geom_cap_mapper[cap] = cap.apply_to_geom(geom)
-        
+        print(geom_cap_mapper) 
         # 3. find corresponding atoms from geom
         for atom in self.atoms:
             # cap: find from geom caps
