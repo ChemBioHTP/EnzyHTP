@@ -298,7 +298,7 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
             # collect error info
             error_info_list = []
             # 1. stdout stderr
-            # error types: Fall of bus, periodic box has changed too much, illegel mem
+            # error types: TODO add comment here
             if isinstance(stdstream_source, ClusterJob):
                 with open(stdstream_source.job_cluster_log) as f:
                     stderr_stdout = f.read()
