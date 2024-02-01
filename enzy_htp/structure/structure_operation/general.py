@@ -129,18 +129,3 @@ def align_atom_order_in_each_residue(stru: Structure, ref_stru: Structure) -> No
             atom_indexes.sort()
             res.renumber_atoms(atom_indexes)
     return stru
-
-
-def update_coordinates(stru:Structure, ref_stru:Structure, allow_index_mismatch:bool=True) -> None:
-    #TODO(CJ): update documenation
-
-    for schain, rchain in zip(stru.chains, ref_stru.chains):
-        for sres, rres in zip(schain.residues, rchain.residues):        
-            for ratom in rres.atoms:
-                for satom in sres.atoms:
-                    if ratom.name == satom.name:
-                        satom.coord = ratom.coord
-                        break
-                else:
-                    assert False
-                

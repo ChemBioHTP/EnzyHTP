@@ -171,7 +171,7 @@ class StructureConstraint(ABC):
                 current_top = current_top.parent                
 
             if isinstance(current_top, StructureRegion):
-                current_top = curren_top.topology()
+                current_top = current_top.topology()
 
             if not isinstance(current_top, Structure):
                 _LOGGER.error(
@@ -272,20 +272,6 @@ class StructureConstraint(ABC):
     #TODO(CJ): add function that checks if topology and constraints are compatible
     #TODO(CJ): will need to make a version of this that actually works for the ResiduePairConstraint
     
-    # TODO move this to interface e.g.: RosettaInterface for current
-    def score_energy(self) -> float: 
-        """Scores the energy penalty of the constraint. If the calc method is not specified, the method exits."""
-        penalty:float = self['rosetta']['penalty'] 
-        tolerance:float = self['rosetta']['tolerance']
-        difference:float = abs(self.current_geometry() - self.target_value)
-        
-        if difference <= tolerance:
-            return 0.0
-        else:
-            return penalty * (difference - tolerance)
-
-        _LOGGER.error(f"Unspecified calculation method {self['calc_method']}. Supported include: rosetta. Exiting...")
-        exit( 1 )
 
 
 class CartesianFreeze(StructureConstraint):
@@ -536,16 +522,6 @@ class ResiduePairConstraint(StructureConstraint): # TODO unified the design of s
 
         return result
 
-
-    def score_energy(self) -> float:
-        """Composite score energy for the """
-
-        energy:float=0.0
-
-        for (cst_name,cst) in self.child_constraints:
-            energy += cst.score_energy()
-
-        return energy
 
     def clone_current(self) -> "ResiduePairConstraint":
         """TODO(CJ)"""

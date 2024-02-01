@@ -1,4 +1,17 @@
-"""
+"""Sub-module containing the constructor functions for various types of StructureConstraint. All of the available
+functions are listed below:
+
+    + create_residue_pair_constraints()
+    + create_cartesian_freeze()
+    + create_backbone_freeze()
+    + create_distance_constraint()
+    + create_angle_constraint()
+    + create_dihedral_constraint()
+    + create_hydrogen_bond_freeze()
+
+    + merge_cartesian_freeze()
+In practice these functions should be used instead of calling each StructureConstraint()'s constructor
+when one wants to make a specific StructureConstraint.
 
 Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
@@ -44,20 +57,26 @@ def create_residue_pair_constraint(
                 torsion_A:Dict[str,float]=None,
                 torsion_B:Dict[str,float]=None,
                 torsionAB:Dict[str,float]=None) -> ResiduePairConstraint:
-    """Converts specified 
+    """Converts specified information into a ResiduePairConstraint which is essentially the EnzDes constraint
+    from Rosetta. It automates the process of StructureConstraint generation by recording multiple Atom()'s
+    for two different Residue()'s and creating named StructureConstraints (i.e. distanceAB, angle_A, ...). While
+    the topology, r1_key, r2_key, r1_atoms and r2_atoms are required, the remaining arguments are not and they define
+    the constraints that are actually used. The remaining arguments are all None by default, but are added to the 
+    parent ResiduePairConstraint when specified. If not None, each key word must correspond to dict() which can only have
+    the keys "target_value", "penalty", and "tolerance".
     
     Args:
-        topology:
-        r1_key:
-        r2_key:
-        r1_atoms:
-        r2_atoms:
-        distanceAB:
-        angle_A:
-        angle_B:
-        torsion_A:
-        torsion_B:
-        torsionAB:
+        topology: The Structure() to apply the ResiduePairConstraint to.
+        r1_key: A key of the form (chain_name, residue_idx) for Residue() 1.
+        r2_key: A key of the form (chain_name, residue_idx) for Residue() 2.
+        r1_atoms: A Tuple[str,str,str] with form (atom_name1, atom_name2, atom_name3) for Residue() 1.
+        r2_atoms: A Tuple[str,str,str] with form (atom_name1, atom_name2, atom_name3) for Residue() 2.
+        distanceAB: Optional. A Dict[str,float] defining DistanceConstraint between Residue1.Atom1 and Residue2.Atom1.
+        angle_A: Optional. A Dict[str,float] defining AngleConstraint between Residue1.Atom2, Residue1.Atom1 and Residue2.Atom1.
+        angle_B: Optional. A Dict[str,float] defining AngleConstraint between Residue1.Atom1, Residue2.Atom1 and Residue2.Atom2.
+        torsion_A: Optional. A Dict[str,float] defining DihedralConstraint between Residue1.Atom3, Residue1.Atom2, Residue1.Atom1, and Residue2.Atom1.
+        torsion_B: Optional. A Dict[str,float] defining DihedralConstraint between Residue1.Atom1, Residue2.Atom1, Residue2.Atom2, and Residue2.Atom3.
+        torsionAB: Optional. A Dict[str,float] defining DihedralConstraint between Residue1.Atom2, Residue1.Atom1, Residue2.Atom1, and Residue2.Atom2.
 
     Returns:
         A ResiduePairConstraint object.
@@ -126,9 +145,18 @@ def create_residue_pair_constraint(
                                 )
 
 def create_cartesian_freeze(
-        atoms: Union[Atom, str],
+        atoms: Union[List[Atom], str],
         topology: Structure= None,) -> CartesianFreeze:
-    """constructor for CartesianFreeze."""
+    """Constructor for CartesianFreeze. Takes a List[Atom] or str, as well as optionally a topology.
+    Performs basic checks. Note that the str input is not currently supported and will throw.
+    
+    Args:
+        atoms: Either a List[Atom] to be frozen or a str.
+        topology: Optionally the Structure to base the constraints on.
+
+    Returns:
+        The CartesianFreeze constraint which freezes the supplied atoms.        
+    """
     if isinstance(atoms, str):
         if not isinstance(topology, Structure):
             _LOGGER.error("key str types of specification is used but reference "
@@ -144,10 +172,18 @@ def create_cartesian_freeze(
     result.check_consistent_topology()
     return result
 
-def create_backbone_freeze(stru: Structure, params:Dict) -> BackBoneFreeze:
-    """constructor for BackboneFreeze. Constrain only C,CA,N.
+#TODO(CJ): add an overload for the ResidueCap's in StructureRegion
+
+def create_backbone_freeze(stru: Structure, params:Dict=None,) -> BackBoneFreeze:
+    """Constructor for BackboneFreeze. Constrains only C,CA,N. Optionally takes a params dict()
+    that updates the 
     Args:
-        stru: the target structure"""
+        stru: The Structure() whose backbone atoms you want to freeze.
+        params: The new params to apply to the BackBoneFreeze. Optional.
+
+    Returns:
+        A BackBoneFreeze StructureConstraint for the supplied Structure.
+    """
     atoms = stru.backbone_atoms()
     result = BackBoneFreeze(atoms=atoms)
     if params is not None:
@@ -161,7 +197,7 @@ def create_distance_constraint(
         topology: Structure= None,
         params:Dict=None
         ) -> DistanceConstraint:
-    """constructor for DistanceConstraint between atoms.
+    """Constructor for DistanceConstraint between atoms.
     Args:
         atom_1, atom_2:
             the 2 atoms of the distance constraint. they can be specified
@@ -170,7 +206,13 @@ def create_distance_constraint(
         target_value:
             the target distance of the constraint
         topology:
-            the reference topology if keyword str is used for atom_1, atom_2."""
+            the reference topology if keyword str is used for atom_1, atom_2.
+        params:
+            The energy constraint parameters to apply to the DistanceConstraint. Optional.
+
+    Returns:
+        The DistanceConstraint object described by the supplied variables.
+    """
     atom_1 = _dispatch_get_key(atom_1, topology)
     atom_2 = _dispatch_get_key(atom_2, topology)
     result = DistanceConstraint(
@@ -191,7 +233,7 @@ def create_angle_constraint(
         topology: Structure= None,
         params:Dict=None
         ) -> AngleConstraint:
-    """constructor for AngleConstraint between atoms.
+    """Constructor for AngleConstraint between atoms.
     Args:
         atom_1, atom_2, atom_3:
             the 3 atoms of the angle constraint. they can be specified
@@ -200,7 +242,13 @@ def create_angle_constraint(
         target_value:
             the target angle of the constraint
         topology:
-            the reference topology if keyword str is used for atom_1, atom_2, atom_3."""
+            the reference topology if keyword str is used for atom_1, atom_2, atom_3.
+        params:
+            The energy constraint parameters to apply to the AngleConstraint. Optional.
+
+    Returns:
+        The AngleConstraint object described by the supplied variables.
+    """
     atom_1 = _dispatch_get_key(atom_1, topology)
     atom_2 = _dispatch_get_key(atom_2, topology)
     atom_3 = _dispatch_get_key(atom_3, topology)
@@ -222,7 +270,7 @@ def create_dihedral_constraint(
         topology: Structure= None,
         params:Dict=None
         ) -> DihedralConstraint:
-    """constructor for DihedralConstraint between atoms.
+    """Constructor for DihedralConstraint between atoms.
     Args:
         atom_1, atom_2, atom_3, atom_4:
             the 4 atoms of the dihedral constraint. they can be specified
@@ -232,7 +280,13 @@ def create_dihedral_constraint(
             the target dihedral of the constraint
         topology:
             the reference topology if keyword str is used for
-            atom_1, atom_2, atom_3, atom_4."""
+            atom_1, atom_2, atom_3, atom_4.
+        params:
+            The energy constraint parameters to apply to the DihedralConstraint. Optional.
+
+    Returns:
+        The DihedralConstraint object described by the supplied variables.
+    """
     atom_1 = _dispatch_get_key(atom_1, topology)
     atom_2 = _dispatch_get_key(atom_2, topology)
     atom_3 = _dispatch_get_key(atom_3, topology)
@@ -295,8 +349,17 @@ def merge_cartesian_freeze(cart_freeze_list: List[CartesianFreeze]) -> Cartesian
 # endregion
 
 
-def freeze_hydrogen_bonds(sr:StructureRegion, params:Dict=None ) -> List[DistanceConstraint]:
-    """TODO(CJ)"""
+def create_hydrogen_bond_freeze(sr:StructureRegion, params:Dict=None ) -> List[DistanceConstraint]:
+    """Creates a List[DistanceConstraint] that constrains all hydrogen bonds in the supplied StructureRegion. 
+    Primarily used during QM geometry optimization.
+
+    Args:
+        sr: The StructureRegion() where the hydrogen bonds are to be frozen.
+        params: The energy parameters for the DistanceConstraint()'s. Optional.
+
+    Returns:
+        A List[DistanceConstraint] constraining all hydrogen bonds.
+    """
     result:List[DistanceConstraint] = list()
     
     for atom in sr.atoms:

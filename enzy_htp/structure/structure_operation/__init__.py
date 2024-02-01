@@ -10,7 +10,6 @@ from .general import (
     remove_non_peptide,
     update_residues,
     align_atom_order_in_each_residue,
-    update_coordinates
 )
 from .residue import (
     deprotonate_residue,

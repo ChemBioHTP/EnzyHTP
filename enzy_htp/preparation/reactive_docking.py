@@ -410,7 +410,7 @@ def evaluate_geometry_csts(df: pd.DataFrame, csts: List[StructureConstraint], cs
         stru:Structure = _parser.get_structure(row.description)
         for cst in csts:
             cst.change_topology(stru)
-            total += cst.score_energy()
+            total += interface.rosetta.score_energy(cst)
         cst_diff.append(total)
 
     df['cst_diff'] = cst_diff

@@ -46,7 +46,7 @@ from .structure_constraint import (
     create_angle_constraint,
     create_dihedral_constraint,
     merge_cartesian_freeze,
-    freeze_hydrogen_bonds 
+    create_hydrogen_bond_freeze 
 )
 
 from .structure_selection_class import StruSelection

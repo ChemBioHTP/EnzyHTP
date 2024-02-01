@@ -880,4 +880,22 @@ class RosettaInterface(BaseInterface):
         return (pdb_file, cst_file)
 
 
+    def score_energy(self, cst) -> float: 
+        """TODO(CJ): add documentation"""
+
+        if cst.is_residue_pair_constraint():
+            total:float = 0.0
+            for (_,child_cst) in self.child_constraints:
+                total += self.score_energy(child_cst)
+            return total
+
+        penalty:float = cst['rosetta']['penalty'] 
+        tolerance:float = cst['rosetta']['tolerance']
+        difference:float = abs(cst.current_geometry() - cst.target_value)
+        
+        if difference <= tolerance:
+            return 0.0
+        else:
+            return penalty * (difference - tolerance)
+
 

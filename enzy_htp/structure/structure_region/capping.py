@@ -36,7 +36,7 @@ def capping_with_residue_terminals(raw_region,
                                    nterm_cap:str=None,
                                    cterm_cap:str=None,
                                    return_copy: bool= False,
-                                   **kwargs):
+                                   **kwargs) -> Union[None, StructureRegion]:
     """cap the raw region composed by whole residues
     only. In this case, capping only on the terminal
     of the residue. (keyword: res_ter_cap)
@@ -262,11 +262,11 @@ class HCap(ResidueCap):
 
     def get_nterm_atoms(self) -> List[Atom]:
         """Create the default n-terminal version of the HCap with appropriate names."""
-        return [Atom({ 'atom_name':'HP11', 'x_coord':0.0, 'y_coord':0.0, 'z_coord':0.0, 'element_symbol':'H' })]
+        return [Atom(name='HP11', coord=[0.0, 0.0, 0.0], element='H' )]
 
     def get_cterm_atoms(self) -> List[Atom]:
         """Create the default c-terminal version of the HCap with appropriate names."""
-        return [Atom({ 'atom_name':'HP21', 'x_coord':0.0, 'y_coord':0.0, 'z_coord':0.0, 'element_symbol':'H' })]
+        return [Atom(name='HP21', coord=[0.0, 0.0, 0.0], element='H' )]
 
 
 class CH3Cap(ResidueCap):
@@ -301,18 +301,18 @@ class CH3Cap(ResidueCap):
     def get_nterm_atoms(self) -> List[Atom]:
         """Create the default n-terminal version of the CH3Cap with appropriate names."""
         return [
-        Atom({'atom_name':"CP1" , 'x_coord':0.000, 'y_coord':  0.000, 'z_coord':  0.000, 'element_symbol':'C'}),
-        Atom({'atom_name':"HP11", 'x_coord':0.360, 'y_coord': -1.029, 'z_coord':  0.000, 'element_symbol':'H'}),
-        Atom({'atom_name':"HP12", 'x_coord':0.360, 'y_coord':  0.514, 'z_coord':  0.891, 'element_symbol':'H'}),
-        Atom({'atom_name':"HP13", 'x_coord':0.360, 'y_coord':  0.514, 'z_coord': -0.891, 'element_symbol':'H'}),]
+        Atom(name="CP1" , coord=[0.000,  0.000,  0.000], element='C'),
+        Atom(name="HP11", coord=[0.360, -1.029,  0.000], element='H'),
+        Atom(name="HP12", coord=[0.360,  0.514,  0.891], element='H'),
+        Atom(name="HP13", coord=[0.360,  0.514, -0.891], element='H'),]
         
     def get_cterm_atoms(self) -> List[Atom]:
         """Create the default c-terminal version of the CH3Cap with appropriate names."""
         return [
-        Atom({'atom_name':"CP2" , 'x_coord':0.000, 'y_coord':  0.000, 'z_coord':  0.000, 'element_symbol':'C'}),
-        Atom({'atom_name':"HP21", 'x_coord':0.360, 'y_coord': -1.029, 'z_coord':  0.000, 'element_symbol':'H'}),
-        Atom({'atom_name':"HP22", 'x_coord':0.360, 'y_coord':  0.514, 'z_coord':  0.891, 'element_symbol':'H'}),
-        Atom({'atom_name':"HP23", 'x_coord':0.360, 'y_coord':  0.514, 'z_coord': -0.891, 'element_symbol':'H'}),]
+        Atom(name="CP2" , coord=[0.000,  0.000,  0.000], element='C'),
+        Atom(name="HP21", coord=[0.360, -1.029,  0.000], element='H'),
+        Atom(name="HP22", coord=[0.360,  0.514,  0.891], element='H'),
+        Atom(name="HP23", coord=[0.360,  0.514, -0.891], element='H'),]
 
     @property
     def cap_type(self) -> str:
@@ -379,24 +379,24 @@ class NHCH3Cap(ResidueCap):
     def get_nterm_atoms(self) -> List[Atom]:
         """Create the default n-terminal version of the NHCH3Cap with appropriate names."""
         return [
-            Atom({'atom_name': 'NP1',  'x_coord': 0.000, 'y_coord':  0.000, 'z_coord': 0.000, 'element_symbol':'N'}),
-            Atom({'atom_name': 'HP1',  'x_coord': -0.5,  'y_coord': -0.860, 'z_coord': 0.000, 'element_symbol':'H'}),
-            Atom({'atom_name': 'CP1',  'x_coord': 1.500, 'y_coord':  0.000, 'z_coord': 0.000, 'element_symbol':'C'}),
-            Atom({'atom_name': 'HP11', 'x_coord': 1.864, 'y_coord':  0.000, 'z_coord':-1.027, 'element_symbol':'H'}),
-            Atom({'atom_name': 'HP12', 'x_coord': 1.864, 'y_coord': -0.889, 'z_coord': 0.515, 'element_symbol':'H'}),
-            Atom({'atom_name': 'HP13', 'x_coord': 1.864, 'y_coord':  0.889, 'z_coord': 0.515, 'element_symbol':'H'}),
+            Atom(name='NP1',  coord=[ 0.000,   0.000,  0.000], element='N'),
+            Atom(name='HP1',  coord=[ -0.5,   -0.860,  0.000], element='H'),
+            Atom(name='CP1',  coord=[ 1.500,   0.000,  0.000], element='C'),
+            Atom(name='HP11', coord=[ 1.864,   0.000, -1.027], element='H'),
+            Atom(name='HP12', coord=[ 1.864,  -0.889,  0.515], element='H'),
+            Atom(name='HP13', coord=[ 1.864,   0.889,  0.515], element='H'),
         ]
 
 
     def get_cterm_atoms(self) -> List[Atom]:
         """Create the default c-terminal version of the NHCH3Cap with appropriate names."""
         return [
-            Atom({'atom_name': 'NP2',  'x_coord': 0.000, 'y_coord': 0.000, 'z_coord': 0.000, 'element_symbol':'N'}),
-            Atom({'atom_name': 'HP2',  'x_coord': -0.5, 'y_coord': -0.860, 'z_coord': 0.000, 'element_symbol':'H'}),
-            Atom({'atom_name': 'CP2',  'x_coord': 1.500, 'y_coord': 0.000, 'z_coord': 0.000, 'element_symbol':'C'}),
-            Atom({'atom_name': 'HP21', 'x_coord': 1.864, 'y_coord': 0.000, 'z_coord':-1.027, 'element_symbol':'H'}),
-            Atom({'atom_name': 'HP22', 'x_coord': 1.864, 'y_coord':-0.889, 'z_coord': 0.515, 'element_symbol':'H'}),
-            Atom({'atom_name': 'HP23', 'x_coord': 1.864, 'y_coord': 0.889, 'z_coord': 0.515, 'element_symbol':'H'}),
+            Atom(name='NP2',  coord=[ 0.000,   0.000,  0.000], element='N'),
+            Atom(name='HP2',  coord=[ -0.5,   -0.860,  0.000], element='H'),
+            Atom(name='CP2',  coord=[ 1.500,   0.000,  0.000], element='C'),
+            Atom(name='HP21', coord=[ 1.864,   0.000, -1.027], element='H'),
+            Atom(name='HP22', coord=[ 1.864,  -0.889,  0.515], element='H'),
+            Atom(name='HP23', coord=[ 1.864,   0.889,  0.515], element='H'),
         ]
 
     def net_charge(self) -> int:
@@ -529,25 +529,24 @@ class COCH3Cap(ResidueCap):
     def get_nterm_atoms(self) -> List[Atom]:
         """Create the default n-terminal version of the COCH3Cap with appropriate names."""
         return [
-            Atom({'atom_name':'CP0',  'x_coord': 0.000 , 'y_coord':  0.000, 'z_coord':  0.000, 'element_symbol': 'C'}),
-            Atom({'atom_name':'OP1',  'x_coord':-0.610 , 'y_coord':  1.056, 'z_coord':  0.000, 'element_symbol': 'O'}),
-            Atom({'atom_name':'CP1',  'x_coord': 1.507 , 'y_coord':  0.000, 'z_coord':  0.000, 'element_symbol': 'C'}),
-            Atom({'atom_name':'HP11', 'x_coord': 1.871 , 'y_coord':  0.000, 'z_coord':  1.028, 'element_symbol': 'H'}),
-            Atom({'atom_name':'HP12', 'x_coord': 1.871 , 'y_coord': -0.890, 'z_coord': -0.514, 'element_symbol': 'H'}),
-            Atom({'atom_name':'HP13', 'x_coord': 1.871 , 'y_coord':  0.890, 'z_coord': -0.514, 'element_symbol': 'H'}),
+            Atom(name='CP0',  coord=[ 0.000 ,   0.000,   0.000], element= 'C'),
+            Atom(name='OP1',  coord=[-0.610 ,   1.056,   0.000], element= 'O'),
+            Atom(name='CP1',  coord=[ 1.507 ,   0.000,   0.000], element= 'C'),
+            Atom(name='HP11', coord=[ 1.871 ,   0.000,   1.028], element= 'H'),
+            Atom(name='HP12', coord=[ 1.871 ,  -0.890,  -0.514], element= 'H'),
+            Atom(name='HP13', coord=[ 1.871 ,   0.890,  -0.514], element= 'H'),
         ]
     
     def get_cterm_atoms(self) -> List[Atom]:
         """Create the default c-terminal version of the COCH3Cap with appropriate names."""
         return [
-            Atom({'atom_name':'CP2',  'x_coord': 0.000, 'y_coord':   0.000, 'z_coord':  0.000, 'element_symbol': 'C'}),
-            Atom({'atom_name':'OP2',  'x_coord':-0.610, 'y_coord':   1.056, 'z_coord':  0.000, 'element_symbol': 'O'}),
-            Atom({'atom_name':'CP3',  'x_coord': 1.507, 'y_coord':   0.000, 'z_coord':  0.000, 'element_symbol': 'C'}),
-            Atom({'atom_name':'HP31', 'x_coord': 1.871, 'y_coord':   0.000, 'z_coord':  1.028, 'element_symbol': 'H'}),
-            Atom({'atom_name':'HP32', 'x_coord': 1.871, 'y_coord':  -0.890, 'z_coord': -0.514, 'element_symbol': 'H'}),
-            Atom({'atom_name':'HP33', 'x_coord': 1.871, 'y_coord':   0.890, 'z_coord': -0.514, 'element_symbol': 'H'}),
+            Atom(name='CP2',  coord=[ 0.000 ,   0.000,   0.000], element= 'C'),
+            Atom(name='OP2',  coord=[-0.610 ,   1.056,   0.000], element= 'O'),
+            Atom(name='CP3',  coord=[ 1.507 ,   0.000,   0.000], element= 'C'),
+            Atom(name='HP31', coord=[ 1.871 ,   0.000,   1.028], element= 'H'),
+            Atom(name='HP32', coord=[ 1.871 ,  -0.890,  -0.514], element= 'H'),
+            Atom(name='HP33', coord=[ 1.871 ,   0.890,  -0.514], element= 'H'),
         ]
-
 
 
 def cap_residue_free_terminal(

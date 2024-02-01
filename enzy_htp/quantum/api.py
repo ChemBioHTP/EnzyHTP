@@ -241,6 +241,7 @@ def optimize(stru: Union[Structure, StructureEnsemble],
         work_dir: str="./QM_OPT",
         keep_in_file: bool=False,
         ) -> List[ElectronicStructure]:
+    """TODO(CJ): this documentation needs to be udpated"""
     if isinstance(stru, Structure):
         stru_esm = StructureEnsemble.from_single_stru(stru)
     elif isinstance(stru, StructureEnsemble):
@@ -336,9 +337,6 @@ def optimize(stru: Union[Structure, StructureEnsemble],
     return result
 
 
-    raise Exception("TODO")
-
-
 SINGLE_REGION_SINGLE_POINT_ENGINE: Dict[str, Callable] = {
     "g16": interface.gaussian.build_single_point_engine,
     "gaussian": interface.gaussian.build_single_point_engine,
@@ -362,6 +360,7 @@ MULTI_REGION_SINGLE_POINT_ENGINE: Dict[str, Callable] = {
 SINGLE_REGION_OPTIMIZATION_ENGINE: Dict[str, Callable] = {
     "xtb": interface.xtb.build_optimization_engine
 }
+"""Constructors of QMOptimizationEngine for optimize() when only 1 region is used."""
 
 def _parallelize_qm_with_cluster_job(
         stru_esm: StructureEnsemble,

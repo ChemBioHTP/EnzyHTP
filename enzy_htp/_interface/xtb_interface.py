@@ -32,7 +32,7 @@ from enzy_htp.structure.structure_constraint import (
     AngleConstraint,
     DihedralConstraint,
     ResiduePairConstraint,
-    freeze_hydrogen_bonds
+    create_hydrogen_bond_freeze
 )
 
 from enzy_htp.electronic_structure import ElectronicStructure
@@ -210,7 +210,7 @@ class XTBOptimizationEngine(XTBSinglePointEngine, QMOptimizationEngine):
         if sr is None:
             sr = create_region_from_full_stru( stru )
 
-        frozen_h_bonds:List[DistanceConstraint] = freeze_hydrogen_bonds(sr)
+        frozen_h_bonds:List[DistanceConstraint] = create_hydrogen_bond_freeze(sr)
 
 
         run_info:Dict = self.parent_interface.setup_xtb_run(
