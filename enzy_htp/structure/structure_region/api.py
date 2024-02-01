@@ -1,8 +1,15 @@
-"""This module defines StructureRegion 
+"""Module API defines creation functions that generate compatible, robust StructureRegion objects from 
+a variety of inputs. Current methods include:
+
+    + create_region_from_selection_pattern()
+    + create_region_from_full_stru()
+
+This is primarily how users should create StructureRegion()'s.
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
-Date: 2023-12-30"""
+Date: 2023-12-30
+"""
 from __future__ import annotations
 from collections import defaultdict
 from copy import deepcopy
@@ -12,43 +19,15 @@ from typing import Callable, Dict, List, Tuple, Union
 from ..structure import Structure, Atom
 from ..residue import Residue
 from ..noncanonical_base import NonCanonicalBase
-from .capping import (
-    capping_with_residue_terminals,
-    ResidueCap,
-    )
+
+from .structure_region import StructureRegion
+
+from .residue_caps import ResidueCap
+
+from .capping import capping_with_residue_terminals
 
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.math_helper import round_by, is_integer
-
-#TODO(CJ): add more documentation
-
-
-def create_region_from_residue_keys(stru:Structure,
-                            residue_keys:List[Tuple[str,int]],
-                            capping_method: str = "res_ter_cap",
-                            method_caps: Dict = None,
-                            ) -> StructureRegion:
-    """TODO(CJ)
-    TODO align with the unified APIs."""
-
-    res_atoms = []
-    for res_key in residue_keys:
-        res:Residue=stru.find_residue_with_key(res_key)
-        res_atoms.extend(res.atoms)
-    
-    raw_region = StructureRegion(res_atoms)
-
-    if method_caps is None:
-        method_caps = dict()
-
-    # capping
-    if capping_method not in CAPPING_METHOD_MAPPER:
-        _LOGGER.error(f"capping method ({capping_method}) not supported. Supported: {CAPPING_METHOD_MAPPER.keys()}")
-        raise ValueError
-    capping_func = CAPPING_METHOD_MAPPER[capping_method]
-    capping_func(raw_region, nterm_cap=method_caps.get("nterm_cap", None), cterm_cap=method_caps.get("cterm_cap", None))
-
-    return raw_region 
 
 def create_region_from_selection_pattern(
         stru: Structure,
@@ -56,7 +35,8 @@ def create_region_from_selection_pattern(
         capping_method: str = "res_ter_cap",
         **kwargs,
     ) -> StructureRegion:
-    """create StructureRegion from selection pattern.
+    """Create StructureRegion from selection pattern and cap terminal Atom()'s/Residue()'s.
+
     Args:
         stru:
             the structure that contains the target region
@@ -81,12 +61,14 @@ def create_region_from_selection_pattern(
         _LOGGER.error(f"capping method ({capping_method}) not supported. Supported: {CAPPING_METHOD_MAPPER.keys()}")
         raise ValueError
     capping_func = CAPPING_METHOD_MAPPER[capping_method]
+    #TODO(CJ): add the ole logic in here about return_copy
     capping_func(raw_region, **kwargs)
 
     return raw_region
 
-def create_region_from_full_stru(stru: Structure):
-    """create StructureRegion of the full structure
+def create_region_from_full_stru(stru: Structure) -> StructureRegion:
+    """Create StructureRegion of the full structure. Essentially acts as a constructor/translation function
+    that converts Structure to StructureRegion.
 
     Returns:
         the StructureRegion"""

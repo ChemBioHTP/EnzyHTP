@@ -3,7 +3,19 @@
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
 Date: 2024-01-31"""
+from __future__ import annotations
+from collections import defaultdict
+from copy import deepcopy
+import numpy as np
+from typing import Callable, Dict, List, Tuple, Union
 
+from ..structure import Structure, Atom
+from ..residue import Residue
+from ..noncanonical_base import NonCanonicalBase
+from enzy_htp.core.logger import _LOGGER
+from enzy_htp.core.math_helper import round_by, is_integer
+
+from .residue_caps import ResidueCap
 
 class StructureRegion:
     """this class defines a region inside of Structure()
@@ -49,11 +61,6 @@ class StructureRegion:
     def atoms(self, val: List[Atom]) -> None:
         """setter for atoms_"""
         self.atoms_ = val
-
-        for atom in self.atoms:
-            if atom.parent.parent is None:
-                atom.parent.parent = self
-        #TODO(CJ): set the parent.
 
     def add_atoms(self, new_atoms:List[Atom]) -> None:
         #TODO(CJ): documentation!
@@ -331,10 +338,6 @@ class StructureRegion:
             if not atom.parent.is_residue_cap():
                 return atom.root()
     # endregion
-
-
-    def root(self, n):
-        return self.topology
 
     # region == checker ==
     def has_atoms(self, atoms:List[Atom] ) -> bool:

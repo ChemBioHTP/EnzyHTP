@@ -15,6 +15,5 @@ from .api import (
     StructureRegion,
     ResidueCap,
     create_region_from_selection_pattern,
-    create_region_from_residue_keys,
     create_region_from_full_stru,
 )

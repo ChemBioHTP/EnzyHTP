@@ -166,12 +166,9 @@ class StructureConstraint(ABC):
         top = self.atoms[0].root()
         for atom in self.atoms:
             current_top = atom.root()
-           
+          
             if isinstance(current_top, ResidueCap):
-                current_top = current_top.parent                
-
-            if isinstance(current_top, StructureRegion):
-                current_top = current_top.topology()
+                current_top = current_top.link_atom.root()
 
             if not isinstance(current_top, Structure):
                 _LOGGER.error(

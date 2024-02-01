@@ -27,7 +27,6 @@ from .structure_io import PDBParser, Mol2Parser, PrepinParser
 from .structure_region import (
     StructureRegion,
     create_region_from_selection_pattern,
-    create_region_from_residue_keys,
     create_region_from_full_stru,
 )
 

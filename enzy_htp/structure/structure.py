@@ -776,7 +776,6 @@ class Structure(DoubleLinkedNode):
             for ch in self:
                 ch.sort_residues()
 
-    @dispatch
     def absolute_index(self, target:Residue, indexed:int=0) -> int:
         """Find the absolute index of a given Residue with a given indexing convention. Exits when the supplied target
         Residue cannot be found.

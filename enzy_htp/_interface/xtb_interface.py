@@ -23,7 +23,6 @@ from enzy_htp._config.xtb_config import XTBConfig, default_xtb_config
 from enzy_htp.structure import Structure, Atom, StructureConstraint, PDBParser
 from enzy_htp.structure.structure_region import (
     StructureRegion,
-    create_region_from_residue_keys,
     create_region_from_full_stru
 )
 from enzy_htp.structure.structure_constraint import (
@@ -183,7 +182,8 @@ class XTBOptimizationEngine(XTBSinglePointEngine, QMOptimizationEngine):
                 keep_in_file: bool,
                 work_dir: str,
                 ):
-      
+        #super().__init__(interface, method, region, keep_geom, name, cluster_job_config, keep_in_file, work_dir)
+
         if constraints is not None:
             self._constraints = constraints
         else:
@@ -196,14 +196,13 @@ class XTBOptimizationEngine(XTBSinglePointEngine, QMOptimizationEngine):
         self._keep_in_file = keep_in_file
         self._work_dir = work_dir
         self._geo_opt = True 
-
+        
 
     def run(self, stru: Structure) -> ElectronicStructure:
         """Method that actually runs the XTB single point calculation. Returns results of calculation as an ElectronicStructure() object."""
         if not isinstance(stru, Structure):
             _LOGGER.error("Supplied stru is not of type Structure()")
             raise TypeError()
-        
         fs.safe_mkdir(self.work_dir)
 
         sr = self.region
@@ -212,7 +211,6 @@ class XTBOptimizationEngine(XTBSinglePointEngine, QMOptimizationEngine):
 
         frozen_h_bonds:List[DistanceConstraint] = create_hydrogen_bond_freeze(sr)
 
-
         run_info:Dict = self.parent_interface.setup_xtb_run(
             sr,
             constraints=self.constraints + frozen_h_bonds,
@@ -220,7 +218,6 @@ class XTBOptimizationEngine(XTBSinglePointEngine, QMOptimizationEngine):
             geo_opt=self.geo_opt,
             work_dir=self.work_dir,
         )
-
         start_dir:str = os.getcwd()
         os.chdir(run_info['work_dir'])
 
@@ -236,7 +233,7 @@ class XTBOptimizationEngine(XTBSinglePointEngine, QMOptimizationEngine):
 
         return  ElectronicStructure(
             energy_0 = self.parent_interface.parse_spe(lines),
-            geometry = stru,
+            geometry = sr.atoms[0].root(),
             mo = '',
             mo_parser = '',
             source="xtb",
@@ -305,7 +302,6 @@ class XTBInterface(BaseInterface):
             n_proc = self.config().N_PROC
 
         result = dict()
-
         coord_file:str = self.write_coord_file(stru, work_dir)
         coord_path = Path(coord_file)
         result['coord_file'] = coord_file
@@ -568,7 +564,6 @@ class XTBInterface(BaseInterface):
 
         Returns:
             Nothing.
-
         """
         session = self.parent().pymol.new_session()
         df:pd.DataFrame = self.parent().pymol.collect(session, coord_file, "x y z rank elem".split())
