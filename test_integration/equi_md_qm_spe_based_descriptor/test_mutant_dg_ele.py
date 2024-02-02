@@ -78,9 +78,10 @@ def workflow(
 
     # mutation
     mutants = assign_mutant(wt_stru, mutant_pattern, chain_sync_list, chain_index_mapper)
-    for mut in mutants:
+    for i, mut in enumerate(mutants):
         if tuple(mut) in result_dict:
             continue
+        mutant_dir = f"{WORK_DIR}mutant_{i}"
         mutant_result = []
         mutant_stru = mutate_stru(wt_stru, mut, engine="pymol")
         mutant_stru.assign_ncaa_chargespin(ligand_chrg_spin_mapper)
@@ -100,7 +101,7 @@ def workflow(
             "cluster" : Accre(),
             "res_keywords" : {
                 "account" : "csb_gpu_acc",
-                "partition" : "maxwell"
+                "partition" : "pascal"
             }
         }
         mut_constraints = []
@@ -115,7 +116,7 @@ def workflow(
             prod_constrain=mut_constraints,
             prod_time=md_length,
             record_period=md_length*0.01,
-            work_dir=f"{WORK_DIR}MD/"
+            work_dir=f"{mutant_dir}MD/"
         )        
 
     # electronic structure
@@ -136,7 +137,7 @@ def workflow(
                 cluster_job_config=qm_cluster_job_config,
                 job_check_period=60,
                 job_array_size=20,
-                work_dir=f"{WORK_DIR}/QM_SPE/",
+                work_dir=f"{mutant_dir}/QM_SPE/",
             )
 
     # analysis
@@ -146,7 +147,8 @@ def workflow(
                     ele_stru, bond_p1, bond_p2,
                     cluster_job_config=qm_cluster_job_config | {
                         "walltime" : "30:00",
-                    })
+                    },
+                    work_dir=f"{mutant_dir}/bond_dipole")
                 field_strength = ele_field_strength_at_along(
                     ele_stru.geometry.topology, bond_p1, bond_p2, region_pattern=ef_region_pattern)
                 dg_ele = ele_stab_energy_of_bond(dipole[0], field_strength)
