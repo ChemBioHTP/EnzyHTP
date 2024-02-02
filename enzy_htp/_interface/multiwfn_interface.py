@@ -162,6 +162,9 @@ class MultiwfnInterface(BaseInterface):
                         **kwargs) -> Tuple[float, Tuple[float]]:
         """get bond dipole using wfn analysis with fchk files.
         TODO we also want to support single-center in some day?
+        NOTE maybe dont use the cluster_job model as it might take too
+        long to queue and config the node. (originally secs now mins)
+        TODO support wait_to_array_end and batch processing.
 
         Args:
             ele_stru:

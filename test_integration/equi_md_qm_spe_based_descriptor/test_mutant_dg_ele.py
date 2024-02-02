@@ -142,12 +142,9 @@ def workflow(
 
     # analysis
     # dGele
-            for ele_stru in qm_results:
+            for ele_stru in qm_results: # TODO make each API also handle list of them
                 dipole = bond_dipole(
                     ele_stru, bond_p1, bond_p2,
-                    cluster_job_config=qm_cluster_job_config | {
-                        "walltime" : "30:00",
-                    },
                     work_dir=f"{mutant_dir}/bond_dipole")
                 field_strength = ele_field_strength_at_along(
                     ele_stru.geometry.topology, bond_p1, bond_p2, region_pattern=ef_region_pattern)

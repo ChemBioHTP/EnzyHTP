@@ -82,6 +82,8 @@ def bond_dipole(
 
     result = BOND_DIPOLE_METHODS[method](
         ele_stru, atom_1, atom_2, work_dir, keep_in_file,
+        work_dir=work_dir,
+        keep_in_file=keep_in_file,
         cluster_job_config = cluster_job_config, 
         job_check_period = job_check_period,
         **kwargs)
