@@ -270,6 +270,11 @@ class Structure(DoubleLinkedNode):
         """number of Atom()s"""
         return len(self.atoms)
 
+    @property
+    def atom_idx_list(self) -> List[int]:
+        """a list of atom indexes as the order of .atoms"""
+        return [a.idx for a in self.atoms]
+
     def find_atoms_in_range(self, center: Union[Atom, Tuple[float, float, float]], range_distance: float) -> List[Atom]:
         """find atoms in {range} of {center}. return a list of atoms found"""
         result = []
