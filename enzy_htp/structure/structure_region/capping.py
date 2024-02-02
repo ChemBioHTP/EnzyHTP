@@ -61,21 +61,23 @@ def capping_with_residue_terminals(raw_region:StructureRegion,
                       "residue terminal capping only support capping for a region"
                       " composed by whole residues only.")
         raise ValueError
+    
+    free_res_mapper = raw_region.involved_residues_with_free_terminal()
+    free_nter_res = free_res_mapper["n_ter"]
+    free_cter_res = free_res_mapper["c_ter"]
 
-    new_atoms:List[Atom] = list()
-    for res in raw_region.involved_residues:
-        
-        if raw_region.needs_nterm_cap(res):
-            new_atoms.extend(cap_residue_free_terminal(res, nterm_cap, "nterm"))
+    add_atoms = []
+    for res in free_nter_res:
+        cap_atoms = cap_residue_free_terminal(res, nterm_cap, "nterm")
+        add_atoms.extend(cap_atoms)
 
-        new_atoms.extend(res.atoms)
-
-        if raw_region.needs_cterm_cap(res):
-            new_atoms.extend(cap_residue_free_terminal(res, cterm_cap, "cterm"))
-
+    for res in free_cter_res:
+        cap_atoms = cap_residue_free_terminal(res, cterm_cap, "cterm")
+        add_atoms.extend(cap_atoms)
+    
     if return_copy:
         new_region = raw_region.clone()
-        new_region.atoms = new_atoms 
+        new_region.atoms.extend(add_atoms)
         return new_region
     else:
-        raw_region.atoms = new_atoms 
+        raw_region.atoms.extend(add_atoms)

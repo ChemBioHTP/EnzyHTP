@@ -378,7 +378,7 @@ class XTBInterface(BaseInterface):
         fs.write_lines(temp_pdb, pdb_lines)
         session = self.parent().pymol.new_session()
         self.parent().pymol.general_cmd(session, [('delete', 'all'), ('load', temp_pdb)])
-        self.parent().pymol.remove_ligand_bonding(session)
+        self.parent().pymol.remove_ligand_bonding(session) #TODO(CJ): add something in here about the cap resolution
         fs.safe_rm(temp_pdb)
         
         self.parent().pymol.general_cmd(session, [("save", coord_file)])

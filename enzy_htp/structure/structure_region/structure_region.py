@@ -46,7 +46,9 @@ class StructureRegion:
 
     def __init__(self, atoms: List[Atom]):
         # attribute
-        self.atoms_ = atoms
+        self.atoms_ = list() 
+        for aa in atoms:
+            self.atoms_.append( aa )
         # property
         self.atom_mapper_ = dict()
         for aa in self.atoms_: 
@@ -158,7 +160,6 @@ class StructureRegion:
         geom_cap_mapper = {}
         for cap in self.caps:
             geom_cap_mapper[cap] = cap.apply_to_geom(geom)
-        print(geom_cap_mapper) 
         # 3. find corresponding atoms from geom
         for atom in self.atoms:
             # cap: find from geom caps
@@ -236,28 +237,6 @@ class StructureRegion:
             else:
                 _LOGGER.warning(f"{res.name} found. Not considered")
         return result
-
-
-    def needs_nterm_cap(self, res: Residue) -> bool:
-
-        if res.is_ligand():
-            return False
-
-        region_residues = self.involved_residues
-        n_side_res = res.n_side_residue()
-
-        return n_side_res is not None and n_side_res not in region_residues
-
-    def needs_cterm_cap(self, res: Residue) -> bool:
-
-        if res.is_ligand():
-            return False
-
-        region_residues = self.involved_residues
-        c_side_res = res.c_side_residue()
-
-        return c_side_res is not None and c_side_res not in region_residues
-
 
     def clone(self):
         """return a clone of self"""

@@ -14,7 +14,7 @@ import enzy_htp.core.file_system as fs
 import enzy_htp.structure.structure_region.capping as capping
 import enzy_htp.structure.structure_region as stru_regi
 import enzy_htp.structure.structure_selection as stru_sele
-from enzy_htp.structure.structure_region.residue_caps import SUPPORTED_CAPS, ResidueCap
+from enzy_htp.structure.structure_region.residue_caps import SUPPORTED_CAPS, ResidueCap, CH3Cap 
 
 CURR_FILE = os.path.abspath(__file__)
 CURR_DIR = os.path.dirname(CURR_FILE)
@@ -32,8 +32,6 @@ def test_capping_with_residue_terminals(helpers):
     test_region = stru_regi.StructureRegion(atoms=sele.atoms)
     unique_names = set()
     for atom in test_region.atoms:
-        if atom.name in unique_names:
-            print(atom.name)
         unique_names.add(atom.name)
 
     assert len(test_region.atoms) == len(unique_names)
@@ -74,7 +72,6 @@ def test_all_cap_types_unique_names():
             unique_names = set()
             for atom in test_region.atoms:
                 unique_names.add(atom.name)
-        
             assert len(test_region.atoms) == len(unique_names)
 
 
@@ -234,18 +231,14 @@ def test_residue_cap_deepcopy():
     test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
     test_res = test_stru.residues[0]
     test_res_2 = test_stru.residues[1]
-    #test_ch3 = capping.capping_with_residue_terminals(
-    #        "cterm", test_res, test_res.atoms[0], test_res_2.atoms[0],
-    #        nterm_cap="CH3", cterm_cap="CH3"
-    #        )
-    #(test_
-    #nterm_cap="CH3", cterm_cap="CH3"
-    #ch3_copy = deepcopy(test_ch3)
+    test_ch3 = CH3Cap(
+        test_res,
+        test_res.find_atom_name('C'),
+        test_res_2.find_atom_name('N'),
+        'cterm' 
+    )
+    ch3_copy = deepcopy(test_ch3)
 
-    #test_region = stru_regi.StructureRegion(atoms=test_res.atoms) #return_copy
-    #capping.capping_with_residue_terminals(test_region, return_copy=True)
-    #assert ch3_copy.link_residue is not test_res
-    #assert ch3_copy.link_residue.parent is None
-    #assert ch3_copy.plug_atom in ch3_copy.atoms
-    #assert ch3_copy.link_atom in ch3_copy.link_residue.atoms
-    assert False
+    assert ch3_copy.link_residue is not test_res
+    assert ch3_copy.link_residue.parent is None
+    assert ch3_copy.link_atom in ch3_copy.link_residue.atoms

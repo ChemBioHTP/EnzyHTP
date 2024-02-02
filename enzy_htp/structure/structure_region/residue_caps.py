@@ -562,7 +562,6 @@ def cap_residue_free_terminal(
         raise ValueError
     
     residue_cap:ResidueCap = SUPPORTED_CAPS[cap_name](res, start_atom, end_atom, terminal_type)
-    
     return residue_cap.atoms
 
 SUPPORTED_CAPS: Dict[str, callable] = {
