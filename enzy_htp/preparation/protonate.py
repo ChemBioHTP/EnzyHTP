@@ -256,7 +256,13 @@ def protonate_ligand_with_pybel(stru: Structure, ph: float = 7.0, int_ligand_fil
         int_pybel_file_path = fs.get_valid_temp_name(f"{int_ligand_file_path.removesuffix('.pdb')}_pybel.pdb")
         # file interface with pybel
         ligand.fix_atom_names()  # make sure original ligand have all unique names
-        with open(int_ligand_file_path, "w") as of:
+
+        # Detect and raise an info if Hydrogen atom(s) is detected, then remove hydrogen atoms.
+        if (ligand.has_hydrogens()):
+            _LOGGER.info('The hydrogen atoms in the ligand is detected. Removing...')
+            ligand = stru_oper.remove_hydrogens(ligand)
+        
+        with open(int_ligand_file_path, "w") as of: 
             of.write(sp.get_file_str(ligand))
         pybel_protonate_pdb_ligand(int_ligand_file_path, int_pybel_file_path, ph=ph)
         ref_ligand = sp.get_structure(int_pybel_file_path).ligands[0]
@@ -304,6 +310,14 @@ def _fix_pybel_output(pdb_path: str, out_path: str, ref_name_path: str = None) -
     use {ref_name_path} to maximumly keep original atom names and residue name (if provided)
     * this fix is based on all newly added atoms from pybel will be under original ones
     * i.e.: assume the original atoms is a subset of the final atoms and in its original order
+
+    Args:
+        pdb_path: Protonated PDB filepath with messed up atom names and residue names.
+        out_path: Fixed PDB filepath.
+        ref_name_path: Reference PDB filepath for atom names and residue name.
+
+    Returns:
+        None.
     """
     if ref_name_path is not None:
         ref_atom_names = []
@@ -311,6 +325,26 @@ def _fix_pybel_output(pdb_path: str, out_path: str, ref_name_path: str = None) -
         ref_ligand.read_pdb(ref_name_path)
         ref_ligand_df: pd.DataFrame = pd.concat((ref_ligand.df["ATOM"], ref_ligand.df["HETATM"]), ignore_index=True)
         ref_ligand_df.sort_values("line_idx", inplace=True)  # make sure lines are aligned
+
+        # (Zhong) Find the first hydrogen atom in the element column
+        # and throws a ValueError if it is followed by any heavy atom anywhere.
+        if 'element_symbol' not in ref_ligand_df.columns:
+            logger_msg = f'{ref_name_path}: Element Symbol field does not exist in the PDB file passed via `ref_name_path`'
+            _LOGGER.error(logger_msg)
+            raise ValueError()
+        element_symbols = ref_ligand_df['element_symbol'].to_list()
+        if ('H' in element_symbols):
+            hydrogen_index = element_symbols.index('H')
+            subsequent_element_set = set(element_symbols[hydrogen_index:])  # A set containing elements after first hydrogen.
+            subsequent_element_set.discard('H') # Discard Hydrogen from the set.
+            if (len(subsequent_element_set) > 0):
+                logger_msg = f'{ref_name_path}: In the PDB file passed via `ref_name_path`, there should not be any hydrogen atom in the middle, i.e., the hydrogen atom(s) should be absent or at the end of the file.'
+                _LOGGER.error(logger_msg)
+                raise ValueError()
+        else:   # If no hydrogen atom exists in the middle, pass.
+            logger_msg = f'{ref_name_path}: In the PDB file passed via `ref_name_path`, Hydrogen atoms are only present at the end of the file, check passes.'
+            _LOGGER.debug(logger_msg)
+
         ref_resi_name = ref_ligand_df.iloc[0]["residue_name"].strip()
         for i, atom_df in ref_ligand_df.iterrows():
             ref_atom_names.append(atom_df["atom_name"].strip())

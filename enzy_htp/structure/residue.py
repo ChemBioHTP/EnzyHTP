@@ -185,6 +185,12 @@ class Residue(DoubleLinkedNode):
             for name in atom_names:
                 result.append(self.find_atom_name(name))
         return result
+    
+    @property
+    def hydrogens(self) -> List[Atom]:
+        """Return all the hydrogen atoms in the Residue/Ligand."""
+        result: List[Atom] = list(filter(lambda atom: atom.is_hydrogen() , self.atoms))
+        return result
 
     # def clone(self) -> Residue: #TODO
     #     """Creates a deepcopy of self."""
@@ -301,6 +307,12 @@ class Residue(DoubleLinkedNode):
     def has_init_charge(self) -> bool:
         """check if self has charge"""
         return math.prod([atom.has_init_charge() for atom in self.atoms])  
+    
+    def has_hydrogens(self) -> bool:
+        """Does the residue contain hydrogen atoms?"""
+        element_list = self.element_composition
+        return ('H' in element_list)
+
     #endregion
 
     #region === Editor ===

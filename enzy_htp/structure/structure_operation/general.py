@@ -7,9 +7,10 @@ Date: 2022-09-19
 
 import copy
 from plum import dispatch
+from typing import Union
 
 from enzy_htp.core.logger import _LOGGER
-from ..structure import Structure, Solvent, Chain, Residue, Atom
+from ..structure import Structure, Solvent, Chain, Residue, NonCanonicalBase, Ligand, Atom
 
 
 def remove_solvent(stru: Structure) -> Structure:
@@ -25,7 +26,7 @@ def remove_solvent(stru: Structure) -> Structure:
 
     return stru
 
-
+@dispatch
 def remove_hydrogens(stru: Structure, polypeptide_only: bool) -> Structure:
     """
     remove all hydrogen Atom()s for {stru}.
@@ -40,6 +41,24 @@ def remove_hydrogens(stru: Structure, polypeptide_only: bool) -> Structure:
 
     return stru
 
+@dispatch
+def remove_hydrogens(residue: Residue) -> Residue:
+    """Remove all hydrogen atom(s) from {residue}.
+    Make changes in-place and return a reference of the changed original Residue / NonCanonicalBase / Ligand.
+
+    Args:
+        residue: An instance of Residue / NonCanonicalBase / Ligand.
+    
+    Returns:
+        The reference of the changed original Residue / NonCanonicalBase / Ligand
+    """
+    hydrogens = residue.hydrogens
+    if len(hydrogens) >= 1:
+        _LOGGER.info(f"Removing {len(hydrogens)} hydrogens from {residue.name}.")
+        for h in hydrogens:
+            h: Atom
+            h.delete_from_parent()
+    return residue
 
 def remove_empty_chain(stru: Structure) -> Structure:
     """
@@ -54,7 +73,6 @@ def remove_empty_chain(stru: Structure) -> Structure:
             ch.delete_from_parent()
     return stru
 
-
 def remove_non_peptide(stru: Structure) -> Structure:
     """remove the non-peptide parts of the structure. 
     Make changes in-place and return a reference of the changed original object."""
@@ -63,7 +81,6 @@ def remove_non_peptide(stru: Structure) -> Structure:
     for ch in non_peptides:
         ch.delete_from_parent()
     return stru
-
 
 @dispatch
 def update_residues(stru: Structure, ref_stru: Structure) -> Structure:

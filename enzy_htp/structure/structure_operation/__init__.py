@@ -8,6 +8,7 @@ from .general import (
     remove_hydrogens,
     remove_empty_chain,
     remove_non_peptide,
+    remove_hydrogens,
     update_residues,
     align_atom_order_in_each_residue,
 )
