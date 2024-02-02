@@ -18,6 +18,7 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-11
 """
 from __future__ import annotations
+import copy
 import os
 import re
 from pathlib import Path
@@ -845,6 +846,7 @@ class GaussianInterface(BaseInterface):
             cluster_job_config = self.config().get_default_qm_spe_cluster_job_config()
         else:
             # For res_keywords, it updates the default config
+            cluster_job_config = copy.deepcopy(cluster_job_config) # because we will change it in place.
             res_keywords_update = cluster_job_config["res_keywords"]
             default_res_keywords = self.config().get_default_qm_spe_cluster_job_res_keywords()
             cluster_job_config["res_keywords"] = default_res_keywords | res_keywords_update

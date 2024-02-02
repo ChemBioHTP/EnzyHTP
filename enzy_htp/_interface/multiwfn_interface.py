@@ -8,6 +8,7 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-07-01
 """
 from collections import defaultdict
+import copy
 import re
 import shutil
 from pathlib import Path
@@ -210,6 +211,7 @@ class MultiwfnInterface(BaseInterface):
             cluster_job_config = self.config().get_default_bond_dipole_cluster_job_config()
         elif cluster_job_config is not None:
             # For res_keywords, it updates the default config
+            cluster_job_config = copy.deepcopy(cluster_job_config)
             res_keywords_update = cluster_job_config["res_keywords"]
             default_res_keywords = self.config().get_default_bond_dipole_res_keywords()
             cluster_job_config["res_keywords"] = default_res_keywords | res_keywords_update

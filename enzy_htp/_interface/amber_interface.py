@@ -7,6 +7,7 @@ Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-02
 """
+import copy
 import glob
 import os
 import re
@@ -2132,6 +2133,7 @@ class AmberInterface(BaseInterface):
             cluster_job_config = self.config().get_default_md_cluster_job(core_type)
         else:
             # For res_keywords, it updates the default config
+            cluster_job_config = copy.deepcopy(cluster_job_config)
             res_keywords_update = cluster_job_config["res_keywords"]
             default_res_keywords = self.config().get_default_md_cluster_job_res_keywords(core_type)
             cluster_job_config["res_keywords"] = default_res_keywords | res_keywords_update
