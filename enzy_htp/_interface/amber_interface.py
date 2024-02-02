@@ -1253,7 +1253,7 @@ class AmberInterface(BaseInterface):
         return [aid_mapper["atom"][at] for at in atoms]
 
 
-    def rename_atoms(self, stru: Structure) -> None:
+    def rename_atoms(self, stru: Structure) -> None: # TODO(high piror) move to structure_io https://github.com/ChemBioHTP/EnzyHTP/pull/162#discussion_r1473217587
         """Renames residues and atoms to be compatible with Amber naming and functions.
         
         Args:
