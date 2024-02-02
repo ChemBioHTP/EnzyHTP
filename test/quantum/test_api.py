@@ -17,7 +17,7 @@ from enzy_htp import interface
 from enzy_htp import PDBParser
 from enzy_htp.quantum import single_point
 from enzy_htp.structure.structure_ensemble import StructureEnsemble
-from enzy_htp.structure.structure_region.api import create_region_from_selection_pattern
+from enzy_htp.structure.structure_region import create_region_from_selection_pattern
 
 DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/data/"
 STRU_DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/../structure/data/"
