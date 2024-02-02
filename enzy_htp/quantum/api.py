@@ -17,6 +17,7 @@ from enzy_htp.structure import (
     Structure,
     StructureEnsemble,
     create_region_from_selection_pattern,
+    create_region_from_full_stru,
     StructureConstraint
 )
 
@@ -170,7 +171,7 @@ def single_point(
         # stru_region
         if not regions:
             # whole
-            qm_region = None
+            qm_region = create_region_from_full_stru(stru_esm.structure_0)
         else:
             qm_region = create_region_from_selection_pattern(
                 stru_esm.structure_0,

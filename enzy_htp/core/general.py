@@ -301,6 +301,6 @@ def get_localtime(time_stamp: float = None) -> str:
         return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time_stamp))
 
 
-def get_itself(input: Any) -> Any:
+def get_itself(input_data: Any) -> Any:
     """a function that return the input itself"""
-    return input
+    return input_data

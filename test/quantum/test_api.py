@@ -33,6 +33,8 @@ def test_single_point_gaussian_lv1():
     level 1:
     - full structure (only 1 ligand)
     - single snapshot"""
+    assert not os.path.exists(f"{WORK_DIR}/QM_SPE/gaussian_spe.gjf")
+
     test_stru = sp.get_structure(f"{DATA_DIR}H5J.pdb")
     test_stru.assign_ncaa_chargespin({"H5J" : (0,1)})
     test_method = QMLevelOfTheory(
@@ -57,7 +59,8 @@ def test_single_point_gaussian_lv1():
         cluster_job_config=cluster_job_config,
         job_check_period=10,
         work_dir=f"{WORK_DIR}/QM_SPE/"
-    )[0]
+    )
+    qm_result = qm_result[0]
 
     assert np.isclose(qm_result.energy_0, -597.293275805, atol=1e-3)
     assert not os.path.exists(f"{WORK_DIR}/QM_SPE/gaussian_spe.gjf")
