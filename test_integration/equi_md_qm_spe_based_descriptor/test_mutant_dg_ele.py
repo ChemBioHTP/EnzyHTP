@@ -116,7 +116,7 @@ def workflow(
             prod_constrain=mut_constraints,
             prod_time=md_length,
             record_period=md_length*0.01,
-            work_dir=f"{mutant_dir}MD/"
+            work_dir=f"{mutant_dir}/MD/"
         )        
 
     # electronic structure
@@ -145,7 +145,7 @@ def workflow(
             for ele_stru in qm_results: # TODO make each API also handle list of them
                 dipole = bond_dipole(
                     ele_stru, bond_p1, bond_p2,
-                    work_dir=f"{mutant_dir}/bond_dipole")
+                    work_dir=f"{mutant_dir}/bond_dipole/")
                 field_strength = ele_field_strength_at_along(
                     ele_stru.geometry.topology, bond_p1, bond_p2, region_pattern=ef_region_pattern)
                 dg_ele = ele_stab_energy_of_bond(dipole[0], field_strength)
