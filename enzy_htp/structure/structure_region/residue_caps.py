@@ -412,6 +412,9 @@ class NHCH3Cap(ResidueCap):
             pt += (direction0*cap_bond_distance) + p0
             aa.coord = pt
 
+        if self.is_cterm_cap():
+            self.atoms[1].coord = np.array(self.socket_atom.parent.find_atom_name('H').coord)
+
     @property
     def cap_type(self) -> str:
         """This is the NHCH3/methylamide ResidueCap."""
