@@ -34,7 +34,7 @@ def single_point(
         # multi region case option
         regions: List[str]= None,
         region_methods: List[LevelOfTheory]= None,
-        capping_method: str = "res_ter_cap",
+        capping_method: str = "res_ter_cap", # TODO add the support for setting differnet caps
         embedding_method: str= "mechanical", # TODO probably not a good default choice
         parallel_method: str="cluster_job",
         cluster_job_config: Dict= None,

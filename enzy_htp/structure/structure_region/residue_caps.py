@@ -123,12 +123,11 @@ class ResidueCap(Residue, ABC):
         Returns:
             A copy of the ResidueCap() specialization applied to the supplied Structure().
         """
-        result = deepcopy(self) 
         link_residue_cpy:Residue    = geom.residue_mapper[self.link_residue.key()]
         link_atom_cpy:Atom          = link_residue_cpy.find_atom_name(self.link_atom.name)
         socket_atom_cpy:Atom        = geom.get(self.socket_atom.key)
 
-        result.__init__(link_residue_cpy, link_atom_cpy, socket_atom_cpy, self.term_type)
+        result = type(self)(link_residue_cpy, link_atom_cpy, socket_atom_cpy, self.term_type)
 
         return result
 

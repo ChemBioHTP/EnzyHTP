@@ -101,7 +101,7 @@ def test_single_point_gaussian_lv2():
         work_dir=f"{WORK_DIR}/QM_SPE/",
         )[0]
 
-    assert np.isclose(qm_result.energy_0, -1668.68154951, atol=1e-3)
+    assert np.isclose(qm_result.energy_0, -2169.29406633, atol=1e-3)
     assert not os.path.exists(f"{WORK_DIR}/QM_SPE/gaussian_spe.gjf")
 
     fs.safe_rm(f"{WORK_DIR}/QM_SPE/gaussian_spe.out")
@@ -150,7 +150,7 @@ def test_single_point_gaussian_lv3():
         )
 
     for qm_result in qm_results:
-        assert np.isclose(qm_result.energy_0, -1668, atol=5)
+        assert np.isclose(qm_result.energy_0, -2169, atol=5)
     fs.safe_rmdir(f"{WORK_DIR}/QM_SPE/")
 
 @pytest.mark.accre
