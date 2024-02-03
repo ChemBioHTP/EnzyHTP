@@ -115,7 +115,7 @@ def workflow(
             job_check_period=10,
             prod_constrain=mut_constraints,
             prod_time=md_length,
-            record_period=md_length*0.01,
+            record_period=md_length*0.1,
             work_dir=f"{mutant_dir}/MD/"
         )        
 
@@ -143,7 +143,7 @@ def workflow(
     # analysis
     # dGele
             for ele_stru in qm_results: # TODO make each API also handle list of them
-                dipole = bond_dipole(
+                dipole = bond_dipole( # take around 1.5 h for 100 frames.
                     ele_stru, bond_p1, bond_p2,
                     work_dir=f"{mutant_dir}/bond_dipole/")
                 field_strength = ele_field_strength_at_along(
@@ -165,7 +165,7 @@ def workflow(
 def test_kemp_elimiase():
     """test the workflow on a kemp elimiase"""
     wt_stru = sp.get_structure(f"{STRU_DATA_DIR}/KE_07_R7_2_S.pdb")
-    mutant_pattern = "WT, r:2[resi 254 around 4: all not self]*2"
+    mutant_pattern = "WT, r:2[resi 254 around 4 and not resi 101: all not self]*2"
     md_constraint = [
         partial(stru_cons.create_distance_constraint,
             "B.254.H2", "A.101.OE2", 2.4),
