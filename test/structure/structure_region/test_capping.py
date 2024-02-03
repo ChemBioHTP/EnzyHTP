@@ -37,9 +37,10 @@ def test_capping_with_residue_terminals_tri_a(helpers):
     assert len(test_region.atoms) == len(unique_names)
         
 
-def test_all_cap_types_supported():
-    """Checking that all the cap types that are supposed to work do not throw errors. This code basically back checks
-    the methods listed in a dict() so if one is not listed there, this test could pass but be incorrect.."""
+def test_capping_with_residue_terminals_cap_types_supported():
+    """Checking that all the cap types that are supposed to work do not throw errors using capping_with_residue_terminals().
+    This code basically back checks the methods listed in a dict() so if one is not listed there, this test could pass but 
+    be incorrect.."""
     test_stru = sp.get_structure(f"{DATA_DIR}tri_alanine.pdb")
     sele = stru_sele.select_stru(
         test_stru, "resi 2")
@@ -57,8 +58,9 @@ def test_all_cap_types_supported():
 
 
 
-def test_all_cap_types_unique_names():
-    """Checking that all the cap types do not conflict with any other atom names of other caps from the other terminus. 
+def test_capping_with_residue_terminals_cap_types_unique_names():
+    """Checking that all the cap types do not conflict with any other atom names of other caps from the other terminus 
+    for capping_with_residue_terminals().
     Atom names can be shared between different cterm caps, but no names can be shared between a cterm and nterm cap
     under ANY circumstances."""
     test_stru = sp.get_structure(f"{DATA_DIR}tri_alanine.pdb")
@@ -79,9 +81,11 @@ def test_all_cap_types_unique_names():
 
 
 
-def test_all_cap_types_have_realistic_bond_distances():
-    """Checking that all the cap types have realistic bond distances with their link Residue()'s and Atom()'s. This is a basic sanity check
-    without invoking a bunch of math that ensures the ResidueCap()'s are being put at reasonable distances from the original Residue()'s."""
+def test_capping_with_residue_terminals_realistic_bond_distances():
+    """Checking that all the cap types from capping_with_residue_terminals() have realistic bond distances with their link
+    Residue()'s and Atom()'s. This is a basic sanity check
+    without invoking a bunch of math that ensures the ResidueCap()'s are being put at reasonable distances
+    from the original Residue()'s."""
     test_stru = sp.get_structure(f"{DATA_DIR}tri_alanine.pdb")
     sele = stru_sele.select_stru(
         test_stru, "resi 2")
@@ -101,8 +105,9 @@ def test_all_cap_types_have_realistic_bond_distances():
 
 
 
-def test_correct_num_caps():
-    """Testing that the correct number of caps are made for a variety of setups and edge cases, i.e. the inclusion
+def test_capping_with_residue_terminals_correct_num_caps():
+    """Testing that the correct number of caps are made in capping_with_residue_terminals() for a variety of setups
+     and edge cases, i.e. the inclusion
     of an already n-terminal or c-terminal Residue()."""
 
     test_stru = sp.get_structure(f"{DATA_DIR}tri_alanine.pdb")
