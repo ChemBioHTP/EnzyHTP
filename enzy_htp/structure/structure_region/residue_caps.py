@@ -23,6 +23,7 @@ from __future__ import annotations
 from abc import abstractmethod, ABC
 from copy import deepcopy
 import numpy as np
+import numpy.typing as npt
 from scipy.spatial.transform import Rotation as R
 from typing import List, Tuple, Dict
 
@@ -30,7 +31,7 @@ from ..structure import Structure, Residue, Atom, Chain
 
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
-from enzy_htp.core.math_helper import rotation_matrix_from_vectors
+import enzy_htp.core.math_helper as mh
 from enzy_htp import chemical as chem
 
 
@@ -75,11 +76,41 @@ class ResidueCap(Residue, ABC):
             self.atoms = self.get_nterm_atoms()
         elif self.term_type == 'cterm':
             self.atoms = self.get_cterm_atoms()
+    
+        self.set_children(self.atoms)
 
         self.set_ghost_parent()
 
         self.anchor()
 
+
+    def cap_direction(self) -> npt.NDArray:
+        """What direction is the List[Atom] aligned to by default? Conventionally they are aligned to [1, 0, 0] by default."""
+        return np.array([1,0,0])
+
+
+    def align_rigid_atoms(self, atoms:List[Atom], d0 : npt.NDAarray, p0 : npt.NDArray, bd:float=None) -> None:
+        """Method that aligns a rigid List[Atom] to the supplied distance (d0) and from the given point (p0). There are overall 
+        two steps, rotation, and translation. Both are specified by parameters above.
+
+        Args:
+            atoms: The List[Atom] to rigidly rotate.
+            d0: The target direction.
+            p0: Starting point for translation in (x,y,z).
+            bd: How far should the List[Atom] be translated after rotating? Optional.
+
+        Returns:
+            Nothing.
+        """
+        rot_mat = mh.rotation_matrix_from_vectors(self.cap_direction(), d0)
+        if bd is None:
+            bd = self.CAP_BOND_DISTANCE[self.link_atom.name]
+
+        for aa in atoms:
+            pt = np.array(aa.coord)
+            pt = np.transpose(np.matmul(rot_mat, np.transpose( pt  )))
+            pt += (d0*bd) + p0
+            aa.coord = pt
 
     def apply_to_geom(self, geom:Structure) -> ResidueCap:
         """Create a copy of the current ResidueCap specialization and attach it to the same 
@@ -233,15 +264,14 @@ class HCap(ResidueCap):
 
     def anchor(self) -> None:
         """Straightforward anchoring that is identical for both n-terminal and c-terminal capping."""
-        p1 = np.array(self.link_atom.coord)
-        p2 = np.array(self.socket_atom.coord)
+        p0 = np.array(self.link_atom.coord)
+        p1 = np.array(self.socket_atom.coord)
 
-        direction = p2 - p1
-        direction /= np.linalg.norm(direction)
-    
-        cap_bond_distance = self.CAP_BOND_DISTANCE[self.link_atom.name]
+        d0 = mh.direction_unit_vector(p0, p1)
 
-        self.atoms[0].coord = p1 + cap_bond_distance*direction
+        d0 *= self.CAP_BOND_DISTANCE[self.link_atom.name]
+
+        self.atoms[0].coord = p0 + d0 
 
     def get_nterm_atoms(self) -> List[Atom]:
         """Create the default n-terminal version of the HCap with appropriate names."""
@@ -310,19 +340,12 @@ class CH3Cap(ResidueCap):
     def anchor(self) -> None:
         """Straightforward anchoring that is identical for both n-terminal and c-terminal capping."""
         
-        p1 = np.array(self.link_atom.coord)
-        p2 = np.array(self.socket_atom.coord)
+        p0 = np.array(self.link_atom.coord)
+        p1 = np.array(self.socket_atom.coord)
+        
+        d0 = mh.direction_unit_vector(p0, p1)
 
-        direction = p2 - p1
-        direction /= np.linalg.norm(direction)
-        rot_mat = rotation_matrix_from_vectors(np.array([1,0,0]), direction)
-        cap_bond_distance = self.CAP_BOND_DISTANCE[self.link_atom.name]
-
-        for aa in self.atoms:
-            pt = np.array(aa.coord)
-            pt = np.transpose(np.matmul(rot_mat, np.transpose( pt  )))
-            pt += (direction*cap_bond_distance) + p1 
-            aa.coord = pt
+        self.align_rigid_atoms(self.atoms, d0, p0)
 
 
 class NHCH3Cap(ResidueCap):
@@ -392,28 +415,22 @@ class NHCH3Cap(ResidueCap):
 
         if self.is_nterm_cap():
             _LOGGER.warning("WARNING: You are trying to add a methylamide cap on the n-terminal side of an amino acid!")
-        
-        p0 = np.array(self.link_atom.coord)
-        p1 = np.array(self.socket_atom.coord)
-        p2 = np.array(self.socket_atom.parent.find_atom_name('CA').coord)
-
-        direction0 = p1 - p0        
-        direction0 /= np.linalg.norm(direction0)
-        
-        direction = p2 - p1
-        direction /= np.linalg.norm(direction)
-        rot_mat = rotation_matrix_from_vectors(np.array([1,0,0]), direction)
-        
-        cap_bond_distance = self.CAP_BOND_DISTANCE[self.link_atom.name]
-
-        for aa in self.atoms:
-            pt = np.array(aa.coord)
-            pt = np.transpose(np.matmul(rot_mat, np.transpose( pt  )))
-            pt += (direction0*cap_bond_distance) + p0
-            aa.coord = pt
-
-        if self.is_cterm_cap():
+            self.atoms[0].coord = np.array(self.socket_atom.coord)
+            self.atoms[1].coord = np.array(self.socket_atom.parent.find_atom_name('O').coord)
+            d0 = mh.direction_unit_vector(np.array(self.atoms[0].coord), np.array(self.atoms[1].coord))
+            self.atoms[1].coord = np.array(self.atoms[0].coord) + 1.05*d0
+        else:
+            self.atoms[0].coord = np.array(self.socket_atom.coord)
             self.atoms[1].coord = np.array(self.socket_atom.parent.find_atom_name('H').coord)
+
+        for aa in self.atoms[2:]:
+            aa.coord = np.array(aa.coord) - np.array([1.5, 0, 0])
+        
+        p0 = np.array(self.socket_atom.coord)
+        p1 = np.array(self.socket_atom.parent.find_atom_name('CA').coord)
+        d0 = mh.direction_unit_vector(p0, p1)
+        self.align_rigid_atoms(self.atoms[2:], d0, p0, 1.4 )
+
 
     @property
     def cap_type(self) -> str:
@@ -466,47 +483,28 @@ class COCH3Cap(ResidueCap):
         if self.is_cterm_cap():
             _LOGGER.warning("WARNING: You are trying to add an acetyl cap on the c-terminal side of an amino acid!")
             self.atoms[0].coord = self.socket_atom.parent.find_atom_name('N').coord
-            self.atoms[1].coord =  self.socket_atom.parent.find_atom_name('H').coord
-            direction =  np.array(self.atoms[1].coord) - np.array(self.atoms[0].coord)
-            direction /= np.linalg.norm(direction)
-            self.atoms[1].coord = 1.2*direction + np.array(self.atoms[0].coord)
-            p0 = np.array(self.link_atom.coord)
-            p1 = np.array(self.socket_atom.coord)
-            p2 = np.array(self.socket_atom.parent.find_atom_name('CA').coord)
-
-            direction0 = p1 - p0        
-            direction0 /= np.linalg.norm(direction0)
+            self.atoms[1].coord = self.socket_atom.parent.find_atom_name('H').coord
             
-            direction = p2 - p1
-            direction /= np.linalg.norm(direction)
-            rot_mat = rotation_matrix_from_vectors(np.array([1,0,0]), direction)
+            p0 = np.array(self.atoms[0].coord)
+            p1 = np.array(self.atoms[1].coord)
             
-            cap_bond_distance = self.CAP_BOND_DISTANCE[self.link_atom.name]
-
-            for aa in self.atoms[2:]:
-                pt = np.array(aa.coord)
-                pt = np.transpose(np.matmul(rot_mat, np.transpose( pt  )))
-                pt += (direction0*cap_bond_distance) + p0
-                aa.coord = pt
-
+            d0 = mh.direction_unit_vector(p0, p1)
+           
+            self.atoms[1].coord = 1.2*d0 + p0 
+            
         elif self.is_nterm_cap():
             self.atoms[0].coord = self.socket_atom.parent.find_atom_name('C').coord
             self.atoms[1].coord = self.socket_atom.parent.find_atom_name('O').coord
-   
-            p0 = np.array(self.socket_atom.parent.find_atom_name('C').coord)
-            p1 = np.array(self.socket_atom.parent.find_atom_name('CA').coord)
 
-            direction0 = p1 - p0
-            direction0 /= np.linalg.norm(direction0)
-            rot_mat = rotation_matrix_from_vectors(np.array([1,0,0]), direction0)
-            cap_bond_distance = self.CAP_BOND_DISTANCE[self.link_atom.name]
 
-            for aa in self.atoms[2:]:
-                pt = np.array(aa.coord)
-                pt = np.transpose(np.matmul(rot_mat, np.transpose( pt  )))
-                pt += p0
-                aa.coord = pt
+        for aa in self.atoms[2:]:
+            aa.coord = np.array(aa.coord) - np.array([1.507, 0.0, 0.0])
 
+        p0 = np.array(self.socket_atom.coord)
+        p1 = np.array(self.socket_atom.parent.find_atom_name('CA').coord)
+
+        d0 = mh.direction_unit_vector(p0, p1)
+        self.align_rigid_atoms(self.atoms[2:], d0, p0, 1.4 )
 
     def net_charge(self) -> int:
         """Net charge always zero for this neutral group."""
