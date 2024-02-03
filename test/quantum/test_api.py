@@ -115,7 +115,7 @@ def test_single_point_gaussian_lv3():
     level 3:
     - 1 structure region
     - 100 snapshots"""
-    test_stru = sp.get_structure(f"{STRU_DATA_DIR}KE_07_R7_2_S.pdb")
+    test_stru = sp.get_structure(f"{STRU_DATA_DIR}KE_07_R7_2_S_geom_1.pdb")
     test_traj = f"{STRU_DATA_DIR}KE_07_R7_2_S_10f.mdcrd"
     test_prmtop = f"{STRU_DATA_DIR}KE_07_R7_2_S_10f.prmtop"
     test_esm = StructureEnsemble(
@@ -142,7 +142,7 @@ def test_single_point_gaussian_lv3():
         stru=test_esm,
         engine="gaussian",
         method=test_method,
-        regions=["br. (resi 254 around 2)"],
+        regions=["br. (resi 11+128+202)"],
         cluster_job_config=cluster_job_config,
         job_check_period=10,
         job_array_size=5,
