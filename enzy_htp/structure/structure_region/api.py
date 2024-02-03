@@ -56,6 +56,9 @@ def create_region_from_selection_pattern(
     # select
     stru_sele = select_stru(stru, pattern)
     raw_region = StructureRegion(atoms=stru_sele.atoms)
+    if not raw_region.atoms:
+        _LOGGER.error("region have no atoms! check your strutcure/pattern")
+        raise ValueError
     # capping
     if capping_method not in CAPPING_METHOD_MAPPER:
         _LOGGER.error(f"capping method ({capping_method}) not supported. Supported: {CAPPING_METHOD_MAPPER.keys()}")
