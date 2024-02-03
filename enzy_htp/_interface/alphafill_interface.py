@@ -107,4 +107,5 @@ class AlphaFillInterface(BaseInterface):
 
         results = self.env_manager_.run_command(self.config_.ALPHAFILL_EXE,
                                                 ["--config", self.config_.CONFIG_FILE, "process", molfile, outfile])
+        fs.safe_rm(temp_path)
         return (outfile, json_outfile)

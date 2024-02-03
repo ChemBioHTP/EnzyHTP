@@ -2,6 +2,7 @@
 operations on it. Place holder for uncategorized functions.
 
 Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-09-19
 """
 
@@ -104,6 +105,7 @@ def update_residues(stru: Structure, ref_stru: Structure) -> Structure:
         if self_res.name != ref_res.name:
             _LOGGER.info(f"updating {self_res.key()} {self_res.name} to {ref_res.name}")
             self_res.name = ref_res.name
+        
         self_res.atoms = copy.deepcopy(ref_res.atoms)  # this will also set self_res as parent
     stru.renumber_atoms()
     return stru

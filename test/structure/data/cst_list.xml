@@ -1,0 +1,23 @@
+<StructureConstraints>
+
+    <ResiduePairConstraint>
+        <Residue1 chain="A" idx="1" atoms="N,CA,C"/>
+        <Residue2 chain="A" idx="3" atoms="N,CA,C"/>
+
+        <distanceAB target_value="2.5" penalty="500.0" tolerance="0.5" />
+        <angle_A target_value="109.2" penalty="50.0" tolerance="20.0" />
+        <angle_B target_value="180.0" penalty="50.0" tolerance="20.0" />
+
+    </ResiduePairConstraint>
+
+    <DistanceConstraint atom1="A.1.N" atom2="A.3.N" target_value="3.14" rosetta_tolerance="0.25"/>
+
+    <AngleConstraint atom1="A.1.N" atom2="A.1.CA" atom3="A.1.C" target_value="70.0"/>
+    
+    <DihedralConstraint atom1="A.1.N" atom2="A.1.CA" atom3="A.1.C" atom4="A.2.N" target_value="100"/>
+    
+    <CartesianFreeze atoms="A.1.N,A.1.CA,A.1.C,A.2.N,A.2.CA,A.2.C" />
+
+    <BackBoneFreeze />
+
+</StructureConstraints>

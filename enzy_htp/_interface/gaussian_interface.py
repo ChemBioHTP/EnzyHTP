@@ -140,6 +140,11 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
         """getter for _region"""
         return self._region
 
+    @region.setter
+    def region(self, val: StructureRegion) -> None:
+        """getter for _region"""
+        self._region = val
+
     @property
     def keep_geom(self) -> bool:
         """getter for _keep_geom"""

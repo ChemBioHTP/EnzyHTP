@@ -290,5 +290,7 @@ class Mole2Interface(BaseInterface):
         result:List[Mole2Cavity] = list()
         for mf in mesh_files:
             result.append(self._parse_cavity(mf, probe, inner, mesh_density))
-                    
+
+        fs.safe_rm(xml_file)
+        
         return result

@@ -277,3 +277,13 @@ def rotation_matrix_from_vectors(vec1, vec2): # TODO complete type hinting
 def _remove_dummy_point(coord: List[npt.NDArray]) -> List[npt.NDArray]:
     """remove the first 3 dummy points"""
     return coord[3:]
+
+
+def direction_unit_vector(p1:npt.NDArray, p2:npt.NDArray) ->  npt.NDArray:
+    """Calculates the unit vector from p1 to p2, where p1 and p2 are both.  The resulting
+    vector "points" from p1 to p2. Requires that both p1 and p2 are numpy arrays."""
+
+    result = p2 - p1
+
+    return result / np.linalg.norm(result)
+

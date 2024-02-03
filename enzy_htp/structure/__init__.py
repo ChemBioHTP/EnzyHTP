@@ -23,6 +23,13 @@ from .chain import Chain
 from .structure import Structure
 from .structure_ensemble import StructureEnsemble
 from .structure_io import PDBParser, Mol2Parser, PrepinParser
+
+from .structure_region import (
+    StructureRegion,
+    create_region_from_selection_pattern,
+    create_region_from_full_stru,
+)
+
 from .structure_constraint import (
     StructureConstraint,
     CartesianFreeze,
@@ -30,15 +37,15 @@ from .structure_constraint import (
     AngleConstraint,
     DihedralConstraint,
     ResiduePairConstraint,
+    structure_constraints_from_xml,
     create_residue_pair_constraint,
-    structure_constraints_from_xml 
-)
-
-from .structure_region import (
-    StructureRegion,
-    create_region_from_selection_pattern,
-    create_region_from_residue_keys,
-    create_region_from_full_stru,
+    create_cartesian_freeze,
+    create_backbone_freeze,
+    create_distance_constraint,
+    create_angle_constraint,
+    create_dihedral_constraint,
+    merge_cartesian_freeze,
+    create_hydrogen_bond_freeze 
 )
 
 from .structure_selection_class import StruSelection

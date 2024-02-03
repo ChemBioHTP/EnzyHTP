@@ -75,7 +75,7 @@ class StructureEnsemble:
             topology=stru,
             top_parser=get_itself,
             coordinate_list=[stru],
-            coord_parser=get_itself,
+            coord_parser=iter,
         )
 
     # region == special ==

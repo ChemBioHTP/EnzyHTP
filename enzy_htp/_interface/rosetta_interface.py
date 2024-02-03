@@ -798,7 +798,7 @@ class RosettaInterface(BaseInterface):
             end = 0                
             if rule.is_angle_constraint() or rule.is_dihedral_constraint():
                 end = 1
-            cst_content.append(f"   CONSTRAINT::  {rname:>10}: {float(rule.target_value):6.2f} {float(rule.params['tolerance']):6.2f} {float(rule.params['penalty']):6.2f} {end}")
+            cst_content.append(f"   CONSTRAINT::  {rname:>10}: {float(rule.target_value):6.2f} {float(rule.params['rosetta']['tolerance']):6.2f} {float(rule.params['rosetta']['penalty']):6.2f} {end}")
 
         cst_content.append("CST::END")
 
@@ -825,14 +825,14 @@ class RosettaInterface(BaseInterface):
                         ridx_1:int=stru.absolute_index(child_cst.atoms[0].parent, indexed=1)
                         ridx_2:int=stru.absolute_index(child_cst.atoms[1].parent, indexed=1)
                         lines.append(
-                            f"AtomPair {child_cst.atoms[0].name} {ridx_1} {child_cst.atoms[1].name} {ridx_2} LINEAR_PENALTY {child_cst.target_value:.2f} 0.00 {child_cst['tolerance']:.2f} {child_cst['penalty']:.2f}"
+                            f"AtomPair {child_cst.atoms[0].name} {ridx_1} {child_cst.atoms[1].name} {ridx_2} LINEAR_PENALTY {child_cst.target_value:.2f} 0.00 {child_cst['rosetta']['tolerance']:.2f} {child_cst['rosetta']['penalty']:.2f}"
                         )
                     elif child_cst.is_angle_constraint():
                         ridx_1:int=stru.absolute_index(child_cst.atoms[0].parent, indexed=1)
                         ridx_2:int=stru.absolute_index(child_cst.atoms[1].parent, indexed=1)
                         ridx_3:int=stru.absolute_index(child_cst.atoms[2].parent, indexed=1)
                         lines.append(
-                            f"Angle {child_cst.atoms[0].name} {ridx_1} {child_cst.atoms[1].name} {ridx_2} {child_cst.atoms[2].name} {ridx_3} LINEAR_PENALTY {np.radians(child_cst.target_value):.2f} 0.00 {np.radians(child_cst['tolerance']):.2f} {child_cst['penalty']/np.radians(1):.2f}"
+                            f"Angle {child_cst.atoms[0].name} {ridx_1} {child_cst.atoms[1].name} {ridx_2} {child_cst.atoms[2].name} {ridx_3} LINEAR_PENALTY {np.radians(child_cst.target_value):.2f} 0.00 {np.radians(child_cst['rosetta']['tolerance']):.2f} {child_cst['rosetta']['penalty']/np.radians(1):.2f}"
                         )
                     else:
                         assert False
@@ -879,5 +879,23 @@ class RosettaInterface(BaseInterface):
     
         return (pdb_file, cst_file)
 
+
+    def score_energy(self, cst) -> float: 
+        """TODO(CJ): add documentation"""
+
+        if cst.is_residue_pair_constraint():
+            total:float = 0.0
+            for (_,child_cst) in self.child_constraints:
+                total += self.score_energy(child_cst)
+            return total
+
+        penalty:float = cst['rosetta']['penalty'] 
+        tolerance:float = cst['rosetta']['tolerance']
+        difference:float = abs(cst.current_geometry() - cst.target_value)
+        
+        if difference <= tolerance:
+            return 0.0
+        else:
+            return penalty * (difference - tolerance)
 
 

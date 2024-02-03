@@ -463,7 +463,13 @@ class PyMolInterface(BaseInterface):
             cmd_str: str = f"{cmd_name}({','.join(map(str, cmd_args))})"
             try:
                 fxn = getattr(session.cmd, cmd_name)
-                if len(cmd_set) > 1:
+                if cmd_name == 'alter' and len(cmd_set) == 3:
+                    #TODO(CJ): add some more checking here
+                    result.append(session.cmd.alter(
+                        cmd_set[1], cmd_set[2]
+                    ))
+                elif len(cmd_set) > 1:
+                    
                     result.append(fxn(*cmd_args))
                 else:
                     result.append(fxn())
@@ -541,7 +547,17 @@ class PyMolInterface(BaseInterface):
         lines = list(filter(lambda ll: ll[0] != '>', lines))
         return ''.join(lines)
 
-    def remove_ligand_bonding(self, session): #TODO(CJ): bad name here
+    def remove_ligand_bonding(self, session: pymol2.PyMOL, clash_cutoff:float=2.0) -> None: #TODO(CJ): bad name here
+        """Given a session with some already present molecule, remove the bonding in between residues presumably due
+        to clashes. Essentially loops through all atoms and unbonds if they are within the specified clash_cutoff.
+
+        Args:
+            session: The pymol session all molecular information is stored inside of.
+            clash_cutoff: How close can two atoms be before they are bonded? Default is 2.0 angstroms.
+
+        Returns:
+            Nothing.
+        """
 
         self.general_cmd(session, [('set', 'retain_order', 1)])       #NOTE(CJ): this solves so many problems
         #TODO(CJ): need to add 
@@ -559,7 +575,7 @@ class PyMolInterface(BaseInterface):
         args = list()
         for i, row in df.iterrows():
             for i2, row2 in df2.iterrows():
-                if dist(row.point, row2.point) <= 2:
+                if dist(row.point, row2.point) <= clash_cutoff:
                     args.append(('unbond',
                         f"chain {row.chain} and resi {row.resi} and resn {row.resn}",
                         f"chain {row2.chain} and resi {row2.resi} and resn {row2.resn}",
@@ -651,7 +667,7 @@ class PyMolInterface(BaseInterface):
         return np.mean(np.array([df.x.to_numpy(), df.y.to_numpy(), df.z.to_numpy()]),axis=1)
 
     def fetch(self, code: str, out_dir: str = None) -> str:
-        """
+        """Given a 
 
         Args:
             code:
@@ -675,6 +691,9 @@ class PyMolInterface(BaseInterface):
             outfile = fs.safe_mv(outfile, f"{out_dir}/")
         #TODO(CJ): check if the file is downloaded
         return outfile
+
+
+    
 
     def get_residue_list(self, session, stru, sele_str:str='all', work_dir:str=None) -> List[Tuple[str,int]]:
         #TODO(CJ): add this documentation + type hinting
@@ -700,6 +719,35 @@ class PyMolInterface(BaseInterface):
 
         return result 
 
+    
+    def get_atom_mask(self, session, stru:Structure, sele_str:str=None, work_dir:str=None) -> List[bool]:
+        #TODO(CJ): this stuff
+
+        
+        if work_dir is None:
+            work_dir = './'
+
+        temp_file:str = f"{work_dir}/__temp_pymol.pdb"
+        _parser = PDBParser()
+        _parser.save_structure(temp_file, stru)
+
+        session = self.new_session()
+
+        df:pd.DataFrame = self.collect(session, temp_file, "chain resi name".split(), sele=sele_str)
+        
+        fs.safe_rm( temp_file )
+
+        sele_set = set()
+
+        for i, row in df.iterrows():
+            sele_set.add(f"{row['chain']}.{row['resi']}.{row['name']}")
+
+        mask:List[bool] = list()
+
+        for atom in stru.atoms:
+            mask.append( atom.key in sele_set )            
+
+        return mask
 
 class OpenPyMolSession:
     """a context manager that open a pymol session once enter and close once exit"""

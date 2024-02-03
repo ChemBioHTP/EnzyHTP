@@ -732,7 +732,7 @@ class Structure(DoubleLinkedNode):
 
     @dispatch
     def add(self, target: Residue, # pylint: disable=function-redefined
-            sort: bool = False, chain_name:str=None) -> None: 
+            sort: bool = False, chain_name:str=None, net_charge:int=None, multiplicity:int=None) -> None: 
         """add a residue into the structure."""
         res_type = target.rtype
         if res_type in [ResidueType.CANONICAL,
@@ -744,6 +744,13 @@ class Structure(DoubleLinkedNode):
                           ResidueType.SOLVENT,
                           ResidueType.UNKNOWN]:
             # always make a new chain as they are not covalently connected
+            if res_type == ResidueType.LIGAND:
+                if net_charge is not None:
+                    target.net_charge = net_charge                    
+                
+                if multiplicity is not None:
+                    target.multiplicity = multiplicity
+                
             if not chain_name:
                 chain_name = self._legal_new_chain_names()[0]
 
@@ -769,15 +776,23 @@ class Structure(DoubleLinkedNode):
             for ch in self:
                 ch.sort_residues()
 
-    @dispatch
     def absolute_index(self, target:Residue, indexed:int=0) -> int:
+        """Find the absolute index of a given Residue with a given indexing convention. Exits when the supplied target
+        Residue cannot be found.
 
+        Args:
+            target: The Residue whose index you want to find.
+            indexed: What is the indexing convention you want? (i.e. 0 vs 1).
+
+        Returns:
+            The specified index of the target residue, if present. 
+        """
         for ridx, res in enumerate(self.residues):
             if res == target:
                 return ridx + indexed
-
         else:
-            assert False
+            _LOGGER.error(f"The supplied target residue {target} is not part of this Structure. You may have copied your Structure at some point! Exiting...")
+            exit( 1 )
 
     def assign_ncaa_chargespin(self, net_charge_mapper: Dict[str, Tuple[int, int]]):
         """assign net charges to NCAAs in Structure() based on net_charge_mapper

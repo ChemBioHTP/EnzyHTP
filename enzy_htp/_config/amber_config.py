@@ -149,7 +149,7 @@ class AmberConfig(BaseConfig):
 
     # region == Default values for StructureConstrain ==
     SUPPORTED_CONSTRAINT_TYPE = ["cartesian_freeze", "backbone_freeze", "distance_constraint",
-                                 "angle_constraint", "dihedral_constraint"]
+                                 "angle_constraint", "dihedral_constraint", "residue_pair_constraint"]
 
     DEFAULT_CARTESIAN_FREEZE_WEIGHT = 2.0
     """the default value for restraint_wt that used in CartesianFreeze.
@@ -254,7 +254,7 @@ class AmberConfig(BaseConfig):
 
     def valid_box_type(self) -> bool:
         """Checks if the BOX_TYPE attribute is an acceptable value. Current allowed values are "box" and "oct"."""
-        return self.BOX_TYPE in set("box oct".split())
+        return self.DEFAULT_SOLVATE_BOX_TYPE in set("box oct".split())
 
     def required_executables(self) -> List[str]:
         """A hardcoded list of required executables for Amber."""

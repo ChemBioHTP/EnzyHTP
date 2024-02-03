@@ -203,7 +203,6 @@ def check_not_empty(fname: str) -> None:
 
     Returns:
         Nothing.
-
     """
 
     check_file_exists(fname)
