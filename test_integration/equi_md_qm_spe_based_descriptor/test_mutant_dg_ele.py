@@ -3,6 +3,7 @@ stablization energy upon mutants for different systems.
 
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2023-09-25"""
+from pathlib import Path
 import pytest
 import os
 import pickle
@@ -163,7 +164,9 @@ def workflow(
 @pytest.mark.accre
 @pytest.mark.temp
 def test_kemp_elimiase():
-    """test the workflow on a kemp elimiase"""
+    """test the workflow on a kemp elimiase
+    the result of a passed test is saved to data/ but due to the randomness
+     of MD it is hard to compare"""
     wt_stru = sp.get_structure(f"{STRU_DATA_DIR}/KE_07_R7_2_S.pdb")
     mutant_pattern = "WT, r:2[resi 254 around 4 and not resi 101: all not self]*2"
     md_constraint = [
@@ -179,6 +182,7 @@ def test_kemp_elimiase():
         wt_stru.ligands[0].find_atom_name("CAE"),
         wt_stru.ligands[0].find_atom_name("H2")
     )
+    result = f"{WORK_DIR}ke_test_result.pickle"
 
     workflow(
         wt_stru = wt_stru,
@@ -190,5 +194,14 @@ def test_kemp_elimiase():
         qm_level_of_theory = qm_level_of_theory,
         target_bond = target_bond,
         ef_region_pattern = "chain A and (not resi 101)",
-        result_path = f"{WORK_DIR}ke_test_result.pickle", 
+        result_path = result, 
     )
+
+    assert Path(result).exists()
+    with open(result, "rb") as f:
+        result_dict = pickle.load(f)
+        assert len(result_dict) == 3
+        assert len(list(result_dict.keys())[1]) == 2
+        result_0 = list(result_dict.values())[0]
+        assert len(result_0) == 3
+        assert len(result_0[0]) == 10
