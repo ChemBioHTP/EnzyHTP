@@ -2,6 +2,7 @@
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2023-12-29
 """
+from pathlib import Path
 import re
 import pytest
 import os
@@ -551,6 +552,10 @@ def test_run_formchk():
     test_chk = f"{DATA_DIR}test.chk"
     test_fchk = f"{WORK_DIR}test.fchk"
     gi.run_formchk(test_chk, test_fchk)
+
+    assert Path(test_fchk).exists()
+    # clean up
+    fs.safe_rm(test_fchk)
 
 def test_run_formchk_wrong():
     """test as name. Need to load Gaussian env first.
