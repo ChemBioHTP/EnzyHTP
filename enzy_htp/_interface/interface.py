@@ -26,6 +26,7 @@ from .amber_interface import amber_interface
 from .alphafill_interface import AlphaFillInterface
 from .bcl_interface import BCLInterface
 from .gaussian_interface import gaussian_interface
+from .modeller_interface import ModellerInterface
 from .moe_interface import MOEInterface
 from .mole2_interface import Mole2Interface
 from .multiwfn_interface import MultiwfnInterface
@@ -47,7 +48,8 @@ class Interface:
         amber: Corresponds to instance of AmberInterface().
         alphafill: Corresponds to instance of AlphaFillInterface().
         bcl: Corresponds to instance of BCLInterface().
-        gaussian: Corresponds to instnce of GaussianInterface().
+        gaussian: Corresponds to instance of GaussianInterface().
+        modeller: Corresponds to instance of ModellerInterface().
         moe: Corresponds to instance of MOEInterface().
         mole2: Corresponds to instance of Mole2Interface().
         multiwfn: Corresponds to instance of MultiwfnInterface().
@@ -66,6 +68,7 @@ class Interface:
         self.bcl = BCLInterface(self, config._bcl)
         gaussian_interface.set_parent(self)
         self.gaussian = gaussian_interface
+        self.modeller = ModellerInterface(self, config._modeller)
         self.moe = MOEInterface(self, config._moe)
         self.mole2 = Mole2Interface(self, config._mole2)
         self.multiwfn = MultiwfnInterface(self, config._multiwfn)

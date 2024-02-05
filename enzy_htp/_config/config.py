@@ -11,6 +11,7 @@ there are configuration settings for the below packages by the given <Package>Co
     + AmberMD, AmberConfig
     + BCL, BCLConfig
     + Gaussian, GaussianConfig
+    + Modeller ModellerConfig
     + MOE, MOEConfig
     + Mole2, Mole2Config
     + Multiwfn, MultiwfnConfig
@@ -34,6 +35,7 @@ from .alphafill_config import AlphaFillConfig, default_alphafill_config
 from .amber_config import AmberConfig, default_amber_config
 from .bcl_config import BCLConfig, default_bcl_config
 from .gaussian_config import GaussianConfig, default_gaussian_config
+from .modeller_config import ModellerConfig, default_modeller_config
 from .moe_config import MOEConfig, default_moe_config
 from .mole2_config import Mole2Config, default_mole2_config
 from .multiwfn_config import MultiwfnConfig, default_multiwfn_config
@@ -58,6 +60,7 @@ class Config:
         _amber: Private instance of AmberConfig() with default settings.
         _bcl: Private instance of BCLConfig() with default settings.
         _gaussian: Private instance of GaussianConfig() with default settings.
+        _modeller: Private instance of ModellerConfig() with default settings.
         _moe: Private instance of MOEConfig() with default settings.
         _mole2: Private instance of Mole2Config() with default settings.
         _multiwfn: Private instance of MultiwfnConfig() with default settings.
@@ -77,6 +80,7 @@ class Config:
         self._bcl = default_bcl_config()
         self._gaussian = default_gaussian_config()
         self._multiwfn = default_multiwfn_config()
+        self._modeller = default_modeller_config()
         self._moe = default_moe_config()
         self._mole2 = default_mole2_config()
         self._pymol = default_pymol_config()
