@@ -544,3 +544,20 @@ def test_is_gaussian_completed():
 
     test_gout = f"{DATA_DIR}incomplete_spe.out"
     assert not gi.is_gaussian_completed(test_gout)
+
+def test_run_formchk():
+    """test as name. Need to load Gaussian env first.
+    make sure it passes without error."""
+    test_chk = f"{DATA_DIR}test.chk"
+    test_fchk = f"{WORK_DIR}test.fchk"
+    gi.run_formchk(test_chk, test_fchk)
+
+def test_run_formchk_wrong():
+    """test as name. Need to load Gaussian env first.
+    make sure errors throws out when wrong files are provideded."""
+    test_fchk = f"{WORK_DIR}test.fchk"
+    with pytest.raises(FileNotFoundError) as exe:
+        gi.run_formchk("dne", test_fchk)
+
+    with pytest.raises(ValueError) as exe:
+        gi.run_formchk(f"{DATA_DIR}puo_put.pdb", test_fchk)

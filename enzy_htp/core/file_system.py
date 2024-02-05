@@ -191,6 +191,7 @@ def check_file_exists(fname: str, exit_script: bool = True) -> None:
         _LOGGER.error(f"The file '{fname}' does not exist. Exiting...")
         exit(1)
     else:
+        _LOGGER.error(f"The file '{fname}' does not exist. Exiting...")
         raise FileNotFoundError(f"The file '{fname}' does not exist.")
 
 

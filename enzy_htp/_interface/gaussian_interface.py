@@ -762,7 +762,13 @@ class GaussianInterface(BaseInterface):
     def run_formchk(self, chk_file: str, out_path: str) -> str:
         """interface for running formchk
         return the out_path"""
-        self.env_manager_.run_command("formchk", [chk_file, out_path])
+        # san check
+        fs.check_file_exists(chk_file, exit_script=False)
+        if fs.get_file_ext(chk_file) != ".chk":
+            _LOGGER.error(f"formchk expect .chk file. (got: {chk_file})")
+            raise ValueError
+
+        self.env_manager_.run_command(self.config_.FORMCHK_EXE, [chk_file, out_path])
         return out_path
 
     # -- cubegen --
