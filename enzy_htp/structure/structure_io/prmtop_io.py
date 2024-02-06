@@ -67,10 +67,35 @@ class PrmtopParser(StructureParserInterface):
                 raise ValueError
         
         # build atoms (contain charge)
+        atoms = type(self)._build_atoms(data)
+
+        # build residues
+        residue_mapper = type(self)._build_residues(data, atoms, add_solvent_list, add_ligand_list, path)
+
+        # build chains
+        chains = PDBParser._build_chains(residue_mapper, False)
+
+        # build structure
+        result = Structure(chains)
+        result.assign_ncaa_chargespin(self.ncaa_chrgspin_mapper)
+
+        return result
+
+    @classmethod
+    def _build_atoms(cls, data: Dict) -> List[Atom]:
+        """build atoms step during get_structure"""
         atoms = []
         atom_data_list = zip(data["ATOM_NAME"], data["CHARGE"], data["ATOMIC_NUMBER"], data["ATOM_NUMBER"])
+        taken_idx = []
         for name, charge, ele_num, idx in atom_data_list:
+            # fix charge
             charge = charge / 18.2223 # unit: e
+            # fix index
+            if idx == 1:
+                if 1 in taken_idx:
+                    # fix index when duplicated
+                    idx = cls._get_next_legal_atom_idx(taken_idx)
+
             atom = Atom(
                 name = name,
                 coord = (None, None, None),
@@ -78,15 +103,27 @@ class PrmtopParser(StructureParserInterface):
                 element = str(periodictable.elements[ele_num]),
                 charge = charge,
             )
+            taken_idx.append(idx)
             atoms.append(atom)
 
-        # build residues
+        return atoms
+
+    @classmethod
+    def _build_residues(
+            cls,
+            data: Dict, 
+            atoms: List[Atom], 
+            add_solvent_list: List, 
+            add_ligand_list: List,
+            path: str
+        ) -> Dict[str, Residue]:
+        """build residues step during get_structure"""
         residue_mapper = defaultdict(list)
         next_pointers = data["RESIDUE_POINTER"][1:] + [None]
         residue_data_list = zip(data["RESIDUE_LABEL"], data["RESIDUE_POINTER"], next_pointers, data["RESIDUE_CHAINID"], data["RESIDUE_NUMBER"])
         taken_ch_ids = set(data["RESIDUE_CHAINID"])
         legal_ch_ids = PDBParser._get_legal_pdb_chain_ids(taken_ch_ids)
-        legal_res_idx = type(self)._get_legal_residue_idx(data["RESIDUE_NUMBER"])
+        legal_res_idx = cls._get_legal_residue_idxes(data["RESIDUE_NUMBER"])
         solvent_list = ["Na+", "Cl-"] + RD_SOLVENT_LIST + add_solvent_list
         for name, pointer, next_pointer, chain_id, idx in residue_data_list:
             # resolve chain id
@@ -100,7 +137,7 @@ class PrmtopParser(StructureParserInterface):
                                   f"residue {name} from {path} dont have a chain id.")
                     raise ValueError
             # resolve pointer
-            res_atoms = type(self)._resolve_residue_pointer(pointer, next_pointer, atoms)
+            res_atoms = cls._resolve_residue_pointer(pointer, next_pointer, atoms)
             # resolve missing residue index
             if idx == 0:
                 if name in solvent_list:
@@ -118,14 +155,7 @@ class PrmtopParser(StructureParserInterface):
         # categorize_residue
         PDBParser._categorize_pdb_residue(residue_mapper, add_solvent_list, add_ligand_list)
 
-        # build chains
-        chains = PDBParser._build_chains(residue_mapper, False)
-
-        # build structure
-        result = Structure(chains)
-        result.assign_ncaa_chargespin(self.ncaa_chrgspin_mapper)
-
-        return result
+        return residue_mapper
 
     @classmethod
     def _resolve_residue_pointer(cls, pointer: int, next_pointer: int, atoms: List[Atom]) -> List[Atom]:
@@ -139,12 +169,19 @@ class PrmtopParser(StructureParserInterface):
             return atoms[pointer:next_pointer]
  
     @classmethod
-    def _get_legal_residue_idx(cls, taken_ids: List) -> List:
+    def _get_legal_residue_idxes(cls, taken_ids: List) -> List:
         """get legal residue indexes"""
         max_id = max(taken_ids)
         result = list(range(max_id+1, max_id+10000))
         return list(reversed(result))
-    
+
+    @classmethod
+    def _get_next_legal_atom_idx(cls, taken_ids: List) -> int:
+        """get the next legal atom indexes"""
+        max_id = max(taken_ids)
+        result = max_id + 1
+        return result
+
     @classmethod
     def get_file_str(cls, stru: Structure) -> str:
         """convert a Structure() to .prmtop file content."""
@@ -697,4 +734,5 @@ class PrmtopParser(StructureParserInterface):
         result = {}
 
         return result
+    
     # endregion

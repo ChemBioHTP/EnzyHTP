@@ -30,3 +30,22 @@ def test_ele_field_strength_at():
     )
 
     assert np.isclose(result, -7.825612571555479, atol=0.0001)
+
+def test_ele_field_strength_at_diff_atom_source():
+    """as name. Use data from a real project using EnzyHTP 1.0
+    as example. use atoms from the WT"""
+    test_stru = sp.get_structure(f"{DATA_DIR}KE_mutant_101_254_frame_0.pdb")
+    test_stru_wt = sp.get_structure(f"{STRU_DATA_DIR}KE_07_R7_2_S.pdb")
+    test_stru.assign_ncaa_chargespin({"H5J" : (0,1)})
+    target_bond = (
+        test_stru_wt.ligands[0].find_atom_name("CAE"),
+        test_stru_wt.ligands[0].find_atom_name("H2")
+    )
+
+    result = ele_field_strength_at_along(
+        test_stru, 
+        *target_bond, 
+        region_pattern="chain A and (not resi 101)",
+    )
+
+    assert np.isclose(result, -7.825612571555479, atol=0.0001)

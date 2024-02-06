@@ -8,6 +8,7 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-07-01
 """
 from collections import defaultdict
+import copy
 import re
 import shutil
 from pathlib import Path
@@ -15,6 +16,7 @@ from typing import List, Dict, Tuple, Union
 import numpy as np
 
 from .base_interface import BaseInterface
+from .gaussian_interface import gaussian_interface
 
 from enzy_htp.core import file_system as fs
 from enzy_htp.core.logger import _LOGGER
@@ -78,21 +80,35 @@ class MultiwfnInterface(BaseInterface):
             Multiwfn {wfn_file} < {instr_file} > output
             the result location depends on the app.
             (e.g.: for bond dipole it will be in ./LMOdip.txt)"""
+        # deal with non-accepting wfn_files
+        temp_path_list = []
+        if fs.get_file_ext(wfn_file) == ".chk":
+            temp_dir = eh_config['system.SCRATCH_DIR']
+            fs.safe_mkdir(temp_dir)
+            temp_fchk_file = fs.get_valid_temp_name(f"{temp_dir}/temp_for_multiwfn.fchk")
+            wfn_file = gaussian_interface.run_formchk(wfn_file, temp_fchk_file)
+            temp_path_list.extend([temp_fchk_file, temp_dir])
+
+        # make settings.ini
+
+        # region deprocated NOTE we didnt use this for fchk conversion because multiwfn have a string length limit I guess so
+        # it mess up with the cmd when the path is too long.
+        # multiwfn_settings = "settings.ini"
+        # if Path(multiwfn_settings).exists():
+        #     with open(multiwfn_settings, "r+") as f:
+        #         if "formchkpath" not in f.read():
+        #             f.write(f'formchkpath= "{shutil.which("formchk")}"')
+        # else:
+        #     with open(multiwfn_settings, "w") as f:
+        #         f.write(f'formchkpath= "{shutil.which("formchk")}"')
+        # endregion
+
+        if additional_settings:
+            raise Exception("TODO")
+
         multiwfn_exe = self.get_multiwfn_executable()
         multiwfn_args = f"{wfn_file} < {instr_file} > {log_path} 2>&1"
         multiwfn_cmd = f"{multiwfn_exe} {multiwfn_args}"
-
-        # make settings.ini
-        multiwfn_settings = "settings.ini"
-        if Path(multiwfn_settings).exists():
-            with open(multiwfn_settings, "r+") as f:
-                if "formchkpath" not in f.read():
-                    f.write(f'formchkpath= "{shutil.which("formchk")}"')
-        else:
-            with open(multiwfn_settings, "w") as f:
-                f.write(f'formchkpath= "{shutil.which("formchk")}"')     
-        if additional_settings:
-            raise Exception("TODO")
 
         # dispatch for running types
         if cluster_job_config is None:
@@ -102,7 +118,8 @@ class MultiwfnInterface(BaseInterface):
                 args=multiwfn_args,
             )
             self.check_multiwfn_error(log_path, this_spe_run)
-
+            # clean up
+            fs.clean_temp_file_n_dir(temp_path_list)
             return None
 
         elif job_check_period is None:
@@ -122,6 +139,9 @@ class MultiwfnInterface(BaseInterface):
                 res_keywords=res_keywords,
                 sub_dir="./",  # because path are relative
                 sub_script_path=sub_script_path)
+            job.mimo = {
+                "temp_path_list" : temp_path_list
+            }
             return job
 
     def check_multiwfn_error(self, out_file, stdstream_source):
@@ -142,6 +162,9 @@ class MultiwfnInterface(BaseInterface):
                         **kwargs) -> Tuple[float, Tuple[float]]:
         """get bond dipole using wfn analysis with fchk files.
         TODO we also want to support single-center in some day?
+        NOTE maybe dont use the cluster_job model as it might take too
+        long to queue and config the node. (originally secs now mins)
+        TODO support wait_to_array_end and batch processing.
 
         Args:
             ele_stru:
@@ -191,9 +214,13 @@ class MultiwfnInterface(BaseInterface):
             cluster_job_config = self.config().get_default_bond_dipole_cluster_job_config()
         elif cluster_job_config is not None:
             # For res_keywords, it updates the default config
+            cluster_job_config = copy.deepcopy(cluster_job_config)
             res_keywords_update = cluster_job_config["res_keywords"]
             default_res_keywords = self.config().get_default_bond_dipole_res_keywords()
             cluster_job_config["res_keywords"] = default_res_keywords | res_keywords_update
+        # init for atoms
+        atom_1 = ele_stru.geometry.topology.get_corresponding_atom(atom_1)
+        atom_2 = ele_stru.geometry.topology.get_corresponding_atom(atom_2)
 
         # prepare path
         wfn_file = ele_stru.mo
@@ -226,6 +253,7 @@ class MultiwfnInterface(BaseInterface):
             self.check_multiwfn_error(log_path, job)
             clean_targets.append(job.job_cluster_log)
             clean_targets.append(job.sub_script_path)
+            clean_targets.extend(job.mimo["temp_path_list"])
 
         # collect the ./LMOdip.txt file and clean up
         fs.safe_mv("LMOdip.txt", result_file)
