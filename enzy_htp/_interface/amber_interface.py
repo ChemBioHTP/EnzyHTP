@@ -7,6 +7,7 @@ Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-02
 """
+import copy
 import glob
 import os
 import re
@@ -103,7 +104,7 @@ class AmberParameter(MolDynParameter):
         result *= Path(self._inpcrd).exists()
         result *= Path(self._prmtop).exists()
         # file size not zero
-        result *= os.path.getsize(self._inpcrd) != 0
+        result *= os.path.getsize(self._inpcrd) != 0 #TODO(CJ): use the function I already implemented for this
         result *= os.path.getsize(self._prmtop) != 0
         # TODO add upon need
         return bool(result)
@@ -701,6 +702,7 @@ class AmberMDStep(MolDynStep):
 
         return result
 
+
     def _make_mdin_file(self) -> str:
         """make a temporary mdin file.
         *path* is based on self.work_dir and self.name.
@@ -1251,6 +1253,42 @@ class AmberInterface(BaseInterface):
         aid_mapper = self.get_amber_index_mapper(stru)
         return [aid_mapper["atom"][at] for at in atoms]
 
+
+    def rename_atoms(self, stru: Structure) -> None: # TODO(high piror) move to structure_io https://github.com/ChemBioHTP/EnzyHTP/pull/162#discussion_r1473217587
+        """Renames residues and atoms to be compatible with Amber naming and functions.
+        
+        Args:
+            stru: The Structure() to perform renaming on.
+
+        Returns:
+            Nothing. 
+        """
+        nterm_mapper:Dict = {"H1":"1H", "H2":"2H", "H3":"3H"}
+        leu_mapper:Dict = {
+            "1HD1":"HD11",
+            "2HD1":"HD12",
+            "3HD1":"HD13",
+            "1HD2":"HD21",
+            "2HD2":"HD22",
+            "3HD2":"HD23",
+            }
+        _LOGGER.info("Beginning renaming...")
+        changed_residues:int = 0
+        changed_atoms:int = 0
+        for res in stru.residues:
+            if not res.is_canonical():
+                continue
+            
+
+            if res.name == 'LEU':
+                for aa in res.atoms:
+                    if aa.name in leu_mapper:
+                        aa.name = leu_mapper[aa.name]
+                        changed_atoms += 1                            
+        
+        _LOGGER.info(f"Finished renaming! Changed {changed_residues} residues and {changed_atoms} atoms.")
+
+
     def get_amber_residue_index(self, residues: List[Atom]) -> List[int]:
         """"""
         raise Exception("TODO")
@@ -1531,7 +1569,6 @@ class AmberInterface(BaseInterface):
         }
 
         return raw_dict
-
     def _parse_cons_to_raw_rs_dict(self, cons: StructureConstraint) -> Dict:
         """parse StructureConstraint() to a raw dict for writing the DISANG file.
         Expression containing value are also parsed in this function.
@@ -1694,6 +1731,7 @@ class AmberInterface(BaseInterface):
         return the executable and mpi prefix if needed."""
         result = self.config()["HARDCODE_MD_ENGINE"][core_type]
         if core_type == "cpu":
+            
             mpi_exec = eh_config._system.get_mpi_executable(num_cores)
             result = f"{mpi_exec} {result}"
         return result
@@ -2132,6 +2170,7 @@ class AmberInterface(BaseInterface):
             cluster_job_config = self.config().get_default_md_cluster_job(core_type)
         else:
             # For res_keywords, it updates the default config
+            cluster_job_config = copy.deepcopy(cluster_job_config)
             res_keywords_update = cluster_job_config["res_keywords"]
             default_res_keywords = self.config().get_default_md_cluster_job_res_keywords(core_type)
             cluster_job_config["res_keywords"] = default_res_keywords | res_keywords_update
@@ -2139,6 +2178,7 @@ class AmberInterface(BaseInterface):
             record_period = self.config()["DEFAULT_MD_RECORD_PERIOD_FACTOR"] * length
         if work_dir == "default":
             work_dir = self.config()["DEFAULT_MD_WORK_DIR"]
+            
 
         return AmberMDStep(
             interface = self,

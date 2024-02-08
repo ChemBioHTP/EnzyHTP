@@ -18,6 +18,7 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-06-11
 """
 from __future__ import annotations
+import copy
 import os
 import re
 from pathlib import Path
@@ -139,6 +140,11 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
     def region(self) -> StructureRegion:
         """getter for _region"""
         return self._region
+
+    @region.setter
+    def region(self, val: StructureRegion) -> None:
+        """getter for _region"""
+        self._region = val
 
     @property
     def keep_geom(self) -> bool:
@@ -298,7 +304,7 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
             # collect error info
             error_info_list = []
             # 1. stdout stderr
-            # error types: Fall of bus, periodic box has changed too much, illegel mem
+            # error types: TODO add comment here
             if isinstance(stdstream_source, ClusterJob):
                 with open(stdstream_source.job_cluster_log) as f:
                     stderr_stdout = f.read()
@@ -758,9 +764,17 @@ class GaussianInterface(BaseInterface):
         raise Exception("TODO")
 
     # -- formchk --
-    def run_formchk(self):
-        """interface for running formchk"""
-        raise Exception("TODO")
+    def run_formchk(self, chk_file: str, out_path: str) -> str:
+        """interface for running formchk
+        return the out_path"""
+        # san check
+        fs.check_file_exists(chk_file, exit_script=False)
+        if fs.get_file_ext(chk_file) != ".chk":
+            _LOGGER.error(f"formchk expect .chk file. (got: {chk_file})")
+            raise ValueError
+
+        self.env_manager_.run_command(self.config_.FORMCHK_EXE, [chk_file, out_path])
+        return out_path
 
     # -- cubegen --
     def run_cubegen(self):
@@ -843,6 +857,7 @@ class GaussianInterface(BaseInterface):
             cluster_job_config = self.config().get_default_qm_spe_cluster_job_config()
         else:
             # For res_keywords, it updates the default config
+            cluster_job_config = copy.deepcopy(cluster_job_config) # because we will change it in place.
             res_keywords_update = cluster_job_config["res_keywords"]
             default_res_keywords = self.config().get_default_qm_spe_cluster_job_res_keywords()
             cluster_job_config["res_keywords"] = default_res_keywords | res_keywords_update
@@ -1233,16 +1248,6 @@ class GaussianInterface(BaseInterface):
         # 4
 
         return add_prm
-
-    def get_fchk(self, chks: List[str]) -> List[str]:
-        """TODO"""
-        result: List[str] = list()
-        for chk in chks:
-            fchk = str(Path(chk).with_suffix(".fchk"))
-            result.append(fchk)
-            self.env_manager_.run_command("formchk", [chk, fchk])
-
-        return result
 
     # endregion
 

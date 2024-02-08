@@ -17,7 +17,7 @@ from enzy_htp import interface
 from enzy_htp import PDBParser
 from enzy_htp.quantum import single_point
 from enzy_htp.structure.structure_ensemble import StructureEnsemble
-from enzy_htp.structure.structure_region.api import create_region_from_selection_pattern
+from enzy_htp.structure.structure_region import create_region_from_selection_pattern
 
 DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/data/"
 STRU_DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/../structure/data/"
@@ -33,6 +33,8 @@ def test_single_point_gaussian_lv1():
     level 1:
     - full structure (only 1 ligand)
     - single snapshot"""
+    assert not os.path.exists(f"{WORK_DIR}/QM_SPE/gaussian_spe.gjf")
+
     test_stru = sp.get_structure(f"{DATA_DIR}H5J.pdb")
     test_stru.assign_ncaa_chargespin({"H5J" : (0,1)})
     test_method = QMLevelOfTheory(
@@ -57,7 +59,8 @@ def test_single_point_gaussian_lv1():
         cluster_job_config=cluster_job_config,
         job_check_period=10,
         work_dir=f"{WORK_DIR}/QM_SPE/"
-    )[0]
+    )
+    qm_result = qm_result[0]
 
     assert np.isclose(qm_result.energy_0, -597.293275805, atol=1e-3)
     assert not os.path.exists(f"{WORK_DIR}/QM_SPE/gaussian_spe.gjf")
@@ -98,7 +101,7 @@ def test_single_point_gaussian_lv2():
         work_dir=f"{WORK_DIR}/QM_SPE/",
         )[0]
 
-    assert np.isclose(qm_result.energy_0, -1668.68154951, atol=1e-3)
+    assert np.isclose(qm_result.energy_0, -2169.29406633, atol=1e-3)
     assert not os.path.exists(f"{WORK_DIR}/QM_SPE/gaussian_spe.gjf")
 
     fs.safe_rm(f"{WORK_DIR}/QM_SPE/gaussian_spe.out")
@@ -112,7 +115,7 @@ def test_single_point_gaussian_lv3():
     level 3:
     - 1 structure region
     - 100 snapshots"""
-    test_stru = sp.get_structure(f"{STRU_DATA_DIR}KE_07_R7_2_S.pdb")
+    test_stru = sp.get_structure(f"{STRU_DATA_DIR}KE_07_R7_2_S_geom_1.pdb")
     test_traj = f"{STRU_DATA_DIR}KE_07_R7_2_S_10f.mdcrd"
     test_prmtop = f"{STRU_DATA_DIR}KE_07_R7_2_S_10f.prmtop"
     test_esm = StructureEnsemble(
@@ -139,7 +142,7 @@ def test_single_point_gaussian_lv3():
         stru=test_esm,
         engine="gaussian",
         method=test_method,
-        regions=["br. (resi 254 around 2)"],
+        regions=["br. (resi 11+128+202)"],
         cluster_job_config=cluster_job_config,
         job_check_period=10,
         job_array_size=5,
@@ -147,7 +150,7 @@ def test_single_point_gaussian_lv3():
         )
 
     for qm_result in qm_results:
-        assert np.isclose(qm_result.energy_0, -1668, atol=5)
+        assert np.isclose(qm_result.energy_0, -2169, atol=5)
     fs.safe_rmdir(f"{WORK_DIR}/QM_SPE/")
 
 @pytest.mark.accre

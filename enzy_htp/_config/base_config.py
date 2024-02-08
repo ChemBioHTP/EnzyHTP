@@ -51,7 +51,7 @@ class BaseConfig(ABC):
             The value associated with the attribute.
         """
         if not hasattr(self, key):
-            _LOGGER.error(f"The Config object has not attribute {key}. Exiting...")
+            _LOGGER.error(f"The Config object has no attribute {key}. Exiting...")
             exit(1)
 
         return getattr(self, key)
@@ -67,7 +67,7 @@ class BaseConfig(ABC):
             Nothing.
         """
         if not hasattr(self, key):
-            _LOGGER.error(f"The Config object has not attribute {key}. Exiting...")
+            _LOGGER.error(f"The Config object has no attribute {key}. Exiting...")
             exit(1)
 
         setattr(self, key, value)

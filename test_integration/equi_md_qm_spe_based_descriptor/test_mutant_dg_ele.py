@@ -3,6 +3,7 @@ stablization energy upon mutants for different systems.
 
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2023-09-25"""
+from pathlib import Path
 import pytest
 import os
 import pickle
@@ -78,9 +79,10 @@ def workflow(
 
     # mutation
     mutants = assign_mutant(wt_stru, mutant_pattern, chain_sync_list, chain_index_mapper)
-    for mut in mutants:
+    for i, mut in enumerate(mutants):
         if tuple(mut) in result_dict:
             continue
+        mutant_dir = f"{WORK_DIR}mutant_{i}"
         mutant_result = []
         mutant_stru = mutate_stru(wt_stru, mut, engine="pymol")
         mutant_stru.assign_ncaa_chargespin(ligand_chrg_spin_mapper)
@@ -100,7 +102,7 @@ def workflow(
             "cluster" : Accre(),
             "res_keywords" : {
                 "account" : "csb_gpu_acc",
-                "partition" : "maxwell"
+                "partition" : "pascal"
             }
         }
         mut_constraints = []
@@ -114,8 +116,8 @@ def workflow(
             job_check_period=10,
             prod_constrain=mut_constraints,
             prod_time=md_length,
-            record_period=md_length*0.01,
-            work_dir=f"{WORK_DIR}MD/"
+            record_period=md_length*0.1,
+            work_dir=f"{mutant_dir}/MD/"
         )        
 
     # electronic structure
@@ -136,20 +138,18 @@ def workflow(
                 cluster_job_config=qm_cluster_job_config,
                 job_check_period=60,
                 job_array_size=20,
-                work_dir=f"{WORK_DIR}/QM_SPE/",
+                work_dir=f"{mutant_dir}/QM_SPE/",
             )
 
     # analysis
     # dGele
-            for ele_stru in qm_results:
-                dipole = bond_dipole(
+            for ele_stru in qm_results: # TODO make each API also handle list of them
+                dipole = bond_dipole( # take around 1.5 h for 100 frames.
                     ele_stru, bond_p1, bond_p2,
-                    cluster_job_config=qm_cluster_job_config | {
-                        "walltime" : "30:00",
-                    })
+                    work_dir=f"{mutant_dir}/bond_dipole/")
                 field_strength = ele_field_strength_at_along(
                     ele_stru.geometry.topology, bond_p1, bond_p2, region_pattern=ef_region_pattern)
-                dg_ele = ele_stab_energy_of_bond(dipole, field_strength)
+                dg_ele = ele_stab_energy_of_bond(dipole[0], field_strength)
 
                 replica_result.append((dg_ele, dipole, field_strength))
 
@@ -164,9 +164,11 @@ def workflow(
 @pytest.mark.accre
 @pytest.mark.temp
 def test_kemp_elimiase():
-    """test the workflow on a kemp elimiase"""
+    """test the workflow on a kemp elimiase
+    the result of a passed test is saved to data/ but due to the randomness
+     of MD it is hard to compare"""
     wt_stru = sp.get_structure(f"{STRU_DATA_DIR}/KE_07_R7_2_S.pdb")
-    mutant_pattern = "WT, r:2[resi 254 around 4: all not self]*2"
+    mutant_pattern = "WT, r:2[resi 254 around 4 and not resi 101: all not self]*2"
     md_constraint = [
         partial(stru_cons.create_distance_constraint,
             "B.254.H2", "A.101.OE2", 2.4),
@@ -180,6 +182,7 @@ def test_kemp_elimiase():
         wt_stru.ligands[0].find_atom_name("CAE"),
         wt_stru.ligands[0].find_atom_name("H2")
     )
+    result = f"{WORK_DIR}ke_test_result.pickle"
 
     workflow(
         wt_stru = wt_stru,
@@ -191,5 +194,14 @@ def test_kemp_elimiase():
         qm_level_of_theory = qm_level_of_theory,
         target_bond = target_bond,
         ef_region_pattern = "chain A and (not resi 101)",
-        result_path = f"{WORK_DIR}ke_test_result.pickle", 
+        result_path = result, 
     )
+
+    assert Path(result).exists()
+    with open(result, "rb") as f:
+        result_dict = pickle.load(f)
+        assert len(result_dict) == 3
+        assert len(list(result_dict.keys())[1]) == 2
+        result_0 = list(result_dict.values())[0]
+        assert len(result_0) == 3
+        assert len(result_0[0]) == 10

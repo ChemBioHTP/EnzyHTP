@@ -62,6 +62,28 @@ activate_env() {
     fi
 }
 
+# Function for yes/no prompt, called when the target environment is 'base'.
+prompt_yes_no() {
+    while true; do
+        read -p "$1 (yes/no): " yn
+        case $yn in
+            [Yy]* ) break;;
+            [Nn]* ) exit;;
+            * ) echo "Please answer yes or no.";;
+        esac
+    done
+}
+
+# Function to check if the environment exists and create it if not
+check_and_create_env() {
+    if ! conda info --envs | grep "$target_env_name" > /dev/null; then
+        echo "Environment $target_env_name does not exist. Creating..."
+        conda create -n "$target_env_name" python=3.9 --yes
+    else
+        echo "Environment $target_env_name exists."
+    fi
+}
+
 # Function to update the conda environment
 update_env() {
     echo "Updating conda environment: $target_env_name"
@@ -76,12 +98,24 @@ current_env_name=$(basename "$current_env_path")
 
 echo "Installing EnzyHTP to Conda environment: $target_env_name"
 
+
+# Check if the user is about to install in the base environment
+if [[ "$target_env_name" == "base" ]]; then
+    prompt_yes_no "You are about to install EnzyHTP in the base environment. Are you sure you want to continue?"
+fi
+
 # Compare current environment with env_name
 if [ "$current_env_name" = "$target_env_name" ]; then
     echo "Deactivating current environment $current_env_name"
     conda deactivate
     update_env
 else
+    # Check and create environment if necessary.
+    check_and_create_env
+
+    # After checking, perform update.
     update_env
     conda deactivate
 fi
+
+cd $initial_dir

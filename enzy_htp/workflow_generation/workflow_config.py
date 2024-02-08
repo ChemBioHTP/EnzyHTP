@@ -43,6 +43,7 @@ demo_json = {
         "api" : "remove_hydrogens",
         "name" : "remove_hydrogens_0",
         "args" : {
+            "stru" : "read_pdb_0",
             "polypeptide_only" : True,
             }
         },
@@ -77,7 +78,7 @@ demo_json = {
                 "name" : "mutate_stru_0",
                 "args" : {
                     "stru" : "protonate_stru",
-                    "mutant" : "loop_data",
+                    "mutant" : "loop_0",
                     "engine" : "pymol",
                     }
                 },
@@ -125,13 +126,13 @@ demo_json = {
                         "api" : "loop",
                         "name" : "loop_0_0_0",
                         "args" : {
-                            "data" : "loop_data",
+                            "data" : "loop_0_0",
                             "actions" : [ # target metrics goes here
                                 {   
                                 "api" : "ele_field_strength_at_along",
                                 "name" : "ef_0",
                                 "args" : {
-                                    "stru" : "loop_data",
+                                    "stru" : "loop_0_0_0",
                                     "p1" : "A.1.CA",
                                     "p2" : "A.1.CB",
                                     }

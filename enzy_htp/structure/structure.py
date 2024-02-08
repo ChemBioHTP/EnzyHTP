@@ -270,6 +270,11 @@ class Structure(DoubleLinkedNode):
         """number of Atom()s"""
         return len(self.atoms)
 
+    @property
+    def atom_idx_list(self) -> List[int]:
+        """a list of atom indexes as the order of .atoms"""
+        return [a.idx for a in self.atoms]
+
     def find_atoms_in_range(self, center: Union[Atom, Tuple[float, float, float]], range_distance: float) -> List[Atom]:
         """find atoms in {range} of {center}. return a list of atoms found"""
         result = []
@@ -526,6 +531,16 @@ class Structure(DoubleLinkedNode):
 
         return result
 
+    def get_corresponding_atom(self, other_atom: Atom) -> Atom:
+        """get the corresponding atom based on an Atom from another 
+        Structure with the same/subset topology"""
+        # 1. san check TODO figure out a way to check this.
+
+        # 2. find atom
+        result = self.get(other_atom.key)
+
+        return result
+
     # endregion
 
     #region === Checker ===
@@ -651,6 +666,30 @@ class Structure(DoubleLinkedNode):
             if self_atom.key != other_atom.key:
                 return False
         return True
+
+    def is_topology_subset(self, other: Structure) -> bool:
+        """determine whether other is in a subset topology
+        of self"""
+        result = 1
+        for name, chain in other.chain_mapper.items():
+            if name in self.chain_mapper:
+                self_chain = self.chain_mapper[name]
+                for res in chain.residues:
+                    self_res = self_chain.find_residue_idx(res.idx)
+                    if self_res:
+                        if self_res.name == res.name:
+                            for atom in res.atoms:
+                                self_atom = self_res.find_atom_name(atom.name)
+                                if not self_atom: # need to have the same atom
+                                    return False
+                        else: # need to be the same residue under the index
+                            return False
+                    else: # need to have same residue index
+                        return False
+            else: # need to have same chain id
+                return False
+        return True                      
+
     #endregion
 
     #region === Editor ===
@@ -732,7 +771,7 @@ class Structure(DoubleLinkedNode):
 
     @dispatch
     def add(self, target: Residue, # pylint: disable=function-redefined
-            sort: bool = False, chain_name:str=None) -> None: 
+            sort: bool = False, chain_name:str=None, net_charge:int=None, multiplicity:int=None) -> None: 
         """add a residue into the structure."""
         res_type = target.rtype
         if res_type in [ResidueType.CANONICAL,
@@ -744,6 +783,13 @@ class Structure(DoubleLinkedNode):
                           ResidueType.SOLVENT,
                           ResidueType.UNKNOWN]:
             # always make a new chain as they are not covalently connected
+            if res_type == ResidueType.LIGAND:
+                if net_charge is not None:
+                    target.net_charge = net_charge                    
+                
+                if multiplicity is not None:
+                    target.multiplicity = multiplicity
+                
             if not chain_name:
                 chain_name = self._legal_new_chain_names()[0]
 
@@ -769,15 +815,23 @@ class Structure(DoubleLinkedNode):
             for ch in self:
                 ch.sort_residues()
 
-    @dispatch
     def absolute_index(self, target:Residue, indexed:int=0) -> int:
+        """Find the absolute index of a given Residue with a given indexing convention. Exits when the supplied target
+        Residue cannot be found.
 
+        Args:
+            target: The Residue whose index you want to find.
+            indexed: What is the indexing convention you want? (i.e. 0 vs 1).
+
+        Returns:
+            The specified index of the target residue, if present. 
+        """
         for ridx, res in enumerate(self.residues):
             if res == target:
                 return ridx + indexed
-
         else:
-            assert False
+            _LOGGER.error(f"The supplied target residue {target} is not part of this Structure. You may have copied your Structure at some point! Exiting...")
+            exit( 1 )
 
     def assign_ncaa_chargespin(self, net_charge_mapper: Dict[str, Tuple[int, int]]):
         """assign net charges to NCAAs in Structure() based on net_charge_mapper

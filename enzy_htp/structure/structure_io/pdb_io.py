@@ -51,7 +51,7 @@ class PDBParser(StructureParserInterface):
 
     # interface
     @classmethod
-    def get_structure(cls,
+    def get_structure(cls, # TODO(high piror) add atom naming aligment https://github.com/ChemBioHTP/EnzyHTP/pull/162#discussion_r1473217587
                       path: str,
                       model: int = 0,
                       add_solvent_list: List = None,

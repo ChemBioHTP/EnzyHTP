@@ -5,12 +5,11 @@ Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-03-19
 """
-# TODO(CJ): figure out how to inherit docstrings to the children classes.
 from __future__ import annotations
 import copy
 import sys
 import math
-from typing import Tuple, List
+from typing import Tuple, List, Union
 
 
 import numpy as np
@@ -135,6 +134,15 @@ class Residue(DoubleLinkedNode):
             return chem.convert_to_one_letter(self.name)
         return f" {self.name} "
 
+    def has_atom_name(self, name:str) -> bool:
+        """Does the Residue() contain an atom with the specified name? """
+        for aa in self.atoms:
+            if aa.name == name:
+                return True
+
+        return False
+        
+
     def find_atom_name(self, name: str) -> Atom:
         """find child Atom base on its name"""
         result = list(filter(lambda a: a.name == name, self.atoms))
@@ -185,13 +193,25 @@ class Residue(DoubleLinkedNode):
             for name in atom_names:
                 result.append(self.find_atom_name(name))
         return result
-
-    # def clone(self) -> Residue: #TODO
-    #     """Creates a deepcopy of self."""
-    #     return deepcopy(self)
+    
+    @property
+    def hydrogens(self) -> List[Atom]:
+        """Return all the hydrogen atoms in the Residue/Ligand."""
+        result: List[Atom] = list(filter(lambda atom: atom.is_hydrogen() , self.atoms))
+        return result
 
     def clash_count(self, other:Residue, radius:float=2.0, ignore_H:bool=True) -> int:
-        #TODO(CJ): the documentation for this part
+        """Counts how many clashes exist between the current residue and another. The distance cutoff 
+        for each clash as well as whether Hydrogen atoms should be considered is determined by user parameters.
+
+        Args:
+            other: Ther other Residue() object to compare against.
+            radius: How many Angstroms can separate two atoms before they are clashing? Default is 2.0
+            ignore_H: Should Hydrogen atoms be considered for the clash count?
+
+        Returns:
+            The number of clashes between the Residue() and the other Residue().
+        """
         if self == other:
             _LOGGER.warning("Attempted to count clashes between Residue and itself.")
             return 0
@@ -206,13 +226,22 @@ class Residue(DoubleLinkedNode):
         return count
             
     def clashes(self, other:Atom, radius:float) -> bool:
-        #TODO(CJ): the documentation for this part
+        """Counts how many clashes exist between the current Residue and a given Atom(). The distance cutoff
+        for each clash is determined by user supplied parameters.
+
+        Args:
+            other: The Atom() to check for clashes with.
+            radius: How many Angstroms can separate two atoms before they are clashing?
+
+        Returns:
+            The number of clashes between the Atom() and the Residue().
+        """
         for aa in self.atoms:
             if aa.distance_to(other) <= radius:
                 return True
         return False
 
-    def c_side_residue(self):
+    def c_side_residue(self) -> Union["Residue", None]:
         """get the sibling Residue that connects to the C atom.
         return None if reached the chain terminal."""
         result = self.chain.find_residue_idx(self.idx + 1)
@@ -223,7 +252,7 @@ class Residue(DoubleLinkedNode):
                                 "It could be your index is not continous")
         return result
 
-    def n_side_residue(self):
+    def n_side_residue(self)-> Union["Residue", None]:
         """get the sibling Residue that connects to the N atom
         return None if reached the chain terminal."""
         result = self.chain.find_residue_idx(self.idx - 1)
@@ -301,6 +330,12 @@ class Residue(DoubleLinkedNode):
     def has_init_charge(self) -> bool:
         """check if self has charge"""
         return math.prod([atom.has_init_charge() for atom in self.atoms])  
+    
+    def has_hydrogens(self) -> bool:
+        """Does the residue contain hydrogen atoms?"""
+        element_list = self.element_composition
+        return ('H' in element_list)
+
     #endregion
 
     #region === Editor ===

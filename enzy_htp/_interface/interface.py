@@ -32,7 +32,7 @@ from .multiwfn_interface import MultiwfnInterface
 from .pymol_interface import PyMolInterface
 from .rdkit_interface import RDKitInterface
 from .rosetta_interface import RosettaInterface
-from .xtb_interface import XTBInterface
+from .xtb_interface import xtb_interface 
 
 from enzy_htp._config import Config
 
@@ -72,7 +72,8 @@ class Interface:
         self.pymol = PyMolInterface(self, config._pymol)
         self.rdkit = RDKitInterface(self, config._rdkit)
         self.rosetta = RosettaInterface(self, config._rosetta)
-        self.xtb = XTBInterface(self, config._xtb)
+        self.xtb = xtb_interface
+        xtb_interface.set_parent(self)
 
         self.check_environment()
 

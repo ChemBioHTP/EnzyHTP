@@ -41,6 +41,12 @@ def test_remove_non_peptide():
     stru_oper.remove_non_peptide(stru)
     assert tuple(map(lambda x: x.name, stru)) == ("A", "B")
 
+def test_remove_hydrogens(caplog):
+    pdb_file_path = f"{DATA_DIR}FAcD-FA-ASP_rmW.pdb"
+    stru: Structure = sp.get_structure(pdb_file_path)
+    ligand = stru.ligands[0]
+    ligand = stru_oper.remove_hydrogens(ligand)
+    assert not ligand.has_hydrogens()
 
 def test_update_residues():
     """test updating residues from a protonated structure"""

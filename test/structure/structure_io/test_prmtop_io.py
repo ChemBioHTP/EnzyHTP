@@ -27,6 +27,7 @@ def test_prmtop_parser_get_stru():
         "CAE","H2","NAG","OAH",
     ])
     assert test_stru.atoms[-1].charge == 0.417
+    assert test_stru.atom_idx_list.count(1) == 1
 
 def test_parse_version():
     """test using content from an example file: {DATA_DIR}/KE_07_R7_2_S_10f.prmtop"""

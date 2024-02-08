@@ -159,6 +159,7 @@ def _place_mole2(stru:Structure,
         for cst in constraints:
             if cst.is_residue_pair_constraint():
                 curr_energy += cst.distanceAB_.score_energy()
+            #TODO(CJ): add in the regular distance constraints
                 
         scores.append( curr_energy )            
 
@@ -228,7 +229,8 @@ def _place_alphafill(stru: Structure,
 
     parser = PDBParser()
     parser.save_structure(structure_start, stru)
-
+    
+    to_delete:List[str] = list()
 
     session = interface.pymol.new_session()
     interface.pymol.general_cmd(session, [
@@ -237,7 +239,6 @@ def _place_alphafill(stru: Structure,
         ('save', structure_start, 'polymer.protein'),
         ('delete', 'all')
     ])
-
 
     lines:List[str]=fs.lines_from_file(structure_start)
 
@@ -269,6 +270,7 @@ def _place_alphafill(stru: Structure,
             atom_names.append(set([row.analogue_id]))
             continue
         temp_file:str = interface.pymol.fetch(row.analogue_id, out_dir=work_dir)
+        to_delete.append( str(Path(temp_file).absolute()) )
         if row.analogue_id not in memo:
             interface.pymol.general_cmd(session, [('load', temp_file)])
             memo[row.analogue_id] = set(interface.pymol.collect(session, 'memory', 'name'.split())['name'].to_list())
@@ -304,7 +306,7 @@ def _place_alphafill(stru: Structure,
     reactant:str=f"{work_dir}/__temp_ligand.mol2"
     template:str=f"{work_dir}/__template_ligand.mol2"
     outfile:str=f"{work_dir}/__aligned_ligand.mol2"
-    to_delete:List[str] = [molfile, reactant, template, outfile]
+    to_delete.extend([molfile, reactant, template, outfile, structure_start, filled_structure, transplant_info_fpath])
 
     parser.save_structure(molfile, stru)
 

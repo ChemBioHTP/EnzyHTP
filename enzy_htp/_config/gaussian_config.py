@@ -38,6 +38,9 @@ class GaussianConfig(BaseConfig):
     GAUSSIAN_EXE: str = "g16"
     """Variable for the g16 version of Gaussian."""
 
+    FORMCHK_EXE: str = "formchk"
+    """Variable for the the exe of formchk."""
+
     # region == Default values for build_single_point_engine() ==
     DEFAULT_SPE_NAME: str = "gaussian_spe"
     """The default value for the name tag of the SPE engine"""
@@ -126,7 +129,7 @@ class GaussianConfig(BaseConfig):
 
     def required_executables(self) -> List[str]:
         """ """
-        return [self.GAUSSIAN_EXE, "formchk", "cubegen"]
+        return [self.GAUSSIAN_EXE, self.FORMCHK_EXE, "cubegen"]
 
     def required_env_vars(self):
         """ """

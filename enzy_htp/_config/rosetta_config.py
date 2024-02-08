@@ -6,7 +6,7 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-03-28
 """
 
-from typing import List, Any
+from typing import List, Any, Dict
 from copy import deepcopy
 
 from .base_config import BaseConfig
@@ -38,7 +38,21 @@ class RosettaConfig(BaseConfig):
     """Executable used to score a specific structure/pose."""
 
     PY_2_7: str = "python2.7"
-    """TODO(CJ)"""
+    """Executable or path to the python2.7 executable that Rosetta will use for miscellaneous scripts."""
+
+
+    DEFAULT_DISTANCE_CONSTRAINT_SETTING:Dict[str, float] = {
+        'tolerance': 0.5,
+        'penalty': 500.0
+    }
+    """Default distance constraints used for AtomPair constraints in Rosetta."""
+
+    DEFAULT_ANGLE_CONSTRAINT_SETTING:Dict[str, float] = {
+        'tolerance': 20.0,
+        'penalty': 50.0
+    }
+    """Default angle constraints used for Angle constraints in Rosetta."""
+
 
     def required_executables(self) -> List[str]:
         """A hardcoded list of required executables for Rosetta."""
