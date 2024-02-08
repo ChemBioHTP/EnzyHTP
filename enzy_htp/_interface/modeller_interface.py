@@ -2,6 +2,8 @@
 import os
 from typing import List
 
+from pathlib import Path
+
 from .base_interface import BaseInterface
 
 from enzy_htp import config
@@ -51,18 +53,23 @@ class ModellerInterface(BaseInterface):
 
         first_existing = None
         last_existing = None
-
+    
+        sidx:int=0
         for aidx, ar in enumerate(all_residues):
             
             if not ar.is_canonical():
                 continue
 
-
+            chain:Chain=stru.get_chain(ar.chain)
+            if chain is None:
+                continue
+            
             if aidx > 0 and (ar.chain != all_residues[aidx-1].chain):
                 current_seq += '/'                                
                 target_seq += '/'                                
             
-            ar.seq_idx = aidx
+            ar.seq_idx = sidx
+            sidx += 1
             target_seq += ar.one_letter()
             if ar.missing: 
                 current_seq += '-' 
@@ -80,7 +87,7 @@ class ModellerInterface(BaseInterface):
         align_file:str = f"{work_dir}/alignment.ali"
         temp_file:str = f"{work_dir}/modeller_temp.pdb"
 
-        sp.save_structure( temp_file, stru )
+        #sp.save_structure( temp_file, stru )
 
         lines:List[str] = [
             ">P1;modeller_temp",
@@ -92,29 +99,29 @@ class ModellerInterface(BaseInterface):
         ]
 
         fs.write_lines(align_file, lines)
-
-        log.none()
-        env = Environ()
-
-        start_dir:str=os.getcwd()
+#        #TODO(CJ): probably need to check for loops that are too long
+#        log.none()
+#        env = Environ()
+#
+        start_dir:str=f"{Path(os.getcwd()).absolute()}"
 
         os.chdir(work_dir)
         
-        # directories for input atom files
-        env.io.atom_files_directory = ['.', '../atom_files']
+#        # directories for input atom files
+#        env.io.atom_files_directory = ['.', '../atom_files']
+#        
+#        a = LoopModel(env, alnfile = 'alignment.ali',
+#                      knowns = 'modeller_temp', sequence = 'modeller_fill')
+#        a.starting_model= 1
+#        a.ending_model  = 1
+#        
+#        a.loop.starting_model = 1
+#        a.loop.ending_model   = 2
+#        a.loop.md_level       = refine.fast
+#        
+#        a.make()
         
-        a = LoopModel(env, alnfile = 'alignment.ali',
-                      knowns = 'modeller_temp', sequence = 'modeller_fill')
-        a.starting_model= 1
-        a.ending_model  = 1
-        
-        a.loop.starting_model = 1
-        a.loop.ending_model   = 2
-        a.loop.md_level       = refine.fast
-        
-        a.make()
-        
-        fs.safe_mv("modeller_fill.B99990001.pdb", "modeller_fill.pdb")
+#        fs.safe_mv("modeller_fill.B99990001.pdb", "modeller_fill.pdb")
 
         for tk in """modeller_fill.BL00010001.pdb
         modeller_fill.B99990001.pdb
@@ -156,7 +163,8 @@ class ModellerInterface(BaseInterface):
 
             if not stru.has_residue(key):
                 chain:Chain=stru.get_chain(ar.chain)
-                chain.add(fs_res, sort=False)
+                if chain is not None:
+                    chain.add(fs_res, sort=False)
 
         for chain in stru.chains:
             chain.sort_residues()

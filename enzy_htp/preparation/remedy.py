@@ -21,7 +21,8 @@ def add_missing_residues( stru: Structure,
                                 ) -> Union[None,Structure]:
 
 
-
+    if not missing_residues:
+        return #TODO(CJ): check if I need to return a cpy or not 
     interface.modeller.add_missing_residues( stru, missing_residues, work_dir=work_dir, inplace=inplace)
 
 def identify_missing_residues( code:str ) -> List[SeqRes]:
@@ -36,6 +37,9 @@ def identify_missing_residues( code:str ) -> List[SeqRes]:
     lines:List[str] = map(lambda ll: ll.decode('utf-8'), r.content.splitlines())
     lines:List[str] = list(filter(lambda ll: ll.startswith(marker), lines))
     lines.reverse()
+
+    if not lines:
+        return list()
     
     ll = lines.pop() 
     while ll.find('M RES C SSSEQI') == -1:
