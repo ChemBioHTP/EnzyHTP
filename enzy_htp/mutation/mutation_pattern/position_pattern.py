@@ -14,9 +14,17 @@ def decode_position_pattern(stru: Structure, pattern: str, if_name: bool = False
     TODO support customized position selector
     Args:
         stru: the Structure object of reference
-        pattern: a pymol-like syntax to select residue positions
-                 NOTE: the result is different from pymol's result
-                 that all non polypeptide part are filtered
+        pattern: 
+            1. a pymol-like syntax to select residue positions
+               NOTE: the result is different from pymol's result
+               that all non polypeptide part are filtered
+               example: "resi 254 around 5"
+            2. a pattern starts with "$" will be recognized to use
+               an internal EnzyHTP function to selected positions.
+               example: "$cone(B.254.CAE, B.254.H2, 10)" means residues
+               within a cone region that formed by points that have angle
+               <= 10 degree than vector from B.254.CAE to B.254.H2.
+
     Returns:
         (chain_id, resi_idx) to indicate a mutation position
         ((chain_id, resi_idx), resi_name)  if_name=True"""
