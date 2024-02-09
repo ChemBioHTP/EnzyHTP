@@ -81,3 +81,8 @@ def test_split_but_brackets():
 
     test_pattern = "'[1,1, [1,1]], (0,10,(1,1))"
     assert len(eg.split_but_brackets(test_pattern, ",")) == 2
+
+def test_split_but_brackets_more_layer():
+    """as name. a failed case. TODO"""
+    test_pattern = "'[1,1, [1,1], 1], (0,10,(1,1))"
+    assert len(eg.split_but_brackets(test_pattern, ",")) == 2
