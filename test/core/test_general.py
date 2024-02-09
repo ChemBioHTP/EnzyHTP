@@ -67,3 +67,17 @@ def test_capture_logging(capfd):
     captured = capfd.readouterr()
     assert "redirect" not in captured.err
     assert "restore" in captured.err
+
+def test_split_but_brackets():
+    """as name"""
+    test_pattern = "'B.254.CAE', 'B.254.H2', (0,10)"
+    assert len(eg.split_but_brackets(test_pattern, ",")) == 3
+
+    test_pattern = "[1,1], {2,2}, (0,10)"
+    assert len(eg.split_but_brackets(test_pattern, ",")) == 3
+
+    test_pattern = "[(1,1)], (0,10)"
+    assert len(eg.split_but_brackets(test_pattern, ",")) == 2
+
+    test_pattern = "'[1,1, [1,1]], (0,10,(1,1))"
+    assert len(eg.split_but_brackets(test_pattern, ",")) == 2
