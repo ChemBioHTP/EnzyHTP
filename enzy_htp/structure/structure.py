@@ -221,6 +221,13 @@ class Structure(DoubleLinkedNode):
         return result
 
     @property
+    def amino_acids(self) -> List[Residue]:
+        """Return a list of Residue()s that are amino_acid (i.e.: canonical, modified)
+        in the Structure() object"""
+        result = list(itertools.chain.from_iterable(self.polypeptides))
+        return result
+
+    @property
     def residue_mapper(self) -> Dict[Tuple[str, int], Residue]:
         """return a mapper of {(chain_id, residue_idx): Residue (reference)}"""
         result = {}
