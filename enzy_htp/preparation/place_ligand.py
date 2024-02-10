@@ -158,7 +158,7 @@ def _place_mole2(stru:Structure,
         curr_energy = 0.0
         for cst in constraints:
             if cst.is_residue_pair_constraint():
-                curr_energy += cst.distanceAB_.score_energy()
+                curr_energy += interface.rosetta.score_energy(cst.distanceAB_)
             #TODO(CJ): add in the regular distance constraints
                 
         scores.append( curr_energy )            
