@@ -39,7 +39,7 @@ SUB_MODULES=[
 if __name__ == '__main__':
     setup(
         name='enzy_htp',
-        version='0.2.0',
+        version='2.0.0',
         description='TODO',
         author='EnzyHTP Authors',
         author_email='zhongyue.yang@vanderbilt.edu',

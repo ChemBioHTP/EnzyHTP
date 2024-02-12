@@ -11,7 +11,7 @@ import itertools
 
 from enzy_htp.core.exception import InvalidMutationPatternSyntax
 from enzy_htp.core.logger import _LOGGER
-from enzy_htp.core.general import (get_random_list_elem, pop_random_list_elem, product_lists_allow_empty)
+from enzy_htp.core.general import (get_random_list_elem, pop_random_list_elem, product_lists_allow_empty, split_but_brackets)
 from enzy_htp.structure import Structure
 from ..mutation import (Mutation, generate_from_mutation_flag, generate_mutation_from_traget_list)
 from .position_pattern import decode_position_pattern
@@ -46,7 +46,7 @@ def decode_mutation_pattern(stru: Structure, pattern: str) -> List[List[Mutation
 
 def seperate_mutant_patterns(pattern: str) -> List[str]:
     """seperate a mutation pattern into pattern of each mutants"""
-    section_seperate_pattern = r"(?:[^,[{]|(?:\{[^\}]*\})|(?:\[[^\]]*\]))+[^,]*"
+    section_seperate_pattern = r"(?:[^,[{]|(?:\{[^\}]*\})|(?:\[[^\]]*\]))+[^,]*" #TODO use the one from general
     mutants = re.findall(section_seperate_pattern, pattern.strip())
     mutants = [i.strip() for i in mutants]
 
@@ -58,7 +58,7 @@ def seperate_section_patterns(pattern: str) -> List[str]:
     *Note that current method use re and do not support [] in a []
     (e.g. 1,2,3,a:[4,[5,6],7] does not work)"""
 
-    section_seperate_pattern = r"(?:[^,[{]|(?:\[[^\]]*\]))+[^,]*"
+    section_seperate_pattern = r"(?:[^,[{]|(?:\[[^\]]*\]))+[^,]*" #TODO use the one from general
     sections = re.findall(section_seperate_pattern, pattern.strip())
     sections = [i.strip() for i in sections]
 
@@ -207,8 +207,7 @@ def decode_mutation_esm_pattern(stru: Structure, mutation_esm_patterns: str) -> 
         position:target_aa"""
 
     esm_result: Dict[tuple, List[Mutation]] = {}
-    seperate_pattern = r"(?:[^,(]|(?:\([^\}]*\)))+[^,]*"
-    esm_pattern_list = [i.strip() for i in re.findall(seperate_pattern, mutation_esm_patterns)]
+    esm_pattern_list = [i.strip() for i in split_but_brackets(mutation_esm_patterns, ",")]
     for esm_pattern in esm_pattern_list:
         position_pattern, target_aa_pattern = esm_pattern.split(":")
         check_target_aa_pattern(target_aa_pattern)  # give warning about pattern
