@@ -354,12 +354,9 @@ def _serial_md_steps(
                 output = step.run(params)
             else:
                 output = step.run(output)
-            if step.if_report:
-                result_ele.append((step, output))
-        if not result_ele:
-            result_ele = [(step, output)] # default add last step if non is specified
+            result_ele.append(output)
 
-        results.append([step.translate(output) for step, output in result_ele])
+        results.append(result_ele)
 
     return results
 

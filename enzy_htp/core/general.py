@@ -31,6 +31,7 @@ Date: 2022-10-21
 import copy
 from io import StringIO
 import os
+import re
 import sys
 import logging
 import time
@@ -183,6 +184,16 @@ def swapped_dict(orig_dict: Dict) -> Dict:
     """get a swapped dictionary based on the original dictionary. The key and value are swapped
     in the new dictionary."""
     return {v : k for k, v in orig_dict.items()}
+
+
+# == str related ==
+def split_but_brackets(string: str, sep: str) -> List[str]:
+    """split a string by {sep} but do not split anything in
+    brackets. all {[( counts."""
+    seperate_pattern = r"(?:[^"+ sep +"[{(]|(?:\{[^}]*\})|(?:\([^)]*\))|(?:\[[^\]]*\]))+[^"+ sep +r"]*"
+    result = [i for i in re.findall(seperate_pattern, string)]
+    return result
+
 
 # == Class related ==
 def get_str_for_print_class_var(cls) -> str:
