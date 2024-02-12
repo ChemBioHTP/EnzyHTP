@@ -1523,7 +1523,16 @@ class AmberInterface(BaseInterface):
             geom_cons: List[StructureConstraint]
             nmropt_cntrl = {'nmropt': 1}
             # figure out path
-            disang_path: str = geom_cons[0].params["amber"]["rs_filepath"]
+            disang_path:str
+            if geom_cons[0].is_residue_pair_constraint():
+                for (_, child_gc) in geom_cons[0].child_constraints:
+                    disang_path = child_gc.params["amber"]["rs_filepath"]
+                    break
+                else:
+                    assert False, "This doesn't make sense! fix: CJ"
+            else:
+                disang_path: str = geom_cons[0].params["amber"]["rs_filepath"]
+
             if disang_path.startswith("{mdstep_dir}"):
                 disang_path = disang_path.lstrip("{mdstep_dir}")
                 disang_path = f"{md_config_dict['mdstep_dir']}/{disang_path}"
@@ -1531,8 +1540,11 @@ class AmberInterface(BaseInterface):
             # figure out content
             disang_content_list = []
             for cons in geom_cons:
-                raw_rs_dict = self._parse_cons_to_raw_rs_dict(cons)
-                disang_content_list.append(raw_rs_dict)
+                if cons.is_residue_pair_constraint():
+                    for (_,child_cons) in cons.child_constraints:
+                        disang_content_list.append(self._parse_cons_to_raw_rs_dict(child_cons))
+                else:
+                    disang_content_list.append(self._parse_cons_to_raw_rs_dict(cons))
             # assemble
             nmropt_file_redirection = {
                 "DISANG" : {

@@ -19,7 +19,7 @@ from enzy_htp.structure.structure_constraint import StructureConstraint, Cartesi
 
 import enzy_htp.chemical as chem
 from enzy_htp import mutation as mm
-from enzy_htp.structure import PDBParser, Mol2Parser, Structure, Ligand
+from enzy_htp.structure import PDBParser, Mol2Parser, Structure, Ligand, translate_structure
 from enzy_htp.core import file_system as fs
 from enzy_htp.quantum import single_point
 from enzy_htp.quantum import optimize as qm_optimize 
@@ -80,8 +80,10 @@ def dock_reactants(structure: Structure,
 
     fs.safe_mkdir(work_dir)
 
-    interface.rosetta.rename_atoms(structure)
-    
+    translate_structure(structure, end_naming='rosetta')
+
+    #interface.rosetta.rename_atoms(structure)
+   
     param_files:List[str] = generate_ligand_params(structure, work_dir)
     
     geometry_df:pd.DataFrame = generate_geometries(structure, constraints, n_struct, clash_cutoff, param_files, freeze_alphafill, rng_seed, work_dir )
@@ -529,7 +531,8 @@ def qm_minimization(structure:Structure,
         
         for atom in res.atoms:
             atom.charge = 0.0
-   
+    
+    translate_structure(structure, start_naming='rosetta')
     es = qm_optimize(structure,
             engine="xtb",
             constraints=constraints + [CartesianFreeze(structure.backbone_atoms())],
@@ -567,6 +570,7 @@ def evaluate_geometry_qm_energy(df: pd.DataFrame, structure: Structure, cluster_
 
         energy:float = None
         _df_stru = _parser.get_structure( row.description )
+        translate_structure(_df_stru, start_naming='rosetta')
         for res in structure.residues:
             if res.is_canonical():
                 continue

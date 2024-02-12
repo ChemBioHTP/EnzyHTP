@@ -286,19 +286,31 @@ class AmberConfig(BaseConfig):
 
     def __getitem__(self, key: str) -> Any:
         """Getter that enables [] accession of AmberConfig() attributes."""
-        if key.count("."):
+        dot_count:int = key.count(".")
+        if dot_count == 0:
+            return getattr(self, key)
+        elif dot_count == 1:
             key1, key2 = key.split(".", 1)
             return getattr(self, key1)[key2]
+        elif dot_count == 2:
+            key1, key2, key3 = key.split('.', 2)
+            return getattr(self, key1)[key2][key3]
         else:
-            return getattr(self, key)
+            assert False
 
     def __setitem__(self, key: str, value: Any) -> None:
         """Setter that enables [] accession of AmberConfig() attributes with value validation."""
-        if key.count("."):
+        dot_count:int = key.count('.')
+        if dot_count == 0:
+            setattr(self, key, value)
+        elif dot_count == 1:
             key1, key2 = key.split(".")
             AmberConfig.__dict__[key1][key2] = value
+        elif dot_count == 2:
+            key1, key2, key3 = key.split(".")
+            AmberConfig.__dict__[key1][key2][key3] = value
         else:
-            setattr(self, key, value)
+            assert False
 
         if not self.valid_box_type():
             # TODO(CJ): make a custom error for this part
