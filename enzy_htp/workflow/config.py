@@ -9,6 +9,13 @@ Date: 2024-01-25"""
 
 from enzy_htp import structure, preparation, mutation, geometry, quantum, analysis, interface
 
+def test_kwargs(x: str, **kwargs):
+    '''This function is to test kwargs inspection only.'''
+    result = x
+    for key, value in kwargs.items():
+        result += f'\n {key} = {value}'
+    return result
+
 SCIENCE_API_MAPPER = {
     "read_pdb" : structure.PDBParser().get_structure,
     "remove_solvent" : preparation.remove_solvent,
@@ -23,7 +30,8 @@ SCIENCE_API_MAPPER = {
     "ele_field_strength_at" : analysis.ele_field_strength_at,
     "ele_stab_energy_of_bond" : analysis.ele_stab_energy_of_bond,
     "ele_stab_energy_of_dipole" : analysis.ele_stab_energy_of_dipole,
-    "bond_dipole" : analysis.bond_dipole,
+    "bond_dipole": analysis.bond_dipole,
+    "test_kwargs": test_kwargs
 }
 
 PARAM_METHOD_MAPPER = {
@@ -34,21 +42,22 @@ demo_json_dict = {
     "procedure" : [
         {
             "api" : "read_pdb",
-            "return" : "read_pdb_0",
+            "store_as" : "read_pdb_0",
             "args" : {
                 "path" : "xxx",
             }
         },
         {
             "api" : "remove_hydrogens",
-            "return" : "remove_hydrogens_0",
+            "store_as" : "remove_hydrogens_0",
             "args" : {
+                "stru" : "read_pdb_0",
                 "polypeptide_only" : True,
             }
         },
         {
             "api" : "protonate_stru",
-            "return" : "protonate_stru_0",
+            "store_as" : "protonate_stru_0",
             "args" : {
                 "stru" : "remove_hydrogens_0",
                 "ph" : 7.0,
@@ -58,7 +67,7 @@ demo_json_dict = {
         },
         {
             "api" : "assign_mutant",
-            "return" : "assign_mutant_0",
+            "store_as" : "assign_mutant_0",
             "args" : {
                 "stru" : "protonate_stru_0",
                 "pattern" : "xxx",
@@ -68,13 +77,13 @@ demo_json_dict = {
         },
         {
             "api" : "loop", # make a for loop when read this
-            "return" : "loop_0",
+            "store_as" : "loop_0",
             "args" : {
                 "data" : "assign_mutant_0",
                 "actions" : [
                     {   
                         "api" : "mutate_stru",
-                        "return" : "mutate_stru_0",
+                        "store_as" : "mutate_stru_0",
                         "args" : {
                             "stru" : "protonate_stru",
                             "mutant" : "loop_data",
@@ -83,7 +92,7 @@ demo_json_dict = {
                     },
                     {
                         "api" : "equi_md_sampling",
-                        "return" : "equi_md_sampling_0",
+                        "store_as" : "equi_md_sampling_0",
                         "args" : {
                             "stru" : "mutate_stru_0",
                             "param_method" : {
@@ -117,19 +126,19 @@ demo_json_dict = {
                     },
                     {
                         "api" : "loop",
-                        "return" : "loop_0_0",
+                        "store_as" : "loop_0_0",
                         "args" : {
                             "data" : "equi_md_sampling_0",
                             "actions" : [      
                                 {   
                                     "api" : "loop",
-                                    "return" : "loop_0_0_0",
+                                    "store_as" : "loop_0_0_0",
                                     "args" : {
                                         "data" : "loop_data",
                                         "actions" : [ # target metrics goes here
                                             {   
                                                 "api" : "ele_field_strength_at_along",
-                                                "return" : "ef_0",
+                                                "store_as" : "ef_0",
                                                 "args" : {
                                                     "stru" : "loop_data",
                                                     "p1" : "A.1.CA",
