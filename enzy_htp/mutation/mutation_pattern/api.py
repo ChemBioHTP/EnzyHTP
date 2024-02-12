@@ -207,7 +207,7 @@ def decode_mutation_esm_pattern(stru: Structure, mutation_esm_patterns: str) -> 
         position:target_aa"""
 
     esm_result: Dict[tuple, List[Mutation]] = {}
-    esm_pattern_list = [i.strip() for i in split_but_brackets(mutation_esm_patterns)]
+    esm_pattern_list = [i.strip() for i in split_but_brackets(mutation_esm_patterns, ",")]
     for esm_pattern in esm_pattern_list:
         position_pattern, target_aa_pattern = esm_pattern.split(":")
         check_target_aa_pattern(target_aa_pattern)  # give warning about pattern
