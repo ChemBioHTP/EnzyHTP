@@ -239,20 +239,38 @@ def d_ele_field_upon_mutation_coarse(
                 put the difference of the net charge of the residue
                 before and after the mutation on the geom_center
                 of the residue before mutation.
+            "ca_coord"
+                put the difference of the net charge of the residue
+                before and after the mutation on the ca_coord
+                of the residue before mutation.
             (the method below requires deploying the mutation)
             "TODO"
                 deploy the mutation and measure all the atomic charge
                 from residues before and after.
     Returns:
         the dEF number"""
-    supported_methods = ["geom_center"]
+    supported_methods = ["geom_center", "ca_coord"]
     if method == "geom_center":
         mut_coord = stru.find_residue_with_key(mutation.get_position_key()).geom_center
-        mut_charge = mutation.get_charge_diff()
+        result = _coarse_one_position_method(mutation, mut_coord, p1, d1, unit)
+    elif method == "ca_coord":
+        mut_coord = stru.find_residue_with_key(mutation.get_position_key()).ca_coord
+        result = _coarse_one_position_method(mutation, mut_coord, p1, d1, unit)
     else:
         _LOGGER.error(f"method ({method}) not in supported list ({supported_methods})")
         raise ValueError
 
+    return result
+
+def _coarse_one_position_method(
+        mutation: Mutation,
+        mut_coord: ArrayLike,
+        p1: ArrayLike,
+        d1: ArrayLike,
+        unit: str,):
+    """the coarse method in d_ele_field_upon_mutation_coarse()
+    that use a single position to place the changed charge upon mutation"""
+    mut_charge = mutation.get_charge_diff()
     result = electric_field_strength(mut_coord, mut_charge, p1, d1, unit=unit)
 
     return result
