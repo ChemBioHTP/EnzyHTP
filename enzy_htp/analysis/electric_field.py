@@ -1,7 +1,11 @@
 """Submodule contains code for charactization of the internal electric field of the enzyme.
-+ field_strength_at()
++ ele_field_strength_at()
+    field strength at a specified bond.
++ ele_field_strength_at_along()
     field strength at and along a specified bond.
-+ ele_stab_energy()
++ ele_stab_energy_of_bond()
+    the electrostatic stablization energy. (See https://pubs.acs.org/doi/full/10.1021/acs.jcim.1c01424)
++ ele_stab_energy_of_dipole()
     the electrostatic stablization energy. (See https://pubs.acs.org/doi/full/10.1021/acs.jcim.1c01424)
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
@@ -17,6 +21,7 @@ import numpy as np
 
 from enzy_htp.core import _LOGGER
 from enzy_htp.chemical import electric_field_strength
+from enzy_htp.mutation import Mutation
 from enzy_htp.structure import Structure, Atom
 
 from enzy_htp.structure.structure_operation.charge import init_charge
@@ -210,4 +215,44 @@ def ele_stab_energy_of_dipole(
 
     return g_ele
 
-    
+def d_ele_field_upon_mutation_coarse(
+        stru: Structure,
+        mutation: Mutation,
+        p1: ArrayLike,
+        d1: ArrayLike,
+        method: str = "geom_center",
+        unit: str = "kcal/(mol*e*Ang)",
+    ) -> float:
+    """calculate the change of EF strength at {p1} along {d1} upon {mutation}
+    using a coarse {method}.
+    Args:
+        stru, mutation:
+            the target structure and mutation
+        p1:
+            the point of measuring the EF
+        d1:
+            the direction of measuring the EF
+        method:
+            the method of estimating the location of the change
+            of point charge of the mutating residue.
+            "geom_center"
+                put the difference of the net charge of the residue
+                before and after the mutation on the geom_center
+                of the residue before mutation.
+            (the method below requires deploying the mutation)
+            "TODO"
+                deploy the mutation and measure all the atomic charge
+                from residues before and after.
+    Returns:
+        the dEF number"""
+    supported_methods = ["geom_center"]
+    if method == "geom_center":
+        mut_coord = stru.find_residue_with_key(mutation.get_position_key()).geom_center
+        mut_charge = mutation.get_charge_diff()
+    else:
+        _LOGGER.error(f"method ({method}) not in supported list ({supported_methods})")
+        raise ValueError
+
+    result = electric_field_strength(mut_coord, mut_charge, p1, d1, unit=unit)
+
+    return result
