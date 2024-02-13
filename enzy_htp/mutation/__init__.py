@@ -12,6 +12,7 @@ from .mutation import (
     check_repeat_mutation,
     remove_repeat_mutation,
     get_mutant_name_tag,
+    get_involved_mutation,
 )
 
 from .api import (
