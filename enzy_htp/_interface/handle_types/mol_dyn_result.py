@@ -8,6 +8,7 @@ Date: 2023-09-19
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, List
 
+from .modeling_engine import ModelingResultEgg
 from enzy_htp.structure import Structure
 
 class MolDynResult:
@@ -85,7 +86,7 @@ class MolDynResult:
                 f"source = {self._source})")
 
 
-class MolDynResultEgg(ABC):
+class MolDynResultEgg(ModelingResultEgg):
     """This class defines the format of md result eggs.
     These eggs are md result place holders before the calculation.
     An example of eggs is file paths, so in Amber's case, it could be
