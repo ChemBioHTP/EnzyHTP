@@ -70,9 +70,11 @@ def ele_field_strength_at_along(
     # initialize variables
     stru_sele = select_stru(stru, region_pattern)
     if isinstance(p1, Atom):
+        p1 = stru.get_corresponding_atom(p1)
         p1 = np.array(p1.coord, dtype=float)
     if p2 is not None:
         if isinstance(p2, Atom):
+            p2 = stru.get_corresponding_atom(p2)
             p2 = np.array(p2.coord, dtype=float)
         d1 = p2 - p1
     d1 /= np.linalg.norm(d1)
@@ -180,7 +182,7 @@ def ele_stab_energy_of_bond(
     Returns:
         g_ele = - E * u (unit: kcal/mol)
             the electrostatic stablization energy"""
-    A0 = physical_constants["atomic unit of length"] # m
+    A0 = physical_constants["atomic unit of length"][0] # m
     A = 10**-10 # m
     g_ele = -bond_dipole * bond_field_strength * A0/A
 
@@ -202,7 +204,7 @@ def ele_stab_energy_of_dipole(
     Returns:
         g_ele = - E * u (unit: kcal/mol)
             the electrostatic stablization energy"""
-    A0 = physical_constants["atomic unit of length"] # m
+    A0 = physical_constants["atomic unit of length"][0] # m
     A = 10**-10 # m
     g_ele = - np.dot(dipole, field_strength) * A0/A
 

@@ -17,7 +17,7 @@ class ElectronicStructure:
     Attributes:
         energy_0: float
             ground state energy
-        geometry: Structure
+        geometry: StructureRegion
             geometry
         mo: str
             the file path/externel object of MO
