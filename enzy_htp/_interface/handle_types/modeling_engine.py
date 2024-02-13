@@ -49,4 +49,3 @@ class ModelingEngine(ABC):
         """the method convert engine specific result eggs to general result.
         For example, QMSinglePointEgg -> ElectronicStructure"""
         pass
-
