@@ -98,6 +98,10 @@ class Mutation:
 
         return True
 
+    def is_wild_type(self) -> bool:
+        """check if self is wild type"""
+        return self.target == "WT"
+
     # == property getter ==
     def get_target(self, if_one_letter: bool = False) -> str:
         """get the mutation target in 1/3-letter format"""

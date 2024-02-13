@@ -248,7 +248,12 @@ def d_ele_field_upon_mutation_coarse(
                 deploy the mutation and measure all the atomic charge
                 from residues before and after.
     Returns:
-        the dEF number"""
+        the dEF number.
+        Return 0.0 for WT"""
+    # wt case
+    if mutation.is_wild_type():
+        return 0.0
+    # non-wt case
     supported_methods = ["geom_center", "ca_coord"]
     if method == "geom_center":
         mut_coord = stru.find_residue_with_key(mutation.get_position_key()).geom_center
