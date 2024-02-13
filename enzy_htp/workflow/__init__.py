@@ -6,5 +6,5 @@ Date: 2024-01-25"""
 
 from .workflow import (
     WorkFlow,
-    ProcedureUnit,
+    WorkUnit,
 )

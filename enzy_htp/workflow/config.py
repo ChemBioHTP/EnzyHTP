@@ -39,7 +39,7 @@ PARAM_METHOD_MAPPER = {
 }
 
 demo_json_dict = {
-    "procedure" : [
+    "workunits" : [
         {
             "api" : "read_pdb",
             "store_as" : "read_pdb_0",
