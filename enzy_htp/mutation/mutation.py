@@ -212,7 +212,7 @@ def generate_mutation_from_traget_list(position: Tuple[str, int], orig_resi: str
     return result
 
 
-# --Mutant--
+# --Mutant-- # TODO may be a class in the future
 # below utilities are for a list of Mutation()
 # == checker ==
 def check_repeat_mutation(mutant: List[Mutation]):
@@ -259,3 +259,14 @@ def get_mutant_name_str(mutant: List[Mutation]) -> str:
     """get a string representation of a mutant.
     e.g.: 'A##B C##D'"""
     return " ".join(str(i) for i in mutant)
+
+# --Mutant Space-- # TODO may be a class in the future
+# below utilities are for a list of mutants (each is a list of Mutation())
+# == property getter ==
+def get_involved_mutation(mutant_space: List[List[Mutation]]) -> List[Mutation]:
+    """get all involved single point Mutations from a mutant space"""
+    result = set()
+    for mutant in mutant_space:
+        for mutation in mutant:
+            result.add(mutation)
+    return result
