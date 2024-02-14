@@ -14,3 +14,4 @@ from .electric_field import (
     d_ele_field_upon_mutation_coarse,
 )
 from .dipole import bond_dipole
+from .stability import ddg_fold_of_mutants
