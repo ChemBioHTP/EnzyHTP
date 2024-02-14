@@ -141,7 +141,7 @@ class PrmtopParser(StructureParserInterface):
             # resolve missing residue index
             if idx == 0:
                 if name in solvent_list:
-                    idx = legal_res_idx.pop()
+                    idx = legal_res_idx.pop() # TODO think about if we want to 1-index each chain
                 else:
                     _LOGGER.warning(f"found non-solvent residue index 0 from prmtop. make sure it is correct. ({path})")
             
@@ -172,7 +172,7 @@ class PrmtopParser(StructureParserInterface):
     def _get_legal_residue_idxes(cls, taken_ids: List) -> List:
         """get legal residue indexes"""
         max_id = max(taken_ids)
-        result = list(range(max_id+1, max_id+10000))
+        result = list(range(max_id+1, max_id+100000))
         return list(reversed(result))
 
     @classmethod
