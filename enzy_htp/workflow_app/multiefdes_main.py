@@ -9,8 +9,10 @@ from pathlib import Path
 import pickle
 from typing import Any, Dict, List, Tuple
 
-from enzy_htp.analysis import d_ele_field_upon_mutation_coarse
-from enzy_htp.mutation import assign_mutant, Mutation, get_involved_mutation
+from enzy_htp.analysis import d_ele_field_upon_mutation_coarse, ddg_fold_of_mutants
+from enzy_htp.core.clusters.accre import Accre
+from enzy_htp.mutation import assign_mutant
+from enzy_htp.mutation_class import Mutation, get_involved_mutation
 from enzy_htp.structure import Structure, PDBParser, Atom
 from enzy_htp.core import _LOGGER
 import numpy as np
@@ -61,6 +63,7 @@ def coarse_filter(
         stru: Structure,
         mutants: List[List[Mutation]],
         atom_1: str, atom_2: str,
+        cluster_job_config: Dict,
         ddg_sample_ranges: List[tuple] = [(float("-inf"),0), (0,10), (10,20), (20,30), (30,40)],
         sample_per_group: int = 300,
         out_ref_path_1: str = "mutant_space_1_coarse_def_ddg_fold.pickle",
@@ -81,7 +84,7 @@ def coarse_filter(
     result = []
     result_dicts = []
     # generate {mutant : (dEF, ddG_fold)} dict
-    coarse_metrics_dict = _generate_coarse_metrics(stru, mutants, atom_1, atom_2)
+    coarse_metrics_dict = _generate_coarse_metrics(stru, mutants, atom_1, atom_2, cluster_job_config)
     save_obj(coarse_metrics_dict, out_ref_path_1)
 
     # filter mutants
@@ -104,6 +107,7 @@ def _generate_coarse_metrics(
         stru: Structure,
         mutants: List[List[Mutation]],
         atom_1: str, atom_2: str,
+        cluster_job_config: Dict,
     ) -> Dict[Tuple[Mutation], Tuple[float, float]]:
     """calculate the dEF and ddG_fold for each mutant
     in mutants"""
@@ -132,7 +136,11 @@ def _generate_coarse_metrics(
         result[tuple(mutant)].append(mutant_ef_strength)
     
     # calculate ddg_fold
-    single_point_stability_mapper = _get_single_point_stability()
+    single_point_stability_mapper = _get_single_mutation_stability(
+        stru=stru,
+        mutant_space=mutants,
+        cluster_job_config=cluster_job_config,
+    )
     for mutant in mutants:
         mutant_stability = 0.0 # this also makes WT in [] form be 0.0 
         for mut in mutant:
@@ -144,15 +152,28 @@ def _generate_coarse_metrics(
 
     return result
 
-def _get_single_point_stability(
+def _get_single_mutation_stability(
         stru: Structure,
         mutant_space: List[List[Mutation]],
+        cluster_job_config: Dict,
+        job_check_period: int= 210, # s
+        job_array_size: int= 100,
     ) -> Dict[Mutation, float]:
     """calculate ddg_fold for each single point mutations
-    involved in all {mutants} of {stru}"""
-    mutations = get_involved_mutation(mutant_space)
-    for mut in mutations:
-        pass
+    involved in the {mutant_space} of {stru}"""
+    result = {}
+    single_mutations = [[mut] for mut in get_involved_mutation(mutant_space)]
+    ddg_fold_mapper = ddg_fold_of_mutants(
+        stru,
+        mutant_space=single_mutations,
+        method="rosetta_cartesian_ddg",
+        cluster_job_config=cluster_job_config,
+        job_check_period=job_check_period,
+        job_array_size=job_array_size,
+        # TODO reference single_point and make one
+        )
+    result = {k[0] : v for k, v in ddg_fold_mapper.items()}
+    return result
 
 def fine_filter() -> List[List[Mutation]]:
     """the fine filter applied on the 2nd mutant space
@@ -172,7 +193,7 @@ def load_obj(in_path: str):
         obj = pickle.load(f)
     return obj
 
-def workflow():
+def workflow_puo():
     """the PuO workflow"""
     # target system
     atom_1 = "C.901.C64"
@@ -185,6 +206,14 @@ def workflow():
     ncaa_chrgspin = {
         "FAD" : (0,1),
         "ACP" : (0,1),
+    }
+    cluster_job_config = {
+        "cluster" : Accre(),
+        "res_keywords" : {
+            "account" : "yang_lab_csb",
+            "partition" : "production",
+            'walltime' : '10:00:00',
+        }
     }
     # file paths
     checkpoint_1 = "mutant_space_1.pickle"
@@ -207,8 +236,11 @@ def workflow():
         mutant_space_1 = load_obj(checkpoint_1)
 
     # 2. coarse filter
-    if not Path(checkpoint_2).exists():        
-        mutant_space_2 = coarse_filter(mutant_space_1)
+    if not Path(checkpoint_2).exists():
+        mutant_space_2 = coarse_filter(
+            stru, mutant_space_1,
+            atom_1, atom_2,
+            cluster_job_config = cluster_job_config,)
         save_obj(mutant_space_2, checkpoint_2)
     else:
         mutant_space_2 = load_obj(checkpoint_2)
@@ -223,7 +255,7 @@ def workflow():
     return mutant_space_3
 
 def main():
-    workflow()
+    workflow_puo()
 
 if __name__ == "__main__":
     main()
