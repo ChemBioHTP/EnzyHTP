@@ -3,6 +3,7 @@
 '''
 WorkFlow and WorkUnit.
 
+TODO (Zhong): Typing type annotation inspection. (Completed 2024-02-16 23:16 UTC-6)
 TODO (Zhong): Use `getfullargspec(func).annotations.get('return').__args__` to extract return annotations from a function and then perform type inspection.
 TODO (Zhong): APIs entitled `loop`.
 TODO (Zhong): Data Output.
@@ -18,7 +19,7 @@ from __future__ import annotations
 from io import TextIOWrapper, FileIO
 from inspect import _empty, Parameter, signature
 from json import load
-from typing import Union, overload
+from typing import Any, Type, Union, overload
 
 from enzy_htp.core.logger import _LOGGER
 
@@ -322,6 +323,37 @@ class WorkUnit():
                 self.error_msg_list.append(str(exc))
                 return self.return_key, None
 
+    @staticmethod        
+    def inspect_argument_type(arg_value: Any, annotation: Union[Type, Any]) -> bool:
+        """
+        Inspects whether the given argument value matches the specified type annotation.
+
+        This method supports both basic types and typing types (e.g., List, Dict from typing module).
+        For typing types, it checks if the argument value matches the origin type of the annotation
+        (e.g., list for List[int], dict for Dict[str, int]).
+        Note: Generic elements in typing types, like `int` in `List[int]`, `str`
+        and `int` in `Dict[str, int]`, are not inspected, as JSON files do not support storing
+        such types directly.
+
+        Args:
+            arg_value (Any): The value of the argument to be inspected.
+            annotation (Union[Type, Any]): The type annotation against which the argument value
+                                           is to be checked. This can be a basic type like `int`,
+                                           `str`, or a typing type like `List[str]`.
+
+        Returns:
+            bool: True if the argument value matches the type annotation, False otherwise.
+        """
+        # Checks if param.annotation is a typing type.
+        is_typing_type = hasattr(annotation, '__origin__')
+
+        if is_typing_type:
+            # Check the origin of typing types (e.g., list for List[int])
+            return isinstance(arg_value, annotation.__origin__)
+        else:
+            # Inspect basic types.
+            return isinstance(arg_value, annotation)
+
     def self_inspection_and_reassembly(self) -> None:
         '''Performs self-inspection and reassembles the arguments for the API call.
 
@@ -343,7 +375,7 @@ class WorkUnit():
             # If `*args` or `**kwargs` parameters exist (which is always at the very last),
             # add all the arguments to the `args_dict_to_pass`. Then, break the loop.
             # APIs with both `*args` and `**kwargs` are not and will not be supported.
-            if (param.name in ['args', 'kwargs']):
+            if (param.name in ['arg', 'args', 'kwarg', 'kwargs']):
                 for key, value in self.__args_dict_input.items():
                     if key not in self.args_dict_to_pass.keys():
                         self.args_dict_to_pass[key] = value
@@ -355,7 +387,7 @@ class WorkUnit():
             if param.default == _empty:
                 is_required = True
 
-            # Inspect argument existence and type.
+            # Inspect argument existence.
             arg_value = self.__args_dict_input.get(param.name, None)
             if (arg_value == None):     # Missing the argument.
                 if is_required: # Record error if it's required.
@@ -372,10 +404,12 @@ class WorkUnit():
                     self.args_dict_to_pass[param.name] = arg_value
                     continue
             
-            # Handle unexpected argument type.
-            if (param.annotation != _empty) and (type(arg_value) != param.annotation):
-                unit_error_list.append(f'Receiving argument `{param.name}` in unexpected type {type(arg_value)} while {param.annotation} is expected (when initializing `{self.__api_key}`).')
-                is_inspection_passed = False
+            # Inspect argument type.
+            if (param.annotation != _empty):
+                pass_type_inspection = WorkUnit.inspect_argument_type(arg_value, param.annotation)
+                if not pass_type_inspection:
+                    unit_error_list.append(f'Receiving argument `{param.name}` in unexpected type {type(arg_value)} while {param.annotation} is expected (when initializing `{self.__api_key}`).')
+                    is_inspection_passed = False
 
             # Inspection passed, now loading arguments.
             self.args_dict_to_pass[param.name] = arg_value
