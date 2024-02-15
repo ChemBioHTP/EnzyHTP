@@ -4,7 +4,6 @@
 WorkFlow and WorkUnit.
 
 TODO (Zhong): Typing type annotation inspection. (Completed 2024-02-16 23:16 UTC-6)
-TODO (Zhong): Use `getfullargspec(func).annotations.get('return').__args__` to extract return annotations from a function and then perform type inspection.
 TODO (Zhong): APIs entitled `loop`.
 TODO (Zhong): Data Output.
 
@@ -38,13 +37,6 @@ class WorkFlow():
     execution_type: str = str()
     parallel_groups: int = 1
     mut_parallel_groups: int = 1
-
-    # cpu_account: str = str()
-    # cpu_partition: str = str()
-    # gpu_account: str = str()
-    # gpu_partition: str = str()
-    # gpu_walltime: str = str()
-
     debug: bool = False
 
     # Error information.
@@ -58,7 +50,7 @@ class WorkFlow():
     intermediate_data_mapper = dict()
 
     # Output
-    data_output_path = './Mutation.dat'
+    # data_output_path = './Mutation.dat'
 
     #region WorkFlow Initialization.
     def __init__(self, debug: bool = False) -> None:
@@ -169,6 +161,10 @@ class WorkFlow():
         is conducive to keeping the workflow from being interrupted by non-fatal errors,
         so that the workflow can continue to run until completion as long as there are no fatal errors.
 
+        Note: Chances exist that the `intermediate_data_mapper` may have `None: None` key-value pairs,
+        but that's fine: A `None: None` key-value pair wouldn't make any difference. Thus, we don't need
+        to add an if-else to filter it out.
+
         Raises:
             ValueError: If the workflow has not passed the self-inspection.
         '''
@@ -181,7 +177,6 @@ class WorkFlow():
                 workunit: WorkUnit
                 return_key, return_value = workunit.execute()
                 self.intermediate_data_mapper[return_key] = return_value
-                self.error_msg_list += workunit.error_msg_list
                 continue
 
 
@@ -215,14 +210,13 @@ class WorkUnit():
     workflow: WorkFlow
     api: object
     return_key: str
-    return_value = None
+    return_value: Any
     args_dict_to_pass: dict
     error_msg_list: list
     is_self_inspection_passed: bool
     params_to_assign_at_execution: list
 
     debug: bool = False
-
 
     def __init__(self, workflow: WorkFlow = None, debug: bool = False):
         '''Initializes a WorkUnit instance.
@@ -269,7 +263,7 @@ class WorkUnit():
         # Initialize the class.
         unit = cls(workflow, debug=debug)
         unit.__api_key = unit_dict.get('api', str())
-        unit.return_key = unit_dict.get('store_as', str())
+        unit.return_key = unit_dict.get('store_as', None)
         unit.__args_dict_input = unit_dict.get('args', dict())
 
         # Map the API.
@@ -284,10 +278,10 @@ class WorkUnit():
                 return unit
         
         # Self Inspection.
-        unit.self_inspection_and_reassembly()
-        unit.check_self_inspection_result()
+        unit.__self_inspection_and_reassembly()
+        unit.__check_self_inspection_result()
 
-        # Setup a placeholder in `workflow.workunits_data_mapper`.
+        # Setup a placeholder in `workflow.intermediate_data_mapper`.
         # TODO (Zhong): Annotation inspection.
         unit.workflow.intermediate_data_mapper[unit.return_key] = None
         return unit
@@ -311,8 +305,11 @@ class WorkUnit():
         try:
             for param in self.params_to_assign_at_execution:
                 self.args_dict_to_pass[param] = self.workflow.intermediate_data_mapper.get(self.__args_dict_input[param])
-            self.return_value = self.api(**self.args_dict_to_pass)
-            self.workflow.intermediate_data_mapper[self.return_key] = self.return_value
+            if self.return_key:
+                self.return_value = self.api(**self.args_dict_to_pass)
+            else:   # If no `return_key`, then `return_value` is None.
+                self.api(**self.args_dict_to_pass)
+                self.return_value = None
             return self.return_key, self.return_value
         except Exception as exc:
             _LOGGER.error(f'Catching Error when executing `{self.__api_key}`:')
@@ -324,16 +321,16 @@ class WorkUnit():
                 return self.return_key, None
 
     @staticmethod        
-    def inspect_argument_type(arg_value: Any, annotation: Union[Type, Any]) -> bool:
+    def __inspect_argument_type(arg_value: Any, annotation: Union[Type, Any]) -> bool:
         """
         Inspects whether the given argument value matches the specified type annotation.
 
-        This method supports both basic types and typing types (e.g., List, Dict from typing module).
+        This method supports both basic types and typing types (e.g., `List`, `Dict` from `typing` module).
         For typing types, it checks if the argument value matches the origin type of the annotation
         (e.g., list for List[int], dict for Dict[str, int]).
         Note: Generic elements in typing types, like `int` in `List[int]`, `str`
         and `int` in `Dict[str, int]`, are not inspected, as JSON files do not support storing
-        such types directly.
+        such types directly (TODO later).
 
         Args:
             arg_value (Any): The value of the argument to be inspected.
@@ -354,7 +351,7 @@ class WorkUnit():
             # Inspect basic types.
             return isinstance(arg_value, annotation)
 
-    def self_inspection_and_reassembly(self) -> None:
+    def __self_inspection_and_reassembly(self) -> None:
         '''Performs self-inspection and reassembles the arguments for the API call.
 
         This method is called every time a new instance is created. It performs a self-inspection
@@ -389,7 +386,7 @@ class WorkUnit():
 
             # Inspect argument existence.
             arg_value = self.__args_dict_input.get(param.name, None)
-            if (arg_value == None):     # Missing the argument.
+            if not arg_value:   # Missing the argument.
                 if is_required: # Record error if it's required.
                     unit_error_list.append(f'Missing required argument `{param.name}` in API `{self.__api_key}`.')
                     is_inspection_passed = False
@@ -406,7 +403,7 @@ class WorkUnit():
             
             # Inspect argument type.
             if (param.annotation != _empty):
-                pass_type_inspection = WorkUnit.inspect_argument_type(arg_value, param.annotation)
+                pass_type_inspection = WorkUnit.__inspect_argument_type(arg_value, param.annotation)
                 if not pass_type_inspection:
                     unit_error_list.append(f'Receiving argument `{param.name}` in unexpected type {type(arg_value)} while {param.annotation} is expected (when initializing `{self.__api_key}`).')
                     is_inspection_passed = False
@@ -419,7 +416,7 @@ class WorkUnit():
         self.error_msg_list += unit_error_list
         return
     
-    def check_self_inspection_result(self) -> None:
+    def __check_self_inspection_result(self) -> None:
         """Checks the result of self-inspection of the instance.
 
         This method checks if the self-inspection of the instance passed (`is_self_inspection_ok`). 

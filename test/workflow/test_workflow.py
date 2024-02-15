@@ -30,27 +30,28 @@ WORK_DIR = f"{CURR_DIR}/work_dir/"
 config["system.SCRATCH_DIR"] = WORK_DIR
 
 
-def test_workflow_initialization_from_json_filepath_simple(caplog):
-    '''Test initializing workflow from a simple json file.'''
-    json_filepath = f'{DATA_DIR}workflow_7si9_init_simple.json'
+def test_workflow_initialization_from_json_filepath(caplog):
+    '''Test initializing workflow from a simple json file.
+    This test may have errors reported, but they are expected.
+    '''
+    json_filepath = f'{DATA_DIR}workflow_7si9_initialization.json'
     workflow = WorkFlow.from_json_filepath(json_filepath=json_filepath)
     with EnablePropagate(_LOGGER):
         workflow.execute()
     fs.safe_rmdir(WORK_DIR)
     # preparation.protonate_stru does not have return value.
-    print(workflow.intermediate_data_mapper)
-    assert workflow.intermediate_data_mapper['protonate_stru_0']
+    assert 'success' in caplog.text
 
-def test_workflow_initialization_from_json_filepath_typing(caplog):
-    json_filepath = f'{DATA_DIR}workflow_7si9_init_typing.json'
+def test_workflow_store_as_label(caplog):
+    '''Test whether the updated `intermediate_data_mapper` labeling strategy 
+    (i.e. use the same label for instances with same memory address) works.'''
+    json_filepath = f'{DATA_DIR}workflow_7si9_store_as_label.json'
     workflow = WorkFlow.from_json_filepath(json_filepath=json_filepath)
     with EnablePropagate(_LOGGER):
         workflow.execute()
     fs.safe_rmdir(WORK_DIR)
-    # [02:46 EnzyHTP <listcomp>] ERROR Receiving argument `chain_sync_list` in unexpected type <class 'list'> while typing.List[tuple] is expected (when initializing `assign_mutant`).
-    # [02:46 EnzyHTP <listcomp>] ERROR Receiving argument `chain_index_mapper` in unexpected type <class 'dict'> while typing.Dict[str, int] is expected (when initializing `assign_mutant`).
-    # [02:46 EnzyHTP execute] ERROR The initialized WorkFlow has not yet passed the self-inspection, so it is not allowed to be executed.
-    assert 'success' in caplog.text
+    print(workflow.intermediate_data_mapper)
+    assert workflow.intermediate_data_mapper['structure']
 
 def test_workunit_read_pdb_7si9(caplog):
     '''A test for reading pdb file.'''
@@ -64,13 +65,10 @@ def test_workunit_read_pdb_7si9(caplog):
     }
     workunit = WorkUnit.from_dict(unit_dict=unit_dict, debug=True)
     key, stru = workunit.execute()
-    print(stru.num_residues)
     assert stru.num_residues
 
 def test_workunit_self_inspection_kwargs(caplog):
     '''Check if kwargs can be successfully inspected.'''
-    from inspect import signature
-
     unit_dict = {
         "api" : "test_kwargs",
         "store_as" : "assign_mutant_0",

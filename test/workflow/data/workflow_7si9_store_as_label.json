@@ -2,24 +2,23 @@
     "workunits" : [
         {
             "api" : "read_pdb",
-            "store_as" : "read_pdb_0",
+            "store_as" : "structure",
             "args" : {
                 "path" : "/home/yinjie/bin/EnzyHTP/test/workflow/data/7si9_rm_water_disconnected.pdb"
             }
         },
         {
             "api" : "remove_hydrogens",
-            "store_as" : "remove_hydrogens_0",
+            "store_as" : "structure",
             "args" : {
-                "stru" : "read_pdb_0",
+                "stru" : "structure",
                 "polypeptide_only" : true
             }
         },
         {
             "api" : "protonate_stru",
-            "store_as" : "protonate_stru_0",
             "args" : {
-                "stru" : "remove_hydrogens_0",
+                "stru" : "structure",
                 "ph" : 7.0,
                 "protonate_ligand" : false,
                 "engine" : "pdb2pqr"
