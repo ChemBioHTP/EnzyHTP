@@ -124,7 +124,7 @@ def generate_sub_wkdirs(wt_pdb_list: List[str],
             mkdir(f"{dir_name}/maas")
             run_cmd(f'cp -r ./maas/* {dir_name}/maas')
 
-def assign_task_num(num_of_task: int, num_of_worker: int) -> List[int]:
+def assign_task_num(num_of_task: int, num_of_worker: int) -> List[int]: # TODO probably can also use itertools.cycle
     """assign task number for each worker based on {num_of_task} and {num_of_worker}"""
     task_each_worker = num_of_task // num_of_worker
     remaining_tasks = num_of_task % num_of_worker
