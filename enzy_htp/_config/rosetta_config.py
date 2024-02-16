@@ -71,7 +71,7 @@ class RosettaConfig(BaseConfig):
     DEFAULT_CART_DDG_FA_MAX_DIS: float = 9.0
     """the default value for the FA_MAX_DIS option of cartesian ddg calculation"""
 
-    DEFAULT_CART_DDG_SCOREFXN: str = "talaris2014_cart"
+    DEFAULT_CART_DDG_SCOREFXN: str = "ref2015_cart"
     """the default value for the SCOREFXN option of cartesian ddg calculation"""
 
     DEFAULT_CART_DDG_RES_KEYWORDS: Dict = copy.deepcopy(ARMerConfig.SINGLE_CPU_RES) | {'job_name' : 'cart_ddg_EnzyHTP',}
