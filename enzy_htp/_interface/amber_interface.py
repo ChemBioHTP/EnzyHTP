@@ -682,7 +682,7 @@ class AmberMDStep(MolDynStep):
         traj_log_parser = self.parent_interface.read_from_mdout
         last_frame_parser = AmberRSTParser(
             prmtop_file=prmtop,
-            interface=self.parent_interface).get_structure
+            interface=self.parent_interface)
 
         result = MolDynResult(
             traj_file = traj_path,
@@ -749,7 +749,7 @@ class AmberMDStep(MolDynStep):
         last_frame_file = result_egg.rst_path
         last_frame_parser = AmberRSTParser(
             prmtop_file=result_egg.prmtop_path,
-            interface=self.parent_interface).get_structure
+            interface=self.parent_interface)
         
         # error check
         self.check_md_error(traj_file, traj_log_file, result_egg.prmtop_path, result_egg.parent_job)
