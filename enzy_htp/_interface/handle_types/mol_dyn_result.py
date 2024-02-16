@@ -36,7 +36,7 @@ class MolDynResult:
                  traj_log_file: str,
                  traj_log_parser: Callable[[str], Dict],
                  last_frame_file: str,
-                 last_frame_parser: Callable[[str], Structure],
+                 last_frame_parser: Callable[[str], Structure], # TODO update this type hinting. We should still make these parser the object and make SelfParser for as is parsing need.
                  source: str,):
         self._traj_file = traj_file
         self._traj_parser = traj_parser
