@@ -246,7 +246,7 @@ def workflow_puo():
         mutant_space_2 = load_obj(checkpoint_2)
 
     # 3. fine filter
-    if not Path(checkpoint_3).exists():        
+    if not Path(checkpoint_3).exists():
         mutant_space_3 = fine_filter(mutant_space_2)
         save_obj(mutant_space_3, checkpoint_3)
     else:
