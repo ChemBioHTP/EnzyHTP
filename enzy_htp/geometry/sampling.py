@@ -108,16 +108,18 @@ def equi_md_sampling(stru: Structure,
     min_step  = parent_interface.build_md_step(
         name="min_micro",
         minimize=True,
-        length=20000, # cycle
+        length=500,#20000, # cycle
         cluster_job_config=cluster_job_config,
-        core_type="gpu",
+        core_type="cpu",
+        #core_type="gpu",
         constrain=[freeze_backbone] + prod_constrain)
 
     heat_step = parent_interface.build_md_step(
         name="heat_nvt",
         length=0.05, # ns
         cluster_job_config=cluster_job_config,
-        core_type="gpu",
+        core_type="cpu",
+        #core_type="gpu",
         temperature=[(0, 0), (0.05*0.9, prod_temperature), (-1, prod_temperature)],
         constrain=[freeze_backbone] + prod_constrain)
 
@@ -359,4 +361,3 @@ def _serial_md_steps(
         results.append(result_ele)
 
     return results
-

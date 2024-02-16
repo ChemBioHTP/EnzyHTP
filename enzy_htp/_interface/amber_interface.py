@@ -48,7 +48,9 @@ from enzy_htp.structure import (
     ModifiedResidue,
     NonCanonicalBase,
     StructureEnsemble,
-    PDBParser)
+    PDBParser,
+    )
+from enzy_htp.structure.structure_io import PrmtopParser
 from enzy_htp import config as eh_config
 
 class AmberParameter(MolDynParameter):
@@ -644,6 +646,7 @@ class AmberMDStep(MolDynStep):
             coord = input_data.input_coordinate_file
             prmtop = input_data.topology_file
         elif isinstance(input_data, MolDynResult) and input_data.source == "amber": # build form previous step
+            print(input_data)
             coord = input_data.last_frame_file
             prmtop = input_data.last_frame_parser.prmtop_file
         else:
@@ -1252,41 +1255,6 @@ class AmberInterface(BaseInterface):
         stru = atoms[0].root()
         aid_mapper = self.get_amber_index_mapper(stru)
         return [aid_mapper["atom"][at] for at in atoms]
-
-
-    def rename_atoms(self, stru: Structure) -> None: # TODO(high piror) move to structure_io https://github.com/ChemBioHTP/EnzyHTP/pull/162#discussion_r1473217587
-        """Renames residues and atoms to be compatible with Amber naming and functions.
-        
-        Args:
-            stru: The Structure() to perform renaming on.
-
-        Returns:
-            Nothing. 
-        """
-        nterm_mapper:Dict = {"H1":"1H", "H2":"2H", "H3":"3H"}
-        leu_mapper:Dict = {
-            "1HD1":"HD11",
-            "2HD1":"HD12",
-            "3HD1":"HD13",
-            "1HD2":"HD21",
-            "2HD2":"HD22",
-            "3HD2":"HD23",
-            }
-        _LOGGER.info("Beginning renaming...")
-        changed_residues:int = 0
-        changed_atoms:int = 0
-        for res in stru.residues:
-            if not res.is_canonical():
-                continue
-            
-
-            if res.name == 'LEU':
-                for aa in res.atoms:
-                    if aa.name in leu_mapper:
-                        aa.name = leu_mapper[aa.name]
-                        changed_atoms += 1                            
-        
-        _LOGGER.info(f"Finished renaming! Changed {changed_residues} residues and {changed_atoms} atoms.")
 
 
     def get_amber_residue_index(self, residues: List[Atom]) -> List[int]:
@@ -2307,7 +2275,30 @@ class AmberRSTParser():
     
     def get_structure(self, rst_file: str) -> Structure:
         """parse a rst file to a Structure()."""
+        temp_pdb:str="temp_amber_structure.pdb"
+        contents:List[str] = [
+            f"parm {self.prmtop_file}",
+            f"trajin {rst_file}",
+             "strip :WAT,Na+,Cl-",
+            f"trajout {temp_pdb}",
+             "run",
+             "quit"
+        ]
 
+        self.parent_interface.run_cpptraj( "\n".join(contents) )
+        sp =  PDBParser()
+
+        stru = sp.get_structure( temp_pdb )
+        fs.safe_rm( temp_pdb )
+#
+#        charge_only = PrmtopParser().get_structure(self.prmtop_file)
+#        
+#        for co, aa in zip(charge_only.atoms, stru.atoms):
+#            print(co.key, aa.key)
+#            print(co.__dict__)
+#            exit( 0 )
+
+        return stru 
 
 class AmberMDCRDParser():
     """parser Amber .mdcrd file
