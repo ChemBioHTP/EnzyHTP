@@ -163,6 +163,7 @@ def _get_single_mutation_stability(
     involved in the {mutant_space} of {stru}"""
     result = {}
     single_mutations = [[mut] for mut in get_involved_mutation(mutant_space)]
+    # TODO after finish the engine
     ddg_fold_mapper = ddg_fold_of_mutants(
         stru,
         mutant_space=single_mutations,
@@ -170,8 +171,8 @@ def _get_single_mutation_stability(
         cluster_job_config=cluster_job_config,
         job_check_period=job_check_period,
         job_array_size=job_array_size,
-        # TODO reference single_point and make one
         )
+    # TODO after finish the engine
     result = {k[0] : v for k, v in ddg_fold_mapper.items()}
     return result
 
@@ -189,7 +190,7 @@ def save_obj(obj: Any, out_path: str):
 def load_obj(in_path: str):
     """load the mutant space to the in_path as a checkpoint
     .pickle file"""
-    with open(in_path, "wb") as f:
+    with open(in_path, "rb") as f:
         obj = pickle.load(f)
     return obj
 
