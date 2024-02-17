@@ -32,6 +32,7 @@ SUB_MODULES=[
         'enzy_htp.preparation',
         'enzy_htp.mutation',
         'enzy_htp.mutation.mutation_pattern',
+        'enzy_htp.mutation_class',
         'enzy_htp.geometry',
         'enzy_htp.analysis',
 ]
