@@ -35,7 +35,8 @@ from .handle_types import ddGFoldEngine, ddGResultEgg
 class RosettaCartesianddGEgg(ddGResultEgg):
     """This class define the result egg of cartesian ddg
     calculation"""
-    todo: Any
+    ddg_file: str
+    parent_job: ClusterJob
 
 
 class RosettaCartesianddGEngine(ddGFoldEngine):
@@ -153,8 +154,11 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
         
         Returns:
             return a copy of the changed structure."""
+        result = copy.deepcopy(stru)
         # 1. relax
-        self.parent_interface.relax(stru, nstruct=20, ) # TODO finish this
+        self.parent_interface.relax(result, nstruct=20, ) # TODO finish this
+
+        return result
 
     # region TODO finish this
     def make_job(self, stru: Structure, mutant: List[Mutation]) -> Tuple[ClusterJob, ddGResultEgg]:
@@ -169,18 +173,19 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
 
         # 2. make input file
         fs.safe_mkdir(self.work_dir)
-        temp_gjf_file, gchk_path = self._make_mut_file(mutant)
+        temp_mut_file, ddg_out_path = self._make_mut_file(mutant) # the output path is determined by the input path. will get_valid for out
+        temp_options_file = self._make_options_file(temp_mut_file)
 
         # 3. make cmd
-        spe_cmd, gout_path = self.parent_interface.make_gaussian_cmd(temp_gjf_file)
+        _cmd = self.parent_interface.make_cart_ddg_cmd(temp_options_file)
 
         # 4. assemble ClusterJob
         cluster = self.cluster_job_config["cluster"]
         res_keywords = self.cluster_job_config["res_keywords"]
-        env_settings = cluster.G16_ENV["CPU"]
-        sub_script_path = fs.get_valid_temp_name(f"{self.work_dir}/submit_{self.name}.cmd")
+        env_settings = cluster.ROSETTA_ENV["serial_CPU"] # will also be "parallel_CPU"
+        sub_script_path = fs.get_valid_temp_name(f"{self.work_dir}/submit_cart_ddg.cmd")
         job = ClusterJob.config_job(
-            commands = spe_cmd,
+            commands = _cmd,
             cluster = cluster,
             env_settings = env_settings,
             res_keywords = res_keywords,
@@ -188,21 +193,20 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
             sub_script_path = sub_script_path
         )
         job.mimo = { # only used for translate clean up
-            "temp_gin": [temp_gjf_file],
+            "temp_files": [temp_mut_file, temp_options_file],
         }
 
         # 5. make result egg
-        result_egg = GaussianQMResultEgg(
-            gout_path = gout_path,
-            gchk_path = gchk_path,
-            stru=stru,
-            parent_job = job,
+        result_egg = RosettaCartesianddGEgg(
+            ddg_file = ddg_out_path,
+            parent_job=job,
         )
 
         return (job, result_egg)
 
-    def run(self, stru: Structure) -> ElectronicStructure:
-        """the method that runs the QM"""
+    def run(self, stru: Structure, mutant: List[Mutation]) -> float:
+        """the method that runs the cartesian ddg"""
+        raise Exception("TODO")
         # 1. input
         if not isinstance(stru, Structure):
             _LOGGER.error("only allow Structure as `stru`")
@@ -247,35 +251,24 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
 
         return result
 
-    def translate(self, result_egg: GaussianQMResultEgg) -> ElectronicStructure:
+    def translate(self, result_egg: ddGResultEgg) -> float:
         """the method convert engine specific results to general output"""
-        gout_path = result_egg.gout_path
-        gchk_path = result_egg.gchk_path
+        ddg_file = result_egg.ddg_file
         parent_job = result_egg.parent_job
 
         # error check
-        self.check_spe_error(gout_path, result_egg.parent_job)
+        self.check_dgg_fold_error(ddg_file, result_egg.parent_job)
 
-        stru = result_egg.stru
-        mo_parser = GaussianChkParser(
-            interface=self.parent_interface)
-        energy_0 = self.get_energy_0(gout_path)
-        geometry = self.region.clone_to_geometry(stru)
+        ddg_fold = self.get_ddg_fold(ddg_file)
 
         # clean up
         clean_up_target = [result_egg.parent_job.job_cluster_log,
                            result_egg.parent_job.sub_script_path]
         if not self.keep_in_file:
-            clean_up_target.extend(parent_job.mimo["temp_gin"])
+            clean_up_target.extend(parent_job.mimo["temp_files"])
         fs.clean_temp_file_n_dir(clean_up_target)
 
-        return ElectronicStructure(
-            energy_0 = energy_0,
-            geometry = geometry,
-            mo = gchk_path,
-            mo_parser = mo_parser,
-            source="gaussian16",
-        )
+        return ddg_fold
 
     def check_dgg_fold_error(self,
                         gout_file: str,
@@ -288,6 +281,7 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
         1. stdout/stderr
         2. gout file
         The ultimate goal is to summarize each error type and give suggestions."""
+        raise Exception("TODO")
         if not self.parent_interface.is_gaussian_completed(gout_file):
             # collect error info
             error_info_list = []
@@ -313,7 +307,7 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
             _LOGGER.error(f"Gaussian SPE didn't finish normally.{os.linesep}{os.linesep.join(error_info_list)}")
             raise GaussianError(error_info_list)
 
-    def _make_mut_file(self, stru: Structure) -> Tuple[str]:
+    def _make_mut_file(self, mutant: List[Mutation]) -> Tuple[str]:
         """make a temporary gjf file.
         *path* is based on self.work_dir and self.name.
         If the file exists, will change the filename to {self.name}_{index}.in
