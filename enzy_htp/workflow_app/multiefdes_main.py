@@ -153,7 +153,7 @@ def _generate_coarse_metrics(
                 _LOGGER.error(f"{mut} not in single_point mapper!")
                 raise Exception
             mutant_stability += single_point_stability_mapper[mut]
-        result[tuple(mutant)].append(mutant_ef_strength)
+        result[tuple(mutant)].append(mutant_stability)
 
     return result
 
