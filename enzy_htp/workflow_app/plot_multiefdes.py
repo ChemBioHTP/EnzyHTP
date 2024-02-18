@@ -8,6 +8,8 @@ import matplotlib
 import seaborn as sns
 import pickle
 import numpy as np
+import csv
+from enzy_htp.mutation.mutation import get_mutant_name_tag
 
 from enzy_htp.mutation_class import Mutation
 from enzy_htp import PDBParser
@@ -79,7 +81,7 @@ def _get_distance(stru, x: Tuple, target: Tuple):
 def plot_stability_vs_ef(mutant_space_data: Dict[Mutation, Tuple[float, float]],
                          out_path: str,
                          s_value: float=0.1, if_add_sele_window: bool=True):
-    """takes around 234s"""
+    """make a scatter plot of ddg_fold vs dEF"""
     # prepare data
     x = []
     y = []
@@ -89,8 +91,8 @@ def plot_stability_vs_ef(mutant_space_data: Dict[Mutation, Tuple[float, float]],
 
     # make plot
     fig, ax = plt.subplots(figsize=(6.6, 4), dpi=300)
-    ax.set_xlim((-10, 140))
-    ax.set_ylim((-15, 140))
+    # ax.set_xlim((-10, 140))
+    # ax.set_ylim((-15, 140))
     ax.scatter(x, y, s=s_value, edgecolor="none")
     if if_add_sele_window:
         add_sele_window(ax, [
@@ -138,6 +140,12 @@ def add_sele_window(ax: matplotlib.axes.Axes, sele_def: list, data_x, data_y):
             (x_low, y_low), width, height,
             linewidth=1, edgecolor='red', facecolor='none')
         ax.add_patch(rect)
+
+def make_mutant_space_csv(data_mapper: Dict, out_path: str):
+    with open(out_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["mutant", "dEF", "ddG"])
+        writer.writerows([[get_mutant_name_tag(i)[1:].replace("_"," "),j,k] for i,(j,k) in data_mapper.items()])
 
 # region TODO recycle
 def plot_ele_rank(data_path, out_path):
@@ -363,17 +371,6 @@ def plot_verify_sample_points(sample_data_list, stablilty_data, ef_data, out_pat
     fig.tight_layout() 
     plt.savefig(out_path, dpi=300, transparent=True)
 
-
-def _make_good_stability_ef_csv(data_path, out_path):
-    import csv
-    from enzy_htp.mutation.mutation import get_mutant_name_tag
-    with open(data_path, "rb") as f:
-        result = pickle.load(f)
-    with open(out_path, "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["mutant", "EF", "ddG"])
-        writer.writerows([[get_mutant_name_tag(i)[1:].replace("_"," "),j*scale_f,k] for i,j,k in result])
-
 def plot_2nd_metric_dist(data_1: list, data_2: list, out_path, s_value=0.1, if_add_sele_window=0):
     """plot the 2d metric distribution"""
     x = data_1
@@ -429,15 +426,18 @@ def puo_chain_sync(key: Tuple[str, int], change_chain: bool=True) -> Tuple[str, 
 
 def main():
     with open("mutant_space_1_coarse_def_ddg_fold.pickle", "rb") as f:
-        mutant_space_data = pickle.load(f)
+        mutant_space_1_data = pickle.load(f)
+    with open("mutant_space_2_coarse_def_ddg_fold.pickle", "rb") as f:
+        mutant_space_2_data = pickle.load(f)
     with open("single_mutation_ddg.pickle", "rb") as f:
         single_mutation_data = pickle.load(f)
     plot_single_stability_violin(single_mutation_data, "figures/single_stability_violin.svg", pdb_path="puo_acp.pdb", 
                                  chain_sync_mapper=puo_chain_sync, merge_chain_sync_mutation=False)
     plot_single_stability_violin(single_mutation_data, "figures/single_stability_violin_sync.svg", pdb_path="puo_acp.pdb",
                                  chain_sync_mapper=puo_chain_sync)
-    plot_stability_vs_ef(mutant_space_data, "figures/mut_space_1_ddgfold_vs_ef.svg", s_value=0.1, if_add_sele_window=False)
-
+    plot_stability_vs_ef(mutant_space_1_data, "figures/mut_space_1_ddgfold_vs_ef.svg", s_value=1)
+    for i, mut_grp in enumerate(mutant_space_2_data):
+        make_mutant_space_csv(mut_grp, f"mut_space_2_{i}.csv")
     pass
 
 if __name__ == "__main__":
