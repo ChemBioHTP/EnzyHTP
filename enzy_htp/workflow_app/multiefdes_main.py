@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Tuple
 from enzy_htp.analysis import d_ele_field_upon_mutation_coarse, ddg_fold_of_mutants
 from enzy_htp.core.clusters.accre import Accre
 from enzy_htp.mutation import assign_mutant
-from enzy_htp.mutation_class import Mutation, get_involved_mutation
+from enzy_htp.mutation_class import Mutation, get_involved_mutation, generate_from_mutation_flag
 from enzy_htp.structure import Structure, PDBParser, Atom
 from enzy_htp.core import _LOGGER
 import numpy as np
@@ -68,9 +68,12 @@ def coarse_filter(
         sample_per_group: int = 300,
         out_ref_path_1: str = "mutant_space_1_coarse_def_ddg_fold.pickle",
         out_ref_path_2: str = "mutant_space_2_coarse_def_ddg_fold.pickle",
+        ddg_fold_file: str = None,
     ) -> List[List[List[Mutation]]]:
     """the coarse filter applied on the 1st mutant space ({mutants})
     and assess dEF and ddG_fold. Gives the 2nd mutant space.
+    if `ddg_fold_file` is given, ddg_fold values for single mutations will be taken from the file.
+
     Returns:
         - the 2nd mutant space as a list of sample groups of mutants
         - also save the {mutant : (dEF, ddG_fold)} to a .pickle
@@ -84,7 +87,7 @@ def coarse_filter(
     result = []
     result_dicts = []
     # generate {mutant : (dEF, ddG_fold)} dict
-    coarse_metrics_dict = _generate_coarse_metrics(stru, mutants, atom_1, atom_2, cluster_job_config)
+    coarse_metrics_dict = _generate_coarse_metrics(stru, mutants, atom_1, atom_2, cluster_job_config, ddg_fold_file)
     save_obj(coarse_metrics_dict, out_ref_path_1)
 
     # filter mutants
@@ -108,6 +111,7 @@ def _generate_coarse_metrics(
         mutants: List[List[Mutation]],
         atom_1: str, atom_2: str,
         cluster_job_config: Dict,
+        ddg_fold_file: str,
     ) -> Dict[Tuple[Mutation], Tuple[float, float]]:
     """calculate the dEF and ddG_fold for each mutant
     in mutants"""
@@ -140,6 +144,7 @@ def _generate_coarse_metrics(
         stru=stru,
         mutant_space=mutants,
         cluster_job_config=cluster_job_config,
+        ddg_fold_file=ddg_fold_file,
     )
     for mutant in mutants:
         mutant_stability = 0.0 # this also makes WT in [] form be 0.0 
@@ -158,22 +163,32 @@ def _get_single_mutation_stability(
         cluster_job_config: Dict,
         job_check_period: int= 210, # s
         job_array_size: int= 100,
+        ddg_fold_file: str= None,
     ) -> Dict[Mutation, float]:
     """calculate ddg_fold for each single point mutations
     involved in the {mutant_space} of {stru}"""
-    result = {}
     single_mutations = [[mut] for mut in get_involved_mutation(mutant_space)]
-    # TODO after finish the engine
-    ddg_fold_mapper = ddg_fold_of_mutants(
-        stru,
-        mutant_space=single_mutations,
-        method="rosetta_cartesian_ddg",
-        cluster_job_config=cluster_job_config,
-        job_check_period=job_check_period,
-        job_array_size=job_array_size,
-        )
-    # TODO after finish the engine
-    result = {k[0] : v for k, v in ddg_fold_mapper.items()}
+    if ddg_fold_file:
+        # 1. extract
+        result = load_obj(ddg_fold_file)
+        # 2. safety check
+        for mut in single_mutations:
+            mut = mut[0]
+            if mut not in result:
+                _LOGGER.error(f"ddg_fold_file missing mutation: {mut} ({ddg_fold_file})")
+                raise ValueError
+    else:
+        # TODO after finish the engine
+        ddg_fold_mapper = ddg_fold_of_mutants(
+            stru,
+            mutant_space=single_mutations,
+            method="rosetta_cartesian_ddg",
+            cluster_job_config=cluster_job_config,
+            job_check_period=job_check_period,
+            job_array_size=job_array_size,
+            )
+        # TODO after finish the engine
+        result = {k[0] : v for k, v in ddg_fold_mapper.items()}
     return result
 
 def fine_filter() -> List[List[Mutation]]:
@@ -194,7 +209,7 @@ def load_obj(in_path: str):
         obj = pickle.load(f)
     return obj
 
-def workflow_puo():
+def workflow_puo(single_mut_ddg_file_path: str = None):
     """the PuO workflow"""
     # target system
     atom_1 = "C.901.C64"
@@ -241,7 +256,8 @@ def workflow_puo():
         mutant_space_2 = coarse_filter(
             stru, mutant_space_1,
             atom_1, atom_2,
-            cluster_job_config = cluster_job_config,)
+            cluster_job_config = cluster_job_config,
+            ddg_fold_file=single_mut_ddg_file_path,)
         save_obj(mutant_space_2, checkpoint_2)
     else:
         mutant_space_2 = load_obj(checkpoint_2)
@@ -256,7 +272,7 @@ def workflow_puo():
     return mutant_space_3
 
 def main():
-    workflow_puo()
+    workflow_puo("single_mutation_ddg.pickle")
 
 if __name__ == "__main__":
     main()
