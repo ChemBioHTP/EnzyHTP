@@ -156,7 +156,7 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
             return a copy of the changed structure."""
         result = copy.deepcopy(stru)
         # 1. relax
-        self.parent_interface.relax(result, nstruct=20, ) # TODO finish this
+        self.parent_interface.relax(result, nstruct=20, )
 
         return result
 
@@ -552,7 +552,9 @@ class RosettaInterface(BaseInterface):
         self,
         infile: Union[Structure, str],
         nstruct: int,
-        ignore_zero_occupancy: bool = True,
+        scorefxn: str = None,
+        use_cartesian: bool = False,
+        ignore_zero_occupancy: bool = True, # TODO make a function that handles making options specifically. (since a lot of them are the same.)
         full_atom: bool = True,
         detect_disulf: bool = True,
         linmem_ig: int = 10,
@@ -562,16 +564,17 @@ class RosettaInterface(BaseInterface):
         prefix: str = None,
         overwrite: bool = True,
         extra_flags: List[str] = None,
-        output_dir: str = './',
+        output_dir: str = './rosetta_relax',
         delete_scores: bool = True,
         delete_crash: bool = True,
+        cluster_job_config: Dict = None,
+        job_check_period: int = 180,
     ) -> pd.DataFrame:
         """Runs Rosetta's relax protocol on the supplied .pdb file, returning the path to the relaxaed structure as 
         well as a dictionary with all characteristics found in the score.sc file. Function provides direct access to a 
         number of commandline options and the ability to add arbitrary commandline options at the end. 
 
         NOTE: The majority of crashes from this function are due to bad atom names.
-         
 
         Args:
             infile: A str() with the path to the .pdb file to relax. Or a Structure() in Rosetta naming convention.
@@ -590,11 +593,11 @@ class RosettaInterface(BaseInterface):
             delete_scores: Whether the score.sc file should be deleted after running. True by default.
             delete_crash: Whether the ROSETTA_CRASH.log file should be deleted after running. True by default.
 
-
         Returns:
             pandas DataFrame containing the results and energies of the relaxed structures. Description column contains
             full paths to relaxed files. 
         """
+        # 1. dispatch for input
         clean_targets = []
         if isinstance(infile, str):
             fs.check_file_exists(infile)
@@ -614,21 +617,20 @@ class RosettaInterface(BaseInterface):
             _LOGGER.error(f"Found unsupported input type: {type(infile)}")
             raise TypeError
 
-        fs.safe_rm(f'{output_dir}/score.sc')
-        #/dors/meilerlab/apps/rosetta/rosetta-3.13/main/source/bin/relax.default.linuxgccrelease
-        #-out:prefix $prefix
-        #-out:file:scorefile ${prefix}.sc &
+        # 2. prepare cmd TODO move this to a seperate function
+        score_file = fs.get_valid_temp_name(f"{output_dir}/temp_score.sc")
         flags: List[str] = [
             f"-in:file:s '{infile}'",
             f"-nstruct {nstruct}",
             f"-linmem_ig {linmem_ig}",
+            f"-out:file:scorefile {score_file}",
         ]
-
         flags.append(f"-ignore_zero_occupancy {'true' if ignore_zero_occupancy else 'false'}")
         flags.append(f"-relax:constrain_relax_to_start_coords {'true' if constrain_relax_to_start_coords else 'false'}")
         flags.append(f"-coord_constrain_sidechains {'true' if coord_constrain_sidechains else 'false'}")
         flags.append(f"-ramp_constraints {'true' if ramp_constraints else 'false'}")
         flags.append(f"-out:path:all {output_dir}")
+        flags.append(f"-cartesian {'true' if use_cartesian else 'false'}")
 
         if full_atom:
             flags.append("-in:file:fullatom")
@@ -642,19 +644,40 @@ class RosettaInterface(BaseInterface):
         if overwrite:
             flags.append("-overwrite")
 
+        if scorefxn:
+            flags.append(f"-score:weights {scorefxn}")
+
         if extra_flags:
             flags.extend(extra_flags)
 
+        # 3. execute
         fs.safe_mkdir(output_dir)
+        
+        if cluster_job_config:
+            _cmd = f"{self.config.RELAX} {' '.join(flags)}"
+            cluster = cluster_job_config["cluster"]
+            res_keywords = cluster_job_config["res_keywords"] | self.config.DEFAULT_RELAX_RES_KEYWORDS
+            env_settings = cluster.ROSETTA_ENV["parallel_CPU"]
+            sub_script_path = fs.get_valid_temp_name(f"{output_dir}/submit_rosetta_relax.cmd")
+            job = ClusterJob.config_job(
+                commands = _cmd,
+                cluster = cluster,
+                env_settings = env_settings,
+                res_keywords = res_keywords,
+                sub_dir = "./", # because some path are relative
+                sub_script_path = sub_script_path
+            )
+            job.submit()
+            job.wait_to_end(period=job_check_period)
+        else:
+            self.env_manager_.run_command(self.config_.RELAX, flags)
 
-        self.env_manager_.run_command(self.config_.RELAX, flags)
-
-        df: pd.DataFrame = self.parse_score_file(f'{output_dir}/score.sc')
+        df: pd.DataFrame = self.parse_score_file(score_file)
 
         df['description'] = df.apply(lambda row: f"{output_dir}/{row.description}.pdb", axis=1)
 
         if delete_scores:
-            self._delete_score_file(output_dir)
+            clean_targets.append(score_file)
 
         if delete_crash:
             self._delete_crash_log()

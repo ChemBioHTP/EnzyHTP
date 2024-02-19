@@ -92,6 +92,15 @@ class RosettaConfig(BaseConfig):
     DEFAULT_CART_DDG_WORK_DIR: str = "./rosetta_cart_ddg"
     """The default value for the cartesian ddg working dir that contains all the temp/result
     files."""
+    # endregion
+
+    # region == Default values for relax() ==
+    DEFAULT_RELAX_RES_KEYWORDS: Dict = copy.deepcopy(ARMerConfig.SINGLE_CPU_RES) | {
+                                            'job_name' : 'rosetta_relax_EnzyHTP',
+                                            }
+    """The default value for the resource configuration of relax()."""
+    
+    # endregion
 
     def required_executables(self) -> List[str]:
         """A hardcoded list of required executables for Rosetta."""
