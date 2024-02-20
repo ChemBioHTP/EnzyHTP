@@ -18,8 +18,9 @@ from typing import Any, Dict, List, Tuple, Set, Union
 
 import numpy as np
 import pandas as pd
-from enzy_htp.mutation_class.mutation import Mutation
 
+from enzy_htp import config as eh_config
+from enzy_htp.mutation_class.mutation import Mutation
 from enzy_htp.structure import Structure, PDBParser, Mol2Parser, Ligand
 from enzy_htp.structure.structure_constraint import StructureConstraint, ResiduePairConstraint
 from enzy_htp._config.rosetta_config import RosettaConfig, default_rosetta_config
@@ -654,11 +655,13 @@ class RosettaInterface(BaseInterface):
         fs.safe_mkdir(output_dir)
         
         if cluster_job_config:
-            _cmd = f"{self.config.RELAX} {' '.join(flags)}"
             cluster = cluster_job_config["cluster"]
             res_keywords = cluster_job_config["res_keywords"] | self.config.DEFAULT_RELAX_RES_KEYWORDS
             env_settings = cluster.ROSETTA_ENV["parallel_CPU"]
             sub_script_path = fs.get_valid_temp_name(f"{output_dir}/submit_rosetta_relax.cmd")
+            num_cores = res_keywords["node_cores"]
+            mpi_exec = eh_config._system.get_mpi_executable(num_cores)
+            _cmd = f"{mpi_exec} {self.config.RELAX} {' '.join(flags)}"
             job = ClusterJob.config_job(
                 commands = _cmd,
                 cluster = cluster,
