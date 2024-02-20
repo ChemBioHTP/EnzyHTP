@@ -13,7 +13,11 @@ from enzy_htp.core.exception import InvalidMutationPatternSyntax
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.general import (get_random_list_elem, pop_random_list_elem, product_lists_allow_empty, split_but_brackets)
 from enzy_htp.structure import Structure
-from ..mutation import (Mutation, generate_from_mutation_flag, generate_mutation_from_traget_list)
+from enzy_htp.mutation_class import (
+    Mutation, 
+    generate_from_mutation_flag, 
+    generate_mutation_from_target_list,
+)
 from .position_pattern import decode_position_pattern
 from .target_aa_pattern import check_target_aa_pattern, decode_target_aa_pattern
 
@@ -214,7 +218,7 @@ def decode_mutation_esm_pattern(stru: Structure, mutation_esm_patterns: str) -> 
         esm_positions = decode_position_pattern(stru, position_pattern, if_name=True)
         for esm_position, orig_resi in esm_positions:
             posi_target_aa = decode_target_aa_pattern(orig_resi, target_aa_pattern)
-            posi_mutation = generate_mutation_from_traget_list(esm_position, orig_resi, posi_target_aa)
+            posi_mutation = generate_mutation_from_target_list(esm_position, orig_resi, posi_target_aa)
             if esm_position in esm_result:  # shared position case
                 esm_result[esm_position] = list(set(esm_result[esm_position]) | set(posi_mutation))
             else:

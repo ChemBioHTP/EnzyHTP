@@ -10,7 +10,7 @@ import pickle
 
 from enzy_htp.core.exception import InvalidMutationPatternSyntax
 from enzy_htp import PDBParser
-from enzy_htp.mutation.mutation import Mutation
+from enzy_htp.mutation_class import Mutation
 import enzy_htp.mutation.mutation_pattern.api as m_p
 
 CURR_FILE = os.path.abspath(__file__)

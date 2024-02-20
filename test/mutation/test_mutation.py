@@ -12,7 +12,7 @@ from typing import List
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.exception import InvalidMutation
 import enzy_htp.structure as es
-import enzy_htp.mutation as mut
+import enzy_htp.mutation_class as mut
 
 DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/data/"
 

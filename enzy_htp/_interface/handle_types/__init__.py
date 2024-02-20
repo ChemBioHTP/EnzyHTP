@@ -11,3 +11,5 @@ from .mol_dyn_step import MolDynStep
 from .mol_dyn_parameterizer import MolDynParameterizer, MolDynParameter
 from .mol_dyn_result import MolDynResult, MolDynResultEgg
 from .qm_engine import QMOptimizationEngine, QMSinglePointEngine, QMResultEgg
+from .modeling_engine import ModelingResultEgg, ModelingEngine
+from .thermostability_engine import ddGFoldEngine, ddGResultEgg
