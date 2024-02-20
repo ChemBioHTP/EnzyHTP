@@ -656,7 +656,7 @@ class RosettaInterface(BaseInterface):
         
         if cluster_job_config:
             cluster = cluster_job_config["cluster"]
-            res_keywords = cluster_job_config["res_keywords"] | self.config().DEFAULT_RELAX_RES_KEYWORDS
+            res_keywords =  self.config().DEFAULT_RELAX_RES_KEYWORDS | cluster_job_config["res_keywords"]
             env_settings = cluster.ROSETTA_ENV["parallel_CPU"]
             sub_script_path = fs.get_valid_temp_name(f"{output_dir}/submit_rosetta_relax.cmd")
             num_cores = res_keywords["node_cores"]
