@@ -656,12 +656,12 @@ class RosettaInterface(BaseInterface):
         
         if cluster_job_config:
             cluster = cluster_job_config["cluster"]
-            res_keywords = cluster_job_config["res_keywords"] | self.config.DEFAULT_RELAX_RES_KEYWORDS
+            res_keywords = cluster_job_config["res_keywords"] | self.config().DEFAULT_RELAX_RES_KEYWORDS
             env_settings = cluster.ROSETTA_ENV["parallel_CPU"]
             sub_script_path = fs.get_valid_temp_name(f"{output_dir}/submit_rosetta_relax.cmd")
             num_cores = res_keywords["node_cores"]
             mpi_exec = eh_config._system.get_mpi_executable(num_cores)
-            _cmd = f"{mpi_exec} {self.config.RELAX} {' '.join(flags)}"
+            _cmd = f"{mpi_exec} {self.config().RELAX} {' '.join(flags)}"
             job = ClusterJob.config_job(
                 commands = _cmd,
                 cluster = cluster,
