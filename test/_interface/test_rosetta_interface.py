@@ -20,8 +20,8 @@ ri = interface.rosetta
 
 def test_relax_w_stru():
     """as said in the name. make sure relax works Structure() input."""
-    config._rosetta.RELAX = "$ROSETTA3/source/bin/relax.mpi.linuxgccrelease"
-    config._system.MPI_EXECUTABLE = "mpiexec"
+    config.rosetta.RELAX = "$ROSETTA3/source/bin/relax.mpi.linuxgccrelease"
+    config.system.MPI_EXECUTABLE = "mpiexec"
     test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
     scores = ri.relax(
         test_stru,
@@ -33,10 +33,10 @@ def test_relax_w_stru():
         cluster_job_config={
             "cluster" : Accre(),
             "res_keywords" : {
-                "partition" : "debug",
+                "partition" : "production",
                 "node_cores" : "24",
                 "account" : "yang_lab_csb",
-                "walltime" : "30:00",
+                "walltime" : "10:00:00",
             }
         }
     )
