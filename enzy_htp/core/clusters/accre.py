@@ -169,7 +169,7 @@ export ROSETTA3=/data/yang_lab/shaoqz/software/Rosetta313/main/""",
             res_line = f"#SBATCH --{k}{v}\n"
             res_str += res_line
         res_str += "#SBATCH --export=NONE\n"
-        res_str += "#SBATCH --exclude=gpu0022,gpu0002,cn1615\n"
+        res_str += "#SBATCH --exclude=gpu0022,gpu0002\n"
         return res_str
     
     @classmethod

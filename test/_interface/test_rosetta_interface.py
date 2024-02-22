@@ -36,7 +36,7 @@ def test_relax_w_stru():
             "res_keywords" : {
                 "partition" : "production",
                 "node_cores" : "24",
-                "account" : "yang_lab_csb",
+                "account" : "yang_lab",
                 "walltime" : "10:00:00",
             }
         },
