@@ -27,6 +27,7 @@ def test_relax_w_stru():
         test_stru,
         nstruct=1,
         constrain_relax_to_start_coords=False,
+        coord_constrain_sidechains=False,
         ramp_constraints=False,
         use_cartesian=True,
         scorefxn="ref2015_cart",
@@ -38,6 +39,7 @@ def test_relax_w_stru():
                 "account" : "yang_lab_csb",
                 "walltime" : "10:00:00",
             }
-        }
+        },
+        delete_crash=False,
     )
     print(scores)

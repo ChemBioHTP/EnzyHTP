@@ -631,7 +631,7 @@ class RosettaInterface(BaseInterface):
         flags.append(f"-coord_constrain_sidechains {'true' if coord_constrain_sidechains else 'false'}")
         flags.append(f"-ramp_constraints {'true' if ramp_constraints else 'false'}")
         flags.append(f"-out:path:all {output_dir}")
-        flags.append(f"-cartesian {'true' if use_cartesian else 'false'}")
+        flags.append(f"-relax:cartesian {'true' if use_cartesian else 'false'}")
 
         if full_atom:
             flags.append("-in:file:fullatom")

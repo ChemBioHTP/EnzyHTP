@@ -67,8 +67,8 @@ export PATH=$PATH:$Multiwfnpath"""
 
     ROSETTA_ENV = {
         "serial_CPU" : "export ROSETTA3=/data/yang_lab/Common_Software/Rosetta3.9/main/",
-        "parallel_CPU" : """module load GCC/5.4.0-2.26
-module load OpenMPI
+        "parallel_CPU" : """module load GCC/11.3.0
+module load OpenMPI/4.1.4
 export ROSETTA3=/data/yang_lab/shaoqz/software/Rosetta313/main/""",
     }
     #############################
