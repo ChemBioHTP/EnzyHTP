@@ -230,8 +230,25 @@ class MetalUnit(NonCanonicalBase):
     #     return line
 
     #endregion
+    @property
+    def bonds(self):
+        return list()
 
 
+   
+def get_metal(metal_name:str, charge:int=None) -> MetalUnit:
+    #@TODO(CJ): add some checks in here
+    return MetalUnit(
+            1,
+            metal_name,
+            atoms=[Atom(
+                name=metal_name,
+                coord=(0.0, 0.0, 0.0),
+                charge=charge,
+                idx=1
+                )]
+            )
+                    
 def residue_to_metal(residue: Residue) -> MetalUnit:
     """Convenience function that converts Residue() to MetalUnit() object."""
     if len(residue.atoms) > 1:

@@ -71,38 +71,6 @@ class RosettaInterface(BaseInterface):
         """
         fs.safe_rm('./ROSETTA_CRASH.log')
 
-    def rename_atoms(self, stru: Structure) -> None:
-        """Renames residues and atoms to be compatible with Rosetta naming and functions.
-        
-        Args:
-            stru: The Structure() to perform renaming on.
-
-        Returns:
-            Nothing. 
-        """
-        nterm_mapper:Dict = {"H1":"1H", "H2":"2H", "H3":"3H"}
-        his_mapper:Dict = {"HB2":"1HB", "HB3":"2HB"}
-        _LOGGER.info("Beginning renaming...")
-        changed_residues:int = 0
-        changed_atoms:int = 0
-        for res in stru.residues:
-            if not res.is_canonical():
-                continue
-            
-            if res.name in "HID HIS HIE".split():
-                res.name = "HIS"
-                changed_residues += 1
-                for aa in res.atoms:
-                    if aa.name in his_mapper:
-                        aa.name = his_mapper[aa.name]
-                        changed_atoms += 1
-
-            for aa in res.atoms:
-                if aa.name in nterm_mapper:
-                    aa.name = nterm_mapper[aa.name]
-                    changed_atoms += 1
-        _LOGGER.info(f"Finished renaming! Changed {changed_residues} residues and {changed_atoms} atoms.")
-
     def run_rosetta_scripts(self, opts: List[str], logfile: str = None) -> None:
         """Method that runs the rosettascripts executabl along with the supplied options. Optionally outputs
         the stdout to a specified logfile. Note that no sanitation is performed prior to running.
@@ -813,10 +781,19 @@ class RosettaInterface(BaseInterface):
         lines:List[str] = list()
         for cst in constraints:
             if cst.is_distance_constraint():
-                assert False
-                pass
+                ridx_1:int=stru.absolute_index(cst.atoms[0].parent, indexed=1)
+                ridx_2:int=stru.absolute_index(cst.atoms[1].parent, indexed=1)
+                lines.append(
+                    f"AtomPair {cst.atoms[0].name} {ridx_1} {cst.atoms[1].name} {ridx_2} LINEAR_PENALTY {cst.target_value:.2f} 0.00 {cst['rosetta']['tolerance']:.2f} {cst['rosetta']['penalty']:.2f}"
+                )
             elif cst.is_angle_constraint():
-                assert False
+                ridx_1:int=stru.absolute_index(cst.atoms[0].parent, indexed=1)
+                ridx_2:int=stru.absolute_index(cst.atoms[1].parent, indexed=1)
+                ridx_3:int=stru.absolute_index(cst.atoms[2].parent, indexed=1)
+                lines.append(
+                    f"Angle {cst.atoms[0].name} {ridx_1} {cst.atoms[1].name} {ridx_2} {cst.atoms[2].name} {ridx_3} LINEAR_PENALTY {np.radians(cst.target_value):.2f} 0.00 {np.radians(cst['rosetta']['tolerance']):.2f} {cst['rosetta']['penalty']/np.radians(1):.2f}"
+                )
+
             elif cst.is_dihedral_constraint():
                 assert False
             elif cst.is_residue_pair_constraint():

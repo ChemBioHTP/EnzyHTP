@@ -44,7 +44,7 @@ class Ligand(NonCanonicalBase):
         NonCanonicalBase.__init__(self, residue_idx, residue_name, atoms, parent, **kwargs)
         self.rtype = chem.ResidueType.LIGAND
 
-        self.bonds = kwargs.get('bonds', list())  # TODO change this to a more general represetation
+        self._bonds = kwargs.get('bonds', list())  # TODO change this to a more general represetation
         self.conformer_coords = list() # TODO change this to StructureEnsemble (we can leave a reference_var here tho)
         self.placement_method_ = None
         # TODO: The idea for Structure and Ligand is to only have the math model recorded. 

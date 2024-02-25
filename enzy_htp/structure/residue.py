@@ -21,6 +21,7 @@ from enzy_htp.core.math_helper import get_geom_center
 
 from .atom import Atom
 
+from .bond import Bond
 
 class Residue(DoubleLinkedNode):
     """Most common functional unit in enzy_htp. Made up of Atom() objects and can be either
@@ -37,13 +38,20 @@ class Residue(DoubleLinkedNode):
         num_atoms: number of belonging Atom()s
     """
 
-    def __init__(self, residue_idx: int, residue_name: str, atoms: List[Atom], parent=None):
+    def __init__(self, residue_idx: int, residue_name: str, atoms: List[Atom], parent=None, bonds:List[Bond] = None):
         """Constructor for the Residue() object"""
         self._name = residue_name
         self._idx = residue_idx
         self._rtype = chem.ResidueType.UNKNOWN
         self.set_parent(parent)
         self.set_children(atoms)
+        self._bonds = bonds #TODO(CJ): add documentation
+        if bonds:
+            self.set_parent(bonds)
+
+    @property
+    def bonds(self) -> List[Bond]:
+        return self._bonds
 
     #region === Getter-Attr ===
     @property
