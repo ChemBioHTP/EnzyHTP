@@ -7,7 +7,7 @@ tp2
 ccopy_reg
 _reconstructor
 p4
-(cenzy_htp.mutation.mutation
+(cenzy_htp.mutation_class
 Mutation
 p5
 c__builtin__

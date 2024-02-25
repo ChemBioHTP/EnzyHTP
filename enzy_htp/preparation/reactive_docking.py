@@ -18,7 +18,6 @@ import enzy_htp.structure.structure_operation as stru_oper
 from enzy_htp.structure.structure_constraint import StructureConstraint, CartesianFreeze
 
 import enzy_htp.chemical as chem
-from enzy_htp import mutation as mm
 from enzy_htp.structure import PDBParser, Mol2Parser, Structure, Ligand, translate_structure
 from enzy_htp.core import file_system as fs
 from enzy_htp.quantum import single_point

@@ -98,6 +98,10 @@ class Mutation:
 
         return True
 
+    def is_wild_type(self) -> bool:
+        """check if self is wild type"""
+        return self.target == "WT"
+
     # == property getter ==
     def get_target(self, if_one_letter: bool = False) -> str:
         """get the mutation target in 1/3-letter format"""
@@ -189,7 +193,7 @@ def generate_from_mutation_flag(mutation_flag: str) -> Mutation:
     return Mutation(orig, target, chain_id, res_idx)
 
 
-def generate_mutation_from_traget_list(position: Tuple[str, int], orig_resi: str, target_list: str) -> List[Mutation]:
+def generate_mutation_from_target_list(position: Tuple[str, int], orig_resi: str, target_list: str) -> List[Mutation]:
     """generate a list of Mutation() objects from position and a list of target residues
     Args:
         position: the sequence position of the mutation (e.g.: A 101)
@@ -208,7 +212,7 @@ def generate_mutation_from_traget_list(position: Tuple[str, int], orig_resi: str
     return result
 
 
-# --Mutant--
+# --Mutant-- # TODO may be a class in the future
 # below utilities are for a list of Mutation()
 # == checker ==
 def check_repeat_mutation(mutant: List[Mutation]):
@@ -255,3 +259,14 @@ def get_mutant_name_str(mutant: List[Mutation]) -> str:
     """get a string representation of a mutant.
     e.g.: 'A##B C##D'"""
     return " ".join(str(i) for i in mutant)
+
+# --Mutant Space-- # TODO may be a class in the future
+# below utilities are for a list of mutants (each is a list of Mutation())
+# == property getter ==
+def get_involved_mutation(mutant_space: List[List[Mutation]]) -> List[Mutation]:
+    """get all involved single point Mutations from a mutant space"""
+    result = set()
+    for mutant in mutant_space:
+        for mutation in mutant:
+            result.add(mutation)
+    return result

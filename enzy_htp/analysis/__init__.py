@@ -10,6 +10,8 @@ from .electric_field import (
     ele_field_strength_at_along,
     ele_field_strength_at,
     ele_stab_energy_of_bond,
-    ele_stab_energy_of_dipole
+    ele_stab_energy_of_dipole,
+    d_ele_field_upon_mutation_coarse,
 )
 from .dipole import bond_dipole
+from .stability import ddg_fold_of_mutants

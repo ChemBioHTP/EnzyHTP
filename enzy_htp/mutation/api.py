@@ -28,7 +28,14 @@ from enzy_htp import config
 from enzy_htp.structure import Structure, PDBParser
 import enzy_htp.structure.structure_operation as stru_oper
 from enzy_htp import interface
-from .mutation import (Mutation, check_repeat_mutation, get_mutant_name_tag, remove_repeat_mutation)
+from ..mutation_class import (
+    Mutation,
+    generate_from_mutation_flag,
+    check_repeat_mutation,
+    remove_repeat_mutation,
+    get_mutant_name_tag,
+    get_involved_mutation,
+)
 from .mutation_pattern import decode_mutation_pattern
 from enzy_htp._interface.pymol_interface import OpenPyMolSession
 

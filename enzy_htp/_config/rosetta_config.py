@@ -3,13 +3,18 @@ Rosetta modelling suite. In addition to holding Rosetta. File also contains defa
 which creates a default version of the RosettaConfig() object.
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Author: Qianzhen Shao <shaoqz@icloud.com>
 Date: 2023-03-28
 """
 
+import copy
 from typing import List, Any, Dict
 from copy import deepcopy
 
 from .base_config import BaseConfig
+from .armer_config import ARMerConfig
+
+from enzy_htp.core.clusters.accre import Accre
 
 
 class RosettaConfig(BaseConfig):
@@ -53,6 +58,49 @@ class RosettaConfig(BaseConfig):
     }
     """Default angle constraints used for Angle constraints in Rosetta."""
 
+    # region == Default values for build_cartesian_ddg_engine() ==
+    DEFAULT_CART_DDG_NUM_ITER: int = 10
+    """the default value for the NUM_ITER option of cartesian ddg calculation"""
+
+    DEFAULT_CART_DDG_FORCE_ITER: bool = False
+    """the default value for the FORCE_ITER option of cartesian ddg calculation"""
+
+    DEFAULT_CART_DDG_SCORE_CUTOFF: float = 1.0
+    """the default value for the SCORE_CUTOFF option of cartesian ddg calculation"""
+
+    DEFAULT_CART_DDG_FA_MAX_DIS: float = 9.0
+    """the default value for the FA_MAX_DIS option of cartesian ddg calculation"""
+
+    DEFAULT_CART_DDG_SCOREFXN: str = "ref2015_cart"
+    """the default value for the SCOREFXN option of cartesian ddg calculation"""
+
+    DEFAULT_CART_DDG_RES_KEYWORDS: Dict = copy.deepcopy(ARMerConfig.SINGLE_CPU_RES) | {'job_name' : 'cart_ddg_EnzyHTP',}
+    """The default value for the resource configuration of CART_DDG."""
+
+    def get_default_cart_ddg_cluster_job_res_keywords(self) -> Dict:
+        """function for lazy resolution."""
+        return copy.deepcopy(self.DEFAULT_CART_DDG_RES_KEYWORDS)
+
+    def get_default_cart_ddg_cluster_job_config(self) -> Dict:
+        """The default value for dictionary that assign arguments to
+        ClusterJob.config_job and ClusterJob.wait_to_end during the CART_DDG"""
+        return {
+            "cluster" : Accre(),
+            "res_keywords" : self.get_default_cart_ddg_cluster_job_res_keywords(),
+        }
+
+    DEFAULT_CART_DDG_WORK_DIR: str = "./rosetta_cart_ddg"
+    """The default value for the cartesian ddg working dir that contains all the temp/result
+    files."""
+    # endregion
+
+    # region == Default values for relax() ==
+    DEFAULT_RELAX_RES_KEYWORDS: Dict = copy.deepcopy(ARMerConfig.SINGLE_CPU_RES) | {
+                                            'job_name' : 'rosetta_relax_EnzyHTP',
+                                            }
+    """The default value for the resource configuration of relax()."""
+    
+    # endregion
 
     def required_executables(self) -> List[str]:
         """A hardcoded list of required executables for Rosetta."""

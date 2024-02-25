@@ -8,13 +8,13 @@ Date: 2023-12-28
 from abc import ABC, abstractmethod
 from typing import Union, List, Tuple
 
-from ..base_interface import BaseInterface
+from .modeling_engine import ModelingEngine, ModelingResultEgg
 
 from enzy_htp.electronic_structure import ElectronicStructure
 from enzy_htp.structure import Structure
 from enzy_htp.core.job_manager import ClusterJob
 
-class QMResultEgg(ABC):
+class QMResultEgg(ModelingResultEgg):
     """This class defines the format of QM result eggs.
     These eggs are QM result place holders before the calculation.
     An example of eggs is file paths, so in Gaussian's case, it could be
@@ -25,14 +25,8 @@ class QMResultEgg(ABC):
     In most cases, the concrete class is a dataclass"""
     pass
 
-class QMSinglePointEngine(ABC):
+class QMSinglePointEngine(ModelingEngine):
     """the qm engine that performs single point calculation"""
-
-    @property
-    @abstractmethod
-    def engine(self) -> str:
-        """the engine name that should be hardcoded in each concrete class"""
-        pass
 
     @abstractmethod
     def make_job(self, stru: Structure) -> Tuple[ClusterJob, QMResultEgg]:
@@ -50,14 +44,8 @@ class QMSinglePointEngine(ABC):
         pass
 
 
-class QMOptimizationEngine(ABC):
+class QMOptimizationEngine(ModelingEngine):
     """the qm engine that performs geometry optimization"""
-
-    @property
-    @abstractmethod
-    def engine(self) -> str:
-        """the engine name that should be hardcoded in each concrete class"""
-        pass
 
     @abstractmethod
     def make_job(self, stru: Structure) -> Tuple[ClusterJob, QMResultEgg]:
