@@ -40,6 +40,7 @@ def test_workflow_initialization_from_json_filepath(caplog):
         workflow.execute()
     fs.safe_rmdir(WORK_DIR)
     # preparation.protonate_stru does not have return value.
+    # print(workflow.intermediate_data_mapper)
     assert 'success' in caplog.text
 
 def test_workflow_store_as_label(caplog):

@@ -8,3 +8,5 @@ from .workflow import (
     WorkFlow,
     WorkUnit,
 )
+
+from .config import SCIENCE_API_MAPPER
