@@ -77,6 +77,12 @@ class RosettaConfig(BaseConfig):
     DEFAULT_CART_DDG_RES_KEYWORDS: Dict = copy.deepcopy(ARMerConfig.SINGLE_CPU_RES) | {'job_name' : 'cart_ddg_EnzyHTP',}
     """The default value for the resource configuration of CART_DDG."""
 
+    DEFAULT_CART_DDG_RELAX_RES_KEYWORDS: Dict = copy.deepcopy(
+        ARMerConfig.SINGLE_CPU_RES
+    ) | {'job_name' : 'cart_ddg_relax_EnzyHTP',
+         'node_cores' : '24',}
+    """The default value for the resource configuration of the relax on the WT before CART_DDG."""
+
     def get_default_cart_ddg_cluster_job_res_keywords(self) -> Dict:
         """function for lazy resolution."""
         return copy.deepcopy(self.DEFAULT_CART_DDG_RES_KEYWORDS)
@@ -87,6 +93,18 @@ class RosettaConfig(BaseConfig):
         return {
             "cluster" : Accre(),
             "res_keywords" : self.get_default_cart_ddg_cluster_job_res_keywords(),
+        }
+
+    def get_default_cart_ddg_relax_cluster_job_res_keywords(self) -> Dict:
+        """function for lazy resolution."""
+        return copy.deepcopy(self.DEFAULT_CART_DDG_RELAX_RES_KEYWORDS)
+
+    def get_default_cart_ddg_relax_cluster_job_config(self) -> Dict:
+        """The default value for dictionary that assign arguments to
+        ClusterJob.config_job and ClusterJob.wait_to_end during the CART_DDG"""
+        return {
+            "cluster" : Accre(),
+            "res_keywords" : self.get_default_cart_ddg_relax_cluster_job_res_keywords(),
         }
 
     DEFAULT_CART_DDG_WORK_DIR: str = "./rosetta_cart_ddg"
