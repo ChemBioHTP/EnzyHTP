@@ -3,7 +3,9 @@ Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2024-02-16
 """
 from pathlib import Path
+import pickle
 import re
+import numpy as np
 import pytest
 import os
 
@@ -46,3 +48,9 @@ def test_relax_w_stru():
     for pdb_file in scores["description"]:
         assert Path(pdb_file).exists()
 
+def test_get_ddg_fold():
+    """as said in the name."""
+    test_ddg_file = f"{DATA_DIR}test.ddg"
+    ddg_engine = ri.build_cartesian_ddg_engine()
+    result = ddg_engine.get_ddg_fold(test_ddg_file)
+    assert np.isclose(result, 12.069600000000037, atol=1e-6)
