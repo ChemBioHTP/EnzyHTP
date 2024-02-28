@@ -63,3 +63,18 @@ def test_get_ddg_fold():
     ddg_engine = ri.build_cartesian_ddg_engine()
     result = ddg_engine.get_ddg_fold(test_ddg_file)
     assert np.isclose(result, 12.069600000000037, atol=1e-6)
+
+def test_cartesian_ddg_action_on_wt():
+    """as said in the name."""
+    test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
+    ddg_engine = ri.build_cartesian_ddg_engine(
+        relax_cluster_job_config={
+            "cluster" : Accre(),
+            "res_keywords" : {
+                "partition" : "production",
+                "account" : "yang_lab",
+            }
+        }
+    )
+    new_stru = ddg_engine.action_on_wt(test_stru)
+    PDBParser().save_structure(f"{DATA_DIR}KE_07_R7_2_S_cart_relax.pdb", new_stru)
