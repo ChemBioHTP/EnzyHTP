@@ -9,13 +9,6 @@ Date: 2024-01-25"""
 
 from enzy_htp import structure, preparation, mutation, geometry, quantum, analysis, interface
 
-def test_kwargs(x: str, **kwargs):
-    '''This function is to test kwargs inspection only.'''
-    result = x
-    for key, value in kwargs.items():
-        result += f'\n {key} = {value}'
-    return result
-
 SCIENCE_API_MAPPER = {
     "read_pdb" : structure.PDBParser().get_structure,
     "remove_solvent" : preparation.remove_solvent,
@@ -31,7 +24,6 @@ SCIENCE_API_MAPPER = {
     "ele_stab_energy_of_bond" : analysis.ele_stab_energy_of_bond,
     "ele_stab_energy_of_dipole" : analysis.ele_stab_energy_of_dipole,
     "bond_dipole": analysis.bond_dipole,
-    "test_kwargs": test_kwargs
 }
 
 PARAM_METHOD_MAPPER = {

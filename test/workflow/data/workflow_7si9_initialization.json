@@ -1,45 +1,40 @@
-{
-    "workunits" : [
-        {
-            "api" : "read_pdb",
-            "store_as" : "read_pdb_0",
-            "args" : {
-                "path" : "/home/yinjie/bin/EnzyHTP/test/workflow/data/7si9_rm_water_disconnected.pdb"
-            }
-        },
-        {
-            "api" : "remove_hydrogens",
-            "store_as" : "remove_hydrogens_0",
-            "args" : {
-                "stru" : "read_pdb_0",
-                "polypeptide_only" : true
-            }
-        },
-        {
-            "api" : "protonate_stru",
-            "store_as" : "protonate_stru_0",
-            "args" : {
-                "stru" : "remove_hydrogens_0",
-                "ph" : 7.0,
-                "protonate_ligand" : false,
-                "engine" : "pdb2pqr"
-            }
-        },
-        {
-            "api" : "assign_mutant",
-            "store_as" : "assign_mutant_0",
-            "args" : {
-                "stru" : "protonate_stru_0",
-                "pattern" : "xxx",
-                "chain_sync_list" : ["A", "B"],
-                "chain_index_mapper" : {
-                    "A" : 0,
-                    "B" : 100
-                }
-            }
-        }
-    ],
-    "execution_type" : "run",
-    "parallel_groups" : 5,
-    "mut_parallel_groups" : 5
-}
+[
+  {
+    "api": "read_pdb",
+    "store_as": "read_pdb_0",
+    "args": {
+      "path": "./data/7si9_rm_water_disconnected.pdb"
+    }
+  },
+  {
+    "api": "remove_hydrogens",
+    "store_as": "remove_hydrogens_0",
+    "args": {
+      "stru": "read_pdb_0",
+      "polypeptide_only": true
+    }
+  },
+  {
+    "api": "protonate_stru",
+    "store_as": "protonate_stru_0",
+    "args": {
+      "stru": "remove_hydrogens_0",
+      "ph": 7.0,
+      "protonate_ligand": false,
+      "engine": "pdb2pqr"
+    }
+  },
+  {
+    "api": "assign_mutant",
+    "store_as": "assign_mutant_0",
+    "args": {
+      "stru": "protonate_stru_0",
+      "pattern": "xxx",
+      "chain_sync_list": ["A", "B"],
+      "chain_index_mapper": {
+        "A": 0,
+        "B": 100
+      }
+    }
+  }
+]

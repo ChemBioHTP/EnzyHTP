@@ -7,6 +7,7 @@ Date: 2024-01-25"""
 from .workflow import (
     WorkFlow,
     WorkUnit,
+    GeneralWorkUnit,
 )
 
 from .config import SCIENCE_API_MAPPER
