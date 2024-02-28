@@ -281,7 +281,6 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
 
         return ddg_fold
 
-    # region
     def check_dgg_fold_error(self,
                         ddg_file: str,
                         stdstream_source: Union[ClusterJob,
@@ -341,7 +340,24 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
 
         return temp_mut_file_path, temp_result_file_path
 
-    # endregion TODO finish this
+    def get_ddg_fold(self, ddg_file: str, method: str="average") -> float:
+        """calculate the ddG_fold number from the .ddg file."""
+        score_df = pd.read_csv(ddg_file, delim_whitespace=True, header=None)
+        group_by_variant = score_df.groupby(2)
+        if method == "average":
+            for tag, value in group_by_variant[3].mean().items():
+                tag: str
+                value: float
+                if tag.startswith("WT_"):
+                    wt_value = value
+                if tag.startswith("MUT_"):
+                    mut_value = value
+            result = mut_value - wt_value
+        else:
+            _LOGGER.error(f"method {method} is not supported")
+            raise ValueError
+
+        return result
 
 
 class RosettaInterface(BaseInterface):
@@ -490,7 +506,7 @@ class RosettaInterface(BaseInterface):
             raise ValueError
 
         pdb_name = score_df["description"][idx]
-        pdb_path = f"{work_dir}/{pdb_name}.pdb"
+        pdb_path = f"{work_dir}/{pdb_name}"
         # parse the PDB
         result = PDBParser().get_structure(pdb_path)
         # TODO need to rename to convention.
