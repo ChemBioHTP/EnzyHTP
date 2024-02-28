@@ -18,7 +18,7 @@ import enzy_htp.structure.structure_operation as stru_oper
 from enzy_htp.structure.structure_constraint import StructureConstraint, CartesianFreeze
 
 import enzy_htp.chemical as chem
-from enzy_htp.structure import PDBParser, Mol2Parser, Structure, Ligand, translate_structure
+from enzy_htp.structure import PDBParser, Mol2Parser, Structure, Ligand, translate_structure, Atom
 from enzy_htp.core import file_system as fs
 from enzy_htp.quantum import single_point
 from enzy_htp.quantum import optimize as qm_optimize 
@@ -96,7 +96,7 @@ def dock_reactants(structure: Structure,
         if id(ligand.root()) != id(structure):
             err_msg:str=f"The supplied ligand {ligand} is not a child of the supplied structure!"
             raise TypeError(err_msg)
-
+    
 
     ligands.reverse()
     while ligands:
@@ -109,6 +109,7 @@ def dock_reactants(structure: Structure,
                         break
                 else:
                     relevant_csts.append(cst)
+
 
         dock_ligand(structure,
                         ligand,
@@ -130,12 +131,37 @@ def dock_reactants(structure: Structure,
                         grid_width,
                         use_qm,
                         rng_seed,
-                        work_dir)
+                        f"{work_dir}/rosetta_docking/")
 
-    mm_minimization(structure, constraints, param_files, contact_threshold, fr_repeats, rng_seed, work_dir)
+
+    sp = PDBParser()
+
+    sp.save_structure("s1.pdb", structure)
+
+    mm_minimization(structure, constraints, param_files, contact_threshold, False, fr_repeats, rng_seed, f"{work_dir}/rosetta_minimization/")
+
+
+    sp.save_structure("s2.pdb", structure)
 
     if use_qm:
-        qm_minimization(structure, constraints, cluster_distance, work_dir)
+        qm_minimization(structure, constraints, cluster_distance, False, work_dir)
+
+
+    sp.save_structure("s3.pdb", structure)
+
+
+    mm_minimization(structure, constraints, param_files, contact_threshold, True, fr_repeats, rng_seed, f"{work_dir}/rosetta_minimization/")
+
+
+    sp.save_structure("s4.pdb", structure)
+
+    if use_qm:
+        qm_minimization(structure, [], cluster_distance, True, work_dir)
+
+    translate_structure(structure, start_naming='rosetta')
+
+    sp.save_structure("s5.pdb", structure)
+
 
     if not save_work_dir:
         _LOGGER.info(f"save_work_dir set to False! Deleting {work_dir}")
@@ -146,12 +172,14 @@ def mm_minimization(structure:Structure,
                 constraints:List[StructureConstraint],
                 param_files:List[str],
                 contact_threshold:float,
+                ramp_constraints:bool,
                 fr_repeats:int,
                 rng_seed:int,
                 work_dir:str):
 
+    fs.safe_mkdir(work_dir)
     xml_script:str = create_minimization_xml(work_dir)
-    pdb_file:str=f"{work_dir}/min_start.pdb"
+    pdb_file:str=f"{work_dir}/start.pdb"
     _sp = PDBParser()
     _sp.save_structure(pdb_file, structure)
     cst_file:str = interface.rosetta.write_constraint_file(structure, constraints, work_dir) #TODO(CJ): look at this; wrong constraint types!!
@@ -174,6 +202,7 @@ def mm_minimization(structure:Structure,
         rng_seed,
         sele,
         contact_threshold,
+        ramp_constraints,
         cst_file,
         fr_repeats
     )
@@ -190,14 +219,13 @@ def mm_minimization(structure:Structure,
 
     os.chdir(start_dir)
 
-    scores_file:str = f"{work_dir}/complexes/score.sc"
+    scores_file:str = f"{work_dir}/minimization_scores.sc"
     
     fs.check_file_exists(scores_file, exit_script = False )
 
     df: pd.DataFrame = interface.rosetta.parse_score_file(scores_file)
 
-
-    df['description'] = df.apply(lambda row: f"{work_dir}/complexes/{row.description}.pdb", axis=1)
+    df['description'] = df.apply(lambda row: f"{work_dir}/{row.description}.pdb", axis=1)
     
     energy_key='total_score'
 
@@ -233,7 +261,7 @@ def dock_ligand(structure,
                     work_dir) -> None:
 
 
-
+    fs.safe_mkdir(work_dir)
     xml_script:str = create_docking_xml(work_dir)
     pdb_file:str=f"{work_dir}/start.pdb"
     _sp = PDBParser()
@@ -285,13 +313,13 @@ def dock_ligand(structure,
 
     os.chdir(start_dir)
 
-    scores_file:str = f"{work_dir}/complexes/score.sc"
+    scores_file:str = f"{work_dir}/docking_scores.sc"
     
     fs.check_file_exists(scores_file, exit_script = False )
 
     df: pd.DataFrame = interface.rosetta.parse_score_file(scores_file)
 
-    df['description'] = df.apply(lambda row: f"{work_dir}/complexes/{row.description}.pdb", axis=1)
+    df['description'] = df.apply(lambda row: f"{work_dir}/{row.description}.pdb", axis=1)
 
     energy_key:str=None        
     if use_qm:
@@ -357,8 +385,8 @@ def create_docking_xml(work_dir:str) -> str:
         <ClearConstraintsMover name="rm_csts" />
 
         <FastRelax name="frelax" scorefxn="hard_rep" cst_file="%%cst_file%%" repeats="%%fr_repeats%%">
-			<MoveMap name="full_enzyme" bb="true" chi="true" jump="false">
-				<ResidueSelector selector="ligand_active_site"     bb="true" chi="true" bondangle="true"/>
+			<MoveMap name="full_enzyme" bb="true" chi="true" jump="true">
+				<ResidueSelector selector="ligand_active_site"     bb="true" chi="true" bondangle="true" />
 				<ResidueSelector selector="not_ligand_active_site" bb="false" chi="true" bondangle="false"/>
 			</MoveMap>
 		</FastRelax>
@@ -418,9 +446,9 @@ def create_minimization_xml(work_dir:str) -> str:
         <FileConstraintGenerator name="add_cst" filename="%%cst_file%%" />
     </CONSTRAINT_GENERATORS>
 	<MOVERS>
-        <FastRelax name="frelax" scorefxn="hard_rep" cst_file="%%cst_file%%" repeats="%%fr_repeats%%" ramp_down_constraints="false">
-			<MoveMap name="full_enzyme" bb="true" chi="true" jump="false">
-				<ResidueSelector selector="ligand_active_site"     bb="true" chi="true" bondangle="true"/>
+        <FastRelax name="frelax" scorefxn="hard_rep" cst_file="%%cst_file%%" repeats="%%fr_repeats%%" ramp_down_constraints="%%ramp_constraints%%">
+			<MoveMap name="full_enzyme" bb="true" chi="true" jump="true">
+				<ResidueSelector selector="ligand_active_site"     bb="true" chi="true" bondangle="true" />
 				<ResidueSelector selector="not_ligand_active_site" bb="false" chi="true" bondangle="false"/>
 			</MoveMap>
 		</FastRelax>
@@ -447,6 +475,7 @@ def create_minimization_options(work_dir:str,
                             rng_seed: int,
                             sele,
                             contact_threshold,
+                            ramp_constraints,
                             cst_file,
                             fr_repeats
                             ) -> str:
@@ -493,17 +522,21 @@ def create_minimization_options(work_dir:str,
         "    -ignore_ligand_chi true",
         "-parser",
         f"   -protocol {Path(xml_file).absolute()}",
-        f"   -script_vars ligand_idx={sele} contact_threshold={contact_threshold} cst_file={cst_file} fr_repeats={fr_repeats}",
+        f"""   -script_vars ligand_idx={sele} \\""",
+        f"""                contact_threshold={contact_threshold} \\""",
+        f"""                ramp_constraints={"true" if ramp_constraints else "false"} \\""",
+        f"""                cst_file={cst_file} \\""",
+        f"""                fr_repeats={fr_repeats}""",
         "-out",
-        f"   -file:scorefile 'score.sc'",
+        f"   -file:scorefile 'minimization_scores.sc'",
         "   -level 200",
         "   -overwrite",
         "   -path",
-        f"       -all './complexes'",
+        f"       -all '{work_dir}'",
     ])
 
     fname = Path(work_dir) / "minimization_options.txt"
-    score_file: str = f"{work_dir}/complexes/score.sc"
+    score_file: str = f"{work_dir}/minimization_scores.sc"
 
     _LOGGER.info(f"\toptions file: {fname}")
     _LOGGER.info(f"\tscore file: {score_file}")
@@ -511,10 +544,7 @@ def create_minimization_options(work_dir:str,
     
     fs.safe_rm(fname)
     fs.safe_rm(score_file)
-    fs.safe_rmdir(f"{work_dir}/complexes/")
-
-    fs.safe_mkdir(f"{work_dir}/complexes/")
-
+    
     _LOGGER.info(f"Wrote the below settings to {fname}:")
     for ll in content:
         _LOGGER.info(f"\t{ll}")
@@ -590,35 +620,46 @@ def create_docking_options(work_dir:str,
         "    -ignore_ligand_chi true",
         "-parser",
         f"   -protocol {Path(xml_file).absolute()}",
-        f"   -script_vars ligand_chain={ligand_chain} {sasa_cutoff=} {clash_cutoff=} contact_threshold={contact_threshold:.1f} ligand_idx={ligand_idx} {cst_cutoff=} cst_file={cst_file} box_size={box_size:.1f} move_distance={move_distance:.1f} {transform_angle=} {transform_cycles=} {transform_repeats=} {transform_temperature=} {fr_repeats=} grid_width={grid_width:.1f}",
+        f"""   -script_vars ligand_chain={ligand_chain} \\""",
+        f"""                {sasa_cutoff=} \\""",
+        f"""                {clash_cutoff=} \\""",
+        f"""                contact_threshold={contact_threshold:.1f} \\""",
+        f"""                ligand_idx={ligand_idx} \\""",
+        f"""                {cst_cutoff=} \\""",
+        f"""                cst_file={cst_file} \\""",
+        f"""                box_size={box_size:.1f} \\""",
+        f"""                move_distance={move_distance:.1f} \\""",
+        f"""                {transform_angle=} \\""",
+        f"""                {transform_cycles=} \\""",
+        f"""                {transform_repeats=} \\""",
+        f"""                {transform_temperature=} \\""",
+        f"""                {fr_repeats=} \\""",
+        f"""                grid_width={grid_width:.1f}""", 
         "-out",
-        f"   -file:scorefile 'score.sc'",
+        f"   -file:scorefile 'docking_scores.sc'",
         "   -level 200",
         f"   -nstruct {n_struct}",
         "   -overwrite",
         "   -path",
-        f"       -all './complexes'",
+        f"       -all '{work_dir}'",
     ])
 
-    qsar_grid: str = str(Path(f"{work_dir}/complexes/qsar_grids/").absolute())
+    qsar_grid: str = str(Path(f"{work_dir}/qsar_grids/").absolute())
     content.append(f"-qsar:grid_dir {qsar_grid}")
 
-    fname = Path(work_dir) / "options.txt"
-    score_file: str = f"{work_dir}/complexes/score.sc"
+    fname = Path(work_dir) / "docking_options.txt"
+    score_file: str = f"{work_dir}/docking_scores.sc"
 
     _LOGGER.info(f"\toptions file: {fname}")
     _LOGGER.info(f"\tscore file: {score_file}")
-    _LOGGER.info(f"\tenzyme-reactant complexes directory: {work_dir}/complexes")
+    _LOGGER.info(f"\tenzyme-reactant complexes directory: {work_dir}/")
     _LOGGER.info(f"\tqsar_gird directory: {qsar_grid}")
     
     fs.safe_rm(fname)
     fs.safe_rm(score_file)
-    fs.safe_rmdir(f"{work_dir}/complexes/")
     fs.safe_rmdir(qsar_grid)
-
-    fs.safe_mkdir(f"{work_dir}/complexes/")
     fs.safe_mkdir(qsar_grid)
-
+    
     _LOGGER.info(f"Wrote the below settings to {fname}:")
     for ll in content:
         _LOGGER.info(f"\t{ll}")
@@ -721,6 +762,7 @@ def get_active_site_sele(structure: Structure, distance_cutoff:float) -> str:
 def qm_minimization(structure:Structure,
                 constraints:List[StructureConstraint],
                 cluster_distance:float,
+                freeze_ligands:bool,
                 work_dir:str) -> None:
     """Performs QM minimization of the enzyme active site using xtb. Assumes that backbone atoms of the Residue()'s should be 
     frozen. Is capable of converting supplied constraints to xtb format. Updates coordinates in place. 
@@ -736,21 +778,28 @@ def qm_minimization(structure:Structure,
     """
 
     as_sele = get_active_site_sele(structure, cluster_distance)
-    
+   
+    to_freeze:List[Atom] = list()
+
     for res in structure.residues:
         if res.is_canonical():
             continue
-        
+
         for atom in res.atoms:
             atom.charge = 0.0
+
+            if freeze_ligands and atom.element != 'H':
+                to_freeze.append(atom)
     
     translate_structure(structure, start_naming='rosetta')
     es = qm_optimize(structure,
             engine="xtb",
-            constraints=constraints + [CartesianFreeze(structure.backbone_atoms())],
+            constraints=constraints + [CartesianFreeze(structure.backbone_atoms() + to_freeze )],
             regions=[as_sele],
             region_methods=[chem.QMLevelOfTheory(basis_set='',method='GFN2', solvent='water', solv_method='ALPB')],
             parallel_method=None)[0]
+
+    translate_structure(structure, end_naming='rosetta')
 
 def evaluate_geometry_qm_energy(df: pd.DataFrame, structure: Structure, cluster_cutoff: float) -> None:
     """Aids in ranking and selection of candidate geometries through a semi-empirical QM single point energy
