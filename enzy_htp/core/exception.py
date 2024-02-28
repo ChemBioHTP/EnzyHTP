@@ -120,3 +120,15 @@ class GaussianError(Exception):
     @property
     def error_info_str(self) -> str:
         return "\n".join(self.error_info_list)
+
+class RosettaError(Exception):
+    """Exception corresponding runtime error of Rosetta in enzy_htp._interface.rosetta_interface
+    contains a list of error information"""
+
+    def __init__(self, error_info_list, *args) -> None:
+        super().__init__(*args)
+        self.error_info_list = error_info_list
+
+    @property
+    def error_info_str(self) -> str:
+        return "\n".join(self.error_info_list)

@@ -6,10 +6,12 @@ Date: 2023-03-28
 """
 from __future__ import annotations
 import copy
+import os
 import re
 import shutil
 from pathlib import Path
 from copy import deepcopy
+from subprocess import CompletedProcess, SubprocessError
 from plum import dispatch
 from xml.dom import minidom
 import xml.etree.cElementTree as ET
@@ -28,6 +30,7 @@ from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import env_manager as em
 from enzy_htp.core.job_manager import ClusterJob
+from enzy_htp.core.exception import RosettaError
 
 from .base_interface import BaseInterface
 from .handle_types import ddGFoldEngine, ddGResultEgg
@@ -278,24 +281,23 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
 
         return ddg_fold
 
-    # region TODO finish this
+    # region
     def check_dgg_fold_error(self,
-                        gout_file: str,
+                        ddg_file: str,
                         stdstream_source: Union[ClusterJob,
                                                 CompletedProcess,
                                                 SubprocessError]):
-        """a check for whether an error occurs in spe is needed everytime before generating
-        a ElectronicStructure.
-        Possible Gaussian error info places:
+        """a check for whether an error occurs in the ddg is needed everytime before generating
+        a final number.
+        Possible error info places:
         1. stdout/stderr
-        2. gout file
-        The ultimate goal is to summarize each error type and give suggestions."""
-        raise Exception("TODO")
-        if not self.parent_interface.is_gaussian_completed(gout_file):
+        2. ROSETTA_CRASH.log (this file is wrote by all Rosetta exec under the folder)
+        The goal is to summarize each error type and give suggestions."""
+        # 0. ddg file not exists or dont have content --> Error occured
+        if not Path(ddg_file).exists() or os.path.getsize(ddg_file) == 0:
             # collect error info
             error_info_list = []
             # 1. stdout stderr
-            # error types: TODO add comment here
             if isinstance(stdstream_source, ClusterJob):
                 with open(stdstream_source.job_cluster_log) as f:
                     stderr_stdout = f.read()
@@ -309,51 +311,36 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
             else:
                 _LOGGER.error("Only allow ClusterJob, CompletedProcess, SubprocessError as input types for `stdstream_source`")
                 raise TypeError
-            # 2. gout file
+            # 2. ROSETTA_CRASH.log file
             # TODO finish this with a real example
             # normally will be a Error termination of Gaussian
 
-            _LOGGER.error(f"Gaussian SPE didn't finish normally.{os.linesep}{os.linesep.join(error_info_list)}")
-            raise GaussianError(error_info_list)
+            _LOGGER.error(f"Rosetta cartesian_ddg didn't finish normally.{os.linesep}{os.linesep.join(error_info_list)}")
+            raise RosettaError(error_info_list)
 
     def _make_mut_file(self, mutant: List[Mutation]) -> Tuple[str]:
-        """make a temporary gjf file.
-        *path* is based on self.work_dir and self.name.
-        If the file exists, will change the filename to {self.name}_{index}.in
-        The index start from 1.
-        *content* is based on attributes of the instance.
+        """make a temporary mut_file.
+        NOTE that the final result file path is determined by the mut_file path.
+        To avoid overwriting results from parallel runs, mut_file path is determined by
+        finding a non-existing result file path under self.work_dir.
+        If the file exists, will change the filename to {self.name}_{index}.txt
 
-        Return: the path of the temp gjf file."""
+        Return: (path of the mut_file and the result file)"""
         # path
-        temp_gjf_file_path = fs.get_valid_temp_name(f"{self.work_dir}/{self.name}input")
-        temp_chk_file_path = temp_gjf_file_path.replace("input",".chk")
+        temp_result_file_path = fs.get_valid_temp_name(f"{self.work_dir}/mutations.ddg")
+        temp_mut_file_path = str(Path(temp_result_file_path).with_suffix(".txt"))
 
         # content
-        res_keywords = self.cluster_job_config["res_keywords"]
-        num_core = int(res_keywords["node_cores"])
-        mem_per_core = int(res_keywords["mem_per_core"].rstrip('GB'))
-        mem = (num_core * mem_per_core) - 1 # GB
-        if mem < 1:
-            _LOGGER.error(f"You need at least 1 GB memory to run a Gaussian job.")
-            raise ValueError
-        additional_keywords = []
-        if self.keep_geom:
-            additional_keywords = ["nosymm"]
+        mut_file_lines = [
+            f"total {len(mutant)}",
+            f"{len(mutant)}",
+        ]
+        for mut in mutant:
+            mut_file_lines.append(f"{mut.orig} {mut.res_idx} {mut.target}")
+            # NOTE potential risk that it could be the pose number is used here.
 
-        self.parent_interface.write_to_gjf(
-            out_path = temp_gjf_file_path,
-            gchk_path = temp_chk_file_path,
-            num_core = num_core,
-            mem = mem,
-            methods = [self.method],
-            job_type = "spe",
-            additional_keywords = additional_keywords,
-            stru = stru,
-            stru_regions = [self.region],
-            title = self.name,
-        )
+        return temp_mut_file_path, temp_result_file_path
 
-        return temp_gjf_file_path, temp_chk_file_path
     # endregion TODO finish this
 
 
@@ -667,7 +654,7 @@ class RosettaInterface(BaseInterface):
             f"-in:file:s '{infile}'",
             f"-nstruct {nstruct}",
             f"-linmem_ig {linmem_ig}",
-            f"-out:file:scorefile {score_file}",
+            f"-out:file:scorefile {Path(score_file).name}",
         ]
         flags.append(f"-ignore_zero_occupancy {'true' if ignore_zero_occupancy else 'false'}")
         flags.append(f"-relax:constrain_relax_to_start_coords {'true' if constrain_relax_to_start_coords else 'false'}")

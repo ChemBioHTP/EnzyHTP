@@ -25,7 +25,7 @@ def test_relax_w_stru():
     test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
     scores = ri.relax(
         test_stru,
-        nstruct=1,
+        nstruct=3,
         constrain_relax_to_start_coords=False,
         coord_constrain_sidechains=False,
         ramp_constraints=False,
@@ -42,4 +42,7 @@ def test_relax_w_stru():
         },
         delete_crash=False,
     )
-    print(scores)
+    assert len(scores) == 3
+    for pdb_file in scores["description"]:
+        assert Path(pdb_file).exists()
+
