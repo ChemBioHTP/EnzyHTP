@@ -83,6 +83,8 @@ class RDKitInterface(BaseInterface):
             temp = str(Path(outfile).with_suffix('.mol'))
             _rchem.MolToMolFile(mol, temp, kekulize=kekulize)
             if ext == '.mol2':
+                #print(_rchem.PDBWriter())
+                #print(mol.
                 session = self.parent().pymol.new_session()
                 self.parent().pymol.convert(session, temp, new_ext='.mol2')
 
@@ -101,6 +103,10 @@ class RDKitInterface(BaseInterface):
         """ """
         mol: _rchem.Mol = self._load_molecule(molfile)
         #TODO(CJ): need to add some stuff for phosphates/carboxylic acids
+        for atom in mol.GetAtoms():
+            if not atom.IsInRing() and atom.GetIsAromatic():
+                atom.SetIsAromatic(False)
+            print(list(atom.GetPropNames()))
         self._save_molecule(mol, outfile)
         return outfile
 
