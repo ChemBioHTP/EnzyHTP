@@ -10,14 +10,14 @@
     "api": "remove_hydrogens",
     "store_as": "structure",
     "args": {
-      "stru": "structure",
+      "stru": "`structure`",
       "polypeptide_only": true
     }
   },
   {
     "api": "protonate_stru",
     "args": {
-      "stru": "structure",
+      "stru": "`structure`",
       "ph": 7.0,
       "protonate_ligand": false,
       "engine": "pdb2pqr"

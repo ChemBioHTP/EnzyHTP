@@ -166,3 +166,16 @@ def test_workflow_loopworkunit_pseudo_api(caplog):
     assert 'original structure' in caplog.text
     assert 'mutant structure' in caplog.text
     return
+
+def test_workflow_general_layer_variable(caplog):
+    """Test initializing and executing workflow with all the variables 
+    with all user-defined arguments are set in the general layer."""
+    json_filepath = f'{DATA_DIR}/workflow_7si9_general_layer_variable.json'
+    # _LOGGER.level = logging.DEBUG
+    with EnablePropagate(_LOGGER):
+        general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath, debug=True)
+        return_key, return_value = general.execute()
+    fs.safe_rmdir(WORK_DIR)
+    assert 'original structure' in caplog.text
+    assert 'mutant structure' in caplog.text
+    return

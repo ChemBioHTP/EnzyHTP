@@ -10,7 +10,7 @@
     "api": "remove_hydrogens",
     "store_as": "remove_hydrogens_0",
     "args": {
-      "stru": "read_pdb_0",
+      "stru": "`read_pdb_0`",
       "polypeptide_only": true
     }
   },
@@ -18,7 +18,7 @@
     "api": "protonate_stru",
     "store_as": "protonate_stru_0",
     "args": {
-      "stru": "remove_hydrogens_0",
+      "stru": "`remove_hydrogens_0`",
       "ph": 7.0,
       "protonate_ligand": false,
       "engine": "pdb2pqr"
@@ -28,7 +28,7 @@
     "api": "assign_mutant",
     "store_as": "assign_mutant_0",
     "args": {
-      "stru": "protonate_stru_0",
+      "stru": "`protonate_stru_0`",
       "pattern": "xxx",
       "chain_sync_list": ["A", "B"],
       "chain_index_mapper": {

@@ -2,12 +2,18 @@
   "api": "general",
   "store_as": "general",
   "args": {
+    "pdb_path": "./data/7si9_rm_water_disconnected.pdb",
+    "remove_polypeptide_hydrogen_only": true,
+    "solvent_ph": 7.4,
+    "if_protonate_ligand": false,
+    "polypeptide_protonation_engine": "pdb2pqr",
+    "assign_mutant_pattern": "{WT},{HA41M},{MA165R}",
     "workunits": [
       {
         "api": "read_pdb",
         "store_as": "structure",
         "args": {
-          "path": "./data/7si9_rm_water_disconnected.pdb"
+          "path": "`pdb_path`"
         }
       },
       {
@@ -15,24 +21,24 @@
         "store_as": "structure",
         "args": {
           "stru": "`structure`",
-          "polypeptide_only": true
+          "polypeptide_only": "`remove_polypeptide_hydrogen_only`"
         }
       },
       {
         "api": "protonate_stru",
         "args": {
           "stru": "`structure`",
-          "ph": 7.0,
-          "protonate_ligand": false,
-          "engine": "pdb2pqr"
+          "ph": "`solvent_ph`",
+          "protonate_ligand": "`if_protonate_ligand`",
+          "engine": "`polypeptide_protonation_engine`"
         }
       },
       {
         "api": "assign_mutant",
-        "store_as": "`assign_mutant_0`",
+        "store_as": "assign_mutant_0",
         "args": {
           "stru": "`structure`",
-          "pattern": "{WT},{H41M},{M165R}"
+          "pattern": "`assign_mutant_pattern`"
         }
       },
       {

@@ -8,6 +8,7 @@ Author: QZ Shao <shaoqz@icloud.com>
 Date: 2024-01-25"""
 
 from enzy_htp import structure, preparation, mutation, geometry, quantum, analysis, interface
+from typing import Any
 
 SCIENCE_API_MAPPER = {
     "read_pdb" : structure.PDBParser().get_structure,
@@ -29,6 +30,65 @@ SCIENCE_API_MAPPER = {
 PARAM_METHOD_MAPPER = {
     "amber" : interface.amber.build_md_parameterizer,
 }
+
+class JsonConfigVariableFormatter():
+    """Handles the formatting of variable names within JSON configuration files.
+
+    In the JSON configuration file, if a parameter value is intended to be a variable name 
+    instead of a literal value, it should be enclosed within backticks (`).
+    
+    For example: if you want to pass a variable named "pdb_path", you should annotate
+    it as follows:
+    
+    ```json
+    "args": {
+          "path": "`pdb_path`"
+    }
+    ```    
+    """
+
+    @staticmethod
+    def is_variable_formatted(value_to_check: Any) -> bool:
+        """Check if a string is formatted as a variable name.
+
+        Args:
+            value_to_check (Any): Value to check for variable formatting.
+
+        Returns:
+            bool: True if the value_to_check is a string and is formatted as a variable name, False otherwise.
+        """
+        if (not isinstance(value_to_check, str)):
+            return False
+        return len(value_to_check) >= 3 and value_to_check.startswith("`") and value_to_check.endswith("`")
+    
+    @staticmethod
+    def format_as_variable(name: str) -> str:
+        """Format a string as a variable name by adding backticks.
+
+        Args:
+            name (str): The string to format as a variable name.
+
+        Returns:
+            str: The formatted variable name.
+        """
+        if not JsonConfigVariableFormatter.is_variable_formatted(name):
+            return f"`{name}`"
+        return name
+        
+    @staticmethod
+    def unformat_variable(name: str) -> str:
+        """Remove the backticks from a string formatted as a variable name.
+
+        Args:
+            name (str): The variable name to remove formatting from.
+
+        Returns:
+            str: The unformatted variable name.
+        """
+        if (JsonConfigVariableFormatter.is_variable_formatted(name)):
+            name = name[1:] if name[0] == "`" else name
+            name = name[:-1] if name[-1] == "`" else name
+        return name
 
 demo_json_dict = {
     "workunits" : [

@@ -25,7 +25,7 @@ from collections.abc import Iterable, Callable
 
 from enzy_htp.core.logger import _LOGGER
 
-from .config import SCIENCE_API_MAPPER
+from .config import SCIENCE_API_MAPPER, JsonConfigVariableFormatter as VarFormatter
 
 # API Keys for flow control, such as `loop`.
 CONTROL_API_KEYS = [
@@ -43,17 +43,13 @@ CONTROL_BODY_WORKUNITS_LABEL = "workunits"  # Key indicating the list of workuni
 LOOP_ITERABLE_DATA_LABEL = "loop_data"      # Key indicating the object to iterate over in a LoopWorkUnit.
 LOOP_BODY_DATUM_LABEL = "loop_datum"        # Key indicating the element iterated from ITERABLE_DATA in each workunit of the loop body.
 
-PLACEHOLDER_VALUE = "PlaceHolder"   # Value for placeholder.
+PLACEHOLDER_VALUE = "PLAC$H0LD$R"   # Value for placeholder.
 
 class WorkFlow():
     """Class to interpret/compose the workflow from/to a json file.
     
     Attributes:
-        wildtype_pdb_path (str): The path to a wildtype pdb file (Default: Empty).
-        cpu_account (str): The account with access to CPU nodes.
-        cpu_partition (str): The CPU Partition to use.
-        gpu_account (str): The account with access to GPU nodes.
-        gpu_partition (str): The GPU Partition to use.
+        
     """
     debug: bool                 # Indicates whether to run in debug mode.
     error_msg_list = list()     # Error information.
@@ -63,8 +59,8 @@ class WorkFlow():
     workunits: list
     
     # Intermediate Data.
-    intermediate_data_mapper: dict
-    inherited_data_mapper: dict
+    intermediate_data_mapper: dict  # Runtime intermediate data for the current layer of workflow.
+    inherited_data_mapper: dict     # Data inherited from parent workflow.
 
     # Output
     # data_output_path = './Mutation.dat'
@@ -76,6 +72,7 @@ class WorkFlow():
         Args:
             debug (bool, optional): Indicates whether to run in debug mode.
             intermediate_data_mapper (Dict[str, Any], optional): The initial value of intermediate_data_mapper.
+            inherited_data_mapper (Dict[str, Any], optional): Data Mapper containing data to be inherited.
         """
         self.debug = debug
         self.intermediate_data_mapper = intermediate_data_mapper
@@ -87,13 +84,14 @@ class WorkFlow():
         return
     
     @classmethod
-    def from_list(cls, units_dict_list: List[dict], debug: bool = False, intermediate_data_mapper: Dict[str, Any] = dict(), inherited_data_mapper: Dict[str, Any] = None) -> WorkFlow:
+    def from_list(cls, units_dict_list: List[dict], debug: bool = False, intermediate_data_mapper: Dict[str, Any] = dict(), inherited_data_mapper: Dict[str, Any] = dict()) -> WorkFlow:
         """Initialize an instance of WorkFlow from a given dictionary instance.
         
         Args:
             units_dict_list (List[dict]): A list containing the WorkUnit configuration dicts.
             debug (bool, optional): Indicates whether to run in debug mode.
             intermediate_data_mapper (Dict[str, Any], optional): The initial value of intermediate_data_mapper.
+            inherited_data_mapper (Dict[str, Any], optional): Data Mapper containing data to be inherited.
         
         Returns:
             An instance of WorkFlow.
@@ -171,11 +169,12 @@ class WorkFlow():
                             parameters.
         """
         api_key = unit_dict.get(WORKUNIT_API_NAME_KEY, str())
+        workunit = WorkUnit()   # Placeholder.
         if (api_key in CONTROL_API_KEYS):
             _LOGGER.info(f"Parsing new Control WorkUnit: {api_key}.")
             if api_key == "loop":
+                # Setup a placeholder in `workflow.intermediate_data_mapper`.
                 workunit = LoopWorkUnit.from_dict(unit_dict=unit_dict, placeholder_workflow=self, debug=self.debug)
-                self.workunits.append(workunit)
             elif api_key == "general":
                 error_msg = "GeneralWorkUnit should not be configured inside a workflow."
                 _LOGGER.error(error_msg)
@@ -183,8 +182,13 @@ class WorkFlow():
         else:
             _LOGGER.info(f"Parsing new Science WorkUnit: {api_key}.")
             workunit = WorkUnit.from_dict(unit_dict=unit_dict, workflow=self, debug=self.debug)
-            self.error_msg_list += workunit.error_msg_list
-            self.workunits.append(workunit)
+
+        # Setup a placeholder in `workflow.intermediate_data_mapper`.
+        self.intermediate_data_mapper[VarFormatter.unformat_variable(workunit.return_key)] = PLACEHOLDER_VALUE
+
+        # Add new workunit to the workflow.
+        self.workunits.append(workunit)
+        self.error_msg_list += workunit.error_msg_list
         return
     
     #endregion
@@ -222,9 +226,9 @@ class WorkFlow():
             _LOGGER.info('The initialized WorkFlow has successfully passed the self-inspection. Proceeding to execution.')
             for workunit in self.workunits:
                 workunit: WorkUnit
-                _LOGGER.info(f'Executing WorkUnit API Key: {workunit.api_key}')
+                _LOGGER.info(f'Executing WorkUnit API Key: {workunit.api_key} ...')
                 return_key, return_value = workunit.execute()
-                self.intermediate_data_mapper[return_key] = return_value
+                self.intermediate_data_mapper[VarFormatter.unformat_variable(return_key)] = return_value
                 continue
             return self.intermediate_data_mapper
 
@@ -329,11 +333,9 @@ class WorkUnit():
                 return unit
         
         # Self Inspection.
-        unit.self_inspection_and_reassembly()
+        unit.self_inspection_and_args_reassembly()
         unit.check_self_inspection_result()
 
-        # Setup a placeholder in `workflow.intermediate_data_mapper`.
-        unit.workflow.intermediate_data_mapper[unit.return_key] = None
         return unit
 
     def execute(self) -> tuple:
@@ -368,8 +370,20 @@ class WorkUnit():
                 _LOGGER.error(exc)
                 self.error_msg_list.append(str(exc))
                 return self.return_key, None
+
+    def update_args_value_from_data_mapper(self) -> None:
+        """Update the `args_dict_to_pass` by mapping data from `intermediate_data_mapper` or `inherited_data_mapper`.
+        If a value is mapped in both `inherited_data_mapper` and `intermediate_data_mapper`,
+        then the latter one will overwrite the former one.
+        """
+        for param in self.params_to_assign_at_execution:
+            for mapper in [self.workflow.intermediate_data_mapper, self.workflow.inherited_data_mapper]:
+                if (mapped_datum := mapper.get(VarFormatter.unformat_variable(self.args_dict_input[param]))):
+                    self.args_dict_to_pass[param] = mapped_datum
+                    break
+            continue
     
-    @staticmethod        
+    @staticmethod
     def __inspect_argument_type(arg_value: Any, annotation: Union[Type, Any]) -> bool:
         """
         Inspects whether the given argument value matches the specified type annotation.
@@ -381,6 +395,9 @@ class WorkUnit():
         and `int` in `Dict[str, int]`, are not inspected, as JSON files do not support storing
         such types directly (Zhong: TODO later).
 
+        Due to some unknown reason, some annotations may not be parse correctly. In such cases, we will set
+        the return value as True with a WARNING logged so as to ensure the smooth operation of workflow.
+
         Args:
             arg_value (Any): The value of the argument to be inspected.
             annotation (Union[Type, Any]): The type annotation against which the argument value
@@ -390,6 +407,7 @@ class WorkUnit():
         Returns:
             bool: True if the argument value matches the type annotation, False otherwise.
         """
+
         # Checks if param.annotation is a typing type.
         is_typing_type = hasattr(annotation, '__origin__')
 
@@ -397,21 +415,23 @@ class WorkUnit():
             # Check the origin of typing types (e.g., list for List[int])
             return isinstance(arg_value, annotation.__origin__)
         else:
+            if (not isinstance(annotation, type)):
+                # TODO Sometimes, the annotation may be parsed as a string value,
+                # so we use pydoc.locate to cast it from string to type if it happens.
+                index_of_bracket = annotation.find("[")
+                matched_type = annotation[:index_of_bracket].lower() if index_of_bracket != -1 else annotation.lower()
+                from pydoc import locate
+                matched_type = locate(matched_type)
+
+                if matched_type:
+                    annotation = matched_type
+                else:
+                    annotation = eval(annotation)
+
             # Inspect basic types.
             return isinstance(arg_value, annotation)
 
-    def update_args_value_from_data_mapper(self) -> None:
-        """Update the `args_dict_to_pass` by mapping data from `intermediate_data_mapper` or `inherited_data_mapper`.
-        If a value is mapped in both `inherited_data_mapper` and `intermediate_data_mapper`,
-        then the latter one will overwrite the former one.
-        """
-        for param in self.params_to_assign_at_execution:
-            if (intermediate_datum := self.workflow.intermediate_data_mapper.get(self.args_dict_input[param])):
-                self.args_dict_to_pass[param] = intermediate_datum
-            elif (inherited_datum := self.workflow.inherited_data_mapper.get(self.args_dict_input[param])):
-                self.args_dict_to_pass[param] = inherited_datum
-
-    def self_inspection_and_reassembly(self) -> None:
+    def self_inspection_and_args_reassembly(self) -> None:
         """Performs self-inspection and reassembles the arguments for the API call.
 
         This method is called every time a new instance is created. It performs a self-inspection
@@ -419,7 +439,9 @@ class WorkUnit():
         existence of required arguments and their types. If any errors are found, they are recorded
         in `error_info_list`, and the `is_self_inspection_passed` flag is set to False.
 
-        The arguments that pass the inspection are reassembled into `args_dict_to_pass` for the API call.
+        The arguments that are to be mapped from the mapper are reassembled into `args_dict_to_pass`
+        for the API call. Such arguments, if they already have been assigned with value in the mapper,
+        they would have to undergo the inspection; otherwise (if is None or Empty value), they could skip the inspection.
         """
         is_inspection_passed = True
         unit_error_list = list()
@@ -448,38 +470,49 @@ class WorkUnit():
             arg_value = self.args_dict_input.get(param.name, None)
             if not arg_value:   # Missing the argument.
                 if is_required: # Record error if it's required.
-                    unit_error_list.append(f'Missing required argument `{param.name}` in API `{self.api_key}`.')
+                    error_msg = f'Missing required argument `{param.name}` in API `{self.api_key}`.'
+                    unit_error_list.append(error_msg)
+                    _LOGGER.error(error_msg)
                     is_inspection_passed = False
                 else:   # Skip if it's optional.
                     pass
                 continue
 
-            # Map intermediate data from `intermediate_data_mapper` or `inherited_data_mapper`.
-            if isinstance(arg_value, str):
-                if (self.workflow.intermediate_data_mapper and arg_value in self.workflow.intermediate_data_mapper):    # If mapped, leave for later.
-                    self.params_to_assign_at_execution.append(param_name)
-                    self.args_dict_to_pass[param.name] = arg_value
+            # Map data from `intermediate_data_mapper` or `inherited_data_mapper`.
+            _LOGGER.debug(f"{self.api_key}, param_name: {param.name}, arg_value: {arg_value}")
+            if VarFormatter.is_variable_formatted(arg_value):   # Check if the arg_value is a formatted as a value name.
+                unformatted_arg_value = VarFormatter.unformat_variable(arg_value)
+                is_key_mapped = False   # Indicate if the value is mapped.
+                is_value_mapped_none = True # Indicate if the value in the mapper is None at present.
+                for mapper in [self.workflow.intermediate_data_mapper, self.workflow.inherited_data_mapper]:    # Listed in order of priority.
+                    if (mapper and unformatted_arg_value in mapper):    # If mapped, leave for later.
+                        is_key_mapped = True
+                        self.params_to_assign_at_execution.append(param_name)
+                        self.args_dict_to_pass[param.name] = unformatted_arg_value
+                        mapped_value = mapper.get(unformatted_arg_value)
+                        if (mapped_value):   # Check if there is a non-none-or-empty value in Mapper.
+                            if (isinstance(mapped_value, type(PLACEHOLDER_VALUE)) # Placeholder values need to be excluded.
+                                and mapped_value == PLACEHOLDER_VALUE):
+                                break
+                            is_value_mapped_none = False
+                            arg_value = mapped_value    # Assign mapped value to the argument.
+                        if is_key_mapped:   # Once key is mapped, no longer mapping other mappers.
+                            break
+                if (is_key_mapped and is_value_mapped_none):    # If the key is mapped but the value is still None, skip inspection.
                     continue
-                elif (self.workflow.inherited_data_mapper and arg_value in self.workflow.inherited_data_mapper):    # If mapped, leave for later.
-                    self.params_to_assign_at_execution.append(param_name)
-                    self.args_dict_to_pass[param_name] = arg_value
+                elif (not is_key_mapped):
+                    error_msg = f"The param `{param_name}` in API `{self.api_key} hasn't received expected variable {arg_value}`. Check your configuration and there's maybe some typos!"
+                    _LOGGER.error(error_msg)
+                    self.error_msg_list.append(error_msg)
                     continue
+                _LOGGER.debug(f"{self.api_key}, param_name: {param.name}, arg_value: {unformatted_arg_value}, Value Changed.")
             
             # Inspect argument type.
             if (param.annotation != _empty):
                 annotation = param.annotation
-
-                if (isinstance(annotation, str)):
-                    # TODO Sometimes, the annotation may be parsed as a string value,
-                    # so we use pydoc.locate to cast it from string to type if it happens.
-                    index_of_bracket = annotation.find("[")
-                    annotation = annotation[:index_of_bracket].lower() if index_of_bracket != -1 else annotation.lower()
-                    from pydoc import locate
-                    annotation = locate(annotation)
-
                 pass_type_inspection = WorkUnit.__inspect_argument_type(arg_value, annotation)
                 if not pass_type_inspection:
-                    error_msg = f'Receiving argument `{param.name}` in unexpected type {type(arg_value)} while {annotation} is expected (when initializing `{self.api_key}`).'
+                    error_msg = f'Receiving argument `{param.name}` with value `{arg_value}` in unexpected type {type(arg_value)} while {annotation} is expected (when initializing `{self.api_key}`).'
                     _LOGGER.error(error_msg)
                     unit_error_list.append(error_msg)
                     is_inspection_passed = False
@@ -506,8 +539,6 @@ class WorkUnit():
         """
         if self.is_self_inspection_passed == False:
             if self.debug:
-                for error_msg in self.error_msg_list:
-                    _LOGGER.error(error_msg)
                 raise ValueError(self)
             else:
                 pass
@@ -604,7 +635,7 @@ class LoopWorkUnit(WorkUnit):
         unit.api = LoopWorkUnit.loop_unit_placeholder_api
 
         # Self Inspection.
-        unit.self_inspection_and_reassembly()
+        unit.self_inspection_and_args_reassembly()
         unit.check_self_inspection_result()
 
         # Initialize the Loop Body.
@@ -623,8 +654,6 @@ class LoopWorkUnit(WorkUnit):
         if (placeholder_workflow.error_msg_list):
             unit.error_msg_list += placeholder_workflow.error_msg_list
 
-        # Setup a placeholder in `workflow.intermediate_data_mapper`.
-        unit.workflow.intermediate_data_mapper[unit.return_key] = None
         return unit
 
     def execute(self) -> tuple:
@@ -718,7 +747,7 @@ class GeneralWorkUnit(WorkUnit):
         unit.api = GeneralWorkUnit.general_unit_placeholder_api
 
         # Self Inspection.
-        unit.self_inspection_and_reassembly()
+        unit.self_inspection_and_args_reassembly()
         unit.check_self_inspection_result()
         
         # Initialize the WorkFlow.
@@ -726,7 +755,7 @@ class GeneralWorkUnit(WorkUnit):
         del data_mapper_for_init[CONTROL_BODY_WORKUNITS_LABEL]  # Pass kwargs to the workflow. Kwargs contain information specifying CPU/GPU partitions.
 
         if (units_dict_list:=unit.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL)):
-            unit.workflow = WorkFlow.from_list(units_dict_list, intermediate_data_mapper=data_mapper_for_init)
+            unit.workflow = WorkFlow.from_list(units_dict_list, debug=debug, intermediate_data_mapper=data_mapper_for_init)
         else:
             error_msg = "Initializing GeneralWorkUnit with empty `workunits`. WorkUnit(s) are expected."
             _LOGGER.error(error_msg)
