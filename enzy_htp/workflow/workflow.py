@@ -46,10 +46,21 @@ LOOP_BODY_DATUM_LABEL = "loop_datum"        # Key indicating the element iterate
 PLACEHOLDER_VALUE = "PLAC$H0LD$R"   # Value for placeholder.
 
 class WorkFlow():
-    """Class to interpret/compose the workflow from/to a json file.
+    """Rrepresents a procedural WorkFlow primarily consists of a number of WorkUnit instances, 
+    including data mappers, self-inspection flags, to ensure its operation.
+
+    Each WorkFlow Instance will perform self-inspection during initialization. If the self-inspection fails, it cannot be executed.
+    
+    If an error occurs during the execution of a single WorkUnit instance, the workflow will record the error, 
+    jump out of the WorkUnit instance, and execute the next one until the execution of the entire workflow is completed.
     
     Attributes:
-        
+        debug (bool): Flag indicating whether debugging mode is enabled.
+        error_msg_list (list): A list of error logs collected from the initialization and execution of the workflow.
+        is_self_inspection_passed (bool): Indicates if the workflow has passed self inspection. If False, the workflow cannot be executed.
+        workunits (List[WorkFlow]): A list of WorkUnit instance carried by this workflow.
+        intermediate_data_mapper (dict): Runtime intermediate data for the current layer of workflow.
+        inherited_data_mapper (dict): Data inherited from parent workflow.
     """
     debug: bool                 # Indicates whether to run in debug mode.
     error_msg_list = list()     # Error information.
@@ -269,7 +280,7 @@ class WorkUnit():
     is_self_inspection_passed: bool
     params_to_assign_at_execution: list
 
-    debug: bool = False
+    debug: bool
 
     def __init__(self, workflow: WorkFlow = None, debug: bool = False):
         """Initializes a WorkUnit instance.

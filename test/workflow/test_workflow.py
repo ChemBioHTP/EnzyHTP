@@ -173,7 +173,7 @@ def test_workflow_general_layer_variable(caplog):
     json_filepath = f'{DATA_DIR}/workflow_7si9_general_layer_variable.json'
     # _LOGGER.level = logging.DEBUG
     with EnablePropagate(_LOGGER):
-        general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath, debug=True)
+        general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath)
         return_key, return_value = general.execute()
     fs.safe_rmdir(WORK_DIR)
     assert 'original structure' in caplog.text
