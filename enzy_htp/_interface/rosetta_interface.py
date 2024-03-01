@@ -700,14 +700,13 @@ class RosettaInterface(BaseInterface):
         # 3. execute
         fs.safe_mkdir(output_dir)
         
-        if cluster_job_config:
+        if cluster_job_config:  # parallel, armer
             cluster = cluster_job_config["cluster"]
             res_keywords =  self.config().DEFAULT_RELAX_RES_KEYWORDS | cluster_job_config["res_keywords"]
             env_settings = cluster.ROSETTA_ENV["parallel_CPU"]
             sub_script_path = fs.get_valid_temp_name(f"{output_dir}/submit_rosetta_relax.cmd")
             num_cores = res_keywords["node_cores"]
-            mpi_exec = eh_config._system.get_mpi_executable(num_cores)
-            _cmd = f"{mpi_exec} {self.config().RELAX} {' '.join(flags)}"
+            _cmd = f"{self.config().RELAX_MPI_EXEC} {num_cores} {self.config().RELAX_MPI} {' '.join(flags)}"
             job = ClusterJob.config_job(
                 commands = _cmd,
                 cluster = cluster,
@@ -718,7 +717,7 @@ class RosettaInterface(BaseInterface):
             )
             job.submit()
             job.wait_to_end(period=job_check_period)
-        else:
+        else: # serial, local
             self.env_manager_.run_command(self.config_.RELAX, flags)
 
         df: pd.DataFrame = self.parse_score_file(score_file)

@@ -39,6 +39,12 @@ class RosettaConfig(BaseConfig):
     RELAX: str = f"$ROSETTA3/source/bin/relax.default.linuxgccrelease"
     """Executable used to relax a structure/pose."""
 
+    RELAX_MPI: str = f"$ROSETTA3/source/bin/relax.mpi.linuxgccrelease"
+    """MPI Executable used to relax a structure/pose."""
+
+    RELAX_MPI_EXEC: str = f"mpiexec -np"
+    """MPI Executable used to relax a structure/pose."""
+
     SCORE: str = f"$ROSETTA3/source/bin/score_jd2.default.linuxgccrelease"
     """Executable used to score a specific structure/pose."""
 

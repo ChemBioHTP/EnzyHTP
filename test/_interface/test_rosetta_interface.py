@@ -23,8 +23,6 @@ ri = interface.rosetta
 
 def test_relax_w_stru():
     """as said in the name. make sure relax works Structure() input."""
-    config.rosetta.RELAX = "$ROSETTA3/source/bin/relax.mpi.linuxgccrelease"
-    config.system.MPI_EXECUTABLE = "mpiexec"
     test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
     scores = ri.relax(
         test_stru,
