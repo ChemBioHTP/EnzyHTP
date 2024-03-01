@@ -4,9 +4,9 @@
 WorkFlow and WorkUnit.
 
 TODO (Zhong): Typing type annotation inspection. (Completed 2024-02-16 23:16 UTC-6)
-TODO (Zhong): Annotation inspection in intermediate_data_mapper.
+TODO (Zhong): Annotation inspection in intermediate_data_mapper. (Completed 2024-03-01 01:00 UTC-6)
 TODO (Zhong): APIs entitled `loop`. (Completed 2024-02-26 20:01 UTC-6)
-TODO (Zhong): How to handle intermediate data transfer between parent and child workflows. Child workflow should be able to read the data in parent flow.
+TODO (Zhong): How to handle intermediate data transfer between parent and child workflows. Child workflow should be able to read the data in parent flow. (Completed 2024-02-28 06:06 UTC-6)
 TODO (Zhong): Data Output.
 
 @File    :   workflow.py
