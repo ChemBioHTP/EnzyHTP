@@ -63,7 +63,8 @@ def test_get_ddg_fold():
     assert np.isclose(result, 12.069600000000037, atol=1e-6)
 
 def test_cartesian_ddg_action_on_wt():
-    """as said in the name."""
+    """as said in the name.
+    just make sure the Structure is returned for now"""
     test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
     ddg_engine = ri.build_cartesian_ddg_engine(
         relax_cluster_job_config={
@@ -75,4 +76,4 @@ def test_cartesian_ddg_action_on_wt():
         }
     )
     new_stru = ddg_engine.action_on_wt(test_stru)
-    PDBParser().save_structure(f"{DATA_DIR}KE_07_R7_2_S_cart_relax.pdb", new_stru)
+    assert isinstance(new_stru, Structure)
