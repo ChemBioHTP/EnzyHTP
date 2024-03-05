@@ -52,7 +52,7 @@ def test_get_structure_from_score():
     just make sure the Structure is returned for now"""
     with open(f"{DATA_DIR}test_rosetta_relax_score/score_df.pickle", "rb") as f:
         test_score_df = pickle.load(f)
-    result = ri.get_structure_from_score(test_score_df, work_dir=".", clean_up_pdb=False)
+    result = ri.get_structure_from_score(test_score_df, base_dir=".", clean_up_pdb=False)
     assert isinstance(result, Structure)
 
 def test_get_ddg_fold():

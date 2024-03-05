@@ -182,7 +182,7 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
             ramp_constraints=False,
             delete_crash=True,
             )
-        new_stru = self.parent_interface.get_structure_from_score(score_df, work_dir=relax_dir)
+        new_stru = self.parent_interface.get_structure_from_score(score_df)
 
         return new_stru
 
@@ -483,7 +483,8 @@ class RosettaInterface(BaseInterface):
         return df
 
     def get_structure_from_score(
-            self, score_df: pd.DataFrame, work_dir: str,
+            self, score_df: pd.DataFrame,
+            base_dir: str = ".",
             target: str = "min_total",
             clean_up_pdb: bool = True) -> Structure:
         """get the structure of need from a score dataframe.
@@ -491,8 +492,9 @@ class RosettaInterface(BaseInterface):
         Args:
             score_df:
                 the target score.sc based DataFrame
-            work_dir:
-                the work dir that contains all the PDBs
+            base_dir:
+                the base dir that the run associated with the score uses.
+                (it determines the relative path in the description)
             target:
                 the target structure based on the score.
                 (default: obtain the structure with the minimum (most negative) total score)
@@ -507,7 +509,7 @@ class RosettaInterface(BaseInterface):
 
         pdb_path = score_df["description"][idx]
         # parse the PDB
-        result = PDBParser().get_structure(pdb_path)
+        result = PDBParser().get_structure(f"{base_dir}/{pdb_path}")
         # TODO need to rename to convention.
 
         if clean_up_pdb:
@@ -716,6 +718,12 @@ class RosettaInterface(BaseInterface):
             )
             job.submit()
             job.wait_to_end(period=job_check_period)
+
+            # clean up
+            fs.clean_temp_file_n_dir([
+                job.sub_script_path,
+                job.job_cluster_log,
+            ])
         else: # serial, local
             self.env_manager_.run_command(self.config_.RELAX, flags)
 
