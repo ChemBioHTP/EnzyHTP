@@ -8,6 +8,8 @@ Date: 2023-03-28
 """
 
 import copy
+import glob
+import os
 from typing import List, Any, Dict
 from copy import deepcopy
 
@@ -44,6 +46,16 @@ class RosettaConfig(BaseConfig):
 
     RELAX_MPI_EXEC: str = f"mpiexec -np"
     """MPI Executable used to relax a structure/pose."""
+
+    CART_DDG: str = f"$ROSETTA3/source/bin/cartesian_ddg*"
+    """Executable used to relax a structure/pose."""
+
+    @classmethod
+    def get_cart_ddg_exe(self):
+        """find the path of the cartesian_ddg executable. This is made because
+        Rosetta exe names varible but compiling settings"""
+        result = glob.glob(os.path.expandvars(self.CART_DDG))[0]
+        return result
 
     SCORE: str = f"$ROSETTA3/source/bin/score_jd2.default.linuxgccrelease"
     """Executable used to score a specific structure/pose."""
