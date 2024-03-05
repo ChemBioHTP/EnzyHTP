@@ -505,8 +505,7 @@ class RosettaInterface(BaseInterface):
             _LOGGER.error(f"unexpected keyword for target found {target}")
             raise ValueError
 
-        pdb_name = score_df["description"][idx]
-        pdb_path = f"{work_dir}/{pdb_name}"
+        pdb_path = score_df["description"][idx]
         # parse the PDB
         result = PDBParser().get_structure(pdb_path)
         # TODO need to rename to convention.
