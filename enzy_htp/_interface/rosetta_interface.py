@@ -198,10 +198,20 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
 
         # 2. make input file
         fs.safe_mkdir(self.work_dir)
+        temp_pdb_file = self._make_mut_file(stru)
         temp_mut_file, ddg_out_path = self._make_mut_file(mutant) # the output path is determined by the input path. will get_valid for out
 
         # 3. make cmd
-        _cmd = self.parent_interface.make_cart_ddg_cmd()
+        _cmd = self.parent_interface.make_cart_ddg_cmd(
+            pdb_path=temp_pdb_file,
+            mut_file=temp_mut_file,
+            num_iter=self.num_iter,
+            force_iter=self.force_iter,
+            score_cutoff=self.score_cutoff,
+            fa_max_dis=self.fa_max_dis,
+            scorefxn=self.scorefxn,
+            save_mutant_pdb=self.save_mutant_pdb,
+        )
 
         # 4. assemble ClusterJob
         cluster = self.cluster_job_config["cluster"]
@@ -217,7 +227,7 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
             sub_script_path = sub_script_path
         )
         job.mimo = { # only used for translate clean up
-            "temp_files": [temp_mut_file],
+            "temp_files": [temp_mut_file, temp_pdb_file],
         }
 
         # 5. make result egg
@@ -240,10 +250,20 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
 
         # 2. make input file
         fs.safe_mkdir(self.work_dir)
+        temp_pdb_file = self._make_mut_file(stru)
         temp_mut_file, ddg_out_path = self._make_mut_file(mutant) # the output path is determined by the input path. will get_valid for out
 
         # 3. make cmd
-        _cmd = self.parent_interface.make_cart_ddg_cmd()
+        _cmd = self.parent_interface.make_cart_ddg_cmd(
+            pdb_path=temp_pdb_file,
+            mut_file=temp_mut_file,
+            num_iter=self.num_iter,
+            force_iter=self.force_iter,
+            score_cutoff=self.score_cutoff,
+            fa_max_dis=self.fa_max_dis,
+            scorefxn=self.scorefxn,
+            save_mutant_pdb=self.save_mutant_pdb,
+        )
         _cmd_exe = _cmd.split(" ")[0]
         _cmd_args = _cmd.split(" ")[1:]
 
@@ -258,7 +278,7 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
         ddg_fold = self.get_ddg_fold(ddg_out_path)
 
         # 6. clean up
-        fs.clean_temp_file_n_dir([temp_mut_file])
+        fs.clean_temp_file_n_dir([temp_mut_file, temp_pdb_file])
 
         return ddg_fold
 
@@ -339,6 +359,15 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
             # NOTE potential risk that it could be the pose number is used here.
 
         return temp_mut_file_path, temp_result_file_path
+
+    def _make_pdb_file(self, stru: Structure) -> str:
+        """make the pdb file for the cartesian ddg calculation"""
+        result = fs.get_valid_temp_name(f"{self.work_dir}/cart_ddg_temp.pdb")
+        rosetta_stru = copy.deepcopy(stru)
+        self.rename_atoms(rosetta_stru)
+        PDBParser().save_structure(result, rosetta_stru)
+        
+        return result
 
     def get_ddg_fold(self, ddg_file: str, method: str="average") -> float:
         """calculate the ddG_fold number from the .ddg file."""
@@ -595,6 +624,38 @@ class RosettaInterface(BaseInterface):
         fs.write_lines(params_file, params_content)
         
         return params_file 
+
+    def make_cart_ddg_cmd(
+            self, 
+            pdb_path: str, 
+            mut_file: str, 
+            num_iter: int,
+            force_iter: bool,
+            score_cutoff: float,
+            fa_max_dis: float,
+            scorefxn: float,
+            save_mutant_pdb: bool,
+            # TODO figure out arguments
+        ) -> str:
+        """make the command line str for running cartesin ddg"""
+        cart_ddg_exe = self.config_.get_cart_ddg_exe()
+        flags = [
+            f"-in:file:s {pdb_path}"
+            f"-ddg::mut_file {mut_file}"
+            f"-ddg:iterations {num_iter}"
+            f"-force_iterations {str(force_iter).lower()}"
+            f"-ddg::score_cutoff {score_cutoff}"
+            f"-ddg::cartesian"
+            f"-ddg::dump_pdbs {str(save_mutant_pdb).lower()}"
+            f"-fa_max_dis {fa_max_dis}"
+            f"-score:weights {scorefxn}"
+            f"-ddg::legacy false"
+            f"-mute all"
+        ]
+        result = [cart_ddg_exe] + flags
+        result = " ".join(result)
+
+        return result
 
     def relax(
         self,

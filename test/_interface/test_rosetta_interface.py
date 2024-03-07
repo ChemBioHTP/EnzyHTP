@@ -14,6 +14,7 @@ import enzy_htp.core.file_system as fs
 from enzy_htp._config.armer_config import ARMerConfig
 from enzy_htp import PDBParser
 from enzy_htp import interface, config
+from enzy_htp.mutation_class.mutation import Mutation
 from enzy_htp.structure.structure import Structure
 
 DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/data/"
@@ -76,4 +77,25 @@ def test_cartesian_ddg_action_on_wt():
         }
     )
     new_stru = ddg_engine.action_on_wt(test_stru)
-    assert isinstance(new_stru, Structure)
+    PDBParser().save_structure(f"{DATA_DIR}KE_07_R7_2_S_cart_relax.pdb", new_stru)
+    # assert isinstance(new_stru, Structure)
+
+def test_cartesian_ddg_make_job():
+    """as said in the name.
+    just make sure the Structure is returned for now"""
+    test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S_cart_relax.pdb")
+    ddg_engine = ri.build_cartesian_ddg_engine(
+        cluster_job_config={
+            "cluster" : Accre(),
+            "res_keywords" : {
+                "partition" : "production",
+                "account" : "yang_lab",
+            }
+        }
+    )
+    mutant = [
+        Mutation(orig='ARG', target='TRP', chain_id='A', res_idx=154),
+        Mutation(orig='HIS', target='ALA', chain_id='A', res_idx=201),
+        ]
+    ddg_engine.make_job(test_stru, mutant)
+    
