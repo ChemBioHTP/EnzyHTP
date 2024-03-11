@@ -15,6 +15,8 @@ import os
 import pytest
 import logging
 
+from typing import Any
+
 from enzy_htp import config
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core import file_system as fs
@@ -47,10 +49,24 @@ class PseudoAPI():
         _LOGGER.info(f"The original structure contains {original_stru.num_atoms} atoms.")
         _LOGGER.info(f"The mutant structure contains {mutant_stru.num_atoms} atoms.")
         return {"original": original_stru.num_atoms, "mutant": mutant_stru.num_atoms}
+    
+    @staticmethod
+    def union_values(**kwargs) -> str:
+        """This function prints out all the keyword argument values and return the printed value."""
+        unioned_value = " | ".join(map(str, kwargs.values()))
+        _LOGGER.info(f"Unioned Value is: {unioned_value}")
+        return unioned_value
+    
+    @staticmethod
+    def print_value(value) -> None:
+        print(value)
+        return
 
 PSEUDO_API_MAPPER = {
     "test_kwargs": PseudoAPI.test_kwargs,
-    "log_difference": PseudoAPI.log_atom_number_difference
+    "log_difference": PseudoAPI.log_atom_number_difference,
+    "print": PseudoAPI.print_value,
+    "union_values": PseudoAPI.union_values,
 }
 
 SCIENCE_API_MAPPER.update(PSEUDO_API_MAPPER)
@@ -178,4 +194,16 @@ def test_workflow_general_layer_variable(caplog):
     fs.safe_rmdir(WORK_DIR)
     assert 'original structure' in caplog.text
     assert 'mutant structure' in caplog.text
+    return
+
+def test_workflow_multi_loop_datum(caplog):
+    """Test initializing and executing workflow with multi layer loops 
+    to check if loop_datum can be passed correctly between multi layers."""
+    json_filepath = f'{DATA_DIR}/workflow_multi_loop_datum.json'
+    # _LOGGER.level = logging.DEBUG
+    with EnablePropagate(_LOGGER):
+        general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath)
+        return_key, return_value = general.execute()
+    fs.safe_rmdir(WORK_DIR)
+    assert 'Lisa | Green Pepper' in caplog.text
     return

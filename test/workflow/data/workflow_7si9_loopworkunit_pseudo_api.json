@@ -40,6 +40,7 @@
         "store_as": "loop_unit_0",
         "args": {
           "loop_data": "`assign_mutant_0`",
+          "loop_datum_varname": "loop_datum",
           "workunits": [
             {
               "api": "mutate_stru",

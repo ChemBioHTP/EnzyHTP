@@ -1,7 +1,7 @@
 #! python3
 # -*- encoding: utf-8 -*-
 """
-WorkFlow and WorkUnit.
+Workflow Interpreter.
 
 TODO (Zhong): Typing type annotation inspection. (Completed 2024-02-16 23:16 UTC-6)
 TODO (Zhong): Annotation inspection in intermediate_data_mapper. (Completed 2024-03-01 01:00 UTC-6)
@@ -20,12 +20,15 @@ from __future__ import annotations
 from io import TextIOWrapper, FileIO
 from inspect import _empty, Parameter, signature
 from json import load, loads
-from typing import Any, Dict, List, Type, Union
+from typing import Any, Dict, List, Type, Union, Tuple
 from collections.abc import Iterable, Callable
 
 from enzy_htp.core.logger import _LOGGER
 
-from .config import SCIENCE_API_MAPPER, JsonConfigVariableFormatter as VarFormatter
+from .config import (
+    SCIENCE_API_MAPPER, 
+    JsonConfigVariableFormatter as VarFormatter, 
+)
 
 # API Keys for flow control, such as `loop`.
 CONTROL_API_KEYS = [
@@ -41,9 +44,18 @@ WORKUNIT_RETURN_VALUE_KEY = "store_as"      # Key indicating the key where the r
 WORKUNIT_ARGUMENT_LIST_KEY = "args"         # Key indicates the arguments to be passed into the API.
 CONTROL_BODY_WORKUNITS_LABEL = "workunits"  # Key indicating the list of workunits contained in the body in a unit playing a control role.
 LOOP_ITERABLE_DATA_LABEL = "loop_data"      # Key indicating the object to iterate over in a LoopWorkUnit.
-LOOP_BODY_DATUM_LABEL = "loop_datum"        # Key indicating the element iterated from ITERABLE_DATA in each workunit of the loop body.
+LOOP_BODY_DATUM_LABEL = "loop_datum_varname"# Key indicating the element iterated from ITERABLE_DATA in each workunit of the loop body.
 
 PLACEHOLDER_VALUE = "PLAC$H0LD$R"   # Value for placeholder.
+
+class ExecutionStatus():
+    """Handles status management for workunits and workflows."""
+    FAILED_INITIALIZATION = -3
+    NOT_STARTED = -2
+    RUNNING = -1
+    EXIT_WITH_OK = 0
+    EXIT_WITH_ERROR = 1
+    PAUSED = 2
 
 class WorkFlow():
     """Rrepresents a procedural WorkFlow primarily consists of a number of WorkUnit instances, 
@@ -56,14 +68,17 @@ class WorkFlow():
     
     Attributes:
         debug (bool): Flag indicating whether debugging mode is enabled.
-        error_msg_list (list): A list of error logs collected from the initialization and execution of the workflow.
+        error_msg_list (list): A list of error logs collected from the initialization and execution of the workflow. This is a class attribute.
         is_self_inspection_passed (bool): Indicates if the workflow has passed self inspection. If False, the workflow cannot be executed.
         workunits (List[WorkFlow]): A list of WorkUnit instance carried by this workflow.
         intermediate_data_mapper (dict): Runtime intermediate data for the current layer of workflow.
         inherited_data_mapper (dict): Data inherited from parent workflow.
+        indexes (List[int]): A list of the hierarchical indexes of the work units to which the current workflow belongs in the configuration file.
+                                  If the current workflow is at the outermost level, this value is an empty list.
+        execution_status (int): A flag indicating the execution status of the WorkFlow instance. Using value from `class ExecutionStatus`.
     """
     debug: bool                 # Indicates whether to run in debug mode.
-    error_msg_list = list()     # Error information.
+    error_msg_list = list()     # Error information. This is a class attribute.
     is_self_inspection_passed: bool
 
     # The list of Work Unit.
@@ -73,46 +88,65 @@ class WorkFlow():
     intermediate_data_mapper: dict  # Runtime intermediate data for the current layer of workflow.
     inherited_data_mapper: dict     # Data inherited from parent workflow.
 
+    indexes: list  # A list of the hierarchical indexes of the work units to which the current workflow belongs in the configuration file.
+    execution_status: int   # A flag indicating the execution status of the WorkFlow instance.
+
     # Output
     # data_output_path = './Mutation.dat'
 
     #region WorkFlow Initialization.
-    def __init__(self, debug: bool = False, intermediate_data_mapper: Dict[str, Any] = dict(), inherited_data_mapper: Dict[str, Any] = dict()) -> None:
+    def __init__(self, debug: bool = False, 
+                indexes: List[int] = list(), 
+                intermediate_data_mapper: Dict[str, Any] = dict(), 
+                inherited_data_mapper: Dict[str, Any] = dict()
+                ) -> None:
         """Initialize an instance.
         
         Args:
             debug (bool, optional): Indicates whether to run in debug mode.
+            unit_indexes (List[int]): A list of the hierarchical indexes of the work units to which the current workflow belongs in the configuration file.
+                                      If the current workflow is at the outermost level, this value is an empty list.
             intermediate_data_mapper (Dict[str, Any], optional): The initial value of intermediate_data_mapper.
             inherited_data_mapper (Dict[str, Any], optional): Data Mapper containing data to be inherited.
         """
         self.debug = debug
+        self.indexes = indexes
         self.intermediate_data_mapper = intermediate_data_mapper
         self.inherited_data_mapper = inherited_data_mapper
         _LOGGER.debug(f"inherited_data_mapper: {self.inherited_data_mapper}")
 
         self.workunits = list()
         self.is_self_inspection_passed = False
+        self.execution_status = ExecutionStatus.NOT_STARTED
         return
     
     @classmethod
-    def from_list(cls, units_dict_list: List[dict], debug: bool = False, intermediate_data_mapper: Dict[str, Any] = dict(), inherited_data_mapper: Dict[str, Any] = dict()) -> WorkFlow:
+    def from_list(cls, units_dict_list: List[dict], debug: bool = False, 
+                intermediate_data_mapper: Dict[str, Any] = dict(), 
+                inherited_data_mapper: Dict[str, Any] = dict(), 
+                indexes: List[int] = list()
+                ) -> WorkFlow:
         """Initialize an instance of WorkFlow from a given dictionary instance.
         
         Args:
             units_dict_list (List[dict]): A list containing the WorkUnit configuration dicts.
             debug (bool, optional): Indicates whether to run in debug mode.
+            unit_indexes (List[int]): A list of the hierarchical indexes of the work units to which the current workflow belongs in the configuration file.
+                                      If the current workflow is at the outermost level, this value is an empty list.
             intermediate_data_mapper (Dict[str, Any], optional): The initial value of intermediate_data_mapper.
             inherited_data_mapper (Dict[str, Any], optional): Data Mapper containing data to be inherited.
         
         Returns:
             An instance of WorkFlow.
         """
-        flow = cls(debug=debug, intermediate_data_mapper=intermediate_data_mapper, inherited_data_mapper=inherited_data_mapper)
+        flow = cls(debug=debug, indexes=indexes, intermediate_data_mapper=intermediate_data_mapper, inherited_data_mapper=inherited_data_mapper)
         if (units_dict_list == None):
             flow.error_msg_list.append('Initializing WorkFlow with no workunits. Workunits are expected.')
         else:
-            for unit_dict in units_dict_list:
-                flow.add_unit(unit_dict)
+            for unit_index, unit_dict in enumerate(units_dict_list):
+                unit_indexes_to_pass = indexes.copy()
+                unit_indexes_to_pass.append(unit_index)
+                flow.add_unit(unit_dict, unit_indexes_to_pass)
                 continue
         
         # If there's no error message, then self-inspection is passed.
@@ -165,7 +199,7 @@ class WorkFlow():
         with open(json_filepath) as fobj:
             return WorkFlow.from_json_file_object(fobj, debug=debug)
     
-    def add_unit(self, unit_dict: dict) -> None:
+    def add_unit(self, unit_dict: dict, unit_indexes_to_pass: List[int] = list()) -> None:
         """Adds a new unit to the workflow.
 
         This method creates a new instance of WorkUnit from a provided dictionary and adds it to 
@@ -178,21 +212,22 @@ class WorkFlow():
             unit_dict (dict): A dictionary containing the configuration for the unit to be added.
                             This dictionary should include keys for API mapping and execution 
                             parameters.
+            unit_indexes_to_pass (List[int]): A list of the hierarchical indexes of the workunit to add.
         """
         api_key = unit_dict.get(WORKUNIT_API_NAME_KEY, str())
         workunit = WorkUnit()   # Placeholder.
         if (api_key in CONTROL_API_KEYS):
-            _LOGGER.info(f"Parsing new Control WorkUnit: {api_key}.")
+            _LOGGER.info(f"Parsing Control WorkUnit {'.'.join(map(str, unit_indexes_to_pass))}:  {api_key}.")
             if api_key == "loop":
                 # Setup a placeholder in `workflow.intermediate_data_mapper`.
-                workunit = LoopWorkUnit.from_dict(unit_dict=unit_dict, placeholder_workflow=self, debug=self.debug)
+                workunit = LoopWorkUnit.from_dict(unit_dict=unit_dict, workflow=self, indexes=unit_indexes_to_pass, debug=self.debug)
             elif api_key == "general":
                 error_msg = "GeneralWorkUnit should not be configured inside a workflow."
                 _LOGGER.error(error_msg)
                 self.error_msg_list.append(error_msg)
         else:
-            _LOGGER.info(f"Parsing new Science WorkUnit: {api_key}.")
-            workunit = WorkUnit.from_dict(unit_dict=unit_dict, workflow=self, debug=self.debug)
+            _LOGGER.info(f"Parsing Science WorkUnit {'.'.join(map(str, unit_indexes_to_pass))}:  {api_key}.")
+            workunit = WorkUnit.from_dict(unit_dict=unit_dict, workflow=self, indexes=unit_indexes_to_pass, debug=self.debug)
 
         # Setup a placeholder in `workflow.intermediate_data_mapper`.
         self.intermediate_data_mapper[VarFormatter.unformat_variable(workunit.return_key)] = PLACEHOLDER_VALUE
@@ -231,18 +266,19 @@ class WorkFlow():
             ValueError: If the workflow has not passed the self-inspection.
         """
         if not self.is_self_inspection_passed:
+            self.execution_status = ExecutionStatus.FAILED_INITIALIZATION
             _LOGGER.error('The initialized WorkFlow has not yet passed the self-inspection, so it is not allowed to be executed.')
             raise ValueError(self)
         else:
             _LOGGER.info('The initialized WorkFlow has successfully passed the self-inspection. Proceeding to execution.')
+            self.execution_status = ExecutionStatus.RUNNING
             for workunit in self.workunits:
                 workunit: WorkUnit
-                _LOGGER.info(f'Executing WorkUnit API Key: {workunit.api_key} ...')
+                _LOGGER.info(f'Executing WorkUnit {".".join(map(str, workunit.indexes))} {workunit.api_key} ...')
                 return_key, return_value = workunit.execute()
                 self.intermediate_data_mapper[VarFormatter.unformat_variable(return_key)] = return_value
                 continue
             return self.intermediate_data_mapper
-
 
 class WorkUnit():
     """Represents a single unit in a procedural workflow.
@@ -253,21 +289,24 @@ class WorkUnit():
     of a specified function or method.
 
     Attributes:
-        __api_key (str): Key used to identify and map the appropriate science API function.
+        indexes (list): A list of hierarchical indexes of the workunit.
+        api_key (str): Key used to identify and map the appropriate science API function.
                          Read from the `api` field in the configuration.
-        __args_dict_input (dict): The raw, unprocessed arguments dictionary as specified
+        args_dict_input (dict): The raw, unprocessed arguments dictionary as specified
                                   in each unit of the JSON configuration.
         workflow (WorkFlow): Reference to the parent workflow object that this unit is part of.
         api (object): The actual science API function object mapped using `__api_key`.
         return_key (str): The key under which the return value of the API call will be stored.
-                          Read from the `store_as` field in the configuration.
+                        Read from the `store_as` field in the configuration.
         return_value: The value returned by the execution of the API function.
         args_dict_to_pass (dict): Processed arguments dictionary to be passed to the API function.
         error_info_list (list): List of error messages encountered during processing.
         is_self_inspection_passed (bool): Flag indicating whether self-inspection passed.
         params_to_assign_at_execution (list): List of parameters that need to be assigned values at execution time.
+        execution_status (int): A flag indicating the execution status of the WorkUnit instance.
         debug (bool): Flag indicating whether debugging mode is enabled.
     """
+    indexes: list
     api_key: str
     args_dict_input: dict
 
@@ -279,14 +318,21 @@ class WorkUnit():
     error_msg_list: list
     is_self_inspection_passed: bool
     params_to_assign_at_execution: list
+    execution_status: int
 
     debug: bool
 
-    def __init__(self, workflow: WorkFlow = None, debug: bool = False):
+    @property
+    def status(self):
+        """Getter for unit_status."""
+        return self.execution_status
+
+    def __init__(self, workflow: WorkFlow = None, indexes: List[int] = list(), debug: bool = False):
         """Initializes a WorkUnit instance.
 
         Args:
             workflow (WorkFlow): A reference to the workflow object this unit belongs to.
+            indexes (list, optional): A list of hierarchical indexes of the workunit.
             debug (bool, optional): Indicates whether to run in debug mode.
         """
         # Initialize attributes in the constructor
@@ -298,16 +344,18 @@ class WorkUnit():
         self.is_self_inspection_passed = False
         self.params_to_assign_at_execution = list()
         self.return_value = None
+        self.execution_status = ExecutionStatus.NOT_STARTED
 
         if workflow == None:
             self.workflow = WorkFlow()
         else:
             self.workflow = workflow
+        self.indexes = indexes
         self.debug = debug
         return
     
     @classmethod
-    def from_dict(cls, unit_dict: dict, workflow: WorkFlow = None, debug: bool = False) -> WorkUnit:
+    def from_dict(cls, unit_dict: dict, workflow: WorkFlow = None, indexes: List[int] = list(), debug: bool = False) -> WorkUnit:
         """Initializes an instance of WorkUnit from a given dictionary.
 
         The dictionary should contain keys such as `api`, `store_as`, and `args`
@@ -318,6 +366,7 @@ class WorkUnit():
             unit_dict (dict): A dictionary derived from a JSON configuration, containing keys
                               for API mapping and execution.
             workflow (WorkFlow, optional): The workflow instance to which this unit belongs.
+            indexes (list, optional): A list of hierarchical indexes of the workunit.
             debug (bool, optional): Indicates whether to run in debug mode.
 
         Returns:
@@ -327,7 +376,7 @@ class WorkUnit():
             KeyError: If the API key cannot be mapped to any API.
         """
         # Initialize the class.
-        unit = cls(workflow, debug=debug)
+        unit = cls(workflow, indexes=indexes, debug=debug)
         unit.api_key = unit_dict.get(WORKUNIT_API_NAME_KEY, str())
         unit.return_key = unit_dict.get(WORKUNIT_RETURN_VALUE_KEY, None)
         unit.args_dict_input = unit_dict.get(WORKUNIT_ARGUMENT_LIST_KEY, dict())
@@ -442,6 +491,39 @@ class WorkUnit():
             # Inspect basic types.
             return isinstance(arg_value, annotation)
 
+    def __load_data_mapper_value(self, param_name: str, arg_value: str) -> Tuple[bool, Any]:
+        """Load data from `intermediate_data_mapper` or `inherited_data_mapper`.
+        
+        Returns:
+            A tuple containing a boolean value of "whether to skip type checking" and loaded `arg_value`.
+        """
+        unformatted_arg_value = VarFormatter.unformat_variable(arg_value)
+        is_key_mapped = False   # Indicate if the value is mapped.
+        is_value_mapped_none = True # Indicate if the value in the mapper is None at present.
+        for mapper in [self.workflow.intermediate_data_mapper, self.workflow.inherited_data_mapper]:    # Listed in order of priority.
+            if (mapper and unformatted_arg_value in mapper):    # If mapped, leave for later.
+                is_key_mapped = True
+                self.params_to_assign_at_execution.append(param_name)
+                self.args_dict_to_pass[param_name] = unformatted_arg_value
+                mapped_value = mapper.get(unformatted_arg_value)
+                if (mapped_value):   # Check if there is a non-none-or-empty value in Mapper.
+                    if (isinstance(mapped_value, type(PLACEHOLDER_VALUE)) # Placeholder values need to be excluded.
+                        and mapped_value == PLACEHOLDER_VALUE):
+                        break
+                    is_value_mapped_none = False
+                    arg_value = mapped_value    # Assign mapped value to the argument.
+                if is_key_mapped:   # Once key is mapped, no longer mapping other mappers.
+                    break
+        if (is_key_mapped and is_value_mapped_none):    # If the key is mapped but the value is still None, skip inspection.
+            return True, arg_value
+        elif (not is_key_mapped):
+            error_msg = f"The param `{param_name}` in API `{self.api_key}` hasn't received expected variable {VarFormatter.format_as_variable(arg_value)}. Check your configuration and there's maybe some typos!"
+            _LOGGER.error(error_msg)
+            self.error_msg_list.append(error_msg)
+            return True, arg_value
+        _LOGGER.debug(f"{self.api_key}, param_name: {param_name}, arg_value: {unformatted_arg_value}, Value Changed.")
+        return False, arg_value
+
     def self_inspection_and_args_reassembly(self) -> None:
         """Performs self-inspection and reassembles the arguments for the API call.
 
@@ -465,11 +547,15 @@ class WorkUnit():
             # If `*args` or `**kwargs` parameters exist (which is always at the very last),
             # add all the arguments to the `args_dict_to_pass`. Then, break the loop.
             # APIs with both `*args` and `**kwargs` are not and will not be supported.
-            if (param.name in ['arg', 'args', 'kwarg', 'kwargs']):
+            if (param_name in ['arg', 'args', 'kwarg', 'kwargs']):
                 for key, value in self.args_dict_input.items():
                     if key not in self.args_dict_to_pass.keys():
-                        self.args_dict_to_pass[key] = value
-                        continue
+                        if VarFormatter.is_variable_formatted(value):   # Check if the arg_value is a formatted as a value name.
+                            _, arg_value = self.__load_data_mapper_value(key, value)  # kwargs params always skip type inspection.
+                            self.args_dict_to_pass[key] = arg_value
+                        else:
+                            self.args_dict_to_pass[key] = value
+                            continue
                 break
 
             # A param with empty default value is a required parameter.
@@ -489,35 +575,15 @@ class WorkUnit():
                     pass
                 continue
 
-            # Map data from `intermediate_data_mapper` or `inherited_data_mapper`.
+            # Load data from `intermediate_data_mapper` or `inherited_data_mapper`.
             _LOGGER.debug(f"{self.api_key}, param_name: {param.name}, arg_value: {arg_value}")
+            skip_type_inspection = False
             if VarFormatter.is_variable_formatted(arg_value):   # Check if the arg_value is a formatted as a value name.
-                unformatted_arg_value = VarFormatter.unformat_variable(arg_value)
-                is_key_mapped = False   # Indicate if the value is mapped.
-                is_value_mapped_none = True # Indicate if the value in the mapper is None at present.
-                for mapper in [self.workflow.intermediate_data_mapper, self.workflow.inherited_data_mapper]:    # Listed in order of priority.
-                    if (mapper and unformatted_arg_value in mapper):    # If mapped, leave for later.
-                        is_key_mapped = True
-                        self.params_to_assign_at_execution.append(param_name)
-                        self.args_dict_to_pass[param.name] = unformatted_arg_value
-                        mapped_value = mapper.get(unformatted_arg_value)
-                        if (mapped_value):   # Check if there is a non-none-or-empty value in Mapper.
-                            if (isinstance(mapped_value, type(PLACEHOLDER_VALUE)) # Placeholder values need to be excluded.
-                                and mapped_value == PLACEHOLDER_VALUE):
-                                break
-                            is_value_mapped_none = False
-                            arg_value = mapped_value    # Assign mapped value to the argument.
-                        if is_key_mapped:   # Once key is mapped, no longer mapping other mappers.
-                            break
-                if (is_key_mapped and is_value_mapped_none):    # If the key is mapped but the value is still None, skip inspection.
-                    continue
-                elif (not is_key_mapped):
-                    error_msg = f"The param `{param_name}` in API `{self.api_key} hasn't received expected variable {arg_value}`. Check your configuration and there's maybe some typos!"
-                    _LOGGER.error(error_msg)
-                    self.error_msg_list.append(error_msg)
-                    continue
-                _LOGGER.debug(f"{self.api_key}, param_name: {param.name}, arg_value: {unformatted_arg_value}, Value Changed.")
+                skip_type_inspection, arg_value = self.__load_data_mapper_value(param_name, arg_value)
             
+            if skip_type_inspection:    # Skip type inspection if `skip_type_inspection` is True.
+                continue
+
             # Inspect argument type.
             if (param.annotation != _empty):
                 annotation = param.annotation
@@ -599,28 +665,32 @@ class LoopWorkUnit(WorkUnit):
     sub_workflow_list: List[WorkFlow]
 
     @staticmethod
-    def loop_unit_placeholder_api(loop_data: Iterable, workunits: list):
+    def loop_unit_placeholder_api(workunits: list, loop_data: Iterable, loop_datum_varname: str):
         """Serves as a placeholder API for initializing LoopWorkUnit. This API is not intended for actual execution but marks
         the necessary arguments for initialization.
 
         Args:
-            loop_data (Iterable): The data to be iterated over in the loop.
             workunits (dict): A list containing the WorkUnit configuration dicts.
+            loop_data (Iterable): The data to be iterated over in the loop. 
+                                  This parameter name needs to be consistent with the value of `LOOP_ITERABLE_DATA_LABEL`.
+            loop_datum_varname (str): Name of the variable representing each element iterated from ITERABLE_DATA in each workunit of the loop body. 
+                                      This parameter name needs to be consistent with the value of `LOOP_BODY_DATUM_LABEL`.
         """
         pass
 
-    def __init__(self, workflow: WorkFlow = None, debug: bool = False):
+    def __init__(self, workflow: WorkFlow = None, indexes: List[int] = list(), debug: bool = False):
         """Initializes a LoopWorkUnit instance.
 
         Args:
             workflow (WorkFlow): A reference to the workflow object this unit belongs to.
+            indexes (list, optional): A list of hierarchical indexes of the workunit.
             debug (bool, optional): Indicates whether to run in debug mode.
         """
-        super().__init__(workflow, debug)
+        super().__init__(workflow, indexes, debug)
         self.sub_workflow_list = list()
 
     @classmethod
-    def from_dict(cls, unit_dict: dict, placeholder_workflow: WorkFlow = None, debug: bool = False) -> LoopWorkUnit:
+    def from_dict(cls, unit_dict: dict, workflow: WorkFlow = None, indexes: List[int] = list(), debug: bool = False) -> LoopWorkUnit:
         """Initializes an instance of LoopWorkUnit from a given dictionary.
 
         As with a normal WorkUnit, the dictionary should contain keys such as `api`, `store_as`, 
@@ -633,13 +703,14 @@ class LoopWorkUnit(WorkUnit):
         Args:
             unit_dict (dict): Configuration dictionary with necessary parameters for initialization.
             workflow (WorkFlow, optional): The parent workflow of this unit.
+            indexes (list, optional): A list of hierarchical indexes of the workunit.
             debug (bool, optional): Indicates whether to run in debug mode.
 
         Returns:
             LoopWorkUnit: An instance of LoopWorkUnit initialized with the given configuration.
         """
         # Initialize the class.
-        unit = cls(placeholder_workflow, debug=debug)
+        unit = cls(workflow, indexes, debug)
         unit.api_key = unit_dict.get(WORKUNIT_API_NAME_KEY, str())
         unit.return_key = unit_dict.get(WORKUNIT_RETURN_VALUE_KEY, None)
         unit.args_dict_input = unit_dict.get(WORKUNIT_ARGUMENT_LIST_KEY, dict())
@@ -654,16 +725,17 @@ class LoopWorkUnit(WorkUnit):
         data_mapper_to_inherite = unit.generate_data_mapper_to_inherite()
 
         # Some data should be passed before the initialization of a sub-WorkFlow.
-        data_mapper_for_initialization = {LOOP_BODY_DATUM_LABEL: PLACEHOLDER_VALUE}
+        loop_body_datum_varname = VarFormatter.unformat_variable(unit.args_dict_to_pass.get(LOOP_BODY_DATUM_LABEL))
+        data_mapper_for_initialize_as_intermediate = {loop_body_datum_varname: PLACEHOLDER_VALUE}
 
         # Initialize a PlaceHolder Sub-WorkFlow to perform self-inspection.
-        placeholder_workflow = WorkFlow.from_list(units_dict_list=unit.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL),
-            debug=unit.debug, intermediate_data_mapper=data_mapper_for_initialization,
-            inherited_data_mapper=data_mapper_to_inherite)
+        placeholder_sub_workflow = WorkFlow.from_list(units_dict_list=unit.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL),
+            debug=unit.debug, intermediate_data_mapper=data_mapper_for_initialize_as_intermediate,
+            inherited_data_mapper=data_mapper_to_inherite, indexes=indexes)
         
         # Add error message from placeholder workflow initialization.
-        if (placeholder_workflow.error_msg_list):
-            unit.error_msg_list += placeholder_workflow.error_msg_list
+        if (placeholder_sub_workflow.error_msg_list):
+            unit.error_msg_list += placeholder_sub_workflow.error_msg_list
 
         return unit
 
@@ -676,26 +748,28 @@ class LoopWorkUnit(WorkUnit):
         Returns:
             tuple: A tuple containing the return key and a list of results from each loop iteration.
         """
-        loop_index = 0
         self.return_value = list()
         data_mapper_to_inherite = self.generate_data_mapper_to_inherite()
         self.update_args_value_from_data_mapper()
         _LOGGER.info(f'We are about to execute a LoopWorkUnit ...')
-        for loop_datum in self.args_dict_to_pass.get(LOOP_ITERABLE_DATA_LABEL):
+        self.execution_status = ExecutionStatus.RUNNING
+        loop_body_datum_varname = self.args_dict_to_pass.get(LOOP_BODY_DATUM_LABEL)
+        for loop_index, loop_datum in enumerate(self.args_dict_to_pass.get(LOOP_ITERABLE_DATA_LABEL)):
             
             # Initialize the sub-workflow at execution time.
-            data_mapper_for_initialization = {LOOP_BODY_DATUM_LABEL: loop_datum}
+            data_mapper_for_initialization = {loop_body_datum_varname: loop_datum}
             workflow = WorkFlow.from_list(
                 units_dict_list=self.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL),
                 debug=self.debug, intermediate_data_mapper=data_mapper_for_initialization,
-                inherited_data_mapper=data_mapper_to_inherite)
+                inherited_data_mapper=data_mapper_to_inherite, indexes=self.indexes)
 
             # Execute the sub-workflow.
             _LOGGER.info(f'Executing loop_{loop_index} ...')
             workflow_return = workflow.execute()
             self.sub_workflow_list.append(workflow)
             self.return_value.append({f'loop_{loop_index}': workflow_return})
-            loop_index += 1
+        # TODO (Zhong): How to indicate error from inner units.
+        self.execution_status = ExecutionStatus.EXIT_WITH_OK
         return self.return_key, self.return_value
 
 class GeneralWorkUnit(WorkUnit):
@@ -821,5 +895,8 @@ class GeneralWorkUnit(WorkUnit):
         Returns:
             tuple: A tuple containing the return key and the intermediate data from the workflow.
         """
+        self.execution_status = ExecutionStatus.RUNNING
         self.return_value = self.workflow.execute()
+        # TODO (Zhong): How to indicate error from inner units.
+        self.execution_status = ExecutionStatus.EXIT_WITH_OK
         return self.return_key, self.return_value
