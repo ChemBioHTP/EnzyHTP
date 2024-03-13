@@ -17,6 +17,7 @@ from xml.dom import minidom
 import xml.etree.cElementTree as ET
 from collections import namedtuple
 from typing import Any, Dict, List, Tuple, Set, Union
+from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
@@ -35,7 +36,7 @@ from enzy_htp.core.exception import RosettaError
 from .base_interface import BaseInterface
 from .handle_types import ddGFoldEngine, ddGResultEgg
 
-
+@dataclass
 class RosettaCartesianddGEgg(ddGResultEgg):
     """This class define the result egg of cartesian ddg
     calculation"""
@@ -186,7 +187,7 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
 
         return new_stru
 
-    def make_job(self, stru: Structure, mutant: List[Mutation]) -> Tuple[ClusterJob, ddGResultEgg]:
+    def make_job(self, stru: Structure, mutant: List[Mutation]) -> Tuple[ClusterJob, RosettaCartesianddGEgg]:
         """the method that makes a ClusterJob that runs the cartesian ddg"""
         # 1. input
         if not isinstance(stru, Structure):
@@ -198,7 +199,7 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
 
         # 2. make input file
         fs.safe_mkdir(self.work_dir)
-        temp_pdb_file = self._make_mut_file(stru)
+        temp_pdb_file = self._make_pdb_file(stru)
         temp_mut_file, ddg_out_path = self._make_mut_file(mutant) # the output path is determined by the input path. will get_valid for out
 
         # 3. make cmd
@@ -250,7 +251,7 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
 
         # 2. make input file
         fs.safe_mkdir(self.work_dir)
-        temp_pdb_file = self._make_mut_file(stru)
+        temp_pdb_file = self._make_pdb_file(stru)
         temp_mut_file, ddg_out_path = self._make_mut_file(mutant) # the output path is determined by the input path. will get_valid for out
 
         # 3. make cmd
@@ -355,8 +356,13 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
             f"{len(mutant)}",
         ]
         for mut in mutant:
-            mut_file_lines.append(f"{mut.orig} {mut.res_idx} {mut.target}")
+            mut_file_lines.append(f"{mut.get_orig(True)} {mut.res_idx} {mut.get_target(True)}")
             # NOTE potential risk that it could be the pose number is used here.
+        mut_file_lines.append(
+            ""
+        )
+
+        fs.write_lines(temp_mut_file_path, mut_file_lines)
 
         return temp_mut_file_path, temp_result_file_path
 
@@ -364,7 +370,7 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
         """make the pdb file for the cartesian ddg calculation"""
         result = fs.get_valid_temp_name(f"{self.work_dir}/cart_ddg_temp.pdb")
         rosetta_stru = copy.deepcopy(stru)
-        self.rename_atoms(rosetta_stru)
+        self.parent_interface.rename_atoms(rosetta_stru)
         PDBParser().save_structure(result, rosetta_stru)
         
         return result
@@ -640,20 +646,20 @@ class RosettaInterface(BaseInterface):
         """make the command line str for running cartesin ddg"""
         cart_ddg_exe = self.config_.get_cart_ddg_exe()
         flags = [
-            f"-in:file:s {pdb_path}"
-            f"-ddg::mut_file {mut_file}"
-            f"-ddg:iterations {num_iter}"
-            f"-force_iterations {str(force_iter).lower()}"
-            f"-ddg::score_cutoff {score_cutoff}"
-            f"-ddg::cartesian"
-            f"-ddg::dump_pdbs {str(save_mutant_pdb).lower()}"
-            f"-fa_max_dis {fa_max_dis}"
-            f"-score:weights {scorefxn}"
-            f"-ddg::legacy false"
-            f"-mute all"
+            f"-in:file:s {pdb_path}",
+            f"-ddg::mut_file {mut_file}",
+            f"-ddg:iterations {num_iter}",
+            f"-force_iterations {str(force_iter).lower()}",
+            f"-ddg::score_cutoff {score_cutoff}",
+            f"-ddg::cartesian",
+            f"-ddg::dump_pdbs {str(save_mutant_pdb).lower()}",
+            f"-fa_max_dis {fa_max_dis}",
+            f"-score:weights {scorefxn}",
+            f"-ddg::legacy false",
+            f"-mute all",
         ]
-        result = [cart_ddg_exe] + flags
-        result = " ".join(result)
+        result = [f"{cart_ddg_exe}"] + flags
+        result = " \\\n".join(result)
 
         return result
 

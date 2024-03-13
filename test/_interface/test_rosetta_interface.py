@@ -24,6 +24,7 @@ ri = interface.rosetta
 
 def test_relax_w_stru():
     """as said in the name. make sure relax works Structure() input."""
+    os.environ["ROSETTA3"] = "/data/yang_lab/Common_Software/Rosetta3.9/main"
     test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
     scores = ri.relax(
         test_stru,
@@ -80,9 +81,10 @@ def test_cartesian_ddg_action_on_wt():
     PDBParser().save_structure(f"{DATA_DIR}KE_07_R7_2_S_cart_relax.pdb", new_stru)
     # assert isinstance(new_stru, Structure)
 
-def test_cartesian_ddg_make_job():
+def test_cartesian_ddg_make_job(helpers):
     """as said in the name.
-    just make sure the Structure is returned for now"""
+    just make sure no error occurs for now"""
+    os.environ["ROSETTA3"] = "/data/yang_lab/Common_Software/Rosetta3.9/main"
     test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S_cart_relax.pdb")
     ddg_engine = ri.build_cartesian_ddg_engine(
         cluster_job_config={
@@ -91,11 +93,17 @@ def test_cartesian_ddg_make_job():
                 "partition" : "production",
                 "account" : "yang_lab",
             }
-        }
+        },
+        work_dir=WORK_DIR
     )
     mutant = [
         Mutation(orig='ARG', target='TRP', chain_id='A', res_idx=154),
         Mutation(orig='HIS', target='ALA', chain_id='A', res_idx=201),
         ]
-    ddg_engine.make_job(test_stru, mutant)
+    job, result_egg = ddg_engine.make_job(test_stru, mutant)
+
+    assert helpers.equiv_files(f"{WORK_DIR}/mutations.txt", f"{DATA_DIR}/mutations_answer.txt")
+    # TODO assert on job.sub_script_str
     
+    fs.safe_rm(f"{WORK_DIR}/mutations.txt")
+    fs.safe_rm(f"{WORK_DIR}/cart_ddg_temp.pdb")
