@@ -19,11 +19,14 @@ TODO (Zhong): Data Output.
 
 # Here put the import lib.
 from __future__ import annotations
+from os import getcwd, path
 from io import TextIOWrapper, FileIO
 from inspect import _empty, Parameter, signature
 from json import load, loads
 from typing import Any, Dict, List, Type, Union, Tuple
 from collections.abc import Iterable, Callable
+from datetime import datetime
+import pickle
 
 from enzy_htp.core.logger import _LOGGER
 
@@ -38,6 +41,8 @@ CONTROL_API_KEYS = [
     "general",
 ]
 
+DEFAULT_WORK_DIR = getcwd() # Default Working Directory: Current working directory.
+
 # In the Json file used to define the workflow, 
 # keys in the mapper are defined by the developer,
 # which are not user-definable.
@@ -48,17 +53,55 @@ CONTROL_BODY_WORKUNITS_LABEL = "workunits"  # Key indicating the list of workuni
 LOOP_ITERABLE_DATA_LABEL = "loop_data"      # Key indicating the object to iterate over in a LoopWorkUnit.
 LOOP_BODY_DATUM_LABEL = "loop_datum_varname"# Key indicating the element iterated from ITERABLE_DATA in each workunit of the loop body.
 
-PLACEHOLDER_VALUE = "The world is yours and ours, but in the final analysis it is you young people's."  # Value for placeholder.
+PLACEHOLDER_VALUE = "The world is yours and ours, but in the final analysis it's you young people's."  # Value for placeholder.
 
 class ExecutionStatus():
-    """Handles status management for workunits and workflows."""
-    NOT_STARTED = -3
-    RUNNING = -2
-    UNIT_PAUSED = -1     # For Science API only. If a unit is paused, keep its outer layers as `RUNNING`.
-    EXIT_WITH_OK = 0
-    ERROR_IN_INNER_UNITS = 1   # For WorkFlow and Control APIs only.
-    EXIT_WITH_ERROR = 2
+    """
+    Class representing various execution statuses for workunits and workflows.
+
+    Notes:
+        When a WorkFlow instance or WorkUnit instance is marked as `RUNNING_WITH_PAUSE_IN_INNER_UNITS` or `EXPECTED_PAUSE`, 
+        it freezes the execution of all subsequent instances of the WorkUnit for the WorkFlow instance in which it resides
+        (a loop ControlWorkUnit or parallel ControlWorkUnit freezes execution of the current loop/parallel instance and 
+        proceeds directly to the next loop/parallel instance until all instances of the ControlWorkUnit in which it resides 
+        have been executed), and then saves the current GeneralWorkUnit instance state to a snapshot pickle file.
+
+    Notes in Chinese Language for Reference (consistent with the meaning of the English version):
+        当一个 WorkFlow 实例或 WorkUnit 实例被标记为 `RUNNING_WITH_PAUSE_IN_INNER_UNITS` 或 `EXPECTED_PAUSE` 时，
+        将冻结其所在的工作流实例的后续所有 WorkUnit 实例的执行（循环式 ControlWorkUnit 或并行式 ControlWorkUnit 
+        会冻结当前循环体/并行体实例，直接继续执行下一个循环体/并行体实例，直至其所在的 ControlWorkUnit 中的所有循环体/并行体实例被执行完毕），
+        然后保存当前 GeneralWorkUnit 实例状态的快照至 pickle 文件。
+
+    Attributes:
+        NOT_STARTED (int): The status before the workunit or workflow starts execution. Value: -9
+        RUNNING (int): Indicates that the workunit or workflow is currently in execution. Value: -3
+        PAUSE_IN_INNER_UNITS (int): Specific to WorkFlow and ControlWorkUnit instances. Indicates
+                                    that the workflow is running but an inner unit is paused as expected. Value: -2
+        EXPECTED_PAUSE (int): Specific to Basic WorkUnit instances. Indicates that a unit is paused and its outer
+                              layers should be marked as `RUNNING_WITH_PAUSE_IN_INNER_UNITS`. Value: -1
+        EXIT_WITH_OK (int): Indicates successful completion of the work unit or workflow. Value: 0
+        ERROR_IN_INNER_UNITS (int): Specific to WorkFlow and ControlWorkUnit. Indicates error(s) in the
+                                    inner units of a workflow. Value: 1
+        EXIT_WITH_ERROR (int): Specific to Basic WorkUnit instances. Indicates that the work unit or workflow
+                               exited with an error. Value: 2
+        EXIT_WITH_ERROR_AND_PAUSE (int): Specific to WorkFlow and ControlWorkUnit. Indicates the coexistence of error(s)
+                                        and expected pause(s) in the inner units of a workflow. Value: 3
+        FAILED_INITIALIZATION (int): Indicates that the initialization of the workunit or workflow failed. Value: 9
+    """
+    NOT_STARTED = -9
+    RUNNING = -3
+    RUNNING_WITH_PAUSE_IN_INNER_UNITS = -2   # For WorkFlow and ControlWorkUnit only.
+    EXPECTED_PAUSE = -1                 # For Basic WorkUnit only. If a unit is paused, set its outer layers as `RUNNING_WITH_PAUSE_IN_INNER_UNITS`.
+    EXIT_OK = 0
+    EXIT_WITH_ERROR_IN_INNER_UNITS = 1  # For WorkFlow and ControlWorkUnit only.
+    EXIT_WITH_ERROR = 2                 # For Science API only.
+    EXIT_WITH_ERROR_AND_PAUSE = 3       # For WorkFlow and ControlWorkUnit only.
     FAILED_INITIALIZATION = 9
+
+    pause_excluding_error_statuses = [EXPECTED_PAUSE, RUNNING_WITH_PAUSE_IN_INNER_UNITS]    # For logical judgment only.
+    pause_including_error_statuses = [EXPECTED_PAUSE, RUNNING_WITH_PAUSE_IN_INNER_UNITS, EXIT_WITH_ERROR_AND_PAUSE] # For logical judgment only.
+    error_excluding_pause_statuses = [EXIT_WITH_ERROR, EXIT_WITH_ERROR_IN_INNER_UNITS]      # For logical judgment only.
+    error_including_pause_statuses = [EXIT_WITH_ERROR, EXIT_WITH_ERROR_IN_INNER_UNITS, EXIT_WITH_ERROR_AND_PAUSE]   # For logical judgment only.
 
 class WorkFlow():
     """Rrepresents a procedural WorkFlow primarily consists of a number of WorkUnit instances, 
@@ -97,6 +140,12 @@ class WorkFlow():
     # Output
     # data_output_path = './Mutation.dat'
 
+    @property
+    def name(self):
+        """The unique name of the WorkFlow instance, collapsed from `api_key` and `indexes`."""
+        name = f"workflow@{'.'.join(map(str, self.indexes))}"
+        return name
+    
     #region WorkFlow Initialization.
     def __init__(self, debug: bool = False, 
                 indexes: List[int] = list(), 
@@ -112,12 +161,14 @@ class WorkFlow():
             intermediate_data_mapper (Dict[str, Any], optional): The initial value of intermediate_data_mapper.
             inherited_data_mapper (Dict[str, Any], optional): Data Mapper containing data to be inherited.
         """
+        # Assigned values.
         self.debug = debug
         self.indexes = indexes
         self.intermediate_data_mapper = intermediate_data_mapper
         self.inherited_data_mapper = inherited_data_mapper
         _LOGGER.debug(f"inherited_data_mapper: {self.inherited_data_mapper}")
 
+        # Default values.
         self.workunits = list()
         self.is_self_inspection_passed = False
         self.execution_status = ExecutionStatus.NOT_STARTED
@@ -217,10 +268,10 @@ class WorkFlow():
                             parameters.
             unit_indexes_to_pass (List[int]): A list of the hierarchical indexes of the workunit to add.
         """
-        api_key = unit_dict.get(WORKUNIT_API_NAME_KEY, str())
-        workunit = WorkUnit()   # Placeholder.
-        if (api_key in CONTROL_API_KEYS):
-            _LOGGER.info(f"Parsing Control WorkUnit {'.'.join(map(str, unit_indexes_to_pass))}:  {api_key}.")
+        workunit = WorkUnit(unit_dict, self, unit_indexes_to_pass, self.debug)   # Placeholder.
+        api_key = workunit.api_key
+        if (workunit.api_key in CONTROL_API_KEYS):
+            _LOGGER.info(f"Parsing Control WorkUnit {workunit.name}.")
             if api_key == "loop":
                 # Setup a placeholder in `workflow.intermediate_data_mapper`.
                 workunit = LoopWorkUnit.from_dict(unit_dict=unit_dict, workflow=self, indexes=unit_indexes_to_pass, debug=self.debug)
@@ -229,7 +280,7 @@ class WorkFlow():
                 _LOGGER.error(error_msg)
                 self.error_msg_list.append(error_msg)
         else:
-            _LOGGER.info(f"Parsing Science WorkUnit {'.'.join(map(str, unit_indexes_to_pass))}:  {api_key}.")
+            _LOGGER.info(f"Parsing Science WorkUnit {workunit.name}.")
             workunit = WorkUnit.from_dict(unit_dict=unit_dict, workflow=self, indexes=unit_indexes_to_pass, debug=self.debug)
 
         # Setup a placeholder in `workflow.intermediate_data_mapper`.
@@ -277,15 +328,22 @@ class WorkFlow():
             self.execution_status = ExecutionStatus.RUNNING
             for workunit in self.workunits:
                 workunit: WorkUnit
-                _LOGGER.info(f'Executing WorkUnit {".".join(map(str, workunit.indexes))} {workunit.api_key} ...')
+                _LOGGER.info(f"Executing WorkUnit {workunit.name} ...")
                 return_key, return_value = workunit.execute()
                 self.intermediate_data_mapper[VarFormatter.unformat_variable(return_key)] = return_value
-                if (len(workunit.error_msg_list)):
+                if (workunit.execution_status in ExecutionStatus.error_excluding_pause_statuses):
                     self.error_msg_list += workunit.error_msg_list
-                    self.execution_status = ExecutionStatus.ERROR_IN_INNER_UNITS
-                continue
-            if self.execution_status != ExecutionStatus.ERROR_IN_INNER_UNITS:
-                self.execution_status = ExecutionStatus.EXIT_WITH_OK
+                    self.execution_status = ExecutionStatus.EXIT_WITH_ERROR_IN_INNER_UNITS
+                    continue
+                elif (workunit.execution_status in ExecutionStatus.pause_excluding_error_statuses):
+                    if (self.execution_status not in ExecutionStatus.error_including_pause_statuses):
+                        self.execution_status = ExecutionStatus.RUNNING_WITH_PAUSE_IN_INNER_UNITS
+                    break
+                elif (workunit.execution_status in ExecutionStatus.pause_including_error_statuses):
+                    self.execution_status = ExecutionStatus.EXIT_WITH_ERROR_AND_PAUSE
+                    break
+            if self.execution_status == ExecutionStatus.RUNNING:
+                self.execution_status = ExecutionStatus.EXIT_OK
             return self.intermediate_data_mapper
 
 class WorkUnit():
@@ -331,22 +389,26 @@ class WorkUnit():
     debug: bool
 
     @property
-    def status(self):
-        """Getter for unit_status."""
-        return self.execution_status
+    def name(self):
+        """The unique name of the WorkUnit instance, collapsed from `api_key` and `indexes`."""
+        name = f"{self.api_key}@{'.'.join(map(str, self.indexes))}"
+        return name
 
-    def __init__(self, workflow: WorkFlow = None, indexes: List[int] = list(), debug: bool = False):
+    def __init__(self, unit_dict: dict = dict(), workflow: WorkFlow = None, indexes: List[int] = list(), debug: bool = False):
         """Initializes a WorkUnit instance.
 
         Args:
+            unit_dict (dict): A dictionary derived from a JSON configuration, containing keys
+                              for API mapping and execution.
             workflow (WorkFlow): A reference to the workflow object this unit belongs to.
             indexes (list, optional): A list of hierarchical indexes of the workunit.
             debug (bool, optional): Indicates whether to run in debug mode.
         """
         # Initialize attributes in the constructor
         # to prevent them from being considered as class attributes.
-        self.api_key = str()
-        self.args_dict_input = dict()
+        self.api_key = unit_dict.get(WORKUNIT_API_NAME_KEY, str())
+        self.return_key = unit_dict.get(WORKUNIT_RETURN_VALUE_KEY, None)
+        self.args_dict_input = unit_dict.get(WORKUNIT_ARGUMENT_LIST_KEY, dict())
         self.args_dict_to_pass = dict()
         self.error_msg_list = list()
         self.is_self_inspection_passed = False
@@ -384,10 +446,7 @@ class WorkUnit():
             KeyError: If the API key cannot be mapped to any API.
         """
         # Initialize the class.
-        unit = cls(workflow, indexes=indexes, debug=debug)
-        unit.api_key = unit_dict.get(WORKUNIT_API_NAME_KEY, str())
-        unit.return_key = unit_dict.get(WORKUNIT_RETURN_VALUE_KEY, None)
-        unit.args_dict_input = unit_dict.get(WORKUNIT_ARGUMENT_LIST_KEY, dict())
+        unit = cls(unit_dict=unit_dict, workflow=workflow, indexes=indexes, debug=debug)
 
         # Map the API.
         unit.api = SCIENCE_API_MAPPER.get(unit.api_key, None)
@@ -429,10 +488,10 @@ class WorkUnit():
             else:   # If no `return_key`, then `return_value` is None.
                 self.api(**self.args_dict_to_pass)
                 self.return_value = None
-            self.status = ExecutionStatus.EXIT_WITH_OK
+            self.status = ExecutionStatus.EXIT_OK
             return self.return_key, self.return_value
         except Exception as exc:
-            _LOGGER.error(f'Catching Error when executing `{self.api_key}`:')
+            _LOGGER.error(f'Catching Error when executing `{self.name}`:')
             self.status = ExecutionStatus.EXIT_WITH_ERROR
             if (self.debug):
                 raise exc
@@ -688,15 +747,16 @@ class LoopWorkUnit(WorkUnit):
         """
         pass
 
-    def __init__(self, workflow: WorkFlow = None, indexes: List[int] = list(), debug: bool = False):
+    def __init__(self, unit_dict: dict, workflow: WorkFlow = None, indexes: List[int] = list(), debug: bool = False):
         """Initializes a LoopWorkUnit instance.
 
         Args:
+            unit_dict (dict): Configuration dictionary with necessary parameters for initialization.
             workflow (WorkFlow): A reference to the workflow object this unit belongs to.
             indexes (list, optional): A list of hierarchical indexes of the workunit.
             debug (bool, optional): Indicates whether to run in debug mode.
         """
-        super().__init__(workflow, indexes, debug)
+        super().__init__(unit_dict, workflow, indexes, debug)
         self.sub_workflow_list = list()
 
     @classmethod
@@ -720,10 +780,7 @@ class LoopWorkUnit(WorkUnit):
             LoopWorkUnit: An instance of LoopWorkUnit initialized with the given configuration.
         """
         # Initialize the class.
-        unit = cls(workflow, indexes, debug)
-        unit.api_key = unit_dict.get(WORKUNIT_API_NAME_KEY, str())
-        unit.return_key = unit_dict.get(WORKUNIT_RETURN_VALUE_KEY, None)
-        unit.args_dict_input = unit_dict.get(WORKUNIT_ARGUMENT_LIST_KEY, dict())
+        unit = cls(unit_dict, workflow, indexes, debug)
         unit.api = LoopWorkUnit.loop_unit_placeholder_api
 
         # Self Inspection.
@@ -777,12 +834,38 @@ class LoopWorkUnit(WorkUnit):
             _LOGGER.info(f'Executing loop_{loop_index} ...')
             workflow_return = workflow.execute()
             self.sub_workflow_list.append(workflow)
-            if workflow.execution_status == ExecutionStatus.ERROR_IN_INNER_UNITS:
-                self.execution_status == ExecutionStatus.ERROR_IN_INNER_UNITS
             self.return_value.append({f'loop_{loop_index}': workflow_return})
-        if self.execution_status != ExecutionStatus.ERROR_IN_INNER_UNITS:
-            self.execution_status = ExecutionStatus.EXIT_WITH_OK
+
+            self.update_execution_status(workflow=workflow)
+            continue
+
+        if (self.execution_status == ExecutionStatus.RUNNING):
+            self.execution_status = ExecutionStatus.EXIT_OK
         return self.return_key, self.return_value
+    
+    def update_execution_status(self, workflow: WorkFlow) -> None:
+        """Update the execution status of LoopWorkUnit instance.
+        
+        Args:
+            workflow (WorkFlow): The WorkFlow instance from loop bodies.
+        """
+        if self.execution_status == ExecutionStatus.EXIT_WITH_ERROR_AND_PAUSE:
+            return
+        elif workflow.execution_status == ExecutionStatus.EXIT_WITH_ERROR_AND_PAUSE:
+            self.execution_status = ExecutionStatus.EXIT_WITH_ERROR_AND_PAUSE
+            return
+        elif workflow.execution_status in ExecutionStatus.error_excluding_pause_statuses:
+            if self.execution_status in ExecutionStatus.pause_including_error_statuses:
+                self.execution_status = ExecutionStatus.EXIT_WITH_ERROR_AND_PAUSE
+            else:
+                self.execution_status = ExecutionStatus.EXIT_WITH_ERROR
+            return
+        elif workflow.execution_status in ExecutionStatus.pause_excluding_error_statuses:
+            if self.execution_status in ExecutionStatus.error_including_pause_statuses:
+                self.execution_status = ExecutionStatus.EXIT_WITH_ERROR_AND_PAUSE
+            else:
+                self.execution_status = ExecutionStatus.RUNNING_WITH_PAUSE_IN_INNER_UNITS
+            return
 
 class GeneralWorkUnit(WorkUnit):
     """This class is used to represent a special kind of unit of work that would normally be used at the outermost level 
@@ -790,16 +873,18 @@ class GeneralWorkUnit(WorkUnit):
     This class is derived from WorkUnit class.
 
     Attributes:
-        workflow (List[WorkFlow]): The workflow it carries.
+        sub_workflow (WorkFlow): The workflow it carries.
         Other inherited attributes...
 
     Methods:
         general_unit_placeholder_api: A static placeholder API for initialization.
         __init__: Initializes a GeneralWorkUnit instance.
         from_dict: Creates a GeneralWorkUnit instance from a dictionary configuration.
-        execute: Executes the GeneralWorkUnit, i.e., executes the workflow.
+        execute: Executes the GeneralWorkUnit, i.e., executes the sub_workflow.
     """
-    workflow: WorkFlow
+    sub_workflow: WorkFlow
+    working_directory: str
+    autodump: bool
 
     @staticmethod
     def general_unit_placeholder_api(workunits: list, **kwargs):
@@ -811,17 +896,23 @@ class GeneralWorkUnit(WorkUnit):
         """
         return
 
-    def __init__(self, debug: bool = False, workflow: WorkFlow = None):
+    def __init__(self, unit_dict: dict, workflow: WorkFlow = None, working_directory: str = DEFAULT_WORK_DIR, autodump: bool = False, debug: bool = False):
         """Initializes a GeneralWorkUnit instance.
 
         Args:
+            unit_dict (dict): Configuration dictionary with necessary parameters for initialization.
             debug (bool, optional): Indicates whether to run in debug mode.
-            workflow (WorkFlow): A reference to the workflow object this unit belongs to.
+            workflow (WorkFlow): A reference to the workflow object this unit belongs to. Usually None.
+            working_directory (str, optional): Indicates where to run the job. Default to current working directory.
+            autodump (bool, optional): Whether to automatically save the GeneralWorkUnit instance as a pickle file 
+                                        when it exits due to Error, Pause, or Completion. Default False.
         """
-        super().__init__(workflow, debug)
+        super().__init__(unit_dict=unit_dict, workflow=workflow, debug=debug)
+        self.working_directory = working_directory
+        self.autodump = autodump
 
     @classmethod
-    def from_dict(cls, unit_dict: dict, debug: bool = False, workflow: WorkFlow = None) -> GeneralWorkUnit:
+    def from_dict(cls, unit_dict: dict, working_directory: str = DEFAULT_WORK_DIR, autodump: bool = False, debug: bool = False) -> GeneralWorkUnit:
         """Initializes an instance of GeneralWorkUnit from a given dictionary.
 
         Here, however, `api` must be `general` to indicate that the WorkUnit is a GeneralWorkUnit, 
@@ -830,17 +921,19 @@ class GeneralWorkUnit(WorkUnit):
 
         Args:
             unit_dict (dict): Configuration dictionary with necessary parameters for initialization.
+            working_directory (str, optional): Indicates where to run the job. Default to current working directory.
+            autodump (bool, optional): Whether to automatically save the GeneralWorkUnit instance as a pickle file 
+                                        when it exits due to Error, Pause, or Completion. Default False.
             debug (bool, optional): Indicates whether to run in debug mode.
-            workflow (WorkFlow, optional): The parent workflow of this unit. Usually None.
 
         Returns:
             LoopWorkUnit: An instance of LoopWorkUnit initialized with the given configuration.
         """
         # Initialize the class.
-        unit = cls(debug=debug, workflow=workflow)
-        unit.api_key = unit_dict.get(WORKUNIT_API_NAME_KEY, str())
-        unit.return_key = unit_dict.get(WORKUNIT_RETURN_VALUE_KEY, None)
-        unit.args_dict_input = unit_dict.get(WORKUNIT_ARGUMENT_LIST_KEY, dict())
+        unit = cls(unit_dict=unit_dict, working_directory=working_directory, autodump=autodump, debug=debug)
+        if not autodump:
+            _LOGGER.warning("The `autodump` value is not set to `True`, so this GeneralWorkUnit instance will not automatically save its state on error or pause and continue computing later after corrections.")
+
         unit.api = GeneralWorkUnit.general_unit_placeholder_api
 
         # Self Inspection.
@@ -852,7 +945,7 @@ class GeneralWorkUnit(WorkUnit):
         del data_mapper_for_init[CONTROL_BODY_WORKUNITS_LABEL]  # Pass kwargs to the workflow. Kwargs contain information specifying CPU/GPU partitions.
 
         if (units_dict_list:=unit.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL)):
-            unit.workflow = WorkFlow.from_list(units_dict_list, debug=debug, intermediate_data_mapper=data_mapper_for_init)
+            unit.sub_workflow = WorkFlow.from_list(units_dict_list, debug=debug, intermediate_data_mapper=data_mapper_for_init)
         else:
             error_msg = "Initializing GeneralWorkUnit with empty `workunits`. WorkUnit(s) are expected."
             _LOGGER.error(error_msg)
@@ -860,46 +953,55 @@ class GeneralWorkUnit(WorkUnit):
         return unit
     
     @classmethod
-    def from_json_string(cls, json_str: str, debug: bool = False) -> GeneralWorkUnit:
+    def from_json_string(cls, json_str: str, working_directory: str = DEFAULT_WORK_DIR, autodump: bool = False, debug: bool = False) -> GeneralWorkUnit:
         """Initialize an instance of GeneralWorkUnit from a serialized json string.
         
         Args:
             json_str (str): The serialized json string.
-            debug (bool, optional): Indicates whether to run in debug mode.
+            working_directory (str, optional): Indicates where to run the job. Default to current working directory.
+            autodump (bool, optional): Whether to automatically save the GeneralWorkUnit instance as a pickle file 
+                                        when it exits due to Error, Pause, or Completion. Default False.
+            debug (bool, optional): Indicates whether to run in debug mode. Default False.
         
         Returns:
             An instance of WorkFlow.
         """
         unit_dict = loads(json_str)
-        return WorkFlow.from_list(unit_dict, debug=debug)
+        return GeneralWorkUnit.from_dict(unit_dict=unit_dict, working_directory=working_directory, autodump=autodump, debug=debug)
 
     @classmethod
-    def from_json_file_object(cls, json_fobj: TextIOWrapper, debug: bool = False) -> GeneralWorkUnit:
+    def from_json_file_object(cls, json_fobj: TextIOWrapper, working_directory: str = DEFAULT_WORK_DIR, autodump: bool = False, debug: bool = False) -> GeneralWorkUnit:
         """Initialize an instance of GeneralWorkUnit from a json file object.
         
         Args:
             json_fobj (TextIOWrapper): The instance of a json file containing GeneralWorkUnit configuration information.
-            debug (bool, optional): Indicates whether to run in debug mode.
+            working_directory (str, optional): Indicates where to run the job. Default to current working directory.
+            autodump (bool, optional): Whether to automatically save the GeneralWorkUnit instance as a pickle file 
+                                        when it exits due to Error, Pause, or Completion. Default False.
+            debug (bool, optional): Indicates whether to run in debug mode. Default False.
         
         Returns:
             An instance of GeneralWorkUnit.
         """
         unit_dict = load(json_fobj)
-        return GeneralWorkUnit.from_dict(unit_dict, debug=debug)
+        return GeneralWorkUnit.from_dict(unit_dict=unit_dict, working_directory=working_directory, autodump=autodump, debug=debug)
 
     @classmethod
-    def from_json_filepath(cls, json_filepath: str, debug: bool = False) -> GeneralWorkUnit:
+    def from_json_filepath(cls, json_filepath: str, working_directory: str = DEFAULT_WORK_DIR, autodump: bool = False, debug: bool = False) -> GeneralWorkUnit:
         """Initialize an instance of GeneralWorkUnit from a json filepath.
         
         Args:
             json_filepath (str): The path to a json file containing GeneralWorkUnit configuration information.
-            debug (bool, optional): Indicates whether to run in debug mode.
+            working_directory (str, optional): Indicates where to run the job. Default to current working directory.
+            autodump (bool, optional): Whether to automatically save the GeneralWorkUnit instance as a pickle file 
+                                        when it exits due to Error, Pause, or Completion. Default False.
+            debug (bool, optional): Indicates whether to run in debug mode. Default False.
         
         Returns:
             An instance of WorkFlow.
         """
         with open(json_filepath) as fobj:
-            return GeneralWorkUnit.from_json_file_object(fobj, debug=debug)
+            return GeneralWorkUnit.from_json_file_object(fobj, working_directory=working_directory, autodump=autodump, debug=debug)
         
     def execute(self) -> tuple:
         """Executes the GeneralWorkUnit.
@@ -908,9 +1010,86 @@ class GeneralWorkUnit(WorkUnit):
             tuple: A tuple containing the return key and the intermediate data from the workflow.
         """
         self.execution_status = ExecutionStatus.RUNNING
-        self.return_value = self.workflow.execute()
-        if (self.workflow.execution_status == ExecutionStatus.ERROR_IN_INNER_UNITS):
-            self.workflow.execution_status = ExecutionStatus.ERROR_IN_INNER_UNITS
+        self.return_value = self.sub_workflow.execute()
+        if (self.sub_workflow.execution_status in ExecutionStatus.error_excluding_pause_statuses):
+            self.execution_status = ExecutionStatus.EXIT_WITH_ERROR_IN_INNER_UNITS
+        elif ((self.sub_workflow.execution_status in ExecutionStatus.pause_excluding_error_statuses) and (self.execution_status not in ExecutionStatus.error_excluding_pause_statuses)):
+            self.execution_status = ExecutionStatus.RUNNING_WITH_PAUSE_IN_INNER_UNITS
         else:
-            self.execution_status = ExecutionStatus.EXIT_WITH_OK
+            self.execution_status = ExecutionStatus.EXIT_OK
+        if (self.autodump):
+            pickle_filepath = self.dump_snapshot_file()
+            _LOGGER.info(f"The current running status has been saved to '{pickle_filepath}'. Please go to this location to view your file(s).")
         return self.return_key, self.return_value
+    
+    def dump_snapshot_file(self, save_directory: str = str()) -> str:
+        """
+        Saves the current state of the GeneralWorkUnit instance to a snapshot file.
+
+        This method serializes the entire state of the GeneralWorkUnit instance and
+        saves it to a file in the specified directory. The filename is generated
+        based on the current timestamp.
+
+        Note:
+            If the `save_directory` value entered is not a directory, 
+            or if saving a file to this directory fails, the save directory would be 
+            switched to the `working_directory` and a Warning is prompted; 
+            if the file cannot be saved to the working directory either, an exception would be raised.
+
+        Args:
+            save_directory (str, optional): The directory where the snapshot file will be saved.
+                                        Defaults to `working_directory`.
+
+        Returns:
+            str: The path to the created snapshot file.
+        """
+        dir_to_save = self.working_directory
+        if (path.exists(save_directory)):
+            dir_to_save = save_directory
+        elif (save_directory):
+            _LOGGER.warning(f"The `save_directory` value '{save_directory}' you specified is not a directory, so change the save address to working_directory.")
+        else:
+            _LOGGER.info("No specified directory to save the Pickle file. Save it to the working directory.")
+            
+        current_time = datetime.now()
+        filename = f"snapshot_{self.api_key}_{current_time.strftime('%Y-%m-%d_%H-%M-%S')}.pickle"
+        filepath = path.join(dir_to_save, filename)
+        try:
+            with open(file=filepath, mode="wb") as fobj:
+                pickle.dump(self, file=fobj, protocol=pickle.HIGHEST_PROTOCOL)
+        except Exception as exc:
+            if dir_to_save != self.working_directory:
+                _LOGGER.warning(f"Unable to save file to '{dir_to_save}'. Using your working directory '{self.working_directory}' instead.")
+                dir_to_save = self.working_directory
+                filepath = path.join(dir_to_save, filename)
+                with open(file=filepath, mode="wb") as fobj:
+                    pickle.dump(self, file=fobj, protocol=pickle.HIGHEST_PROTOCOL)
+            else:
+                raise exc
+        return filepath
+    
+    @staticmethod
+    def load_snapshot_file(filepath: str) -> GeneralWorkUnit:
+        """
+        Loads a GeneralWorkUnit instance from a snapshot file.
+
+        This method deserializes the state of a GeneralWorkUnit instance from the given
+        snapshot file. If the deserialized object is not an instance of GeneralWorkUnit,
+        it raises a TypeError.
+
+        Args:
+            filepath (str): The path to the snapshot file from which to load the state.
+
+        Returns:
+            GeneralWorkUnit: The deserialized GeneralWorkUnit instance.
+
+        Raises:
+            TypeError: If the deserialized object is not an instance of GeneralWorkUnit.
+        """
+        with open(file=filepath, mode="rb") as fobj:
+            unit = pickle.load(file=fobj)
+            
+            if not isinstance(unit, GeneralWorkUnit):
+                raise TypeError("The loaded object is not an instance of GeneralWorkUnit.")
+            
+            return unit
