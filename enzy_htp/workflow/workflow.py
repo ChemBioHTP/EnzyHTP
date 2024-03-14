@@ -7,6 +7,8 @@ TODO (Zhong): Typing type annotation inspection. (Completed 2024-02-16 23:16 UTC
 TODO (Zhong): Annotation inspection in intermediate_data_mapper. (Completed 2024-03-01 01:00 UTC-6)
 TODO (Zhong): APIs entitled `loop`. (Completed 2024-02-26 20:01 UTC-6)
 TODO (Zhong): How to handle intermediate data transfer between parent and child workflows. Child workflow should be able to read the data in parent flow. (Completed 2024-02-28 06:06 UTC-6)
+TODO (Zhong): Continue computing.
+TODO (Zhong): How to indicate error from inner units. (Completed 2024-03-13 19:00 UTC-5)
 TODO (Zhong): Data Output.
 
 @File    :   workflow.py
@@ -46,16 +48,17 @@ CONTROL_BODY_WORKUNITS_LABEL = "workunits"  # Key indicating the list of workuni
 LOOP_ITERABLE_DATA_LABEL = "loop_data"      # Key indicating the object to iterate over in a LoopWorkUnit.
 LOOP_BODY_DATUM_LABEL = "loop_datum_varname"# Key indicating the element iterated from ITERABLE_DATA in each workunit of the loop body.
 
-PLACEHOLDER_VALUE = "PLAC$H0LD$R"   # Value for placeholder.
+PLACEHOLDER_VALUE = "The world is yours and ours, but in the final analysis it is you young people's."  # Value for placeholder.
 
 class ExecutionStatus():
     """Handles status management for workunits and workflows."""
-    FAILED_INITIALIZATION = -3
-    NOT_STARTED = -2
-    RUNNING = -1
+    NOT_STARTED = -3
+    RUNNING = -2
+    UNIT_PAUSED = -1     # For Science API only. If a unit is paused, keep its outer layers as `RUNNING`.
     EXIT_WITH_OK = 0
-    EXIT_WITH_ERROR = 1
-    PAUSED = 2
+    ERROR_IN_INNER_UNITS = 1   # For WorkFlow and Control APIs only.
+    EXIT_WITH_ERROR = 2
+    FAILED_INITIALIZATION = 9
 
 class WorkFlow():
     """Rrepresents a procedural WorkFlow primarily consists of a number of WorkUnit instances, 
@@ -277,7 +280,12 @@ class WorkFlow():
                 _LOGGER.info(f'Executing WorkUnit {".".join(map(str, workunit.indexes))} {workunit.api_key} ...')
                 return_key, return_value = workunit.execute()
                 self.intermediate_data_mapper[VarFormatter.unformat_variable(return_key)] = return_value
+                if (len(workunit.error_msg_list)):
+                    self.error_msg_list += workunit.error_msg_list
+                    self.execution_status = ExecutionStatus.ERROR_IN_INNER_UNITS
                 continue
+            if self.execution_status != ExecutionStatus.ERROR_IN_INNER_UNITS:
+                self.execution_status = ExecutionStatus.EXIT_WITH_OK
             return self.intermediate_data_mapper
 
 class WorkUnit():
@@ -421,9 +429,11 @@ class WorkUnit():
             else:   # If no `return_key`, then `return_value` is None.
                 self.api(**self.args_dict_to_pass)
                 self.return_value = None
+            self.status = ExecutionStatus.EXIT_WITH_OK
             return self.return_key, self.return_value
         except Exception as exc:
             _LOGGER.error(f'Catching Error when executing `{self.api_key}`:')
+            self.status = ExecutionStatus.EXIT_WITH_ERROR
             if (self.debug):
                 raise exc
             else:
@@ -767,9 +777,11 @@ class LoopWorkUnit(WorkUnit):
             _LOGGER.info(f'Executing loop_{loop_index} ...')
             workflow_return = workflow.execute()
             self.sub_workflow_list.append(workflow)
+            if workflow.execution_status == ExecutionStatus.ERROR_IN_INNER_UNITS:
+                self.execution_status == ExecutionStatus.ERROR_IN_INNER_UNITS
             self.return_value.append({f'loop_{loop_index}': workflow_return})
-        # TODO (Zhong): How to indicate error from inner units.
-        self.execution_status = ExecutionStatus.EXIT_WITH_OK
+        if self.execution_status != ExecutionStatus.ERROR_IN_INNER_UNITS:
+            self.execution_status = ExecutionStatus.EXIT_WITH_OK
         return self.return_key, self.return_value
 
 class GeneralWorkUnit(WorkUnit):
@@ -897,6 +909,8 @@ class GeneralWorkUnit(WorkUnit):
         """
         self.execution_status = ExecutionStatus.RUNNING
         self.return_value = self.workflow.execute()
-        # TODO (Zhong): How to indicate error from inner units.
-        self.execution_status = ExecutionStatus.EXIT_WITH_OK
+        if (self.workflow.execution_status == ExecutionStatus.ERROR_IN_INNER_UNITS):
+            self.workflow.execution_status = ExecutionStatus.ERROR_IN_INNER_UNITS
+        else:
+            self.execution_status = ExecutionStatus.EXIT_WITH_OK
         return self.return_key, self.return_value

@@ -1,45 +1,44 @@
 {
-    "api": "general",
-    "store_as": "general",
-    "args": {
-      "name_list": ["Thomas", "Lisa", "Kimberly"],
-      "food_list": ["Chicken", "Beef", "Green Pepper"],
-      "workunits": [
-        {
-          "api": "loop",
-          "store_as": "loop_unit_0",
-          "args": {
-            "loop_data": "`name_list`",
-            "loop_datum_varname": "name",
-            "workunits": [
-              {
-                "api": "print",
-                "args": {
-                  "value": "`name`"
-                }
-              },
-              {
-                "api": "loop",
-                "store_as": "loop_unit_0_0",
-                "args": {
-                  "loop_data": "`food_list`",
-                  "loop_datum_varname": "food",
-                  "workunits": [
-                    {
-                      "api": "union_values",
-                      "store_as": "unioned_value",
-                      "args": {
-                        "name": "`name`",
-                        "food": "`food`"
-                      }
-                    }
-                  ]
-                }
+  "api": "general",
+  "store_as": "general",
+  "args": {
+    "name_list": ["Thomas", "Lisa", "Kimberly"],
+    "food_list": ["Chicken", "Beef", "Green Pepper"],
+    "workunits": [
+      {
+        "api": "loop",
+        "store_as": "loop_unit_0",
+        "args": {
+          "loop_data": "`name_list`",
+          "loop_datum_varname": "name",
+          "workunits": [
+            {
+              "api": "print",
+              "args": {
+                "value": "`name`"
               }
-            ]
-          }
+            },
+            {
+              "api": "loop",
+              "store_as": "loop_unit_0_0",
+              "args": {
+                "loop_data": "`food_list`",
+                "loop_datum_varname": "food",
+                "workunits": [
+                  {
+                    "api": "union_values",
+                    "store_as": "unioned_value",
+                    "args": {
+                      "name": "`name`",
+                      "food": "`food`"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
         }
-      ]
-    }
+      }
+    ]
   }
-  
+}
