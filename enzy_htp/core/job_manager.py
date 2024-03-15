@@ -24,6 +24,7 @@ import os
 
 from .clusters import ClusterInterface
 from .general import get_localtime, num_ele_2d
+import enzy_htp.core.file_system as fs
 from enzy_htp.core.logger import _LOGGER, get_eh_logging_level
 from enzy_htp import config as eh_config
 # TODO fix more Config
@@ -246,11 +247,7 @@ class ClusterJob():
         else:
         # make default value for filename
             if script_path is None:
-                script_path = sub_dir + "/submit.cmd"
-                i = 0
-                while os.path.isfile(script_path):
-                    i += 1
-                    script_path = sub_dir + f"/submit_{i}.cmd"  # TODO(shaoqz): move to helper
+                script_path = fs.get_valid_temp_name(sub_dir + "/submit.cmd")                
 
         # san check
         if self.job_id is not None:
@@ -273,8 +270,10 @@ class ClusterJob():
         deploy the submission scirpt for current job
         store the out_path to self.sub_script_path
         """
-        with open(out_path, "w", encoding="utf-8") as f:
+        actual_path = fs.get_valid_temp_name(out_path)
+        with open(actual_path, "w", encoding="utf-8") as f:
             f.write(self.sub_script_str)
+        self.sub_script_path = actual_path
         return out_path
 
     def _record_job_id_to_file(self):
