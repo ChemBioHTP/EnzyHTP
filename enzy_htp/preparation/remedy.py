@@ -21,11 +21,26 @@ def add_missing_residues( stru: Structure,
                                 ) -> Union[None,Structure]:
 
 
+    """
+
+    Args:
+        stru:
+        missing_residues:
+        method:
+        work_dir:
+        inplace:
+
+    Returns:
+        
+    """
+
     if not missing_residues:
         return #TODO(CJ): check if I need to return a cpy or not 
     interface.modeller.add_missing_residues( stru, missing_residues, work_dir=work_dir, inplace=inplace)
 
 def identify_missing_residues( code:str ) -> List[SeqRes]:
+    """
+    """
 
     #TODO(CJ): add in some checking about the supplkied PDB code. 
 

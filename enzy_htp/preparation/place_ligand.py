@@ -170,13 +170,14 @@ def _place_mole2(stru:Structure,
     score_mask = np.isclose(scores, np.min(scores))
 
     clash_counts = list()
-
+    print(seed_locations[score_mask])
     for slidx,sl in enumerate(seed_locations[score_mask]):
         lig_start = ligand.geom_center
         shift = sl - lig_start
 
         ligand.shift(shift)
         clash_ct = 0
+        print(ligand.geom_center)
 
         for res in stru.residues:
             if res == ligand:
@@ -184,6 +185,7 @@ def _place_mole2(stru:Structure,
             clash_ct += res.clash_count( ligand )
     
         clash_counts.append( clash_ct ) 
+        print(clash_ct)
 
     clash_counts = np.array(clash_counts)
 
@@ -193,6 +195,8 @@ def _place_mole2(stru:Structure,
     seed = final_locations[0]
 
     ligand.shift( seed - ligand.geom_center)
+    
+    print(ligand.geom_center)
 
 
 def _place_alphafill(stru: Structure,

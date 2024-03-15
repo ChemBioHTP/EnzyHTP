@@ -2279,7 +2279,7 @@ class AmberRSTParser():
         contents:List[str] = [
             f"parm {self.prmtop_file}",
             f"trajin {rst_file}",
-             "strip :WAT,Na+,Cl-",
+            # "strip :WAT,Na+,Cl-",
             f"trajout {temp_pdb}",
              "run",
              "quit"

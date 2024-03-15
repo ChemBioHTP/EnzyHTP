@@ -49,6 +49,8 @@ class StructureEnsemble:
         as Structure()s"""
         for this_coord in self.coord_parser(self.coordinate_list):
             result = deepcopy(self.topology)
+            if len(result.atoms) < len(this_coord):
+                this_coord = this_coord[ :len(result.atoms)]
             result.apply_geom(this_coord)
             yield result
 
@@ -65,6 +67,9 @@ class StructureEnsemble:
         """getter for the 1st structure in the ensemble"""
         coord_0 = next(self.coord_parser(self.coordinate_list))
         result = deepcopy(self.topology)
+        if len(result.atoms) < len(coord_0):
+            coord_0 = coord_0[ :len(result.atoms)]
+
         result.apply_geom(coord_0)
         return result    
 
