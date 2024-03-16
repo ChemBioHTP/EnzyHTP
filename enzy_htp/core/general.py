@@ -36,12 +36,13 @@ import sys
 import logging
 import time
 import numpy as np
-from typing import Any, List, Iterable, Tuple, Dict
+from typing import Any, List, Iterable, Tuple, Dict, Callable
 import itertools
 import pickle
+import inspect
 
 from .logger import _LOGGER
-
+from .file_system import write_lines
 
 # == List related ==
 class GhostListElement:
@@ -330,3 +331,20 @@ def load_obj(in_path: str) -> Any:
         obj = pickle.load(f)
     return obj
 
+
+def save_func_to_main(func: Callable, kwargs_file: str, out_path: str):
+    """convert a function to a string of a python main script.
+    This is commonly used when a function needs to be run by
+    ARMer.
+    Limitation: this func have to include import lines in itself.
+    Will replace this with WorkUnit based solution later"""
+    func_source = inspect.getsource(func)
+    result = [
+        "import sys",
+        "from enzy_htp.core.general import load_obj",
+        func_source,
+        "if __name__ == '__main__':",
+        f"    {func.__name__}(argvs=sys.argv, **load_obj({kwargs_file}))",
+        "",
+    ]
+    write_lines(out_path, result)

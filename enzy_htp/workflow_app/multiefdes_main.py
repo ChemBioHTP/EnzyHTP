@@ -5,17 +5,24 @@ Author: QZ Shao <shaoqz@icloud.com>
 Date: 2023-02-11
 """
 import glob
+import itertools
+import os
 from pathlib import Path
+import numpy as np
 import pickle
 from typing import Any, Dict, List, Tuple
 
 from enzy_htp.analysis import d_ele_field_upon_mutation_coarse, ddg_fold_of_mutants
-from enzy_htp.core.clusters.accre import Accre
 from enzy_htp.mutation import assign_mutant
 from enzy_htp.mutation_class import Mutation, get_involved_mutation, generate_from_mutation_flag
+from enzy_htp._config.armer_config import ARMerConfig
 from enzy_htp.structure import Structure, PDBParser, Atom
+from enzy_htp.core.clusters.accre import Accre
+from enzy_htp.core.job_manager import ClusterJob, ClusterInterface
 from enzy_htp.core import _LOGGER
-import numpy as np
+from enzy_htp.core.general import save_obj, load_obj, save_func_to_main
+import enzy_htp.core.math_helper as mh
+import enzy_htp.core.file_system as fs
 
 sp = PDBParser()
 
@@ -191,23 +198,155 @@ def _get_single_mutation_stability(
         result = {k[0] : v for k, v in ddg_fold_mapper.items()}
     return result
 
-def fine_filter() -> List[List[Mutation]]:
+def fine_filter( # TODO summarize logics from here to a general shrapnel function
+        stru: Structure,
+        mutants: List[List[Mutation]],
+        atom_1: str, atom_2: str,
+        shrapnel_child_job_config: Dict,
+        job_period: int = 120,
+        job_array_size: int = 50,
+        shrapnel_groups: int = 100,
+        shrapnel_gpu_partition_mapper: Dict = None,
+        out_ref_path_1: str = "mutant_space_2_fine_metrics.pickle",
+        out_ref_path_2: str = "mutant_space_3_fine_metrics.pickle",
+        checkpoint_1: str = "fine_filer_child_jobs.pickle",
+        work_dir: str = "./fine_filter",
+    ) -> List[List[Mutation]]:
     """the fine filter applied on the 2nd mutant space
-    and assess dEF, ddG_fold, MMPBSA, and SPI. Gives the final mutant space."""
-    # NOTE MMPBSA is important for some close range
+    and assess 
+        dEF(atom_1, atom_2),
+        ddG_fold, 
+        MMPBSA(ligand), 
+        and SPI (ligand, pocket).
+    Gives the final mutant space."""
+    num_mut_each_grp = mh.calc_average_task_num(len(mutants), shrapnel_groups)
+    child_result_fname = "result.pickle"
+    mutant_fname = "mutants.pickle"
+    child_main_path = f"{work_dir}/child_main.py"
+    kwargs_file = f"{work_dir}/child_main_kwargs.pickle"
 
-def save_obj(obj: Any, out_path: str):
-    """save the mutant space to the out_path as a checkpoint
-    .pickle file"""
-    with open(out_path, "wb") as of:
-        pickle.dump(obj, of)
+    if not Path(checkpoint_1).exists():
+        fs.safe_mkdir(work_dir)
+        # 1. make main script
+        # make kwargs
+        child_main_kwargs = {
+            "result_path" : child_result_fname
+        }
+        save_obj(child_main_kwargs, kwargs_file)
+        # make script
+        save_func_to_main(_fine_filter_child_main, kwargs_file, child_main_path)
 
-def load_obj(in_path: str):
-    """load the mutant space to the in_path as a checkpoint
-    .pickle file"""
-    with open(in_path, "rb") as f:
-        obj = pickle.load(f)
-    return obj
+        # 2. seperate mutants in groups & make jobs
+        child_jobs = []
+        assigned = 0
+        for grp_id, num_mut in enumerate(num_mut_each_grp):
+            # make dir
+            grp_path = f"{work_dir}/group_{grp_id}"
+            fs.safe_mkdir(grp_path)
+            # dist mutants
+            grp_mut = mutants[assigned:assigned+num_mut]
+            assigned += num_mut
+            grp_mut_pickle = f"{grp_path}/{mutant_fname}"
+            save_obj(grp_mut, grp_mut_pickle)
+            # make job
+            gpu_partition = _find_gpu_partition(grp_id, shrapnel_gpu_partition_mapper)
+            sub_script_path = f"{grp_path}/submit_main.sh"
+            child_jobs.append(
+                _make_child_job(
+                    grp_id = grp_id,
+                    cluster_job_config = shrapnel_child_job_config,
+                    child_main_path = os.path.abspath(child_main_path),
+                    mutant_fname = mutant_fname,
+                    child_result_fname = child_result_fname,
+                    gpu_partition = gpu_partition,
+                    sub_dir = grp_path,
+                    sub_script_path = sub_script_path,
+                )
+            )
+
+        # 3. submit jobs
+        save_obj(child_jobs, checkpoint_1)
+    else:
+        pass # handle re-run
+        # 1. analyze remaining child_jobs (recycle old one)
+        # 2. resubmit unfinished ones and substitude them in material
+
+    ClusterJob.wait_to_array_end(child_jobs, job_period, job_array_size) # re-run also handled within each children
+
+    # 4. summarize result
+    fine_metrics = {}
+    for grp_id, num_mut in enumerate(num_mut_each_grp):
+        grp_path = f"{work_dir}/group_{grp_id}"
+        result_path = f"{grp_path}/{child_result_fname}"
+        child_result = load_obj(result_path)
+        fine_metrics.update(child_result)
+    save_obj(fine_metrics, out_ref_path_1)
+
+    # 5. screen based on fine metrics
+    result_mutant_space = _screen_w_fine_metrics(mutants, fine_metrics, out_ref_path_2)
+
+    return result_mutant_space
+
+def _fine_filter_child_main():
+    """the child main script of the shrapnel treatment
+    in fine_filter
+    use -m mutant_file -p gpu_partition -o result from cmdline"""
+    # task of each mutant (handle re-run too)
+    # 1. prepare
+    # 2. get ddg fold
+    # 3. mutate
+    # 4. MD
+    # 5. get dEF
+    # 6. get MMPBSA
+    # 7. get SPI
+
+def _make_child_job(
+        grp_id: int,
+        cluster_job_config: Dict,
+        child_main_path: str,
+        mutant_fname: str,
+        child_result_fname: str,
+        gpu_partition: str,
+        sub_dir: str,
+        sub_script_path: str,
+        ) -> ClusterJob:
+    """make the ClusterJob for children runs
+    under the shrapnel framework"""
+    cluster = cluster_job_config["cluster"]
+    res_keywords = cluster_job_config["res_keywords"]
+
+    cmd = f"python {child_main_path} -m {mutant_fname} -p {gpu_partition} -o {child_result_fname}"
+    enzyhtp_main_env = cluster.ENZYHTP_MAIN_ENV # TODO add this
+    final_res_keywords = ARMerConfig.SINGLE_CPU_RES | {
+        'job_name' : f'shrapnel_child_{grp_id}',
+        'mem_per_core' : '10G',
+        'walltime' : '10-00:00:00',
+    } | res_keywords
+
+    job = ClusterJob.config_job(
+        commands=cmd,
+        cluster=cluster,
+        env_settings=enzyhtp_main_env,
+        res_keywords=final_res_keywords,
+        sub_dir=sub_dir,
+        sub_script_path=sub_script_path,
+    )
+    return job
+
+def _find_gpu_partition(grp_id, partition_mapper) -> str:
+    """determine which partition the group should use
+    based on the id and the mapper"""
+    for (l, h), partition in partition_mapper.items():
+        if l <= grp_id <= h:
+            return partition
+
+def _screen_w_fine_metrics(
+        mutants: List[List[Mutation]],
+        fine_metrics: Dict[Tuple[Mutation], Dict],
+        out_ref_path_2: str) -> List[List[Mutation]]:
+    """screen the mutant space with the fine metrics.
+    and save a ref pickle file for all resulting mutants with
+    fine metricss"""
 
 def workflow_puo(single_mut_ddg_file_path: str = None):
     """the PuO workflow"""
@@ -251,7 +390,7 @@ def workflow_puo(single_mut_ddg_file_path: str = None):
     else:
         mutant_space_1 = load_obj(checkpoint_1)
 
-    # 2. coarse filter
+    # 2. coarse filter (mutant_space_2 are in groups)
     if not Path(checkpoint_2).exists():
         mutant_space_2 = coarse_filter(
             stru, mutant_space_1,
@@ -263,8 +402,20 @@ def workflow_puo(single_mut_ddg_file_path: str = None):
         mutant_space_2 = load_obj(checkpoint_2)
 
     # 3. fine filter
+    shrapnel_child_job_config = cluster_job_config | {"walltime" : "10-00:00:00"}
     if not Path(checkpoint_3).exists():
-        mutant_space_3 = fine_filter(mutant_space_2)
+        mutant_space_2 = itertools.chain.from_iterable(mutant_space_2)
+        mutant_space_3 = fine_filter(
+            stru, mutant_space_2,
+            atom_1, atom_2,
+            shrapnel_child_job_config = shrapnel_child_job_config,
+            shrapnel_groups = 100,
+            shrapnel_gpu_partition_mapper = {
+                (0, 40) : "pascal",
+                (41, 80) : "turing",
+                (81, 99) : "a6000x4",
+            },
+            )
         save_obj(mutant_space_3, checkpoint_3)
     else:
         mutant_space_3 = load_obj(checkpoint_3)
