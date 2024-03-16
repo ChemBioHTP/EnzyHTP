@@ -21,6 +21,7 @@ TODO (Zhong): Data Output.
 from __future__ import annotations
 from os import getcwd, path
 from io import TextIOWrapper, FileIO
+from time import sleep
 from inspect import _empty, Parameter, signature
 from json import load, loads
 from typing import Any, Dict, List, Type, Union, Tuple
@@ -35,12 +36,6 @@ from .config import (
     JsonConfigVariableFormatter as VarFormatter, 
 )
 
-# API Keys for flow control, such as `loop`.
-CONTROL_API_KEYS = [
-    "loop",
-    "general",
-]
-
 DEFAULT_WORK_DIR = getcwd() # Default Working Directory: Current working directory.
 
 # In the Json file used to define the workflow, 
@@ -50,12 +45,23 @@ WORKUNIT_API_NAME_KEY = "api"               # Key indicating the API name.
 WORKUNIT_RETURN_VALUE_KEY = "store_as"      # Key indicating the key where the return value of the workunit is stored.
 WORKUNIT_ARGUMENT_LIST_KEY = "args"         # Key indicates the arguments to be passed into the API.
 CONTROL_BODY_WORKUNITS_LABEL = "workunits"  # Key indicating the list of workunits contained in the body in a unit playing a control role.
+LOOP_API_KEY = "loop"                       # The key of a loop workunit.
 LOOP_ITERABLE_DATA_LABEL = "loop_data"      # Key indicating the object to iterate over in a LoopWorkUnit.
 LOOP_BODY_DATUM_LABEL = "loop_datum_varname"# Key indicating the element iterated from ITERABLE_DATA in each workunit of the loop body.
+GENERAL_API_KEY = "general"                 # The key of a general workunit.
 
+# API Keys for flow control, such as `loop`, `general`.
+CONTROL_API_KEYS = [
+    LOOP_API_KEY,
+    GENERAL_API_KEY,
+]
+
+# Some string values used globally are defined here.
+FAILED_INITIALIZATION_ERROR_MSG = "The initialized work has not yet passed the self-inspection, so it is not allowed to be executed!"
+SUCCESS_INITIALIZATION_MSG = "The initialized work has successfully passed the self-inspection. Now proceeding to execution."
 PLACEHOLDER_VALUE = "The world is yours and ours, but in the final analysis it's you young people's."  # Value for placeholder.
 
-class ExecutionStatus():
+class StatusCode():
     """
     Class representing various execution statuses for workunits and workflows.
 
@@ -66,14 +72,16 @@ class ExecutionStatus():
         proceeds directly to the next loop/parallel instance until all instances of the ControlWorkUnit in which it resides 
         have been executed), and then saves the current GeneralWorkUnit instance state to a snapshot pickle file.
 
-    Notes in Chinese Language for Reference (consistent with the meaning of the English version):
+    Notes in Chinese Language for Reference (consistent with the meaning of the English version) / 汉语备注，备忘用，与英语文本含义一致:
         当一个 WorkFlow 实例或 WorkUnit 实例被标记为 `RUNNING_WITH_PAUSE_IN_INNER_UNITS` 或 `EXPECTED_PAUSE` 时，
         将冻结其所在的工作流实例的后续所有 WorkUnit 实例的执行（循环式 ControlWorkUnit 或并行式 ControlWorkUnit 
         会冻结当前循环体/并行体实例，直接继续执行下一个循环体/并行体实例，直至其所在的 ControlWorkUnit 中的所有循环体/并行体实例被执行完毕），
         然后保存当前 GeneralWorkUnit 实例状态的快照至 pickle 文件。
 
     Attributes:
-        NOT_STARTED (int): The status before the workunit or workflow starts execution. Value: -9
+        CREATED (int): The initial status when a WorkUnit or WorkFlow instance is created. Value: -9
+        INITIALIZING (int): The status when a WorkUnit or WorkFlow instance is undergoin initialization. Value: -8
+        READY_TO_START (int): The status when a WorkUnit or WorkFlow instance has passed the self-inspection but hasn't yet been started. Value: -4
         RUNNING (int): Indicates that the workunit or workflow is currently in execution. Value: -3
         PAUSE_IN_INNER_UNITS (int): Specific to WorkFlow and ControlWorkUnit instances. Indicates
                                     that the workflow is running but an inner unit is paused as expected. Value: -2
@@ -88,7 +96,9 @@ class ExecutionStatus():
                                         and expected pause(s) in the inner units of a workflow. Value: 3
         FAILED_INITIALIZATION (int): Indicates that the initialization of the workunit or workflow failed. Value: 9
     """
-    NOT_STARTED = -9
+    CREATED = -9
+    INITIALIZING = -8
+    READY_TO_START = -4
     RUNNING = -3
     RUNNING_WITH_PAUSE_IN_INNER_UNITS = -2   # For WorkFlow and ControlWorkUnit only.
     EXPECTED_PAUSE = -1                 # For Basic WorkUnit only. If a unit is paused, set its outer layers as `RUNNING_WITH_PAUSE_IN_INNER_UNITS`.
@@ -102,6 +112,7 @@ class ExecutionStatus():
     pause_including_error_statuses = [EXPECTED_PAUSE, RUNNING_WITH_PAUSE_IN_INNER_UNITS, EXIT_WITH_ERROR_AND_PAUSE] # For logical judgment only.
     error_excluding_pause_statuses = [EXIT_WITH_ERROR, EXIT_WITH_ERROR_IN_INNER_UNITS]      # For logical judgment only.
     error_including_pause_statuses = [EXIT_WITH_ERROR, EXIT_WITH_ERROR_IN_INNER_UNITS, EXIT_WITH_ERROR_AND_PAUSE]   # For logical judgment only.
+    unexecutable_statuses = [CREATED, INITIALIZING, FAILED_INITIALIZATION]                  # For logical judgment only.
 
 class WorkFlow():
     """Rrepresents a procedural WorkFlow primarily consists of a number of WorkUnit instances, 
@@ -115,7 +126,6 @@ class WorkFlow():
     Attributes:
         debug (bool): Flag indicating whether debugging mode is enabled.
         error_msg_list (list): A list of error logs collected from the initialization and execution of the workflow. This is a class attribute.
-        is_self_inspection_passed (bool): Indicates if the workflow has passed self inspection. If False, the workflow cannot be executed.
         workunits (List[WorkFlow]): A list of WorkUnit instance carried by this workflow.
         intermediate_data_mapper (dict): Runtime intermediate data for the current layer of workflow.
         inherited_data_mapper (dict): Data inherited from parent workflow.
@@ -125,7 +135,6 @@ class WorkFlow():
     """
     debug: bool                 # Indicates whether to run in debug mode.
     error_msg_list = list()     # Error information. This is a class attribute.
-    is_self_inspection_passed: bool
 
     # The list of Work Unit.
     workunits: list
@@ -135,16 +144,24 @@ class WorkFlow():
     inherited_data_mapper: dict     # Data inherited from parent workflow.
 
     indexes: list  # A list of the hierarchical indexes of the work units to which the current workflow belongs in the configuration file.
-    execution_status: int   # A flag indicating the execution status of the WorkFlow instance.
+    status: int   # A flag indicating the execution status of the WorkFlow instance.
 
     # Output
     # data_output_path = './Mutation.dat'
 
     @property
-    def name(self):
+    def identifier(self):
         """The unique name of the WorkFlow instance, collapsed from `api_key` and `indexes`."""
         name = f"workflow@{'.'.join(map(str, self.indexes))}"
         return name
+    
+    @property
+    def is_executable(self) -> bool:
+        """Flag indicating whether the current instance passed self-inspection."""
+        if self.status in StatusCode.unexecutable_statuses:
+            return False
+        else:
+            return True
     
     #region WorkFlow Initialization.
     def __init__(self, debug: bool = False, 
@@ -170,8 +187,7 @@ class WorkFlow():
 
         # Default values.
         self.workunits = list()
-        self.is_self_inspection_passed = False
-        self.execution_status = ExecutionStatus.NOT_STARTED
+        self.status = StatusCode.CREATED
         return
     
     @classmethod
@@ -194,8 +210,11 @@ class WorkFlow():
             An instance of WorkFlow.
         """
         flow = cls(debug=debug, indexes=indexes, intermediate_data_mapper=intermediate_data_mapper, inherited_data_mapper=inherited_data_mapper)
+        flow.status = StatusCode.INITIALIZING
         if (units_dict_list == None):
-            flow.error_msg_list.append('Initializing WorkFlow with no workunits. Workunits are expected.')
+            no_workunit_err_msg = "Initializing WorkFlow with no workunits. Workunits are expected."
+            flow.error_msg_list.append(no_workunit_err_msg)
+            flow.status = StatusCode.FAILED_INITIALIZATION
         else:
             for unit_index, unit_dict in enumerate(units_dict_list):
                 unit_indexes_to_pass = indexes.copy()
@@ -203,11 +222,9 @@ class WorkFlow():
                 flow.add_unit(unit_dict, unit_indexes_to_pass)
                 continue
         
-        # If there's no error message, then self-inspection is passed.
-        if (len(flow.error_msg_list) == 0):
-            flow.is_self_inspection_passed = True
-        else:
-            pass
+        # If the flow status keeps INITIALIZING, then mark it as READY_TO_START.
+        if flow.status == StatusCode.INITIALIZING:
+            flow.status = StatusCode.READY_TO_START
         return flow
     
     @classmethod
@@ -223,7 +240,6 @@ class WorkFlow():
         """
         units_dict_list = loads(json_str)
         return WorkFlow.from_list(units_dict_list, debug=debug)
-
 
     @classmethod
     def from_json_file_object(cls, json_fobj: TextIOWrapper, debug: bool = False) -> WorkFlow:
@@ -267,20 +283,23 @@ class WorkFlow():
                             This dictionary should include keys for API mapping and execution 
                             parameters.
             unit_indexes_to_pass (List[int]): A list of the hierarchical indexes of the workunit to add.
+        
+        Returns:
+            The WorkUnit instance added.
         """
         workunit = WorkUnit(unit_dict, self, unit_indexes_to_pass, self.debug)   # Placeholder.
         api_key = workunit.api_key
         if (workunit.api_key in CONTROL_API_KEYS):
-            _LOGGER.info(f"Parsing Control WorkUnit {workunit.name}.")
-            if api_key == "loop":
+            _LOGGER.info(f"Parsing Control WorkUnit {workunit.identifier}.")
+            if api_key == LOOP_API_KEY:
                 # Setup a placeholder in `workflow.intermediate_data_mapper`.
                 workunit = LoopWorkUnit.from_dict(unit_dict=unit_dict, workflow=self, indexes=unit_indexes_to_pass, debug=self.debug)
-            elif api_key == "general":
+            elif api_key == GENERAL_API_KEY:
                 error_msg = "GeneralWorkUnit should not be configured inside a workflow."
                 _LOGGER.error(error_msg)
                 self.error_msg_list.append(error_msg)
         else:
-            _LOGGER.info(f"Parsing Science WorkUnit {workunit.name}.")
+            _LOGGER.info(f"Parsing Science WorkUnit {workunit.identifier}.")
             workunit = WorkUnit.from_dict(unit_dict=unit_dict, workflow=self, indexes=unit_indexes_to_pass, debug=self.debug)
 
         # Setup a placeholder in `workflow.intermediate_data_mapper`.
@@ -288,7 +307,9 @@ class WorkFlow():
 
         # Add new workunit to the workflow.
         self.workunits.append(workunit)
-        self.error_msg_list += workunit.error_msg_list
+        if workunit.status == StatusCode.FAILED_INITIALIZATION:
+            self.status = StatusCode.FAILED_INITIALIZATION
+            self.error_msg_list += workunit.error_msg_list
         return
     
     #endregion
@@ -319,31 +340,30 @@ class WorkFlow():
         Raises:
             ValueError: If the workflow has not passed the self-inspection.
         """
-        if not self.is_self_inspection_passed:
-            self.execution_status = ExecutionStatus.FAILED_INITIALIZATION
-            _LOGGER.error('The initialized WorkFlow has not yet passed the self-inspection, so it is not allowed to be executed.')
+        if not self.is_executable:
+            _LOGGER.error(FAILED_INITIALIZATION_ERROR_MSG)
             raise ValueError(self)
         else:
-            _LOGGER.info('The initialized WorkFlow has successfully passed the self-inspection. Proceeding to execution.')
-            self.execution_status = ExecutionStatus.RUNNING
+            _LOGGER.info(SUCCESS_INITIALIZATION_MSG)
+            self.status = StatusCode.RUNNING
             for workunit in self.workunits:
                 workunit: WorkUnit
-                _LOGGER.info(f"Executing WorkUnit {workunit.name} ...")
+                _LOGGER.info(f"Executing WorkUnit {workunit.identifier} ...")
                 return_key, return_value = workunit.execute()
                 self.intermediate_data_mapper[VarFormatter.unformat_variable(return_key)] = return_value
-                if (workunit.execution_status in ExecutionStatus.error_excluding_pause_statuses):
+                if (workunit.status in StatusCode.error_excluding_pause_statuses):
                     self.error_msg_list += workunit.error_msg_list
-                    self.execution_status = ExecutionStatus.EXIT_WITH_ERROR_IN_INNER_UNITS
+                    self.status = StatusCode.EXIT_WITH_ERROR_IN_INNER_UNITS
                     continue
-                elif (workunit.execution_status in ExecutionStatus.pause_excluding_error_statuses):
-                    if (self.execution_status not in ExecutionStatus.error_including_pause_statuses):
-                        self.execution_status = ExecutionStatus.RUNNING_WITH_PAUSE_IN_INNER_UNITS
+                elif (workunit.status in StatusCode.pause_excluding_error_statuses):
+                    if (self.status not in StatusCode.error_including_pause_statuses):
+                        self.status = StatusCode.RUNNING_WITH_PAUSE_IN_INNER_UNITS
                     break
-                elif (workunit.execution_status in ExecutionStatus.pause_including_error_statuses):
-                    self.execution_status = ExecutionStatus.EXIT_WITH_ERROR_AND_PAUSE
+                elif (workunit.status in StatusCode.pause_including_error_statuses):
+                    self.status = StatusCode.EXIT_WITH_ERROR_AND_PAUSE
                     break
-            if self.execution_status == ExecutionStatus.RUNNING:
-                self.execution_status = ExecutionStatus.EXIT_OK
+            if self.status == StatusCode.RUNNING:
+                self.status = StatusCode.EXIT_OK
             return self.intermediate_data_mapper
 
 class WorkUnit():
@@ -367,7 +387,6 @@ class WorkUnit():
         return_value: The value returned by the execution of the API function.
         args_dict_to_pass (dict): Processed arguments dictionary to be passed to the API function.
         error_info_list (list): List of error messages encountered during processing.
-        is_self_inspection_passed (bool): Flag indicating whether self-inspection passed.
         params_to_assign_at_execution (list): List of parameters that need to be assigned values at execution time.
         execution_status (int): A flag indicating the execution status of the WorkUnit instance.
         debug (bool): Flag indicating whether debugging mode is enabled.
@@ -382,17 +401,25 @@ class WorkUnit():
     return_value: Any
     args_dict_to_pass: dict
     error_msg_list: list
-    is_self_inspection_passed: bool
     params_to_assign_at_execution: list
-    execution_status: int
+    status: int
 
     debug: bool
 
     @property
-    def name(self):
+    def identifier(self) -> str:
         """The unique name of the WorkUnit instance, collapsed from `api_key` and `indexes`."""
-        name = f"{self.api_key}@{'.'.join(map(str, self.indexes))}"
+        name = f"{self.api_key}@{':'.join(map(str, self.indexes))}"
         return name
+    
+    @property
+    def is_executable(self) -> bool:
+        """Flag indicating whether the current instance passed self-inspection."""
+        if self.status in StatusCode.unexecutable_statuses:
+            return False
+        else:
+            return True
+        
 
     def __init__(self, unit_dict: dict = dict(), workflow: WorkFlow = None, indexes: List[int] = list(), debug: bool = False):
         """Initializes a WorkUnit instance.
@@ -411,10 +438,9 @@ class WorkUnit():
         self.args_dict_input = unit_dict.get(WORKUNIT_ARGUMENT_LIST_KEY, dict())
         self.args_dict_to_pass = dict()
         self.error_msg_list = list()
-        self.is_self_inspection_passed = False
         self.params_to_assign_at_execution = list()
         self.return_value = None
-        self.execution_status = ExecutionStatus.NOT_STARTED
+        self.status = StatusCode.CREATED
 
         if workflow == None:
             self.workflow = WorkFlow()
@@ -447,6 +473,7 @@ class WorkUnit():
         """
         # Initialize the class.
         unit = cls(unit_dict=unit_dict, workflow=workflow, indexes=indexes, debug=debug)
+        unit.status = StatusCode.INITIALIZING
 
         # Map the API.
         unit.api = SCIENCE_API_MAPPER.get(unit.api_key, None)
@@ -461,7 +488,7 @@ class WorkUnit():
         
         # Self Inspection.
         unit.self_inspection_and_args_reassembly()
-        unit.check_self_inspection_result()
+        unit.check_initialization_status()
 
         return unit
 
@@ -488,11 +515,11 @@ class WorkUnit():
             else:   # If no `return_key`, then `return_value` is None.
                 self.api(**self.args_dict_to_pass)
                 self.return_value = None
-            self.status = ExecutionStatus.EXIT_OK
+            self.status = StatusCode.EXIT_OK
             return self.return_key, self.return_value
         except Exception as exc:
-            _LOGGER.error(f'Catching Error when executing `{self.name}`:')
-            self.status = ExecutionStatus.EXIT_WITH_ERROR
+            _LOGGER.error(f'Catching Error when executing `{self.identifier}`:')
+            self.status = StatusCode.EXIT_WITH_ERROR
             if (self.debug):
                 raise exc
             else:
@@ -501,7 +528,7 @@ class WorkUnit():
                 return self.return_key, None
 
     def update_args_value_from_data_mapper(self) -> None:
-        """Update the `args_dict_to_pass` by mapping data from `intermediate_data_mapper` or `inherited_data_mapper`.
+        """Update the `args_dict_to_pass` by mapping data from `workflow.intermediate_data_mapper` or `workflow.inherited_data_mapper`.
         If a value is mapped in both `inherited_data_mapper` and `intermediate_data_mapper`,
         then the latter one will overwrite the former one.
         """
@@ -564,7 +591,7 @@ class WorkUnit():
         """Load data from `intermediate_data_mapper` or `inherited_data_mapper`.
         
         Returns:
-            A tuple containing a boolean value of "whether to skip type checking" and loaded `arg_value`.
+            A tuple containing a boolean value of "whether to skip type inspection" and loaded `arg_value`.
         """
         unformatted_arg_value = VarFormatter.unformat_variable(arg_value)
         is_key_mapped = False   # Indicate if the value is mapped.
@@ -605,7 +632,6 @@ class WorkUnit():
         for the API call. Such arguments, if they already have been assigned with value in the mapper,
         they would have to undergo the inspection; otherwise (if is None or Empty value), they could skip the inspection.
         """
-        is_inspection_passed = True
         unit_error_list = list()
         
         # Inspect Arguments.
@@ -639,7 +665,7 @@ class WorkUnit():
                     error_msg = f'Missing required argument `{param.name}` in API `{self.api_key}`.'
                     unit_error_list.append(error_msg)
                     _LOGGER.error(error_msg)
-                    is_inspection_passed = False
+                    self.status = StatusCode.FAILED_INITIALIZATION
                 else:   # Skip if it's optional.
                     pass
                 continue
@@ -661,40 +687,38 @@ class WorkUnit():
                     error_msg = f'Receiving argument `{param.name}` with value `{arg_value}` in unexpected type {type(arg_value)} while {annotation} is expected (when initializing `{self.api_key}`).'
                     _LOGGER.error(error_msg)
                     unit_error_list.append(error_msg)
-                    is_inspection_passed = False
+                    self.status = StatusCode.FAILED_INITIALIZATION
 
             # Inspection passed, now loading arguments.
             self.args_dict_to_pass[param.name] = arg_value
             continue
         
-        self.is_self_inspection_passed = is_inspection_passed
         self.error_msg_list += unit_error_list
         return
     
-    def check_self_inspection_result(self) -> None:
+    def check_initialization_status(self) -> None:
         """Checks the result of self-inspection of the instance.
 
-        This method checks if the self-inspection of the instance passed (`is_self_inspection_ok`). 
-        If the inspection fails and debugging is enabled, it logs each error message and raises a 
-        ValueError with the list of error messages. If debugging is not enabled, it appends the 
-        error messages to the workflow error list.
+        This method checks if the initialization fails (`self.status`). 
+        If the initialization fails and debugging is enabled, it logs each error message and raises a 
+        ValueError. If debugging is not enabled, nothing happens.
+        If the initialization succeeds, then the status of the instance is set to READY_TO_START.
 
         Raises:
-            ValueError: If self-inspection fails and debugging is enabled, a ValueError is raised 
-                        with all collected error information.
+            ValueError: If initialization fails and debugging is enabled, a ValueError is raised
+                        with the input argument dictionary.
         """
-        if self.is_self_inspection_passed == False:
+        if self.status == StatusCode.FAILED_INITIALIZATION:
             if self.debug:
-                raise ValueError(self)
+                raise ValueError(self.args_dict_input)
             else:
-                pass
+                return
         else:
+            self.status = StatusCode.READY_TO_START
             return
 
     def generate_data_mapper_to_inherite(self) -> Dict[str, Any]:
         """Generate data mappers for sub-workflow inheritance.
-        
-        `Dict` or `dict` type data are not inheritable.
         
         Returns:
             Data mapper to inherite (dict)
@@ -704,13 +728,56 @@ class WorkUnit():
             # Data Mapper inherited from parent workflow(s) should be inherited.
             data_mapper_to_inherite.update(inherited_data_mapper.copy())
         for key, value in self.workflow.intermediate_data_mapper.items():
-            if (WorkUnit.__inspect_argument_type(value, dict)):
-                # `Dict` or `dict` type data are not inheritable.
-                continue
+            # if (WorkUnit.__inspect_argument_type(value, dict)):
+            #     # `Dict` or `dict` type data are not inheritable.
+            #     continue
             data_mapper_to_inherite[key] = value
         return data_mapper_to_inherite
 
-class LoopWorkUnit(WorkUnit):
+class ControlWorkUnit(WorkUnit):
+    """This class is an abstract class defining shared attributes and methods of Control WorkUnits (e.g. loop, general, etc.)
+    This class is derived from WorkUnit class.
+    """
+
+    def __init__(self, unit_dict: Dict = dict(), workflow: WorkFlow = None, indexes: List[int] = list(), debug: bool = False):
+        super().__init__(unit_dict, workflow, indexes, debug)
+
+    def encode_layer_index(self, execution_index: int = None) -> str:
+        """The index of current layer to be added to `indexes`.
+        
+        Args:
+            execution_index (int, optional): Indicates the execution index of the target sub-workflow instance in the current control unit, 
+                                            such as the index of loops in the `LoopWorkUnit`,
+                                            and/or the index of parallel tasks in the `ParallelWorkUnit`. (TODO Zhong)
+        
+        Returns:
+            The encoded index of current layer. Default `self.api_key`
+        """
+        splitter = "_"
+        if execution_index is None:
+            return self.api_key
+        else:
+            return f"{self.api_key}{splitter}{execution_index}"
+    
+    def decode_layer_index(self, layer_index: str) -> int:
+        """Decode the index of current layer to obtain the execution index.
+        
+        Args:
+            layer_index (str): The index of current layer in `indexes`.
+
+        Return:
+            The execution index obtained. Default 0.
+        """
+        splitter = "_"
+        if (splitter in layer_index):
+            index_str = layer_index.split(splitter)[-1]
+            index = int(index_str)
+            return index
+        else:
+            return 0
+
+
+class LoopWorkUnit(ControlWorkUnit):
     """This class is used to represent a special kind of workunit in a procedural workflow that is used to carry a loop.
     In this kind of workunit, all single units contained in the loop body is packaged together as a subworkflow.
     This class is derived from WorkUnit class.
@@ -782,10 +849,11 @@ class LoopWorkUnit(WorkUnit):
         # Initialize the class.
         unit = cls(unit_dict, workflow, indexes, debug)
         unit.api = LoopWorkUnit.loop_unit_placeholder_api
+        unit.status = StatusCode.INITIALIZING
 
         # Self Inspection.
         unit.self_inspection_and_args_reassembly()
-        unit.check_self_inspection_result()
+        unit.check_initialization_status()
 
         # Initialize the Loop Body.
         _LOGGER.debug("Initializing a LoopWorkUnit now...")
@@ -796,9 +864,11 @@ class LoopWorkUnit(WorkUnit):
         data_mapper_for_initialize_as_intermediate = {loop_body_datum_varname: PLACEHOLDER_VALUE}
 
         # Initialize a PlaceHolder Sub-WorkFlow to perform self-inspection.
+        flow_indexes = unit.indexes.copy()
+        flow_indexes.append(unit.encode_layer_index())
         placeholder_sub_workflow = WorkFlow.from_list(units_dict_list=unit.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL),
             debug=unit.debug, intermediate_data_mapper=data_mapper_for_initialize_as_intermediate,
-            inherited_data_mapper=data_mapper_to_inherite, indexes=indexes)
+            inherited_data_mapper=data_mapper_to_inherite, indexes=flow_indexes)
         
         # Add error message from placeholder workflow initialization.
         if (placeholder_sub_workflow.error_msg_list):
@@ -819,28 +889,30 @@ class LoopWorkUnit(WorkUnit):
         data_mapper_to_inherite = self.generate_data_mapper_to_inherite()
         self.update_args_value_from_data_mapper()
         _LOGGER.info(f'We are about to execute a LoopWorkUnit ...')
-        self.execution_status = ExecutionStatus.RUNNING
+        self.status = StatusCode.RUNNING
         loop_body_datum_varname = self.args_dict_to_pass.get(LOOP_BODY_DATUM_LABEL)
         for loop_index, loop_datum in enumerate(self.args_dict_to_pass.get(LOOP_ITERABLE_DATA_LABEL)):
             
             # Initialize the sub-workflow at execution time.
             data_mapper_for_initialization = {loop_body_datum_varname: loop_datum}
+            flow_indexes = self.indexes.copy()
+            flow_indexes.append(self.encode_layer_index(loop_index))
             workflow = WorkFlow.from_list(
                 units_dict_list=self.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL),
                 debug=self.debug, intermediate_data_mapper=data_mapper_for_initialization,
-                inherited_data_mapper=data_mapper_to_inherite, indexes=self.indexes)
+                inherited_data_mapper=data_mapper_to_inherite, indexes=flow_indexes)
 
             # Execute the sub-workflow.
             _LOGGER.info(f'Executing loop_{loop_index} ...')
-            workflow_return = workflow.execute()
             self.sub_workflow_list.append(workflow)
-            self.return_value.append({f'loop_{loop_index}': workflow_return})
+            workflow_return = workflow.execute()
+            self.return_value.append({self.encode_layer_index(loop_index): workflow_return})
 
             self.update_execution_status(workflow=workflow)
             continue
 
-        if (self.execution_status == ExecutionStatus.RUNNING):
-            self.execution_status = ExecutionStatus.EXIT_OK
+        if (self.status == StatusCode.RUNNING):
+            self.status = StatusCode.EXIT_OK
         return self.return_key, self.return_value
     
     def update_execution_status(self, workflow: WorkFlow) -> None:
@@ -849,25 +921,25 @@ class LoopWorkUnit(WorkUnit):
         Args:
             workflow (WorkFlow): The WorkFlow instance from loop bodies.
         """
-        if self.execution_status == ExecutionStatus.EXIT_WITH_ERROR_AND_PAUSE:
+        if self.status == StatusCode.EXIT_WITH_ERROR_AND_PAUSE:
             return
-        elif workflow.execution_status == ExecutionStatus.EXIT_WITH_ERROR_AND_PAUSE:
-            self.execution_status = ExecutionStatus.EXIT_WITH_ERROR_AND_PAUSE
+        elif workflow.status == StatusCode.EXIT_WITH_ERROR_AND_PAUSE:
+            self.status = StatusCode.EXIT_WITH_ERROR_AND_PAUSE
             return
-        elif workflow.execution_status in ExecutionStatus.error_excluding_pause_statuses:
-            if self.execution_status in ExecutionStatus.pause_including_error_statuses:
-                self.execution_status = ExecutionStatus.EXIT_WITH_ERROR_AND_PAUSE
+        elif workflow.status in StatusCode.error_excluding_pause_statuses:
+            if self.status in StatusCode.pause_including_error_statuses:
+                self.status = StatusCode.EXIT_WITH_ERROR_AND_PAUSE
             else:
-                self.execution_status = ExecutionStatus.EXIT_WITH_ERROR
+                self.status = StatusCode.EXIT_WITH_ERROR
             return
-        elif workflow.execution_status in ExecutionStatus.pause_excluding_error_statuses:
-            if self.execution_status in ExecutionStatus.error_including_pause_statuses:
-                self.execution_status = ExecutionStatus.EXIT_WITH_ERROR_AND_PAUSE
+        elif workflow.status in StatusCode.pause_excluding_error_statuses:
+            if self.status in StatusCode.error_including_pause_statuses:
+                self.status = StatusCode.EXIT_WITH_ERROR_AND_PAUSE
             else:
-                self.execution_status = ExecutionStatus.RUNNING_WITH_PAUSE_IN_INNER_UNITS
+                self.status = StatusCode.RUNNING_WITH_PAUSE_IN_INNER_UNITS
             return
 
-class GeneralWorkUnit(WorkUnit):
+class GeneralWorkUnit(ControlWorkUnit):
     """This class is used to represent a special kind of unit of work that would normally be used at the outermost level 
     of a workflow configuration, existing as a carrier for the entire workflow.
     This class is derived from WorkUnit class.
@@ -932,13 +1004,16 @@ class GeneralWorkUnit(WorkUnit):
         # Initialize the class.
         unit = cls(unit_dict=unit_dict, working_directory=working_directory, autodump=autodump, debug=debug)
         if not autodump:
-            _LOGGER.warning("The `autodump` value is not set to `True`, so this GeneralWorkUnit instance will not automatically save its state on error or pause and continue computing later after corrections.")
+            not_autodump_warning_msg = "The `autodump` value is not set to `True`, so this GeneralWorkUnit instance will not automatically save its state on error or pause and continue computing later after corrections."
+            _LOGGER.warning(not_autodump_warning_msg)
+            _LOGGER.warning("Continue in 5 seconds...\n")
+            sleep(5.0)
 
         unit.api = GeneralWorkUnit.general_unit_placeholder_api
 
         # Self Inspection.
         unit.self_inspection_and_args_reassembly()
-        unit.check_self_inspection_result()
+        unit.check_initialization_status()
         
         # Initialize the WorkFlow.
         data_mapper_for_init = unit.args_dict_to_pass.copy()
@@ -1009,18 +1084,23 @@ class GeneralWorkUnit(WorkUnit):
         Returns:
             tuple: A tuple containing the return key and the intermediate data from the workflow.
         """
-        self.execution_status = ExecutionStatus.RUNNING
-        self.return_value = self.sub_workflow.execute()
-        if (self.sub_workflow.execution_status in ExecutionStatus.error_excluding_pause_statuses):
-            self.execution_status = ExecutionStatus.EXIT_WITH_ERROR_IN_INNER_UNITS
-        elif ((self.sub_workflow.execution_status in ExecutionStatus.pause_excluding_error_statuses) and (self.execution_status not in ExecutionStatus.error_excluding_pause_statuses)):
-            self.execution_status = ExecutionStatus.RUNNING_WITH_PAUSE_IN_INNER_UNITS
+        if not self.is_executable:
+            _LOGGER.error(FAILED_INITIALIZATION_ERROR_MSG)
+            raise ValueError(self)
         else:
-            self.execution_status = ExecutionStatus.EXIT_OK
-        if (self.autodump):
-            pickle_filepath = self.dump_snapshot_file()
-            _LOGGER.info(f"The current running status has been saved to '{pickle_filepath}'. Please go to this location to view your file(s).")
-        return self.return_key, self.return_value
+            _LOGGER.info(SUCCESS_INITIALIZATION_MSG)
+            self.status = StatusCode.RUNNING
+            self.return_value = self.sub_workflow.execute()
+            if (self.sub_workflow.status in StatusCode.error_excluding_pause_statuses):
+                self.status = StatusCode.EXIT_WITH_ERROR_IN_INNER_UNITS
+            elif ((self.sub_workflow.status in StatusCode.pause_excluding_error_statuses) and (self.status not in StatusCode.error_excluding_pause_statuses)):
+                self.status = StatusCode.RUNNING_WITH_PAUSE_IN_INNER_UNITS
+            else:
+                self.status = StatusCode.EXIT_OK
+            if (self.autodump):
+                pickle_filepath = self.dump_snapshot_file()
+                _LOGGER.info(f"The current running status has been saved to '{pickle_filepath}'. Please go to this location to view your file(s).")
+            return self.return_key, self.return_value
     
     def dump_snapshot_file(self, save_directory: str = str()) -> str:
         """
