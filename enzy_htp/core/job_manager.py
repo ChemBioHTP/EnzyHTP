@@ -258,14 +258,14 @@ class ClusterJob():
 
         self.sub_script_path = self._deploy_sub_script(script_path)
         _LOGGER.debug(f"submitting {script_path} in {sub_dir}")
-        self.job_id, self.job_cluster_log = self.cluster.submit_job(sub_dir, script_path, debug=debug)
+        self.job_id, self.job_cluster_log = self.cluster.submit_job(sub_dir, self.sub_script_path, debug=debug)
         self.sub_dir = sub_dir
         if get_eh_logging_level() < logging.CRITICAL:
             self._record_job_id_to_file()
 
         return self.job_id
 
-    def _deploy_sub_script(self, out_path: str) -> None:
+    def _deploy_sub_script(self, out_path: str) -> str:
         """
         deploy the submission scirpt for current job
         store the out_path to self.sub_script_path
@@ -273,8 +273,7 @@ class ClusterJob():
         actual_path = fs.get_valid_temp_name(out_path)
         with open(actual_path, "w", encoding="utf-8") as f:
             f.write(self.sub_script_str)
-        self.sub_script_path = actual_path
-        return out_path
+        return actual_path
 
     def _record_job_id_to_file(self):
         """

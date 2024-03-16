@@ -280,10 +280,13 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
 
         # 6. clean up
         fs.clean_temp_file_n_dir([temp_mut_file, temp_pdb_file])
+        # archive
+        fs.safe_mkdir(f"{self.work_dir}/results")
+        fs.safe_mv(ddg_out_path, f"{self.work_dir}/results/{Path(ddg_out_path).name}")
 
         return ddg_fold
 
-    def translate(self, result_egg: ddGResultEgg) -> float:
+    def translate(self, result_egg: RosettaCartesianddGEgg) -> float:
         """the method convert engine specific results to general output"""
         ddg_file = result_egg.ddg_file
         parent_job = result_egg.parent_job
@@ -299,6 +302,9 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
         if not self.keep_in_file:
             clean_up_target.extend(parent_job.mimo["temp_files"])
         fs.clean_temp_file_n_dir(clean_up_target)
+        # archive
+        fs.safe_mkdir(f"{self.work_dir}/results")
+        fs.safe_mv(ddg_file, f"{self.work_dir}/results/{Path(ddg_file).name}")
 
         return ddg_fold
 
@@ -344,11 +350,17 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
         To avoid overwriting results from parallel runs, mut_file path is determined by
         finding a non-existing result file path under self.work_dir.
         If the file exists, will change the filename to {self.name}_{index}.txt
+        NOTE that Rosetta made the .ddg file always under the current folder
 
         Return: (path of the mut_file and the result file)"""
         # path
-        temp_result_file_path = fs.get_valid_temp_name(f"{self.work_dir}/mutations.ddg")
-        temp_mut_file_path = str(Path(temp_result_file_path).with_suffix(".txt"))
+        # 1. repel with existing .ddg file
+        temp_result_file_path = fs.get_valid_temp_name("mutations.ddg")
+        # 2. repel with upcoming .ddg file
+        temp_mut_file_path = f"{temp_result_file_path.removesuffix('ddg')}.txt"
+        temp_mut_file_path = fs.get_valid_temp_name(f"{self.work_dir}/{temp_mut_file_path}")
+        # 3. finalize
+        temp_result_file_path = f"{Path(temp_mut_file_path).stem}.ddg"
 
         # content
         mut_file_lines = [
@@ -519,7 +531,7 @@ class RosettaInterface(BaseInterface):
 
     def get_structure_from_score(
             self, score_df: pd.DataFrame,
-            base_dir: str = ".",
+            base_dir: str = "",
             target: str = "min_total",
             clean_up_pdb: bool = True) -> Structure:
         """get the structure of need from a score dataframe.
@@ -529,7 +541,9 @@ class RosettaInterface(BaseInterface):
                 the target score.sc based DataFrame
             base_dir:
                 the base dir that the run associated with the score uses.
-                (it determines the relative path in the description)
+                (it completes the relative path in the description when the relax
+                is ran in a different dir. NOTE that if `output_dir` is used
+                this base_dir is to complete output_dir if it is also relative.)
             target:
                 the target structure based on the score.
                 (default: obtain the structure with the minimum (most negative) total score)
@@ -544,7 +558,7 @@ class RosettaInterface(BaseInterface):
 
         pdb_path = score_df["description"][idx]
         # parse the PDB
-        result = PDBParser().get_structure(f"{base_dir}/{pdb_path}")
+        result = PDBParser().get_structure(f"{base_dir}{pdb_path}")
         # TODO need to rename to convention.
 
         if clean_up_pdb:
@@ -721,7 +735,7 @@ class RosettaInterface(BaseInterface):
                 exit(1)
         elif isinstance(infile, Structure):
             # convert Structure to a PDB
-            temp_pdb_path = fs.get_valid_temp_name("temp_rosetta_unrelax.pdb")
+            temp_pdb_path = fs.get_valid_temp_name("temp_rosetta_relax.pdb")
             # TODO apply StructureTranslator here
             stru = copy.deepcopy(infile)
             self.rename_atoms(stru)

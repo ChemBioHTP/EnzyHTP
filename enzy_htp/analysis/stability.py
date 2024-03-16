@@ -82,9 +82,9 @@ def ddg_fold_of_mutants(
 
     # get engine
     ddg_fold_engine = DDG_FOLD_ENGINE[method](
-        cluster_job_config,
-        work_dir,
-        keep_in_file,
+        cluster_job_config = cluster_job_config,
+        work_dir = work_dir,
+        keep_in_file = keep_in_file,
         **kwargs
     )
 
@@ -120,11 +120,11 @@ def _parallelize_ddg_fold_with_cluster_job(
     """The parallelization method: cluster_job.
     This method will utilize ARMer@EnzyHTP and make each calculation a ClusterJob and
     parallalize them in a job array"""
-    result = []
+    result = {}
     job_list = []
     result_eggs = []
     # 0. action on WT
-    stru = engine.action_on_wt(stru)
+    # stru = engine.action_on_wt(stru)
 
     # 1. prep jobs
     for mutant in mutant_space:

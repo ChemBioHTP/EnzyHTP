@@ -13,6 +13,9 @@ import os
 from typing import List, Any, Dict
 from copy import deepcopy
 
+from enzy_htp.core.exception import MissingEnvironmentElement
+from enzy_htp.core.logger import _LOGGER
+
 from .base_config import BaseConfig
 from .armer_config import ARMerConfig
 
@@ -54,6 +57,9 @@ class RosettaConfig(BaseConfig):
     def get_cart_ddg_exe(self):
         """find the path of the cartesian_ddg executable. This is made because
         Rosetta exe names varible but compiling settings"""
+        if 'ROSETTA3' not in os.environ:
+            _LOGGER.error("$ROSETTA3 needed but not assigned!")
+            raise MissingEnvironmentElement
         result = glob.glob(os.path.expandvars(self.CART_DDG))[0]
         return result
 
