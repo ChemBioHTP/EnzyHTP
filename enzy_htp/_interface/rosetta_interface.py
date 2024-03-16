@@ -357,7 +357,7 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
         # 1. repel with existing .ddg file
         temp_result_file_path = fs.get_valid_temp_name("mutations.ddg")
         # 2. repel with upcoming .ddg file
-        temp_mut_file_path = f"{temp_result_file_path.removesuffix('ddg')}.txt"
+        temp_mut_file_path = f"{temp_result_file_path.removesuffix('ddg')}txt"
         temp_mut_file_path = fs.get_valid_temp_name(f"{self.work_dir}/{temp_mut_file_path}")
         # 3. finalize
         temp_result_file_path = f"{Path(temp_mut_file_path).stem}.ddg"

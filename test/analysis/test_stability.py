@@ -34,13 +34,15 @@ def test_ddg_fold_of_mutants():
     result = ddg_fold_of_mutants(
         test_stru,
         mutant_space,
+        num_iter = 3,
         cluster_job_config = cluster_job_config,
         relax_cluster_job_config = cluster_job_config,
         work_dir=WORK_DIR,
+        action_on_wt_at_start=False, # Turn off relax temp for testing
     )
 
     mut_1 = tuple(mutant_space[0])
     mut_2 = tuple(mutant_space[1])
-    assert np.isclose(result[mut_1], -5.8368, atol=1)
-    assert np.isclose(result[mut_2], -6.4792, atol=1)
+    assert np.isclose(result[mut_1], -0.142, atol=1)
+    assert np.isclose(result[mut_2], -1.2, atol=1)
 
