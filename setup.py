@@ -41,7 +41,7 @@ if __name__ == '__main__':
     setup(
         name='enzy_htp',
         version='2.0.0',
-        description='TODO',
+        description='EnzyHTP automates the complete life-cycle of enzyme modeling',
         author='EnzyHTP Authors',
         author_email='zhongyue.yang@vanderbilt.edu',
         include_package_data=True,
