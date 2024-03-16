@@ -38,6 +38,7 @@ import time
 import numpy as np
 from typing import Any, List, Iterable, Tuple, Dict
 import itertools
+import pickle
 
 from .logger import _LOGGER
 
@@ -315,3 +316,17 @@ def get_localtime(time_stamp: float = None) -> str:
 def get_itself(input_data: Any) -> Any:
     """a function that return the input itself"""
     return input_data
+
+
+def save_obj(obj: Any, out_path: str):
+    """save {obj} to the {out_path} as a .pickle file"""
+    with open(out_path, "wb") as of:
+        pickle.dump(obj, of)
+
+
+def load_obj(in_path: str) -> Any:
+    """load {obj} from the {in_path} as a .pickle file"""
+    with open(in_path, "rb") as f:
+        obj = pickle.load(f)
+    return obj
+
