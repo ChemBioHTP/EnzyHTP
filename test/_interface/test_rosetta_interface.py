@@ -14,6 +14,7 @@ import enzy_htp.core.file_system as fs
 from enzy_htp._config.armer_config import ARMerConfig
 from enzy_htp import PDBParser
 from enzy_htp import interface, config
+from enzy_htp.core.job_manager import ClusterJob
 from enzy_htp.mutation_class.mutation import Mutation
 from enzy_htp.structure.structure import Structure
 
@@ -107,3 +108,25 @@ def test_cartesian_ddg_make_job(helpers):
     
     fs.safe_rm(f"{WORK_DIR}/mutations.txt")
     fs.safe_rm(f"{WORK_DIR}/cart_ddg_temp.pdb")
+
+def test_check_dgg_fold_error():
+    """as said in the name.
+    use a pseudo ClusterJob. Only testing for ddg file existence
+    just make sure no error occurs for now"""
+    os.environ["ROSETTA3"] = "/data/yang_lab/Common_Software/Rosetta3.9/main"
+    test_ddg_file = f'{DATA_DIR}mutations.ddg'
+    test_job = ClusterJob(Accre(), "")
+    test_job.job_cluster_log = f"{DATA_DIR}empty_file"
+    ddg_engine = ri.build_cartesian_ddg_engine(
+        cluster_job_config={
+            "cluster" : Accre(),
+            "res_keywords" : {
+                "partition" : "production",
+                "account" : "yang_lab",
+            }
+        },
+        work_dir=WORK_DIR
+    )
+    ddg_engine.check_dgg_fold_error(
+        test_ddg_file, test_job
+        )
