@@ -36,7 +36,7 @@ from .config import (
     JsonConfigVariableFormatter as VarFormatter, 
 )
 
-DEFAULT_WORK_DIR = getcwd() # Default Working Directory: Current working directory.
+CURRENT_DIRECTORY = getcwd() # Current working directory. (Not the current directory where this file is located, but the directory where the program is running.)
 
 # In the Json file used to define the workflow, 
 # keys in the mapper are defined by the developer,
@@ -45,6 +45,7 @@ WORKUNIT_API_NAME_KEY = "api"               # Key indicating the API name.
 WORKUNIT_RETURN_VALUE_KEY = "store_as"      # Key indicating the key where the return value of the workunit is stored.
 WORKUNIT_ARGUMENT_LIST_KEY = "args"         # Key indicates the arguments to be passed into the API.
 CONTROL_BODY_WORKUNITS_LABEL = "workunits"  # Key indicating the list of workunits contained in the body in a unit playing a control role.
+WORKFLOW_API_KEY = "workflow"               # The value of `api_key` attribute of workflow instance.
 LOOP_API_KEY = "loop"                       # The key of a loop workunit.
 LOOP_ITERABLE_DATA_LABEL = "loop_data"      # Key indicating the object to iterate over in a LoopWorkUnit.
 LOOP_BODY_DATUM_LABEL = "loop_datum_varname"# Key indicating the element iterated from ITERABLE_DATA in each workunit of the loop body.
@@ -114,7 +115,103 @@ class StatusCode():
     error_including_pause_statuses = [EXIT_WITH_ERROR, EXIT_WITH_ERROR_IN_INNER_UNITS, EXIT_WITH_ERROR_AND_PAUSE]   # For logical judgment only.
     unexecutable_statuses = [CREATED, INITIALIZING, FAILED_INITIALIZATION]                  # For logical judgment only.
 
-class WorkFlow():
+class ExecutionEntity:
+    """
+    A base class representing an entity in an execution context, such as a workflow or workunit.
+
+    This class provides a shared foundation for both WorkUnit and WorkFlow classes, encapsulating
+    common attributes and functionalities like identification and executability check. It also
+    facilitates the recursive search of entities based on their unique identifiers, supporting 
+    complex execution structures in workflows.
+
+    Attributes:
+        api_key: str    # A string value indicating the role/function of the current ExecutionEntity instance.
+        status (int): A integer indicating the execution status of the current ExecutionEntity instance.
+                    The value of `status` is according to the values in `StatusCode` class.
+        locator (List[int]): A list of the hierarchical indexes to locate the current ExecutionEntity instance.
+                            If the current instance is at the outermost level, this value is an empty list.
+        debug (bool): Flag indicating whether debugging mode is enabled.
+                    If True, the error is raised everytime it is catched.
+        identifier: A unique identifier for the instance, used to track and reference the entity.
+        is_executable: Indicates whether the instance has passed self-inspection and is ready for execution.
+
+    Methods:
+        search: Recursively searches for an ExecutionEntity instance within the workflow or process
+                structure based on the identifier. Useful for locating specific components within
+                a potentially complex workflow.
+    """
+    api_key: str    # A string value indicating the role/function of the current ExecutionEntity instance.
+    status: int     # A integer indicating the execution status of the current ExecutionEntity instance.
+    locator: list   # A list of the hierarchical indexes to locate the current ExecutionEntity instance.
+    debug: bool     # Indicates whether to run in debug mode.
+
+    def __init__(self, debug: bool = False, locator: List[int] = list()):
+        """Initialize an ExecutionEntity instance.
+        
+        Args:
+            debug (bool, optional): Indicates whether to run in debug mode.
+            locator (List[int]): A list of the hierarchical indexes to locate the current workflow.
+                                If the current workflow is at the outermost level, this value is an empty list.
+        """
+        self.debug = debug
+        self.locator = locator
+        self.status = StatusCode.CREATED
+        self.api_key = str()
+
+    def locate(self, relative_locator: list) -> ExecutionEntity:
+        """Recursive locating of ExecutionEntity instance based on their locators.
+
+        Note: This method will return None for an unexecuted ExecutionEntity instance that is inside a ControlWorkUnit instance other than GeneralWorkUnit.
+        
+        Args:
+            relative_locator (list): A locator that locates the target instance starting from the current instance.
+                                    For example, if the locator of target instance is [4, loop_0, 1, 2] and the locator of current instance is [4, loop_0],
+                                    then the value of `relative_locator` should be [1, 2].
+
+        Returns:
+            The located ExecutionEntity instance. None if nothing is located.
+        """
+        # This method is a placeholder now.
+        pass
+    
+    @property
+    def is_executable(self) -> bool:
+        """Flag indicating whether the current instance passed self-inspection."""
+        if self.status in StatusCode.unexecutable_statuses:
+            return False
+        else:
+            return True
+
+    @property
+    def identifier(self):
+        """The unique identifier of current instance, collapsed from `api_key` and `locator`."""
+        identifier = f"{self.api_key}@{':'.join(map(str, self.locator))}"
+        return identifier
+    
+    @staticmethod
+    def get_locator(identifier: str) -> list:
+        """Parse the identifier string of an ExecutionEntity instance and return the locator list.
+        
+        Args:
+            identifier (str): A unique identifier for the instance, used to track and reference the entity.
+
+        Returns:
+            The list of locators corresponding to the identifier.
+        """
+        locator_section = identifier.split("@")[-1]
+        raw_locator = locator_section.split(":")
+        locator = []
+        for item in raw_locator:
+            try:
+                # Try parsing item to int.
+                locator.append(int(item))
+            except ValueError:
+                # Keep original item if it's not an int.
+                locator.append(item)
+        return locator
+
+
+class WorkFlow(ExecutionEntity):
     """Rrepresents a procedural WorkFlow primarily consists of a number of WorkUnit instances, 
     including data mappers, self-inspection flags, to ensure its operation.
 
@@ -124,92 +221,83 @@ class WorkFlow():
     jump out of the WorkUnit instance, and execute the next one until the execution of the entire workflow is completed.
     
     Attributes:
-        debug (bool): Flag indicating whether debugging mode is enabled.
+        api_key (str): The value of api_key of workflow instance, which is set to be WORKFLOW_API_KEY.
         error_msg_list (list): A list of error logs collected from the initialization and execution of the workflow. This is a class attribute.
+        control_workunit (ControlWorkUnit): The outer ControlWorkUnit instance hosting the current workflow.
         workunits (List[WorkFlow]): A list of WorkUnit instance carried by this workflow.
         intermediate_data_mapper (dict): Runtime intermediate data for the current layer of workflow.
         inherited_data_mapper (dict): Data inherited from parent workflow.
-        indexes (List[int]): A list of the hierarchical indexes of the work units to which the current workflow belongs in the configuration file.
+        locator (List[int]): A list of the hierarchical indexes to locate the current workflow.
                                   If the current workflow is at the outermost level, this value is an empty list.
         execution_status (int): A flag indicating the execution status of the WorkFlow instance. Using value from `class ExecutionStatus`.
     """
-    debug: bool                 # Indicates whether to run in debug mode.
+    api_key: str
     error_msg_list = list()     # Error information. This is a class attribute.
 
-    # The list of Work Unit.
-    workunits: list
+    
+    control_workunit: ControlWorkUnit   # The outer ControlWorkUnit instance hosting the current workflow.
+    workunits: list                     # A list of WorkUnit instance carried by this workflow.
     
     # Intermediate Data.
     intermediate_data_mapper: dict  # Runtime intermediate data for the current layer of workflow.
     inherited_data_mapper: dict     # Data inherited from parent workflow.
 
-    indexes: list  # A list of the hierarchical indexes of the work units to which the current workflow belongs in the configuration file.
-    status: int   # A flag indicating the execution status of the WorkFlow instance.
-
     # Output
     # data_output_path = './Mutation.dat'
-
-    @property
-    def identifier(self):
-        """The unique name of the WorkFlow instance, collapsed from `api_key` and `indexes`."""
-        name = f"workflow@{'.'.join(map(str, self.indexes))}"
-        return name
-    
-    @property
-    def is_executable(self) -> bool:
-        """Flag indicating whether the current instance passed self-inspection."""
-        if self.status in StatusCode.unexecutable_statuses:
-            return False
-        else:
-            return True
     
     #region WorkFlow Initialization.
     def __init__(self, debug: bool = False, 
-                indexes: List[int] = list(), 
+                locator: List[int] = list(), 
                 intermediate_data_mapper: Dict[str, Any] = dict(), 
-                inherited_data_mapper: Dict[str, Any] = dict()
+                inherited_data_mapper: Dict[str, Any] = dict(),
+                control_workunit: ControlWorkUnit = None,
                 ) -> None:
         """Initialize an instance.
         
         Args:
             debug (bool, optional): Indicates whether to run in debug mode.
-            unit_indexes (List[int]): A list of the hierarchical indexes of the work units to which the current workflow belongs in the configuration file.
-                                      If the current workflow is at the outermost level, this value is an empty list.
+            locator (List[int]): A list of the hierarchical indexes to locate the current workflow.
+                                If the current workflow is at the outermost level, this value is an empty list.
             intermediate_data_mapper (Dict[str, Any], optional): The initial value of intermediate_data_mapper.
             inherited_data_mapper (Dict[str, Any], optional): Data Mapper containing data to be inherited.
+            control_workunit (ControlWorkUnit): The outer ControlWorkUnit instance hosting the current workflow.
         """
+        super().__init__(debug=debug, locator=locator)
+
         # Assigned values.
         self.debug = debug
-        self.indexes = indexes
         self.intermediate_data_mapper = intermediate_data_mapper
         self.inherited_data_mapper = inherited_data_mapper
         _LOGGER.debug(f"inherited_data_mapper: {self.inherited_data_mapper}")
+        self.control_workunit = control_workunit
 
         # Default values.
+        self.api_key = WORKFLOW_API_KEY
         self.workunits = list()
-        self.status = StatusCode.CREATED
         return
     
     @classmethod
-    def from_list(cls, units_dict_list: List[dict], debug: bool = False, 
+    def from_list(cls, units_dict_list: List[dict], 
+                debug: bool = False, locator: List[int] = list(),
                 intermediate_data_mapper: Dict[str, Any] = dict(), 
                 inherited_data_mapper: Dict[str, Any] = dict(), 
-                indexes: List[int] = list()
+                control_workunit: ControlWorkUnit = None,
                 ) -> WorkFlow:
         """Initialize an instance of WorkFlow from a given dictionary instance.
         
         Args:
             units_dict_list (List[dict]): A list containing the WorkUnit configuration dicts.
             debug (bool, optional): Indicates whether to run in debug mode.
-            unit_indexes (List[int]): A list of the hierarchical indexes of the work units to which the current workflow belongs in the configuration file.
-                                      If the current workflow is at the outermost level, this value is an empty list.
+            locator (List[int]): A list of the hierarchical indexes to locate the current workflow.
+                                If the current workflow is at the outermost level, locator is an empty list.
             intermediate_data_mapper (Dict[str, Any], optional): The initial value of intermediate_data_mapper.
             inherited_data_mapper (Dict[str, Any], optional): Data Mapper containing data to be inherited.
+            control_workunit (ControlWorkUnit): The outer ControlWorkUnit instance hosting the current workflow.
         
         Returns:
             An instance of WorkFlow.
         """
-        flow = cls(debug=debug, indexes=indexes, intermediate_data_mapper=intermediate_data_mapper, inherited_data_mapper=inherited_data_mapper)
+        flow = cls(debug, locator, intermediate_data_mapper, inherited_data_mapper, control_workunit)
         flow.status = StatusCode.INITIALIZING
         if (units_dict_list == None):
             no_workunit_err_msg = "Initializing WorkFlow with no workunits. Workunits are expected."
@@ -217,9 +305,9 @@ class WorkFlow():
             flow.status = StatusCode.FAILED_INITIALIZATION
         else:
             for unit_index, unit_dict in enumerate(units_dict_list):
-                unit_indexes_to_pass = indexes.copy()
-                unit_indexes_to_pass.append(unit_index)
-                flow.add_unit(unit_dict, unit_indexes_to_pass)
+                locator_to_pass = locator.copy()
+                locator_to_pass.append(unit_index)
+                flow.add_unit(unit_dict, locator_to_pass)
                 continue
         
         # If the flow status keeps INITIALIZING, then mark it as READY_TO_START.
@@ -269,7 +357,7 @@ class WorkFlow():
         with open(json_filepath) as fobj:
             return WorkFlow.from_json_file_object(fobj, debug=debug)
     
-    def add_unit(self, unit_dict: dict, unit_indexes_to_pass: List[int] = list()) -> None:
+    def add_unit(self, unit_dict: dict, locator_to_pass: List[int] = list()) -> None:
         """Adds a new unit to the workflow.
 
         This method creates a new instance of WorkUnit from a provided dictionary and adds it to 
@@ -282,25 +370,25 @@ class WorkFlow():
             unit_dict (dict): A dictionary containing the configuration for the unit to be added.
                             This dictionary should include keys for API mapping and execution 
                             parameters.
-            unit_indexes_to_pass (List[int]): A list of the hierarchical indexes of the workunit to add.
+            locator_to_pass (List[int]): A list of the hierarchical indexes to locate the new workunit.
         
         Returns:
             The WorkUnit instance added.
         """
-        workunit = WorkUnit(unit_dict, self, unit_indexes_to_pass, self.debug)   # Placeholder.
+        workunit = WorkUnit(unit_dict, self, locator_to_pass, self.debug)   # Placeholder.
         api_key = workunit.api_key
         if (workunit.api_key in CONTROL_API_KEYS):
             _LOGGER.info(f"Parsing Control WorkUnit {workunit.identifier}.")
             if api_key == LOOP_API_KEY:
                 # Setup a placeholder in `workflow.intermediate_data_mapper`.
-                workunit = LoopWorkUnit.from_dict(unit_dict=unit_dict, workflow=self, indexes=unit_indexes_to_pass, debug=self.debug)
+                workunit = LoopWorkUnit.from_dict(unit_dict=unit_dict, workflow=self, locator=locator_to_pass, debug=self.debug)
             elif api_key == GENERAL_API_KEY:
                 error_msg = "GeneralWorkUnit should not be configured inside a workflow."
                 _LOGGER.error(error_msg)
                 self.error_msg_list.append(error_msg)
         else:
             _LOGGER.info(f"Parsing Science WorkUnit {workunit.identifier}.")
-            workunit = WorkUnit.from_dict(unit_dict=unit_dict, workflow=self, indexes=unit_indexes_to_pass, debug=self.debug)
+            workunit = WorkUnit.from_dict(unit_dict=unit_dict, workflow=self, locator=locator_to_pass, debug=self.debug)
 
         # Setup a placeholder in `workflow.intermediate_data_mapper`.
         self.intermediate_data_mapper[VarFormatter.unformat_variable(workunit.return_key)] = PLACEHOLDER_VALUE
@@ -341,10 +429,11 @@ class WorkFlow():
             ValueError: If the workflow has not passed the self-inspection.
         """
         if not self.is_executable:
-            _LOGGER.error(FAILED_INITIALIZATION_ERROR_MSG)
-            raise ValueError(self)
+            _LOGGER.error(f"{self.identifier}: {FAILED_INITIALIZATION_ERROR_MSG}")
+            raise ValueError(self.identifier)
         else:
-            _LOGGER.info(SUCCESS_INITIALIZATION_MSG)
+            if not self.control_workunit:    # If the current workflow is at the outermost level, log the message; otherwise skip the duplicated message.
+                _LOGGER.info(SUCCESS_INITIALIZATION_MSG)
             self.status = StatusCode.RUNNING
             for workunit in self.workunits:
                 workunit: WorkUnit
@@ -366,7 +455,29 @@ class WorkFlow():
                 self.status = StatusCode.EXIT_OK
             return self.intermediate_data_mapper
 
-class WorkUnit():
+    def locate(self, relative_locator: list) -> ExecutionEntity:
+        """Recursive locating of ExecutionEntity instance based on their locators.
+
+        Note: This method will return None for an unexecuted ExecutionEntity instance that is inside a ControlWorkUnit instance other than GeneralWorkUnit.
+        
+        Args:
+            relative_locator (list): A locator that locates the target instance starting from the current instance.
+                                    For example, if the locator of target instance is [4, loop_0, 1, 2] and the locator of current instance is [4, loop_0],
+                                    then the value of `relative_locator` should be [1, 2].
+
+        Returns:
+            The located ExecutionEntity instance. None if nothing is located.
+        """
+        if len(relative_locator) == 0:
+            return self
+        else:
+            try:
+                located_instance: ExecutionEntity = self.workunits[relative_locator[0]]
+                return located_instance.locate(relative_locator[1:])
+            except:
+                return None
+
+class WorkUnit(ExecutionEntity):
     """Represents a single unit in a procedural workflow.
 
     - This class encapsulates the information and functionality for initializing, interpreting and executing
@@ -375,7 +486,6 @@ class WorkUnit():
     of a specified function or method.
 
     Attributes:
-        indexes (list): A list of hierarchical indexes of the workunit.
         api_key (str): Key used to identify and map the appropriate science API function.
                          Read from the `api` field in the configuration.
         args_dict_input (dict): The raw, unprocessed arguments dictionary as specified
@@ -388,10 +498,8 @@ class WorkUnit():
         args_dict_to_pass (dict): Processed arguments dictionary to be passed to the API function.
         error_info_list (list): List of error messages encountered during processing.
         params_to_assign_at_execution (list): List of parameters that need to be assigned values at execution time.
-        execution_status (int): A flag indicating the execution status of the WorkUnit instance.
-        debug (bool): Flag indicating whether debugging mode is enabled.
+        Other inherited attributes...
     """
-    indexes: list
     api_key: str
     args_dict_input: dict
 
@@ -402,35 +510,18 @@ class WorkUnit():
     args_dict_to_pass: dict
     error_msg_list: list
     params_to_assign_at_execution: list
-    status: int
 
-    debug: bool
-
-    @property
-    def identifier(self) -> str:
-        """The unique name of the WorkUnit instance, collapsed from `api_key` and `indexes`."""
-        name = f"{self.api_key}@{':'.join(map(str, self.indexes))}"
-        return name
-    
-    @property
-    def is_executable(self) -> bool:
-        """Flag indicating whether the current instance passed self-inspection."""
-        if self.status in StatusCode.unexecutable_statuses:
-            return False
-        else:
-            return True
-        
-
-    def __init__(self, unit_dict: dict = dict(), workflow: WorkFlow = None, indexes: List[int] = list(), debug: bool = False):
+    def __init__(self, unit_dict: dict = dict(), workflow: WorkFlow = None, locator: List[int] = list(), debug: bool = False):
         """Initializes a WorkUnit instance.
 
         Args:
             unit_dict (dict): A dictionary derived from a JSON configuration, containing keys
                               for API mapping and execution.
             workflow (WorkFlow): A reference to the workflow object this unit belongs to.
-            indexes (list, optional): A list of hierarchical indexes of the workunit.
+            locator (list, optional): A list of the hierarchical indexes to locate the current workunit.
             debug (bool, optional): Indicates whether to run in debug mode.
         """
+        super().__init__(debug=debug, locator=locator)
         # Initialize attributes in the constructor
         # to prevent them from being considered as class attributes.
         self.api_key = unit_dict.get(WORKUNIT_API_NAME_KEY, str())
@@ -440,18 +531,15 @@ class WorkUnit():
         self.error_msg_list = list()
         self.params_to_assign_at_execution = list()
         self.return_value = None
-        self.status = StatusCode.CREATED
 
         if workflow == None:
             self.workflow = WorkFlow()
         else:
             self.workflow = workflow
-        self.indexes = indexes
-        self.debug = debug
         return
     
     @classmethod
-    def from_dict(cls, unit_dict: dict, workflow: WorkFlow = None, indexes: List[int] = list(), debug: bool = False) -> WorkUnit:
+    def from_dict(cls, unit_dict: dict, workflow: WorkFlow = None, locator: List[int] = list(), debug: bool = False) -> WorkUnit:
         """Initializes an instance of WorkUnit from a given dictionary.
 
         The dictionary should contain keys such as `api`, `store_as`, and `args`
@@ -462,7 +550,7 @@ class WorkUnit():
             unit_dict (dict): A dictionary derived from a JSON configuration, containing keys
                               for API mapping and execution.
             workflow (WorkFlow, optional): The workflow instance to which this unit belongs.
-            indexes (list, optional): A list of hierarchical indexes of the workunit.
+            locator (list, optional): A list of the hierarchical indexes to locate the current workunit.
             debug (bool, optional): Indicates whether to run in debug mode.
 
         Returns:
@@ -472,7 +560,7 @@ class WorkUnit():
             KeyError: If the API key cannot be mapped to any API.
         """
         # Initialize the class.
-        unit = cls(unit_dict=unit_dict, workflow=workflow, indexes=indexes, debug=debug)
+        unit = cls(unit_dict=unit_dict, workflow=workflow, locator=locator, debug=debug)
         unit.status = StatusCode.INITIALIZING
 
         # Map the API.
@@ -734,16 +822,34 @@ class WorkUnit():
             data_mapper_to_inherite[key] = value
         return data_mapper_to_inherite
 
+    def locate(self, relative_locator: list) -> WorkUnit:
+        """Recursive locating of ExecutionEntity instance based on their locators.
+
+        Note: This method will return None for an unexecuted ExecutionEntity instance that is inside a ControlWorkUnit instance other than GeneralWorkUnit.
+        
+        Args:
+            relative_locator (list): A locator that locates the target instance starting from the current instance.
+                                    For example, if the locator of target instance is [4, loop_0, 1, 2] and the locator of current instance is [4, loop_0],
+                                    then the value of `relative_locator` should be [1, 2].
+
+        Returns:
+            The located ExecutionEntity instance. None if nothing is located.
+        """
+        if len(relative_locator) == 0:
+            return self
+        else:
+            None
+
 class ControlWorkUnit(WorkUnit):
     """This class is an abstract class defining shared attributes and methods of Control WorkUnits (e.g. loop, general, etc.)
     This class is derived from WorkUnit class.
     """
 
-    def __init__(self, unit_dict: Dict = dict(), workflow: WorkFlow = None, indexes: List[int] = list(), debug: bool = False):
-        super().__init__(unit_dict, workflow, indexes, debug)
+    def __init__(self, unit_dict: Dict = dict(), workflow: WorkFlow = None, locator: List[int] = list(), debug: bool = False):
+        super().__init__(unit_dict, workflow, locator, debug)
 
     def encode_layer_index(self, execution_index: int = None) -> str:
-        """The index of current layer to be added to `indexes`.
+        """The index of current layer to be added to `locator`.
         
         Args:
             execution_index (int, optional): Indicates the execution index of the target sub-workflow instance in the current control unit, 
@@ -763,19 +869,20 @@ class ControlWorkUnit(WorkUnit):
         """Decode the index of current layer to obtain the execution index.
         
         Args:
-            layer_index (str): The index of current layer in `indexes`.
+            layer_index (str): The index of current layer in `locator`.
 
         Return:
             The execution index obtained. Default 0.
         """
+        api_key_length = len(self.api_key)
         splitter = "_"
-        if (splitter in layer_index):
-            index_str = layer_index.split(splitter)[-1]
-            index = int(index_str)
-            return index
+        if layer_index[:api_key_length] == self.api_key and layer_index[api_key_length] == splitter:
+            if (splitter in layer_index):
+                index_str = layer_index.split(splitter)[-1]
+                index = int(index_str)
+                return index
         else:
             return 0
-
 
 class LoopWorkUnit(ControlWorkUnit):
     """This class is used to represent a special kind of workunit in a procedural workflow that is used to carry a loop.
@@ -798,7 +905,7 @@ class LoopWorkUnit(ControlWorkUnit):
     """
 
     iterable_data: Iterable
-    sub_workflow_list: List[WorkFlow]
+    sub_workflows: List[WorkFlow]
 
     @staticmethod
     def loop_unit_placeholder_api(workunits: list, loop_data: Iterable, loop_datum_varname: str):
@@ -814,20 +921,20 @@ class LoopWorkUnit(ControlWorkUnit):
         """
         pass
 
-    def __init__(self, unit_dict: dict, workflow: WorkFlow = None, indexes: List[int] = list(), debug: bool = False):
+    def __init__(self, unit_dict: dict, workflow: WorkFlow = None, locator: List[int] = list(), debug: bool = False):
         """Initializes a LoopWorkUnit instance.
 
         Args:
             unit_dict (dict): Configuration dictionary with necessary parameters for initialization.
             workflow (WorkFlow): A reference to the workflow object this unit belongs to.
-            indexes (list, optional): A list of hierarchical indexes of the workunit.
+            locator (list, optional): A list of the hierarchical indexes to locate the current workunit.
             debug (bool, optional): Indicates whether to run in debug mode.
         """
-        super().__init__(unit_dict, workflow, indexes, debug)
-        self.sub_workflow_list = list()
+        super().__init__(unit_dict, workflow, locator, debug)
+        self.sub_workflows = list()
 
     @classmethod
-    def from_dict(cls, unit_dict: dict, workflow: WorkFlow = None, indexes: List[int] = list(), debug: bool = False) -> LoopWorkUnit:
+    def from_dict(cls, unit_dict: dict, workflow: WorkFlow = None, locator: List[int] = list(), debug: bool = False) -> LoopWorkUnit:
         """Initializes an instance of LoopWorkUnit from a given dictionary.
 
         As with a normal WorkUnit, the dictionary should contain keys such as `api`, `store_as`, 
@@ -840,14 +947,14 @@ class LoopWorkUnit(ControlWorkUnit):
         Args:
             unit_dict (dict): Configuration dictionary with necessary parameters for initialization.
             workflow (WorkFlow, optional): The parent workflow of this unit.
-            indexes (list, optional): A list of hierarchical indexes of the workunit.
+            locator (list, optional): A list of the hierarchical indexes to locate the current workunit.
             debug (bool, optional): Indicates whether to run in debug mode.
 
         Returns:
             LoopWorkUnit: An instance of LoopWorkUnit initialized with the given configuration.
         """
         # Initialize the class.
-        unit = cls(unit_dict, workflow, indexes, debug)
+        unit = cls(unit_dict, workflow, locator, debug)
         unit.api = LoopWorkUnit.loop_unit_placeholder_api
         unit.status = StatusCode.INITIALIZING
 
@@ -864,11 +971,11 @@ class LoopWorkUnit(ControlWorkUnit):
         data_mapper_for_initialize_as_intermediate = {loop_body_datum_varname: PLACEHOLDER_VALUE}
 
         # Initialize a PlaceHolder Sub-WorkFlow to perform self-inspection.
-        flow_indexes = unit.indexes.copy()
-        flow_indexes.append(unit.encode_layer_index())
+        flow_locator = unit.locator.copy()
+        flow_locator.append(unit.encode_layer_index())
         placeholder_sub_workflow = WorkFlow.from_list(units_dict_list=unit.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL),
             debug=unit.debug, intermediate_data_mapper=data_mapper_for_initialize_as_intermediate,
-            inherited_data_mapper=data_mapper_to_inherite, indexes=flow_indexes)
+            inherited_data_mapper=data_mapper_to_inherite, locator=flow_locator, control_workunit=unit)
         
         # Add error message from placeholder workflow initialization.
         if (placeholder_sub_workflow.error_msg_list):
@@ -895,16 +1002,17 @@ class LoopWorkUnit(ControlWorkUnit):
             
             # Initialize the sub-workflow at execution time.
             data_mapper_for_initialization = {loop_body_datum_varname: loop_datum}
-            flow_indexes = self.indexes.copy()
-            flow_indexes.append(self.encode_layer_index(loop_index))
+            flow_locator = self.locator.copy()
+            flow_locator.append(self.encode_layer_index(loop_index))
             workflow = WorkFlow.from_list(
                 units_dict_list=self.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL),
                 debug=self.debug, intermediate_data_mapper=data_mapper_for_initialization,
-                inherited_data_mapper=data_mapper_to_inherite, indexes=flow_indexes)
+                inherited_data_mapper=data_mapper_to_inherite, locator=flow_locator,
+                control_workunit=self)
 
             # Execute the sub-workflow.
-            _LOGGER.info(f'Executing loop_{loop_index} ...')
-            self.sub_workflow_list.append(workflow)
+            _LOGGER.debug(f'Executing {self.encode_layer_index(loop_index)} ...')
+            self.sub_workflows.append(workflow)
             workflow_return = workflow.execute()
             self.return_value.append({self.encode_layer_index(loop_index): workflow_return})
 
@@ -938,6 +1046,28 @@ class LoopWorkUnit(ControlWorkUnit):
             else:
                 self.status = StatusCode.RUNNING_WITH_PAUSE_IN_INNER_UNITS
             return
+   
+    def locate(self, relative_locator: list) -> ExecutionEntity:
+        """Recursive locating of ExecutionEntity instance based on their locators.
+
+        Note: This method will return None for an unexecuted ExecutionEntity instance that is inside a ControlWorkUnit instance other than GeneralWorkUnit.
+        
+        Args:
+            relative_locator (list): A locator that locates the target instance starting from the current instance.
+                                    For example, if the locator of target instance is [4, loop_0, 1, 2] and the locator of current instance is [4, loop_0],
+                                    then the value of `relative_locator` should be [1, 2].
+
+        Returns:
+            The located ExecutionEntity instance. None if nothing is located.
+        """
+        if len(relative_locator) == 0:
+            return self
+        else:
+            try:
+                located_instance: ExecutionEntity = self.sub_workflows[self.decode_layer_index(relative_locator[0])]
+                return located_instance.locate(relative_locator[1:])
+            except:
+                return None
 
 class GeneralWorkUnit(ControlWorkUnit):
     """This class is used to represent a special kind of unit of work that would normally be used at the outermost level 
@@ -968,7 +1098,7 @@ class GeneralWorkUnit(ControlWorkUnit):
         """
         return
 
-    def __init__(self, unit_dict: dict, workflow: WorkFlow = None, working_directory: str = DEFAULT_WORK_DIR, autodump: bool = False, debug: bool = False):
+    def __init__(self, unit_dict: dict, workflow: WorkFlow = None, working_directory: str = CURRENT_DIRECTORY, autodump: bool = False, debug: bool = False):
         """Initializes a GeneralWorkUnit instance.
 
         Args:
@@ -984,7 +1114,7 @@ class GeneralWorkUnit(ControlWorkUnit):
         self.autodump = autodump
 
     @classmethod
-    def from_dict(cls, unit_dict: dict, working_directory: str = DEFAULT_WORK_DIR, autodump: bool = False, debug: bool = False) -> GeneralWorkUnit:
+    def from_dict(cls, unit_dict: dict, working_directory: str = CURRENT_DIRECTORY, autodump: bool = False, debug: bool = False) -> GeneralWorkUnit:
         """Initializes an instance of GeneralWorkUnit from a given dictionary.
 
         Here, however, `api` must be `general` to indicate that the WorkUnit is a GeneralWorkUnit, 
@@ -993,7 +1123,7 @@ class GeneralWorkUnit(ControlWorkUnit):
 
         Args:
             unit_dict (dict): Configuration dictionary with necessary parameters for initialization.
-            working_directory (str, optional): Indicates where to run the job. Default to current working directory.
+            working_directory (str, optional): Indicates where to run the job. Default to current directory.
             autodump (bool, optional): Whether to automatically save the GeneralWorkUnit instance as a pickle file 
                                         when it exits due to Error, Pause, or Completion. Default False.
             debug (bool, optional): Indicates whether to run in debug mode.
@@ -1006,7 +1136,7 @@ class GeneralWorkUnit(ControlWorkUnit):
         if not autodump:
             not_autodump_warning_msg = "The `autodump` value is not set to `True`, so this GeneralWorkUnit instance will not automatically save its state on error or pause and continue computing later after corrections."
             _LOGGER.warning(not_autodump_warning_msg)
-            _LOGGER.warning("Continue in 5 seconds...\n")
+            _LOGGER.warning("Press CTRL+C to cancel the job now, or we continue in 5 seconds...\n")
             sleep(5.0)
 
         unit.api = GeneralWorkUnit.general_unit_placeholder_api
@@ -1020,7 +1150,7 @@ class GeneralWorkUnit(ControlWorkUnit):
         del data_mapper_for_init[CONTROL_BODY_WORKUNITS_LABEL]  # Pass kwargs to the workflow. Kwargs contain information specifying CPU/GPU partitions.
 
         if (units_dict_list:=unit.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL)):
-            unit.sub_workflow = WorkFlow.from_list(units_dict_list, debug=debug, intermediate_data_mapper=data_mapper_for_init)
+            unit.sub_workflow = WorkFlow.from_list(units_dict_list, debug=debug, intermediate_data_mapper=data_mapper_for_init, control_workunit=unit)
         else:
             error_msg = "Initializing GeneralWorkUnit with empty `workunits`. WorkUnit(s) are expected."
             _LOGGER.error(error_msg)
@@ -1028,7 +1158,7 @@ class GeneralWorkUnit(ControlWorkUnit):
         return unit
     
     @classmethod
-    def from_json_string(cls, json_str: str, working_directory: str = DEFAULT_WORK_DIR, autodump: bool = False, debug: bool = False) -> GeneralWorkUnit:
+    def from_json_string(cls, json_str: str, working_directory: str = CURRENT_DIRECTORY, autodump: bool = False, debug: bool = False) -> GeneralWorkUnit:
         """Initialize an instance of GeneralWorkUnit from a serialized json string.
         
         Args:
@@ -1045,7 +1175,7 @@ class GeneralWorkUnit(ControlWorkUnit):
         return GeneralWorkUnit.from_dict(unit_dict=unit_dict, working_directory=working_directory, autodump=autodump, debug=debug)
 
     @classmethod
-    def from_json_file_object(cls, json_fobj: TextIOWrapper, working_directory: str = DEFAULT_WORK_DIR, autodump: bool = False, debug: bool = False) -> GeneralWorkUnit:
+    def from_json_file_object(cls, json_fobj: TextIOWrapper, working_directory: str = CURRENT_DIRECTORY, autodump: bool = False, debug: bool = False) -> GeneralWorkUnit:
         """Initialize an instance of GeneralWorkUnit from a json file object.
         
         Args:
@@ -1062,7 +1192,7 @@ class GeneralWorkUnit(ControlWorkUnit):
         return GeneralWorkUnit.from_dict(unit_dict=unit_dict, working_directory=working_directory, autodump=autodump, debug=debug)
 
     @classmethod
-    def from_json_filepath(cls, json_filepath: str, working_directory: str = DEFAULT_WORK_DIR, autodump: bool = False, debug: bool = False) -> GeneralWorkUnit:
+    def from_json_filepath(cls, json_filepath: str, working_directory: str = CURRENT_DIRECTORY, autodump: bool = False, debug: bool = False) -> GeneralWorkUnit:
         """Initialize an instance of GeneralWorkUnit from a json filepath.
         
         Args:
@@ -1101,6 +1231,25 @@ class GeneralWorkUnit(ControlWorkUnit):
                 pickle_filepath = self.dump_snapshot_file()
                 _LOGGER.info(f"The current running status has been saved to '{pickle_filepath}'. Please go to this location to view your file(s).")
             return self.return_key, self.return_value
+   
+    def locate(self, locator: list) -> ExecutionEntity:
+        """Recursive locating of ExecutionEntity instance based on their locators.
+
+        Note: This method will return None for an unexecuted ExecutionEntity instance that is inside a ControlWorkUnit instance other than GeneralWorkUnit.
+        
+        Args:
+            locator (list): The locator of the target ExecutionEntity instance.
+
+        Returns:
+            The located ExecutionEntity instance. None if nothing is located.
+        """
+        if len(locator) == 0:
+            return self
+        else:
+            try:
+                return self.sub_workflow.locate(locator)
+            except:
+                return None
     
     def dump_snapshot_file(self, save_directory: str = str()) -> str:
         """

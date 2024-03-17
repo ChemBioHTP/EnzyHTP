@@ -5,6 +5,7 @@ Author: QZ Shao <shaoqz@icloud.com>
 Date: 2024-01-25"""
 
 from .workflow import (
+    ExecutionEntity,
     WorkFlow,
     WorkUnit,
     GeneralWorkUnit,

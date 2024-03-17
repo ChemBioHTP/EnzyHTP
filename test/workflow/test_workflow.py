@@ -23,7 +23,7 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core.general import EnablePropagate
 
 from enzy_htp.structure import Structure
-from enzy_htp.workflow import WorkFlow, WorkUnit, GeneralWorkUnit
+from enzy_htp.workflow import ExecutionEntity, WorkFlow, WorkUnit, GeneralWorkUnit
 from enzy_htp.workflow import SCIENCE_API_MAPPER
 
 CURR_FILE = os.path.abspath(__file__)
@@ -206,4 +206,21 @@ def test_workflow_multi_loop_datum(caplog):
         return_key, return_value = general.execute()
     fs.safe_rmdir(WORK_DIR)
     assert 'Lisa | Green Pepper' in caplog.text
+    return
+
+def test_workflow_locate_workunit(caplog):
+    """Test locating a certain workunit after the execution of the general."""
+    json_filepath = f'{DATA_DIR}/workflow_7si9_general_layer_variable.json'
+    general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath)
+    return_key, return_value = general.execute()
+    locator = ExecutionEntity.get_locator("mutate_stru@4:loop_2:0")
+    target = general.locate(locator)
+    fs.safe_rmdir(WORK_DIR)
+    target_info = {
+        "api_key": target.api_key,
+        "locator": target.locator,
+        "status": target. status
+    }
+    assert target_info["api_key"] == "mutate_stru"
+    assert target_info["status"] == 0
     return
