@@ -171,38 +171,38 @@ def test_workflow_initialization_from_json_filepath(caplog):
     assert 'success' in caplog.text
     return
 
-def test_workflow_loopworkunit_pseudo_api(caplog):
+def test_general_loopworkunit_pseudo_api(caplog):
     """Test initializing and executing workflow with Loop(s) to test if LoopWorkUnit works properly."""
-    json_filepath = f'{DATA_DIR}/workflow_7si9_loopworkunit_pseudo_api.json'
+    json_filepath = f'{DATA_DIR}/general_7si9_loopworkunit_pseudo_api.json'
     # _LOGGER.level = logging.DEBUG
     with EnablePropagate(_LOGGER):
-        general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath, overwrite_database=True)
+        general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath, overwrite_database=True, debug=True)
         return_key, return_value = general.execute()
     fs.safe_rmdir(WORK_DIR)
     assert 'original structure' in caplog.text
     assert 'mutant structure' in caplog.text
     return
 
-def test_workflow_general_layer_variable(caplog):
-    """Test initializing and executing workflow with all the variables 
+def test_general_layer_variable(caplog):
+    """Test initializing and executing general with all the variables 
     with all user-defined arguments are set in the general layer."""
-    json_filepath = f'{DATA_DIR}/workflow_7si9_general_layer_variable.json'
+    json_filepath = f'{DATA_DIR}/general_7si9_general_layer_variable.json'
     # _LOGGER.level = logging.DEBUG
     with EnablePropagate(_LOGGER):
-        general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath, working_directory=WORK_DIR, overwrite_database=True)
+        general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath, working_directory=WORK_DIR, overwrite_database=True, debug=True)
         return_key, return_value = general.execute()
     fs.safe_rmdir(WORK_DIR)
     assert 'original structure' in caplog.text
     assert 'mutant structure' in caplog.text
     return
 
-def test_workflow_multi_loop_datum(caplog):
-    """Test initializing and executing workflow with multi layer loops 
+def test_general_multi_loop_datum(caplog):
+    """Test initializing and executing general with multi layer loops 
     to check if loop_datum can be passed correctly between multi layers."""
-    json_filepath = f'{DATA_DIR}/workflow_multi_loop_datum.json'
+    json_filepath = f'{DATA_DIR}/general_multi_loop_datum.json'
     # _LOGGER.level = logging.DEBUG
     with EnablePropagate(_LOGGER):
-        general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath, working_directory=WORK_DIR, overwrite_database=True)
+        general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath, working_directory=WORK_DIR, overwrite_database=True, debug=True)
         return_key, return_value = general.execute()
     fs.safe_rmdir(WORK_DIR)
     assert 'Lisa | Green Pepper' in caplog.text
@@ -210,8 +210,8 @@ def test_workflow_multi_loop_datum(caplog):
 
 def test_workflow_locate_workunit(caplog):
     """Test locating a certain workunit after the execution of the general."""
-    json_filepath = f'{DATA_DIR}/workflow_7si9_general_layer_variable.json'
-    general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath, overwrite_database=True)
+    json_filepath = f'{DATA_DIR}/general_7si9_general_layer_variable.json'
+    general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath, overwrite_database=True, debug=True)
     return_key, return_value = general.execute()
     locator = GeneralWorkUnit.get_locator("mutate_stru@4:loop_2:0")
     target = general.locate(locator)
@@ -226,3 +226,12 @@ def test_workflow_locate_workunit(caplog):
     return
 
 # TODO (Zhong): A test for database.
+
+def test_general_read_schema(caplog):
+    """Test reading the schema of the configuration json/unit_dict."""
+    # json_filepath = f'{DATA_DIR}/general_multi_loop_datum.json'
+    json_filepath = f'{DATA_DIR}/general_7si9_general_layer_variable.json'
+    general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath, overwrite_database=True, debug=True)
+    # assert "        - loop" in general.schema
+    print(general.schema)
+    return

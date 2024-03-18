@@ -124,6 +124,7 @@ class StatusCode():
     error_excluding_pause_statuses = [EXIT_WITH_ERROR, EXIT_WITH_ERROR_IN_INNER_UNITS]      # For logical judgment only.
     error_including_pause_statuses = [EXIT_WITH_ERROR, EXIT_WITH_ERROR_IN_INNER_UNITS, EXIT_WITH_ERROR_AND_PAUSE]   # For logical judgment only.
     unexecutable_statuses = [CREATED, INITIALIZING, FAILED_INITIALIZATION]                  # For logical judgment only.
+    unexecuted_statuses = [CREATED, INITIALIZING, READY_TO_START, FAILED_INITIALIZATION]    # For logical judgment only. Note its distinction from `unexecutable_statuses`.
 
 class ExecutionEntity:
     """
@@ -176,14 +177,20 @@ class ExecutionEntity:
         self.api_key = str()
         self.child_execution_entities = None
     
-    def update_execution_status(self) -> None:
-        """Update the status of the current entity to database. Called everytime before executing the WorkUnit or WorkFlow instances.
+    def synchronize_execution_status(self) -> None:
+        """Synchronize the status of the current entity to database. Called everytime before executing the WorkUnit or WorkFlow instances.
         
         Note: Don't call it within initialization!
         """
-        entity = EntityORM(self.identifier, self.status)
-        entity.insert_or_update(self.database_session)
-
+        if (self.status in StatusCode.unexecuted_statuses):
+            return
+        if (self.database_session):
+            entity = EntityORM(self.identifier, self.status)
+            entity.insert_or_update(self.database_session)
+        else:
+            _LOGGER.warning(f"Database session doesn't exist in {self.identifier}!")
+            return
+    
     @property
     def is_executable(self) -> bool:
         """Flag indicating whether the current instance passed self-inspection."""
@@ -262,6 +269,7 @@ class WorkFlow(ExecutionEntity):
         locator (List[int]): A list of the hierarchical indexes to locate the current workflow.
                                   If the current workflow is at the outermost level, this value is an empty list.
         execution_status (int): A flag indicating the execution status of the WorkFlow instance. Using value from `class ExecutionStatus`.
+        Other inherited attributes...
     """
     api_key: str
     error_msg_list = list()     # Error information. This is a class attribute.
@@ -471,7 +479,7 @@ class WorkFlow(ExecutionEntity):
             if not self.control_workunit:    # If the current workflow is at the outermost level, log the message; otherwise skip the duplicated message.
                 _LOGGER.info(SUCCESS_INITIALIZATION_MSG)
             self.status = StatusCode.RUNNING
-            self.update_execution_status()
+            self.synchronize_execution_status()
             for workunit in self.workunits:
                 workunit: WorkUnit
                 _LOGGER.info(f"Executing WorkUnit {workunit.identifier} ...")
@@ -490,7 +498,7 @@ class WorkFlow(ExecutionEntity):
                     break
             if self.status == StatusCode.RUNNING:
                 self.status = StatusCode.EXIT_OK
-            self.update_execution_status()
+            self.synchronize_execution_status()
             return self.intermediate_data_mapper
 
 class WorkUnit(ExecutionEntity):
@@ -618,7 +626,7 @@ class WorkUnit(ExecutionEntity):
         """
         try:
             self.status = StatusCode.RUNNING
-            self.update_execution_status()
+            self.synchronize_execution_status()
             self.update_args_value_from_data_mapper()
             if self.return_key:
                 self.return_value = self.api(**self.args_dict_to_pass)
@@ -626,12 +634,12 @@ class WorkUnit(ExecutionEntity):
                 self.api(**self.args_dict_to_pass)
                 self.return_value = None
             self.status = StatusCode.EXIT_OK
-            self.update_execution_status()
+            self.synchronize_execution_status()
             return self.return_key, self.return_value
         except Exception as exc:
             _LOGGER.error(f'Catching Error when executing `{self.identifier}`:')
             self.status = StatusCode.EXIT_WITH_ERROR
-            self.update_execution_status()
+            self.synchronize_execution_status()
             if (self.debug):
                 raise exc
             else:
@@ -1028,9 +1036,9 @@ class LoopWorkUnit(ControlWorkUnit):
         self.return_value = list()
         data_mapper_to_inherite = self.generate_data_mapper_to_inherite()
         self.update_args_value_from_data_mapper()
-        _LOGGER.info(f'We are about to execute a LoopWorkUnit ...')
+        _LOGGER.info(f'We are about to execute {self.__class__.__name__} {self.identifier} ...')
         self.status = StatusCode.RUNNING
-        self.update_execution_status()
+        self.synchronize_execution_status()
         loop_body_datum_varname = self.args_dict_to_pass.get(LOOP_BODY_DATUM_LABEL)
         for loop_index, loop_datum in enumerate(self.args_dict_to_pass.get(LOOP_ITERABLE_DATA_LABEL)):
             
@@ -1050,16 +1058,16 @@ class LoopWorkUnit(ControlWorkUnit):
             workflow_return = workflow.execute()
             self.return_value.append({self.encode_layer_index(loop_index): workflow_return})
 
-            self.update_execution_status(workflow=workflow)
+            self.update_status_code(workflow=workflow)
             continue
 
         if (self.status == StatusCode.RUNNING):
             self.status = StatusCode.EXIT_OK
-        self.update_execution_status()
+        self.synchronize_execution_status()
         return self.return_key, self.return_value
     
-    def update_execution_status(self, workflow: WorkFlow) -> None:
-        """Update the execution status of LoopWorkUnit instance.
+    def update_status_code(self, workflow: WorkFlow) -> None:
+        """Update the status code of LoopWorkUnit instance.
         
         Args:
             workflow (WorkFlow): The WorkFlow instance from loop bodies.
@@ -1089,6 +1097,7 @@ class GeneralWorkUnit(ControlWorkUnit):
 
     Attributes:
         sub_workflow (WorkFlow): The workflow it carries.
+        working_directory (str): Indicates where to run the job. Default to current working directory.
         save_snapshot (bool): Whether to automatically save the status as a pickle file 
                             when it exits due to Error, Pause, or Completion. Default False.
         Other inherited attributes...
@@ -1102,6 +1111,7 @@ class GeneralWorkUnit(ControlWorkUnit):
     sub_workflow: WorkFlow
     working_directory: str
     save_snapshot: bool
+    schema: str
 
     @staticmethod
     def general_unit_placeholder_api(workunits: list, **kwargs):
@@ -1136,7 +1146,8 @@ class GeneralWorkUnit(ControlWorkUnit):
         self.api_key = GENERAL_API_KEY
 
     @classmethod
-    def from_dict(cls, unit_dict: dict, working_directory: str = CURRENT_DIRECTORY, save_snapshot: bool = False, database_session: Session = None, debug: bool = False) -> GeneralWorkUnit:
+    def from_dict(cls, unit_dict: dict, working_directory: str = CURRENT_DIRECTORY, 
+                save_snapshot: bool = False, database_session: Session = None, debug: bool = False) -> GeneralWorkUnit:
         """Initializes an instance of GeneralWorkUnit from a given dictionary.
 
         Here, however, `api` must be `general` to indicate that the WorkUnit is a GeneralWorkUnit, 
@@ -1159,12 +1170,14 @@ class GeneralWorkUnit(ControlWorkUnit):
 
         # Initialize the class.
         unit = cls(unit_dict=unit_dict, working_directory=working_directory, save_snapshot=save_snapshot, database_session=database_session, debug=debug)
+        unit.schema = __class__.read_schema(unit_dict=unit_dict)
         if not save_snapshot:
             not_save_snapshot_warning_msg = "The `save_snapshot` value is not set to `True`, so this GeneralWorkUnit instance will not automatically save its state on error or pause and continue computing later after corrections."
             _LOGGER.warning(not_save_snapshot_warning_msg)
-            sleep_seconds = 5.0
-            _LOGGER.warning(f"Press CTRL+C to cancel the job now, or we continue in {sleep_seconds} seconds...\n")
-            sleep(sleep_seconds)
+            if not debug:
+                sleep_seconds = 5.0
+                _LOGGER.warning(f"Press CTRL+C to cancel the job now, or we continue in {sleep_seconds} seconds...\n")
+                sleep(sleep_seconds)
 
         unit.api = GeneralWorkUnit.general_unit_placeholder_api
 
@@ -1271,7 +1284,7 @@ class GeneralWorkUnit(ControlWorkUnit):
         else:
             _LOGGER.info(SUCCESS_INITIALIZATION_MSG)
             self.status = StatusCode.RUNNING
-            self.update_execution_status()
+            self.synchronize_execution_status()
             self.return_value = self.sub_workflow.execute()
             if (self.sub_workflow.status in StatusCode.error_excluding_pause_statuses):
                 self.status = StatusCode.EXIT_WITH_ERROR_IN_INNER_UNITS
@@ -1282,7 +1295,7 @@ class GeneralWorkUnit(ControlWorkUnit):
             if (self.save_snapshot):
                 pickle_filepath = self.dump_snapshot_file()
                 _LOGGER.info(f"The current running status has been saved to '{pickle_filepath}'. Please go to this location to view your file(s).")
-            self.update_execution_status()
+            self.synchronize_execution_status()
             return self.return_key, self.return_value
    
     def locate(self, locator: list) -> ExecutionEntity:
@@ -1375,3 +1388,29 @@ class GeneralWorkUnit(ControlWorkUnit):
                 raise TypeError("The loaded object is not an instance of GeneralWorkUnit.")
             
             return unit
+
+    @staticmethod
+    def read_schema(unit_dict: dict, indent: int = 0):
+        """
+        Recursively reads a nested unit_dict dictionary and extracts 'api' values.
+
+        Args:
+            schema (dict): The nested dictionary schema.
+            indent (int): The current indentation level (number of spaces).
+
+        Returns:
+            str: A formatted string representing the 'api' values at each level.
+        """
+        result = ""
+
+        # Check if 'api' key exists in the current level
+        if WORKUNIT_API_NAME_KEY in unit_dict:
+            result += ' ' * indent + f"- {unit_dict[WORKUNIT_API_NAME_KEY]}\n"
+        
+        # If 'args' key exists and it has a 'workunits' key, process each item in 'workunits'
+        if (WORKUNIT_ARGUMENT_LIST_KEY in unit_dict) and (CONTROL_BODY_WORKUNITS_LABEL in unit_dict[WORKUNIT_ARGUMENT_LIST_KEY]):
+            for workunit in unit_dict[WORKUNIT_ARGUMENT_LIST_KEY][CONTROL_BODY_WORKUNITS_LABEL]:
+                result += __class__.read_schema(workunit, indent + 4)
+
+        return result
+
