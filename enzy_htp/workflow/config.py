@@ -4,7 +4,7 @@ of the workflow (or shrapnel script) in term of information. This
 distinguish it from the _config module that this module 
 also configs for the procedure of the workflow.
 
-Author: QZ Shao <shaoqz@icloud.com>
+Author: QZ Shao <shaoqz@icloud.com>; Zhong, Yinjie <yinjie.zhong@vanderbilt.edu>
 Date: 2024-01-25"""
 
 from enzy_htp import structure, preparation, mutation, geometry, quantum, analysis, interface

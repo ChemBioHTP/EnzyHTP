@@ -176,7 +176,7 @@ def test_workflow_loopworkunit_pseudo_api(caplog):
     json_filepath = f'{DATA_DIR}/workflow_7si9_loopworkunit_pseudo_api.json'
     # _LOGGER.level = logging.DEBUG
     with EnablePropagate(_LOGGER):
-        general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath)
+        general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath, overwrite_database=True)
         return_key, return_value = general.execute()
     fs.safe_rmdir(WORK_DIR)
     assert 'original structure' in caplog.text
@@ -202,7 +202,7 @@ def test_workflow_multi_loop_datum(caplog):
     json_filepath = f'{DATA_DIR}/workflow_multi_loop_datum.json'
     # _LOGGER.level = logging.DEBUG
     with EnablePropagate(_LOGGER):
-        general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath, working_directory=WORK_DIR)
+        general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath, working_directory=WORK_DIR, overwrite_database=True)
         return_key, return_value = general.execute()
     fs.safe_rmdir(WORK_DIR)
     assert 'Lisa | Green Pepper' in caplog.text
@@ -211,7 +211,7 @@ def test_workflow_multi_loop_datum(caplog):
 def test_workflow_locate_workunit(caplog):
     """Test locating a certain workunit after the execution of the general."""
     json_filepath = f'{DATA_DIR}/workflow_7si9_general_layer_variable.json'
-    general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath)
+    general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath, overwrite_database=True)
     return_key, return_value = general.execute()
     locator = GeneralWorkUnit.get_locator("mutate_stru@4:loop_2:0")
     target = general.locate(locator)
