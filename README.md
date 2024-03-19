@@ -33,6 +33,7 @@ For non-commerical use, please find our “Non-Exclusive Non-Commercial Academic
 As a summary, for non-commerical use, you are allowed to (for free)
 - copy
 - modify
+
 you are not allowed to:
 - redistribute a modified version
 
@@ -42,5 +43,6 @@ For commerical use, please contact Vanderbilt (cttc@vanderbilt.edu) for a commer
 As a summary, for commerical use, after obtaining the license from Vanderbilt, you are allowed to (for free)
 - copy
 - modify
+
 you are not allowed to:
 - redistribute a modified version
