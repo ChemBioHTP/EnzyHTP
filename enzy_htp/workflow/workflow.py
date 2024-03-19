@@ -67,7 +67,40 @@ CONTROL_API_KEYS = [
 # Some string values used globally are defined here.
 FAILED_INITIALIZATION_ERROR_MSG = "The initialized work has not yet passed the self-inspection, so it is not allowed to be executed!"
 SUCCESS_INITIALIZATION_MSG = "The initialized work has successfully passed the self-inspection. Now proceeding to execution."
-PLACEHOLDER_VALUE = "The world is yours and ours, but in the final analysis it's you young people's."  # Value for placeholder.
+
+# Placeholder values.
+PLACEHOLDER_STR_VALUE = "The world is yours and ours, but in the final analysis it's you young people's."  # Value for placeholder.
+PLACEHOLDER_INT_VALUE = -9876
+PLACEHOLDER_FLOAT_VALUE = 2024.03
+PLACEHOLDER_ITERABLE_VALUE = ["111", "565", "32162", "333", "555", "65132"]
+PLACEHOLDER_DICT_VALUE = {
+    "zzz": "abbc",
+    "yyy": "cdde",
+    "xxx": "effg",
+}
+
+def assign_placeholder_value(var):
+    """
+    Assigns var placeholder value to 'var' based on its type.
+
+    Args:
+        var: The variable whose placeholder value needs to be assigned.
+
+    Returns:
+        The placeholder value corresponding to the type of 'var'.
+    """
+    if isinstance(var, str):
+        return PLACEHOLDER_STR_VALUE
+    elif isinstance(var, int):
+        return PLACEHOLDER_INT_VALUE
+    elif isinstance(var, float):
+        return PLACEHOLDER_FLOAT_VALUE
+    elif isinstance(var, dict):
+        return PLACEHOLDER_DICT_VALUE
+    elif hasattr(var, '__iter__'):  # Checks if 'a' is iterable
+        return PLACEHOLDER_ITERABLE_VALUE
+    else:
+        None
 
 class StatusCode():
     """
@@ -89,9 +122,11 @@ class StatusCode():
     Attributes:
         CREATED (int): The initial status when a WorkUnit or WorkFlow instance is created. Value: -9
         INITIALIZING (int): The status when a WorkUnit or WorkFlow instance is undergoin initialization. Value: -8
-        READY_TO_START (int): The status when a WorkUnit or WorkFlow instance has passed the self-inspection but hasn't yet been started. Value: -5
-        READY_WITH_UPDATES (int): The status when a previously `EXIT_OK` WorkUnit or WorkFlow instance have its input arguments changed
-                                due to the influence from the update in the input values of the task during continue computing. Value: -4
+        READY_TO_START (int): The status when a WorkUnit or WorkFlow instance has passed the self-inspection but hasn't yet been started. Value: -6
+        READY_WITH_UPDATES (int): The status when a previously executed WorkUnit or WorkFlow instance have its input arguments changed
+                                due to the influence from the update in the input values of the task during continue computing. Value: -5
+        SUSPECIOUS_UPDATES (int): The status when a previously `EXIT_OK` WorkUnit or WorkFlow instance has detected but unsure argument updates
+                                    during reloading. Value: -4
         RUNNING (int): Indicates that the workunit or workflow is currently in execution. Value: -3
         PAUSE_IN_INNER_UNITS (int): Specific to WorkFlow and ControlWorkUnit instances. Indicates
                                     that the workflow is running but an inner unit is paused as expected. Value: -2
@@ -108,8 +143,9 @@ class StatusCode():
     """
     CREATED = -9
     INITIALIZING = -8
-    READY_TO_START = -5
-    READY_WITH_UPDATES = -4
+    READY_TO_START = -6
+    READY_WITH_UPDATES = -5
+    SUSPECIOUS_UPDATES = -4             # For 
     RUNNING = -3
     RUNNING_WITH_PAUSE_IN_INNER_UNITS = -2   # For WorkFlow and ControlWorkUnit only.
     EXPECTED_PAUSE = -1                 # For Basic WorkUnit only. If a unit is paused, set its outer layers as `RUNNING_WITH_PAUSE_IN_INNER_UNITS`.
@@ -123,8 +159,10 @@ class StatusCode():
     pause_including_error_statuses = [EXPECTED_PAUSE, RUNNING_WITH_PAUSE_IN_INNER_UNITS, EXIT_WITH_ERROR_AND_PAUSE] # For logical judgment only.
     error_excluding_pause_statuses = [EXIT_WITH_ERROR, EXIT_WITH_ERROR_IN_INNER_UNITS]      # For logical judgment only.
     error_including_pause_statuses = [EXIT_WITH_ERROR, EXIT_WITH_ERROR_IN_INNER_UNITS, EXIT_WITH_ERROR_AND_PAUSE]   # For logical judgment only.
+    error_or_pause_statuses = [EXIT_WITH_ERROR, EXIT_WITH_ERROR_IN_INNER_UNITS, EXPECTED_PAUSE, RUNNING_WITH_PAUSE_IN_INNER_UNITS, EXIT_WITH_ERROR_AND_PAUSE]   # For logical judgment only.
     unexecutable_statuses = [CREATED, INITIALIZING, FAILED_INITIALIZATION]                  # For logical judgment only.
     unexecuted_statuses = [CREATED, INITIALIZING, READY_TO_START, FAILED_INITIALIZATION]    # For logical judgment only. Note its distinction from `unexecutable_statuses`.
+    skippable_statuses = [EXIT_OK]  # For logical judgement only.
 
 class ExecutionEntity:
     """
@@ -250,6 +288,13 @@ class ExecutionEntity:
             except:
                 return None
 
+    def reload(self):
+        """Reload task. Placeholder ONLY!"""
+        if self.status in StatusCode.unexecuted_statuses:
+            _LOGGER.info(f"{self.identifier} hasn't been executed yet, cannot reload!")
+            return
+        _LOGGER.info(f"Reloading {self.identifier}...")
+
 class WorkFlow(ExecutionEntity):
     """Rrepresents a procedural WorkFlow primarily consists of a number of WorkUnit instances, 
     including data mappers, self-inspection flags, to ensure its operation.
@@ -276,7 +321,7 @@ class WorkFlow(ExecutionEntity):
 
     
     control_workunit: ControlWorkUnit   # The outer ControlWorkUnit instance hosting the current workflow.
-    workunits: list                     # A list of WorkUnit instance carried by this workflow.
+    workunits: List[WorkUnit]           # A list of WorkUnit instance carried by this workflow.
     
     # Intermediate Data.
     intermediate_data_mapper: dict  # Runtime intermediate data for the current layer of workflow.
@@ -319,7 +364,7 @@ class WorkFlow(ExecutionEntity):
         return
     
     @classmethod
-    def from_list(cls, units_dict_list: List[dict], 
+    def from_list(cls, unit_dict_list: List[dict], 
                 debug: bool = False, locator: List[int] = list(),
                 intermediate_data_mapper: Dict[str, Any] = dict(), 
                 inherited_data_mapper: Dict[str, Any] = dict(), 
@@ -329,7 +374,7 @@ class WorkFlow(ExecutionEntity):
         """Initialize an instance of WorkFlow from a given dictionary instance.
         
         Args:
-            units_dict_list (List[dict]): A list containing the WorkUnit configuration dicts.
+            unit_dict_list (List[dict]): A list containing the WorkUnit configuration dicts.
             debug (bool, optional): Indicates whether to run in debug mode.
             locator (List[int]): A list of the hierarchical indexes to locate the current workflow.
                                 If the current workflow is at the outermost level, locator is an empty list.
@@ -343,12 +388,12 @@ class WorkFlow(ExecutionEntity):
         """
         flow = cls(debug, locator, intermediate_data_mapper, inherited_data_mapper, control_workunit, database_session)
         flow.status = StatusCode.INITIALIZING
-        if (units_dict_list == None):
+        if (unit_dict_list == None):
             no_workunit_err_msg = "Initializing WorkFlow with no workunits. Workunits are expected."
             flow.error_msg_list.append(no_workunit_err_msg)
             flow.status = StatusCode.FAILED_INITIALIZATION
         else:
-            for unit_index, unit_dict in enumerate(units_dict_list):
+            for unit_index, unit_dict in enumerate(unit_dict_list):
                 locator_to_pass = locator.copy()
                 locator_to_pass.append(unit_index)
                 flow.add_unit(unit_dict, locator_to_pass)
@@ -370,8 +415,8 @@ class WorkFlow(ExecutionEntity):
         Returns:
             An instance of WorkFlow.
         """
-        units_dict_list = loads(json_str)
-        return WorkFlow.from_list(units_dict_list, debug=debug)
+        unit_dict_list = loads(json_str)
+        return WorkFlow.from_list(unit_dict_list, debug=debug)
 
     @classmethod
     def from_json_file_object(cls, json_fobj: TextIOWrapper, debug: bool = False) -> WorkFlow:
@@ -384,8 +429,8 @@ class WorkFlow(ExecutionEntity):
         Returns:
             An instance of WorkFlow.
         """
-        units_dict_list = load(json_fobj)
-        return WorkFlow.from_list(units_dict_list, debug=debug)
+        unit_dict_list = load(json_fobj)
+        return WorkFlow.from_list(unit_dict_list, debug=debug)
 
     @classmethod
     def from_json_filepath(cls, json_filepath: str, debug: bool = False) -> WorkFlow:
@@ -435,7 +480,7 @@ class WorkFlow(ExecutionEntity):
             workunit = WorkUnit.from_dict(unit_dict=unit_dict, workflow=self, locator=locator_to_pass, database_session=self.database_session, debug=self.debug)
 
         # Setup a placeholder in `workflow.intermediate_data_mapper`.
-        self.intermediate_data_mapper[VarFormatter.unformat_variable(workunit.return_key)] = PLACEHOLDER_VALUE
+        self.intermediate_data_mapper[VarFormatter.unformat_variable(workunit.return_key)] = PLACEHOLDER_STR_VALUE
 
         # Add new workunit to the workflow.
         self.workunits.append(workunit)
@@ -445,6 +490,47 @@ class WorkFlow(ExecutionEntity):
         return
     
     #endregion
+
+    def reload(self, unit_dict_list: List[dict]):
+        """
+        Reloads the WorkFlow instance with updated configuration.
+
+        This method is used when a user wants to reload the entire task and checks 
+        if there are any changes in the parameter values. To perform this, we reload each
+        WorkUnit instance in this WorkFlow instance and update its intermediate_data_mapper.
+
+        Args:
+            unit_dict_list (List[dict]): A list containing the WorkUnit configuration dicts.
+
+        Notes:
+            - If a WorkUnit instance is marked as `SUSPECIOUS_UPDATE` after reloading, 
+                its `store_as` value will be assigned as a placeholder value in the intermediate_data_mapper.
+        """
+        super().reload()
+        has_suspecious_updates = False
+        has_unresolved_error_or_pause = False
+        for i, unit_dict in enumerate(unit_dict_list):
+            workunit = self.workunits[i]
+            store_as_key_backup = workunit.return_key
+            workunit.reload(unit_dict)
+            if workunit.status in StatusCode.unexecutable_statuses:
+                self.status = StatusCode.FAILED_INITIALIZATION
+            elif workunit.status == StatusCode.SUSPECIOUS_UPDATES:
+                has_suspecious_updates = True
+                store_as_key = workunit.return_key
+                store_as_value = workunit.return_value
+                del self.intermediate_data_mapper[store_as_key_backup]
+                self.intermediate_data_mapper[store_as_key] = assign_placeholder_value(store_as_value)
+            elif workunit.status in StatusCode.error_or_pause_statuses:
+                has_unresolved_error_or_pause = True
+            continue
+        if self.status not in StatusCode.unexecutable_statuses:
+            if has_unresolved_error_or_pause:
+                return
+            elif has_suspecious_updates:
+                self.status = StatusCode.SUSPECIOUS_UPDATES
+            else:
+                self.status = StatusCode.EXIT_OK
 
     def execute(self):
         """Executes all units in the workflow sequentially.
@@ -520,6 +606,7 @@ class WorkUnit(ExecutionEntity):
                         Read from the `store_as` field in the configuration.
         return_value: The value returned by the execution of the API function.
         args_dict_to_pass (dict): Processed arguments dictionary to be passed to the API function.
+        args_dict_to_pass_backup (dict): For reload use only. A backup of `args_dict_to_pass` to compare before execution.
         error_info_list (list): List of error messages encountered during processing.
         params_to_assign_at_execution (list): List of parameters that need to be assigned values at execution time.
         Other inherited attributes...
@@ -532,6 +619,7 @@ class WorkUnit(ExecutionEntity):
     return_key: str
     return_value: Any
     args_dict_to_pass: dict
+    args_dict_to_pass_backup: dict
     error_msg_list: list
     params_to_assign_at_execution: list
 
@@ -605,8 +693,63 @@ class WorkUnit(ExecutionEntity):
         # Self Inspection.
         unit.self_inspection_and_args_reassembly()
         unit.check_initialization_status()
-
         return unit
+
+    def reload(self, unit_dict: dict, api: Callable = None) -> WorkUnit:
+        """
+        Reloads the WorkUnit with updated configuration.
+
+        This method is used when a user wants to reload the entire task and checks 
+        if there are any changes in the parameter values. If the WorkUnit's status 
+        indicates an error or pause, it updates the WorkUnit's properties with the 
+        new configuration. Otherwise, it compares the current and new configurations 
+        to check for updates.
+
+        Args:
+            unit_dict (dict): The new configuration dictionary for the WorkUnit.
+
+        Notes:
+            - Compares `args_dict_input`, `args_dict_to_pass`, and `params_to_assign_at_execution`
+              between the current WorkUnit and a virtual unit created from the new configuration.
+            - Also compares `return_key` values.
+            - If any of these values are different, sets the status to `StatusCode.SUSPECIOUS_UPDATES`.
+
+        Returns:
+            The created virtual WorkUnit instance for further comparison.
+        """
+        super().reload()
+        # Create a virtual unit with the new configuration for comparison.
+        self.args_dict_to_pass_backup = self.args_dict_to_pass.copy()
+        
+        virtual_unit = WorkUnit(unit_dict=unit_dict)
+        virtual_unit.status = StatusCode.INITIALIZING
+        virtual_unit.workflow = self.workflow
+        if (api is None):
+            api = SCIENCE_API_MAPPER.get(virtual_unit.api_key)
+        virtual_unit.self_inspection_and_args_reassembly()
+        virtual_unit.check_initialization_status()
+        virtual_unit.update_args_value_from_data_mapper()
+
+        if (virtual_unit.status in StatusCode.unexecutable_statuses):
+            self.status = StatusCode.FAILED_INITIALIZATION
+            self.check_initialization_status()
+
+        # Compare the attributes for updates.
+        # Check if any of the attributes (args_dict_input, args_dict_to_pass, params_to_assign_at_execution,
+        # or return_key) are different in the virtual unit.
+        # If there are differences, update the attributes and then update status to indicate that updates are detected.
+        elif (self.return_key != virtual_unit.return_key or 
+            self.args_dict_input != virtual_unit.args_dict_input or 
+            self.args_dict_to_pass != virtual_unit.args_dict_to_pass or 
+            self.params_to_assign_at_execution != virtual_unit.params_to_assign_at_execution):
+
+            self.status = StatusCode.SUSPECIOUS_UPDATES
+            self.args_dict_input = virtual_unit.args_dict_input
+            self.args_dict_to_pass = virtual_unit.args_dict_to_pass
+            self.params_to_assign_at_execution = virtual_unit.params_to_assign_at_execution
+            self.return_key = virtual_unit.return_key
+        
+        return virtual_unit
 
     def execute(self) -> tuple:
         """Executes the workunit.
@@ -625,16 +768,31 @@ class WorkUnit(ExecutionEntity):
             Exception: Any exception raised by the API function if debug mode is enabled.
         """
         try:
+            self.update_args_value_from_data_mapper()
+            _LOGGER.debug(f"{self.identifier} with Status {self.status}.")
+            # if (self.status not in StatusCode.unexecuted_statuses and self.args_dict_to_pass == self.args_dict_to_pass_backup):
+            #     if (self.status == StatusCode.SUSPECIOUS_UPDATES):
+            #         self.status = StatusCode.EXIT_OK
+            #     elif (self.status in StatusCode.error_or_pause_statuses):
+            #         # If the old status is error or pause 
+            #         # and nothing changed to `args_dict_to_pass`, no need to run it again.
+            #         return self.return_key, self.return_value
+                
             self.status = StatusCode.RUNNING
             self.synchronize_execution_status()
-            self.update_args_value_from_data_mapper()
+
+            if (self.status in StatusCode.skippable_statuses):
+                return self.return_key, self.return_value
+
             if self.return_key:
                 self.return_value = self.api(**self.args_dict_to_pass)
             else:   # If no `return_key`, then `return_value` is None.
                 self.api(**self.args_dict_to_pass)
                 self.return_value = None
+            print(self.return_value)
             self.status = StatusCode.EXIT_OK
             self.synchronize_execution_status()
+            _LOGGER.debug(f"{self.identifier}(return_key={self.return_key}, return_value={self.return_value})")
             return self.return_key, self.return_value
         except Exception as exc:
             _LOGGER.error(f'Catching Error when executing `{self.identifier}`:')
@@ -647,17 +805,28 @@ class WorkUnit(ExecutionEntity):
                 self.error_msg_list.append(str(exc))
                 return self.return_key, None
 
-    def update_args_value_from_data_mapper(self) -> None:
+    def update_args_value_from_data_mapper(self, commit_update: bool = True) -> list:
         """Update the `args_dict_to_pass` by mapping data from `workflow.intermediate_data_mapper` or `workflow.inherited_data_mapper`.
         If a value is mapped in both `inherited_data_mapper` and `intermediate_data_mapper`,
         then the latter one will overwrite the former one.
+
+        Args:
+            commit_update (bool, optional): Whether to update discovered parameter value changes to `args_dict_to_pass`?
+
+        Returns:
+            A list of updated params.
         """
+        updated_params = list()
         for param in self.params_to_assign_at_execution:
             for mapper in [self.workflow.intermediate_data_mapper, self.workflow.inherited_data_mapper]:
                 if (mapped_datum := mapper.get(VarFormatter.unformat_variable(self.args_dict_input[param]))):
-                    self.args_dict_to_pass[param] = mapped_datum
-                    break
+                    if (self.args_dict_to_pass.get(param) != mapped_datum):
+                        if (commit_update):
+                            self.args_dict_to_pass[param] = mapped_datum
+                        updated_params.append(param)
+                        break
             continue
+        return updated_params
     
     @staticmethod
     def __inspect_argument_type(arg_value: Any, annotation: Union[Type, Any]) -> bool:
@@ -723,8 +892,8 @@ class WorkUnit(ExecutionEntity):
                 self.args_dict_to_pass[param_name] = unformatted_arg_value
                 mapped_value = mapper.get(unformatted_arg_value)
                 if (mapped_value):   # Check if there is a non-none-or-empty value in Mapper.
-                    if (isinstance(mapped_value, type(PLACEHOLDER_VALUE)) # Placeholder values need to be excluded.
-                        and mapped_value == PLACEHOLDER_VALUE):
+                    if (isinstance(mapped_value, type(PLACEHOLDER_STR_VALUE)) # Placeholder values need to be excluded.
+                        and mapped_value == PLACEHOLDER_STR_VALUE):
                         break
                     is_value_mapped_none = False
                     arg_value = mapped_value    # Assign mapped value to the argument.
@@ -746,7 +915,7 @@ class WorkUnit(ExecutionEntity):
         This method is called every time a new instance is created. It performs a self-inspection
         to validate the `args` dictionary specified in the JSON configuration. It checks for the
         existence of required arguments and their types. If any errors are found, they are recorded
-        in `error_info_list`, and the `is_self_inspection_passed` flag is set to False.
+        in `error_info_list`, and the `status` flag is set to `FAILED_INITIALIZATION`.
 
         The arguments that are to be mapped from the mapper are reassembled into `args_dict_to_pass`
         for the API call. Such arguments, if they already have been assigned with value in the mapper,
@@ -864,10 +1033,36 @@ class ControlWorkUnit(WorkUnit):
     """
     sub_workflows: List[WorkFlow]
 
-    def __init__(self, unit_dict: Dict = dict(), workflow: WorkFlow = None, locator: List[int] = list(), database_session: Session = None, debug: bool = False):
+    def __init__(self, unit_dict: dict = dict(), workflow: WorkFlow = None, locator: List[int] = list(), database_session: Session = None, debug: bool = False):
         super().__init__(unit_dict=unit_dict, workflow=workflow, locator=locator, database_session=database_session, debug=debug)
         self.sub_workflows = list()
         self.child_execution_entities = self.sub_workflows
+
+    def reload(self, unit_dict: dict, api: Callable) -> ControlWorkUnit:
+        """
+        Reloads the WorkUnit instance with updated configuration.
+
+        This method is used when a user wants to reload the entire task and checks 
+        if there are any changes in the parameter values. If the WorkUnit's status 
+        indicates an error or pause, it updates the WorkUnit's properties with the 
+        new configuration. Otherwise, it compares the current and new configurations 
+        to check for updates.
+
+        Args:
+            unit_dict (dict): The new configuration dictionary for the WorkUnit.
+            api (Callable): The Callable object to perform self-inspection.
+
+        Notes:
+            - Compares `args_dict_input`, `args_dict_to_pass`, and `params_to_assign_at_execution`
+              between the current WorkUnit and a virtual unit created from the new configuration.
+            - Also compares `return_key` values.
+            - If any of these values are different, sets the status to `StatusCode.SUSPECIOUS_UPDATES`.
+
+        Returns:
+            The created virtual WorkUnit instance for further comparison.
+        """
+        virtual_unit = super().reload(unit_dict=unit_dict, api=api)
+        return virtual_unit
 
     def encode_layer_index(self, execution_index: int = None) -> str:
         """The index of current layer to be added to `locator`.
@@ -1009,12 +1204,12 @@ class LoopWorkUnit(ControlWorkUnit):
 
         # Some data should be passed before the initialization of a sub-WorkFlow.
         loop_body_datum_varname = VarFormatter.unformat_variable(unit.args_dict_to_pass.get(LOOP_BODY_DATUM_LABEL))
-        data_mapper_for_initialize_as_intermediate = {loop_body_datum_varname: PLACEHOLDER_VALUE}
+        data_mapper_for_initialize_as_intermediate = {loop_body_datum_varname: PLACEHOLDER_STR_VALUE}
 
         # Initialize a PlaceHolder Sub-WorkFlow to perform self-inspection.
         flow_locator = unit.locator.copy()
         flow_locator.append(unit.encode_layer_index())
-        placeholder_sub_workflow = WorkFlow.from_list(units_dict_list=unit.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL),
+        placeholder_sub_workflow = WorkFlow.from_list(unit_dict_list=unit.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL),
             debug=unit.debug, intermediate_data_mapper=data_mapper_for_initialize_as_intermediate,
             inherited_data_mapper=data_mapper_to_inherite, locator=flow_locator, control_workunit=unit, database_session=unit.database_session)
         
@@ -1023,6 +1218,69 @@ class LoopWorkUnit(ControlWorkUnit):
             unit.error_msg_list += placeholder_sub_workflow.error_msg_list
 
         return unit
+
+    def reload(self, unit_dict: dict):
+        """
+        Reloads the LoopWorkUnit instance with updated configuration.
+
+        This method is used when a user wants to reload the entire task and checks 
+        if there are any changes in the parameter values. If the WorkUnit's status 
+        indicates an error or pause, it updates the WorkUnit's properties with the 
+        new configuration. Otherwise, it compares the current and new configurations 
+        to check for updates.
+
+        Args:
+            unit_dict (dict): The new configuration dictionary for the WorkUnit.
+
+        Notes:
+            - Compares `args_dict_input`, `args_dict_to_pass`, and `params_to_assign_at_execution`
+              between the current WorkUnit and a virtual unit created from the new configuration.
+            - Also compares `return_key` values.
+            - If any of these values are different, sets the status to `StatusCode.SUSPECIOUS_UPDATES`.
+
+        Returns:
+            The created virtual WorkUnit instance for further comparison.
+        """
+        loop_body_datum_varname_backup = self.args_dict_to_pass.get(LOOP_BODY_DATUM_LABEL)
+
+        virtual_unit = super().reload(unit_dict=unit_dict, api=__class__.loop_unit_placeholder_api)
+        reloaded_loop_data = virtual_unit.args_dict_to_pass.get(LOOP_ITERABLE_DATA_LABEL)
+        loop_body_datum_varname = virtual_unit.args_dict_to_pass.get(LOOP_BODY_DATUM_LABEL)
+
+        data_mapper_to_inherite = self.generate_data_mapper_to_inherite()
+
+        if (loop_data:=self.args_dict_to_pass_backup.get(LOOP_ITERABLE_DATA_LABEL)) == reloaded_loop_data:
+            has_suspecious_updates = False
+            has_unresolved_error_or_pause = False
+
+            for loop_index, loop_datum in enumerate(loop_data):
+                workflow = self.sub_workflows[loop_index]
+                
+                data_mapper_for_update = {loop_body_datum_varname: loop_datum}
+                data_mapper_for_update.update(data_mapper_to_inherite)
+
+                del workflow.intermediate_data_mapper[loop_body_datum_varname_backup]
+                workflow.intermediate_data_mapper.update(data_mapper_for_update)
+                workflow.reload()
+                if workflow.status in StatusCode.unexecutable_statuses:
+                    self.status = StatusCode.FAILED_INITIALIZATION
+                elif workflow.status == StatusCode.SUSPECIOUS_UPDATES:
+                    has_suspecious_updates = True
+                elif workflow.status in StatusCode.error_or_pause_statuses:
+                    has_unresolved_error_or_pause = True
+                continue
+            
+            if self.status not in StatusCode.unexecutable_statuses:
+                if has_unresolved_error_or_pause:
+                    return
+                elif has_suspecious_updates:
+                    self.status = StatusCode.SUSPECIOUS_UPDATES
+                else:
+                    self.status = StatusCode.EXIT_OK
+        else:
+            _LOGGER.warning(f"Inconsistent {LOOP_ITERABLE_DATA_LABEL} in {self.identifier}, all the workflows are to be cleared.")
+            self.sub_workflows.clear()
+            self.status = StatusCode.SUSPECIOUS_UPDATES
 
     def execute(self) -> tuple:
         """Executes the loop, iterating over each sub-workflow in `sub_workflow_list`.
@@ -1033,33 +1291,50 @@ class LoopWorkUnit(ControlWorkUnit):
         Returns:
             tuple: A tuple containing the return key and a list of results from each loop iteration.
         """
-        self.return_value = list()
+        if self.status in StatusCode.skippable_statuses:
+            return self.return_key, self.return_value
+
+        self.return_value: dict = dict()
         data_mapper_to_inherite = self.generate_data_mapper_to_inherite()
         self.update_args_value_from_data_mapper()
         _LOGGER.info(f'We are about to execute {self.__class__.__name__} {self.identifier} ...')
         self.status = StatusCode.RUNNING
         self.synchronize_execution_status()
         loop_body_datum_varname = self.args_dict_to_pass.get(LOOP_BODY_DATUM_LABEL)
-        for loop_index, loop_datum in enumerate(self.args_dict_to_pass.get(LOOP_ITERABLE_DATA_LABEL)):
-            
-            # Initialize the sub-workflow at execution time.
-            data_mapper_for_initialization = {loop_body_datum_varname: loop_datum}
-            flow_locator = self.locator.copy()
-            flow_locator.append(self.encode_layer_index(loop_index))
-            workflow = WorkFlow.from_list(
-                units_dict_list=self.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL),
-                debug=self.debug, intermediate_data_mapper=data_mapper_for_initialization,
-                inherited_data_mapper=data_mapper_to_inherite, locator=flow_locator,
-                control_workunit=self, database_session=self.database_session)
+        loop_data = self.args_dict_to_pass.get(LOOP_ITERABLE_DATA_LABEL)
+        if len(loop_data) == len(self.sub_workflows):
+            for loop_index, loop_datum in enumerate(loop_data):
+                workflow = self.sub_workflows[loop_index]
+                data_mapper_for_initialization = {loop_body_datum_varname: loop_datum}
+                data_mapper_for_update = {loop_body_datum_varname: loop_datum}
+                data_mapper_for_update.update(data_mapper_to_inherite)
+                workflow.intermediate_data_mapper.update(data_mapper_for_update)
+                workflow_return = workflow.execute()
+                self.return_value[self.encode_layer_index(loop_index)] = workflow_return
+                self.update_status_code(workflow=workflow)
+                continue
 
-            # Execute the sub-workflow.
-            _LOGGER.debug(f'Executing {self.encode_layer_index(loop_index)} ...')
-            self.sub_workflows.append(workflow)
-            workflow_return = workflow.execute()
-            self.return_value.append({self.encode_layer_index(loop_index): workflow_return})
+        else:
+            for loop_index, loop_datum in enumerate(loop_data):
+                
+                # Initialize the sub-workflow at execution time.
+                data_mapper_for_initialization = {loop_body_datum_varname: loop_datum}
+                flow_locator = self.locator.copy()
+                flow_locator.append(self.encode_layer_index(loop_index))
+                workflow = WorkFlow.from_list(
+                    unit_dict_list=self.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL),
+                    debug=self.debug, intermediate_data_mapper=data_mapper_for_initialization,
+                    inherited_data_mapper=data_mapper_to_inherite, locator=flow_locator,
+                    control_workunit=self, database_session=self.database_session)
 
-            self.update_status_code(workflow=workflow)
-            continue
+                # Execute the sub-workflow.
+                _LOGGER.debug(f'Executing {self.encode_layer_index(loop_index)} ...')
+                self.sub_workflows.append(workflow)
+                workflow_return = workflow.execute()
+                self.return_value[self.encode_layer_index(loop_index)] = workflow_return
+
+                self.update_status_code(workflow=workflow)
+                continue
 
         if (self.status == StatusCode.RUNNING):
             self.status = StatusCode.EXIT_OK
@@ -1100,6 +1375,7 @@ class GeneralWorkUnit(ControlWorkUnit):
         working_directory (str): Indicates where to run the job. Default to current working directory.
         save_snapshot (bool): Whether to automatically save the status as a pickle file 
                             when it exits due to Error, Pause, or Completion. Default False.
+        architecture (str): The workunits and workflows to be performed in the task, and their order and hierarchy of operation.
         Other inherited attributes...
 
     Methods:
@@ -1111,7 +1387,7 @@ class GeneralWorkUnit(ControlWorkUnit):
     sub_workflow: WorkFlow
     working_directory: str
     save_snapshot: bool
-    schema: str
+    architecture: str
 
     @staticmethod
     def general_unit_placeholder_api(workunits: list, **kwargs):
@@ -1155,7 +1431,7 @@ class GeneralWorkUnit(ControlWorkUnit):
         required information to execute the GeneralWorkUnit (the whole workflow).
 
         Args:
-            unit_dict (dict): Configuration dictionary with necessary parameters for initialization.
+            unit_dict (dict): Configuration dictionary parsed from Json configuration containing information to initialize a task.
             working_directory (str, optional): Indicates where to run the job. Default to current directory.
             save_snapshot (bool, optional): Whether to automatically save the GeneralWorkUnit instance as a pickle file 
                                         when it exits due to Error, Pause, or Completion. Default False.
@@ -1170,7 +1446,7 @@ class GeneralWorkUnit(ControlWorkUnit):
 
         # Initialize the class.
         unit = cls(unit_dict=unit_dict, working_directory=working_directory, save_snapshot=save_snapshot, database_session=database_session, debug=debug)
-        unit.schema = __class__.read_schema(unit_dict=unit_dict)
+        unit.architecture = __class__.read_architecture(unit_dict=unit_dict)
         if not save_snapshot:
             not_save_snapshot_warning_msg = "The `save_snapshot` value is not set to `True`, so this GeneralWorkUnit instance will not automatically save its state on error or pause and continue computing later after corrections."
             _LOGGER.warning(not_save_snapshot_warning_msg)
@@ -1187,10 +1463,10 @@ class GeneralWorkUnit(ControlWorkUnit):
         
         # Initialize the WorkFlow.
         data_mapper_for_init = unit.args_dict_to_pass.copy()
-        del data_mapper_for_init[CONTROL_BODY_WORKUNITS_LABEL]  # Pass kwargs to the workflow. Kwargs contain information specifying CPU/GPU partitions.
+        del data_mapper_for_init[CONTROL_BODY_WORKUNITS_LABEL]  # Pass kwargs to the workflow.
 
-        if (units_dict_list:=unit.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL)):
-            unit.sub_workflow = WorkFlow.from_list(units_dict_list, debug=debug, intermediate_data_mapper=data_mapper_for_init, control_workunit=unit, database_session=unit.database_session)
+        if (unit_dict_list:=unit.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL)):
+            unit.sub_workflow = WorkFlow.from_list(unit_dict_list, debug=debug, intermediate_data_mapper=data_mapper_for_init, control_workunit=unit, database_session=unit.database_session)
         else:
             error_msg = "Initializing GeneralWorkUnit with empty `workunits`. WorkUnit(s) are expected."
             _LOGGER.error(error_msg)
@@ -1390,7 +1666,7 @@ class GeneralWorkUnit(ControlWorkUnit):
             return unit
 
     @staticmethod
-    def read_schema(unit_dict: dict, indent: int = 0):
+    def read_architecture(unit_dict: dict, indent: int = 0):
         """
         Recursively reads a nested unit_dict dictionary and extracts 'api' values.
 
@@ -1410,7 +1686,56 @@ class GeneralWorkUnit(ControlWorkUnit):
         # If 'args' key exists and it has a 'workunits' key, process each item in 'workunits'
         if (WORKUNIT_ARGUMENT_LIST_KEY in unit_dict) and (CONTROL_BODY_WORKUNITS_LABEL in unit_dict[WORKUNIT_ARGUMENT_LIST_KEY]):
             for workunit in unit_dict[WORKUNIT_ARGUMENT_LIST_KEY][CONTROL_BODY_WORKUNITS_LABEL]:
-                result += __class__.read_schema(workunit, indent + 4)
+                result += __class__.read_architecture(workunit, indent + 4)
 
         return result
 
+    def reload(self, unit_dict: dict) -> None:
+        """Reload task from a GeneralWorkUnit dict.
+        
+        Note: If the architecture is changed, the task is not able to be reloaded.
+
+        Args:
+            unit_dict (dict): Modified configuration dictionary parsed from Json configuration containing information to initialize a task.
+        """
+        architecture = __class__.read_architecture(unit_dict=unit_dict)
+        if (architecture != self.architecture):
+            raise ValueError("We currently do not support reloading the task after architectural changes.")
+        virtual_unit = super().reload(unit_dict=unit_dict, api=__class__.general_unit_placeholder_api)
+        
+        if (self.status == StatusCode.SUSPECIOUS_UPDATES):
+            # Reload the workflow.
+            data_mapper_for_init = virtual_unit.args_dict_to_pass.copy()
+            del data_mapper_for_init[CONTROL_BODY_WORKUNITS_LABEL]  # Pass kwargs to the workflow.
+            self.sub_workflow.intermediate_data_mapper.update(data_mapper_for_init)
+            self.sub_workflow.reload()
+
+    def reload_json_string(self, json_str: str) -> None:
+        """Reload task from a serialized json string.
+        
+        Args:
+            json_str (str): The serialized json string.
+        """
+        unit_dict = loads(json_str)
+        self.reload(unit_dict)
+        return
+
+    def reload_json_file_object(self, json_fobj: TextIOWrapper) -> None:
+        """Reload task from JSON format configuration file object.
+        
+        Args:
+            json_fobj (str): The modified json file object.
+        """
+        json_str = json_fobj.read()
+        self.reload_json_string(json_str)
+        return
+
+    def reload_json_filepath(self, json_filepath) -> None:
+        """Reload task from JSON format configuration filepath.
+        
+        Args:
+            json_filepath (str): The modified json filepath.
+        """
+        with open(json_filepath) as fobj:
+            self.reload_json_file_object(fobj)
+        return

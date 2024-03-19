@@ -151,6 +151,7 @@ def test_workflow_store_as_label(caplog):
     (i.e. use the same label for instances with same memory address) works.'''
     json_filepath = f'{DATA_DIR}/workflow_7si9_store_as_label.json'
     workflow = WorkFlow.from_json_filepath(json_filepath=json_filepath)
+    _LOGGER.level = logging.DEBUG
     with EnablePropagate(_LOGGER):
         workflow.execute()
     fs.safe_rmdir(WORK_DIR)
@@ -176,7 +177,7 @@ def test_general_loopworkunit_pseudo_api(caplog):
     json_filepath = f'{DATA_DIR}/general_7si9_loopworkunit_pseudo_api.json'
     # _LOGGER.level = logging.DEBUG
     with EnablePropagate(_LOGGER):
-        general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath, overwrite_database=True, debug=True)
+        general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath, working_directory=WORK_DIR, overwrite_database=True, debug=True)
         return_key, return_value = general.execute()
     fs.safe_rmdir(WORK_DIR)
     assert 'original structure' in caplog.text
@@ -211,7 +212,7 @@ def test_general_multi_loop_datum(caplog):
 def test_workflow_locate_workunit(caplog):
     """Test locating a certain workunit after the execution of the general."""
     json_filepath = f'{DATA_DIR}/general_7si9_general_layer_variable.json'
-    general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath, overwrite_database=True, debug=True)
+    general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath, working_directory=WORK_DIR, overwrite_database=True, debug=True)
     return_key, return_value = general.execute()
     locator = GeneralWorkUnit.get_locator("mutate_stru@4:loop_2:0")
     target = general.locate(locator)
@@ -231,7 +232,7 @@ def test_general_read_schema(caplog):
     """Test reading the schema of the configuration json/unit_dict."""
     # json_filepath = f'{DATA_DIR}/general_multi_loop_datum.json'
     json_filepath = f'{DATA_DIR}/general_7si9_general_layer_variable.json'
-    general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath, overwrite_database=True, debug=True)
+    general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath, working_directory=WORK_DIR, overwrite_database=True, debug=True)
     # assert "        - loop" in general.schema
-    print(general.schema)
+    print(general.architecture)
     return
