@@ -28,9 +28,9 @@ https://enzyhtp-doc.readthedocs.io/en/latest/install.html#
 
 # License
 
-For non-commerical use, please find our “Non-Exclusive Non-Commercial Academic Software License Agreement” in `license.md`.
+For non-commercial use, please find our “Non-Exclusive Non-Commercial Academic Software License Agreement” in `license.md`.
 
-As a summary, for non-commerical use, you are allowed to (for free)
+As a summary, for non-commercial use, you are allowed to (for free)
 - copy
 - modify
 
@@ -38,9 +38,9 @@ you are not allowed to:
 - redistribute a modified version
 
 
-For commerical use, please contact Vanderbilt (cttc@vanderbilt.edu) for a commerical license, it will be similar to the EULA but distributed throught the CTTC office.
+For commercial use, please send a request to Vanderbilt (cttc@vanderbilt.edu) and cc Dr. Yang (zhongyue.yang@vanderbilt.edu) and QZ (qz.shao@outlook.com) for a commerical license, it will be similar to the EULA but distributed through the CTTC office.
 
-As a summary, for commerical use, after obtaining the license from Vanderbilt, you are allowed to (for free)
+As a summary, for commercial use, after obtaining the license from Vanderbilt, you are allowed to (for free)
 - copy
 - modify
 
