@@ -1,4 +1,4 @@
-Please Note: This “Non-Exclusive Non-Commercial Academic Software License Agreement” is available only to non-profit academic and/or research institutions who use the Software solely for internal non-commercial research purposes.  In the event the Licensee wishes to obtain a commercial use license, the Licensee must contact Vanderbilt's Center for Technology Transfer and Commercialization, 1207 17th Avenue South, Suite 105, Nashville, Tennessee 37212 (cttc@vanderbilt.edu). 
+Please Note: This “Non-Exclusive Non-Commercial Academic Software License Agreement” is available only to non-profit academic and/or research institutions who use the Software solely for internal non-commercial research purposes.  In the event the Licensee wishes to obtain a commercial use license, the Licensee must contact Vanderbilt's Center for Technology Transfer and Commercialization, 1207 17th Avenue South, Suite 105, Nashville, Tennessee 37212 (cttc@vanderbilt.edu). Please also cc Dr. Yang (zhongyue.yang@vanderbilt.edu) and QZ (qz.shao@outlook.com) in the license-requesting email.
 
 
 
