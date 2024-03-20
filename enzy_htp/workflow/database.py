@@ -13,7 +13,8 @@ that records execution information for each WorkUnit and WorkFlow instance.
 
 # Here put the import lib.
 from sqlalchemy import Column, Integer, String, DateTime, create_engine
-from sqlalchemy.orm import sessionmaker, Session, declarative_base
+from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm.session import Session
 from datetime import datetime
 from os import path, remove
 

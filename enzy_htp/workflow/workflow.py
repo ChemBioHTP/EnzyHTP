@@ -27,14 +27,16 @@ from json import load, loads
 from typing import Any, Dict, List, Type, Union, Tuple
 from collections.abc import Iterable, Callable
 from datetime import datetime
-from sqlalchemy.orm import Session
+from sqlalchemy.orm.session import Session
 import pickle
 
 from enzy_htp.core.logger import _LOGGER
 
 from .config import (
     SCIENCE_API_MAPPER, 
-    JsonConfigVariableFormatter as VarFormatter, 
+    JsonConfigVariableFormatter as VarFormatter,
+    StatusCode,
+    Placeholder,
 )
 
 from .database import (
@@ -68,102 +70,6 @@ CONTROL_API_KEYS = [
 FAILED_INITIALIZATION_ERROR_MSG = "The initialized work has not yet passed the self-inspection, so it is not allowed to be executed!"
 SUCCESS_INITIALIZATION_MSG = "The initialized work has successfully passed the self-inspection. Now proceeding to execution."
 
-# Placeholder values.
-PLACEHOLDER_STR_VALUE = "The world is yours and ours, but in the final analysis it's you young people's."  # Value for placeholder.
-PLACEHOLDER_INT_VALUE = -9876
-PLACEHOLDER_FLOAT_VALUE = 2024.03
-PLACEHOLDER_ITERABLE_VALUE = ["111", "565", "32162", "333", "555", "65132"]
-PLACEHOLDER_DICT_VALUE = {
-    "zzz": "abbc",
-    "yyy": "cdde",
-    "xxx": "effg",
-}
-
-def assign_placeholder_value(var):
-    """
-    Assigns var placeholder value to 'var' based on its type.
-
-    Args:
-        var: The variable whose placeholder value needs to be assigned.
-
-    Returns:
-        The placeholder value corresponding to the type of 'var'.
-    """
-    if isinstance(var, str):
-        return PLACEHOLDER_STR_VALUE
-    elif isinstance(var, int):
-        return PLACEHOLDER_INT_VALUE
-    elif isinstance(var, float):
-        return PLACEHOLDER_FLOAT_VALUE
-    elif isinstance(var, dict):
-        return PLACEHOLDER_DICT_VALUE
-    elif hasattr(var, '__iter__'):  # Checks if 'a' is iterable
-        return PLACEHOLDER_ITERABLE_VALUE
-    else:
-        None
-
-class StatusCode():
-    """
-    Class representing various execution statuses for workunits and workflows.
-
-    Notes:
-        When a WorkFlow instance or WorkUnit instance is marked as `RUNNING_WITH_PAUSE_IN_INNER_UNITS` or `EXPECTED_PAUSE`, 
-        it freezes the execution of all subsequent instances of the WorkUnit for the WorkFlow instance in which it resides
-        (a loop ControlWorkUnit or parallel ControlWorkUnit freezes execution of the current loop/parallel instance and 
-        proceeds directly to the next loop/parallel instance until all instances of the ControlWorkUnit in which it resides 
-        have been executed), and then saves the current GeneralWorkUnit instance state to a snapshot pickle file.
-
-    Notes in Chinese Language for Reference (consistent with the meaning of the English version) / 汉语备注，备忘用，与英语文本含义一致:
-        当一个 WorkFlow 实例或 WorkUnit 实例被标记为 `RUNNING_WITH_PAUSE_IN_INNER_UNITS` 或 `EXPECTED_PAUSE` 时，
-        将冻结其所在的工作流实例的后续所有 WorkUnit 实例的执行（循环式 ControlWorkUnit 或并行式 ControlWorkUnit 
-        会冻结当前循环体/并行体实例，直接继续执行下一个循环体/并行体实例，直至其所在的 ControlWorkUnit 中的所有循环体/并行体实例被执行完毕），
-        然后保存当前 GeneralWorkUnit 实例状态的快照至 pickle 文件。
-
-    Attributes:
-        CREATED (int): The initial status when a WorkUnit or WorkFlow instance is created. Value: -9
-        INITIALIZING (int): The status when a WorkUnit or WorkFlow instance is undergoin initialization. Value: -8
-        READY_TO_START (int): The status when a WorkUnit or WorkFlow instance has passed the self-inspection but hasn't yet been started. Value: -6
-        READY_WITH_UPDATES (int): The status when a previously executed WorkUnit or WorkFlow instance have its input arguments changed
-                                due to the influence from the update in the input values of the task during continue computing. Value: -5
-        SUSPECIOUS_UPDATES (int): The status when a previously `EXIT_OK` WorkUnit or WorkFlow instance has detected but unsure argument updates
-                                    during reloading. Value: -4
-        RUNNING (int): Indicates that the workunit or workflow is currently in execution. Value: -3
-        PAUSE_IN_INNER_UNITS (int): Specific to WorkFlow and ControlWorkUnit instances. Indicates
-                                    that the workflow is running but an inner unit is paused as expected. Value: -2
-        EXPECTED_PAUSE (int): Specific to Basic WorkUnit instances. Indicates that a unit is paused and its outer
-                              layers should be marked as `RUNNING_WITH_PAUSE_IN_INNER_UNITS`. Value: -1
-        EXIT_WITH_OK (int): Indicates successful completion of the work unit or workflow. Value: 0
-        ERROR_IN_INNER_UNITS (int): Specific to WorkFlow and ControlWorkUnit. Indicates error(s) in the
-                                    inner units of a workflow. Value: 1
-        EXIT_WITH_ERROR (int): Specific to Basic WorkUnit instances. Indicates that the work unit or workflow
-                               exited with an error. Value: 2
-        EXIT_WITH_ERROR_AND_PAUSE (int): Specific to WorkFlow and ControlWorkUnit. Indicates the coexistence of error(s)
-                                        and expected pause(s) in the inner units of a workflow. Value: 3
-        FAILED_INITIALIZATION (int): Indicates that the initialization of the workunit or workflow failed. Value: 9
-    """
-    CREATED = -9
-    INITIALIZING = -8
-    READY_TO_START = -6
-    READY_WITH_UPDATES = -5
-    SUSPECIOUS_UPDATES = -4             # For 
-    RUNNING = -3
-    RUNNING_WITH_PAUSE_IN_INNER_UNITS = -2   # For WorkFlow and ControlWorkUnit only.
-    EXPECTED_PAUSE = -1                 # For Basic WorkUnit only. If a unit is paused, set its outer layers as `RUNNING_WITH_PAUSE_IN_INNER_UNITS`.
-    EXIT_OK = 0
-    EXIT_WITH_ERROR_IN_INNER_UNITS = 1  # For WorkFlow and ControlWorkUnit only.
-    EXIT_WITH_ERROR = 2                 # For Science API only.
-    EXIT_WITH_ERROR_AND_PAUSE = 3       # For WorkFlow and ControlWorkUnit only.
-    FAILED_INITIALIZATION = 9
-
-    pause_excluding_error_statuses = [EXPECTED_PAUSE, RUNNING_WITH_PAUSE_IN_INNER_UNITS]    # For logical judgment only.
-    pause_including_error_statuses = [EXPECTED_PAUSE, RUNNING_WITH_PAUSE_IN_INNER_UNITS, EXIT_WITH_ERROR_AND_PAUSE] # For logical judgment only.
-    error_excluding_pause_statuses = [EXIT_WITH_ERROR, EXIT_WITH_ERROR_IN_INNER_UNITS]      # For logical judgment only.
-    error_including_pause_statuses = [EXIT_WITH_ERROR, EXIT_WITH_ERROR_IN_INNER_UNITS, EXIT_WITH_ERROR_AND_PAUSE]   # For logical judgment only.
-    error_or_pause_statuses = [EXIT_WITH_ERROR, EXIT_WITH_ERROR_IN_INNER_UNITS, EXPECTED_PAUSE, RUNNING_WITH_PAUSE_IN_INNER_UNITS, EXIT_WITH_ERROR_AND_PAUSE]   # For logical judgment only.
-    unexecutable_statuses = [CREATED, INITIALIZING, FAILED_INITIALIZATION]                  # For logical judgment only.
-    unexecuted_statuses = [CREATED, INITIALIZING, READY_TO_START, FAILED_INITIALIZATION]    # For logical judgment only. Note its distinction from `unexecutable_statuses`.
-    skippable_statuses = [EXIT_OK]  # For logical judgement only.
-
 class ExecutionEntity:
     """
     A base class representing an entity in an execution context, such as a workflow or workunit.
@@ -183,7 +89,7 @@ class ExecutionEntity:
                     If True, the error is raised everytime it is catched.
         child_execution_entities (list): Child execution entities of current instance.
                                         e.g. `sub_workflows` in `LoopWorkUnit`, `workunits` in `WorkFlow`, etc.
-        database_session (Session): The database connection session to save entity status as persistent storage.
+        sqlite_filepath (str): The filepath to your sqlite database file for persistent storage.
         identifier: A unique identifier for the instance, used to track and reference the entity.
         is_executable: Indicates whether the instance has passed self-inspection and is ready for execution.
 
@@ -193,27 +99,52 @@ class ExecutionEntity:
                 a potentially complex workflow.
     """
     api_key: str    # A string value indicating the role/function of the current ExecutionEntity instance.
-    status: int     # A integer indicating the execution status of the current ExecutionEntity instance.
+    _status: int     # A integer indicating the execution status of the current ExecutionEntity instance.
     locator: list   # A list of the hierarchical indexes to locate the current ExecutionEntity instance.
     debug: bool     # Indicates whether to run in debug mode.
     child_execution_entities: list  # Child execution entities of current instance.
     database_session: Session   # The database connection session.
+    sqlite_filepath: str      # The filepath to your sqlite database file for persistent storage. 
 
-    def __init__(self, debug: bool = False, locator: List[int] = list(), database_session: Session = None):
+    def __init__(self, debug: bool = False, locator: List[int] = list(), sqlite_filepath: str = str()):
         """Initialize an ExecutionEntity instance.
         
         Args:
             debug (bool, optional): Indicates whether to run in debug mode.
             locator (List[int], optional): A list of the hierarchical indexes to locate the current workflow.
                                 If the current workflow is at the outermost level, this value is an empty list.
-            database_session (Session, optional): The database connection session to save entity status as persistent storage.
+            sqlite_filepath (str): The filepath to your sqlite database file for persistent storage.
         """
         self.debug = debug
         self.locator = locator
-        self.database_session = database_session
-        self.status = StatusCode.CREATED
+        self.sqlite_filepath = sqlite_filepath
+        self._status = StatusCode.CREATED
         self.api_key = str()
         self.child_execution_entities = None
+        if (sqlite_filepath):
+            self.sqlite_filepath = sqlite_filepath
+
+    def create_database_session(self, overwrite_database: bool = False) -> Session:
+        """Create database session with given working directory and sqlite_filename.
+        
+        Args:
+            sqlite_filepath (str): The filepath to your sqlite database file for persistent storage.
+            overwrite_database: If overwrite the database file when it exists. Default False.
+
+        Returns:
+            The database connection session to save entity status as persistent storage.
+        """
+        session = SqliteSqlalchemy(self.sqlite_filepath, overwrite_database).session
+        return session
+    
+    @property
+    def status(self) -> int:
+        return self._status
+    
+    @status.setter
+    def status(self, value: int):
+        self._status = value
+        self.synchronize_execution_status()
     
     def synchronize_execution_status(self) -> None:
         """Synchronize the status of the current entity to database. Called everytime before executing the WorkUnit or WorkFlow instances.
@@ -222,9 +153,11 @@ class ExecutionEntity:
         """
         if (self.status in StatusCode.unexecuted_statuses):
             return
-        if (self.database_session):
+        database_session = self.create_database_session()
+        if (database_session):
             entity = EntityORM(self.identifier, self.status)
-            entity.insert_or_update(self.database_session)
+            entity.insert_or_update(database_session)
+            database_session.close()
         else:
             _LOGGER.warning(f"Database session doesn't exist in {self.identifier}!")
             return
@@ -311,6 +244,8 @@ class WorkFlow(ExecutionEntity):
         workunits (List[WorkFlow]): A list of WorkUnit instance carried by this workflow.
         intermediate_data_mapper (dict): Runtime intermediate data for the current layer of workflow.
         inherited_data_mapper (dict): Data inherited from parent workflow.
+        nested_control_unit_return_keys (list): The return keys of nested ControlWorkUnit instances (e.g. loop)
+                                                Keys stored in it will not be inherited to prevent the `inherited_data_mapper` from being toooo large.
         locator (List[int]): A list of the hierarchical indexes to locate the current workflow.
                                   If the current workflow is at the outermost level, this value is an empty list.
         execution_status (int): A flag indicating the execution status of the WorkFlow instance. Using value from `class ExecutionStatus`.
@@ -326,6 +261,7 @@ class WorkFlow(ExecutionEntity):
     # Intermediate Data.
     intermediate_data_mapper: dict  # Runtime intermediate data for the current layer of workflow.
     inherited_data_mapper: dict     # Data inherited from parent workflow.
+    nested_control_unit_return_keys: list   # The return keys of nested ControlWorkUnit instances (e.g. loop)
 
     # Output
     # data_output_path = './Mutation.dat'
@@ -336,7 +272,7 @@ class WorkFlow(ExecutionEntity):
                 intermediate_data_mapper: Dict[str, Any] = dict(), 
                 inherited_data_mapper: Dict[str, Any] = dict(),
                 control_workunit: ControlWorkUnit = None,
-                database_session: Session = None,
+                sqlite_filepath: str = str(),
                 ) -> None:
         """Initialize an instance.
         
@@ -347,9 +283,9 @@ class WorkFlow(ExecutionEntity):
             intermediate_data_mapper (Dict[str, Any], optional): The initial value of intermediate_data_mapper.
             inherited_data_mapper (Dict[str, Any], optional): Data Mapper containing data to be inherited.
             control_workunit (ControlWorkUnit): The outer ControlWorkUnit instance hosting the current workflow.
-            database_session (Session, optional): The database connection session to save entity status as persistent storage.
+            sqlite_filepath (str): The filepath to your sqlite database file for persistent storage.
         """
-        super().__init__(debug=debug, locator=locator, database_session=database_session)
+        super().__init__(debug=debug, locator=locator, sqlite_filepath=sqlite_filepath)
 
         # Assigned values.
         self.intermediate_data_mapper = intermediate_data_mapper
@@ -360,6 +296,7 @@ class WorkFlow(ExecutionEntity):
         # Default values.
         self.api_key = WORKFLOW_API_KEY
         self.workunits = list()
+        self.nested_control_unit_return_keys = list()
         self.child_execution_entities = self.workunits
         return
     
@@ -369,7 +306,7 @@ class WorkFlow(ExecutionEntity):
                 intermediate_data_mapper: Dict[str, Any] = dict(), 
                 inherited_data_mapper: Dict[str, Any] = dict(), 
                 control_workunit: ControlWorkUnit = None, 
-                database_session: Session = None,
+                sqlite_filepath: str = str(),
                 ) -> WorkFlow:
         """Initialize an instance of WorkFlow from a given dictionary instance.
         
@@ -381,12 +318,12 @@ class WorkFlow(ExecutionEntity):
             intermediate_data_mapper (Dict[str, Any], optional): The initial value of intermediate_data_mapper.
             inherited_data_mapper (Dict[str, Any], optional): Data Mapper containing data to be inherited.
             control_workunit (ControlWorkUnit): The outer ControlWorkUnit instance hosting the current workflow.
-            database_session (Session, optional): The database connection session to save entity status as persistent storage.
+            sqlite_filepath (str): The filepath to your sqlite database file for persistent storage.
         
         Returns:
             An instance of WorkFlow.
         """
-        flow = cls(debug, locator, intermediate_data_mapper, inherited_data_mapper, control_workunit, database_session)
+        flow = cls(debug, locator, intermediate_data_mapper, inherited_data_mapper, control_workunit, sqlite_filepath)
         flow.status = StatusCode.INITIALIZING
         if (unit_dict_list == None):
             no_workunit_err_msg = "Initializing WorkFlow with no workunits. Workunits are expected."
@@ -470,17 +407,17 @@ class WorkFlow(ExecutionEntity):
             _LOGGER.info(f"Parsing Control WorkUnit {workunit.identifier}.")
             if api_key == LOOP_API_KEY:
                 # Setup a placeholder in `workflow.intermediate_data_mapper`.
-                workunit = LoopWorkUnit.from_dict(unit_dict=unit_dict, workflow=self, locator=locator_to_pass, database_session=self.database_session, debug=self.debug)
+                workunit = LoopWorkUnit.from_dict(unit_dict=unit_dict, workflow=self, locator=locator_to_pass, sqlite_filepath=self.sqlite_filepath, debug=self.debug)
             elif api_key == GENERAL_API_KEY:
                 error_msg = "GeneralWorkUnit should not be configured inside a workflow."
                 _LOGGER.error(error_msg)
                 self.error_msg_list.append(error_msg)
         else:
             _LOGGER.info(f"Parsing Science WorkUnit {workunit.identifier}.")
-            workunit = WorkUnit.from_dict(unit_dict=unit_dict, workflow=self, locator=locator_to_pass, database_session=self.database_session, debug=self.debug)
+            workunit = WorkUnit.from_dict(unit_dict=unit_dict, workflow=self, locator=locator_to_pass, sqlite_filepath=self.sqlite_filepath, debug=self.debug)
 
         # Setup a placeholder in `workflow.intermediate_data_mapper`.
-        self.intermediate_data_mapper[VarFormatter.unformat_variable(workunit.return_key)] = PLACEHOLDER_STR_VALUE
+        self.intermediate_data_mapper[VarFormatter.unformat_variable(workunit.return_key)] = Placeholder.PLACEHOLDER_STR_VALUE
 
         # Add new workunit to the workflow.
         self.workunits.append(workunit)
@@ -520,7 +457,7 @@ class WorkFlow(ExecutionEntity):
                 store_as_key = workunit.return_key
                 store_as_value = workunit.return_value
                 del self.intermediate_data_mapper[store_as_key_backup]
-                self.intermediate_data_mapper[store_as_key] = assign_placeholder_value(store_as_value)
+                self.intermediate_data_mapper[store_as_key] = Placeholder.assign_placeholder_value(store_as_value)
             elif workunit.status in StatusCode.error_or_pause_statuses:
                 has_unresolved_error_or_pause = True
             continue
@@ -565,7 +502,6 @@ class WorkFlow(ExecutionEntity):
             if not self.control_workunit:    # If the current workflow is at the outermost level, log the message; otherwise skip the duplicated message.
                 _LOGGER.info(SUCCESS_INITIALIZATION_MSG)
             self.status = StatusCode.RUNNING
-            self.synchronize_execution_status()
             for workunit in self.workunits:
                 workunit: WorkUnit
                 _LOGGER.info(f"Executing WorkUnit {workunit.identifier} ...")
@@ -584,7 +520,6 @@ class WorkFlow(ExecutionEntity):
                     break
             if self.status == StatusCode.RUNNING:
                 self.status = StatusCode.EXIT_OK
-            self.synchronize_execution_status()
             return self.intermediate_data_mapper
 
 class WorkUnit(ExecutionEntity):
@@ -623,7 +558,7 @@ class WorkUnit(ExecutionEntity):
     error_msg_list: list
     params_to_assign_at_execution: list
 
-    def __init__(self, unit_dict: dict = dict(), workflow: WorkFlow = None, locator: List[int] = list(), database_session: Session = None, debug: bool = False):
+    def __init__(self, unit_dict: dict = dict(), workflow: WorkFlow = None, locator: List[int] = list(), sqlite_filepath: str = str(), debug: bool = False):
         """Initializes a WorkUnit instance.
 
         Args:
@@ -631,10 +566,10 @@ class WorkUnit(ExecutionEntity):
                               for API mapping and execution.
             workflow (WorkFlow): A reference to the workflow object this unit belongs to.
             locator (list, optional): A list of the hierarchical indexes to locate the current workunit.
-            database_session (Session, optional): The database connection session to save entity status as persistent storage.
+            sqlite_filepath (str): The filepath to your sqlite database file for persistent storage.
             debug (bool, optional): Indicates whether to run in debug mode.
         """
-        super().__init__(debug=debug, locator=locator, database_session=database_session)
+        super().__init__(debug=debug, locator=locator, sqlite_filepath=sqlite_filepath)
         # Initialize attributes in the constructor
         # to prevent them from being considered as class attributes.
         self.api_key = unit_dict.get(WORKUNIT_API_NAME_KEY, str())
@@ -652,7 +587,7 @@ class WorkUnit(ExecutionEntity):
         return
     
     @classmethod
-    def from_dict(cls, unit_dict: dict, workflow: WorkFlow = None, locator: List[int] = list(), database_session: Session = None, debug: bool = False) -> WorkUnit:
+    def from_dict(cls, unit_dict: dict, workflow: WorkFlow = None, locator: List[int] = list(), sqlite_filepath: str = str(), debug: bool = False) -> WorkUnit:
         """Initializes an instance of WorkUnit from a given dictionary.
 
         The dictionary should contain keys such as `api`, `store_as`, and `args`
@@ -664,7 +599,7 @@ class WorkUnit(ExecutionEntity):
                               for API mapping and execution.
             workflow (WorkFlow, optional): The workflow instance to which this unit belongs.
             locator (list, optional): A list of the hierarchical indexes to locate the current workunit.
-            database_session (Session, optional): The database connection session to save entity status as persistent storage.
+            sqlite_filepath (str): The filepath to your sqlite database file for persistent storage.
             debug (bool, optional): Indicates whether to run in debug mode.
 
         Returns:
@@ -674,7 +609,7 @@ class WorkUnit(ExecutionEntity):
             KeyError: If the API key cannot be mapped to any API.
         """
         # Initialize the class.
-        unit = cls(unit_dict=unit_dict, workflow=workflow, locator=locator, database_session=database_session, debug=debug)
+        unit = cls(unit_dict=unit_dict, workflow=workflow, locator=locator, sqlite_filepath=sqlite_filepath, debug=debug)
         unit.status = StatusCode.INITIALIZING
 
         # Map the API.
@@ -725,10 +660,12 @@ class WorkUnit(ExecutionEntity):
         virtual_unit.status = StatusCode.INITIALIZING
         virtual_unit.workflow = self.workflow
         if (api is None):
-            api = SCIENCE_API_MAPPER.get(virtual_unit.api_key)
+            virtual_unit.api = SCIENCE_API_MAPPER.get(virtual_unit.api_key)
+        else:
+            virtual_unit.api = api
         virtual_unit.self_inspection_and_args_reassembly()
         virtual_unit.check_initialization_status()
-        virtual_unit.update_args_value_from_data_mapper()
+        updated_params = virtual_unit.update_args_value_from_data_mapper()
 
         if (virtual_unit.status in StatusCode.unexecutable_statuses):
             self.status = StatusCode.FAILED_INITIALIZATION
@@ -738,11 +675,12 @@ class WorkUnit(ExecutionEntity):
         # Check if any of the attributes (args_dict_input, args_dict_to_pass, params_to_assign_at_execution,
         # or return_key) are different in the virtual unit.
         # If there are differences, update the attributes and then update status to indicate that updates are detected.
-        elif (self.return_key != virtual_unit.return_key or 
+        elif (updated_params or
+            self.return_key != virtual_unit.return_key or 
             self.args_dict_input != virtual_unit.args_dict_input or 
             self.args_dict_to_pass != virtual_unit.args_dict_to_pass or 
             self.params_to_assign_at_execution != virtual_unit.params_to_assign_at_execution):
-
+            
             self.status = StatusCode.SUSPECIOUS_UPDATES
             self.args_dict_input = virtual_unit.args_dict_input
             self.args_dict_to_pass = virtual_unit.args_dict_to_pass
@@ -779,7 +717,6 @@ class WorkUnit(ExecutionEntity):
             #         return self.return_key, self.return_value
                 
             self.status = StatusCode.RUNNING
-            self.synchronize_execution_status()
 
             if (self.status in StatusCode.skippable_statuses):
                 return self.return_key, self.return_value
@@ -789,15 +726,12 @@ class WorkUnit(ExecutionEntity):
             else:   # If no `return_key`, then `return_value` is None.
                 self.api(**self.args_dict_to_pass)
                 self.return_value = None
-            print(self.return_value)
             self.status = StatusCode.EXIT_OK
-            self.synchronize_execution_status()
             _LOGGER.debug(f"{self.identifier}(return_key={self.return_key}, return_value={self.return_value})")
             return self.return_key, self.return_value
         except Exception as exc:
             _LOGGER.error(f'Catching Error when executing `{self.identifier}`:')
             self.status = StatusCode.EXIT_WITH_ERROR
-            self.synchronize_execution_status()
             if (self.debug):
                 raise exc
             else:
@@ -820,9 +754,13 @@ class WorkUnit(ExecutionEntity):
         for param in self.params_to_assign_at_execution:
             for mapper in [self.workflow.intermediate_data_mapper, self.workflow.inherited_data_mapper]:
                 if (mapped_datum := mapper.get(VarFormatter.unformat_variable(self.args_dict_input[param]))):
-                    if (self.args_dict_to_pass.get(param) != mapped_datum):
+                    existing_arg_in_mapper = self.args_dict_to_pass.get(param)
+                    if (Placeholder.is_none_or_placeholder(existing_arg_in_mapper) or (existing_arg_in_mapper != mapped_datum)):
                         if (commit_update):
-                            self.args_dict_to_pass[param] = mapped_datum
+                            if (Placeholder.is_none_or_placeholder(mapped_datum)):
+                                continue
+                            else:
+                                self.args_dict_to_pass[param] = mapped_datum
                         updated_params.append(param)
                         break
             continue
@@ -892,8 +830,8 @@ class WorkUnit(ExecutionEntity):
                 self.args_dict_to_pass[param_name] = unformatted_arg_value
                 mapped_value = mapper.get(unformatted_arg_value)
                 if (mapped_value):   # Check if there is a non-none-or-empty value in Mapper.
-                    if (isinstance(mapped_value, type(PLACEHOLDER_STR_VALUE)) # Placeholder values need to be excluded.
-                        and mapped_value == PLACEHOLDER_STR_VALUE):
+                    if (isinstance(mapped_value, type(Placeholder.PLACEHOLDER_STR_VALUE)) # Placeholder values need to be excluded.
+                        and mapped_value == Placeholder.PLACEHOLDER_STR_VALUE):
                         break
                     is_value_mapped_none = False
                     arg_value = mapped_value    # Assign mapped value to the argument.
@@ -1017,9 +955,9 @@ class WorkUnit(ExecutionEntity):
             # Data Mapper inherited from parent workflow(s) should be inherited.
             data_mapper_to_inherite.update(inherited_data_mapper.copy())
         for key, value in self.workflow.intermediate_data_mapper.items():
-            # if (WorkUnit.__inspect_argument_type(value, dict)):
-            #     # `Dict` or `dict` type data are not inheritable.
-            #     continue
+            if (self.workflow and key in self.workflow.nested_control_unit_return_keys):
+                # Keys stored in `nested_control_unit_return_keys` should not be inherited
+                continue
             data_mapper_to_inherite[key] = value
         return data_mapper_to_inherite
 
@@ -1033,10 +971,12 @@ class ControlWorkUnit(WorkUnit):
     """
     sub_workflows: List[WorkFlow]
 
-    def __init__(self, unit_dict: dict = dict(), workflow: WorkFlow = None, locator: List[int] = list(), database_session: Session = None, debug: bool = False):
-        super().__init__(unit_dict=unit_dict, workflow=workflow, locator=locator, database_session=database_session, debug=debug)
+    def __init__(self, unit_dict: dict = dict(), workflow: WorkFlow = None, locator: List[int] = list(), sqlite_filepath: str = str(), debug: bool = False):
+        super().__init__(unit_dict=unit_dict, workflow=workflow, locator=locator, sqlite_filepath=sqlite_filepath, debug=debug)
         self.sub_workflows = list()
         self.child_execution_entities = self.sub_workflows
+        if (self.workflow):
+            self.workflow.nested_control_unit_return_keys.append(self.return_key)
 
     def reload(self, unit_dict: dict, api: Callable) -> ControlWorkUnit:
         """
@@ -1156,20 +1096,20 @@ class LoopWorkUnit(ControlWorkUnit):
         """
         pass
 
-    def __init__(self, unit_dict: dict, workflow: WorkFlow = None, locator: List[int] = list(), database_session: Session = None, debug: bool = False):
+    def __init__(self, unit_dict: dict, workflow: WorkFlow = None, locator: List[int] = list(), sqlite_filepath: str = str(), debug: bool = False):
         """Initializes a LoopWorkUnit instance.
 
         Args:
             unit_dict (dict): Configuration dictionary with necessary parameters for initialization.
             workflow (WorkFlow): A reference to the workflow object this unit belongs to.
             locator (list, optional): A list of the hierarchical indexes to locate the current workunit.
-            database_session (Session, optional): The database connection session to save entity status as persistent storage.
+            sqlite_filepath (str): The filepath to your sqlite database file for persistent storage.
             debug (bool, optional): Indicates whether to run in debug mode.
         """
-        super().__init__(unit_dict=unit_dict, workflow=workflow, locator=locator, database_session=database_session, debug=debug)
+        super().__init__(unit_dict=unit_dict, workflow=workflow, locator=locator, sqlite_filepath=sqlite_filepath, debug=debug)
 
     @classmethod
-    def from_dict(cls, unit_dict: dict, workflow: WorkFlow = None, locator: List[int] = list(), database_session: Session = None, debug: bool = False) -> LoopWorkUnit:
+    def from_dict(cls, unit_dict: dict, workflow: WorkFlow = None, locator: List[int] = list(), sqlite_filepath: str = str(), debug: bool = False) -> LoopWorkUnit:
         """Initializes an instance of LoopWorkUnit from a given dictionary.
 
         As with a normal WorkUnit, the dictionary should contain keys such as `api`, `store_as`, 
@@ -1183,14 +1123,14 @@ class LoopWorkUnit(ControlWorkUnit):
             unit_dict (dict): Configuration dictionary with necessary parameters for initialization.
             workflow (WorkFlow, optional): The parent workflow of this unit.
             locator (list, optional): A list of the hierarchical indexes to locate the current workunit.
-            database_session (Session, optional): The database connection session to save entity status as persistent storage.
+            sqlite_filepath (str): The filepath to your sqlite database file for persistent storage.
             debug (bool, optional): Indicates whether to run in debug mode.
 
         Returns:
             LoopWorkUnit: An instance of LoopWorkUnit initialized with the given configuration.
         """
         # Initialize the class.
-        unit = cls(unit_dict, workflow, locator, database_session, debug)
+        unit = cls(unit_dict, workflow, locator, sqlite_filepath, debug)
         unit.api = LoopWorkUnit.loop_unit_placeholder_api
         unit.status = StatusCode.INITIALIZING
 
@@ -1204,14 +1144,14 @@ class LoopWorkUnit(ControlWorkUnit):
 
         # Some data should be passed before the initialization of a sub-WorkFlow.
         loop_body_datum_varname = VarFormatter.unformat_variable(unit.args_dict_to_pass.get(LOOP_BODY_DATUM_LABEL))
-        data_mapper_for_initialize_as_intermediate = {loop_body_datum_varname: PLACEHOLDER_STR_VALUE}
+        data_mapper_for_initialize_as_intermediate = {loop_body_datum_varname: Placeholder.PLACEHOLDER_STR_VALUE}
 
         # Initialize a PlaceHolder Sub-WorkFlow to perform self-inspection.
         flow_locator = unit.locator.copy()
         flow_locator.append(unit.encode_layer_index())
         placeholder_sub_workflow = WorkFlow.from_list(unit_dict_list=unit.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL),
             debug=unit.debug, intermediate_data_mapper=data_mapper_for_initialize_as_intermediate,
-            inherited_data_mapper=data_mapper_to_inherite, locator=flow_locator, control_workunit=unit, database_session=unit.database_session)
+            inherited_data_mapper=data_mapper_to_inherite, locator=flow_locator, control_workunit=unit, sqlite_filepath=unit.sqlite_filepath)
         
         # Add error message from placeholder workflow initialization.
         if (placeholder_sub_workflow.error_msg_list):
@@ -1261,7 +1201,8 @@ class LoopWorkUnit(ControlWorkUnit):
 
                 del workflow.intermediate_data_mapper[loop_body_datum_varname_backup]
                 workflow.intermediate_data_mapper.update(data_mapper_for_update)
-                workflow.reload()
+                unit_dict_list = virtual_unit.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL)
+                workflow.reload(unit_dict_list=unit_dict_list)
                 if workflow.status in StatusCode.unexecutable_statuses:
                     self.status = StatusCode.FAILED_INITIALIZATION
                 elif workflow.status == StatusCode.SUSPECIOUS_UPDATES:
@@ -1299,46 +1240,39 @@ class LoopWorkUnit(ControlWorkUnit):
         self.update_args_value_from_data_mapper()
         _LOGGER.info(f'We are about to execute {self.__class__.__name__} {self.identifier} ...')
         self.status = StatusCode.RUNNING
-        self.synchronize_execution_status()
         loop_body_datum_varname = self.args_dict_to_pass.get(LOOP_BODY_DATUM_LABEL)
         loop_data = self.args_dict_to_pass.get(LOOP_ITERABLE_DATA_LABEL)
-        if len(loop_data) == len(self.sub_workflows):
-            for loop_index, loop_datum in enumerate(loop_data):
-                workflow = self.sub_workflows[loop_index]
-                data_mapper_for_initialization = {loop_body_datum_varname: loop_datum}
-                data_mapper_for_update = {loop_body_datum_varname: loop_datum}
-                data_mapper_for_update.update(data_mapper_to_inherite)
-                workflow.intermediate_data_mapper.update(data_mapper_for_update)
-                workflow_return = workflow.execute()
-                self.return_value[self.encode_layer_index(loop_index)] = workflow_return
-                self.update_status_code(workflow=workflow)
-                continue
 
-        else:
-            for loop_index, loop_datum in enumerate(loop_data):
-                
-                # Initialize the sub-workflow at execution time.
-                data_mapper_for_initialization = {loop_body_datum_varname: loop_datum}
+        is_existing_subflows = (len(loop_data) == len(self.sub_workflows))
+        if (not is_existing_subflows):  # If we don't use existing sub-workflows, clear all the sub-workflows.
+            self.sub_workflows.clear()
+
+        for loop_index, loop_datum in enumerate(loop_data):
+            workflow: WorkFlow
+            data_mapper_for_initialization = {loop_body_datum_varname: loop_datum}
+            
+            if (is_existing_subflows):
+                workflow = self.sub_workflows[loop_index]
+                workflow.intermediate_data_mapper.update(data_mapper_for_initialization)
+                workflow.inherited_data_mapper.update(data_mapper_to_inherite)
+            else:
                 flow_locator = self.locator.copy()
                 flow_locator.append(self.encode_layer_index(loop_index))
                 workflow = WorkFlow.from_list(
                     unit_dict_list=self.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL),
                     debug=self.debug, intermediate_data_mapper=data_mapper_for_initialization,
                     inherited_data_mapper=data_mapper_to_inherite, locator=flow_locator,
-                    control_workunit=self, database_session=self.database_session)
-
-                # Execute the sub-workflow.
-                _LOGGER.debug(f'Executing {self.encode_layer_index(loop_index)} ...')
+                    control_workunit=self, sqlite_filepath=self.sqlite_filepath)
                 self.sub_workflows.append(workflow)
-                workflow_return = workflow.execute()
-                self.return_value[self.encode_layer_index(loop_index)] = workflow_return
 
-                self.update_status_code(workflow=workflow)
-                continue
+            _LOGGER.debug(f'Executing {workflow.identifier} ...')
+            workflow_return = workflow.execute()
+            self.return_value[self.encode_layer_index(loop_index)] = workflow_return
+            self.update_status_code(workflow=workflow)
+            continue
 
         if (self.status == StatusCode.RUNNING):
             self.status = StatusCode.EXIT_OK
-        self.synchronize_execution_status()
         return self.return_key, self.return_value
     
     def update_status_code(self, workflow: WorkFlow) -> None:
@@ -1386,8 +1320,10 @@ class GeneralWorkUnit(ControlWorkUnit):
     """
     sub_workflow: WorkFlow
     working_directory: str
+    sqlite_filename: str
     save_snapshot: bool
     architecture: str
+    latest_pickle_filepath: str
 
     @staticmethod
     def general_unit_placeholder_api(workunits: list, **kwargs):
@@ -1403,7 +1339,7 @@ class GeneralWorkUnit(ControlWorkUnit):
                 workflow: WorkFlow = None, 
                 working_directory: str = CURRENT_DIRECTORY, 
                 save_snapshot: bool = False, 
-                database_session: Session = None, 
+                sqlite_filepath: str = str(), 
                 debug: bool = False):
         """Initializes a GeneralWorkUnit instance.
 
@@ -1413,17 +1349,19 @@ class GeneralWorkUnit(ControlWorkUnit):
             working_directory (str, optional): Indicates where to run the job. Default to current working directory.
             save_snapshot (bool, optional): Whether to automatically save the GeneralWorkUnit instance as a pickle file 
                                         when it exits due to Error, Pause, or Completion. Default False.
-            database_session (Session): The database connection session to save entity status as persistent storage.
+            sqlite_filepath (str): The filepath to your sqlite database file for persistent storage.
             debug (bool, optional): Indicates whether to run in debug mode.
         """
-        super().__init__(unit_dict=unit_dict, workflow=workflow, database_session=database_session, debug=debug)
+        super().__init__(unit_dict=unit_dict, workflow=workflow, sqlite_filepath=sqlite_filepath, debug=debug)
         self.working_directory = working_directory
         self.save_snapshot = save_snapshot
         self.api_key = GENERAL_API_KEY
+        self.latest_pickle_filepath = str()
 
     @classmethod
     def from_dict(cls, unit_dict: dict, working_directory: str = CURRENT_DIRECTORY, 
-                save_snapshot: bool = False, database_session: Session = None, debug: bool = False) -> GeneralWorkUnit:
+                sqlite_filename: str = DEFAULT_SQLITE_FILENAME, overwrite_database: bool = False,
+                save_snapshot: bool = False, debug: bool = False) -> GeneralWorkUnit:
         """Initializes an instance of GeneralWorkUnit from a given dictionary.
 
         Here, however, `api` must be `general` to indicate that the WorkUnit is a GeneralWorkUnit, 
@@ -1443,10 +1381,14 @@ class GeneralWorkUnit(ControlWorkUnit):
         """
         if not path.isdir(working_directory):
             makedirs(working_directory)
+        
+        sqlite_filepath = path.join(working_directory, sqlite_filename)
 
         # Initialize the class.
-        unit = cls(unit_dict=unit_dict, working_directory=working_directory, save_snapshot=save_snapshot, database_session=database_session, debug=debug)
+        unit = cls(unit_dict=unit_dict, working_directory=working_directory, save_snapshot=save_snapshot, sqlite_filepath=sqlite_filepath, debug=debug)
         unit.architecture = __class__.read_architecture(unit_dict=unit_dict)
+        database_session = unit.create_database_session(overwrite_database=True)
+        database_session.close()
         if not save_snapshot:
             not_save_snapshot_warning_msg = "The `save_snapshot` value is not set to `True`, so this GeneralWorkUnit instance will not automatically save its state on error or pause and continue computing later after corrections."
             _LOGGER.warning(not_save_snapshot_warning_msg)
@@ -1466,7 +1408,7 @@ class GeneralWorkUnit(ControlWorkUnit):
         del data_mapper_for_init[CONTROL_BODY_WORKUNITS_LABEL]  # Pass kwargs to the workflow.
 
         if (unit_dict_list:=unit.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL)):
-            unit.sub_workflow = WorkFlow.from_list(unit_dict_list, debug=debug, intermediate_data_mapper=data_mapper_for_init, control_workunit=unit, database_session=unit.database_session)
+            unit.sub_workflow = WorkFlow.from_list(unit_dict_list, debug=debug, intermediate_data_mapper=data_mapper_for_init, control_workunit=unit, sqlite_filepath=unit.sqlite_filepath)
         else:
             error_msg = "Initializing GeneralWorkUnit with empty `workunits`. WorkUnit(s) are expected."
             _LOGGER.error(error_msg)
@@ -1485,7 +1427,7 @@ class GeneralWorkUnit(ControlWorkUnit):
             working_directory (str, optional): Indicates where to run the job. Default to current working directory.
             save_snapshot (bool, optional): Whether to automatically save the GeneralWorkUnit instance as a pickle file 
                                         when it exits due to Error, Pause, or Completion. Default False.
-            sqlite_filename (str, optional): The filename of the sqlite database file.
+            sqlite_filename (str, optional): The filename of the sqlite database file in your working directory.
             overwrite_database: If overwrite the database file when it exists. Default False.
             debug (bool, optional): Indicates whether to run in debug mode. Default False.
         
@@ -1495,11 +1437,10 @@ class GeneralWorkUnit(ControlWorkUnit):
         if not path.isdir(working_directory):
             makedirs(working_directory)
         
-        sqlite_filepath = path.join(working_directory, sqlite_filename)
-        session = SqliteSqlalchemy(sqlite_filepath, overwrite_database).session
         unit_dict = loads(json_str)
         return GeneralWorkUnit.from_dict(unit_dict=unit_dict, working_directory=working_directory, 
-                                        save_snapshot=save_snapshot, database_session=session, debug=debug)
+                                        save_snapshot=save_snapshot, sqlite_filename=sqlite_filename, 
+                                        overwrite_database=overwrite_database, debug=debug)
 
     @classmethod
     def from_json_file_object(cls, json_fobj: TextIOWrapper, 
@@ -1513,7 +1454,7 @@ class GeneralWorkUnit(ControlWorkUnit):
             working_directory (str, optional): Indicates where to run the job. Default to current working directory.
             save_snapshot (bool, optional): Whether to automatically save the GeneralWorkUnit instance as a pickle file 
                                         when it exits due to Error, Pause, or Completion. Default False.
-            sqlite_filename (str, optional): The filename of the sqlite database file.
+            sqlite_filename (str, optional): The filename of the sqlite database file in your working directory.
             overwrite_database: If overwrite the database file when it exists. Default False.
             debug (bool, optional): Indicates whether to run in debug mode. Default False.
         
@@ -1537,6 +1478,7 @@ class GeneralWorkUnit(ControlWorkUnit):
             working_directory (str, optional): Indicates where to run the job. Default to current working directory.
             save_snapshot (bool, optional): Whether to automatically save the GeneralWorkUnit instance as a pickle file 
                                         when it exits due to Error, Pause, or Completion. Default False.
+            sqlite_filename (str, optional): The filename of the sqlite database file in your working directory.
             overwrite_database: If overwrite the database file when it exists. Default False.
             debug (bool, optional): Indicates whether to run in debug mode. Default False.
         
@@ -1560,7 +1502,6 @@ class GeneralWorkUnit(ControlWorkUnit):
         else:
             _LOGGER.info(SUCCESS_INITIALIZATION_MSG)
             self.status = StatusCode.RUNNING
-            self.synchronize_execution_status()
             self.return_value = self.sub_workflow.execute()
             if (self.sub_workflow.status in StatusCode.error_excluding_pause_statuses):
                 self.status = StatusCode.EXIT_WITH_ERROR_IN_INNER_UNITS
@@ -1570,8 +1511,8 @@ class GeneralWorkUnit(ControlWorkUnit):
                 self.status = StatusCode.EXIT_OK
             if (self.save_snapshot):
                 pickle_filepath = self.dump_snapshot_file()
+                self.latest_pickle_filepath = pickle_filepath
                 _LOGGER.info(f"The current running status has been saved to '{pickle_filepath}'. Please go to this location to view your file(s).")
-            self.synchronize_execution_status()
             return self.return_key, self.return_value
    
     def locate(self, locator: list) -> ExecutionEntity:
@@ -1602,6 +1543,8 @@ class GeneralWorkUnit(ControlWorkUnit):
         based on the current timestamp.
 
         Note:
+            Once you dump your snapshot file, the database session will be dumped.
+
             If the `save_directory` value entered is not a directory, 
             or if saving a file to this directory fails, the save directory would be 
             switched to the `working_directory` and a Warning is prompted; 
@@ -1621,7 +1564,7 @@ class GeneralWorkUnit(ControlWorkUnit):
             _LOGGER.warning(f"The `save_directory` value '{save_directory}' you specified is not a directory, so change the save address to working_directory.")
         else:
             _LOGGER.info("No specified directory to save the Pickle file. Save it to the working directory.")
-            
+        
         current_time = datetime.now()
         filename = f"snapshot_{self.api_key}_{current_time.strftime('%Y-%m-%d_%H-%M-%S')}.pickle"
         filepath = path.join(dir_to_save, filename)
@@ -1663,6 +1606,8 @@ class GeneralWorkUnit(ControlWorkUnit):
             if not isinstance(unit, GeneralWorkUnit):
                 raise TypeError("The loaded object is not an instance of GeneralWorkUnit.")
             
+            database_session = unit.create_database_session()
+            database_session.close()
             return unit
 
     @staticmethod
@@ -1705,10 +1650,11 @@ class GeneralWorkUnit(ControlWorkUnit):
         
         if (self.status == StatusCode.SUSPECIOUS_UPDATES):
             # Reload the workflow.
+            unit_dict_list = virtual_unit.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL)
             data_mapper_for_init = virtual_unit.args_dict_to_pass.copy()
             del data_mapper_for_init[CONTROL_BODY_WORKUNITS_LABEL]  # Pass kwargs to the workflow.
             self.sub_workflow.intermediate_data_mapper.update(data_mapper_for_init)
-            self.sub_workflow.reload()
+            self.sub_workflow.reload(unit_dict_list=unit_dict_list)
 
     def reload_json_string(self, json_str: str) -> None:
         """Reload task from a serialized json string.
@@ -1730,7 +1676,7 @@ class GeneralWorkUnit(ControlWorkUnit):
         self.reload_json_string(json_str)
         return
 
-    def reload_json_filepath(self, json_filepath) -> None:
+    def reload_json_filepath(self, json_filepath: str) -> None:
         """Reload task from JSON format configuration filepath.
         
         Args:

@@ -16,6 +16,8 @@ import pytest
 import logging
 
 from typing import Any
+from datetime import datetime
+from random import randint
 
 from enzy_htp import config
 from enzy_htp.core.logger import _LOGGER
@@ -24,7 +26,7 @@ from enzy_htp.core.general import EnablePropagate
 
 from enzy_htp.structure import Structure
 from enzy_htp.workflow import ExecutionEntity, WorkFlow, WorkUnit, GeneralWorkUnit
-from enzy_htp.workflow import SCIENCE_API_MAPPER
+from enzy_htp.workflow import SCIENCE_API_MAPPER, StatusCode
 
 CURR_FILE = os.path.abspath(__file__)
 CURR_DIR = os.path.dirname(CURR_FILE)
@@ -61,12 +63,45 @@ class PseudoAPI():
     def print_value(value) -> None:
         print(value)
         return
+    
+    @staticmethod
+    def checkpoint_fruit_producer(fruit_name: str) -> None:
+        """This function produce input value for checkpoint functions.
+        
+        Args:
+            fruit_name (str): The name of the fruit you want to produce.
+        
+        Returns:
+            A generated string value containing the `fruit_name` you enter.
+        """
+        brands = ["Mutexa", "Enzeva", "Minerva", "Molgraph"]
+        current_time = datetime.now()
+        result = f"{brands[randint(0, len(brands)-1)]}'s {fruit_name}, produced at {current_time.strftime('%Y-%m-%d_%H:%M')}."
+        return result
+        
+    @staticmethod
+    def checkpoint_apple_eater_error(test_str: str) -> None:
+        """This function act as a checkpoint to test if the reload (continue computing) functions normally.
+        
+        Args:
+            test_str (str): A string value as input for checkpoint.
+
+        Raises:
+            ValueError: If the `test_str` does not contain `apple`.
+        """
+        _LOGGER.info(f"I received {test_str}...")
+        if ("apple" in test_str):
+            return
+        else:
+            raise ValueError("I need apples!")
 
 PSEUDO_API_MAPPER = {
     "test_kwargs": PseudoAPI.test_kwargs,
     "log_difference": PseudoAPI.log_atom_number_difference,
     "print": PseudoAPI.print_value,
     "union_values": PseudoAPI.union_values,
+    "checkpoint_producer": PseudoAPI.checkpoint_fruit_producer,
+    "checkpoint_error": PseudoAPI.checkpoint_apple_eater_error
 }
 
 SCIENCE_API_MAPPER.update(PSEUDO_API_MAPPER)
@@ -209,7 +244,7 @@ def test_general_multi_loop_datum(caplog):
     assert 'Lisa | Green Pepper' in caplog.text
     return
 
-def test_workflow_locate_workunit(caplog):
+def test_general_locate_workunit(caplog):
     """Test locating a certain workunit after the execution of the general."""
     json_filepath = f'{DATA_DIR}/general_7si9_general_layer_variable.json'
     general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath, working_directory=WORK_DIR, overwrite_database=True, debug=True)
@@ -220,7 +255,7 @@ def test_workflow_locate_workunit(caplog):
     target_info = {
         "api_key": target.api_key,
         "locator": target.locator,
-        "status": target. status
+        "status": target.status
     }
     assert target_info["api_key"] == "mutate_stru"
     assert target_info["status"] == 0
@@ -228,11 +263,73 @@ def test_workflow_locate_workunit(caplog):
 
 # TODO (Zhong): A test for database.
 
-def test_general_read_schema(caplog):
+def test_general_read_architecture(caplog):
     """Test reading the schema of the configuration json/unit_dict."""
-    # json_filepath = f'{DATA_DIR}/general_multi_loop_datum.json'
     json_filepath = f'{DATA_DIR}/general_7si9_general_layer_variable.json'
     general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath, working_directory=WORK_DIR, overwrite_database=True, debug=True)
-    # assert "        - loop" in general.schema
-    print(general.architecture)
+    # print(general.architecture)
+    assert "        - mutate_stru" in general.architecture
+    fs.safe_rmdir(WORK_DIR)
+    return
+
+def test_general_reload(caplog):
+    """Test reloading and continue computing when facing error."""
+    json_filepath_error = f"{DATA_DIR}/general_7si9_reload_checkpoint_error.json"
+    general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath_error, working_directory=WORK_DIR, overwrite_database=True)
+    general.execute()
+
+    loop_body = general.locate(ExecutionEntity.get_locator(identifier="workflow@5:loop_1"))
+    mutate_stru = general.locate(ExecutionEntity.get_locator(identifier="mutate_stru@5:loop_1:0"))
+    checkpoint = general.locate(ExecutionEntity.get_locator(identifier="checkpoint_error@5:loop_2:1"))
+
+    assert loop_body.status == StatusCode.EXIT_WITH_ERROR_IN_INNER_UNITS
+    assert mutate_stru.status == StatusCode.EXIT_OK
+    assert checkpoint.status == StatusCode.EXIT_WITH_ERROR
+
+    json_filepath_pass = f"{DATA_DIR}/general_7si9_reload_checkpoint_pass.json"
+    general.reload_json_filepath(json_filepath=json_filepath_pass)
+    assert loop_body.status == StatusCode.SUSPECIOUS_UPDATES
+    assert mutate_stru.status == StatusCode.EXIT_OK
+    assert checkpoint.status == StatusCode.SUSPECIOUS_UPDATES
+
+    general.execute()
+    assert loop_body.status == StatusCode.EXIT_OK
+    assert mutate_stru.status == StatusCode.EXIT_OK
+    assert checkpoint.status == StatusCode.EXIT_OK
+
+    fs.safe_rmdir(WORK_DIR)
+    return
+
+def test_general_dump_and_load(caplog):
+    """Test dumping pickle when facing error, and then loading pickle to continue computing."""
+    json_filepath_error = f"{DATA_DIR}/general_7si9_reload_checkpoint_error.json"
+    general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath_error, working_directory=WORK_DIR, save_snapshot=True, overwrite_database=True)
+    general.execute()
+    pickle_filepath = general.latest_pickle_filepath
+
+    loop_body = general.locate(ExecutionEntity.get_locator(identifier="workflow@5:loop_1"))
+    mutate_stru = general.locate(ExecutionEntity.get_locator(identifier="mutate_stru@5:loop_1:0"))
+    checkpoint = general.locate(ExecutionEntity.get_locator(identifier="checkpoint_error@5:loop_2:1"))
+
+    assert loop_body.status == StatusCode.EXIT_WITH_ERROR_IN_INNER_UNITS
+    assert mutate_stru.status == StatusCode.EXIT_OK
+    assert checkpoint.status == StatusCode.EXIT_WITH_ERROR
+
+    json_filepath_pass = f"{DATA_DIR}/general_7si9_reload_checkpoint_pass.json"
+
+    reloaded_general = GeneralWorkUnit.load_snapshot_file(filepath=pickle_filepath)
+    reloaded_general.reload_json_filepath(json_filepath=json_filepath_pass)
+    loop_body = reloaded_general.locate(ExecutionEntity.get_locator(identifier="workflow@5:loop_1"))
+    mutate_stru = reloaded_general.locate(ExecutionEntity.get_locator(identifier="mutate_stru@5:loop_1:0"))
+    checkpoint = reloaded_general.locate(ExecutionEntity.get_locator(identifier="checkpoint_error@5:loop_2:1"))
+    assert loop_body.status == StatusCode.SUSPECIOUS_UPDATES
+    assert mutate_stru.status == StatusCode.EXIT_OK
+    assert checkpoint.status == StatusCode.SUSPECIOUS_UPDATES
+
+    reloaded_general.execute()
+    assert loop_body.status == StatusCode.EXIT_OK
+    assert mutate_stru.status == StatusCode.EXIT_OK
+    assert checkpoint.status == StatusCode.EXIT_OK
+
+    fs.safe_rmdir(WORK_DIR)
     return

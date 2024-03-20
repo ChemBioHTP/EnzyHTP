@@ -917,14 +917,26 @@ class Structure(DoubleLinkedNode):
         return bool(len(self.chains) != 0)
 
     def __eq__(self, other: Structure) -> bool:
-        """Structure comparsion is a multi-demension task. Vaguely asking for comparing just structures is not allowed."""
-        _LOGGER.error("Vaguely asking for comparing just structures is not allowed. Please use Structure().same_xxx. (xxx stands for a specific demension)")
-        raise NameError
+        # """Structure comparsion is a multi-demension task. Vaguely asking for comparing just structures is not allowed."""
+        # _LOGGER.error("Vaguely asking for comparing just structures is not allowed. Please use Structure().same_xxx. (xxx stands for a specific demension)")
+        # raise NameError
+        """Return True if self and other have the same topology, otherwise False."""
+        try:
+            result = self.is_same_topology(other=other)
+            return result
+        except:
+            return False
 
     def __ne__(self, other: Structure) -> bool:
-        """Structure comparsion is a multi-demension task. Vaguely asking for comparing just structures is not allowed."""
-        _LOGGER.error("Vaguely asking for comparing just structures is not allowed. Please use Structure().same_xxx. (xxx stands for a specific demension)")
-        raise NameError
+        # """Structure comparsion is a multi-demension task. Vaguely asking for comparing just structures is not allowed."""
+        # _LOGGER.error("Vaguely asking for comparing just structures is not allowed. Please use Structure().same_xxx. (xxx stands for a specific demension)")
+        # raise NameError
+        """Return True if self and other have the different topology, otherwise False."""
+        try:
+            result = not self.is_same_topology(other=other)
+            return result
+        except:
+            return True
     #endregion
 
     @dispatch
