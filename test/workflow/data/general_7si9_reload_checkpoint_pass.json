@@ -1,88 +1,87 @@
 {
-    "api": "general",
-    "store_as": "general",
-    "args": {
-      "pdb_path": "./data/7si9_rm_water_disconnected.pdb",
-      "remove_polypeptide_hydrogen_only": true,
-      "solvent_ph": 7.4,
-      "if_protonate_ligand": false,
-      "polypeptide_protonation_engine": "pdb2pqr",
-      "assign_mutant_pattern": "{WT},{HA41M},{MA165R}",
-      "fruit": "apple",
-      "workunits": [
-        {
-          "api": "read_pdb",
-          "store_as": "structure",
-          "args": {
-            "path": "`pdb_path`"
-          }
-        },
-        {
-          "api": "remove_hydrogens",
-          "store_as": "structure",
-          "args": {
-            "stru": "`structure`",
-            "polypeptide_only": "`remove_polypeptide_hydrogen_only`"
-          }
-        },
-        {
-            "api": "checkpoint_producer",
-            "store_as": "test_str",
-            "args": {
-              "fruit_name": "`fruit`"
-            }
-        },
-        {
-          "api": "protonate_stru",
-          "args": {
-            "stru": "`structure`",
-            "ph": "`solvent_ph`",
-            "protonate_ligand": "`if_protonate_ligand`",
-            "engine": "`polypeptide_protonation_engine`"
-          }
-        },
-        {
-          "api": "assign_mutant",
-          "store_as": "assign_mutant_0",
-          "args": {
-            "stru": "`structure`",
-            "pattern": "`assign_mutant_pattern`"
-          }
-        },
-        {
-          "api": "loop",
-          "store_as": "loop_unit_0",
-          "args": {
-            "loop_data": "`assign_mutant_0`",
-            "loop_datum_varname": "loop_datum",
-            "workunits": [
-              {
-                "api": "mutate_stru",
-                "store_as": "mutant_stru",
-                "args": {
-                  "stru": "`structure`",
-                  "mutant": "`loop_datum`",
-                  "engine": "pymol"
-                }
-              },
-              {
-                "api": "checkpoint_error",
-                "args": {
-                    "test_str": "`test_str`"
-                }
-              },
-              {
-                "api": "log_difference",
-                "store_as": "difference",
-                "args": {
-                  "original_stru": "`structure`",
-                  "mutant_stru": "`mutant_stru`"
-                }
-              }
-            ]
-          }
+  "api": "general",
+  "store_as": "general",
+  "args": {
+    "pdb_path": "./data/7si9_rm_water_disconnected.pdb",
+    "remove_polypeptide_hydrogen_only": true,
+    "solvent_ph": 7.4,
+    "if_protonate_ligand": false,
+    "polypeptide_protonation_engine": "pdb2pqr",
+    "assign_mutant_pattern": "{WT},{HA41M},{MA165R}",
+    "fruit": "apple",
+    "workunits": [
+      {
+        "api": "read_pdb",
+        "store_as": "structure",
+        "args": {
+          "path": "`pdb_path`"
         }
-      ]
-    }
+      },
+      {
+        "api": "remove_hydrogens",
+        "store_as": "structure",
+        "args": {
+          "stru": "`structure`",
+          "polypeptide_only": "`remove_polypeptide_hydrogen_only`"
+        }
+      },
+      {
+        "api": "checkpoint_producer",
+        "store_as": "test_str",
+        "args": {
+          "fruit_name": "`fruit`"
+        }
+      },
+      {
+        "api": "protonate_stru",
+        "args": {
+          "stru": "`structure`",
+          "ph": "`solvent_ph`",
+          "protonate_ligand": "`if_protonate_ligand`",
+          "engine": "`polypeptide_protonation_engine`"
+        }
+      },
+      {
+        "api": "assign_mutant",
+        "store_as": "assign_mutant_0",
+        "args": {
+          "stru": "`structure`",
+          "pattern": "`assign_mutant_pattern`"
+        }
+      },
+      {
+        "api": "loop",
+        "store_as": "loop_unit_0",
+        "args": {
+          "loop_data": "`assign_mutant_0`",
+          "loop_datum_varname": "loop_datum",
+          "workunits": [
+            {
+              "api": "mutate_stru",
+              "store_as": "mutant_stru",
+              "args": {
+                "stru": "`structure`",
+                "mutant": "`loop_datum`",
+                "engine": "pymol"
+              }
+            },
+            {
+              "api": "checkpoint_error",
+              "args": {
+                "test_str": "`test_str`"
+              }
+            },
+            {
+              "api": "log_difference",
+              "store_as": "difference",
+              "args": {
+                "original_stru": "`structure`",
+                "mutant_stru": "`mutant_stru`"
+              }
+            }
+          ]
+        }
+      }
+    ]
   }
-  
+}

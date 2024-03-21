@@ -1,7 +1,7 @@
 #! python3
 # -*- encoding: utf-8 -*-
 '''
-Test the enzy_htp.workflow.workflow module.
+Test the enzy_htp.task_assembler.workflow module.
 
 @File    :   test_workflow.py
 @Created :   2024/02/07 01:30
@@ -272,34 +272,6 @@ def test_general_read_architecture(caplog):
     fs.safe_rmdir(WORK_DIR)
     return
 
-def test_general_reload(caplog):
-    """Test reloading and continue computing when facing error."""
-    json_filepath_error = f"{DATA_DIR}/general_7si9_reload_checkpoint_error.json"
-    general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath_error, working_directory=WORK_DIR, overwrite_database=True)
-    general.execute()
-
-    loop_body = general.locate(ExecutionEntity.get_locator(identifier="workflow@5:loop_1"))
-    mutate_stru = general.locate(ExecutionEntity.get_locator(identifier="mutate_stru@5:loop_1:0"))
-    checkpoint = general.locate(ExecutionEntity.get_locator(identifier="checkpoint_error@5:loop_2:1"))
-
-    assert loop_body.status == StatusCode.EXIT_WITH_ERROR_IN_INNER_UNITS
-    assert mutate_stru.status == StatusCode.EXIT_OK
-    assert checkpoint.status == StatusCode.EXIT_WITH_ERROR
-
-    json_filepath_pass = f"{DATA_DIR}/general_7si9_reload_checkpoint_pass.json"
-    general.reload_json_filepath(json_filepath=json_filepath_pass)
-    assert loop_body.status == StatusCode.SUSPECIOUS_UPDATES
-    assert mutate_stru.status == StatusCode.EXIT_OK
-    assert checkpoint.status == StatusCode.SUSPECIOUS_UPDATES
-
-    general.execute()
-    assert loop_body.status == StatusCode.EXIT_OK
-    assert mutate_stru.status == StatusCode.EXIT_OK
-    assert checkpoint.status == StatusCode.EXIT_OK
-
-    fs.safe_rmdir(WORK_DIR)
-    return
-
 def test_general_dump_and_load(caplog):
     """Test dumping pickle when facing error, and then loading pickle to continue computing."""
     json_filepath_error = f"{DATA_DIR}/general_7si9_reload_checkpoint_error.json"
@@ -333,3 +305,62 @@ def test_general_dump_and_load(caplog):
 
     fs.safe_rmdir(WORK_DIR)
     return
+
+def test_general_reload_pass(caplog):
+    """Test reloading and continue computing when facing error."""
+    json_filepath_error = f"{DATA_DIR}/general_7si9_reload_checkpoint_error.json"
+    general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath_error, working_directory=WORK_DIR, overwrite_database=True)
+    general.execute()
+
+    loop_body = general.locate(ExecutionEntity.get_locator(identifier="workflow@5:loop_1"))
+    mutate_stru = general.locate(ExecutionEntity.get_locator(identifier="mutate_stru@5:loop_1:0"))
+    checkpoint = general.locate(ExecutionEntity.get_locator(identifier="checkpoint_error@5:loop_2:1"))
+
+    assert loop_body.status == StatusCode.EXIT_WITH_ERROR_IN_INNER_UNITS
+    assert mutate_stru.status == StatusCode.EXIT_OK
+    assert checkpoint.status == StatusCode.EXIT_WITH_ERROR
+
+    json_filepath_pass = f"{DATA_DIR}/general_7si9_reload_checkpoint_pass.json"
+    general.reload_json_filepath(json_filepath=json_filepath_pass)
+    assert loop_body.status == StatusCode.SUSPECIOUS_UPDATES
+    assert mutate_stru.status == StatusCode.EXIT_OK
+    assert checkpoint.status == StatusCode.SUSPECIOUS_UPDATES
+
+    general.execute()
+    assert loop_body.status == StatusCode.EXIT_OK
+    assert mutate_stru.status == StatusCode.EXIT_OK
+    assert checkpoint.status == StatusCode.EXIT_OK
+
+    fs.safe_rmdir(WORK_DIR)
+    return
+
+def test_general_reload_change_varname(caplog):
+    """Test reloading and test if changed varname can be detecetd and raise error."""
+    json_filepath_error = f"{DATA_DIR}/general_7si9_reload_checkpoint_error.json"
+    general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath_error, working_directory=WORK_DIR, overwrite_database=True)
+    general.execute()
+
+    loop_body = general.locate(ExecutionEntity.get_locator(identifier="workflow@5:loop_1"))
+    mutate_stru = general.locate(ExecutionEntity.get_locator(identifier="mutate_stru@5:loop_1:0"))
+    checkpoint = general.locate(ExecutionEntity.get_locator(identifier="checkpoint_error@5:loop_2:1"))
+
+    assert loop_body.status == StatusCode.EXIT_WITH_ERROR_IN_INNER_UNITS
+    assert mutate_stru.status == StatusCode.EXIT_OK
+    assert checkpoint.status == StatusCode.EXIT_WITH_ERROR
+
+    json_filepath_pass = f"{DATA_DIR}/general_7si9_reload_checkpoint_change_varname.json"
+    general.reload_json_filepath(json_filepath=json_filepath_pass)
+    assert loop_body.status == StatusCode.SUSPECIOUS_UPDATES
+    assert mutate_stru.status == StatusCode.EXIT_OK
+    assert checkpoint.status == StatusCode.SUSPECIOUS_UPDATES
+
+    general.execute()
+    assert loop_body.status == StatusCode.EXIT_OK
+    assert mutate_stru.status == StatusCode.EXIT_OK
+    assert checkpoint.status == StatusCode.EXIT_OK
+
+    fs.safe_rmdir(WORK_DIR)
+    return
+
+    
+    

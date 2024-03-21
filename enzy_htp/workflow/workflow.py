@@ -7,7 +7,7 @@ TODO (Zhong): Typing type annotation inspection. (Completed 2024-02-16 23:16 UTC
 TODO (Zhong): Annotation inspection in intermediate_data_mapper. (Completed 2024-03-01 01:00 UTC-6)
 TODO (Zhong): APIs entitled `loop`. (Completed 2024-02-26 20:01 UTC-6)
 TODO (Zhong): How to handle intermediate data transfer between parent and child workflows. Child workflow should be able to read the data in parent flow. (Completed 2024-02-28 06:06 UTC-6)
-TODO (Zhong): Continue computing.
+TODO (Zhong): Continue computing. (Completed 2024-03-20 01:15 UTC-5)
 TODO (Zhong): How to indicate error from inner units. (Completed 2024-03-13 19:00 UTC-5)
 TODO (Zhong): Data Output.
 
