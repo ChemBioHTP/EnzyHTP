@@ -4,19 +4,21 @@ Specialized for the optimization of PuO.
 Author: QZ Shao <shaoqz@icloud.com>
 Date: 2023-02-11
 """
+from functools import partial
 import glob
 import itertools
 import os
 from pathlib import Path
 import numpy as np
 import pickle
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Callable
 
 from enzy_htp.analysis import d_ele_field_upon_mutation_coarse, ddg_fold_of_mutants
 from enzy_htp.mutation import assign_mutant
 from enzy_htp.mutation_class import Mutation, get_involved_mutation, generate_from_mutation_flag
 from enzy_htp._config.armer_config import ARMerConfig
-from enzy_htp.structure import Structure, PDBParser, Atom
+from enzy_htp.structure import Structure, PDBParser, Atom, StructureConstraint
+import enzy_htp.structure.structure_constraint as stru_cons
 from enzy_htp.core.clusters.accre import Accre
 from enzy_htp.core.job_manager import ClusterJob, ClusterInterface
 from enzy_htp.core import _LOGGER
@@ -198,15 +200,23 @@ def _get_single_mutation_stability(
         result = {k[0] : v for k, v in ddg_fold_mapper.items()}
     return result
 
-def fine_filter( # TODO summarize logics from here to a general shrapnel function
+def fine_filter( # TODO summarize logics from here to a general shrapnel function & core checkpoit logics
         stru: Structure,
         mutants: List[List[Mutation]],
         atom_1: str, atom_2: str,
+        ligand_chrg_spin_mapper: Dict,
+        md_constraints: List[Callable[[Structure], StructureConstraint]],
+        md_length: float,
+        md_parallel_runs: int,
+        ef_region_pattern: str,
         shrapnel_child_job_config: Dict,
+        shrapnel_cpujob_config: Dict,
+        shrapnel_gpujob_config: Dict,
         job_period: int = 120,
         job_array_size: int = 50,
         shrapnel_groups: int = 100,
         shrapnel_gpu_partition_mapper: Dict = None,
+        ncaa_param_lib_path: str = None,
         out_ref_path_1: str = "mutant_space_2_fine_metrics.pickle",
         out_ref_path_2: str = "mutant_space_3_fine_metrics.pickle",
         checkpoint_1: str = "fine_filer_child_jobs.pickle",
@@ -219,6 +229,9 @@ def fine_filter( # TODO summarize logics from here to a general shrapnel functio
         MMPBSA(ligand), 
         and SPI (ligand, pocket).
     Gives the final mutant space."""
+    if ncaa_param_lib_path is None:
+        ncaa_param_lib_path = f"{work_dir}/ncaa_lib"
+
     num_mut_each_grp = mh.calc_average_task_num(len(mutants), shrapnel_groups)
     child_result_fname = "result.pickle"
     mutant_fname = "mutants.pickle"
@@ -230,7 +243,17 @@ def fine_filter( # TODO summarize logics from here to a general shrapnel functio
         # 1. make main script
         # make kwargs
         child_main_kwargs = {
-            "result_path" : child_result_fname
+            "wt_stru" : stru,
+            "atom_1" : stru.get(atom_1),
+            "atom_2" : stru.get(atom_2),
+            "ligand_chrg_spin_mapper" : ligand_chrg_spin_mapper,
+            "ncaa_param_lib_path" : os.path.abspath(ncaa_param_lib_path),
+            "cpu_job_config" : shrapnel_cpujob_config,
+            "gpu_job_config" : shrapnel_gpujob_config,
+            "md_constraints" : md_constraints,
+            "md_length" : md_length,
+            "md_parallel_runs" : md_parallel_runs,
+            "ef_region_pattern" : ef_region_pattern,
         }
         save_obj(child_main_kwargs, kwargs_file)
         # make script
@@ -268,10 +291,12 @@ def fine_filter( # TODO summarize logics from here to a general shrapnel functio
         save_obj(child_jobs, checkpoint_1)
     else:
         pass # handle re-run
-        # 1. analyze remaining child_jobs (recycle old one)
-        # 2. resubmit unfinished ones and substitude them in material
+        # 1. analyze remaining child_jobs (recycle old one) may benefit from having a mimo
+        # 2. edit failed ones if changes are needed in child_jobs
+        # 3. update the checkpoint
 
     ClusterJob.wait_to_array_end(child_jobs, job_period, job_array_size) # re-run also handled within each children
+    # TODO make another one that support some job are already running?
 
     # 4. summarize result
     fine_metrics = {}
@@ -287,18 +312,146 @@ def fine_filter( # TODO summarize logics from here to a general shrapnel functio
 
     return result_mutant_space
 
-def _fine_filter_child_main():
+def _fine_filter_child_main(
+        wt_stru, # we dont do type hinting here as they will not be imported at the time of func def in the saved main script
+        atom_1, atom_2,
+        ligand_chrg_spin_mapper,
+        ncaa_param_lib_path: str,
+        cpu_job_config,
+        gpu_job_config,
+        md_constraints,
+        md_length: float,
+        md_parallel_runs: int,
+        ef_region_pattern: str,
+    ):
     """the child main script of the shrapnel treatment
     in fine_filter
-    use -m mutant_file -p gpu_partition -o result from cmdline"""
-    # task of each mutant (handle re-run too)
+    This will be the content of the main function with
+    `-m mutant_file -p gpu_partition -o result` from cmdline."""
+    # import section (required by save_func_to_main)
+    import os
+    import sys
+    from typing import List, Dict, Callable
+
+    from enzy_htp.preparation import protonate_stru, remove_hydrogens
+    from enzy_htp.mutation import mutate_stru
+    from enzy_htp.geometry import equi_md_sampling
+    from enzy_htp.analysis import ele_field_strength_at_along
+    from enzy_htp import interface
+    from enzy_htp.structure import StructureConstraint
+    from enzy_htp.core.general import load_obj
+
+    # cmd inp
+    for i, arg in enumerate(sys.argv):
+        if arg == "-m":
+            mutants: List[List[Mutation]] = load_obj(sys.argv[i+1])
+        if arg == "-p":
+            gpu_partition: str = sys.argv[i+1]
+        if arg == "-o":
+            result_path: str = sys.argv[i+1]
+    # type hinting
+    wt_stru: Structure
+    ligand_chrg_spin_mapper: Dict
+    atom_1: Atom
+    atom_2: Atom
+    cpu_job_config: Dict
+    gpu_job_config: Dict
+    md_constraints: List[Callable[[Structure], StructureConstraint]]
+    # re-run
+    if os.path.exists(result_path):
+        result_dict: Dict = load_obj(result_path)
+
     # 1. prepare
+    remove_hydrogens(wt_stru, polypeptide_only=True)
+    protonate_stru(wt_stru, protonate_ligand=False)
+
     # 2. get ddg fold
-    # 3. mutate
-    # 4. MD
-    # 5. get dEF
-    # 6. get MMPBSA
-    # 7. get SPI
+    todo_mut = []
+    for mut in mutants:
+        mut_result_data: Dict = result_dict.get(tuple(mut), dict())
+        if "ddg_fold" not in mut_result_data: # skip in re-run
+            todo_mut.append(mut)
+    if todo_mut:
+        ddg_results = ddg_fold_of_mutants(
+            wt_stru,
+            todo_mut,
+            num_iter = 10,
+            cluster_job_config = cpu_job_config,
+            relax_cluster_job_config = cpu_job_config,
+        )
+    for k, v in ddg_results.items():
+        result_dict[k]["ddg_fold"] = v
+
+    for i, mut in enumerate(mutants):
+        tuple_mut = tuple(mut)
+        mut_result_data: Dict = result_dict.get(tuple_mut, dict())
+        # 3. mutate
+        mutant_stru = mut_result_data.get("mutant_stru", None)
+        if mutant_stru is None:
+            mutant_dir = f"mutant_{i}" # as this will be executed under the grp_dir
+            mutant_stru = mutate_stru(wt_stru, mut, engine="pymol")
+            mutant_stru.assign_ncaa_chargespin(ligand_chrg_spin_mapper)
+            remove_hydrogens(mutant_stru, polypeptide_only=True)
+            protonate_stru(mutant_stru, protonate_ligand=False)
+            mut_result_data["mutant_stru"] = mutant_stru
+        
+        # 4. MD
+        trajs: List = mut_result_data.get("trajs", list())
+        runs_left = md_parallel_runs - len(trajs)
+        if runs_left > 0:
+            param_method = interface.amber.build_md_parameterizer(
+                ncaa_param_lib_path=ncaa_param_lib_path,
+                force_fields=[
+                    "leaprc.protein.ff14SB",
+                    "leaprc.gaff2",
+                    "leaprc.water.tip3p",
+                ],
+            )
+            gpu_job_config = gpu_job_config | {"partition" : gpu_partition}
+            mut_constraints = []
+            for cons in md_constraints:
+                mut_constraints.append(cons(mutant_stru))
+            new_trajs = equi_md_sampling(
+                stru = mutant_stru,
+                param_method = param_method,
+                cluster_job_config = gpu_job_config,
+                prod_constrain=mut_constraints,
+                prod_time=md_length,
+                record_period=md_length*0.01,
+                work_dir=f"{mutant_dir}/MD/",
+                parallel_runs=runs_left,
+            )
+            trajs.extend(new_trajs)
+        
+        # TODO handle re-run of this part
+        mut_data = {
+            "ef" : [],
+            "spi" : [],
+            "mmpbsa" : [],
+            "mmgbsa" : [],
+        }
+        for replica_esm in trajs:
+            replica_ef = []
+            replica_spi = []
+            for traj_stru in replica_esm.structures:
+                # 5. get dEF
+                field_strength = ele_field_strength_at_along(
+                    traj_stru, atom_1, atom_2, region_pattern=ef_region_pattern)
+                replica_ef.append(field_strength)
+                # 6. get SPI
+                # spi = xxx()
+                # replica_spi.append(spi)
+            # 7. get MMPBSA
+            # replica_mmpbsa, replica_mmgbsa = xxx()
+
+            mut_data["ef"].append(replica_ef)
+            # mut_data["spi"].append(replica_spi)
+            # mut_data["mmpbsa"].append(replica_mmpbsa)
+            # mut_data["mmgbsa"].append(replica_mmgbsa)
+
+        result_dict[tuple_mut].update(mut_data)
+
+    save_obj(result_dict, result_path)
 
 def _make_child_job(
         grp_id: int,
@@ -403,12 +556,30 @@ def workflow_puo(single_mut_ddg_file_path: str = None):
 
     # 3. fine filter
     shrapnel_child_job_config = cluster_job_config | {"walltime" : "10-00:00:00"}
+    shrapnel_cpujob_config = cluster_job_config | {"walltime" : "2-00:00:00"}
+    shrapnel_gpujob_config = cluster_job_config | {
+        "account" : "csb_gpu_acc",
+        "partition" : "pascal",
+        "walltime" : "5-00:00:00",
+    }
+    md_constraint = [
+        partial(stru_cons.create_distance_constraint,
+            "B.254.H2", "A.101.OE2", 2.4),
+        partial(stru_cons.create_angle_constraint,
+            "B.254.CAE", "B.254.H2", "A.101.OE2", 180.0),]
     if not Path(checkpoint_3).exists():
         mutant_space_2 = itertools.chain.from_iterable(mutant_space_2)
         mutant_space_3 = fine_filter(
             stru, mutant_space_2,
             atom_1, atom_2,
+            ligand_chrg_spin_mapper = {"ACP" : (0,1), "FAD" : (0,1)},
+            md_constraints=md_constraint,
+            md_length=100.0, # ns
+            md_parallel_runs=1,
+            ef_region_pattern="chain A+B+C+D+E+F and (not resi 901+902)",
             shrapnel_child_job_config = shrapnel_child_job_config,
+            shrapnel_cpujob_config = shrapnel_cpujob_config,
+            shrapnel_gpujob_config = shrapnel_gpujob_config ,
             shrapnel_groups = 100,
             shrapnel_gpu_partition_mapper = {
                 (0, 40) : "pascal",
