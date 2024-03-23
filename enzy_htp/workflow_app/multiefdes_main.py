@@ -291,8 +291,8 @@ def fine_filter( # TODO summarize logics from here to a general shrapnel functio
     if ncaa_param_lib_path is None:
         ncaa_param_lib_path = f"{work_dir}/ncaa_lib"
     num_mut_each_grp = mh.calc_average_task_num(len(mutants), shrapnel_groups)
-    child_main_path = f"{work_dir}/{child_main_fname}",
-    kwargs_file = f"{work_dir}/{kwargs_fname}",
+    child_main_path = f"{work_dir}/{child_main_fname}"
+    kwargs_file = f"{work_dir}/{kwargs_fname}"
 
     if not Path(checkpoint_1).exists():
         fs.safe_mkdir(work_dir)
@@ -314,7 +314,6 @@ def fine_filter( # TODO summarize logics from here to a general shrapnel functio
         save_obj(child_main_kwargs, kwargs_file)
         # make script
         save_func_to_main(_fine_filter_child_main, kwargs_file, child_main_path)
-        import pdb; pdb.set_trace()
         # 2. seperate mutants in groups & make jobs
         child_jobs = []
         assigned = 0
@@ -369,6 +368,7 @@ def fine_filter( # TODO summarize logics from here to a general shrapnel functio
     return result_mutant_space
 
 def _fine_filter_child_main(
+        sys_argvs,
         wt_stru, # we dont do type hinting here as they will not be imported at the time of func def in the saved main script
         atom_1, atom_2,
         ligand_chrg_spin_mapper,
@@ -386,25 +386,25 @@ def _fine_filter_child_main(
     `-m mutant_file -p gpu_partition -o result` from cmdline."""
     # import section (required by save_func_to_main)
     import os
-    import sys
     from typing import List, Dict, Callable
 
     from enzy_htp.preparation import protonate_stru, remove_hydrogens
     from enzy_htp.mutation import mutate_stru
     from enzy_htp.geometry import equi_md_sampling
-    from enzy_htp.analysis import ele_field_strength_at_along
+    from enzy_htp.analysis import ele_field_strength_at_along, ddg_fold_of_mutants
     from enzy_htp import interface
-    from enzy_htp.structure import StructureConstraint
-    from enzy_htp.core.general import load_obj
+    from enzy_htp.mutation_class import Mutation
+    from enzy_htp.structure import StructureConstraint, Structure, Atom
+    from enzy_htp.core.general import load_obj, save_obj
 
     # cmd inp
-    for i, arg in enumerate(sys.argv):
+    for i, arg in enumerate(sys_argvs):
         if arg == "-m":
-            mutants: List[List[Mutation]] = load_obj(sys.argv[i+1])
+            mutants: List[List[Mutation]] = load_obj(sys_argvs[i+1])
         if arg == "-p":
-            gpu_partition: str = sys.argv[i+1]
+            gpu_partition: str = sys_argvs[i+1]
         if arg == "-o":
-            result_path: str = sys.argv[i+1]
+            result_path: str = sys_argvs[i+1]
     # type hinting
     wt_stru: Structure
     ligand_chrg_spin_mapper: Dict
@@ -525,7 +525,7 @@ def _make_child_job(
     res_keywords = cluster_job_config["res_keywords"]
 
     cmd = f"python {child_main_path} -m {mutant_fname} -p {gpu_partition} -o {child_result_fname}"
-    enzyhtp_main_env = cluster.ENZYHTP_MAIN_ENV # TODO add this
+    enzyhtp_main_env = cluster.ENZYHTP_MAIN_ENV["CPU"]
     final_res_keywords = ARMerConfig.SINGLE_CPU_RES | {
         'job_name' : f'shrapnel_child_{grp_id}',
         'mem_per_core' : '10G',
@@ -622,7 +622,7 @@ def workflow_puo(single_mut_ddg_file_path: str = None):
         md_constraint = [
             partial(stru_cons.create_distance_constraint,
                 "C.901.C64", "D.902.N7", 2.4),]
-        mutant_space_2 = itertools.chain.from_iterable(mutant_space_2)
+        mutant_space_2 = list(itertools.chain.from_iterable(mutant_space_2))
         mutant_space_3 = fine_filter(
             stru = stru, 
             mutants= mutant_space_2,
@@ -635,7 +635,8 @@ def workflow_puo(single_mut_ddg_file_path: str = None):
             ef_region_pattern="chain A+B+C+D+E+F and (not resi 901+902)",
             shrapnel_child_job_config = shrapnel_child_job_config,
             shrapnel_cpujob_config = shrapnel_cpujob_config,
-            shrapnel_gpujob_config = shrapnel_gpujob_config ,
+            shrapnel_gpujob_config = shrapnel_gpujob_config,
+            shrapnel_child_array_size = 2, # TODO change this after the test
             shrapnel_groups = 100,
             shrapnel_gpu_partition_mapper = {
                 (0, 40) : "pascal",

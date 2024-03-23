@@ -344,7 +344,7 @@ def save_func_to_main(func: Callable, kwargs_file: str, out_path: str):
         "from enzy_htp.core.general import load_obj",
         func_source,
         "if __name__ == '__main__':",
-        f"    {func.__name__}(argvs=sys.argv, **load_obj({kwargs_file}))",
+        f"    {func.__name__}(sys.argv, **load_obj('{kwargs_file}'))",
         "",
     ]
     write_lines(out_path, result)

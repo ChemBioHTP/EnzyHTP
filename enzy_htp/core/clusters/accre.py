@@ -70,6 +70,13 @@ export PATH=$PATH:$Multiwfnpath"""
         "parallel_CPU" : """module load GCC/11.3.0 OpenMPI/4.1.4
 export ROSETTA3=/data/yang_lab/shaoqz/software/Rosetta313/main/""",
     }
+    ENZYHTP_MAIN_ENV = { # use the env from QZ
+        "CPU": f"""source /home/shaoq1/bin/miniconda3/bin/activate new_EnzyHTP
+{G16_ENV['CPU']}
+{AMBER_ENV['CPU']}
+{MULTIWFN_ENV['CPU']}""",
+        "GPU": None,
+    }
     #############################
     ### Internal use constant ###
     #############################
