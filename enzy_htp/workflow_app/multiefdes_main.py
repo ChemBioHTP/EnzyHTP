@@ -212,8 +212,8 @@ def fine_filter( # TODO summarize logics from here to a general shrapnel functio
         shrapnel_child_job_config: Dict,
         shrapnel_cpujob_config: Dict,
         shrapnel_gpujob_config: Dict,
-        job_period: int = 120,
-        job_array_size: int = 50,
+        shrapnel_check_period: int = 120,
+        shrapnel_child_array_size: int = 50,
         shrapnel_groups: int = 100,
         shrapnel_gpu_partition_mapper: Dict = None,
         ncaa_param_lib_path: str = None,
@@ -221,6 +221,11 @@ def fine_filter( # TODO summarize logics from here to a general shrapnel functio
         out_ref_path_2: str = "mutant_space_3_fine_metrics.pickle",
         checkpoint_1: str = "fine_filer_child_jobs.pickle",
         work_dir: str = "./fine_filter",
+        # fname under work_dir or child_dir
+        child_result_fname = "result.pickle",
+        mutant_fname = "mutants.pickle",
+        child_main_fname = "child_main.py",
+        kwargs_fname = "child_main_kwargs.pickle",
     ) -> List[List[Mutation]]:
     """the fine filter applied on the 2nd mutant space
     and assess 
@@ -228,15 +233,66 @@ def fine_filter( # TODO summarize logics from here to a general shrapnel functio
         ddG_fold, 
         MMPBSA(ligand), 
         and SPI (ligand, pocket).
-    Gives the final mutant space."""
+    Gives the final mutant space.
+
+    Args:
+        stru: Structure
+            target wt strutcure
+        mutants: List[List[Mutation]]
+            target mutant space
+        atom_1: str, atom_2: str
+            target bond for dEF
+        ligand_chrg_spin_mapper: Dict
+            NCAA chrgspin assignment
+        md_constraints: List[Callable[[Structure], StructureConstraint]]
+            constraints in MD
+        md_length: float
+            length of MD
+        md_parallel_runs: int
+            replica runs of MD
+        ef_region_pattern: str
+            the region of the field source charges
+        shrapnel_child_job_config: Dict
+            job config for each children jobs of shrapnel
+        shrapnel_cpujob_config: Dict
+            job config for each cpu jobs of shrapnel
+        shrapnel_gpujob_config: Dict
+            job config for each gpu jobs of shrapnel
+        shrapnel_check_period: int = 120
+            job check period for the array of all children jobs
+        shrapnel_child_array_size: int = 50
+            job array size for the array of all children jobs
+        shrapnel_groups: int = 100
+            num of groups of shrapnel (i.e., total num of child jobs)
+        shrapnel_gpu_partition_mapper: Dict = None
+            a mapper that allows assignment of gpu partition names for each children
+        ncaa_param_lib_path: str = None
+            the path of the ncaa_lib.
+            (default: f"{work_dir}/ncaa_lib")
+        out_ref_path_1: str = "mutant_space_2_fine_metrics.pickle"
+            reference result file
+        out_ref_path_2: str = "mutant_space_3_fine_metrics.pickle"
+            reference result file
+        checkpoint_1: str = "fine_filer_child_jobs.pickle"
+            check point file that contain all children job objects
+        work_dir: str = "./fine_filter"
+            the working dir
+        child_result_fname = "result.pickle"
+            result fname relative to the children dir (i.e., f"{work_dir}/group_{i}/")
+        mutant_fname = "mutants.pickle"
+            mutant fname relative to the children dir (i.e., f"{work_dir}/group_{i}/")
+        child_main_fname = "child_main.py"
+            main script fname relative to the work dir
+        kwargs_fname = "child_main_kwargs.pickle"
+            fname of the kwargs for the main script relative to the work dir
+
+    Return:
+        the mutant space after screening."""
     if ncaa_param_lib_path is None:
         ncaa_param_lib_path = f"{work_dir}/ncaa_lib"
-
     num_mut_each_grp = mh.calc_average_task_num(len(mutants), shrapnel_groups)
-    child_result_fname = "result.pickle"
-    mutant_fname = "mutants.pickle"
-    child_main_path = f"{work_dir}/child_main.py"
-    kwargs_file = f"{work_dir}/child_main_kwargs.pickle"
+    child_main_path = f"{work_dir}/{child_main_fname}",
+    kwargs_file = f"{work_dir}/{kwargs_fname}",
 
     if not Path(checkpoint_1).exists():
         fs.safe_mkdir(work_dir)
@@ -258,7 +314,7 @@ def fine_filter( # TODO summarize logics from here to a general shrapnel functio
         save_obj(child_main_kwargs, kwargs_file)
         # make script
         save_func_to_main(_fine_filter_child_main, kwargs_file, child_main_path)
-
+        import pdb; pdb.set_trace()
         # 2. seperate mutants in groups & make jobs
         child_jobs = []
         assigned = 0
@@ -290,12 +346,12 @@ def fine_filter( # TODO summarize logics from here to a general shrapnel functio
         # 3. submit jobs
         save_obj(child_jobs, checkpoint_1)
     else:
-        pass # handle re-run
+        pass # handle re-run TODO start the test while working on this part
         # 1. analyze remaining child_jobs (recycle old one) may benefit from having a mimo
         # 2. edit failed ones if changes are needed in child_jobs
         # 3. update the checkpoint
 
-    ClusterJob.wait_to_array_end(child_jobs, job_period, job_array_size) # re-run also handled within each children
+    ClusterJob.wait_to_array_end(child_jobs, shrapnel_check_period, shrapnel_child_array_size) # re-run also handled within each children
     # TODO make another one that support some job are already running?
 
     # 4. summarize result
@@ -555,23 +611,23 @@ def workflow_puo(single_mut_ddg_file_path: str = None):
         mutant_space_2 = load_obj(checkpoint_2)
 
     # 3. fine filter
-    shrapnel_child_job_config = cluster_job_config | {"walltime" : "10-00:00:00"}
-    shrapnel_cpujob_config = cluster_job_config | {"walltime" : "2-00:00:00"}
-    shrapnel_gpujob_config = cluster_job_config | {
-        "account" : "csb_gpu_acc",
-        "partition" : "pascal",
-        "walltime" : "5-00:00:00",
-    }
-    md_constraint = [
-        partial(stru_cons.create_distance_constraint,
-            "B.254.H2", "A.101.OE2", 2.4),
-        partial(stru_cons.create_angle_constraint,
-            "B.254.CAE", "B.254.H2", "A.101.OE2", 180.0),]
     if not Path(checkpoint_3).exists():
+        shrapnel_child_job_config = cluster_job_config | {"walltime" : "10-00:00:00"}
+        shrapnel_cpujob_config = cluster_job_config | {"walltime" : "2-00:00:00"}
+        shrapnel_gpujob_config = cluster_job_config | {
+            "account" : "csb_gpu_acc",
+            "partition" : "pascal",
+            "walltime" : "5-00:00:00",
+        }
+        md_constraint = [
+            partial(stru_cons.create_distance_constraint,
+                "C.901.C64", "D.902.N7", 2.4),]
         mutant_space_2 = itertools.chain.from_iterable(mutant_space_2)
         mutant_space_3 = fine_filter(
-            stru, mutant_space_2,
-            atom_1, atom_2,
+            stru = stru, 
+            mutants= mutant_space_2,
+            atom_1 = atom_1,
+            atom_2 = atom_2,
             ligand_chrg_spin_mapper = {"ACP" : (0,1), "FAD" : (0,1)},
             md_constraints=md_constraint,
             md_length=100.0, # ns
@@ -586,7 +642,7 @@ def workflow_puo(single_mut_ddg_file_path: str = None):
                 (41, 80) : "turing",
                 (81, 99) : "a6000x4",
             },
-            )
+        )
         save_obj(mutant_space_3, checkpoint_3)
     else:
         mutant_space_3 = load_obj(checkpoint_3)
