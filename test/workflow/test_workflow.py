@@ -277,12 +277,16 @@ def test_general_dump_and_load(caplog):
     json_filepath_error = f"{DATA_DIR}/general_7si9_reload_checkpoint_error.json"
     general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath_error, working_directory=WORK_DIR, save_snapshot=True, overwrite_database=True)
     general.execute()
+
+    # print("Finished first execution.")
+    # print(general.architecture)
+    # input()
+
     pickle_filepath = general.latest_pickle_filepath
 
-    loop_body = general.locate(ExecutionEntity.get_locator(identifier="workflow@5:loop_1"))
-    mutate_stru = general.locate(ExecutionEntity.get_locator(identifier="mutate_stru@5:loop_1:0"))
-    checkpoint = general.locate(ExecutionEntity.get_locator(identifier="checkpoint_error@5:loop_2:1"))
-
+    loop_body = general.locate_by_identifier(identifier="workflow@5:loop_1")
+    mutate_stru = general.locate_by_identifier(identifier="mutate_stru@5:loop_1:0")
+    checkpoint = general.locate_by_identifier(identifier="checkpoint_error@5:loop_2:1")
     assert loop_body.status == StatusCode.EXIT_WITH_ERROR_IN_INNER_UNITS
     assert mutate_stru.status == StatusCode.EXIT_OK
     assert checkpoint.status == StatusCode.EXIT_WITH_ERROR
@@ -291,6 +295,9 @@ def test_general_dump_and_load(caplog):
 
     reloaded_general = GeneralWorkUnit.load_snapshot_file(filepath=pickle_filepath)
     reloaded_general.reload_json_filepath(json_filepath=json_filepath_pass)
+    # print("Finished reloading.")
+    # input()
+
     loop_body = reloaded_general.locate(ExecutionEntity.get_locator(identifier="workflow@5:loop_1"))
     mutate_stru = reloaded_general.locate(ExecutionEntity.get_locator(identifier="mutate_stru@5:loop_1:0"))
     checkpoint = reloaded_general.locate(ExecutionEntity.get_locator(identifier="checkpoint_error@5:loop_2:1"))
@@ -299,6 +306,9 @@ def test_general_dump_and_load(caplog):
     assert checkpoint.status == StatusCode.SUSPECIOUS_UPDATES
 
     reloaded_general.execute()
+    # print("Finished second execution.")
+    # input()
+
     assert loop_body.status == StatusCode.EXIT_OK
     assert mutate_stru.status == StatusCode.EXIT_OK
     assert checkpoint.status == StatusCode.EXIT_OK

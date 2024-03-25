@@ -7,7 +7,7 @@ Email: yinjie.zhong@vanderbilt.edu
 
 ## 1. Introduction
 
-This module serves as a task assembler to assemble JSON format task configuration files written in the specified format into a computing task, and supports saving the task as a binary file, re-reading the binary file, and reloading the task by reading the updated configuration file after the task exits with an error, as well as to continue execution from the updated/error-reporting position.
+This module is to assemble JSON format task configuration files written in the specified format into a computing task, and supports saving the task as a binary file, re-reading the binary file, and reloading the task by reading the updated configuration file after the task exits with an error, as well as to continue execution from the updated/error-reporting position.
 
 ## 2. Quick Start
 

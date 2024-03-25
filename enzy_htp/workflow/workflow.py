@@ -220,6 +220,22 @@ class ExecutionEntity:
                 return located_instance.locate(relative_locator[1:])
             except:
                 return None
+    
+    def locate_by_identifier(self, identifier: str) -> ExecutionEntity:
+        """Locate an ExecutionEntity instance by identifier.
+        
+        Args:
+            identifier (str): A unique identifier for the instance, used to track and reference the entity.
+
+        Returns:
+            The located ExecutionEntity instance. None if nothing is located.
+        """
+        locator = __class__.get_locator(identifier=identifier)
+        entity = self.locate(locator)
+        if (entity):
+            if (entity.identifier != identifier):
+                return None
+        return entity
 
     def reload(self):
         """Reload task. Placeholder ONLY!"""
@@ -715,11 +731,12 @@ class WorkUnit(ExecutionEntity):
             #         # If the old status is error or pause 
             #         # and nothing changed to `args_dict_to_pass`, no need to run it again.
             #         return self.return_key, self.return_value
-                
-            self.status = StatusCode.RUNNING
 
             if (self.status in StatusCode.skippable_statuses):
+                _LOGGER.info(f"WorkUnit {self.identifier} is skipped!")
                 return self.return_key, self.return_value
+                
+            self.status = StatusCode.RUNNING
 
             if self.return_key:
                 self.return_value = self.api(**self.args_dict_to_pass)
@@ -1290,7 +1307,7 @@ class LoopWorkUnit(ControlWorkUnit):
             if self.status in StatusCode.pause_including_error_statuses:
                 self.status = StatusCode.EXIT_WITH_ERROR_AND_PAUSE
             else:
-                self.status = StatusCode.EXIT_WITH_ERROR
+                self.status = StatusCode.EXIT_WITH_ERROR_IN_INNER_UNITS
             return
         elif workflow.status in StatusCode.pause_excluding_error_statuses:
             if self.status in StatusCode.error_including_pause_statuses:
