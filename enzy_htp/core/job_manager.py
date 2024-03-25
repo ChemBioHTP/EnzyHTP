@@ -15,6 +15,7 @@ Feature:
 Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Date: 2022-04-13"""
 
+from __future__ import annotations
 import logging
 import time
 from typing import List, Tuple, Union
@@ -400,7 +401,7 @@ class ClusterJob():
             array_size: int = 0,
             sub_dir = None,
             sub_scirpt_path = None
-        ) -> None:
+        ) -> List[ClusterJob]:
         """
         submit an array of jobs in a way that only {array_size} number of jobs is submitted simultaneously.
         Wait until all job ends.
