@@ -14,6 +14,7 @@ import pickle
 from typing import Any, Dict, List, Tuple, Callable
 
 from enzy_htp.analysis import d_ele_field_upon_mutation_coarse, ddg_fold_of_mutants
+from enzy_htp.core.exception import ShrapnelChildError
 from enzy_htp.mutation import assign_mutant
 from enzy_htp.mutation_class import Mutation, get_involved_mutation, generate_from_mutation_flag
 from enzy_htp._config.armer_config import ARMerConfig
@@ -313,7 +314,7 @@ def fine_filter( # TODO summarize logics from here to a general shrapnel functio
         }
         save_obj(child_main_kwargs, kwargs_file)
         # make script
-        save_func_to_main(_fine_filter_child_main, kwargs_file, child_main_path)
+        save_func_to_main(_fine_filter_child_main, os.path.abspath(kwargs_file), child_main_path)
         # 2. seperate mutants in groups & make jobs
         child_jobs = []
         assigned = 0
@@ -350,8 +351,12 @@ def fine_filter( # TODO summarize logics from here to a general shrapnel functio
         # 2. edit failed ones if changes are needed in child_jobs
         # 3. update the checkpoint
 
-    ClusterJob.wait_to_array_end(child_jobs, shrapnel_check_period, shrapnel_child_array_size) # re-run also handled within each children
+    jobs_remain = ClusterJob.wait_to_array_end(child_jobs, shrapnel_check_period, shrapnel_child_array_size) # re-run also handled within each children
     # TODO make another one that support some job are already running?
+    if jobs_remain:
+        _LOGGER.error("some children jobs didn't finish normally. they are:")
+        _LOGGER.error("\n".join([j.sub_dir for j in jobs_remain]))
+        raise ShrapnelChildError
 
     # 4. summarize result
     fine_metrics = {}

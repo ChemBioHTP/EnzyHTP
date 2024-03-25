@@ -132,3 +132,7 @@ class RosettaError(Exception):
     @property
     def error_info_str(self) -> str:
         return "\n".join(self.error_info_list)
+
+class ShrapnelChildError(Exception):
+    """Exception corresponding to incomplete shrapnel children runs"""
+    pass
