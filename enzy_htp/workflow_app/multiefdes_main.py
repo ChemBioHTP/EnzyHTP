@@ -328,7 +328,7 @@ def fine_filter( # TODO summarize logics from here to a general shrapnel functio
             save_obj(grp_mut, grp_mut_pickle)
             # make job
             gpu_partition = _find_gpu_partition(grp_id, shrapnel_gpu_partition_mapper)
-            sub_script_path = f"{grp_path}/submit_main.sh"
+            sub_script_path = os.path.abspath(f"{grp_path}/submit_main.sh")
             child_jobs.append(
                 _make_child_job(
                     grp_id = grp_id,
