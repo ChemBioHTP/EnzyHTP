@@ -4,5 +4,9 @@
         "test"
     ],
     "python.testing.unittestEnabled": false,
-    "python.testing.pytestEnabled": true
+    "python.testing.pytestEnabled": true,
+    "editor.defaultFoldingRangeProvider": "esbenp.prettier-vscode",
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "python.languageServer": "Pylance",
+    "python.analysis.completeFunctionParens": true
 }
