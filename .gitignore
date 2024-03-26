@@ -161,4 +161,4 @@ submit_test_long*.sh
 submit_test*.sh
 
 # no vscode setting
-settings.json
+.vscode/*
