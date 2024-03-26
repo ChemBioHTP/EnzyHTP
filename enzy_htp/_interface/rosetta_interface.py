@@ -25,6 +25,7 @@ import pandas as pd
 from enzy_htp import config as eh_config
 from enzy_htp.mutation_class.mutation import Mutation
 from enzy_htp.structure import Structure, PDBParser, Mol2Parser, Ligand
+from enzy_htp.structure.structure_operation import remove_non_peptide
 from enzy_htp.structure.structure_constraint import StructureConstraint, ResiduePairConstraint
 from enzy_htp._config.rosetta_config import RosettaConfig, default_rosetta_config
 from enzy_htp.core import _LOGGER
@@ -167,6 +168,10 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
         Returns:
             return a copy of the changed structure."""
         stru = copy.deepcopy(stru)
+        # 0. remove ligands
+        remove_non_peptide(stru)
+        # TODO deal with NCAA
+        
         # 1. relax
         fs.safe_mkdir(self.work_dir)
         relax_dir = f"{self.work_dir}/wt_relax/"

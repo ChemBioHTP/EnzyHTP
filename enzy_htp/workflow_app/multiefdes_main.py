@@ -419,6 +419,7 @@ def _fine_filter_child_main(
     gpu_job_config: Dict
     md_constraints: List[Callable[[Structure], StructureConstraint]]
     # re-run
+    result_dict = {}
     if os.path.exists(result_path):
         result_dict: Dict = load_obj(result_path)
 

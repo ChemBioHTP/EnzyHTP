@@ -72,7 +72,7 @@ export ROSETTA3=/data/yang_lab/shaoqz/software/Rosetta313/main/""",
     }
     ENZYHTP_MAIN_ENV = { # use the env from QZ
         "CPU": f"""source /home/shaoq1/bin/miniconda3/bin/activate new_EnzyHTP
-{G16_ENV['CPU']}
+{G16_ENV['CPU']["head"]}
 {AMBER_ENV['CPU']}
 {MULTIWFN_ENV['CPU']}""",
         "GPU": None,
