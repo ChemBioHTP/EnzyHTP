@@ -50,7 +50,7 @@ class ClusterJob():
         hold()
         release()
         get_state()
-        ifcomplete()
+        is_complete()
         wait_to_end()
         wait_to_array_end()
     """
@@ -252,7 +252,7 @@ class ClusterJob():
 
         # san check
         if self.job_id is not None:
-            if self.last_state[0][0] in ["run", "pend"]:
+            if self.get_state()[0] in ["run", "pend"]:
                 raise Exception(f"attempt to submit a non-finished (pend, run) job.{os.linesep} id: {self.job_id} state: {self.last_state[0][0]}::{self.last_state[0][1]} @{get_localtime(self.last_state[1])}")
             else: #finished job
                 _LOGGER.warning(f"WARNING: re-submitting a finished job. The job id will be renewed and the old job id will be lose tracked{os.linesep} id: {self.job_id} state: {self.last_state[0][0]}::{self.last_state[0][1]} @{get_localtime(self.last_state[1])}")
@@ -344,7 +344,7 @@ class ClusterJob():
         self.last_state = (result, time.time()) # TODO(qz): this may not be a good design. It record the last state with a time tho.
         return result
 
-    def ifcomplete(self) -> bool:
+    def is_complete(self) -> bool:
         """
         determine if the job is complete.
         """
@@ -443,6 +443,85 @@ class ClusterJob():
             while len(current_active_job) < array_size and i < len(jobs):
                 jobs[i].submit(sub_dir, sub_scirpt_path)
                 current_active_job.append(jobs[i])
+                i += 1
+            # 2. check every job in the array to detect completion of jobs and deal with some error
+            for j in range(len(current_active_job)-1,-1,-1):
+                job = current_active_job[j]
+                if job.get_state()[0] not in ["pend", "run"]:
+                    if get_eh_logging_level() <= logging.DEBUG:
+                        cls._action_end_with(job)
+                    finished_job.append(job)
+                    del current_active_job[j]
+            # 3. wait a period before next check TODO: add behavior that the more checking the longer time till a limit
+            time.sleep(period)
+
+        # summarize
+        n_complete = list(filter(lambda x: x.last_state[0][0] == "complete", finished_job))
+        n_error = list(filter(lambda x: x.last_state[0][0] == "error", finished_job))
+        n_cancel = list(filter(lambda x: x.last_state[0][0] == "cancel", finished_job))
+        _LOGGER.info(f"Job array finished: {len(n_complete)} complete {len(n_error)} error {len(n_cancel)} cancel")
+
+        return n_error + n_cancel
+
+    @classmethod
+    def wait_to_array_end_plus(
+            cls,
+            jobs: List["ClusterJob"],
+            period: int,
+            array_size: int = 0,
+            sub_dir = None,
+            sub_scirpt_path = None
+        ) -> List[ClusterJob]:
+        """
+        submit an array of jobs in a way that only {array_size} number of jobs is submitted simultaneously.
+        Wait until all job ends.
+        The "plus" version will not resubmit the pending or running jobs from {jobs} 
+
+        Args:
+        jobs:
+            a list of ClusterJob object to be execute
+        period:
+            the time cycle for update job state change (Unit: s)
+        array_size:
+            how many jobs are allowed to submit simultaneously. (default: 0 means all -> len(inp))
+            (e.g. 5 for 100 jobs means run 20 groups. All groups will be submitted and
+            in each group, submit the next job only after the previous one finishes.)
+        sub_dir: (default: self.sub_dir)
+            submission directory for all jobs in the array. Overwrite existing self.sub_dir in the job obj
+            * you can set the self value during config_job to make each job different
+        sub_scirpt_path: (default: self.sub_script_path)
+            path of the submission script. Overwrite existing self.sub_script_path in the job obj
+            * you can set the self value during config_job to make each job different
+
+        Return:
+        return a list of not completed job. (error + canceled)
+        """
+        # san check
+        for job in jobs:
+            if job.cluster.NAME != jobs[0].cluster.NAME:
+                raise TypeError(f"array job need to use the same cluster! while {job.cluster.NAME} and {jobs[0].cluster.NAME} are found.")
+        # default value
+        if array_size == 0:
+            array_size = len(jobs)
+        # set up array job
+        current_active_job = []
+        total_job_num = len(jobs)
+        finished_job = []
+        # consider already running jobs
+        inactive_job = []
+        for job in jobs:
+            if (job.job_id is not None) and (job.get_state()[0] in ["pend", "run"]):
+                current_active_job.append(job)
+            else:
+                inactive_job.append(job)
+        i = 0 # submitted job number
+        while len(finished_job) < total_job_num:
+            # before every job finishes, keep running
+            # 0. collect all the active jobs
+            # 1. make up the running chunk to the array size
+            while len(current_active_job) < array_size and i < len(inactive_job):
+                inactive_job[i].submit(sub_dir, sub_scirpt_path)
+                current_active_job.append(inactive_job[i])
                 i += 1
             # 2. check every job in the array to detect completion of jobs and deal with some error
             for j in range(len(current_active_job)-1,-1,-1):
