@@ -24,7 +24,7 @@ from enzy_htp.chemical import electric_field_strength
 from enzy_htp.mutation_class import Mutation
 from enzy_htp.structure import Structure, Atom
 
-from enzy_htp.structure.structure_operation.charge import init_charge
+from enzy_htp.structure.structure_enchantment.charge import init_charge
 from enzy_htp.structure.structure_selection import select_stru
 
 

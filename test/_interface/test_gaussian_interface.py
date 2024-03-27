@@ -13,7 +13,7 @@ from enzy_htp.chemical.level_of_theory import QMLevelOfTheory, MMLevelOfTheory
 from enzy_htp._config.armer_config import ARMerConfig
 from enzy_htp.structure import structure_constraint as stru_cons
 from enzy_htp.structure.structure_region import create_region_from_selection_pattern
-from enzy_htp.structure.structure_operation.charge import init_charge
+from enzy_htp.structure.structure_enchantment.charge import init_charge
 from enzy_htp import PDBParser
 from enzy_htp import interface
 from enzy_htp._interface.gaussian_interface import GaussianSinglePointEngine

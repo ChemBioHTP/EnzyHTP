@@ -8,6 +8,7 @@ import os
 
 import pytest
 from enzy_htp.structure import PDBParser, Structure
+from enzy_htp.structure.structure_enchantment import init_connectivity
 import enzy_htp.structure.structure_operation as stru_oper
 from enzy_htp.core import _LOGGER
 
@@ -25,6 +26,7 @@ def test_deprotonate_residue():
     # CYS A69
     residue = stru["A"].find_residue_idx(69)
     target_atom = residue.find_atom_name("SG")
+    init_connectivity(target_atom)
     stru_oper.deprotonate_residue(residue, target_atom)
     assert residue.name == "CYM"
     assert len(residue) == 10
@@ -32,6 +34,7 @@ def test_deprotonate_residue():
     ## case where no need to deproton
     residue = stru["A"].find_residue_idx(21)
     target_atom = residue.find_atom_name("NE2")
+    init_connectivity(target_atom)
     stru_oper.deprotonate_residue(residue, target_atom)
     assert residue.name == "HID"
     assert len(residue) == 17
@@ -45,6 +48,7 @@ def test_deprotonate_residue_switch():
     # manually select the case where it is a switch
     residue = stru["A"].find_residue_idx(21)  # HID 21
     target_atom = residue.find_atom_name("ND1")
+    init_connectivity(target_atom)
     stru_oper.deprotonate_residue(residue, target_atom)
 
     assert residue.name == "HIE"

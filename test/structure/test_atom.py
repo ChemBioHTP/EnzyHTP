@@ -18,7 +18,7 @@ from enzy_htp.core.file_system import lines_from_file
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.structure.atom import Atom
 from enzy_htp.structure.structure_io import PDBParser
-from enzy_htp.structure.structure_operation import init_connectivity
+from enzy_htp.structure.structure_enchantment import init_connectivity
 
 CURR_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = f"{CURR_DIR}/data/"

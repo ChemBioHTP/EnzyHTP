@@ -8,7 +8,7 @@ import enzy_htp.core.file_system as fs
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.structure import Atom, Chain, Residue, PDBParser, Structure
 import enzy_htp.structure.structure_region as stru_regi
-import enzy_htp.structure.structure_operation.charge as chrg
+import enzy_htp.structure.structure_enchantment.charge as chrg
 
 CURR_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = f"{CURR_DIR}/../../test_data"

@@ -9,7 +9,7 @@ from pathlib import Path
 import enzy_htp.core.file_system as fs
 from enzy_htp.core.general import EnablePropagate
 from enzy_htp.structure import Atom, Structure
-from enzy_htp.structure.structure_operation import init_connectivity
+from enzy_htp.structure.structure_enchantment import init_connectivity
 from enzy_htp import _LOGGER
 from enzy_htp import PDBParser
 from enzy_htp import config as eh_config

@@ -1,10 +1,15 @@
+"""The template for EnzyHTP 2.0 main script:
+A workflow that calculates the following properties for mutants:
+- 
+
+Author: QZ Shao <shaoqz@icloud.com>
+Date: 2024-03-15"""
 """This file contain integration tests that calculates the change of electrostatic
 stablization energy upon mutants for different systems.
 
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2023-09-25"""
 from pathlib import Path
-import pytest
 import os
 import pickle
 from typing import List, Tuple, Dict, Callable
@@ -23,15 +28,11 @@ import enzy_htp.structure.structure_constraint as stru_cons
 from enzy_htp.structure import (
     Structure,
     StructureConstraint,
-    PDBParser,
-    Atom
+    PDBParser
 )
 from enzy_htp.chemical.level_of_theory import QMLevelOfTheory
 from enzy_htp.core.clusters.accre import Accre
 
-DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/data/"
-STRU_DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/../../test/test_data/diversed_stru/"
-WORK_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/work_dir/"
 sp = PDBParser()
 
 def workflow(
@@ -42,7 +43,7 @@ def workflow(
         md_length: float,
         qm_region_pattern: str,
         qm_level_of_theory: QMLevelOfTheory,
-        target_bond: Tuple[Atom],
+        target_bond: Tuple[str],
         ef_region_pattern: str,
         result_path: str,
         chain_sync_list: List = None,
@@ -162,9 +163,7 @@ def workflow(
         with open(result_path, "wb") as of:
             pickle.dump(result_dict, of)
 
-@pytest.mark.accre
-@pytest.mark.temp
-def test_kemp_elimiase():
+def kemp_elimiase():
     """test the workflow on a kemp elimiase
     the result of a passed test is saved to data/ but due to the randomness
      of MD it is hard to compare"""

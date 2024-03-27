@@ -78,7 +78,7 @@ class Mutation:
         # yapf: enable
 
         # Mutation.chain_id, Mutation.res_idx: should exist in {stru}, should not be empty
-        if self.chain_id.strip() is "":
+        if self.chain_id.strip() == "":
             raise InvalidMutation(f"empty chain_id in: {self}")
         if self.chain_id not in stru.chain_mapper:
             raise InvalidMutation(f"chain id in {self} does not exist in structure (in-stru: {stru.chain_mapper.keys()})")

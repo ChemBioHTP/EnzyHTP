@@ -6,12 +6,14 @@ Date: 2023-09-20
 import glob
 from subprocess import run
 import re
+from typing import List
 import pytest
 import os
 import logging
 import itertools
 
 from enzy_htp.core import clusters
+from enzy_htp.core.general import EnablePropagate
 from enzy_htp.core.job_manager import ClusterJob
 from enzy_htp.core.logger import get_eh_logging_level, _LOGGER
 import enzy_htp.core.file_system as fs
@@ -329,6 +331,58 @@ def test_ClusterJob_wait_to_array_end_ACCRE():
     for job in jobs:
         assert job.job_id is not None
         assert job.last_state[0][0] in ("complete", "cancel", "error")
+
+    _LOGGER.setLevel(old_level)
+
+@pytest.mark.accre
+@pytest.mark.long
+def test_ClusterJob_wait_to_array_end_plus_ACCRE():
+    # make the test array
+    jobs = []
+    for i in range(10):
+        jobs.append(ClusterJob( clusters.accre.Accre(),
+                                sub_script_str=get_array_sub_str(i),
+                                sub_dir=test_sub_dir,
+                                sub_script_path=f"{test_sub_dir}/test_{i}.cmd"))
+    # job array
+    old_level = get_eh_logging_level()
+    _LOGGER.setLevel(logging.DEBUG)
+
+    ClusterJob.wait_to_array_end_plus(jobs, period=3, array_size=5)
+    test_file_paths.append(f"{test_sub_dir}/submitted_job_ids.log")
+    for i, job in enumerate(jobs):
+        test_file_paths.extend([job.sub_script_path, job.job_cluster_log, f"{job.sub_dir}/QM_test_{i}.out"])
+    for job in jobs:
+        assert job.job_id is not None
+        assert job.last_state[0][0] in ("complete", "cancel", "error")
+
+    _LOGGER.setLevel(old_level)
+
+@pytest.mark.accre
+@pytest.mark.long
+def test_ClusterJob_wait_to_array_end_plus_rerun_ACCRE(caplog):
+    # make the test array
+    jobs: List[ClusterJob] = []
+    for i in range(10):
+        jobs.append(ClusterJob( clusters.accre.Accre(),
+                                sub_script_str=get_array_sub_str(i),
+                                sub_dir=test_sub_dir,
+                                sub_script_path=f"{test_sub_dir}/test_{i}.cmd"))
+    # job array
+    old_level = get_eh_logging_level()
+    _LOGGER.setLevel(logging.DEBUG)
+
+    # put some jobs running or pending
+    jobs[7].submit()
+    with EnablePropagate(_LOGGER):
+        ClusterJob.wait_to_array_end_plus(jobs, period=3, array_size=5) # It will raise or warn if there is a resubmit of repeating
+    assert "re-submitting a finished job" not in caplog.text
+    test_file_paths.append(f"{test_sub_dir}/submitted_job_ids.log")
+    for i, job in enumerate(jobs):
+        test_file_paths.extend([job.sub_script_path, job.job_cluster_log, f"{job.sub_dir}/QM_test_{i}.out"])
+    for job in jobs:
+        assert job.job_id is not None
+        assert job.last_state[0][0] == "complete"
 
     _LOGGER.setLevel(old_level)
 

@@ -159,3 +159,6 @@ test/preparation/work_dir/*
 # Always keeps the 1st version of the submission script template
 submit_test_long*.sh
 submit_test*.sh
+
+# no vscode setting
+.vscode/*
