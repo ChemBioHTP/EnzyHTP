@@ -23,6 +23,7 @@ SUB_MODULES=[
         'enzy_htp.structure',
         'enzy_htp.structure.structure_io',
         'enzy_htp.structure.structure_operation',
+        'enzy_htp.structure.structure_enchantment',
         'enzy_htp.structure.structure_region',
         'enzy_htp.structure.structure_selection',
         'enzy_htp.structure.structure_selection_class',
