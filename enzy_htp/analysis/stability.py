@@ -8,7 +8,7 @@ Date: 2024-02-12
 """
 from typing import List, Dict, Tuple
 
-from enzy_htp.mutation_class import Mutation
+from enzy_htp.mutation_class import Mutation, is_mutant_wt
 from enzy_htp import interface
 from enzy_htp._interface.handle_types import ddGFoldEngine
 from enzy_htp.structure import Structure
@@ -133,6 +133,9 @@ def _parallelize_ddg_fold_with_cluster_job(
 
     # 1. prep jobs
     for mutant in mutant_space:
+        if is_mutant_wt(mutant): # treatment on WT
+            result[tuple(mutant)] = 0.0
+            continue
         job, egg = engine.make_job(stru, mutant)
         job_list.append(job)
         result_eggs.append((mutant, egg))
