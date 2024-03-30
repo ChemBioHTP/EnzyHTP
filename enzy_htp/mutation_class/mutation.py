@@ -215,7 +215,7 @@ def generate_mutation_from_target_list(position: Tuple[str, int], orig_resi: str
 # --Mutant-- # TODO may be a class in the future
 # below utilities are for a list of Mutation()
 # == checker ==
-def check_repeat_mutation(mutant: List[Mutation]):
+def check_repeat_mutation(mutant: List[Mutation]) -> bool:
     """check if there is any repeating mutation (position-wise)
     in the mutant"""
     mutation_posi = []
@@ -226,6 +226,14 @@ def check_repeat_mutation(mutant: List[Mutation]):
         mutation_posi.append(position_key)
     return False
 
+def is_mutant_wt(mutant: List[Mutation]) -> bool:
+    """determine if a mutant is actually a WT"""
+    if len(mutant) == 0:
+        return True
+    elif len(mutant) == 1:
+        return mutant[0].is_wild_type()
+    else:
+        return False
 
 # == editor ==
 def remove_repeat_mutation(mutant: List[Mutation], keep: str = "last") -> List[Mutation]:
