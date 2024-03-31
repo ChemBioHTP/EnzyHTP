@@ -16,7 +16,7 @@ from plum import dispatch
 from xml.dom import minidom
 import xml.etree.cElementTree as ET
 from collections import namedtuple
-from typing import Any, Dict, List, Tuple, Set, Union
+from typing import Any, Dict, List, Tuple, Set, Union, Iterable
 from dataclasses import dataclass
 
 import numpy as np
@@ -192,13 +192,13 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
 
         return new_stru
 
-    def make_job(self, stru: Structure, mutant: List[Mutation]) -> Tuple[ClusterJob, RosettaCartesianddGEgg]:
+    def make_job(self, stru: Structure, mutant: Iterable[Mutation]) -> Tuple[ClusterJob, RosettaCartesianddGEgg]:
         """the method that makes a ClusterJob that runs the cartesian ddg"""
         # 1. input
         if not isinstance(stru, Structure):
             _LOGGER.error("only allow Structure as `stru`")
             raise TypeError
-        if not isinstance(mutant, list) or not isinstance(mutant[0], Mutation):
+        if (not isinstance(mutant, list) and not isinstance(mutant, tuple)) or not isinstance(mutant[0], Mutation):
             _LOGGER.error("only allow List[Mutation] as `mutant`")
             raise TypeError
 
@@ -250,7 +250,7 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
         if not isinstance(stru, Structure):
             _LOGGER.error("only allow Structure as `stru`")
             raise TypeError
-        if not isinstance(mutant, list) or not isinstance(mutant[0], Mutation):
+        if (not isinstance(mutant, list) and not isinstance(mutant, tuple)) or not isinstance(mutant[0], Mutation):
             _LOGGER.error("only allow List[Mutation] as `mutant`")
             raise TypeError
 
