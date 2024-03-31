@@ -346,12 +346,18 @@ def fine_filter( # TODO summarize logics from here to a general shrapnel functio
         # 3. submit jobs
         save_obj(child_jobs, checkpoint_1)
     else:
-        pass # handle re-run TODO start the test while working on this part
+        # TODO start here
+        child_jobs: List[ClusterJob] = load_obj(checkpoint_1)
+        new_child_jobs = []
         # 1. analyze remaining child_jobs (recycle old one) may benefit from having a mimo
-        # 2. edit failed ones if changes are needed in child_jobs
-        # 3. update the checkpoint
+        for job in child_jobs:
+            if not job.is_complete():
+                new_child_jobs.append(job)
+        child_jobs = new_child_jobs # this will include failing, pending, running jobs
+        # 2. update the checkpoint
+        save_obj(child_jobs, checkpoint_1)
 
-    jobs_remain = ClusterJob.wait_to_array_end(child_jobs, shrapnel_check_period, shrapnel_child_array_size) # re-run also handled within each children
+    jobs_remain = ClusterJob.wait_to_array_end(child_jobs, shrapnel_check_period, shrapnel_child_array_size)
     # TODO make another one that support some job are already running?
     if jobs_remain:
         _LOGGER.error("some children jobs didn't finish normally. they are:")
@@ -392,6 +398,7 @@ def _fine_filter_child_main(
     # import section (required by save_func_to_main)
     import os
     from typing import List, Dict, Callable
+    from collections import defaultdict
 
     from enzy_htp.preparation import protonate_stru, remove_hydrogens
     from enzy_htp.mutation import mutate_stru
@@ -419,7 +426,7 @@ def _fine_filter_child_main(
     gpu_job_config: Dict
     md_constraints: List[Callable[[Structure], StructureConstraint]]
     # re-run
-    result_dict = {}
+    result_dict = defaultdict(dict)
     if os.path.exists(result_path):
         result_dict: Dict = load_obj(result_path)
 
@@ -469,7 +476,10 @@ def _fine_filter_child_main(
                     "leaprc.water.tip3p",
                 ],
             )
-            gpu_job_config = gpu_job_config | {"partition" : gpu_partition}
+            gpu_job_config = {
+                "cluster" : gpu_job_config["cluster"],
+                "res_keywords" : gpu_job_config["res_keywords"] | {"partition" : gpu_partition}
+            }
             mut_constraints = []
             for cons in md_constraints:
                 mut_constraints.append(cons(mutant_stru))
@@ -485,7 +495,6 @@ def _fine_filter_child_main(
             )
             trajs.extend(new_trajs)
         
-        # TODO handle re-run of this part
         mut_data = {
             "ef" : [],
             "spi" : [],
@@ -511,7 +520,20 @@ def _fine_filter_child_main(
             # mut_data["mmpbsa"].append(replica_mmpbsa)
             # mut_data["mmgbsa"].append(replica_mmgbsa)
 
-        result_dict[tuple_mut].update(mut_data)
+        mut_result_data.update(mut_data)
+        result_dict[tuple_mut] = mut_result_data
+
+    for mut in mutants:
+        assert tuple(mut) in result_dict
+        assert "ddg_fold" in result_dict[tuple(mut)]
+        assert "ef" in result_dict[tuple(mut)]
+        assert result_dict[tuple(mut)]["ef"]
+        # assert "spi" in result_dict[tuple(mut)]
+        # assert result_dict[tuple(mut)]["spi"]
+        # assert "mmpbsa" in result_dict[tuple(mut)]
+        # assert result_dict[tuple(mut)]["mmpbsa"]
+        # assert "mmgbsa" in result_dict[tuple(mut)]
+        # assert result_dict[tuple(mut)]["mmgbsa"]
 
     save_obj(result_dict, result_path)
 
@@ -618,12 +640,21 @@ def workflow_puo(single_mut_ddg_file_path: str = None):
 
     # 3. fine filter
     if not Path(checkpoint_3).exists():
-        shrapnel_child_job_config = cluster_job_config | {"walltime" : "10-00:00:00"}
-        shrapnel_cpujob_config = cluster_job_config | {"walltime" : "2-00:00:00"}
-        shrapnel_gpujob_config = cluster_job_config | {
-            "account" : "csb_gpu_acc",
-            "partition" : "pascal",
-            "walltime" : "5-00:00:00",
+        shrapnel_child_job_config = {
+            "cluster" : cluster_job_config["cluster"],
+            "res_keywords" : cluster_job_config["res_keywords"] | {"walltime" : "10-00:00:00"}
+        }
+        shrapnel_cpujob_config = {
+            "cluster" : cluster_job_config["cluster"],
+            "res_keywords" : cluster_job_config["res_keywords"] | {"walltime" : "2-00:00:00"},
+        }
+        shrapnel_gpujob_config = {
+            "cluster" : cluster_job_config["cluster"],
+            "res_keywords" : cluster_job_config["res_keywords"] | {
+                "account" : "csb_gpu_acc",
+                "partition" : "pascal",
+                "walltime" : "5-00:00:00",
+            }
         }
         md_constraint = [
             partial(stru_cons.create_distance_constraint,
