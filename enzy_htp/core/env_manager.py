@@ -228,5 +228,9 @@ class EnvironmentManager:
             _LOGGER.error(
                 f"Executable '{key}' is in list of executables to check but has not been searched for yet. Call .check_environment() first. Exiting..."
             )
-            exit(1)
-        return self.mapper[key]
+            raise AttributeError(key)
+
+        try:
+            return self.mapper[key]
+        except KeyError:
+            raise AttributeError(key)
