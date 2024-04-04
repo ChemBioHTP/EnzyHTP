@@ -98,6 +98,9 @@ class RosettaConfig(BaseConfig):
     DEFAULT_CART_DDG_SCOREFXN: str = "ref2015_cart"
     """the default value for the SCOREFXN option of cartesian ddg calculation"""
 
+    DEFAULT_CART_DDG_RELAX_NSTRUCT: int = 20
+    """the default value for the RELAX_NSTRUCT option of cartesian ddg calculation"""
+
     DEFAULT_CART_DDG_RES_KEYWORDS: Dict = copy.deepcopy(ARMerConfig.SINGLE_CPU_RES) | {'job_name' : 'cart_ddg_EnzyHTP',}
     """The default value for the resource configuration of CART_DDG."""
 
