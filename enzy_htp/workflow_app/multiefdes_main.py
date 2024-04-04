@@ -346,7 +346,6 @@ def fine_filter( # TODO summarize logics from here to a general shrapnel functio
         # 3. submit jobs
         save_obj(child_jobs, checkpoint_1)
     else:
-        # TODO start here
         child_jobs: List[ClusterJob] = load_obj(checkpoint_1)
         new_child_jobs = []
         # 1. analyze remaining child_jobs (recycle old one) may benefit from having a mimo
@@ -358,7 +357,7 @@ def fine_filter( # TODO summarize logics from here to a general shrapnel functio
         save_obj(child_jobs, checkpoint_1)
 
     jobs_remain = ClusterJob.wait_to_array_end(child_jobs, shrapnel_check_period, shrapnel_child_array_size)
-    # TODO make another one that support some job are already running?
+
     if jobs_remain:
         _LOGGER.error("some children jobs didn't finish normally. they are:")
         _LOGGER.error("\n".join([j.sub_dir for j in jobs_remain]))
@@ -450,6 +449,8 @@ def _fine_filter_child_main(
         )
     for k, v in ddg_results.items():
         result_dict[k]["ddg_fold"] = v
+    # save
+    save_obj(result_dict, result_path)
 
     for i, mut in enumerate(mutants):
         tuple_mut = tuple(mut)
@@ -462,7 +463,9 @@ def _fine_filter_child_main(
             mutant_stru.assign_ncaa_chargespin(ligand_chrg_spin_mapper)
             remove_hydrogens(mutant_stru, polypeptide_only=True)
             protonate_stru(mutant_stru, protonate_ligand=False)
-            mut_result_data["mutant_stru"] = mutant_stru
+            result_dict[tuple_mut]["mutant_stru"] = mutant_stru
+            # save
+            save_obj(result_dict, result_path)
         
         # 4. MD
         trajs: List = mut_result_data.get("trajs", list())
@@ -494,6 +497,9 @@ def _fine_filter_child_main(
                 parallel_runs=runs_left,
             )
             trajs.extend(new_trajs)
+            # save
+            result_dict[tuple_mut]["trajs"] = trajs
+            save_obj(result_dict, result_path)
         
         mut_data = {
             "ef" : [],
@@ -667,7 +673,7 @@ def workflow_puo(single_mut_ddg_file_path: str = None):
             atom_2 = atom_2,
             ligand_chrg_spin_mapper = {"ACP" : (0,1), "FAD" : (0,1)},
             md_constraints=md_constraint,
-            md_length=100.0, # ns
+            md_length=1.0, # TODO change this back after the test
             md_parallel_runs=1,
             ef_region_pattern="chain A+B+C+D+E+F and (not resi 901+902)",
             shrapnel_child_job_config = shrapnel_child_job_config,
