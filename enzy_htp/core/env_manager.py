@@ -224,6 +224,8 @@ class EnvironmentManager:
 
     def __getattr__(self, key: str) -> str:
         """Allows accession into acquired executables."""
+        if key.startswith('__') and key.endswith('__'):
+            raise AttributeError
         if key not in self.mapper and key in self.executables_:
             _LOGGER.error(
                 f"Executable '{key}' is in list of executables to check but has not been searched for yet. Call .check_environment() first. Exiting..."
