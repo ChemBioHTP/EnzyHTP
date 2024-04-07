@@ -47,11 +47,16 @@ class StructureEnsemble:
     def structures(self, remove_solvent: bool=False) -> Generator[Structure]:
         """get a Generator of all geometries in the ensemble
         as Structure()s"""
+        stru = deepcopy(self.topology)
+        if remove_solvent:
+            stru_oper.remove_solvent(stru)
+            stru_oper.remove_counterions(stru)
+
         for this_coord in self.coord_parser(
                 self.coordinate_list,
                 remove_solvent=remove_solvent
             ):
-            result = deepcopy(self.topology)
+            result = deepcopy(stru)
             if remove_solvent:
                 stru_oper.remove_solvent(result)
                 stru_oper.remove_counterions(result)
