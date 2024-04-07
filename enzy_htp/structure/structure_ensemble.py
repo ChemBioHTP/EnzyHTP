@@ -12,6 +12,7 @@ from copy import deepcopy
 
 from .structure import Structure
 from .structure_io import StructureParserInterface
+from .structure_operation import remove_solvent
 from enzy_htp.core.general import get_itself
 
 
@@ -43,12 +44,16 @@ class StructureEnsemble:
         self.coordinate_list = coordinate_list
         self.coord_parser = coord_parser
 
-    @property
-    def structures(self) -> Generator[Structure]:
+    def structures(self, remove_solvent: bool=False) -> Generator[Structure]:
         """get a Generator of all geometries in the ensemble
         as Structure()s"""
-        for this_coord in self.coord_parser(self.coordinate_list):
+        for this_coord in self.coord_parser(
+                self.coordinate_list,
+                remove_solvent=remove_solvent
+            ):
             result = deepcopy(self.topology)
+            if remove_solvent:
+                remove_solvent(result)
             result.apply_geom(this_coord)
             yield result
 
@@ -80,5 +85,5 @@ class StructureEnsemble:
 
     # region == special ==
     def __iter__(self):
-        return self.structures
+        return self.structures()
     # endregion

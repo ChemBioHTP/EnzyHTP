@@ -330,6 +330,13 @@ class Structure(DoubleLinkedNode):
             result.extend(list(filter(lambda r: r.is_solvent(), chain)))
         return result
 
+    def counterions(self, counterion_list: List[str] = None) -> List[Residue]:
+        """return all counterions hold by current Structure()"""
+        result: List[Residue] = []
+        for chain in self.chains:
+            result.extend(list(filter(lambda r: r.is_counterions(counterion_list), chain)))
+        return result
+
     @property
     def metals(self) -> List[MetalUnit]:
         """Filters out the metal Residue()"s from the chains in the Structure()."""
