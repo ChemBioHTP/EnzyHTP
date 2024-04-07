@@ -12,7 +12,7 @@ from copy import deepcopy
 
 from .structure import Structure
 from .structure_io import StructureParserInterface
-from .structure_operation import remove_solvent, remove_counterions
+from . import structure_operation as stru_oper
 from enzy_htp.core.general import get_itself
 
 
@@ -53,8 +53,8 @@ class StructureEnsemble:
             ):
             result = deepcopy(self.topology)
             if remove_solvent:
-                remove_solvent(result)
-                remove_counterions(result)
+                stru_oper.remove_solvent(result)
+                stru_oper.remove_counterions(result)
             result.apply_geom(this_coord)
             yield result
 
