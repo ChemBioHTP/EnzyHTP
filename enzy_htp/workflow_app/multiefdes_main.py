@@ -405,7 +405,7 @@ def _fine_filter_child_main(
     from enzy_htp.analysis import ele_field_strength_at_along, ddg_fold_of_mutants
     from enzy_htp import interface
     from enzy_htp.mutation_class import Mutation
-    from enzy_htp.structure import StructureConstraint, Structure, Atom
+    from enzy_htp.structure import StructureConstraint, Structure, Atom, StructureEnsemble
     from enzy_htp.core.general import load_obj, save_obj
 
     # cmd inp
@@ -447,10 +447,10 @@ def _fine_filter_child_main(
             cluster_job_config = cpu_job_config,
             relax_cluster_job_config = cpu_job_config,
         )
-    for k, v in ddg_results.items():
-        result_dict[k]["ddg_fold"] = v
-    # save
-    save_obj(result_dict, result_path)
+        for k, v in ddg_results.items():
+            result_dict[k]["ddg_fold"] = v
+        # save
+        save_obj(result_dict, result_path)
 
     for i, mut in enumerate(mutants):
         tuple_mut = tuple(mut)
@@ -468,7 +468,7 @@ def _fine_filter_child_main(
             save_obj(result_dict, result_path)
         
         # 4. MD
-        trajs: List = mut_result_data.get("trajs", list())
+        trajs: List[StructureEnsemble] = mut_result_data.get("trajs", list())
         runs_left = md_parallel_runs - len(trajs)
         if runs_left > 0:
             param_method = interface.amber.build_md_parameterizer(
@@ -510,7 +510,7 @@ def _fine_filter_child_main(
         for replica_esm in trajs:
             replica_ef = []
             replica_spi = []
-            for traj_stru in replica_esm.structures:
+            for traj_stru in replica_esm.structures(remove_solvent=True):
                 # 5. get dEF
                 field_strength = ele_field_strength_at_along(
                     traj_stru, atom_1, atom_2, region_pattern=ef_region_pattern)
@@ -558,7 +558,7 @@ def _make_child_job(
     cluster = cluster_job_config["cluster"]
     res_keywords = cluster_job_config["res_keywords"]
 
-    cmd = f"python {child_main_path} -m {mutant_fname} -p {gpu_partition} -o {child_result_fname}"
+    cmd = f"python -u {child_main_path} -m {mutant_fname} -p {gpu_partition} -o {child_result_fname} > {child_main_path}.out 2>&1"
     enzyhtp_main_env = cluster.ENZYHTP_MAIN_ENV["CPU"]
     final_res_keywords = ARMerConfig.SINGLE_CPU_RES | {
         'job_name' : f'shrapnel_child_{grp_id}',
