@@ -7,6 +7,7 @@ Date: 2022-09-19
 """
 from .general import (
     remove_solvent,
+    remove_counterions,
     remove_hydrogens,
     remove_empty_chain,
     remove_non_peptide,
