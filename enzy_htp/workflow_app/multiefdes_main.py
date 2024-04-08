@@ -675,18 +675,24 @@ def workflow_puo(single_mut_ddg_file_path: str = None):
             atom_2 = atom_2,
             ligand_chrg_spin_mapper = {"ACP" : (0,1), "FAD" : (0,1)},
             md_constraints=md_constraint,
-            md_length=1.0, # TODO change this back after the test
+            md_length=50.0,
             md_parallel_runs=1,
             ef_region_pattern="chain A+B+C+D+E+F and (not resi 901+902)",
             shrapnel_child_job_config = shrapnel_child_job_config,
             shrapnel_cpujob_config = shrapnel_cpujob_config,
             shrapnel_gpujob_config = shrapnel_gpujob_config,
-            shrapnel_child_array_size = 2, # TODO change this after the test
+            shrapnel_child_array_size = 50,
             shrapnel_groups = 100,
             shrapnel_gpu_partition_mapper = {
-                (0, 40) : "pascal",
-                (41, 80) : "turing",
-                (81, 99) : "a6000x4",
+                (0, 10) : "pascal",
+                (11, 20) : "turing",
+                (31, 40) : "a6000x4",
+                (41, 50) : "pascal",
+                (51, 60) : "turing",
+                (61, 70) : "a6000x4",
+                (71, 80) : "pascal",
+                (81, 90) : "turing",
+                (91, 99) : "a6000x4",
             },
         )
         save_obj(mutant_space_3, checkpoint_3)
