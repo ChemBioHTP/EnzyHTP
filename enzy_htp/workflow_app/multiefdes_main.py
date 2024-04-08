@@ -110,8 +110,10 @@ def coarse_filter(
     # electrostatic ranking: top ranking {sample_per_group} mutants in each group
     for ddg_group in ddg_groups:
         sort_by_ef = sorted(ddg_group.items(), key=lambda x: x[1][0], reverse=True)
+        mutant_result = [mut for mut, metrics in sort_by_ef]
+
         result_dicts.append(dict(sort_by_ef[:sample_per_group]))
-        result.append([mut for mut, metrics in sort_by_ef])
+        result.append(mutant_result[:sample_per_group])
 
     save_obj(result_dicts, out_ref_path_2)
     return result
