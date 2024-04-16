@@ -50,7 +50,7 @@ class RosettaConfig(BaseConfig):
     RELAX_MPI_EXEC: str = f"mpiexec -np"
     """MPI Executable used to relax a structure/pose."""
 
-    CART_DDG: str = f"$ROSETTA3/source/bin/cartesian_ddg*"
+    CART_DDG: str = f"$ROSETTA3/source/bin/cartesian_ddg.*.linuxgccrelease"
     """Executable used to relax a structure/pose."""
 
     @classmethod
@@ -61,6 +61,9 @@ class RosettaConfig(BaseConfig):
             _LOGGER.error("$ROSETTA3 needed but not assigned!")
             raise MissingEnvironmentElement
         result = glob.glob(os.path.expandvars(self.CART_DDG))[0]
+        _LOGGER.info(
+            f"getting {result} as the exe of cartesian_ddg. "
+            "Change enzy_htp.config.rosetta.CART_DDG if you want to use a different one")
         return result
 
     SCORE: str = f"$ROSETTA3/source/bin/score_jd2.default.linuxgccrelease"
