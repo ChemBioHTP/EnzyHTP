@@ -290,7 +290,7 @@ class Residue(DoubleLinkedNode):
         """Checks if the Residue() is 
         counter ion. default only Na+ and Cl- counters.
         This list can be overwritten by {counterion_list}"""
-        if not counterion_list:
+        if counterion_list is None:
             counterion_list = chem.COUNTER_ION_LIST
         return self.name in counterion_list
 
