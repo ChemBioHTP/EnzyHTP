@@ -2205,6 +2205,7 @@ class AmberInterface(BaseInterface):
             prmtop_path: str,
             out_path: str,
             autoimage: bool = True,
+            remove_solvent: bool = False,
             start: int = 1,
             end: int = "last",
             step: int = 1,
@@ -2226,6 +2227,10 @@ class AmberInterface(BaseInterface):
         if autoimage:
             contents += [
                 "autoimage"
+            ]
+        if remove_solvent:
+            contents += [
+                "strip :WAT,Cl-,Na+"
             ]
         contents += [
             f"trajout {out_path}",
@@ -2408,7 +2413,9 @@ class AmberNCParser():
     def get_coordinates(
             self,
             nc_file: str,
-            autoimage: bool=True) -> Generator[List[List[float]], None, None]:
+            autoimage: bool=True,
+            remove_solvent: bool=False,
+        ) -> Generator[List[List[float]], None, None]:
         """parse a nc file to a Generator of coordinates. Intermediate mdcrd file is created."""
         # 0. init temp path
         if self.mdcrd is None:
@@ -2422,6 +2429,7 @@ class AmberNCParser():
                 prmtop_path=self.prmtop_file,
                 out_path=temp_mdcrd,
                 autoimage=autoimage,
+                remove_solvent=remove_solvent,
             )
 
             # 2. store for future use

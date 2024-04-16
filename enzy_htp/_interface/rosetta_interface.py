@@ -6,15 +6,18 @@ Date: 2023-03-28
 """
 from __future__ import annotations
 import copy
+import os
 import re
 import shutil
 from pathlib import Path
 from copy import deepcopy
+from subprocess import CompletedProcess, SubprocessError
 from plum import dispatch
 from xml.dom import minidom
 import xml.etree.cElementTree as ET
 from collections import namedtuple
-from typing import Any, Dict, List, Tuple, Set, Union
+from typing import Any, Dict, List, Tuple, Set, Union, Iterable
+from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
@@ -22,17 +25,19 @@ import pandas as pd
 from enzy_htp import config as eh_config
 from enzy_htp.mutation_class.mutation import Mutation
 from enzy_htp.structure import Structure, PDBParser, Mol2Parser, Ligand
+from enzy_htp.structure.structure_operation import remove_non_peptide
 from enzy_htp.structure.structure_constraint import StructureConstraint, ResiduePairConstraint
 from enzy_htp._config.rosetta_config import RosettaConfig, default_rosetta_config
 from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import env_manager as em
 from enzy_htp.core.job_manager import ClusterJob
+from enzy_htp.core.exception import RosettaError
 
 from .base_interface import BaseInterface
 from .handle_types import ddGFoldEngine, ddGResultEgg
 
-
+@dataclass
 class RosettaCartesianddGEgg(ddGResultEgg):
     """This class define the result egg of cartesian ddg
     calculation"""
@@ -77,6 +82,8 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
             fa_max_dis: float,
             scorefxn: float,
             cluster_job_config: Dict,
+            relax_cluster_job_config: Dict,
+            relax_nstruct: int,
             save_mutant_pdb: float,
             keep_in_file: bool,
             work_dir: str,
@@ -88,6 +95,8 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
         self._fa_max_dis = fa_max_dis
         self._scorefxn = scorefxn
         self._cluster_job_config = cluster_job_config
+        self._relax_cluster_job_config = relax_cluster_job_config
+        self._relax_nstruct = relax_nstruct
         self._save_mutant_pdb = save_mutant_pdb
         self._keep_in_file = keep_in_file
         self._work_dir = work_dir
@@ -134,6 +143,16 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
         return self._cluster_job_config
 
     @property
+    def relax_cluster_job_config(self) -> Dict:
+        """getter for _relax_cluster_job_config"""
+        return self._relax_cluster_job_config
+
+    @property
+    def relax_nstruct(self) -> int:
+        """getter for _relax_nstruct"""
+        return self._relax_nstruct
+
+    @property
     def save_mutant_pdb(self) -> float:
         """getter for _save_mutant_pdb"""
         return self._save_mutant_pdb
@@ -155,35 +174,62 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
         
         Returns:
             return a copy of the changed structure."""
-        result = copy.deepcopy(stru)
+        stru = copy.deepcopy(stru)
+        # 0. remove ligands
+        remove_non_peptide(stru)
+        # TODO deal with NCAA
+        
         # 1. relax
-        self.parent_interface.relax(result, nstruct=20, )
+        fs.safe_mkdir(self.work_dir)
+        relax_dir = f"{self.work_dir}/wt_relax/"
+        score_df = self.parent_interface.relax(
+            stru,
+            nstruct=self.relax_nstruct,
+            use_cartesian=True,
+            scorefxn="ref2015_cart",
+            cluster_job_config=self.relax_cluster_job_config,
+            output_dir=relax_dir,
+            # turn off un-necessary default
+            constrain_relax_to_start_coords=False,
+            coord_constrain_sidechains=False,
+            ramp_constraints=False,
+            delete_crash=True,
+            )
+        new_stru = self.parent_interface.get_structure_from_score(score_df)
 
-        return result
+        return new_stru
 
-    # region TODO finish this
-    def make_job(self, stru: Structure, mutant: List[Mutation]) -> Tuple[ClusterJob, ddGResultEgg]:
+    def make_job(self, stru: Structure, mutant: Iterable[Mutation]) -> Tuple[ClusterJob, RosettaCartesianddGEgg]:
         """the method that makes a ClusterJob that runs the cartesian ddg"""
         # 1. input
         if not isinstance(stru, Structure):
             _LOGGER.error("only allow Structure as `stru`")
             raise TypeError
-        if not isinstance(mutant, list) or not isinstance(mutant[0], Mutation):
+        if (not isinstance(mutant, list) and not isinstance(mutant, tuple)) or not isinstance(mutant[0], Mutation):
             _LOGGER.error("only allow List[Mutation] as `mutant`")
             raise TypeError
 
         # 2. make input file
         fs.safe_mkdir(self.work_dir)
+        temp_pdb_file = self._make_pdb_file(stru)
         temp_mut_file, ddg_out_path = self._make_mut_file(mutant) # the output path is determined by the input path. will get_valid for out
-        temp_options_file = self._make_options_file(temp_mut_file)
 
         # 3. make cmd
-        _cmd = self.parent_interface.make_cart_ddg_cmd(temp_options_file)
+        _cmd = self.parent_interface.make_cart_ddg_cmd(
+            pdb_path=temp_pdb_file,
+            mut_file=temp_mut_file,
+            num_iter=self.num_iter,
+            force_iter=self.force_iter,
+            score_cutoff=self.score_cutoff,
+            fa_max_dis=self.fa_max_dis,
+            scorefxn=self.scorefxn,
+            save_mutant_pdb=self.save_mutant_pdb,
+        )
 
         # 4. assemble ClusterJob
         cluster = self.cluster_job_config["cluster"]
         res_keywords = self.cluster_job_config["res_keywords"]
-        env_settings = cluster.ROSETTA_ENV["serial_CPU"] # will also be "parallel_CPU"
+        env_settings = cluster.ROSETTA_ENV["serial_CPU"]
         sub_script_path = fs.get_valid_temp_name(f"{self.work_dir}/submit_cart_ddg.cmd")
         job = ClusterJob.config_job(
             commands = _cmd,
@@ -194,7 +240,7 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
             sub_script_path = sub_script_path
         )
         job.mimo = { # only used for translate clean up
-            "temp_files": [temp_mut_file, temp_options_file],
+            "temp_files": [temp_mut_file, temp_pdb_file],
         }
 
         # 5. make result egg
@@ -207,52 +253,52 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
 
     def run(self, stru: Structure, mutant: List[Mutation]) -> float:
         """the method that runs the cartesian ddg"""
-        raise Exception("TODO")
         # 1. input
         if not isinstance(stru, Structure):
             _LOGGER.error("only allow Structure as `stru`")
             raise TypeError
+        if (not isinstance(mutant, list) and not isinstance(mutant, tuple)) or not isinstance(mutant[0], Mutation):
+            _LOGGER.error("only allow List[Mutation] as `mutant`")
+            raise TypeError
 
         # 2. make input file
         fs.safe_mkdir(self.work_dir)
-        temp_gjf_file, gchk_path = self._make_gjf_file(stru)
+        temp_pdb_file = self._make_pdb_file(stru)
+        temp_mut_file, ddg_out_path = self._make_mut_file(mutant) # the output path is determined by the input path. will get_valid for out
 
         # 3. make cmd
-        spe_cmd, gout_path = self.parent_interface.make_spe_cmd(temp_gjf_file)
+        _cmd = self.parent_interface.make_cart_ddg_cmd(
+            pdb_path=temp_pdb_file,
+            mut_file=temp_mut_file,
+            num_iter=self.num_iter,
+            force_iter=self.force_iter,
+            score_cutoff=self.score_cutoff,
+            fa_max_dis=self.fa_max_dis,
+            scorefxn=self.scorefxn,
+            save_mutant_pdb=self.save_mutant_pdb,
+        )
+        _cmd_exe = _cmd.split(" ")[0]
+        _cmd_args = _cmd.split(" ")[1:]
 
         # 4. run cmd
-        spe_cmd_exe = spe_cmd.split(" ")[0]
-        spe_cmd_args = spe_cmd.split(" ")[1:]
-        parent_interface = self.parent_interface
-        this_spe_run = parent_interface.env_manager_.run_command(
-            exe=spe_cmd_exe,
-            args=spe_cmd_args,
+        this_run = self.parent_interface.env_manager_.run_command(
+            exe=_cmd_exe,
+            args=_cmd_args,
         )
-        self.check_spe_error(gout_path, this_spe_run)
+        self.check_dgg_fold_error(ddg_out_path, this_run)
 
         # 5. make result
-        mo_parser = GaussianChkParser(
-            interface=self.parent_interface)
-        energy_0 = self.get_energy_0(gout_path)
-        geometry = self.region.clone_to_geometry(stru)
-
-        result = ElectronicStructure(
-            energy_0 = energy_0,
-            geometry = geometry,
-            mo = gchk_path,
-            mo_parser = mo_parser,
-            source="gaussian16",
-        )
+        ddg_fold = self.get_ddg_fold(ddg_out_path)
 
         # 6. clean up
-        clean_up_target = []
-        if not self.keep_in_file:
-            clean_up_target.append(temp_gjf_file)
-        fs.clean_temp_file_n_dir(clean_up_target)
+        fs.clean_temp_file_n_dir([temp_mut_file, temp_pdb_file])
+        # archive
+        fs.safe_mkdir(f"{self.work_dir}/results")
+        fs.safe_mv(ddg_out_path, f"{self.work_dir}/results/{Path(ddg_out_path).name}")
 
-        return result
+        return ddg_fold
 
-    def translate(self, result_egg: ddGResultEgg) -> float:
+    def translate(self, result_egg: RosettaCartesianddGEgg) -> float:
         """the method convert engine specific results to general output"""
         ddg_file = result_egg.ddg_file
         parent_job = result_egg.parent_job
@@ -268,26 +314,28 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
         if not self.keep_in_file:
             clean_up_target.extend(parent_job.mimo["temp_files"])
         fs.clean_temp_file_n_dir(clean_up_target)
+        # archive
+        fs.safe_mkdir(f"{self.work_dir}/results")
+        fs.safe_mv(ddg_file, f"{self.work_dir}/results/{Path(ddg_file).name}")
 
         return ddg_fold
 
     def check_dgg_fold_error(self,
-                        gout_file: str,
+                        ddg_file: str,
                         stdstream_source: Union[ClusterJob,
                                                 CompletedProcess,
                                                 SubprocessError]):
-        """a check for whether an error occurs in spe is needed everytime before generating
-        a ElectronicStructure.
-        Possible Gaussian error info places:
+        """a check for whether an error occurs in the ddg is needed everytime before generating
+        a final number.
+        Possible error info places:
         1. stdout/stderr
-        2. gout file
-        The ultimate goal is to summarize each error type and give suggestions."""
-        raise Exception("TODO")
-        if not self.parent_interface.is_gaussian_completed(gout_file):
+        2. ROSETTA_CRASH.log (this file is wrote by all Rosetta exec under the folder)
+        The goal is to summarize each error type and give suggestions."""
+        # 0. ddg file not exists or dont have content --> Error occured
+        if not Path(ddg_file).exists() or os.path.getsize(ddg_file) == 0:
             # collect error info
             error_info_list = []
             # 1. stdout stderr
-            # error types: TODO add comment here
             if isinstance(stdstream_source, ClusterJob):
                 with open(stdstream_source.job_cluster_log) as f:
                     stderr_stdout = f.read()
@@ -301,52 +349,74 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
             else:
                 _LOGGER.error("Only allow ClusterJob, CompletedProcess, SubprocessError as input types for `stdstream_source`")
                 raise TypeError
-            # 2. gout file
+            # 2. ROSETTA_CRASH.log file
             # TODO finish this with a real example
             # normally will be a Error termination of Gaussian
 
-            _LOGGER.error(f"Gaussian SPE didn't finish normally.{os.linesep}{os.linesep.join(error_info_list)}")
-            raise GaussianError(error_info_list)
+            _LOGGER.error(f"Rosetta cartesian_ddg didn't finish normally.{os.linesep}{os.linesep.join(error_info_list)}")
+            raise RosettaError(error_info_list)
 
     def _make_mut_file(self, mutant: List[Mutation]) -> Tuple[str]:
-        """make a temporary gjf file.
-        *path* is based on self.work_dir and self.name.
-        If the file exists, will change the filename to {self.name}_{index}.in
-        The index start from 1.
-        *content* is based on attributes of the instance.
+        """make a temporary mut_file.
+        NOTE that the final result file path is determined by the mut_file path.
+        To avoid overwriting results from parallel runs, mut_file path is determined by
+        finding a non-existing result file path under self.work_dir.
+        If the file exists, will change the filename to {self.name}_{index}.txt
+        NOTE that Rosetta made the .ddg file always under the current folder
 
-        Return: the path of the temp gjf file."""
+        Return: (path of the mut_file and the result file)"""
         # path
-        temp_gjf_file_path = fs.get_valid_temp_name(f"{self.work_dir}/{self.name}input")
-        temp_chk_file_path = temp_gjf_file_path.replace("input",".chk")
+        # 1. repel with existing .ddg file
+        temp_result_file_path = fs.get_valid_temp_name("mutations.ddg")
+        # 2. repel with upcoming .ddg file
+        temp_mut_file_path = f"{temp_result_file_path.removesuffix('ddg')}txt"
+        temp_mut_file_path = fs.get_valid_temp_name(f"{self.work_dir}/{temp_mut_file_path}")
+        # 3. finalize
+        temp_result_file_path = f"{Path(temp_mut_file_path).stem}.ddg"
 
         # content
-        res_keywords = self.cluster_job_config["res_keywords"]
-        num_core = int(res_keywords["node_cores"])
-        mem_per_core = int(res_keywords["mem_per_core"].rstrip('GB'))
-        mem = (num_core * mem_per_core) - 1 # GB
-        if mem < 1:
-            _LOGGER.error(f"You need at least 1 GB memory to run a Gaussian job.")
-            raise ValueError
-        additional_keywords = []
-        if self.keep_geom:
-            additional_keywords = ["nosymm"]
-
-        self.parent_interface.write_to_gjf(
-            out_path = temp_gjf_file_path,
-            gchk_path = temp_chk_file_path,
-            num_core = num_core,
-            mem = mem,
-            methods = [self.method],
-            job_type = "spe",
-            additional_keywords = additional_keywords,
-            stru = stru,
-            stru_regions = [self.region],
-            title = self.name,
+        mut_file_lines = [
+            f"total {len(mutant)}",
+            f"{len(mutant)}",
+        ]
+        for mut in mutant:
+            mut_file_lines.append(f"{mut.get_orig(True)} {mut.res_idx} {mut.get_target(True)}")
+            # NOTE potential risk that it could be the pose number is used here.
+        mut_file_lines.append(
+            ""
         )
 
-        return temp_gjf_file_path, temp_chk_file_path
-    # endregion TODO finish this
+        fs.write_lines(temp_mut_file_path, mut_file_lines)
+
+        return temp_mut_file_path, temp_result_file_path
+
+    def _make_pdb_file(self, stru: Structure) -> str:
+        """make the pdb file for the cartesian ddg calculation"""
+        result = fs.get_valid_temp_name(f"{self.work_dir}/cart_ddg_temp.pdb")
+        rosetta_stru = copy.deepcopy(stru)
+        self.parent_interface.rename_atoms(rosetta_stru)
+        PDBParser().save_structure(result, rosetta_stru)
+        
+        return result
+
+    def get_ddg_fold(self, ddg_file: str, method: str="average") -> float:
+        """calculate the ddG_fold number from the .ddg file."""
+        score_df = pd.read_csv(ddg_file, delim_whitespace=True, header=None)
+        group_by_variant = score_df.groupby(2)
+        if method == "average":
+            for tag, value in group_by_variant[3].mean().items():
+                tag: str
+                value: float
+                if tag.startswith("WT_"):
+                    wt_value = value
+                if tag.startswith("MUT_"):
+                    mut_value = value
+            result = mut_value - wt_value
+        else:
+            _LOGGER.error(f"method {method} is not supported")
+            raise ValueError
+
+        return result
 
 
 class RosettaInterface(BaseInterface):
@@ -471,6 +541,44 @@ class RosettaInterface(BaseInterface):
 
         return df
 
+    def get_structure_from_score(
+            self, score_df: pd.DataFrame,
+            base_dir: str = "",
+            target: str = "min_total",
+            clean_up_pdb: bool = True) -> Structure:
+        """get the structure of need from a score dataframe.
+
+        Args:
+            score_df:
+                the target score.sc based DataFrame
+            base_dir:
+                the base dir that the run associated with the score uses.
+                (it completes the relative path in the description when the relax
+                is ran in a different dir. NOTE that if `output_dir` is used
+                this base_dir is to complete output_dir if it is also relative.)
+            target:
+                the target structure based on the score.
+                (default: obtain the structure with the minimum (most negative) total score)
+            clean_up_pdb:
+                whether clean up all the PDB files after parsing."""
+        # locate the PDB
+        if target == "min_total":
+            idx = score_df["total_score"].idxmin()
+        else:
+            _LOGGER.error(f"unexpected keyword for target found {target}")
+            raise ValueError
+
+        pdb_path = score_df["description"][idx]
+        # parse the PDB
+        result = PDBParser().get_structure(f"{base_dir}{pdb_path}")
+        # TODO need to rename to convention.
+
+        if clean_up_pdb:
+            for temp_pdb_path in score_df["description"]:
+                fs.clean_temp_file_n_dir([temp_pdb_path])
+
+        return result
+
     def parameterize_ligand(self, mol: Ligand, charge:int=None, work_dir:str=None) -> Tuple[str, str]:
         """Parameterizes the input ligand for use in the RosettaLigand protocol. Takes an input file with the ligand,
         as well as the name of the residue in PDB format (3 capitalized letters) as well as optionally where the output
@@ -549,6 +657,38 @@ class RosettaInterface(BaseInterface):
         
         return params_file 
 
+    def make_cart_ddg_cmd(
+            self, 
+            pdb_path: str, 
+            mut_file: str, 
+            num_iter: int,
+            force_iter: bool,
+            score_cutoff: float,
+            fa_max_dis: float,
+            scorefxn: float,
+            save_mutant_pdb: bool,
+            # TODO figure out arguments
+        ) -> str:
+        """make the command line str for running cartesin ddg"""
+        cart_ddg_exe = self.config_.get_cart_ddg_exe()
+        flags = [
+            f"-in:file:s {pdb_path}",
+            f"-ddg::mut_file {mut_file}",
+            f"-ddg:iterations {num_iter}",
+            f"-force_iterations {str(force_iter).lower()}",
+            f"-ddg::score_cutoff {score_cutoff}",
+            f"-ddg::cartesian",
+            f"-ddg::dump_pdbs {str(save_mutant_pdb).lower()}",
+            f"-fa_max_dis {fa_max_dis}",
+            f"-score:weights {scorefxn}",
+            f"-ddg::legacy false",
+            f"-mute all",
+        ]
+        result = [f"{cart_ddg_exe}"] + flags
+        result = " \\\n".join(result)
+
+        return result
+
     def relax(
         self,
         infile: Union[Structure, str],
@@ -607,7 +747,7 @@ class RosettaInterface(BaseInterface):
                 exit(1)
         elif isinstance(infile, Structure):
             # convert Structure to a PDB
-            temp_pdb_path = fs.get_valid_temp_name("temp_rosetta_unrelax.pdb")
+            temp_pdb_path = fs.get_valid_temp_name("temp_rosetta_relax.pdb")
             # TODO apply StructureTranslator here
             stru = copy.deepcopy(infile)
             self.rename_atoms(stru)
@@ -624,14 +764,14 @@ class RosettaInterface(BaseInterface):
             f"-in:file:s '{infile}'",
             f"-nstruct {nstruct}",
             f"-linmem_ig {linmem_ig}",
-            f"-out:file:scorefile {score_file}",
+            f"-out:file:scorefile {Path(score_file).name}",
         ]
         flags.append(f"-ignore_zero_occupancy {'true' if ignore_zero_occupancy else 'false'}")
         flags.append(f"-relax:constrain_relax_to_start_coords {'true' if constrain_relax_to_start_coords else 'false'}")
         flags.append(f"-coord_constrain_sidechains {'true' if coord_constrain_sidechains else 'false'}")
         flags.append(f"-ramp_constraints {'true' if ramp_constraints else 'false'}")
         flags.append(f"-out:path:all {output_dir}")
-        flags.append(f"-cartesian {'true' if use_cartesian else 'false'}")
+        flags.append(f"-relax:cartesian {'true' if use_cartesian else 'false'}")
 
         if full_atom:
             flags.append("-in:file:fullatom")
@@ -654,14 +794,13 @@ class RosettaInterface(BaseInterface):
         # 3. execute
         fs.safe_mkdir(output_dir)
         
-        if cluster_job_config:
+        if cluster_job_config:  # parallel, armer
             cluster = cluster_job_config["cluster"]
             res_keywords =  self.config().DEFAULT_RELAX_RES_KEYWORDS | cluster_job_config["res_keywords"]
             env_settings = cluster.ROSETTA_ENV["parallel_CPU"]
             sub_script_path = fs.get_valid_temp_name(f"{output_dir}/submit_rosetta_relax.cmd")
             num_cores = res_keywords["node_cores"]
-            mpi_exec = eh_config._system.get_mpi_executable(num_cores)
-            _cmd = f"{mpi_exec} {self.config().RELAX} {' '.join(flags)}"
+            _cmd = f"{self.config().RELAX_MPI_EXEC} {num_cores} {self.config().RELAX_MPI} {' '.join(flags)}"
             job = ClusterJob.config_job(
                 commands = _cmd,
                 cluster = cluster,
@@ -672,7 +811,13 @@ class RosettaInterface(BaseInterface):
             )
             job.submit()
             job.wait_to_end(period=job_check_period)
-        else:
+
+            # clean up
+            fs.clean_temp_file_n_dir([
+                job.sub_script_path,
+                job.job_cluster_log,
+            ])
+        else: # serial, local
             self.env_manager_.run_command(self.config_.RELAX, flags)
 
         df: pd.DataFrame = self.parse_score_file(score_file)
@@ -1257,8 +1402,10 @@ class RosettaInterface(BaseInterface):
         score_cutoff: float = "default",
         fa_max_dis: float = "default",
         scorefxn: float = "default",
+        relax_nstruct: int = "default",
         # execution config
         cluster_job_config: Dict = "default",
+        relax_cluster_job_config: Dict = "default",
         save_mutant_pdb: float = False,
         keep_in_file: bool = False,
         work_dir: str = "default",
@@ -1280,6 +1427,8 @@ class RosettaInterface(BaseInterface):
                 (default: 9.0)  
             scorefxn:
                 the name of the Rosetta scoring function used.
+            relax_nstruct:
+                the nstruct of the relax on the WT before calculating the ddg
             save_mutant_pdb:
                 whether save mutants pdb generated by Rosetta.
             cluster_job_config:
@@ -1289,6 +1438,8 @@ class RosettaInterface(BaseInterface):
                 ARMerConfig.MD_CPU_RES depending on the core_type.)
                 NOTE that it is also used to config resources (num cores, core type) even if local run is specified.
                 key list: [cluster, res_keywords]
+            relax_cluster_job_config:
+                the cluster_job_config for the relax applied to the WT before the ddG calculation.
             keep_in_file:
                 whether the function will keep the input file after completion.
             work_dir:
@@ -1307,6 +1458,8 @@ class RosettaInterface(BaseInterface):
             fa_max_dis = self.config()["DEFAULT_CART_DDG_FA_MAX_DIS"]
         if scorefxn == "default":
             scorefxn = self.config()["DEFAULT_CART_DDG_SCOREFXN"]
+        if relax_nstruct == "default":
+            relax_nstruct = self.config()["DEFAULT_CART_DDG_RELAX_NSTRUCT"]
 
         if cluster_job_config == "default":
             cluster_job_config = self.config().get_default_cart_ddg_cluster_job_config()
@@ -1316,6 +1469,16 @@ class RosettaInterface(BaseInterface):
             res_keywords_update = cluster_job_config["res_keywords"]
             default_res_keywords = self.config().get_default_cart_ddg_cluster_job_res_keywords()
             cluster_job_config["res_keywords"] = default_res_keywords | res_keywords_update
+
+        if relax_cluster_job_config == "default":
+            relax_cluster_job_config = self.config().get_default_cart_ddg_relax_cluster_job_config()
+        else:
+            # For res_keywords, it updates the default config
+            relax_cluster_job_config = copy.deepcopy(relax_cluster_job_config) # because we will change it in place.
+            res_keywords_update = relax_cluster_job_config["res_keywords"]
+            default_res_keywords = self.config().get_default_cart_ddg_relax_cluster_job_res_keywords()
+            relax_cluster_job_config["res_keywords"] = default_res_keywords | res_keywords_update
+
         if work_dir == "default":
             work_dir = self.config()["DEFAULT_CART_DDG_WORK_DIR"]
 
@@ -1326,7 +1489,9 @@ class RosettaInterface(BaseInterface):
             score_cutoff = score_cutoff,
             fa_max_dis = fa_max_dis,
             scorefxn = scorefxn,
+            relax_nstruct= relax_nstruct,
             cluster_job_config = cluster_job_config,
+            relax_cluster_job_config = relax_cluster_job_config,
             save_mutant_pdb = save_mutant_pdb,
             keep_in_file = keep_in_file,
             work_dir = work_dir,

@@ -8,8 +8,13 @@ Date: 2023-03-28
 """
 
 import copy
+import glob
+import os
 from typing import List, Any, Dict
 from copy import deepcopy
+
+from enzy_htp.core.exception import MissingEnvironmentElement
+from enzy_htp.core.logger import _LOGGER
 
 from .base_config import BaseConfig
 from .armer_config import ARMerConfig
@@ -38,6 +43,28 @@ class RosettaConfig(BaseConfig):
 
     RELAX: str = f"$ROSETTA3/source/bin/relax.default.linuxgccrelease"
     """Executable used to relax a structure/pose."""
+
+    RELAX_MPI: str = f"$ROSETTA3/source/bin/relax.mpi.linuxgccrelease"
+    """MPI Executable used to relax a structure/pose."""
+
+    RELAX_MPI_EXEC: str = f"mpiexec -np"
+    """MPI Executable used to relax a structure/pose."""
+
+    CART_DDG: str = f"$ROSETTA3/source/bin/cartesian_ddg.*.linuxgccrelease"
+    """Executable used to relax a structure/pose."""
+
+    @classmethod
+    def get_cart_ddg_exe(self):
+        """find the path of the cartesian_ddg executable. This is made because
+        Rosetta exe names varible but compiling settings"""
+        if 'ROSETTA3' not in os.environ:
+            _LOGGER.error("$ROSETTA3 needed but not assigned!")
+            raise MissingEnvironmentElement
+        result = glob.glob(os.path.expandvars(self.CART_DDG))[0]
+        _LOGGER.info(
+            f"getting {result} as the exe of cartesian_ddg. "
+            "Change enzy_htp.config.rosetta.CART_DDG if you want to use a different one")
+        return result
 
     SCORE: str = f"$ROSETTA3/source/bin/score_jd2.default.linuxgccrelease"
     """Executable used to score a specific structure/pose."""
@@ -74,8 +101,17 @@ class RosettaConfig(BaseConfig):
     DEFAULT_CART_DDG_SCOREFXN: str = "ref2015_cart"
     """the default value for the SCOREFXN option of cartesian ddg calculation"""
 
+    DEFAULT_CART_DDG_RELAX_NSTRUCT: int = 20
+    """the default value for the RELAX_NSTRUCT option of cartesian ddg calculation"""
+
     DEFAULT_CART_DDG_RES_KEYWORDS: Dict = copy.deepcopy(ARMerConfig.SINGLE_CPU_RES) | {'job_name' : 'cart_ddg_EnzyHTP',}
     """The default value for the resource configuration of CART_DDG."""
+
+    DEFAULT_CART_DDG_RELAX_RES_KEYWORDS: Dict = copy.deepcopy(
+        ARMerConfig.SINGLE_CPU_RES
+    ) | {'job_name' : 'cart_ddg_relax_EnzyHTP',
+         'node_cores' : '24',}
+    """The default value for the resource configuration of the relax on the WT before CART_DDG."""
 
     def get_default_cart_ddg_cluster_job_res_keywords(self) -> Dict:
         """function for lazy resolution."""
@@ -87,6 +123,18 @@ class RosettaConfig(BaseConfig):
         return {
             "cluster" : Accre(),
             "res_keywords" : self.get_default_cart_ddg_cluster_job_res_keywords(),
+        }
+
+    def get_default_cart_ddg_relax_cluster_job_res_keywords(self) -> Dict:
+        """function for lazy resolution."""
+        return copy.deepcopy(self.DEFAULT_CART_DDG_RELAX_RES_KEYWORDS)
+
+    def get_default_cart_ddg_relax_cluster_job_config(self) -> Dict:
+        """The default value for dictionary that assign arguments to
+        ClusterJob.config_job and ClusterJob.wait_to_end during the CART_DDG"""
+        return {
+            "cluster" : Accre(),
+            "res_keywords" : self.get_default_cart_ddg_relax_cluster_job_res_keywords(),
         }
 
     DEFAULT_CART_DDG_WORK_DIR: str = "./rosetta_cart_ddg"

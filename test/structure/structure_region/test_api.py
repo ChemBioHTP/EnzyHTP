@@ -11,7 +11,7 @@ from enzy_htp.core.general import EnablePropagate
 import enzy_htp.core.file_system as fs
 import enzy_htp.structure.structure_region as stru_regi
 import enzy_htp.structure.structure_selection as stru_sele
-from enzy_htp.structure.structure_operation import init_charge
+from enzy_htp.structure.structure_enchantment import init_charge
 
 CURR_FILE = os.path.abspath(__file__)
 CURR_DIR = os.path.dirname(CURR_FILE)

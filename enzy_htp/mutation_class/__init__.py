@@ -15,4 +15,5 @@ from .mutation import (
     get_mutant_name_tag,
     get_mutant_name_str,
     get_involved_mutation,
+    is_mutant_wt,
 )

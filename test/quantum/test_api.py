@@ -6,8 +6,8 @@ Date: 2023-12-29
 import numpy as np
 import pytest
 import os
-from enzy_htp._interface.amber_interface import AmberMDCRDParser
 
+from enzy_htp._interface.amber_interface import AmberMDCRDParser
 from enzy_htp.core.clusters.accre import Accre
 import enzy_htp.core.file_system as fs
 from enzy_htp.chemical.level_of_theory import QMLevelOfTheory, MMLevelOfTheory
