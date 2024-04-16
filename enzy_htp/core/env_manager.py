@@ -224,7 +224,7 @@ class EnvironmentManager:
 
     def __getattr__(self, key: str) -> str:
         """Allows accession into acquired executables."""
-        if key.startswith('__') and key.endswith('__'):
+        if key.startswith('__') and key.endswith('__'): # this is critical for pickle to work (https://stackoverflow.com/questions/50888391/pickle-of-object-with-getattr-method-in-python-returns-typeerror-object-no)
             raise AttributeError
         if key not in self.mapper and key in self.executables_:
             _LOGGER.error(
