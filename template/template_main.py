@@ -19,13 +19,31 @@ from enzy_htp.chemical.level_of_theory import QMLevelOfTheory
 from enzy_htp.core.clusters.accre import Accre
 
 # workflow config
+# I/O path
 wt_pdb_path = "KE_07_R7_2_S.pdb"
 result_path = "ke_test_result.pickle"
+ligand_chrg_spin_mapper = {"H5J" : (0,1)} # define the charge spin for ligands and modified AAs
+
+# HPC job resources
+md_hpc_job_config = {
+    "cluster" : Accre(),
+    "res_keywords" : {
+        "account" : "csb_gpu_acc",
+        "partition" : "pascal"
+    }
+}
+qm_hpc_job_config = {
+    "cluster" : Accre(),
+    "res_keywords" : {
+        "account" : "yang_lab_csb",
+        "partition" : "production",
+        'walltime' : '1-00:00:00',
+    }
+}
 result_dict = {}
 
 # 1. create Structure()
 wt_stru = PDBParser().get_structure(wt_pdb_path)
-ligand_chrg_spin_mapper = {"H5J" : (0,1)} # define the charge spin for ligands and modified AAs
 
 # 2. prepare
 remove_hydrogens(wt_stru, polypeptide_only=True)
@@ -55,16 +73,9 @@ for i, mut in enumerate(mutants):
             "leaprc.water.tip3p",
         ],
     )
-    md_hpc_job_config = {
-        "cluster" : Accre(),
-        "res_keywords" : {
-            "account" : "csb_gpu_acc",
-            "partition" : "pascal"
-        }
-    }
     mut_constraints = [
         stru_cons.create_distance_constraint("B.254.H2", "A.101.OE2", 2.4, mutant_stru),
-        stru_cons.create_distance_constraint("B.254.CAE", "B.254.H2", "A.101.OE2", 180.0, mutant_stru),
+        stru_cons.create_angle_constraint("B.254.CAE", "B.254.H2", "A.101.OE2", 180.0, mutant_stru),
     ]
 
     md_result = equi_md_sampling(
@@ -77,29 +88,22 @@ for i, mut in enumerate(mutants):
         work_dir=f"{mutant_dir}/MD/"
     )
 
-# electronic structure
     for replica_esm in md_result:
         replica_result = []
-        qm_cluster_job_config = {
-            "cluster" : Accre(),
-            "res_keywords" : {
-                "account" : "yang_lab_csb",
-                "partition" : "production",
-                'walltime' : '1-00:00:00',
-            }}
 
+# 6. electronic structure
         qm_results = single_point(
             stru=replica_esm,
             engine="gaussian",
             method=QMLevelOfTheory( basis_set="3-21G", method="hf" ),
             regions=["resi 101+254"],
-            cluster_job_config=qm_cluster_job_config,
+            cluster_job_config=qm_hpc_job_config,
             job_check_period=60,
             job_array_size=20,
             work_dir=f"{mutant_dir}/QM_SPE/",
         )
 
-# analysis
+# 7. analysis
         for ele_stru in qm_results:
             this_frame_stru = ele_stru.geometry.topology
             atom_1 = this_frame_stru.get("B.254.CAE")
