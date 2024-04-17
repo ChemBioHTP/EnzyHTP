@@ -358,7 +358,7 @@ def fine_filter( # TODO summarize logics from here to a general shrapnel functio
         # 2. update the checkpoint
         save_obj(child_jobs, checkpoint_1)
 
-    jobs_remain = ClusterJob.wait_to_array_end(child_jobs, shrapnel_check_period, shrapnel_child_array_size)
+    jobs_remain = ClusterJob.wait_to_array_end_plus(child_jobs, shrapnel_check_period, shrapnel_child_array_size)
 
     if jobs_remain:
         _LOGGER.error("some children jobs didn't finish normally. they are:")
