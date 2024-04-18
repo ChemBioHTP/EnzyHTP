@@ -51,6 +51,8 @@ class ClusterJob():
         release()
         get_state()
         is_complete()
+        is_submitted()
+        retrive_job_id()
         wait_to_end()
         wait_to_array_end()
     """
@@ -281,10 +283,7 @@ class ClusterJob():
         record submitted job id to a file to help removing and tracking all jobs upon aborting
         """
         # get file path
-        if eh_config["system.JOB_ID_LOG_PATH"] == "DEFAULT":
-            job_id_log_path = f"{self.sub_dir}/submitted_job_ids.log"
-        else:
-            job_id_log_path = eh_config["system.JOB_ID_LOG_PATH"]
+        job_id_log_path = self.job_id_log_path()
         # write to
         with open(job_id_log_path, "a") as of:
             of.write(f"{self.job_id} {self.sub_script_path}{os.linesep}")
@@ -355,6 +354,40 @@ class ClusterJob():
         determine if the job is ever being submitted.
         """
         return self.job_id is not None
+
+    def retrive_job_id(self) -> None:
+        """this method is used for retriving job id for a job that is
+        submitted in a job array by methods like wait_to_array_end etc.
+        NOTE: Typically in these method, it is impossible to know the job id before
+        the method finishes. In the meantime these method takes a long time
+        to finish.
+        To retrive the job id:
+        1. the submitted_job_ids.log under self.sub_dir is read
+        2. find the last record that matches self.sub_script_path
+        
+        limitation: 
+        1. this method might cause hidden bugs if the sub_script is changed 
+        manually or submitted manually.
+        2. the cwd should be the same as when the job is submitted"""
+
+        with open(self.job_id_log_path(), "r") as f:
+            job_id_log_lines = f.readlines()
+
+        for i in range(len(job_id_log_lines)-1, -1, -1):
+            job_id, sub_script_path = job_id_log_lines[i].strip().split()
+            if os.path.abspath(sub_script_path) == os.path.abspath(self.sub_script_path):
+                self.job_id = job_id
+                return
+
+    def job_id_log_path(self) -> str:
+        """getter for job_id_log_path"""
+
+        if eh_config["system.JOB_ID_LOG_PATH"] == "DEFAULT":
+            job_id_log_path = f"{self.sub_dir}/submitted_job_ids.log"
+        else:
+            job_id_log_path = eh_config["system.JOB_ID_LOG_PATH"]
+
+        return job_id_log_path
 
     def wait_to_end(self, period: int) -> None:
         """
@@ -516,7 +549,7 @@ class ClusterJob():
         # consider already running jobs
         inactive_job = []
         for job in jobs:
-            if (job.job_id is not None) and (job.get_state()[0] in ["pend", "run"]):
+            if job.is_submitted() and (job.get_state()[0] in ["pend", "run"]):
                 current_active_job.append(job)
             else:
                 inactive_job.append(job)

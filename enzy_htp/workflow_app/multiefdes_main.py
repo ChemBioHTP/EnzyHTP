@@ -352,6 +352,7 @@ def fine_filter( # TODO summarize logics from here to a general shrapnel functio
         new_child_jobs = []
         # 1. analyze remaining child_jobs (recycle old one) may benefit from having a mimo
         for job in child_jobs:
+            job.retrive_job_id()
             if (not job.is_submitted()) or (not job.is_complete()):
                 new_child_jobs.append(job)
         child_jobs = new_child_jobs # this will include failing, pending, running jobs
