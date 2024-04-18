@@ -294,7 +294,7 @@ def _parallelize_md_steps_with_cluster_job(
         job_list = []
         result_egg_ele = []
         # create job path
-        sub_work_dir = f"{work_dir}/rep_{i}"
+        sub_work_dir = fs.get_valid_temp_name(f"{work_dir}/rep_{i}")
         fs.safe_mkdir(sub_work_dir)
         output = None  # the output place holder; the output between steps are very different for different packages so it will prob also becomes a class
 
@@ -344,7 +344,7 @@ def _serial_md_steps(
     results = []
     for i in range(parallel_runs):
         # create job path
-        sub_work_dir = f"{work_dir}/rep_{i}"
+        sub_work_dir = fs.get_valid_temp_name(f"{work_dir}/rep_{i}")
         fs.safe_mkdir(sub_work_dir)
         output = None
         result_ele = []
