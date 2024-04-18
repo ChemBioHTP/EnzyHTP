@@ -167,6 +167,18 @@ def test_get_valid_temp_name_symlink():
     fs.safe_rm(sym_fname1)
     assert not os.path.lexists(sym_fname1)
 
+def test_get_valid_temp_name_dir():
+    fname1 = f"{CURR_DIR}/test_get_valid_temp_name/"
+    fname2 = f"{CURR_DIR}/test_get_valid_temp_name_1/////"
+    fs.safe_mkdir(fname1)
+    assert fs.get_valid_temp_name(fname1) == f"{CURR_DIR}/test_get_valid_temp_name_1"
+    fs.safe_mkdir(fname2)
+    assert fs.get_valid_temp_name(fname1) == f"{CURR_DIR}/test_get_valid_temp_name_2"
+    fs.safe_rmdir(fname1)
+    fs.safe_rmdir(fname2)
+    assert not os.path.exists(fname1)
+    assert not os.path.exists(fname2)
+
 def test_clean_temp_file_n_dir():
     temp_dir_path = f"{CURR_DIR}/temp/"
     temp_path_list = [temp_dir_path]
