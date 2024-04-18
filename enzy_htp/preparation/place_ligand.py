@@ -157,12 +157,14 @@ def _place_mole2(stru:Structure,
 
         curr_energy = 0.0
         for cst in constraints:
-            if cst.is_residue_pair_constraint():
-                curr_energy += interface.rosetta.score_energy(cst.distanceAB_)
-            elif cst.is_distance_constraint():
-                curr_energy += interface.rosetta.score_energy(cst)
+            if sum([aa.parent == ligand for aa in cst.atoms]) > 1:
+                continue
+            curr_energy += interface.rosetta.score_energy(cst)
+#            if cst.is_residue_pair_constraint():
+#                curr_energy += interface.rosetta.score_energy(cst.distanceAB_)
+#            elif cst.is_distance_constraint():
+#                curr_energy += interface.rosetta.score_energy(cst)
             #TODO(CJ): add in the regular distance constraints
-                
         scores.append( curr_energy )            
 
     scores = np.array(scores)
@@ -170,14 +172,13 @@ def _place_mole2(stru:Structure,
     score_mask = np.isclose(scores, np.min(scores))
 
     clash_counts = list()
-    print(seed_locations[score_mask])
+    
     for slidx,sl in enumerate(seed_locations[score_mask]):
         lig_start = ligand.geom_center
         shift = sl - lig_start
 
         ligand.shift(shift)
         clash_ct = 0
-        print(ligand.geom_center)
 
         for res in stru.residues:
             if res == ligand:
@@ -185,7 +186,6 @@ def _place_mole2(stru:Structure,
             clash_ct += res.clash_count( ligand )
     
         clash_counts.append( clash_ct ) 
-        print(clash_ct)
 
     clash_counts = np.array(clash_counts)
 
@@ -196,7 +196,6 @@ def _place_mole2(stru:Structure,
 
     ligand.shift( seed - ligand.geom_center)
     
-    print(ligand.geom_center)
 
 
 def _place_alphafill(stru: Structure,
@@ -328,7 +327,7 @@ def _place_alphafill(stru: Structure,
                                           ("align", f"{Path(filled_structure).stem} and ({' or '.join(pp_chains)})", f"{Path(molfile).stem} and ({' or '.join(pp_chains)})"),
                                           ("delete", Path(molfile).stem),
                                           ("save", template, f"chain {selected_id} and segi {selected_id}")])
-
+    
     if ligand.is_ligand():
         outfile:str=align_ligand(template, reactant, outfile=outfile)
     else:

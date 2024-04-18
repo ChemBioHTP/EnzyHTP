@@ -28,6 +28,34 @@ class PrmtopParser(StructureParserInterface):
             ncaa_chrgspin_mapper = {}
         self.ncaa_chrgspin_mapper = ncaa_chrgspin_mapper
 
+
+    def add_charges(self, stru:Structure, prmtop:str) -> None:
+        """TODO(CJ)"""
+        data = type(self)._parse_prmtop_file(prmtop)
+        print(data.keys())
+        all_res_names:List[str] = type(self)._expand_data(data["RESIDUE_LABEL"],
+                                                            data['RESIDUE_POINTER'],
+                                                            data['RESIDUE_LABEL'] )
+        
+        all_chain_names:List[str] = type(self)._expand_data(data["RESIDUE_CHAINID"],
+                                                            data['RESIDUE_POINTER'],
+                                                            data['RESIDUE_LABEL'] )
+        
+        all_res_nums:List[int] = type(self)._expand_data(data["RESIDUE_NUMBER"],
+                                                            data['RESIDUE_POINTER'],
+                                                            data['RESIDUE_LABEL'] )
+        charge_mapper = dict()
+
+        for (ar_name, ac_name, ar_num, atom_name, chrg) in zip(all_res_names, all_chain_names, all_res_nums, data['ATOM_NAME'], data['CHARGE']):
+            charge_mapper[(ac_name, ar_num, ar_name, atom_name)] = chrg
+            
+        for atom in stru.atoms:
+            atom.charge = charge_mapper[(
+                atom.parent.parent.name, 
+                atom.parent.idx, 
+                atom.parent.name, 
+                atom.name)]
+
     def get_structure(
             self,
             path: str,

@@ -69,4 +69,6 @@ from .analysis import (
     ele_stab_energy_of_bond,
     ele_stab_energy_of_dipole,
     bond_dipole,
+    spi_metric,
+    binding_energy
 )

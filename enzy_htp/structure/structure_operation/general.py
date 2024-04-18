@@ -105,8 +105,16 @@ def update_residues(stru: Structure, ref_stru: Structure) -> Structure:
         if self_res.name != ref_res.name:
             _LOGGER.info(f"updating {self_res.key()} {self_res.name} to {ref_res.name}")
             self_res.name = ref_res.name
+
+        if self_res.is_ligand():
+            for satom in self_res.atoms:
+                for ratom in ref_res.atoms:
+                    if satom.name == ratom.name:
+                        satom.coord = ratom.coord
+        else:
+            self_res.atoms = copy.deepcopy(ref_res.atoms)  # this will also set self_res as parent
         
-        self_res.atoms = copy.deepcopy(ref_res.atoms)  # this will also set self_res as parent
+
     stru.renumber_atoms()
     return stru
 

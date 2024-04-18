@@ -4,6 +4,8 @@ Date: 2023-10-09
 """
 
 #TODO(CJ): maybe wrap this in a try,except loop
+from collections import defaultdict
+
 import rdkit
 from rdkit import Chem as _rchem
 import rdkit.Chem.AllChem as _rchem_ac
@@ -69,7 +71,7 @@ class RDKitInterface(BaseInterface):
             return _rchem.MolFromMolFile(molfile, sanitize, removeHs, strictParsing)
 
         if ext == '.sdf':
-            reader = _rchem.SDMolSupplier(molfile)
+            reader = _rchem.SDMolSupplier(molfile, removeHs)
             for rr in reader:
                 return rr
 
@@ -78,6 +80,8 @@ class RDKitInterface(BaseInterface):
         self._supported_ftype(outfile)
 
         ext: str = Path(outfile).suffix
+
+
 
         if ext == '.mol' or ext == '.mol2':
             temp = str(Path(outfile).with_suffix('.mol'))
@@ -103,10 +107,34 @@ class RDKitInterface(BaseInterface):
         """ """
         mol: _rchem.Mol = self._load_molecule(molfile)
         #TODO(CJ): need to add some stuff for phosphates/carboxylic acids
+        bond_idxs = list()
+        for bond in mol.GetBonds():
+            if bond.GetIsAromatic() and not  bond.IsInRing():
+                bond_idxs.append((bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()))
+                bond.GetBeginAtom().SetIsAromatic(False)
+                bond.GetEndAtom().SetIsAromatic(False)
+
+        if bond_idxs:
+            holder = defaultdict(list)
+
+            for (first, second) in bond_idxs:
+                holder[first].append( second )
+
+            for base_atom_idx, child_idxs in holder.items():
+                double_bond_idx = child_idxs.pop()
+                bb = mol.GetBondBetweenAtoms(base_atom_idx, double_bond_idx)
+                bb.SetBondType(_rchem.rdchem.BondType.DOUBLE)
+                bb.SetIsAromatic(False)
+                
+                for cidx in child_idxs:
+                    bb = mol.GetBondBetweenAtoms(base_atom_idx, cidx)
+                    bb.SetBondType(_rchem.rdchem.BondType.SINGLE)
+                    bb.SetIsAromatic(False)
+                #print(base_atom_idx, child_idxs)
+        
         for atom in mol.GetAtoms():
             if not atom.IsInRing() and atom.GetIsAromatic():
                 atom.SetIsAromatic(False)
-            print(list(atom.GetPropNames()))
         self._save_molecule(mol, outfile)
         return outfile
 

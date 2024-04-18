@@ -18,6 +18,8 @@ WORK_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/work_dir/"
 sp = PDBParser()
 ri = interface.rosetta
 
+
+
 def test_relax_w_stru():
     """as said in the name. make sure relax works Structure() input."""
     config.rosetta.RELAX = "$ROSETTA3/source/bin/relax.mpi.linuxgccrelease"

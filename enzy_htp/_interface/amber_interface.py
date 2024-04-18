@@ -646,7 +646,6 @@ class AmberMDStep(MolDynStep):
             coord = input_data.input_coordinate_file
             prmtop = input_data.topology_file
         elif isinstance(input_data, MolDynResult) and input_data.source == "amber": # build form previous step
-            print(input_data)
             coord = input_data.last_frame_file
             prmtop = input_data.last_frame_parser.prmtop_file
         else:
@@ -1761,7 +1760,7 @@ class AmberInterface(BaseInterface):
 
         Application:
             Used in mutation.api.mutate_stru_with_tleap()"""
-
+        
         tleap_in_lines: List[str] = [
             f"source {amber_lib}",
             f"a = loadpdb {input_pdb}",

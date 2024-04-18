@@ -5,9 +5,10 @@ Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
 Date: 2023-03-20
 """
 
-from typing import Tuple, Union
+from typing import Tuple, Union, List
 
 from enzy_htp.core.logger import _LOGGER
+from enzy_htp.core import math_helper as mh
 import enzy_htp.chemical as chem
 from ..structure import Structure, Residue, Atom
 from .connectivity import init_connectivity
@@ -111,3 +112,23 @@ def check_res_topology_error(
     # 3. check for any bond (polyline) from the target residue thread through any ring
     # 4. check for any ring from the target residue is threaded by any bond
     pass
+
+
+def closest_n_residues( 
+    target:Residue,
+    n:int,
+    method:str='centerofmass',
+    include_H:bool=False) -> List[Residue]:
+    target_coord = target.geom_center
+    distances = list()
+    for res in target.root().residues:
+        if res == target:
+            continue
+        
+        distances.append((mh.get_distance(target_coord, res.geom_center), res))
+
+    distances = sorted(distances, key=lambda pr: pr[0])
+    result = list()
+    for (_, res) in distances[:n]:
+        result.append( res )        
+    return result

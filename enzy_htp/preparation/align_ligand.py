@@ -6,7 +6,11 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-10-09
 """
 
+from rdkit import Chem
+from rdkit.Chem import AllChem
+from rdkit.Chem import rdMolTransforms as rdmt
 from collections import defaultdict
+
 from typing import List, Dict, Set, Tuple
 from pathlib import Path
 
@@ -19,6 +23,8 @@ from enzy_htp import config, interface
 
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import _LOGGER
+
+from enzy_htp.structure import Mol2Parser
 
 
 def align_ligand(template: str,
@@ -66,6 +72,12 @@ def align_ligand(template: str,
             _LOGGER.error(em)
         _LOGGER.error("Exiting...")
         exit(1)
+
+    special_case_try = special_case(template, ligand)
+
+    if special_case_try is not None:
+        return special_case_try
+
 
     t_info: Dict = _molecule_info(template, mapping_tol)
     l_info: Dict = _molecule_info(ligand, mapping_tol)
@@ -125,6 +137,18 @@ def align_ligand(template: str,
     interface.pymol.general_cmd(session, args)
 
     return outfile
+
+def get_atom_info( fname :str ):
+    
+    session = interface.pymol.new_session()
+    
+    df = interface.pymol.collect(session, fname, "rank name elem".split())
+    
+    result = list()
+    for i, row in df.iterrows():
+        result.append({'rank': row['rank'], 'name': row['name'], 'elem': row['elem']})
+    
+    return result
 
 
 def _map_atoms(mol: _rchem.RWMol, fname: str, cutoff: float = 0.001) -> Tuple[Dict, List[str]]:
@@ -202,3 +226,142 @@ def _molecule_info(fname: str, dist_tol: float) -> Dict:
         'bonded': bonded,
         'bond_mapper': bond_mapper
     }
+
+
+def special_case(template, ligand):
+
+    t_anames = get_atom_info(template)
+    l_anames = get_atom_info(ligand)
+    
+    t_set = set()
+
+    for tt in t_anames:
+        if tt['elem'] == 'H':
+            continue
+
+        t_set.add( tt['name'] )
+
+
+    exact_match = False
+    for ll in l_anames:
+
+        if ll['elem'] == 'H':
+            continue
+        
+        if ll['name'] not in t_set:
+            break
+    
+    else:
+        exact_match = True
+
+    if exact_match:
+        parser = Mol2Parser()
+        lig = parser.get_ligand(ligand)
+        params_file = str(Path(interface.rosetta.parameterize_ligand(lig)).absolute())
+
+        session = interface.pymol.new_session()
+        pdb_file=interface.pymol.convert(session, template, new_ext='.pdb')
+        
+        interface.rosetta.score(pdb_file, ignore_zero_occupancy=False, delete_scores=False, extra_flags=['-extra_res_fa',str(Path(params_file).absolute()), '-out:output', 'true' , '-no_optH', 'false', '-out:file:scorefile', 'score.sc'])
+
+        full_atom = Path(pdb_file).stem + "_0001.pdb"
+        ligand=interface.pymol.convert(session, full_atom, ligand)
+        fs.safe_rm(full_atom)
+
+        return ligand
+
+
+def enumerate_torsions(mol):
+    ri = mol.GetRingInfo()
+
+    ring_mapper = defaultdict(list)
+    for ridx, ring in enumerate(ri.AtomRings()):
+        ring_name = f"ring_{ridx}"
+        for rr in ring:
+            ring_mapper[rr].append(ring_name)
+    torsionSmarts = '[!$(*#*)&!D1]~[!$(*#*)&!D1]'
+    torsionQuery = Chem.MolFromSmarts(torsionSmarts)
+    matches = mol.GetSubstructMatches(torsionQuery)
+    torsionList = []
+    for match in matches:
+        idx2 = match[0]
+        idx3 = match[1]
+        bond = mol.GetBondBetweenAtoms(idx2, idx3)
+        jAtom = mol.GetAtomWithIdx(idx2)
+        kAtom = mol.GetAtomWithIdx(idx3)
+        if (((jAtom.GetHybridization() != Chem.HybridizationType.SP2)
+            and (jAtom.GetHybridization() != Chem.HybridizationType.SP3))
+            or ((kAtom.GetHybridization() != Chem.HybridizationType.SP2)
+            and (kAtom.GetHybridization() != Chem.HybridizationType.SP3))):
+            continue
+        for b1 in jAtom.GetBonds():
+            if (b1.GetIdx() == bond.GetIdx()):
+                continue
+            idx1 = b1.GetOtherAtomIdx(idx2)
+            for b2 in kAtom.GetBonds():
+                if ((b2.GetIdx() == bond.GetIdx())
+                    or (b2.GetIdx() == b1.GetIdx())):
+                    continue
+                idx4 = b2.GetOtherAtomIdx(idx3)
+                # skip 3-membered rings
+                if (idx4 == idx1):
+                    continue
+                if idx2 in ring_mapper and idx3 in ring_mapper  and set(ring_mapper[idx2])&set(ring_mapper[idx3]):
+                    continue
+                torsionList.append((idx1, idx2, idx3, idx4))
+    return torsionList
+
+
+
+
+def mimic_torsions(template, reactant):
+
+    template_path = template
+    ligand = AllChem.MolFromMol2File(reactant, removeHs=False)
+    template = AllChem.MolFromMol2File(template, removeHs=False)
+
+
+    torsions = enumerate_torsions(template)
+
+    template_to_ligand = dict()
+
+    atom_names = list()
+    for aidx, at in enumerate(template.GetAtoms()):
+        target_name:str=at.GetPropsAsDict()['_TriposAtomName']
+        atom_names.append(target_name)
+        for lidx, al in enumerate(ligand.GetAtoms()):
+            if target_name == al.GetPropsAsDict()['_TriposAtomName']:
+                template_to_ligand[aidx] = lidx
+                break
+        else:
+            assert False
+
+
+    for (a1,a2,a3,a4) in torsions:
+        m1,m2,m3,m4 = template_to_ligand[a1],template_to_ligand[a2],template_to_ligand[a3],template_to_ligand[a4]
+        rdmt.SetDihedralDeg(ligand.GetConformer(), m1, m2, m3, m4,
+            rdmt.GetDihedralDeg(template.GetConformer(), a1, a2, a3, a4)
+        )
+
+
+
+
+    session = interface.pymol.new_session()
+    args = [('load', reactant)]
+    for aidx, atom in enumerate(ligand.GetAtoms()):
+        pos = ligand.GetConformer().GetAtomPosition(aidx)
+        args.append(('alter_state', 1, f'rank {aidx}', f"(x,y,z) = ({pos.x},{pos.y},{pos.z})"))
+
+    args.extend([
+    ('load', template_path),
+    ('align', Path(reactant).stem, Path(template_path).stem),
+    ('delete', Path(template_path).stem),
+    ('save', reactant)
+    ])    
+
+    interface.pymol.general_cmd(session, args)
+
+    return reactant
+        
+
+
