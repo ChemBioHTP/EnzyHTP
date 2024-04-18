@@ -369,15 +369,19 @@ class ClusterJob():
         1. this method might cause hidden bugs if the sub_script is changed 
         manually or submitted manually.
         2. the cwd should be the same as when the job is submitted"""
+        job_id_log_path = self.job_id_log_path()
+        if os.path.exists(job_id_log_path):
+            with open(job_id_log_path, "r") as f:
+                job_id_log_lines = f.readlines()
 
-        with open(self.job_id_log_path(), "r") as f:
-            job_id_log_lines = f.readlines()
-
-        for i in range(len(job_id_log_lines)-1, -1, -1):
-            job_id, sub_script_path = job_id_log_lines[i].strip().split()
-            if os.path.abspath(sub_script_path) == os.path.abspath(self.sub_script_path):
-                self.job_id = job_id
-                return
+            for i in range(len(job_id_log_lines)-1, -1, -1):
+                job_id, sub_script_path = job_id_log_lines[i].strip().split()
+                if os.path.abspath(sub_script_path) == os.path.abspath(self.sub_script_path):
+                    self.job_id = job_id
+                    return
+        # None case
+        if self.job_id is None:
+            _LOGGER.info(f"no job id for {self.sub_dir} -> {self.sub_script_path}")
 
     def job_id_log_path(self) -> str:
         """getter for job_id_log_path"""

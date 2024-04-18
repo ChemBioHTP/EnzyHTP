@@ -471,6 +471,7 @@ def _fine_filter_child_main(
             save_obj(result_dict, result_path)
         
         # 4. MD
+        # TODO check and stop any previous MD jobs (workflow specific)
         trajs: List[StructureEnsemble] = mut_result_data.get("trajs", list())
         runs_left = md_parallel_runs - len(trajs)
         if runs_left > 0:
