@@ -350,6 +350,12 @@ class ClusterJob():
         """
         return self.get_state()[0] == "complete"
 
+    def is_submitted(self) -> bool:
+        """
+        determine if the job is ever being submitted.
+        """
+        return self.job_id is not None
+
     def wait_to_end(self, period: int) -> None:
         """
         monitor the job in a specified frequency
