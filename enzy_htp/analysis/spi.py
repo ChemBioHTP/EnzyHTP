@@ -20,6 +20,7 @@ from typing import List, Union, Any
 from enzy_htp.structure import (Structure, StructureEnsemble, Ligand, PDBParser, Residue)
 
 from plum import dispatch
+from enzy_htp._interface.pymol_interface import OpenPyMolSession
 
 
 @dispatch
@@ -83,8 +84,6 @@ def spi_metric(
 
     return result
 
-
-
 @dispatch
 def spi_metric( stru: Structure, 
             ligand: Ligand,
@@ -101,15 +100,16 @@ def spi_metric( stru: Structure,
     Returns:
         A List[float] of len(StructureEnsemble.structures), with each value being a different spi metric for the nth Structure(). 
     """
-
+    
     (lig_chain, lig_idx) = ligand.key()
-    session = interface.pymol.new_session()
-    interface.pymol.load_enzy_htp_stru(session, stru )
-    results:List[Any] = interface.pymol.general_cmd(session,[
-        ('set', 'dot_solvent', 1),
-        ('create', 'ligand', f'chain {lig_chain} and resi {lig_idx}'),
-        ('create', 'protein', f'not (chain {lig_chain} and resi {lig_idx})'),
-        ('get_area', 'ligand'),
-        ('get_area', f'protein and ({pocket_sele})')
-    ])
-    return results[-2] / results[-1]
+    pi = interface.pymol
+    with OpenPyMolSession(pi) as pms:
+        interface.pymol.load_enzy_htp_stru(session, pms )
+        results:List[Any] = interface.pymol.general_cmd(pms,[
+            ('set', 'dot_solvent', 1),
+            ('create', 'ligand', f'chain {lig_chain} and resi {lig_idx}'),
+            ('create', 'protein', f'not (chain {lig_chain} and resi {lig_idx})'),
+            ('get_area', 'ligand'),
+            ('get_area', f'protein and ({pocket_sele})')
+        ])
+        return results[-2] / results[-1]

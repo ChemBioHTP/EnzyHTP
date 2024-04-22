@@ -2,12 +2,14 @@
 operations on them.
 
 Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-03-20
 """
 
 from typing import Tuple, Union, List
 
 from enzy_htp.core.logger import _LOGGER
+from enzy_htp.core import math_helper as mh
 import enzy_htp.chemical as chem
 from ..structure import Structure, Residue, Atom
 from .connectivity import init_connectivity

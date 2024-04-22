@@ -161,11 +161,11 @@ def get_valid_temp_name(fname: str, is_symlink: bool = False) -> str:
     if is_symlink:
         while Path(result_fname).is_symlink():
             idx += 1
-            result_fname = f"{fname[:-len(suffix)]}_{str(idx)}{suffix}"
+            result_fname = f"{fname[:-len(suffix)]}_{str(idx):04f}{suffix}"
     else:
         while os.path.isfile(result_fname):
             idx += 1
-            result_fname = f"{fname[:-len(suffix)]}_{str(idx)}{suffix}"
+            result_fname = f"{fname[:-len(suffix)]}_{idx:04d}{suffix}"
     return result_fname
 
 
