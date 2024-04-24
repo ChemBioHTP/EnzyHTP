@@ -104,11 +104,11 @@ def spi_metric( stru: Structure,
     (lig_chain, lig_idx) = ligand.key()
     pi = interface.pymol
     with OpenPyMolSession(pi) as pms:
-        interface.pymol.load_enzy_htp_stru(session, pms )
+        interface.pymol.load_enzy_htp_stru(pms, stru )
         results:List[Any] = interface.pymol.general_cmd(pms,[
             ('set', 'dot_solvent', 1),
-            ('create', 'ligand', f'chain {lig_chain} and resi {lig_idx}'),
-            ('create', 'protein', f'not (chain {lig_chain} and resi {lig_idx})'),
+            ('create', 'ligand', f'chain {lig_chain} and resi {lig_idx} and not solvent'),
+            ('create', 'protein', f'not (chain {lig_chain} and resi {lig_idx}) and not solvent'),
             ('get_area', 'ligand'),
             ('get_area', f'protein and ({pocket_sele})')
         ])

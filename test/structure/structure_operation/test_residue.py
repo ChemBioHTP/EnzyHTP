@@ -71,7 +71,6 @@ def test_closest_n_residues_correct():
     stru: Structure = sp.get_structure(pdb_file_path)
     residues = stru.residues
     ligand = residues[-1] 
-    print(stru_oper.closest_n_residues(ligand, 4))
     assert stru_oper.closest_n_residues(ligand, 1) == [residues[49]]
     assert stru_oper.closest_n_residues(ligand, 2) == [residues[49], residues[127]]
     assert stru_oper.closest_n_residues(ligand, 3) == [residues[49], residues[127], residues[200]]
