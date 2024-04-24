@@ -378,6 +378,7 @@ class ClusterJob():
                 job_id, sub_script_path = job_id_log_lines[i].strip().split()
                 if os.path.abspath(sub_script_path) == os.path.abspath(self.sub_script_path):
                     self.job_id = job_id
+                    _LOGGER.info(f"found job id {job_id} for {self.sub_dir} -> {self.sub_script_path}")
                     return
         # None case
         if self.job_id is None:
