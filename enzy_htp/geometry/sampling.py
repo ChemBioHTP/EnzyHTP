@@ -121,7 +121,7 @@ def equi_md_sampling(stru: Structure,
         temperature=[(0, 0), (0.05*0.9, prod_temperature), (-1, prod_temperature)],
         constrain=[freeze_backbone] + prod_constrain)
 
-    equi_step = parent_interface.build_md_step(
+    equi_step_1 = parent_interface.build_md_step(
         name="equi_npt",
         length=prod_time * 0.01,
         cluster_job_config=equi_job_config,
@@ -129,7 +129,7 @@ def equi_md_sampling(stru: Structure,
         temperature=prod_temperature,
         constrain=[freeze_backbone] + prod_constrain)
 
-    equi_step = parent_interface.build_md_step(
+    equi_step_2 = parent_interface.build_md_step(
         name="equi_npt_free_bb",
         length=prod_time * 0.01,
         cluster_job_config=equi_job_config,
@@ -151,7 +151,7 @@ def equi_md_sampling(stru: Structure,
     # 2. run simulation
     params, md_result = md_simulation(
         stru, param_method,
-        steps=[min_step, heat_step, equi_step, prod_step],
+        steps=[min_step, heat_step, equi_step_1, equi_step_2, prod_step],
         parallel_runs=parallel_runs,
         parallel_method=parallel_method,
         work_dir=work_dir,
