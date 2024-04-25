@@ -8,7 +8,7 @@ is accessed through spi_metric(), which is  overloaded with the below signatures
 
 The most used API will typically be spi_metric( StructureEnsemble, Ligand, List[Residue] ). To get the List[Residue], consider
 using enzy_htp.structure.structure_operation.closest_n_residues(). Note that all SASA calculations are done using pymol's
-python API. Citation for spi: DOI:https://doi.org/10.1021/acs.jpclett.3c02444.
+python API, using the function PyMolInterface.get_spi(). Citation for spi: DOI:https://doi.org/10.1021/acs.jpclett.3c02444. 
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2024-04-18
@@ -90,7 +90,7 @@ def spi_metric( stru: Structure,
             pocket_sele:str ) -> float:
     """Calculates the spi metric for a single Structure using a pymol-formatted pocket sele str. 
     Note: The pocket_sele expression is applied to the Structure(), so it is recommended to use a selection which specifies
-    individual Residue()'s.
+    individual Residue()'s. Relies on the PyMolInterfaace.get_spi() method.
 
     Args:
         stru: The Structure() to analyze.
@@ -100,16 +100,7 @@ def spi_metric( stru: Structure,
     Returns:
         A List[float] of len(StructureEnsemble.structures), with each value being a different spi metric for the nth Structure(). 
     """
-    
-    (lig_chain, lig_idx) = ligand.key()
-    pi = interface.pymol
-    with OpenPyMolSession(pi) as pms:
-        interface.pymol.load_enzy_htp_stru(pms, stru )
-        results:List[Any] = interface.pymol.general_cmd(pms,[
-            ('set', 'dot_solvent', 1),
-            ('create', 'ligand', f'chain {lig_chain} and resi {lig_idx} and not solvent'),
-            ('create', 'protein', f'not (chain {lig_chain} and resi {lig_idx}) and not solvent'),
-            ('get_area', 'ligand'),
-            ('get_area', f'protein and ({pocket_sele})')
-        ])
-        return results[-2] / results[-1]
+   
+    return interface.pymol.get_spi(stru, ligand, pocket_sele)
+
+

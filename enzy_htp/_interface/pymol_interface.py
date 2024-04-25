@@ -21,7 +21,7 @@ from enzy_htp.core import env_manager as em
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import _LOGGER, check_var_type
 from enzy_htp._config.pymol_config import PyMolConfig, default_pymol_config
-from enzy_htp.structure import Structure, PDBParser
+from enzy_htp.structure import Structure, PDBParser, Ligand
 import enzy_htp.chemical as chem
 
 from .base_interface import BaseInterface
@@ -748,6 +748,33 @@ class PyMolInterface(BaseInterface):
             mask.append( atom.key in sele_set )            
 
         return mask
+
+
+    def get_spi(self, stru: Structure, ligand:Ligand, pocket_sele:str) -> float:
+        """Calculates substrate positioning index (SPI) for a given Ligand in a given Structure. SPI roughly corresponds to the
+        ratio of the ligand's solvent accessible surface area (SASA) dived by protein binding pocket SASA. The citation for 
+        this paper is here: DOI:https://doi.org/10.1021/acs.jpclett.3c02444.
+
+        Args:
+            stru: The Structure containing the Ligand and active site.
+            ligand: The actual Ligand we are calculating SPI for. 
+            pocket_sele: A str describing the active site of the protein in pymol format.
+        
+        Returns:
+            The calculated SPI as a float.
+
+        """
+        (lig_chain, lig_idx) = ligand.key()
+        with OpenPyMolSession(self) as pms:
+            self.load_enzy_htp_stru(pms, stru )
+            results:List[Any] = self.general_cmd(pms,[
+                ('set', 'dot_solvent', 1),
+                ('create', 'ligand', f'chain {lig_chain} and resi {lig_idx} and not solvent'),
+                ('create', 'protein', f'not (chain {lig_chain} and resi {lig_idx}) and not solvent'),
+                ('get_area', 'ligand'),
+                ('get_area', f'protein and ({pocket_sele})')
+            ])
+            return results[-2] / results[-1]
 
 class OpenPyMolSession:
     """a context manager that open a pymol session once enter and close once exit"""
