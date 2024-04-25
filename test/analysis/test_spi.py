@@ -34,7 +34,7 @@ sp = PDBParser()
 
 
 def test_spi_consistent_with_old_enzyhtp():
-
+    """To validate that the SPI calculated here is accurate, we compare a value calculated with spi_metric() to a value from the original/old EnzyHTP"""
     pdb_file = f"{DATA_DIR}/test_spi.pdb"
     prmtop = f"{DATA_DIR}/test_spi.prmtop"
     data = f"{DATA_DIR}/test_spi.mdcrd"
