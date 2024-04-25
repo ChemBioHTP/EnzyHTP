@@ -10,3 +10,6 @@ RD_NON_LIGAND_LIST: List[str] = ["CL", "EDO", "GOL", "EOH"]  #@shaoqz: these are
 
 RD_SOLVENT_LIST: List[str] = ["HOH", "WAT"]
 """Common aliases for water."""
+
+COUNTER_ION_LIST: List[str] = ["Na+", "Cl-", "NA+", "CL-"]
+"""Common residue names for counter ion."""

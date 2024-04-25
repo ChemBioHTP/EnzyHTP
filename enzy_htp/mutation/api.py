@@ -94,6 +94,10 @@ def assign_mutant(
                                                   or a:M[mutation_esm_patterns]
                                                   (M stands for force mutate each position so that
                                                   no mutation on any position is not allowed)
+                                                  or a:X[mutation_esm_patterns] TODO
+                                                  (X stands for a maximum number of point mutations
+                                                  allowed. e.g.: X=1 means only single point mutations
+                                                  are yielded)
 
         The mutation_esm_patterns is seperated by comma and each describes 2 things:
         1. position_pattern: a set of positions

@@ -12,7 +12,6 @@ from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core import math_helper as mh
 import enzy_htp.chemical as chem
 from ..structure import Structure, Residue, Atom
-from .connectivity import init_connectivity
 
 
 def deprotonate_residue(residue: Residue, target_atom: Union[None, Atom] = None) -> None:
@@ -28,7 +27,9 @@ def deprotonate_residue(residue: Residue, target_atom: Union[None, Atom] = None)
         Nothing.
     """
     new_resi_name, target_proton = get_default_deproton_info(residue, target_atom)
-    init_connectivity(target_atom, renew=False)
+    if not target_atom.is_connected:
+        _LOGGER.error(f"the target atom {target_atom} is not connected. Use init_connectivity() first.")
+        raise ValueError
     if new_resi_name is None:
         if len(target_atom.attached_protons()) == 0:
             _LOGGER.info(f"target atom {target_atom} already have no H. keep original")

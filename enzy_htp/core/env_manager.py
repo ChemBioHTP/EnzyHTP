@@ -224,9 +224,15 @@ class EnvironmentManager:
 
     def __getattr__(self, key: str) -> str:
         """Allows accession into acquired executables."""
+        if key.startswith('__') and key.endswith('__'): # this is critical for pickle to work (https://stackoverflow.com/questions/50888391/pickle-of-object-with-getattr-method-in-python-returns-typeerror-object-no)
+            raise AttributeError
         if key not in self.mapper and key in self.executables_:
             _LOGGER.error(
                 f"Executable '{key}' is in list of executables to check but has not been searched for yet. Call .check_environment() first. Exiting..."
             )
-            exit(1)
-        return self.mapper[key]
+            raise AttributeError(key)
+
+        try:
+            return self.mapper[key]
+        except KeyError:
+            raise AttributeError(key)
