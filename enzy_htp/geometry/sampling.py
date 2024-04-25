@@ -344,7 +344,7 @@ def _serial_md_steps(
     results = []
     for i in range(parallel_runs):
         # create job path
-        sub_work_dir = fs.get_valid_temp_name(f"{work_dir}/rep_{i}")
+        sub_work_dir = fs.get_valid_temp_name(f"{work_dir}/rep_{i:06d}")
         fs.safe_mkdir(sub_work_dir)
         output = None
         result_ele = []

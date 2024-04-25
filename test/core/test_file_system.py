@@ -154,7 +154,7 @@ def test_write_lines():
 def test_get_valid_temp_name():
     fname1 = f"{CURR_DIR}/test.test.test.py"
     make_test_file(fname1, "")
-    assert fs.get_valid_temp_name(fname1) == f"{CURR_DIR}/test_1.test.test.py"
+    assert fs.get_valid_temp_name(fname1) == f"{CURR_DIR}/test_000001.test.test.py"
     fs.safe_rm(fname1)
     assert not os.path.exists(fname1)
 
@@ -163,17 +163,17 @@ def test_get_valid_temp_name_symlink():
     fname1 = f"{CURR_DIR}/test.test.test.py"
     Path(sym_fname1).symlink_to(fname1)
     
-    assert fs.get_valid_temp_name(sym_fname1, is_symlink=True) == f"{CURR_DIR}/test_1.test.test.py.lnk"
+    assert fs.get_valid_temp_name(sym_fname1, is_symlink=True) == f"{CURR_DIR}/test_000001.test.test.py.lnk"
     fs.safe_rm(sym_fname1)
     assert not os.path.lexists(sym_fname1)
 
 def test_get_valid_temp_name_dir():
     fname1 = f"{CURR_DIR}/test_get_valid_temp_name/"
-    fname2 = f"{CURR_DIR}/test_get_valid_temp_name_1/////"
+    fname2 = f"{CURR_DIR}/test_get_valid_temp_name_000001/////"
     fs.safe_mkdir(fname1)
-    assert fs.get_valid_temp_name(fname1) == f"{CURR_DIR}/test_get_valid_temp_name_1"
+    assert fs.get_valid_temp_name(fname1) == f"{CURR_DIR}/test_get_valid_temp_name_000001"
     fs.safe_mkdir(fname2)
-    assert fs.get_valid_temp_name(fname1) == f"{CURR_DIR}/test_get_valid_temp_name_2"
+    assert fs.get_valid_temp_name(fname1) == f"{CURR_DIR}/test_get_valid_temp_name_000002"
     fs.safe_rmdir(fname1)
     fs.safe_rmdir(fname2)
     assert not os.path.exists(fname1)
