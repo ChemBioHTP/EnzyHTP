@@ -121,7 +121,7 @@ def equi_md_sampling(stru: Structure,
         temperature=[(0, 0), (0.05*0.9, prod_temperature), (-1, prod_temperature)],
         constrain=[freeze_backbone] + prod_constrain)
 
-    equi_step = parent_interface.build_md_step(
+    equi_step_1 = parent_interface.build_md_step(
         name="equi_npt",
         length=prod_time * 0.01,
         cluster_job_config=equi_job_config,
@@ -129,7 +129,7 @@ def equi_md_sampling(stru: Structure,
         temperature=prod_temperature,
         constrain=[freeze_backbone] + prod_constrain)
 
-    equi_step = parent_interface.build_md_step(
+    equi_step_2 = parent_interface.build_md_step(
         name="equi_npt_free_bb",
         length=prod_time * 0.01,
         cluster_job_config=equi_job_config,
@@ -151,7 +151,7 @@ def equi_md_sampling(stru: Structure,
     # 2. run simulation
     params, md_result = md_simulation(
         stru, param_method,
-        steps=[min_step, heat_step, equi_step, prod_step],
+        steps=[min_step, heat_step, equi_step_1, equi_step_2, prod_step],
         parallel_runs=parallel_runs,
         parallel_method=parallel_method,
         work_dir=work_dir,
@@ -294,7 +294,7 @@ def _parallelize_md_steps_with_cluster_job(
         job_list = []
         result_egg_ele = []
         # create job path
-        sub_work_dir = f"{work_dir}/rep_{i}"
+        sub_work_dir = fs.get_valid_temp_name(f"{work_dir}/rep_{i}")
         fs.safe_mkdir(sub_work_dir)
         output = None  # the output place holder; the output between steps are very different for different packages so it will prob also becomes a class
 
@@ -344,7 +344,7 @@ def _serial_md_steps(
     results = []
     for i in range(parallel_runs):
         # create job path
-        sub_work_dir = f"{work_dir}/rep_{i}"
+        sub_work_dir = fs.get_valid_temp_name(f"{work_dir}/rep_{i:06d}")
         fs.safe_mkdir(sub_work_dir)
         output = None
         result_ele = []

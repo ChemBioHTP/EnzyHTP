@@ -352,13 +352,14 @@ def fine_filter( # TODO summarize logics from here to a general shrapnel functio
         new_child_jobs = []
         # 1. analyze remaining child_jobs (recycle old one) may benefit from having a mimo
         for job in child_jobs:
-            if not job.is_complete():
+            job.retrive_job_id()
+            if (not job.is_submitted()) or (not job.is_complete()):
                 new_child_jobs.append(job)
         child_jobs = new_child_jobs # this will include failing, pending, running jobs
         # 2. update the checkpoint
         save_obj(child_jobs, checkpoint_1)
 
-    jobs_remain = ClusterJob.wait_to_array_end(child_jobs, shrapnel_check_period, shrapnel_child_array_size)
+    jobs_remain = ClusterJob.wait_to_array_end_plus(child_jobs, shrapnel_check_period, shrapnel_child_array_size)
 
     if jobs_remain:
         _LOGGER.error("some children jobs didn't finish normally. they are:")
@@ -470,6 +471,7 @@ def _fine_filter_child_main(
             save_obj(result_dict, result_path)
         
         # 4. MD
+        # TODO check and stop any previous MD jobs (workflow specific)
         trajs: List[StructureEnsemble] = mut_result_data.get("trajs", list())
         runs_left = md_parallel_runs - len(trajs)
         if runs_left > 0:
