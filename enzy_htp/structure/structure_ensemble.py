@@ -12,6 +12,7 @@ from copy import deepcopy
 
 from .structure import Structure
 from .structure_io import StructureParserInterface
+from . import structure_operation as stru_oper
 from enzy_htp.core.general import get_itself
 
 
@@ -43,14 +44,22 @@ class StructureEnsemble:
         self.coordinate_list = coordinate_list
         self.coord_parser = coord_parser
 
-    @property
-    def structures(self) -> Generator[Structure]:
+    def structures(self, remove_solvent: bool=False) -> Generator[Structure]:
         """get a Generator of all geometries in the ensemble
         as Structure()s"""
-        for this_coord in self.coord_parser(self.coordinate_list):
-            result = deepcopy(self.topology)
-            if len(result.atoms) < len(this_coord):
-                this_coord = this_coord[ :len(result.atoms)]
+        stru = deepcopy(self.topology)
+        if remove_solvent:
+            stru_oper.remove_solvent(stru)
+            stru_oper.remove_counterions(stru)
+
+        for this_coord in self.coord_parser(
+                self.coordinate_list,
+                remove_solvent=remove_solvent
+            ):
+            result = deepcopy(stru)
+            if remove_solvent:
+                stru_oper.remove_solvent(result)
+                stru_oper.remove_counterions(result)
             result.apply_geom(this_coord)
             yield result
 
@@ -67,9 +76,6 @@ class StructureEnsemble:
         """getter for the 1st structure in the ensemble"""
         coord_0 = next(self.coord_parser(self.coordinate_list))
         result = deepcopy(self.topology)
-        if len(result.atoms) < len(coord_0):
-            coord_0 = coord_0[ :len(result.atoms)]
-
         result.apply_geom(coord_0)
         return result    
 
@@ -85,5 +91,5 @@ class StructureEnsemble:
 
     # region == special ==
     def __iter__(self):
-        return self.structures
+        return self.structures()
     # endregion

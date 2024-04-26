@@ -24,6 +24,7 @@ SUB_MODULES=[
         'enzy_htp.structure.structure_translator',
         'enzy_htp.structure.structure_io',
         'enzy_htp.structure.structure_operation',
+        'enzy_htp.structure.structure_enchantment',
         'enzy_htp.structure.structure_region',
         'enzy_htp.structure.structure_selection',
         'enzy_htp.structure.structure_selection_class',
@@ -42,7 +43,7 @@ if __name__ == '__main__':
     setup(
         name='enzy_htp',
         version='2.0.0',
-        description='TODO',
+        description='EnzyHTP automates the complete life-cycle of enzyme modeling',
         author='EnzyHTP Authors',
         author_email='zhongyue.yang@vanderbilt.edu',
         include_package_data=True,

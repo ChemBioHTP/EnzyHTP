@@ -11,7 +11,9 @@ from plum import dispatch
 from typing import Union
 
 from enzy_htp.core.logger import _LOGGER
-from ..structure import Structure, Solvent, Chain, Residue, NonCanonicalBase, Ligand, Atom
+from ..structure import (
+    Structure, Solvent, Chain, 
+    Residue, NonCanonicalBase, Ligand, Atom)
 
 
 def remove_solvent(stru: Structure) -> Structure:
@@ -24,6 +26,19 @@ def remove_solvent(stru: Structure) -> Structure:
     solv: Solvent
     for solv in stru.solvents:
         solv.delete_from_parent()
+
+    return stru
+
+def remove_counterions(stru: Structure) -> Structure:
+    """
+    remove all counterions for {stru}.
+    Make changes in-place and return a reference of the changed
+    original object.
+    """
+    _LOGGER.debug(f"removing {len(stru.counterions())} counterions")
+    ion: Residue
+    for ion in stru.counterions():
+        ion.delete_from_parent()
 
     return stru
 

@@ -161,7 +161,7 @@ def decode_random_mutation(stru: Structure, section_pattern: str) -> List[List[M
 
 
 # a:
-def decode_all_mutation(stru: Structure, section_pattern: str) -> List[List[Mutation]]:
+def decode_all_mutation(stru: Structure, section_pattern: str) -> List[List[Mutation]]: # TODO support a number cap
     """decode the mutation pattern section that mutate all in the mutation set.
     There will be the maxium same number of mutations as the number of positions.
     If "M" is not specificed, non-mutation of each site will also be included.
