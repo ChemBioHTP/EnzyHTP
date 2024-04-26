@@ -21,6 +21,7 @@ SUB_MODULES=[
         'enzy_htp.core.clusters',
         'enzy_htp.chemical',
         'enzy_htp.structure',
+        'enzy_htp.structure.structure_translator',
         'enzy_htp.structure.structure_io',
         'enzy_htp.structure.structure_operation',
         'enzy_htp.structure.structure_region',
