@@ -22,7 +22,7 @@ from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.exception import FileFormatError
 
 class PrmtopParser(StructureParserInterface):
-    """the parser for Gaussian prmtop files"""
+    """the parser for Amber prmtop files"""
     def __init__(self, ncaa_chrgspin_mapper: Dict = None) -> None:  # pylint: disable=super-init-not-called
         if ncaa_chrgspin_mapper is None:
             ncaa_chrgspin_mapper = {}
