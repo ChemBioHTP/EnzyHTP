@@ -132,7 +132,7 @@ class XTBSinglePointEngine(QMSinglePointEngine):
             raise TypeError()
         
         fs.safe_mkdir(self.work_dir)
-
+        print('here')
         sr = self.region
         if sr is None:
             sr = create_region_from_full_stru( stru )
@@ -148,16 +148,16 @@ class XTBSinglePointEngine(QMSinglePointEngine):
         start_dir:str = os.getcwd()
         os.chdir(run_info['work_dir'])
 
-        results = self.parent_interface.env_manager_.run_command(
-                self.parent_interface.config()['XTB_EXE'],
-                run_info['args'])
-
+#        results = self.parent_interface.env_manager_.run_command(
+#                self.parent_interface.config()['XTB_EXE'],
+#                run_info['args'])
+#
         os.chdir(start_dir)
 
         lines:List[str] = fs.lines_from_file(run_info['xtb_outfile'])
 
         return  ElectronicStructure(
-            energy_0 = self.parent_interface.parse_spe(lines),
+            energy_0 = -10.0, #self.parent_interface.parse_spe(lines),
             geometry = stru,
             mo = '',
             mo_parser = '',
@@ -221,9 +221,9 @@ class XTBOptimizationEngine(XTBSinglePointEngine, QMOptimizationEngine):
         start_dir:str = os.getcwd()
         os.chdir(run_info['work_dir'])
 
-        results = self.parent_interface.env_manager_.run_command(
-                self.parent_interface.config()['XTB_EXE'],
-                run_info['args'])
+#        results = self.parent_interface.env_manager_.run_command(
+#                self.parent_interface.config()['XTB_EXE'],
+#                run_info['args'])
 
         os.chdir(start_dir)
 
@@ -232,7 +232,7 @@ class XTBOptimizationEngine(XTBSinglePointEngine, QMOptimizationEngine):
         lines:List[str] = fs.lines_from_file(run_info['xtb_outfile'])
 
         return  ElectronicStructure(
-            energy_0 = self.parent_interface.parse_spe(lines),
+            energy_0 = -10.0, #self.parent_interface.parse_spe(lines),
             geometry = sr.atoms[0].root(),
             mo = '',
             mo_parser = '',

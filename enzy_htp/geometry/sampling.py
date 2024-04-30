@@ -33,6 +33,8 @@ def equi_md_sampling(stru: Structure,
                      prod_constrain: List[stru_cons.StructureConstraint]= None,
                      record_period: float= 0.5, # ns
                      cluster_job_config: Dict= None,
+                     cpu_heat_step: bool = False,
+                     cpu_heat_job_config: Dict = None,
                      cpu_equi_step: bool= False,
                      cpu_equi_job_config: Dict= None,
                      job_check_period: int=210, # s
@@ -93,6 +95,14 @@ def equi_md_sampling(stru: Structure,
     # 1. build steps
     parent_interface = param_method.parent_interface
 
+    heat_core:str="gpu"   
+    if cpu_heat_step:
+        heat_core = "cpu"
+        heat_job_config = cpu_heat_job_config
+    else:
+        heat_job_config = cluster_job_config
+
+
     # 1.1 equi core
     equi_core = "gpu"
     equi_job_config = cluster_job_config
@@ -116,8 +126,8 @@ def equi_md_sampling(stru: Structure,
     heat_step = parent_interface.build_md_step(
         name="heat_nvt",
         length=0.05, # ns
-        cluster_job_config=cluster_job_config,
-        core_type="cpu", 
+        cluster_job_config=heat_job_config,
+        core_type=heat_core, 
         temperature=[(0, 0), (0.05*0.9, prod_temperature), (-1, prod_temperature)],
         constrain=[freeze_backbone] + prod_constrain)
 

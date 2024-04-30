@@ -51,17 +51,22 @@ class StructureEnsemble:
         if remove_solvent:
             stru_oper.remove_solvent(stru)
             stru_oper.remove_counterions(stru)
+        
+        if self.top_parser == get_itself:
+            for yy in self.coordinate_list:
+                yield yy
+        else:
 
-        for this_coord in self.coord_parser(
-                self.coordinate_list,
-                remove_solvent=remove_solvent
-            ):
-            result = deepcopy(stru)
-            if remove_solvent:
-                stru_oper.remove_solvent(result)
-                stru_oper.remove_counterions(result)
-            result.apply_geom(this_coord)
-            yield result
+            for this_coord in self.coord_parser(
+                    self.coordinate_list,
+                    remove_solvent=remove_solvent
+                ):
+                result = deepcopy(stru)
+                if remove_solvent:
+                    stru_oper.remove_solvent(result)
+                    stru_oper.remove_counterions(result)
+                result.apply_geom(this_coord)
+                yield result
 
     @property
     def topology(self) -> Structure:

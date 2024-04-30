@@ -15,11 +15,11 @@ from enzy_htp.structure import (
 
 from enzy_htp.structure.structure_operation import    update_residues
 
-from enzy_htp._interface.rosetta_interface import (
-    RosettaOptions,
-    RosettaScriptsElement,
-    RosettaScriptsProtocol
-)
+#from enzy_htp._interface.rosetta_interface import (
+#    RosettaOptions,
+#    RosettaScriptsElement,
+#    RosettaScriptsProtocol
+#)
 
 
 

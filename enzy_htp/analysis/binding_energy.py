@@ -7,10 +7,10 @@ from enzy_htp import interface, config
 from enzy_htp.structure import PDBParser, translate_structure 
 
 from typing import Dict, Callable
-from enzy_htp._interface.rosetta_interface import (
-        RosettaOptions,
-        RosettaScriptsElement,
-        RosettaScriptsProtocol)
+#from enzy_htp._interface.rosetta_interface import (
+#        RosettaOptions,
+#        RosettaScriptsElement,
+#        RosettaScriptsProtocol)
 
 from enzy_htp.structure import Structure, Atom, Ligand
 
@@ -18,7 +18,7 @@ def binding_energy(
     stru: Structure,
     ligand: Ligand,
     engine:str,
-    rosetta_sfxn:RosettaScriptsElement=None,
+    rosetta_sfxn:"RosettaScriptsElement"=None,
     work_dir:str=None
     ) -> float:
 
@@ -30,7 +30,7 @@ def binding_energy(
 
 
 
-def binding_energy_rosetta( stru: Structure, ligand: Ligand, rosetta_sfxn:RosettaScriptsElement, work_dir) -> float:
+def binding_energy_rosetta( stru: Structure, ligand: Ligand, rosetta_sfxn:"RosettaScriptsElement", work_dir) -> float:
 
 
     if work_dir is None:
