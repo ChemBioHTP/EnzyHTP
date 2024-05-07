@@ -50,15 +50,18 @@ DEFAULT_SQLITE_FILENAME = "database.db" # Default database filename.
 # In the Json file used to define the workflow, 
 # keys in the mapper are defined by the developer,
 # which are not user-definable.
-WORKUNIT_API_NAME_KEY = "api"               # Key indicating the API name.
-WORKUNIT_RETURN_VALUE_KEY = "store_as"      # Key indicating the key where the return value of the workunit is stored.
-WORKUNIT_ARGUMENT_LIST_KEY = "args"         # Key indicates the arguments to be passed into the API.
-CONTROL_BODY_WORKUNITS_LABEL = "workunits"  # Key indicating the list of workunits contained in the body in a unit playing a control role.
-WORKFLOW_API_KEY = "workflow"               # The value of `api_key` attribute of workflow instance.
-LOOP_API_KEY = "loop"                       # The key of a loop workunit.
-LOOP_ITERABLE_DATA_LABEL = "loop_data"      # Key indicating the object to iterate over in a LoopWorkUnit.
-LOOP_BODY_DATUM_LABEL = "loop_datum_varname"# Key indicating the element iterated from ITERABLE_DATA in each workunit of the loop body.
-GENERAL_API_KEY = "general"                 # The key of a general workunit.
+WORKUNIT_API_NAME_KEY = "api"                   # Key indicating the API name.
+WORKUNIT_RETURN_VALUE_KEY = "store_as"          # Key indicating the key where the return value of the workunit is stored.
+WORKUNIT_ARGUMENT_LIST_KEY = "args"             # Key indicates the arguments to be passed into the API.
+CONTROL_BODY_WORKUNITS_LABEL = "workunits"      # Key indicating the list of workunits contained in the body in a unit playing a control role.
+WORKFLOW_API_KEY = "workflow"                   # The value of `api_key` attribute of workflow instance.
+LOOP_API_KEY = "loop"                           # The key of a loop workunit.
+LOOP_ITERABLE_DATA_LABEL = "loop_data"          # Key indicating the object to iterate over in a LoopWorkUnit.
+LOOP_BODY_DATUM_LABEL = "loop_datum_varname"    # Key indicating the element iterated from ITERABLE_DATA in each workunit of the loop body.
+CLUSTER_BATCH_API_KEY = "cluster_batch"         # The key of a cluster batch workunit.
+BATCH_ITERABLE_DATA_LABEL = "batch_data"        # Key indicating the object to iterate over in a ClusterBatchWorkUnit.
+BATCH_BODY_DATUM_LABEL = "batch_datum_varname"  # Key indicating the element iterated from ITERABLE_DATA in each workunit of the batch body.
+GENERAL_API_KEY = "general"                     # The key of a general workunit.
 
 # API Keys for flow control, such as `loop`, `general`.
 CONTROL_API_KEYS = [
@@ -705,7 +708,7 @@ class WorkUnit(ExecutionEntity):
         
         return virtual_unit
 
-    def execute(self) -> tuple:
+    def execute(self) -> Tuple[str, Any]:
         """Executes the workunit.
 
         This method attempts to execute the API function associated with this work unit using the
@@ -1027,7 +1030,7 @@ class ControlWorkUnit(WorkUnit):
         Args:
             execution_index (int, optional): Indicates the execution index of the target sub-workflow instance in the current control unit, 
                                             such as the index of loops in the `LoopWorkUnit`,
-                                            and/or the index of parallel tasks in the `ParallelWorkUnit`. (TODO Zhong)
+                                            and/or the index of parallel tasks in the `ClusterBatchWorkUnit`.
         
         Returns:
             The encoded index of current layer. Default `self.api_key`
@@ -1079,7 +1082,192 @@ class ControlWorkUnit(WorkUnit):
             except:
                 return None
 
-class LoopWorkUnit(ControlWorkUnit):
+class IterativeWorkUnit(ControlWorkUnit):
+    """
+    A base class for managing and executing workflows multiple times or in parallel based on an iterable object.
+    
+    IterativeWorkUnit serves as an abstract base class that encapsulates common functionalities
+    needed for executing a series of workflows iteratively. This class is designed to be extended by
+    specific types of work units that require repeated or parallel execution over a set of parameters or data points,
+    such as processing parallel tasks in a compute cluster or iterating over a collection of data within a loop.
+    
+    Features include:
+    - Initialization from an iterable object that dictates the number or nature of iterations.
+    - Common setup and teardown procedures for each iteration.
+    - Abstract methods that must be implemented by subclasses to define specific execution logic.
+
+    This class is intended for use where tasks need to be executed repetitively with variations in input
+    or configuration, typical in scenarios like batch processing or parametric studies.
+
+    Attributes:
+        iterable_data (Iterable): The data over which the loop iterates.
+        Other inherited attributes...
+
+    Methods:
+        __init__: Initializes a IterativeWorkUnit instance.
+        from_dict: Creates a IterativeWorkUnit instance from a dictionary configuration.
+        reload: Reloads the IterativeWorkUnit instance with updated configuration.
+        execute: Executes the loop, iterating over each sub-workflow.
+    """
+    iterable_data: Iterable
+
+    def __init__(self, unit_dict: dict, workflow: WorkFlow = None, locator: List[int] = list(), sqlite_filepath: str = str(), debug: bool = False):
+        """Initializes an IterativeWorkUnit instance.
+
+        Args:
+            unit_dict (dict): Configuration dictionary with necessary parameters for initialization.
+            workflow (WorkFlow): A reference to the workflow object this unit belongs to.
+            locator (list, optional): A list of the hierarchical indexes to locate the current workunit.
+            sqlite_filepath (str): The filepath to your sqlite database file for persistent storage.
+            debug (bool, optional): Indicates whether to run in debug mode.
+        """
+        super().__init__(unit_dict=unit_dict, workflow=workflow, locator=locator, sqlite_filepath=sqlite_filepath, debug=debug)
+
+    @classmethod
+    def from_dict(cls, unit_dict: dict, placeholder_api: Callable, iterative_body_datum_label: str, 
+                workflow: WorkFlow = None, locator: List[int] = list(), sqlite_filepath: str = str(), debug: bool = False) -> IterativeWorkUnit:
+        """Initializes an instance of IterativeWorkUnit from a given dictionary.
+
+        As with a normal WorkUnit, the dictionary should contain keys such as `api`, `store_as`, 
+        and `args`, which specify the API to be called, the return key to be used for storing the results, 
+        and the arguments to the API call, respectively.
+        Here, however, the value of `api` must be `loop` to indicate that this WorkUnit is a IterativeWorkUnit, 
+        and the arguments contained in `args` are the iteration object and the loop body, where the loop 
+        body is treated as a sub-WorkFlow.
+
+        Args:
+            unit_dict (dict): Configuration dictionary with necessary parameters for initialization.
+            placeholder_api (Callable): a placeholder API marking the necessary arguments for initializing a specific class derived from IterativeWorkUnit.
+            iterative_body_datum_label (str): Key indicating the element iterated from ITERABLE_DATA in each sub-workflow.
+            workflow (WorkFlow, optional): The parent workflow of this unit.
+            locator (list, optional): A list of the hierarchical indexes to locate the current workunit.
+            sqlite_filepath (str): The filepath to your sqlite database file for persistent storage.
+            debug (bool, optional): Indicates whether to run in debug mode.
+
+        Returns:
+            IterativeWorkUnit: An instance of IterativeWorkUnit initialized with the given configuration.
+        """
+        # Initialize the class.
+        unit = cls(unit_dict, workflow, locator, sqlite_filepath, debug)
+        unit.api = placeholder_api
+        unit.status = StatusCode.INITIALIZING
+
+        # Self Inspection.
+        unit.self_inspection_and_args_reassembly()
+        unit.check_initialization_status()
+
+        # Initialize the Iterative Body.
+        data_mapper_to_inherite = unit.generate_data_mapper_to_inherite()
+
+        # Some data should be passed before the initialization of a sub-WorkFlow.
+        iterative_body_datum_varname = VarFormatter.unformat_variable(unit.args_dict_to_pass.get(iterative_body_datum_label))
+        data_mapper_for_initialize_as_intermediate = {iterative_body_datum_varname: Placeholder.PLACEHOLDER_STR_VALUE}
+
+        # Initialize a PlaceHolder Sub-WorkFlow to perform self-inspection.
+        flow_locator = unit.locator.copy()
+        flow_locator.append(unit.encode_layer_index())
+        placeholder_sub_workflow = WorkFlow.from_list(unit_dict_list=unit.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL),
+            debug=unit.debug, intermediate_data_mapper=data_mapper_for_initialize_as_intermediate,
+            inherited_data_mapper=data_mapper_to_inherite, locator=flow_locator, control_workunit=unit, sqlite_filepath=unit.sqlite_filepath)
+        
+        # Add error message from placeholder workflow initialization.
+        if (placeholder_sub_workflow.error_msg_list):
+            unit.error_msg_list += placeholder_sub_workflow.error_msg_list
+
+        return unit
+    
+    def reload(self, unit_dict: dict, placeholder_api: Callable, iterable_data_label: str, iterative_body_datum_label: str):
+        """
+        Reloads the IterativeWorkUnit instance with updated configuration.
+
+        This method is used when a user wants to reload the entire task and checks 
+        if there are any changes in the parameter values. If the WorkUnit's status 
+        indicates an error or pause, it updates the WorkUnit's properties with the 
+        new configuration. Otherwise, it compares the current and new configurations 
+        to check for updates.
+
+        Args:
+            unit_dict (dict): The new configuration dictionary for the WorkUnit.
+            placeholder_api (Callable): a placeholder API marking the necessary arguments for initializing a specific class derived from IterativeWorkUnit.
+            iterable_data_label (str): Key indicating the object to iterate over in an IterativeWorkUnit.
+            iterative_body_datum_label (str): Key indicating the element iterated from ITERABLE_DATA in each sub-workflow.
+
+        Notes:
+            - Compares `args_dict_input`, `args_dict_to_pass`, and `params_to_assign_at_execution`
+              between the current WorkUnit and a virtual unit created from the new configuration.
+            - Also compares `return_key` values.
+            - If any of these values are different, sets the status to `StatusCode.SUSPECIOUS_UPDATES`.
+
+        Returns:
+            The created virtual WorkUnit instance for further comparison.
+        """
+        iterative_body_datum_varname_backup = self.args_dict_to_pass.get(iterative_body_datum_label)
+
+        virtual_unit = super().reload(unit_dict=unit_dict, api=placeholder_api)
+        reloaded_iterative_data = virtual_unit.args_dict_to_pass.get(iterable_data_label)
+        iterative_body_datum_varname = virtual_unit.args_dict_to_pass.get(iterative_body_datum_label)
+
+        data_mapper_to_inherite = self.generate_data_mapper_to_inherite()
+
+        if (iterative_data:=self.args_dict_to_pass_backup.get(iterable_data_label)) == reloaded_iterative_data:
+            has_suspecious_updates = False
+            has_unresolved_error_or_pause = False
+
+            for iterative_index, iterative_datum in enumerate(iterative_data):
+                workflow = self.sub_workflows[iterative_index]
+                
+                data_mapper_for_update = {iterative_body_datum_varname: iterative_datum}
+                data_mapper_for_update.update(data_mapper_to_inherite)
+
+                del workflow.intermediate_data_mapper[iterative_body_datum_varname_backup]
+                workflow.intermediate_data_mapper.update(data_mapper_for_update)
+                unit_dict_list = virtual_unit.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL)
+                workflow.reload(unit_dict_list=unit_dict_list)
+                if workflow.status in StatusCode.unexecutable_statuses:
+                    self.status = StatusCode.FAILED_INITIALIZATION
+                elif workflow.status == StatusCode.SUSPECIOUS_UPDATES:
+                    has_suspecious_updates = True
+                elif workflow.status in StatusCode.error_or_pause_statuses:
+                    has_unresolved_error_or_pause = True
+                continue
+            
+            if self.status not in StatusCode.unexecutable_statuses:
+                if has_unresolved_error_or_pause:
+                    return
+                elif has_suspecious_updates:
+                    self.status = StatusCode.SUSPECIOUS_UPDATES
+                else:
+                    self.status = StatusCode.EXIT_OK
+        else:
+            _LOGGER.warning(f"Inconsistent {iterable_data_label} in {self.identifier}, all the workflows are to be cleared.")
+            self.sub_workflows.clear()
+            self.status = StatusCode.SUSPECIOUS_UPDATES
+
+    def update_status_code(self, workflow: WorkFlow) -> None:
+        """Update the status code of IterativeWorkUnit (and its derived classes) instance.
+        
+        Args:
+            workflow (WorkFlow): The WorkFlow instance from iterative bodies.
+        """
+        if self.status == StatusCode.EXIT_WITH_ERROR_AND_PAUSE:
+            return
+        elif workflow.status == StatusCode.EXIT_WITH_ERROR_AND_PAUSE:
+            self.status = StatusCode.EXIT_WITH_ERROR_AND_PAUSE
+            return
+        elif workflow.status in StatusCode.error_excluding_pause_statuses:
+            if self.status in StatusCode.pause_including_error_statuses:
+                self.status = StatusCode.EXIT_WITH_ERROR_AND_PAUSE
+            else:
+                self.status = StatusCode.EXIT_WITH_ERROR_IN_INNER_UNITS
+            return
+        elif workflow.status in StatusCode.pause_excluding_error_statuses:
+            if self.status in StatusCode.error_including_pause_statuses:
+                self.status = StatusCode.EXIT_WITH_ERROR_AND_PAUSE
+            else:
+                self.status = StatusCode.RUNNING_WITH_PAUSE_IN_INNER_UNITS
+            return
+    
+class LoopWorkUnit(IterativeWorkUnit):
     """This class is used to represent a special kind of workunit in a procedural workflow that is used to carry a loop.
     In this kind of workunit, all single units contained in the loop body is packaged together as a subworkflow.
     This class is derived from WorkUnit class.
@@ -1088,16 +1276,15 @@ class LoopWorkUnit(ControlWorkUnit):
     - It initializes and executes these sub-workflows successively. Failures in individual sub-workflows do not halt the entire loop's execution.
 
     Attributes:
-        iterable_data (Iterable): The data over which the loop iterates.
         Other inherited attributes...
 
     Methods:
         loop_unit_placeholder_api: A static placeholder API for initialization.
         __init__: Initializes a LoopWorkUnit instance.
         from_dict: Creates a LoopWorkUnit instance from a dictionary configuration.
+        reload: Reloads the LoopWorkUnit instance with updated configuration.
         execute: Executes the loop, iterating over each sub-workflow.
     """
-    iterable_data: Iterable
 
     @staticmethod
     def loop_unit_placeholder_api(workunits: list, loop_data: Iterable, loop_datum_varname: str):
@@ -1124,6 +1311,7 @@ class LoopWorkUnit(ControlWorkUnit):
             debug (bool, optional): Indicates whether to run in debug mode.
         """
         super().__init__(unit_dict=unit_dict, workflow=workflow, locator=locator, sqlite_filepath=sqlite_filepath, debug=debug)
+        return
 
     @classmethod
     def from_dict(cls, unit_dict: dict, workflow: WorkFlow = None, locator: List[int] = list(), sqlite_filepath: str = str(), debug: bool = False) -> LoopWorkUnit:
@@ -1146,34 +1334,10 @@ class LoopWorkUnit(ControlWorkUnit):
         Returns:
             LoopWorkUnit: An instance of LoopWorkUnit initialized with the given configuration.
         """
-        # Initialize the class.
-        unit = cls(unit_dict, workflow, locator, sqlite_filepath, debug)
-        unit.api = LoopWorkUnit.loop_unit_placeholder_api
-        unit.status = StatusCode.INITIALIZING
-
-        # Self Inspection.
-        unit.self_inspection_and_args_reassembly()
-        unit.check_initialization_status()
-
-        # Initialize the Loop Body.
-        _LOGGER.debug("Initializing a LoopWorkUnit now...")
-        data_mapper_to_inherite = unit.generate_data_mapper_to_inherite()
-
-        # Some data should be passed before the initialization of a sub-WorkFlow.
-        loop_body_datum_varname = VarFormatter.unformat_variable(unit.args_dict_to_pass.get(LOOP_BODY_DATUM_LABEL))
-        data_mapper_for_initialize_as_intermediate = {loop_body_datum_varname: Placeholder.PLACEHOLDER_STR_VALUE}
-
-        # Initialize a PlaceHolder Sub-WorkFlow to perform self-inspection.
-        flow_locator = unit.locator.copy()
-        flow_locator.append(unit.encode_layer_index())
-        placeholder_sub_workflow = WorkFlow.from_list(unit_dict_list=unit.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL),
-            debug=unit.debug, intermediate_data_mapper=data_mapper_for_initialize_as_intermediate,
-            inherited_data_mapper=data_mapper_to_inherite, locator=flow_locator, control_workunit=unit, sqlite_filepath=unit.sqlite_filepath)
-        
-        # Add error message from placeholder workflow initialization.
-        if (placeholder_sub_workflow.error_msg_list):
-            unit.error_msg_list += placeholder_sub_workflow.error_msg_list
-
+        _LOGGER.info(f"Initializing a {__class__.__name__} now...")
+        unit = super().from_dict(unit_dict=unit_dict, placeholder_api=__class__.loop_unit_placeholder_api, 
+                            iterative_body_datum_label=LOOP_BODY_DATUM_LABEL, workflow=workflow, locator=locator, 
+                            sqlite_filepath=sqlite_filepath, debug=debug)
         return unit
 
     def reload(self, unit_dict: dict):
@@ -1198,47 +1362,8 @@ class LoopWorkUnit(ControlWorkUnit):
         Returns:
             The created virtual WorkUnit instance for further comparison.
         """
-        loop_body_datum_varname_backup = self.args_dict_to_pass.get(LOOP_BODY_DATUM_LABEL)
-
-        virtual_unit = super().reload(unit_dict=unit_dict, api=__class__.loop_unit_placeholder_api)
-        reloaded_loop_data = virtual_unit.args_dict_to_pass.get(LOOP_ITERABLE_DATA_LABEL)
-        loop_body_datum_varname = virtual_unit.args_dict_to_pass.get(LOOP_BODY_DATUM_LABEL)
-
-        data_mapper_to_inherite = self.generate_data_mapper_to_inherite()
-
-        if (loop_data:=self.args_dict_to_pass_backup.get(LOOP_ITERABLE_DATA_LABEL)) == reloaded_loop_data:
-            has_suspecious_updates = False
-            has_unresolved_error_or_pause = False
-
-            for loop_index, loop_datum in enumerate(loop_data):
-                workflow = self.sub_workflows[loop_index]
-                
-                data_mapper_for_update = {loop_body_datum_varname: loop_datum}
-                data_mapper_for_update.update(data_mapper_to_inherite)
-
-                del workflow.intermediate_data_mapper[loop_body_datum_varname_backup]
-                workflow.intermediate_data_mapper.update(data_mapper_for_update)
-                unit_dict_list = virtual_unit.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL)
-                workflow.reload(unit_dict_list=unit_dict_list)
-                if workflow.status in StatusCode.unexecutable_statuses:
-                    self.status = StatusCode.FAILED_INITIALIZATION
-                elif workflow.status == StatusCode.SUSPECIOUS_UPDATES:
-                    has_suspecious_updates = True
-                elif workflow.status in StatusCode.error_or_pause_statuses:
-                    has_unresolved_error_or_pause = True
-                continue
-            
-            if self.status not in StatusCode.unexecutable_statuses:
-                if has_unresolved_error_or_pause:
-                    return
-                elif has_suspecious_updates:
-                    self.status = StatusCode.SUSPECIOUS_UPDATES
-                else:
-                    self.status = StatusCode.EXIT_OK
-        else:
-            _LOGGER.warning(f"Inconsistent {LOOP_ITERABLE_DATA_LABEL} in {self.identifier}, all the workflows are to be cleared.")
-            self.sub_workflows.clear()
-            self.status = StatusCode.SUSPECIOUS_UPDATES
+        super().reload(unit_dict=unit_dict, placeholder_api=__class__.loop_unit_placeholder_api, 
+                    iterable_data_label=LOOP_ITERABLE_DATA_LABEL, iterative_body_datum_label=LOOP_BODY_DATUM_LABEL)
 
     def execute(self) -> tuple:
         """Executes the loop, iterating over each sub-workflow in `sub_workflow_list`.
@@ -1291,30 +1416,113 @@ class LoopWorkUnit(ControlWorkUnit):
         if (self.status == StatusCode.RUNNING):
             self.status = StatusCode.EXIT_OK
         return self.return_key, self.return_value
+
+class ClusterBatchWorkUnit(ControlWorkUnit):
+    """Manages and orchestrates computational tasks across a cluster computing environment.
     
-    def update_status_code(self, workflow: WorkFlow) -> None:
-        """Update the status code of LoopWorkUnit instance.
-        
+    The ClusterBatchWorkUnit class is derived from ControlWorkUnit and is designed to handle the 
+    distribution and execution of computational tasks on multiple nodes within a computing cluster.
+    This class facilitates the submission, tracking, and scheduling of parallel tasks, leveraging
+    the power of cluster resources to perform large-scale computations more efficiently.
+    
+    - This class encapsulates a cluster job within a workflow, where each instance of the workflow is treated as a sub-workflow.
+    - It initializes and submits these sub-workflows to computational cluster. Failures in individual sub-workflows do not halt the execution of the entire WorkUnit.
+
+    Attributes:
+        iterable_data (Iterable): The data over which the WorkUnit encapsulates cluster batch jobs.
+        max_simultaeneous_jobs (int): The maximum number of simultaneous tasks submitted to the cluster.
+        Other inherited attributes...
+
+    Methods:
+        cluster_batch_unit_placeholder_api: A static placeholder API for initialization.
+        __init__: Initializes a ClusterBatchWorkUnit instance.
+        from_dict: Creates a ClusterBatchWorkUnit instance from a dictionary configuration.
+        execute: Executes the cluster batch, iterating over each sub-workflow.
+    """
+    iterable_data: Iterable
+    max_simultaeneous_jobs: int
+
+    @staticmethod
+    def cluster_batch_placeholder_api(workunits: list, batch_data: Iterable, batch_datum_varname: str, max_simultaeneous_jobs: int = 5):
+        """Serves as a placeholder API for initializing ClusterBatchWorkUnit. This API is not intended for actual execution but marks
+        the necessary arguments for initialization.
+
         Args:
-            workflow (WorkFlow): The WorkFlow instance from loop bodies.
+            workunits (dict): A list containing the WorkUnit configuration dicts.
+            batch_data (Iterable): The data to be iterated over in the loop. 
+                                  This parameter name needs to be consistent with the value of `BATCH_ITERABLE_DATA_LABEL`.
+            batch_datum_varname (str): Name of the variable representing each element iterated from ITERABLE_DATA in each workunit of the loop body. 
+                                      This parameter name needs to be consistent with the value of `BATCH_BODY_DATUM_LABEL`.
+            max_simultaeneous_jobs (int, optional): Due to the resource limit of the Cluster, we have to set a maximum number of simultaneous tasks 
+                                    submitted to the cluster (Default 5).
         """
-        if self.status == StatusCode.EXIT_WITH_ERROR_AND_PAUSE:
-            return
-        elif workflow.status == StatusCode.EXIT_WITH_ERROR_AND_PAUSE:
-            self.status = StatusCode.EXIT_WITH_ERROR_AND_PAUSE
-            return
-        elif workflow.status in StatusCode.error_excluding_pause_statuses:
-            if self.status in StatusCode.pause_including_error_statuses:
-                self.status = StatusCode.EXIT_WITH_ERROR_AND_PAUSE
-            else:
-                self.status = StatusCode.EXIT_WITH_ERROR_IN_INNER_UNITS
-            return
-        elif workflow.status in StatusCode.pause_excluding_error_statuses:
-            if self.status in StatusCode.error_including_pause_statuses:
-                self.status = StatusCode.EXIT_WITH_ERROR_AND_PAUSE
-            else:
-                self.status = StatusCode.RUNNING_WITH_PAUSE_IN_INNER_UNITS
-            return
+        pass
+
+    def __init__(self, unit_dict: dict, workflow: WorkFlow = None, locator: List[int] = list(), sqlite_filepath: str = str(), debug: bool = False):
+        """Initializes a ClusterBatchWorkUnit instance.
+
+        Args:
+            unit_dict (dict): Configuration dictionary with necessary parameters for initialization.
+            workflow (WorkFlow): A reference to the workflow object this unit belongs to.
+            locator (list, optional): A list of the hierarchical indexes to locate the current workunit.
+            sqlite_filepath (str): The filepath to your sqlite database file for persistent storage.
+            debug (bool, optional): Indicates whether to run in debug mode.
+        """
+        super().__init__(unit_dict=unit_dict, workflow=workflow, locator=locator, sqlite_filepath=sqlite_filepath, debug=debug)
+        return
+    
+    @classmethod
+    def from_dict(cls, unit_dict: dict, workflow: WorkFlow = None, locator: List[int] = list(), sqlite_filepath: str = str(), debug: bool = False) -> LoopWorkUnit:
+        """Initializes an instance of ClusterBatchWorkUnit from a given dictionary.
+
+        As with a normal WorkUnit, the dictionary should contain keys such as `api`, `store_as`, 
+        and `args`, which specify the API to be called, the return key to be used for storing the results, 
+        and the arguments to the API call, respectively.
+        Here, however, the value of `api` must be `cluster_batch` to indicate that this WorkUnit is a ClusterBatchWorkUnit, 
+        and the arguments contained in `args` are the iteration object and the batch body, where the loop 
+        body is treated as a sub-WorkFlow.
+
+        Args:
+            unit_dict (dict): Configuration dictionary with necessary parameters for initialization.
+            workflow (WorkFlow, optional): The parent workflow of this unit.
+            locator (list, optional): A list of the hierarchical indexes to locate the current workunit.
+            sqlite_filepath (str): The filepath to your sqlite database file for persistent storage.
+            debug (bool, optional): Indicates whether to run in debug mode.
+
+        Returns:
+            ClusterBatchWorkUnit: An instance of ClusterBatchWorkUnit initialized with the given configuration.
+        """
+        _LOGGER.info(f"Initializing a {__class__.__name__} now...")
+        unit = super().from_dict(unit_dict=unit_dict, placeholder_api=__class__.cluster_batch_placeholder_api, 
+                            iterative_body_datum_label=BATCH_BODY_DATUM_LABEL, workflow=workflow, locator=locator, 
+                            sqlite_filepath=sqlite_filepath, debug=debug)
+        return unit
+
+    def reload(self, unit_dict: dict):
+        """
+        Reloads the ClusterBatchWorkUnit instance with updated configuration.
+
+        This method is used when a user wants to reload the entire task and checks 
+        if there are any changes in the parameter values. If the WorkUnit's status 
+        indicates an error or pause, it updates the WorkUnit's properties with the 
+        new configuration. Otherwise, it compares the current and new configurations 
+        to check for updates.
+
+        Args:
+            unit_dict (dict): The new configuration dictionary for the WorkUnit.
+
+        Notes:
+            - Compares `args_dict_input`, `args_dict_to_pass`, and `params_to_assign_at_execution`
+              between the current WorkUnit and a virtual unit created from the new configuration.
+            - Also compares `return_key` values.
+            - If any of these values are different, sets the status to `StatusCode.SUSPECIOUS_UPDATES`.
+
+        Returns:
+            The created virtual WorkUnit instance for further comparison.
+        """
+        super().reload(unit_dict=unit_dict, placeholder_api=__class__.cluster_batch_placeholder_api, 
+                    iterable_data_label=BATCH_ITERABLE_DATA_LABEL, iterative_body_datum_label=BATCH_BODY_DATUM_LABEL)
+
 
 class GeneralWorkUnit(ControlWorkUnit):
     """This class is used to represent a special kind of unit of work that would normally be used at the outermost level 

@@ -1703,7 +1703,7 @@ class AmberInterface(BaseInterface):
                 return str(result)
 
             # 4. symlink in ./
-            _LOGGER.debug("3nd attempt failed. making the symlink under cwd.")
+            _LOGGER.debug("3rd attempt failed. making the symlink under cwd.")
             result = fs.get_valid_temp_name(f"./{target_path.name}.lnk", is_symlink=True)
             if len(result) <= 70:
                 Path(result).symlink_to(target_path)
@@ -1806,7 +1806,7 @@ class AmberInterface(BaseInterface):
             self,
             # find default values in AmberConfig
             # method
-            force_fields: List[str] = "default",
+            force_fields: Union[List[str], str] = "default",
             charge_method: str = "default",
             resp_engine: str = "default",
             resp_lvl_of_theory: str = "default",
@@ -1846,7 +1846,7 @@ class AmberInterface(BaseInterface):
                 of a same wild-type/template enzyme.
                 * The NCAA-file correspondence is determined by the 
                   (1) 3-letter name in the file
-                  (2) (if not 1 not exist) the file name
+                  (2) (if 1 not exist) the file name
                 * Setting this to a path that is too general may cause conflict when different
                 NCAAs have the same name. (e.g.: different tautomer or general res name like LIG)
             force_renew_ncaa_parameter:
@@ -1870,6 +1870,8 @@ class AmberInterface(BaseInterface):
                 handle for adding additional tleap lines before generating the parameters."""
         # tool: write the below code
         # print(AmberInterface._generate_default_assigning_lines_for_build_md_parameterizer_or_step(locals().items()))
+        if (isinstance(force_fields, str) and force_fields != "default"):
+            raise ValueError("The argument `force_fields` should be a List[str] value or 'default', which is the only allowed string value for `force_fields`.")
 
         # init default values
         type_hint_sticker: AmberConfig

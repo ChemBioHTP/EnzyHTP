@@ -23,8 +23,8 @@ from enzy_htp import config
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp.core.general import EnablePropagate
-
 from enzy_htp.structure import Structure
+
 from enzy_htp.workflow import ExecutionEntity, WorkFlow, WorkUnit, GeneralWorkUnit
 from enzy_htp.workflow import SCIENCE_API_MAPPER, StatusCode
 
@@ -372,5 +372,7 @@ def test_general_reload_change_varname(caplog):
     fs.safe_rmdir(WORK_DIR)
     return
 
-    
+def test_general_execute_full_workflow(caplog):
+    """Execute the full workflow."""
+    pass
     
