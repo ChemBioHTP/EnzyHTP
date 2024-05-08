@@ -61,17 +61,21 @@ LOOP_BODY_DATUM_LABEL = "loop_datum_varname"    # Key indicating the element ite
 CLUSTER_BATCH_API_KEY = "cluster_batch"         # The key of a cluster batch workunit.
 BATCH_ITERABLE_DATA_LABEL = "batch_data"        # Key indicating the object to iterate over in a ClusterBatchWorkUnit.
 BATCH_BODY_DATUM_LABEL = "batch_datum_varname"  # Key indicating the element iterated from ITERABLE_DATA in each workunit of the batch body.
+DEFAULT_CLUSTER_JOB_CAPABILITY = 5              # How much jobs can be submitted to the cluster before reaching its capability?
 GENERAL_API_KEY = "general"                     # The key of a general workunit.
 
-# API Keys for flow control, such as `loop`, `general`.
+# API Keys for flow control, such as `loop`, `general`, etc.
 CONTROL_API_KEYS = [
     LOOP_API_KEY,
+    CLUSTER_BATCH_API_KEY,
     GENERAL_API_KEY,
 ]
 
 # Some string values used globally are defined here.
 FAILED_INITIALIZATION_ERROR_MSG = "The initialized work has not yet passed the self-inspection, so it is not allowed to be executed!"
 SUCCESS_INITIALIZATION_MSG = "The initialized work has successfully passed the self-inspection. Now proceeding to execution."
+
+#region Base entities.
 
 class ExecutionEntity:
     """
@@ -153,8 +157,10 @@ class ExecutionEntity:
         """Synchronize the status of the current entity to database. Called everytime before executing the WorkUnit or WorkFlow instances.
         
         Note: Don't call it within initialization!
+
+        TODO (Zhong): 也许一个根据 Walltime 时间进行重生的逻辑可以放在这个卡口。Maybe a logic for respawning based on Walltime time could go in this place.
         """
-        if (self.status in StatusCode.unexecuted_statuses):
+        if (not self.is_executable):
             return
         database_session = self.create_database_session()
         if (database_session):
@@ -271,7 +277,7 @@ class WorkFlow(ExecutionEntity):
         Other inherited attributes...
     """
     api_key: str
-    error_msg_list = list()     # Error information. This is a class attribute.
+    error_msg_list: list     # Error information. This is a class attribute.
 
     
     control_workunit: ControlWorkUnit   # The outer ControlWorkUnit instance hosting the current workflow.
@@ -282,10 +288,6 @@ class WorkFlow(ExecutionEntity):
     inherited_data_mapper: dict     # Data inherited from parent workflow.
     nested_control_unit_return_keys: list   # The return keys of nested ControlWorkUnit instances (e.g. loop)
 
-    # Output
-    # data_output_path = './Mutation.dat'
-    
-    #region WorkFlow Initialization.
     def __init__(self, debug: bool = False, 
                 locator: List[int] = list(), 
                 intermediate_data_mapper: Dict[str, Any] = dict(), 
@@ -314,6 +316,7 @@ class WorkFlow(ExecutionEntity):
 
         # Default values.
         self.api_key = WORKFLOW_API_KEY
+        self.error_msg_list = list()
         self.workunits = list()
         self.nested_control_unit_return_keys = list()
         self.child_execution_entities = self.workunits
@@ -420,19 +423,20 @@ class WorkFlow(ExecutionEntity):
         Returns:
             The WorkUnit instance added.
         """
-        workunit = WorkUnit(unit_dict=unit_dict)   # Placeholder ONLY!
-        api_key = workunit.api_key
+        api_key = unit_dict.get(WORKUNIT_API_NAME_KEY)
         if (api_key in CONTROL_API_KEYS):
-            _LOGGER.info(f"Parsing Control WorkUnit {workunit.identifier}.")
+            _LOGGER.info(f"Parsing Control WorkUnit {api_key}.")
             if api_key == LOOP_API_KEY:
                 # Setup a placeholder in `workflow.intermediate_data_mapper`.
                 workunit = LoopWorkUnit.from_dict(unit_dict=unit_dict, workflow=self, locator=locator_to_pass, sqlite_filepath=self.sqlite_filepath, debug=self.debug)
+            elif api_key == CLUSTER_BATCH_API_KEY:
+                workunit = ClusterBatchWorkUnit.from_dict(unit_dict=unit_dict, workflow=self, locator=locator_to_pass, sqlite_filepath=self.sqlite_filepath, debug=self.debug)
             elif api_key == GENERAL_API_KEY:
                 error_msg = "GeneralWorkUnit should not be configured inside a workflow."
                 _LOGGER.error(error_msg)
                 self.error_msg_list.append(error_msg)
         else:
-            _LOGGER.info(f"Parsing Science WorkUnit {workunit.identifier}.")
+            _LOGGER.info(f"Parsing Science WorkUnit {api_key}.")
             workunit = WorkUnit.from_dict(unit_dict=unit_dict, workflow=self, locator=locator_to_pass, sqlite_filepath=self.sqlite_filepath, debug=self.debug)
 
         # Setup a placeholder in `workflow.intermediate_data_mapper`.
@@ -444,8 +448,6 @@ class WorkFlow(ExecutionEntity):
             self.status = StatusCode.FAILED_INITIALIZATION
             self.error_msg_list += workunit.error_msg_list
         return
-    
-    #endregion
 
     def reload(self, unit_dict_list: List[dict]):
         """
@@ -981,20 +983,17 @@ class WorkUnit(ExecutionEntity):
             data_mapper_to_inherite[key] = value
         return data_mapper_to_inherite
 
+#endregion
+
+#region Non-entry Control entities.
+
 class ControlWorkUnit(WorkUnit):
     """This class is an abstract class defining shared attributes and methods of Control WorkUnits (e.g. loop, general, etc.)
     This class is derived from WorkUnit class.
-
-    Attributes:
-        sub_workflows (List[WorkFlow]): A list of sub-workflows, each representing one iteration of the loop.
-        Other inherited attributes...
     """
-    sub_workflows: List[WorkFlow]
 
     def __init__(self, unit_dict: dict = dict(), workflow: WorkFlow = None, locator: List[int] = list(), sqlite_filepath: str = str(), debug: bool = False):
         super().__init__(unit_dict=unit_dict, workflow=workflow, locator=locator, sqlite_filepath=sqlite_filepath, debug=debug)
-        self.sub_workflows = list()
-        self.child_execution_entities = self.sub_workflows
         if (self.workflow):
             self.workflow.nested_control_unit_return_keys.append(self.return_key)
 
@@ -1100,6 +1099,8 @@ class IterativeWorkUnit(ControlWorkUnit):
     or configuration, typical in scenarios like batch processing or parametric studies.
 
     Attributes:
+        sub_workflows (List[WorkFlow]): A list of sub-workflows.
+        Other inherited attributes...
         iterable_data (Iterable): The data over which the loop iterates.
         Other inherited attributes...
 
@@ -1110,6 +1111,7 @@ class IterativeWorkUnit(ControlWorkUnit):
         execute: Executes the loop, iterating over each sub-workflow.
     """
     iterable_data: Iterable
+    sub_workflows: List[WorkFlow]
 
     def __init__(self, unit_dict: dict, workflow: WorkFlow = None, locator: List[int] = list(), sqlite_filepath: str = str(), debug: bool = False):
         """Initializes an IterativeWorkUnit instance.
@@ -1122,6 +1124,8 @@ class IterativeWorkUnit(ControlWorkUnit):
             debug (bool, optional): Indicates whether to run in debug mode.
         """
         super().__init__(unit_dict=unit_dict, workflow=workflow, locator=locator, sqlite_filepath=sqlite_filepath, debug=debug)
+        self.sub_workflows = list()
+        self.child_execution_entities = self.sub_workflows
 
     @classmethod
     def from_dict(cls, unit_dict: dict, placeholder_api: Callable, iterative_body_datum_label: str, 
@@ -1365,8 +1369,8 @@ class LoopWorkUnit(IterativeWorkUnit):
         super().reload(unit_dict=unit_dict, placeholder_api=__class__.loop_unit_placeholder_api, 
                     iterable_data_label=LOOP_ITERABLE_DATA_LABEL, iterative_body_datum_label=LOOP_BODY_DATUM_LABEL)
 
-    def execute(self) -> tuple:
-        """Executes the loop, iterating over each sub-workflow in `sub_workflow_list`.
+    def execute(self) -> Tuple[str, Any]:
+        """Executes the loop, iterating over each sub-workflow in `sub_workflows`.
 
         In each iteration, the corresponding sub-workflow is executed, and its results are collected.
         Failures in sub-workflows do not stop the execution of the entire loop.
@@ -1389,6 +1393,7 @@ class LoopWorkUnit(IterativeWorkUnit):
         if (not is_existing_subflows):  # If we don't use existing sub-workflows, clear all the sub-workflows.
             self.sub_workflows.clear()
 
+        # Add sub_workflow(s) to the execution queue.
         for loop_index, loop_datum in enumerate(loop_data):
             workflow: WorkFlow
             data_mapper_for_initialization = {loop_body_datum_varname: loop_datum}
@@ -1406,7 +1411,11 @@ class LoopWorkUnit(IterativeWorkUnit):
                     inherited_data_mapper=data_mapper_to_inherite, locator=flow_locator,
                     control_workunit=self, sqlite_filepath=self.sqlite_filepath)
                 self.sub_workflows.append(workflow)
+            continue
 
+        # Execute the sub-workflows one by one.
+        for loop_index, loop_datum in enumerate(loop_data):
+            workflow = self.sub_workflows[loop_index]
             _LOGGER.debug(f'Executing {workflow.identifier} ...')
             workflow_return = workflow.execute()
             self.return_value[self.encode_layer_index(loop_index)] = workflow_return
@@ -1417,7 +1426,7 @@ class LoopWorkUnit(IterativeWorkUnit):
             self.status = StatusCode.EXIT_OK
         return self.return_key, self.return_value
 
-class ClusterBatchWorkUnit(ControlWorkUnit):
+class ClusterBatchWorkUnit(IterativeWorkUnit):
     """Manages and orchestrates computational tasks across a cluster computing environment.
     
     The ClusterBatchWorkUnit class is derived from ControlWorkUnit and is designed to handle the 
@@ -1443,7 +1452,7 @@ class ClusterBatchWorkUnit(ControlWorkUnit):
     max_simultaeneous_jobs: int
 
     @staticmethod
-    def cluster_batch_placeholder_api(workunits: list, batch_data: Iterable, batch_datum_varname: str, max_simultaeneous_jobs: int = 5):
+    def cluster_batch_placeholder_api(workunits: list, batch_data: Iterable, batch_datum_varname: str, max_simultaeneous_jobs: int = DEFAULT_CLUSTER_JOB_CAPABILITY):
         """Serves as a placeholder API for initializing ClusterBatchWorkUnit. This API is not intended for actual execution but marks
         the necessary arguments for initialization.
 
@@ -1454,7 +1463,7 @@ class ClusterBatchWorkUnit(ControlWorkUnit):
             batch_datum_varname (str): Name of the variable representing each element iterated from ITERABLE_DATA in each workunit of the loop body. 
                                       This parameter name needs to be consistent with the value of `BATCH_BODY_DATUM_LABEL`.
             max_simultaeneous_jobs (int, optional): Due to the resource limit of the Cluster, we have to set a maximum number of simultaneous tasks 
-                                    submitted to the cluster (Default 5).
+                                    submitted to the cluster (Default: the value of DEFAULT_CLUSTER_JOB_CAPABILITY).
         """
         pass
 
@@ -1472,7 +1481,7 @@ class ClusterBatchWorkUnit(ControlWorkUnit):
         return
     
     @classmethod
-    def from_dict(cls, unit_dict: dict, workflow: WorkFlow = None, locator: List[int] = list(), sqlite_filepath: str = str(), debug: bool = False) -> LoopWorkUnit:
+    def from_dict(cls, unit_dict: dict, workflow: WorkFlow = None, locator: List[int] = list(), sqlite_filepath: str = str(), debug: bool = False) -> ClusterBatchWorkUnit:
         """Initializes an instance of ClusterBatchWorkUnit from a given dictionary.
 
         As with a normal WorkUnit, the dictionary should contain keys such as `api`, `store_as`, 
@@ -1493,9 +1502,10 @@ class ClusterBatchWorkUnit(ControlWorkUnit):
             ClusterBatchWorkUnit: An instance of ClusterBatchWorkUnit initialized with the given configuration.
         """
         _LOGGER.info(f"Initializing a {__class__.__name__} now...")
-        unit = super().from_dict(unit_dict=unit_dict, placeholder_api=__class__.cluster_batch_placeholder_api, 
+        unit: __class__ = super().from_dict(unit_dict=unit_dict, placeholder_api=__class__.cluster_batch_placeholder_api, 
                             iterative_body_datum_label=BATCH_BODY_DATUM_LABEL, workflow=workflow, locator=locator, 
                             sqlite_filepath=sqlite_filepath, debug=debug)
+        unit.max_simultaeneous_jobs = unit.args_dict_to_pass.get("max_simultaeneous_jobs", DEFAULT_CLUSTER_JOB_CAPABILITY)
         return unit
 
     def reload(self, unit_dict: dict):
@@ -1523,6 +1533,66 @@ class ClusterBatchWorkUnit(ControlWorkUnit):
         super().reload(unit_dict=unit_dict, placeholder_api=__class__.cluster_batch_placeholder_api, 
                     iterable_data_label=BATCH_ITERABLE_DATA_LABEL, iterative_body_datum_label=BATCH_BODY_DATUM_LABEL)
 
+    def execute(self) -> Tuple[str, Any]:
+        """Executes the cluster batch, iterating over each sub-workflow in `sub_workflows`.
+
+        In each iteration, the corresponding sub-workflow is executed, and its results are collected.
+        Failures in sub-workflows do not stop the execution of the entire loop.
+
+        Returns:
+            tuple: A tuple containing the return key and a list of results from each loop iteration.
+        """
+        if self.status in StatusCode.skippable_statuses:
+            return self.return_key, self.return_value
+
+        self.return_value: dict = dict()
+        data_mapper_to_inherite = self.generate_data_mapper_to_inherite()
+        self.update_args_value_from_data_mapper()
+        _LOGGER.info(f'We are about to execute {self.__class__.__name__} {self.identifier} ...')
+        self.status = StatusCode.RUNNING
+        batch_body_datum_varname = self.args_dict_to_pass.get(BATCH_BODY_DATUM_LABEL)
+        batch_data = self.args_dict_to_pass.get(BATCH_ITERABLE_DATA_LABEL)
+
+        is_existing_subflows = (len(batch_data) == len(self.sub_workflows))
+        if (not is_existing_subflows):  # If we don't use existing sub-workflows, clear all the sub-workflows.
+            self.sub_workflows.clear()
+
+        # Add sub_workflow(s) to the execution queue.
+        for batch_index, batch_datum in enumerate(batch_data):
+            workflow: WorkFlow
+            data_mapper_for_initialization = {batch_body_datum_varname: batch_datum}
+            
+            if (is_existing_subflows):
+                workflow = self.sub_workflows[batch_index]
+                workflow.intermediate_data_mapper.update(data_mapper_for_initialization)
+                workflow.inherited_data_mapper.update(data_mapper_to_inherite)
+            else:
+                flow_locator = self.locator.copy()
+                flow_locator.append(self.encode_layer_index(batch_index))
+                workflow = WorkFlow.from_list(
+                    unit_dict_list=self.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL),
+                    debug=self.debug, intermediate_data_mapper=data_mapper_for_initialization,
+                    inherited_data_mapper=data_mapper_to_inherite, locator=flow_locator,
+                    control_workunit=self, sqlite_filepath=self.sqlite_filepath)
+                self.sub_workflows.append(workflow)
+            continue
+
+        # Execute the sub-workflows one by one. TODO: 这里还是从 Loop 复制过来的状态，需要重新写，涉及 sbatch 提交等事务。
+        for batch_index, batch_datum in enumerate(batch_data):
+            workflow = self.sub_workflows[batch_index]
+            _LOGGER.debug(f'Executing {workflow.identifier} ...')
+            workflow_return = workflow.execute()
+            self.return_value[self.encode_layer_index(batch_index)] = workflow_return
+            self.update_status_code(workflow=workflow)
+            continue
+
+        if (self.status == StatusCode.RUNNING):
+            self.status = StatusCode.EXIT_OK
+        return self.return_key, self.return_value
+
+#endregion
+
+#region Entry Point.
 
 class GeneralWorkUnit(ControlWorkUnit):
     """This class is used to represent a special kind of unit of work that would normally be used at the outermost level 
@@ -1715,7 +1785,7 @@ class GeneralWorkUnit(ControlWorkUnit):
                                                     save_snapshot=save_snapshot, sqlite_filename=sqlite_filename, 
                                                     overwrite_database=overwrite_database, debug=debug)
         
-    def execute(self) -> tuple:
+    def execute(self) -> Tuple[str, Any]:
         """Executes the GeneralWorkUnit.
 
         Returns:
@@ -1910,3 +1980,5 @@ class GeneralWorkUnit(ControlWorkUnit):
         with open(json_filepath) as fobj:
             self.reload_json_file_object(fobj)
         return
+
+#endregion
