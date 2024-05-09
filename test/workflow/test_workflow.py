@@ -22,8 +22,11 @@ from random import randint
 from enzy_htp import config
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core import file_system as fs
+from enzy_htp.core.clusters.accre import Accre
 from enzy_htp.core.general import EnablePropagate
+
 from enzy_htp.structure import Structure
+from enzy_htp.chemical.level_of_theory import QMLevelOfTheory
 
 from enzy_htp.workflow import ExecutionEntity, WorkFlow, WorkUnit, GeneralWorkUnit
 from enzy_htp.workflow import SCIENCE_API_MAPPER, StatusCode
@@ -374,5 +377,38 @@ def test_general_reload_change_varname(caplog):
 
 def test_general_execute_full_workflow(caplog):
     """Execute the full workflow."""
+    cluster = Accre()
+    md_cluster_job_config = {
+        "cluster" : cluster,
+        "res_keywords" : {
+            "account" : "csb_gpu_acc",
+            "partition" : "a6000x4"
+        }
+    }
+    qm_cluster_job_config = {
+        "cluster" : cluster,
+        "res_keywords" : {
+            "account" : "yang_lab_csb",
+            "partition" : "production",
+            'walltime' : '1-00:00:00',
+        }
+    }
+    qm_level_of_theory = QMLevelOfTheory(
+        basis_set="3-21G",
+        method="HF",
+        solvent="water",
+        solv_method="SMD",
+    )
+    data_mapper_for_init = {
+        "cluster": cluster,
+        "md_cluster_job_config": md_cluster_job_config,
+        "qm_cluster_job_config": qm_cluster_job_config,
+        "qm_level_of_theory": qm_level_of_theory,
+    }
+
+    json_filepath = f"{DATA_DIR}/general_7si9_general_full.json"
+    general = GeneralWorkUnit.from_json_filepath(
+        json_filepath=json_filepath, working_directory=WORK_DIR, 
+        overwrite_database=True, data_mapper_for_init=data_mapper_for_init)
     pass
     

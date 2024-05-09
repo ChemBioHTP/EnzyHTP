@@ -17,6 +17,7 @@ SCIENCE_API_MAPPER = {
     "protonate_stru" : preparation.protonate_stru,
     "assign_mutant" : mutation.assign_mutant,
     "mutate_stru" : mutation.mutate_stru,
+    "build_md_parameterizer": interface.amber.build_md_parameterizer,
     "equi_md_sampling" : geometry.equi_md_sampling,
     "single_point" : quantum.single_point,
     "optimize" : quantum.optimize,
