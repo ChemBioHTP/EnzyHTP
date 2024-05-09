@@ -19,7 +19,7 @@ from enzy_htp.chemical.solvent import RD_SOLVENT_LIST
 import enzy_htp.core.file_system as fs
 import enzy_htp.core.fortran_helper as fh
 from enzy_htp.core.logger import _LOGGER
-from enzy_htp.core.exception import FileFormatError
+from enzy_htp.core.exception import AddPDBError
 
 class PrmtopParser(StructureParserInterface):
     """the parser for Amber prmtop files"""
@@ -64,7 +64,7 @@ class PrmtopParser(StructureParserInterface):
         for ess in essential:
             if ess not in data:
                 _LOGGER.error(f"{ess} not in prmtop. ({path}) You need a prmtop after `add_pdb`.")
-                raise ValueError
+                raise AddPDBError
         
         # build atoms (contain charge)
         atoms = type(self)._build_atoms(data)
@@ -390,6 +390,18 @@ class PrmtopParser(StructureParserInterface):
         content = cls._remove_comments(content)
         result = cls._parse_general(content)
         return result
+
+    @classmethod
+    def has_add_pdb(cls, prmtop_path: str) -> bool:
+        """check if a prmtop file have the critical information from add_pdb"""
+        data = cls._parse_prmtop_file(prmtop_path)
+        essential = ["ATOM_NUMBER", "RESIDUE_CHAINID", "RESIDUE_NUMBER"]
+        for ess in essential:
+            if ess not in data:
+                _LOGGER.info(f"{ess} not in prmtop. ({prmtop_path}) It may need `add_pdb`.")
+                return False
+        return True
+
 
     # region unfullfilled TODO finish these when needed. I didnt make them directly use _parse_general because we dont want to store too much we dont need in the mem.
     @classmethod

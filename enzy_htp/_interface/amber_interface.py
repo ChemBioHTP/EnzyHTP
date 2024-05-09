@@ -30,7 +30,7 @@ from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import math_helper as mh
 from enzy_htp.core.job_manager import ClusterJob
-from enzy_htp.core.exception import UnsupportedMethod, tLEaPError, AmberMDError
+from enzy_htp.core.exception import AddPDBError, tLEaPError, AmberMDError
 from enzy_htp.core.general import get_interval_str_from_list
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
 from enzy_htp.structure.structure_io import pdb_io, prmtop_io
@@ -2239,6 +2239,32 @@ class AmberInterface(BaseInterface):
         ]
         contents = "\n".join(contents)
         self.run_cpptraj(contents)
+
+    def load_traj(self, prmtop_path: str, traj_path: str, ref_pdb: str = None) -> StructureEnsemble:
+        """load StructureEnsemble from Amber prmtop and nc/mdcrd files"""
+        coord_parser_mapper = {
+            ".nc" : AmberNCParser(prmtop_file=prmtop_path),
+            ".mdcrd" : AmberMDCRDParser(prmtop_file=prmtop_path),
+        }
+        if not prmtop_io.PrmtopParser.has_add_pdb(prmtop_path):
+            scratch_dir = eh_config["system.SCRATCH_DIR"]
+            fs.safe_mkdir(scratch_dir)
+            temp_prmtop = fs.get_valid_temp_name(f"{scratch_dir}/load_traj.prmtop")
+            self.run_add_pdb(
+                in_prmtop=prmtop_path,
+                out_path=temp_prmtop,
+                ref_pdb=ref_pdb
+            )
+            prmtop_path = temp_prmtop
+
+        result = StructureEnsemble(
+            topology=prmtop_path,
+            top_parser=prmtop_io.PrmtopParser().get_structure,
+            coordinate_list=traj_path,
+            coord_parser=coord_parser_mapper[Path(traj_path).suffix].get_coordinates,
+        )
+
+        return result
 
     # region == TODO ==
     def add_charges(self, stru: Structure, prmtop: str) -> None:
