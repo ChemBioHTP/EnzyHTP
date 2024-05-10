@@ -2,7 +2,7 @@
     "api": "general",
     "store_as": "general",
     "args": {
-      "pdb_path": "./data/7si9_rm_water_disconnected.pdb",
+      "pdb_path": "./data/7si9_rm_water_disconnected_changed_angle.pdb",
       "remove_polypeptide_hydrogen_only": true,
       "solvent_ph": 7.4,
       "if_protonate_ligand": false,
@@ -16,6 +16,9 @@
       "qm_level_of_theory": "qm_level_of_theory",
       "qm_job_check_period": 60,
       "qm_job_array_size": 20,
+      "bond_p1": "bond_p1",
+      "bond_p2": "bond_p2",
+      "qm_region_pattern": ["resi 41+145+163:166+207"],
       "workunits": [
         {
           "api": "read_pdb",
@@ -94,6 +97,7 @@
                                 "stru": "`replica_esm`",
                                 "engine": "`qm_engine`",
                                 "method": "`qm_level_of_theory`",
+                                "regions": "`qm_region_pattern`",
                                 "cluster_job_config": "`qm_cluster_job_config`",
                                 "job_check_period": "`qm_job_check_period`",
                                 "job_array_size": "`qm_job_array_size`"
@@ -110,21 +114,42 @@
                                         "api": "bond_dipole",
                                         "store_as": "dipole",
                                         "args": {
-                                            "ele_stru": "`ele_stru`"
+                                            "ele_stru": "`ele_stru`",
+                                            "atom_1": "`bond_p1`",
+                                            "atom_2": "`bond_p2`"
+                                        }
+                                    },
+                                    {
+                                        "api": "get_attr",
+                                        "store_as": "topology",
+                                        "args": {
+                                          "obj": "`ele_stru`",
+                                          "attr_chain": ["geometry", "topology"]
                                         }
                                     },
                                     {
                                         "api": "ele_field_strength_at_along",
                                         "store_as": "field_strength",
                                         "args": {
-
+                                          "stru": "`topology`",
+                                          "p1": "`bond_p1`",
+                                          "p2": "`bond_p2`"
+                                        }
+                                    },
+                                    {
+                                        "api": "get_item",
+                                        "store_as": "dipole_0",
+                                        "args": {
+                                          "obj": "`dipole`",
+                                          "index": 0
                                         }
                                     },
                                     {
                                         "api": "ele_stab_energy_of_bond",
                                         "store_as": "dg_ele",
                                         "args": {
-
+                                          "bond_dipole": "`dipole_0`",
+                                          "bond_field_strength": "`field_strength`"
                                         }
                                     }
                                 ]

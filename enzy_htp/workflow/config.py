@@ -7,8 +7,9 @@ also configs for the procedure of the workflow.
 Author: QZ Shao <shaoqz@icloud.com>; Zhong, Yinjie <yinjie.zhong@vanderbilt.edu>
 Date: 2024-01-25"""
 
+from collections.abc import Iterable
 from enzy_htp import structure, preparation, mutation, geometry, quantum, analysis, interface
-from typing import Any
+from typing import Any, List, Union
 
 SCIENCE_API_MAPPER = {
     "read_pdb" : structure.PDBParser().get_structure,
@@ -27,6 +28,69 @@ SCIENCE_API_MAPPER = {
     "ele_stab_energy_of_dipole" : analysis.ele_stab_energy_of_dipole,
     "bond_dipole": analysis.bond_dipole,
 }
+
+class WidgetAPI:
+    """
+    Provides static methods for simple data processing tasks such as
+    retrieving items and attributes from various Python objects.
+    This utility class enhances data access in a generalized manner.
+    """
+    
+    @staticmethod
+    def get_item(obj: Union[list, tuple, dict, str], index: Any = 0) -> Any:
+        """
+        Retrieves an item from a given object (list, tuple, dictionary, or string)
+        using the provided index or key.
+
+        Args:
+            obj (Union[list, tuple, dict, str]): The object from which to retrieve the item.
+            index (Any): The index or key for accessing the item. Default is 0.
+
+        Returns:
+            Any: The item located at the specified index/key.
+
+        Raises:
+            KeyError: If the key is not found in a dictionary.
+            IndexError: If the index is out of range for lists or tuples.
+            TypeError: If the object type does not support indexing.
+        """
+        try:
+            return obj[index]
+        except (KeyError, IndexError, TypeError) as e:
+            raise e  # Optionally, handle or log the error here as needed.
+
+    @staticmethod
+    def get_attr(obj: Any, attr_chain: List[str]) -> Any:
+        """
+        Retrieves a nested attribute from an object based on a chain of attribute names.
+
+        Args:
+            obj (Any): The object from which attributes are to be fetched.
+            attr_chain (List[str]): A list of attribute names representing the path to
+                                    the desired attribute (e.g., ['attr1', 'attr2'] will fetch obj.attr1.attr2).
+
+        Returns:
+            Any: The value of the nested attribute, or None if any attribute in the chain does not exist.
+
+        Example:
+            If you pass an object `example` with a structure where `example.part1.subpart2.final` exists,
+            calling `get_attr(example, ['part1', 'subpart2', 'final'])` will return the value of `final`.
+        """
+        attr = obj
+        for attr_name in attr_chain:
+            if hasattr(attr, attr_name):
+                attr = getattr(attr, attr_name)
+            else:
+                return None
+        return attr
+
+
+WIDGET_API_MAPPER = {
+    "get_item": WidgetAPI.get_item,
+    "get_attr": WidgetAPI.get_attr,
+}
+
+SCIENCE_API_MAPPER.update(WIDGET_API_MAPPER)
 
 PARAM_METHOD_MAPPER = {
     "amber" : interface.amber.build_md_parameterizer,

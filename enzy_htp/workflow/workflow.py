@@ -24,7 +24,7 @@ from io import TextIOWrapper, FileIO
 from time import sleep
 from inspect import _empty, Parameter, signature
 from json import load, loads
-from typing import Any, Dict, List, Type, Union, Tuple
+from typing import Any, Dict, List, Type, Union, Tuple, get_args
 from collections.abc import Iterable, Callable
 from datetime import datetime
 from sqlalchemy.orm.session import Session
@@ -903,13 +903,26 @@ class WorkUnit(ExecutionEntity):
         Returns:
             bool: True if the argument value matches the type annotation, False otherwise.
         """
-
-        # Checks if param.annotation is a typing type.
-        is_typing_type = hasattr(annotation, '__origin__')
-
-        if is_typing_type:
-            # Check the origin of typing types (e.g., list for List[int])
-            return isinstance(arg_value, annotation.__origin__)
+        if hasattr(annotation, '__origin__'):   # Checks if param.annotation is a typing type.
+            if (annotation.__origin__ is Union):   # Handle Union Type.
+                valid_types = get_args(annotation)
+                _LOGGER.debug(f"Type from Union are {valid_types}.")
+                subscripted_generics = list()
+                for typ in valid_types:
+                    try:
+                        if isinstance(arg_value, typ):
+                            return True 
+                    except (TypeError):
+                        subscripted_generics.append(typ)
+                        continue
+                if (subscripted_generics):
+                    _LOGGER.warning(f"Please make sure that `{arg_value}` is an instance of {' or '.join(subscripted_generics)}.")
+                    return True
+                else:
+                    return False
+            else:
+                # Check the origin of typing types (e.g., list for List[int])
+                return isinstance(arg_value, annotation.__origin__)
         else:
             if (not isinstance(annotation, type)):
                 # TODO Sometimes, the annotation may be parsed as a string value,
@@ -942,9 +955,12 @@ class WorkUnit(ExecutionEntity):
                 self.params_to_assign_at_execution.append(param_name)
                 self.args_dict_to_pass[param_name] = unformatted_arg_value
                 mapped_value = mapper.get(unformatted_arg_value)
-                if (mapped_value):   # Check if there is a non-none-or-empty value in Mapper.
+                _LOGGER.debug(f"Checkpoint 1: The mapped value is `{mapped_value}`.")
+                if (mapped_value != None):   # Check if there is a non-none-or-empty value in Mapper.
+                    _LOGGER.debug(f"Checkpoint 2: The mapped value `{mapped_value}` is not NoneValue.")
                     if (isinstance(mapped_value, type(Placeholder.PLACEHOLDER_STR_VALUE)) # Placeholder values need to be excluded.
                         and mapped_value == Placeholder.PLACEHOLDER_STR_VALUE):
+                        _LOGGER.debug(f"Checkpoint 3: The mapped value `{mapped_value}` is a placeholder value.")
                         break
                     is_value_mapped_none = False
                     arg_value = mapped_value    # Assign mapped value to the argument.
@@ -1269,6 +1285,7 @@ class IterativeWorkUnit(ControlWorkUnit):
         placeholder_sub_workflow = WorkFlow.from_list(unit_dict_list=unit.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL),
             debug=unit.debug, intermediate_data_mapper=data_mapper_for_initialize_as_intermediate,
             inherited_data_mapper=data_mapper_to_inherite, locator=flow_locator, control_workunit=unit, sqlite_filepath=unit.sqlite_filepath)
+        unit.status = placeholder_sub_workflow.status
         
         # Add error message from placeholder workflow initialization.
         if (placeholder_sub_workflow.error_msg_list):
@@ -1750,6 +1767,7 @@ class GeneralWorkUnit(ControlWorkUnit):
         self.save_snapshot = save_snapshot
         self.api_key = GENERAL_API_KEY
         self.latest_pickle_filepath = str()
+        self.status = StatusCode.CREATED
 
     @classmethod
     def from_dict(cls, unit_dict: dict, working_directory: str = CURRENT_DIRECTORY, 
@@ -1795,6 +1813,8 @@ class GeneralWorkUnit(ControlWorkUnit):
         # Self Inspection.
         unit.self_inspection_and_args_reassembly()
         unit.check_initialization_status()
+        if (unit.status == StatusCode.READY_TO_START):
+            unit.status = StatusCode.INITIALIZING
         
         # Initialize the WorkFlow.
         data_mapper_for_inherit = unit.args_dict_to_pass.copy()
@@ -1803,8 +1823,13 @@ class GeneralWorkUnit(ControlWorkUnit):
 
         if (unit_dict_list:=unit.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL)):
             unit.sub_workflow = WorkFlow.from_list(unit_dict_list, debug=debug, inherited_data_mapper=data_mapper_for_inherit, control_workunit=unit, sqlite_filepath=unit.sqlite_filepath)
+            if unit.sub_workflow.status == StatusCode.READY_TO_START:
+                unit.status = StatusCode.READY_TO_START
+            else:
+                unit.status = StatusCode.FAILED_INITIALIZATION
         else:
             error_msg = "Initializing GeneralWorkUnit with empty `workunits`. WorkUnit(s) are expected."
+            unit.status = StatusCode.FAILED_INITIALIZATION
             _LOGGER.error(error_msg)
             raise ValueError(error_msg)
         return unit

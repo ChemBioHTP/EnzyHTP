@@ -389,6 +389,16 @@ class Atom(DoubleLinkedNode):
 
     def __repr__(self):
         return f"<{self} at {hex(id(self))}>"
+    
+    def __bool__(self):
+        try:
+            if (self.element):
+                return True
+            else:
+                return False
+        except:
+            return False
+    
     #endregion
 
     @dispatch

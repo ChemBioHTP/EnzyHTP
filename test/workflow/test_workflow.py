@@ -25,7 +25,7 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core.clusters.accre import Accre
 from enzy_htp.core.general import EnablePropagate
 
-from enzy_htp.structure import Structure
+from enzy_htp.structure import Structure, PDBParser
 from enzy_htp.chemical.level_of_theory import QMLevelOfTheory
 
 from enzy_htp.workflow import ExecutionEntity, WorkFlow, WorkUnit, GeneralWorkUnit
@@ -264,8 +264,6 @@ def test_general_locate_workunit(caplog):
     assert target_info["status"] == 0
     return
 
-# TODO (Zhong): A test for database.
-
 def test_general_read_architecture(caplog):
     """Test reading the schema of the configuration json/unit_dict."""
     json_filepath = f'{DATA_DIR}/general_7si9_general_layer_variable.json'
@@ -377,6 +375,9 @@ def test_general_reload_change_varname(caplog):
 
 def test_general_execute_full_workflow(caplog):
     """Execute the full workflow."""
+    # _LOGGER.level = logging.DEBUG
+    wt_stru = PDBParser().get_structure(f"{DATA_DIR}/7si9_rm_water_disconnected_changed_angle.pdb")
+
     cluster = Accre()
     md_cluster_job_config = {
         "cluster" : cluster,
@@ -399,16 +400,20 @@ def test_general_execute_full_workflow(caplog):
         solvent="water",
         solv_method="SMD",
     )
+    bond_p1 = wt_stru.ligands[0].find_atom_name("C1")
+    bond_p2 = wt_stru.ligands[0].find_atom_name("N")
+
     data_mapper_for_init = {
         "cluster": cluster,
         "md_cluster_job_config": md_cluster_job_config,
         "qm_cluster_job_config": qm_cluster_job_config,
         "qm_level_of_theory": qm_level_of_theory,
+        "bond_p1": bond_p1,
+        "bond_p2": bond_p2,
     }
-
     json_filepath = f"{DATA_DIR}/general_7si9_general_full.json"
     general = GeneralWorkUnit.from_json_filepath(
         json_filepath=json_filepath, working_directory=WORK_DIR, 
         overwrite_database=True, data_mapper_for_init=data_mapper_for_init)
-    pass
+    assert general.status == StatusCode.READY_TO_START
     
