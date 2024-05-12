@@ -146,6 +146,10 @@ def write_data(outfile: str, tag: Any, data: Dict) -> str:
 
     return outfile
 
+def write_data_to_excel(outfile: str, tag: Any, data: dict) -> str:
+    # TODO (Zhong): Write or add data to the excel file in the working directory.
+    pass
+
 
 def get_valid_temp_name(fname: str, is_symlink: bool = False) -> str:
     """find a vaild name for a temporary file of {fname}. 

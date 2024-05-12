@@ -2,7 +2,7 @@
     "api": "general",
     "store_as": "general",
     "args": {
-      "pdb_path": "./data/7si9_rm_water_disconnected_changed_angle.pdb",
+      "pdb_path": "../data/7si9_rm_water_disconnected_changed_angle.pdb",
       "remove_polypeptide_hydrogen_only": true,
       "solvent_ph": 7.4,
       "if_protonate_ligand": false,
@@ -18,7 +18,7 @@
       "qm_job_array_size": 20,
       "bond_p1": "bond_p1",
       "bond_p2": "bond_p2",
-      "qm_region_pattern": ["resi 41+145+163:166+207"],
+      "qm_region_pattern": ["resi 41+145+163+164+165+166+207"],
       "workunits": [
         {
           "api": "read_pdb",

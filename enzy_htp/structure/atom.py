@@ -391,6 +391,15 @@ class Atom(DoubleLinkedNode):
         return f"<{self} at {hex(id(self))}>"
     
     def __bool__(self):
+        """Truth Value Testing method of the instance.
+        
+        Note:
+            Shao doesn't think we should add a Truth Value Testing method to the Atom object.
+            However, Zhong found that without this method now, when someone apply Truth Value Testing to Atom object, 
+            the program will report an error, but in practice, Truth Value Testing as a common operation, 
+            the user or the developer will not "not do it" just because "it should not be done", 
+            so we'd better return some value in such case, right?
+        """
         try:
             if (self.element):
                 return True

@@ -2,7 +2,7 @@
     "api": "general",
     "store_as": "general",
     "args": {
-      "pdb_path": "./data/7si9_rm_water_disconnected.pdb",
+      "pdb_path": "../data/7si9_rm_water_disconnected.pdb",
       "remove_polypeptide_hydrogen_only": true,
       "solvent_ph": 7.4,
       "if_protonate_ligand": false,
