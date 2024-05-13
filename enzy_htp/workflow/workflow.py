@@ -1860,6 +1860,7 @@ class GeneralWorkUnit(ControlWorkUnit):
             if (work_dir_from_unit_dict:=unit_dict.get(WORKING_DIRECTORY_KEY)):
                 working_directory = work_dir_from_unit_dict
 
+        unit_dict[WORKING_DIRECTORY_KEY] = working_directory  # Update working directory to the unit dict.
         safe_mkdir(working_directory)
         sqlite_filepath = path.join(working_directory, sqlite_filename)
 
@@ -1886,7 +1887,7 @@ class GeneralWorkUnit(ControlWorkUnit):
         # Initialize the WorkFlow.
         data_mapper_for_inherit = unit.args_dict_to_pass.copy()
         data_mapper_for_inherit.update(data_mapper_for_init)
-        data_mapper_for_inherit[WORKING_DIRECTORY_KEY] = working_directory  # Add working directory into data mapper.
+        
         del data_mapper_for_inherit[CONTROL_BODY_WORKUNITS_LABEL]  # Pass kwargs to the workflow.
 
         if (unit_dict_list:=unit.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL)):
