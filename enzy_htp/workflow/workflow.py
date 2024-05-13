@@ -10,7 +10,7 @@ TODO (Zhong): How to handle intermediate data transfer between parent and child 
 TODO (Zhong): Continue computing. (Completed 2024-03-20 01:15 UTC-5)
 TODO (Zhong): How to indicate error from inner units. (Completed 2024-03-13 19:00 UTC-5)
 TODO (Zhong): Cluster Batch.
-TODO (Zhong): Data Output to excel (enzy_htp.core.file_system.write_data_to_excel). 
+TODO (Zhong): Data Output to excel (enzy_htp.core.file_system.write_data_to_excel, Completed 2024-05-12 19:50 UTC-5). 
 
 @File    :   workflow.py
 @Created :   2024/02/05 22:53
@@ -53,6 +53,7 @@ DEFAULT_SQLITE_FILENAME = "database.db" # Default database filename.
 # In the Json file used to define the workflow, 
 # keys in the mapper are defined by the developer,
 # which are not user-definable.
+WORKING_DIRECTORY_KEY = "working_directory"     # Key indicating the working directory in the data mapper.
 WORKUNIT_API_NAME_KEY = "api"                   # Key indicating the API name.
 WORKUNIT_RETURN_VALUE_KEY = "store_as"          # Key indicating the key where the return value of the workunit is stored.
 WORKUNIT_ARGUMENT_LIST_KEY = "args"             # Key indicates the arguments to be passed into the API.
@@ -158,7 +159,8 @@ class ExecutionEntity:
     @status.setter
     def status(self, value: int):
         self._status = value
-        self.synchronize_execution_status()
+        if (value not in StatusCode.unexecuted_statuses):
+            self.synchronize_execution_status()
     
     def synchronize_execution_status(self) -> None:
         """Synchronize the status of the current entity to database. Called everytime before executing the WorkUnit or WorkFlow instances.
@@ -365,7 +367,6 @@ class WorkFlow(ExecutionEntity):
     """
     api_key: str
     error_msg_list: list     # Error information. This is a class attribute.
-
     
     control_workunit: ControlWorkUnit   # The outer ControlWorkUnit instance hosting the current workflow.
     workunits: List[WorkUnit]           # A list of WorkUnit instance carried by this workflow.
@@ -662,10 +663,12 @@ class WorkUnit(ExecutionEntity):
         args_dict_to_pass_backup (dict): For reload use only. A backup of `args_dict_to_pass` to compare before execution.
         error_info_list (list): List of error messages encountered during processing.
         params_to_assign_at_execution (list): List of parameters that need to be assigned values at execution time.
+        architecture (str): The workunits and workflows to be performed in the task, and their order and hierarchy of operation.
         Other inherited attributes...
     """
     api_key: str
     args_dict_input: dict
+    architecture: str
 
     workflow: WorkFlow
     api: Callable
@@ -691,6 +694,7 @@ class WorkUnit(ExecutionEntity):
         super().__init__(working_directory=working_directory, debug=debug, locator=locator, sqlite_filepath=sqlite_filepath)
         # Initialize attributes in the constructor
         # to prevent them from being considered as class attributes.
+        self.architecture = __class__.read_architecture(unit_dict=unit_dict)
         self.api_key = unit_dict.get(WORKUNIT_API_NAME_KEY, str())
         self.return_key = unit_dict.get(WORKUNIT_RETURN_VALUE_KEY, None)
         self.args_dict_input = unit_dict.get(WORKUNIT_ARGUMENT_LIST_KEY, dict())
@@ -705,6 +709,31 @@ class WorkUnit(ExecutionEntity):
             self.workflow = workflow
         return
     
+    @staticmethod
+    def read_architecture(unit_dict: dict, indent: int = 0):
+        """
+        Recursively reads a nested unit_dict dictionary and extracts 'api' values.
+
+        Args:
+            schema (dict): The nested dictionary schema.
+            indent (int): The current indentation level (number of spaces).
+
+        Returns:
+            str: A formatted string representing the 'api' values at each level.
+        """
+        result = ""
+
+        # Check if 'api' key exists in the current level
+        if WORKUNIT_API_NAME_KEY in unit_dict:
+            result += ' ' * indent + f"- {unit_dict[WORKUNIT_API_NAME_KEY]}\n"
+        
+        # If 'args' key exists and it has a 'workunits' key, process each item in 'workunits'
+        if (WORKUNIT_ARGUMENT_LIST_KEY in unit_dict) and (CONTROL_BODY_WORKUNITS_LABEL in unit_dict[WORKUNIT_ARGUMENT_LIST_KEY]):
+            for workunit in unit_dict[WORKUNIT_ARGUMENT_LIST_KEY][CONTROL_BODY_WORKUNITS_LABEL]:
+                result += __class__.read_architecture(workunit, indent + 4)
+
+        return result
+
     @classmethod
     def from_dict(cls, unit_dict: dict, workflow: WorkFlow = None, working_directory: str = BASE_DIRECTORY, locator: List[int] = list(), sqlite_filepath: str = str(), debug: bool = False) -> WorkUnit:
         """Initializes an instance of WorkUnit from a given dictionary.
@@ -1750,7 +1779,6 @@ class GeneralWorkUnit(ControlWorkUnit):
         working_directory (str): Indicates where to run the job. Default to current working directory.
         save_snapshot (bool): Whether to automatically save the status as a pickle file 
                             when it exits due to Error, Pause, or Completion. Default False.
-        architecture (str): The workunits and workflows to be performed in the task, and their order and hierarchy of operation.
         Other inherited attributes...
 
     Methods:
@@ -1762,7 +1790,6 @@ class GeneralWorkUnit(ControlWorkUnit):
     sub_workflow: WorkFlow
     sqlite_filename: str
     save_snapshot: bool
-    architecture: str
     latest_pickle_filepath: str
 
     @staticmethod
@@ -1820,12 +1847,18 @@ class GeneralWorkUnit(ControlWorkUnit):
         Returns:
             LoopWorkUnit: An instance of LoopWorkUnit initialized with the given configuration.
         """
+        # Handle working directory.
+        # Highest priority: use the working directory passed in by the initialization function; 
+        # Lowest priority: use BASE_DIRECTORY.
+        if path.abspath(working_directory) == path.abspath(BASE_DIRECTORY):
+            if (work_dir_from_unit_dict:=unit_dict.get(WORKING_DIRECTORY_KEY)):
+                working_directory = work_dir_from_unit_dict
+
         safe_mkdir(working_directory)
         sqlite_filepath = path.join(working_directory, sqlite_filename)
 
         # Initialize the class.
         unit = cls(unit_dict=unit_dict, working_directory=working_directory, save_snapshot=save_snapshot, sqlite_filepath=sqlite_filepath, debug=debug)
-        unit.architecture = __class__.read_architecture(unit_dict=unit_dict)
         database_session = unit.create_database_session(overwrite_database=overwrite_database)
         database_session.close()
         if not save_snapshot:
@@ -1847,6 +1880,7 @@ class GeneralWorkUnit(ControlWorkUnit):
         # Initialize the WorkFlow.
         data_mapper_for_inherit = unit.args_dict_to_pass.copy()
         data_mapper_for_inherit.update(data_mapper_for_init)
+        data_mapper_for_inherit[WORKING_DIRECTORY_KEY] = working_directory  # Add working directory into data mapper.
         del data_mapper_for_inherit[CONTROL_BODY_WORKUNITS_LABEL]  # Pass kwargs to the workflow.
 
         if (unit_dict_list:=unit.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL)):
@@ -1992,31 +2026,6 @@ class GeneralWorkUnit(ControlWorkUnit):
             except:
                 return None
     
-    @staticmethod
-    def read_architecture(unit_dict: dict, indent: int = 0):
-        """
-        Recursively reads a nested unit_dict dictionary and extracts 'api' values.
-
-        Args:
-            schema (dict): The nested dictionary schema.
-            indent (int): The current indentation level (number of spaces).
-
-        Returns:
-            str: A formatted string representing the 'api' values at each level.
-        """
-        result = ""
-
-        # Check if 'api' key exists in the current level
-        if WORKUNIT_API_NAME_KEY in unit_dict:
-            result += ' ' * indent + f"- {unit_dict[WORKUNIT_API_NAME_KEY]}\n"
-        
-        # If 'args' key exists and it has a 'workunits' key, process each item in 'workunits'
-        if (WORKUNIT_ARGUMENT_LIST_KEY in unit_dict) and (CONTROL_BODY_WORKUNITS_LABEL in unit_dict[WORKUNIT_ARGUMENT_LIST_KEY]):
-            for workunit in unit_dict[WORKUNIT_ARGUMENT_LIST_KEY][CONTROL_BODY_WORKUNITS_LABEL]:
-                result += __class__.read_architecture(workunit, indent + 4)
-
-        return result
-
     def reload(self, unit_dict: dict) -> None:
         """Reload task from a GeneralWorkUnit dict.
         

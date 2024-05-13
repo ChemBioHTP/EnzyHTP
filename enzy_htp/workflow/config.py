@@ -8,8 +8,9 @@ Author: QZ Shao <shaoqz@icloud.com>; Zhong, Yinjie <yinjie.zhong@vanderbilt.edu>
 Date: 2024-01-25"""
 
 from collections.abc import Iterable
-from enzy_htp import structure, preparation, mutation, geometry, quantum, analysis, interface
 from typing import Any, List, Union
+
+from enzy_htp import core, structure, preparation, mutation, geometry, quantum, analysis, interface
 
 SCIENCE_API_MAPPER = {
     "read_pdb" : structure.PDBParser().get_structure,
@@ -27,6 +28,7 @@ SCIENCE_API_MAPPER = {
     "ele_stab_energy_of_bond" : analysis.ele_stab_energy_of_bond,
     "ele_stab_energy_of_dipole" : analysis.ele_stab_energy_of_dipole,
     "bond_dipole": analysis.bond_dipole,
+    "write_data_to_excel": core.write_data_to_excel,
 }
 
 class WidgetAPI:

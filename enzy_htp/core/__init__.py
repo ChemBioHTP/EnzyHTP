@@ -23,6 +23,7 @@ from .file_system import (
     write_lines,
     get_file_ext,
     write_data,
+    write_data_to_excel,
     check_not_empty,
 )
 from .math_helper import (check_valid_ph)

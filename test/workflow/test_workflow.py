@@ -373,6 +373,18 @@ def test_general_reload_change_varname(caplog):
     fs.safe_rmdir(WORK_DIR)
     return
 
+def test_write_data_to_excel(caplog):
+    """Test initializing and executing workflow with Loop(s) to test if LoopWorkUnit works properly."""
+    json_filepath = f'{DATA_DIR}/general_7si9_write_data_to_excel.json'
+    # _LOGGER.level = logging.DEBUG
+    with EnablePropagate(_LOGGER):
+        general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath, working_directory=WORK_DIR, overwrite_database=True, debug=True)
+        return_key, return_value = general.execute()
+    fs.safe_rmdir(WORK_DIR)
+    assert 'original structure' in caplog.text
+    assert 'mutant structure' in caplog.text
+    return
+
 def test_general_execute_full_workflow(caplog):
     """Execute the full workflow."""
     # _LOGGER.level = logging.DEBUG
@@ -415,5 +427,6 @@ def test_general_execute_full_workflow(caplog):
     general = GeneralWorkUnit.from_json_filepath(
         json_filepath=json_filepath, working_directory=WORK_DIR, 
         overwrite_database=True, data_mapper_for_init=data_mapper_for_init)
+    fs.safe_rmdir(WORK_DIR)
     assert general.status == StatusCode.READY_TO_START
     

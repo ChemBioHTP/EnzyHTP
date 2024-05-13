@@ -1,0 +1,77 @@
+{
+  "api": "general",
+  "store_as": "general",
+  "args": {
+    "pdb_filepath": "../data/7si9_rm_water_disconnected.pdb",
+    "working_directory": "",
+    "workunits": [
+      {
+        "api": "read_pdb",
+        "store_as": "structure",
+        "args": {
+          "path": "`pdb_filepath`"
+        }
+      },
+      {
+        "api": "remove_hydrogens",
+        "store_as": "structure",
+        "args": {
+          "stru": "`structure`",
+          "polypeptide_only": true
+        }
+      },
+      {
+        "api": "protonate_stru",
+        "args": {
+          "stru": "`structure`",
+          "ph": 7.0,
+          "protonate_ligand": false,
+          "engine": "pdb2pqr"
+        }
+      },
+      {
+        "api": "assign_mutant",
+        "store_as": "`assign_mutant_0`",
+        "args": {
+          "stru": "`structure`",
+          "pattern": "{WT},{H41M},{M165R}"
+        }
+      },
+      {
+        "api": "loop",
+        "store_as": "loop_unit_0",
+        "args": {
+          "loop_data": "`assign_mutant_0`",
+          "loop_datum_varname": "loop_datum",
+          "workunits": [
+            {
+              "api": "mutate_stru",
+              "store_as": "mutant_stru",
+              "args": {
+                "stru": "`structure`",
+                "mutant": "`loop_datum`",
+                "engine": "pymol"
+              }
+            },
+            {
+              "api": "log_difference",
+              "store_as": "difference",
+              "args": {
+                "original_stru": "`structure`",
+                "mutant_stru": "`mutant_stru`"
+              }
+            },
+            {
+              "api": "write_data_to_excel",
+              "args": {
+                "output_directory": "`working_directory`",
+                "mutant": "`loop_datum`",
+                "difference": "`difference`"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -2,13 +2,17 @@
 
 Author: Chris Jurich, <chris.jurich@vanderbilt.edu>
 Author: QZ Shao, <shaoqz@icloud.com>
+Author: Zhong, Yinjie <yinjie.zhong@vanderbilt.edu>
 Date: 2022-03-14
 """
-from io import IOBase
 import os
 import glob
 import shutil
 import datetime
+import pandas as pd
+from openpyxl import load_workbook
+
+from io import IOBase
 from typing import List, Any, Dict
 from pathlib import Path
 
@@ -146,10 +150,36 @@ def write_data(outfile: str, tag: Any, data: Dict) -> str:
 
     return outfile
 
-def write_data_to_excel(outfile: str, tag: Any, data: dict) -> str:
-    # TODO (Zhong): Write or add data to the excel file in the working directory.
-    pass
+def write_data_to_excel(output_directory: str, excel_filename: str = "result.xlsx", sheet_name: str = "Sheet1", **kwargs):
+    """Write the data to an excel (.xlsx) file.
+    
+    Args:
+        output_directory (str): The directory for data output (Absolute paths are recommended).
+        excel_filename (str, optional): The filepath of the output excel file (Absolute paths are recommended).
+        sheet_name (str, optional): The sheet name to write data.
+        kwargs: The data to be written (The key strings in kwargs will be column names.).
+    """
+    # Create the directory if it doesn't exist.
+    safe_mkdir(output_directory)
+    filepath = os.path.join(output_directory, excel_filename)
 
+    # Convert kwargs to DataFrame
+    data_df = pd.DataFrame([kwargs])
+    
+    # Check if the file exists
+    if not os.path.isfile(filepath):
+        # Create a new Excel writer object and write to it, because the file does not exist
+        with pd.ExcelWriter(filepath, engine="openpyxl", mode="w") as writer:
+            data_df.to_excel(writer, sheet_name=sheet_name, index=False)
+    else:
+        # Load the existing workbook
+        with pd.ExcelWriter(filepath, engine="openpyxl", mode="a", if_sheet_exists="overlay") as writer:
+            # If the sheet exists, append the data, otherwise write to a new sheet
+            if sheet_name in writer.sheets:
+                startrow = writer.sheets[sheet_name].max_row
+                data_df.to_excel(writer, sheet_name=sheet_name, startrow=startrow, header=False, index=False)
+            else:
+                data_df.to_excel(writer, sheet_name=sheet_name, index=False)
 
 def get_valid_temp_name(fname: str, is_symlink: bool = False) -> str:
     """find a vaild name for a temporary file of {fname}. 
