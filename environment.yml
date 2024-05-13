@@ -26,10 +26,10 @@ dependencies:
   - bs4=4.12.2=py38hd3eb1b0_0
   - bzip2=1.0.8=hd590300_5
   - c-ares=1.23.0=hd590300_0
-  - ca-certificates=2023.12.12=h06a4308_0
+  - ca-certificates=2024.3.11=h06a4308_0
   - cairo=1.18.0=h3faef2a_0
   - cclib=1.8=pyhd8ed1ab_0
-  - certifi=2023.11.17=py39h06a4308_0
+  - certifi=2024.2.2=py39h06a4308_0
   - charset-normalizer=3.3.2=pyhd8ed1ab_0
   - colorlog=6.7.0=py39hf3d152e_2
   - contourpy=1.2.0=py39hdb19cb5_0
@@ -41,6 +41,7 @@ dependencies:
   - editdistance=0.6.1=py39h6a678d5_0
   - eigen=3.4.0=h00ab1b0_0
   - elfutils=0.189=h6f2b95c_1
+  - et_xmlfile=1.1.0=py39h06a4308_0
   - exceptiongroup=1.0.4=py39h06a4308_0
   - expat=2.5.0=hcb278e6_1
   - ffmpeg=6.0.0=gpl_hc9fb8ae_101
@@ -181,6 +182,7 @@ dependencies:
   - openbabel=3.1.1=py39h421517d_8
   - openh264=2.3.1=hcb278e6_2
   - openjpeg=2.5.0=hfec8fc6_2
+  - openpyxl=3.1.2=py39h5eee18b_0
   - openssl=3.1.4=hd590300_0
   - p11-kit=0.24.1=hc5aa10d_0
   - packaging=23.2=pyhd8ed1ab_0
