@@ -612,7 +612,7 @@ class WorkFlow(ExecutionEntity):
         """
         if not self.is_executable:
             _LOGGER.error(f"{self.identifier}: {FAILED_INITIALIZATION_ERROR_MSG}")
-            raise ValueError(self.identifier)
+            return dict()
         else:
             if not self.control_workunit:    # If the current workflow is at the outermost level, log the message; otherwise skip the duplicated message.
                 _LOGGER.info(SUCCESS_INITIALIZATION_MSG)
