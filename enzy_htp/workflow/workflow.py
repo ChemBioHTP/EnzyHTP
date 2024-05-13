@@ -295,41 +295,41 @@ class ExecutionEntity:
         filepath = path.join(dir_to_save, filename)
         try:
             with open(file=filepath, mode="wb") as fobj:
-                pickle.dump(self, file=fobj, protocol=pickle.HIGHEST_PROTOCOL)
+                pickle.dump(self, file=fobj)
         except Exception as exc:
             if dir_to_save != self.working_directory:
                 _LOGGER.warning(f"Unable to save file to '{dir_to_save}'. Using your working directory '{self.working_directory}' instead.")
                 dir_to_save = self.working_directory
                 filepath = path.join(dir_to_save, filename)
                 with open(file=filepath, mode="wb") as fobj:
-                    pickle.dump(self, file=fobj, protocol=pickle.HIGHEST_PROTOCOL)
+                    pickle.dump(self, file=fobj)
             else:
                 raise exc
         return filepath
     
     @staticmethod
-    def load_snapshot_file(filepath: str) -> GeneralWorkUnit:
+    def load_snapshot_file(filepath: str) -> ExecutionEntity:
         """
-        Loads a GeneralWorkUnit instance from a snapshot file.
+        Loads a ExecutionEntity instance from a snapshot file.
 
-        This method deserializes the state of a GeneralWorkUnit instance from the given
-        snapshot file. If the deserialized object is not an instance of GeneralWorkUnit,
+        This method deserializes the state of a ExecutionEntity instance from the given
+        snapshot file. If the deserialized object is not an instance of ExecutionEntity,
         it raises a TypeError.
 
         Args:
             filepath (str): The path to the snapshot file from which to load the state.
 
         Returns:
-            GeneralWorkUnit: The deserialized GeneralWorkUnit instance.
+            ExecutionEntity: The deserialized ExecutionEntity instance.
 
         Raises:
-            TypeError: If the deserialized object is not an instance of GeneralWorkUnit.
+            TypeError: If the deserialized object is not an instance of ExecutionEntity.
         """
         with open(file=filepath, mode="rb") as fobj:
             unit = pickle.load(file=fobj)
             
-            if not isinstance(unit, GeneralWorkUnit):
-                raise TypeError("The loaded object is not an instance of GeneralWorkUnit.")
+            if not isinstance(unit, __class__):
+                raise TypeError(f"The loaded object is not an instance of {__class__.__name__}.")
             
             database_session = unit.create_database_session()
             database_session.close()
@@ -940,7 +940,9 @@ class WorkUnit(ExecutionEntity):
         Returns:
             bool: True if the argument value matches the type annotation, False otherwise.
         """
-        if hasattr(annotation, '__origin__'):   # Checks if param.annotation is a typing type.
+        if (annotation == Any):
+            return True
+        elif hasattr(annotation, '__origin__'):   # Checks if param.annotation is a typing type.
             if (annotation.__origin__ is Union):   # Handle Union Type.
                 valid_types = get_args(annotation)
                 _LOGGER.debug(f"Type from Union are {valid_types}.")
@@ -964,15 +966,19 @@ class WorkUnit(ExecutionEntity):
             if (not isinstance(annotation, type)):
                 # TODO Sometimes, the annotation may be parsed as a string value,
                 # so we use pydoc.locate to cast it from string to type if it happens.
-                index_of_bracket = annotation.find("[")
-                matched_type = annotation[:index_of_bracket].lower() if index_of_bracket != -1 else annotation.lower()
-                from pydoc import locate
-                matched_type = locate(matched_type)
+                if (isinstance(annotation, str)):
+                    index_of_bracket = annotation.find("[")
+                    matched_type = annotation[:index_of_bracket].lower() if index_of_bracket != -1 else annotation.lower()
+                    from pydoc import locate
+                    matched_type = locate(matched_type)
 
-                if matched_type:
-                    annotation = matched_type
+                    if matched_type:
+                        annotation = matched_type
+                    else:
+                        annotation = eval(annotation)
                 else:
-                    annotation = eval(annotation)
+                    _LOGGER.warning(f"Unable to determine if `{arg_value}` is an instance of {annotation}. Please ensure it by yourself")
+                    return True
 
             # Inspect basic types.
             return isinstance(arg_value, annotation)
