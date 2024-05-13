@@ -394,6 +394,18 @@ class Residue(DoubleLinkedNode):
 
     #endregion
 
+    def create_seq_res(self) -> chem.SeqRes:
+        """TODO(CJ)"""
+
+        return chem.SeqRes(
+            model=1,
+            chain=self.parent.name,
+            idx=self.idx,
+            seq_idx=None,
+            name=self.name,
+            missing=False
+        )
+
     #region === Special ===
     def __str__(self) -> str:
         return f"Residue({self._idx}, {self._name}, atom:{len(self._atoms)}, {self._parent})"
