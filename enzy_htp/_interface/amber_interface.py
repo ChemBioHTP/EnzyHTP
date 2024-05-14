@@ -48,7 +48,9 @@ from enzy_htp.structure import (
     ModifiedResidue,
     NonCanonicalBase,
     StructureEnsemble,
-    PDBParser)
+    PDBParser,
+    )
+from enzy_htp.structure.structure_io import PrmtopParser
 from enzy_htp import config as eh_config
 
 class AmberParameter(MolDynParameter):
@@ -682,7 +684,7 @@ class AmberMDStep(MolDynStep):
         traj_log_parser = self.parent_interface.read_from_mdout
         last_frame_parser = AmberRSTParser(
             prmtop_file=prmtop,
-            interface=self.parent_interface).get_structure
+            interface=self.parent_interface)
 
         result = MolDynResult(
             traj_file = traj_path,
@@ -749,7 +751,7 @@ class AmberMDStep(MolDynStep):
         last_frame_file = result_egg.rst_path
         last_frame_parser = AmberRSTParser(
             prmtop_file=result_egg.prmtop_path,
-            interface=self.parent_interface).get_structure
+            interface=self.parent_interface)
         
         # error check
         self.check_md_error(traj_file, traj_log_file, result_egg.prmtop_path, result_egg.parent_job)
@@ -1254,41 +1256,6 @@ class AmberInterface(BaseInterface):
         return [aid_mapper["atom"][at] for at in atoms]
 
 
-    def rename_atoms(self, stru: Structure) -> None: # TODO(high piror) move to structure_io https://github.com/ChemBioHTP/EnzyHTP/pull/162#discussion_r1473217587
-        """Renames residues and atoms to be compatible with Amber naming and functions.
-        
-        Args:
-            stru: The Structure() to perform renaming on.
-
-        Returns:
-            Nothing. 
-        """
-        nterm_mapper:Dict = {"H1":"1H", "H2":"2H", "H3":"3H"}
-        leu_mapper:Dict = {
-            "1HD1":"HD11",
-            "2HD1":"HD12",
-            "3HD1":"HD13",
-            "1HD2":"HD21",
-            "2HD2":"HD22",
-            "3HD2":"HD23",
-            }
-        _LOGGER.info("Beginning renaming...")
-        changed_residues:int = 0
-        changed_atoms:int = 0
-        for res in stru.residues:
-            if not res.is_canonical():
-                continue
-            
-
-            if res.name == 'LEU':
-                for aa in res.atoms:
-                    if aa.name in leu_mapper:
-                        aa.name = leu_mapper[aa.name]
-                        changed_atoms += 1                            
-        
-        _LOGGER.info(f"Finished renaming! Changed {changed_residues} residues and {changed_atoms} atoms.")
-
-
     def get_amber_residue_index(self, residues: List[Atom]) -> List[int]:
         """"""
         raise Exception("TODO")
@@ -1523,7 +1490,16 @@ class AmberInterface(BaseInterface):
             geom_cons: List[StructureConstraint]
             nmropt_cntrl = {'nmropt': 1}
             # figure out path
-            disang_path: str = geom_cons[0].params["amber"]["rs_filepath"]
+            disang_path:str
+            if geom_cons[0].is_residue_pair_constraint():
+                for (_, child_gc) in geom_cons[0].child_constraints:
+                    disang_path = child_gc.params["amber"]["rs_filepath"]
+                    break
+                else:
+                    assert False, "This doesn't make sense! fix: CJ"
+            else:
+                disang_path: str = geom_cons[0].params["amber"]["rs_filepath"]
+
             if disang_path.startswith("{mdstep_dir}"):
                 disang_path = disang_path.lstrip("{mdstep_dir}")
                 disang_path = f"{md_config_dict['mdstep_dir']}/{disang_path}"
@@ -1531,8 +1507,11 @@ class AmberInterface(BaseInterface):
             # figure out content
             disang_content_list = []
             for cons in geom_cons:
-                raw_rs_dict = self._parse_cons_to_raw_rs_dict(cons)
-                disang_content_list.append(raw_rs_dict)
+                if cons.is_residue_pair_constraint():
+                    for (_,child_cons) in cons.child_constraints:
+                        disang_content_list.append(self._parse_cons_to_raw_rs_dict(child_cons))
+                else:
+                    disang_content_list.append(self._parse_cons_to_raw_rs_dict(cons))
             # assemble
             nmropt_file_redirection = {
                 "DISANG" : {
@@ -1781,7 +1760,7 @@ class AmberInterface(BaseInterface):
 
         Application:
             Used in mutation.api.mutate_stru_with_tleap()"""
-
+        
         tleap_in_lines: List[str] = [
             f"source {amber_lib}",
             f"a = loadpdb {input_pdb}",
@@ -2207,6 +2186,7 @@ class AmberInterface(BaseInterface):
             prmtop_path: str,
             out_path: str,
             autoimage: bool = True,
+            remove_solvent: bool = False,
             start: int = 1,
             end: int = "last",
             step: int = 1,
@@ -2228,6 +2208,10 @@ class AmberInterface(BaseInterface):
         if autoimage:
             contents += [
                 "autoimage"
+            ]
+        if remove_solvent:
+            contents += [
+                "strip :WAT,Cl-,Na+"
             ]
         contents += [
             f"trajout {out_path}",
@@ -2297,7 +2281,30 @@ class AmberRSTParser():
     
     def get_structure(self, rst_file: str) -> Structure:
         """parse a rst file to a Structure()."""
+        temp_pdb:str="temp_amber_structure.pdb"
+        contents:List[str] = [
+            f"parm {self.prmtop_file}",
+            f"trajin {rst_file}",
+            # "strip :WAT,Na+,Cl-",
+            f"trajout {temp_pdb}",
+             "run",
+             "quit"
+        ]
 
+        self.parent_interface.run_cpptraj( "\n".join(contents) )
+        sp =  PDBParser()
+
+        stru = sp.get_structure( temp_pdb )
+        fs.safe_rm( temp_pdb )
+#
+#        charge_only = PrmtopParser().get_structure(self.prmtop_file)
+#        
+#        for co, aa in zip(charge_only.atoms, stru.atoms):
+#            print(co.key, aa.key)
+#            print(co.__dict__)
+#            exit( 0 )
+
+        return stru 
 
 class AmberMDCRDParser():
     """parser Amber .mdcrd file
@@ -2410,7 +2417,9 @@ class AmberNCParser():
     def get_coordinates(
             self,
             nc_file: str,
-            autoimage: bool=True) -> Generator[List[List[float]], None, None]:
+            autoimage: bool=True,
+            remove_solvent: bool=False,
+        ) -> Generator[List[List[float]], None, None]:
         """parse a nc file to a Generator of coordinates. Intermediate mdcrd file is created."""
         # 0. init temp path
         if self.mdcrd is None:
@@ -2424,6 +2433,7 @@ class AmberNCParser():
                 prmtop_path=self.prmtop_file,
                 out_path=temp_mdcrd,
                 autoimage=autoimage,
+                remove_solvent=remove_solvent,
             )
 
             # 2. store for future use

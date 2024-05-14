@@ -25,6 +25,7 @@ from enzy_htp.structure import (Structure, Ligand, Chain, PDBParser)
 
 from enzy_htp.structure.metal_atom import MetalUnit
 import enzy_htp.structure.structure_operation as stru_oper
+from enzy_htp.structure.structure_enchantment import init_connectivity
 
 from pdb2pqr.main import main_driver as run_pdb2pqr
 from pdb2pqr.main import build_main_parser as build_pdb2pqr_parser
@@ -214,7 +215,9 @@ def deprotonate_metal_donors(center: MetalUnit):
         # the donor atom selection guarantees the atom is deprotonable
         if d_resi.is_deprotonatable():
             # find_closest_h_to_center(d_atom, center)
-            stru_oper.deprotonate_residue(d_resi, d_atoms[0])
+            target_atom = d_atoms[0]
+            init_connectivity(target_atom)
+            stru_oper.deprotonate_residue(d_resi, target_atom)
             # TODO(qz): refine this by also determine the closest proton
         elif d_resi.is_hetatom_noproton():
             _LOGGER.info(f"donor residue {d_resi} already have no proton in center {center}")

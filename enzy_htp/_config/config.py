@@ -104,6 +104,72 @@ class Config:
             "xtb": self._xtb,
             "armer": self._armer,
         }
+    
+    # attributes
+    @property
+    def alphafill(self) -> AlphaFillConfig:
+        """getter for _alphafill"""
+        return self._alphafill
+
+    @property
+    def amber(self) -> AmberConfig:
+        """getter for _amber"""
+        return self._amber
+
+    @property
+    def bcl(self) -> BCLConfig:
+        """getter for _bcl"""
+        return self._bcl
+
+    @property
+    def gaussian(self) -> GaussianConfig:
+        """getter for _gaussian"""
+        return self._gaussian
+
+    @property
+    def multiwfn(self) -> MultiwfnConfig:
+        """getter for _multiwfn"""
+        return self._multiwfn
+
+    @property
+    def moe(self) -> MOEConfig:
+        """getter for _moe"""
+        return self._moe
+
+    @property
+    def mole2(self) -> Mole2Config:
+        """getter for _mole2"""
+        return self._mole2
+
+    @property
+    def pymol(self) -> PyMolConfig:
+        """getter for _pymol"""
+        return self._pymol
+
+    @property
+    def rdkit(self) -> RDKitConfig:
+        """getter for _rdkit"""
+        return self._rdkit
+
+    @property
+    def rosetta(self) -> RosettaConfig:
+        """getter for _rosetta"""
+        return self._rosetta
+
+    @property
+    def system(self) -> SystemConfig:
+        """getter for _system"""
+        return self._system
+
+    @property
+    def armer(self) -> ARMerConfig:
+        """getter for _armer"""
+        return self._armer
+
+    @property
+    def xtb(self) -> XTBConfig:
+        """getter for _xtb"""
+        return self._xtb
 
     def __getitem__(self, key: str) -> Any:
         """Getter for the settings in the Config() object. Uses the grammar: "<package>.<setting>" 

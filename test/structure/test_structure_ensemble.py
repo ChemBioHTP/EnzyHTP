@@ -19,7 +19,8 @@ from enzy_htp.structure import (
     Ligand,
 )
 from enzy_htp.structure.structure_ensemble import StructureEnsemble
-from enzy_htp._interface.amber_interface import AmberMDCRDParser
+from enzy_htp.structure.structure_io import PrmtopParser
+from enzy_htp._interface.amber_interface import AmberMDCRDParser, AmberNCParser
 
 CURR_DIR = os.path.dirname(os.path.abspath(__file__))
 WORK_DIR = f"{CURR_DIR}/work_dir/"
@@ -55,6 +56,33 @@ def test_structures():
         ([39.391, 19.22, 17.043], [37.366, 39.457, 37.706]),
     ]
 
-    for stru, (answer_1, answer_m1) in zip(test_esm.structures, answer):
+    for stru, (answer_1, answer_m1) in zip(test_esm.structures(), answer):
+        assert stru.atoms[0].coord == answer_1
+        assert stru.atoms[-1].coord == answer_m1
+
+def test_structures_rm_solvent():
+    """test the function in name
+    use Structure and Amber as example
+    remove_solvent=True
+    check using manually confirmed answer"""
+    test_prmtop = f"{DATA_DIR}stru_w_solvent.prmtop"
+    test_traj = f"{DATA_DIR}traj_w_solvent_3f.nc"
+    test_esm = StructureEnsemble(
+        topology=test_prmtop,
+        top_parser=PrmtopParser({
+                "FAD" : (0,1),
+                "ACP" : (0,1),
+                }
+            ).get_structure,
+        coordinate_list=test_traj,
+        coord_parser=AmberNCParser(test_prmtop).get_coordinates,
+    )
+    answer = [
+        ([69.168, 45.518, 83.438], [33.796, 76.501,  9.040]),
+        ([68.969, 46.198, 82.766], [32.082, 77.429, 12.821]),
+        ([68.605, 45.599, 82.123], [30.553, 75.828,  9.951]),
+    ]
+
+    for stru, (answer_1, answer_m1) in zip(test_esm.structures(), answer):
         assert stru.atoms[0].coord == answer_1
         assert stru.atoms[-1].coord == answer_m1

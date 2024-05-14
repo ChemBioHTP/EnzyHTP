@@ -146,7 +146,7 @@ def _place_mole2(stru:Structure,
 
     seed_locations = np.array(seed_locations)
     scores = list()
-
+    
     for sl in seed_locations:
         #TODO(CJ): this is where I put the actual energy/constraint evaluation
     
@@ -157,10 +157,14 @@ def _place_mole2(stru:Structure,
 
         curr_energy = 0.0
         for cst in constraints:
-            if cst.is_residue_pair_constraint():
-                curr_energy += cst.distanceAB_.score_energy()
+            if sum([aa.parent == ligand for aa in cst.atoms]) > 1:
+                continue
+            curr_energy += interface.rosetta.score_energy(cst)
+#            if cst.is_residue_pair_constraint():
+#                curr_energy += interface.rosetta.score_energy(cst.distanceAB_)
+#            elif cst.is_distance_constraint():
+#                curr_energy += interface.rosetta.score_energy(cst)
             #TODO(CJ): add in the regular distance constraints
-                
         scores.append( curr_energy )            
 
     scores = np.array(scores)
@@ -168,7 +172,8 @@ def _place_mole2(stru:Structure,
     score_mask = np.isclose(scores, np.min(scores))
 
     clash_counts = list()
-    for sl in seed_locations[score_mask]:
+    
+    for slidx,sl in enumerate(seed_locations[score_mask]):
         lig_start = ligand.geom_center
         shift = sl - lig_start
 
@@ -190,6 +195,7 @@ def _place_mole2(stru:Structure,
     seed = final_locations[0]
 
     ligand.shift( seed - ligand.geom_center)
+    
 
 
 def _place_alphafill(stru: Structure,
@@ -321,8 +327,12 @@ def _place_alphafill(stru: Structure,
                                           ("align", f"{Path(filled_structure).stem} and ({' or '.join(pp_chains)})", f"{Path(molfile).stem} and ({' or '.join(pp_chains)})"),
                                           ("delete", Path(molfile).stem),
                                           ("save", template, f"chain {selected_id} and segi {selected_id}")])
+    
+    if ligand.is_ligand():
+        outfile:str=align_ligand(template, reactant, outfile=outfile)
+    else:
+        fs.safe_mv(template, outfile)
 
-    outfile:str=align_ligand(template, reactant, outfile=outfile)
     aligned_ligand:Ligand=Mol2Parser().get_ligand(outfile)
     
     for a1 in ligand.atoms:
@@ -330,6 +340,6 @@ def _place_alphafill(stru: Structure,
             if a1.name == a2.name:
                 a1.coord = a2.coord
 
-    for td in to_delete:
-        fs.safe_rm( td )
-
+#    for td in to_delete:
+#        fs.safe_rm( td )
+#

@@ -420,7 +420,11 @@ class NHCH3Cap(ResidueCap):
             self.atoms[1].coord = np.array(self.atoms[0].coord) + 1.05*d0
         else:
             self.atoms[0].coord = np.array(self.socket_atom.coord)
-            self.atoms[1].coord = np.array(self.socket_atom.parent.find_atom_name('H').coord)
+            if self.socket_atom.parent.name == 'PRO':
+                self.atoms[1].coord = np.array(self.socket_atom.parent.find_atom_name('CD').coord)
+                #TODO(CJ): fix this
+            else:
+                self.atoms[1].coord = np.array(self.socket_atom.parent.find_atom_name('H').coord)
 
         for aa in self.atoms[2:]:
             aa.coord = np.array(aa.coord) - np.array([1.5, 0, 0])

@@ -13,19 +13,14 @@ from enzy_htp.core.job_manager import ClusterJob
 from enzy_htp.structure.structure_constraint import StructureConstraint
 
 from ..base_interface import BaseInterface
+from .modeling_engine import ModelingEngine
 from .mol_dyn_parameterizer import MolDynParameter
 from .mol_dyn_result import MolDynResult, MolDynResultEgg
 
-class MolDynStep(ABC):
+class MolDynStep(ModelingEngine):
     """A modular/indivisible step of Molecular Dynamics simulation.
     This is expected to be the most general building block of all different
     MD based sampling methods."""
-
-    @property
-    @abstractmethod
-    def engine(self) -> str:
-        """the engine name that should be hardcoded in each concrete class"""
-        pass
 
     @property
     @abstractmethod

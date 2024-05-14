@@ -2,15 +2,16 @@
 operations on them.
 
 Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-03-20
 """
 
-from typing import Tuple, Union
+from typing import Tuple, Union, List
 
 from enzy_htp.core.logger import _LOGGER
+from enzy_htp.core import math_helper as mh
 import enzy_htp.chemical as chem
 from ..structure import Structure, Residue, Atom
-from .connectivity import init_connectivity
 
 
 def deprotonate_residue(residue: Residue, target_atom: Union[None, Atom] = None) -> None:
@@ -26,7 +27,9 @@ def deprotonate_residue(residue: Residue, target_atom: Union[None, Atom] = None)
         Nothing.
     """
     new_resi_name, target_proton = get_default_deproton_info(residue, target_atom)
-    init_connectivity(target_atom, renew=False)
+    if not target_atom.is_connected:
+        _LOGGER.error(f"the target atom {target_atom} is not connected. Use init_connectivity() first.")
+        raise ValueError
     if new_resi_name is None:
         if len(target_atom.attached_protons()) == 0:
             _LOGGER.info(f"target atom {target_atom} already have no H. keep original")
@@ -111,3 +114,34 @@ def check_res_topology_error(
     # 3. check for any bond (polyline) from the target residue thread through any ring
     # 4. check for any ring from the target residue is threaded by any bond
     pass
+
+
+def closest_n_residues( 
+    target:Residue,
+    n:int,
+    method:str='centerofmass',
+    include_H:bool=False) -> List[Residue]:
+    """Find the closest n Residue() objects to a given Residue(). Complements a number of residue based functions.
+
+    Args:
+        target: The initial Residue() we are trying to find other Residue()'s near to.
+        n: The cutoff for top n Residue()'s that will be selected.
+        method: What metric should be used to rank Residue() distances? Default is 'centerofmass'.
+        include_H:Should Hydrogens be considered in various center of mass or other distance calculation? False by default.
+
+    Returns:
+        A List[Residue] containing the closest n residues.
+    """
+    target_coord = target.geom_center
+    distances = list()
+    for res in target.root().residues:
+        if res == target:
+            continue
+        
+        distances.append((mh.get_distance(target_coord, res.geom_center), res))
+
+    distances = sorted(distances, key=lambda pr: pr[0])
+    result = list()
+    for (_, res) in distances[:n]:
+        result.append( res )        
+    return result

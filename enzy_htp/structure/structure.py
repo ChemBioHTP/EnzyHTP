@@ -144,6 +144,12 @@ class Structure(DoubleLinkedNode):
         if self.has_duplicate_chain_name():
             self.resolve_duplicated_chain_name()
 
+        self._data = dict()
+
+    @property
+    def data(self):
+        return self._data
+
     #region === Getters-attr ===
     @property
     def chains(self) -> List[Chain]:
@@ -221,6 +227,13 @@ class Structure(DoubleLinkedNode):
         return result
 
     @property
+    def amino_acids(self) -> List[Residue]:
+        """Return a list of Residue()s that are amino_acid (i.e.: canonical, modified)
+        in the Structure() object"""
+        result = list(itertools.chain.from_iterable(self.polypeptides))
+        return result
+
+    @property
     def residue_mapper(self) -> Dict[Tuple[str, int], Residue]:
         """return a mapper of {(chain_id, residue_idx): Residue (reference)}"""
         result = {}
@@ -284,7 +297,8 @@ class Structure(DoubleLinkedNode):
         return result
 
     def find_idx_atom(self, atom_idx: int) -> Atom:
-        """find atom base on its idx. return a reference of the atom."""
+        """find atom base on its idx. return a reference of the atom.
+        NOT! suitable for heavy duty jobs. pretty slow. use atom_idx_mapper instead"""
         result = list(filter(lambda a: a.idx == atom_idx, self.atoms))
         if not result:
             _LOGGER.info(f"found 0 atom with index: {atom_idx}")
@@ -295,9 +309,14 @@ class Structure(DoubleLinkedNode):
     def find_idxes_atom_list(self, atom_idx_list: int) -> List[Atom]:
         """find atom base on its idx. return a list reference of the atoms."""
         result = []
+        atom_mapper = self.atom_idx_mapper()
         for idx in atom_idx_list:
-            result.append(self.find_idx_atom(idx))
+            result.append(atom_mapper[idx])
         return result
+
+    def atom_idx_mapper(self) -> Dict[int, Atom]:
+        """the mapper for idx -> atom"""
+        return {atom.idx : atom for atom in self.atoms}
 
     @property
     def ligands(self) -> List[Ligand]:
@@ -321,6 +340,13 @@ class Structure(DoubleLinkedNode):
         result: List[Solvent] = []
         for chain in self.chains:
             result.extend(list(filter(lambda r: r.is_solvent(), chain)))
+        return result
+
+    def counterions(self, counterion_list: List[str] = None) -> List[Residue]:
+        """return all counterions hold by current Structure()"""
+        result: List[Residue] = []
+        for chain in self.chains:
+            result.extend(list(filter(lambda r: r.is_counterions(counterion_list), chain)))
         return result
 
     @property

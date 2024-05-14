@@ -122,6 +122,17 @@ class StructureConstraint(ABC):
         """hard coded constraint type"""
         return "general"
 
+    def is_constraining(self, residue:Residue) -> bool:
+        pass
+        
+        for atom in self.atoms:
+            for r_atom in residue.atoms:
+                if atom==r_atom:
+                    return True 
+
+        return False 
+
+
     def clone(self) -> "StructureConstraint":
         """Clones the StructureConstraint with the original target_value."""
         result = type(self).__new__(type(self))

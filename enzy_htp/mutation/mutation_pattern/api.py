@@ -11,9 +11,13 @@ import itertools
 
 from enzy_htp.core.exception import InvalidMutationPatternSyntax
 from enzy_htp.core.logger import _LOGGER
-from enzy_htp.core.general import (get_random_list_elem, pop_random_list_elem, product_lists_allow_empty)
+from enzy_htp.core.general import (get_random_list_elem, pop_random_list_elem, product_lists_allow_empty, split_but_brackets)
 from enzy_htp.structure import Structure
-from ..mutation import (Mutation, generate_from_mutation_flag, generate_mutation_from_traget_list)
+from enzy_htp.mutation_class import (
+    Mutation, 
+    generate_from_mutation_flag, 
+    generate_mutation_from_target_list,
+)
 from .position_pattern import decode_position_pattern
 from .target_aa_pattern import check_target_aa_pattern, decode_target_aa_pattern
 
@@ -46,7 +50,7 @@ def decode_mutation_pattern(stru: Structure, pattern: str) -> List[List[Mutation
 
 def seperate_mutant_patterns(pattern: str) -> List[str]:
     """seperate a mutation pattern into pattern of each mutants"""
-    section_seperate_pattern = r"(?:[^,[{]|(?:\{[^\}]*\})|(?:\[[^\]]*\]))+[^,]*"
+    section_seperate_pattern = r"(?:[^,[{]|(?:\{[^\}]*\})|(?:\[[^\]]*\]))+[^,]*" #TODO use the one from general
     mutants = re.findall(section_seperate_pattern, pattern.strip())
     mutants = [i.strip() for i in mutants]
 
@@ -58,7 +62,7 @@ def seperate_section_patterns(pattern: str) -> List[str]:
     *Note that current method use re and do not support [] in a []
     (e.g. 1,2,3,a:[4,[5,6],7] does not work)"""
 
-    section_seperate_pattern = r"(?:[^,[{]|(?:\[[^\]]*\]))+[^,]*"
+    section_seperate_pattern = r"(?:[^,[{]|(?:\[[^\]]*\]))+[^,]*" #TODO use the one from general
     sections = re.findall(section_seperate_pattern, pattern.strip())
     sections = [i.strip() for i in sections]
 
@@ -157,7 +161,7 @@ def decode_random_mutation(stru: Structure, section_pattern: str) -> List[List[M
 
 
 # a:
-def decode_all_mutation(stru: Structure, section_pattern: str) -> List[List[Mutation]]:
+def decode_all_mutation(stru: Structure, section_pattern: str) -> List[List[Mutation]]: # TODO support a number cap
     """decode the mutation pattern section that mutate all in the mutation set.
     There will be the maxium same number of mutations as the number of positions.
     If "M" is not specificed, non-mutation of each site will also be included.
@@ -207,15 +211,14 @@ def decode_mutation_esm_pattern(stru: Structure, mutation_esm_patterns: str) -> 
         position:target_aa"""
 
     esm_result: Dict[tuple, List[Mutation]] = {}
-    seperate_pattern = r"(?:[^,(]|(?:\([^\}]*\)))+[^,]*"
-    esm_pattern_list = [i.strip() for i in re.findall(seperate_pattern, mutation_esm_patterns)]
+    esm_pattern_list = [i.strip() for i in split_but_brackets(mutation_esm_patterns, ",")]
     for esm_pattern in esm_pattern_list:
         position_pattern, target_aa_pattern = esm_pattern.split(":")
         check_target_aa_pattern(target_aa_pattern)  # give warning about pattern
         esm_positions = decode_position_pattern(stru, position_pattern, if_name=True)
         for esm_position, orig_resi in esm_positions:
             posi_target_aa = decode_target_aa_pattern(orig_resi, target_aa_pattern)
-            posi_mutation = generate_mutation_from_traget_list(esm_position, orig_resi, posi_target_aa)
+            posi_mutation = generate_mutation_from_target_list(esm_position, orig_resi, posi_target_aa)
             if esm_position in esm_result:  # shared position case
                 esm_result[esm_position] = list(set(esm_result[esm_position]) | set(posi_mutation))
             else:

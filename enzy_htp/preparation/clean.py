@@ -10,7 +10,7 @@ from enzy_htp.structure import Structure, Residue
 import enzy_htp.structure.structure_operation as stru_oper
 
 
-def remove_solvent(stru: Structure, protect: str = None) -> Structure:
+def remove_solvent(stru: Structure, protect: str = None, in_place: bool = True) -> Structure:
     """
     remove solvent from the structure. all Solvent() object will be removed
     TODO support customized solvent name maybe in another function assign_solvent
@@ -20,6 +20,7 @@ def remove_solvent(stru: Structure, protect: str = None) -> Structure:
         protect: protect some solvent from removal and change its rtype to Ligand. Use selection grammer
     Returns:
         a reference of the changed {stru}
+        (or a copy if in_place = False)
     """
     # planning for #9
     # assign_ligand(stru, protect):
@@ -29,6 +30,8 @@ def remove_solvent(stru: Structure, protect: str = None) -> Structure:
     #     if not res.is_solvent():
     #         _LOGGER.warning(f'protecting non-solvent: {res}')
     #     solvent_to_ligand(res, inplace=True) # this inplace allow it to also change its identity in .parent.children
+    if not in_place:
+        stru = copy.deepcopy(stru)
     stru_oper.remove_solvent(stru)
     # clean up empty chains (suggest doing this every time when residues are removed)
     stru_oper.remove_empty_chain(stru)

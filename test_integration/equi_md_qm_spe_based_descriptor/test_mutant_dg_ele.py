@@ -23,7 +23,8 @@ import enzy_htp.structure.structure_constraint as stru_cons
 from enzy_htp.structure import (
     Structure,
     StructureConstraint,
-    PDBParser
+    PDBParser,
+    Atom
 )
 from enzy_htp.chemical.level_of_theory import QMLevelOfTheory
 from enzy_htp.core.clusters.accre import Accre
@@ -41,7 +42,7 @@ def workflow(
         md_length: float,
         qm_region_pattern: str,
         qm_level_of_theory: QMLevelOfTheory,
-        target_bond: Tuple[str],
+        target_bond: Tuple[Atom],
         ef_region_pattern: str,
         result_path: str,
         chain_sync_list: List = None,

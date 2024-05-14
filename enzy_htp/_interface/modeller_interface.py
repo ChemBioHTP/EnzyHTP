@@ -87,7 +87,7 @@ class ModellerInterface(BaseInterface):
         align_file:str = f"{work_dir}/alignment.ali"
         temp_file:str = f"{work_dir}/modeller_temp.pdb"
 
-        #sp.save_structure( temp_file, stru )
+        sp.save_structure( temp_file, stru )
 
         lines:List[str] = [
             ">P1;modeller_temp",
@@ -99,29 +99,29 @@ class ModellerInterface(BaseInterface):
         ]
 
         fs.write_lines(align_file, lines)
-#        #TODO(CJ): probably need to check for loops that are too long
-#        log.none()
-#        env = Environ()
-#
+        #TODO(CJ): probably need to check for loops that are too long
+        log.none()
+        env = Environ()
+
         start_dir:str=f"{Path(os.getcwd()).absolute()}"
 
         os.chdir(work_dir)
         
-#        # directories for input atom files
-#        env.io.atom_files_directory = ['.', '../atom_files']
-#        
-#        a = LoopModel(env, alnfile = 'alignment.ali',
-#                      knowns = 'modeller_temp', sequence = 'modeller_fill')
-#        a.starting_model= 1
-#        a.ending_model  = 1
-#        
-#        a.loop.starting_model = 1
-#        a.loop.ending_model   = 2
-#        a.loop.md_level       = refine.fast
-#        
-#        a.make()
+        # directories for input atom files
+        env.io.atom_files_directory = ['.', '../atom_files']
         
-#        fs.safe_mv("modeller_fill.B99990001.pdb", "modeller_fill.pdb")
+        a = LoopModel(env, alnfile = 'alignment.ali',
+                      knowns = 'modeller_temp', sequence = 'modeller_fill')
+        a.starting_model= 1
+        a.ending_model  = 1
+        
+        a.loop.starting_model = 1
+        a.loop.ending_model   = 2
+        a.loop.md_level       = refine.fast
+        
+        a.make()
+       
+        fs.safe_mv("modeller_fill.B99990001.pdb", "modeller_fill.pdb")
 
         for tk in """modeller_fill.BL00010001.pdb
         modeller_fill.B99990001.pdb

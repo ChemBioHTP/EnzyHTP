@@ -16,11 +16,12 @@ from .atom import Atom
 from .ligand import Ligand
 from .residue import Residue
 from .solvent import Solvent, residue_to_solvent
-from .metal_atom import MetalUnit, residue_to_metal
+from .metal_atom import MetalUnit, residue_to_metal, get_metal
 from .modified_residue import ModifiedResidue, residue_to_modified_residue
 from .noncanonical_base import NonCanonicalBase
 from .chain import Chain
 from .structure import Structure
+from .structure_translator import (translate_structure, TranslatorBase)
 from .structure_ensemble import StructureEnsemble
 from .structure_io import PDBParser, Mol2Parser, PrepinParser
 

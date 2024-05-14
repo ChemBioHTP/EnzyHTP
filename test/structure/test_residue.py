@@ -15,6 +15,7 @@ from enzy_htp.core.exception import ResidueDontHaveAtom
 
 from enzy_htp.structure import Atom, Residue, Chain
 from enzy_htp.structure.structure_io import PDBParser
+from enzy_htp.structure.structure_enchantment import init_connectivity
 import enzy_htp.structure.structure_operation as so
 
 CURR_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -174,5 +175,5 @@ def test_is_connected():
     """test function works as expected"""
     test_residue = copy.deepcopy(RESIDUES[1])
     test_residue.parent = RESIDUES[2].parent
-    so.init_connectivity(test_residue)
+    init_connectivity(test_residue)
     assert test_residue.is_connected()

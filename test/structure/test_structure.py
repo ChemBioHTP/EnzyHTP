@@ -255,3 +255,9 @@ def test_net_chrgspin_mapper():
     test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
     test_stru.assign_ncaa_chargespin({"H5J" : (0,1)})
     assert test_stru.ncaa_chrgspin_mapper == {"H5J" : (0,1)}
+
+def test_amino_acids():
+    """as name"""
+    test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
+    
+    assert len(test_stru.amino_acids) == 253

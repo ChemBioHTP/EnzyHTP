@@ -225,7 +225,7 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
         temp_gjf_file, gchk_path = self._make_gjf_file(stru)
 
         # 3. make cmd
-        spe_cmd, gout_path = self.parent_interface.make_spe_cmd(temp_gjf_file)
+        spe_cmd, gout_path = self.parent_interface.make_gaussian_cmd(temp_gjf_file)
 
         # 4. run cmd
         spe_cmd_exe = spe_cmd.split(" ")[0]

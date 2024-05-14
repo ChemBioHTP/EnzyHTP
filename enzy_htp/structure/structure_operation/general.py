@@ -11,7 +11,9 @@ from plum import dispatch
 from typing import Union
 
 from enzy_htp.core.logger import _LOGGER
-from ..structure import Structure, Solvent, Chain, Residue, NonCanonicalBase, Ligand, Atom
+from ..structure import (
+    Structure, Solvent, Chain, 
+    Residue, NonCanonicalBase, Ligand, Atom)
 
 
 def remove_solvent(stru: Structure) -> Structure:
@@ -24,6 +26,19 @@ def remove_solvent(stru: Structure) -> Structure:
     solv: Solvent
     for solv in stru.solvents:
         solv.delete_from_parent()
+
+    return stru
+
+def remove_counterions(stru: Structure) -> Structure:
+    """
+    remove all counterions for {stru}.
+    Make changes in-place and return a reference of the changed
+    original object.
+    """
+    _LOGGER.debug(f"removing {len(stru.counterions())} counterions")
+    ion: Residue
+    for ion in stru.counterions():
+        ion.delete_from_parent()
 
     return stru
 
@@ -105,8 +120,16 @@ def update_residues(stru: Structure, ref_stru: Structure) -> Structure:
         if self_res.name != ref_res.name:
             _LOGGER.info(f"updating {self_res.key()} {self_res.name} to {ref_res.name}")
             self_res.name = ref_res.name
+
+        if self_res.is_ligand():
+            for satom in self_res.atoms:
+                for ratom in ref_res.atoms:
+                    if satom.name == ratom.name:
+                        satom.coord = ratom.coord
+        else:
+            self_res.atoms = copy.deepcopy(ref_res.atoms)  # this will also set self_res as parent
         
-        self_res.atoms = copy.deepcopy(ref_res.atoms)  # this will also set self_res as parent
+
     stru.renumber_atoms()
     return stru
 
