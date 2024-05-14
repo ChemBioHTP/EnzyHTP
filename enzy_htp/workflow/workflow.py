@@ -1152,7 +1152,7 @@ class ControlWorkUnit(WorkUnit):
 
     def reload(self, unit_dict: dict, api: Callable) -> ControlWorkUnit:
         """
-        Reloads the WorkUnit instance with updated configuration.
+        Reloads the Control WorkUnit instance with updated configuration.
 
         This method is used when a user wants to reload the entire task and checks 
         if there are any changes in the parameter values. If the WorkUnit's status 
@@ -1785,6 +1785,7 @@ class GeneralWorkUnit(ControlWorkUnit):
         working_directory (str): Indicates where to run the job. Default to current working directory.
         save_snapshot (bool): Whether to automatically save the status as a pickle file 
                             when it exits due to Error, Pause, or Completion. Default False.
+        data_mapper_for_init (dict): An data mapper for initialization, which can be used to pass in data of types that are inconvenient to record in JSON.
         Other inherited attributes...
 
     Methods:
@@ -1797,6 +1798,7 @@ class GeneralWorkUnit(ControlWorkUnit):
     sqlite_filename: str
     save_snapshot: bool
     latest_pickle_filepath: str
+    data_mapper_for_init: dict
 
     @staticmethod
     def general_unit_placeholder_api(workunits: list, **kwargs):
@@ -1857,12 +1859,15 @@ class GeneralWorkUnit(ControlWorkUnit):
         # Highest priority: use the working directory passed in by the initialization function; 
         # Lowest priority: use BASE_DIRECTORY.
         if path.abspath(working_directory) == path.abspath(BASE_DIRECTORY):
-            if (work_dir_from_unit_dict:=unit_dict.get(WORKING_DIRECTORY_KEY)):
+            if (work_dir_from_unit_dict:=unit_dict.get(WORKUNIT_ARGUMENT_LIST_KEY).get(WORKING_DIRECTORY_KEY)):
                 working_directory = work_dir_from_unit_dict
 
-        unit_dict[WORKING_DIRECTORY_KEY] = working_directory  # Update working directory to the unit dict.
+        unit_dict[WORKUNIT_ARGUMENT_LIST_KEY][WORKING_DIRECTORY_KEY] = working_directory    # Update working directory to the unit dict.
         safe_mkdir(working_directory)
         sqlite_filepath = path.join(working_directory, sqlite_filename)
+
+        # Temporarily change directory before initialization.
+        chdir(working_directory)
 
         # Initialize the class.
         unit = cls(unit_dict=unit_dict, working_directory=working_directory, save_snapshot=save_snapshot, sqlite_filepath=sqlite_filepath, debug=debug)
@@ -1877,6 +1882,7 @@ class GeneralWorkUnit(ControlWorkUnit):
                 sleep(sleep_seconds)
 
         unit.api = GeneralWorkUnit.general_unit_placeholder_api
+        unit.data_mapper_for_init = data_mapper_for_init
 
         # Self Inspection.
         unit.self_inspection_and_args_reassembly()
@@ -1886,7 +1892,7 @@ class GeneralWorkUnit(ControlWorkUnit):
         
         # Initialize the WorkFlow.
         data_mapper_for_inherit = unit.args_dict_to_pass.copy()
-        data_mapper_for_inherit.update(data_mapper_for_init)
+        data_mapper_for_inherit.update(unit.data_mapper_for_init)
         
         del data_mapper_for_inherit[CONTROL_BODY_WORKUNITS_LABEL]  # Pass kwargs to the workflow.
 
@@ -1901,6 +1907,9 @@ class GeneralWorkUnit(ControlWorkUnit):
             unit.status = StatusCode.FAILED_INITIALIZATION
             _LOGGER.error(error_msg)
             raise ValueError(error_msg)
+    
+        # Change directory back after initialization.
+        chdir(BASE_DIRECTORY)
         return unit
     
     @classmethod
@@ -1923,8 +1932,6 @@ class GeneralWorkUnit(ControlWorkUnit):
         Returns:
             An instance of WorkFlow.
         """
-        safe_mkdir(working_directory)
-        
         unit_dict = loads(json_str)
         return GeneralWorkUnit.from_dict(unit_dict=unit_dict, working_directory=working_directory, 
                                         save_snapshot=save_snapshot, sqlite_filename=sqlite_filename, 
@@ -2033,55 +2040,79 @@ class GeneralWorkUnit(ControlWorkUnit):
             except:
                 return None
     
-    def reload(self, unit_dict: dict) -> None:
+    def reload(self, unit_dict: dict, data_mapper_for_reload: dict = dict()) -> None:
         """Reload task from a GeneralWorkUnit dict.
         
         Note: If the architecture is changed, the task is not able to be reloaded.
 
         Args:
             unit_dict (dict): Modified configuration dictionary parsed from Json configuration containing information to initialize a task.
+            data_mapper_for_reload (dict): An data mapper for updating the initialization data mapper (data_mapper_for_init).
         """
         architecture = __class__.read_architecture(unit_dict=unit_dict)
         if (architecture != self.architecture):
-            raise ValueError("We currently do not support reloading the task after architectural changes.")
-        virtual_unit = super().reload(unit_dict=unit_dict, api=__class__.general_unit_placeholder_api)
+            raise ValueError("Unable to reload the GeneralWorkUnit. We currently do not support reloading the task after architectural changes.")
+
+        # Temporarily change directory before initialization.
+        chdir(self.working_directory)
         
-        if (self.status == StatusCode.SUSPECIOUS_UPDATES):
+        virtual_unit = super().reload(unit_dict=unit_dict, api=__class__.general_unit_placeholder_api)
+
+        if (not set(data_mapper_for_reload.items()).issubset(set(self.data_mapper_for_init.items()))):
+            # If not all the items in `data_mapper_for_reload` is already in `self.data_mapper_for_init`, then updates exist.
+            self.data_mapper_for_init.update(data_mapper_for_reload)
+            self.status = StatusCode.SUSPECIOUS_UPDATES if self.status != StatusCode.FAILED_INITIALIZATION else StatusCode.FAILED_INITIALIZATION
+        
+        if (self.status == StatusCode.FAILED_INITIALIZATION):
+            raise ValueError("Unable to reload the GeneralWorkUnit. Format errors exist your json configuration file!")
+        elif (self.status == StatusCode.SUSPECIOUS_UPDATES):
+            self.data_mapper_for_init.update(data_mapper_for_reload)
+
             # Reload the workflow.
             unit_dict_list = virtual_unit.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL)
-            data_mapper_for_init = virtual_unit.args_dict_to_pass.copy()
-            del data_mapper_for_init[CONTROL_BODY_WORKUNITS_LABEL]  # Pass kwargs to the workflow.
-            self.sub_workflow.intermediate_data_mapper.update(data_mapper_for_init)
+
+            # Pass data mapper to the workflow.
+            data_mapper_for_inherit = virtual_unit.args_dict_to_pass.copy()
+            data_mapper_for_inherit.update(self.data_mapper_for_init)
+            del data_mapper_for_inherit[CONTROL_BODY_WORKUNITS_LABEL]
+
+            self.sub_workflow.inherited_data_mapper.update(data_mapper_for_inherit)
             self.sub_workflow.reload(unit_dict_list=unit_dict_list)
 
-    def reload_json_string(self, json_str: str) -> None:
+        # Change directory back after initialization.
+        chdir(BASE_DIRECTORY)
+
+    def reload_json_string(self, json_str: str, data_mapper_for_reload: dict = dict()) -> None:
         """Reload task from a serialized json string.
         
         Args:
             json_str (str): The serialized json string.
+            data_mapper_for_reload (dict): An data mapper for updating the initialization data mapper (data_mapper_for_init).
         """
         unit_dict = loads(json_str)
-        self.reload(unit_dict)
+        self.reload(unit_dict, data_mapper_for_reload=data_mapper_for_reload)
         return
 
-    def reload_json_file_object(self, json_fobj: TextIOWrapper) -> None:
+    def reload_json_file_object(self, json_fobj: TextIOWrapper, data_mapper_for_reload: dict = dict()) -> None:
         """Reload task from JSON format configuration file object.
         
         Args:
             json_fobj (str): The modified json file object.
+            data_mapper_for_reload (dict): An data mapper for updating the initialization data mapper (data_mapper_for_init).
         """
         json_str = json_fobj.read()
-        self.reload_json_string(json_str)
+        self.reload_json_string(json_str, data_mapper_for_reload=data_mapper_for_reload)
         return
 
-    def reload_json_filepath(self, json_filepath: str) -> None:
+    def reload_json_filepath(self, json_filepath: str, data_mapper_for_reload: dict = dict()) -> None:
         """Reload task from JSON format configuration filepath.
         
         Args:
             json_filepath (str): The modified json filepath.
+            data_mapper_for_reload (dict): An data mapper for updating the initialization data mapper (data_mapper_for_init).
         """
         with open(json_filepath) as fobj:
-            self.reload_json_file_object(fobj)
+            self.reload_json_file_object(fobj, data_mapper_for_reload=data_mapper_for_reload)
         return
 
 #endregion
