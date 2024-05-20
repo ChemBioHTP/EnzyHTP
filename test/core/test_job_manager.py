@@ -427,6 +427,32 @@ def test_ClusterJob_with_to_2d_array_end_ACCRE():
     fs.clean_temp_file_n_dir(test_file_paths)
     _LOGGER.setLevel(old_level)
 
+def test_ClusterJob_get_state_CNGrid12():
+    """
+    only run on CNGrid12
+    """
+    res_keywords_dict = {   "core_type" : "cpu",
+                            "nodes":"1",
+                            "node_cores" : "5",
+                            "job_name" : "job_name",
+                            "partition" : "gpu",
+                            "mem_per_core" : "4G",
+                            "walltime" : "24:00:00",
+                            "clusters" : "swarm"}
+    job = ClusterJob.config_job(
+        commands = "sleep 10",
+        cluster = clusters.paracloud_cngrid12.CNGrid12(),
+        env_settings = "",
+        res_keywords = res_keywords_dict,
+    )
+    job.submit(sub_dir=test_sub_dir)
+    assert job.get_state()[0] in ["pend", "run"]
+    import time
+    time.sleep(10)
+    job.kill()
+    assert job.get_state()[0] == "cancel"
+    fs.clean_temp_file_n_dir([job.job_cluster_log, job.sub_script_path, f"{test_sub_dir}/submitted_job_ids.log"])
+
 ### utilities ###
 @pytest.mark.clean
 def test_clean_files():
