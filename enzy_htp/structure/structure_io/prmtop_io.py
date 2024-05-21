@@ -5,7 +5,7 @@ this parser only. The PrmtopParser has no private data and serves as a namespace
 Author: Qianzhen Shao <shaoqz@icloud.com>
 Date: 2023-10-28
 """
-from collections import defaultdict, OrderedDict
+from collections import defaultdict
 from typing import Dict, List
 import re
 from itertools import chain
@@ -28,41 +28,11 @@ class PrmtopParser(StructureParserInterface):
             ncaa_chrgspin_mapper = {}
         self.ncaa_chrgspin_mapper = ncaa_chrgspin_mapper
 
-
-    def add_charges(self, stru:Structure, prmtop:str) -> None:
-        """TODO(CJ)"""
-        data = type(self)._parse_prmtop_file(prmtop)
-        print(data.keys())
-        all_res_names:List[str] = type(self)._expand_data(data["RESIDUE_LABEL"],
-                                                            data['RESIDUE_POINTER'],
-                                                            data['RESIDUE_LABEL'] )
-        
-        all_chain_names:List[str] = type(self)._expand_data(data["RESIDUE_CHAINID"],
-                                                            data['RESIDUE_POINTER'],
-                                                            data['RESIDUE_LABEL'] )
-        
-        all_res_nums:List[int] = type(self)._expand_data(data["RESIDUE_NUMBER"],
-                                                            data['RESIDUE_POINTER'],
-                                                            data['RESIDUE_LABEL'] )
-        charge_mapper = dict()
-
-        for (ar_name, ac_name, ar_num, atom_name, chrg) in zip(all_res_names, all_chain_names, all_res_nums, data['ATOM_NAME'], data['CHARGE']):
-            charge_mapper[(ac_name, ar_num, ar_name, atom_name)] = chrg
-            
-        for atom in stru.atoms:
-            atom.charge = charge_mapper[(
-                atom.parent.parent.name, 
-                atom.parent.idx, 
-                atom.parent.name, 
-                atom.name)]
-
     def get_structure(
             self,
             path: str,
             add_solvent_list: List = None,
             add_ligand_list: List = None,
-            ignore_solvents:bool = True,
-            ignore_neutralizing_ions:bool = True,
         ) -> Structure:
         """Converting a .prmtop file (as its path) into the Structure()
         also assign charges as prmtop contains.
@@ -95,96 +65,27 @@ class PrmtopParser(StructureParserInterface):
             if ess not in data:
                 _LOGGER.error(f"{ess} not in prmtop. ({path}) You need a prmtop after `add_pdb`.")
                 raise ValueError
-       
-        residues = list()
         
-        all_res_names:List[str] = type(self)._expand_data(data["RESIDUE_LABEL"],
-                                                            data['RESIDUE_POINTER'],
-                                                            data['RESIDUE_LABEL'] )
-        
-        all_chain_names:List[str] = type(self)._expand_data(data["RESIDUE_CHAINID"],
-                                                            data['RESIDUE_POINTER'],
-                                                            data['RESIDUE_LABEL'] )
-        
-        all_res_nums:List[int] = type(self)._expand_data(data["RESIDUE_NUMBER"],
-                                                            data['RESIDUE_POINTER'],
-                                                            data['RESIDUE_LABEL'] )
+        # build atoms (contain charge)
+        atoms = type(self)._build_atoms(data)
 
-        atom_mapper = OrderedDict() 
+        # build residues
+        residue_mapper = type(self)._build_residues(data, atoms, add_solvent_list, add_ligand_list, path)
 
-        for (chain_name, res_name, res_idx, atom_name, charge, atomic_number, atom_number)  in zip(
-                                                                                            all_chain_names,
-                                                                                            all_res_names,
-                                                                                            all_res_nums,
-                                                                                            data['ATOM_NAME'],
-                                                                                            data['CHARGE'],
-                                                                                            data['ATOMIC_NUMBER'],
-                                                                                            data['ATOM_NUMBER']):
-
-            if ignore_solvents and res_name == "WAT":
-                continue
-
-            if ignore_neutralizing_ions and res_name in {"Na+", "Cl-"}:
-                continue 
-
-            res_key = (chain_name, res_idx, res_name )
-            if res_key not in atom_mapper:
-                atom_mapper[res_key] = list()
-
-            atom_mapper[res_key].append( Atom(
-                name = atom_name,
-                coord = (None, None, None),
-                idx = atom_number,
-                element = str(periodictable.elements[atomic_number]),
-                charge = charge/ 18.2223
-            ))
-
-        residue_mapper = OrderedDict()        
-
-        for (chain_name, res_idx, res_name), atoms in atom_mapper.items():
-            if chain_name not in residue_mapper:
-                residue_mapper[chain_name] = list()
-
-            residue_mapper[chain_name].append( Residue(
-                residue_name = res_name,
-                residue_idx = res_idx,
-                atoms = atoms
-            ))
-
+        # build chains
         chains = PDBParser._build_chains(residue_mapper, False)
 
         # build structure
         result = Structure(chains)
         result.assign_ncaa_chargespin(self.ncaa_chrgspin_mapper)
-        result.data['full_atom_count'] = len(data["ATOM_NUMBER"])
 
         return result
-
-    @classmethod
-    def _expand_data(cls, to_expand, pointers, residue_names):
-        #print(to_expand)
-        assert len(to_expand) == len(pointers)
-        result = list()
-        for p1, p2, te in zip(pointers[:-1], pointers[1:], to_expand):
-            result.extend( [te]*(p2-p1) )
-      
-        if residue_names[-1] == "WAT":
-            result.extend( [to_expand[-1]]*3 )
-        else:
-            assert False
-
-        return result
-        
 
     @classmethod
     def _build_atoms(cls, data: Dict) -> List[Atom]:
         """build atoms step during get_structure"""
         atoms = []
-        atom_data_list = zip(
-            data["ATOM_NAME"],
-            data["CHARGE"],
-            data["ATOMIC_NUMBER"],
-            data["ATOM_NUMBER"])
+        atom_data_list = zip(data["ATOM_NAME"], data["CHARGE"], data["ATOMIC_NUMBER"], data["ATOM_NUMBER"])
         taken_idx = []
         for name, charge, ele_num, idx in atom_data_list:
             # fix charge
@@ -204,7 +105,6 @@ class PrmtopParser(StructureParserInterface):
             )
             taken_idx.append(idx)
             atoms.append(atom)
-            print(atom)
 
         return atoms
 
@@ -220,23 +120,16 @@ class PrmtopParser(StructureParserInterface):
         """build residues step during get_structure"""
         residue_mapper = defaultdict(list)
         next_pointers = data["RESIDUE_POINTER"][1:] + [None]
-        residue_data_list = zip(data["RESIDUE_LABEL"],
-        data["RESIDUE_POINTER"],
-        next_pointers, 
-        data["RESIDUE_CHAINID"],
-        data["RESIDUE_NUMBER"])
+        residue_data_list = zip(data["RESIDUE_LABEL"], data["RESIDUE_POINTER"], next_pointers, data["RESIDUE_CHAINID"], data["RESIDUE_NUMBER"])
         taken_ch_ids = set(data["RESIDUE_CHAINID"])
         legal_ch_ids = PDBParser._get_legal_pdb_chain_ids(taken_ch_ids)
         legal_res_idx = cls._get_legal_residue_idxes(data["RESIDUE_NUMBER"])
         solvent_list = ["Na+", "Cl-"] + RD_SOLVENT_LIST + add_solvent_list
-        solvent_chain_id:str=None
         for name, pointer, next_pointer, chain_id, idx in residue_data_list:
             # resolve chain id
             if chain_id is None:
                 if name in solvent_list:
-                    if not solvent_chain_id:
-                        solvent_chain_id  = legal_ch_ids.pop()
-                    chain_id = solvent_chain_id
+                    chain_id = legal_ch_ids.pop()
                     _LOGGER.debug("Found solvent with out chain id in prmtop. "
                                   f"Assigning new chain: {chain_id}.")
                 else:

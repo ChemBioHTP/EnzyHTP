@@ -1311,10 +1311,18 @@ class RosettaInterface(BaseInterface):
         lines:List[str] = list()
         for cst in constraints:
             if cst.is_distance_constraint():
-                assert False
-                pass
+                ridx_1:int=stru.absolute_index(cst.atoms[0].parent, indexed=1)
+                ridx_2:int=stru.absolute_index(cst.atoms[1].parent, indexed=1)
+                lines.append(
+                    f"AtomPair {cst.atoms[0].name} {ridx_1} {cst.atoms[1].name} {ridx_2} LINEAR_PENALTY {cst.target_value:.2f} 0.00 {cst['rosetta']['tolerance']:.2f} {cst['rosetta']['penalty']:.2f}"
+                )
             elif cst.is_angle_constraint():
-                assert False
+                ridx_1:int=stru.absolute_index(cst.atoms[0].parent, indexed=1)
+                ridx_2:int=stru.absolute_index(cst.atoms[1].parent, indexed=1)
+                ridx_3:int=stru.absolute_index(cst.atoms[2].parent, indexed=1)
+                lines.append(
+                    f"Angle {cst.atoms[0].name} {ridx_1} {cst.atoms[1].name} {ridx_2} {cst.atoms[2].name} {ridx_3} LINEAR_PENALTY {np.radians(cst.target_value):.2f} 0.00 {np.radians(cst['rosetta']['tolerance']):.2f} {cst['rosetta']['penalty']/np.radians(1):.2f}"
+                )
             elif cst.is_dihedral_constraint():
                 assert False
             elif cst.is_residue_pair_constraint():
