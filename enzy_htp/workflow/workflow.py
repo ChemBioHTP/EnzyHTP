@@ -32,7 +32,7 @@ from sqlalchemy.orm.session import Session
 import pickle
 
 from enzy_htp.core.logger import _LOGGER
-from enzy_htp.core.file_system import safe_mkdir
+from enzy_htp.core.file_system import safe_mkdir, safe_rmdir
 
 from .config import (
     SCIENCE_API_MAPPER, 
@@ -59,14 +59,15 @@ WORKUNIT_RETURN_VALUE_KEY = "store_as"          # Key indicating the key where t
 WORKUNIT_ARGUMENT_LIST_KEY = "args"             # Key indicates the arguments to be passed into the API.
 CONTROL_BODY_WORKUNITS_LABEL = "workunits"      # Key indicating the list of workunits contained in the body in a unit playing a control role.
 WORKFLOW_API_KEY = "workflow"                   # The value of `api_key` attribute of workflow instance.
-LOOP_API_KEY = "loop"                           # The key of a loop workunit.
-LOOP_ITERABLE_DATA_LABEL = "loop_data"          # Key indicating the object to iterate over in a LoopWorkUnit.
-LOOP_BODY_DATUM_LABEL = "loop_datum_varname"    # Key indicating the element iterated from ITERABLE_DATA in each workunit of the loop body.
-CLUSTER_BATCH_API_KEY = "cluster_batch"         # The key of a cluster batch workunit.
-BATCH_ITERABLE_DATA_LABEL = "batch_data"        # Key indicating the object to iterate over in a ClusterBatchWorkUnit.
-BATCH_BODY_DATUM_LABEL = "batch_datum_varname"  # Key indicating the element iterated from ITERABLE_DATA in each workunit of the batch body.
-DEFAULT_CLUSTER_JOB_CAPABILITY = 5              # How much jobs can be submitted to the cluster before reaching its capability?
-GENERAL_API_KEY = "general"                     # The key of a general workunit.
+ITERATIVE_SUBFOLDERS_OPTION = "run_in_subfolders"   # Key indicate if to run the sub-workflow in subfolder(s).
+LOOP_API_KEY = "loop"                               # The key of a loop workunit.
+LOOP_ITERABLE_DATA_LABEL = "loop_data"              # Key indicating the object to iterate over in a LoopWorkUnit.
+LOOP_BODY_DATUM_LABEL = "loop_datum_varname"        # Key indicating the element iterated from ITERABLE_DATA in each workunit of the loop body.
+CLUSTER_BATCH_API_KEY = "cluster_batch"             # The key of a cluster batch workunit.
+BATCH_ITERABLE_DATA_LABEL = "batch_data"            # Key indicating the object to iterate over in a ClusterBatchWorkUnit.
+BATCH_BODY_DATUM_LABEL = "batch_datum_varname"      # Key indicating the element iterated from ITERABLE_DATA in each workunit of the batch body.
+DEFAULT_CLUSTER_JOB_CAPABILITY = 5                  # How much jobs can be submitted to the cluster before reaching its capability?
+GENERAL_API_KEY = "general"                         # The key of a general workunit.
 
 # API Keys for flow control, such as `loop`, `general`, etc.
 CONTROL_API_KEYS = [
@@ -1253,8 +1254,8 @@ class IterativeWorkUnit(ControlWorkUnit):
 
     Attributes:
         sub_workflows (List[WorkFlow]): A list of sub-workflows.
-        Other inherited attributes...
         iterable_data (Iterable): The data over which the loop iterates.
+        run_in_subfolders (bool): Indicate if to run the sub-workflow in subfolder(s). Default False.
         Other inherited attributes...
 
     Methods:
@@ -1265,6 +1266,7 @@ class IterativeWorkUnit(ControlWorkUnit):
     """
     iterable_data: Iterable
     sub_workflows: List[WorkFlow]
+    run_in_subfolders: bool
 
     def __init__(self, unit_dict: dict, workflow: WorkFlow = None, working_directory: str = BASE_DIRECTORY, locator: List[int] = list(), sqlite_filepath: str = str(), debug: bool = False):
         """Initializes an IterativeWorkUnit instance.
@@ -1280,6 +1282,7 @@ class IterativeWorkUnit(ControlWorkUnit):
         super().__init__(unit_dict=unit_dict, workflow=workflow, working_directory=working_directory, locator=locator, sqlite_filepath=sqlite_filepath, debug=debug)
         self.sub_workflows = list()
         self.child_execution_entities = self.sub_workflows
+        self.run_in_subfolders = False
 
     @classmethod
     def from_dict(cls, unit_dict: dict, placeholder_api: Callable, iterative_body_datum_label: str, 
@@ -1314,6 +1317,7 @@ class IterativeWorkUnit(ControlWorkUnit):
         # Self Inspection.
         unit.self_inspection_and_args_reassembly()
         unit.check_initialization_status()
+        unit.run_in_subfolders = unit.args_dict_to_pass.get(ITERATIVE_SUBFOLDERS_OPTION, False)
 
         # Initialize the Iterative Body.
         data_mapper_to_inherite = unit.generate_data_mapper_to_inherite()
@@ -1447,7 +1451,7 @@ class LoopWorkUnit(IterativeWorkUnit):
     """
 
     @staticmethod
-    def loop_unit_placeholder_api(workunits: list, loop_data: Iterable, loop_datum_varname: str):
+    def loop_unit_placeholder_api(workunits: list, loop_data: Iterable, loop_datum_varname: str, run_in_subfolders: bool = False):
         """Serves as a placeholder API for initializing LoopWorkUnit. This API is not intended for actual execution but marks
         the necessary arguments for initialization.
 
@@ -1457,6 +1461,7 @@ class LoopWorkUnit(IterativeWorkUnit):
                                   This parameter name needs to be consistent with the value of `LOOP_ITERABLE_DATA_LABEL`.
             loop_datum_varname (str): Name of the variable representing each element iterated from ITERABLE_DATA in each workunit of the loop body. 
                                       This parameter name needs to be consistent with the value of `LOOP_BODY_DATUM_LABEL`.
+            run_in_subfolders (bool, optional): Indicate if to run the sub-workflow in subfolder(s). Default False.
         """
         pass
 
@@ -1547,8 +1552,8 @@ class LoopWorkUnit(IterativeWorkUnit):
         loop_body_datum_varname = self.args_dict_to_pass.get(LOOP_BODY_DATUM_LABEL)
         loop_data = self.args_dict_to_pass.get(LOOP_ITERABLE_DATA_LABEL)
 
-        is_existing_subflows = (len(loop_data) == len(self.sub_workflows))
-        if (not is_existing_subflows):  # If we don't use existing sub-workflows, clear all the sub-workflows.
+        use_existing_subflows = (len(loop_data) == len(self.sub_workflows))
+        if (not use_existing_subflows):  # If we don't use existing sub-workflows, clear all the sub-workflows.
             self.sub_workflows.clear()
 
         # Add sub_workflow(s) to the execution queue.
@@ -1556,7 +1561,7 @@ class LoopWorkUnit(IterativeWorkUnit):
             workflow: WorkFlow
             data_mapper_for_initialization = {loop_body_datum_varname: loop_datum}
             
-            if (is_existing_subflows):
+            if (use_existing_subflows):
                 workflow = self.sub_workflows[loop_index]
                 workflow.intermediate_data_mapper.update(data_mapper_for_initialization)
                 workflow.inherited_data_mapper.update(data_mapper_to_inherite)
@@ -1577,14 +1582,23 @@ class LoopWorkUnit(IterativeWorkUnit):
             _LOGGER.debug(f'Executing {workflow.identifier} ...')
 
             # Temporarily change directory before execution.
-            flow_working_subfolder = f"{VarFormatter.unformat_variable(self.args_dict_to_pass.get(LOOP_BODY_DATUM_LABEL))}_{loop_index}"
-            safe_mkdir(flow_working_subfolder)
-            chdir(flow_working_subfolder)
-
+            current_dir = getcwd()
+            if (self.run_in_subfolders):
+                flow_working_subfolder = f"{VarFormatter.unformat_variable(self.args_dict_to_pass.get(LOOP_BODY_DATUM_LABEL))}_{loop_index}"
+                if (not use_existing_subflows):
+                    safe_rmdir(flow_working_subfolder, empty_only=False)
+                safe_mkdir(flow_working_subfolder)
+                chdir(flow_working_subfolder)
+            else:
+                pass
+            
             workflow_return = workflow.execute()
 
             # Change directory back after execution.
-            chdir("..")
+            if (self.run_in_subfolders):
+                chdir(current_dir)
+            else:
+                pass
 
             self.return_value[self.encode_layer_index(loop_index)] = workflow_return
             self.update_status_code(workflow=workflow)
@@ -1620,7 +1634,7 @@ class ClusterBatchWorkUnit(IterativeWorkUnit):
     max_simultaeneous_jobs: int
 
     @staticmethod
-    def cluster_batch_placeholder_api(workunits: list, batch_data: Iterable, batch_datum_varname: str, max_simultaeneous_jobs: int = DEFAULT_CLUSTER_JOB_CAPABILITY):
+    def cluster_batch_placeholder_api(workunits: list, batch_data: Iterable, batch_datum_varname: str, max_simultaeneous_jobs: int = DEFAULT_CLUSTER_JOB_CAPABILITY, run_in_subfolders: bool = False):
         """Serves as a placeholder API for initializing ClusterBatchWorkUnit. This API is not intended for actual execution but marks
         the necessary arguments for initialization.
 
@@ -1632,6 +1646,7 @@ class ClusterBatchWorkUnit(IterativeWorkUnit):
                                       This parameter name needs to be consistent with the value of `BATCH_BODY_DATUM_LABEL`.
             max_simultaeneous_jobs (int, optional): Due to the resource limit of the Cluster, we have to set a maximum number of simultaneous tasks 
                                     submitted to the cluster (Default: the value of DEFAULT_CLUSTER_JOB_CAPABILITY).
+            run_in_subfolders (bool, optional): Indicate if to run the sub-workflow in subfolder(s). Default False.
         """
         pass
 
@@ -1723,8 +1738,8 @@ class ClusterBatchWorkUnit(IterativeWorkUnit):
         batch_body_datum_varname = self.args_dict_to_pass.get(BATCH_BODY_DATUM_LABEL)
         batch_data = self.args_dict_to_pass.get(BATCH_ITERABLE_DATA_LABEL)
 
-        is_existing_subflows = (len(batch_data) == len(self.sub_workflows))
-        if (not is_existing_subflows):  # If we don't use existing sub-workflows, clear all the sub-workflows.
+        use_existing_subflows = (len(batch_data) == len(self.sub_workflows))
+        if (not use_existing_subflows):  # If we don't use existing sub-workflows, clear all the sub-workflows.
             self.sub_workflows.clear()
 
         # Add sub_workflow(s) to the execution queue.
@@ -1732,7 +1747,7 @@ class ClusterBatchWorkUnit(IterativeWorkUnit):
             workflow: WorkFlow
             data_mapper_for_initialization = {batch_body_datum_varname: batch_datum}
             
-            if (is_existing_subflows):
+            if (use_existing_subflows):
                 workflow = self.sub_workflows[batch_index]
                 workflow.intermediate_data_mapper.update(data_mapper_for_initialization)
                 workflow.inherited_data_mapper.update(data_mapper_to_inherite)
@@ -1754,14 +1769,20 @@ class ClusterBatchWorkUnit(IterativeWorkUnit):
 
             # Temporarily change directory before execution.
             current_dir = getcwd()
-            flow_working_subfolder = f"{VarFormatter.unformat_variable(self.args_dict_to_pass.get(LOOP_BODY_DATUM_LABEL))}_{batch_index}"
-            safe_mkdir(flow_working_subfolder)
-            chdir(flow_working_subfolder)
+            if (self.run_in_subfolders):
+                flow_working_subfolder = f"{VarFormatter.unformat_variable(self.args_dict_to_pass.get(LOOP_BODY_DATUM_LABEL))}_{batch_index}"
+                if (not use_existing_subflows):
+                    safe_rmdir(flow_working_subfolder, empty_only=False)
+                safe_mkdir(flow_working_subfolder)
+                chdir(flow_working_subfolder)
+            else:
+                pass
 
             workflow_return = workflow.execute()
 
             # Change directory back after execution.
-            chdir(current_dir)
+            if (self.run_in_subfolders):
+                chdir(current_dir)
 
             self.return_value[self.encode_layer_index(batch_index)] = workflow_return
             self.update_status_code(workflow=workflow)
