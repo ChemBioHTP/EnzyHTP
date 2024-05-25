@@ -79,6 +79,8 @@ class StructureEnsemble:
     @property
     def structure_0(self) -> Structure:
         """getter for the 1st structure in the ensemble"""
+        if self.top_parser == get_itself:
+            return self.coordinate_list[0]
         coord_0 = next(self.coord_parser(self.coordinate_list))
         result = deepcopy(self.topology)
         result.apply_geom(coord_0)

@@ -128,7 +128,7 @@ def equi_md_sampling(stru: Structure,
         name="min_micro",
         minimize=True,
         length=200000, # cycle
-        cluster_job_config=cpu_min_job_config,
+        cluster_job_config=min_job_config,
         core_type=min_core,
         constrain=[freeze_backbone] + prod_constrain)
 

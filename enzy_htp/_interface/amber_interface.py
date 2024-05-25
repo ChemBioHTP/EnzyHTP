@@ -1378,6 +1378,7 @@ class AmberInterface(BaseInterface):
 
             # ntpr
             ntpr = max(int(self.config()["HARDCODE_NTPR_RATIO"] * nstlim), 1)
+            ntwr = ntpr
 
             # ntwx
             ntwx = 0
@@ -1535,6 +1536,7 @@ class AmberInterface(BaseInterface):
                 'ntc': ntc, 'ntf': ntf,
                 'cut': self.config()["HARDCODE_CUT"],
                 'ntpr': ntpr, 'ntwx': ntwx,
+                'ntwr': 5*ntpr,
                 } | ntr_cntrl | nmropt_cntrl | {
             }},
         ] + wt_list
