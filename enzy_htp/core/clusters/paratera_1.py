@@ -1,4 +1,4 @@
-"""Here is everything job manager need to know about `paracloud-CNGrid12` of BSCC (Beijing Super Computer Center.
+"""Here is everything job manager need to know about `paracloud-NC-N40` of BSCC (Beijing Super Computer Center.
 TODO make a base class for slurm
 
 NOTE: for SLURM based HPC, there will be a common problem with job manager that it creates large
@@ -31,7 +31,7 @@ ENV_MANAGER = EnvironmentManager(
 ) # TODO(qz): for some reason ABC is not happy with this going into the class
 ENV_MANAGER.check_executables()
 
-class CNGrid12(ClusterInterface):
+class Paratera1(ClusterInterface):
     """
     The CNGrid12 interface
     """

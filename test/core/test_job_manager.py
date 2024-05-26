@@ -427,7 +427,7 @@ def test_ClusterJob_with_to_2d_array_end_ACCRE():
     fs.clean_temp_file_n_dir(test_file_paths)
     _LOGGER.setLevel(old_level)
 
-def test_ClusterJob_get_state_CNGrid12():
+def test_ClusterJob_get_state_paratera_1():
     """
     only run on CNGrid12
     """
@@ -441,7 +441,7 @@ def test_ClusterJob_get_state_CNGrid12():
                             "clusters" : "swarm"}
     job = ClusterJob.config_job(
         commands = "sleep 10",
-        cluster = clusters.paracloud_cngrid12.CNGrid12(),
+        cluster = clusters.paratera_1.Paratera1(),
         env_settings = "",
         res_keywords = res_keywords_dict,
     )
