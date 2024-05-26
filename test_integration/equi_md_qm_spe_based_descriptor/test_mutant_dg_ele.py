@@ -28,6 +28,7 @@ from enzy_htp.structure import (
 )
 from enzy_htp.chemical.level_of_theory import QMLevelOfTheory
 from enzy_htp.core.clusters.accre import Accre
+from enzy_htp.core.clusters.paratera_1 import Paratera1Paratera1
 
 DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/data/"
 STRU_DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/../../test/test_data/diversed_stru/"
@@ -45,6 +46,8 @@ def workflow(
         target_bond: Tuple[Atom],
         ef_region_pattern: str,
         result_path: str,
+        qm_cluster_job_config: Dict,
+        md_cluster_job_config: Dict,
         chain_sync_list: List = None,
         chain_index_mapper: Dict = None,
     ):
@@ -99,13 +102,6 @@ def workflow(
                 "leaprc.water.tip3p",
             ],
         )
-        md_cluster_job_config = {
-            "cluster" : Accre(),
-            "res_keywords" : {
-                "account" : "csb_gpu_acc",
-                "partition" : "pascal"
-            }
-        }
         mut_constraints = []
         for cons in md_constraints:
             mut_constraints.append(cons(mutant_stru))
@@ -124,13 +120,6 @@ def workflow(
     # electronic structure
         for replica_esm in md_result:
             replica_result = []
-            qm_cluster_job_config = {
-                "cluster" : Accre(),
-                "res_keywords" : {
-                    "account" : "yang_lab_csb",
-                    "partition" : "production",
-                    'walltime' : '1-00:00:00',
-                }}
             qm_results = single_point(
                 stru=replica_esm,
                 engine="gaussian",
@@ -184,6 +173,77 @@ def test_kemp_elimiase():
         wt_stru.ligands[0].find_atom_name("H2")
     )
     result = f"{WORK_DIR}ke_test_result.pickle"
+    md_cluster_job_config = {
+        "cluster" : Accre(),
+        "res_keywords" : {
+            "account" : "csb_gpu_acc",
+            "partition" : "pascal"
+        }
+    }
+    qm_cluster_job_config = {
+        "cluster" : Accre(),
+        "res_keywords" : {
+            "account" : "yang_lab_csb",
+            "partition" : "production",
+            'walltime' : '1-00:00:00',
+        }}
+
+    workflow(
+        wt_stru = wt_stru,
+        mutant_pattern = mutant_pattern,
+        ligand_chrg_spin_mapper = {"H5J" : (0,1)},
+        md_constraints = md_constraint,
+        md_length = 0.1, #ns
+        qm_region_pattern = "resi 101+254",
+        qm_level_of_theory = qm_level_of_theory,
+        target_bond = target_bond,
+        ef_region_pattern = "chain A and (not resi 101)",
+        result_path = result, 
+        md_cluster_job_config = md_cluster_job_config,
+        qm_cluster_job_config = qm_cluster_job_config,
+    )
+
+    assert Path(result).exists()
+    with open(result, "rb") as f:
+        result_dict = pickle.load(f)
+        assert len(result_dict) == 3
+        assert len(list(result_dict.keys())[1]) == 2
+        result_0 = list(result_dict.values())[0]
+        assert len(result_0) == 3
+        assert len(result_0[0]) == 10
+
+def test_kemp_elimiase_paratera_1():
+    """test the workflow on a kemp elimiase
+    the result of a passed test is saved to data/ but due to the randomness
+     of MD it is hard to compare"""
+    wt_stru = sp.get_structure(f"{STRU_DATA_DIR}/KE_07_R7_2_S.pdb")
+    mutant_pattern = "WT, r:2[resi 254 around 4 and not resi 101: all not self]*2"
+    md_constraint = [
+        partial(stru_cons.create_distance_constraint,
+            "B.254.H2", "A.101.OE2", 2.4),
+        partial(stru_cons.create_angle_constraint,
+            "B.254.CAE", "B.254.H2", "A.101.OE2", 180.0),]
+    qm_level_of_theory = QMLevelOfTheory(
+        basis_set="3-21G",
+        method="hf",        
+    )
+    target_bond = (
+        wt_stru.ligands[0].find_atom_name("CAE"),
+        wt_stru.ligands[0].find_atom_name("H2")
+    )
+    result = f"{WORK_DIR}ke_test_result.pickle"
+    md_cluster_job_config = {
+        "cluster" : Paratera1(),
+        "res_keywords" : {
+            "partition" : "gpu"
+        }
+    }
+    qm_cluster_job_config = {
+        "cluster" : Paratera1(),
+        "res_keywords" : {
+            "partition" : "cpusx",
+            'walltime' : '1-00:00:00',
+        }}
 
     workflow(
         wt_stru = wt_stru,
