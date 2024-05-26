@@ -28,7 +28,7 @@ from enzy_htp.structure import (
 )
 from enzy_htp.chemical.level_of_theory import QMLevelOfTheory
 from enzy_htp.core.clusters.accre import Accre
-from enzy_htp.core.clusters.paratera_1 import Paratera1Paratera1
+from enzy_htp.core.clusters.paratera_1 import Paratera1
 
 DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/data/"
 STRU_DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/../../test/test_data/diversed_stru/"
@@ -235,7 +235,7 @@ def test_kemp_elimiase_paratera_1():
     md_cluster_job_config = {
         "cluster" : Paratera1(),
         "res_keywords" : {
-            "partition" : "gpu"
+            "partition" : "gpu_4090"
         }
     }
     qm_cluster_job_config = {
@@ -256,6 +256,8 @@ def test_kemp_elimiase_paratera_1():
         target_bond = target_bond,
         ef_region_pattern = "chain A and (not resi 101)",
         result_path = result, 
+        md_cluster_job_config = md_cluster_job_config,
+        qm_cluster_job_config = qm_cluster_job_config,
     )
 
     assert Path(result).exists()

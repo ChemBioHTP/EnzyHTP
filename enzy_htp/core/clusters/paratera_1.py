@@ -33,31 +33,33 @@ ENV_MANAGER.check_executables()
 
 class Paratera1(ClusterInterface):
     """
-    The CNGrid12 interface
+    The Paratera1 interface (e.g.: NC-N40)
     """
     #############################
     ### External use constant ###
     #############################
-    NAME = "CNGrid12"
+    NAME = "Paratera1"
 
     # environment presets #
     AMBER_ENV = {
-        "CPU": "source /project/wangxin4/soft/amber20_src/amber.sh",
-        "GPU": "source /project/wangxin4/soft/amber20_src/amber.sh",
+        "CPU": """module load amber/22_ambertools22_openmpi
+source /data/apps_4090/amber/amber22-install/amber.sh""",
+        "GPU": """module load amber/22_ambertools22_openmpi
+source /data/apps_4090/amber/amber22-install/amber.sh""",
     }
 
     G16_ENV = {
-        "CPU":"""alias g16='/project/wangxin4/soft/gs/g16/g16'
-export g16root=/project/wangxin4/soft/gs
-export GAUSS_SCRDIR=/project/wangxin4/soft/gs/g16/tmp
+        "CPU":"""alias g16='/HOME/scw6d1q/run/g16/g16'
+export g16root=/HOME/scw6d1q/run/g16
+export GAUSS_SCRDIR=/HOME/scw6d1q/run/tmp
 source $g16root/g16/bsd/g16.profile"""
     }
 
     MULTIWFN_ENV = {
         "GPU" : """ulimit -s unlimited
 export OMP_STACKSIZE=200M
-export Multiwfnpath=/project/wangxin4/soft/Multiwfn_3.8_dev_bin_Linux_noGUI
-export PATH=$PATH:/project/wangxin4/soft/Multiwfn_3.8_dev_bin_Linux_noGUI"""
+export Multiwfnpath=/HOME/scw6d1q/run/Multiwfn_3.8_dev_bin_Linux_noGUI
+export PATH=$PATH:$Multiwfnpath"""
     }
 
     #############################
@@ -106,7 +108,7 @@ export PATH=$PATH:/project/wangxin4/soft/Multiwfn_3.8_dev_bin_Linux_noGUI"""
     @classmethod
     def parser_resource_str(cls, res_dict: dict) -> str:
         """
-        1. parser general resource keywords to CNGrid12 specified keywords
+        1. parser general resource keywords to Paratera1 specified keywords
         2. format the head of the submission script
         res_dict: the dictionary with general keywords and value
            (Available keys & value format:
@@ -127,7 +129,7 @@ export PATH=$PATH:/project/wangxin4/soft/Multiwfn_3.8_dev_bin_Linux_noGUI"""
     @classmethod
     def _parser_res_dict(cls, res_dict):
         """
-        parser keywords into CNGrid12 style
+        parser keywords into Paratera1 style
         """
         new_dict = {}
         for k, v in res_dict.items():
@@ -171,7 +173,7 @@ export PATH=$PATH:/project/wangxin4/soft/Multiwfn_3.8_dev_bin_Linux_noGUI"""
         Raise:
             SubprocessError if sbatch wont work after 1440 retries (12hrs)
 
-        CNGrid12 sbatch rule:
+        Paratera1 sbatch rule:
             stdout: Submitted batch job ######## on cluster XXX
             file: slurm-#######.out will be generated in the *submission dir*
             exec: commands in the script will run under the *submission dir*
