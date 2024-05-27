@@ -1,6 +1,14 @@
+"""The TranslatorBase describes the API for supporting the translation of a Structure's canonical amino acid Residue and Atom names. 
+In this scheme, AmberMD naming represents the standard naming scheme. Mapping is executed in the TranslatorBase.init_mappings() function,
+which will call on static, pre-defined calls to TranslatorBase.register_mapping() function. For more information and examples, see 
+the rosetta version in enzy_htp/structure/translate_structure/rosetta_translator.py
+
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Date: 2024-05-27
+"""
+
 from typing import Dict, Tuple, List
 from abc import ABC, abstractmethod
-
 
 from plum import dispatch
 
@@ -12,8 +20,21 @@ from ..structure import Structure
 
 
 class TranslatorBase(ABC):
+    """Defines the API for translating to/from a given naming scheme. There must be one for each
+    naming scheme, the standard naming scheme is AmberMD and translation is primarily targeted at 
+    canonical amino acids. All translation occurs through overloaded versions of the to_standard()
+    and from_standard() methods.
 
+    Attributes:
+        TO_STANDARD: A dict() with (key, value) pairs of (translated_resname, standard_res_name) and 
+            ((translated_resname, translated_atom_name), (standard_resname, standard_atom_name)) for each 
+            residue code and atom name, respectively.
+        FROM_STANDARD: A dict() with (key, value) pairs of (standard_res_name, translated_resname) and 
+            ((standard_resname, standard_atom_name), (translated_resname, translated_atom_name)) for each
+            residue code and atom name, respectively.
+    """
     def __init__(self):
+        """Simplistic constructor that initializes variables then calls child-instantiated init_mappings() method."""
         self.TO_STANDARD = dict()
         self.FROM_STANDARD = dict()
         self.init_mappings()
@@ -23,9 +44,23 @@ class TranslatorBase(ABC):
                         s_rname:str,
                         s_atoms:List[str],
                         t_rname:str,
-                        t_atoms:List[str]):
+                        t_atoms:List[str]) -> None:
+        """Workhorse method where one defines how the same residue is described in multiple 
+        software packages. s_ prefix is for standard, t_ prefix is for translatred. Function works 
+        for only one Residue. Note that the number of Atom()'s must be the same and that
+        the supplied atom names in s_atoms and 
+        
+        Args:
+            s_rname: What is the 3-letter Residue name in AmberMD?
+            s_atoms: What are the atom names for the Residue in AmberMD?
+            t_rname: What is the 3-letter Residue name in the other naming scheme?
+            s_atoms: What are the atom names for the Residue in the other name scheme?
 
-        assert len(s_atoms) == len(t_atoms)
+        Returns:
+            Nothing.
+        """
+
+        assert len(s_atoms) == len(t_atoms) #TODO(CJ): use error logging here
 
         for s_aa, t_aa in zip(s_atoms, t_atoms):
             s_key:Tuple[str, str] = (s_rname, s_aa)
@@ -82,6 +117,7 @@ class TranslatorBase(ABC):
 
     @dispatch
     def from_standard(self, res:Residue) -> None:
+        
         value = self.FROM_STANDARD.get(res.name, None)
 
         if value is None:
@@ -103,9 +139,11 @@ class TranslatorBase(ABC):
 
     @abstractmethod
     def naming_style(self) -> str:
+        """What naming scheme is in use?"""
         pass
 
     @abstractmethod
     def init_mappings(self) -> None:
+        """Mappings are defined here through various calls to regiset_mapping()"""
         pass
 
