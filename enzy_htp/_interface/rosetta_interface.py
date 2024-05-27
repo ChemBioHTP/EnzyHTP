@@ -37,6 +37,303 @@ from enzy_htp.core.exception import RosettaError
 from .base_interface import BaseInterface
 from .handle_types import ddGFoldEngine, ddGResultEgg
 
+class RosettaOptions:
+    
+    def __init__(self):
+
+        self.data_ = dict()
+        self.script_vars_ = dict()
+
+
+    def convert_script_vars_(self) -> None:
+
+        if not self.script_vars_:
+            return
+
+        result = str()
+
+        for key_name, value in self.script_vars.items():
+            result += f" {key_name}={self.convert_value_(value)}"
+
+        self['parser:script_vars'] = result
+
+
+    @property
+    def script_vars(self) -> Dict:  
+        """Getter for the dict() of script variables in this options object."""
+        return self.script_vars_
+
+    def __setitem__(self, key, value) -> None:
+        tks:List[str] = key.split(':')
+        ptr = self.data_
+        n_tks = len(tks)
+        for tidx, tt in enumerate(tks):
+            if tidx == n_tks - 1 :
+                break
+            new_ptr = ptr.get(tt, None)
+            if not new_ptr:
+                ptr[tt] = dict()
+                new_ptr = ptr[tt]
+
+            ptr = new_ptr
+
+        ptr[tks[-1]] = value
+
+
+    def __getitem__(self, key:str) -> Any:
+        tks:List[str] = key.split(':')
+        ptr = self.data_
+        tks = list(reversed(tks))
+        tt = tks.pop()
+        while tks:
+            ptr = ptr.get(tt)
+            tt = tks.pop()
+
+        return ptr[tt]
+
+
+    def convert_value_(self, value:Any) -> str:
+        if isinstance(value, list):
+            return ' '.join(map(lambda vv: self.convert_value_(vv), value))
+
+        if isinstance(value, bool):
+            if value == True:
+                return 'true'
+            else:
+                return 'false'
+
+        if isinstance(value, str):
+            return f"'{value}'"
+
+        return f"{value}"
+
+
+    def to_file(self, fname:str) -> str:
+        """Writes the options 
+        """
+
+        self.convert_script_vars_()
+        depth = 0
+        lines = list()
+        self.traverse_options_(self.data_, lines, depth)
+        fs.write_lines(fname, lines)
+        return fname
+
+    def traverse_options_(self, data, lines, depth) -> None:
+        insert = ' '*4*depth
+        for key_name, value in data.items():
+            if isinstance(value, dict):
+                lines.append(f"{insert}-{key_name}")
+                self.traverse_options_(value,  lines, depth+1)
+            else:
+                if key_name == 'script_vars':
+                    lines.append(f"{insert}-{key_name} {value}")
+                else:
+                    lines.append(f"{insert}-{key_name} {self.convert_value_(value)}")
+
+class RosettaScriptsElement:
+
+    def __init__(self, tag:str, **kwargs):
+
+        self.tag_ = tag
+        self.attrib = dict()
+        self.children_ = list()
+
+
+        children_temp = kwargs.pop('children', None)
+
+        if children_temp:
+            self.children_ = children_temp
+
+        for k, v in kwargs.items():
+            self.attrib[k] = v
+
+    @property
+    def children(self) -> List["RosettaScriptsElement"]:
+        return self.children_
+
+    @property
+    def tag(self) -> str:
+        return self.tag_
+
+
+    def has_children(self) -> bool:
+        return len(self.children_) 
+
+    def add_child(self, child: "RosettaScriptsElement") -> None:
+
+        self.children_.append( child )
+
+    def to_lines(self, offset:int = 2) -> List[str]:
+
+        prefix:str=' '*offset*4
+        content:List[str] = []
+
+        opening_line:str = f"{prefix}<{self.tag}"
+
+        for att_name, att_value in self.attrib.items():
+
+            opening_line += f" {att_name}=\"{att_value}\""
+
+        if self.has_children():
+            opening_line += ">"
+            content.append( opening_line )
+            for child in self.children_:
+                content.extend( child.to_lines( offset + 1 ) )
+
+            content.append( f"{prefix}</{self.tag}>" )
+
+        else:
+            opening_line += "/>"
+            content.append( opening_line )
+
+
+        return content 
+
+
+class RosettaScriptsProtocol:
+
+    def __init__(self):
+        self.sections = defaultdict(list)
+        self.section_names = "SCORINGGRIDS SCOREFXNS RESIDUE_SELECTORS PACKER_PALETTES TASKOPERATIONS MOVE_MAP_FACTORIES SIMPLE_METRICS FILTERS MOVERS PROTOCOLS OUTPUT".split()
+
+    def add_element(self, section:str, element:RosettaScriptsElement) -> None:
+        #TODO(CJ): add checks
+
+        self.sections[section].append( element )
+
+        pass
+
+
+    def add_scorefunction(self, scorefxn: RosettaScriptsElement) -> None:
+
+        self.add_element("SCOREFXNS", scorefxn)
+
+    def add_residue_selector(self, res_selector: RosettaScriptsElement) -> None:
+        self.add_element("RESIDUE_SELECTORS", res_selector)
+
+    def add_mover(self, mover: RosettaScriptsElement) -> None:
+        self.add_element("MOVERS", mover)
+
+    def add_filter(self, r_filter: RosettaScriptsElement) -> None:
+        self.add_element("FILTERS", r_filter)
+
+
+    def add_simple_metric(self, simple_metric: RosettaScriptsElement) -> None:
+        self.add_element("SIMPLE_METRICS", simple_metric)
+
+    def add_protocol(self, protocol: RosettaScriptsElement) -> None:
+
+        self.add_element("PROTOCOLS", protocol)
+
+
+    def add_scoring_grid(self, scoring_grid: RosettaScriptsElement) -> None:
+
+        self.add_element("SCORINGGRIDS", scoring_grid)
+
+    def to_file(self, fname:str) -> str:
+
+        content:List[str] = [ "<ROSETTASCRIPTS>"] 
+
+        for sn in self.section_names:
+            if sn == "SCORINGGRIDS":
+                if not self.sections[sn]:
+                    continue
+                opening_line = f"    <SCORINGGRIDS"                
+
+                #TODO(CJ): fix for multiple scoring grids
+                grid = self.sections[sn][0]
+
+                for k, v in grid.attrib.items():
+                    opening_line += f" {k}=\"{v}\""
+                opening_line += ">"
+                content.append( opening_line )
+
+                for child in grid.children:
+                    content.extend( child.to_lines(2) )
+
+
+                content.append("    </SCORINGGRIDS>")
+                continue
+
+            content.append(f"    <{sn}>")
+
+            for ss in self.sections[sn]:
+                content.extend( ss.to_lines() )
+
+            content.append(f"    </{sn}>")
+
+        content.append("</ROSETTASCRIPTS>")
+
+        fs.write_lines(fname, content)
+
+        return fname
+
+class RosettaScriptsEgg(ModelingResultEgg):
+    score_file:str
+    pdb_files:List[str]
+
+class RosettaScriptsEngine(ModelingEngine):
+
+    def __init__(self, interface, protocol: RosettaScriptsProtocol, opts:RosettaOptions, work_dir:str):
+        self._parent_interface = interface
+        self._work_dir = work_dir
+        self._protocol = protocol
+        self._opts = opts
+
+    @property
+    def parent_interface(self):
+        return self._parent_interface
+
+    @property
+    def work_dir(self) -> str:
+        return self._work_dir
+
+    @property
+    def protocol(self) -> RosettaScriptsProtocol:
+        return self._protocol
+
+    @property
+    def opts(self) -> RosettaOptions:
+        return self._opts
+
+    def engine(self) -> str:
+        return "rosetta"
+        pass
+
+    def make_job(self, stru:Structure,  opts:RosettaOptions) -> Tuple[ClusterJob, RosettaScriptsEgg]:
+        pass
+
+    def run(self, stru:Structure) -> List[Structure]:
+
+        _parser = PDBParser()
+        score_file:str = self.parent_interface.run_rscripts(stru, self.protocol, self.opts, self.work_dir)
+
+        results = self.parent_interface.parse_score_file(score_file)
+        structures = list()
+
+        for i, row in results.iterrows():
+            row_dict = row.to_dict()
+
+            pdb_file = f"{self.work_dir}/{row_dict.pop('description')}.pdb"
+            stru = _parser.get_structure(pdb_file)
+
+            for rk, rv in row_dict.items():
+                stru.data[rk] = rv
+
+            structures.append( stru )
+
+        return structures
+
+
+
+
+    def translate(self, egg: RosettaScriptsEgg):
+        pass
+
+
+
+
 @dataclass
 class RosettaCartesianddGEgg(ddGResultEgg):
     """This class define the result egg of cartesian ddg
