@@ -1,3 +1,10 @@
+"""Instantiation of TranslatorBase for the Rosetta molecular modelling suite. This class 
+enables support for translation of canonical amino acid names to and from the standard
+AmberMD scheme in EnzyHTP.
+
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Date: 2024-05-27
+"""
 
 from plum import dispatch
 
@@ -9,19 +16,18 @@ from ..structure import Structure
 from .translator_base import TranslatorBase
 
 
-
-
 class RosettaTranslator(TranslatorBase):
-
-
-
+    """
+    """
 
     def naming_style(self) -> str:
+        """This is the Rosetta naming scheme."""
         return "rosetta"
 
 
     @dispatch
     def to_standard(self, res:Residue) -> None:
+        """Special overloaded of to_standard() that addresses funky histidine 3 letter naming."""
 
         
         if res.name == 'HIS':
