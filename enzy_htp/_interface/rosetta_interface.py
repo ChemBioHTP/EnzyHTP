@@ -35,17 +35,27 @@ from enzy_htp.core.job_manager import ClusterJob
 from enzy_htp.core.exception import RosettaError
 
 from .base_interface import BaseInterface
-from .handle_types import ddGFoldEngine, ddGResultEgg
+from .handle_types import ddGFoldEngine, ddGResultEgg, ModelingEngine, ModelingResultEgg
 
 class RosettaOptions:
+    """Holds options for running generic functions in the Rosetta molecular modelling suite. Serves
+    as a dict() and supports [] operator usage so that options can be set and then subsequently accessed
+    or written to a file. Allows namespace nesting with the ':' character.
+
+    Attributes:
+        data_: The dict() holding various settings.
+        script_vars_: A dict() with a special case of (key, value) pairs that defines script variables for a RosettaScripts run.
+    """
     
     def __init__(self):
+        """Simplistic constructor that initializes the data_ and script_vars_ dict()'s"""
 
         self.data_ = dict()
         self.script_vars_ = dict()
 
 
     def convert_script_vars_(self) -> None:
+        """Private method which converts the script variables to a 'parser:script_vars' variable."""
 
         if not self.script_vars_:
             return
@@ -63,7 +73,17 @@ class RosettaOptions:
         """Getter for the dict() of script variables in this options object."""
         return self.script_vars_
 
-    def __setitem__(self, key, value) -> None:
+    def __setitem__(self, key:str, value:Any) -> None:
+        """Allows bracket operator setting for the options, with support for namespace
+        nesting with the ':' character.
+
+        Args:
+            key: Name of the key/variable name as a str().
+            value: Value of the variable. Must be able to be converted to a str().
+
+        Returns:
+            Nothing.
+        """
         tks:List[str] = key.split(':')
         ptr = self.data_
         n_tks = len(tks)
@@ -81,18 +101,47 @@ class RosettaOptions:
 
 
     def __getitem__(self, key:str) -> Any:
+        """Allows bracket operating getting for the options, with support for namespace
+        nesting with the ':' character. Raises error if unsupported key.
+
+        Args:
+            key: Name of the variable to be accessed as a str().
+
+        Returns:
+            The value associated with the key.
+        """
         tks:List[str] = key.split(':')
         ptr = self.data_
         tks = list(reversed(tks))
         tt = tks.pop()
         while tks:
             ptr = ptr.get(tt)
+            if ptr is None:
+                err_msg:str = f"No stored variable '{key}'. Encountered problem with namespace '{tt}'."
+                _LOGGER.error(err_msg)
+                raise TypeError( err_msg )
+                                
             tt = tks.pop()
+        
+        result = ptr.get(tt)
+        if result is None:
+            err_msg:str = f"No stored variable '{key}'. Encountered problem with namespace '{tt}'."
+            _LOGGER.error(err_msg)
+            raise TypeError( err_msg )
 
-        return ptr[tt]
+        return result
 
 
     def convert_value_(self, value:Any) -> str:
+        """Helper method that converts an arbitrary value to a str() supported by Rosetta.
+
+        Args:
+            value: The Any-type value to convert.
+
+        Returns:
+            The supplied type converted to a str().
+        """
+        
         if isinstance(value, list):
             return ' '.join(map(lambda vv: self.convert_value_(vv), value))
 
@@ -109,9 +158,14 @@ class RosettaOptions:
 
 
     def to_file(self, fname:str) -> str:
-        """Writes the options 
-        """
+        """Writes the options to a file that can be parsed at the commandline.
 
+        Args: 
+            fname: The filename as a str() to write the options to.
+
+        Returns:
+            The name of the written options filepath.
+        """
         self.convert_script_vars_()
         depth = 0
         lines = list()
@@ -119,8 +173,19 @@ class RosettaOptions:
         fs.write_lines(fname, lines)
         return fname
 
-    def traverse_options_(self, data, lines, depth) -> None:
-        insert = ' '*4*depth
+    def traverse_options_(self, data:Dict, lines:List[str], depth:int) -> None:
+        """Helper method that traverses the options in the dict() and converts
+        them into lines that can be written to a file.
+
+        Args:
+            data: The data Dict() with (key, value) pairs to convert to lines.
+            lines: The lines to add the (key, value) pairs.
+            depth: What is the starting indent to use here?
+        
+        Returns:
+            Nothing.
+        """
+        insert:str = ' '*4*depth
         for key_name, value in data.items():
             if isinstance(value, dict):
                 lines.append(f"{insert}-{key_name}")
@@ -200,9 +265,11 @@ class RosettaScriptsProtocol:
     def add_element(self, section:str, element:RosettaScriptsElement) -> None:
         #TODO(CJ): add checks
 
-        self.sections[section].append( element )
+        if section not in section_names:
+            #TODO(CJ):
+            pass
 
-        pass
+        self.sections[section].append( element )
 
 
     def add_scorefunction(self, scorefxn: RosettaScriptsElement) -> None:
@@ -301,7 +368,48 @@ class RosettaScriptsEngine(ModelingEngine):
         return "rosetta"
         pass
 
+    def make_input_files(self, stru: Structure):
+        pass
+
     def make_job(self, stru:Structure,  opts:RosettaOptions) -> Tuple[ClusterJob, RosettaScriptsEgg]:
+        if not isinstance(stru, Structure):
+            _LOGGER.error("only allow Structure as `stru`")
+            raise TypeError
+
+        # 2. make .gjf file
+        fs.safe_mkdir(self.work_dir)
+        temp_gjf_file, gchk_path = self._make_gjf_file(stru)
+
+        # 3. make cmd
+        spe_cmd, gout_path = self.parent_interface.make_gaussian_cmd(temp_gjf_file)
+
+        # 4. assemble ClusterJob
+        cluster = self.cluster_job_config["cluster"]
+        res_keywords = self.cluster_job_config["res_keywords"]
+        env_settings = cluster.G16_ENV["CPU"]
+        sub_script_path = fs.get_valid_temp_name(f"{self.work_dir}/submit_{self.name}.cmd")
+        job = ClusterJob.config_job(
+            commands = spe_cmd,
+            cluster = cluster,
+            env_settings = env_settings,
+            res_keywords = res_keywords,
+            sub_dir = "./", # because path are relative
+            sub_script_path = sub_script_path
+        )
+        job.mimo = { # only used for translate clean up
+            "temp_gin": [temp_gjf_file],
+        }
+
+        # 5. make result egg
+        result_egg = GaussianQMResultEgg(
+            gout_path = gout_path,
+            gchk_path = gchk_path,
+            stru=stru,
+            parent_job = job,
+        )
+
+        return (job, result_egg)
+
         pass
 
     def run(self, stru:Structure) -> List[Structure]:
@@ -327,11 +435,8 @@ class RosettaScriptsEngine(ModelingEngine):
 
 
 
-
     def translate(self, egg: RosettaScriptsEgg):
         pass
-
-
 
 
 @dataclass
@@ -985,6 +1090,11 @@ class RosettaInterface(BaseInterface):
         result = " \\\n".join(result)
 
         return result
+
+    def make_rosetta_scripts_cmd(
+        self, 
+        pdb_path,
+        
 
     def relax(
         self,
