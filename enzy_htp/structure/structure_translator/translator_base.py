@@ -60,7 +60,13 @@ class TranslatorBase(ABC):
             Nothing.
         """
 
-        assert len(s_atoms) == len(t_atoms) #TODO(CJ): use error logging here
+        n_s_atoms:int = len(s_atoms)
+        n_t_atoms:int = len(t_atoms)
+        
+        if n_s_atoms != n_t_atoms:
+            err_msg = f"Error! Number of standard-named and translated atoms must be the same, but got {n_s_atoms} vs {n_t_atoms}"
+            _LOGGER.error(err_msg)
+            raise ValueError(err_msg)
 
         for s_aa, t_aa in zip(s_atoms, t_atoms):
             s_key:Tuple[str, str] = (s_rname, s_aa)

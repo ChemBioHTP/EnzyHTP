@@ -17,8 +17,7 @@ from .translator_base import TranslatorBase
 
 
 class RosettaTranslator(TranslatorBase):
-    """
-    """
+    """Instantiation of TranslatorBase() for the Rosetta molecular modellig suite. """
 
     def naming_style(self) -> str:
         """This is the Rosetta naming scheme."""
@@ -29,7 +28,6 @@ class RosettaTranslator(TranslatorBase):
     def to_standard(self, res:Residue) -> None:
         """Special overloaded of to_standard() that addresses funky histidine 3 letter naming."""
 
-        
         if res.name == 'HIS':
             atom_names = [aa.name for aa in res.atoms]
 
@@ -52,6 +50,7 @@ class RosettaTranslator(TranslatorBase):
 
 
     def init_mappings(self) -> None:
+        """Registers mappings for Rosetta to/from AmberMD. Most changes relate to Hydrogens."""
         self.register_mapping('ALA', ['HB1', 'HB2', 'HB3', 'H1', 'H2', 'H3'], 
                                 'ALA', ['1HB', '2HB', '3HB', '1H', '2H', '3H'])
         self.register_mapping('ARG', ['HB3', 'HB2', 'HG3', 'HG2', 'HD3', 'HD2', 'HH11', 'HH12', 'HH21', 'HH22', 'H1', 'H2', 'H3'],
