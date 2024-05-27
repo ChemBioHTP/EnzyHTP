@@ -148,10 +148,10 @@ class XTBSinglePointEngine(QMSinglePointEngine):
         start_dir:str = os.getcwd()
         os.chdir(run_info['work_dir'])
 
-#        results = self.parent_interface.env_manager_.run_command(
-#                self.parent_interface.config()['XTB_EXE'],
-#                run_info['args'])
-#
+        results = self.parent_interface.env_manager_.run_command(
+                self.parent_interface.config()['XTB_EXE'],
+                run_info['args'])
+
         os.chdir(start_dir)
 
         lines:List[str] = fs.lines_from_file(run_info['xtb_outfile'])
@@ -221,9 +221,9 @@ class XTBOptimizationEngine(XTBSinglePointEngine, QMOptimizationEngine):
         start_dir:str = os.getcwd()
         os.chdir(run_info['work_dir'])
 
-#        results = self.parent_interface.env_manager_.run_command(
-#                self.parent_interface.config()['XTB_EXE'],
-#                run_info['args'])
+        results = self.parent_interface.env_manager_.run_command(
+                self.parent_interface.config()['XTB_EXE'],
+                run_info['args'])
 
         os.chdir(start_dir)
 
