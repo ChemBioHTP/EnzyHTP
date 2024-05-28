@@ -117,11 +117,36 @@ def update_residues(stru: Structure, ref_stru: Structure) -> Structure:
     ref_res: Residue
     for ref_res in ref_stru.residues:
         self_res = self_res_mapper[ref_res.key()]
+        atype_mapper = dict()
+        if self_res.is_ligand():
+            for aa in self_res.atoms:
+                atype_mapper[aa.name] = aa._atom_type
+
+
         if self_res.name != ref_res.name:
             _LOGGER.info(f"updating {self_res.key()} {self_res.name} to {ref_res.name}")
             self_res.name = ref_res.name
-        
-        self_res.atoms = copy.deepcopy(ref_res.atoms)  # this will also set self_res as parent
+        if not self_res.is_ligand():
+            self_res.atoms = copy.deepcopy(ref_res.atoms)  # this will also set self_res as parent
+        else:
+            print(self_res.atoms[0])    
+            print(ref_res.atoms[0])    
+
+            atom_names = [aa.name for aa in self_res.atoms]
+            for atom in self_res.atoms:
+                for new_atom in ref_res.atoms:
+                    if atom.name == new_atom.name:
+                        atom.coord = new_atom.coord
+#                for new_atom in ref_res.atoms:
+#                    if new_atom.name == aa:
+#                        new_atoms.append( new_atom )
+#                        break
+#            
+#            self_res.atoms = copy.deepcopy( new_atoms )
+#
+#            for aa in self_res.atoms:
+#                aa._atom_type = atype_mapper[aa.name]
+
     stru.renumber_atoms()
     return stru
 

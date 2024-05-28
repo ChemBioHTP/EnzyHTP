@@ -11,5 +11,9 @@ from .sampling import (
     equi_md_sampling,
 )
 
+from .minimize import (
+    minimize
+)
+
 # from .reaction import (
 # )

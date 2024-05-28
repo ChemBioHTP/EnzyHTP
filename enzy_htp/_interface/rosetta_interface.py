@@ -15,7 +15,7 @@ from subprocess import CompletedProcess, SubprocessError
 from plum import dispatch
 from xml.dom import minidom
 import xml.etree.cElementTree as ET
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 from typing import Any, Dict, List, Tuple, Set, Union, Iterable
 from dataclasses import dataclass
 
@@ -265,7 +265,7 @@ class RosettaScriptsProtocol:
     def add_element(self, section:str, element:RosettaScriptsElement) -> None:
         #TODO(CJ): add checks
 
-        if section not in section_names:
+        if section not in self.section_names:
             #TODO(CJ):
             pass
 
@@ -893,25 +893,53 @@ class RosettaInterface(BaseInterface):
                     changed_atoms += 1
         _LOGGER.info(f"Finished renaming! Changed {changed_residues} residues and {changed_atoms} atoms.")
 
-    def run_rosetta_scripts(self, opts: List[str], logfile: str = None) -> None:
-        """Method that runs the rosettascripts executabl along with the supplied options. Optionally outputs
-        the stdout to a specified logfile. Note that no sanitation is performed prior to running.
 
-        Args:
-            opts: a list() of str() to be run by the RosettaScripts executable.
-            logfile: The file to output the stdout log to. Optional.
+    def run_rosetta_scripts(self, stru: Structure, protocol:RosettaScriptsProtocol, opts:RosettaOptions, work_dir:str) -> str:
 
-        Returns:
-            Nothing,
-        """
+        opts_file:str = str(Path(f"{work_dir}/rosetta_options.txt").absolute())
+        xml_file:str = str(Path(f"{work_dir}/rosetta_protocol.xml").absolute())
 
-        if logfile:
-            opts.extend([">", str(logfile)])
+        opts['parser:protocol'] = str(Path(xml_file).absolute())
 
-        self.env_manager_.run_command(self.config_.ROSETTA_SCRIPTS, opts, quiet_fail=True)
+        fname = f"{work_dir}/rosttascripts_start.pdb"
+        parser = PDBParser()
+        parser.save_structure(fname, stru)
 
-        if logfile:
-            _LOGGER.info(f"Saved RosettaScripts log to '{Path(logfile).absolute}'.")
+        opts['in:file:s'] = str(Path(fname).absolute())
+
+        opts.to_file(opts_file)
+        protocol.to_file(xml_file)
+
+        opts['out:file:scorefile'] = f"{work_dir}/score.sc"
+
+        work_dir = Path(opts_file).parent.absolute()
+        start_dir:str = os.getcwd()
+        os.chdir(work_dir)
+        self.env_manager_.run_command(self.config_.ROSETTA_SCRIPTS, [f"@{opts_file}"], quiet_fail=True)
+
+        os.chdir( start_dir )
+
+        return opts['out:file:scorefile'] #TODO(CJ): add some stuff in for this
+
+#    def run_rosetta_scripts(self, opts: List[str], logfile: str = None) -> None:
+#        """Method that runs the rosettascripts executabl along with the supplied options. Optionally outputs
+#        the stdout to a specified logfile. Note that no sanitation is performed prior to running.
+#
+#        Args:
+#            opts: a list() of str() to be run by the RosettaScripts executable.
+#            logfile: The file to output the stdout log to. Optional.
+#
+#        Returns:
+#            Nothing,
+#        """
+#
+#        if logfile:
+#            opts.extend([">", str(logfile)])
+#
+#        self.env_manager_.run_command(self.config_.ROSETTA_SCRIPTS, opts, quiet_fail=True)
+#
+#        if logfile:
+#            _LOGGER.info(f"Saved RosettaScripts log to '{Path(logfile).absolute}'.")
 
     def parse_score_file(self, fname: str) -> pd.DataFrame:
         """Method that parses a score file into a Pandas Dataframe. Only encodes lines that begin with SCORE.
@@ -1091,10 +1119,10 @@ class RosettaInterface(BaseInterface):
 
         return result
 
-    def make_rosetta_scripts_cmd(
-        self, 
-        pdb_path,
-        
+#    def make_rosetta_scripts_cmd(
+#        self, 
+#        pdb_path,
+#        
 
     def relax(
         self,
