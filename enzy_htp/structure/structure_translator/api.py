@@ -20,7 +20,7 @@ from .translator_base import TranslatorBase
 from .rosetta_translator import RosettaTranslator
 
 
-def translate_structure(stru:Structure, start_naming:str=None, end_naming:str=None) -> Union[None, Structure]:
+def translate_structure(stru:Structure, start_naming:str=None, end_naming:str=None) -> None:
     """Translates names of the supplied Structure()'s Residue() and Atom() objects to EnzyHTP standard or 
     a supported naming convention. Exactly one of start_naming or end_naming scheme must be supplied. It is assumed that
     the other, blank parameter is EnzyHTP standard/AmberMD. end_naming should be left blank if a Structure() is to be 
@@ -34,7 +34,7 @@ def translate_structure(stru:Structure, start_naming:str=None, end_naming:str=No
         end_naming:  The ending naming scheme as a str().
 
     Returns:
-        Nothing or a renamed Structure(), depending on usage of inplace. 
+        Nothing.
     """
     
     err_msg = str()
