@@ -1499,4 +1499,8 @@ class RosettaInterface(BaseInterface):
         )
 
     # endregion
- 
+
+    def add_missing_residues(self, 
+        ): #TODOC(J):
+
+        pass

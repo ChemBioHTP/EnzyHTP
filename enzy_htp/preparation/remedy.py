@@ -6,61 +6,74 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-09-22
 """
 import requests
-from typing import List, Union
+from typing import List, Union, Dict, Callable
 
 from enzy_htp.chemical import SeqRes
 
 from enzy_htp.structure import Structure
 
-from enzy_htp import interface
+from enzy_htp import interface, config
+from enzy_htp.core import _LOGGER
+from enzy_htp.core import file_system as fs
 
 def add_missing_residues( stru: Structure, 
                                 missing_residues:List[SeqRes], 
                                 method:str='modeller', 
                                 work_dir:str=None,
-                                ) -> Union[None,Structure]:
+                                **kwargs
+                                ) -> None:
 
 
-    """
+    """Add in real amino acids with 3D coordinates into a supplied Structure() missing known
+    amino acids. This is the main client function that should be called by users. Note that all
+    missing Residue()'s are added to the supplied Structure() in place.
 
     Args:
-        stru:
-        missing_residues:
-        method:
-        work_dir:
-        inplace:
+        stru: The Structure() to which the missing Residue()'s will be added.
+        missing_residues: A List[SeqRes] of missing residues, often created by identify_missing_residues().
+        method: Which package should be used? 
+        work_dir: The directory where the work will take place.
 
     Returns:
-        
+        Nothing.        
     """
+    if not work_dir:
+        work_dir = config['system.SCRATCH_DIR']
+
+    fs.safe_mkdir( work_dir )
 
     if not missing_residues:
-        return #TODO(CJ): check if I need to return a cpy or not 
+        return 
 
     func =  RESIDUE_ADDER_MAPPER.get( method )
 
     if func is None:
-        #TODO(CJ): add the error here about the supplied method not being supported
-        pass
+        err_msg:str = f"The supplied method '{method}' is not a valid way to add missing residues. Allowed methods include: {', '.join(RESIDUE_ADDER_MAPPER.keys())}."
+        _LOGGER.error( err_msg )
+        raise ValueError( err_msg )
 
-    interface.modeller.add_missing_residues( stru, missing_residues, work_dir=work_dir, inplace=inplace)
+    func( stru, missing_residues, work_dir=work_dir, **kwargs )
 
 def identify_missing_residues( code:str ) -> List[SeqRes]:
-    """
+    """Helper function that gets the missing residues for a given PDB code. Requires
+    access to the internet to work. Validation is not directly performed on the code, but will 
+    presumably not work with an inavlid one.
+
     Args:
         code: The 4-letter PDB code to look up.
 
     Returns:
         A List[SeqRes] of the missing residues in the given PDB code.
     """
-
-    #TODO(CJ): add in some checking about the supplkied PDB code. 
-
+    
     url:str=f"https://files.rcsb.org/download/{code}.pdb"
     marker:str='REMARK 465'
     r = requests.get(url)
-    if not r.ok:
-        pass
+    if not (r.text.count('ATOM') + r.text.count("HETATM")):
+        err_msg:str=f"Unable to get PDB Structure for {code}. Check that this is the right code!"
+        _LOGGER.error( err_msg )
+        raise ValueError( err_msg )
+    
     lines:List[str] = map(lambda ll: ll.decode('utf-8'), r.content.splitlines())
     lines:List[str] = list(filter(lambda ll: ll.startswith(marker), lines))
     lines.reverse()

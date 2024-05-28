@@ -682,7 +682,6 @@ class PyMolInterface(BaseInterface):
         elif len(code) == 4:
             url: str = f"{self.config_.STRUCTURE_STEM}/{outfile}"
         else:
-            print(code)
             assert False
 
         self.env_manager_.run_command(self.config_.WGET, [url])
