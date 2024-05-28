@@ -1679,9 +1679,11 @@ class AmberInterface(BaseInterface):
             return target_path
         else:
             _LOGGER.info("found file path exceeding length limit of mdin. reducing it.")
+            # 0. resolve path
+            target_path: Path = Path(target_path)
+            target_path = target_path.resolve()
 
             # 1. relative path
-            target_path: Path = Path(target_path)
             result = target_path.relative_to(Path.cwd())
             if len(str(result)) <= 70:
                 return str(result)
