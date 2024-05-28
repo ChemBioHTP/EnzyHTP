@@ -562,7 +562,7 @@ def _make_child_job(
     cluster = cluster_job_config["cluster"]
     res_keywords = cluster_job_config["res_keywords"]
 
-    cmd = f"python -u {child_main_path} -m {mutant_fname} -p {gpu_partition} -o {child_result_fname} > {child_main_path}.out 2>&1"
+    cmd = f"python -u {child_main_path} -m {mutant_fname} -p {gpu_partition} -o {child_result_fname} > {child_main_path}.grp{grp_id}.out 2>&1"
     enzyhtp_main_env = cluster.ENZYHTP_MAIN_ENV["CPU"]
     final_res_keywords = ARMerConfig.SINGLE_CPU_RES | {
         'job_name' : f'shrapnel_child_{grp_id}',
