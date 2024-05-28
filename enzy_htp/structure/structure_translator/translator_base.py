@@ -54,7 +54,7 @@ class TranslatorBase(ABC):
             s_rname: What is the 3-letter Residue name in AmberMD?
             s_atoms: What are the atom names for the Residue in AmberMD?
             t_rname: What is the 3-letter Residue name in the other naming scheme?
-            s_atoms: What are the atom names for the Residue in the other name scheme?
+            t_atoms: What are the atom names for the Residue in the other name scheme?
 
         Returns:
             Nothing.

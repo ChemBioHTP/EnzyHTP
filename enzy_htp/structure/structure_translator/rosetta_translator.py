@@ -17,7 +17,7 @@ from .translator_base import TranslatorBase
 
 
 class RosettaTranslator(TranslatorBase):
-    """Instantiation of TranslatorBase() for the Rosetta molecular modellig suite. """
+    """Specialization of TranslatorBase() for the Rosetta molecular modellig suite."""
 
     def naming_style(self) -> str:
         """This is the Rosetta naming scheme."""
