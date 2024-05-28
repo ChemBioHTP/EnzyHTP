@@ -92,6 +92,7 @@ export PATH=$PATH:$Multiwfnpath"""
         "partition" : "partition=",
         "mem_per_core" : {"cpu": "mem-per-cpu=", "gpu": "mem="}, # previously using mem-per-gpu= change to mem= (calculate the total memory) base on issue #57
         "walltime" : "time=",
+        "account" : None,
         "clusters" : "clusters=", # TODO this is an example that we may need more conceptual keywords
     }
 
@@ -133,8 +134,8 @@ export PATH=$PATH:$Multiwfnpath"""
         """
         new_dict = {}
         for k, v in res_dict.items():
-            # remove core type line
-            if k == "core_type":
+            # remove unsupported kwords
+            if k == ["core_type", "account"]:
                 continue
             # select core type
             if k in ("node_cores", "mem_per_core"):
