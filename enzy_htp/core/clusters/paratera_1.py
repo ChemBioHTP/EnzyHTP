@@ -56,7 +56,7 @@ source $g16root/g16/bsd/g16.profile"""
     }
 
     MULTIWFN_ENV = {
-        "GPU" : """ulimit -s unlimited
+        "CPU" : """ulimit -s unlimited
 export OMP_STACKSIZE=200M
 export Multiwfnpath=/HOME/scw6d1q/run/Multiwfn_3.8_dev_bin_Linux_noGUI
 export PATH=$PATH:$Multiwfnpath"""
