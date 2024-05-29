@@ -50,7 +50,7 @@ source /data/apps_4090/amber/amber22-install/amber.sh""",
 
     G16_ENV = {
         "CPU":"""alias g16='/HOME/scw6d1q/run/g16/g16'
-export g16root=/HOME/scw6d1q/run/g16
+export g16root=/HOME/scw6d1q/run
 export GAUSS_SCRDIR=/HOME/scw6d1q/run/tmp
 source $g16root/g16/bsd/g16.profile"""
     }
