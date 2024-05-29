@@ -135,7 +135,7 @@ export PATH=$PATH:$Multiwfnpath"""
         new_dict = {}
         for k, v in res_dict.items():
             # remove unsupported kwords
-            if k == ["core_type", "account"]:
+            if k in ["core_type", "account"]:
                 continue
             # select core type
             if k in ("node_cores", "mem_per_core"):
@@ -161,7 +161,6 @@ export PATH=$PATH:$Multiwfnpath"""
         for k, v in parsered_res_dict.items():
             res_line = f"#SBATCH --{k}{v}\n"
             res_str += res_line
-        # res_str += "#SBATCH --clusters=swarm"
         return res_str
     
     @classmethod
