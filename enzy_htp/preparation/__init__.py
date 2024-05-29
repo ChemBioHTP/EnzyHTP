@@ -12,3 +12,4 @@ from .protonate import protonate_stru
 from .clean import remove_solvent, remove_hydrogens
 from .reactive_docking import dock_reactants
 from .seed_ligand import seed_ligand
+from .remedy import add_missing_residues, identify_missing_residues

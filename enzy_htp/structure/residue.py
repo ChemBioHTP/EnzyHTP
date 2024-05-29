@@ -11,7 +11,6 @@ import sys
 import math
 from typing import Tuple, List, Union
 
-
 import numpy as np
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
 from enzy_htp.core import _LOGGER
@@ -401,6 +400,18 @@ class Residue(DoubleLinkedNode):
             aa.coord = updated
 
     #endregion
+
+    def create_seq_res(self) -> chem.SeqRes:
+        """TODO(CJ): finish documentation"""
+
+        return chem.SeqRes(
+            model=1,
+            chain=self.parent.name,
+            idx=self.idx,
+            seq_idx=None,
+            name=self.name,
+            missing=False
+        )
 
     #region === Special ===
     def __str__(self) -> str:
