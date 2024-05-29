@@ -18,11 +18,10 @@ from enzy_htp.core import file_system as fs
 
 def add_missing_residues( stru: Structure, 
                                 missing_residues:List[SeqRes], 
-                                method:str='modeller', 
+                                method:str, 
                                 work_dir:str=None,
                                 **kwargs
                                 ) -> None:
-
 
     """Add in real amino acids with 3D coordinates into a supplied Structure() missing known
     amino acids. This is the main client function that should be called by users. Note that all
@@ -45,7 +44,7 @@ def add_missing_residues( stru: Structure,
     if not missing_residues:
         return 
 
-    func =  RESIDUE_ADDER_MAPPER.get( method )
+    func = RESIDUE_ADDER_MAPPER.get( method )
 
     if func is None:
         err_msg:str = f"The supplied method '{method}' is not a valid way to add missing residues. Allowed methods include: {', '.join(RESIDUE_ADDER_MAPPER.keys())}."

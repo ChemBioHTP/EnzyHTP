@@ -26,6 +26,7 @@ from enzy_htp import config as eh_config
 from enzy_htp.mutation_class.mutation import Mutation
 from enzy_htp.structure import Structure, PDBParser, Mol2Parser, Ligand
 from enzy_htp.structure.structure_operation import remove_non_peptide
+from enzy_htp.structure import translate_structure
 from enzy_htp.structure.structure_constraint import StructureConstraint, ResiduePairConstraint
 from enzy_htp._config.rosetta_config import RosettaConfig, default_rosetta_config
 from enzy_htp.core import _LOGGER
@@ -496,8 +497,7 @@ class RosettaInterface(BaseInterface):
         the stdout to a specified logfile. Note that no sanitation is performed prior to running.
 
         Args:
-            opts: a list() of str() to be run by the RosettaScripts executable.
-            logfile: The file to output the stdout log to. Optional.
+            opts: a list() of str() to be run by the RosettaScripts executable.  logfile: The file to output the stdout log to. Optional.
 
         Returns:
             Nothing,
@@ -1501,6 +1501,127 @@ class RosettaInterface(BaseInterface):
     # endregion
 
     def add_missing_residues(self, 
-        ): #TODOC(J):
+            stru: Structure,
+            missing_residues:List[SeqRes],
+            work_dir:str=None,
+            **kwargs
+        ) -> None: 
+        """Uses the LoopRemodel mover to add missing loop residues to a Structure(). All work is done 
+        to the Structure() in place.
 
-        pass
+        Args:
+            stru: The Structure() with missing loop Residue()'s.
+            missing_residues: The List[SeqRes] of missing Residues.
+            work_dir: The directory where work will take place. Optional.
+
+        Returns:
+            Nothing.
+        """
+        
+        fs.safe_mkdir( work_dir )
+
+        translate_structure( stru, end_naming='rosetta' )
+        
+        nc_chains = list()
+        aa_chains = list()
+
+        for chain in stru.chains:
+            if not len(chain.residues):
+                continue
+            
+            if chain.residues[0].is_canonical():
+                aa_chains.append( chain )
+            else:
+                nc_chains.append( chain )
+
+        aa_stru = Structure( aa_chains )
+
+        existing = list()
+        for rr in aa_stru.residues: 
+            if not rr.is_canonical(): 
+                continue
+            existing.append( rr.create_seq_res() )        
+        
+        seq_res = missing_residues + existing
+        seq_res.sort()
+        
+        existing = 1
+        content = list()
+        
+        for sidx, sr in enumerate(seq_res):
+        
+            if sr.missing:
+                line = f"0 X L PIKAA {sr.one_letter()}"
+            else:
+                borders_loop:bool = (
+                    sidx > 0 and seq_res[sidx-1].missing 
+                ) or (
+                    sidx < len(seq_res) - 1 and seq_res[sidx+1].missing                
+                )
+                if borders_loop:
+                    line = f"{existing} {sr.one_letter()} L PIKAA {sr.one_letter()}"
+                else:
+                    line = f"{existing} {sr.one_letter()} ."
+                existing += 1
+            
+            content.append(line)
+        
+        remodel_file:str = f"{work_dir}/input.remodel"
+        fs.write_lines( remodel_file, content ) 
+        lines=f"""<ROSETTASCRIPTS>
+<SCOREFXNS>
+</SCOREFXNS>
+<RESIDUE_SELECTORS>
+</RESIDUE_SELECTORS>
+<PACKER_PALETTES>
+</PACKER_PALETTES>
+<TASKOPERATIONS>
+</TASKOPERATIONS>
+<MOVE_MAP_FACTORIES>
+</MOVE_MAP_FACTORIES>
+<SIMPLE_METRICS>
+</SIMPLE_METRICS>
+<FILTERS>
+</FILTERS>
+<MOVERS>
+    <RemodelMover name="rm" blueprint="{remodel_file}" />
+</MOVERS>
+<PROTOCOLS>
+    <Add mover_name="rm" />
+</PROTOCOLS>
+<OUTPUT />
+</ROSETTASCRIPTS>""".splitlines()
+        script_file:str=f"{work_dir}/remodel_script.xml"
+        pdb_file = f"{work_dir}/remodel_input.pdb"
+        pdb_outfile = f"{work_dir}/remodel_input_0001.pdb"
+        
+        fs.write_lines( script_file, lines )
+        
+        opts:List[str] = ["-in:file:s", pdb_file,
+                "-parser:protocol", script_file,
+                "-remodel:quick_and_dirty",
+                "-remodel:num_trajectory", "1",
+                "-out:path:all", f"{work_dir}",
+                "-overwrite"]
+        
+        parser = PDBParser() 
+        parser.save_structure( pdb_file, aa_stru )
+        self.run_rosetta_scripts( opts )
+        
+        if not Path(pdb_outfile).exists():
+            err_msg:str=f"The output file '{pdb_outfile}' was not created. Error during loop reconstruction."
+            _LOGGER.error( err_msg )
+            raise ValueError( err_msg )
+        
+        filled_stru = parser.get_structure(pdb_outfile)
+        
+        for sr, res in zip(seq_res, filter(lambda rr: rr.is_canonical(), filled_stru.residues)):
+            res.idx = sr.idx
+            res.parent.name = sr.chain 
+        
+        for r1, r2 in zip(aa_stru.residues, filled_stru.residues):
+            r2.parent.name = r1.parent.name
+        
+        filled_stru.chains = filled_stru.chains + nc_chains
+        translate_structure(filled_stru, start_naming='rosetta' )
+        stru.chains = filled_stru.chains
