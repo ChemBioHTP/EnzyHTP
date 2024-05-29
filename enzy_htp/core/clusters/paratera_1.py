@@ -142,6 +142,10 @@ export PATH=$PATH:$Multiwfnpath"""
                 new_k = cls.RES_KEYWORDS_MAP[k][res_dict["core_type"]]
             else:
                 new_k = cls.RES_KEYWORDS_MAP[k]
+            # NC-N40 do not allow mem keywords when using GPU
+            if res_dict["core_type"] == "gpu":
+                if k in ["mem_per_core"]:
+                    continue
             new_dict[new_k] = v
         # process total mem
         for k in new_dict:
