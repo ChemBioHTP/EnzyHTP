@@ -54,11 +54,10 @@ class RosettaOptions:
         self.data_ = dict()
         self.script_vars_ = dict()
 
-
     def convert_script_vars_(self) -> None:
         """Private method which converts the script variables to a 'parser:script_vars' variable."""
 
-        if not self.script_vars_:
+        if not self.script_vars:
             return
 
         result = str()
@@ -168,8 +167,8 @@ class RosettaOptions:
             The name of the written options filepath.
         """
         self.convert_script_vars_()
-        depth = 0
-        lines = list()
+        depth:int = 0
+        lines:List[str] = list()
         self.traverse_options_(self.data_, lines, depth)
         fs.write_lines(fname, lines)
         return fname
@@ -198,6 +197,9 @@ class RosettaOptions:
                     lines.append(f"{insert}-{key_name} {self.convert_value_(value)}")
 
 class RosettaScriptsElement:
+    """Represents a single Tag or element in a RosettaScripts. Each instance has a "tag" value 
+    and essentially serves as dict() with attrib-value pairs, as well as 
+    """
 
     def __init__(self, tag:str, **kwargs):
 

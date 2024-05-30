@@ -35,7 +35,7 @@ def dock_reactants(structure: Structure,
                    contact_threshold:float=3.0,
                    box_size:float=50.0,
                    move_distance:float=40.0,
-                   transform_angle=360,
+                   transform_angle:float=360,
                    transform_cycles:int=1000,
                    transform_repeats:int=3,
                    transform_temperature:int=5,
@@ -136,32 +136,19 @@ def dock_reactants(structure: Structure,
 
     sp = PDBParser()
 
-    sp.save_structure("s1.pdb", structure)
-
     mm_minimization(structure, constraints, param_files, contact_threshold, False, fr_repeats, rng_seed, f"{work_dir}/rosetta_minimization/")
-
-
-    sp.save_structure("s2.pdb", structure)
 
     if use_qm:
         qm_minimization(structure, constraints, cluster_distance, False, work_dir)
 
 
-    sp.save_structure("s3.pdb", structure)
-
-
     mm_minimization(structure, constraints, param_files, contact_threshold, True, fr_repeats, rng_seed, f"{work_dir}/rosetta_minimization/")
 
-
-    sp.save_structure("s4.pdb", structure)
 
     if use_qm:
         qm_minimization(structure, [], cluster_distance, True, work_dir)
 
     translate_structure(structure, start_naming='rosetta')
-
-    sp.save_structure("s5.pdb", structure)
-
 
     if not save_work_dir:
         _LOGGER.info(f"save_work_dir set to False! Deleting {work_dir}")
@@ -175,7 +162,9 @@ def mm_minimization(structure:Structure,
                 ramp_constraints:bool,
                 fr_repeats:int,
                 rng_seed:int,
-                work_dir:str):
+                work_dir:str) -> None:
+    """
+    """
 
     fs.safe_mkdir(work_dir)
     xml_script:str = create_minimization_xml(work_dir)
@@ -238,27 +227,27 @@ def mm_minimization(structure:Structure,
     for cst in constraints:
         cst.change_topology(structure)
 
-def dock_ligand(structure,
-                    ligand,
-                    constraints,
-                    param_files,
-                    n_struct,
-                    clash_cutoff,
-                    max_sasa_ratio,
-                    cst_energy,
-                    cluster_distance,
-                    contact_threshold,
-                    box_size,
-                    move_distance,
-                    transform_angle,
-                    transform_cycles,
-                    transform_repeats,
-                    transform_temperature,
-                    fr_repeats,
-                    grid_width,
-                    use_qm,
-                    rng_seed,
-                    work_dir) -> None:
+def dock_ligand(structure:Structure,
+                    ligand:Ligand,
+                    constraints:List[StructureConstraint],
+                    param_files:List[str],
+                    n_struct:int,
+                    clash_cutoff:float,
+                    max_sasa_ratio:float,
+                    cst_energy:float,
+                    cluster_distance:float,
+                    contact_threshold:float,
+                    box_size:float,
+                    move_distance:float,
+                    transform_angle:float,
+                    transform_cycles:int,
+                    transform_repeats:int,
+                    transform_temperature:float,
+                    fr_repeats:int,
+                    grid_width:float,
+                    use_qm:bool,
+                    rng_seed:int,
+                    work_dir:str) -> None:
 
 
     fs.safe_mkdir(work_dir)
