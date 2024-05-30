@@ -1,3 +1,10 @@
+"""Defines ModellerConfig() which holds configuration settings for enzy_htp to interface with the
+Modeller modelling suite. In addition to holding Modeller. File also contains default_rosetta_config()
+which creates a default version of the ModellerConfig() object.
+
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Date: 2024-05-30
+"""
 from typing import List, Any
 
 from copy import deepcopy

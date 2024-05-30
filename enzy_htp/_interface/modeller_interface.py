@@ -1,4 +1,11 @@
-#TODO(CJ): documentation
+"""Defines a ModellerInterface class that serves as a bride for enzy_htp to utilize the Modeller software package.
+Uses the ModellerConfig class found in enzy_htp/_config/modeller_config.py Supported operations include:
+
+    + filling missing loop Residue()'s in a Structure()
+
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Date: 2024-05-30
+"""
 import os
 from typing import List
 
@@ -7,6 +14,7 @@ from pathlib import Path
 from .base_interface import BaseInterface
 
 from enzy_htp import config
+from enzy_htp.chemical import SeqRes
 
 from enzy_htp.core import file_system as fs
 
@@ -18,6 +26,7 @@ except:
     pass
 
 from enzy_htp.structure import (
+    Chain,
     Structure,
     Residue,
     PDBParser
@@ -25,7 +34,15 @@ from enzy_htp.structure import (
 
 
 class ModellerInterface(BaseInterface):
+    """Class that provides a direct interface for enzy_htp to utilize Modeller. Supported operations
+    include adding missing Residue()'s Users should use this class as the only way to interact with this
+    Application.
 
+    Attributes:
+        config_ : The ModellerConfig() class which provides settings for both running Modeller and maintaining a compatible environment.
+        env_manager_ : The EnvironmentManager() class which ensures all required environment elements exist.
+        compatible_env_ : A bool() indicating if the current environment is comptaible with the object itself.
+    """
 
     def __init__(self, parent, config: ModellerConfig = None) -> None:
         """Simplistic constructor that optionally takes an AlphaFillConfig object as its only argument.
@@ -37,8 +54,11 @@ class ModellerInterface(BaseInterface):
 
     def add_missing_residues(self,
                             stru:Structure,
-                            missing_residues,
-                            work_dir:str=None) -> None:
+                            missing_residues:List[SeqRes],
+                            work_dir:str=None,
+                            **kwargs) -> None:
+        """Given a 
+        """
 
         if work_dir is None:
             work_dir = config['system.SCRATCH_DIR']
@@ -174,6 +194,3 @@ class ModellerInterface(BaseInterface):
         for chain in stru.chains:
             chain.sort_residues()
 
-
-        if not inplace:
-            return stru
