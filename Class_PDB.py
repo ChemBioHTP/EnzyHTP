@@ -1019,7 +1019,8 @@ class PDB():
         ** THIS FUNCTION IS IMPORTED FROM FUTURE ENZYHTP **
         '''
         from enzy_htp import PDBParser
-        from enzy_htp.mutation import mutate_stru, get_mutant_name_tag
+        from enzy_htp.mutation import mutate_stru
+        from enzy_htp.mutation_class import get_mutant_name_tag
         sp = PDBParser()
         stru = sp.get_structure(self.path)
         mutant_stru = mutate_stru(
