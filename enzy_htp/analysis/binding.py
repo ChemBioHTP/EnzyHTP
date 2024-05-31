@@ -84,100 +84,21 @@ def binding_energy(
         - AI based method
             (under development)"""
 
-    # # get engine
-    # ddg_fold_engine = DDG_FOLD_ENGINE[method](
-    #     cluster_job_config = cluster_job_config,
-    #     work_dir = work_dir,
-    #     keep_in_file = keep_in_file,
-    #     **kwargs
-    # )
+    if not (isinstance(stru, Structure) or isinstance(stru, StructureEnsemble)):
+        _LOGGER.error(f"stru can only be an Structure() or StructureEnsemble(). found: {stru}")
+        raise TypeError
+    if method not in BINDING_ENERGY_METHODS:
+        _LOGGER.error(f"method ({method}) not supported. Supported: {BINDING_ENERGY_METHODS.keys()}")
+        raise ValueError
 
-    # # parallel methods
-    # if parallel_method == "cluster_job":
-    #     if not cluster_job_config:
-    #         _LOGGER.error("cluster_job is used but cluster_job_config is not given! "
-    #                     "You need to at least specify the account and partition. "
-    #                     "See test/geometry/test_sampling.py::test_equi_md_sampling_lv1() for an example.")
-    #         raise ValueError
-    #     result = _parallelize_ddg_fold_with_cluster_job(
-    #         stru, mutant_space, ddg_fold_engine,
-    #         job_check_period,
-    #         job_array_size,
-    #         action_on_wt_at_start = action_on_wt_at_start,
-    #     )
-    # elif parallel_method is None:
-    #     result = _serial_ddg_fold(
-    #         stru, mutant_space, ddg_fold_engine,
-    #         action_on_wt_at_start = action_on_wt_at_start,
-    #     )
-    # else:
-    #     _LOGGER.error(f"{parallel_method} is not a supported parallel_method")
-    #     raise ValueError        
+    result = BINDING_ENERGY_METHODS[method](
+        stru, ligand, work_dir, keep_in_file,
+        cluster_job_config = cluster_job_config, 
+        job_check_period = job_check_period,
+        **kwargs)
 
     return result
 
-# def _parallelize_ddg_fold_with_cluster_job(
-#         stru: Structure,
-#         mutant_space: List[List[Mutation]],
-#         engine: ddGFoldEngine,
-#         job_check_period: int,
-#         array_size: int,
-#         action_on_wt_at_start: bool,
-#         ) -> Dict[Tuple[Mutation], float]:
-#     """The parallelization method: cluster_job.
-#     This method will utilize ARMer@EnzyHTP and make each calculation a ClusterJob and
-#     parallalize them in a job array"""
-#     result = {}
-#     job_list = []
-#     result_eggs = []
-#     # 0. action on WT
-#     if action_on_wt_at_start:
-#         stru = engine.action_on_wt(stru)
-
-#     # 1. prep jobs
-#     for mutant in mutant_space:
-#         if is_mutant_wt(mutant): # treatment on WT
-#             result[tuple(mutant)] = 0.0
-#             continue
-#         job, egg = engine.make_job(stru, mutant)
-#         job_list.append(job)
-#         result_eggs.append((mutant, egg))
-    
-#     # 2. wait to end
-#     ClusterJob.wait_to_array_end(
-#         job_list,
-#         period=job_check_period,
-#         array_size=array_size,
-#     )
-    
-#     # 3. translate eggs
-#     for mutant, egg in result_eggs:
-#         result[tuple(mutant)] = engine.translate(egg)
-
-#     return result
-
-
-# def _serial_ddg_fold(
-#         stru: Structure,
-#         mutant_space: List[List[Mutation]],
-#         engine: ddGFoldEngine,
-#         action_on_wt_at_start: bool,
-#         ) -> Dict[Tuple[Mutation], float]:
-#     """The serial running method
-#     This method runs calculations in a serial manner locally."""
-#     result = []
-#     # 0. action on WT
-#     if action_on_wt_at_start:
-#         stru = engine.action_on_wt(stru)
-
-#     # 1. run jobs
-#     for mutant in mutant_space:
-#         output = engine.run(stru, mutant)
-#         result[tuple(mutant)] = output
-    
-#     return result
-
-
-BINDING_ENERGY_ENGINE: Dict[str, Callable] = {
+BINDING_ENERGY_METHODS: Dict[str, Callable] = {
     "mmpbgbsa_amber" : interface.amber.get_mmpbgbsa_energy,
 }
