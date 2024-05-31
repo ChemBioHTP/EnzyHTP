@@ -1202,6 +1202,13 @@ class AmberInterface(BaseInterface):
         # clean up temp file if success
         fs.clean_temp_file_n_dir(temp_path_list)
 
+    # -- MMPBSA.py --
+    def run_mmpbsa():
+        """the python wrapper for running MMPBSA.py.MPI and MMPBSA.py (not supported yet)"""
+
+    def run_ante_mmpbsa():
+        """the python wrapper for running ante-MMPBSA.py"""
+
     # -- index mapping --
     def get_amber_index_mapper(self, stru: Structure) -> Dict[str, Dict[Union[Residue, Atom], Union[int, tuple]]]:
         """get a mapper for objects in {stru} and in Amberilzed PDB of stru
@@ -1569,6 +1576,7 @@ class AmberInterface(BaseInterface):
         }
 
         return raw_dict
+
     def _parse_cons_to_raw_rs_dict(self, cons: StructureConstraint) -> Dict:
         """parse StructureConstraint() to a raw dict for writing the DISANG file.
         Expression containing value are also parsed in this function.
@@ -1714,7 +1722,6 @@ class AmberInterface(BaseInterface):
             _LOGGER.warning(f"4nd attempt failed. making {result} for {target_path}.")
             Path(result).symlink_to(target_path)
             return result
-
 
     def read_from_mdout(self, mdout_file_path: str) -> Dict:
         """the knowledge of the mdout format as the log of sander/pmemd.
@@ -2266,6 +2273,149 @@ class AmberInterface(BaseInterface):
 
         return result
 
+    # -- MMPB/GBSA --
+    def get_mmpbgbsa_energy(
+        self,
+        # Input Data
+        stru_esm: StructureEnsemble,
+        ligand: StruSelection,
+        # Config
+        cluster_job_config: Dict= None,
+        job_check_period: int= 30, # s
+        work_dir: str="./binding",
+        keep_in_file: bool=False,
+        # method specifics
+        solvent_mask: str = ":WAT,Na+,Cl-",
+        solvent_model: str = "pbsa",
+        igb: int = 5,
+        use_sander: bool = True,
+        ion_strength: float = 0.15,
+        fillratio: float = 4.0,
+        ) -> List[float]:
+        """Function that calculate the MMPB/GBSA energy for a given structure/structure ensemble with
+        a selection pattern for the ligand.
+        
+        Args:
+            stru, ligand, cluster_job_config, job_check_period, work_dir, keep_in_file:
+                see the docstring of `enzy_htp.analysis.binding.binding_energy`
+            solvent_mask:
+                the Amber mask for solvent in the structure ensemble
+            solvent_model:
+                the model for the implicit solvation. (default: pbsa)
+                Supported keywords: [pbsa, gbsa]
+            igb:
+                the GB model to use. (default: 5 ; when solvent_model="gbsa")
+                Supported value: (based on https://ambermd.org/Manuals.php)
+                    0               No generalized Born term
+                    1,2,5,6,7,8     Different GB models/parameters
+                    3,4             Unused
+                    10              numerical Poisson-Boltzmann (NOT generalized Born)
+            use_sander:
+                force using sander to calculate the energy
+            ion_strength:
+                the ion strength of the model in Molarity.
+                Used as "saltcon" for gb and "istrng" for pb.
+            fillratio:
+                the fill ratio for PB
+        
+        Returns:
+            the MMPB/GBSA energies as a list"""
+        
+        # resolve ligand mask
+        ligand_mask = self.get_amber_mask(ligand, reduce=True)
+
+        # make MMPBSA .prmtop files
+        temp_dr_prmtop = fs.get_valid_temp_name(f"{work_dir}/temp_dr.prmtop")
+        temp_dl_prmtop = fs.get_valid_temp_name(f"{work_dir}/temp_dl.prmtop")
+        temp_dc_prmtop = fs.get_valid_temp_name(f"{work_dir}/temp_dc.prmtop")
+        temp_sc_prmtop = fs.get_valid_temp_name(f"{work_dir}/temp_sc.prmtop")
+
+        self.make_mmpbgbsa_prmtop_files(
+            stru_esm = stru_esm,
+            ligand_mask = ligand_mask,
+            solvent_mask = solvent_mask,
+            igb = igb,
+            temp_dr_prmtop = temp_dr_prmtop,
+            temp_dl_prmtop = temp_dl_prmtop,
+            temp_dc_prmtop = temp_dc_prmtop,
+            temp_sc_prmtop = temp_sc_prmtop,
+        )
+
+        # make .nc file
+        temp_nc = fs.get_valid_temp_name(f"{work_dir}/temp_mmpbsa.nc")
+        self.make_mmpbgbsa_nc_file(stru_esm, temp_nc)
+
+        # execute
+        mmpbsa_result_file = fs.get_valid_temp_name(f"{work_dir}/mmpbsa.dat")
+        self.run_mmpbsa(
+            dr_prmtop = temp_dr_prmtop,
+            dl_prmtop = temp_dl_prmtop,
+            dc_prmtop = temp_dc_prmtop,
+            sc_prmtop = temp_sc_prmtop,
+            traj_file = temp_nc,
+            out_path = mmpbsa_result_file,
+            keep_in_file = keep_in_file,
+            cluster_job_config = cluster_job_config,
+            job_check_period = job_check_period,
+            igb = igb,
+            use_sander = use_sander,
+            ion_strength = ion_strength,
+            fillratio = fillratio,
+            verbose = "TODO: figure out how this be set",
+        )
+
+        # extract output
+        result = self.parse_mmpbsa_result(mmpbsa_result_file)
+
+        # clean up
+        fs.clean_temp_file_n_dir([
+            temp_dr_prmtop,
+            temp_dl_prmtop,
+            temp_dc_prmtop,
+            temp_sc_prmtop,
+            temp_nc,
+        ])
+
+        return result
+
+    def make_mmpbgbsa_prmtop_files(
+        self,
+        stru_esm: StructureEnsemble,
+        ligand_mask: str,
+        solvent_mask: str,
+        igb: int,
+        temp_dr_prmtop: str,
+        temp_dl_prmtop: str,
+        temp_dc_prmtop: str,
+        temp_sc_prmtop: str,
+        ) -> None:
+        """make the prmtop files needed by the MMPB/GBSA calculation and
+        generate them in temp_dr_prmtop, temp_dl_prmtop, temp_dc_prmtop, temp_sc_prmtop"""
+        # radii = radii_map[str(igb)]
+        # dr_prmtop = f"{temp_dir}dr.prmtop"
+        # dl_prmtop = f"{temp_dir}dl.prmtop"
+        # dc_prmtop = f"{temp_dir}dc.prmtop"
+        self.run_ante_mmpbsa()
+        # ante_cmd = f'ante-MMPBSA.py -p {self.prmtop_path} --radii {radii} -s ":WAT,Na+,Cl-" -c {dc_prmtop} -n "{ligand_mask}" -l {dl_prmtop} -r {dr_prmtop}'
+        # try:
+        #     run(ante_cmd, check=0, text=True, shell=True, capture_output=True)
+        # except CalledProcessError as err:
+        #     print(err.stdout, err.stderr)
+        #     raise err
+        # sc_prmtop = type(self).update_radii(
+        #     self.prmtop_path,
+        #     out_path=f'{temp_dir}sc.prmtop', igb=igb)
+        # return dr_prmtop, dl_prmtop, dc_prmtop, sc_prmtop
+
+    def make_mmpbgbsa_nc_file(
+        self,
+        stru_esm: StructureEnsemble,
+        temp_nc: str,    
+        ) -> None:
+        """make the nc file for the MMPB/GBSA calculation.
+        Generate the file in {temp_nc}"""
+
+        self.convert_traj_to_nc()
 
 amber_interface = AmberInterface(None, eh_config._amber)
 """The singleton of AmberInterface() that handles all Amber related operations in EnzyHTP
