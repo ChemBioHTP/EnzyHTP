@@ -2266,47 +2266,6 @@ class AmberInterface(BaseInterface):
 
         return result
 
-    # region == TODO ==
-    def add_charges(self, stru: Structure, prmtop: str) -> None:
-        """Method that adds RESP charges from a .prmtop file to the supplied Structure object. If the supplied prmtop
-        file does not line up with the structure, an error is thrown. Performs operation in place.
-        Will also throw an error if some of the resulting atoms do not get assigned charges.
-
-        Args:
-            stru: The Structure object that charges will be added to.
-            prmtop: The str() path of an Amber paramter file.
-
-        Returns:
-            Nothing.
-        """
-        p_dict = self.parse_prmtop(prmtop)
-
-        charges: List[float] = p_dict['CHARGE']
-        anames: List[str] = p_dict['ATOM_NAME']
-        res_pointers: List[int] = p_dict['RESIDUE_POINTER']
-        res_names: List[int] = p_dict['RESIDUE_LABEL']
-
-        temp = []
-        for (ridx, rp), rn in zip(enumerate(res_pointers[:-1]), res_names):
-            temp.extend([rn] * (res_pointers[ridx + 1] - rp))
-
-        temp.extend((len(anames) - len(temp)) * [rn[-1]])
-        res_names = temp
-
-        for c, an, rn, aa in zip(charges, anames, res_names, stru.atoms):
-
-            if not (an == aa.name and aa.residue.name == rn):
-                _LOGGER.error(f"There is a mismatch in the atoms. Make sure the supplied prmtop file is correct. Exiting..")
-                exit(1)
-            aa.charge = c
-
-        if not stru.has_charges():
-            _LOGGER.error("Not all atoms in the supplied structure were assigned charges. Exiting...")
-            exit(1)
-            pass
-
-    # endregion == TODO ==
-
 
 amber_interface = AmberInterface(None, eh_config._amber)
 """The singleton of AmberInterface() that handles all Amber related operations in EnzyHTP
