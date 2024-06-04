@@ -194,7 +194,7 @@ class EnvironmentManager:
             _LOGGER.warning(f"    Please add it to corresponding config.required_executables if this is a long-term use")
 
         # run the command
-        _LOGGER.log(log_level, f"Running command: `{cmd}`...") # TODO may provide an option for higher level
+        _LOGGER.log(log_level, f"Running command: `{cmd}` from `{os.getcwd()}.") # TODO may provide an option for higher level
         for i in range(try_time):
             try:
                 this_run = run(cmd, timeout=timeout, check=True, text=True, shell=True, capture_output=True)

@@ -23,54 +23,40 @@ from enzy_htp._interface.handle_types import (
     MolDynResult)
 
 def equi_md_sampling(stru: Structure,
-                     param_method: MolDynParameterizer, # TODO support using engine + kwarg to specify
-                     parallel_runs: int= 3,
-                     parallel_method: str= "cluster_job", # TODO prepare_only for just export files and cmd
-                     work_dir: str="./MD",
-                     # config for steps
-                     prod_time: float= 50.0, # ns
-                     prod_temperature: float = 300.0, #K
-                     prod_constrain: List[stru_cons.StructureConstraint]= None,
-                     record_period: float= 0.5, # ns
-                     cluster_job_config: Dict= None,
-                     cpu_equi_step: bool= False,
-                     cpu_equi_job_config: Dict= None,
-                     job_check_period: int=210, # s
-                     ) -> List[StructureEnsemble]:
+        param_method: MolDynParameterizer, # TODO support using engine + kwarg to specify
+        parallel_runs: int= 3,
+        parallel_method: str= "cluster_job", # TODO prepare_only for just export files and cmd
+        work_dir: str="./MD",
+        # config for steps
+        prod_time: float= 50.0, # ns
+        prod_temperature: float = 300.0, #K
+        prod_constrain: List[stru_cons.StructureConstraint]= None,
+        record_period: float= 0.5, # ns
+        cluster_job_config: Dict= None,
+        cpu_equi_step: bool= False,
+        cpu_job_config: Dict= None,
+        job_check_period: int=210, # s
+    ) -> List[StructureEnsemble]:
     """This science API performs a production run of molecular dynamics simulation with the
     system equilibrated by several short md simulations from the starting {stru}
     (Basically md_simulation() with preset steps)
     min (micro) -> heat (NVT) -> equi (NPT) -> prod (NPT)
     Args:
-        stru: 
-            the starting structure
-        param_method: 
-            the Parameterizer() used for parameterization. This determines the engine.
-        parallel_runs: 
-            the number of desired parallel runs of the steps.
-        parallel_method: 
-            the method to parallelize the multiple runs
-        work_dir: 
-            the directory that contains all the MD files input/intermediate/output
-        prod_time: 
-            the simulation time in production step (unit: ns)
-        prod_temperature: 
-            the production temperature
-        prod_constrain: 
-            the constrain applied in the production step
-        record_period: 
-            the simulation time period for recording the geom. (unit: ns)
-        cluster_job_config: 
-            the config for cluster_job if it is used as the parallel method.
-        cpu_equi_step: 
-            whether use cpu for equi step
-        cpu_equi_job_config: 
-            the job config for the cpu equi step if specified
-        job_check_period:
-            the check period for wait_to_2d_array_end. Used when parallel_method='cluster_job'.
-            (Unit: s, default: 210s)
+        stru (Structure): The starting structure
+        param_method: The Parameterizer() used for parameterization. This determines the engine.
+        parallel_runs: The number of desired parallel runs of the steps.
+        parallel_method: The method to parallelize the multiple runs
+        work_dir: The directory that contains all the MD files input/intermediate/output
+        prod_time: The simulation time in production step (unit: ns)
+        prod_temperature: The production temperature
+        prod_constrain: The constrain applied in the production step
+        record_period: The simulation time period for recording the geom. (unit: ns)
+        cluster_job_config: The config for cluster_job if it is used as the parallel method.
+        cpu_equi_step: Whether use cpu for equi step
+        cpu_job_config: The job config for the cpu equi step if specified
+        job_check_period: The check period for wait_to_2d_array_end. Used when parallel_method='cluster_job'. (Unit: s, default: 210s)
     Returns:
-        a list trajectories for each replica in StructureEnsemble format."""
+        A list trajectories for each replica in StructureEnsemble format."""
     result = []
     # san check
     if parallel_method == "cluster_job":
@@ -98,8 +84,8 @@ def equi_md_sampling(stru: Structure,
     equi_job_config = cluster_job_config
     if cpu_equi_step:
         equi_core = "cpu"
-        equi_job_config = cpu_equi_job_config
-        if not cpu_equi_job_config:
+        equi_job_config = cpu_job_config
+        if not cpu_job_config:
             _LOGGER.error("cpu_equi_step is used but cpu_equi_job_config is not given! "
                           "You need to at least specify the account and partition. ")
             raise ValueError
@@ -116,8 +102,8 @@ def equi_md_sampling(stru: Structure,
     heat_step = parent_interface.build_md_step(
         name="heat_nvt",
         length=0.05, # ns
-        cluster_job_config=cluster_job_config,
-        core_type="gpu",
+        cluster_job_config=cpu_job_config,
+        core_type="cpu",
         temperature=[(0, 0), (0.05*0.9, prod_temperature), (-1, prod_temperature)],
         constrain=[freeze_backbone] + prod_constrain)
 
