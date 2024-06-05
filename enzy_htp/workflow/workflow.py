@@ -447,7 +447,7 @@ class WorkFlow(ExecutionEntity):
         Returns:
             An instance of WorkFlow.
         """
-        flow = cls(working_directory, debug, locator, intermediate_data_mapper, inherited_data_mapper, control_workunit, sqlite_filepath)
+        flow = __class__(working_directory, debug, locator, intermediate_data_mapper, inherited_data_mapper, control_workunit, sqlite_filepath)
         flow.status = StatusCode.INITIALIZING
         if (unit_dict_list == None):
             no_workunit_err_msg = "Initializing WorkFlow with no workunits. Workunits are expected."
@@ -465,8 +465,8 @@ class WorkFlow(ExecutionEntity):
             flow.status = StatusCode.READY_TO_START
         return flow
     
-    @classmethod
-    def from_json_string(cls, json_str: str, working_directory: str = BASE_DIRECTORY, debug: bool = False) -> WorkFlow:
+    @staticmethod
+    def from_json_string(json_str: str, working_directory: str = BASE_DIRECTORY, debug: bool = False) -> WorkFlow:
         """Initialize an instance of WorkFlow from a serialized json string.
         
         Args:
@@ -778,7 +778,7 @@ class WorkUnit(ExecutionEntity):
             KeyError: If the API key cannot be mapped to any API.
         """
         # Initialize the class.
-        unit = cls(unit_dict=unit_dict, workflow=workflow, working_directory=working_directory, locator=locator, sqlite_filepath=sqlite_filepath, debug=debug)
+        unit = __class__(unit_dict=unit_dict, workflow=workflow, working_directory=working_directory, locator=locator, sqlite_filepath=sqlite_filepath, debug=debug)
         unit.status = StatusCode.INITIALIZING
 
         # Map the API.
@@ -1287,6 +1287,7 @@ class IterativeWorkUnit(ControlWorkUnit):
         iterable_data_label (str): Key indicating the object to iterate over in a IterativeWorkUnit.
         iterative_body_datum_label (str): Key indicating the element iterated from ITERABLE_DATA in each sub-workflow.
         iterable_data (Iterable): The data over which the loop iterates.
+        placeholder_api (Callable): a placeholder API marking the necessary arguments for initializing a specific class derived from IterativeWorkUnit.
         run_in_subfolders (bool): Indicate if to run the sub-workflow in subfolder(s). Default False.
         Other inherited attributes...
 
@@ -1302,13 +1303,14 @@ class IterativeWorkUnit(ControlWorkUnit):
     sub_workflows: List[WorkFlow]
     run_in_subfolders: bool
 
-    def __init__(self, unit_dict: dict, iterable_data_label: str, iterative_body_datum_label: str, workflow: WorkFlow = None, working_directory: str = BASE_DIRECTORY, locator: List[int] = list(), sqlite_filepath: str = str(), debug: bool = False):
+    def __init__(self, unit_dict: dict, iterable_data_label: str, iterative_body_datum_label: str, placeholder_api: Callable, workflow: WorkFlow = None, working_directory: str = BASE_DIRECTORY, locator: List[int] = list(), sqlite_filepath: str = str(), debug: bool = False):
         """Initializes an IterativeWorkUnit instance.
 
         Args:
             unit_dict (dict): Configuration dictionary with necessary parameters for initialization.
             iterable_data_label (str): Key indicating the object to iterate over in a IterativeWorkUnit.
             iterative_body_datum_label (str): Key indicating the element iterated from ITERABLE_DATA in each sub-workflow.
+            placeholder_api (Callable): a placeholder API marking the necessary arguments for initializing a specific class derived from IterativeWorkUnit.
             workflow (WorkFlow): A reference to the workflow object this unit belongs to.
             working_directory (str, optional): Indicates where to run the job. Default to current directory.
             locator (list, optional): A list of the hierarchical indexes to locate the current workunit.
@@ -1318,66 +1320,44 @@ class IterativeWorkUnit(ControlWorkUnit):
         super().__init__(unit_dict=unit_dict, workflow=workflow, working_directory=working_directory, locator=locator, sqlite_filepath=sqlite_filepath, debug=debug)
         self.iterable_data_label = iterable_data_label
         self.iterative_body_datum_label = iterative_body_datum_label
+        self.api = placeholder_api
         self.sub_workflows = list()
         self.child_execution_entities = self.sub_workflows
         self.run_in_subfolders = False
 
-    @classmethod
-    def from_dict(cls, unit_dict: dict, placeholder_api: Callable, iterable_data_label: str, iterative_body_datum_label: str, 
-                workflow: WorkFlow = None, working_directory: str = BASE_DIRECTORY, locator: List[int] = list(), sqlite_filepath: str = str(), debug: bool = False) -> IterativeWorkUnit:
-        """Initializes an instance of IterativeWorkUnit from a given dictionary.
-
-        As with a normal WorkUnit, the dictionary should contain keys such as `api`, `store_as`, 
-        and `args`, which specify the API to be called, the return key to be used for storing the results, 
-        and the arguments to the API call, respectively.
-        Here, however, the value of `api` must be `loop` to indicate that this WorkUnit is a IterativeWorkUnit, 
-        and the arguments contained in `args` are the iteration object and the loop body, where the loop 
-        body is treated as a sub-WorkFlow.
-
-        Args:
-            unit_dict (dict): Configuration dictionary with necessary parameters for initialization.
-            placeholder_api (Callable): a placeholder API marking the necessary arguments for initializing a specific class derived from IterativeWorkUnit.
-            iterable_data_label (str): Key indicating the object to iterate over in a IterativeWorkUnit.
-            iterative_body_datum_label (str): Key indicating the element iterated from ITERABLE_DATA in each sub-workflow.
-            workflow (WorkFlow, optional): The parent workflow of this unit.
-            working_directory (str, optional): Indicates where to run the job. Default to current directory.
-            locator (list, optional): A list of the hierarchical indexes to locate the current workunit.
-            sqlite_filepath (str): The filepath to your sqlite database file for persistent storage.
-            debug (bool, optional): Indicates whether to run in debug mode.
+    def actualize(self) -> IterativeWorkUnit:
+        """Actualize an instance of IterativeWorkUnit from an initialized instance of LoopWorkUnit or ClusterBatchWorkUnit
+        to have it ready for execution.
 
         Returns:
             IterativeWorkUnit: An instance of IterativeWorkUnit initialized with the given configuration.
         """
         # Initialize the class.
-        unit = cls(unit_dict, iterable_data_label, iterative_body_datum_label, workflow, working_directory, locator, sqlite_filepath, debug)
-        unit.api = placeholder_api
-        unit.status = StatusCode.INITIALIZING
+        self.status = StatusCode.INITIALIZING
 
         # Self Inspection.
-        unit.self_inspection_and_args_reassembly()
-        unit.check_initialization_status()
-        unit.run_in_subfolders = unit.args_dict_to_pass.get(ITERATIVE_SUBFOLDERS_OPTION, False)
+        self.self_inspection_and_args_reassembly()
+        self.check_initialization_status()
+        self.run_in_subfolders = self.args_dict_to_pass.get(ITERATIVE_SUBFOLDERS_OPTION, False)
 
         # Initialize the Iterative Body.
-        data_mapper_to_inherite = unit.generate_data_mapper_to_inherite()
+        data_mapper_to_inherite = self.generate_data_mapper_to_inherite()
 
         # Some data should be passed before the initialization of a sub-WorkFlow.
-        iterative_body_datum_varname = VarFormatter.unformat_variable(unit.args_dict_to_pass.get(iterative_body_datum_label))
+        iterative_body_datum_varname = VarFormatter.unformat_variable(self.args_dict_to_pass.get(self.iterative_body_datum_label))
         data_mapper_for_initialize_as_intermediate = {iterative_body_datum_varname: Placeholder.PLACEHOLDER_STR_VALUE}
 
         # Initialize a PlaceHolder Sub-WorkFlow to perform self-inspection.
-        flow_locator = unit.locator.copy()
-        flow_locator.append(unit.encode_layer_index())
-        placeholder_sub_workflow = WorkFlow.from_list(unit_dict_list=unit.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL),
-            debug=unit.debug, intermediate_data_mapper=data_mapper_for_initialize_as_intermediate,
-            inherited_data_mapper=data_mapper_to_inherite, locator=flow_locator, control_workunit=unit)
-        unit.status = placeholder_sub_workflow.status
+        flow_locator = self.locator.copy()
+        flow_locator.append(self.encode_layer_index())
+        placeholder_sub_workflow = WorkFlow.from_list(unit_dict_list=self.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL),
+            debug=self.debug, intermediate_data_mapper=data_mapper_for_initialize_as_intermediate,
+            inherited_data_mapper=data_mapper_to_inherite, locator=flow_locator, control_workunit=self)
+        self.status = placeholder_sub_workflow.status
         
         # Add error message from placeholder workflow initialization.
         if (placeholder_sub_workflow.error_msg_list):
-            unit.error_msg_list += placeholder_sub_workflow.error_msg_list
-
-        return unit
+            self.error_msg_list += placeholder_sub_workflow.error_msg_list
 
     def reload(self, unit_dict: dict, placeholder_api: Callable, iterable_data_label: str, iterative_body_datum_label: str):
         """
@@ -1539,7 +1519,9 @@ class LoopWorkUnit(IterativeWorkUnit):
             sqlite_filepath (str): The filepath to your sqlite database file for persistent storage.
             debug (bool, optional): Indicates whether to run in debug mode.
         """
-        super().__init__(unit_dict=unit_dict, workflow=workflow, working_directory=working_directory, locator=locator, sqlite_filepath=sqlite_filepath, debug=debug)
+        super().__init__(unit_dict=unit_dict, workflow=workflow, iterable_data_label=LOOP_ITERABLE_DATA_LABEL, 
+                iterative_body_datum_label=LOOP_BODY_DATUM_LABEL, placeholder_api=__class__.loop_unit_placeholder_api,
+                working_directory=working_directory, locator=locator, sqlite_filepath=sqlite_filepath, debug=debug)
         return
 
     @classmethod
@@ -1565,10 +1547,9 @@ class LoopWorkUnit(IterativeWorkUnit):
             LoopWorkUnit: An instance of LoopWorkUnit initialized with the given configuration.
         """
         _LOGGER.info(f"Initializing a {__class__.__name__} now...")
-        unit = super().from_dict(unit_dict=unit_dict, placeholder_api=__class__.loop_unit_placeholder_api, 
-                            iterable_data_label=LOOP_ITERABLE_DATA_LABEL, iterative_body_datum_label=LOOP_BODY_DATUM_LABEL,
-                            workflow=workflow, working_directory=working_directory, locator=locator, 
-                            sqlite_filepath=sqlite_filepath, debug=debug)
+        unit = __class__(unit_dict=unit_dict, workflow=workflow, working_directory=working_directory, 
+                        locator=locator, sqlite_filepath=sqlite_filepath, debug=debug)
+        unit.actualize()
         return unit
 
     def reload(self, unit_dict: dict):
@@ -1673,7 +1654,7 @@ class LoopWorkUnit(IterativeWorkUnit):
             self.status = StatusCode.EXIT_OK
         return self.return_key, self.return_value
 
-class ClusterBatchWorkUnit(IterativeWorkUnit):
+class ClusterBatchWorkUnit(IterativeWorkUnit):  # TODO (Zhong)
     """Manages and orchestrates computational tasks across a cluster computing environment.
     
     The ClusterBatchWorkUnit class is derived from ControlWorkUnit and is designed to handle the 
@@ -1725,8 +1706,10 @@ class ClusterBatchWorkUnit(IterativeWorkUnit):
             locator (list, optional): A list of the hierarchical indexes to locate the current workunit.
             sqlite_filepath (str): The filepath to your sqlite database file for persistent storage.
             debug (bool, optional): Indicates whether to run in debug mode.
-        """
-        super().__init__(unit_dict=unit_dict, workflow=workflow, working_directory=working_directory, locator=locator, sqlite_filepath=sqlite_filepath, debug=debug)
+        """        
+        super().__init__(unit_dict=unit_dict, workflow=workflow, iterable_data_label=BATCH_ITERABLE_DATA_LABEL, 
+                iterative_body_datum_label=BATCH_BODY_DATUM_LABEL, placeholder_api=__class__.cluster_batch_placeholder_api,
+                working_directory=working_directory, locator=locator, sqlite_filepath=sqlite_filepath, debug=debug)
         return
     
     @classmethod
@@ -1752,10 +1735,9 @@ class ClusterBatchWorkUnit(IterativeWorkUnit):
             ClusterBatchWorkUnit: An instance of ClusterBatchWorkUnit initialized with the given configuration.
         """
         _LOGGER.info(f"Initializing a {__class__.__name__} now...")
-        unit: __class__ = super().from_dict(unit_dict=unit_dict, placeholder_api=__class__.cluster_batch_placeholder_api,
-                            iterable_data_label=BATCH_ITERABLE_DATA_LABEL, iterative_body_datum_label=BATCH_BODY_DATUM_LABEL, 
-                            workflow=workflow, working_directory=working_directory, locator=locator, 
-                            sqlite_filepath=sqlite_filepath, debug=debug)
+        unit = __class__(unit_dict=unit_dict, workflow=workflow, working_directory=working_directory, 
+                        locator=locator, sqlite_filepath=sqlite_filepath, debug=debug)
+        unit.actualize()
         unit.max_simultaeneous_jobs = unit.args_dict_to_pass.get("max_simultaeneous_jobs", DEFAULT_CLUSTER_JOB_CAPABILITY)
         return unit
 
@@ -1958,7 +1940,7 @@ class GeneralWorkUnit(ControlWorkUnit):
         chdir(working_directory)
 
         # Initialize the class.
-        unit = cls(unit_dict=unit_dict, working_directory=working_directory, save_snapshot=save_snapshot, sqlite_filepath=sqlite_filepath, debug=debug)
+        unit = __class__(unit_dict=unit_dict, working_directory=working_directory, save_snapshot=save_snapshot, sqlite_filepath=sqlite_filepath, debug=debug)
         database_session = unit.create_database_session(overwrite_database=overwrite_database)
         database_session.close()
         if not save_snapshot:
@@ -1969,7 +1951,7 @@ class GeneralWorkUnit(ControlWorkUnit):
                 _LOGGER.warning(f"Press CTRL+C to cancel the job now, or we continue in {sleep_seconds} seconds...\n")
                 sleep(sleep_seconds)
 
-        unit.api = GeneralWorkUnit.general_unit_placeholder_api
+        unit.api = __class__.general_unit_placeholder_api
         unit.data_mapper_for_init = data_mapper_for_init
 
         # Self Inspection.
@@ -2021,13 +2003,13 @@ class GeneralWorkUnit(ControlWorkUnit):
             An instance of WorkFlow.
         """
         unit_dict = loads(json_str)
-        return GeneralWorkUnit.from_dict(unit_dict=unit_dict, working_directory=working_directory, 
+        return __class__.from_dict(unit_dict=unit_dict, working_directory=working_directory, 
                                         save_snapshot=save_snapshot, sqlite_filename=sqlite_filename, 
                                         overwrite_database=overwrite_database, debug=debug, 
                                         data_mapper_for_init=data_mapper_for_init)
 
-    @classmethod
-    def from_json_file_object(cls, json_fobj: TextIOWrapper, 
+    @staticmethod
+    def from_json_file_object(json_fobj: TextIOWrapper, 
                             working_directory: str = BASE_DIRECTORY, save_snapshot: bool = False, 
                             sqlite_filename: str = DEFAULT_SQLITE_FILENAME, overwrite_database: bool = False,
                             debug: bool = False, data_mapper_for_init: dict = dict()) -> GeneralWorkUnit:
@@ -2047,7 +2029,7 @@ class GeneralWorkUnit(ControlWorkUnit):
             An instance of GeneralWorkUnit.
         """
         json_str = json_fobj.read()
-        return GeneralWorkUnit.from_json_string(json_str=json_str, working_directory=working_directory, 
+        return __class__.from_json_string(json_str=json_str, working_directory=working_directory, 
                                                 save_snapshot=save_snapshot, sqlite_filename=sqlite_filename, overwrite_database=overwrite_database,
                                                 debug=debug, data_mapper_for_init=data_mapper_for_init)
 
@@ -2072,7 +2054,7 @@ class GeneralWorkUnit(ControlWorkUnit):
             An instance of WorkFlow.
         """
         with open(json_filepath) as fobj:
-            return GeneralWorkUnit.from_json_file_object(fobj, working_directory=working_directory, 
+            return __class__.from_json_file_object(fobj, working_directory=working_directory, 
                                                     save_snapshot=save_snapshot, sqlite_filename=sqlite_filename, 
                                                     overwrite_database=overwrite_database, debug=debug, 
                                                     data_mapper_for_init=data_mapper_for_init)
