@@ -211,6 +211,8 @@ def get_str_for_print_class_var(cls) -> str:
     return result
 
 
+
+
 # == context manager ==
 class HiddenPrints:
     """block or redirect stdout/stderr prints to 'redirect'
