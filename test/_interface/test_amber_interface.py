@@ -1088,7 +1088,6 @@ def test_run_ante_mmpbsa():
 
 def test_update_radii():
     """test the function"""
-    ai = interface.amber
     test_out_path = f"{MM_WORK_DIR}/update_radii_test.prmtop"
 
     ai.update_radii(
@@ -1100,3 +1099,36 @@ def test_update_radii():
     assert os.path.getsize(test_out_path)
 
     fs.clean_temp_file_n_dir([test_out_path])
+
+def test_make_mmpbgbsa_prmtop_files():
+    """test the function"""
+    ai = interface.amber
+    stru_esm = ai.load_traj(
+        prmtop_path=f"{MM_DATA_DIR}/mmpbsa_test_sol.prmtop",
+        traj_path=f"{MM_DATA_DIR}/mmpbsa_test_sol_10f.nc",
+        ref_pdb=f"{MM_DATA_DIR}/mmpbsa_test_sol.pdb"
+    )
+    test_dr_prmtop = f"{MM_WORK_DIR}/test_make_mmpbsa_prmtop_dr.prmtop"
+    test_dl_prmtop = f"{MM_WORK_DIR}/test_make_mmpbsa_prmtop_dl.prmtop"
+    test_dc_prmtop = f"{MM_WORK_DIR}/test_make_mmpbsa_prmtop_dc.prmtop"
+    test_sc_prmtop = f"{MM_WORK_DIR}/test_make_mmpbsa_prmtop_sc.prmtop"
+
+    ai.make_mmpbgbsa_prmtop_files(
+        stru_esm=stru_esm,
+        ligand_mask=":290",
+        strip_mask=":WAT,Na+,Cl-",
+        igb=5,
+        temp_dr_prmtop = test_dr_prmtop,
+        temp_dl_prmtop = test_dl_prmtop,
+        temp_dc_prmtop = test_dc_prmtop,
+        temp_sc_prmtop = test_sc_prmtop,
+    )
+
+    assert os.path.getsize(test_dr_prmtop)
+    assert os.path.getsize(test_dl_prmtop)
+    assert os.path.getsize(test_dc_prmtop)
+    assert os.path.getsize(test_sc_prmtop)
+
+    fs.clean_temp_file_n_dir([
+      test_dr_prmtop,test_dl_prmtop,test_dc_prmtop,test_sc_prmtop,stru_esm.topology_source_file
+    ])

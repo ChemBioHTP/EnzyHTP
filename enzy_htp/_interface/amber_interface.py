@@ -1189,6 +1189,14 @@ class AmberInterface(BaseInterface):
             cmd_args = f"{cmd_args} -guess"
         self.env_manager_.run_command("add_pdb", cmd_args)
 
+    def clean_up_add_pdb_info(self, in_prmtop: str, out_path: str):
+        """remove add_pdb info in prmtop"""
+        with open(in_prmtop, "r") as f, open(out_path, "w") as of:
+            for line in f:
+                if "RESIDUE_CHAINID" in line: # TODO move this function to PrmtopIO and make a better solution
+                    break
+                of.write(line)
+        
     # -- cpptraj --
     def run_cpptraj(
             self,
@@ -2482,9 +2490,11 @@ class AmberInterface(BaseInterface):
         temp_dir = eh_config['system.SCRATCH_DIR']
         fs.safe_mkdir(temp_dir)
         temp_in_prmtop = fs.get_valid_temp_name(f"{temp_dir}/temp_in.prmtop")
+        temp_in2_prmtop = fs.get_valid_temp_name(f"{temp_dir}/temp_in_2.prmtop")
         self.convert_top_to_prmtop(stru_esm.topology_source_file, temp_in_prmtop)
+        self.clean_up_add_pdb_info(temp_in_prmtop, temp_in2_prmtop) # the add_pdb info in prmtop will cause bug in ante-MMPBSA
         self.run_ante_mmpbsa(
-            complex_prmtop_in = temp_in_prmtop,
+            complex_prmtop_in = temp_in2_prmtop,
             dry_complex_out = temp_dc_prmtop,
             dry_receptor_out = temp_dr_prmtop,
             dry_ligand_out = temp_dl_prmtop,
@@ -2494,13 +2504,13 @@ class AmberInterface(BaseInterface):
         )
 
         self.update_radii(
-            prmtop_path=temp_in_prmtop,
+            prmtop_path=temp_in2_prmtop,
             out_path=temp_sc_prmtop,
             radii=radii
         )
 
         # cleean up
-        fs.clean_temp_file_n_dir([temp_in_prmtop])
+        fs.clean_temp_file_n_dir([temp_in_prmtop, temp_in2_prmtop])
 
     def update_radii(self, prmtop_path: str, out_path: str, radii: str) -> None:
         """update the radii of the prmtop_path and generate the updated file in out_path"""
