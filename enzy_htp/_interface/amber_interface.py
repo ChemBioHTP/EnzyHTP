@@ -946,12 +946,34 @@ class AmberInterface(BaseInterface):
         self.config_.display()
 
     # == general amber app interface ==
+
+    # -- file format --
     def get_file_format(self, fname: str) -> str:
         """determine the file type give file path"""
         ext = fs.get_file_ext(fname)
         if "frcmod" in ext:
             return "frcmod"
         return self.AMBER_FILE_FORMAT_MAPPER.get(ext, ext[1:])
+
+    def convert_traj_to_nc(self, fpath: str, out_path: str) -> None:
+        """convert the given trajectory file to the Amber .nc file in the out_path"""
+        in_format = self.get_file_format(fpath)
+
+        if in_format == "nc":
+            fs.safe_cp(fpath, out_path)
+        else:
+            _LOGGER.error(f"found unsupported file format: {in_format} ({fpath})")
+            raise ValueError
+
+    def convert_top_to_prmtop(self, fpath: str, out_path: str) -> None:
+        """convert the given topology file to the Amber .prmtop file in the out_path"""
+        in_format = self.get_file_format(fpath)
+
+        if in_format == "prmtop":
+            fs.safe_cp(fpath, out_path)
+        else:
+            _LOGGER.error(f"found unsupported file format: {in_format} ({fpath})")
+            raise ValueError
 
     # -- tleap --
     def run_tleap(
@@ -1241,6 +1263,39 @@ class AmberInterface(BaseInterface):
 
         self.env_manager_.run_command("ante-MMPBSA.py", cmd_args)
 
+    # -- parmed --
+    def run_parmed(
+        self,
+        parmed_in_str: str,
+        prmtop_file: str,
+        inpcrd_file: str = None,
+        log_file: str = None,
+        overwrite: bool = True,
+        ):
+        """the python wrapper for running parmed"""
+        temp_dir = eh_config.system.SCRATCH_DIR
+        fs.safe_mkdir(temp_dir)
+        temp_in_file = fs.get_valid_temp_name(f"{temp_dir}/temp_parmed.in")
+        with open(temp_in_file, "w") as of:
+            of.write(parmed_in_str)
+
+        cmd_args = [
+            "-i", temp_in_file,
+            "-p", prmtop_file,
+        ]
+        if inpcrd_file is not None:
+            cmd_args += ["-c", inpcrd_file]
+        if log_file is not None:
+            cmd_args += ["-l", log_file]
+        if overwrite:
+            cmd_args += ["-O"]
+
+        self.env_manager_.run_command("parmed", cmd_args)
+
+        # clean up
+        fs.clean_temp_file_n_dir([
+            temp_in_file
+        ])
 
     # -- index mapping --
     def get_amber_index_mapper(self, stru: Structure) -> Dict[str, Dict[Union[Residue, Atom], Union[int, tuple]]]:
@@ -1293,7 +1348,6 @@ class AmberInterface(BaseInterface):
         aid_mapper = self.get_amber_index_mapper(stru)
         return [aid_mapper["atom"][at] for at in atoms]
 
-
     def rename_atoms(self, stru: Structure) -> None: # TODO(high piror) move to structure_io https://github.com/ChemBioHTP/EnzyHTP/pull/162#discussion_r1473217587
         """Renames residues and atoms to be compatible with Amber naming and functions.
         
@@ -1327,7 +1381,6 @@ class AmberInterface(BaseInterface):
                         changed_atoms += 1                            
         
         _LOGGER.info(f"Finished renaming! Changed {changed_residues} residues and {changed_atoms} atoms.")
-
 
     def get_amber_residue_index(self, residues: List[Atom]) -> List[int]:
         """"""
@@ -2366,7 +2419,7 @@ class AmberInterface(BaseInterface):
         self.make_mmpbgbsa_prmtop_files(
             stru_esm = stru_esm,
             ligand_mask = ligand_mask,
-            solvent_mask = strip_mask,
+            strip_mask = strip_mask,
             igb = igb,
             temp_dr_prmtop = temp_dr_prmtop,
             temp_dl_prmtop = temp_dl_prmtop,
@@ -2416,7 +2469,7 @@ class AmberInterface(BaseInterface):
         self,
         stru_esm: StructureEnsemble,
         ligand_mask: str,
-        solvent_mask: str,
+        strip_mask: str,
         igb: int,
         temp_dr_prmtop: str,
         temp_dl_prmtop: str,
@@ -2426,11 +2479,46 @@ class AmberInterface(BaseInterface):
         """make the prmtop files needed by the MMPB/GBSA calculation and
         generate them in temp_dr_prmtop, temp_dl_prmtop, temp_dc_prmtop, temp_sc_prmtop"""
         radii = self.config()["RADII_MAP"][str(igb)]
-        self.run_ante_mmpbsa()
-        # sc_prmtop = type(self).update_radii(
-        #     self.prmtop_path,
-        #     out_path=f'{temp_dir}sc.prmtop', igb=igb)
-        # return dr_prmtop, dl_prmtop, dc_prmtop, sc_prmtop
+        temp_dir = eh_config['system.SCRATCH_DIR']
+        fs.safe_mkdir(temp_dir)
+        temp_in_prmtop = fs.get_valid_temp_name(f"{temp_dir}/temp_in.prmtop")
+        self.convert_top_to_prmtop(stru_esm.topology_source_file, temp_in_prmtop)
+        self.run_ante_mmpbsa(
+            complex_prmtop_in = temp_in_prmtop,
+            dry_complex_out = temp_dc_prmtop,
+            dry_receptor_out = temp_dr_prmtop,
+            dry_ligand_out = temp_dl_prmtop,
+            strip_mask = strip_mask,
+            radii = radii,
+            ligand_mask = ligand_mask,
+        )
+
+        self.update_radii(
+            prmtop_path=temp_in_prmtop,
+            out_path=temp_sc_prmtop,
+            radii=radii
+        )
+
+        # cleean up
+        fs.clean_temp_file_n_dir([temp_in_prmtop])
+
+    def update_radii(self, prmtop_path: str, out_path: str, radii: str) -> None:
+        """update the radii of the prmtop_path and generate the updated file in out_path"""
+
+        temp_dir = eh_config['system.SCRATCH_DIR']
+        fs.safe_mkdir(temp_dir)
+
+        parmed_in_lines = [
+            f"changeRadii {radii}",
+            f"parmout {out_path}",
+            ""
+        ]
+        parmed_in_str = "\n".join(parmed_in_lines)
+
+        self.run_parmed(
+            parmed_in_str,
+            prmtop_path,
+        )
 
     def make_mmpbgbsa_nc_file(
         self,

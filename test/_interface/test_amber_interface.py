@@ -1085,3 +1085,18 @@ def test_run_ante_mmpbsa():
         dry_receptor_out,
         dry_ligand_out,
     ])
+
+def test_update_radii():
+    """test the function"""
+    ai = interface.amber
+    test_out_path = f"{MM_WORK_DIR}/update_radii_test.prmtop"
+
+    ai.update_radii(
+        prmtop_path=f"{MM_DATA_DIR}/mmpbsa_test_sol.prmtop",
+        out_path=test_out_path,
+        radii="mbondi2"
+    )
+
+    assert os.path.getsize(test_out_path)
+
+    fs.clean_temp_file_n_dir([test_out_path])
