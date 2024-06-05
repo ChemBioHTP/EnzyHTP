@@ -927,7 +927,8 @@ class WorkUnit(ExecutionEntity):
         updated_params = list()
         for param in self.params_to_assign_at_execution:
             for mapper in [self.workflow.intermediate_data_mapper, self.workflow.inherited_data_mapper]:
-                if (mapped_datum := mapper.get(VarFormatter.unformat_variable(self.args_dict_input[param]))):
+                mapped_datum = mapper.get(VarFormatter.unformat_variable(self.args_dict_input[param]))
+                if (mapped_datum != None):
                     existing_arg_in_mapper = self.args_dict_to_pass.get(param)
                     if (Placeholder.is_none_or_placeholder(existing_arg_in_mapper) or (existing_arg_in_mapper != mapped_datum)):
                         if (commit_update):
@@ -1140,23 +1141,6 @@ class WorkUnit(ExecutionEntity):
             self.status = StatusCode.READY_TO_START
             return
 
-    def generate_data_mapper_to_inherite(self) -> Dict[str, Any]:
-        """Generate data mappers for sub-workflow inheritance.
-        
-        Returns:
-            Data mapper to inherite (dict)
-        """
-        data_mapper_to_inherite = dict()
-        if (inherited_data_mapper:=self.workflow.inherited_data_mapper):
-            # Data Mapper inherited from parent workflow(s) should be inherited.
-            data_mapper_to_inherite.update(inherited_data_mapper.copy())
-        for key, value in self.workflow.intermediate_data_mapper.items():
-            if (self.workflow and key in self.workflow.nested_control_unit_return_keys):
-                # Keys stored in `nested_control_unit_return_keys` should not be inherited
-                continue
-            data_mapper_to_inherite[key] = value
-        return data_mapper_to_inherite
-
 #endregion
 
 #region Non-entry Control entities.
@@ -1199,6 +1183,23 @@ class ControlWorkUnit(WorkUnit):
         """
         virtual_unit = super().reload(unit_dict=unit_dict, api=api)
         return virtual_unit
+
+    def generate_data_mapper_to_inherite(self) -> Dict[str, Any]:
+        """Generate data mappers for sub-workflow inheritance.
+        
+        Returns:
+            Data mapper to inherite (dict)
+        """
+        data_mapper_to_inherite = dict()
+        if (inherited_data_mapper:=self.workflow.inherited_data_mapper):
+            # Data Mapper inherited from parent workflow(s) should be inherited.
+            data_mapper_to_inherite.update(inherited_data_mapper.copy())
+        for key, value in self.workflow.intermediate_data_mapper.items():
+            if (self.workflow and key in self.workflow.nested_control_unit_return_keys):
+                # Keys stored in `nested_control_unit_return_keys` should not be inherited
+                continue
+            data_mapper_to_inherite[key] = value
+        return data_mapper_to_inherite
 
     def encode_layer_index(self, execution_index: int = None) -> str:
         """The index of current layer to be added to `locator`.
@@ -1283,6 +1284,8 @@ class IterativeWorkUnit(ControlWorkUnit):
 
     Attributes:
         sub_workflows (List[WorkFlow]): A list of sub-workflows.
+        iterable_data_label (str): Key indicating the object to iterate over in a IterativeWorkUnit.
+        iterative_body_datum_label (str): Key indicating the element iterated from ITERABLE_DATA in each sub-workflow.
         iterable_data (Iterable): The data over which the loop iterates.
         run_in_subfolders (bool): Indicate if to run the sub-workflow in subfolder(s). Default False.
         Other inherited attributes...
@@ -1293,15 +1296,19 @@ class IterativeWorkUnit(ControlWorkUnit):
         reload: Reloads the IterativeWorkUnit instance with updated configuration.
         execute: Executes the loop, iterating over each sub-workflow.
     """
+    iterable_data_label: str
+    iterative_body_datum_label: str
     iterable_data: Iterable
     sub_workflows: List[WorkFlow]
     run_in_subfolders: bool
 
-    def __init__(self, unit_dict: dict, workflow: WorkFlow = None, working_directory: str = BASE_DIRECTORY, locator: List[int] = list(), sqlite_filepath: str = str(), debug: bool = False):
+    def __init__(self, unit_dict: dict, iterable_data_label: str, iterative_body_datum_label: str, workflow: WorkFlow = None, working_directory: str = BASE_DIRECTORY, locator: List[int] = list(), sqlite_filepath: str = str(), debug: bool = False):
         """Initializes an IterativeWorkUnit instance.
 
         Args:
             unit_dict (dict): Configuration dictionary with necessary parameters for initialization.
+            iterable_data_label (str): Key indicating the object to iterate over in a IterativeWorkUnit.
+            iterative_body_datum_label (str): Key indicating the element iterated from ITERABLE_DATA in each sub-workflow.
             workflow (WorkFlow): A reference to the workflow object this unit belongs to.
             working_directory (str, optional): Indicates where to run the job. Default to current directory.
             locator (list, optional): A list of the hierarchical indexes to locate the current workunit.
@@ -1309,12 +1316,14 @@ class IterativeWorkUnit(ControlWorkUnit):
             debug (bool, optional): Indicates whether to run in debug mode.
         """
         super().__init__(unit_dict=unit_dict, workflow=workflow, working_directory=working_directory, locator=locator, sqlite_filepath=sqlite_filepath, debug=debug)
+        self.iterable_data_label = iterable_data_label
+        self.iterative_body_datum_label = iterative_body_datum_label
         self.sub_workflows = list()
         self.child_execution_entities = self.sub_workflows
         self.run_in_subfolders = False
 
     @classmethod
-    def from_dict(cls, unit_dict: dict, placeholder_api: Callable, iterative_body_datum_label: str, 
+    def from_dict(cls, unit_dict: dict, placeholder_api: Callable, iterable_data_label: str, iterative_body_datum_label: str, 
                 workflow: WorkFlow = None, working_directory: str = BASE_DIRECTORY, locator: List[int] = list(), sqlite_filepath: str = str(), debug: bool = False) -> IterativeWorkUnit:
         """Initializes an instance of IterativeWorkUnit from a given dictionary.
 
@@ -1328,6 +1337,7 @@ class IterativeWorkUnit(ControlWorkUnit):
         Args:
             unit_dict (dict): Configuration dictionary with necessary parameters for initialization.
             placeholder_api (Callable): a placeholder API marking the necessary arguments for initializing a specific class derived from IterativeWorkUnit.
+            iterable_data_label (str): Key indicating the object to iterate over in a IterativeWorkUnit.
             iterative_body_datum_label (str): Key indicating the element iterated from ITERABLE_DATA in each sub-workflow.
             workflow (WorkFlow, optional): The parent workflow of this unit.
             working_directory (str, optional): Indicates where to run the job. Default to current directory.
@@ -1339,7 +1349,7 @@ class IterativeWorkUnit(ControlWorkUnit):
             IterativeWorkUnit: An instance of IterativeWorkUnit initialized with the given configuration.
         """
         # Initialize the class.
-        unit = cls(unit_dict, workflow, working_directory, locator, sqlite_filepath, debug)
+        unit = cls(unit_dict, iterable_data_label, iterative_body_datum_label, workflow, working_directory, locator, sqlite_filepath, debug)
         unit.api = placeholder_api
         unit.status = StatusCode.INITIALIZING
 
@@ -1368,7 +1378,7 @@ class IterativeWorkUnit(ControlWorkUnit):
             unit.error_msg_list += placeholder_sub_workflow.error_msg_list
 
         return unit
-    
+
     def reload(self, unit_dict: dict, placeholder_api: Callable, iterable_data_label: str, iterative_body_datum_label: str):
         """
         Reloads the IterativeWorkUnit instance with updated configuration.
@@ -1438,6 +1448,18 @@ class IterativeWorkUnit(ControlWorkUnit):
             self.sub_workflows.clear()
             
             self.status = StatusCode.SUSPECIOUS_UPDATES
+
+    def generate_data_mapper_to_inherite(self) -> Dict[str, Any]:
+        """Generate data mappers for sub-workflow inheritance.
+        
+        Returns:
+            Data mapper to inherite (dict)
+        """
+        data_mapper_to_inherite = super().generate_data_mapper_to_inherite()
+        
+        # Remove loop_data or batch_data to reduce memory overhead.
+        del data_mapper_to_inherite[VarFormatter.unformat_variable(self.args_dict_input.get(self.iterable_data_label))]
+        return data_mapper_to_inherite
 
     def update_status_code(self, workflow: WorkFlow) -> None:
         """Update the status code of IterativeWorkUnit (and its derived classes) instance.
@@ -1544,8 +1566,9 @@ class LoopWorkUnit(IterativeWorkUnit):
         """
         _LOGGER.info(f"Initializing a {__class__.__name__} now...")
         unit = super().from_dict(unit_dict=unit_dict, placeholder_api=__class__.loop_unit_placeholder_api, 
-                            iterative_body_datum_label=LOOP_BODY_DATUM_LABEL, workflow=workflow, working_directory=working_directory,
-                            locator=locator, sqlite_filepath=sqlite_filepath, debug=debug)
+                            iterable_data_label=LOOP_ITERABLE_DATA_LABEL, iterative_body_datum_label=LOOP_BODY_DATUM_LABEL,
+                            workflow=workflow, working_directory=working_directory, locator=locator, 
+                            sqlite_filepath=sqlite_filepath, debug=debug)
         return unit
 
     def reload(self, unit_dict: dict):
@@ -1729,8 +1752,9 @@ class ClusterBatchWorkUnit(IterativeWorkUnit):
             ClusterBatchWorkUnit: An instance of ClusterBatchWorkUnit initialized with the given configuration.
         """
         _LOGGER.info(f"Initializing a {__class__.__name__} now...")
-        unit: __class__ = super().from_dict(unit_dict=unit_dict, placeholder_api=__class__.cluster_batch_placeholder_api, 
-                            iterative_body_datum_label=BATCH_BODY_DATUM_LABEL, workflow=workflow, working_directory=working_directory, locator=locator, 
+        unit: __class__ = super().from_dict(unit_dict=unit_dict, placeholder_api=__class__.cluster_batch_placeholder_api,
+                            iterable_data_label=BATCH_ITERABLE_DATA_LABEL, iterative_body_datum_label=BATCH_BODY_DATUM_LABEL, 
+                            workflow=workflow, working_directory=working_directory, locator=locator, 
                             sqlite_filepath=sqlite_filepath, debug=debug)
         unit.max_simultaeneous_jobs = unit.args_dict_to_pass.get("max_simultaeneous_jobs", DEFAULT_CLUSTER_JOB_CAPABILITY)
         return unit
