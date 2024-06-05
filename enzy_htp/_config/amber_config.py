@@ -267,6 +267,7 @@ class AmberConfig(BaseConfig):
             "antechamber",
             "cpptraj",
             "add_pdb",
+            "ante-MMPBSA.py",
         ]
 
     def required_env_vars(self) -> List[str]:

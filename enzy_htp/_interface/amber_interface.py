@@ -1206,8 +1206,41 @@ class AmberInterface(BaseInterface):
     def run_mmpbsa():
         """the python wrapper for running MMPBSA.py.MPI and MMPBSA.py (not supported yet)"""
 
-    def run_ante_mmpbsa():
+    def run_ante_mmpbsa(
+        self,
+        complex_prmtop_in: str,
+        dry_complex_out: str,
+        dry_receptor_out: str,
+        dry_ligand_out: str,
+        strip_mask: str,
+        radii: str,
+        receptor_mask: str = None,
+        ligand_mask: str = None,
+        ):
         """the python wrapper for running ante-MMPBSA.py"""
+        if receptor_mask is None:
+            if ligand_mask is None:
+                _LOGGER.error("Must specify either 'receptor_mask' or 'ligand_mask'!")
+                raise ValueError
+            else:
+                selection_args = ["-n", ligand_mask]
+        elif ligand_mask is None:
+            selection_args = ["-m", receptor_mask]
+        else:
+            _LOGGER.error("Must specify either 'receptor_mask' OR 'ligand_mask'! (not both) ")
+            raise ValueError
+
+        cmd_args = [
+            "-p", complex_prmtop_in,
+            "-c", dry_complex_out,
+            "-r", dry_receptor_out,
+            "-l", dry_ligand_out,
+            "--radii", radii,
+            "-s", strip_mask,
+        ] + selection_args
+
+        self.env_manager_.run_command("ante-MMPBSA.py", cmd_args)
+
 
     # -- index mapping --
     def get_amber_index_mapper(self, stru: Structure) -> Dict[str, Dict[Union[Residue, Atom], Union[int, tuple]]]:
@@ -2285,7 +2318,7 @@ class AmberInterface(BaseInterface):
         work_dir: str="./binding",
         keep_in_file: bool=False,
         # method specifics
-        solvent_mask: str = ":WAT,Na+,Cl-",
+        strip_mask: str = ":WAT,Na+,Cl-",
         solvent_model: str = "pbsa",
         igb: int = 5,
         use_sander: bool = True,
@@ -2298,8 +2331,8 @@ class AmberInterface(BaseInterface):
         Args:
             stru, ligand, cluster_job_config, job_check_period, work_dir, keep_in_file:
                 see the docstring of `enzy_htp.analysis.binding.binding_energy`
-            solvent_mask:
-                the Amber mask for solvent in the structure ensemble
+            strip_mask:
+                the Amber mask for stripping unwanted parts (e.g.: solvent) in the structure ensemble
             solvent_model:
                 the model for the implicit solvation. (default: pbsa)
                 Supported keywords: [pbsa, gbsa]
@@ -2333,7 +2366,7 @@ class AmberInterface(BaseInterface):
         self.make_mmpbgbsa_prmtop_files(
             stru_esm = stru_esm,
             ligand_mask = ligand_mask,
-            solvent_mask = solvent_mask,
+            solvent_mask = strip_mask,
             igb = igb,
             temp_dr_prmtop = temp_dr_prmtop,
             temp_dl_prmtop = temp_dl_prmtop,
@@ -2355,6 +2388,7 @@ class AmberInterface(BaseInterface):
             traj_file = temp_nc,
             out_path = mmpbsa_result_file,
             keep_in_file = keep_in_file,
+            solvent_model = solvent_model,
             cluster_job_config = cluster_job_config,
             job_check_period = job_check_period,
             igb = igb,
@@ -2391,17 +2425,8 @@ class AmberInterface(BaseInterface):
         ) -> None:
         """make the prmtop files needed by the MMPB/GBSA calculation and
         generate them in temp_dr_prmtop, temp_dl_prmtop, temp_dc_prmtop, temp_sc_prmtop"""
-        # radii = radii_map[str(igb)]
-        # dr_prmtop = f"{temp_dir}dr.prmtop"
-        # dl_prmtop = f"{temp_dir}dl.prmtop"
-        # dc_prmtop = f"{temp_dir}dc.prmtop"
+        radii = self.config()["RADII_MAP"][str(igb)]
         self.run_ante_mmpbsa()
-        # ante_cmd = f'ante-MMPBSA.py -p {self.prmtop_path} --radii {radii} -s ":WAT,Na+,Cl-" -c {dc_prmtop} -n "{ligand_mask}" -l {dl_prmtop} -r {dr_prmtop}'
-        # try:
-        #     run(ante_cmd, check=0, text=True, shell=True, capture_output=True)
-        # except CalledProcessError as err:
-        #     print(err.stdout, err.stderr)
-        #     raise err
         # sc_prmtop = type(self).update_radii(
         #     self.prmtop_path,
         #     out_path=f'{temp_dir}sc.prmtop', igb=igb)
