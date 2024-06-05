@@ -205,6 +205,32 @@ class Structure(DoubleLinkedNode):
         return result
 
     @property
+    def aa_chains(self) -> List[Chain]:
+        result = list()
+        for chain in self.chains:
+            if not len(chain.residues):
+                continue
+            
+            if chain.residues[0].is_canonical():
+                result.append( chain )
+
+        return result
+
+    @property
+    def non_aa_chains(self) -> List[Chain]:
+        result = list()
+        for chain in self.chains:
+            if not len(chain.residues):
+                continue
+            
+            if not chain.residues[0].is_canonical():
+                result.append( chain )
+
+        return result
+
+
+
+    @property
     def num_residues(self) -> int:
         """Returns the number of Residue() objects in the current Structure()."""
         return len(self.residues)
@@ -394,7 +420,18 @@ class Structure(DoubleLinkedNode):
         for ch in self._chains:
             result[ch.name] = ch.sequence
         return result
-    
+
+    @property
+    def seqres_sequence(self) -> List[SeqRes]:
+        """Gets the List[SeqRes] for the entire Structure(), including only and all of the canonical amino acids."""
+        result = list()
+        for chain in self.aa_chains:
+            for res in chain.residues:
+                result.append( res.seqres )
+
+        return result
+
+
     @property
     def chemical_diversity(self) -> Dict[str, str]:
         """determine and return the chemical diversity of current Structure()

@@ -1522,26 +1522,13 @@ class RosettaInterface(BaseInterface):
 
         translate_structure( stru, end_naming='rosetta' )
         
-        nc_chains = list()
-        aa_chains = list()
-
-        for chain in stru.chains:
-            if not len(chain.residues):
-                continue
-            
-            if chain.residues[0].is_canonical():
-                aa_chains.append( chain )
-            else:
-                nc_chains.append( chain )
+        nc_chains = stru.non_aa_chains
+        aa_chains = stru.aa_chains
 
         aa_stru = Structure( aa_chains )
 
-        existing = list()
-        for rr in aa_stru.residues: 
-            if not rr.is_canonical(): 
-                continue
-            existing.append( rr.create_seq_res() )        
-        
+        existing = aa_stru.seqres_sequence
+
         seq_res = missing_residues + existing
         seq_res.sort()
         
