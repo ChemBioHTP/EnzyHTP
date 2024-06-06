@@ -47,7 +47,7 @@ def spi_metric(
         stru = stru.from_single_stru( stru )
 
     result = list()
-    for ss in stru.structures:
+    for ss in stru.structures():
         result.append(
             spi_metric( ss, ligand, pocket_sele )
         )
@@ -77,7 +77,7 @@ def spi_metric(
     ))
 
     result = list()
-    for ss in stru.structures:
+    for ss in stru.structures():
         result.append(
             spi_metric( ss, ligand, pocket_sele )
         )
