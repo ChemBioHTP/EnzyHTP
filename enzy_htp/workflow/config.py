@@ -181,10 +181,10 @@ class Placeholder():
         PLACEHOLDER_ITERABLE_VALUE, 
         PLACEHOLDER_STR_VALUE
     ]
-
+    
     @staticmethod
     def is_none_or_placeholder(var):
-        """Check if a value is None/Placeholder value.
+        """Check if a value is None or a Placeholder value.
         
         Args:
             var: The variable to check.
@@ -192,12 +192,11 @@ class Placeholder():
         Returns:
             The check result.
         """
-        result = False
-        if var == None:
-            result = True
-        elif var in __class__.placeholder_values:
-            result = True
-        return result
+        if var is None:
+            return True
+        else:
+            placeholder_value = __class__.assign_placeholder_value(var)
+            return var == placeholder_value
 
     @staticmethod
     def assign_placeholder_value(var):
