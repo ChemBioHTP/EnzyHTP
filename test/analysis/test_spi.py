@@ -56,7 +56,7 @@ def test_spi_consistent_with_old_enzyhtp():
         coordinate_list=data
     )
     
-    for ss in se.structures:
+    for ss in se.structures():
         remove_solvent( ss )
     
     aas = set()
