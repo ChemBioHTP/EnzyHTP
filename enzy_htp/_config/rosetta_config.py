@@ -32,6 +32,9 @@ class RosettaConfig(BaseConfig):
         PARAMS_SCRIPT: str() of the parameter generation file needed for RosettaLigand.
     """
 
+    REMODEL:str="$ROSETTA3/source/bin/remodel.linuxgccrelease"
+    """TODO(CJ)"""        
+
     ROSETTA3: str = "ROSETTA3"
     """Path variable that points to the git installation of rosetta aka 'main'."""
 

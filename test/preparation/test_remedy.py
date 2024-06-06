@@ -14,6 +14,11 @@ import enzy_htp
 from enzy_htp.chemical import (
     SeqRes
 )
+
+from enzy_htp.preparation import (
+    protonate_stru
+)
+
 from enzy_htp.preparation.remedy import (
     identify_missing_residues,
     add_missing_residues
@@ -65,7 +70,7 @@ def test_add_missing_residues_unsupported_method() -> None:
 
 
 def test_add_missing_residues_correct_behavior_case1() -> None:
-    """Checking that the add_missing_residues() function works correctly for the test case of PDB code 2a2c.."""
+    """Checking that the add_missing_residues() function works correctly for the test case of PDB code 2a2c."""
     
     infile:str=f"{DATA_DIR}/missing_residues1.pdb"
     stru = sp.get_structure( infile )
@@ -80,3 +85,28 @@ def test_add_missing_residues_correct_behavior_case1() -> None:
     assert len(stru.chains[1].residues) == 1 
     assert len(stru.chains[2].residues) == 1 
     assert len(stru.chains[3].residues) == 1 
+
+def test_add_missing_residues_correct_behavior_case2_multiple_chains() -> None:
+    """Checking that the add_missing_residues() function works correctly for the test case of PDB code <> which has two amino acid chains missing Residue()'s."""
+    
+    infile:str=f"{DATA_DIR}/missing_residues2.pdb"
+    stru = sp.get_structure( infile )
+    missing_residues = identify_missing_residues('3r3v')
+    
+    add_missing_residues( stru, missing_residues, 'rosetta', WORK_DIR)
+
+    assert len(stru.chains) == 3
+    assert len(stru.chains[0].residues) == 306 
+    assert len(stru.chains[1].residues) == 306 
+    assert stru.chains[0].residues[0].idx == -1
+    assert stru.chains[1].residues[0].idx == -1
+
+    target_sequence = ''.join("""GHMPDLADLFPGFGSEWINTSSGRIFARVGGDGPPLLLLHGFPQTHVMWHRVAPKLAERFKVIVADLPGY
+GWSDMPESDEQHTPYTKRAMAKQLIEAMEQLGHVHFALAGHNRGARVSYRLALDSPGRLSKLAVLDILPT
+YEYWQRMNRAYALKIYHWSFLAQPAPLPENLLGGDPDFYVKAKLASWTRAGDLSAFDPRAVEHYRIAFAD
+PMRRHVMCEDYRAGAYADFEHDKIDVEAGNKIPVPMLALWGASGIAQSAATPLDVWRKWASDVQGAPIES
+GHFLPEEAPDQTAEALVRFFSAAPGS""".splitlines())
+
+    seq_mapper = stru.sequence
+    assert seq_mapper['A'] == target_sequence, seq_mapper['A']
+    assert seq_mapper['B'] == target_sequence, seq_mapper['B']
