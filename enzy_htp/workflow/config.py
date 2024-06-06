@@ -23,6 +23,7 @@ SCIENCE_API_MAPPER = {
     "equi_md_sampling" : geometry.equi_md_sampling,
     "single_point" : quantum.single_point,
     "optimize" : quantum.optimize,
+    "spi_metric": analysis.spi_metric,
     "ele_field_strength_at_along" : analysis.ele_field_strength_at_along,
     "ele_field_strength_at" : analysis.ele_field_strength_at,
     "ele_stab_energy_of_bond" : analysis.ele_stab_energy_of_bond,
