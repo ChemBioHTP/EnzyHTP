@@ -1,4 +1,11 @@
-#TODO(CJ): documentation
+"""Defines a ModellerInterface class that serves as a bride for enzy_htp to utilize the Modeller software package.
+Uses the ModellerConfig class found in enzy_htp/_config/modeller_config.py Supported operations include:
+
+    + filling missing loop Residue()'s in a Structure()
+
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Date: 2024-05-30
+"""
 import os
 from typing import List
 
@@ -6,18 +13,20 @@ from pathlib import Path
 
 from .base_interface import BaseInterface
 
+import importlib
+
+
 from enzy_htp import config
+from enzy_htp.chemical import SeqRes
 
 from enzy_htp.core import file_system as fs
+from enzy_htp.core.general import HiddenPrints
+from enzy_htp.core import _LOGGER
 
 from enzy_htp._config.modeller_config import ModellerConfig, default_modeller_config
-try:
-    from modeller import *
-    from modeller.automodel import *
-except:
-    pass
 
 from enzy_htp.structure import (
+    Chain,
     Structure,
     Residue,
     PDBParser
@@ -25,20 +34,91 @@ from enzy_htp.structure import (
 
 
 class ModellerInterface(BaseInterface):
+    """Class that provides a direct interface for enzy_htp to utilize Modeller. Supported operations
+    include adding missing Residue()'s Users should use this class as the only way to interact with this
+    Application.
 
+    Attributes:
+        config_ : The ModellerConfig() class which provides settings for both running Modeller and maintaining a compatible environment.
+        env_manager_ : The EnvironmentManager() class which ensures all required environment elements exist.
+        compatible_env_ : A bool() indicating if the current environment is comptaible with the object itself.
+        self.modeller_ : The modeller package import that is accesible only within the class.
+        self.modeller_automodel_ : The modeller.automodel package import that is accesible only within the class.
+    """
 
     def __init__(self, parent, config: ModellerConfig = None) -> None:
         """Simplistic constructor that optionally takes an AlphaFillConfig object as its only argument.
         Calls parent constructor.
         """
         super().__init__(parent, config, default_modeller_config)
+        self.modeller_ = None
+        self.modeller_automodel_ = None
+        try:
+            self.modeller_ = importlib.import_module('modeller')
+        except:
+            pass
 
+        try:
+            self.modeller_automodel_ = importlib.import_module('modeller.automodel')
+        except:
+            pass
+
+
+    def delete_temp_files(self, stem:str) -> None:
+        """Removes various temporary files created by modelller during loop modelling."""
+        for ext in """.BL00010001.pdb
+        .B99990001.pdb
+        .BL00020001.pdb
+        .D00000001
+        .DL00010001
+        .DL00020001
+        .IL00000001.pdb
+        .ini
+        .lrsr
+        .rsr
+        .sch
+        .V99990001""".split():
+            fs.safe_rm( f"{stem}{ext}" )
+
+
+    @property
+    def modeller(self) -> "module":
+        """Gets the modeller module if it exists, raises an error if not."""
+        if self.modeller_ is None:
+            err_msg:str="The 'modeller' python package is not installed in this environment. Cannot use ModellerInterface()."
+            _LOGGER.error( err_msg )  
+            raise ImportError(err_msg)
+        return self.modeller_
+
+
+    @property
+    def modeller_automodel(self) -> "module":
+        """Gets the modelle._automodel module if it exists, raises an error if not."""
+        if self.modeller_automodel_ is None:
+            err_msg:str="The 'modeller_automodel' python package is not installed in this environment. Cannot use ModellerInterface()."
+            _LOGGER.error( err_msg )  
+            raise ImportError(err_msg)
+        return self.modeller_automodel_
 
 
     def add_missing_residues(self,
                             stru:Structure,
-                            missing_residues,
-                            work_dir:str=None) -> None:
+                            missing_residues:List[SeqRes],
+                            work_dir:str=None,
+                            **kwargs) -> None:
+        """Uses the LoopMode class to add missing loop residues to a Structure(). All work is done 
+        to the Structure() in place. Note that it will implicitly relax most/all of the Structure() including
+        various non-loop sidechains.
+
+
+        Args:
+            stru: The Structure() to add missing Residue()'s to.
+            missing_residues: The List[SeqRes] of missing residues to add.
+            work_dir: The name of the directory where the work should be done. Optional.
+        
+        Returns:
+            Nothing.
+        """
 
         if work_dir is None:
             work_dir = config['system.SCRATCH_DIR']
@@ -105,6 +185,11 @@ class ModellerInterface(BaseInterface):
 
         fs.write_lines(align_file, lines)
         #TODO(CJ): probably need to check for loops that are too long
+        Environ = self.modeller.Environ
+        LoopModel = self.modeller_automodel.LoopModel
+        refine = self.modeller_automodel.refine
+        log = self.modeller.log 
+
         log.none()
         env = Environ()
 
@@ -123,25 +208,15 @@ class ModellerInterface(BaseInterface):
         a.loop.starting_model = 1
         a.loop.ending_model   = 2
         a.loop.md_level       = refine.fast
-        
-        a.make()
+
+        with HiddenPrints() as hp:
+            a.make()
        
         fs.safe_mv("modeller_fill.B99990001.pdb", "modeller_fill.pdb")
 
-        for tk in """modeller_fill.BL00010001.pdb
-        modeller_fill.B99990001.pdb
-        modeller_fill.BL00020001.pdb
-        modeller_fill.D00000001
-        modeller_fill.DL00010001
-        modeller_fill.DL00020001
-        modeller_fill.IL00000001.pdb
-        modeller_fill.ini
-        modeller_fill.lrsr
-        modeller_fill.rsr
-        modeller_fill.sch
-        modeller_fill.V99990001""".split():
-            fs.safe_rm(tk)
-   
+
+        self.delete_temp_files( "modeller_fill" )
+
         os.chdir(start_dir)
 
         session = self.parent().pymol.new_session() 
@@ -153,10 +228,6 @@ class ModellerInterface(BaseInterface):
         ])
 
         filled_stru = sp.get_structure(f"{work_dir}/modeller_fill.pdb")
-
-        if not inplace:
-            temp = stru.clone()
-            stru = temp
 
         for ar in all_residues:
             if ar.seq_idx is None:
@@ -174,6 +245,3 @@ class ModellerInterface(BaseInterface):
         for chain in stru.chains:
             chain.sort_residues()
 
-
-        if not inplace:
-            return stru

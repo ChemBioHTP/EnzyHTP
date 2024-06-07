@@ -122,6 +122,18 @@ class Residue(DoubleLinkedNode):
         return ".".join(tokens)
 
     @property
+    def seqres(self) -> chem.SeqRes:
+        """Converts the Residue() into its respective SeqRes object."""
+        return chem.SeqRes(
+            model=1,
+            chain=self.parent.name,
+            idx=self.idx,
+            seq_idx=None,
+            name=self.name,
+            missing=False
+        )
+
+    @property
     def num_atoms(self) -> int:
         """Number of atoms in the Residue."""
         return len(self._atoms)
@@ -401,17 +413,6 @@ class Residue(DoubleLinkedNode):
 
     #endregion
 
-    def create_seq_res(self) -> chem.SeqRes:
-        """TODO(CJ): finish documentation"""
-
-        return chem.SeqRes(
-            model=1,
-            chain=self.parent.name,
-            idx=self.idx,
-            seq_idx=None,
-            name=self.name,
-            missing=False
-        )
 
     #region === Special ===
     def __str__(self) -> str:
