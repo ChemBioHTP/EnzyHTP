@@ -1594,9 +1594,9 @@ class RosettaInterface(BaseInterface):
 
         translate_structure( stru, end_naming='rosetta' )
         
-        all_chains:List[Chain] = stru.non_aa_chains
+        all_chains:List[Chain] = stru.non_polypeptides
 
-        for chain in stru.aa_chains:
+        for chain in stru.polypeptides:
             single_chain_stru = Structure([chain])
             seq_res = single_chain_stru.seqres_sequence
             mr : chem.SeqRes
