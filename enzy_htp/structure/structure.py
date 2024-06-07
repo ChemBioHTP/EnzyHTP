@@ -211,7 +211,7 @@ class Structure(DoubleLinkedNode):
             if not len(chain.residues):
                 continue
             
-            if chain.residues[0].is_canonical():
+            if chain.is_polypeptide():
                 result.append( chain )
 
         return result
@@ -223,7 +223,7 @@ class Structure(DoubleLinkedNode):
             if not len(chain.residues):
                 continue
             
-            if not chain.residues[0].is_canonical():
+            if not chain.is_polypeptide():
                 result.append( chain )
 
         return result
