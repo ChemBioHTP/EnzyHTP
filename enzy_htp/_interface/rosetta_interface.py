@@ -1580,12 +1580,14 @@ class RosettaInterface(BaseInterface):
                 _LOGGER.error( err_msg )
                 raise ValueError( err_msg )
 
+            result =  sp.get_structure( pdb_outfile )
 
             fs.safe_rm(script_file)
             fs.safe_rm(pdb_infile)
             fs.safe_rm(pdb_outfile)
 
-            return sp.get_structure( pdb_outfile )
+            return result
+
 
 
         fs.safe_mkdir( work_dir )
