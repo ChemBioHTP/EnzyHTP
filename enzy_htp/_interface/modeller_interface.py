@@ -21,6 +21,7 @@ from enzy_htp.chemical import SeqRes
 
 from enzy_htp.core import file_system as fs
 from enzy_htp.core.general import HiddenPrints
+from enzy_htp.core import _LOGGER
 
 from enzy_htp._config.modeller_config import ModellerConfig, default_modeller_config
 

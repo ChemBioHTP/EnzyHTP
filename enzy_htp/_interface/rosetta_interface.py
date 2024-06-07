@@ -1505,7 +1505,7 @@ class RosettaInterface(BaseInterface):
 
     def add_missing_residues(self, 
             stru: Structure,
-            missing_residues:List[SeqRes],
+            missing_residues:List[chem.SeqRes],
             work_dir:str=None,
             **kwargs
         ) -> None: 
@@ -1521,7 +1521,8 @@ class RosettaInterface(BaseInterface):
             Nothing.
         """
 
-        def fix_remodel(stru, seq_res, work_dir):
+        def fix_remodel(stru:Structure, seq_res:List[chem.SeqRes], work_dir:str) -> Structure:
+            """Hacky helper method that makes sure all of amino acids have the correct identities."""
             content = """<ROSETTASCRIPTS>
 <SCOREFXNS>
 </SCOREFXNS>
@@ -1538,7 +1539,7 @@ class RosettaInterface(BaseInterface):
 <FILTERS>
 </FILTERS>
 <MOVERS>""".split()
-            sr: SeqRes  
+            sr: chem.SeqRes  
             muts = list()
             for idx,(res, sr) in enumerate(zip(stru.residues, seq_res)):
                 seq_res_three_letter = chem.convert_to_three_letter(sr.one_letter())
@@ -1628,7 +1629,6 @@ class RosettaInterface(BaseInterface):
             script_file:str=f"{work_dir}/remodel_script.xml"
             pdb_file = f"{work_dir}/remodel_input.pdb"
             pdb_outfile = f"{work_dir}/remodel_input_0001.pdb"
-            write_xml_input( script_file )
             
             opts:List[str] = [
                     "-in:file:s", pdb_file,
@@ -1642,7 +1642,6 @@ class RosettaInterface(BaseInterface):
                     ]
             
             parser = PDBParser() 
-            single_chain_stru = self.hack_fix( single_chain_stru ) 
             parser.save_structure( pdb_file, single_chain_stru )
             self.env_manager_.run_command(
                 self.config_.REMODEL, 
