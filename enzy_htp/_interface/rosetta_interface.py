@@ -672,7 +672,7 @@ class RosettaInterface(BaseInterface):
             # TODO figure out arguments
         ) -> str:
         """make the command line str for running cartesin ddg"""
-        cart_ddg_exe = self.config_.get_cart_ddg_exe()
+        cart_ddg_exe = self.config_.get_exe("CART_DDG")
         flags = [
             f"-in:file:s {pdb_path}",
             f"-ddg::mut_file {mut_file}",
@@ -1646,7 +1646,7 @@ class RosettaInterface(BaseInterface):
             parser = PDBParser() 
             parser.save_structure( pdb_file, single_chain_stru )
             self.env_manager_.run_command(
-                self.config_.REMODEL, 
+                self.config_.get_exe("REMODEL"), 
                 opts, quiet_fail=True)
         
             if not Path(pdb_outfile).exists():
