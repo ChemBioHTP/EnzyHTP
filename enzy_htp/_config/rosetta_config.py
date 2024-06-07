@@ -50,21 +50,8 @@ class RosettaConfig(BaseConfig):
     RELAX_MPI_EXEC: str = f"mpiexec -np"
     """MPI Executable used to relax a structure/pose."""
 
-    CART_DDG: str = f"$ROSETTA3/source/bin/cartesian_ddg.*.linuxgccrelease"
-    """Executable used to relax a structure/pose."""
-
-    @classmethod
-    def get_cart_ddg_exe(self):
-        """find the path of the cartesian_ddg executable. This is made because
-        Rosetta exe names varible but compiling settings"""
-        if 'ROSETTA3' not in os.environ:
-            _LOGGER.error("$ROSETTA3 needed but not assigned!")
-            raise MissingEnvironmentElement
-        result = glob.glob(os.path.expandvars(self.CART_DDG))[0]
-        _LOGGER.info(
-            f"getting {result} as the exe of cartesian_ddg. "
-            "Change enzy_htp.config.rosetta.CART_DDG if you want to use a different one")
-        return result
+    CART_DDG: str = f"$ROSETTA3/source/bin/cartesian_ddg.*linuxgccrelease"
+    """Executable used for cartesian_ddg calculation."""
 
     SCORE: str = f"$ROSETTA3/source/bin/score_jd2.default.linuxgccrelease"
     """Executable used to score a specific structure/pose."""
@@ -148,6 +135,26 @@ class RosettaConfig(BaseConfig):
                                             }
     """The default value for the resource configuration of relax()."""
     
+    # endregion
+
+    # region == Default values for remodel ==
+
+    REMODEL:str="$ROSETTA3/source/bin/remodel.*linuxgccrelease"
+    """Executable used to remodel."""
+
+    @classmethod
+    def get_exe(self, name: str):
+        """find the path of the cartesian_ddg executable. This is made because
+        Rosetta exe names varible but compiling settings"""
+        if 'ROSETTA3' not in os.environ:
+            _LOGGER.error("$ROSETTA3 needed but not assigned!")
+            raise MissingEnvironmentElement
+        result = glob.glob(os.path.expandvars(getattr(self, name)))[0]
+        _LOGGER.info(
+            f"getting {result} as the exe of {name}. "
+            f"Change enzy_htp.config.rosetta.{name} if you want to use a different one")
+        return result
+
     # endregion
 
     def required_executables(self) -> List[str]:
