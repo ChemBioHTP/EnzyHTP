@@ -50,19 +50,6 @@ class Residue(DoubleLinkedNode):
         """Returns a list of all Atom() objects that the Residue() "owns" """
         return self.get_children()
 
-    @property
-    def seqres(self) -> chem.SeqRes:
-        """Converts the Residue() into its respective SeqRes object."""
-        return chem.SeqRes(
-            model=1,
-            chain=self.parent.name,
-            idx=self.idx,
-            seq_idx=None,
-            name=self.name,
-            missing=False
-        )
-
-
     @atoms.setter
     def atoms(self, val):
         self.set_children(val)
@@ -133,6 +120,18 @@ class Residue(DoubleLinkedNode):
             tokens[0] = self.chain.name
 
         return ".".join(tokens)
+
+    @property
+    def seqres(self) -> chem.SeqRes:
+        """Converts the Residue() into its respective SeqRes object."""
+        return chem.SeqRes(
+            model=1,
+            chain=self.parent.name,
+            idx=self.idx,
+            seq_idx=None,
+            name=self.name,
+            missing=False
+        )
 
     @property
     def num_atoms(self) -> int:
