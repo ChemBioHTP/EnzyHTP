@@ -26,7 +26,7 @@ import pandas as pd
 import enzy_htp.chemical as chem
 from enzy_htp import config as eh_config
 from enzy_htp.mutation_class.mutation import Mutation
-from enzy_htp.structure import Structure, PDBParser, Mol2Parser, Ligand
+from enzy_htp.structure import Structure, PDBParser, Mol2Parser, Ligand, Chain
 from enzy_htp.structure.structure_operation import remove_non_peptide
 from enzy_htp.structure import translate_structure
 from enzy_htp.structure.structure_constraint import StructureConstraint, ResiduePairConstraint
@@ -1599,7 +1599,7 @@ class RosettaInterface(BaseInterface):
         for chain in stru.aa_chains:
             single_chain_stru = Structure([chain])
             seq_res = single_chain_stru.seqres_sequence
-            mr : SeqRes
+            mr : chem.SeqRes
             for mr in missing_residues:
                 if mr.chain == chain.name:
                     seq_res.append(mr)
