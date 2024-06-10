@@ -41,12 +41,23 @@ def seed_ligand(stru: Structure,
     constraints:List[StructureConstraint]=None, 
     work_dir:str=None, 
     **kwargs) -> None:
+    """
+
+    Args:
+        ligand:
+        method:
+        minimize:
+        constraints:
+        work_dir:
+
+    Returns:
+        Nothing.
+    """
 
     if not work_dir:
         work_dir = config['system.SCRATCH_DIR']
 
     fs.safe_mkdir(work_dir)
-    print(work_dir)
     
     func:Callable = SEEDING_METHOD_MAPPER.get( method )
 
@@ -214,7 +225,6 @@ def _seed_alphafill(stru: Structure,
 
     interface.pymol.general_cmd(session, args)
 
-
     if ligand.is_ligand():
         outfile = mimic_torsions(template, reactant)
     else:
@@ -262,11 +272,111 @@ def _seed_ligand_analog(stru, ligand, work_dir, **kwargs):
 
     ligand.shift( shift )
 
-def _seed_ligand_coordinate( stru, ligand, work_dir, **kwargs ):
-    pass
+def _seed_ligand_coordinate( stru:Structure, ligand:Ligand, work_dir:str, **kwargs ) -> None:
+    """
 
-def _seed_ligand_mole2( stru, ligand, work_dir, **kwargs ):
-    pass
+    Args:
+        stru: 
+        ligand:
+        work_dir:
+
+    Returns:
+        Nothing.
+    """
+
+
+def _seed_ligand_mole2( stru:Structure, ligand:Ligand, work_dir:str, **kwargs ) -> None:
+    """
+    Args:
+        stru: 
+        ligand:
+        work_dir:
+
+    Returns:
+        Nothing.
+    """
+    ligand:Ligand = stru.get(f"{ligand_chain}.{ligand_idx}")
+    ligand.placement_method = "mole2"
+    if not work_dir:
+        work_dir = config['system.SCRATCH_DIR']
+
+    relevant_constraints: List[str] = list()
+    
+    temp_pdb:str=f"{work_dir}/__temp.pdb"
+    to_delete:List[str] = [ temp_pdb ]
+
+    parser = PDBParser()
+    parser.save_structure( temp_pdb, stru )
+    cavities:List[Mole2Cavity] = interface.mole2.identify_cavities(temp_pdb)
+
+    seed_locations:List = list()
+    for cc in cavities:
+        vert_matrix = np.array(cc.points())
+        (x_min, y_min, z_min) = np.min(vert_matrix,axis=0)
+        (x_max, y_max, z_max) = np.max(vert_matrix,axis=0)
+        contained_points = list()
+        x_vals = list(np.arange(x_min, x_max+delta, delta))
+        y_vals = list(np.arange(y_min, y_max+delta, delta))
+        z_vals = list(np.arange(z_min, z_max+delta, delta))
+        
+        candidates = list()
+        for x in x_vals:
+            for y in y_vals:
+                for z in z_vals:
+                    candidates.append(np.array([x, y, z]))
+        candidates = np.array(candidates)
+        for included, cp in zip(cc.contains_points(candidates), candidates):
+            if included:
+                seed_locations.append(cp)
+
+
+    seed_locations = np.array(seed_locations)
+    scores = list()
+    
+    for sl in seed_locations:
+        #TODO(CJ): this is where I put the actual energy/constraint evaluation
+    
+        lig_start = ligand.geom_center
+        shift = sl - lig_start
+
+        ligand.shift(shift)
+
+        curr_energy = 0.0
+        for cst in constraints:
+            if sum([aa.parent == ligand for aa in cst.atoms]) > 1:
+                continue
+            curr_energy += interface.rosetta.score_energy(cst)
+        scores.append( curr_energy )            
+
+    scores = np.array(scores)
+
+    score_mask = np.isclose(scores, np.min(scores))
+
+    clash_counts = list()
+    
+    for slidx,sl in enumerate(seed_locations[score_mask]):
+        lig_start = ligand.geom_center
+        shift = sl - lig_start
+
+        ligand.shift(shift)
+        clash_ct = 0
+
+        for res in stru.residues:
+            if res == ligand:
+                continue
+            clash_ct += res.clash_count( ligand )
+    
+        clash_counts.append( clash_ct ) 
+
+    clash_counts = np.array(clash_counts)
+
+    clash_mask = np.isclose(clash_counts, np.min(clash_counts))
+
+    final_locations = seed_locations[score_mask][clash_mask]
+    seed = final_locations[0]
+
+    ligand.shift( seed - ligand.geom_center)
+    
 
 
 SEEDING_METHOD_MAPPER:Dict[str, Callable] = {
