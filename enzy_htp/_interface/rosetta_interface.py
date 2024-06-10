@@ -995,6 +995,7 @@ class RosettaInterface(BaseInterface):
             if opts.has('out:path:all'):
                 work_dir = opts['out:path:all']
             else:
+                #TODO(CJ): put an error code here
                 work_dir = config['system.SCRATCH_DIR']
                 opts['out:path:all'] = work_dir
 
@@ -1003,7 +1004,7 @@ class RosettaInterface(BaseInterface):
 
         opts['parser:protocol'] = str(Path(xml_file).absolute())
 
-        fname = f"{work_dir}/rosttascripts_start.pdb"
+        fname:str = f"{work_dir}/rosettascripts_start.pdb"
         parser = PDBParser()
         parser.save_structure(fname, stru)
 
@@ -1023,26 +1024,6 @@ class RosettaInterface(BaseInterface):
         os.chdir( start_dir )
 
         return opts['out:file:scorefile'] #TODO(CJ): add some stuff in for this
-
-#    def run_rosetta_scripts(self, opts: List[str], logfile: str = None) -> None:
-#        """Method that runs the rosettascripts executabl along with the supplied options. Optionally outputs
-#        the stdout to a specified logfile. Note that no sanitation is performed prior to running.
-#
-#        Args:
-#            opts: a list() of str() to be run by the RosettaScripts executable.
-#            logfile: The file to output the stdout log to. Optional.
-#
-#        Returns:
-#            Nothing,
-#        """
-#
-#        if logfile:
-#            opts.extend([">", str(logfile)])
-#
-#        self.env_manager_.run_command(self.config_.ROSETTA_SCRIPTS, opts, quiet_fail=True)
-#
-#        if logfile:
-#            _LOGGER.info(f"Saved RosettaScripts log to '{Path(logfile).absolute}'.")
 
     def parse_score_file(self, fname: str, work_dir:str=None) -> pd.DataFrame:
         """Method that parses a score file into a Pandas Dataframe. Only encodes lines that begin with SCORE.
@@ -1227,10 +1208,6 @@ class RosettaInterface(BaseInterface):
 
         return result
 
-#    def make_rosetta_scripts_cmd(
-#        self, 
-#        pdb_path,
-#        
 
     def relax(
         self,
@@ -2066,77 +2043,6 @@ class RosettaInterface(BaseInterface):
             Nothing.
         """
 
-        def fix_remodel(stru:Structure, seq_res:List[chem.SeqRes], work_dir:str) -> Structure:
-            """Hacky helper method that makes sure all of amino acids have the correct identities."""
-            content = """<ROSETTASCRIPTS>
-<SCOREFXNS>
-</SCOREFXNS>
-<RESIDUE_SELECTORS>
-</RESIDUE_SELECTORS>
-<PACKER_PALETTES>
-</PACKER_PALETTES>
-<TASKOPERATIONS>
-</TASKOPERATIONS>
-<MOVE_MAP_FACTORIES>
-</MOVE_MAP_FACTORIES>
-<SIMPLE_METRICS>
-</SIMPLE_METRICS>
-<FILTERS>
-</FILTERS>
-<MOVERS>""".split()
-            sr: chem.SeqRes  
-            muts = list()
-            for idx,(res, sr) in enumerate(zip(stru.residues, seq_res)):
-                seq_res_three_letter = chem.convert_to_three_letter(sr.one_letter())
-                if res.name == seq_res_three_letter:
-                    continue
-                mut_name = f"mut{idx+1}"
-                content.append(f"""<MutateResidue name="{mut_name}" target="{idx+1}" new_res="{seq_res_three_letter}" />""")
-                muts.append( mut_name )
-            if not muts:
-                return stru
-            content.extend("""</MOVERS>
-<PROTOCOLS>""".split())
-            
-            for mm in muts:
-                content.append(f"\t<Add mover_name=\"{mm}\"/>")
-
-            content.extend("""</PROTOCOLS>
-<OUTPUT />
-</ROSETTASCRIPTS>""".splitlines())
-            
-            script_file = f"{work_dir}/fix_remodel_script.xml"
-            pdb_infile = f"{work_dir}/fix_remodel.pdb"
-            pdb_outfile = f"{work_dir}/fix_remodel_0001.pdb"
-
-            fs.write_lines(script_file, content)
-            sp = PDBParser()
-            sp.save_structure(pdb_infile, stru)
-
-            opts = [
-                '-in:file:s', pdb_infile,
-                '-parser:protocol', script_file,
-                '-out:path:all', work_dir
-            ]
-            self.run_rosetta_scripts( opts )
-
-            if not Path(pdb_outfile).exists():
-                err_msg:str=f"The output file '{pdb_outfile}' was not created. Error during loop reconstruction fixing protocol."
-                _LOGGER.error( err_msg )
-                raise ValueError( err_msg )
-
-            result =  sp.get_structure( pdb_outfile )
-
-            fs.safe_rm(script_file)
-            fs.safe_rm(pdb_infile)
-            fs.safe_rm(pdb_outfile)
-
-            return result
-
-
-
-        fs.safe_mkdir( work_dir )
-
         translate_structure( stru, end_naming='rosetta' )
         
         all_chains:List[Chain] = stru.non_polypeptides
@@ -2173,38 +2079,43 @@ class RosettaInterface(BaseInterface):
 
             remodel_file:str = f"{work_dir}/input.remodel"
             fs.write_lines( remodel_file, content ) 
-            script_file:str=f"{work_dir}/remodel_script.xml"
-            pdb_file = f"{work_dir}/remodel_input.pdb"
-            pdb_outfile = f"{work_dir}/remodel_input_0001.pdb"
-            
-            opts:List[str] = [
-                    "-in:file:s", pdb_file,
-                    "-remodel:num_trajectory", "1",
-                    "-remodel:quick_and_dirty",
-                    "-overwrite",
-                    "-ignore_zero_occupancy", "false",
-                    "-remodel:use_blueprint_sequence", "true",
-                    "-remodel:blueprint", remodel_file,
-                    "-out:path:all", f"{work_dir}",
-                    ]
-            
+
+            opts = RosettaOptions()
+            opts['remodel:num_trajectory'] = 1
+            opts['remodel:quick_and_dirty'] = True
+            opts['overwrite'] = True
+            opts['ignore_zero_occupancy'] = False
+            opts['remodel:use_blueprint_sequence'] = True
+            opts['out:path:all'] =  f"{work_dir}"
+
+            protocol = RosettaScriptsProtocol()
+            protocol.add_mover( 
+                'RemodelMover', name='rm', blueprint=remodel_file
+            ).add_protocol(
+                mover_name='rm'
+            )
+
+            self.run_rosetta_scripts( single_chain_stru, protocol, opts )
+            df : pd.DataFrame = self.parse_score_file( opts['out:file:scorefile'] )
             parser = PDBParser() 
-            parser.save_structure( pdb_file, single_chain_stru )
-            self.env_manager_.run_command(
-                self.config_.get_exe("REMODEL"), 
-                opts, quiet_fail=True)
-        
-            if not Path(pdb_outfile).exists():
-                err_msg:str=f"The output file '{pdb_outfile}' was not created. Error during loop reconstruction."
-                _LOGGER.error( err_msg )
-                raise ValueError( err_msg )
-
-            filled_single_chain_stru = parser.get_structure( pdb_outfile )
+            filled_single_chain_stru = parser.get_structure( f"{opts['out:path:all']}/{df.iloc[0].description}.pdb")
+            if not chem.same_aa_sequence( 
+                filled_single_chain_stru.seqres_sequence,
+                seq_res ):
+                mut_protocol = RosettaScriptsProtocol()
+                for midx, (act, targ) in enumerate(zip( filled_single_chain_stru.seqres_sequence, seq_res)):
+                    
+                    if not act.same_aa( targ ):
+                        mut_name:str=f"mut{midx+1}"
+                        mut_protocol.add_mover(
+                            'MutateResidue', name=mut_name, target=f"{midx+1}", new_res=chem.convert_to_three_letter(targ.one_letter())
+                        ).add_protocol(
+                            mover_name=mut_name
+                        )
+                self.run_rosetta_scripts( filled_single_chain_stru, mut_protocol, opts )
+                df : pd.DataFrame = self.parse_score_file( opts['out:file:scorefile'] )
+                filled_single_chain_stru = parser.get_structure( f"{opts['out:path:all']}/{df.iloc[0].description}.pdb")
             
-            filled_single_chain_stru = fix_remodel(filled_single_chain_stru, seq_res, work_dir)
-            
-            assert len(seq_res) == len(filled_single_chain_stru.residues) 
-
             for sr, res in zip(seq_res, filled_single_chain_stru.residues ):
                 res.idx = sr.idx
                 res.parent.name = sr.chain 
