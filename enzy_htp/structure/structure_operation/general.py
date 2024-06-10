@@ -129,9 +129,6 @@ def update_residues(stru: Structure, ref_stru: Structure) -> Structure:
         if not self_res.is_ligand():
             self_res.atoms = copy.deepcopy(ref_res.atoms)  # this will also set self_res as parent
         else:
-            print(self_res.atoms[0])    
-            print(ref_res.atoms[0])    
-
             atom_names = [aa.name for aa in self_res.atoms]
             for atom in self_res.atoms:
                 for new_atom in ref_res.atoms:

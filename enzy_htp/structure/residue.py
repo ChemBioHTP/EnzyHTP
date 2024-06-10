@@ -11,7 +11,6 @@ import sys
 import math
 from typing import Tuple, List, Union
 
-
 import numpy as np
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
 from enzy_htp.core import _LOGGER
@@ -121,6 +120,18 @@ class Residue(DoubleLinkedNode):
             tokens[0] = self.chain.name
 
         return ".".join(tokens)
+
+    @property
+    def seqres(self) -> chem.SeqRes:
+        """Converts the Residue() into its respective SeqRes object."""
+        return chem.SeqRes(
+            model=1,
+            chain=self.parent.name,
+            idx=self.idx,
+            seq_idx=None,
+            name=self.name,
+            missing=False
+        )
 
     @property
     def num_atoms(self) -> int:
@@ -401,6 +412,7 @@ class Residue(DoubleLinkedNode):
             aa.coord = updated
 
     #endregion
+
 
     #region === Special ===
     def __str__(self) -> str:
