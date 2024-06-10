@@ -775,6 +775,19 @@ class PyMolInterface(BaseInterface):
             ])
             return results[-2] / results[-1]
 
+
+    def get_ligand_area(self, stru:Structure, ligand:Ligand) -> float:
+        """TODO(CJ)"""
+        (lig_chain, lig_idx) = ligand.key()
+        with OpenPyMolSession(self) as pms:
+            self.load_enzy_htp_stru( pms, stru )
+            results:List[Any] = self.general_cmd(pms,[
+                ('set', 'dot_solvent', 1),
+                ('create', 'ligand', f'chain {lig_chain} and resi {lig_idx} and not solvent'),
+                ('get_area', 'ligand'),
+            ])
+        return results[-1]            
+
 class OpenPyMolSession:
     """a context manager that open a pymol session once enter and close once exit"""
 

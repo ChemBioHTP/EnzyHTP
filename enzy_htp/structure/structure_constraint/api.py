@@ -273,7 +273,14 @@ class StructureConstraint(ABC):
     #TODO(CJ): add function that checks if topology and constraints are compatible
     #TODO(CJ): will need to make a version of this that actually works for the ResiduePairConstraint
     
+    def is_constraining(self, residue: Residue) -> bool:
+        """Is this StructureConstraint trying to enforce a constraint on the supplied Residue()?"""
+        for atom in self.atoms:
+            for r_atom in residue.atoms:
+                if atom==r_atom:
+                    return True
 
+        return False
 
 class CartesianFreeze(StructureConstraint):
     """Specialization of StructureConstraint() for Atoms() that are frozen in Cartesian space. Many

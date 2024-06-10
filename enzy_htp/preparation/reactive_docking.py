@@ -14,6 +14,11 @@ import numpy as np
 import pandas as pd
 
 from enzy_htp import interface, config, _LOGGER
+from enzy_htp._interface import (
+    RosettaOptions,
+    RosettaScriptsElement,
+    RosettaScriptsProtocol
+)
 import enzy_htp.structure.structure_operation as stru_oper
 from enzy_htp.structure.structure_constraint import StructureConstraint, CartesianFreeze
 
@@ -90,13 +95,12 @@ def dock_reactants(structure: Structure,
 
     translate_structure(structure, end_naming='rosetta')
     
-    param_files:List[str] = parameterize_structure(structure, work_dir)
+    interface.rosetta.parameterize_structure( structure, work_dir )
 
     for ligand in ligands:
         if id(ligand.root()) != id(structure):
             err_msg:str=f"The supplied ligand {ligand} is not a child of the supplied structure!"
             raise TypeError(err_msg)
-    
 
     ligands.reverse()
     while ligands:
@@ -110,40 +114,73 @@ def dock_reactants(structure: Structure,
                 else:
                     relevant_csts.append(cst)
 
+        opts = RosettaOptions()
+
+        ### boiler plate options that are always the same
+        opts['keep_input_protonation_state'] = True
+        opts['auto_setup_metals'] = True
+        opts['run:preserve_header'] = True
+        opts["packing:ex1"] = True
+        opts["packing:ex2"] = True
+        opts["packing:ex2aro"] = True
+        opts["packing:no_optH"] = False
+        opts["packing:flip_HNQ"] = True
+        opts["packing:ignore_ligand_chi"] = True
+        opts['out:overwrite'] = True
+        opts['out:level'] = 200
+
+        opts['run:constant_seed'] = True
+        opts['run:jran'] = rng_seed
+        opts['nstruct'] = n_struct
+        opts['out:path:all'] = work_dir
+        
+        ### parameterization
+        extra_res_fa:List[str] = list()
+        stub_parent: str = os.path.expandvars(
+            f"${config['rosetta.ROSETTA3']}/database/chemical/residue_type_sets/fa_standard/residue_types/protonation_states/")
+        
+        for stub in "GLU_P1 GLU_P2 LYS_D ASP_P1 TYR_D HIS_P ASP_P2".split():
+            extra_res_fa.append(f"'{stub_parent}/{stub}.params'")
+
+        if structure.data['rosetta_params']:
+            extra_res_fa.extend( structure.data['rosetta_params'] )
+            
+        opts['extra_res_fa'] = ' '.join(map(lambda pf: f"'{erf}'", extra_res_fa))
+        
+        ### script variables
+        opts.add_script_variable( 'ligand_chain', ligand.parent.name )
+        opts.add_script_variable( 'ligand_idx', ligand.idx )
+        opts.add_script_variable( 'grid_width', grid_width )
+        opts.add_script_variable( 'contact_threshold', contact_threshold )
+        opts.add_script_variable( 'clash_cutoff', clash_cutoff )
+        opts.add_script_variable( 'sasa_cutoff', max_sasa_ratio ) 
+        opts.add_script_variable( 'cst_cutoff', cst_energy )
+        opts.add_script_variable( 'box_size', box_size )
+        opts.add_script_variable( 'move_distance', move_distance )
+        opts.add_script_variable( 'transform_angle', transform_angle )
+        opts.add_script_variable( 'transform_cycles', transform_cycles )
+        opts.add_script_variable( 'transform_repeats', transform_repeats )
+        opts.add_script_variable( 'transform_temperature', transform_temperature )
+        opts.add_script_variable( 'fr_repeats', fr_repeats )
 
         dock_ligand(structure,
                         ligand,
                         relevant_csts,
-                        param_files,
-                        n_struct,
-                        clash_cutoff,
-                        max_sasa_ratio,
-                        cst_energy,
-                        cluster_distance,
-                        contact_threshold,
-                        box_size,
-                        move_distance,
-                        transform_angle,
-                        transform_cycles,
-                        transform_repeats,
-                        transform_temperature,
-                        1,#fr_repeats,
-                        grid_width,
+                        opts,
                         use_qm,
-                        rng_seed,
-                        f"{work_dir}/rosetta_docking/")
-
+                        cluster_distance
+                        )
 
     sp = PDBParser()
 
-    mm_minimization(structure, constraints, param_files, contact_threshold, False, fr_repeats, rng_seed, f"{work_dir}/rosetta_minimization/")
+    opts.add_script_variable('ramp_constraints', False)
+    mm_minimization(structure, constraints, opts)
 
     if use_qm:
         qm_minimization(structure, constraints, cluster_distance, False, work_dir)
 
-
-    mm_minimization(structure, constraints, param_files, contact_threshold, True, fr_repeats, rng_seed, f"{work_dir}/rosetta_minimization/")
-
+    opts.add_script_variable('ramp_constraints', True)
+    mm_minimization(structure, constraints, opts)
 
     if use_qm:
         qm_minimization(structure, [], cluster_distance, True, work_dir)
@@ -157,69 +194,61 @@ def dock_reactants(structure: Structure,
 
 def mm_minimization(structure:Structure,
                 constraints:List[StructureConstraint],
-                param_files:List[str],
-                contact_threshold:float,
-                ramp_constraints:bool,
-                fr_repeats:int,
-                rng_seed:int,
-                work_dir:str) -> None:
+                opts:RosettaOptions,
+                ) -> None:
     """
     """
 
-    fs.safe_mkdir(work_dir)
-    xml_script:str = create_minimization_xml(work_dir)
-    pdb_file:str=f"{work_dir}/start.pdb"
-    _sp = PDBParser()
-    _sp.save_structure(pdb_file, structure)
-    cst_file:str = interface.rosetta.write_constraint_file(structure, constraints, work_dir) #TODO(CJ): look at this; wrong constraint types!!
-
+    protocol = RosettaScriptsProtocol()
+    protocol.add_residue_selector(
+		'Index', name="ligand", resnums="%%ligand_idx%%"
+    ).add_residue_selector(
+		'CloseContact', name="ligand_active_site", residue_selector="ligand", contact_threshold="%%contact_threshold%%"
+    ).add_residue_selector(
+		'Not', name="not_ligand_active_site", selector="ligand_active_site"
+    ).add_scorefunction(
+        'ScoreFunction', name='hard_rep', weights='ligand'        
+    ).add_mover(
+        'FastRelax', name="frelax", scorefxn="hard_rep", cst_file="%%cst_file%%", repeats="%%fr_repeats%%", ramp_down_constraints="%%ramp_constraints%%", children=[
+			('MoveMap', {'name':"full_enzyme", 'bb':"true", 'chi':"true", 'jump':"true", 'children':[
+				('ResidueSelector', {'selector':"ligand_active_site",     'bb':"true", 'chi':"true", 'bondangle':"true" }),
+				('ResidueSelector', {'selector':"not_ligand_active_site", 'bb':"false", 'chi':"true", 'bondangle':"false"})
+                ]})]
+    ).add_protocol(
+        mover_name='frelax'
+    )
+    opts.add_script_variable('cst_file', 
+        interface.rosetta.write_constraint_file( structure, constraints, opts['out:path:all'])
+    )
+#    exit( 0 )
+#    fs.safe_mkdir(work_dir)
+#    xml_script:str = create_minimization_xml(work_dir)
+#    pdb_file:str=f"{work_dir}/start.pdb"
+#    _sp = PDBParser()
+#    _sp.save_structure(pdb_file, structure)
+#    cst_file:str = interface.rosetta.write_constraint_file(structure, constraints, work_dir) #TODO(CJ): look at this; wrong constraint types!!
+#
     sele = list()
     for cst in constraints:
         for atom in cst.atoms:
             parent_residue = atom.parent
             sele.append(f"{parent_residue.idx}{parent_residue.parent.name}")
 
-    sele = ",".join(list(set(sele)))
-        
-
-    #TODO(CJ): make the sele here
-    options_file:str = create_minimization_options(
-        work_dir,
-        pdb_file,
-        xml_script,
-        param_files,
-        rng_seed,
-        sele,
-        contact_threshold,
-        ramp_constraints,
-        cst_file,
-        fr_repeats
-    )
-
-    start_dir: str = os.getcwd()
+    opts.add_script_variable( 'ligand_idx',  ",".join(list(set(sele))))
     
-    os.chdir(work_dir)
-    
-    try:
-        interface.rosetta.run_rosetta_scripts([f"@{Path(options_file).name}"])
-    except:
-        pass
+    _LOGGER.info("Beginning Minimization step geometry sampling step...") #TODO(CJ):
+    interface.rosetta.run_rosetta_scripts(
+        structure,
+        protocol,
+        opts)
 
+    df: pd.DataFrame = interface.rosetta.parse_score_file(opts['out:file:scorefile'], opts['out:path:all'])
 
-    os.chdir(start_dir)
-
-    scores_file:str = f"{work_dir}/minimization_scores.sc"
-    
-    fs.check_file_exists(scores_file, exit_script = False )
-
-    df: pd.DataFrame = interface.rosetta.parse_score_file(scores_file)
-
-    df['description'] = df.apply(lambda row: f"{work_dir}/{row.description}.pdb", axis=1)
     
     energy_key='total_score'
 
     infile:str=df.sort_values(by=energy_key).description.to_list()[0]
-
+    
     _parser = PDBParser()
     ref_stru = _parser.get_structure(infile)
     stru_oper.update_residues(structure, ref_stru)
@@ -230,85 +259,90 @@ def mm_minimization(structure:Structure,
 def dock_ligand(structure:Structure,
                     ligand:Ligand,
                     constraints:List[StructureConstraint],
-                    param_files:List[str],
-                    n_struct:int,
-                    clash_cutoff:float,
-                    max_sasa_ratio:float,
-                    cst_energy:float,
-                    cluster_distance:float,
-                    contact_threshold:float,
-                    box_size:float,
-                    move_distance:float,
-                    transform_angle:float,
-                    transform_cycles:int,
-                    transform_repeats:int,
-                    transform_temperature:float,
-                    fr_repeats:int,
-                    grid_width:float,
+                    opts: RosettaOptions,
                     use_qm:bool,
-                    rng_seed:int,
-                    work_dir:str) -> None:
+                    cluster_distance:float=None
+                    ) -> None:
+    """TODO(CJ)""" 
+    
+    opts['qsar:grid_dir'] = str( Path(opts['out:path:all'] + "/qsar_grids/").absolute())
+    fs.safe_mkdir(opts['qsar:grid_dir'])
+    
+    protocol = RosettaScriptsProtocol()
+    protocol.add_scoring_grid(
+        ligand_chain='%%ligand_chain%%', width='%%grid_width%%', name='grid',children=[
+            ('ClassicGrid', {'grid_name':'classic', 'weight':'1.0'})]
+    ).add_residue_selector(
+        'Index', name='ligand', resnums='%%ligand_idx%%'
+    ).add_residue_selector(
+        'CloseContact', name='ligand_active_site', residue_selector='ligand', contact_threshold="%%contact_threshold%%"
+    ).add_residue_selector(
+        'Not', name="not_ligand_active_site", selector="ligand_active_site"
+    ).add_scorefunction(
+        'ScoreFunction', name='ligand_soft_rep', weights='ligand_soft_rep', children=[
+			('Reweight', {'scoretype':"coordinate_constraint", 'weight':"1.0"}),
+			('Reweight', {'scoretype':"atom_pair_constraint", 'weight':"1.0"}),
+			('Reweight', {'scoretype':"angle_constraint", 'weight':"1.0"}),
+			('Reweight', {'scoretype':"dihedral_constraint", 'weight':"1.0"}),
+			('Reweight', {'scoretype':"chainbreak", 'weight':"1.0"})
+        ]
+    ).add_scorefunction(
+        'ScoreFunction', name='hard_rep', weights='ligand'
+    ).add_constraint_generator(
+        'FileConstraintGenerator', name='add_cst', filename='%%cst_file%%'
+    ).add_mover(
+        'Transform', name='dock', chain='%%ligand_chain%%', box_size='%%box_size%%', 
+            move_distance='%%move_distance%%',  angle="%%transform_angle%%", cycles="%%transform_cycles%%",
+            repeats="%%transform_repeats%%", temperature="%%transform_temperature%%", grid_set="grid", 
+            use_constraints="true", cst_fa_file="%%cst_file%%"
+    ).add_mover(
+        "ConstraintSetMover", name="add_csts", add_constraints="true", cst_file="%%cst_file%%" 
+    ).add_mover(
+        "ClearConstraintsMover", name="rm_csts"
+    ).add_mover(
+        'FastRelax', name="frelax", scorefxn="hard_rep", cst_file="%%cst_file%%", repeats="%%fr_repeats%%", children=[
+            ('MoveMap', {'name':"full_enzyme", 'bb':"true", 'chi':"true", 'jump':"true", 'children':[
+                ('ResidueSelector', {'selector':"ligand_active_site", 'bb':"true", 'chi':"true", 'bondangle':"true"}),
+				('ResidueSelector', {'selector':"not_ligand_active_site", 'bb':"false", 'chi':"true", 'bondangle':"false"})
+                ]}
+            )]
+    ).add_filter(
+		'SimpleMetricFilter', name="clash_filter", comparison_type="lt_or_eq", cutoff="%%clash_cutoff%%", composite_action="any", children=[
+			('PerResidueClashMetric', {'name':"clash", 'residue_selector':"ligand", 'residue_selector2':"ligand_active_site"})]
+    ).add_filter(
+        "SimpleMetricFilter", name="sasa_filter", comparison_type="lt_or_eq", cutoff="%%sasa_cutoff%%", composite_action="any", children=[
+            ('SasaMetric', {'name':"sasa", 'residue_selector':"ligand"})  ]
+    ).add_filter(
+        'ConstraintScore', name="cst_filter", constraint_generators="add_cst", threshold="%%cst_cutoff%%" 
+    ).add_protocol(
+        mover_name="dock"
+    ).add_protocol(
+        filter="clash_filter"
+    ).add_protocol(
+        filter="sasa_filter"
+    ).add_protocol(
+        mover_name="frelax"    
+    ).add_protocol(
+        filter="cst_filter"    
+    ).add_protocol(
+        mover_name="rm_csts"
+    )
+    
+    ligand_area:float=interface.pymol.get_ligand_area( structure, ligand )
+    
+    opts.add_script_variable('sasa_cutoff',  int(opts.get_script_variable('sasa_cutoff')*ligand_area))
 
-
-    fs.safe_mkdir(work_dir)
-    xml_script:str = create_docking_xml(work_dir)
-    pdb_file:str=f"{work_dir}/start.pdb"
-    _sp = PDBParser()
-    _sp.save_structure(pdb_file, structure)
-
-    cst_file:str = interface.rosetta.write_constraint_file(structure, constraints, work_dir) #TODO(CJ): look at this; wrong constraint types!!
-    session = interface.pymol.new_session()
-    ligand_area:float=interface.pymol.general_cmd(session, [
-        ('load', pdb_file),
-        ('get_area', f"chain {ligand.parent.name} and resi {ligand.idx}")
-    ])[-1]
-    sasa_cutoff:int = int(max_sasa_ratio*ligand_area)
-
-    options_file:str = create_docking_options(
-                work_dir,
-                pdb_file,
-                xml_script,
-                param_files,
-                rng_seed,
-                n_struct,
-                ligand.parent.name,
-                sasa_cutoff,
-                clash_cutoff,
-                contact_threshold,
-                f"{ligand.idx}{ligand.parent.name}",
-                cst_energy,
-                cst_file,
-                box_size,
-                move_distance,
-                transform_angle,
-                transform_cycles,
-                transform_repeats,
-                transform_temperature,
-                fr_repeats,
-                grid_width
-                )
+    opts.add_script_variable('cst_file', 
+        interface.rosetta.write_constraint_file( structure, constraints, opts['out:path:all'])
+    )
 
     _LOGGER.info("Beginning RosettaLigand geometry sampling step...")
-    
-    start_dir: str = os.getcwd()
-    
-    os.chdir(work_dir)
-    
-    try:
-        interface.rosetta.run_rosetta_scripts([f"@{Path(options_file).name}"])
-    except:
-        pass
+    interface.rosetta.run_rosetta_scripts(
+        structure,
+        protocol,
+        opts)
 
-
-    os.chdir(start_dir)
-
-    scores_file:str = f"{work_dir}/docking_scores.sc"
-    
-    fs.check_file_exists(scores_file, exit_script = False )
-
-    df: pd.DataFrame = interface.rosetta.parse_score_file(scores_file)
-
-    df['description'] = df.apply(lambda row: f"{work_dir}/{row.description}.pdb", axis=1)
+    df: pd.DataFrame = interface.rosetta.parse_score_file(opts['out:file:scorefile'], opts['out:path:all'])
 
     energy_key:str=None        
     if use_qm:
@@ -326,381 +360,6 @@ def dock_ligand(structure:Structure,
 
     for cst in constraints:
         cst.change_topology(structure)
-
-    
-
-def create_docking_xml(work_dir:str) -> str:
-    
-    script_name:str=f"{work_dir}/docking_script.xml"
-
-    content:List[str]="""<ROSETTASCRIPTS>
-	<SCORINGGRIDS ligand_chain="%%ligand_chain%%" width="%%grid_width%%" name="grid">
-		<ClassicGrid grid_name="classic" weight="1.0"/>
-	</SCORINGGRIDS>
-	<RESIDUE_SELECTORS>
-		<Index name="ligand" resnums="%%ligand_idx%%"/>
-		<CloseContact name="ligand_active_site" residue_selector="ligand" contact_threshold="%%contact_threshold%%"/>
-		<Not name="not_ligand_active_site" selector="ligand_active_site"/>
-	</RESIDUE_SELECTORS>
-	<SCOREFXNS>
-		<ScoreFunction name="ligand_soft_rep" weights="ligand_soft_rep">
-			<Reweight scoretype="coordinate_constraint" weight="1.0"/>
-			<Reweight scoretype="atom_pair_constraint" weight="1.0"/>
-			<Reweight scoretype="angle_constraint" weight="1.0"/>
-			<Reweight scoretype="dihedral_constraint" weight="1.0"/>
-			<Reweight scoretype="chainbreak" weight="1.0"/>
-		</ScoreFunction>
-		<ScoreFunction name="hard_rep" weights="ligand"/>
-	</SCOREFXNS>
-	<LIGAND_AREAS>
-	</LIGAND_AREAS>
-	<INTERFACE_BUILDERS>
-	</INTERFACE_BUILDERS>
-	<MOVEMAP_BUILDERS>
-	</MOVEMAP_BUILDERS>
-	<TASKOPERATIONS>
-	</TASKOPERATIONS>
-	<SIMPLE_METRICS>
-	</SIMPLE_METRICS>
-    <CONSTRAINT_GENERATORS>
-        <FileConstraintGenerator name="add_cst" filename="%%cst_file%%" />
-    </CONSTRAINT_GENERATORS>
-	<MOVERS>
-
-		<Transform name="dock" chain="%%ligand_chain%%" box_size="%%box_size%%" move_distance="%%move_distance%%" angle="%%transform_angle%%" cycles="%%transform_cycles%%" repeats="%%transform_repeats%%" temperature="%%transform_temperature%%" grid_set="grid" use_constraints="true" cst_fa_file="%%cst_file%%"/>
-        
-        <ConstraintSetMover name="add_csts" add_constraints="true" cst_file="%%cst_file%%" />
-
-        <ClearConstraintsMover name="rm_csts" />
-
-        <FastRelax name="frelax" scorefxn="hard_rep" cst_file="%%cst_file%%" repeats="%%fr_repeats%%">
-			<MoveMap name="full_enzyme" bb="true" chi="true" jump="true">
-				<ResidueSelector selector="ligand_active_site"     bb="true" chi="true" bondangle="true" />
-				<ResidueSelector selector="not_ligand_active_site" bb="false" chi="true" bondangle="false"/>
-			</MoveMap>
-		</FastRelax>
-	</MOVERS>
-
-	<FILTERS>
-		<SimpleMetricFilter name="clash_filter" comparison_type="lt_or_eq" cutoff="%%clash_cutoff%%" composite_action="any">
-			<PerResidueClashMetric name="clash" residue_selector="ligand" residue_selector2="ligand_active_site"/>
-		</SimpleMetricFilter>
-        <SimpleMetricFilter name="sasa_filter" comparison_type="lt_or_eq" cutoff="%%sasa_cutoff%%" composite_action="any">
-            <SasaMetric name="sasa" residue_selector="ligand" />
-		</SimpleMetricFilter>
-
-        <ConstraintScore name="cst_filter" constraint_generators="add_cst" threshold="%%cst_cutoff%%" />
-	</FILTERS>
-
-	<PROTOCOLS>
-		<Add mover_name="dock"      />
-		<Add filter="clash_filter"  />
-        <Add filter="sasa_filter"   />
-		<Add mover_name="frelax"    />
-        <Add filter="cst_filter"    />
-        <Add mover_name="rm_csts"   />
-	</PROTOCOLS>
-	<OUTPUT>
-	</OUTPUT>
-</ROSETTASCRIPTS>""".splitlines()
-    
-    fs.write_lines(script_name, content)
-    
-    return script_name
-
-def create_minimization_xml(work_dir:str) -> str:
-
-    script_name:str=f"{work_dir}/minimization_script.xml"
-
-    content:str="""<ROSETTASCRIPTS>
-	<RESIDUE_SELECTORS>
-		<Index name="ligand" resnums="%%ligand_idx%%"/>
-		<CloseContact name="ligand_active_site" residue_selector="ligand" contact_threshold="%%contact_threshold%%"/>
-		<Not name="not_ligand_active_site" selector="ligand_active_site"/>
-	</RESIDUE_SELECTORS>
-	<SCOREFXNS>
-		<ScoreFunction name="hard_rep" weights="ligand"/>
-	</SCOREFXNS>
-	<LIGAND_AREAS>
-	</LIGAND_AREAS>
-	<INTERFACE_BUILDERS>
-	</INTERFACE_BUILDERS>
-	<MOVEMAP_BUILDERS>
-	</MOVEMAP_BUILDERS>
-	<TASKOPERATIONS>
-	</TASKOPERATIONS>
-	<SIMPLE_METRICS>
-	</SIMPLE_METRICS>
-    <CONSTRAINT_GENERATORS>
-        <FileConstraintGenerator name="add_cst" filename="%%cst_file%%" />
-    </CONSTRAINT_GENERATORS>
-	<MOVERS>
-        <FastRelax name="frelax" scorefxn="hard_rep" cst_file="%%cst_file%%" repeats="%%fr_repeats%%" ramp_down_constraints="%%ramp_constraints%%">
-			<MoveMap name="full_enzyme" bb="true" chi="true" jump="true">
-				<ResidueSelector selector="ligand_active_site"     bb="true" chi="true" bondangle="true" />
-				<ResidueSelector selector="not_ligand_active_site" bb="false" chi="true" bondangle="false"/>
-			</MoveMap>
-		</FastRelax>
-	</MOVERS>
-
-	<FILTERS>
-	</FILTERS>
-
-	<PROTOCOLS>
-		<Add mover_name="frelax" />
-	</PROTOCOLS>
-	<OUTPUT>
-	</OUTPUT>
-</ROSETTASCRIPTS>""".splitlines()
-
-    fs.write_lines(script_name, content)
-    
-    return script_name
-
-def create_minimization_options(work_dir:str,
-                            pdb_file: str,
-                            xml_file: str,
-                            param_files: List[str],
-                            rng_seed: int,
-                            sele,
-                            contact_threshold,
-                            ramp_constraints,
-                            cst_file,
-                            fr_repeats
-                            ) -> str:
-                            
-    """Makes the docking_options.txt file that the docking run will actually use. This function DOES NOT make any checks to the inputs.
-    
-    Args:
-        pdb_file: The .pdb file (with constraints) to use. 
-        xml_file: The validated RosettaScripts .xml file to be used for docking.
-        param_files: The list() of reactant .params files.
-        work_dir: The working directory 
-        rng_seed: rng seed to be used during dcking.
-        n_struct: Number of strutures to make as an int().
-
-    Returns:
-        Path to the docking_options.txt file with all the Rosetta options.
-    """
-    _LOGGER.info("Beginning creation of options file for Rosetta...")
-    content: List[str] = [
-        "-keep_input_protonation_state", 
-        "-auto_setup_metals",
-        "-run:constant_seed",
-        f"-run:jran {int(rng_seed)}",
-        "-in:file",
-        f"    -s '{Path(pdb_file).name}'",
-    ]
-
-    for pf in param_files:
-        content.append(f"    -extra_res_fa '{Path(pf).absolute()}'")
-
-    stub_parent: str = os.path.expandvars(
-        f"${config['rosetta.ROSETTA3']}/database/chemical/residue_type_sets/fa_standard/residue_types/protonation_states/")
-    for stub in "GLU_P1.params GLU_P2.params LYS_D.params ASP_P1.params TYR_D.params HIS_P.params ASP_P2.params".split():
-        content.append(f"    -extra_res_fa '{stub_parent}/{stub}'")
-
-    content.extend([
-        "-run:preserve_header",
-        "-packing",
-        "    -ex1",
-        "    -ex2aro",
-        "    -ex2 ",
-        "    -no_optH false",
-        "    -flip_HNQ true",
-        "    -ignore_ligand_chi true",
-        "-parser",
-        f"   -protocol {Path(xml_file).absolute()}",
-        f"""   -script_vars ligand_idx={sele} \\""",
-        f"""                contact_threshold={contact_threshold} \\""",
-        f"""                ramp_constraints={"true" if ramp_constraints else "false"} \\""",
-        f"""                cst_file={cst_file} \\""",
-        f"""                fr_repeats={fr_repeats}""",
-        "-out",
-        f"   -file:scorefile 'minimization_scores.sc'",
-        "   -level 200",
-        "   -overwrite",
-        "   -path",
-        f"       -all '{work_dir}'",
-    ])
-
-    fname = Path(work_dir) / "minimization_options.txt"
-    score_file: str = f"{work_dir}/minimization_scores.sc"
-
-    _LOGGER.info(f"\toptions file: {fname}")
-    _LOGGER.info(f"\tscore file: {score_file}")
-    _LOGGER.info(f"\tenzyme-reactant complexes directory: {work_dir}/complexes")
-    
-    fs.safe_rm(fname)
-    fs.safe_rm(score_file)
-    
-    _LOGGER.info(f"Wrote the below settings to {fname}:")
-    for ll in content:
-        _LOGGER.info(f"\t{ll}")
-    fs.write_lines(fname, content)
-
-    option_file = fname.absolute()
-
-    return str(fname)
-
-
-
-def create_docking_options(work_dir:str,
-                            pdb_file: str,
-                            xml_file: str,
-                            param_files: List[str],
-                            rng_seed: int,
-                            n_struct: int,
-                            ligand_chain:str,
-                            sasa_cutoff:int,
-                            clash_cutoff:int,
-                            contact_threshold:float,
-                            ligand_idx:str,
-                            cst_cutoff:int,
-                            cst_file:str,
-                            box_size:float,
-                            move_distance:float,
-                            transform_angle:int,
-                            transform_cycles:int,
-                            transform_repeats:int,
-                            transform_temperature:int,
-                            fr_repeats:int,
-                            grid_width:float) -> str:
-                            
-    """Makes the docking_options.txt file that the docking run will actually use. This function DOES NOT make any checks to the inputs.
-    
-    Args:
-        pdb_file: The .pdb file (with constraints) to use. 
-        xml_file: The validated RosettaScripts .xml file to be used for docking.
-        param_files: The list() of reactant .params files.
-        work_dir: The working directory 
-        rng_seed: rng seed to be used during dcking.
-        n_struct: Number of strutures to make as an int().
-
-    Returns:
-        Path to the docking_options.txt file with all the Rosetta options.
-    """
-    _LOGGER.info("Beginning creation of options file for Rosetta...")
-    content: List[str] = [
-        "-keep_input_protonation_state", 
-        "-auto_setup_metals",
-        "-run:constant_seed",
-        f"-run:jran {int(rng_seed)}",
-        "-in:file",
-        f"    -s '{Path(pdb_file).name}'",
-    ]
-
-    for pf in param_files:
-        content.append(f"    -extra_res_fa '{Path(pf).absolute()}'")
-
-    stub_parent: str = os.path.expandvars(
-        f"${config['rosetta.ROSETTA3']}/database/chemical/residue_type_sets/fa_standard/residue_types/protonation_states/")
-    for stub in "GLU_P1.params GLU_P2.params LYS_D.params ASP_P1.params TYR_D.params HIS_P.params ASP_P2.params".split():
-        content.append(f"    -extra_res_fa '{stub_parent}/{stub}'")
-
-    content.extend([
-        "-run:preserve_header",
-        "-packing",
-        "    -ex1",
-        "    -ex2aro",
-        "    -ex2 ",
-        "    -no_optH false",
-        "    -flip_HNQ true",
-        "    -ignore_ligand_chi true",
-        "-parser",
-        f"   -protocol {Path(xml_file).absolute()}",
-        f"""   -script_vars ligand_chain={ligand_chain} \\""",
-        f"""                {sasa_cutoff=} \\""",
-        f"""                {clash_cutoff=} \\""",
-        f"""                contact_threshold={contact_threshold:.1f} \\""",
-        f"""                ligand_idx={ligand_idx} \\""",
-        f"""                {cst_cutoff=} \\""",
-        f"""                cst_file={cst_file} \\""",
-        f"""                box_size={box_size:.1f} \\""",
-        f"""                move_distance={move_distance:.1f} \\""",
-        f"""                {transform_angle=} \\""",
-        f"""                {transform_cycles=} \\""",
-        f"""                {transform_repeats=} \\""",
-        f"""                {transform_temperature=} \\""",
-        f"""                {fr_repeats=} \\""",
-        f"""                grid_width={grid_width:.1f}""", 
-        "-out",
-        f"   -file:scorefile 'docking_scores.sc'",
-        "   -level 200",
-        f"   -nstruct {n_struct}",
-        "   -overwrite",
-        "   -path",
-        f"       -all '{work_dir}'",
-    ])
-
-    qsar_grid: str = str(Path(f"{work_dir}/qsar_grids/").absolute())
-    content.append(f"-qsar:grid_dir {qsar_grid}")
-
-    fname = Path(work_dir) / "docking_options.txt"
-    score_file: str = f"{work_dir}/docking_scores.sc"
-
-    _LOGGER.info(f"\toptions file: {fname}")
-    _LOGGER.info(f"\tscore file: {score_file}")
-    _LOGGER.info(f"\tenzyme-reactant complexes directory: {work_dir}/")
-    _LOGGER.info(f"\tqsar_gird directory: {qsar_grid}")
-    
-    fs.safe_rm(fname)
-    fs.safe_rm(score_file)
-    fs.safe_rmdir(qsar_grid)
-    fs.safe_mkdir(qsar_grid)
-    
-    _LOGGER.info(f"Wrote the below settings to {fname}:")
-    for ll in content:
-        _LOGGER.info(f"\t{ll}")
-    fs.write_lines(fname, content)
-
-    option_file = fname.absolute()
-
-    return str(fname)
-
-
-def parameterize_structure(structure:Structure, work_dir:str) -> List[str]:
-    
-    result:List[str] = list()
-    for residue in structure.residues:
-        if residue.is_ligand():
-            result.append(generate_ligand_params(residue, work_dir))
-
-    return result
-
-def generate_ligand_params(ligand:Ligand, work_dir:str) -> List[str]:
-    """Given the input Structure(), parameterize everything needed to use the Ligand()'s in Rosetta.
-    
-    Args:
-        stru: The Structure() to parameterize.
-        work_dir: Where temporary files will be saved.
-
-    Returns:
-        A List[str] with ligand .params files.         
-    """
-    #TODO(CJ): probably move this to the RosettaInterface
-    _LOGGER.info("Beginning preparation of each reactant...")
-  
-    param_file:str = f"{work_dir}/{ligand.name}.params"
-    if Path(param_file).exists():
-        return param_file
-
-
-    parser = Mol2Parser()
-    if ligand.net_charge is None:
-        ligand.net_charge = interface.bcl.calculate_formal_charge( ligand )
-
-
-    param_file:str = interface.rosetta.parameterize_ligand(ligand, charge=ligand.net_charge, work_dir=work_dir)
-    
-    _LOGGER.info(f"Information for reactant {ligand.name}:")
-    _LOGGER.info(f"\tparam file: {param_file}")
-    _LOGGER.info(f"\tcharge: {ligand.net_charge}")
-    _LOGGER.info(f"\tnum conformers: {ligand.n_conformers()}")
-    
-    _LOGGER.info("Finished reactant preparation!")
-    return param_file
-
 
 def get_active_site_sele(structure: Structure, distance_cutoff:float) -> str:
     """Creates a pymol-compatible sele for the active site of the supplied Structure(). Basic structure
@@ -803,9 +462,6 @@ def evaluate_geometry_qm_energy(df: pd.DataFrame, structure: Structure, cluster_
     Returns:
         Nothing.        
     """
-#    if not df.selected.sum():
-#        _LOGGER.error("No geometries are still selected!")
-#        raise TypeError()
 
     _LOGGER.info(f"Beginning qm energy evaluation.")
     as_sele:str = get_active_site_sele(structure, cluster_cutoff)
@@ -813,7 +469,6 @@ def evaluate_geometry_qm_energy(df: pd.DataFrame, structure: Structure, cluster_
 
     _parser = PDBParser()
     for i, row in df.iterrows():
-
 
         energy:float = None
         _df_stru = _parser.get_structure( row.description )

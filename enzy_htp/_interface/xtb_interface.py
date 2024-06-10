@@ -147,7 +147,6 @@ class XTBSinglePointEngine(QMSinglePointEngine):
 
         start_dir:str = os.getcwd()
         os.chdir(run_info['work_dir'])
-
         results = self.parent_interface.env_manager_.run_command(
                 self.parent_interface.config()['XTB_EXE'],
                 run_info['args'])

@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 
 
+from enzy_htp.core.general import HiddenPrints
 import enzy_htp.chemical as chem
 from enzy_htp import config as eh_config
 from enzy_htp.mutation_class.mutation import Mutation
@@ -65,9 +66,24 @@ class RosettaOptions:
         result = str()
 
         for key_name, value in self.script_vars.items():
-            result += f" {key_name}={self.convert_value_(value)}"
+            temp_value:str = self.convert_value_(value)
+            if temp_value[0] == "'":
+                temp_value = temp_value[1:]
+            
+            if temp_value[-1] == "'":
+                temp_value = temp_value[:-1]
+
+            result += f" {key_name}={temp_value}"
 
         self['parser:script_vars'] = result
+
+    def add_script_variable(self, key:str, value:Any) -> None:
+
+        self.script_vars_[key] = value 
+
+    def get_script_variable(self, key:stry) -> Any:
+
+        return self.script_vars_[key]
 
 
     @property
@@ -100,6 +116,17 @@ class RosettaOptions:
             ptr = new_ptr
 
         ptr[tks[-1]] = value
+
+    def has(self, key:str) -> bool:
+        #TODO(CJ): documentation
+        result = None
+        try:
+            with HiddenPrints() as hp:
+                result = self[key]
+        except:
+            pass
+
+        return result is not None
 
 
     def __getitem__(self, key:str) -> Any:
@@ -215,6 +242,12 @@ class RosettaScriptsElement:
         if children_temp:
             self.children_ = children_temp
 
+            for cidx, cc in enumerate( self.children_ ):
+                if not isinstance( cc, RosettaScriptsElement ):
+                    self.children_[cidx] = RosettaScriptsElement(
+                        cc[0], **cc[1]
+                    )
+
         for k, v in kwargs.items():
             self.attrib[k] = v
 
@@ -260,13 +293,13 @@ class RosettaScriptsElement:
 
         return content 
 
-
 class RosettaScriptsProtocol:
+    #TODO(CJ): documentation
 
     def __init__(self):
         self.sections = defaultdict(list)
-        self.section_names = "SCORINGGRIDS SCOREFXNS RESIDUE_SELECTORS PACKER_PALETTES TASKOPERATIONS MOVE_MAP_FACTORIES SIMPLE_METRICS FILTERS MOVERS PROTOCOLS OUTPUT".split()
-
+        self.section_names = "SCORINGGRIDS SCOREFXNS RESIDUE_SELECTORS PACKER_PALETTES TASKOPERATIONS MOVE_MAP_FACTORIES SIMPLE_METRICS CONSTRAINT_GENERATORS FILTERS MOVERS PROTOCOLS OUTPUT".split()
+    
     def add_element(self, section:str, element:RosettaScriptsElement) -> None:
         #TODO(CJ): add checks
 
@@ -276,35 +309,86 @@ class RosettaScriptsProtocol:
 
         self.sections[section].append( element )
 
+        return self
 
-    def add_scorefunction(self, scorefxn: RosettaScriptsElement) -> None:
+    @dispatch
+    def add_scorefunction(self, scorefxn: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        return self.add_element("SCOREFXNS", scorefxn)
+    
+    @dispatch
+    def add_scorefunction(self, sf_name:str, **kwargs) -> RosettaScriptsProtocol:
+        return self.add_element("SCOREFXNS", 
+            RosettaScriptsElement(sf_name, **kwargs)
+        )
 
-        self.add_element("SCOREFXNS", scorefxn)
+    @dispatch
+    def add_residue_selector(self, res_selector: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        return self.add_element("RESIDUE_SELECTORS", res_selector)
 
-    def add_residue_selector(self, res_selector: RosettaScriptsElement) -> None:
-        self.add_element("RESIDUE_SELECTORS", res_selector)
+    @dispatch
+    def add_residue_selector(self, rs_type:str, **kwargs) -> RosettaScriptsProtocol:
+        return self.add_residue_selector(
+            RosettaScriptsElement(rs_type, **kwargs)
+        )
+    
+    @dispatch
+    def add_mover(self, mover: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        return self.add_element("MOVERS", mover)
 
-    def add_mover(self, mover: RosettaScriptsElement) -> None:
-        self.add_element("MOVERS", mover)
+    @dispatch
+    def add_mover(self, m_name:str, **kwargs) -> RosettaScriptsProtocol:
+        return self.add_element("MOVERS", 
+            RosettaScriptsElement(m_name, **kwargs)
+        )
 
-    def add_filter(self, r_filter: RosettaScriptsElement) -> None:
-        self.add_element("FILTERS", r_filter)
+    @dispatch
+    def add_filter(self, r_filter: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        return self.add_element("FILTERS", r_filter)
+
+    @dispatch
+    def add_filter(self, rf_name: str, **kwargs) -> RosettaScriptsProtocol:
+        return self.add_element("FILTERS", 
+            RosettaScriptsElement( rf_name, **kwargs )
+        )
 
 
     def add_simple_metric(self, simple_metric: RosettaScriptsElement) -> None:
-        self.add_element("SIMPLE_METRICS", simple_metric)
+        return self.add_element("SIMPLE_METRICS", simple_metric)
 
-    def add_protocol(self, protocol: RosettaScriptsElement) -> None:
+    @dispatch
+    def add_protocol(self, protocol: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        return self.add_element("PROTOCOLS", protocol)
 
-        self.add_element("PROTOCOLS", protocol)
+    @dispatch
+    def add_protocol(self, **kwargs) -> RosettaScriptsProtocol:
+        return self.add_protocol(
+            RosettaScriptsElement('Add', **kwargs)
+        )
+
+    @dispatch
+    def add_constraint_generator(self, cst_gen: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        return self.add_element('CONSTRAINT_GENERATORS', cst_gen)
+
+    @dispatch
+    def add_constraint_generator(self, cg_name:str, **kwargs) -> RosettaScriptsProtocol:
+        return self.add_element('CONSTRAINT_GENERATORS', 
+            RosettaScriptsElement(cg_name, **kwargs)
+        )
+
+    @dispatch
+    def add_scoring_grid(self, scoring_grid: RosettaScriptsElement) -> RosettaScriptsProtocol:
+
+        return self.add_element("SCORINGGRIDS", scoring_grid)
+
+    @dispatch
+    def add_scoring_grid(self, **kwargs ) -> RosettaScriptsProtocol:
+        return self.add_element("SCORINGGRIDS", 
+            RosettaScriptsElement('', **kwargs)
+        )
 
 
-    def add_scoring_grid(self, scoring_grid: RosettaScriptsElement) -> None:
-
-        self.add_element("SCORINGGRIDS", scoring_grid)
 
     def to_file(self, fname:str) -> str:
-
         content:List[str] = [ "<ROSETTASCRIPTS>"] 
 
         for sn in self.section_names:
@@ -903,10 +987,17 @@ class RosettaInterface(BaseInterface):
                     stru: Structure,
                     protocol:RosettaScriptsProtocol,
                     opts:RosettaOptions,
-                    work_dir:str) -> str:
+                    work_dir:str=None) -> str:
         """
             opts: a list() of str() to be run by the RosettaScripts executable.  logfile: The file to output the stdout log to. Optional.
         """
+        if work_dir is None:
+            if opts.has('out:path:all'):
+                work_dir = opts['out:path:all']
+            else:
+                work_dir = config['system.SCRATCH_DIR']
+                opts['out:path:all'] = work_dir
+
         opts_file:str = str(Path(f"{work_dir}/rosetta_options.txt").absolute())
         xml_file:str = str(Path(f"{work_dir}/rosetta_protocol.xml").absolute())
 
@@ -922,6 +1013,7 @@ class RosettaInterface(BaseInterface):
         protocol.to_file(xml_file)
 
         opts['out:file:scorefile'] = f"{work_dir}/score.sc"
+        fs.safe_rm( f"{work_dir}/score.sc" )
 
         work_dir = Path(opts_file).parent.absolute()
         start_dir:str = os.getcwd()
@@ -952,11 +1044,12 @@ class RosettaInterface(BaseInterface):
 #        if logfile:
 #            _LOGGER.info(f"Saved RosettaScripts log to '{Path(logfile).absolute}'.")
 
-    def parse_score_file(self, fname: str) -> pd.DataFrame:
+    def parse_score_file(self, fname: str, work_dir:str=None) -> pd.DataFrame:
         """Method that parses a score file into a Pandas Dataframe. Only encodes lines that begin with SCORE.
 
         Args:
             fname: Path to the score file. Will error if does not exist.
+            #TODO(CJ): update docs                
 
         Returns:
             A pandas dataframe containing the data in the supplied score file.
@@ -979,6 +1072,10 @@ class RosettaInterface(BaseInterface):
             if cn == 'description':
                 continue
             df[cn] = df[cn].astype('float')
+
+        if work_dir is not None:
+            df['description'] = df.apply(lambda row: f"{work_dir}/{row.description}.pdb", axis=1)
+
 
         return df
 
@@ -1757,8 +1854,12 @@ class RosettaInterface(BaseInterface):
         lines:List[str] = list()
         for cst in constraints:
             if cst.is_distance_constraint():
-                assert False
-                pass
+                ridx_1:int=stru.absolute_index(cst.atoms[0].parent, indexed=1)
+                ridx_2:int=stru.absolute_index(cst.atoms[1].parent, indexed=1)
+                lines.append(
+                    f"AtomPair {cst.atoms[0].name} {ridx_1} {cst.atoms[1].name} {ridx_2} LINEAR_PENALTY {cst.target_value:.2f} 0.00 {cst['rosetta']['tolerance']:.2f} {cst['rosetta']['penalty']:.2f}"
+                )
+
             elif cst.is_angle_constraint():
                 assert False
             elif cst.is_dihedral_constraint():
@@ -2115,3 +2216,19 @@ class RosettaInterface(BaseInterface):
         translate_structure(filled_stru, start_naming='rosetta' )
         filled_stru.sort_chains()
         stru.chains = filled_stru.chains
+
+
+    def parameterize_structure(self, stru:Structure, param_dir:str) -> None:
+        """TODO(CJ)"""
+        params_list:List[str] = list()
+        for res in stru.residues:
+            if res.is_ligand():
+                lname:str = res.name
+                params_file:str = Path(param_dir)/ f"{lname}.params"
+                if not params_file.exists():
+                    self.parameterize_ligand(res, charge=res.net_charge, work_dir=param_dir)
+                
+                params_list.append( str(params_file) )
+        
+        stru.data['rosetta_params'] = params_list
+
