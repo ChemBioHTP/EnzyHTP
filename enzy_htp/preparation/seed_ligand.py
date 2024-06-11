@@ -1,10 +1,7 @@
-"""Aids in the preparation of enzyme systems by providing an initial, unrefined "seed" for a given ligand. 
-This functionality is accessed through the seed_ligand() free function. The strategy for how the ligand is 
-seeded can be specified by the 'method' keyword argument. Available options are:
-    + coordinate: uses the specified (x, y, z) seed, or if multiple are supplied, one is chosen at random
-    + alphafill: uses homology modelling with alphafill to place 
-    + ligand_analog: uses homology modelling with AlphaFill but bases the geometry off of a specified ligand analog 
-    + mole2: uses a combination of constraints and clashes to choose a cavity identified by mole2 
+"""Aids in the preparation of enzyme systems by providing an initial, unrefined "seed" for a given ligand. Use the below
+functions:
+    
+    + seed_with_coordinates(): 
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2024-05-27
@@ -32,6 +29,42 @@ from enzy_htp._interface import Mole2Cavity
 
 from .ligand_moves import mimic_torsions
 from enzy_htp.geometry import minimize as geo_minimize
+
+
+def seed_with_coordinates(ligand:Ligand,
+                            coords:Union[Tuple[float, float, float], List[Tuple[float,float,float]]],
+                            rng_seed:int=1996,
+                            minimize:bool=False,
+                            min_iter:int=1,
+                            work_dir:str) -> None:
+    """Seeds the location of the Ligand()'s center of mass using the supplied seeds. If multiple seeds are supplied, one
+    is chosen at random. Ligand() can be minimized at end.
+
+    Args:
+        ligand: The Ligand() to seed.
+        coords: A (float, float, float) or List[(float, float, float)] to choose the seed from.
+        rng_seed: Random number generation seed. Optional.
+        minimize: Should Ligand()-only minimization be performed?
+        min_iter: How many minimization iterations should be performed? Optional.
+        work_dir: temp directory where the work is done.  Optional.
+
+
+    Returns:
+        Nothing.
+    """
+    np.random.seed( rng_seed )
+
+    if not isinstance( coords, list ):
+        coords = [ coords ]
+
+    coord = np.array(np.random.choice( coords ))
+    current = np.array(ligand.geom_center)
+    ligand.shift(
+        coord - current
+    )
+
+    if minimize:
+        minimize_ligand_only( ligand, min_iter, work_dir )
 
 
 def seed_ligand(stru: Structure, 
@@ -273,17 +306,6 @@ def _seed_ligand_analog(stru, ligand, work_dir, **kwargs):
 
     ligand.shift( shift )
 
-def _seed_ligand_coordinate( stru:Structure, ligand:Ligand, work_dir:str, **kwargs ) -> None:
-    """
-
-    Args:
-        stru: 
-        ligand:
-        work_dir:
-
-    Returns:
-        Nothing.
-    """
 
 
 def _seed_ligand_mole2( stru:Structure, ligand:Ligand, work_dir:str, **kwargs ) -> None:
@@ -380,11 +402,22 @@ def _seed_ligand_mole2( stru:Structure, ligand:Ligand, work_dir:str, **kwargs ) 
     ligand.shift( seed - ligand.geom_center)
     
 
+def minimize_ligand_only(ligand:Ligand, n_iter:int, work_dir:str) -> None:
+    """Uses Rosetta to minimize only the supplied Ligand(). Designed to remove clashes,
+    not perform a rigorous optimization of the molecule.
 
-SEEDING_METHOD_MAPPER:Dict[str, Callable] = {
-    'alphafill':_seed_alphafill,
-    'ligand_analog':_seed_ligand_analog,
-    'coordinate':_seed_ligand_coordinate,
-    'mole2':_seed_ligand_mole2
-}
-"""Maps seeding algorithm names to the callable seeding algorithms."""
+    Args:
+        ligand: Ligand() to minimize.
+        n_iter: How many iter's/trajectories should be used?
+        work_dir: Where should work be done? Note: actually done in <work_dir>/minimize/
+
+    Returns:
+        Nothing.
+    """
+    sele = f'(chain {ligand.parent.name} and resi {ligand.idx})'
+    geo_minimize(stru, movemap=[
+        {'sele':sele, 'bb':'true', 'chi':'true', 'bondangle':'true'}, 
+        {'sele':f'not ({sele})', 'bb':'false', 'chi':'false', 'bondangle':'false'}, 
+    
+    ],n_iter=n_iter, work_dir=f"{work_dir}/minimize/")
+
