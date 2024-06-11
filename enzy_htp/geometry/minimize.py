@@ -83,7 +83,7 @@ def minimize_rosetta(stru, n_iter, n_struct, movemap, work_dir, **kwargs):
     protocol.add_mover(RosettaScriptsElement("FastRelax", name="frelax", scorefxn="r15", repeats=str(n_iter),
         children=[RosettaScriptsElement("MoveMap", name="full_structure", bb="true", chi="true", jump="true", children=mm_children)]
     ))
-    score_file = interface.rosetta.run_rscripts(stru, protocol, options, work_dir)
+    score_file = interface.rosetta.run_rosetta_scripts(stru, protocol, options, work_dir)
 
     
     df = interface.rosetta.parse_score_file(score_file)

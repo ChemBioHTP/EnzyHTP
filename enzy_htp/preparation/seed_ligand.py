@@ -66,6 +66,7 @@ def seed_ligand(stru: Structure,
         _LOGGER.error(err_msg)
         raise ValueError(err_msg)
 
+    kwargs['constraints'] = constraints
     func(stru, ligand, work_dir=work_dir, **kwargs)
 
     if minimize:
@@ -295,8 +296,9 @@ def _seed_ligand_mole2( stru:Structure, ligand:Ligand, work_dir:str, **kwargs ) 
     Returns:
         Nothing.
     """
-    ligand:Ligand = stru.get(f"{ligand_chain}.{ligand_idx}")
-    ligand.placement_method = "mole2"
+    delta = kwargs.get('delta', 0.75) 
+    constraints = kwargs.get('constraints', [])
+    assert constraints
     if not work_dir:
         work_dir = config['system.SCRATCH_DIR']
 
@@ -350,7 +352,7 @@ def _seed_ligand_mole2( stru:Structure, ligand:Ligand, work_dir:str, **kwargs ) 
 
     scores = np.array(scores)
 
-    score_mask = np.isclose(scores, np.min(scores))
+    score_mask = np.isclose(scores, np.min(scores)*2)
 
     clash_counts = list()
     

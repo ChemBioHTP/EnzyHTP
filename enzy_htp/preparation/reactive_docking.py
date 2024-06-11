@@ -44,7 +44,8 @@ def dock_reactants(structure: Structure,
                    transform_cycles:int=1000,
                    transform_repeats:int=3,
                    transform_temperature:int=5,
-                   fr_repeats:int=1,
+                   docking_fr_repeats:int=1,
+                   min_fr_repeats:int=20,
                    grid_width:float=50.0,
                    rng_seed: int = 1996,
                    work_dir: str = None,
@@ -127,7 +128,6 @@ def dock_reactants(structure: Structure,
         opts["packing:flip_HNQ"] = True
         opts["packing:ignore_ligand_chi"] = True
         opts['out:overwrite'] = True
-        opts['out:level'] = 200
 
         opts['run:constant_seed'] = True
         opts['run:jran'] = rng_seed
@@ -140,7 +140,7 @@ def dock_reactants(structure: Structure,
             f"${config['rosetta.ROSETTA3']}/database/chemical/residue_type_sets/fa_standard/residue_types/protonation_states/")
         
         for stub in "GLU_P1 GLU_P2 LYS_D ASP_P1 TYR_D HIS_P ASP_P2".split():
-            extra_res_fa.append(f"'{stub_parent}/{stub}.params'")
+            extra_res_fa.append(f"{stub_parent}/{stub}.params")
 
         if structure.data['rosetta_params']:
             extra_res_fa.extend( structure.data['rosetta_params'] )
@@ -149,7 +149,7 @@ def dock_reactants(structure: Structure,
         
         ### script variables
         opts.add_script_variable( 'ligand_chain', ligand.parent.name )
-        opts.add_script_variable( 'ligand_idx', ligand.idx )
+        opts.add_script_variable( 'ligand_idx', f"{ligand.idx}{ligand.parent.name}" )
         opts.add_script_variable( 'grid_width', grid_width )
         opts.add_script_variable( 'contact_threshold', contact_threshold )
         opts.add_script_variable( 'clash_cutoff', clash_cutoff )
@@ -161,7 +161,7 @@ def dock_reactants(structure: Structure,
         opts.add_script_variable( 'transform_cycles', transform_cycles )
         opts.add_script_variable( 'transform_repeats', transform_repeats )
         opts.add_script_variable( 'transform_temperature', transform_temperature )
-        opts.add_script_variable( 'fr_repeats', fr_repeats )
+        opts.add_script_variable( 'fr_repeats', docking_fr_repeats )
 
         dock_ligand(structure,
                         ligand,
@@ -173,6 +173,7 @@ def dock_reactants(structure: Structure,
 
     sp = PDBParser()
 
+    opts.add_script_variable( 'fr_repeats', min_fr_repeats )
     opts.add_script_variable('ramp_constraints', False)
     mm_minimization(structure, constraints, opts)
 
