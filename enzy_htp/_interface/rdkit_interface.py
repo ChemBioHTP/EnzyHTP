@@ -4,6 +4,7 @@ Date: 2023-10-09
 """
 
 #TODO(CJ): maybe wrap this in a try,except loop
+import importlib
 import rdkit
 from rdkit import Chem as _rchem
 import rdkit.Chem.AllChem as _rchem_ac
@@ -25,8 +26,20 @@ class RDKitInterface(BaseInterface):
         Calls parent constructor.
         """
         super().__init__(parent, config, default_rdkit_config)
+        self.chem_ = None
+        try:
+            self.chem_ = importlib.import_module('rdkit.Chem')
+        except:
+            pass
 
-        #self.rdkit = 
+    @property
+    def chem(self) -> "module":
+        """Gets the modeller module if it exists, raises an error if not."""
+        if self.chem_ is None:
+            err_msg:str="The 'rdkit.Chem' python package is not installed in this environment. Cannot use RDKitInterface()."
+            _LOGGER.error( err_msg )  
+            raise ImportError(err_msg)
+        return self.chem_
 
     def _supported_ftype(self, molfile: str) -> None:
         """Is the supplied file type supported for use in rdkit? Errors and exists if not."""

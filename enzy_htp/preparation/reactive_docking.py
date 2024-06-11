@@ -48,6 +48,7 @@ def dock_reactants(structure: Structure,
                    min_fr_repeats:int=20,
                    grid_width:float=50.0,
                    rng_seed: int = 1996,
+                   cluster_binding_dist:float=1.5,
                    work_dir: str = None,
                    save_work_dir: bool = True,
                    ) -> None:
@@ -221,14 +222,7 @@ def mm_minimization(structure:Structure,
     opts.add_script_variable('cst_file', 
         interface.rosetta.write_constraint_file( structure, constraints, opts['out:path:all'])
     )
-#    exit( 0 )
-#    fs.safe_mkdir(work_dir)
-#    xml_script:str = create_minimization_xml(work_dir)
-#    pdb_file:str=f"{work_dir}/start.pdb"
-#    _sp = PDBParser()
-#    _sp.save_structure(pdb_file, structure)
-#    cst_file:str = interface.rosetta.write_constraint_file(structure, constraints, work_dir) #TODO(CJ): look at this; wrong constraint types!!
-#
+    
     sele = list()
     for cst in constraints:
         for atom in cst.atoms:
@@ -342,6 +336,8 @@ def dock_ligand(structure:Structure,
         structure,
         protocol,
         opts)
+       
+    #TODO(CJ): add the clustering here
 
     df: pd.DataFrame = interface.rosetta.parse_score_file(opts['out:file:scorefile'], opts['out:path:all'])
 

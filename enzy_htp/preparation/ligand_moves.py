@@ -1,3 +1,8 @@
+"""Implements some basic ligand manipulation and movement functionality.
+
+Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Date: 2024-06-10
+"""
 from pathlib import Path
 from collections import defaultdict
 

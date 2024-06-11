@@ -788,6 +788,15 @@ class PyMolInterface(BaseInterface):
             ])
         return results[-1]            
 
+    def rmsd_matrix(self, 
+            structures:List[Structure], 
+            align_sele:str,
+            measure_sele:str,
+            rmsd_cutoff:float) -> List[List[float]]:
+    
+        np.zeros((len(structures), len(structures)))
+
+
 class OpenPyMolSession:
     """a context manager that open a pymol session once enter and close once exit"""
 

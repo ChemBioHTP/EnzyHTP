@@ -15,6 +15,11 @@ from .base_interface import BaseInterface
 from enzy_htp import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp._config.alphafill_config import AlphaFillConfig, default_alphafill_config
+from enzy_htp.structure import (
+    PDBParser,
+    Structure,
+    Ligand
+)
 
 
 class AlphaFillInterface(BaseInterface):
@@ -67,33 +72,47 @@ class AlphaFillInterface(BaseInterface):
 
         return outfile
 
-    def fill_structure(self, molfile: str, outfile: str = None, work_dir: str = None, use_cache: bool = True) -> Tuple[str, str]:
+    def fill_structure(self, 
+            stru: Structure, 
+            work_dir: str = None, 
+            use_cache: bool = True) -> Tuple[str, str]:
         """Using MSA-derived constraints, place ligands into the supplied structure file. File can be either .cif or .pdb format.
         Note that if it is .cif format it MUST be mmCIF, not just .cif
 
         Args:
-            molfile: The str() path to a .cif file to add ligand transplants to.
-            outfile: Where the filled structure will be saved to. Optional.
+            stru: 
             work_dir: Where temporary files will be saved to. Optional.
             use_cache: Should we use existing files when available? Optional.
         
         Returns:
-            A Tuple[str, str] with the format ( .cif file with transplants, .json file from alphafill). 
+            A Tuple[str, str] with the format ( .cif file filled with transplants, .json file from alphafill). 
         """
         if work_dir is None:
             work_dir = self.parent().config()['system.SCRATCH_DIR']
 
+
+        ### need to sanitize the input Structure()
+        structure_start:str=f"{work_dir}/afill_temp.pdb"
+        fs.safe_rm(structure_start)
+
+        session = self.parent().pymol.new_session()
+        self.parent().pymol.load_enzy_htp_stru(session,  stru)
+        interface.pymol.general_cmd(session, [
+            ('save', structure_start, 'polymer.protein'),
+            ('delete', 'all')
+        ])
+    
+        lines:List[str]=fs.lines_from_file(structure_start)
+    
+        for lidx, ll in enumerate(lines): #epic fix
+            lines[lidx] = ll[0:76]
+    
+        fs.write_lines(structure_start, lines)
+        
         fs.safe_mkdir( work_dir )
 
-        if fs.get_file_ext(molfile) == ".pdb":
-            _LOGGER.info(f"The supplied file {molfile} is .pdb format. Converting to mmCIF...")
-            molfile = self.convert_file(molfile)
+        molfile = self.convert_file(structure_start)
 
-        if fs.get_file_ext(molfile) != '.cif':
-            _LOGGER.error(f"The supplied file {mofile} is not a .cif file! Exiting...")
-            exit(1)
-
-        #TODO(CJ): add more options in here
         fs.check_file_exists(molfile)
         temp_path = Path(molfile)
         outfile = str(temp_path.parent / f"{temp_path.stem}_filled.cif")
