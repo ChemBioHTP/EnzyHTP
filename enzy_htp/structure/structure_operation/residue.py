@@ -11,7 +11,7 @@ from typing import Tuple, Union, List
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core import math_helper as mh
 import enzy_htp.chemical as chem
-from ..structure import Structure, Residue, Atom
+from ..structure import Structure, Residue, Atom, Ligand
 
 
 def deprotonate_residue(residue: Residue, target_atom: Union[None, Atom] = None) -> None:
@@ -145,3 +145,47 @@ def closest_n_residues(
     for (_, res) in distances[:n]:
         result.append( res )        
     return result
+
+def atom_name_similarity(
+    res1: Residue,
+    res2: Residue,
+    include_H:bool = False
+    ) -> float:
+    """Scores similarity between two Residue() objects, scoring based on matching atom names. The 
+    function compares two List[str] corresponding to the atom names in each Residue(). The equation 
+    for similarity is intersection( res1_names, res2_names ) / union( res1_names, res2_names ). The 
+    value will range between 0 (no overlap) and 1 (perfect match).
+    
+    Args:
+        res1: The first Residue() to compare.
+        res2: The second Residue() to compare.
+        include_H: Should hydrogens be included? 
+
+    Returns:
+        A value between 0 (no overlap) and 1 (perfect match).
+    """
+    if not res1 or not res2:
+        return 0.0
+
+    anames1 = set()
+    anames2 = set()
+    
+    for aa in res1.atoms:
+        if aa.element == 'H' and not include_H:
+            continue
+        anames1.add( aa.name )
+
+    for aa in res2.atoms:
+        if aa.element == 'H' and not include_H:
+            continue
+        anames2.add( aa.name )
+
+    return len( anames1.intersection( anames2 ) ) / len ( anames1.union( anames2 ) ) 
+
+def ligand_mcs( 
+    lig1: Ligand,
+    lig2: Ligand
+    ) -> float:
+    """
+    """
+    assert False

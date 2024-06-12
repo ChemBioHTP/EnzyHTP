@@ -2,12 +2,13 @@
 functions:
     
     + seed_with_coordinates(): 
+    + seed_with_transplants():
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2024-05-27
 """
 import json
-from typing import List, Tuple, Dict, Set, Callable
+from typing import List, Tuple, Dict, Set, Callable, Union
 
 from rdkit import Chem as _rchem
 import numpy as np
@@ -27,6 +28,11 @@ from enzy_htp.structure import PDBParser, Structure, Ligand, Mol2Parser, Chain
 from enzy_htp.structure.structure_constraint import StructureConstraint
 from enzy_htp._interface import Mole2Cavity
 
+from enzy_htp.structure.structure_operation import (
+    ligand_mcs,
+    atom_name_similarity
+)
+
 from .ligand_moves import mimic_torsions
 from enzy_htp.geometry import minimize as geo_minimize
 
@@ -36,7 +42,7 @@ def seed_with_coordinates(ligand:Ligand,
                             rng_seed:int=1996,
                             minimize:bool=False,
                             min_iter:int=1,
-                            work_dir:str) -> None:
+                            work_dir:str=None) -> None:
     """Seeds the location of the Ligand()'s center of mass using the supplied seeds. If multiple seeds are supplied, one
     is chosen at random. Ligand() can be minimized at end.
 
@@ -112,105 +118,56 @@ def seed_ligand(stru: Structure,
         ],n_iter=1)
 
 
-def _seed_alphafill(stru: Structure,
-                        ligand:Ligand,
-                     work_dir: str,
-                     #similarity_cutoff: float = 0.75,
-                     clash_radius: float = 2.0, #TODO(CJ); get rid of this
-                     **kwargs) -> Ligand:
-    """Implementation function that places a specified ligand into a structure using the alphafill 
-    algorithm (https://doi.org/10.1038/s41592-022-01685-y). SHOULD NOT be called directly by the user. 
-    Instead, call `enzy_htp.preparation.place_ligand.place_ligand()`. Assumes that the input Ligand() has PDB style naming 
-    and is in the .mol2 format. When scanning alphafill transplants, the algorithm looks for exact atom label
-    matches. If none are found, then a similarity score is calculated which is:
 
-    intersection(candidate atoms, template atoms) / max( number candidate atoms, number template atoms )
+def seed_with_transplants(ligand:Ligand,
+                     similarity_metric:str,
+                     similarity_cutoff:float = 0.45,
+                     minimize:bool=False,
+                     min_iter:int=1,
+                     use_cache:bool=False,
+                     work_dir:str=None
+) -> Ligand:
+    """Implementation function that places a specified ligand into a structure using the alphafill 
+    algorithm (https://doi.org/10.1038/s41592-022-01685-y). 
 
     Args:
-        stru: Structure() where the Ligand() will be added.
-        ligand: The Ligand() object that is being placed.
-        work_dir: Directory where all temporary files will be saved.
-        similarity_cutoff: How similar a Ligand() and template must be to get considered.
-        clash_radius: Radius cutoff (Angstroms) for clash counting between two heavy atoms.
+        ligand:
+        simliarity_metric:
+        similaritY_cutoff:
+        minimize:
+        min_iter:
+        use_cache:
+        work_dir:
 
     Returns:
         An aligned, deepcopied Ligand().
     """
     _LOGGER.info(f"Beginnning placement of ligand {ligand} into the structure...")
     _LOGGER.info(f"Calling out to AlphaFill to fill structure...")
-
-    structure_start:str=f"{work_dir}/afill_temp.pdb"
-    fs.safe_rm(structure_start)
-
-    fs.safe_rm(f"{work_dir}/afill_temp_filled.cif")
-    fs.safe_rm(f"{work_dir}/afill_temp_filled.json")
-
-    similarity_cutoff:float = kwargs.get('similarity_cutoff', 0.45)
-
-    parser = PDBParser()
-    parser.save_structure(structure_start, stru)
+    # atom_names mcs
     
-    to_delete:List[str] = list()
-
-    session = interface.pymol.new_session()
-    ligand_chain:str = ligand.parent.name
-    ligand_idx:str = str(ligand.idx)
-    interface.pymol.general_cmd(session, [
-        ('load', structure_start),
-        ('remove', f'chain {ligand_chain} and resi {ligand_idx}'),
-        ('save', structure_start, 'polymer.protein'),
-        ('delete', 'all')
-    ])
-
-    lines:List[str]=fs.lines_from_file(structure_start)
-
-    for lidx, ll in enumerate(lines): #epic fix
-        lines[lidx] = ll[0:76]
-
-    fs.write_lines(structure_start, lines)
-
-    (filled_structure, transplant_info_fpath) = interface.alphafill.fill_structure(structure_start,use_cache=kwargs.get('use_cache',False))
+    (filled_structure, df) = interface.alphafill.fill_structure(
+        ligand.parent.parent,use_cache=use_cache, work_dir=work_dir)
     _LOGGER.info("Filled structure using AlphaFill!")
-    
-    transplant_info = json.load(open(transplant_info_fpath, 'r'))
-   
-    transplant_data = defaultdict(list)
-    for hit in transplant_info['hits']:
-        identity = hit['identity']
-        for tt in hit['transplants']:
-            transplant_data['analogue_id'].append( tt['analogue_id'] )
-            transplant_data['identity'].append( identity )
-            transplant_data['asym_id'].append( tt['asym_id'] )
-            transplant_data['clash_count'].append(tt['clash']['clash_count'])
-    
-    df = pd.DataFrame(transplant_data)
-    #TODO(CJ): add logging and actually use the similarity_cutoff 
-    memo = dict()
-    atom_names:List[List[str]] = list()
-    for i, row in df.iterrows():
-        if len(row.analogue_id) <= 2:
-            atom_names.append(set([row.analogue_id]))
-            continue
-        temp_file:str = interface.pymol.fetch(row.analogue_id, out_dir=work_dir)
-        to_delete.append( str(Path(temp_file).absolute()) )
-        if row.analogue_id not in memo:
-            interface.pymol.general_cmd(session, [('load', temp_file)])
-            memo[row.analogue_id] = set(interface.pymol.collect(session, 'memory', 'name'.split())['name'].to_list())
-            interface.pymol.general_cmd(session, [('delete', 'all')])
 
-        atom_names.append(memo[row.analogue_id])
-
-    df['atom_names'] = atom_names
-   
+    
     ligand_atoms:Set[str]=set([aa.name for aa in ligand.atoms])
     
     similarity_score:List[float] = list()
-    for i, row in df.iterrows():
-        numerator:int=len(row.atom_names.intersection(ligand_atoms))
-        denominator:int=max(len(ligand_atoms), len(row.atom_names))
-        similarity_score.append(numerator/denominator)
-
-    df['similarity_score'] = similarity_score
+    sim_func = None
+    if similarity_metric == 'atom_names':
+        sim_func = atom_name_similarity
+    elif similarity_metric == 'mcs':
+        sim_func = ligand_mcs
+    else:
+        assert False
+#    for i, row in df.iterrows():
+#        numerator:int=len(row.atom_names.intersection(ligand_atoms))
+#        denominator:int=max(len(ligand_atoms), len(row.atom_names))
+#        similarity_score.append(numerator/denominator)
+    df['similarity_score'] = df.apply(lambda row: sim_func( ligand, row.mol ), axis=1 )
+    print(df)
+    exit( 0 )
     similarity_mask = df.similarity_score >= similarity_cutoff
 
     if not similarity_mask.sum():

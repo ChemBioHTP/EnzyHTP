@@ -7,8 +7,11 @@ the AlphaFillConfig class found in enzy_htp/_config/alphafill_config.py. Support
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-09-14
 """
+import pandas as pd
+import json
 from typing import List, Tuple
 from pathlib import Path
+from collections import defaultdict
 
 from .base_interface import BaseInterface
 
@@ -17,6 +20,7 @@ from enzy_htp.core import file_system as fs
 from enzy_htp._config.alphafill_config import AlphaFillConfig, default_alphafill_config
 from enzy_htp.structure import (
     PDBParser,
+    Mol2Parser,
     Structure,
     Ligand
 )
@@ -97,7 +101,7 @@ class AlphaFillInterface(BaseInterface):
 
         session = self.parent().pymol.new_session()
         self.parent().pymol.load_enzy_htp_stru(session,  stru)
-        interface.pymol.general_cmd(session, [
+        self.parent().pymol.general_cmd(session, [
             ('save', structure_start, 'polymer.protein'),
             ('delete', 'all')
         ])
@@ -127,4 +131,43 @@ class AlphaFillInterface(BaseInterface):
         results = self.env_manager_.run_command(self.config_.ALPHAFILL_EXE,
                                                 ["--config", self.config_.CONFIG_FILE, "process", molfile, outfile])
         fs.safe_rm(temp_path)
-        return (outfile, json_outfile)
+
+        transplant_info = json.load(open(json_outfile, 'r'))
+       
+        transplant_data = defaultdict(list)
+        for hit in transplant_info['hits']:
+            identity = hit['identity']
+            for tt in hit['transplants']:
+                transplant_data['analogue_id'].append( tt['analogue_id'] )
+                transplant_data['identity'].append( identity )
+                transplant_data['asym_id'].append( tt['asym_id'] )
+                transplant_data['clash_count'].append(tt['clash']['clash_count'])
+        
+        a_df = self.parent().pymol.collect(self.parent().pymol.new_session(), outfile, "resn name segi x y z".split(), sele='not polymer.protein')
+        df = pd.DataFrame(transplant_data)
+        mols = list()
+        mlp = Mol2Parser()
+        for i, row in df.iterrows():
+            if len(row.analogue_id) == 1:
+                mols.append( None )
+            else:
+                coord_mapper = dict()
+                for aa, arow in a_df[row.asym_id==a_df.segi].iterrows():
+                    coord_mapper[arow['name']] = (arow.x, arow.y, arow.z)
+                session = self.parent().pymol.new_session()
+                args = [
+                    ('fetch', row.analogue_id),
+                    ('remove', 'hydrogens')
+                ]
+                for aname, (x,y,z) in coord_mapper.items():
+                    args.append(('alter_state', -1, f'name {aname}', f"(x, y, z) = ({x}, {y}, {z})"))
+                
+                args.append(('save', 'afill_temp.mol2'))
+                self.parent().pymol.general_cmd(session, args)
+                mol = mlp.get_ligand('afill_temp.mol2')
+                fs.safe_rm('afill_temp.mol2')
+                mols.append( mol )
+        
+        df['mol'] = mols
+
+        return (outfile, df)
