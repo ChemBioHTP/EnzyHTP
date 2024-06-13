@@ -11,7 +11,11 @@ from rdkit.Chem import AllChem
 import rdkit.Chem as _rchem
 from rdkit.Chem import rdMolTransforms as rdmt
 
+from rdkit.Chem.rdMolAlign import AlignMol
+
 from enzy_htp import config, interface
+
+from enzy_htp.structure import Ligand
 
 
 def enumerate_torsions(mol):
@@ -54,11 +58,10 @@ def enumerate_torsions(mol):
                 torsionList.append((idx1, idx2, idx3, idx4))
     return torsionList
 
-def mimic_torsions(template, reactant):
-    template_path = template
-    ligand = AllChem.MolFromMol2File(reactant, removeHs=False,  cleanupSubstructures=False)
-    template = AllChem.MolFromMol2File(template, removeHs=False,  cleanupSubstructures=False)
-
+def mimic_torsions(t_ligand:Ligand, r_ligand:Ligand) -> None:
+    
+    template = interface.rdkit.mol_from_ligand(t_ligand, removeHs=False, cleanupSubstructures=False)
+    ligand  = interface.rdkit.mol_from_ligand(r_ligand, removeHs=False, cleanupSubstructures=False)
 
     torsions = enumerate_torsions(template)
 
@@ -82,22 +85,26 @@ def mimic_torsions(template, reactant):
             rdmt.GetDihedralDeg(template.GetConformer(), a1, a2, a3, a4)
         )
 
+    amapper = list(zip(template_to_ligand.values(), template_to_ligand.keys()))
+    AlignMol( ligand, template, atomMap=amapper ) #TODO(CJ): put into the rdkit interface
+
+    interface.rdkit.update_ligand_positions(r_ligand, ligand)
 
 
+def ligand_mcs_score( l1, l2 ) -> float:
+    
+    if l1 is None or l2 is None:
+        return 0.0
 
-    session = interface.pymol.new_session()
-    args = [('load', reactant)]
-    for aidx, atom in enumerate(ligand.GetAtoms()):
-        pos = ligand.GetConformer().GetAtomPosition(aidx)
-        args.append(('alter_state', 1, f'rank {aidx}', f"(x,y,z) = ({pos.x},{pos.y},{pos.z})"))
-
-    args.extend([
-    ('load', template_path),
-    ('align', Path(reactant).stem, Path(template_path).stem),
-    ('delete', Path(template_path).stem),
-    ('save', reactant)
-    ])    
-
-    interface.pymol.general_cmd(session, args)
-
-    return reactant
+    ct = 0
+    for aa in l1.atoms:
+        if aa.element == 'H':
+            continue
+        ct += 1
+    
+    for aa in l2.atoms:
+        if aa.element == 'H':
+            continue
+        ct += 1
+    mcs_result = interface.rdkit.find_mcs( l1 , l2 )
+    return mcs_result.numAtoms /  (ct - mcs_result.numAtoms)

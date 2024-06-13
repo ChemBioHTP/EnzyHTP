@@ -28,6 +28,11 @@ from enzy_htp.core import file_system as fs
 
 from enzy_htp._config.mole2_config import Mole2Config, default_mole2_config
 
+from enzy_htp.structure import (
+    Structure,
+    PDBParser
+)
+
 class Mole2Cavity:
     """Companion class to the Mole2Interface that stores information about individual cavities identified
     by Mole2. Supported operations include cavity volume and center of mass calculations, and indicating if
@@ -230,7 +235,8 @@ class Mole2Interface(BaseInterface):
             com=com
             )
 
-    def identify_cavities(self, molfile:str, 
+    def identify_cavities(self, 
+                                stru:Structure, 
                                 non_active_parts:List[Tuple[str,int]]=None, 
                                 probe:float=None, 
                                 inner:float=None, 
@@ -272,8 +278,12 @@ class Mole2Interface(BaseInterface):
             ignore_hetatm = self.config_.IGNORE_HETATM
 
         fs.safe_mkdir( work_dir )
-
         fs.safe_rmdir( f"{work_dir}/mesh/")
+
+        molfile = f"{work_dir}/mole2_temp.pdb"
+
+        parser = PDBParser()
+        parser.save_structure( molfile, stru )
 
         fs.check_not_empty( molfile )
 
@@ -292,5 +302,6 @@ class Mole2Interface(BaseInterface):
             result.append(self._parse_cavity(mf, probe, inner, mesh_density))
 
         fs.safe_rm(xml_file)
+        fs.safe_rm(molfile)
         
         return result

@@ -21,6 +21,5 @@ from .residue import (
     remove_side_chain_mutating_atom,
     check_res_topology_error,
     closest_n_residues,
-    ligand_mcs,
     atom_name_similarity
 )

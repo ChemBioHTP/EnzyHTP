@@ -3,6 +3,8 @@ functions:
     
     + seed_with_coordinates(): 
     + seed_with_transplants():
+    + seed_with_constraints():
+    + seed_with_analog():
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2024-05-27
@@ -29,11 +31,14 @@ from enzy_htp.structure.structure_constraint import StructureConstraint
 from enzy_htp._interface import Mole2Cavity
 
 from enzy_htp.structure.structure_operation import (
-    ligand_mcs,
     atom_name_similarity
 )
 
-from .ligand_moves import mimic_torsions
+from .ligand_moves import (
+    mimic_torsions,
+    ligand_mcs_score
+)
+
 from enzy_htp.geometry import minimize as geo_minimize
 
 
@@ -71,53 +76,6 @@ def seed_with_coordinates(ligand:Ligand,
 
     if minimize:
         minimize_ligand_only( ligand, min_iter, work_dir )
-
-
-def seed_ligand(stru: Structure, 
-    ligand:Ligand, 
-    method:str, 
-    minimize:bool=False, 
-    constraints:List[StructureConstraint]=None, 
-    work_dir:str=None, 
-    **kwargs) -> None:
-    """
-
-    Args:
-        ligand:
-        method:
-        minimize:
-        constraints:
-        work_dir:
-
-    Returns:
-        Nothing.
-    """
-
-    if not work_dir:
-        work_dir = config['system.SCRATCH_DIR']
-
-    fs.safe_mkdir(work_dir)
-    
-    func:Callable = SEEDING_METHOD_MAPPER.get( method )
-
-    if func is None:
-        err_msg:str=f"The supplied method '{method}' is not supported. Supported include: {', '.join(SEEDING_METHOD_MAPPER.keys())}"
-        _LOGGER.error(err_msg)
-        raise ValueError(err_msg)
-
-    kwargs['constraints'] = constraints
-    func(stru, ligand, work_dir=work_dir, **kwargs)
-
-    if minimize:
-        sele = f'(chain {ligand.parent.name} and resi {ligand.idx})'
-        #sele = f'byres polymer.protein within 2 of {lig_sele} or {lig_sele}'
-        geo_minimize(stru, movemap=[
-            {'sele':sele, 'bb':'true', 'chi':'true', 'bondangle':'true'}, 
-            {'sele':f'not ({sele})', 'bb':'false', 'chi':'false', 'bondangle':'false'}, 
-
-        ],n_iter=1)
-
-
 
 def seed_with_transplants(ligand:Ligand,
                      similarity_metric:str,
@@ -158,16 +116,11 @@ def seed_with_transplants(ligand:Ligand,
     if similarity_metric == 'atom_names':
         sim_func = atom_name_similarity
     elif similarity_metric == 'mcs':
-        sim_func = ligand_mcs
+        sim_func = ligand_mcs_score
     else:
         assert False
-#    for i, row in df.iterrows():
-#        numerator:int=len(row.atom_names.intersection(ligand_atoms))
-#        denominator:int=max(len(ligand_atoms), len(row.atom_names))
-#        similarity_score.append(numerator/denominator)
+    
     df['similarity_score'] = df.apply(lambda row: sim_func( ligand, row.mol ), axis=1 )
-    print(df)
-    exit( 0 )
     similarity_mask = df.similarity_score >= similarity_cutoff
 
     if not similarity_mask.sum():
@@ -177,60 +130,30 @@ def seed_with_transplants(ligand:Ligand,
     df = df[similarity_mask].reset_index(drop=True)
     similarity = df.similarity_score.to_numpy()
     df = df[np.isclose(similarity, np.max(similarity))].reset_index(drop=True)
-
     df.sort_values(by='clash_count',inplace=True)
-    selected_id:str=df.asym_id[0]
+    template:Ligand = df.iloc[0].mol
 
-    molfile:str=f"{work_dir}/temp.pdb"
-    reactant:str=f"{work_dir}/temp_ligand.mol2"
-    template:str=f"{work_dir}/template_ligand.mol2"
-    outfile:str=f"{work_dir}/aligned_ligand.mol2"
-    to_delete.extend([molfile, reactant, template, outfile, structure_start, filled_structure, transplant_info_fpath])
+    if not ligand.is_ligand():
+        #TODO(CJ): this is where the stuff will go ab metal units
+        pass
 
-    parser.save_structure(molfile, stru)
+    if similarity_metric == 'atom_names':
+        mimic_torsions( template, ligand )
+    elif similarity_metric == 'mcs':
+        assert False
 
-    Mol2Parser().save_ligand(reactant, ligand)
-    
-    pp_chains:List[str] = list()
-    for cc in stru.chains:
-        if cc.is_polypeptide():
-            pp_chains.append(f"chain {cc.name}")
+    if minimize:
+        minimize_ligand_only( ligand, min_iter, work_dir )
 
-    interface.pymol.general_cmd(session, [('delete', 'all'), ("load", filled_structure), ("remove", "solvent"), ("load", molfile),
-                                          ("align", f"{Path(filled_structure).stem} and ({' or '.join(pp_chains)})", f"{Path(molfile).stem} and ({' or '.join(pp_chains)})"),
-                                          ("delete", Path(molfile).stem),
-                                          ("save", template, f"chain {selected_id} and segi {selected_id}")])
-    
-    analogue_code = df.analogue_id[0]
-    session = interface.pymol.new_session()
+def seed_with_analog(ligand:Ligand,
+                analog:Ligand,
+                seed_atom:Atom,
+                analog_atom:Atom,
+                minimize:bool=False,
+                min_iter:int=1,
+                work_dir:str=None) -> None:
 
-    df = interface.pymol.collect(session, template, 'name x y z'.split())
-    
-    session = interface.pymol.new_session()
-    args = [('fetch', analogue_code), ('remove', 'hydrogens')]
-
-    for i, row in df.iterrows():
-        args.append(('alter_state', 1, f"name {row['name']}", f"(x, y, z) = ({row.x}, {row.y}, {row.z})"))
-
-    args.append(('save', template))
-
-    interface.pymol.general_cmd(session, args)
-
-    if ligand.is_ligand():
-        outfile = mimic_torsions(template, reactant)
-    else:
-        fs.safe_mv(template, outfile)
-
-    aligned_ligand:Ligand=Mol2Parser().get_ligand(outfile)
-    
-    for a1 in ligand.atoms:
-        for a2 in aligned_ligand.atoms:
-            if a1.name == a2.name:
-                a1.coord = a2.coord
-
-
-
-def _seed_ligand_analog(stru, ligand, work_dir, **kwargs):
+    assert False
 
     analog_file:str=f"{work_dir}/analog.mol2"
     analog_template_file:str=f"{work_dir}/analog_template.mol2"
@@ -263,32 +186,25 @@ def _seed_ligand_analog(stru, ligand, work_dir, **kwargs):
 
     ligand.shift( shift )
 
+    if minimize:
+        minimize_ligand_only( ligand, min_iter, work_dir )
 
 
-def _seed_ligand_mole2( stru:Structure, ligand:Ligand, work_dir:str, **kwargs ) -> None:
-    """
-    Args:
-        stru: 
-        ligand:
-        work_dir:
-
-    Returns:
-        Nothing.
-    """
-    delta = kwargs.get('delta', 0.75) 
-    constraints = kwargs.get('constraints', [])
+def seed_with_constraints(ligand:Ligand,
+        constraints:List[StructureConstraint], 
+        delta:float=0.75,
+        minimize:bool=False,
+        min_iter:int=1,
+        work_dir:str=None ) -> None:
+    """ TODO(CJ) """
+    stru = ligand.parent.parent
     assert constraints
     if not work_dir:
         work_dir = config['system.SCRATCH_DIR']
 
     relevant_constraints: List[str] = list()
-    
-    temp_pdb:str=f"{work_dir}/__temp.pdb"
-    to_delete:List[str] = [ temp_pdb ]
 
-    parser = PDBParser()
-    parser.save_structure( temp_pdb, stru )
-    cavities:List[Mole2Cavity] = interface.mole2.identify_cavities(temp_pdb)
+    cavities:List[Mole2Cavity] = interface.mole2.identify_cavities(stru, work_dir=work_dir)
 
     seed_locations:List = list()
     for cc in cavities:
@@ -331,7 +247,7 @@ def _seed_ligand_mole2( stru:Structure, ligand:Ligand, work_dir:str, **kwargs ) 
 
     scores = np.array(scores)
 
-    score_mask = np.isclose(scores, np.min(scores)*2)
+    score_mask = np.isclose(scores, np.min(scores))
 
     clash_counts = list()
     
@@ -357,7 +273,10 @@ def _seed_ligand_mole2( stru:Structure, ligand:Ligand, work_dir:str, **kwargs ) 
     seed = final_locations[0]
 
     ligand.shift( seed - ligand.geom_center)
-    
+
+    if minimize:
+        minimize_ligand_only( ligand, min_iter, work_dir )
+
 
 def minimize_ligand_only(ligand:Ligand, n_iter:int, work_dir:str) -> None:
     """Uses Rosetta to minimize only the supplied Ligand(). Designed to remove clashes,

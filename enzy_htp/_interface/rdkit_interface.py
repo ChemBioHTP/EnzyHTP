@@ -14,6 +14,8 @@ from pathlib import Path
 from .base_interface import BaseInterface
 
 from enzy_htp import _LOGGER
+
+from enzy_htp.core.general import HiddenPrints
 from enzy_htp.core import file_system as fs
 from enzy_htp._config.rdkit_config import RDKitConfig, default_rdkit_config
 
@@ -21,7 +23,6 @@ from enzy_htp.structure import (
     Ligand,
     Mol2Parser
 )
-
 
 class RDKitInterface(BaseInterface):
     pass
@@ -36,6 +37,9 @@ class RDKitInterface(BaseInterface):
             self.chem_ = importlib.import_module('rdkit.Chem')
         except:
             pass
+
+        from rdkit import RDLogger #TODO(CJ): update this
+        RDLogger.DisableLog('rdApp.*')
 
     @property
     def chem(self) -> "module":
@@ -115,9 +119,13 @@ class RDKitInterface(BaseInterface):
 
         return outfile
 
-    def mol_from_ligand(self, ligand : Ligand, work_dir:str=None ):
+    def mol_from_ligand(self, 
+                ligand : Ligand, 
+                removeHs:bool=True,
+                cleanupSubstructures:bool=True,
+                work_dir:str=None ) -> "rdkit.Chem.Mol":
         if not work_dir:
-            work_dir = self.parent().config['system.SCRATCH_DIR']
+            work_dir = self.parent().config()['system.SCRATCH_DIR']
    
         fs.safe_mkdir( work_dir )
 
@@ -126,23 +134,28 @@ class RDKitInterface(BaseInterface):
         lp = Mol2Parser()
 
         lp.save_ligand( temp_file, ligand )
-        
-        result = self.chem.MolFromMol2File( temp_file )
+
+        result = self.chem.MolFromMol2File( temp_file, removeHs=removeHs, cleanupSubstructures=cleanupSubstructures )
 
         fs.safe_rm( temp_file )
 
         return result
 
     def find_mcs(self, ligand1:Ligand, ligand2:Ligand):
-        
+
+
         mol1 = self.mol_from_ligand( ligand1 )
         mol2 = self.mol_from_ligand( ligand2 )
-
-        module = importlib.import_module('rdkit.Chem.rdFMCS')
+       
+        module = None
+        try:
+            module = importlib.import_module('rdkit.Chem.rdFMCS')
+        except:
+            pass
 
         assert module
 
-        return module.FindMCS( [mol1, mol2] )
+        return  module.FindMCS( [mol1, mol2] )
 
 
     def kekulize(self, molfile: str, outfile: str) -> str:
@@ -174,4 +187,13 @@ class RDKitInterface(BaseInterface):
         mol: _rdkit.Chem = self._load_molecule(molfile)
         return _rchem_ac.ComputeMolVolume(mol, gridSpacing=gridSpacing, boxMargin=boxMargin)
 
-rdkit_interface = RDKitInterface(None, eh_config._rdkit)
+    def update_ligand_positions(self, ligand:Ligand, mol) -> None:
+        
+        assert len(ligand.atoms) == len(mol.GetAtoms())
+       
+        for idx, latom in enumerate(ligand.atoms):
+            pos = mol.GetConformer().GetAtomPosition(idx)
+            latom.coord = (pos.x, pos.y, pos.z)
+
+
+

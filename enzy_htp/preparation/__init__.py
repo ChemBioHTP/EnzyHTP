@@ -13,7 +13,8 @@ from .clean import remove_solvent, remove_hydrogens
 from .reactive_docking import dock_reactants
 from .seed_ligand import (
     seed_with_coordinates,
-    seed_with_transplants
+    seed_with_transplants,
+    seed_with_constraints,
 )
 from .remedy import (
     add_missing_residues, 
