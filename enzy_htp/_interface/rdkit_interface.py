@@ -5,9 +5,9 @@ Date: 2023-10-09
 
 #TODO(CJ): maybe wrap this in a try,except loop
 import importlib
-import rdkit
-from rdkit import Chem as _rchem
-import rdkit.Chem.AllChem as _rchem_ac
+#import rdkit
+#from rdkit import Chem as _rchem
+#import rdkit.Chem.AllChem as _rchem_ac
 
 from pathlib import Path
 
@@ -16,6 +16,11 @@ from .base_interface import BaseInterface
 from enzy_htp import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp._config.rdkit_config import RDKitConfig, default_rdkit_config
+
+from enzy_htp.structure import (
+    Ligand,
+    Mol2Parser
+)
 
 
 class RDKitInterface(BaseInterface):
@@ -63,7 +68,7 @@ class RDKitInterface(BaseInterface):
                        removeHs: bool = False,
                        cleanupSubstructures: bool = False,
                        proximityBonding: bool = False,
-                       strictParsing: bool = False) -> _rchem.Mol:
+                       strictParsing: bool = False) :
         """ """
         #TODO(CJ): add in checks that the file exists
         #TODO(CJ): get the list of molecules out if needed
@@ -86,7 +91,7 @@ class RDKitInterface(BaseInterface):
             for rr in reader:
                 return rr
 
-    def _save_molecule(self, mol: _rchem.Mol, outfile: str, kekulize: bool = True) -> str:
+    def _save_molecule(self, mol, outfile: str, kekulize: bool = True) -> str:
         """ """
         self._supported_ftype(outfile)
 
@@ -110,9 +115,39 @@ class RDKitInterface(BaseInterface):
 
         return outfile
 
+    def mol_from_ligand(self, ligand : Ligand, work_dir:str=None ):
+        if not work_dir:
+            work_dir = self.parent().config['system.SCRATCH_DIR']
+   
+        fs.safe_mkdir( work_dir )
+
+        temp_file:str = f"{work_dir}/rdkit_temp.mol2"
+        
+        lp = Mol2Parser()
+
+        lp.save_ligand( temp_file, ligand )
+        
+        result = self.chem.MolFromMol2File( temp_file )
+
+        fs.safe_rm( temp_file )
+
+        return result
+
+    def find_mcs(self, ligand1:Ligand, ligand2:Ligand):
+        
+        mol1 = self.mol_from_ligand( ligand1 )
+        mol2 = self.mol_from_ligand( ligand2 )
+
+        module = importlib.import_module('rdkit.Chem.rdFMCS')
+
+        assert module
+
+        return module.FindMCS( [mol1, mol2] )
+
+
     def kekulize(self, molfile: str, outfile: str) -> str:
         """ """
-        mol: _rchem.Mol = self._load_molecule(molfile)
+        mol = self._load_molecule(molfile)
         #TODO(CJ): need to add some stuff for phosphates/carboxylic acids
         self._save_molecule(mol, outfile)
         return outfile
@@ -138,3 +173,5 @@ class RDKitInterface(BaseInterface):
         self.check_rdkit_installed()
         mol: _rdkit.Chem = self._load_molecule(molfile)
         return _rchem_ac.ComputeMolVolume(mol, gridSpacing=gridSpacing, boxMargin=boxMargin)
+
+rdkit_interface = RDKitInterface(None, eh_config._rdkit)

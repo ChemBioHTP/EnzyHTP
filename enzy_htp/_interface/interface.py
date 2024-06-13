@@ -32,7 +32,7 @@ from .moe_interface import MOEInterface
 from .mole2_interface import Mole2Interface
 from .multiwfn_interface import MultiwfnInterface
 from .pymol_interface import PyMolInterface
-from .rdkit_interface import RDKitInterface
+from .rdkit_interface import rdkit_interface 
 from .rosetta_interface import RosettaInterface
 from .xtb_interface import xtb_interface 
 
@@ -74,7 +74,8 @@ class Interface:
         self.mole2 = Mole2Interface(self, config._mole2)
         self.multiwfn = MultiwfnInterface(self, config._multiwfn)
         self.pymol = PyMolInterface(self, config._pymol)
-        self.rdkit = RDKitInterface(self, config._rdkit)
+        rdkit_interface.set_parent(self)
+        self.rdkit = rdkit_interface
         self.rosetta = RosettaInterface(self, config._rosetta)
         self.xtb = xtb_interface
         xtb_interface.set_parent(self)
