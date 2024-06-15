@@ -342,18 +342,25 @@ def dock_ligand(structure:Structure,
 
     df: pd.DataFrame = interface.rosetta.parse_score_file(opts['out:file:scorefile'], opts['out:path:all'])
 
-    energy_key:str=None        
+    sfxn = None
     if use_qm:
-        evaluate_geometry_qm_energy(df, structure, cluster_distance)
-        energy_key='qm_energy'
-    else:
-        df['combined_energy'] = df.total_score + df.cst_filter
-        energy_key='combined_energy'
-
-    infile:str=df.sort_values(by=energy_key).description.to_list()[0]
-
+        pass
+        #TODO(CJ)
+#        evaluate_geometry_qm_energy(df, structure, cluster_distance)
+#        energy_key='qm_energy'
+#    else:
+#        df['combined_energy'] = df.total_score + df.cst_filter
+#        energy_key='combined_energy'
+    
     _parser = PDBParser()
-    ref_stru = _parser.get_structure(infile)
+    structures:List[Structure] = list(map(lambda dd: _parser.get_structure( dd ), df.description ) )
+    
+    clusters:List[StructureCluster] = cluster_structures( structures, 'polymer.protein', f"resn {ligand.name}", 1.0 )
+    for cc in clusters:
+        interface.rosetta.score( cc )
+
+    ref_stru = sorted(clusters, lambda clust: clust.average_score())[0].lowest_energy_structure()
+
     stru_oper.update_residues(structure, ref_stru)
 
     for cst in constraints:
