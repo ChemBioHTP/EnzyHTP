@@ -27,7 +27,14 @@ from enzy_htp.core.general import HiddenPrints
 import enzy_htp.chemical as chem
 from enzy_htp import config as eh_config
 from enzy_htp.mutation_class.mutation import Mutation
-from enzy_htp.structure import Structure, PDBParser, Mol2Parser, Ligand, Chain
+from enzy_htp.structure import (
+    Structure, 
+    StructureEnsemble,
+    PDBParser,
+    Mol2Parser,
+    Ligand,
+    Chain
+)
 from enzy_htp.structure.structure_operation import remove_non_peptide
 from enzy_htp.structure import translate_structure
 from enzy_htp.structure.structure_constraint import StructureConstraint, ResiduePairConstraint
@@ -996,7 +1003,7 @@ class RosettaInterface(BaseInterface):
                 work_dir = opts['out:path:all']
             else:
                 #TODO(CJ): put an error code here
-                work_dir = config['system.SCRATCH_DIR']
+                work_dir = eh_config['system.SCRATCH_DIR']
                 opts['out:path:all'] = work_dir
 
         opts_file:str = str(Path(f"{work_dir}/rosetta_options.txt").absolute())
@@ -1022,6 +1029,10 @@ class RosettaInterface(BaseInterface):
         self.env_manager_.run_command(self.config_.ROSETTA_SCRIPTS, [f"@{opts_file}"], quiet_fail=True)
 
         os.chdir( start_dir )
+
+        fs.safe_rm( opts_file )
+        fs.safe_rm( xml_file )
+        fs.safe_rm( fname )
 
         return opts['out:file:scorefile'] #TODO(CJ): add some stuff in for this
 
@@ -1356,14 +1367,18 @@ class RosettaInterface(BaseInterface):
 
     def score(
         self,
-        infile: str,
-        ignore_zero_occupancy: bool = True,
-        overwrite: bool = True,
-        extra_flags: List[str] = None,
-        output_dir: str = './',
-        delete_scores: bool = True,
-        delete_crash: bool = True,
-    ) -> float:
+        structure:Union[Structure, StructureEnsemble],
+        opts:RosettaOptions=None,
+#        infile: str,
+#        ignore_zero_occupancy: bool = True,
+#        overwrite: bool = True,
+#        extra_flags: List[str] = None,
+#        output_dir: str = './',
+#        delete_scores: bool = True,
+#        delete_crash: bool = True,
+        score_fxn:[str, RosettaScriptsElement]=None,
+        work_dir:str=None        
+    ) -> List[float]:
         """Provides the total score in Rosetta Energy Units (REU) for a given structure. Uses default flags but can have behavior modified
         via supplied extra_flags. Returns the total score in REU.
 
@@ -1379,43 +1394,75 @@ class RosettaInterface(BaseInterface):
         Returns:
             Score of structure in file in REU.
 
-        """
-        fs.check_file_exists(infile)
+        """ #TODO(CJ): update this
+        if opts is None:
+            opts = RosettaOptions()
 
-        flags: List[str] = [
-            f"-in:file:s '{infile}'",
-            "-ignore_unrecognized_res",
-        ]
+        if score_fxn is None:
+            sfxn = RosettaScriptsElement('ScoreFunction', name='sfxn', weights='ref2015')
 
-        flags.append(f"-ignore_zero_occupancy {'true' if ignore_zero_occupancy else 'false'}")
-        flags.append(f"-out:path:all {output_dir}")
+        if isinstance(structure, StructureEnsemble):
+            structure = StructureEnsemble.from_single_stru( structure )
+        
+        protocol = RosettaScriptsProtocol()
+        protocol.add_scorefunction(
+            sfxn
+        ).add_mover(
+            'ScoreMover', name='score', scorefxn='sfxn'
+        ).add_protocol(
+            mover_name='score'
+        )
 
-        if overwrite:
-            flags.append("-overwrite")
-
-        if extra_flags:
-            flags.extend(extra_flags)
-
-        fs.safe_rm(f"{output_dir}/score.sc")
-
-        fs.safe_mkdir(output_dir)
-
-        self.env_manager_.run_command(self.config_.SCORE, flags)
-
-        df: pd.DataFrame = self.parse_score_file(f"{output_dir}/score.sc")
-
-        if len(df) != 1:
-            _LOGGER.error("Found more than one entry in score.sc file. Exiting...")
-            exit(1)
-
-        if delete_scores:
-            self._delete_score_file(output_dir)
-
-        if delete_crash:
-            self._delete_crash_log()
-
-        return df.iloc[0].total_score
-
+        opts['overwrite'] = True
+        
+        results:List[float] = list()
+        for stru in structure.structures():
+            score_file:str=self.run_rosetta_scripts(
+                    stru,
+                    protocol,
+                    opts,
+                    work_dir)
+            results.append(
+                self.parse_score_file( score_file ).iloc[0].total_score
+            )
+            stru.data['rosetta_score'] = results[-1]
+        return results
+#        fs.check_file_exists(infile)
+#
+#        flags: List[str] = [
+#            f"-in:file:s '{infile}'",
+#            "-ignore_unrecognized_res",
+#        ]
+#
+#        flags.append(f"-ignore_zero_occupancy {'true' if ignore_zero_occupancy else 'false'}")
+#        flags.append(f"-out:path:all {output_dir}")
+#
+#        if overwrite:
+#            flags.append("-overwrite")
+#
+#        if extra_flags:
+#            flags.extend(extra_flags)
+#
+#        fs.safe_rm(f"{output_dir}/score.sc")
+#
+#        fs.safe_mkdir(output_dir)
+#
+#        self.env_manager_.run_command(self.config_.SCORE, flags)
+#
+#        df: pd.DataFrame = self.parse_score_file(f"{output_dir}/score.sc")
+#
+#        if len(df) != 1:
+#            _LOGGER.error("Found more than one entry in score.sc file. Exiting...")
+#            exit(1)
+#
+#        if delete_scores:
+#            self._delete_score_file(output_dir)
+#
+#        if delete_crash:
+#            self._delete_crash_log()
+#
+#        return df.iloc[0].total_score
+#
     def relax_loops(
         self,
         infile: str,
