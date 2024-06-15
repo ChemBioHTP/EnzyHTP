@@ -176,6 +176,7 @@ def dock_reactants(structure: Structure,
 
     opts.add_script_variable( 'fr_repeats', min_fr_repeats )
     opts.add_script_variable('ramp_constraints', False)
+    opts['nstruct'] = 1 #Ooops
     mm_minimization(structure, constraints, opts)
 
     if use_qm:

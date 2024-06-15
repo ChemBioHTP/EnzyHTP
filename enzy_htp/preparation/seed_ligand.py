@@ -275,10 +275,10 @@ def seed_with_constraints(ligand:Ligand,
     ligand.shift( seed - ligand.geom_center)
 
     if minimize:
-        minimize_ligand_only( ligand, min_iter, work_dir )
+        minimize_ligand_only( ligand, min_iter, constraints, work_dir )
 
 
-def minimize_ligand_only(ligand:Ligand, n_iter:int, work_dir:str) -> None:
+def minimize_ligand_only(ligand:Ligand, n_iter:int, constraints:List[StructureConstraint], work_dir:str) -> None:
     """Uses Rosetta to minimize only the supplied Ligand(). Designed to remove clashes,
     not perform a rigorous optimization of the molecule.
 
@@ -291,9 +291,10 @@ def minimize_ligand_only(ligand:Ligand, n_iter:int, work_dir:str) -> None:
         Nothing.
     """
     sele = f'(chain {ligand.parent.name} and resi {ligand.idx})'
+    stru = ligand.parent.parent
     geo_minimize(stru, movemap=[
         {'sele':sele, 'bb':'true', 'chi':'true', 'bondangle':'true'}, 
-        {'sele':f'not ({sele})', 'bb':'false', 'chi':'false', 'bondangle':'false'}, 
+        #{'sele':f'not ({sele})', 'bb':'false', 'chi':'false', 'bondangle':'false'}, 
     
     ],n_iter=n_iter, work_dir=f"{work_dir}/minimize/")
 
