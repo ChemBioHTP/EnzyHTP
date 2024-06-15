@@ -791,11 +791,51 @@ class PyMolInterface(BaseInterface):
     def rmsd_matrix(self, 
             structures:List[Structure], 
             align_sele:str,
-            measure_sele:str,
-            rmsd_cutoff:float) -> List[List[float]]:
-    
-        np.zeros((len(structures), len(structures)))
+            measure_sele:str
+            ) -> List[List[float]]:
+    #TODO(CJ) 
+        result = np.zeros((len(structures), len(structures)))
 
+        session = self.new_session()
+        obj_names:List[str] = list()
+        for sidx,ss in enumerate(structures):
+            obj_names.append(
+                self.load_enzy_htp_stru(session, ss)[0]
+            )
+            structures[sidx].data["cluster_idx"] = sidx
+
+        args = list()
+        template = obj_names[0]
+        for on in obj_names[1:]:
+            args.append((
+                'align',
+                f"{template} and polymer.protein",
+                f"{on} and polymer.protein",
+                ))                
+        
+        self.general_cmd( session, args )
+        
+        n_obj = len(obj_names )
+        args = list()
+        for oi1 in range( n_obj ):
+            for oi2 in range( oi1+1, n_obj):
+                assert oi1 != oi2
+                o1 = obj_names[oi1]
+                o2 = obj_names[oi2]
+
+                rmsd = self.general_cmd(session, [(
+                    'rms_cur', 
+                    f"{o1} and {measure_sele}",
+                    f"{o2} and {measure_sele}",
+                    "1",
+                    "-1"
+                )])[-1]
+            
+        
+                result[oi1, oi2] = rmsd
+                result[oi2, oi1] = rmsd
+
+        return result
 
 class OpenPyMolSession:
     """a context manager that open a pymol session once enter and close once exit"""
