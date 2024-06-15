@@ -108,3 +108,43 @@ def ligand_mcs_score( l1, l2 ) -> float:
         ct += 1
     mcs_result = interface.rdkit.find_mcs( l1 , l2 )
     return mcs_result.numAtoms /  (ct - mcs_result.numAtoms)
+
+
+def mimic_torsions_mcs(t_ligand:Ligand, r_ligand:Ligand) -> None:
+    
+    mcs = interface.rdkit.find_mcs( t_ligand, r_ligand )
+
+    template = interface.rdkit.mol_from_ligand(t_ligand, removeHs=False, cleanupSubstructures=False)
+    ligand  = interface.rdkit.mol_from_ligand(r_ligand, removeHs=False, cleanupSubstructures=False)
+
+    ss1 = template.GetSubstructMatch(mcs.queryMol)
+    ss2 = ligand.GetSubstructMatch(mcs.queryMol)
+
+
+    template_to_ligand = dict()
+    
+    template_to_ligand = dict( zip (
+            ss1, ss2
+    ))
+
+    torsions = enumerate_torsions(template)
+    for (a1,a2,a3,a4) in torsions:
+        if a1 not in template_to_ligand:
+            continue
+        if a2 not in template_to_ligand:
+            continue
+        if a3 not in template_to_ligand:
+            continue
+        if a4 not in template_to_ligand:
+            continue
+
+        m1,m2,m3,m4 = template_to_ligand[a1],template_to_ligand[a2],template_to_ligand[a3],template_to_ligand[a4]
+        rdmt.SetDihedralDeg(ligand.GetConformer(), m1, m2, m3, m4,
+            rdmt.GetDihedralDeg(template.GetConformer(), a1, a2, a3, a4)
+        )
+
+    amapper = list(zip(template_to_ligand.values(), template_to_ligand.keys()))
+    AlignMol( ligand, template, atomMap=amapper ) #TODO(CJ): put into the rdkit interface
+
+    interface.rdkit.update_ligand_positions(r_ligand, ligand)
+

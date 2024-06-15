@@ -26,7 +26,7 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core import _LOGGER
 
 import enzy_htp.chemical as chem
-from enzy_htp.structure import PDBParser, Structure, Ligand, Mol2Parser, Chain
+from enzy_htp.structure import PDBParser, Structure, Ligand, Mol2Parser, Chain, Atom
 from enzy_htp.structure.structure_constraint import StructureConstraint
 from enzy_htp._interface import Mole2Cavity
 
@@ -36,6 +36,7 @@ from enzy_htp.structure.structure_operation import (
 
 from .ligand_moves import (
     mimic_torsions,
+    mimic_torsions_mcs,
     ligand_mcs_score
 )
 
@@ -134,13 +135,12 @@ def seed_with_transplants(ligand:Ligand,
     template:Ligand = df.iloc[0].mol
 
     if not ligand.is_ligand():
-        #TODO(CJ): this is where the stuff will go ab metal units
-        pass
-
-    if similarity_metric == 'atom_names':
-        mimic_torsions( template, ligand )
-    elif similarity_metric == 'mcs':
-        assert False
+        ligand.atoms[0].coord = template.atoms[0].coord
+    else:
+        if similarity_metric == 'atom_names':
+            mimic_torsions( template, ligand )
+        elif similarity_metric == 'mcs':
+            mimic_torsions_mcs( template, ligand )
 
     if minimize:
         minimize_ligand_only( ligand, min_iter, work_dir )
