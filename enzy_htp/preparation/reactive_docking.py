@@ -20,7 +20,15 @@ from enzy_htp._interface import (
     RosettaScriptsProtocol
 )
 import enzy_htp.structure.structure_operation as stru_oper
-from enzy_htp.structure.structure_constraint import StructureConstraint, CartesianFreeze
+from enzy_htp.structure.structure_constraint import (
+    StructureConstraint, 
+    CartesianFreeze
+)
+
+from enzy_htp.structure.structure_cluster import (
+    cluster_structures,
+    StructureCluster
+)
 
 import enzy_htp.chemical as chem
 from enzy_htp.structure import PDBParser, Mol2Parser, Structure, Ligand, translate_structure, Atom
@@ -346,20 +354,18 @@ def dock_ligand(structure:Structure,
     if use_qm:
         pass
         #TODO(CJ)
-#        evaluate_geometry_qm_energy(df, structure, cluster_distance)
-#        energy_key='qm_energy'
-#    else:
-#        df['combined_energy'] = df.total_score + df.cst_filter
-#        energy_key='combined_energy'
     
     _parser = PDBParser()
     structures:List[Structure] = list(map(lambda dd: _parser.get_structure( dd ), df.description ) )
     
-    clusters:List[StructureCluster] = cluster_structures( structures, 'polymer.protein', f"resn {ligand.name}", 1.0 )
+    clusters:List[StructureCluster] = cluster_structures( structures, 'polymer.protein', f"resn {ligand.name}", 1.0 ) #TODO(CJ): update params
     for cc in clusters:
-        interface.rosetta.score( cc )
+        interface.rosetta.score( cc, opts )
 
-    ref_stru = sorted(clusters, lambda clust: clust.average_score())[0].lowest_energy_structure()
+    ref_stru = sorted(
+        clusters,
+        key=lambda clust: clust.average_score()
+    )[0].lowest_energy_structure()
 
     stru_oper.update_residues(structure, ref_stru)
 
