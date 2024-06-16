@@ -251,9 +251,15 @@ class RosettaScriptsElement:
 
             for cidx, cc in enumerate( self.children_ ):
                 if not isinstance( cc, RosettaScriptsElement ):
-                    self.children_[cidx] = RosettaScriptsElement(
-                        cc[0], **cc[1]
-                    )
+                    if len(cc) > 1:
+                        self.children_[cidx] = RosettaScriptsElement(
+                            cc[0], **cc[1]
+                        )
+                    else:
+                        self.children_[cidx] = RosettaScriptsElement(
+                            cc[0]
+                        )
+
 
         for k, v in kwargs.items():
             self.attrib[k] = v
@@ -305,7 +311,7 @@ class RosettaScriptsProtocol:
 
     def __init__(self):
         self.sections = defaultdict(list)
-        self.section_names = "SCORINGGRIDS SCOREFXNS RESIDUE_SELECTORS PACKER_PALETTES TASKOPERATIONS MOVE_MAP_FACTORIES SIMPLE_METRICS CONSTRAINT_GENERATORS FILTERS MOVERS PROTOCOLS OUTPUT".split()
+        self.section_names = "SCORINGGRIDS RESIDUE_SELECTORS SCOREFXNS  PACKER_PALETTES TASKOPERATIONS MOVE_MAP_FACTORIES SIMPLE_METRICS CONSTRAINT_GENERATORS FILTERS MOVERS PROTOCOLS OUTPUT".split()
     
     def add_element(self, section:str, element:RosettaScriptsElement) -> None:
         #TODO(CJ): add checks
@@ -357,10 +363,16 @@ class RosettaScriptsProtocol:
         return self.add_element("FILTERS", 
             RosettaScriptsElement( rf_name, **kwargs )
         )
-
-
-    def add_simple_metric(self, simple_metric: RosettaScriptsElement) -> None:
+    
+    @dispatch
+    def add_simple_metric(self, simple_metric: RosettaScriptsElement) -> RosettaScriptsProtocol:
         return self.add_element("SIMPLE_METRICS", simple_metric)
+
+    @dispatch
+    def add_simple_metric(self, sm_name:str, **kwargs) -> RosettaScriptsProtocol:
+        return self.add_element("SIMPLE_METRICS", 
+            RosettaScriptsElement( sm_name,  **kwargs )
+        )
 
     @dispatch
     def add_protocol(self, protocol: RosettaScriptsElement) -> RosettaScriptsProtocol:
@@ -1029,9 +1041,9 @@ class RosettaInterface(BaseInterface):
 
         os.chdir( start_dir )
 
-        fs.safe_rm( opts_file )
-        fs.safe_rm( xml_file )
-        fs.safe_rm( fname )
+#        fs.safe_rm( opts_file )
+#        fs.safe_rm( xml_file )
+#        fs.safe_rm( fname )
 
         return opts['out:file:scorefile'] #TODO(CJ): add some stuff in for this
 
@@ -1047,7 +1059,7 @@ class RosettaInterface(BaseInterface):
         """
 
         if not Path(fname).exists():
-            _LOGGER.error(f"The suppliied file '{fname}' does not exist. Exiting...")
+            _LOGGER.error(f"The supplied file '{fname}' does not exist. Exiting...")
             exit(1)
 
         lines: List[str] = fs.lines_from_file(fname)
@@ -1368,8 +1380,8 @@ class RosettaInterface(BaseInterface):
         self,
         structure:Union[Structure, StructureEnsemble],
         opts:RosettaOptions=None,
-        residue_selectors:List[RosettasScriptsElement]=None,
-        score_fxn:[str, RosettaScriptsElement]=None,
+        protocol:RosettaScriptsProtocol=None,
+        score_fxn:RosettaScriptsElement=None,
         work_dir:str=None        
     ) -> List[float]:
         """Provides the total score in Rosetta Energy Units (REU) for a given structure. Uses default flags but can have behavior modified
@@ -1390,23 +1402,21 @@ class RosettaInterface(BaseInterface):
             opts = RosettaOptions()
 
         if score_fxn is None:
-            sfxn = RosettaScriptsElement('ScoreFunction', name='sfxn', weights='ref2015')
+            score_fxn = RosettaScriptsElement('ScoreFunction', name='sfxn', weights='ref2015')
 
-        if isinstance(structure, StructureEnsemble):
+        if isinstance(structure, Structure):
             structure = StructureEnsemble.from_single_stru( structure )
-        
-        protocol = RosettaScriptsProtocol()
-        protocol.add_scorefunction(
-            sfxn
-        ).add_mover(
-            'ScoreMover', name='score', scorefxn='sfxn'
-        ).add_protocol(
-            mover_name='score'
-        )
 
-        if residue_selectors is not None:
-            for rs in residue_selectors:
-                protocol.add_residue_selector( rs )
+        if protocol is None:
+            protocol = RosettaScriptsProtocol()
+
+        protocol.add_scorefunction(
+            score_fxn            
+        ).add_simple_metric(
+            'TotalEnergyMetric', name='score', scorefxn='sfxn'
+        ).add_protocol(
+            metrics='score'
+        )
 
         opts['overwrite'] = True
         
@@ -1418,7 +1428,7 @@ class RosettaInterface(BaseInterface):
                     opts,
                     work_dir)
             results.append(
-                self.parse_score_file( score_file ).iloc[0].total_score
+                self.parse_score_file( score_file ).iloc[0].score
             )
             stru.data['rosetta_score'] = results[-1]
         return results
