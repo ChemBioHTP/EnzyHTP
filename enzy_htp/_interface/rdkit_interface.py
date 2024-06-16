@@ -5,10 +5,11 @@ Date: 2023-10-09
 
 #TODO(CJ): maybe wrap this in a try,except loop
 import importlib
+from copy import deepcopy
 #import rdkit
 #from rdkit import Chem as _rchem
 #import rdkit.Chem.AllChem as _rchem_ac
-
+from typing import List
 from pathlib import Path
 
 from .base_interface import BaseInterface
@@ -187,13 +188,43 @@ class RDKitInterface(BaseInterface):
         mol: _rdkit.Chem = self._load_molecule(molfile)
         return _rchem_ac.ComputeMolVolume(mol, gridSpacing=gridSpacing, boxMargin=boxMargin)
 
-    def update_ligand_positions(self, ligand:Ligand, mol) -> None:
+    def update_ligand_positions(self, ligand:Ligand, mol, cidx:int=-1) -> None:
         
         assert len(ligand.atoms) == len(mol.GetAtoms())
        
         for idx, latom in enumerate(ligand.atoms):
-            pos = mol.GetConformer().GetAtomPosition(idx)
+            pos = mol.GetConformer(cidx).GetAtomPosition(idx)
             latom.coord = (pos.x, pos.y, pos.z)
 
 
+    def generate_conformers( self,
+            ligand:Ligand, 
+            n_conformers:int,
+            rms_cutoff:float,
+            attempts:int,
+            rng:int=1996 ) -> List[Ligand]:
 
+        module = None
+        try:
+            module = importlib.import_module('rdkit.Chem.rdDistGeom')
+        except:
+            pass
+
+        assert module
+        mol = self.mol_from_ligand(ligand, removeHs=False )
+        
+        module.EmbedMultipleConfs( 
+                mol,
+                numConfs=n_conformers,
+                maxAttempts=attempts,
+                randomSeed=rng,
+                pruneRmsThresh=rms_cutoff,
+                )
+        
+        result = list()
+        for idx in range( mol.GetNumConformers() ):
+            temp = deepcopy( ligand )
+            self.update_ligand_positions( temp, mol, idx )
+            result.append( temp )
+
+        return result
