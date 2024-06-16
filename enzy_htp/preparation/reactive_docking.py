@@ -350,17 +350,18 @@ def dock_ligand(structure:Structure,
 
     df: pd.DataFrame = interface.rosetta.parse_score_file(opts['out:file:scorefile'], opts['out:path:all'])
 
-    sfxn = None
-    if use_qm:
-        pass
-        #TODO(CJ)
-    
     _parser = PDBParser()
     structures:List[Structure] = list(map(lambda dd: _parser.get_structure( dd ), df.description ) )
     
     clusters:List[StructureCluster] = cluster_structures( structures, 'polymer.protein', f"resn {ligand.name}", 1.0 ) #TODO(CJ): update params
-    for cc in clusters:
-        interface.rosetta.score( cc, opts )
+    
+    score_clusters(
+        clusters,
+        structure,
+        cluster_distance,#TODO(CJ): I think this comes from the options?
+        opts,
+        use_qm
+    )
 
     ref_stru = sorted(
         clusters,
@@ -372,7 +373,7 @@ def dock_ligand(structure:Structure,
     for cst in constraints:
         cst.change_topology(structure)
 
-def get_active_site_sele(structure: Structure, distance_cutoff:float) -> str:
+def get_active_site_sele(structure: Structure, distance_cutoff:float, fmt:str='pymol') -> str:
     """Creates a pymol-compatible sele for the active site of the supplied Structure(). Basic structure
     is to select all residues within the specified cutoff of the Ligand()'s in the structure. Metal ions up to
     2*distance_cutoff from the Ligand()'s are also selected.
@@ -413,10 +414,17 @@ def get_active_site_sele(structure: Structure, distance_cutoff:float) -> str:
     
     _LOGGER.info(f"Found {len(result)} residues within {distance_cutoff} angstroms of reactants!")
     
-    return " or ".join(map(
-        lambda rr: f"( chain {rr[0]} and resi {rr[1]})",
-        result
-    ))
+    if fmt == 'pymol':
+        return " or ".join(map(
+            lambda rr: f"( chain {rr[0]} and resi {rr[1]})",
+            result
+        ))
+    elif fmt == 'rosetta':
+        return ",".join(map(
+            lambda rr: f"{rr[1]}{rr[0]}", result
+        ))
+    else:
+        assert False
 
 def qm_minimization(structure:Structure,
                 constraints:List[StructureConstraint],
@@ -460,44 +468,54 @@ def qm_minimization(structure:Structure,
 
     translate_structure(structure, end_naming='rosetta')
 
-def evaluate_geometry_qm_energy(df: pd.DataFrame, structure: Structure, cluster_cutoff: float) -> None:
-    """Aids in ranking and selection of candidate geometries through a semi-empirical QM single point energy
-    calculation with xtb. Creates a capped active site by using a specified cluster_cutoff parameter to specify
-    the enzyme's active site.
+def score_clusters(
+    clusters,
+    structure,
+    cluster_cutoff,
+    opts,
+    use_qm
+    ) -> None:
+    #TODO(CJ)
 
-    Args:
-        df: The geometry DataFrame containing all information  
-        structure: The reference Structure() in use.
-        cluster_cutoff: The cutoff in Angstroms for a Residue() to be included in the QM region. 
+    for cc in clusters:
+        sfxn=None
+        protocol=None
 
-    Returns:
-        Nothing.        
-    """
+        if use_qm:
+            protocol = RosettaScriptsProtocol()
+            protocol.add_scorefunction(
+                "ScoreFunction", name='total_region', weights='ref2015'
+            ).add_scorefunction(
+                "ScoreFunction", name="qm_region", children=[
+                    ('Reweight', {'scoretype':"orca_qm_energy", 'weight':"1.0" }),
+                    ('Set', {'orca_path':config['rosetta.ORCA_DIR'] }),
+                    ('Set', {'orca_processes':"1" }),
+                    ('Set', {'orca_memory_megabytes':"3000" }),
+                    ('Set', {'rosetta_orca_bridge_temp_directory':"xtb_temp" }),
+                    ('Set', {'orca_electron_correlation_treatment':"XTB" }),
+                    ('Set', {'orca_geo_opt_max_steps':"1500" }),
+                    ('Set', {'clean_rosetta_orca_bridge_temp_directory':"true" }),
+                    ('Set', {'orca_deduce_charge':"true" })
+                ]
+            ).add_residue_selector(
+                'Index', name='ligand', resnums=get_active_site_sele(structure, cluster_cutoff, 'rosetta')
+            )
+            sfxn = RosettaScriptsElement(
+                'MultiScoreFunction', name='sfxn', children=[
+                    ('SimpleCombinationRule',{}),
+                    ('Region', {'scorefxn':'qm_region', 'residue_selector': 'ligand', 'children':[
+                        ('CappedBondResolutionRule',)
+                    ]}),
+                    ('Region', {'scorefxn':'total_region', 'children':[
+                        ('SimpleBondResolutionRule',)
+                    ]})
+                ]
+            )
 
-    _LOGGER.info(f"Beginning qm energy evaluation.")
-    as_sele:str = get_active_site_sele(structure, cluster_cutoff)
-    qm_energy = []
+        interface.rosetta.score( 
+            cc, 
+            opts=opts,
+            protocol=protocol,
+            score_fxn=sfxn
+        )
 
-    _parser = PDBParser()
-    for i, row in df.iterrows():
-
-        energy:float = None
-        _df_stru = _parser.get_structure( row.description )
-        translate_structure(_df_stru, start_naming='rosetta')
-        for res in structure.residues:
-            if res.is_canonical():
-                continue
-            _df_stru.get(res.key_str).net_charge = res.net_charge
-            _df_stru.get(res.key_str).multiplicity = res.multiplicity
-            for atom in _df_stru.get(res.key_str):
-                atom.charge = 0.0
-        es = single_point(
-            _df_stru,
-            engine='xtb',
-            region_methods=[chem.QMLevelOfTheory(basis_set='',method='GFN2', solvent='water', solv_method='ALPB')],
-            parallel_method=None,
-            regions=[as_sele])
-        qm_energy.append(es[0].energy_0)
-
-    df['qm_energy'] = qm_energy
-    _LOGGER.info("Finished qm energy evaluation!")
