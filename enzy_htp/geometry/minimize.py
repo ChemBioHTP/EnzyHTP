@@ -50,7 +50,6 @@ def minimize_rosetta(stru, n_iter, n_struct, movemap, work_dir, **kwargs):
         if res.is_ligand():
             params.append(Path(interface.rosetta.parameterize_ligand(res, work_dir=work_dir)).absolute())
 
-    print(params)
     options = RosettaOptions()
     options['extra_res_fa'] = params
     options['nstruct'] = n_struct
@@ -81,7 +80,7 @@ def minimize_rosetta(stru, n_iter, n_struct, movemap, work_dir, **kwargs):
     fs.safe_rm(temp_pdb)
 
     protocol.add_mover(RosettaScriptsElement("FastRelax", name="frelax", scorefxn="r15", repeats=str(n_iter),
-        children=[RosettaScriptsElement("MoveMap", name="full_structure", bb="false", chi="false", jump="true", children=mm_children)]
+        children=[RosettaScriptsElement("MoveMap", name="full_structure", bb="false", chi="false", jump="false", children=mm_children)]
     ))
     score_file = interface.rosetta.run_rosetta_scripts(stru, protocol, options, work_dir)
 

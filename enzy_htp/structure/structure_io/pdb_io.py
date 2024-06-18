@@ -156,10 +156,11 @@ class PDBParser(StructureParserInterface):
                     outfile:str,
                     le: LigandEnsemble,
                     if_renumber: bool = True,
-                    if_fix_atomname: bool = True ) -> str:
+                    if_fix_atomname: bool = True
+                    ) -> str:
         """TODO(CJ)"""            
         content:List[str] = list()
-        for lig in le.ligands():
+        for lig in le.ligands()[1:]:
             if not lig.parent:
                 lig = convert_res_to_structure( lig )
             for ll in  cls.get_file_str(

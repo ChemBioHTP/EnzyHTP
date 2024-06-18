@@ -1041,9 +1041,11 @@ class RosettaInterface(BaseInterface):
 
         os.chdir( start_dir )
 
-#        fs.safe_rm( opts_file )
-#        fs.safe_rm( xml_file )
-#        fs.safe_rm( fname )
+        assert Path(opts['out:file:scorefile']).exists() #TODO(CJ): update this
+
+        #fs.safe_rm( opts_file )
+        #fs.safe_rm( xml_file )
+        #fs.safe_rm( fname )
 
         return opts['out:file:scorefile'] #TODO(CJ): add some stuff in for this
 
@@ -1142,7 +1144,6 @@ class RosettaInterface(BaseInterface):
 
         res_name:str=mol.name
         molfile:str = f"{work_dir}/{res_name}.mol2"
-        conformers:str=f"{work_dir}/{res_name}_conformers.pdb"
         params_file:str=f"./{res_name}.params"
         _parser = Mol2Parser()
         _parser.save_ligand(molfile, mol)
@@ -1156,7 +1157,6 @@ class RosettaInterface(BaseInterface):
             
         if len(indices) <= 2:            
             flags.append( f"--nbr_atom={indices[0]}" )
-        
 
         self.env_manager_.run_command(self.config_.PY_2_7, flags)
         fs.safe_rm(f"{res_name}_0001.pdb")
@@ -1170,30 +1170,19 @@ class RosettaInterface(BaseInterface):
             )
 
         _LOGGER.info(params_file)
+        if mol.has_ensemble:
+            mapper:Dict[str, str] = dict()
+            for ll in fs.lines_from_file( params_file ):
+                if ll.startswith('ATOM'):
+                    mapper[ll[5:9].strip()] = ll[5:9]
+            
+            mol.ensemble.fix_atom_names( mapper )
 
-        n_conformers:int=mol.n_conformers()
-        if n_conformers > 1:
-            conformer_file_content:List[str] = list()
-            mol2_temp:str=f"{work_dir}/__temp_ligand_mol2.mol2"
-            _LOGGER.info(f"Detected {n_conformers} in ligand {res_name}")
-            _parser = Mol2Parser()
-            session = self.parent().pymol.new_session()
-            for cidx in range(1, n_conformers):
-                conf = mol.get_ligand_conformer(cidx)
-                fs.safe_rm(mol2_temp)
-                _parser.save_ligand(mol2_temp, conf)
-                pdb_conf:str=self.parent().pymol.convert(session, mol2_temp, new_ext='.pdb')
-                conformer_file_content.extend(fs.lines_from_file(pdb_conf))
-                fs.safe_rm(pdb_conf)
-
-            conformer_file_content = list(filter(lambda ll: ll.startswith('HETATM') or ll.startswith('END'), conformer_file_content))
-
-            fs.write_lines(conformers, conformer_file_content) 
-
+            conformers:str=f"{work_dir}/{res_name}_conformers.pdb"
+            _LOGGER.info(f"Detected {mol.ensemble.n_conformers()} in ligand {res_name}")
+            _parser = PDBParser()
+            _parser.save_ensemble( conformers, mol.ensemble )
             params_content.append(f"PDB_ROTAMERS {conformers}")
-
-            fs.safe_rm(mol2_temp)
-
         fs.write_lines(params_file, params_content)
         
         return params_file 
@@ -1711,7 +1700,7 @@ class RosettaInterface(BaseInterface):
         stru.chains = filled_stru.chains
 
 
-    def parameterize_structure(self, stru:Structure, param_dir:str) -> None:
+    def parameterize_structure(self, stru:Structure, param_dir:str, overwrite:bool=False) -> None:
         """Setup non-standad residues and ligands for use in Rosetta. All files are created in the standard
         .params format, and saved to the supplied param_dir. The params list() is stored in the .data attribute
         of the supplied Structure() with the key 'rosetta_params'.
@@ -1730,7 +1719,7 @@ class RosettaInterface(BaseInterface):
             if res.is_ligand():
                 lname:str = res.name
                 params_file:str = Path(param_dir)/ f"{lname}.params"
-                if not params_file.exists():
+                if not params_file.exists() or overwrite:
                     self.parameterize_ligand(res, charge=res.net_charge, work_dir=param_dir)
                 
                 params_list.append( str(params_file) )

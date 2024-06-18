@@ -1,5 +1,5 @@
 #TODO(CJ): documentation
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
 from plum import dispatch
 from .ligand import (
@@ -48,3 +48,10 @@ class LigandEnsemble:
             atom.coord = coord
 
         self.ligands_.append( new_ligand )
+
+    def fix_atom_names(self, name_mapper:Dict[str, str]) -> None:
+        for lig in self.ligands_:
+            for aa in lig.atoms:
+                mapped_name = name_mapper.get( aa.name.strip(), None)
+                if mapped_name:
+                    aa.name = mapped_name

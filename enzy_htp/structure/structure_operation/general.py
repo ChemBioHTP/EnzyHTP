@@ -132,17 +132,8 @@ def update_residues(stru: Structure, ref_stru: Structure) -> Structure:
             atom_names = [aa.name for aa in self_res.atoms]
             for atom in self_res.atoms:
                 for new_atom in ref_res.atoms:
-                    if atom.name == new_atom.name:
+                    if atom.name.strip() == new_atom.name.strip(): #LOL
                         atom.coord = new_atom.coord
-#                for new_atom in ref_res.atoms:
-#                    if new_atom.name == aa:
-#                        new_atoms.append( new_atom )
-#                        break
-#            
-#            self_res.atoms = copy.deepcopy( new_atoms )
-#
-#            for aa in self_res.atoms:
-#                aa._atom_type = atype_mapper[aa.name]
 
     stru.renumber_atoms()
     return stru

@@ -143,7 +143,7 @@ def seed_with_transplants(ligand:Ligand,
             mimic_torsions_mcs( template, ligand )
 
     if minimize:
-        minimize_ligand_only( ligand, min_iter, work_dir )
+        minimize_ligand_only( ligand, min_iter, [], work_dir )
 
 def seed_with_analog(ligand:Ligand,
                 analog:Ligand,
@@ -187,7 +187,7 @@ def seed_with_analog(ligand:Ligand,
     ligand.shift( shift )
 
     if minimize:
-        minimize_ligand_only( ligand, min_iter, work_dir )
+        minimize_ligand_only( ligand, min_iter, [], work_dir )
 
 
 def seed_with_constraints(ligand:Ligand,
@@ -290,11 +290,13 @@ def minimize_ligand_only(ligand:Ligand, n_iter:int, constraints:List[StructureCo
     Returns:
         Nothing.
     """
+    if work_dir is None:
+        work_dir = config['system.SCRATCH_DIR']
     sele = f'(chain {ligand.parent.name} and resi {ligand.idx})'
     stru = ligand.parent.parent
     geo_minimize(stru, movemap=[
-        {'sele':sele, 'bb':'true', 'chi':'true', 'bondangle':'true'}, 
-        #{'sele':f'not ({sele})', 'bb':'false', 'chi':'false', 'bondangle':'false'}, 
+        {'sele':sele, 'bb':'true', 'chi':'true', 'bondangle':'false'}, 
+        {'sele':f'not ({sele})', 'bb':'false', 'chi':'false', 'bondangle':'false'}, 
     
     ],n_iter=n_iter, work_dir=f"{work_dir}/minimize/")
 
