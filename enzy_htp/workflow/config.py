@@ -288,6 +288,23 @@ class StatusCode():
     unexecuted_statuses = [CREATED, INITIALIZING, READY_TO_START, FAILED_INITIALIZATION]    # For logical judgment only. Note its distinction from `unexecutable_statuses`.
     skippable_statuses = [EXIT_OK]  # For logical judgement only.
 
+    status_text_mapper = {
+        CREATED: "Created",
+        INITIALIZING: "Initializing",
+        READY_TO_START: "Ready to Start",
+        READY_WITH_UPDATES: "Ready with Updates",
+        SUSPECIOUS_UPDATES: "Suspecious Updates",
+        RUNNING: "Running",
+        RUNNING_WITH_PAUSE_IN_INNER_UNITS: "Running with Pause in Inner Units",
+        EXPECTED_PAUSE: "Expected Pause",
+        EXIT_OK: "Completed",
+        EXIT_WITH_ERROR_IN_INNER_UNITS: "Exit with Error in Inner Units",
+        EXIT_WITH_ERROR: "Exit with Error",
+        EXIT_WITH_ERROR_AND_PAUSE: "Exit with Error and Pause",
+        DEPRECATED: "Deprecated",
+        FAILED_INITIALIZATION: "Initialization Failed."
+    }
+
 demo_json_dict = {
     "workunits" : [
         {
