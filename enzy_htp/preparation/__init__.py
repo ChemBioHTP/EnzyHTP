@@ -15,6 +15,7 @@ from .seed_ligand import (
     seed_with_coordinates,
     seed_with_transplants,
     seed_with_constraints,
+    seed_using_phosphates,
 )
 from .remedy import (
     add_missing_residues, 

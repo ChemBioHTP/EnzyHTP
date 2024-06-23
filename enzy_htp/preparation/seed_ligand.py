@@ -277,6 +277,69 @@ def seed_with_constraints(ligand:Ligand,
     if minimize:
         minimize_ligand_only( ligand, min_iter, constraints, work_dir )
 
+def seed_using_phosphates( metal, phosphate ):
+    def dist( p1, p2 ):
+        return np.sqrt(np.sum(
+            np.power(p1-p2, 2)
+        ))
+
+    def intersect(p1, p2, cutoff=0.50):
+            
+        
+        dists = list()
+        x = np.arange(0, 5.0, 0.1)
+        for dx in x:
+            dists.append(dist(
+                p1['v']*dx+p1['p'], p2['v']*dx+p2['p']
+            ))
+        
+        if np.min(dists) > cutoff:
+            return (False, None)
+        dx = x[np.argmin(dists)]
+        dx = 2.0 #TODO(CJ): update
+    
+        return (True, ( p1['v']*dx+p1['p']+p2['v']*dx+p2['p'] )*0.5)
+    
+   
+    points = dict()
+    
+    for atom in phosphate.atoms:
+        points[atom.name] = np.array(atom.coord)
+
+    p1_vectors = list()
+    
+    for aname in 'O1A O2A'.split():
+        if aname not in points:
+            continue
+        v = points[aname] - points['PA']
+        p1_vectors.append({
+            'v': v / np.linalg.norm(v),
+            'p': points[aname]
+        })
+    
+    p2_vectors = list()
+    
+    for aname in 'O1B O2B O3B'.split():
+        if aname not in points:
+            continue
+        v = points[aname] - points['PB']
+        p2_vectors.append({
+            'v': v / np.linalg.norm(v),
+            'p': points[aname]
+        })
+    
+    pt = None
+    for p1 in p1_vectors:
+        for p2 in p2_vectors:
+            
+            (good,ipt) = intersect(p1, p2)
+            if good:
+                metal.atom.coord = ipt
+                return
+    
+    assert pt
+    
+
 
 def minimize_ligand_only(ligand:Ligand, n_iter:int, constraints:List[StructureConstraint], work_dir:str) -> None:
     """Uses Rosetta to minimize only the supplied Ligand(). Designed to remove clashes,
