@@ -14,13 +14,21 @@ import enzy_htp.core.file_system as fs
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.exception import InconsistentMDEngine
 from enzy_htp.core import job_manager
-from enzy_htp.structure import Structure, StructureEnsemble
+from enzy_htp.structure import (
+    Structure,
+    StructureEnsemble,
+    Ligand,
+    LigandEnsemble
+)
+
 from enzy_htp.structure import structure_constraint as stru_cons
 from enzy_htp._interface.handle_types import (
     MolDynStep,
     MolDynParameterizer,
     MolDynParameter,
     MolDynResult)
+
+from enzy_htp import interface
 
 def equi_md_sampling(stru: Structure,
                      param_method: MolDynParameterizer, # TODO support using engine + kwarg to specify
@@ -360,3 +368,31 @@ def _serial_md_steps(
 
     return results
 
+
+def conformer_sampling(
+    ligand:Ligand,
+    n_conformers:int,
+    rms_cutoff:float=0.1,
+    attempts:int=1000,
+    method:str='rdkit',
+    rng:int=1996,
+    ) -> LigandEnsemble:
+    
+    le = LigandEnsemble( ligand )
+    if method == 'rdkit':
+        conformers:List[Ligand] = interface.rdkit.generate_conformers(
+            ligand,
+            n_conformers,
+            rms_cutoff,
+            attempts,
+            rng
+            )
+        
+        for conf in conformers:
+            le.add_conformer( conf )
+        
+        ligand.ensemble = le
+    else:
+        assert False
+
+    return le

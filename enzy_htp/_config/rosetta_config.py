@@ -59,6 +59,8 @@ class RosettaConfig(BaseConfig):
     PY_2_7: str = "python2.7"
     """Executable or path to the python2.7 executable that Rosetta will use for miscellaneous scripts."""
 
+    ORCA_DIR:str = ""
+    #TODO(CJ)
 
     DEFAULT_DISTANCE_CONSTRAINT_SETTING:Dict[str, float] = {
         'tolerance': 0.5,

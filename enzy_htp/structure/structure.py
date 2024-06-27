@@ -144,6 +144,13 @@ class Structure(DoubleLinkedNode):
         if self.has_duplicate_chain_name():
             self.resolve_duplicated_chain_name()
 
+        self._data = dict()            
+
+    @property
+    def data(self) -> Dict:
+        #TODO(CJ):
+        return self._data
+
     #region === Getters-attr ===
     @property
     def chains(self) -> List[Chain]:

@@ -156,7 +156,7 @@ class Residue(DoubleLinkedNode):
 
     def find_atom_name(self, name: str) -> Atom:
         """find child Atom base on its name"""
-        result = list(filter(lambda a: a.name == name, self.atoms))
+        result = list(filter(lambda a: a.name.strip() == name.strip(), self.atoms))
         if len(result) > 1:
             _LOGGER.error(f"residue {self} have more than 1 {name}")
             sys.exit(1)

@@ -140,7 +140,6 @@ def single_point(
     else:
         _LOGGER.error(f"only accept Structure() or StructureEnsemble(). Got: {stru}")
         raise TypeError
-
     # dispatch: region, region_methods, method -> qm_engine
     if regions is None:
         regions = []
@@ -158,6 +157,7 @@ def single_point(
         # qm_engine
         qm_engine_ctor = SINGLE_REGION_SINGLE_POINT_ENGINE[engine]
         # qm_method
+        qm_engine_ctor
         if region_methods:
             if not isinstance(region_methods[0], QMLevelOfTheory):
                 _LOGGER.error(f"Only 1 or less region specified. Have to be a QMLevelOfTheory. Got: {region_methods[0]}")
@@ -405,7 +405,7 @@ def _serial_qm(
     This method runs QMs in a serial manner locally."""
     result = []
     # 1. run jobs
-    for stru in stru_esm:
+    for stru in stru_esm.structures():
         output = qm_engine.run(stru)
         result.append(output) 
     

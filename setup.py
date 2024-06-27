@@ -28,6 +28,7 @@ SUB_MODULES=[
         'enzy_htp.structure.structure_selection',
         'enzy_htp.structure.structure_selection_class',
         'enzy_htp.structure.structure_constraint',
+        'enzy_htp.structure.structure_cluster',
         'enzy_htp.quantum',
         'enzy_htp.electronic_structure',
         'enzy_htp.preparation',
