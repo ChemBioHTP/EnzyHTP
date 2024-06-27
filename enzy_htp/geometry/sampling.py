@@ -39,6 +39,8 @@ def equi_md_sampling(stru: Structure,
                      prod_time: float= 50.0, # ns
                      prod_temperature: float = 300.0, #K
                      prod_constrain: List[stru_cons.StructureConstraint]= None,
+                     cpu_heat_step:bool=False,
+                     cpu_heat_job_config:Dict=None,
                      record_period: float= 0.5, # ns
                      cluster_job_config: Dict= None,
                      cpu_equi_step: bool= False,
@@ -112,6 +114,15 @@ def equi_md_sampling(stru: Structure,
                           "You need to at least specify the account and partition. ")
             raise ValueError
 
+    # 1.2 heat core
+    heat_core = "gpu"
+    heat_job_config = cluster_job_config
+    if cpu_heat_step:
+        heat_core = "cpu"
+        heat_job_config = cpu_heat_job_config
+        if not cpu_heat_job_config:
+            assert False
+
     freeze_backbone = stru_cons.create_backbone_freeze(stru)
     min_step  = parent_interface.build_md_step(
         name="min_micro",
@@ -124,8 +135,8 @@ def equi_md_sampling(stru: Structure,
     heat_step = parent_interface.build_md_step(
         name="heat_nvt",
         length=0.05, # ns
-        cluster_job_config=cluster_job_config,
-        core_type="gpu",
+        cluster_job_config=heat_job_config,
+        core_type=heat_core,
         temperature=[(0, 0), (0.05*0.9, prod_temperature), (-1, prod_temperature)],
         constrain=[freeze_backbone] + prod_constrain)
 
