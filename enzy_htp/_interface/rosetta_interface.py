@@ -1425,6 +1425,7 @@ class RosettaInterface(BaseInterface):
     def write_constraint_file(self, 
         stru:Structure, 
         constraints:List[StructureConstraint], 
+        functional:str="LINEAR_PENALTY",
         work_dir:str = None) -> str:
         #TODO(CJ): this!
         if work_dir is None:
@@ -1436,7 +1437,7 @@ class RosettaInterface(BaseInterface):
                 ridx_1:int=stru.absolute_index(cst.atoms[0].parent, indexed=1)
                 ridx_2:int=stru.absolute_index(cst.atoms[1].parent, indexed=1)
                 lines.append(
-                    f"AtomPair {cst.atoms[0].name} {ridx_1} {cst.atoms[1].name} {ridx_2} LINEAR_PENALTY {cst.target_value:.2f} 0.00 {cst['rosetta']['tolerance']:.2f} {cst['rosetta']['penalty']:.2f}"
+                    f"AtomPair {cst.atoms[0].name} {ridx_1} {cst.atoms[1].name} {ridx_2} {functional} {cst.target_value:.2f} 0.00 {cst['rosetta']['tolerance']:.2f} {cst['rosetta']['penalty']:.2f}"
                 )
 
             elif cst.is_angle_constraint():
@@ -1444,7 +1445,7 @@ class RosettaInterface(BaseInterface):
                 ridx_2:int=stru.absolute_index(cst.atoms[1].parent, indexed=1)
                 ridx_3:int=stru.absolute_index(cst.atoms[2].parent, indexed=1)
                 lines.append(
-                    f"Angle {cst.atoms[0].name} {ridx_1} {cst.atoms[1].name} {ridx_2} {cst.atoms[2].name} {ridx_3} LINEAR_PENALTY {np.radians(cst.target_value):.2f} 0.00 {np.radians(cst['rosetta']['tolerance']):.2f} {cst['rosetta']['penalty']/np.radians(1):.2f}"
+                    f"Angle {cst.atoms[0].name} {ridx_1} {cst.atoms[1].name} {ridx_2} {cst.atoms[2].name} {ridx_3} {functional} {np.radians(cst.target_value):.2f} 0.00 {np.radians(cst['rosetta']['tolerance']):.2f} {cst['rosetta']['penalty']/np.radians(1):.2f}"
                 )
             elif cst.is_dihedral_constraint():
                 assert False
@@ -1454,14 +1455,14 @@ class RosettaInterface(BaseInterface):
                         ridx_1:int=stru.absolute_index(child_cst.atoms[0].parent, indexed=1)
                         ridx_2:int=stru.absolute_index(child_cst.atoms[1].parent, indexed=1)
                         lines.append(
-                            f"AtomPair {child_cst.atoms[0].name} {ridx_1} {child_cst.atoms[1].name} {ridx_2} LINEAR_PENALTY {child_cst.target_value:.2f} 0.00 {child_cst['rosetta']['tolerance']:.2f} {child_cst['rosetta']['penalty']:.2f}"
+                            f"AtomPair {child_cst.atoms[0].name} {ridx_1} {child_cst.atoms[1].name} {ridx_2} {functional} {child_cst.target_value:.2f} 0.00 {child_cst['rosetta']['tolerance']:.2f} {child_cst['rosetta']['penalty']:.2f}"
                         )
                     elif child_cst.is_angle_constraint():
                         ridx_1:int=stru.absolute_index(child_cst.atoms[0].parent, indexed=1)
                         ridx_2:int=stru.absolute_index(child_cst.atoms[1].parent, indexed=1)
                         ridx_3:int=stru.absolute_index(child_cst.atoms[2].parent, indexed=1)
                         lines.append(
-                            f"Angle {child_cst.atoms[0].name} {ridx_1} {child_cst.atoms[1].name} {ridx_2} {child_cst.atoms[2].name} {ridx_3} LINEAR_PENALTY {np.radians(child_cst.target_value):.2f} 0.00 {np.radians(child_cst['rosetta']['tolerance']):.2f} {child_cst['rosetta']['penalty']/np.radians(1):.2f}"
+                            f"Angle {child_cst.atoms[0].name} {ridx_1} {child_cst.atoms[1].name} {ridx_2} {child_cst.atoms[2].name} {ridx_3} {functional} {np.radians(child_cst.target_value):.2f} 0.00 {np.radians(child_cst['rosetta']['tolerance']):.2f} {child_cst['rosetta']['penalty']/np.radians(1):.2f}"
                         )
                     else:
                         assert False

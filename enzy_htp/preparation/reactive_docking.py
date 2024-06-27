@@ -1,6 +1,5 @@
 """Driver for the reactive docking functionality available in enzy_htp. The only function that that should be 
 called is dock_reactants(). All others are implementation functions that SHOULD NOT be used. 
-
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-07-28
 """
@@ -179,13 +178,14 @@ def dock_reactants(structure: Structure,
                         use_qm,
                         cluster_distance
                         )
-
+     
     sp = PDBParser()
 
     opts.add_script_variable( 'fr_repeats', min_fr_repeats )
     opts.add_script_variable('ramp_constraints', False)
     opts['nstruct'] = 1 #Ooops
     mm_minimization(structure, constraints, opts)
+    
 
     if use_qm:
         qm_minimization(structure, constraints, cluster_distance, False, work_dir)
@@ -194,7 +194,8 @@ def dock_reactants(structure: Structure,
     mm_minimization(structure, constraints, opts)
 
     if use_qm:
-        qm_minimization(structure, [], cluster_distance, True, work_dir)
+        pass
+        #qm_minimization(structure, [], cluster_distance, True, work_dir)
 
     translate_structure(structure, start_naming='rosetta')
 
@@ -229,7 +230,7 @@ def mm_minimization(structure:Structure,
         mover_name='frelax'
     )
     opts.add_script_variable('cst_file', 
-        interface.rosetta.write_constraint_file( structure, constraints, opts['out:path:all'])
+        interface.rosetta.write_constraint_file( structure, constraints, work_dir=opts['out:path:all'])
     )
     
     sele = list()
@@ -248,7 +249,6 @@ def mm_minimization(structure:Structure,
 
     df: pd.DataFrame = interface.rosetta.parse_score_file(opts['out:file:scorefile'], opts['out:path:all'])
 
-    
     energy_key='total_score'
 
     infile:str=df.sort_values(by=energy_key).description.to_list()[0]
@@ -337,7 +337,7 @@ def dock_ligand(structure:Structure,
     opts.add_script_variable('sasa_cutoff',  int(opts.get_script_variable('sasa_cutoff')*ligand_area))
 
     opts.add_script_variable('cst_file', 
-        interface.rosetta.write_constraint_file( structure, constraints, opts['out:path:all'])
+        interface.rosetta.write_constraint_file( structure, constraints, work_dir=opts['out:path:all'])
     )
 
     _LOGGER.info("Beginning RosettaLigand geometry sampling step...")
@@ -373,7 +373,7 @@ def dock_ligand(structure:Structure,
     for cst in constraints:
         cst.change_topology(structure)
 
-def get_active_site_sele(structure: Structure, distance_cutoff:float, fmt:str='pymol') -> str:
+def get_active_site_sele(structure: Structure, distance_cutoff:float, fmt:str='pymol', bridge_gaps:bool=False, constraints=None) -> str:
     """Creates a pymol-compatible sele for the active site of the supplied Structure(). Basic structure
     is to select all residues within the specified cutoff of the Ligand()'s in the structure. Metal ions up to
     2*distance_cutoff from the Ligand()'s are also selected.
@@ -385,7 +385,7 @@ def get_active_site_sele(structure: Structure, distance_cutoff:float, fmt:str='p
     Returns:
         Selection string in pymol format which defines the enzyme active site.        
     """
-
+    #TODO(CJ): make this work with constraints
     _LOGGER.info("Analyzing enzyme active site...")
     #for res in structure.residues:
     ligand_residue_keys = set()
@@ -410,8 +410,27 @@ def get_active_site_sele(structure: Structure, distance_cutoff:float, fmt:str='p
 
     result = set()
     for i, row in df.iterrows():
-        result.add((row['chain'], row['resi']))
-    
+        result.add((row['chain'], int(row['resi'])))
+
+    if constraints is not None:
+        for cst in constraints:
+            for atom in cst.atoms:
+                result.add( atom.parent.key() )
+
+    if bridge_gaps:
+        result = list(result)
+        result.sort()
+        bridge = list()
+        for r1, r2 in zip(result[:-1], result[1:]):
+            if r1[0] != r2[0]:
+                continue
+            
+            if abs(int(r1[1]) -  int(r2[1])) == 2:
+                _LOGGER.info(f"Bridging gap between {r1[0]}.{r1[1]} and {r2[0]}.{r2[1]}")
+                bridge.append((r1[0], int(r1[1])+1))
+            
+            result.extend( bridge )
+
     _LOGGER.info(f"Found {len(result)} residues within {distance_cutoff} angstroms of reactants!")
     
     if fmt == 'pymol':
@@ -443,30 +462,80 @@ def qm_minimization(structure:Structure,
     Returns:
         Nothing.
     """
+    #TODO(CJ): add to freeze stuff for ligands
 
-    as_sele = get_active_site_sele(structure, cluster_distance)
-   
-    to_freeze:List[Atom] = list()
-
-    for res in structure.residues:
-        if res.is_canonical():
-            continue
-
-        for atom in res.atoms:
-            atom.charge = 0.0
-
-            if freeze_ligands and atom.element != 'H':
-                to_freeze.append(atom)
+    protocol = RosettaScriptsProtocol()
+    options = RosettaOptions()
+    protocol.add_residue_selector(
+        "Index", name="active_site", resnums=get_active_site_sele(structure, cluster_distance, 'rosetta', bridge_gaps=True, constraints=constraints)
+    ).add_scorefunction(
+        "ScoreFunction", name="r15", weights="ref2015"
+    ).add_scorefunction(
+        "ScoreFunction", name="qm_region", children=[
+            ( 'Reweight',  {'scoretype': 'orca_qm_energy', 'weight':'1.0'}),
+            ( 'Set', {'orca_processes':'1'}),
+            ( 'Set', {'orca_path':config['rosetta.ORCA_DIR'] }),
+            ( 'Set', {'orca_memory_megabytes':"3000" }),
+            ( 'Set', {'orca_electron_correlation_treatment':"XTB" }),
+            ( 'Set', {'rosetta_orca_bridge_temp_directory':"xtb_temp" }),
+            ( 'Set', {'orca_geo_opt_max_steps':"1500" }),
+            ( 'Set', {'clean_rosetta_orca_bridge_temp_directory':"false" }),
+            ( 'Set', {'orca_deduce_charge':"true" }),
+        ]
+    ).add_scorefunction(
+        'MultiScoreFunction', name="combo_sfxn", children=[
+            ('SimpleCombinationRule', {}),
+            ('Region', {'scorefxn':'qm_region', 'residue_selector':'active_site', 'children':[
+                ('CappedBondResolutionRule', {
+                    'peptide_nterm_cap':'H',
+                    'peptide_cterm_cap':'H',
+                    })
+            ]}),
+            ('Region', {'scorefxn':'r15', 'children':[
+                ('SimpleBondResolutionRule', {})
+            ]}),
+        ]
+    ).add_mover(
+        'OrcaQMGeometryOptimizationMover', name='qm_opt',
+            freeze_backbone_atoms='true',
+            msfxn_name="combo_sfxn",
+            msfxn_freeze_noncommon_atoms="true",
+            clean_rosetta_orca_bridge_temp_directory='false',
+            geo_opt_max_steps="1500", deduce_charge="true",
+            orca_memory_megabytes="20000",
+            immobilize_h_bond_lengths="true",
+            optimization_convergence="LOOSEOPT"
+    ).add_mover(
+        'ConstraintSetMover', name="add_cst",
+            add_constraints="true",
+            cst_file="%%cst_file%%"
+    ).add_protocol(
+        mover_name='add_cst'
+    ).add_protocol(
+        mover_name='qm_opt'
+    )
     
-    translate_structure(structure, start_naming='rosetta')
-    es = qm_optimize(structure,
-            engine="xtb",
-            constraints=constraints + [CartesianFreeze(structure.backbone_atoms() + to_freeze )],
-            regions=[as_sele],
-            region_methods=[chem.QMLevelOfTheory(basis_set='',method='GFN2', solvent='water', solv_method='ALPB')],
-            parallel_method=None)[0]
+    options['overwrite'] = True
+    
+    interface.rosetta.parameterize_structure( structure, work_dir )
+    options['extra_res_fa'] = ' '.join(structure.data['rosetta_params'])
+    
+    options.add_script_variable('cst_file', interface.rosetta.write_constraint_file(structure, constraints, 'ORCA', work_dir=work_dir))
+    
+    interface.rosetta.run_rosetta_scripts( structure, protocol, options)
+    
+    df: pd.DataFrame = interface.rosetta.parse_score_file(options['out:file:scorefile'], options['out:path:all'])
+    
+    infile:str=df.iloc[0].description
+    
+    _parser = PDBParser()
+    
+    ref_stru = _parser.get_structure(infile)
+    stru_oper.update_residues(structure, ref_stru)
+    
+    for cst in constraints:
+        cst.change_topology( structure )
 
-    translate_structure(structure, end_naming='rosetta')
 
 def score_clusters(
     clusters,
