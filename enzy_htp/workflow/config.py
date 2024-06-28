@@ -242,7 +242,8 @@ class StatusCode():
 
     Attributes:
         CREATED (int): The initial status when a WorkUnit or WorkFlow instance is created. Value: -9
-        INITIALIZING (int): The status when a WorkUnit or WorkFlow instance is undergoin initialization. Value: -8
+        PENDING (int): The status when a WorkUnit or WorkFlow instance is pending for initialization and execution. Value: -8
+        INITIALIZING (int): The status when a WorkUnit or WorkFlow instance is undergoing initialization. Value: -7
         READY_TO_START (int): The status when a WorkUnit or WorkFlow instance has passed the self-inspection but hasn't yet been started. Value: -6
         READY_WITH_UPDATES (int): The status when a previously executed WorkUnit or WorkFlow instance have its input arguments changed
                                 due to the influence from the update in the input values of the task during continue computing. Value: -5
@@ -260,12 +261,15 @@ class StatusCode():
                                exited with an error. Value: 2
         EXIT_WITH_ERROR_AND_PAUSE (int): Specific to WorkFlow and ControlWorkUnit. Indicates the coexistence of error(s)
                                         and expected pause(s) in the inner units of a workflow. Value: 3
+        CANCELLED (int): Indicates that the workunit or workflow is cancelled.
+                        Any workflows or workunits inside it should be marked with this status. Value: 8
         DEPRECATED (int): Indicates that the workunit or workflow is deprecated.
                         Any workflows or workunits inside it should be marked with this status and deleted. Value: 8
         FAILED_INITIALIZATION (int): Indicates that the initialization of the workunit or workflow failed. Value: 9
     """
     CREATED = -9
-    INITIALIZING = -8
+    PENDING = -8
+    INITIALIZING = -7
     READY_TO_START = -6
     READY_WITH_UPDATES = -5
     SUSPECIOUS_UPDATES = -4             # For Reload time only.
@@ -276,20 +280,23 @@ class StatusCode():
     EXIT_WITH_ERROR_IN_INNER_UNITS = 1  # For WorkFlow and ControlWorkUnit only.
     EXIT_WITH_ERROR = 2                 # For Science API only.
     EXIT_WITH_ERROR_AND_PAUSE = 3       # For WorkFlow and ControlWorkUnit only.
+    CANCELLED = 7
     DEPRECATED = 8
     FAILED_INITIALIZATION = 9
 
+    queued_status = [PENDING, INITIALIZING, RUNNING, RUNNING_WITH_PAUSE_IN_INNER_UNITS]     # For logical judgment only.
     pause_excluding_error_statuses = [EXPECTED_PAUSE, RUNNING_WITH_PAUSE_IN_INNER_UNITS]    # For logical judgment only.
     pause_including_error_statuses = [EXPECTED_PAUSE, RUNNING_WITH_PAUSE_IN_INNER_UNITS, EXIT_WITH_ERROR_AND_PAUSE] # For logical judgment only.
     error_excluding_pause_statuses = [EXIT_WITH_ERROR, EXIT_WITH_ERROR_IN_INNER_UNITS, FAILED_INITIALIZATION]       # For logical judgment only.
     error_including_pause_statuses = [EXIT_WITH_ERROR, EXIT_WITH_ERROR_IN_INNER_UNITS, FAILED_INITIALIZATION, EXIT_WITH_ERROR_AND_PAUSE]   # For logical judgment only.
     error_or_pause_statuses = [EXIT_WITH_ERROR, EXIT_WITH_ERROR_IN_INNER_UNITS, EXPECTED_PAUSE, RUNNING_WITH_PAUSE_IN_INNER_UNITS, EXIT_WITH_ERROR_AND_PAUSE]   # For logical judgment only.
-    unexecutable_statuses = [CREATED, INITIALIZING, DEPRECATED, FAILED_INITIALIZATION]      # For logical judgment only.
-    unexecuted_statuses = [CREATED, INITIALIZING, READY_TO_START, FAILED_INITIALIZATION]    # For logical judgment only. Note its distinction from `unexecutable_statuses`.
+    unexecutable_statuses = [CREATED, PENDING, INITIALIZING, DEPRECATED, FAILED_INITIALIZATION]      # For logical judgment only.
+    unexecuted_statuses = [CREATED, PENDING, INITIALIZING, READY_TO_START, FAILED_INITIALIZATION]    # For logical judgment only. Note its distinction from `unexecutable_statuses`.
     skippable_statuses = [EXIT_OK]  # For logical judgement only.
 
     status_text_mapper = {
         CREATED: "Created",
+        PENDING: "Pending",
         INITIALIZING: "Initializing",
         READY_TO_START: "Ready to Start",
         READY_WITH_UPDATES: "Ready with Updates",
@@ -301,10 +308,12 @@ class StatusCode():
         EXIT_WITH_ERROR_IN_INNER_UNITS: "Exit with Error in Inner Units",
         EXIT_WITH_ERROR: "Exit with Error",
         EXIT_WITH_ERROR_AND_PAUSE: "Exit with Error and Pause",
+        CANCELLED: "Cancelled",
         DEPRECATED: "Deprecated",
         FAILED_INITIALIZATION: "Initialization Failed."
     }
 
+# Deprecated.
 demo_json_dict = {
     "workunits" : [
         {
