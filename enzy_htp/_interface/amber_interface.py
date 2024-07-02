@@ -162,12 +162,12 @@ class AmberParameterizer(MolDynParameterizer):
         self._parent_interface: AmberInterface = interface
         self.force_fields = force_fields
         self.charge_method = charge_method
-        self.resp_engine = resp_engine
-        self.resp_lvl_of_theory = resp_lvl_of_theory
+        self.resp_engine = resp_engine # TODO make this actually work
+        self.resp_lvl_of_theory = resp_lvl_of_theory # TODO make this actually work
         self.ncaa_param_lib_path = ncaa_param_lib_path
-        self.force_renew_ncaa_parameter = force_renew_ncaa_parameter
-        self.ncaa_net_charge_engine = ncaa_net_charge_engine
-        self.ncaa_net_charge_ph = ncaa_net_charge_ph
+        self.force_renew_ncaa_parameter = force_renew_ncaa_parameter # TODO make this actually work
+        self.ncaa_net_charge_engine = ncaa_net_charge_engine # TODO make this actually work
+        self.ncaa_net_charge_ph = ncaa_net_charge_ph # TODO make this actually work
         self.solvate_box_type = solvate_box_type
         self.solvate_box_size = solvate_box_size
         self.gb_radii = gb_radii
@@ -278,7 +278,8 @@ class AmberParameterizer(MolDynParameterizer):
             mol_desc_path = f"{self.ncaa_param_lib_path}/{lig.name}_{target_method}.mol2" # the search ensured no existing file named this
             self.parent_interface.antechamber_ncaa_to_moldesc(ncaa=lig,
                                                               out_path=mol_desc_path,
-                                                              gaff_type=gaff_type)
+                                                              gaff_type=gaff_type,
+                                                              charge_method=self.charge_method)
 
         # 2. run parmchk2 on the PDB
         # (this also runs when mol_desc exsit but not frcmod)
