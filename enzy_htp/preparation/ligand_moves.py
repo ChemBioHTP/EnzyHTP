@@ -76,10 +76,14 @@ def mimic_torsions(t_ligand:Ligand, r_ligand:Ligand) -> None:
                 template_to_ligand[aidx] = lidx
                 break
         else:
-            assert False
+            #TODO(CJ): put an error code here
+            pass
+            #assert False, target_name
 
 
     for (a1,a2,a3,a4) in torsions:
+        if not (a1 in template_to_ligand and a2 in template_to_ligand and a3 in template_to_ligand and a4 in template_to_ligand):
+            continue
         m1,m2,m3,m4 = template_to_ligand[a1],template_to_ligand[a2],template_to_ligand[a3],template_to_ligand[a4]
         rdmt.SetDihedralDeg(ligand.GetConformer(), m1, m2, m3, m4,
             rdmt.GetDihedralDeg(template.GetConformer(), a1, a2, a3, a4)
@@ -137,7 +141,7 @@ def mimic_torsions_mcs(t_ligand:Ligand, r_ligand:Ligand) -> None:
             continue
         if a4 not in template_to_ligand:
             continue
-
+        print('here')
         m1,m2,m3,m4 = template_to_ligand[a1],template_to_ligand[a2],template_to_ligand[a3],template_to_ligand[a4]
         rdmt.SetDihedralDeg(ligand.GetConformer(), m1, m2, m3, m4,
             rdmt.GetDihedralDeg(template.GetConformer(), a1, a2, a3, a4)
@@ -145,6 +149,7 @@ def mimic_torsions_mcs(t_ligand:Ligand, r_ligand:Ligand) -> None:
 
     amapper = list(zip(template_to_ligand.values(), template_to_ligand.keys()))
     AlignMol( ligand, template, atomMap=amapper ) #TODO(CJ): put into the rdkit interface
+    
 
     interface.rdkit.update_ligand_positions(r_ligand, ligand)
 

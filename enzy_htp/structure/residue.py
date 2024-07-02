@@ -164,6 +164,12 @@ class Residue(DoubleLinkedNode):
             raise ResidueDontHaveAtom(self, name, f"residue {self} dont have {name}")
         return result[0]
 
+    def get(self, keyname) -> Atom:
+        #TODO(CJ): add error handling and documentation
+        if self.has_atom_name( keyname ):
+            return self.find_atom_name( keyname )
+        return None
+
     @property
     def atom_name_list(self) -> List[str]:
         """get a list of atom names in the residue"""

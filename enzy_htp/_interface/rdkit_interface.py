@@ -106,8 +106,8 @@ class RDKitInterface(BaseInterface):
             temp = str(Path(outfile).with_suffix('.mol'))
             _rchem.MolToMolFile(mol, temp, kekulize=kekulize)
             if ext == '.mol2':
-                session = self.parent().pymol.new_session()
-                self.parent().pymol.convert(session, temp, new_ext='.mol2')
+                session = self.parent.pymol.new_session()
+                self.parent.pymol.convert(session, temp, new_ext='.mol2')
 
         if ext == '.pdb':
             _rchem.MolToPDBFile(mol, outfile)
@@ -126,7 +126,7 @@ class RDKitInterface(BaseInterface):
                 cleanupSubstructures:bool=True,
                 work_dir:str=None ) -> "rdkit.Chem.Mol":
         if not work_dir:
-            work_dir = self.parent().config()['system.SCRATCH_DIR']
+            work_dir = self.parent.config['system.SCRATCH_DIR']
    
         fs.safe_mkdir( work_dir )
 

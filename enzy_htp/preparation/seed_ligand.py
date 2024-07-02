@@ -108,7 +108,6 @@ def seed_with_transplants(ligand:Ligand,
     (filled_structure, df) = interface.alphafill.fill_structure(
         ligand.parent.parent,use_cache=use_cache, work_dir=work_dir)
     _LOGGER.info("Filled structure using AlphaFill!")
-
     
     ligand_atoms:Set[str]=set([aa.name for aa in ligand.atoms])
     
@@ -132,6 +131,7 @@ def seed_with_transplants(ligand:Ligand,
     similarity = df.similarity_score.to_numpy()
     df = df[np.isclose(similarity, np.max(similarity))].reset_index(drop=True)
     df.sort_values(by='clash_count',inplace=True)
+    df.reset_index(drop=True, inplace=True)
     template:Ligand = df.iloc[0].mol
 
     if not ligand.is_ligand():
@@ -146,6 +146,7 @@ def seed_with_transplants(ligand:Ligand,
         minimize_ligand_only( ligand, min_iter, [], work_dir )
 
 def seed_with_analog(ligand:Ligand,
+                analog_template:Ligand,
                 analog:Ligand,
                 seed_atom:Atom,
                 analog_atom:Atom,
@@ -153,23 +154,25 @@ def seed_with_analog(ligand:Ligand,
                 min_iter:int=1,
                 work_dir:str=None) -> None:
 
-    assert False
+    if not work_dir:
+        work_dir = config['system.SCRATCH_DIR']
 
-    analog_file:str=f"{work_dir}/analog.mol2"
-    analog_template_file:str=f"{work_dir}/analog_template.mol2"
 
-    parser = Mol2Parser()
-    parser.save_ligand(analog_file, kwargs['analog'])
-    parser.save_ligand(analog_template_file, kwargs['analog_template'])
+#    analog_file:str=f"{work_dir}/analog.mol2"
+#    analog_template_file:str=f"{work_dir}/analog_template.mol2"
+#
+#    parser = Mol2Parser()
+#    parser.save_ligand(analog_file, analog)
+#    parser.save_ligand(analog_template_file, analog_template)
 
-    analog = mimic_torsions(analog_template_file, analog_file)
+    mimic_torsions(analog_template, analog)
     
-    analog = parser.get_ligand(analog_file)
+    #analog = parser.get_ligand(analog_file)
 
     target_location = None
 
     for atom in analog.atoms:
-        if atom.name == kwargs['analog_atom']:
+        if atom.name == analog_atom.name:
             target_location = np.array(atom.coord)
             break
     
@@ -177,7 +180,7 @@ def seed_with_analog(ligand:Ligand,
 
     current_location = None
     for atom in ligand.atoms:
-        if atom.name == kwargs['seed_atom']:
+        if atom.name == seed_atom.name:
             current_location = np.array(atom.coord)
             break
 

@@ -92,17 +92,17 @@ class AlphaFillInterface(BaseInterface):
             A Tuple[str, str] with the format ( .cif file filled with transplants, .json file from alphafill). 
         """
         if work_dir is None:
-            work_dir = self.parent().config()['system.SCRATCH_DIR']
+            work_dir = self.parent.config['system.SCRATCH_DIR']
 
 
         ### need to sanitize the input Structure()
         structure_start:str=f"{work_dir}/afill_temp.pdb"
         fs.safe_rm(structure_start)
 
-        session = self.parent().pymol.new_session()
-        self.parent().pymol.load_enzy_htp_stru(session,  stru)
-        self.parent().pymol.general_cmd(session, [
-            ('save', structure_start, 'polymer.protein'),
+        session = self.parent.pymol.new_session()
+        self.parent.pymol.load_enzy_htp_stru(session,  stru)
+        self.parent.pymol.general_cmd(session, [
+            ('save', structure_start, 'polymer.protein and (not resn SAH)'), #TODO(CJ): make this a config 
             ('delete', 'all')
         ])
     
@@ -126,24 +126,27 @@ class AlphaFillInterface(BaseInterface):
             _LOGGER.info(f"The output files {outfile} and {json_outfile} exist and caching is enabled. Using these files as is.")
             return (outfile, json_outfile)
         else:
-            fs.safe_rm(outfile)
+            pass
+            #fs.safe_rm(outfile)
 
-        results = self.env_manager_.run_command(self.config_.ALPHAFILL_EXE,
-                                                ["--config", self.config_.CONFIG_FILE, "process", molfile, outfile])
-        fs.safe_rm(temp_path)
+        results = self.env_manager_.run_command(self.config.ALPHAFILL_EXE,
+                                                ["--config", self.config.CONFIG_FILE,
+                                                "process", molfile, outfile,
+                                                ])
+        #fs.safe_rm(temp_path)
 
         transplant_info = json.load(open(json_outfile, 'r'))
        
         transplant_data = defaultdict(list)
         for hit in transplant_info['hits']:
-            identity = hit['identity']
+            #identity = hit['identity']
             for tt in hit['transplants']:
                 transplant_data['analogue_id'].append( tt['analogue_id'] )
-                transplant_data['identity'].append( identity )
+                #transplant_data['identity'].append( identity )
                 transplant_data['asym_id'].append( tt['asym_id'] )
                 transplant_data['clash_count'].append(tt['clash']['clash_count'])
-        
-        a_df = self.parent().pymol.collect(self.parent().pymol.new_session(), outfile, "resn name segi x y z".split(), sele='not polymer.protein')
+        #assert False 
+        a_df = self.parent.pymol.collect(self.parent.pymol.new_session(), outfile, "resn name chain segi x y z".split())
         df = pd.DataFrame(transplant_data)
         mols = list()
         mlp = Mol2Parser()
@@ -152,9 +155,9 @@ class AlphaFillInterface(BaseInterface):
                 mols.append( None )
             else:
                 coord_mapper = dict()
-                for aa, arow in a_df[row.asym_id==a_df.segi].iterrows():
+                for aa, arow in a_df[row.asym_id==a_df.chain].iterrows():
                     coord_mapper[arow['name']] = (arow.x, arow.y, arow.z)
-                session = self.parent().pymol.new_session()
+                session = self.parent.pymol.new_session()
                 args = [
                     ('fetch', row.analogue_id),
                     ('remove', 'hydrogens')
@@ -163,7 +166,7 @@ class AlphaFillInterface(BaseInterface):
                     args.append(('alter_state', -1, f'name {aname}', f"(x, y, z) = ({x}, {y}, {z})"))
                 
                 args.append(('save', 'afill_temp.mol2'))
-                self.parent().pymol.general_cmd(session, args)
+                self.parent.pymol.general_cmd(session, args)
                 mol = mlp.get_ligand('afill_temp.mol2')
                 fs.safe_rm('afill_temp.mol2')
                 mols.append( mol )

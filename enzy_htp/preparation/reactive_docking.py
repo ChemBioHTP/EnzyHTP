@@ -190,8 +190,8 @@ def dock_reactants(structure: Structure,
     if use_qm:
         qm_minimization(structure, constraints, cluster_distance, False, work_dir)
 
-    opts.add_script_variable('ramp_constraints', True)
-    mm_minimization(structure, constraints, opts)
+    #opts.add_script_variable('ramp_constraints', True)
+    #mm_minimization(structure, constraints, opts)
 
     if use_qm:
         pass
@@ -473,7 +473,7 @@ def qm_minimization(structure:Structure,
     ).add_scorefunction(
         "ScoreFunction", name="qm_region", children=[
             ( 'Reweight',  {'scoretype': 'orca_qm_energy', 'weight':'1.0'}),
-            ( 'Set', {'orca_processes':'1'}),
+            ( 'Set', {'orca_processes':'8'}),
             ( 'Set', {'orca_path':config['rosetta.ORCA_DIR'] }),
             ( 'Set', {'orca_memory_megabytes':"3000" }),
             ( 'Set', {'orca_electron_correlation_treatment':"XTB" }),
@@ -486,10 +486,7 @@ def qm_minimization(structure:Structure,
         'MultiScoreFunction', name="combo_sfxn", children=[
             ('SimpleCombinationRule', {}),
             ('Region', {'scorefxn':'qm_region', 'residue_selector':'active_site', 'children':[
-                ('CappedBondResolutionRule', {
-                    'peptide_nterm_cap':'H',
-                    'peptide_cterm_cap':'H',
-                    })
+                ('CappedBondResolutionRule', {})
             ]}),
             ('Region', {'scorefxn':'r15', 'children':[
                 ('SimpleBondResolutionRule', {})
@@ -504,7 +501,7 @@ def qm_minimization(structure:Structure,
             geo_opt_max_steps="1500", deduce_charge="true",
             orca_memory_megabytes="20000",
             immobilize_h_bond_lengths="true",
-            optimization_convergence="LOOSEOPT"
+            optimization_convergence="LOOSEOPT" #TODO(CJ)
     ).add_mover(
         'ConstraintSetMover', name="add_cst",
             add_constraints="true",
@@ -518,9 +515,9 @@ def qm_minimization(structure:Structure,
     options['overwrite'] = True
     
     interface.rosetta.parameterize_structure( structure, work_dir )
-    options['extra_res_fa'] = ' '.join(structure.data['rosetta_params'])
+    options['extra_res_fa'] = "' '".join(structure.data['rosetta_params'])
     
-    options.add_script_variable('cst_file', interface.rosetta.write_constraint_file(structure, constraints, 'ORCA', work_dir=work_dir))
+    options.add_script_variable('cst_file', interface.rosetta.write_constraint_file(structure, constraints, 'ORCA_FROZEN', work_dir=work_dir))
     
     interface.rosetta.run_rosetta_scripts( structure, protocol, options)
     
@@ -558,7 +555,7 @@ def score_clusters(
                 "ScoreFunction", name="qm_region", children=[
                     ('Reweight', {'scoretype':"orca_qm_energy", 'weight':"1.0" }),
                     ('Set', {'orca_path':config['rosetta.ORCA_DIR'] }),
-                    ('Set', {'orca_processes':"1" }),
+                    ('Set', {'orca_processes':"8" }),
                     ('Set', {'orca_memory_megabytes':"3000" }),
                     ('Set', {'rosetta_orca_bridge_temp_directory':"xtb_temp" }),
                     ('Set', {'orca_electron_correlation_treatment':"XTB" }),
