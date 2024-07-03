@@ -293,9 +293,23 @@ class AmberParameterizer(MolDynParameterizer):
     def _parameterize_modified_res(self, maa: ModifiedResidue, gaff_type: str) -> Tuple[str, List[str]]:
         """parameterize modified residues for AmberMD, use ncaa_param_lib_path for customized
         parameters. Multiplicity and charge information can be set in ModifiedResidue objects."""
-        fs.safe_mkdir(self.ncaa_param_lib_path)
-        # 0. search parm lib
+        # san check
+        if not gaff_type:
+            _LOGGER.error("The structure contains non-canonical residue"
+                          " (lig or maa) but GAFF/GAFF2 is not used!"
+                          f" Check you force_fields. (current: {self.force_fields})")
+            raise ValueError
 
+        fs.safe_mkdir(self.ncaa_param_lib_path)
+        target_method = f"{self.charge_method}-{gaff_type}"
+        # 0. search parm lib
+        mol_desc_path, frcmod_path_list = search_ncaa_parm_file(maa,
+                                            target_method=target_method,
+                                            ncaa_lib_path=self.ncaa_param_lib_path)
+
+        if mol_desc_path:
+            if frcmod_path_list:
+                return mol_desc_path, frcmod_path_list
         # 1. make maa PDB
 
         # 2. run antechamber on the PDB get ac
