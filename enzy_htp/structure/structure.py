@@ -98,7 +98,7 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core.general import if_list_contain_repeating_element
 from enzy_htp.core.exception import ResidueDontHaveAtom, IndexMappingError
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
-from enzy_htp.chemical import ResidueType
+from enzy_htp.chemical import ResidueType, SeqRes
 
 from .atom import Atom
 from . import Chain
@@ -372,7 +372,27 @@ class Structure(DoubleLinkedNode):
     @property
     def polypeptides(self) -> List[Chain]:
         """return the peptide part of current Structure() as a list of chains"""
-        result: List[Chain] = list(filter(lambda c: c.is_polypeptide(), self._chains))
+        result = list()
+        for chain in self.chains:
+            if not len(chain.residues):
+                continue
+            
+            if chain.is_polypeptide():
+                result.append( chain )
+
+        return result
+
+    @property
+    def non_polypeptides(self) -> List[Chain]:
+        """return the non-peptide part of current Structure() as a list of chains"""
+        result = list()
+        for chain in self.chains:
+            if not len(chain.residues):
+                continue
+            
+            if not chain.is_polypeptide():
+                result.append( chain )
+
         return result
 
     def hydrogens(self, polypeptide_only: bool=False) -> List[Atom]:
@@ -394,7 +414,18 @@ class Structure(DoubleLinkedNode):
         for ch in self._chains:
             result[ch.name] = ch.sequence
         return result
-    
+
+    @property
+    def seqres_sequence(self) -> List[SeqRes]:
+        """Gets the List[SeqRes] for the entire Structure(), including only and all of the canonical amino acids."""
+        result = list()
+        for chain in self.polypeptides:
+            for res in chain.residues:
+                result.append( res.seqres )
+
+        return result
+
+
     @property
     def chemical_diversity(self) -> Dict[str, str]:
         """determine and return the chemical diversity of current Structure()
