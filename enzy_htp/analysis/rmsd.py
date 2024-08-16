@@ -62,6 +62,10 @@ def rmsd_of_region(structure_ensemble: StructureEnsemble, mask_region: List[Resi
 def rmsd_with_pattern(structure_ensemble: StructureEnsemble, mask_pattern: str) -> float:
     """
     mvp function for RMSD calculation
+    
+    Args:
+        structure_ensemble (StructureEnsemble): A collection of different geometries of the same enzyme structure.
+        mask_pattern (str): A pymol-formatted selection string which defines the region for calculating RMSD value.
     """
     tmp_rmsd_in = f"{eh_config['system.SCRATCH_DIR']}/cpptraj_rmsd.in"
     tmp_rmsd_out = f"{eh_config['system.SCRATCH_DIR']}/rmsd.agr"

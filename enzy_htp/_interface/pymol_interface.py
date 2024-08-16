@@ -23,6 +23,7 @@ from enzy_htp.core import _LOGGER, check_var_type
 from enzy_htp._config.pymol_config import PyMolConfig, default_pymol_config
 from enzy_htp.structure import Structure, PDBParser, Ligand
 import enzy_htp.chemical as chem
+from enzy_htp.structure.structure_ensemble import StructureEnsemble
 
 from .base_interface import BaseInterface
 
@@ -748,6 +749,32 @@ class PyMolInterface(BaseInterface):
 
         return mask
 
+    def get_rmsd(self, structure_ensemble: StructureEnsemble, mask_region: str = str()) -> float:
+        """Calculates the Root Mean Square Deviation (RMSD) for a structure ensemble.
+        The lower the RMSD value is, the more stable the structure is.
+
+        Args:
+            structure_ensemble (StructureEnsemble): A collection of different geometries of the same enzyme structure.
+            mask_pattern (str, optional): A pymol-formatted selection string which defines the region for calculating RMSD value.
+
+        Returns:
+            The calculated RMSD value as a float.
+        """
+        # TODO: By residue.
+        with OpenPyMolSession(self) as pms:
+            ref_stru_name, _ = self.load_enzy_htp_stru(pms, structure_ensemble.structure_0)
+            rmsd_list = list()
+            for frame_stru in structure_ensemble.structures(remove_solvent=True):
+                frame_stru_name, _ = self.load_enzy_htp_stru(pms, stru=frame_stru)
+                results: List[Any] = self.general_cmd(pms, [
+                    ('remove', 'solvent'),
+                    ('align', frame_stru_name, ref_stru_name),
+                    # Returns: rmsd, atom_number, cycles, cycle_1_rmsd, aligned_atoms (larger than atom_number), score, pairwise_matrix 
+                    ('remove', frame_stru_name),
+                ])
+                rmsd_list.append(results[1][0])
+                continue
+            return sum(rmsd_list) / len(rmsd_list)
 
     def get_spi(self, stru: Structure, ligand:Ligand, pocket_sele:str) -> float:
         """Calculates substrate positioning index (SPI) for a given Ligand in a given Structure. SPI roughly corresponds to the
