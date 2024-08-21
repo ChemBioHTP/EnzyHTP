@@ -178,6 +178,20 @@ class PyMolInterface(BaseInterface):
 
 
         return (pymol_obj_name, session)
+    
+    def load_enzy_htp_stru_esm(self, session: pymol2.PyMOL, stru_esm: StructureEnsemble) -> Tuple[str, pymol2.PyMOL]:
+        """Convert enzy_htp.structure.StructureEnsemble object into a pymol object in a pymol2.PyMOL() session.
+        
+        Args:
+            session (pymol2.PyMOL): Current pymol2.PyMOL() session instance.
+            stru_esm (StructureEnsemble): A StructureEnsemble instance.
+
+        Returns:
+            pymol_obj_name (str): The name of the loaded PyMOL object.
+            session (pymol2.PyMOL): Current pymol2.PyMOL() session instance.
+        """
+        self.check_pymol2_installed()
+        prmtop_str = stru_esm._topology
 
     def select_pymol_obj(self, session: pymol2.PyMOL, pattern: str, pymol_obj_name: str) -> List[int]:
         """an internal function return atom indexes of a pymol selection of a pymol obj 
@@ -749,8 +763,8 @@ class PyMolInterface(BaseInterface):
 
         return mask
 
-    def get_rmsd(self, structure_ensemble: StructureEnsemble, mask_region: str = str()) -> float:
-        """Calculates the Root Mean Square Deviation (RMSD) for a structure ensemble.
+    def get_rmsd(self, structure_ensemble: StructureEnsemble, mask_pattern: str = str()) -> float:
+        """Calculates the Root Mean Square Deviation (RMSD) for a structure ensemble. Ligands, solvents and ions are not included.
         The lower the RMSD value is, the more stable the structure is.
 
         Args:
@@ -768,14 +782,27 @@ class PyMolInterface(BaseInterface):
                 frame_stru_name, _ = self.load_enzy_htp_stru(pms, stru=frame_stru)
                 results: List[Any] = self.general_cmd(pms, [
                     ('remove', 'solvent'),
+                    ('remove', 'inorganic'),
+                    ('remove', 'organic'),
+                    ('sele', mask_pattern),
+
                     ('align', frame_stru_name, ref_stru_name),
-                    # Returns: rmsd, atom_number, cycles, cycle_1_rmsd, aligned_atoms (larger than atom_number), score, pairwise_matrix 
+                    # This returns a tuple with 7 items:
+                    # 1. RMSD after refinement
+                    # 2. Number of aligned atoms after refinement
+                    # 3. Number of refinement cycles
+                    # 4. RMSD before refinement
+                    # 5. Number of aligned atoms before refinement
+                    # 6. Raw alignment score
+                    # 7. Number of residues aligned
+                    # https://pymolwiki.org/index.php/Align
+
                     ('remove', frame_stru_name),
                 ])
-                rmsd_list.append(results[1][0])
+                rmsd_list.append(results[-1][0])
                 continue
             return sum(rmsd_list) / len(rmsd_list)
-
+        
     def get_spi(self, stru: Structure, ligand:Ligand, pocket_sele:str) -> float:
         """Calculates substrate positioning index (SPI) for a given Ligand in a given Structure. SPI roughly corresponds to the
         ratio of the ligand's solvent accessible surface area (SASA) dived by protein binding pocket SASA. The citation for 
