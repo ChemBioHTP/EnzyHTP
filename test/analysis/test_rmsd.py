@@ -19,7 +19,7 @@ import enzy_htp.core.file_system as fs
 from enzy_htp.electronic_structure import ElectronicStructure
 from enzy_htp import PDBParser, interface, _LOGGER
 
-from enzy_htp.analysis import rmsd_of_region
+from enzy_htp.analysis import rmsd_of_region, rmsd_with_pattern
 
 from enzy_htp.structure.structure_ensemble import StructureEnsemble
 from enzy_htp.core.general import EnablePropagate, get_itself
@@ -34,7 +34,7 @@ sp = PDBParser()
 
 
 def test_rmsd_of_region():
-    """Test the `rmsd_of_region` function. If this function works well, other functions can also work properly."""
+    """Test the `rmsd_of_region` function."""
     pdb_file = f"{DATA_DIR}/test_spi.pdb"
     prmtop = f"{DATA_DIR}/test_spi.prmtop"
     data = f"{DATA_DIR}/test_spi.mdcrd"
@@ -52,6 +52,31 @@ def test_rmsd_of_region():
     )
     
     rmsd = rmsd_of_region(structure_ensemble=structure_ensemble, ca_only=True)
+    _LOGGER.info(f"The RMSD value is {rmsd}.")
+
+    fs.safe_rmdir("scratch")
+
+    assert rmsd < 10
+
+def test_rmsd_with_pattern():
+    """Test the `rmsd_with_pattern` function."""
+    pdb_file = f"{DATA_DIR}/test_spi.pdb"
+    prmtop = f"{DATA_DIR}/test_spi.prmtop"
+    data = f"{DATA_DIR}/test_spi.mdcrd"
+    parser = PDBParser()
+
+    stru = parser.get_structure(pdb_file)
+
+    mdcrd_parser=AmberMDCRDParser(prmtop).get_coordinates
+
+    structure_ensemble = StructureEnsemble(
+        topology=stru,
+        top_parser=get_itself,
+        coord_parser=mdcrd_parser,
+        coordinate_list=data,
+    )
+    
+    rmsd = rmsd_with_pattern(structure_ensemble=structure_ensemble, mask_pattern="resi 7+11+27+40+41+43+165+168+169+170+199+210+211")
     _LOGGER.info(f"The RMSD value is {rmsd}.")
 
     fs.safe_rmdir("scratch")

@@ -28,7 +28,7 @@ def compose_mask_pattern(mask_region: List[Residue] = list(), ca_only: bool = Tr
     """
     mask_pattern = str()
     if (mask_region):
-        mask_pattern = f":{'+'.join([str(residue.idx) for residue in mask_region])}"
+        mask_pattern = f"resi {'+'.join([str(residue.idx) for residue in mask_region])}"
     else:
         mask_pattern = "all"
 
