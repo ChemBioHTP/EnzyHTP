@@ -782,6 +782,7 @@ class PyMolInterface(BaseInterface):
                 ('remove', 'solvent'),
                 ('remove', 'inorganic'),
                 ('remove', 'organic'),
+                ('remove', 'hydrogen'),
                 ('select', ref_sele_name, f"{mask_pattern} and object {ref_stru_name}"),
             ])
             rmsd_list = list()
@@ -791,6 +792,7 @@ class PyMolInterface(BaseInterface):
                     ('remove', 'solvent'),
                     ('remove', 'inorganic'),
                     ('remove', 'organic'),
+                    ('remove', 'hydrogen'),
                     ('select', frame_sele_name, f"{mask_pattern} and object {frame_stru_name}"),
 
                     ('align', frame_sele_name, ref_sele_name),
