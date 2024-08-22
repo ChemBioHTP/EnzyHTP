@@ -21,3 +21,9 @@ from .dipole import bond_dipole
 from .stability import ddg_fold_of_mutants
 
 from .spi import (spi_metric)
+
+from .rmsd import (
+    rmsd_of_structure,
+    rmsd_of_region,
+    rmsd_with_pattern,
+)

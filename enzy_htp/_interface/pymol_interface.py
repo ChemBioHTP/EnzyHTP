@@ -774,9 +774,16 @@ class PyMolInterface(BaseInterface):
         Returns:
             The calculated RMSD value as a float.
         """
-        # TODO: By residue.
+        ref_sele_name = "target"
+        frame_sele_name = "mobile"
         with OpenPyMolSession(self) as pms:
             ref_stru_name, _ = self.load_enzy_htp_stru(pms, structure_ensemble.structure_0)
+            self.general_cmd(pms, [
+                ('remove', 'solvent'),
+                ('remove', 'inorganic'),
+                ('remove', 'organic'),
+                ('select', ref_sele_name, f"{mask_pattern} and object {ref_stru_name}"),
+            ])
             rmsd_list = list()
             for frame_stru in structure_ensemble.structures(remove_solvent=True):
                 frame_stru_name, _ = self.load_enzy_htp_stru(pms, stru=frame_stru)
@@ -784,9 +791,9 @@ class PyMolInterface(BaseInterface):
                     ('remove', 'solvent'),
                     ('remove', 'inorganic'),
                     ('remove', 'organic'),
-                    ('sele', mask_pattern),
+                    ('select', frame_sele_name, f"{mask_pattern} and object {frame_stru_name}"),
 
-                    ('align', frame_stru_name, ref_stru_name),
+                    ('align', frame_sele_name, ref_sele_name),
                     # This returns a tuple with 7 items:
                     # 1. RMSD after refinement
                     # 2. Number of aligned atoms after refinement
@@ -799,8 +806,9 @@ class PyMolInterface(BaseInterface):
 
                     ('remove', frame_stru_name),
                 ])
-                rmsd_list.append(results[-1][0])
+                rmsd_list.append(results[-2][0])
                 continue
+            # print(rmsd_list)
             return sum(rmsd_list) / len(rmsd_list)
         
     def get_spi(self, stru: Structure, ligand:Ligand, pocket_sele:str) -> float:
