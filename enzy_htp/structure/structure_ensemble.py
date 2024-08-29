@@ -15,6 +15,8 @@ from .structure_io import StructureParserInterface
 from . import structure_operation as stru_oper
 from enzy_htp.core.general import get_itself
 
+from pandas import DataFrame, concat
+from numpy import ndarray, asarray
 
 class StructureEnsemble:
     """A collection of different geometries of the same enzyme structure.
@@ -73,15 +75,43 @@ class StructureEnsemble:
 
     @property
     def structure_0(self) -> Structure:
-        """getter for the 1st structure in the ensemble"""
+        """getter for the 1st Structure (state) in the ensemble."""
         coord_0 = next(self.coord_parser(self.coordinate_list))
         result = deepcopy(self.topology)
         result.apply_geom(coord_0)
-        return result    
+        return result
+    
+    def average(self, remove_solvent: bool=False) -> Structure:
+        """A structure that represents the average coordinates of the entire Structure Ensemble.
+        
+        Args:
+            remove_solvent (bool, optional): Indicate if solvents in the structure ensemble are to be removed.
+        """
+        result = deepcopy(self.topology)
+        if (remove_solvent):
+            stru_oper.remove_solvent(result)
+            stru_oper.remove_counterions(result)
 
+        atom_key_list = [atom.key for atom in result.atoms]
+        coord_df = DataFrame(columns=atom_key_list)
+
+        structure_generator = self.structures(remove_solvent=remove_solvent)
+        for structure_state in structure_generator:
+            atom_coord_dict = dict()
+            for atom in structure_state.atoms:
+                atom_coord_dict[atom.key] = asarray(atom.coord)
+                continue
+            coord_df = concat([coord_df, DataFrame([atom_coord_dict])], ignore_index=True)
+            continue
+        
+        coord_series = coord_df.sum() / len(coord_df)
+        coord_list = [coord.tolist() for coord in coord_series]
+        result.apply_geom(coord_list)
+        return result
+    
     @classmethod
     def from_single_stru(cls, stru: Structure) -> StructureEnsemble:
-        """create an ensemble of 1 snapshot from a stru"""
+        """create an ensemble of 1 snapshot from a Structure instance"""
         return cls(
             topology=stru,
             top_parser=get_itself,
