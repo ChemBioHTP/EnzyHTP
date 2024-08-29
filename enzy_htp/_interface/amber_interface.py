@@ -58,7 +58,7 @@ class AmberParameter(MolDynParameter):
         inpcrd: the path of the .inpcrd input coordinate file
         prmtop: the path of the .prmtop parameter topology file"""
 
-    def __init__(self, inpcrd_path: str, prmtop_path: str, ncaa_chrgspin_mapper: Dict = None):
+    def __init__(self, inpcrd_path: str, prmtop_path: str, ncaa_chrgspin_mapper: Union[Dict, None] = None):
         self._inpcrd = inpcrd_path
         self._prmtop = prmtop_path
         if ncaa_chrgspin_mapper is None:
@@ -372,6 +372,9 @@ class AmberParameterizer(MolDynParameterizer):
         lines = []
         for ff in self.force_fields:
             lines.append(f"source {ff}")
+
+        # support for custom lines
+        # TODO
 
         # NCAA parts
 
@@ -975,7 +978,9 @@ class AmberInterface(BaseInterface):
         # cmd based
         if_ignore_start_up: bool = True,
         additional_search_path: List[str] = None,
-        tleap_out_path: str = None,) -> None:
+        tleap_out_path: Union[str, None] = None,
+        # debug
+        keep_in_file: bool = False,) -> None:
         """the python wrapper of running tleap
         Args:
             tleap_in_str:
@@ -988,6 +993,8 @@ class AmberInterface(BaseInterface):
             tleap_out_path:
                 file path for stdout of the tleap command. the _LOGGER level
                 determines if delete the file.
+            keep_in_file:
+                control whether delete tleap.in file
 
         NOTE: run_tleap API should not handle the index alignment since it do
         not carry information of the input pdb"""
@@ -995,7 +1002,9 @@ class AmberInterface(BaseInterface):
         # init file paths (tleap_in_path, tleap_out_path)
         fs.safe_mkdir(eh_config["system.SCRATCH_DIR"])
         tleap_in_path = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/tleap.in")
-        temp_path_list.extend([eh_config["system.SCRATCH_DIR"], tleap_in_path])
+        temp_path_list.append(eh_config["system.SCRATCH_DIR"])
+        if not keep_in_file:
+            temp_path_list.append(tleap_in_path)
         if tleap_out_path is None:
             tleap_out_path = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/tleap.out")
             temp_path_list.append(tleap_out_path)
@@ -1186,7 +1195,7 @@ class AmberInterface(BaseInterface):
     def run_cpptraj(
             self,
             instr_str: str,
-            log_path: str = None,
+            log_path: Union[str, None] = None,
         ):
         """the python wrapper of running cpptraj.
         Based on https://amberhub.chpc.utah.edu/command-line-syntax/.
@@ -1943,7 +1952,7 @@ class AmberInterface(BaseInterface):
 
     def antechamber_ncaa_to_moldesc(self,
                                     ncaa: NonCanonicalBase,
-                                    out_path: str = None,
+                                    out_path: Union[str, None] = None,
                                     gaff_type: str = "GAFF",
                                     charge_method: str = "AM1BCC",
                                     cluster_job_config: Dict=None,) -> str:
@@ -2036,7 +2045,7 @@ class AmberInterface(BaseInterface):
     def build_md_step(self,
                       name: str = "default",
                       # simulation
-                      length: float = None, # ns
+                      length: Union[float, None] = None, # ns
                       timestep: float = "default", # ns
                       minimize: bool = "default",
                       temperature: Union[float, List[Tuple[float]]] = "default",
