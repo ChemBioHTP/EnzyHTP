@@ -17,6 +17,7 @@ from subprocess import CalledProcessError, CompletedProcess, SubprocessError
 from typing import Generator, List, Tuple, Union, Dict, Any
 from dataclasses import dataclass
 from sympy import sympify
+from collections import Iterable
 
 from .base_interface import BaseInterface
 from .handle_types import (
@@ -228,12 +229,13 @@ class AmberParameterizer(MolDynParameterizer):
 
         # 3. write the combining tleap.in
         tleap_content, temp_dry_pdb = self._write_combining_tleap_input(
-                                            stru,
-                                            ligand_parms,
-                                            maa_parms,
-                                            metalcenter_parms,
-                                            result_inpcrd,
-                                            temp_prmtop,)
+                                            stru=stru,
+                                            ligand_parms=ligand_parms,
+                                            maa_parms=maa_parms,
+                                            metalcenter_parms=metalcenter_parms,
+                                            result_inpcrd=result_inpcrd,
+                                            result_prmtop=temp_prmtop,
+                                            additional_tleap_lines=self.additional_tleap_lines,)
 
         # 4. run tleap
         self.parent_interface.run_tleap(tleap_content, keep_in_file=self.keep_tleap_in)
@@ -364,7 +366,8 @@ class AmberParameterizer(MolDynParameterizer):
             maa_parms: Dict,
             metalcenter_parms: Dict,
             result_inpcrd: str,
-            result_prmtop: str,) -> Tuple[str, str]:
+            result_prmtop: str,
+            additional_tleap_lines: List[str],) -> Tuple[str, str]:
         """combine mol_desc and parm file of each noncanonical parts and make the content
         of the input file for tleap.
         Returns:
@@ -377,7 +380,14 @@ class AmberParameterizer(MolDynParameterizer):
             lines.append(f"source {ff}")
 
         # support for custom lines
-        # TODO
+        if (isinstance(additional_tleap_lines, Iterable)
+            and not isinstance(additional_tleap_lines, str)
+            and isinstance(additional_tleap_lines[0], str)
+            ):
+            lines.extend(additional_tleap_lines)
+        else:
+            _LOGGER.error(f"`additional_tleap_line` needs to be a list of str. current: {repr(additional_tleap_lines)}")
+            raise TypeError
 
         # NCAA parts
 
@@ -410,6 +420,7 @@ class AmberParameterizer(MolDynParameterizer):
             f"solvate{self.solvate_box_type} a TIP3PBOX {self.solvate_box_size}",
             f"saveamberparm a {result_prmtop} {result_inpcrd}",
             "quit",
+            "",
         ])
 
         result = "\n".join(lines)
