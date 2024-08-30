@@ -391,7 +391,11 @@ class GaussianInterface(BaseInterface):
     }
     """map Schrodinger eq. solving method name to gaussian keyword. mostly record special ones."""
 
-    BASIS_SET_KEYWORD_MAPPER = {}
+    BASIS_SET_KEYWORD_MAPPER = {
+        "def2-svp" : "def2svp",
+        "def2-tzvp" : "def2tzvp",
+        "def2-qzvpp" : "def2qzvpp",
+    }
     """map basis set name to gaussian keyword."""
 
     SOLVENT_KEYWORD_MAPPER = {}
