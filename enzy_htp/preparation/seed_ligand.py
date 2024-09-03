@@ -5,6 +5,7 @@ functions:
     + seed_with_transplants():
     + seed_with_constraints():
     + seed_with_analog():
+    + seed_with_pdb_structure();
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2024-05-27
@@ -342,6 +343,99 @@ def seed_using_phosphates( metal, phosphate ):
     
     assert pt
     
+
+def seed_with_pdb_structure(ligand:Ligand,
+                     pdb_code:str,
+                     ligand_sele:str,
+                     #similarity_metric:str,
+                     #similarity_cutoff:float = 0.45,
+                     minimize:bool=False,
+                     min_iter:int=1,
+                     use_cache:bool=False,
+                     work_dir:str=None
+) -> Ligand:
+    """Implementation function that places a specified ligand into a structure using the alphafill 
+    algorithm (https://doi.org/10.1038/s41592-022-01685-y). 
+
+    Args:
+        ligand:
+        simliarity_metric:
+        similaritY_cutoff:
+        minimize:
+        min_iter:
+        use_cache:
+        work_dir:
+
+    Returns:
+        An aligned, deepcopied Ligand().
+    """
+    _LOGGER.info(f"Beginnning placement of ligand {ligand} into the structure...")
+    _LOGGER.info(f"Calling out to AlphaFill to fill structure...")
+    # atom_names mcs
+    session = interface.pymol.new_session() 
+    stru = ligand.parent.parent
+    (stru_sele, session) = interface.pymol.load_enzy_htp_stru(session, stru)
+    
+    temp_file = "./temp.mol2"
+    args = [
+        ('fetch', pdb_code),
+        ('remove', 'solvent'),
+        ('align', pdb_code, stru_sele),
+        ('save', temp_file, ligand_sele)
+        ]
+    interface.pymol.general_cmd(session, args )
+    lp = Mol2Parser()
+    template = lp.get_ligand( temp_file )
+    
+    ligand_atoms:Set[str]=set([aa.name for aa in ligand.atoms])
+    template_atoms:Set[str]=set([aa.name for aa in template.atoms]) 
+    ligand_atoms_no_h:Set[str]=set([aa.name for aa in ligand.atoms if aa.element !='H'])
+    template_atoms_no_h:Set[str]=set([aa.name for aa in template.atoms if aa.element !='H']) 
+    
+    if ligand_atoms_no_h.issubset(template_atoms_no_h) or template_atoms_no_h.issubset(ligand_atoms_no_h):
+        from rdkit.Chem import AllChem
+        template_to_ligand = dict()
+        atom_names = list()
+        tmol = interface.rdkit.mol_from_ligand(template, False)
+        lmol = interface.rdkit.mol_from_ligand(ligand, False)
+        for aidx, at in enumerate(tmol.GetAtoms()):
+            target_name:str=at.GetPropsAsDict()['_TriposAtomName']
+            atom_names.append(target_name)
+            for lidx, al in enumerate(lmol.GetAtoms()):
+                if target_name == al.GetPropsAsDict()['_TriposAtomName']:
+                    template_to_ligand[aidx] = lidx
+                    break
+            else:
+                #TODO(CJ): put an error code here
+                pass
+                #assert False, target_name
+        
+        lconf = lmol.GetConformer()
+        tconf = tmol.GetConformer()
+        
+        ff = AllChem.UFFGetMoleculeForceField(lmol)
+        for tidx, lidx in template_to_ligand.items():
+            
+            lconf.SetAtomPosition(lidx, tconf.GetAtomPosition(tidx))
+
+            ff.UFFAddPositionConstraint(lidx, 0.05, 10000)
+        ff.Minimize()
+
+        ff = AllChem.UFFGetMoleculeForceField(lmol)
+        for idx in range(lmol.GetNumAtoms()):
+            atom = lmol.GetAtomWithIdx(idx)
+            if atom.GetAtomicNum() != 1:
+                ff.UFFAddPositionConstraint(idx, 0.05, 10000)
+        
+                
+        ff.Minimize()
+        interface.rdkit.update_ligand_positions(ligand, lmol)
+    else:
+        assert False
+
+    if minimize:
+        minimize_ligand_only( ligand, min_iter, [], work_dir )
+
 
 
 def minimize_ligand_only(ligand:Ligand, n_iter:int, constraints:List[StructureConstraint], work_dir:str) -> None:

@@ -4,7 +4,7 @@ relaxation (minimization), scoring, ligand parameterization, and the ability to 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-03-28
 """
-from __future__ import annotations
+from __future__ import annotations 
 import copy
 import os
 import re
@@ -63,6 +63,14 @@ class RosettaOptions:
 
         self.data_ = dict()
         self.script_vars_ = dict()
+        self.extra_res_fa_ = list()
+
+    def add_extra_res_fa(self, params_file):
+        self.extra_res_fa_.append(params_file)
+
+    @property
+    def extra_res_fa(self):
+        return self.extra_res_fa_
 
     def convert_script_vars_(self) -> None:
         """Private method which converts the script variables to a 'parser:script_vars' variable."""
@@ -70,7 +78,7 @@ class RosettaOptions:
         if not self.script_vars:
             return
 
-        result = str()
+        result = list()
 
         for key_name, value in self.script_vars.items():
             temp_value:str = self.convert_value_(value)
@@ -80,9 +88,11 @@ class RosettaOptions:
             if temp_value[-1] == "'":
                 temp_value = temp_value[:-1]
 
-            result += f" {key_name}={temp_value}"
+            result.extend([f"{key_name}={temp_value} ", "\\\n\t\t\t"])
+        
+        result.pop(-1)
 
-        self['parser:script_vars'] = result
+        self['parser:script_vars'] = ''.join(result)
 
     def add_script_variable(self, key:str, value:Any) -> None:
 
@@ -146,6 +156,7 @@ class RosettaOptions:
         Returns:
             The value associated with the key.
         """
+
         tks:List[str] = key.split(':')
         ptr = self.data_
         tks = list(reversed(tks))
@@ -205,6 +216,19 @@ class RosettaOptions:
         self.convert_script_vars_()
         depth:int = 0
         lines:List[str] = list()
+        
+        if self.extra_res_fa:
+            tks = ['-extra_res_fa'] 
+            
+            for idx, erf in enumerate(self.extra_res_fa):
+                prefix = ''
+                if idx:
+                    prefix = '\t\t\t'
+                tks.append( f"{prefix}'{erf}'")
+                tks.append( "\\\n" )
+            tks.pop(-1)
+            lines.append(' '.join(tks))
+
         self.traverse_options_(self.data_, lines, depth)
         fs.write_lines(fname, lines)
         return fname
@@ -1006,7 +1030,10 @@ class RosettaInterface(BaseInterface):
                     stru: Structure,
                     protocol:RosettaScriptsProtocol,
                     opts:RosettaOptions,
-                    work_dir:str=None) -> str:
+                    prefix:str="rosetta_scripts",
+                    work_dir:str=None,
+                    remove_temp_files:bool=False
+                    ) -> str:
         """
             opts: a list() of str() to be run by the RosettaScripts executable.  logfile: The file to output the stdout log to. Optional.
         """
@@ -1018,21 +1045,28 @@ class RosettaInterface(BaseInterface):
                 work_dir = eh_config['system.SCRATCH_DIR']
                 opts['out:path:all'] = work_dir
         
-        opts_file:str = str(Path(f"{work_dir}/rosetta_options.txt").absolute())
-        xml_file:str = str(Path(f"{work_dir}/rosetta_protocol.xml").absolute())
+        opts_file:str = str(Path(f"{work_dir}/{prefix}_options.txt").absolute())
+        xml_file:str = str(Path(f"{work_dir}/{prefix}_protocol.xml").absolute())
 
         opts['parser:protocol'] = str(Path(xml_file).absolute())
 
-        fname:str = f"{work_dir}/rosettascripts_start.pdb"
+        fname:str = f"{work_dir}/{prefix}_start.pdb"
+        old_pattern:str = f"{prefix}_start_????.pdb"
+        
         parser = PDBParser()
         parser.save_structure(fname, stru)
 
         opts['in:file:s'] = str(Path(fname).absolute())
-        opts.to_file(opts_file)
         protocol.to_file(xml_file)
 
-        opts['out:file:scorefile'] = f"{work_dir}/score.sc"
-        fs.safe_rm( f"{work_dir}/score.sc" )
+        opts['out:file:scorefile'] = f"{work_dir}/{prefix}_score.sc"
+
+        for op in Path(work_dir).glob(old_pattern):
+            fs.safe_rm( op )
+
+        fs.safe_rm( f"{work_dir}/{prefix}_score.sc" )
+        
+        opts.to_file(opts_file)
 
         work_dir = Path(opts_file).parent.absolute()
         start_dir:str = os.getcwd()
@@ -1041,11 +1075,12 @@ class RosettaInterface(BaseInterface):
 
         os.chdir( start_dir )
 
-        assert Path(opts['out:file:scorefile']).exists() #TODO(CJ): update this
+        assert Path(opts['out:file:scorefile']).exists(),  opts['out:file:scorefile'] #TODO(CJ): update this
 
-        #fs.safe_rm( opts_file )
-        #fs.safe_rm( xml_file )
-        #fs.safe_rm( fname )
+        if remove_temp_files:
+            fs.safe_rm( opts_file )
+            fs.safe_rm( xml_file )
+            fs.safe_rm( fname )
 
         return opts['out:file:scorefile'] #TODO(CJ): add some stuff in for this
 
@@ -1179,6 +1214,7 @@ class RosettaInterface(BaseInterface):
             mol.ensemble.fix_atom_names( mapper )
 
             conformers:str=f"{work_dir}/{res_name}_conformers.pdb"
+            conformers = str(Path(conformers).absolute())
             _LOGGER.info(f"Detected {mol.ensemble.n_conformers()} in ligand {res_name}")
             _parser = PDBParser()
             _parser.save_ensemble( conformers, mol.ensemble )
@@ -1371,6 +1407,7 @@ class RosettaInterface(BaseInterface):
         opts:RosettaOptions=None,
         protocol:RosettaScriptsProtocol=None,
         score_fxn:RosettaScriptsElement=None,
+        prefix:str=None,
         work_dir:str=None        
     ) -> List[float]:
         """Provides the total score in Rosetta Energy Units (REU) for a given structure. Uses default flags but can have behavior modified
@@ -1387,6 +1424,9 @@ class RosettaInterface(BaseInterface):
             Score of structure in file in REU.
 
         """ #TODO(CJ): update this
+        if prefix is None:
+            prefix = "rosetta_score"
+
         if opts is None:
             opts = RosettaOptions()
 
@@ -1415,7 +1455,9 @@ class RosettaInterface(BaseInterface):
                     stru,
                     protocol,
                     opts,
-                    work_dir)
+                    prefix=prefix,
+                    work_dir=work_dir
+                    )
             results.append(
                 self.parse_score_file( score_file ).iloc[0].score
             )
@@ -1437,7 +1479,11 @@ class RosettaInterface(BaseInterface):
                 ridx_1:int=stru.absolute_index(cst.atoms[0].parent, indexed=1)
                 ridx_2:int=stru.absolute_index(cst.atoms[1].parent, indexed=1)
                 lines.append(
-                    f"AtomPair {cst.atoms[0].name} {ridx_1} {cst.atoms[1].name} {ridx_2} {functional} {cst.target_value:.2f} 0.00 {cst['rosetta']['tolerance']:.2f} {cst['rosetta']['penalty']:.2f}"
+                    f"AtomPair "
+                    f"{cst.atoms[0].name} {ridx_1} "
+                    f"{cst.atoms[1].name} {ridx_2} "
+                    f"{functional} "
+                    f"{cst.target_value:.2f} 0.00 {cst['rosetta']['tolerance']:.2f} {cst['rosetta']['penalty']:.2f}"
                 )
 
             elif cst.is_angle_constraint():
@@ -1445,10 +1491,27 @@ class RosettaInterface(BaseInterface):
                 ridx_2:int=stru.absolute_index(cst.atoms[1].parent, indexed=1)
                 ridx_3:int=stru.absolute_index(cst.atoms[2].parent, indexed=1)
                 lines.append(
-                    f"Angle {cst.atoms[0].name} {ridx_1} {cst.atoms[1].name} {ridx_2} {cst.atoms[2].name} {ridx_3} {functional} {np.radians(cst.target_value):.2f} 0.00 {np.radians(cst['rosetta']['tolerance']):.2f} {cst['rosetta']['penalty']/np.radians(1):.2f}"
+                    f"Angle "
+                    f"{cst.atoms[0].name} {ridx_1} "
+                    f"{cst.atoms[1].name} {ridx_2} "
+                    f"{cst.atoms[2].name} {ridx_3} "
+                    f"{functional} "
+                    f"{np.radians(cst.target_value):.2f} 0.00 {np.radians(cst['rosetta']['tolerance']):.2f} {cst['rosetta']['penalty']/np.radians(1):.2f}"
                 )
             elif cst.is_dihedral_constraint():
-                assert False
+                ridx_1:int=stru.absolute_index(cst.atoms[0].parent, indexed=1)
+                ridx_2:int=stru.absolute_index(cst.atoms[1].parent, indexed=1)
+                ridx_3:int=stru.absolute_index(cst.atoms[2].parent, indexed=1)
+                ridx_4:int=stru.absolute_index(cst.atoms[3].parent, indexed=1)
+                lines.append(
+                    f"Dihedral "
+                    f"{cst.atoms[0].name} {ridx_1} "
+                    f"{cst.atoms[1].name} {ridx_2} "
+                    f"{cst.atoms[2].name} {ridx_3} "
+                    f"{cst.atoms[3].name} {ridx_4} "
+                    f"{functional} "
+                    f"{np.radians(cst.target_value):.2f} 0.00 {np.radians(cst['rosetta']['tolerance']):.2f} {cst['rosetta']['penalty']/np.radians(1):.2f}"
+                )
             elif cst.is_residue_pair_constraint():
                 for (cst_name, child_cst) in cst.child_constraints:
                     if child_cst.is_distance_constraint():

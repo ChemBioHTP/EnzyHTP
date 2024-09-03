@@ -38,6 +38,7 @@ from enzy_htp.quantum import optimize as qm_optimize
 def dock_reactants(structure: Structure,
                    ligands: List[Ligand],
                    constraints: List[StructureConstraint] = None,
+                   stereo_constraints: List[StructureConstraint] = None,
                    n_struct: int = 100,
                    cst_energy: float = None,
                    use_qm: bool = True,
@@ -100,7 +101,15 @@ def dock_reactants(structure: Structure,
     if cst_energy is None:
         cst_energy = len(constraints)*2000.0
 
+    if stereo_constraints is None:
+        stereo_constraints = []
+
     fs.safe_mkdir(work_dir)
+    fs.safe_mkdir("./snapshots")
+    
+    sp = PDBParser()
+
+    sp.save_structure("./snapshots/initial_structure.pdb", structure)
 
     translate_structure(structure, end_naming='rosetta')
     
@@ -112,10 +121,11 @@ def dock_reactants(structure: Structure,
             raise TypeError(err_msg)
 
     ligands.reverse()
+    lrk = set() 
     while ligands:
         ligand = ligands.pop()
         relevant_csts:List[StructureConstraint] = list()
-        for cst in constraints:
+        for cst in constraints + stereo_constraints:
             if cst.is_constraining(ligand):
                 for ll in ligands:
                     if cst.is_constraining(ll):
@@ -143,17 +153,17 @@ def dock_reactants(structure: Structure,
         opts['out:path:all'] = work_dir
         
         ### parameterization
-        extra_res_fa:List[str] = list()
         stub_parent: str = os.path.expandvars(
             f"${config['rosetta.ROSETTA3']}/database/chemical/residue_type_sets/fa_standard/residue_types/protonation_states/")
         
         for stub in "GLU_P1 GLU_P2 LYS_D ASP_P1 TYR_D HIS_P ASP_P2".split():
-            extra_res_fa.append(f"{stub_parent}/{stub}.params")
+            opts.add_extra_res_fa(  f"{stub_parent}/{stub}.params" )
 
         if structure.data['rosetta_params']:
-            extra_res_fa.extend( structure.data['rosetta_params'] )
+            for pp in structure.data['rosetta_params']:
+                opts.add_extra_res_fa( pp )
             
-        opts['extra_res_fa'] = ' '.join(map(lambda erf: f"'{erf}'", extra_res_fa))
+        #opts['extra_res_fa'] = ' '.join(map(lambda erf: f"'{erf}'", extra_res_fa))
         
         ### script variables
         opts.add_script_variable( 'ligand_chain', ligand.parent.name )
@@ -170,7 +180,8 @@ def dock_reactants(structure: Structure,
         opts.add_script_variable( 'transform_repeats', transform_repeats )
         opts.add_script_variable( 'transform_temperature', transform_temperature )
         opts.add_script_variable( 'fr_repeats', docking_fr_repeats )
-
+        
+        lrk.add( ligand.key() )
         dock_ligand(structure,
                         ligand,
                         relevant_csts,
@@ -178,24 +189,29 @@ def dock_reactants(structure: Structure,
                         use_qm,
                         cluster_distance
                         )
-     
-    sp = PDBParser()
+    
 
+    sp.save_structure("./snapshots/docked_structure.pdb", structure)
+    
     opts.add_script_variable( 'fr_repeats', min_fr_repeats )
     opts.add_script_variable('ramp_constraints', False)
     opts['nstruct'] = 1 #Ooops
-    mm_minimization(structure, constraints, opts)
     
+    mm_minimization(structure, constraints, opts, True)
+    sp.save_structure("./snapshots/mm_structure_01.pdb", structure)
 
     if use_qm:
-        qm_minimization(structure, constraints, cluster_distance, False, work_dir)
+        #TODO(CJ): this will be the xtb only optimization
+        qm_minimization_xtb(structure, constraints, cluster_distance, False, work_dir, lrk)
+        sp.save_structure("./snapshots/qm_structure_01.pdb", structure)
 
-    #opts.add_script_variable('ramp_constraints', True)
-    #mm_minimization(structure, constraints, opts)
+    opts.add_script_variable('ramp_constraints', True)
+    mm_minimization(structure, constraints, opts, False)
+    sp.save_structure("./snapshots/mm_structure_02.pdb", structure)
 
     if use_qm:
-        pass
-        #qm_minimization(structure, [], cluster_distance, True, work_dir)
+        qm_minimization(structure, constraints, cluster_distance, True, work_dir, lrk)
+        sp.save_structure("./snapshots/qm_structure_02.pdb", structure)
 
     translate_structure(structure, start_naming='rosetta')
 
@@ -207,6 +223,7 @@ def dock_reactants(structure: Structure,
 def mm_minimization(structure:Structure,
                 constraints:List[StructureConstraint],
                 opts:RosettaOptions,
+                bb_flex:bool
                 ) -> None:
     """
     """
@@ -222,9 +239,9 @@ def mm_minimization(structure:Structure,
         'ScoreFunction', name='hard_rep', weights='ligand'        
     ).add_mover(
         'FastRelax', name="frelax", scorefxn="hard_rep", cst_file="%%cst_file%%", repeats="%%fr_repeats%%", ramp_down_constraints="%%ramp_constraints%%", children=[
-			('MoveMap', {'name':"full_enzyme", 'bb':"true", 'chi':"true", 'jump':"true", 'children':[
-				('ResidueSelector', {'selector':"ligand_active_site",     'bb':"true", 'chi':"true", 'bondangle':"true" }),
-				('ResidueSelector', {'selector':"not_ligand_active_site", 'bb':"false", 'chi':"true", 'bondangle':"false"})
+			('MoveMap', {'name':"full_enzyme", 'bb':"true" if bb_flex else "false", 'chi':"true", 'jump':"true", 'children':[
+				('ResidueSelector', {'selector':"ligand_active_site",     'bb': "true" if bb_flex else 'false', 'chi':"true", 'bondangle':"true" }),
+				('ResidueSelector', {'selector':"not_ligand_active_site", 'bb': "true" if bb_flex else "false", 'chi':"true", 'bondangle':"false"})
                 ]})]
     ).add_protocol(
         mover_name='frelax'
@@ -245,7 +262,9 @@ def mm_minimization(structure:Structure,
     interface.rosetta.run_rosetta_scripts(
         structure,
         protocol,
-        opts)
+        opts,
+        prefix="mm_minimization"
+        )
 
     df: pd.DataFrame = interface.rosetta.parse_score_file(opts['out:file:scorefile'], opts['out:path:all'])
 
@@ -325,11 +344,11 @@ def dock_ligand(structure:Structure,
     ).add_protocol(
         filter="sasa_filter"
     ).add_protocol(
-        mover_name="frelax"    
-    ).add_protocol(
         filter="cst_filter"    
     ).add_protocol(
         mover_name="rm_csts"
+    ).add_protocol(
+        mover_name="frelax"    
     )
     
     ligand_area:float=interface.pymol.get_ligand_area( structure, ligand )
@@ -344,9 +363,9 @@ def dock_ligand(structure:Structure,
     interface.rosetta.run_rosetta_scripts(
         structure,
         protocol,
-        opts)
-       
-    #TODO(CJ): add the clustering here
+        opts,
+        prefix="docking"
+        )
 
     df: pd.DataFrame = interface.rosetta.parse_score_file(opts['out:file:scorefile'], opts['out:path:all'])
 
@@ -373,7 +392,7 @@ def dock_ligand(structure:Structure,
     for cst in constraints:
         cst.change_topology(structure)
 
-def get_active_site_sele(structure: Structure, distance_cutoff:float, fmt:str='pymol', bridge_gaps:bool=False, constraints=None) -> str:
+def get_active_site_sele(structure: Structure, distance_cutoff:float, fmt:str='pymol', bridge_gaps:bool=False, constraints=None, lrk=None) -> str:
     """Creates a pymol-compatible sele for the active site of the supplied Structure(). Basic structure
     is to select all residues within the specified cutoff of the Ligand()'s in the structure. Metal ions up to
     2*distance_cutoff from the Ligand()'s are also selected.
@@ -389,9 +408,12 @@ def get_active_site_sele(structure: Structure, distance_cutoff:float, fmt:str='p
     _LOGGER.info("Analyzing enzyme active site...")
     #for res in structure.residues:
     ligand_residue_keys = set()
-    for res in structure.residues:
-        if res.is_ligand():
-            ligand_residue_keys.add(res.key())
+    if lrk is None:
+        for res in structure.residues:
+            if res.is_ligand():
+                ligand_residue_keys.add(res.key())
+    else:
+        ligand_residue_keys = lrk
 
     parser = PDBParser()
     start_pdb:str=f"{config['system.SCRATCH_DIR']}/active_site_selection.pdb"
@@ -445,11 +467,51 @@ def get_active_site_sele(structure: Structure, distance_cutoff:float, fmt:str='p
     else:
         assert False
 
+def qm_minimization_xtb(structure:Structure,
+                constraints:List[StructureConstraint],
+                cluster_distance:float,
+                freeze_ligands:bool,
+                work_dir:str,
+                lrk=None
+                ) -> None:
+
+
+    as_sele:str = get_active_site_sele(
+                structure,
+                cluster_distance,
+                'pymol',
+                bridge_gaps=True,
+                constraints=constraints,
+                lrk=lrk)
+
+    to_freeze:List[Atom] = list()
+
+    for res in structure.residues:
+        if res.is_canonical():
+            continue
+
+        for atom in res.atoms:
+            atom.charge = 0.0
+        
+            if freeze_ligands and atom.element != 'H':
+                to_freeze.append(atom)
+
+    translate_structure(structure, start_naming='rosetta')
+    es = qm_optimize(structure,
+                engine='xtb',
+                constraints=constraints + [CartesianFreeze(structure.backbone_atoms() + to_freeze)],
+                regions=[as_sele],
+                region_methods=[chem.QMLevelOfTheory(basis_set='', method='GFN2', solvent='water', solv_method='ALPB')],
+                parallel_method=None)[0]
+
+    translate_structure(structure, end_naming='rosetta')
+
 def qm_minimization(structure:Structure,
                 constraints:List[StructureConstraint],
                 cluster_distance:float,
                 freeze_ligands:bool,
-                work_dir:str) -> None:
+                work_dir:str,
+                lrk=None) -> None:
     """Performs QM minimization of the enzyme active site using xtb. Assumes that backbone atoms of the Residue()'s should be 
     frozen. Is capable of converting supplied constraints to xtb format. Updates coordinates in place. 
     
@@ -463,11 +525,12 @@ def qm_minimization(structure:Structure,
         Nothing.
     """
     #TODO(CJ): add to freeze stuff for ligands
+    #TODO(CJ): update to the new version with better capping and CB freezing
 
     protocol = RosettaScriptsProtocol()
     options = RosettaOptions()
     protocol.add_residue_selector(
-        "Index", name="active_site", resnums=get_active_site_sele(structure, cluster_distance, 'rosetta', bridge_gaps=True, constraints=constraints)
+        "Index", name="active_site", resnums=get_active_site_sele(structure, cluster_distance, 'rosetta', bridge_gaps=True, constraints=constraints, lrk=lrk)
     ).add_scorefunction(
         "ScoreFunction", name="r15", weights="ref2015"
     ).add_scorefunction(
@@ -515,7 +578,9 @@ def qm_minimization(structure:Structure,
     options['overwrite'] = True
     
     interface.rosetta.parameterize_structure( structure, work_dir )
-    options['extra_res_fa'] = "' '".join(structure.data['rosetta_params'])
+
+    for prm in structure.data['rosetta_params']:
+        options.add_extra_res_fa( prm )
     
     options.add_script_variable('cst_file', interface.rosetta.write_constraint_file(structure, constraints, 'ORCA_FROZEN', work_dir=work_dir))
     
@@ -542,7 +607,8 @@ def score_clusters(
     use_qm
     ) -> None:
     #TODO(CJ)
-
+    local_opts = deepcopy( opts )
+    local_opts['nstruct'] = 1
     for cc in clusters:
         sfxn=None
         protocol=None
@@ -580,8 +646,9 @@ def score_clusters(
 
         interface.rosetta.score( 
             cc, 
-            opts=opts,
+            opts=local_opts,
             protocol=protocol,
-            score_fxn=sfxn
+            score_fxn=sfxn,
+            prefix="xtb_score"
         )
 

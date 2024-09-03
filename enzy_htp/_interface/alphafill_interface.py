@@ -150,6 +150,7 @@ class AlphaFillInterface(BaseInterface):
         df = pd.DataFrame(transplant_data)
         mols = list()
         mlp = Mol2Parser()
+        to_delete:List[str] = list()
         for i, row in df.iterrows():
             if len(row.analogue_id) == 1:
                 mols.append( None )
@@ -162,6 +163,7 @@ class AlphaFillInterface(BaseInterface):
                     ('fetch', row.analogue_id),
                     ('remove', 'hydrogens')
                 ]
+                to_delete.append(f"{row.analogue_id}.cif")
                 for aname, (x,y,z) in coord_mapper.items():
                     args.append(('alter_state', -1, f'name {aname}', f"(x, y, z) = ({x}, {y}, {z})"))
                 
@@ -173,4 +175,7 @@ class AlphaFillInterface(BaseInterface):
         
         df['mol'] = mols
 
+        for td in to_delete:
+            fs.safe_rm( td )
+        
         return (outfile, df)

@@ -141,7 +141,6 @@ def mimic_torsions_mcs(t_ligand:Ligand, r_ligand:Ligand) -> None:
             continue
         if a4 not in template_to_ligand:
             continue
-        print('here')
         m1,m2,m3,m4 = template_to_ligand[a1],template_to_ligand[a2],template_to_ligand[a3],template_to_ligand[a4]
         rdmt.SetDihedralDeg(ligand.GetConformer(), m1, m2, m3, m4,
             rdmt.GetDihedralDeg(template.GetConformer(), a1, a2, a3, a4)

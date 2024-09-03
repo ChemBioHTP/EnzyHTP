@@ -1410,7 +1410,7 @@ class AmberInterface(BaseInterface):
                                 f" to {nstlim}. (i.e.:actual length={nstlim * timestep} ns)")
 
             # ntpr
-            ntpr = max(int(self.config()["HARDCODE_NTPR_RATIO"] * nstlim), 1)
+            ntpr = max(int(self.config["HARDCODE_NTPR_RATIO"] * nstlim), 1)
 
             # ntwx
             ntwx = 0
@@ -1447,7 +1447,7 @@ class AmberInterface(BaseInterface):
                 raise ValueError
             ntt_cntrl = {'ntt': ntt}
             if ntt == 3:
-                ntt_cntrl.update({'gamma_ln': self.config()["HARDCODE_GAMMA_LN"],})
+                ntt_cntrl.update({'gamma_ln': self.config["HARDCODE_GAMMA_LN"],})
             
             # ntp
             if imin == 1:
@@ -1471,16 +1471,16 @@ class AmberInterface(BaseInterface):
             imin_or_not_cntrl = imin_or_not_cntrl | {
                 'nstlim': nstlim, 'dt': dt,
                 } | temp_cntrl | ntt_cntrl | ntb_cntrl | ntp_cntrl | {
-                'iwrap': self.config()["HARDCODE_IWRAP"],
-                'ig': self.config()["HARDCODE_IG"],
+                'iwrap': self.config["HARDCODE_IWRAP"],
+                'ig': self.config["HARDCODE_IG"],
                 }
 
         else: # minimization
             # maxcyc, ncyc
             maxcyc = md_config_dict["length"]
-            ncyc = max(mh.round_by(maxcyc * self.config()["HARDCODE_NCYC_RATIO"], 0.5), 1)
+            ncyc = max(mh.round_by(maxcyc * self.config["HARDCODE_NCYC_RATIO"], 0.5), 1)
             # ntpr
-            ntpr = max(int(self.config()["HARDCODE_NTPR_RATIO"] * maxcyc), 1)
+            ntpr = max(int(self.config["HARDCODE_NTPR_RATIO"] * maxcyc), 1)
             # ntwx
             ntwx = 0
 
@@ -1497,14 +1497,14 @@ class AmberInterface(BaseInterface):
         if constraints:
             for cons in constraints:
                 cons: StructureConstraint
-                if cons.constraint_type in self.config()["SUPPORTED_CONSTRAINT_TYPE"]:
+                if cons.constraint_type in self.config["SUPPORTED_CONSTRAINT_TYPE"]:
                     if cons.is_cartesian_freeze():
                         cart_freeze.append(cons)
                     else:
                         geom_cons.append(cons)
                 else:
                     _LOGGER.error(
-                        f"Dont support {cons.constraint_type} yet in AmberInterface. Supported: {self.config()['SUPPORTED_CONSTRAINT_TYPE']}")
+                        f"Dont support {cons.constraint_type} yet in AmberInterface. Supported: {self.config['SUPPORTED_CONSTRAINT_TYPE']}")
                     raise ValueError
 
         # ntr and cartesian restraint
@@ -1554,7 +1554,7 @@ class AmberInterface(BaseInterface):
             'config': imin_or_not_cntrl | {
                 'ntx': ntx, 'irest': irest,
                 'ntc': ntc, 'ntf': ntf,
-                'cut': self.config()["HARDCODE_CUT"],
+                'cut': self.config["HARDCODE_CUT"],
                 'ntpr': ntpr, 'ntwx': ntwx,
                 } | ntr_cntrl | nmropt_cntrl | {
             }},
@@ -1729,7 +1729,7 @@ class AmberInterface(BaseInterface):
     def get_md_executable(self, core_type: str, num_cores: int) -> str:
         """get the name of the md executable depending on core_type
         return the executable and mpi prefix if needed."""
-        result = self.config()["HARDCODE_MD_ENGINE"][core_type]
+        result = self.config["HARDCODE_MD_ENGINE"][core_type]
         if core_type == "cpu":
             
             mpi_exec = eh_config._system.get_mpi_executable(num_cores)
@@ -1874,27 +1874,27 @@ class AmberInterface(BaseInterface):
         # init default values
         type_hint_sticker: AmberConfig
         if force_fields == "default":
-            force_fields = self.config()["DEFAULT_FORCE_FIELDS"]        
+            force_fields = self.config["DEFAULT_FORCE_FIELDS"]        
         if charge_method == "default":
-            charge_method = self.config()["DEFAULT_CHARGE_METHOD"]
+            charge_method = self.config["DEFAULT_CHARGE_METHOD"]
         if resp_engine == "default":
-            resp_engine = self.config()["DEFAULT_RESP_ENGINE"]
+            resp_engine = self.config["DEFAULT_RESP_ENGINE"]
         if resp_lvl_of_theory == "default":
-            resp_lvl_of_theory = self.config()["DEFAULT_RESP_LVL_OF_THEORY"]
+            resp_lvl_of_theory = self.config["DEFAULT_RESP_LVL_OF_THEORY"]
         if ncaa_param_lib_path == "default":
-            ncaa_param_lib_path = self.config()["DEFAULT_NCAA_PARAM_LIB_PATH"]
+            ncaa_param_lib_path = self.config["DEFAULT_NCAA_PARAM_LIB_PATH"]
         if force_renew_ncaa_parameter == "default":
-            force_renew_ncaa_parameter = self.config()["DEFAULT_FORCE_RENEW_NCAA_PARAMETER"]
+            force_renew_ncaa_parameter = self.config["DEFAULT_FORCE_RENEW_NCAA_PARAMETER"]
         if ncaa_net_charge_engine == "default":
-            ncaa_net_charge_engine = self.config()["DEFAULT_NCAA_NET_CHARGE_ENGINE"]
+            ncaa_net_charge_engine = self.config["DEFAULT_NCAA_NET_CHARGE_ENGINE"]
         if ncaa_net_charge_ph == "default":
-            ncaa_net_charge_ph = self.config()["DEFAULT_NCAA_NET_CHARGE_PH"]
+            ncaa_net_charge_ph = self.config["DEFAULT_NCAA_NET_CHARGE_PH"]
         if solvate_box_type == "default":
-            solvate_box_type = self.config()["DEFAULT_SOLVATE_BOX_TYPE"]
+            solvate_box_type = self.config["DEFAULT_SOLVATE_BOX_TYPE"]
         if solvate_box_size == "default":
-            solvate_box_size = self.config()["DEFAULT_SOLVATE_BOX_SIZE"]
+            solvate_box_size = self.config["DEFAULT_SOLVATE_BOX_SIZE"]
         if parameterizer_temp_dir == "default":
-            parameterizer_temp_dir = self.config()["DEFAULT_PARAMETERIZER_TEMP_DIR"]
+            parameterizer_temp_dir = self.config["DEFAULT_PARAMETERIZER_TEMP_DIR"]
 
         return AmberParameterizer(
             self,
@@ -1920,7 +1920,7 @@ class AmberInterface(BaseInterface):
         for k, v in parameter_mapper:
             if v == "default":
                 result += (f"""if {k} == "default":
-            {k} = self.config()["DEFAULT_{k.upper()}"]
+            {k} = self.config["DEFAULT_{k.upper()}"]
         """)
         return result
 
@@ -2147,37 +2147,37 @@ class AmberInterface(BaseInterface):
         # make them unified in style so that amber_md_in_file block can judge if any value is explicitly assigned
         type_hint_sticker: AmberConfig
         if name == "default":
-            name = self.config()["DEFAULT_MD_NAME"]
+            name = self.config["DEFAULT_MD_NAME"]
         if timestep == "default":
-            timestep = self.config()["DEFAULT_MD_TIMESTEP"]
+            timestep = self.config["DEFAULT_MD_TIMESTEP"]
         if minimize == "default":
-            minimize = self.config()["DEFAULT_MD_MINIMIZE"]
+            minimize = self.config["DEFAULT_MD_MINIMIZE"]
         if temperature == "default":
-            temperature = self.config()["DEFAULT_MD_TEMPERATURE"]
+            temperature = self.config["DEFAULT_MD_TEMPERATURE"]
         if thermostat == "default":
-            thermostat = self.config()["DEFAULT_MD_THERMOSTAT"]
+            thermostat = self.config["DEFAULT_MD_THERMOSTAT"]
         if pressure_scaling == "default":
-            pressure_scaling = self.config()["DEFAULT_MD_PRESSURE_SCALING"]
+            pressure_scaling = self.config["DEFAULT_MD_PRESSURE_SCALING"]
         if constrain == "default":
-            constrain = self.config()["DEFAULT_MD_CONSTRAIN"]
+            constrain = self.config["DEFAULT_MD_CONSTRAIN"]
         elif isinstance(constrain, StructureConstraint): # dispatch for non list input
             constrain = [constrain]
         if restart == "default":
-            restart = self.config()["DEFAULT_MD_RESTART"]
+            restart = self.config["DEFAULT_MD_RESTART"]
         if core_type == "default":
-            core_type = self.config()["DEFAULT_MD_CORE_TYPE"]
+            core_type = self.config["DEFAULT_MD_CORE_TYPE"]
         if cluster_job_config == "default":
-            cluster_job_config = self.config().get_default_md_cluster_job(core_type)
+            cluster_job_config = self.config.get_default_md_cluster_job(core_type)
         else:
             # For res_keywords, it updates the default config
             cluster_job_config = copy.deepcopy(cluster_job_config)
             res_keywords_update = cluster_job_config["res_keywords"]
-            default_res_keywords = self.config().get_default_md_cluster_job_res_keywords(core_type)
+            default_res_keywords = self.config.get_default_md_cluster_job_res_keywords(core_type)
             cluster_job_config["res_keywords"] = default_res_keywords | res_keywords_update
         if record_period == "default":
-            record_period = self.config()["DEFAULT_MD_RECORD_PERIOD_FACTOR"] * length
+            record_period = self.config["DEFAULT_MD_RECORD_PERIOD_FACTOR"] * length
         if work_dir == "default":
-            work_dir = self.config()["DEFAULT_MD_WORK_DIR"]
+            work_dir = self.config["DEFAULT_MD_WORK_DIR"]
             
 
         return AmberMDStep(

@@ -45,7 +45,7 @@ def minimize_rosetta(stru, n_iter, n_struct, movemap, work_dir, **kwargs):
     params = list()
 
     structure_translator.translate_structure(stru, end_naming='rosetta')
-
+    
     for res in stru.residues:
         if res.is_ligand():
             params.append(Path(interface.rosetta.parameterize_ligand(res, work_dir=work_dir)).absolute())
@@ -68,21 +68,27 @@ def minimize_rosetta(stru, n_iter, n_struct, movemap, work_dir, **kwargs):
     for midx,mm in enumerate(movemap):
         session = interface.pymol.new_session() 
         df = interface.pymol.collect(session, temp_pdb, sele=mm['sele'], variables='chain resi'.split())
-        rs=",".join(map(lambda pr: pr[-1]+pr[0],
-            set(list(zip(df.chain,df.resi)))
-        ))
+        rs = list()
+        for pr in set(list(zip(df.chain, df.resi))):
+            if int(pr[-1]) < 0:
+                continue #TODO(CJ): fix this
+            rs.append( pr[-1]+pr[0])
+                
+        rs = ','.join(rs)
+        #print(rs)
+#        rs=",".join(map(lambda pr: pr[-1]+pr[0],
+#        ))
         
         rs_name=f"res_selector_{midx}"
         protocol.add_residue_selector(RosettaScriptsElement("Index", name=rs_name, resnums=rs))
         
         mm_children.append(RosettaScriptsElement("ResidueSelector", selector=rs_name, bb=mm.get('bb', 'false'), chi=mm.get('chi', 'false'), bondangle=mm.get('bondangle', 'false')))
-
     fs.safe_rm(temp_pdb)
 
     protocol.add_mover(RosettaScriptsElement("FastRelax", name="frelax", scorefxn="r15", repeats=str(n_iter),
         children=[RosettaScriptsElement("MoveMap", name="full_structure", bb="false", chi="false", jump="false", children=mm_children)]
     ))
-    score_file = interface.rosetta.run_rosetta_scripts(stru, protocol, options, work_dir)
+    score_file = interface.rosetta.run_rosetta_scripts(stru, protocol, options, work_dir=work_dir)
 
     
     df = interface.rosetta.parse_score_file(score_file)
