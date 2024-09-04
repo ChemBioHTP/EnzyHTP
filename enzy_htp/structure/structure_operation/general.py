@@ -42,39 +42,98 @@ def remove_counterions(stru: Structure) -> Structure:
 
     return stru
 
-@dispatch
-def remove_hydrogens(stru: Structure, polypeptide_only: bool) -> Structure:
-    """
-    remove all hydrogen Atom()s for {stru}.
-    Make changes in-place and return a reference of the changed
-    original object.
-    """
-    hydrogens = stru.hydrogens(polypeptide_only=polypeptide_only)
-    _LOGGER.debug(f"removing {len(hydrogens)} hydrogens")
-    for h in hydrogens:
-        h: Atom
-        h.delete_from_parent()
-
-    return stru
-
-@dispatch
-def remove_hydrogens(residue: Residue) -> Residue:
-    """Remove all hydrogen atom(s) from {residue}.
-    Make changes in-place and return a reference of the changed original Residue / NonCanonicalBase / Ligand.
+def remove_hydrogens(operation_object: Union[Structure, Residue], polypeptide_only: bool=False) -> Structure:
+    """Remove all hydrogen atom(s) from a Structure instance or a Residue instance.
+    Make changes in-place and return a reference of the changed original Structure / Residue / NonCanonicalBase / Ligand.
 
     Args:
-        residue: An instance of Residue / NonCanonicalBase / Ligand.
+        operation_object: An instance of Structure / Residue / NonCanonicalBase / Ligand.
+        polypeptide_only: Indicate if only hydrogens in the polypeptides are removed. Valid only when `operation_object` is a Structure instance.
     
     Returns:
-        The reference of the changed original Residue / NonCanonicalBase / Ligand
+        The reference of the changed original Structure / Residue / NonCanonicalBase / Ligand.
     """
-    hydrogens = residue.hydrogens
-    if len(hydrogens) >= 1:
-        _LOGGER.info(f"Removing {len(hydrogens)} hydrogens from {residue.name}.")
+    if isinstance(operation_object, Residue):
+        hydrogens = operation_object.hydrogens
+        if len(hydrogens) >= 1:
+            _LOGGER.info(f"Removing {len(hydrogens)} hydrogens from {operation_object.name}.")
+            for h in hydrogens:
+                h: Atom
+                h.delete_from_parent()
+    elif isinstance(operation_object, Structure):
+        hydrogens = operation_object.hydrogens(polypeptide_only=polypeptide_only)
+        _LOGGER.debug(f"Removing {len(hydrogens)} hydrogens.")
         for h in hydrogens:
             h: Atom
             h.delete_from_parent()
-    return residue
+    else:
+        pass
+    return operation_object
+
+# test_rmsd.py:79: 
+# _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+# ../../enzy_htp/analysis/rmsd.py:71: in rmsd_with_pattern
+#     return interface.pymol.get_rmsd(structure_ensemble=structure_ensemble, mask_pattern=mask_pattern)
+# ../../enzy_htp/_interface/pymol_interface.py:784: in get_rmsd
+#     remove_hydrogens(average_structure, polypeptide_only=False)
+# /home/zhongy8/anaconda3/envs/enzyhtp_v2/lib/python3.9/site-packages/plum/function.py:398: in __call__
+#     method, return_type = self._resolve_method_with_cache(args=args)
+# /home/zhongy8/anaconda3/envs/enzyhtp_v2/lib/python3.9/site-packages/plum/function.py:427: in _resolve_method_with_cache
+#     method, return_type = self.resolve_method(args)
+# /home/zhongy8/anaconda3/envs/enzyhtp_v2/lib/python3.9/site-packages/plum/function.py:350: in resolve_method
+#     method, return_type = self._handle_not_found_lookup_error(e)
+# _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+# self = <function <function remove_hydrogens at 0x7f1f53989820> with 2 registered and 0 pending method(s)>
+# ex = NotFoundLookupError('For function `remove_hydrogens`, `(<enzy_htp.structure.structure.Structure object at 0x7f238507bd90>,)` could not be resolved.')
+
+#     def _handle_not_found_lookup_error(
+#         self, ex: NotFoundLookupError
+#     ) -> Tuple[Callable, TypeHint]:
+#         if not self.owner:
+#             # Not in a class. Nothing we can do.
+# >           raise ex
+# E           plum.resolver.NotFoundLookupError: For function `remove_hydrogens`, `(<enzy_htp.structure.structure.Structure object at 0x7f238507bd90>,)` could not be resolved.
+
+# /home/zhongy8/anaconda3/envs/enzyhtp_v2/lib/python3.9/site-packages/plum/function.py:359: NotFoundLookupError
+# ============================================================================= short test summary info =============================================================================
+# FAILED test_rmsd.py::test_rmsd_with_pattern - plum.resolver.NotFoundLookupError: For function `remove_hydrogens`, `(<enzy_htp.structure.structure.Structure object at 0x7f238507bd90>,)` could not be resolved.
+
+
+
+# @dispatch
+# def remove_hydrogens(stru: Structure, polypeptide_only: bool) -> Structure:
+#     """
+#     remove all hydrogen Atom()s for {stru}.
+#     Make changes in-place and return a reference of the changed
+#     original object.
+#     """
+#     hydrogens = stru.hydrogens(polypeptide_only=polypeptide_only)
+#     _LOGGER.debug(f"removing {len(hydrogens)} hydrogens")
+#     for h in hydrogens:
+#         h: Atom
+#         h.delete_from_parent()
+
+#     return stru
+
+# @dispatch
+# def remove_hydrogens(residue: Residue) -> Residue:
+#     """Remove all hydrogen atom(s) from {residue}.
+#     Make changes in-place and return a reference of the changed original Residue / NonCanonicalBase / Ligand.
+
+#     Args:
+#         residue: An instance of Residue / NonCanonicalBase / Ligand.
+    
+#     Returns:
+#         The reference of the changed original Residue / NonCanonicalBase / Ligand
+#     """
+#     hydrogens = residue.hydrogens
+#     if len(hydrogens) >= 1:
+#         _LOGGER.info(f"Removing {len(hydrogens)} hydrogens from {residue.name}.")
+#         for h in hydrogens:
+#             h: Atom
+#             h.delete_from_parent()
+#     return residue
 
 def remove_empty_chain(stru: Structure) -> Structure:
     """

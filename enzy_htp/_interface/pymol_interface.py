@@ -22,6 +22,7 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core import _LOGGER, check_var_type
 from enzy_htp._config.pymol_config import PyMolConfig, default_pymol_config
 from enzy_htp.structure import Structure, PDBParser, Ligand
+from enzy_htp.structure.structure_operation import remove_non_peptide, remove_hydrogens
 import enzy_htp.chemical as chem
 from enzy_htp.structure.structure_ensemble import StructureEnsemble
 
@@ -192,6 +193,7 @@ class PyMolInterface(BaseInterface):
         """
         self.check_pymol2_installed()
         prmtop_str = stru_esm._topology
+        pass
 
     def select_pymol_obj(self, session: pymol2.PyMOL, pattern: str, pymol_obj_name: str) -> List[int]:
         """an internal function return atom indexes of a pymol selection of a pymol obj 
@@ -764,8 +766,8 @@ class PyMolInterface(BaseInterface):
         return mask
 
     def get_rmsd(self, structure_ensemble: StructureEnsemble, mask_pattern: str = str()) -> float:
-        """Calculates the Root Mean Square Deviation (RMSD) for a structure ensemble. Ligands, solvents and ions are not included.
-        The lower the RMSD value is, the more stable the structure is.
+        """Calculates the Root Mean Square Deviation (RMSD) for a structure ensemble compared with its average structure.
+        Ligands, solvents and ions are not included. The lower the RMSD value is, the more stable the structure is.
 
         Args:
             structure_ensemble (StructureEnsemble): A collection of different geometries of the same enzyme structure.
@@ -777,22 +779,19 @@ class PyMolInterface(BaseInterface):
         ref_sele_name = "target"
         frame_sele_name = "mobile"
         with OpenPyMolSession(self) as pms:
-            ref_stru_name, _ = self.load_enzy_htp_stru(pms, structure_ensemble.structure_0)
+            average_structure = structure_ensemble.average(remove_solvent=True)
+            remove_non_peptide(average_structure)
+            remove_hydrogens(average_structure, polypeptide_only=False)
+            ref_stru_name, _ = self.load_enzy_htp_stru(pms, average_structure)
             self.general_cmd(pms, [
-                ('remove', 'solvent'),
-                ('remove', 'inorganic'),
-                ('remove', 'organic'),
-                ('remove', 'hydrogen'),
                 ('select', ref_sele_name, f"{mask_pattern} and object {ref_stru_name}"),
             ])
             rmsd_list = list()
             for frame_stru in structure_ensemble.structures(remove_solvent=True):
+                remove_non_peptide(frame_stru)
+                remove_hydrogens(frame_stru, polypeptide_only=False)
                 frame_stru_name, _ = self.load_enzy_htp_stru(pms, stru=frame_stru)
                 results: List[Any] = self.general_cmd(pms, [
-                    ('remove', 'solvent'),
-                    ('remove', 'inorganic'),
-                    ('remove', 'organic'),
-                    ('remove', 'hydrogen'),
                     ('select', frame_sele_name, f"{mask_pattern} and object {frame_stru_name}"),
 
                     ('align', frame_sele_name, ref_sele_name),
@@ -810,7 +809,7 @@ class PyMolInterface(BaseInterface):
                 ])
                 rmsd_list.append(results[-2][0])
                 continue
-            # print(rmsd_list)
+            print(rmsd_list)
             return sum(rmsd_list) / len(rmsd_list)
         
     def get_spi(self, stru: Structure, ligand:Ligand, pocket_sele:str) -> float:
