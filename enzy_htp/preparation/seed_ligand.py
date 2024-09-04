@@ -134,11 +134,13 @@ def seed_with_transplants(ligand:Ligand,
     df.sort_values(by='clash_count',inplace=True)
     df.reset_index(drop=True, inplace=True)
     template:Ligand = df.iloc[0].mol
-
+    
     if not ligand.is_ligand():
         ligand.atoms[0].coord = template.atoms[0].coord
     else:
-        if similarity_metric == 'atom_names':
+        if df.iloc[0].similarity_score >= 0.95:
+            interface.rdkit.apply_coords(template, ligand) 
+        elif similarity_metric == 'atom_names':
             mimic_torsions( template, ligand )
         elif similarity_metric == 'mcs':
             mimic_torsions_mcs( template, ligand )

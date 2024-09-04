@@ -228,3 +228,61 @@ class RDKitInterface(BaseInterface):
             result.append( temp )
 
         return result
+
+    def apply_coords(self,
+                template:Ligand,
+                ligand:Ligand) -> None:
+        from rdkit.Chem import AllChem
+        template_to_ligand = dict()
+        atom_names = list()
+        tmol = self.mol_from_ligand(template, False)
+        lmol = self.mol_from_ligand(ligand, False)
+
+        orig_smiles=AllChem.MolToSmiles(lmol,canonical=True)
+        for aidx, at in enumerate(tmol.GetAtoms()):
+            target_name:str=at.GetPropsAsDict()['_TriposAtomName']
+            atom_names.append(target_name)
+            for lidx, al in enumerate(lmol.GetAtoms()):
+                if target_name == al.GetPropsAsDict()['_TriposAtomName']:
+                    template_to_ligand[aidx] = lidx
+                    break
+            else:
+                #TODO(CJ): put an error code here
+                pass
+                #assert False, target_name
+        
+        lconf = lmol.GetConformer()
+        tconf = tmol.GetConformer()
+        
+        ff = AllChem.UFFGetMoleculeForceField(lmol)
+        for tidx, lidx in template_to_ligand.items():
+            
+            lconf.SetAtomPosition(lidx, tconf.GetAtomPosition(tidx))
+
+            ff.UFFAddPositionConstraint(lidx, 0.05, 10000)
+        ff.Minimize()
+        from rdkit.Chem import rdMolTransforms as rdmt
+
+        #ff = AllChem.UFFGetMoleculeForceField(lmol)
+        for idx in range(lmol.GetNumAtoms()):
+            atom = lmol.GetAtomWithIdx(idx)
+            if atom.GetAtomicNum() != 1:
+                ff.UFFAddPositionConstraint(idx, 0.05, 100)
+            else:
+                pidx = None
+                for bb in lmol.GetBonds():
+                    bidxs = [bb.GetBeginAtomIdx(), bb.GetEndAtomIdx()]
+                    if idx == bidxs[0]:
+                        pidx = bidxs[1]
+                    
+                    if idx == bidxs[1]:
+                        pidx = bidxs[0]
+                
+
+                rdmt.SetBondLength(lconf, pidx, idx, 1.10)
+               
+        ff.Minimize()
+        self.update_ligand_positions(ligand, lmol)
+        end_smiles=AllChem.MolToSmiles(lmol, canonical=True)
+        assert orig_smiles == end_smiles, f"{orig_smiles}\n{end_smiles}"
+        #assert False
