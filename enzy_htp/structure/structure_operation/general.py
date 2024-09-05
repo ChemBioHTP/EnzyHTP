@@ -64,6 +64,10 @@ def remove_hydrogens(residue: Residue) -> Residue:
 
     Args:
         residue: An instance of Residue / NonCanonicalBase / Ligand.
+        (dispatch)
+        stru: A instance of Structure. And when stru is used, `polypeptide_only` needs to be specified for whether hydrogens are only removed for
+            polypeptides (exclude ligands). NOTE that this value have to be given as a positional argument! Otherwise there will be an
+            dispatch error. 
     
     Returns:
         The reference of the changed original Residue / NonCanonicalBase / Ligand
