@@ -388,14 +388,13 @@ class GaussianInterface(BaseInterface):
     # region == mappers ==
     METHOD_KEYWORD_MAPPER = {
         "pbe0": "pbe1pbe",
-    }
-    """map Schrodinger eq. solving method name to gaussian keyword. mostly record special ones."""
-
-    BASIS_SET_KEYWORD_MAPPER = {
         "def2-svp" : "def2svp",
         "def2-tzvp" : "def2tzvp",
         "def2-qzvpp" : "def2qzvpp",
     }
+    """map Schrodinger eq. solving method name to gaussian keyword. mostly record special ones."""
+
+    BASIS_SET_KEYWORD_MAPPER = {}
     """map basis set name to gaussian keyword."""
 
     SOLVENT_KEYWORD_MAPPER = {}
