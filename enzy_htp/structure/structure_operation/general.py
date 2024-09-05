@@ -43,7 +43,7 @@ def remove_counterions(stru: Structure) -> Structure:
     return stru
 
 @dispatch
-def remove_hydrogens(stru: Structure, polypeptide_only: bool) -> Structure:
+def remove_hydrogens(stru: Structure, polypeptide_only: bool = False) -> Structure:
     """
     remove all hydrogen Atom()s for {stru}.
     Make changes in-place and return a reference of the changed
