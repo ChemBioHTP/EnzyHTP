@@ -1,0 +1,4 @@
+parm stru_w_solvent.prmtop
+trajin traj_w_solvent_3f.nc
+autoimage
+average traj_w_solvent_average.pdb pdb

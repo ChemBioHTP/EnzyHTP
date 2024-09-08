@@ -60,12 +60,13 @@ def test_rmsd_of_region():
 
 def test_rmsd_with_pattern():
     """Test the `rmsd_with_pattern` function."""
+    parser = PDBParser()
     pdb_file = f"{DATA_DIR}/test_spi.pdb"
     prmtop = f"{DATA_DIR}/test_spi.prmtop"
     data = f"{DATA_DIR}/test_spi.mdcrd"
-    parser = PDBParser()
 
     stru = parser.get_structure(pdb_file)
+    ref_structure = parser.get_structure(f"{DATA_DIR}/spi_average_structure.pdb")
 
     mdcrd_parser=AmberMDCRDParser(prmtop).get_coordinates
 
@@ -76,7 +77,7 @@ def test_rmsd_with_pattern():
         coordinate_list=data,
     )
     
-    rmsd = rmsd_with_pattern(structure_ensemble=structure_ensemble, mask_pattern="resi 7+11+27+40+41+43+165+168+169+170+199+210+211")
+    rmsd = rmsd_with_pattern(structure_ensemble=structure_ensemble, reference_structure=ref_structure, mask_pattern="resi 7+11+27+40+41+43+165+168+169+170+199+210+211 not elem H")
     _LOGGER.info(f"The RMSD value is {rmsd}.")
 
     fs.safe_rmdir("scratch")

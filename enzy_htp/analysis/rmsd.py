@@ -15,7 +15,7 @@ from typing import List
 from enzy_htp import interface, _LOGGER
 from enzy_htp import config as eh_config
 from enzy_htp.core import file_system as fs
-from enzy_htp.structure import Residue
+from enzy_htp.structure import Residue, Structure
 from enzy_htp.structure.structure_ensemble import StructureEnsemble
 
 def compose_mask_pattern(mask_region: List[Residue] = list(), ca_only: bool = True) -> str:
@@ -36,36 +36,48 @@ def compose_mask_pattern(mask_region: List[Residue] = list(), ca_only: bool = Tr
         mask_pattern += " and name CA"
     return mask_pattern
 
-def rmsd_of_structure(structure_ensemble: StructureEnsemble, include_ligand: bool = True, ca_only: bool = True) -> float:
+def rmsd_of_structure(structure_ensemble: StructureEnsemble, reference_structure: Structure = None, include_ligand: bool = True, ca_only: bool = True) -> float:
     """Get RMSD value from MD simulation result of the whole structure.
     
     Args:
         structure_ensemble (StructureEnsemble): A collection of different geometries of the same enzyme structure.
+        reference_structure (Structure, optional): The reference structure, which should have the same sequences and ligangs as the structure_ensemble. Default: Average structure.
         include_ligand (bool, optional): Indicate if ligands are included in RMSD calculation. Default True.
         ca_only (bool, optional): Indicate if only C-alpha are included in RMSD calculation; otherwise all atoms except hydrogens are included. Default True.
     """
     mask_region = structure_ensemble.structure_0.residues
     if (not include_ligand):
         mask_region = list(filter(lambda residue: (not residue.is_noncanonical()), mask_region))
-    return rmsd_of_region(structure_ensemble, mask_region, ca_only)
+    return rmsd_of_region(
+        structure_ensemble=structure_ensemble, 
+        reference_structure=reference_structure, 
+        mask_region=mask_region, 
+        ca_only=ca_only
+    )
 
-def rmsd_of_region(structure_ensemble: StructureEnsemble, mask_region: List[Residue] = list(), ca_only: bool = True) -> float:
+def rmsd_of_region(structure_ensemble: StructureEnsemble, reference_structure: Structure = None, mask_region: List[Residue] = list(), ca_only: bool = True) -> float:
     """Get RMSD value from MD simulation result with a mask region (a list of residues).
     
     Args:
         structure_ensemble (StructureEnsemble): A collection of different geometries of the same enzyme structure.
+        reference_structure (Structure, optional): The reference structure, which should have the same sequences and ligangs as the structure_ensemble. Default: Average structure.
         mask_region (List[Residue], optional): A list of Residues to calculation RMSD value. If the list is empty, then all residues are selected.
         ca_only (bool, optional): Indicate if only C-alpha are included in RMSD calculation; otherwise all atoms except hydrogens are included. Default True.
     """
     mask_pattern = compose_mask_pattern(mask_region=mask_region, ca_only=ca_only)
-    return rmsd_with_pattern(structure_ensemble, mask_pattern)
+    return rmsd_with_pattern(
+        structure_ensemble=structure_ensemble, 
+        reference_structure=reference_structure, 
+        mask_pattern=mask_pattern
+    )
 
-def rmsd_with_pattern(structure_ensemble: StructureEnsemble, mask_pattern: str) -> float:
+def rmsd_with_pattern(structure_ensemble: StructureEnsemble, reference_structure: Structure = None, mask_pattern: str = str()) -> float:
     """
     mvp function for RMSD calculation
     
     Args:
         structure_ensemble (StructureEnsemble): A collection of different geometries of the same enzyme structure.
+        reference_structure (Structure, optional): The reference structure, which should have the same sequences and ligangs as the structure_ensemble. Default: Average structure.
         mask_pattern (str): A pymol-formatted selection string which defines the region for calculating RMSD value.
     """
-    return interface.pymol.get_rmsd(structure_ensemble=structure_ensemble, mask_pattern=mask_pattern)
+    return interface.pymol.get_rmsd(structure_ensemble=structure_ensemble, reference_structure=reference_structure, mask_pattern=mask_pattern)

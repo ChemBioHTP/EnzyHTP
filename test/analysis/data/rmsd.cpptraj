@@ -1,0 +1,9 @@
+parm test_spi.prmtop
+trajin test_spi.mdcrd
+autoimage
+rmsd :7,11,27,40,41,43,165,168,169,170,199,210,211&!@H= first mass
+average crdset AVE :7,11,27,40,41,43,165,168,169,170,199,210,211&!@H=
+run
+autoimage
+rmsd :7,11,27,40,41,43,165,168,169,170,199,210,211&!@H= ref AVE * out rmsd.csv mass
+run
