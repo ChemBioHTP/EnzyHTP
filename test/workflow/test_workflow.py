@@ -268,8 +268,8 @@ def test_general_read_architecture(caplog):
     """Test reading the schema of the configuration json/unit_dict."""
     json_filepath = f'{DATA_DIR}/general_7si9_general_layer_variable.json'
     general = GeneralWorkUnit.from_json_filepath(json_filepath=json_filepath, working_directory=WORK_DIR, overwrite_database=True, debug=True)
-    # print(general.architecture)
-    assert "        - mutate_stru" in general.architecture
+    print(general.architecture)
+    assert "->-> mutate_stru" in general.architecture
     fs.safe_rmdir(WORK_DIR)
     return
 
@@ -342,7 +342,7 @@ def test_general_reload_pass(caplog):
     assert mutate_stru.status == StatusCode.EXIT_OK
     assert checkpoint.status == StatusCode.EXIT_OK
 
-    fs.safe_rmdir(WORK_DIR)
+    # fs.safe_rmdir(WORK_DIR)
     return
 
 def test_general_reload_change_varname(caplog):

@@ -11,6 +11,8 @@ TODO (Zhong): Continue computing. (Completed 2024-03-20 01:15 UTC-5)
 TODO (Zhong): How to indicate error from inner units. (Completed 2024-03-13 19:00 UTC-5)
 TODO (Zhong): Cluster Batch.
 TODO (Zhong): Data Output to excel (enzy_htp.core.file_system.write_data_to_excel, Completed 2024-05-12 19:50 UTC-5). 
+TODO (Zhong): How to lower the memeory cost due to inherited_data_mapper? (Use outer_data_mappers instead, Completed 2024-09-10 18:18).
+TODO (Zhong): How to optimize the return value of workflow.execute().
 
 @File    :   workflow.py
 @Created :   2024/02/05 22:53
@@ -347,11 +349,15 @@ class ExecutionEntity:
             return unit
 
     def reload(self):
-        """Reload task. Placeholder ONLY!"""
+        """Reload task. Message Logging ONLY!"""
         if self.status in StatusCode.unexecuted_statuses:
             _LOGGER.info(f"{self.identifier} hasn't been executed yet, cannot reload!")
             return
         _LOGGER.info(f"Reloading {self.identifier}...")
+
+    def __del__(self):
+        self.deprecate_and_delete()
+        return
 
 class WorkFlow(ExecutionEntity):
     """Rrepresents a procedural WorkFlow primarily consists of a number of WorkUnit instances, 
@@ -384,14 +390,16 @@ class WorkFlow(ExecutionEntity):
     
     # Intermediate Data.
     intermediate_data_mapper: dict  # Runtime intermediate data for the current layer of workflow.
-    inherited_data_mapper: dict     # Data inherited from parent workflow.
+    # inherited_data_mapper: dict     # Data inherited from parent workflow.
+    outer_data_mappers: List[dict]  # List of data mappers from outer workflows.
     nested_control_unit_return_keys: list   # The return keys of nested ControlWorkUnit instances (e.g. loop)
 
     def __init__(self, working_directory: str = BASE_DIRECTORY, 
                 debug: bool = False, 
                 locator: List[int] = list(), 
                 intermediate_data_mapper: Dict[str, Any] = dict(), 
-                inherited_data_mapper: Dict[str, Any] = dict(),
+                data_mapper_to_inherite: Dict[str, Any] = dict(),
+                outer_data_mappers: List[dict] = list(),
                 control_workunit: ControlWorkUnit = None,
                 sqlite_filepath: str = str(),
                 ) -> None:
@@ -403,7 +411,8 @@ class WorkFlow(ExecutionEntity):
             locator (List[int]): A list of the hierarchical indexes to locate the current workflow.
                                 If the current workflow is at the outermost level, this value is an empty list.
             intermediate_data_mapper (Dict[str, Any], optional): The initial value of intermediate_data_mapper.
-            inherited_data_mapper (Dict[str, Any], optional): Data Mapper containing data to be inherited.
+            data_mapper_to_inherite (Dict[str, Any], optional): The data mapper containing the data to be inherited, typically the data mapper of the current layer workflow.
+            outer_data_mappers (List[dict], optional): List of data mappers from outer layer workflows.
             control_workunit (ControlWorkUnit): The outer ControlWorkUnit instance hosting the current workflow.
             sqlite_filepath (str): The filepath to your sqlite database file for persistent storage.
         """
@@ -411,8 +420,10 @@ class WorkFlow(ExecutionEntity):
 
         # Assigned values.
         self.intermediate_data_mapper = intermediate_data_mapper
-        self.inherited_data_mapper = inherited_data_mapper
-        _LOGGER.debug(f"inherited_data_mapper: {self.inherited_data_mapper}")
+
+        self.outer_data_mappers = [data_mapper_to_inherite] + outer_data_mappers.copy()
+        _LOGGER.debug(f"outer_data_mappers: {self.outer_data_mappers}")
+
         self.control_workunit = control_workunit
 
         # Default values.
@@ -427,7 +438,8 @@ class WorkFlow(ExecutionEntity):
     def from_list(cls, unit_dict_list: List[dict], working_directory: str = BASE_DIRECTORY, 
                 debug: bool = False, locator: List[int] = list(),
                 intermediate_data_mapper: Dict[str, Any] = dict(), 
-                inherited_data_mapper: Dict[str, Any] = dict(), 
+                data_mapper_to_inherite: Dict[str, Any] = dict(),
+                outer_data_mappers: List[dict] = list(),
                 control_workunit: ControlWorkUnit = None, 
                 sqlite_filepath: str = str(),
                 ) -> WorkFlow:
@@ -440,16 +452,23 @@ class WorkFlow(ExecutionEntity):
             locator (List[int]): A list of the hierarchical indexes to locate the current workflow.
                                 If the current workflow is at the outermost level, locator is an empty list.
             intermediate_data_mapper (Dict[str, Any], optional): The initial value of intermediate_data_mapper.
-            inherited_data_mapper (Dict[str, Any], optional): Data Mapper containing data to be inherited.
+            data_mapper_to_inherite (Dict[str, Any], optional): The data mapper containing the data to be inherited, typically the data mapper of the current layer workflow.
+            outer_data_mappers (List[dict], optional): List of data mappers from outer layer workflows.
             control_workunit (ControlWorkUnit): The outer ControlWorkUnit instance hosting the current workflow.
             sqlite_filepath (str): The filepath to your sqlite database file for persistent storage.
         
         Returns:
             An instance of WorkFlow.
         """
-        flow = __class__(working_directory, debug, locator, intermediate_data_mapper, inherited_data_mapper, control_workunit, sqlite_filepath)
+        flow = __class__(working_directory=working_directory, 
+                debug=debug, locator=locator, 
+                intermediate_data_mapper=intermediate_data_mapper, 
+                data_mapper_to_inherite=data_mapper_to_inherite, 
+                outer_data_mappers=outer_data_mappers, 
+                control_workunit=control_workunit, 
+                sqlite_filepath=sqlite_filepath)
         flow.status = StatusCode.INITIALIZING
-        if (unit_dict_list == None):
+        if (not unit_dict_list):
             no_workunit_err_msg = "Initializing WorkFlow with no workunits. Workunits are expected."
             flow.error_msg_list.append(no_workunit_err_msg)
             flow.status = StatusCode.FAILED_INITIALIZATION
@@ -745,12 +764,12 @@ class WorkUnit(ExecutionEntity):
 
         # Check if 'api' key exists in the current level
         if WORKUNIT_API_NAME_KEY in unit_dict:
-            result += ' ' * indent + f"- {unit_dict[WORKUNIT_API_NAME_KEY]}\n"
+            result += "·" + "->" * indent + f" {unit_dict[WORKUNIT_API_NAME_KEY]}\n"
         
         # If 'args' key exists and it has a 'workunits' key, process each item in 'workunits'
         if (WORKUNIT_ARGUMENT_LIST_KEY in unit_dict) and (CONTROL_BODY_WORKUNITS_LABEL in unit_dict[WORKUNIT_ARGUMENT_LIST_KEY]):
             for workunit in unit_dict[WORKUNIT_ARGUMENT_LIST_KEY][CONTROL_BODY_WORKUNITS_LABEL]:
-                result += __class__.read_architecture(workunit, indent + 4)
+                result += __class__.read_architecture(workunit, indent + 1)
 
         return result
 
@@ -926,7 +945,8 @@ class WorkUnit(ExecutionEntity):
         """
         updated_params = list()
         for param in self.params_to_assign_at_execution:
-            for mapper in [self.workflow.intermediate_data_mapper, self.workflow.inherited_data_mapper]:
+            data_mappers = [self.workflow.intermediate_data_mapper] + self.workflow.outer_data_mappers
+            for mapper in data_mappers:    # Listed in order of priority.
                 mapped_datum = mapper.get(VarFormatter.unformat_variable(self.args_dict_input[param]))
                 if (mapped_datum != None):
                     existing_arg_in_mapper = self.args_dict_to_pass.get(param)
@@ -1017,7 +1037,8 @@ class WorkUnit(ExecutionEntity):
         unformatted_arg_value = VarFormatter.unformat_variable(arg_value)
         is_key_mapped = False   # Indicate if the value is mapped.
         is_value_mapped_none = True # Indicate if the value in the mapper is None at present.
-        for mapper in [self.workflow.intermediate_data_mapper, self.workflow.inherited_data_mapper]:    # Listed in order of priority.
+        data_mappers = [self.workflow.intermediate_data_mapper] + self.workflow.outer_data_mappers
+        for mapper in data_mappers:    # Listed in order of priority.
             if (mapper and unformatted_arg_value in mapper):    # If mapped, leave for later.
                 is_key_mapped = True
                 self.params_to_assign_at_execution.append(param_name)
@@ -1184,23 +1205,6 @@ class ControlWorkUnit(WorkUnit):
         virtual_unit = super().reload(unit_dict=unit_dict, api=api)
         return virtual_unit
 
-    def generate_data_mapper_to_inherite(self) -> Dict[str, Any]:
-        """Generate data mappers for sub-workflow inheritance.
-        
-        Returns:
-            Data mapper to inherite (dict)
-        """
-        data_mapper_to_inherite = dict()
-        if (inherited_data_mapper:=self.workflow.inherited_data_mapper):
-            # Data Mapper inherited from parent workflow(s) should be inherited.
-            data_mapper_to_inherite.update(inherited_data_mapper.copy())
-        for key, value in self.workflow.intermediate_data_mapper.items():
-            if (self.workflow and key in self.workflow.nested_control_unit_return_keys):
-                # Keys stored in `nested_control_unit_return_keys` should not be inherited
-                continue
-            data_mapper_to_inherite[key] = value
-        return data_mapper_to_inherite
-
     def encode_layer_index(self, execution_index: int = None) -> str:
         """The index of current layer to be added to `locator`.
         
@@ -1341,8 +1345,6 @@ class IterativeWorkUnit(ControlWorkUnit):
         self.run_in_subfolders = self.args_dict_to_pass.get(ITERATIVE_SUBFOLDERS_OPTION, False)
 
         # Initialize the Iterative Body.
-        data_mapper_to_inherite = self.generate_data_mapper_to_inherite()
-
         # Some data should be passed before the initialization of a sub-WorkFlow.
         iterative_body_datum_varname = VarFormatter.unformat_variable(self.args_dict_to_pass.get(self.iterative_body_datum_label))
         data_mapper_for_initialize_as_intermediate = {iterative_body_datum_varname: Placeholder.PLACEHOLDER_STR_VALUE}
@@ -1352,7 +1354,9 @@ class IterativeWorkUnit(ControlWorkUnit):
         flow_locator.append(self.encode_layer_index())
         placeholder_sub_workflow = WorkFlow.from_list(unit_dict_list=self.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL),
             debug=self.debug, intermediate_data_mapper=data_mapper_for_initialize_as_intermediate,
-            inherited_data_mapper=data_mapper_to_inherite, locator=flow_locator, control_workunit=self)
+            data_mapper_to_inherite=self.workflow.intermediate_data_mapper, 
+            outer_data_mappers=self.workflow.outer_data_mappers, 
+            locator=flow_locator, control_workunit=self)
         self.status = placeholder_sub_workflow.status
         
         # Add error message from placeholder workflow initialization.
@@ -1390,8 +1394,6 @@ class IterativeWorkUnit(ControlWorkUnit):
         reloaded_iterative_data = virtual_unit.args_dict_to_pass.get(iterable_data_label)
         iterative_body_datum_varname = virtual_unit.args_dict_to_pass.get(iterative_body_datum_label)
 
-        data_mapper_to_inherite = self.generate_data_mapper_to_inherite()
-
         if (iterative_data:=self.args_dict_to_pass_backup.get(iterable_data_label)) == reloaded_iterative_data:
             has_suspecious_updates = False
             has_unresolved_error_or_pause = False
@@ -1400,7 +1402,7 @@ class IterativeWorkUnit(ControlWorkUnit):
                 workflow = self.sub_workflows[iterative_index]
                 
                 data_mapper_for_update = {iterative_body_datum_varname: iterative_datum}
-                data_mapper_for_update.update(data_mapper_to_inherite)
+                workflow.outer_data_mappers[0].update(self.workflow.intermediate_data_mapper)
 
                 del workflow.intermediate_data_mapper[iterative_body_datum_varname_backup]
                 workflow.intermediate_data_mapper.update(data_mapper_for_update)
@@ -1429,18 +1431,6 @@ class IterativeWorkUnit(ControlWorkUnit):
             
             self.status = StatusCode.SUSPECIOUS_UPDATES
 
-    def generate_data_mapper_to_inherite(self) -> Dict[str, Any]:
-        """Generate data mappers for sub-workflow inheritance.
-        
-        Returns:
-            Data mapper to inherite (dict)
-        """
-        data_mapper_to_inherite = super().generate_data_mapper_to_inherite()
-        
-        # Remove loop_data or batch_data to reduce memory overhead.
-        del data_mapper_to_inherite[VarFormatter.unformat_variable(self.args_dict_input.get(self.iterable_data_label))]
-        return data_mapper_to_inherite
-
     def update_status_code(self, workflow: WorkFlow) -> None:
         """Update the status code of IterativeWorkUnit (and its derived classes) instance.
         
@@ -1466,7 +1456,7 @@ class IterativeWorkUnit(ControlWorkUnit):
             return
         
     def deprecate_and_delete(self) -> None:
-        """Deprecate and Delete an ExecutionEntity instance as well as its sub-workflows and internal workunits.
+        """Deprecate and Delete an IterativeWorkUnit instance as well as its sub-workflows and internal workunits.
         If an ExecutionEntity instance is deprecated, it will be cleared and its record will be removed from the database.
         """
         for workflow in self.sub_workflows:
@@ -1590,7 +1580,6 @@ class LoopWorkUnit(IterativeWorkUnit):
             return self.return_key, self.return_value
 
         self.return_value: dict = dict()
-        data_mapper_to_inherite = self.generate_data_mapper_to_inherite()
         self.update_args_value_from_data_mapper()
         _LOGGER.info(f'We are about to execute {self.__class__.__name__} {self.identifier} ...')
         self.status = StatusCode.RUNNING
@@ -1610,15 +1599,16 @@ class LoopWorkUnit(IterativeWorkUnit):
             if (use_existing_subflows):
                 workflow = self.sub_workflows[loop_index]
                 workflow.intermediate_data_mapper.update(data_mapper_for_initialization)
-                workflow.inherited_data_mapper.update(data_mapper_to_inherite)
+                workflow.outer_data_mappers[0].update(self.workflow.intermediate_data_mapper)
             else:
                 flow_locator = self.locator.copy()
                 flow_locator.append(self.encode_layer_index(loop_index))
                 workflow = WorkFlow.from_list(
                     unit_dict_list=self.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL), 
-                    working_directory=self.working_directory, debug=self.debug, 
+                    working_directory=self.working_directory, debug=self.debug, locator=flow_locator,
                     intermediate_data_mapper=data_mapper_for_initialization,
-                    inherited_data_mapper=data_mapper_to_inherite, locator=flow_locator,
+                    data_mapper_to_inherite=self.workflow.intermediate_data_mapper,
+                    outer_data_mappers=self.workflow.outer_data_mappers,
                     control_workunit=self, sqlite_filepath=self.sqlite_filepath)
                 self.sub_workflows.append(workflow)
             continue
@@ -1779,7 +1769,6 @@ class ClusterBatchWorkUnit(IterativeWorkUnit):  # TODO (Zhong)
             return self.return_key, self.return_value
 
         self.return_value: dict = dict()
-        data_mapper_to_inherite = self.generate_data_mapper_to_inherite()
         self.update_args_value_from_data_mapper()
         _LOGGER.info(f'We are about to execute {self.__class__.__name__} {self.identifier} ...')
         self.status = StatusCode.RUNNING
@@ -1799,15 +1788,16 @@ class ClusterBatchWorkUnit(IterativeWorkUnit):  # TODO (Zhong)
             if (use_existing_subflows):
                 workflow = self.sub_workflows[batch_index]
                 workflow.intermediate_data_mapper.update(data_mapper_for_initialization)
-                workflow.inherited_data_mapper.update(data_mapper_to_inherite)
+                workflow.outer_data_mappers[0].update(self.workflow.intermediate_data_mapper)
             else:
                 flow_locator = self.locator.copy()
                 flow_locator.append(self.encode_layer_index(batch_index))
                 workflow = WorkFlow.from_list(
                     unit_dict_list=self.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL),
-                    working_directory=self.working_directory, debug=self.debug, 
+                    working_directory=self.working_directory, debug=self.debug, locator=flow_locator,
                     intermediate_data_mapper=data_mapper_for_initialization,
-                    inherited_data_mapper=data_mapper_to_inherite, locator=flow_locator,
+                    data_mapper_to_inherite=self.workflow.intermediate_data_mapper, 
+                    outer_data_mappers=self.workflow.outer_data_mappers,
                     control_workunit=self, sqlite_filepath=self.sqlite_filepath)
                 self.sub_workflows.append(workflow)
             continue
@@ -1961,13 +1951,16 @@ class GeneralWorkUnit(ControlWorkUnit):
             unit.status = StatusCode.INITIALIZING
         
         # Initialize the WorkFlow.
-        data_mapper_for_inherit = unit.args_dict_to_pass.copy()
-        data_mapper_for_inherit.update(unit.data_mapper_for_init)
+        general_unit_data_mapper = unit.args_dict_to_pass.copy()
+        general_unit_data_mapper.update(unit.data_mapper_for_init)
         
-        del data_mapper_for_inherit[CONTROL_BODY_WORKUNITS_LABEL]  # Pass kwargs to the workflow.
+        del general_unit_data_mapper[CONTROL_BODY_WORKUNITS_LABEL]  # Pass kwargs to the workflow.
 
         if (unit_dict_list:=unit.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL)):
-            unit.sub_workflow = WorkFlow.from_list(unit_dict_list, debug=debug, inherited_data_mapper=data_mapper_for_inherit, control_workunit=unit, sqlite_filepath=unit.sqlite_filepath)
+            unit.sub_workflow = WorkFlow.from_list(
+                unit_dict_list, debug=debug, 
+                data_mapper_to_inherite=general_unit_data_mapper, 
+                control_workunit=unit, sqlite_filepath=unit.sqlite_filepath)
             if unit.sub_workflow.status == StatusCode.READY_TO_START:
                 unit.status = StatusCode.READY_TO_START
             else:
@@ -2046,7 +2039,7 @@ class GeneralWorkUnit(ControlWorkUnit):
             save_snapshot (bool, optional): Whether to automatically save the GeneralWorkUnit instance as a pickle file 
                                         when it exits due to Error, Pause, or Completion. Default False.
             sqlite_filename (str, optional): The filename of the sqlite database file in your working directory.
-            overwrite_database: If overwrite the database file when it exists. Default False.
+            overwrite_database (bool, optional): If overwrite the database file when it exists. Default False.
             debug (bool, optional): Indicates whether to run in debug mode. Default False.
             data_mapper_for_init (dict, optional): An data mapper for initialization, which can be used to pass in data of types that are inconvenient to record in JSON.
         
@@ -2093,7 +2086,9 @@ class GeneralWorkUnit(ControlWorkUnit):
         
     def deprecate_and_delete(self) -> None:
         """A GeneralWorkunit instance cannot be deprecated or deleted."""
-        _LOGGER.warning("A GeneralWorkunit instance cannot be deprecated or deleted.")
+        # _LOGGER.warning("A GeneralWorkunit instance cannot be deprecated or deleted.")
+        self.workflow.deprecate_and_delete()
+        super().deprecate_and_delete()
         return
    
     def locate(self, locator: list) -> ExecutionEntity:
@@ -2154,11 +2149,12 @@ class GeneralWorkUnit(ControlWorkUnit):
             unit_dict_list = virtual_unit.args_dict_to_pass.get(CONTROL_BODY_WORKUNITS_LABEL)
 
             # Pass data mapper to the workflow.
-            data_mapper_for_inherit = virtual_unit.args_dict_to_pass.copy()
-            data_mapper_for_inherit.update(self.data_mapper_for_init)
-            del data_mapper_for_inherit[CONTROL_BODY_WORKUNITS_LABEL]
+            general_unit_data_mapper = virtual_unit.args_dict_to_pass.copy()
+            general_unit_data_mapper.update(self.data_mapper_for_init)
+            del general_unit_data_mapper[CONTROL_BODY_WORKUNITS_LABEL]
 
-            self.sub_workflow.inherited_data_mapper.update(data_mapper_for_inherit)
+            # self.sub_workflow.inherited_data_mapper.update(general_unit_data_mapper)
+            self.sub_workflow.outer_data_mappers[0].update(general_unit_data_mapper)
             self.sub_workflow.reload(unit_dict_list=unit_dict_list)
 
         # Change directory back after initialization.

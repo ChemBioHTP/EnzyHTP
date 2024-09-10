@@ -3,7 +3,7 @@
     "api": "read_pdb",
     "store_as": "read_pdb_0",
     "args": {
-      "path": "../data/7si9_rm_water_disconnected.pdb"
+      "path": "./data/7si9_rm_water_disconnected.pdb"
     }
   },
   {
