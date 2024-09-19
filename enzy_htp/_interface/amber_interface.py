@@ -200,6 +200,8 @@ class AmberParameterizer(MolDynParameterizer):
         maa_parms = {}
         metalcenter_parms = {}
         gaff_type = self._check_gaff_type()
+        if gaff_type == "GAFF2" and self.charge_method == "AM1BCC":
+            _LOGGER.warning("found combinations of GAFF2 and AM1BCC is not recommend per Amber Manual! Consider GAFF2/ABCG2")
         if "ligand" in diversity:
             for lig in stru.ligands:
                 if lig.name not in ligand_parms: # avoid repeating calculation
@@ -1233,8 +1235,25 @@ class AmberInterface(BaseInterface):
         fs.clean_temp_file_n_dir(temp_path_list)
 
     # -- MMPBSA.py --
-    def run_mmpbsa():
-        """the python wrapper for running MMPBSA.py.MPI and MMPBSA.py (not supported yet)"""
+    def run_mmpbsa(
+        dr_prmtop = temp_dr_prmtop,
+        dl_prmtop = temp_dl_prmtop,
+        dc_prmtop = temp_dc_prmtop,
+        sc_prmtop = temp_sc_prmtop,
+        traj_file = temp_nc,
+        out_path = mmpbsa_result_file,
+        keep_in_file = keep_in_file,
+        solvent_model = solvent_model,
+        cluster_job_config = cluster_job_config,
+        job_check_period = job_check_period,
+        igb = igb,
+        use_sander = use_sander,
+        ion_strength = ion_strength,
+        fillratio = fillratio,
+        verbose = "TODO: figure out how this be set",
+        ) -> None:
+        """the python wrapper for running MMPBSA.py.MPI and MMPBSA.py (not supported yet)
+        Handle dispatch of ClusterJob or not in this function"""
 
     def run_ante_mmpbsa(
         self,
@@ -2439,7 +2458,7 @@ class AmberInterface(BaseInterface):
         temp_nc = fs.get_valid_temp_name(f"{work_dir}/temp_mmpbsa.nc")
         self.make_mmpbgbsa_nc_file(stru_esm, temp_nc)
 
-        # execute
+        # execute TODO start from here
         mmpbsa_result_file = fs.get_valid_temp_name(f"{work_dir}/mmpbsa.dat")
         self.run_mmpbsa(
             dr_prmtop = temp_dr_prmtop,
@@ -2538,7 +2557,7 @@ class AmberInterface(BaseInterface):
         """make the nc file for the MMPB/GBSA calculation.
         Generate the file in {temp_nc}"""
 
-        self.convert_traj_to_nc()
+        self.convert_traj_to_nc(stru_esm.coordinate_list, temp_nc)
 
 amber_interface = AmberInterface(None, eh_config._amber)
 """The singleton of AmberInterface() that handles all Amber related operations in EnzyHTP

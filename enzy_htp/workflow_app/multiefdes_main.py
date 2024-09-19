@@ -222,7 +222,7 @@ def fine_filter( # TODO summarize logics from here to a general shrapnel functio
         ncaa_param_lib_path: str = None,
         out_ref_path_1: str = "mutant_space_2_fine_metrics.pickle",
         out_ref_path_2: str = "mutant_space_3_fine_metrics.pickle",
-        checkpoint_1: str = "fine_filer_child_jobs.pickle",
+        checkpoint_1: str = "fine_filter_child_jobs.pickle",
         work_dir: str = "./fine_filter",
         # fname under work_dir or child_dir
         child_result_fname = "result.pickle",
@@ -276,7 +276,7 @@ def fine_filter( # TODO summarize logics from here to a general shrapnel functio
             reference result file
         out_ref_path_2: str = "mutant_space_3_fine_metrics.pickle"
             reference result file
-        checkpoint_1: str = "fine_filer_child_jobs.pickle"
+        checkpoint_1: str = "fine_filter_child_jobs.pickle"
             check point file that contain all children job objects
         work_dir: str = "./fine_filter"
             the working dir
@@ -348,11 +348,11 @@ def fine_filter( # TODO summarize logics from here to a general shrapnel functio
         # 3. submit jobs
         save_obj(child_jobs, checkpoint_1)
     else:
-        child_jobs: List[ClusterJob] = load_obj(checkpoint_1)
+        child_jobs: List[ClusterJob] = load_obj(checkpoint_1) # NOTE that this will cause source code change in this script cannot effect the content of those existing jobs. (e.g.: partition etc.)
         new_child_jobs = []
         # 1. analyze remaining child_jobs (recycle old one) may benefit from having a mimo
         for job in child_jobs:
-            job.retrive_job_id()
+            job.retrive_job_id() # BUG multiple submissions of the job causes retriving a wrong job id; consider retrieving using a uid in .log?
             if (not job.is_submitted()) or (not job.is_complete()):
                 new_child_jobs.append(job)
         child_jobs = new_child_jobs # this will include failing, pending, running jobs
@@ -683,12 +683,12 @@ def workflow_puo(single_mut_ddg_file_path: str = None):
             shrapnel_child_job_config = shrapnel_child_job_config,
             shrapnel_cpujob_config = shrapnel_cpujob_config,
             shrapnel_gpujob_config = shrapnel_gpujob_config,
-            shrapnel_child_array_size = 50,
+            shrapnel_child_array_size = 10,
             shrapnel_groups = 100,
             shrapnel_gpu_partition_mapper = {
                 (0, 10) : "pascal",
                 (11, 20) : "turing",
-                (31, 40) : "a6000x4",
+                (21, 40) : "a6000x4",
                 (41, 50) : "pascal",
                 (51, 60) : "turing",
                 (61, 70) : "a6000x4",
