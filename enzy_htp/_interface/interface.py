@@ -80,7 +80,8 @@ class Interface:
         xtb_interface.set_parent(self)
 
         self.check_environment()
-
+    
+    @property
     def config(self) -> Config:
         """Getter for the config class."""
         return self._config

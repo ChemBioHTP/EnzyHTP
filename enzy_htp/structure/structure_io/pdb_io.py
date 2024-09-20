@@ -29,7 +29,8 @@ from ..solvent import Solvent, residue_to_solvent
 from ..ligand import Ligand, residue_to_ligand
 from ..modified_residue import ModifiedResidue, residue_to_modified_residue
 from ..chain import Chain
-from ..structure import Structure
+from ..structure import ( Structure, convert_res_to_structure )
+from ..ligand_ensemble import LigandEnsemble
 
 
 class PDBParser(StructureParserInterface):
@@ -148,6 +149,31 @@ class PDBParser(StructureParserInterface):
         fs.write_lines( outfile, content.splitlines() )
 
         return outfile
+
+    @classmethod
+    def save_ensemble(
+                    cls,
+                    outfile:str,
+                    le: LigandEnsemble,
+                    if_renumber: bool = True,
+                    if_fix_atomname: bool = True
+                    ) -> str:
+        """TODO(CJ)"""            
+        content:List[str] = list()
+        for lig in le.ligands()[1:]:
+            if not lig.parent:
+                lig = convert_res_to_structure( lig )
+            for ll in  cls.get_file_str(
+                lig, if_renumber, if_fix_atomname
+                ).splitlines():
+                if ll.startswith('ATOM  '):
+                    content.append( ll.replace('ATOM  ', 'HETATM') )
+            content.append('TER')
+        content.pop(-1)
+        content.append( 'END' )
+        fs.write_lines( outfile, content )
+        return outfile
+
 
     @classmethod
     @dispatch

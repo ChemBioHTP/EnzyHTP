@@ -276,7 +276,7 @@ class Atom(DoubleLinkedNode):
         chain, an empty value is given (e.g. "..CA")
         """
         
-        tokens:List[str] = ["", "", self.name]
+        tokens:List[str] = ["", "", self.name.strip()] #LOL
 
         if self.parent is not None:
             tokens[1] = str(self.parent.idx)

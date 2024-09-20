@@ -147,9 +147,8 @@ class XTBSinglePointEngine(QMSinglePointEngine):
 
         start_dir:str = os.getcwd()
         os.chdir(run_info['work_dir'])
-
         results = self.parent_interface.env_manager_.run_command(
-                self.parent_interface.config()['XTB_EXE'],
+                self.parent_interface.config['XTB_EXE'],
                 run_info['args'])
 
         os.chdir(start_dir)
@@ -222,7 +221,7 @@ class XTBOptimizationEngine(XTBSinglePointEngine, QMOptimizationEngine):
         os.chdir(run_info['work_dir'])
 
         results = self.parent_interface.env_manager_.run_command(
-                self.parent_interface.config()['XTB_EXE'],
+                self.parent_interface.config['XTB_EXE'],
                 run_info['args'])
 
         os.chdir(start_dir)
@@ -296,10 +295,10 @@ class XTBInterface(BaseInterface):
             charge = stru.get_net_charge()
 
         if n_iter is None:
-            n_iter = self.config().N_ITER
+            n_iter = self.config.N_ITER
 
         if n_proc is None:
-            n_proc = self.config().N_PROC
+            n_proc = self.config.N_PROC
 
         result = dict()
         coord_file:str = self.write_coord_file(stru, work_dir)
@@ -376,12 +375,12 @@ class XTBInterface(BaseInterface):
             pdb_lines.append( _parser._write_pdb_atom( aa ).replace('\n',''))
         
         fs.write_lines(temp_pdb, pdb_lines)
-        session = self.parent().pymol.new_session()
-        self.parent().pymol.general_cmd(session, [('delete', 'all'), ('load', temp_pdb)])
-        self.parent().pymol.remove_ligand_bonding(session) #TODO(CJ): add something in here about the cap resolution
+        session = self.parent.pymol.new_session()
+        self.parent.pymol.general_cmd(session, [('delete', 'all'), ('load', temp_pdb)])
+        self.parent.pymol.remove_ligand_bonding(session) #TODO(CJ): add something in here about the cap resolution
         fs.safe_rm(temp_pdb)
         
-        self.parent().pymol.general_cmd(session, [("save", coord_file)])
+        self.parent.pymol.general_cmd(session, [("save", coord_file)])
 
         return coord_file
 
@@ -536,22 +535,22 @@ class XTBInterface(BaseInterface):
         Returns:
             Nothing.
         """
-        if lot.method and lot.method not in self.config()['SUPPORTED_XTB_THEORY_LEVELS']:
-            _LOGGER.error(f"The method {lot.method} is not supported. Allowed values are: {', '.join(self.config()['SUPPORTED_XTB_THEORY_LEVELS'])}")
+        if lot.method and lot.method not in self.config['SUPPORTED_XTB_THEORY_LEVELS']:
+            _LOGGER.error(f"The method {lot.method} is not supported. Allowed values are: {', '.join(self.config['SUPPORTED_XTB_THEORY_LEVELS'])}")
             raise TypeError()
 
-        if lot.solv_method and lot.solv_method not in self.config()['SOLVATION_METHODS']:
-            _LOGGER.error(f"The solvation method {lot.solv_method} is not supported. Allowed values are: {', '.join(self.config()['SOLVATION_METHODS'])}")
+        if lot.solv_method and lot.solv_method not in self.config['SOLVATION_METHODS']:
+            _LOGGER.error(f"The solvation method {lot.solv_method} is not supported. Allowed values are: {', '.join(self.config['SOLVATION_METHODS'])}")
             raise TypeError()
 
         if lot.solv_method == 'ALPB':
-            if lot.solvent not in self.config()['ALPB_SOLVENTS']:
-                _LOGGER.error(f"The solvent {lot.solvent} is not supported in the ALPB model. Allowed values are: {', '.join(self.config()['ALPB_SOLVENTS'])}")
+            if lot.solvent not in self.config['ALPB_SOLVENTS']:
+                _LOGGER.error(f"The solvent {lot.solvent} is not supported in the ALPB model. Allowed values are: {', '.join(self.config['ALPB_SOLVENTS'])}")
                 raise TypeError()
         
         elif lot.solv_method == 'GBSA':
-            if lot.solvent not in self.config()['ALPB_SOLVENTS']:
-                _LOGGER.error(f"The solvent {lot.solvent} is not supported in the GBSA model. Allowed values are: {', '.join(self.config()['ALPB_SOLVENTS'])}")
+            if lot.solvent not in self.config['ALPB_SOLVENTS']:
+                _LOGGER.error(f"The solvent {lot.solvent} is not supported in the GBSA model. Allowed values are: {', '.join(self.config['ALPB_SOLVENTS'])}")
                 raise TypeError()
 
 
@@ -565,8 +564,8 @@ class XTBInterface(BaseInterface):
         Returns:
             Nothing.
         """
-        session = self.parent().pymol.new_session()
-        df:pd.DataFrame = self.parent().pymol.collect(session, coord_file, "x y z rank elem".split())
+        session = self.parent.pymol.new_session()
+        df:pd.DataFrame = self.parent.pymol.collect(session, coord_file, "x y z rank elem".split())
         df.sort_values(by='rank', inplace=True)
         #TODO(CJ): add some checks in here
         for aa, (i, row) in zip(sr.atoms, df.iterrows()):
