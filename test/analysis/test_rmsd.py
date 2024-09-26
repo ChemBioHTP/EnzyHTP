@@ -58,7 +58,7 @@ def test_rmsd_of_region():
 
     assert rmsd < 10
 
-def test_rmsd_with_pattern():
+def test_pymol_rmsd_with_pattern():
     """Test the `rmsd_with_pattern` function."""
     parser = PDBParser()
     pdb_file = f"{DATA_DIR}/test_spi.pdb"
@@ -77,9 +77,36 @@ def test_rmsd_with_pattern():
         coordinate_list=data,
     )
     
-    rmsd = rmsd_with_pattern(structure_ensemble=structure_ensemble, reference_structure=ref_structure, mask_pattern="resi 7+11+27+40+41+43+165+168+169+170+199+210+211 not elem H")
+    rmsd = rmsd_with_pattern(structure_ensemble=structure_ensemble, interface="pymol", reference_structure=ref_structure, mask_pattern="resi 7+11+27+40+41+43+165+168+169+170+199+210+211 not elem H")
     _LOGGER.info(f"The RMSD value is {rmsd}.")
 
     fs.safe_rmdir("scratch")
+
+    assert rmsd < 10
+
+def test_amber_rmsd_with_pattern():
+    """Test the `rmsd_with_pattern` function."""
+    parser = PDBParser()
+    pdb_file = f"{DATA_DIR}/test_spi.pdb"
+    prmtop = f"{DATA_DIR}/test_spi.prmtop"
+    trajs = f"{DATA_DIR}/test_spi.mdcrd"
+
+    stru = parser.get_structure(pdb_file)
+
+    mdcrd_parser=AmberMDCRDParser(prmtop).get_coordinates
+    structure_ensemble = StructureEnsemble(
+        topology=prmtop,
+        top_parser=get_itself,
+        coord_parser=mdcrd_parser,
+        coordinate_list=trajs,
+    )
+
+    mask_pattern=":7,11,27,40,41,43,165,168,169,170,199,210,211&!@H="
+    
+    rmsd = rmsd_with_pattern(structure_ensemble=structure_ensemble, interface="amber", reference_structure=None, mask_pattern=mask_pattern)
+    # rmsd = interface.amber.get_rmsd(traj_path=data, prmtop_path=prmtop, mask_pattern=mask_pattern)
+    _LOGGER.info(f"The RMSD value is {rmsd}.")
+
+    # fs.safe_rmdir("scratch")
 
     assert rmsd < 10

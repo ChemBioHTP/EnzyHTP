@@ -2263,6 +2263,79 @@ class AmberInterface(BaseInterface):
         contents = "\n".join(contents)
         self.run_cpptraj(contents)
 
+    def get_average_structure(
+            self,
+            traj_path: str,
+            prmtop_path: str,
+            auto_image: bool = False,
+        ) -> Structure:
+        """Calculate the average structure of a trajectory file.
+        
+        Args:
+            traj_path (str): The path to the .nc/.mdcrd file.
+            prmtop_path (str): The path to the prmtop file.
+            auto_image (bool, optional): Indicate if to move the structures from all frames together (to the box center).
+
+        Returns:
+            average_structure (Structure): A structure that represents the average coordinates of the entire trajectory.   
+        """
+        avg_structure_filename = os.path.join(eh_config.system.SCRATCH_DIR, "temp_traj_average.pdb")
+
+        contents: List[str] = [
+            f"parm {prmtop_path}",
+            f"trajin {traj_path}",
+        ]
+        if auto_image:
+            contents += [
+                "autoimage"
+            ]
+        contents += [
+            f"average {avg_structure_filename} pdb",
+            "quit",
+        ]
+        contents = "\n".join(contents)
+        self.run_cpptraj(contents)
+        average_structure = PDBParser().get_structure(avg_structure_filename)
+        
+        fs.safe_rm(avg_structure_filename)
+        return average_structure
+
+    def get_rmsd(
+            self,
+            traj_path: str,
+            prmtop_path: str,
+            mask_pattern: str = str(),
+        ) -> Structure:
+        """Calculate the RMSD value of a trajectory file.
+        
+        Args:
+            traj_path (str): The path to the .nc/.mdcrd file.
+            prmtop_path (str): The path to the prmtop file.
+            mask_pattern (str, optional): mask_pattern (str): A pymol-formatted selection string which defines the region for calculating RMSD value."""
+        rmsd_csv_filename = os.path.join(eh_config.system.SCRATCH_DIR, "temp_rmsd.csv")
+
+        contents: List[str] = [
+            f"parm {prmtop_path}",
+            f"trajin {traj_path}",
+            "autoimage",
+            f"rmsd {mask_pattern} first mass",
+            f"average crdset AVE {mask_pattern}",
+            "run",
+            "autoimage",
+            f"rmsd {mask_pattern} ref AVE * out {rmsd_csv_filename} mass",
+            "run",
+            "quit"
+        ]
+        contents = "\n".join(contents)
+        self.run_cpptraj(contents)
+
+        from pandas import read_csv
+        result_df = read_csv(rmsd_csv_filename, delim_whitespace=True)
+        rmsd_value = result_df.iloc[:, 1].mean()
+
+        # fs.safe_rm(rmsd_csv_filename)
+        return rmsd_value
+
     # region == TODO ==
     def add_charges(self, stru: Structure, prmtop: str) -> None:
         """Method that adds RESP charges from a .prmtop file to the supplied Structure object. If the supplied prmtop
