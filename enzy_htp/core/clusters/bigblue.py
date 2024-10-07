@@ -20,7 +20,7 @@ ENV_MANAGER = EnvironmentManager(
 ENV_MANAGER.check_executables()
 
 
-class Bigblue(ClusterInterface):
+class BigBlue(ClusterInterface):
     NAME = "bigblue"
     
     AMBER_ENV = {
