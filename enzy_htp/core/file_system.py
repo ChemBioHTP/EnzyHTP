@@ -165,24 +165,14 @@ def get_valid_temp_name(fname: str, is_symlink: bool = False, ext_set: Union[Non
     idx = 0
     suffix = ''.join(Path(fname).suffixes)
     result_fname = fname
-    if is_symlink:
-        while Path(result_fname).is_symlink():
-            idx += 1
-            if len(suffix) == 0: # the fname is a dir
-                while fname.endswith("/"):
-                    fname = fname[:-1]
-                result_fname = f"{fname}_{idx:06d}{suffix}"
-            else:
-                result_fname = f"{fname[:-len(suffix)]}_{idx:06d}{suffix}"
-    else:
-        while os.path.isfile(result_fname) or os.path.isdir(result_fname):
-            idx += 1
-            if len(suffix) == 0: # the fname is a dir
-                while fname.endswith("/"):
-                    fname = fname[:-1]
-                result_fname = f"{fname}_{idx:06d}{suffix}"
-            else:
-                result_fname = f"{fname[:-len(suffix)]}_{idx:06d}{suffix}"
+    while is_path_exist(result_fname, is_symlink=is_symlink, ext_set=ext_set):
+        idx += 1
+        if len(suffix) == 0: # the fname is a dir
+            while fname.endswith("/"):
+                fname = fname[:-1]
+            result_fname = f"{fname}_{idx:06d}{suffix}"
+        else:
+            result_fname = f"{fname[:-len(suffix)]}_{idx:06d}{suffix}"
     return result_fname
 
 def is_path_exist(target_path: str, is_symlink: bool = False, ext_set: Union[None, Iterable] = None) -> bool:

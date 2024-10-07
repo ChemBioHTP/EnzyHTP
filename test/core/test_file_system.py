@@ -158,6 +158,14 @@ def test_get_valid_temp_name():
     fs.safe_rm(fname1)
     assert not os.path.exists(fname1)
 
+def test_get_valid_temp_name_ext_set():
+    fname1 = f"{CURR_DIR}/test.gjf"
+    fname2 = f"{CURR_DIR}/test.out"
+    make_test_file(fname2, "")
+    assert fs.get_valid_temp_name(fname1, ext_set=[".gjf", ".out"]) == f"{CURR_DIR}/test_000001.gjf"
+    fs.safe_rm(fname2)
+    assert not os.path.exists(fname2)
+
 def test_get_valid_temp_name_symlink():
     sym_fname1 = f"{CURR_DIR}/test.test.test.py.lnk"
     fname1 = f"{CURR_DIR}/test.test.test.py"
