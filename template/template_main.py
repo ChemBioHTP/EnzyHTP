@@ -88,7 +88,7 @@ for i, mut in enumerate(mutants):
         work_dir=f"{mutant_dir}/MD/"
     )
 
-    for replica_esm in md_result:
+    for j, replica_esm in enumerate(md_result):
         replica_result = []
 
 # 6. electronic structure
@@ -100,7 +100,7 @@ for i, mut in enumerate(mutants):
             cluster_job_config=qm_hpc_job_config,
             job_check_period=60,
             job_array_size=20,
-            work_dir=f"{mutant_dir}/QM_SPE/",
+            work_dir=f"{mutant_dir}/QM_SPE/rep_{j}",
         )
 
 # 7. analysis
@@ -112,7 +112,7 @@ for i, mut in enumerate(mutants):
         # bond dipole
             dipole = bond_dipole(
                 ele_stru, atom_1, atom_2,
-                work_dir=f"{mutant_dir}/bond_dipole/"
+                work_dir=f"{mutant_dir}/bond_dipole/rep_{j}"
             )
         # EF
             field_strength = ele_field_strength_at_along(

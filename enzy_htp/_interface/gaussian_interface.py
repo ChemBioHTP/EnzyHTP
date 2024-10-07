@@ -334,7 +334,10 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
 
         Return: the path of the temp gjf file."""
         # path
-        temp_gjf_file_path = fs.get_valid_temp_name(f"{self.work_dir}/{self.name}.gjf")
+        temp_gjf_file_path = fs.get_valid_temp_name(
+            f"{self.work_dir}/{self.name}.gjf",
+            ext_set=[".out", ".chk", ".fchk"]
+            ) # prevent from overwriting the output files when their gjf is cleaned up
         temp_chk_file_path = temp_gjf_file_path.replace(".gjf",".chk")
 
         # content
