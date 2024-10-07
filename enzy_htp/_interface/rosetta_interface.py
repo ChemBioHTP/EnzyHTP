@@ -376,6 +376,11 @@ class RosettaCartesianddGEngine(ddGFoldEngine):
         temp_mut_file_path = fs.get_valid_temp_name(f"{self.work_dir}/{temp_mut_file_path}")
         # 3. finalize
         temp_result_file_path = f"{Path(temp_mut_file_path).stem}.ddg"
+        # NOTE I didn't use the `ext_set` function in get_valid_temp_name because this filename
+        # coupling is not only same path with different extensions but different directories.
+        # In this case, if mutations.ddg exists, it will just make mutations_000001 and if
+        # {self.work_dir}/mutations_000001.txt exists it will just be mutations_000001_000001.txt
+        # TODO we might supp resolve such coupling across directories.
 
         # content
         mut_file_lines = [
