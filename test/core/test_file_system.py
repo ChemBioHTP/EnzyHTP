@@ -179,6 +179,45 @@ def test_get_valid_temp_name_dir():
     assert not os.path.exists(fname1)
     assert not os.path.exists(fname2)
 
+def test_is_path_exist_dir():
+    fname1 = f"{CURR_DIR}/test_get_valid_temp_name_real/"
+    fname2 = f"{CURR_DIR}/test_get_valid_temp_name_fake/"
+    fs.safe_mkdir(fname1)
+    assert fs.is_path_exist(fname1)
+    assert not fs.is_path_exist(fname2)
+    fs.safe_rmdir(fname1)
+    assert not os.path.exists(fname1)
+    assert not os.path.exists(fname2)
+
+def test_is_path_exist_symlink():
+    sym_fname1 = f"{CURR_DIR}/test.test.fake.py.lnk"
+    fname1 = f"{CURR_DIR}/test.test.fake.py"
+
+    Path(sym_fname1).symlink_to(fname1)
+    assert fs.is_path_exist(sym_fname1, is_symlink=True)
+    assert not fs.is_path_exist(sym_fname1, is_symlink=False)
+    fs.safe_rm(sym_fname1)
+    assert not os.path.lexists(sym_fname1)
+
+def test_is_path_exist():
+    fname1 = f"{CURR_DIR}/test.test.test.gjf"
+    fname2 = f"{CURR_DIR}/test.test.fake.gjf"
+    
+    make_test_file(fname1, "")
+    assert fs.is_path_exist(fname1)
+    assert not fs.is_path_exist(fname2)
+    fs.safe_rm(fname1)
+    assert not os.path.exists(fname1)
+
+def test_is_path_exist_multi_ext():
+    fname1 = f"{CURR_DIR}/test.gjf"
+    fname2 = f"{CURR_DIR}/test.out"
+    
+    make_test_file(fname2, "")
+    assert fs.is_path_exist(fname1, ext_set=[".chk", ".out"])
+    fs.safe_rm(fname2)
+    assert not os.path.exists(fname2)
+
 def test_clean_temp_file_n_dir():
     temp_dir_path = f"{CURR_DIR}/temp/"
     temp_path_list = [temp_dir_path]
