@@ -18,54 +18,30 @@ these issues through automation of molecular model construction, mutation, sampl
 ![](resources/four_modules_whitebg.png)
 
 # Documentation
-Complete documentation for EnzyHTP is in progress, and its code is under refactoring. 
-Stay tuned for documentation and the refactored code. 
-For an in-depth description of EnzyHTP, please refer to [our paper](https://pubs.acs.org/doi/10.1021/acs.jcim.1c01424) 
-and corresponding use cases under `/Test_file/FAcD_expanse`
-
-# Requirement
-
-## External Program
-
-- AmberTool/Amber
-- Gaussian
-- Multiwfn (for wavefunction analysis)
-
-## Python Package
-
-- python >= 3.6
-- numpy
-- pdb2pqr
-- openbabel
+The documents are in the making at https://enzyhtp-doc.readthedocs.io/en/latest/
+For an in-depth description of EnzyHTP, you can also refer to [our paper](https://pubs.acs.org/doi/10.1021/acs.jcim.1c01424) 
+and corresponding use cases (tests) under `/test` and `/test_integration`
 
 # Installation
 
-## 1. Automated Installation
+https://enzyhtp-doc.readthedocs.io/en/latest/install.html#
 
-From the base directory of the package, i.e., the same directory as this file's.
+# License
 
-1. Run the command `source /path/to/EnzyHTP/dev-tools/conda-install --name <YOUR_ENV_NAME>`. If you don't specify the name, it will be installed to your current conda environment.
-2. (optional) Install Gaussian16.
-3. (optional) Install Multiwfn (install demo in author's [blog](http://bbs.keinsci.com/thread-12020-1-1.html): (The LMO func seems not working for WSL) (Note that run Multiwfn on ACCRE requires loading the GCC module).
+For non-commercial use, please find our “Non-Exclusive Non-Commercial Academic Software License Agreement” in `license.md`.
 
-## 2. Automated Installation as a Dependency.
+As a summary, for non-commercial use, you are allowed to (for free)
+- copy
+- modify
 
-As we are to install the EnzyHTP as a package, the installation of Gaussian16 and Multiwfn are omitted.
+you are not allowed to:
+- redistribute a modified version
 
-Run the command `source /path/to/EnzyHTP/dev-tools/conda-install --name <YOUR_ENV_NAME>`. If you don't specify the name, it will be installed to your current conda environment.
+For commercial use, please send a request to Vanderbilt (cttc@vanderbilt.edu) and cc Dr. Yang (zhongyue.yang@vanderbilt.edu) and QZ (qz.shao@outlook.com) for a commerical license, it will be similar to the EULA but distributed through the CTTC office.
 
-## 3. Manual Installation
+As a summary, for commercial use, after obtaining the license from Vanderbilt, you are allowed to (for free)
+- copy
+- modify
 
-1. Install conda & (optional) create an environment
-2. install numpy `conda install numpy`
-3. Install openbabel `conda install openbabel -c conda-forge`
-4. Install pdb2pqr 
-```
-git clone https://github.com/Electrostatics/pdb2pqr.git
-cd pdb2pqr
-pip install .
-```
-5. Install [AmberTool](https://ambermd.org/AmberTools.php)
-6. (optional) Install RDKit `conda install -c conda-forge rdkit`
-7. (optional) Install Gaussian16.
-8. (optional) Install Multiwfn (install demo in author's [blog](http://bbs.keinsci.com/thread-12020-1-1.html): (The LMO func seems not working for WSL) (Note that run Multiwfn on ACCRE requires loading the GCC module).
+you are not allowed to:
+- redistribute a modified version
