@@ -52,7 +52,7 @@ From the base directory of the package, i.e., the same directory as this file's.
 
 As we are to install the EnzyHTP as a package, the installation of Gaussian16 and Multiwfn are omitted.
 
-Run the command `bash /path/to/EnzyHTP/dev-tools/conda-install --name <YOUR_ENV_NAME>`. If you don't specify the name, it will be installed to your current conda environment.
+Run the command `source /path/to/EnzyHTP/dev-tools/conda-install --name <YOUR_ENV_NAME>`. If you don't specify the name, it will be installed to your current conda environment.
 
 ## 3. Manual Installation
 
