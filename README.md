@@ -37,7 +37,6 @@ As a summary, for non-commercial use, you are allowed to (for free)
 you are not allowed to:
 - redistribute a modified version
 
-
 For commercial use, please send a request to Vanderbilt (cttc@vanderbilt.edu) and cc Dr. Yang (zhongyue.yang@vanderbilt.edu) and QZ (qz.shao@outlook.com) for a commerical license, it will be similar to the EULA but distributed through the CTTC office.
 
 As a summary, for commercial use, after obtaining the license from Vanderbilt, you are allowed to (for free)

@@ -11,7 +11,6 @@ import sys
 import math
 from typing import Tuple, List, Union
 
-
 import numpy as np
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
 from enzy_htp.core import _LOGGER
@@ -121,6 +120,18 @@ class Residue(DoubleLinkedNode):
             tokens[0] = self.chain.name
 
         return ".".join(tokens)
+
+    @property
+    def seqres(self) -> chem.SeqRes:
+        """Converts the Residue() into its respective SeqRes object."""
+        return chem.SeqRes(
+            model=1,
+            chain=self.parent.name,
+            idx=self.idx,
+            seq_idx=None,
+            name=self.name,
+            missing=False
+        )
 
     @property
     def num_atoms(self) -> int:
@@ -286,6 +297,14 @@ class Residue(DoubleLinkedNode):
         """Checks if the Residue() is an rd_sovlent as defined by enzy_htp.chemical.solvent.RD_SOLVENT"""
         return self._rtype == chem.ResidueType.SOLVENT
 
+    def is_counterions(self, counterion_list: List[str]=None) -> bool:
+        """Checks if the Residue() is 
+        counter ion. default only Na+ and Cl- counters.
+        This list can be overwritten by {counterion_list}"""
+        if counterion_list is None:
+            counterion_list = chem.COUNTER_ION_LIST
+        return self.name in counterion_list
+
     def is_metal(self) -> bool:
         """Checks if Residue() is a metal. Inherited by children."""
         return self._rtype == chem.ResidueType.METAL
@@ -393,6 +412,7 @@ class Residue(DoubleLinkedNode):
             aa.coord = updated
 
     #endregion
+
 
     #region === Special ===
     def __str__(self) -> str:

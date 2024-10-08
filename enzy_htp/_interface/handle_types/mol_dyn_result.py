@@ -8,6 +8,7 @@ Date: 2023-09-19
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, List
 
+from .modeling_engine import ModelingResultEgg
 from enzy_htp.structure import Structure
 
 class MolDynResult:
@@ -36,7 +37,7 @@ class MolDynResult:
                  traj_log_file: str,
                  traj_log_parser: Callable[[str], Dict],
                  last_frame_file: str,
-                 last_frame_parser: Callable[[str], Structure],
+                 last_frame_parser: Callable[[str], Structure], # TODO update this type hinting. We should still make these parser the object and make SelfParser for as is parsing need.
                  source: str,):
         self._traj_file = traj_file
         self._traj_parser = traj_parser
@@ -85,7 +86,7 @@ class MolDynResult:
                 f"source = {self._source})")
 
 
-class MolDynResultEgg(ABC):
+class MolDynResultEgg(ModelingResultEgg):
     """This class defines the format of md result eggs.
     These eggs are md result place holders before the calculation.
     An example of eggs is file paths, so in Amber's case, it could be

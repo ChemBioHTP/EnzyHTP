@@ -31,15 +31,18 @@ Date: 2022-10-21
 import copy
 from io import StringIO
 import os
+import re
 import sys
 import logging
 import time
 import numpy as np
-from typing import Any, List, Iterable, Tuple, Dict
+from typing import Any, List, Iterable, Tuple, Dict, Callable
 import itertools
+import pickle
+import inspect
 
 from .logger import _LOGGER
-
+from .file_system import write_lines
 
 # == List related ==
 class GhostListElement:
@@ -184,6 +187,16 @@ def swapped_dict(orig_dict: Dict) -> Dict:
     in the new dictionary."""
     return {v : k for k, v in orig_dict.items()}
 
+
+# == str related ==
+def split_but_brackets(string: str, sep: str) -> List[str]:
+    """split a string by {sep} but do not split anything in
+    brackets. all {[( counts."""
+    seperate_pattern = r"(?:[^"+ sep +"[{(]|(?:\{[^}]*\})|(?:\([^)]*\))|(?:\[[^\]]*\]))+[^"+ sep +r"]*"
+    result = [i for i in re.findall(seperate_pattern, string)]
+    return result
+
+
 # == Class related ==
 def get_str_for_print_class_var(cls) -> str:
     """return the str for printing out variables and values of cls to stdout"""
@@ -196,6 +209,8 @@ def get_str_for_print_class_var(cls) -> str:
         var_value = getattr(cls, var_name)
         result += f"{os.linesep}{var_name}: {os.linesep}{var_value}{os.linesep}"
     return result
+
+
 
 
 # == context manager ==
@@ -304,3 +319,34 @@ def get_localtime(time_stamp: float = None) -> str:
 def get_itself(input_data: Any) -> Any:
     """a function that return the input itself"""
     return input_data
+
+
+def save_obj(obj: Any, out_path: str):
+    """save {obj} to the {out_path} as a .pickle file"""
+    with open(out_path, "wb") as of:
+        pickle.dump(obj, of)
+
+
+def load_obj(in_path: str) -> Any:
+    """load {obj} from the {in_path} as a .pickle file"""
+    with open(in_path, "rb") as f:
+        obj = pickle.load(f)
+    return obj
+
+
+def save_func_to_main(func: Callable, kwargs_file: str, out_path: str):
+    """convert a function to a string of a python main script.
+    This is commonly used when a function needs to be run by
+    ARMer.
+    Limitation: this func have to include import lines in itself.
+    Will replace this with WorkUnit based solution later"""
+    func_source = inspect.getsource(func)
+    result = [
+        "import sys",
+        "from enzy_htp.core.general import load_obj",
+        func_source,
+        "if __name__ == '__main__':",
+        f"    {func.__name__}(sys.argv, **load_obj('{kwargs_file}'))",
+        "",
+    ]
+    write_lines(out_path, result)

@@ -59,6 +59,18 @@ class ARMerConfig(BaseConfig):
         'account' : '<fillthis>'}
     """Default resource settings for GPU MD jobs from `geometry`"""
 
+    SINGLE_CPU_RES: dict = {
+        'core_type' : 'cpu',
+        'nodes':'1',
+        'node_cores' : '1',
+        'job_name' : 'EnzyHTP_armer',
+        'partition' : '<fillthis>',
+        'mem_per_core' : '3G',
+        'walltime' : '1-00:00:00',
+        'account' : '<fillthis>',
+        }
+    """Default resource settings for using single CPU"""
+
     def required_executables(self) -> List[str]:
         """A list of all required executables for ARMerConfig."""
         return list()

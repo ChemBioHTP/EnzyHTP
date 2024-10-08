@@ -64,6 +64,20 @@ export KMP_STACKSIZE=200000000
 export Multiwfnpath=/home/jiany37/Software_installed/Multiwfn_3.7_bin_Linux_noGUI
 export PATH=$PATH:$Multiwfnpath"""
     }
+
+    ROSETTA_ENV = {
+        "serial_CPU" : "export ROSETTA3=/data/yang_lab/Common_Software/Rosetta3.9/main/",
+        "parallel_CPU" : """module load GCC/11.3.0 OpenMPI/4.1.4
+export ROSETTA3=/data/yang_lab/shaoqz/software/Rosetta313/main/""",
+    }
+    ENZYHTP_MAIN_ENV = { # use the env from QZ
+        "CPU": f"""source /home/shaoq1/bin/miniconda3/bin/activate new_EnzyHTP
+{G16_ENV['CPU']["head"]}
+{ROSETTA_ENV['serial_CPU']}
+{AMBER_ENV['CPU']}
+{MULTIWFN_ENV['CPU']}""",
+        "GPU": None,
+    }
     #############################
     ### Internal use constant ###
     #############################
@@ -162,7 +176,7 @@ export PATH=$PATH:$Multiwfnpath"""
             res_line = f"#SBATCH --{k}{v}\n"
             res_str += res_line
         res_str += "#SBATCH --export=NONE\n"
-        res_str += "#SBATCH --exclude=gpu0022,gpu0002,cn1615\n"
+        res_str += "#SBATCH --exclude=gpu0022,gpu0002\n"
         return res_str
     
     @classmethod

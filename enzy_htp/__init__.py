@@ -40,6 +40,8 @@ from .structure import (
     Mol2Parser
 )
 
+from .mutation_class import Mutation
+
 from .electronic_structure import ElectronicStructure
 
 from ._interface import Interface, OpenPyMolSession
@@ -54,6 +56,8 @@ by end users and should be used to customize system settings for each environmen
 
 from .preparation import PDBLine, read_pdb_lines, dock_reactants, generate_conformers #TODO(CJ): get rid of system charge
 
+from .mutation import assign_mutant, mutate_stru
+
 from .geometry import equi_md_sampling, md_simulation
 
 from .quantum import single_point, optimize
@@ -64,4 +68,5 @@ from .analysis import (
     ele_stab_energy_of_bond,
     ele_stab_energy_of_dipole,
     bond_dipole,
+    spi_metric,
 )

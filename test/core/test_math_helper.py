@@ -5,6 +5,8 @@ Date: 2022-09-26
 import logging
 import numpy as np
 import enzy_htp
+from enzy_htp.core.general import EnablePropagate
+from enzy_htp import _LOGGER
 from enzy_htp.core import math_helper as mh
 
 
@@ -13,21 +15,23 @@ def test_check_valid_ph_good_input(caplog):
     existing_level = enzy_htp._LOGGER.level
     enzy_htp._LOGGER.setLevel(logging.DEBUG)
     phValues = np.linspace(0, 14, 100)
-    for ph in phValues:
-        mh.check_valid_ph(ph)
-        assert "assigned pH:" not in caplog.text
+    with EnablePropagate(_LOGGER):
+        for ph in phValues:
+            mh.check_valid_ph(ph)
+            assert "assigned pH:" not in caplog.text
 
     enzy_htp._LOGGER.setLevel(existing_level)
 
 
 def test_check_valid_ph_bad_input(caplog):
     """Testing that the check_valid_ph() functio fails for bad input."""
-    existing_level = enzy_htp._LOGGER.level
-    enzy_htp._LOGGER.setLevel(logging.DEBUG)
-    mh.check_valid_ph(-1)
-    assert "assigned pH: -1.00 out of range: [0.00,14.00]" in caplog.text
-    mh.check_valid_ph(15)
-    assert "assigned pH: 15.00 out of range: [0.00,14.00]" in caplog.text
+    existing_level = _LOGGER.level
+    _LOGGER.setLevel(logging.DEBUG)
+    with EnablePropagate(_LOGGER):
+        mh.check_valid_ph(-1)
+        assert "assigned pH: -1.00 out of range: [0.00,14.00]" in caplog.text
+        mh.check_valid_ph(15)
+        assert "assigned pH: 15.00 out of range: [0.00,14.00]" in caplog.text
     enzy_htp._LOGGER.setLevel(existing_level)
 
 
@@ -59,7 +63,7 @@ def test_get_dihedral():
         (36.72200012207031, 40.66899871826172, 37.95899963378906),
         (36.42900085449219, 41.4739990234375, 39.000999450683594),
     ]
-    assert mh.get_dihedral(*test_points) == -100.3235330367286
+    assert np.isclose(mh.get_dihedral(*test_points), -100.3235330367286, atol=1e-6)
 
 def test_convert_first_three_point():
     """test using an example data"""
@@ -88,7 +92,7 @@ def test_calcuate_cartesian():
     ]
     test_point = [2, 1.540,  1, 111.208,  0, 20.000]
 
-    new_point =  mh._calculate_cartesian(test_point, test_known_points)
+    new_point =  mh._calculate_cartesian(test_point, test_known_points, False)
     answer = [0.94383, 2.42729, 0.49104]
     for i,j in zip(new_point, answer):
         assert np.isclose(i,j)

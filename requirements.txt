@@ -1,17 +1,19 @@
-biopandas
-pdb2pqr
-plum-dispatch
-numpy
-# openbabel
-pandas
-# pymol
-colorlog
-modeller
-pyvista
-rdkit
-editdistance
-beautifulsoup4
-sympy
-goodvibes
-biopython==1.83 # asked by goodvibes
-periodictable
+# biopandas
+# pdb2pqr
+# plum-dispatch
+# numpy
+# # openbabel
+# pandas
+# # pymol
+# colorlog
+# # modeller
+# pyvista
+# rdkit
+# editdistance
+# beautifulsoup4
+# sympy
+# goodvibes
+# biopython==1.83 # asked by goodvibes
+# periodictable
+
+# Note: We use conda to manage all the dependencies. This file is deprecated.

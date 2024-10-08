@@ -11,7 +11,9 @@ from plum import dispatch
 from typing import Union
 
 from enzy_htp.core.logger import _LOGGER
-from ..structure import Structure, Solvent, Chain, Residue, NonCanonicalBase, Ligand, Atom
+from ..structure import (
+    Structure, Solvent, Chain, 
+    Residue, NonCanonicalBase, Ligand, Atom)
 
 
 def remove_solvent(stru: Structure) -> Structure:
@@ -27,8 +29,21 @@ def remove_solvent(stru: Structure) -> Structure:
 
     return stru
 
+def remove_counterions(stru: Structure) -> Structure:
+    """
+    remove all counterions for {stru}.
+    Make changes in-place and return a reference of the changed
+    original object.
+    """
+    _LOGGER.debug(f"removing {len(stru.counterions())} counterions")
+    ion: Residue
+    for ion in stru.counterions():
+        ion.delete_from_parent()
+
+    return stru
+
 @dispatch
-def remove_hydrogens(stru: Structure, polypeptide_only: bool) -> Structure:
+def remove_hydrogens(stru: Structure, polypeptide_only: bool = False) -> Structure:
     """
     remove all hydrogen Atom()s for {stru}.
     Make changes in-place and return a reference of the changed
@@ -49,6 +64,10 @@ def remove_hydrogens(residue: Residue) -> Residue:
 
     Args:
         residue: An instance of Residue / NonCanonicalBase / Ligand.
+        (dispatch)
+        stru: A instance of Structure. And when stru is used, `polypeptide_only` needs to be specified for whether hydrogens are only removed for
+            polypeptides (exclude ligands). NOTE that this value have to be given as a positional argument! Otherwise there will be an
+            dispatch error. 
     
     Returns:
         The reference of the changed original Residue / NonCanonicalBase / Ligand

@@ -682,7 +682,7 @@ class AmberMDStep(MolDynStep):
         traj_log_parser = self.parent_interface.read_from_mdout
         last_frame_parser = AmberRSTParser(
             prmtop_file=prmtop,
-            interface=self.parent_interface).get_structure
+            interface=self.parent_interface)
 
         result = MolDynResult(
             traj_file = traj_path,
@@ -749,7 +749,7 @@ class AmberMDStep(MolDynStep):
         last_frame_file = result_egg.rst_path
         last_frame_parser = AmberRSTParser(
             prmtop_file=result_egg.prmtop_path,
-            interface=self.parent_interface).get_structure
+            interface=self.parent_interface)
         
         # error check
         self.check_md_error(traj_file, traj_log_file, result_egg.prmtop_path, result_egg.parent_job)
@@ -2205,6 +2205,7 @@ class AmberInterface(BaseInterface):
             prmtop_path: str,
             out_path: str,
             autoimage: bool = True,
+            remove_solvent: bool = False,
             start: int = 1,
             end: int = "last",
             step: int = 1,
@@ -2227,7 +2228,34 @@ class AmberInterface(BaseInterface):
             contents += [
                 "autoimage"
             ]
+        if remove_solvent:
+            contents += [
+                "strip :WAT,Cl-,Na+"
+            ]
         contents += [
+            f"trajout {out_path}",
+            "run",
+            "quit",
+        ]
+        contents = "\n".join(contents)
+        self.run_cpptraj(contents)
+
+    def remove_traj_solvent(
+            self,
+            traj_path: str,
+            prmtop_path: str,
+            out_path: str,
+            ) -> None:
+        """remove solvent in an Amber traj file using cpptraj
+        Args:
+            nc_path: The path to the .nc/.mdcrd file as a str().
+            prmtop_path: The path to the prmtop file as str().
+            out_path: the output MDCRD file path.
+        """
+        contents: List[str] = [
+            f"parm {prmtop_path}",
+            f"trajin {traj_path}",
+            "strip :WAT,Cl-,Na+",
             f"trajout {out_path}",
             "run",
             "quit",
@@ -2302,11 +2330,11 @@ class AmberMDCRDParser():
     Attribute:
         prmtop_file
         parent_interface"""
-    def __init__(self, prmtop_file: str, interface: BaseInterface = amber_interface):
+    def __init__(self, prmtop_file: str, interface: AmberInterface = amber_interface):
         self.prmtop_file = prmtop_file
         self.parent_interface = interface
     
-    def get_coordinates(self, mdcrd: str) -> Generator[List[List[float]], None, None]:
+    def get_coordinates(self, mdcrd: str, remove_solvent: bool=False) -> Generator[List[List[float]], None, None]:
         """parse a mdcrd file to a Generator of coordinates. Intermediate files are created."""
         coord = [] # coords of 1 frame
         atom_coord = [] # coord of 1 atom
@@ -2316,6 +2344,15 @@ class AmberMDCRDParser():
         line_feed = os.linesep
         digit_pattern = r'[ ,\-,0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][0-9]' # a number
         frame_sep_pattern = digit_pattern * 3 + line_feed
+
+        # remove solvent
+        if remove_solvent:
+            temp_dir = eh_config["system.SCRATCH_DIR"]
+            fs.safe_mkdir(temp_dir)
+            new_mdcrd = fs.get_valid_temp_name(f"{temp_dir}/mdcrd_parser_temp_rm_sol.mdcrd")
+            self.parent_interface.remove_traj_solvent(mdcrd, self.prmtop_file, new_mdcrd)
+            mdcrd = new_mdcrd
+
         with open(mdcrd) as f:
             while True:
                 # use the while True format to detect the EOF
@@ -2399,7 +2436,7 @@ class AmberNCParser():
         self.prmtop_file = prmtop_file
         self.parent_interface: AmberInterface = interface
 
-        self.mdcrd = None
+        self.mdcrd: Dict = {}
     
     def mdcrd_parser(self) -> AmberMDCRDParser:
         """get an associated mdcrd parser"""
@@ -2408,10 +2445,12 @@ class AmberNCParser():
     def get_coordinates(
             self,
             nc_file: str,
-            autoimage: bool=True) -> Generator[List[List[float]], None, None]:
+            autoimage: bool=True,
+            remove_solvent: bool=False,
+        ) -> Generator[List[List[float]], None, None]:
         """parse a nc file to a Generator of coordinates. Intermediate mdcrd file is created."""
         # 0. init temp path
-        if self.mdcrd is None:
+        if self.mdcrd.get((autoimage, remove_solvent), None) is None:
             temp_dir = eh_config["system.SCRATCH_DIR"]
             fs.safe_mkdir(temp_dir)
             temp_mdcrd = fs.get_valid_temp_name(f"{temp_dir}/nc_parser_temp.mdcrd")
@@ -2422,13 +2461,14 @@ class AmberNCParser():
                 prmtop_path=self.prmtop_file,
                 out_path=temp_mdcrd,
                 autoimage=autoimage,
+                remove_solvent=remove_solvent,
             )
 
             # 2. store for future use
-            self.mdcrd = temp_mdcrd        
+            self.mdcrd[(autoimage, remove_solvent)] = temp_mdcrd
 
         # 3. parse mdcrd file
-        return self.mdcrd_parser().get_coordinates(self.mdcrd)
+        return self.mdcrd_parser().get_coordinates(self.mdcrd[(autoimage, remove_solvent)])
 
     def get_structures(self, nc_file: str) -> Generator[Structure, None, None]:
         pass

@@ -98,7 +98,7 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core.general import if_list_contain_repeating_element
 from enzy_htp.core.exception import ResidueDontHaveAtom, IndexMappingError
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
-from enzy_htp.chemical import ResidueType
+from enzy_htp.chemical import ResidueType, SeqRes
 
 from .atom import Atom
 from . import Chain
@@ -221,6 +221,13 @@ class Structure(DoubleLinkedNode):
         return result
 
     @property
+    def amino_acids(self) -> List[Residue]:
+        """Return a list of Residue()s that are amino_acid (i.e.: canonical, modified)
+        in the Structure() object"""
+        result = list(itertools.chain.from_iterable(self.polypeptides))
+        return result
+
+    @property
     def residue_mapper(self) -> Dict[Tuple[str, int], Residue]:
         """return a mapper of {(chain_id, residue_idx): Residue (reference)}"""
         result = {}
@@ -284,7 +291,8 @@ class Structure(DoubleLinkedNode):
         return result
 
     def find_idx_atom(self, atom_idx: int) -> Atom:
-        """find atom base on its idx. return a reference of the atom."""
+        """find atom base on its idx. return a reference of the atom.
+        NOT! suitable for heavy duty jobs. pretty slow. use atom_idx_mapper instead"""
         result = list(filter(lambda a: a.idx == atom_idx, self.atoms))
         if not result:
             _LOGGER.info(f"found 0 atom with index: {atom_idx}")
@@ -295,9 +303,14 @@ class Structure(DoubleLinkedNode):
     def find_idxes_atom_list(self, atom_idx_list: int) -> List[Atom]:
         """find atom base on its idx. return a list reference of the atoms."""
         result = []
+        atom_mapper = self.atom_idx_mapper()
         for idx in atom_idx_list:
-            result.append(self.find_idx_atom(idx))
+            result.append(atom_mapper[idx])
         return result
+
+    def atom_idx_mapper(self) -> Dict[int, Atom]:
+        """the mapper for idx -> atom"""
+        return {atom.idx : atom for atom in self.atoms}
 
     @property
     def ligands(self) -> List[Ligand]:
@@ -321,6 +334,13 @@ class Structure(DoubleLinkedNode):
         result: List[Solvent] = []
         for chain in self.chains:
             result.extend(list(filter(lambda r: r.is_solvent(), chain)))
+        return result
+
+    def counterions(self, counterion_list: List[str] = None) -> List[Residue]:
+        """return all counterions hold by current Structure()"""
+        result: List[Residue] = []
+        for chain in self.chains:
+            result.extend(list(filter(lambda r: r.is_counterions(counterion_list), chain)))
         return result
 
     @property
@@ -352,7 +372,27 @@ class Structure(DoubleLinkedNode):
     @property
     def polypeptides(self) -> List[Chain]:
         """return the peptide part of current Structure() as a list of chains"""
-        result: List[Chain] = list(filter(lambda c: c.is_polypeptide(), self._chains))
+        result = list()
+        for chain in self.chains:
+            if not len(chain.residues):
+                continue
+            
+            if chain.is_polypeptide():
+                result.append( chain )
+
+        return result
+
+    @property
+    def non_polypeptides(self) -> List[Chain]:
+        """return the non-peptide part of current Structure() as a list of chains"""
+        result = list()
+        for chain in self.chains:
+            if not len(chain.residues):
+                continue
+            
+            if not chain.is_polypeptide():
+                result.append( chain )
+
         return result
 
     def hydrogens(self, polypeptide_only: bool=False) -> List[Atom]:
@@ -374,7 +414,18 @@ class Structure(DoubleLinkedNode):
         for ch in self._chains:
             result[ch.name] = ch.sequence
         return result
-    
+
+    @property
+    def seqres_sequence(self) -> List[SeqRes]:
+        """Gets the List[SeqRes] for the entire Structure(), including only and all of the canonical amino acids."""
+        result = list()
+        for chain in self.polypeptides:
+            for res in chain.residues:
+                result.append( res.seqres )
+
+        return result
+
+
     @property
     def chemical_diversity(self) -> Dict[str, str]:
         """determine and return the chemical diversity of current Structure()

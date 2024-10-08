@@ -28,7 +28,14 @@ from enzy_htp import config
 from enzy_htp.structure import Structure, PDBParser
 import enzy_htp.structure.structure_operation as stru_oper
 from enzy_htp import interface
-from .mutation import (Mutation, check_repeat_mutation, get_mutant_name_tag, remove_repeat_mutation)
+from ..mutation_class import (
+    Mutation,
+    generate_from_mutation_flag,
+    check_repeat_mutation,
+    remove_repeat_mutation,
+    get_mutant_name_tag,
+    get_involved_mutation,
+)
 from .mutation_pattern import decode_mutation_pattern
 from enzy_htp._interface.pymol_interface import OpenPyMolSession
 
@@ -87,6 +94,10 @@ def assign_mutant(
                                                   or a:M[mutation_esm_patterns]
                                                   (M stands for force mutate each position so that
                                                   no mutation on any position is not allowed)
+                                                  or a:X[mutation_esm_patterns] TODO
+                                                  (X stands for a maximum number of point mutations
+                                                  allowed. e.g.: X=1 means only single point mutations
+                                                  are yielded)
 
         The mutation_esm_patterns is seperated by comma and each describes 2 things:
         1. position_pattern: a set of positions

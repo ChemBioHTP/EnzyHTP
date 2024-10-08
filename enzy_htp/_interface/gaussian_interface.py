@@ -225,7 +225,7 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
         temp_gjf_file, gchk_path = self._make_gjf_file(stru)
 
         # 3. make cmd
-        spe_cmd, gout_path = self.parent_interface.make_spe_cmd(temp_gjf_file)
+        spe_cmd, gout_path = self.parent_interface.make_gaussian_cmd(temp_gjf_file)
 
         # 4. run cmd
         spe_cmd_exe = spe_cmd.split(" ")[0]
@@ -334,7 +334,10 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
 
         Return: the path of the temp gjf file."""
         # path
-        temp_gjf_file_path = fs.get_valid_temp_name(f"{self.work_dir}/{self.name}.gjf")
+        temp_gjf_file_path = fs.get_valid_temp_name(
+            f"{self.work_dir}/{self.name}.gjf",
+            ext_set=[".out", ".chk", ".fchk"]
+            ) # prevent from overwriting the output files when their gjf is cleaned up
         temp_chk_file_path = temp_gjf_file_path.replace(".gjf",".chk")
 
         # content

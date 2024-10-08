@@ -13,7 +13,7 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core.exception import UnsupportedMethod
 from enzy_htp.structure import PDBParser
 import enzy_htp.mutation.api as mapi
-from enzy_htp.mutation.mutation import Mutation
+from enzy_htp.mutation_class import Mutation
 
 DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/data/"
 sp = PDBParser()

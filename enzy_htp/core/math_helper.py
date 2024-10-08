@@ -49,26 +49,38 @@ def get_angle(p1: Union[tuple, list],
               p2: Union[tuple, list],
               p3: Union[tuple, list],
               rad_result: bool = False) -> float:
-    """get the angle between p1, p2, p3"""
+    """get the angle between p1, p2, p3.
+    result range is [0,180]"""
     p1 = np.array(p1)
     p2 = np.array(p2)
     p3 = np.array(p3)
 
     v21 = p1 - p2
     v23 = p3 - p2
-    n1 = np.cross(v23, v21)
+    result = get_angle_vec(v21, v23, rad_result)
+
+    return result
+
+
+def get_angle_vec(
+        d1: Union[tuple, list],
+        d2: Union[tuple, list],
+        rad_result: bool = False) -> float:
+    """get the angle between d1, d2
+    result range is [0,180]"""
+    n1 = np.cross(d2, d1)
     # consider collinear
     if np.isclose(np.linalg.norm(n1), 0, atol=1e-9):
-        if np.dot(v21, v23) < 0:
+        if np.dot(d1, d2) < 0:
             result = np.pi
         else:
             result = 0.0
     else:
-        x_unit = v23 / np.linalg.norm(v23)
-        y_unit = np.cross(n1, v23)
+        x_unit = d2 / np.linalg.norm(d2)
+        y_unit = np.cross(n1, d2)
         y_unit = y_unit / np.linalg.norm(y_unit)
-        x = np.dot(v21, x_unit)
-        y = np.dot(v21, y_unit)
+        x = np.dot(d1, x_unit)
+        y = np.dot(d1, y_unit)
 
         result = np.arctan2(y, x)
 
@@ -187,6 +199,11 @@ def internal_to_cartesian(internal_coordinate: List[npt.ArrayLike],
     Args:
         internal_coordinate:
             format: [(bond_index, bond, angle_index, angle, dihedral_index, dihedral), ...]
+        remove_dummy_point:
+            whether remove the first 3 dummy points from the result
+        start_from_1:
+            whether the point indexes from {internal_coordinate} starts from 1
+            instead of 0.
     Returns:
         cartesian_coordinate:
             format: [(x,  y, z), ...]"""
