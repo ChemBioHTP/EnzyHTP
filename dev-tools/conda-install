@@ -4,7 +4,7 @@
 initial_dir=$(pwd)
 
 # Change the working directory to the parent directory of this script
-cd "$(dirname "$0")"/..
+cd "$(dirname "${BASH_SOURCE[0]}")"/..
 
 # Set a default environment name
 target_env_name=$CONDA_DEFAULT_ENV
@@ -89,7 +89,7 @@ update_env() {
     echo "Updating conda environment: $target_env_name"
     conda env update -n "$target_env_name" --file environment.yml
     activate_env
-    conda develop .
+    dev-tools/pip-install
 }
 
 # Check current conda environment and extract environment name.

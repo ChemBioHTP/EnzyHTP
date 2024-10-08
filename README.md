@@ -44,7 +44,7 @@ and corresponding use cases under `/Test_file/FAcD_expanse`
 
 From the base directory of the package, i.e., the same directory as this file's.
 
-1. Run the command `bash /path/to/EnzyHTP/dev-tools/conda-install --name <YOUR_ENV_NAME>`. If you don't specify the name, it will be installed to your current conda environment.
+1. Run the command `source /path/to/EnzyHTP/dev-tools/conda-install --name <YOUR_ENV_NAME>`. If you don't specify the name, it will be installed to your current conda environment.
 2. (optional) Install Gaussian16.
 3. (optional) Install Multiwfn (install demo in author's [blog](http://bbs.keinsci.com/thread-12020-1-1.html): (The LMO func seems not working for WSL) (Note that run Multiwfn on ACCRE requires loading the GCC module).
 
