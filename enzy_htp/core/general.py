@@ -328,10 +328,21 @@ def save_obj(obj: Any, out_path: str):
 
 
 def load_obj(in_path: str) -> Any:
-    """load {obj} from the {in_path} as a .pickle file"""
+    """load {obj} from the {in_path} as a .pickle file.
+    Update: support loading a pickle file written multiple obj
+    with 'ab'"""
+    result = []
     with open(in_path, "rb") as f:
-        obj = pickle.load(f)
-    return obj
+        while True:
+            try:
+                result.append(pickle.load(f))
+            except EOFError:
+                break
+
+    if len(result) == 1:
+        return result[0]
+    else:
+        return result
 
 
 def save_func_to_main(func: Callable, kwargs_file: str, out_path: str):

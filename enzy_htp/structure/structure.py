@@ -889,7 +889,9 @@ class Structure(DoubleLinkedNode):
         format: {"RES" : (charge, spin), ...}
             RES is the 3-letter name of NCAAs (or "LIGAND", "MODAA" for all of that kind)
             charge is the net charge
-            spin the 2S+1 number for multiplicity"""
+            spin the 2S+1 number for multiplicity\
+        Note: will not abort when a 3-letter name does not exist. This is to support user
+            use a general library of ncaa charge spin mapping."""
         for resname, (charge, spin) in net_charge_mapper.items():
             if resname == "LIGAND":
                 target_ncaa = self.ligands
