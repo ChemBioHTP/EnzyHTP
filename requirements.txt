@@ -6,7 +6,7 @@ numpy
 pandas
 # pymol
 colorlog
-modeller
+# modeller
 pyvista
 rdkit
 editdistance
