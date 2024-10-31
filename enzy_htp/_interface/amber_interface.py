@@ -1950,6 +1950,9 @@ class AmberInterface(BaseInterface):
             force_fields:
                 The list of force fields used for parameterization in Amber tleap format
                 (e.g.: ["leaprc.protein.ff14SB", "leaprc.gaff", "leaprc.water.tip3p"])
+                (NOTE that if the user has access to AmberTools24 or later. It is recommend
+                to use `abcg2` charge method for gaff2 and `bcc` for gaff according to Page
+                312 of Amber24 manual.)
             charge_method:
                 The method used for determine the atomic charge.
                 This method is applied to parameterization of ligand, modified AA,
