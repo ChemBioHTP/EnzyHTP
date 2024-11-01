@@ -339,7 +339,10 @@ def load_obj(in_path: str) -> Any:
             except EOFError:
                 break
 
-    if len(result) == 1:
+    if len(result) == 0:
+        _LOGGER.error(f"The pickle file ({in_path}) have no content")
+        raise EOFError
+    elif len(result) == 1:
         return result[0]
     else:
         return result
