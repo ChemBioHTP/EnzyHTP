@@ -83,8 +83,8 @@ def binding_energy(
             + slow
             + accurate
         - AI based method
-            (under development)"""
-
+            AP-net (support under development)"""
+ 
     # handle the stru dispatch
     if isinstance(stru, Structure):
         # TODO convert to a single frame StructureEnsemble
@@ -99,10 +99,12 @@ def binding_energy(
         _LOGGER.error(f"method ({method}) not supported. Supported: {BINDING_ENERGY_METHODS.keys()}")
         raise ValueError
 
-    ligand = select_stru(stru_esm.structure_0, ligand) # the selection has to be resolved here due to the import structure
+    ligand = select_stru(stru_esm.structure_0, ligand) # the selection has to be resolved here due to the import-layer structure (otherwise casuing loop importing)
 
     result = BINDING_ENERGY_METHODS[method](
-        stru_esm, ligand, work_dir, keep_in_file,
+        stru_esm, ligand, 
+        keep_in_file = keep_in_file,
+        work_dir = work_dir,
         cluster_job_config = cluster_job_config, 
         job_check_period = job_check_period,
         **kwargs)

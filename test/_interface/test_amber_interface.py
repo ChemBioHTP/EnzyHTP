@@ -1088,6 +1088,7 @@ def test_run_ante_mmpbsa():
 
 def test_update_radii():
     """test the function"""
+    ai = interface.amber
     test_out_path = f"{MM_WORK_DIR}/update_radii_test.prmtop"
 
     ai.update_radii(
