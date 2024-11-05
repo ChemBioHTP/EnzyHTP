@@ -143,6 +143,8 @@ class MultiwfnInterface(BaseInterface):
                 "temp_path_list" : temp_path_list
             }
             return job
+            # NOTE(qz): not entirely sure why written this way at the time. 
+            # (see AmberInterface.run_mmpbsa for another set up)
 
     def check_multiwfn_error(self, out_file, stdstream_source):
         """TODO make this error checker when encounters a need."""
