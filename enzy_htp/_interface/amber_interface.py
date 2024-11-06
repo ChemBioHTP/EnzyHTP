@@ -16,6 +16,7 @@ from pathlib import Path
 from subprocess import CalledProcessError, CompletedProcess, SubprocessError
 from typing import Generator, List, Tuple, Union, Dict, Any
 from dataclasses import dataclass
+import pandas as pd
 from sympy import sympify
 
 from .base_interface import BaseInterface
@@ -1546,6 +1547,81 @@ class AmberInterface(BaseInterface):
 
         self.env_manager_.run_command("ante-MMPBSA.py", cmd_args)
 
+    def parse_mmpbsa_result(self, mmpbsa_out_file: str) -> Dict[str, pd.DataFrame]:
+        """parse the resulting mmpbsa.dat file from MMPBSA to a dictionary"""
+        gb_pattern = (
+            r"GENERALIZED BORN:(?:.|\n)+?Differences \(Complex - Receptor - Ligand\):\n"
+            r"((?:.|\n)+?)"
+            r"-------------------------------------------------------------------------------\n"
+            r"-------------------------------------------------------------------------------"
+        )
+        pb_pattern = (
+            r"POISSON BOLTZMANN:(?:.|\n)+?Differences \(Complex - Receptor - Ligand\):\n"
+            r"((?:.|\n)+?)"
+            r"-------------------------------------------------------------------------------\n"
+            r"-------------------------------------------------------------------------------"
+        )
+        result = {}
+
+        with open(mmpbsa_out_file) as f:
+            f_str = f.read()
+        # GB
+        gb_search = re.search(gb_pattern, f_str)
+        if gb_search is not None:
+            gb_table = gb_search.group(1).strip()
+            gb_result = self._parse_pb_gb_table(gb_table)
+            result["gb"] = gb_result
+        # PB
+        pb_search = re.search(pb_pattern, f_str)
+        if pb_search is not None:
+            pb_table = pb_search.group(1).strip()
+            pb_result = self._parse_pb_gb_table(pb_table)
+            result["pb"] = pb_result
+
+        if not result:
+            _LOGGER.warning(
+                f"The provided mmpbsa data file ({mmpbsa_out_file}) does not contain any data!"
+            )
+
+        return result
+    
+    def _parse_pb_gb_table(self, table_str: str) -> pd.DataFrame:
+        """the table looks like this:
+        Energy Component            Average              Std. Dev.   Std. Err. of Mean
+        -------------------------------------------------------------------------------
+        VDWAALS                    -20.3834                3.1308              0.3131
+        EEL                        -19.1765                7.2973              0.7297
+        EGB                         20.8964                4.2728              0.4273
+        ESURF                       -3.8046                0.1256              0.0126
+
+        DELTA G gas                -39.5599                8.4658              0.8466
+        DELTA G solv                17.0918                4.2257              0.4226
+
+        DELTA TOTAL                -22.4680                5.2186              0.5219
+        Returns: (like this) pd.DataFrame
+                          mean      sd     sem
+            VDWAALS      -20.3834  3.1308  0.3131
+            EEL          -19.1765  7.2973  0.7297
+            EGB           20.8964  4.2728  0.4273
+            ESURF         -3.8046  0.1256  0.0126
+            DELTA G gas  -39.5599  8.4658  0.8466
+            DELTA G solv  17.0918  4.2257  0.4226
+            DELTA TOTAL  -22.4680  5.2186  0.5219"""
+
+        data_pattern = r"([A-z]+(?: [A-z]+)*)( *[0-9\-\.]+)( *[0-9\-\.]+)( *[0-9\-\.]+)"
+        data_lines = re.findall(data_pattern, table_str)
+        data_dict = {}
+        for line in data_lines:
+            data_dict[line[0].strip()] = [float(line[1].strip()), float(line[2].strip()), float(line[3].strip())]
+        
+        result_df = pd.DataFrame.from_dict(
+            data_dict, 
+            orient="index",
+            columns=["mean", "sd", "sem"]
+            )
+        
+        return result_df
+
     # -- parmed --
     def run_parmed(
         self,
@@ -2679,7 +2755,9 @@ class AmberInterface(BaseInterface):
         keep_in_file: bool=False,
         cluster_job_config: Union[Dict, ClusterJobConfig]= "default",
         job_check_period: int= 30, # s
+        non_armer_cpu_num: int = None,
         # method specifics
+        in_file: str = None,
         strip_mask: str = ":WAT,Na+,Cl-",
         solvent_model: str = "pbsa",
         igb: int = 5,
@@ -2714,6 +2792,9 @@ class AmberInterface(BaseInterface):
                 Used as "saltcon" for gb and "istrng" for pb.
             fillratio:
                 the fill ratio for PB
+            in_file:
+                this argument allows user to provide their own .in files. This will overwrite
+                all the .in file related arguments.
         
         Returns:
             the MMPB/GBSA energies as a list"""
@@ -2767,13 +2848,14 @@ class AmberInterface(BaseInterface):
             solvent_model = solvent_model,
             cluster_job_config = cluster_job_config,
             job_check_period = job_check_period,
+            non_armer_cpu_num = non_armer_cpu_num,
+            in_file = in_file,
             igb = igb,
             use_sander = use_sander,
             ion_strength = ion_strength,
             fillratio = fillratio,
             exdi = exdi,
             indi = indi,
-            verbose = "TODO: figure out how this be set",
         )
 
         # extract output

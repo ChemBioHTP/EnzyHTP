@@ -1179,4 +1179,14 @@ def test_run_mmpbsa():
         job_check_period = 5,
     )
 
-    assert fs.check_file_exists(out_path)
+    assert os.path.exists(out_path)
+
+def test_parse_mmpbsa_result():
+    """test the function using an example data file"""
+    ai = interface.amber
+    test_dat_file = f"{MM_DATA_DIR}/mmpbsa_test.dat"
+
+    result = ai.parse_mmpbsa_result(test_dat_file)
+
+    assert "gb" not in result
+    assert result["pb"]["mean"]["DELTA TOTAL"] == -1.3130
