@@ -729,11 +729,17 @@ class ClusterJobConfig:
         self.check_res_keys()
 
     @classmethod
-    def from_dict(cls, source_dict) -> ClusterJobConfig:
+    def from_dict(cls, source_dict: Dict) -> ClusterJobConfig:
         """support directly coverting the old cluster_job_config to the new one"""
         cluster = source_dict.get("cluster", None)
         res_keywords = source_dict.get("res_keywords", None)
         return cls(cluster, res_keywords)
+
+    # region == attribute getter ==
+    @property
+    def node_cores(self):
+        return self.res_keywords.get("node_cores", None)
+    # endregion
 
     # region == checker ==
     def has_cluster(self):
