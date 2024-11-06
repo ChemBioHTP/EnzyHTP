@@ -15,7 +15,7 @@ from enzy_htp import interface
 from enzy_htp.structure.structure_selection import select_stru
 from enzy_htp.structure import Structure, Ligand, StructureEnsemble
 from enzy_htp.core import _LOGGER
-from enzy_htp.core.job_manager import ClusterJob
+from enzy_htp.core.job_manager import ClusterJob, ClusterJobConfig
 
 def binding_energy(
         # Input Data
@@ -23,8 +23,9 @@ def binding_energy(
         ligand: str,
         # Config
         method: str = "mmpbsa_amber",
-        cluster_job_config: Dict= None,
+        cluster_job_config: Union[ClusterJobConfig, Dict]= None,
         job_check_period: int= 30, # s
+        non_armer_cpu_num: int = None,
         work_dir: str="./binding",
         keep_in_file: bool=False,
         **kwargs,
@@ -44,6 +45,8 @@ def binding_energy(
             the config for cluster_job. (also enables running via a ClusterJob/ARMer)
         job_check_period:
             the time cycle for update job state change (Unit: s)
+        non_armer_cpu_num:
+            specify the number of local cpus for the calculation if ARMer is not used.
         work_dir:
             the working dir that contains all the files in the process
         keep_in_file:
@@ -99,6 +102,18 @@ def binding_energy(
         _LOGGER.error(f"method ({method}) not supported. Supported: {BINDING_ENERGY_METHODS.keys()}")
         raise ValueError
 
+    if cluster_job_config is None and non_armer_cpu_num is None:
+        _LOGGER.error(
+            "Please either specify `cluster_job_config` to run under the ARMer framework "
+            "(recommended) or specify `non_armer_cpu_num` to run locally where the function "
+            "is called")
+        raise ValueError
+
+    if cluster_job_config is not None and non_armer_cpu_num is not None:
+        _LOGGER.warning(
+            "Both `cluster_job_config` and `non_armer_cpu_num` are specified"
+            "only `cluster_job_config` and ARMer framework is used.")
+
     ligand = select_stru(stru_esm.structure_0, ligand) # the selection has to be resolved here due to the import-layer structure (otherwise casuing loop importing)
 
     result = BINDING_ENERGY_METHODS[method](
@@ -107,6 +122,7 @@ def binding_energy(
         work_dir = work_dir,
         cluster_job_config = cluster_job_config, 
         job_check_period = job_check_period,
+        non_armer_cpu_num = non_armer_cpu_num,
         **kwargs)
 
     return result
