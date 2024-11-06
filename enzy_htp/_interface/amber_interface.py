@@ -29,7 +29,7 @@ from .gaussian_interface import gaussian_interface
 from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import math_helper as mh
-from enzy_htp.core.job_manager import ClusterJob
+from enzy_htp.core.job_manager import ClusterJob, ClusterJobConfig
 from enzy_htp.core.exception import AddPDBError, tLEaPError, AmberMDError
 from enzy_htp.core.general import get_interval_str_from_list
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
@@ -964,6 +964,7 @@ class AmberInterface(BaseInterface):
         if in_format == "nc":
             fs.safe_cp(fpath, out_path)
         else:
+            # TODO for other formats. We probably need a central format to reduce the engineering overhead
             _LOGGER.error(f"found unsupported file format: {in_format} ({fpath})")
             raise ValueError
 
@@ -1234,26 +1235,281 @@ class AmberInterface(BaseInterface):
         # clean up temp file if success
         fs.clean_temp_file_n_dir(temp_path_list)
 
+    def get_n_frames_cpptraj_log(self, cpptraj_log: str) -> int:
+        """get the num of frames from a cpptraj log. (this will always be in the output)"""
+        with open(cpptraj_log, "r") as f:
+            content = f.read()
+        pattern = r"INPUT TRAJECTORIES.*\n.*\(reading 1 of (\d+)\)"
+        result = int(re.search(pattern, content).group(1))
+        return result
+
     # -- MMPBSA.py --
     def run_mmpbsa(
-        dr_prmtop = temp_dr_prmtop,
-        dl_prmtop = temp_dl_prmtop,
-        dc_prmtop = temp_dc_prmtop,
-        sc_prmtop = temp_sc_prmtop,
-        traj_file = temp_nc,
-        out_path = mmpbsa_result_file,
-        keep_in_file = keep_in_file,
-        solvent_model = solvent_model,
-        cluster_job_config = cluster_job_config,
-        job_check_period = job_check_period,
-        igb = igb,
-        use_sander = use_sander,
-        ion_strength = ion_strength,
-        fillratio = fillratio,
-        verbose = "TODO: figure out how this be set",
+        self,
+        # IO data
+        dr_prmtop: str, dl_prmtop: str, dc_prmtop: str, sc_prmtop: str, traj_file: str,
+        out_path: str, 
+        # choose algorithm
+        solvent_model: str,
+        # algorithm config
+        ion_strength: float = 0.15,
+        igb: int = 5,
+        fillratio: float = None, # default: 4.0
+        exdi: float = None, # default: 80.0
+        indi: float = None, # default: 1.0
+        # operation config
+        startframe: int = 1,
+        endframe: int = None, # default: last frame
+        interval: int = 1,
+        verbose: int = 1,
+        keep_files: int = 0,
+        use_sander: bool = True,
+        cluster_job_config: ClusterJobConfig = None,
+        job_check_period: int = 30,
+        non_armer_cpu_num: int = None,
+        keep_in_file: bool = False,
+        in_file: str = None,
+        work_dir: str = None,
         ) -> None:
-        """the python wrapper for running MMPBSA.py.MPI and MMPBSA.py (not supported yet)
-        Handle dispatch of ClusterJob or not in this function"""
+        """the python wrapper for running MMPBSA.py.MPI (MMPBSA.py not supported yet)
+        Handle dispatch of using ClusterJob or not in this function.
+        Args:
+            dr_prmtop, dl_prmtop, dc_prmtop, sc_prmtop, traj_file:
+                The input prmtop files of dry receptor, dry ligand, dry complex, solvated
+                complex, and the .nc/.mdcrd file of the trajectory
+            out_path:
+                the path for output the .dat file
+            solvent_model:
+                choose between PBSA and GBSA by keywords "pbsa" or "gbsa".
+            ion_strength:
+                this is istrng for PB and saltcon for GB.
+            startframe, endframe, interval, keep_files, igb, fillratio, verbose, 
+            use_sander, exdi, indi:
+                These arguments means the same as the original keywords in the .in file of
+                MMPB/GBSA. See the Amber Manual (Section 34.3.1 in Amber20's case) for details.
+                Only commonly used ones are included. Contact developer if you need more.
+            cluster_job_config, job_check_period, non_armer_cpu_num:
+                arguments for ARMer setup. 
+                (see the docstring of `enzy_htp.analysis.binding.binding_energy`)
+            
+            keep_in_file:
+                control whether clean up the .in file after finish. (force keep if in_file
+                is provided by user through {in_file})
+            in_file:
+                this argument allows user to provide their own .in files. This will overwrite
+                all the .in file related arguments.
+            """
+        if work_dir is None:
+            work_dir = eh_config.system.SCRATCH_DIR
+        fs.safe_mkdir(work_dir)
+
+        # make .in file if not provided
+        if not in_file:
+            in_file = fs.get_valid_temp_name(f"{work_dir}/mmpbsa.in")
+            self._create_mmpbgbsa_in_file(
+                in_file = in_file,
+                solvent_model = solvent_model,
+                ion_strength = ion_strength,
+                igb = igb,
+                startframe = startframe,
+                endframe = endframe,
+                interval = interval,
+                verbose = verbose,
+                keep_files = keep_files,
+                use_sander = use_sander,
+                fillratio = fillratio,
+                exdi = exdi,
+                indi = indi,
+            )
+        else:
+            keep_in_file = True # force keep in file if it is provided.
+
+        if cluster_job_config is not None:
+            num_cores = int(cluster_job_config.node_cores)
+        else:
+            num_cores = non_armer_cpu_num
+        # MMPBSA need num_cores <= num of frames
+        num_of_frames = self.count_num_of_frames_traj(sc_prmtop, traj_file)
+        if num_cores > num_of_frames:
+            num_cores = num_of_frames
+
+        mmpbgbsa_command = self._make_mmpbgbsa_command(
+            num_cores = num_cores,
+            dr_prmtop = dr_prmtop,
+            dl_prmtop = dl_prmtop,
+            dc_prmtop = dc_prmtop,
+            sc_prmtop = sc_prmtop,
+            traj_file = traj_file,
+            in_path = in_file,
+            out_path = out_path,
+        )
+
+        # dispatch for ARMer
+        if cluster_job_config is None:
+            # running locally
+            mmpbgbsa_exec, mmpbgbsa_args = mmpbgbsa_command.split(" ", 1)
+            this_run = self.env_manager_.run_command(
+                exe=mmpbgbsa_exec,
+                args=mmpbgbsa_args,
+            )
+            self.check_mmpbgbsa_error(out_path, this_run)
+        else:
+            # make job
+            cluster = cluster_job_config.cluster
+            res_keywords = cluster_job_config.res_keywords
+            env_settings = cluster.AMBER_ENV["CPU"]
+            sub_script_path = fs.get_valid_temp_name(f"{work_dir}/submit_mmpbgbsa.cmd")
+            
+            job = ClusterJob.config_job(
+                commands=mmpbgbsa_command,
+                cluster=cluster,
+                env_settings=env_settings,
+                res_keywords=res_keywords,
+                sub_dir="./",  # because path are relative
+                sub_script_path=sub_script_path)
+            job.submit()
+            job.wait_to_end(period=job_check_period)
+            self.check_mmpbgbsa_error(out_path, job)
+        
+        # clean up
+        if not keep_in_file:
+            fs.clean_temp_file_n_dir([in_file])
+        fs.clean_temp_file_n_dir([job.job_cluster_log, sub_script_path])
+
+    def _create_mmpbgbsa_in_file(self, in_file,
+            solvent_model,
+            ion_strength,
+            igb,
+            startframe,
+            endframe,
+            interval,
+            verbose,
+            keep_files,
+            use_sander,
+            fillratio,
+            exdi,
+            indi,
+        ):
+        """create a mmpbgbsa .in file in {in_file}"""
+        general_optional_namelist = [
+            "startframe", "endframe", "interval", "verbose", "keep_files", 
+            "use_sander",]
+        pb_optional_namelist = [
+            "fillratio", "exdi", "indi",]
+        gb_optional_namelist = []
+
+        # create in file
+        in_file_lines = [
+            "config generated by EnzyHTP",
+        ]
+        general_lines = [
+            "&general",
+        ]
+        # general namelist
+        arguments = locals()
+        for k in general_optional_namelist:
+            v = arguments[k]
+            if v is not None:
+                if isinstance(v, bool):
+                    v = int(v)
+                general_lines.append(f"  {k}={v}")
+        general_lines.append("/")
+        in_file_lines.extend(general_lines)
+
+        if solvent_model == "pbsa":
+        # pb namelist
+            pb_lines = [
+                "&pb",
+                f"  istrng={ion_strength}",
+            ]
+            for k in pb_optional_namelist:
+                v = arguments[k]
+                if v is not None:
+                    if isinstance(v, bool):
+                        v = int(v)
+                    pb_lines.append(f"  {k}={v}")
+            pb_lines.append("/")
+            in_file_lines.extend(pb_lines)
+
+        elif solvent_model == "gbsa":
+        # gb namelist
+            gb_lines = [
+                "&gb",
+                f"  saltcon={ion_strength}",
+                f"  igb={igb}",
+            ]
+            for k in gb_optional_namelist:
+                v = arguments[k]
+                if v is not None:
+                    if isinstance(v, bool):
+                        v = int(v)
+                    gb_lines.append(f"  {k}={v}")
+            gb_lines.append("/")
+            in_file_lines.extend(gb_lines)
+        
+        else:
+            _LOGGER.error(
+                f"solvent_model ({solvent_model}) not supported. Supported: [pbsa, gbsa]")
+            raise ValueError
+
+        fs.write_lines(in_file, in_file_lines)
+
+    def check_mmpbgbsa_error(
+            self, 
+            out_file: str, 
+            stdstream_source: Union[ClusterJob, CompletedProcess, SubprocessError]
+        ):
+        """avoid slient error from mmpbsa run"""
+        if not Path(out_file).exists():
+            # collect error info
+            error_info_list = []
+            # 1. stdout stderr
+            # error types: Fall of bus, periodic box has changed too much, illegel mem
+            if isinstance(stdstream_source, ClusterJob):
+                with open(stdstream_source.job_cluster_log) as f:
+                    stderr_stdout = f.read()
+                    error_info_list.append(f"stdout/stderr(from job log):{os.linesep*2}{stderr_stdout}")
+            elif isinstance(stdstream_source, CompletedProcess):
+                error_info_list.append(f"stdout:{os.linesep*2}{stdstream_source.stdout}")
+                error_info_list.append(f"stderr:{os.linesep*2}{stdstream_source.stderr}")
+            elif isinstance(stdstream_source, SubprocessError):
+                error_info_list.append(f"stdout:{os.linesep*2}{stdstream_source.stdout}")
+                error_info_list.append(f"stderr:{os.linesep*2}{stdstream_source.stderr}")
+            else:
+                _LOGGER.error("Only allow ClusterJob, CompletedProcess, SubprocessError as input types for `stdstream_source`")
+                raise TypeError
+            # 2. mdout file
+            # have no experience that error pops here yet. Add when observed
+            # 3. traj analysis 
+            # TODO
+            # Note that if_report = 0 will make traj_path = None
+            # TODO give suggestion for each detected types of errors.
+
+            _LOGGER.error(f"MMPBSA didn't finish normally.{os.linesep}{os.linesep.join(error_info_list)}")
+            raise AmberMDError(error_info_list)
+
+    def _make_mmpbgbsa_command(
+            self, 
+            num_cores: int,
+            dr_prmtop: str, dl_prmtop: str, dc_prmtop: str, sc_prmtop: str, traj_file: str,
+            in_path: str, out_path: str,
+        ) -> str:
+        """make the mmpb/gbsa command. Overwrite existing files by default by "-O"."""
+        mpi_exec = eh_config.system.get_mpi_executable(num_cores)
+        mmpbsa_exec = self.config()["HARDCODE_MMMPBSA_MPI_ENGINE"]
+        result = (
+            f"{mpi_exec} {mmpbsa_exec} "
+            f"-O "
+            f"-i {in_path} "
+            f"-o {out_path} "
+            f"-sp {sc_prmtop} "
+            f"-cp {dc_prmtop} "
+            f"-rp {dr_prmtop} "
+            f"-lp {dl_prmtop} "
+            f"-y {traj_file} "
+        )
+
+        return result
 
     def run_ante_mmpbsa(
         self,
@@ -2389,6 +2645,29 @@ class AmberInterface(BaseInterface):
 
         return result
 
+    def count_num_of_frames_traj(self, prmtop_path: str, traj_path: str) -> int:
+        """count the num of frames of the trajectory from
+        the traj_path. Considered to be a faster approach then using
+        StructureEnsemble"""
+        contents: List[str] = [
+            f"parm {prmtop_path}",
+            f"trajin {traj_path} 1 1",
+            "run",
+            "quit",
+        ]
+        contents = "\n".join(contents)
+        # prepare log
+        temp_dir = eh_config.system.SCRATCH_DIR
+        temp_log_path = fs.get_valid_temp_name(f"{temp_dir}/cpptraj.log")
+        fs.safe_mkdir(temp_dir)
+        # run
+        self.run_cpptraj(contents, temp_log_path)
+        # read log
+        result = self.get_n_frames_cpptraj_log(temp_log_path)
+        fs.clean_temp_file_n_dir([temp_log_path, temp_dir])
+
+        return result
+
     # -- MMPB/GBSA --
     def get_mmpbgbsa_energy(
         self,
@@ -2396,10 +2675,10 @@ class AmberInterface(BaseInterface):
         stru_esm: StructureEnsemble,
         ligand: StruSelection,
         # Config
-        cluster_job_config: Dict= None,
-        job_check_period: int= 30, # s
         work_dir: str="./binding",
         keep_in_file: bool=False,
+        cluster_job_config: Union[Dict, ClusterJobConfig]= "default",
+        job_check_period: int= 30, # s
         # method specifics
         strip_mask: str = ":WAT,Na+,Cl-",
         solvent_model: str = "pbsa",
@@ -2407,6 +2686,8 @@ class AmberInterface(BaseInterface):
         use_sander: bool = True,
         ion_strength: float = 0.15,
         fillratio: float = 4.0,
+        exdi: float = None, # amber default: 80.0
+        indi: float = None, # amber default: 1.0
         ) -> List[float]:
         """Function that calculate the MMPB/GBSA energy for a given structure/structure ensemble with
         a selection pattern for the ligand.
@@ -2436,6 +2717,17 @@ class AmberInterface(BaseInterface):
         
         Returns:
             the MMPB/GBSA energies as a list"""
+        # init cluster_job_config
+        type_hint_sticker: AmberConfig
+        default_cluster_job_config = ClusterJobConfig.from_dict(
+            self.config().get_default_mmpbsa_cluster_job_config()
+            )
+        if cluster_job_config == "default":
+            cluster_job_config = default_cluster_job_config
+        elif cluster_job_config is not None:
+            if not isinstance(cluster_job_config, ClusterJobConfig):
+                cluster_job_config = ClusterJobConfig.from_dict(cluster_job_config)
+            cluster_job_config = default_cluster_job_config.update(cluster_job_config)
         
         # resolve ligand mask
         ligand_mask = self.get_amber_mask(ligand, reduce=True)
@@ -2461,7 +2753,7 @@ class AmberInterface(BaseInterface):
         temp_nc = fs.get_valid_temp_name(f"{work_dir}/temp_mmpbsa.nc")
         self.make_mmpbgbsa_nc_file(stru_esm, temp_nc)
 
-        # execute TODO start from here
+        # execute
         mmpbsa_result_file = fs.get_valid_temp_name(f"{work_dir}/mmpbsa.dat")
         self.run_mmpbsa(
             dr_prmtop = temp_dr_prmtop,
@@ -2470,6 +2762,7 @@ class AmberInterface(BaseInterface):
             sc_prmtop = temp_sc_prmtop,
             traj_file = temp_nc,
             out_path = mmpbsa_result_file,
+            work_dir=work_dir,
             keep_in_file = keep_in_file,
             solvent_model = solvent_model,
             cluster_job_config = cluster_job_config,
@@ -2478,6 +2771,8 @@ class AmberInterface(BaseInterface):
             use_sander = use_sander,
             ion_strength = ion_strength,
             fillratio = fillratio,
+            exdi = exdi,
+            indi = indi,
             verbose = "TODO: figure out how this be set",
         )
 
@@ -2531,7 +2826,7 @@ class AmberInterface(BaseInterface):
             radii=radii
         )
 
-        # cleean up
+        # clean up
         fs.clean_temp_file_n_dir([temp_in_prmtop, temp_in2_prmtop])
 
     def update_radii(self, prmtop_path: str, out_path: str, radii: str) -> None:

@@ -1144,3 +1144,39 @@ def test_count_num_of_frames_traj():
     )
     assert result == 10
     
+def test_run_mmpbsa():
+    """test the function"""
+    ai = interface.amber
+    dry_complex = f"{MM_DATA_DIR}/mmpbsa_test_dc.prmtop"
+    dry_receptor = f"{MM_DATA_DIR}/mmpbsa_test_dr.prmtop"
+    dry_ligand = f"{MM_DATA_DIR}/mmpbsa_test_dl.prmtop"
+    sol_complex = f"{MM_DATA_DIR}/mmpbsa_test_sol.prmtop"
+    traj = f"{MM_DATA_DIR}/mmpbsa_test_sol_10f.nc"
+    out_path = f"{MM_WORK_DIR}/mmpbsa_test.dat"
+    cluster_job_config = ClusterJobConfig.from_dict({
+        "cluster" : Accre(),
+        "res_keywords" : {
+        'core_type' : 'cpu',
+        'nodes':'1',
+        'node_cores' : '24',
+        'job_name' : 'mmpbsa_EnzyHTP',
+        'partition' : 'production',
+        'mem_per_core' : '2G', # in GB.
+        'walltime' : '24:00:00',
+        'account' : 'yang_lab',
+        }
+    })
+
+    ai.run_mmpbsa(
+        dr_prmtop=dry_receptor,
+        dl_prmtop=dry_ligand,
+        dc_prmtop=dry_complex,
+        sc_prmtop=sol_complex,
+        traj_file=traj,
+        out_path=out_path,
+        solvent_model="pbsa",
+        cluster_job_config=cluster_job_config,
+        job_check_period = 5,
+    )
+
+    assert fs.check_file_exists(out_path)
