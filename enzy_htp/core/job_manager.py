@@ -709,7 +709,9 @@ class ClusterJobConfig:
     """This class describes the configuration for a ClusterJob that contains the cluster and 
     res_keywords information for ClusterJob.config_job(). This class is created to standardlize
     the ClusterJob related argument that most science APIs would expose to the user.""" 
-
+    # NOTE: this is not completely applied in all science APIs yet.
+    #   future APIs will support both dict input and ClusterJobConfig input
+    # TODO apply this in all science APIs that involves cluster_job_config
     ALLOWED_RES_KEYWORDS = [
         'core_type',
         'nodes',
