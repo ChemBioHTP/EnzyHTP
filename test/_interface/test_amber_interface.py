@@ -17,7 +17,7 @@ from enzy_htp.core.clusters.accre import Accre
 from enzy_htp.core.exception import tLEaPError, AmberMDError
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.general import EnablePropagate
-from enzy_htp.core.job_manager import ClusterJob
+from enzy_htp.core.job_manager import ClusterJob, ClusterJobConfig
 from enzy_htp.core import file_system as fs
 from enzy_htp._interface.amber_interface import (
     AmberParameterizer,
@@ -1133,3 +1133,14 @@ def test_make_mmpbgbsa_prmtop_files():
     fs.clean_temp_file_n_dir([
       test_dr_prmtop,test_dl_prmtop,test_dc_prmtop,test_sc_prmtop,stru_esm.topology_source_file
     ])
+
+def test_count_num_of_frames_traj():
+    ai = interface.amber
+    prmtop_path = f"{MM_DATA_DIR}/mmpbsa_test_sol.prmtop"
+    traj = f"{MM_DATA_DIR}/mmpbsa_test_sol_10f.nc"
+    result = ai.count_num_of_frames_traj(
+        prmtop_path=prmtop_path,
+        traj_path=traj,
+    )
+    assert result == 10
+    
