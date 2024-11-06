@@ -705,7 +705,7 @@ class ClusterJob():
         """
         pass
 
-class ClusterJobConfig: # NOTE currently not used anywhere but should replace all the cluster_job_config
+class ClusterJobConfig:
     """This class describes the configuration for a ClusterJob that contains the cluster and 
     res_keywords information for ClusterJob.config_job(). This class is created to standardlize
     the ClusterJob related argument that most science APIs would expose to the user.""" 
