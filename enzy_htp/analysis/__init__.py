@@ -15,3 +15,4 @@ from .electric_field import (
 )
 from .dipole import bond_dipole
 from .stability import ddg_fold_of_mutants
+from .binding import binding_energy
