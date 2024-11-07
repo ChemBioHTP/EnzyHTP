@@ -252,7 +252,8 @@ class Structure(DoubleLinkedNode):
         return result
 
     def find_residue_with_key(self, key: Tuple[str, int]) -> Union[Residue, None]:
-        """find residues base on its (chain_id, idx). Return the matching residues"""
+        """find residues base on its (chain_id, idx). Return the matching residues
+        NOT! suitable for heavy duty jobs. pretty slow. use residue_mapper instead"""
         result = list(filter(lambda r: r.key() == key, self.residues))
         if len(result) == 0:
             _LOGGER.info(f"Didn't find any residue with key: {key} in {self}")

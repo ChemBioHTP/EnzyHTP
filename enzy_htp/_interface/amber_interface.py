@@ -1687,11 +1687,12 @@ class AmberInterface(BaseInterface):
             "residue" : {},
             "atom" : {},
         }
+        ref_reskey_mapper = ref_stru.residue_mapper
         for k, res in stru.residue_mapper.items():
             amber_key = ref_mapper[k]
             result["residue"][res] = amber_key
             for atom in res.atoms:
-                amber_atom_idx = ref_stru.find_residue_with_key(amber_key).find_atom_name(atom.name).idx
+                amber_atom_idx = ref_reskey_mapper[amber_key].find_atom_name(atom.name).idx
                 result["atom"][atom] = amber_atom_idx
         fs.clean_temp_file_n_dir([
             temp_dir,

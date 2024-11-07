@@ -34,9 +34,11 @@ from enzy_htp.structure.structure_constraint import (
 from enzy_htp import interface
 from enzy_htp import config as eh_config
 from enzy_htp.structure.structure_ensemble import StructureEnsemble
+from enzy_htp.structure.structure_selection.general import select_stru
 
 MM_BASE_DIR = Path(__file__).absolute().parent
 MM_DATA_DIR = f"{MM_BASE_DIR}/data/"
+STRU_DATA_DIR = f"{MM_BASE_DIR}/../structure/data/"
 MM_WORK_DIR = f"{MM_BASE_DIR}/work_dir/"
 MINIMIZE_INPUT_1 = f"{MM_DATA_DIR}/min_1.inp"
 TARGET_MINIMIZE_INPUT_1 = f"{MM_DATA_DIR}/target_min_1.inp"
@@ -1001,9 +1003,20 @@ def test_get_amber_atom_index(): # TODO
     raise Exception("TODO")
 
 
-def test_get_amber_index_mapper(): # TODO VIP
-    """this dont work for the 1Q4T case."""
-    raise Exception("TODO")
+def test_get_amber_index_mapper():
+    """this dont work for the 1Q4T case.
+    Update: 2024.11.6 seems it works for 1Q4T?"""
+    ai = interface.amber
+    test_pdb = f"{STRU_DATA_DIR}/1Q4T_ligand_test.pdb"
+    test_stru = struct.PDBParser().get_structure(test_pdb)
+    test_res_1 = test_stru.get("A.12")
+    test_res_2 = test_stru.get("B.12")
+    test_atom_1 = test_stru.get("D.371.N1A")
+
+    index_mapper = ai.get_amber_index_mapper(test_stru)
+    assert index_mapper["residue"][test_res_1][1] == 3
+    assert index_mapper["residue"][test_res_2][1] == 143
+    assert index_mapper["atom"][test_atom_1] == 4434
 
 
 def test_parse_cons_to_raw_rs_dict():
@@ -1046,7 +1059,7 @@ def test_get_mmpbsa_energy():
         traj_path=f"{MM_DATA_DIR}/mmpbsa_test_sol_10f.nc",
         ref_pdb=f"{MM_DATA_DIR}/mmpbsa_test_sol.pdb"
     )
-    ligand = "resi 290"
+    ligand = select_stru(stru_esm.structure_0, "resi 290")
     cluster_job_config = {
         "cluster" : Accre(),
         "res_keywords" : {"account" : "yang_lab",}
