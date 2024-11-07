@@ -1665,6 +1665,9 @@ class AmberInterface(BaseInterface):
             "residue" : {Residue(): amber_1_index_residue_idx_1, ...},
             "atom" : {Atom(): amber_1_index_atom_idx_1}
             }
+
+        This will work as long as the order of residues remains the same after tleap process and atom
+        have unique names in each residue.
         TODO solve this for the 1Q4T case."""
         # init files
         temp_dir = eh_config['system.SCRATCH_DIR']
