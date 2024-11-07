@@ -7,6 +7,7 @@ class. Packages:
     + AlphaFill, AlphaFillInterface
     + BCL, BCLInterface
     + Gaussian, GaussianInterface
+    + Modeller, ModellerInterface
     + MOE, MOEInterface
     + Mole2, Mole2Interface
     + Multiwfn, MultiwfnInterface
@@ -47,7 +48,7 @@ class Interface:
         amber: Corresponds to instance of AmberInterface().
         alphafill: Corresponds to instance of AlphaFillInterface().
         bcl: Corresponds to instance of BCLInterface().
-        gaussian: Corresponds to instnce of GaussianInterface().
+        gaussian: Corresponds to instance of GaussianInterface().
         moe: Corresponds to instance of MOEInterface().
         mole2: Corresponds to instance of Mole2Interface().
         multiwfn: Corresponds to instance of MultiwfnInterface().

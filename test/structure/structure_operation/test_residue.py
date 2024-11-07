@@ -67,3 +67,15 @@ def test_remove_side_chain_atom():
     test_residue = stru.residues[7]
     stru_oper.remove_side_chain_mutating_atom(test_residue, "GLY")
     assert set(test_residue.atom_name_list) == set(["N", "CA", "C", "O", "H"])
+
+
+def test_closest_n_residues_correct():
+    """Testing that the closest_n_residues() function can correctly order which residues are closest to a given other residue."""
+    pdb_file_path = f"{DATA_DIR}/KE_07_R7_2_S.pdb"
+    stru: Structure = sp.get_structure(pdb_file_path)
+    residues = stru.residues
+    ligand = residues[-1] 
+    assert stru_oper.closest_n_residues(ligand, 1) == [residues[49]]
+    assert stru_oper.closest_n_residues(ligand, 2) == [residues[49], residues[127]]
+    assert stru_oper.closest_n_residues(ligand, 3) == [residues[49], residues[127], residues[200]]
+    assert stru_oper.closest_n_residues(ligand, 4) == [residues[49], residues[127], residues[200], residues[201]]
