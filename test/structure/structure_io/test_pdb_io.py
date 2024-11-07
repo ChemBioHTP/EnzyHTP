@@ -484,7 +484,9 @@ def test_get_structure():
 @pytest.mark.interface  
 def test_get_structure_solvated_fast():
     '''
-    make sure it finishes in a reasonable amount of time TODO not achieved yet
+    make sure it finishes in a reasonable amount of time 
+    TODO not achieved yet. 
+    Probably move from using pandas in resolve missing chain id is the way to go
     '''
     pdb_file_path = f'{DATA_DIR}test_pdb_parser_solvated.pdb'
 
