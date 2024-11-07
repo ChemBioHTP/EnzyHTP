@@ -763,3 +763,11 @@ class ClusterJobConfig:
         if other.has_res_keywords():
             self.res_keywords.update(other.res_keywords)
     # endregion
+
+    # region == special ==
+    def __or__(self, other: ClusterJobConfig) -> ClusterJobConfig:
+        """define the | operation to mimik dict"""
+        result = deepcopy(self)
+        result.update(other)
+        return result
+    # endregion
