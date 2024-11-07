@@ -266,7 +266,7 @@ class AmberConfig(BaseConfig):
         """function for lazy resolution."""
         return deepcopy(self.DEFAULT_MMPBSA_RES_KEYWORDS)
 
-    def get_default_mmpbsa_cluster_job(self):
+    def get_default_mmpbsa_cluster_job_config(self):
         """The default value for dictionary that assign arguments to
         ClusterJob.config_job during MMPBSA"""
         return {
