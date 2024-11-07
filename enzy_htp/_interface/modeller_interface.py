@@ -1,4 +1,6 @@
-"""Defines a ModellerInterface class that serves as a bride for enzy_htp to utilize the Modeller software package.
+"""*NOTE* THIS MODULE IS DEPROCATED FOR NOW
+
+Defines a ModellerInterface class that serves as a bride for enzy_htp to utilize the Modeller software package.
 Uses the ModellerConfig class found in enzy_htp/_config/modeller_config.py Supported operations include:
 
     + filling missing loop Residue()'s in a Structure()
@@ -53,15 +55,16 @@ class ModellerInterface(BaseInterface):
         super().__init__(parent, config, default_modeller_config)
         self.modeller_ = None
         self.modeller_automodel_ = None
-        try:
-            self.modeller_ = importlib.import_module('modeller')
-        except:
-            pass
+        # BUG the following lines will cause pickle to refuse dumping. (because module is included as an attribute)
+        # try:
+        #     self.modeller_ = importlib.import_module('modeller')
+        # except:
+        #     pass
 
-        try:
-            self.modeller_automodel_ = importlib.import_module('modeller.automodel')
-        except:
-            pass
+        # try:
+        #     self.modeller_automodel_ = importlib.import_module('modeller.automodel')
+        # except:
+        #     pass
 
 
     def delete_temp_files(self, stem:str) -> None:
