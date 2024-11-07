@@ -1062,12 +1062,14 @@ def test_get_mmpbsa_energy():
     ligand = select_stru(stru_esm.structure_0, "resi 290")
     cluster_job_config = {
         "cluster" : Accre(),
-        "res_keywords" : {"account" : "yang_lab",}
+        "res_keywords" : {
+            "partition" : "production",
+            "account" : "yang_lab",}
     }
     
     result = ai.get_mmpbgbsa_energy(
         stru_esm, ligand,
-        cluster_job_config,
+        cluster_job_config=cluster_job_config,
     )
 
     assert np.isclose(result, -1.9344, atol=1)
@@ -1201,5 +1203,5 @@ def test_parse_mmpbsa_result():
 
     result = ai.parse_mmpbsa_result(test_dat_file)
 
-    assert "gb" not in result
-    assert result["pb"]["mean"]["DELTA TOTAL"] == -1.3130
+    assert "gbsa" not in result
+    assert result["pbsa"]["mean"]["DELTA TOTAL"] == -1.3130

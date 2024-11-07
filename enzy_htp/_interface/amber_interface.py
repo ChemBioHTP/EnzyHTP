@@ -1570,13 +1570,13 @@ class AmberInterface(BaseInterface):
         if gb_search is not None:
             gb_table = gb_search.group(1).strip()
             gb_result = self._parse_pb_gb_table(gb_table)
-            result["gb"] = gb_result
+            result["gbsa"] = gb_result
         # PB
         pb_search = re.search(pb_pattern, f_str)
         if pb_search is not None:
             pb_table = pb_search.group(1).strip()
             pb_result = self._parse_pb_gb_table(pb_table)
-            result["pb"] = pb_result
+            result["pbsa"] = pb_result
 
         if not result:
             _LOGGER.warning(
@@ -2812,8 +2812,7 @@ class AmberInterface(BaseInterface):
         elif cluster_job_config is not None:
             if not isinstance(cluster_job_config, ClusterJobConfig):
                 cluster_job_config = ClusterJobConfig.from_dict(cluster_job_config)
-            cluster_job_config = default_cluster_job_config.update(cluster_job_config)
-        
+            cluster_job_config = default_cluster_job_config | cluster_job_config
         # resolve ligand mask
         ligand_mask = self.get_amber_mask(ligand, reduce=True)
 
@@ -2822,6 +2821,7 @@ class AmberInterface(BaseInterface):
         temp_dl_prmtop = fs.get_valid_temp_name(f"{work_dir}/temp_dl.prmtop")
         temp_dc_prmtop = fs.get_valid_temp_name(f"{work_dir}/temp_dc.prmtop")
         temp_sc_prmtop = fs.get_valid_temp_name(f"{work_dir}/temp_sc.prmtop")
+        fs.safe_mkdir(work_dir)
 
         self.make_mmpbgbsa_prmtop_files(
             stru_esm = stru_esm,
@@ -2864,6 +2864,7 @@ class AmberInterface(BaseInterface):
 
         # extract output
         result = self.parse_mmpbsa_result(mmpbsa_result_file)
+        result = result[solvent_model]["mean"]["DELTA TOTAL"]
 
         # clean up
         fs.clean_temp_file_n_dir([

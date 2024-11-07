@@ -29,7 +29,7 @@ def binding_energy(
         work_dir: str="./binding",
         keep_in_file: bool=False,
         **kwargs,
-        ) -> List[float]:
+        ) -> float:
     """Calculate the binding energy of {ligand} in {stru}
 
     Args:
@@ -56,8 +56,8 @@ def binding_energy(
         TODO
 
     Returns:
-        a list of float for the value of the binding energy
-        (if stru is Structure() only 1 value will be in the list)
+        a float for the mean value of the binding energy
+        (will support output value for each frame in the future when needed.)
 
     Details:
         The binding energy assesses how favorable would a ligand bind into a protein. It is the energy 
