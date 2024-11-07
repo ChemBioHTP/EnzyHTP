@@ -18,6 +18,8 @@ from typing import Generator, List, Tuple, Union, Dict, Any
 from dataclasses import dataclass
 from sympy import sympify
 
+from enzy_htp.structure.structure_region.api import create_region_from_selection_pattern
+
 from .base_interface import BaseInterface
 from .handle_types import (
     MolDynParameterizer, MolDynParameter,
@@ -292,14 +294,32 @@ class AmberParameterizer(MolDynParameterizer):
     def _parameterize_modified_res(self, maa: ModifiedResidue, gaff_type: str) -> Tuple[str, List[str]]:
         """parameterize modified residues for AmberMD, use ncaa_param_lib_path for customized
         parameters. Multiplicity and charge information can be set in ModifiedResidue objects."""
+
+        # san check
+        if not gaff_type:
+            _LOGGER.error("The structure contains non-canonical residue"
+                          " (lig or maa) but GAFF/GAFF2 is not used!"
+                          f" Check you force_fields. (current: {self.force_fields})")
+            raise ValueError
+    
+        # init
         fs.safe_mkdir(self.ncaa_param_lib_path)
-        # 0. search parm lib
+        target_method = f"{self.charge_method}-{gaff_type}"
 
-        # 1. make maa PDB
+        # 0. search parm lib - same as ligand
+        mol_desc_path, frcmod_path_list = search_ncaa_parm_file(maa,
+                                            target_method=target_method,
+                                            ncaa_lib_path=self.ncaa_param_lib_path)
 
-        # 2. run antechamber on the PDB get ac
-        ac_path = fs.get_valid_temp_name(
-            f"{self.ncaa_param_lib_path}/{maa.name}.ac")
+        if mol_desc_path:
+            if frcmod_path_list:
+                return mol_desc_path, frcmod_path_list
+        else:
+            # 1. generate ac if not found (MAKE PDB FILE IN NCAA_TO_MOLDESC w/ capping)
+            mol_desc_path = f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.ac" # the search ensured no existing file named this
+            self.parent_interface.antechamber_ncaa_to_moldesc(ncaa=maa,
+                                                              out_path=mol_desc_path,
+                                                              gaff_type=gaff_type)
         # 2.1 fix the wrong atom type given by antechamber
 
         # 3. run prepgen on ac & mc get prepin
@@ -1948,12 +1968,18 @@ class AmberInterface(BaseInterface):
             raise ValueError
         # init_path
         if out_path is None:
-            out_path = f"{eh_config['system.NCAA_LIB_PATH']}/{ncaa.name}_{charge_method}-{gaff_type}.mol2"
+            if ncaa.is_modified():
+                out_path = f"{eh_config['system.NCAA_LIB_PATH']}/{ncaa.name}_{charge_method}-{gaff_type}.ac"
+            else:
+                out_path = f"{eh_config['system.NCAA_LIB_PATH']}/{ncaa.name}_{charge_method}-{gaff_type}.mol2"
 
         # 1. make ligand PDB
         temp_dir = eh_config["system.SCRATCH_DIR"]
         fs.safe_mkdir(temp_dir)
         temp_pdb_path = fs.get_valid_temp_name(f"{temp_dir}/{ncaa.name}.pdb")
+        if ncaa.is_modified():
+            # capping - cap C with OH and N with H
+            ncaa = create_region_from_selection_pattern(stru=ncaa, pattern="all", nterm_cap="H", cterm_cap="OH")
         pdb_io.PDBParser().save_structure(temp_pdb_path, ncaa)
         input_file = temp_pdb_path
 

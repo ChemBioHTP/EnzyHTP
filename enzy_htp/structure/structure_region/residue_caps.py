@@ -531,6 +531,80 @@ class COCH3Cap(ResidueCap):
             Atom(name='HP33', coord=[ 1.871 ,   0.890,  -0.514], element= 'H'),
         ]
 
+class OHCap(ResidueCap):
+    """A ResidueCap() which uses a -OH (hydroxyl) as a cap. Adds a total of 2 atoms, with the 
+    
+    n-terminal version having atom names:      
+    and c-terminal version having atom names: OXT, HXT
+
+    No support for n-terminal version (just duplicated from c-terminal)
+
+    """
+    FIXED_CHARGE_MAP:Dict[str,float] = {
+        # n-terminal
+        
+        # c-terminal
+        'OXT': 0.0,
+        'HXT': 0.0,
+    }
+    """Fixed charge for a NHCH3 attached to the N/C-ter of a Residue()."""
+
+    CAP_BOND_DISTANCE:Dict[str, float] = {
+        "N" : 1.342,
+        "C" : 1.342,
+    }
+    """Maps the name of the link_atom to appropriate bond distance."""
+
+    @property
+    def cap_type(self) -> str:
+        """This is the OH/hydroxyl ResidueCap."""
+        return "OH"
+
+
+    def anchor(self) -> None:
+        """Straightforward anchoring that is mostly identifcal for both n-terminal and c-terminal capping."""
+
+        if self.is_cterm_cap():
+            self.atoms[0].coord = self.socket_atom.parent.find_atom_name('N').coord
+            self.atoms[1].coord = self.socket_atom.parent.find_atom_name('H').coord
+            
+            p0 = np.array(self.atoms[0].coord)
+            p1 = np.array(self.atoms[1].coord)
+            
+            d0 = mh.direction_unit_vector(p0, p1)
+           
+            self.atoms[1].coord = 1.2*d0 + p0 
+            
+        elif self.is_nterm_cap():
+            self.atoms[0].coord = self.socket_atom.parent.find_atom_name('C').coord
+            self.atoms[1].coord = self.socket_atom.parent.find_atom_name('O').coord
+
+
+        for aa in self.atoms[2:]:
+            aa.coord = np.array(aa.coord) - np.array([1.507, 0.0, 0.0])
+
+        p0 = np.array(self.socket_atom.coord)
+        p1 = np.array(self.socket_atom.parent.find_atom_name('CA').coord)
+
+        d0 = mh.direction_unit_vector(p0, p1)
+        self.align_rigid_atoms(self.atoms[2:], d0, p0, 1.4 )
+
+    def net_charge(self) -> int:
+        return -1
+
+    def get_nterm_atoms(self) -> List[Atom]:
+        """Create the default n-terminal version of the OHCap with appropriate names."""
+        return [
+            Atom(name='OXT',  coord=[ 0.661 ,   0.439,   -1.742], element= 'O'),
+            Atom(name='HXT',  coord=[ 0.435 ,   0.182,   -2.647], element= 'H'),
+        ]
+    
+    def get_cterm_atoms(self) -> List[Atom]:
+        """Create the default c-terminal version of the OHCap with appropriate names."""
+        return [
+            Atom(name='OXT',  coord=[ 0.661 ,   0.439,   -1.742], element= 'O'),
+            Atom(name='HXT',  coord=[ 0.435 ,   0.182,   -2.647], element= 'H'),
+        ]
 
 def cap_residue_free_terminal(
         res: Residue, cap_name: str, terminal_type: str) -> List[Atom]:
