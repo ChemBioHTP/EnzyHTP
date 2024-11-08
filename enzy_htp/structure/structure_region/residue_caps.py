@@ -644,10 +644,12 @@ SUPPORTED_CAPS: Dict[str, callable] = {
     "H" : HCap,
     "NHCH3": NHCH3Cap,
     "COCH3": COCH3Cap,
+    "OH": OHCap,
     # common names for redundancy
     "methyl": CH3Cap,
     "hydrogen": HCap,
     "methylamide": NHCH3Cap,
-    "acetate": COCH3Cap
+    "acetate": COCH3Cap,
+    "hydroxyl": OHCap,
 }
 """Mapper that converts a cap name into a constructor. Both the chemical formula and common names for each method are provided."""
