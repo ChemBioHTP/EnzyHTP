@@ -1271,6 +1271,7 @@ class AmberInterface(BaseInterface):
         keep_in_file: bool = False,
         in_file: str = None,
         work_dir: str = None,
+        result_in_each_frames: bool = True,
         ) -> None:
         """the python wrapper for running MMPBSA.py.MPI (MMPBSA.py not supported yet)
         Handle dispatch of using ClusterJob or not in this function.
@@ -1303,6 +1304,7 @@ class AmberInterface(BaseInterface):
         if work_dir is None:
             work_dir = eh_config.system.SCRATCH_DIR
         fs.safe_mkdir(work_dir)
+        clean_up_targets = []
 
         # make .in file if not provided
         if not in_file:
@@ -1334,6 +1336,12 @@ class AmberInterface(BaseInterface):
         if num_cores > num_of_frames:
             num_cores = num_of_frames
 
+        if result_in_each_frames:
+            temp_out_path = fs.get_valid_temp_name(f"{work_dir}/temp_mmpbsa_out.dat")
+            clean_up_targets.append(temp_out_path)
+        else:
+            temp_out_path = None
+
         mmpbgbsa_command = self._make_mmpbgbsa_command(
             num_cores = num_cores,
             dr_prmtop = dr_prmtop,
@@ -1343,6 +1351,9 @@ class AmberInterface(BaseInterface):
             traj_file = traj_file,
             in_path = in_file,
             out_path = out_path,
+            prefix = f"{work_dir}/_MMPBSA_", # control the intermediate file
+            result_in_each_frames=result_in_each_frames,
+            temp_out_path=temp_out_path,
         )
 
         # dispatch for ARMer
@@ -1371,11 +1382,12 @@ class AmberInterface(BaseInterface):
             job.submit()
             job.wait_to_end(period=job_check_period)
             self.check_mmpbgbsa_error(out_path, job)
+            clean_up_targets.extend([job.job_cluster_log, sub_script_path])
         
         # clean up
         if not keep_in_file:
-            fs.clean_temp_file_n_dir([in_file])
-        fs.clean_temp_file_n_dir([job.job_cluster_log, sub_script_path])
+            clean_up_targets.append(in_file)
+        fs.clean_temp_file_n_dir(clean_up_targets)
 
     def _create_mmpbgbsa_in_file(self, in_file,
             solvent_model,
@@ -1413,7 +1425,7 @@ class AmberInterface(BaseInterface):
             if v is not None:
                 if isinstance(v, bool):
                     v = int(v)
-                general_lines.append(f"  {k}={v}")
+                general_lines.append(f"  {k}={v},")
         general_lines.append("/")
         in_file_lines.extend(general_lines)
 
@@ -1421,14 +1433,14 @@ class AmberInterface(BaseInterface):
         # pb namelist
             pb_lines = [
                 "&pb",
-                f"  istrng={ion_strength}",
+                f"  istrng={ion_strength},",
             ]
             for k in pb_optional_namelist:
                 v = arguments[k]
                 if v is not None:
                     if isinstance(v, bool):
                         v = int(v)
-                    pb_lines.append(f"  {k}={v}")
+                    pb_lines.append(f"  {k}={v},")
             pb_lines.append("/")
             in_file_lines.extend(pb_lines)
 
@@ -1436,15 +1448,15 @@ class AmberInterface(BaseInterface):
         # gb namelist
             gb_lines = [
                 "&gb",
-                f"  saltcon={ion_strength}",
-                f"  igb={igb}",
+                f"  saltcon={ion_strength},",
+                f"  igb={igb},",
             ]
             for k in gb_optional_namelist:
                 v = arguments[k]
                 if v is not None:
                     if isinstance(v, bool):
                         v = int(v)
-                    gb_lines.append(f"  {k}={v}")
+                    gb_lines.append(f"  {k}={v},")
             gb_lines.append("/")
             in_file_lines.extend(gb_lines)
         
@@ -1493,7 +1505,8 @@ class AmberInterface(BaseInterface):
             self, 
             num_cores: int,
             dr_prmtop: str, dl_prmtop: str, dc_prmtop: str, sc_prmtop: str, traj_file: str,
-            in_path: str, out_path: str,
+            in_path: str, out_path: str, temp_out_path: str, prefix: str,
+            result_in_each_frames: bool = True,
         ) -> str:
         """make the mmpb/gbsa command. Overwrite existing files by default by "-O"."""
         mpi_exec = eh_config.system.get_mpi_executable(num_cores)
@@ -1502,13 +1515,17 @@ class AmberInterface(BaseInterface):
             f"{mpi_exec} {mmpbsa_exec} "
             f"-O "
             f"-i {in_path} "
-            f"-o {out_path} "
             f"-sp {sc_prmtop} "
             f"-cp {dc_prmtop} "
             f"-rp {dr_prmtop} "
             f"-lp {dl_prmtop} "
             f"-y {traj_file} "
+            f"-prefix {prefix} "
         )
+        if result_in_each_frames:
+            result += f"-eo {out_path} -o {temp_out_path}"
+        else:
+            result += f"-o {out_path} "
 
         return result
 
@@ -1547,8 +1564,18 @@ class AmberInterface(BaseInterface):
 
         self.env_manager_.run_command("ante-MMPBSA.py", cmd_args)
 
-    def parse_mmpbsa_result(self, mmpbsa_out_file: str) -> Dict[str, pd.DataFrame]:
+    def parse_mmpbsa_result(self, mmpbsa_out_file: str, by_frames: bool) -> Dict[str, pd.DataFrame]:
         """parse the resulting mmpbsa.dat file from MMPBSA to a dictionary"""
+        if by_frames:
+            result = self._parse_mmpbsa_result_by_frames(mmpbsa_out_file)
+        else:
+            result = self._parse_mmpbsa_result_average(mmpbsa_out_file)
+        return result
+    
+    def _parse_mmpbsa_result_by_frames(self, mmpbsa_out_file: str) -> Dict[str, pd.DataFrame]:
+        """parse the result when -eo is specified for the output"""
+    
+    def _parse_mmpbsa_result_average(self, mmpbsa_out_file: str) -> Dict[str, pd.DataFrame]:
         gb_pattern = (
             r"GENERALIZED BORN:(?:.|\n)+?Differences \(Complex - Receptor - Ligand\):\n"
             r"((?:.|\n)+?)"
@@ -2862,7 +2889,7 @@ class AmberInterface(BaseInterface):
         self.make_mmpbgbsa_nc_file(stru_esm, temp_nc)
 
         # execute
-        mmpbsa_result_file = fs.get_valid_temp_name(f"{work_dir}/mmpbsa.dat")
+        mmpbsa_result_file = fs.get_valid_temp_name(f"{work_dir}/mmpbsa_by_frames.csv")
         self.run_mmpbsa(
             dr_prmtop = temp_dr_prmtop,
             dl_prmtop = temp_dl_prmtop,
@@ -2883,10 +2910,11 @@ class AmberInterface(BaseInterface):
             fillratio = fillratio,
             exdi = exdi,
             indi = indi,
+            result_in_each_frames=True,
         )
 
         # extract output
-        result = self.parse_mmpbsa_result(mmpbsa_result_file)
+        result = self.parse_mmpbsa_result(mmpbsa_result_file, by_frames = True)
         result = result[solvent_model]["mean"]["DELTA TOTAL"]
 
         # clean up
