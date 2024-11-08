@@ -1167,7 +1167,7 @@ def test_run_mmpbsa():
     dry_ligand = f"{MM_DATA_DIR}/mmpbsa_test_dl.prmtop"
     sol_complex = f"{MM_DATA_DIR}/mmpbsa_test_sol.prmtop"
     traj = f"{MM_DATA_DIR}/mmpbsa_test_sol_10f.nc"
-    out_path = f"{MM_WORK_DIR}/mmpbsa_test.dat"
+    out_path = f"{MM_WORK_DIR}/mmpbsa_test.csv"
     cluster_job_config = ClusterJobConfig.from_dict({
         "cluster" : Accre(),
         "res_keywords" : {
@@ -1196,12 +1196,45 @@ def test_run_mmpbsa():
 
     assert os.path.exists(out_path)
 
-def test_parse_mmpbsa_result():
+def test_run_mmpbsa_local():
+    """test the function"""
+    ai = interface.amber
+    dry_complex = f"{MM_DATA_DIR}/mmpbsa_test_dc.prmtop"
+    dry_receptor = f"{MM_DATA_DIR}/mmpbsa_test_dr.prmtop"
+    dry_ligand = f"{MM_DATA_DIR}/mmpbsa_test_dl.prmtop"
+    sol_complex = f"{MM_DATA_DIR}/mmpbsa_test_sol.prmtop"
+    traj = f"{MM_DATA_DIR}/mmpbsa_test_sol_10f.nc"
+    out_path = f"{MM_WORK_DIR}/mmpbsa_test.csv"
+
+    ai.run_mmpbsa(
+        dr_prmtop=dry_receptor,
+        dl_prmtop=dry_ligand,
+        dc_prmtop=dry_complex,
+        sc_prmtop=sol_complex,
+        traj_file=traj,
+        out_path=out_path,
+        solvent_model="pbsa",
+        non_armer_cpu_num=10,
+    )
+
+    assert os.path.exists(out_path)
+
+def test_parse_mmpbsa_result_not_by_frame():
     """test the function using an example data file"""
     ai = interface.amber
     test_dat_file = f"{MM_DATA_DIR}/mmpbsa_test.dat"
 
-    result = ai.parse_mmpbsa_result(test_dat_file)
+    result = ai.parse_mmpbsa_result(test_dat_file, by_frames=False)
 
     assert "gbsa" not in result
     assert result["pbsa"]["mean"]["DELTA TOTAL"] == -1.3130
+
+def test_parse_mmpbsa_result_by_frames():
+    """test the function using an example data file. Using manually confirmed data as reference."""
+    ai = interface.amber
+    test_dat_file = f"{MM_DATA_DIR}/mmpbsa_test.csv"
+
+    result = ai.parse_mmpbsa_result(test_dat_file, by_frames=True)
+
+    assert np.isclose(result["pbsa"]["DELTA TOTAL"].mean(), -1.3130, atol=0.01)
+    assert np.isclose(result["gbsa"]["DELTA TOTAL"].mean(), -12.234, atol=0.01)
