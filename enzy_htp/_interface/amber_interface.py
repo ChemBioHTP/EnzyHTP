@@ -1264,7 +1264,7 @@ class AmberInterface(BaseInterface):
         endframe: int = None, # default: last frame
         interval: int = 1,
         verbose: int = 1,
-        keep_files: int = 0,
+        keep_files: int = 0, # NOTE seems the keep files option no longer works in terms of removing the intermediate files when prefix is used
         use_sander: bool = True,
         cluster_job_config: ClusterJobConfig = None,
         job_check_period: int = 30,
@@ -1343,6 +1343,7 @@ class AmberInterface(BaseInterface):
         else:
             temp_out_path = None
 
+        int_file_prefix = f"{work_dir}/_MMPBSA_"
         mmpbgbsa_command = self._make_mmpbgbsa_command(
             num_cores = num_cores,
             dr_prmtop = dr_prmtop,
@@ -1352,7 +1353,7 @@ class AmberInterface(BaseInterface):
             traj_file = traj_file,
             in_path = in_file,
             out_path = out_path,
-            prefix = f"{work_dir}/_MMPBSA_", # control the intermediate file
+            prefix = int_file_prefix, # control the intermediate file 
             result_in_each_frames=result_in_each_frames,
             temp_out_path=temp_out_path,
         )
@@ -1388,6 +1389,7 @@ class AmberInterface(BaseInterface):
         # clean up
         if not keep_in_file:
             clean_up_targets.append(in_file)
+        clean_up_targets.extend(glob.glob(f"{int_file_prefix}*"))
         fs.clean_temp_file_n_dir(clean_up_targets)
 
     def _create_mmpbgbsa_in_file(self, in_file,
@@ -2951,7 +2953,7 @@ class AmberInterface(BaseInterface):
 
         # extract output
         result = self.parse_mmpbsa_result(mmpbsa_result_file, by_frames = True)
-        result = result[solvent_model]["mean"]["DELTA TOTAL"]
+        result = list(result[solvent_model]["DELTA TOTAL"])
 
         # clean up
         fs.clean_temp_file_n_dir([

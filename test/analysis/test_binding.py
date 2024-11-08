@@ -32,10 +32,23 @@ def test_binding_energy():
             "partition" : "production",
             "account" : "yang_lab",}
     }
+    answer = [
+        1.6840000000016948, 
+        -0.6804000000007093, 
+        5.076199999997218, 
+        0.3467999999985514, 
+        -5.959400000001956, 
+        -5.139099999993475, 
+        -3.543699999996821, 
+        -5.468999999998417, 
+        -3.973000000000989, 
+        4.527400000004005
+    ]
     
     result = binding_energy(
         stru_esm, ligand,
         cluster_job_config=cluster_job_config,
     )
 
-    assert np.isclose(result, -1.9344, atol=1)
+    for r, a in zip(result, answer):
+        assert np.isclose(r, a, atol=0.01)

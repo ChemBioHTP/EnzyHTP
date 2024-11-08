@@ -1066,13 +1066,27 @@ def test_get_mmpbsa_energy():
             "partition" : "production",
             "account" : "yang_lab",}
     }
+    answer = [
+        1.6840000000016948, 
+        -0.6804000000007093, 
+        5.076199999997218, 
+        0.3467999999985514, 
+        -5.959400000001956, 
+        -5.139099999993475, 
+        -3.543699999996821, 
+        -5.468999999998417, 
+        -3.973000000000989, 
+        4.527400000004005
+    ]
     
     result = ai.get_mmpbgbsa_energy(
-        stru_esm, ligand,
+        stru_esm, ligand, work_dir=MM_WORK_DIR,
         cluster_job_config=cluster_job_config,
     )
-
-    assert np.isclose(result, -1.9344, atol=1)
+    for r, a in zip(result, answer):
+        assert np.isclose(r, a, atol=0.01)
+    
+    fs.clean_temp_file_n_dir([f"{MM_WORK_DIR}/mmpbsa_by_frames.csv"])
 
 def test_run_ante_mmpbsa():
     """test the function"""
@@ -1195,6 +1209,7 @@ def test_run_mmpbsa():
     )
 
     assert os.path.exists(out_path)
+    fs.clean_temp_file_n_dir([out_path])
 
 def test_run_mmpbsa_local():
     """test the function"""
@@ -1218,6 +1233,7 @@ def test_run_mmpbsa_local():
     )
 
     assert os.path.exists(out_path)
+    fs.clean_temp_file_n_dir([out_path])
 
 def test_parse_mmpbsa_result_not_by_frame():
     """test the function using an example data file"""
