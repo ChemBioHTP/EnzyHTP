@@ -9,6 +9,7 @@ import itertools
 import logging
 import os
 import string
+from timeit import timeit
 import pandas as pd
 from typing import Dict
 import pytest
@@ -18,7 +19,6 @@ from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
 import enzy_htp.chemical as chem
 from enzy_htp.core.exception import IndexMappingError
-from enzy_htp.core.general import EnablePropagate
 from enzy_htp.structure.structure_io.pdb_io import (PDBParser, restore_pdb_index, get_index_mapper_from_pdb, get_pdb_index_key)
 from enzy_htp.structure.structure_io._interface import StructureParserInterface
 from enzy_htp.structure import (
@@ -479,6 +479,19 @@ def test_get_structure():
     pdb_file_path = f'{DATA_DIR}1Q4T_ligand_test.pdb'
 
     stru: Structure = sp.get_structure(pdb_file_path)
+
+
+@pytest.mark.interface  
+def test_get_structure_solvated_fast():
+    '''
+    make sure it finishes in a reasonable amount of time 
+    TODO not achieved yet. 
+    Probably move from using pandas in resolve missing chain id is the way to go
+    '''
+    pdb_file_path = f'{DATA_DIR}test_pdb_parser_solvated.pdb'
+
+    exec_time = timeit(lambda: sp.get_structure(pdb_file_path), number=1)
+    assert exec_time <= 10
 
 
 @pytest.mark.interface

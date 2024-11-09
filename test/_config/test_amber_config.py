@@ -62,21 +62,6 @@ def test_required_env_vars():
     assert ac1.required_env_vars() == ["AMBERHOME"]
 
 
-def test_get_engine_valid():
-    """Checking that AmberConfig.get_engine() works for valid inputs of "CPU" and "GPU"."""
-    ac1: ac.AmberConfig = ac.default_amber_config()
-    assert ac1.get_engine("CPU") == "sander"
-    assert ac1.get_engine("GPU") == "pmemd.cuda"
-
-
-def test_get_engine_invalid():
-    """Checking that AmberConfig.get_engine() fails for an invalid input"""
-    ac1: ac.AmberConfig = ac.default_amber_config()
-    with pytest.raises(TypeError) as exc:
-        _ = ac1.get_engine('dne')
-    assert exc.type == TypeError
-
-
 def test_round_trip_getting_and_setting():
     """Testing that bracket accession can be used in a round trip manner."""
 

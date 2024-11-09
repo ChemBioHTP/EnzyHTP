@@ -16,9 +16,10 @@ Author: Qianzhen (QZ) Shao <qianzhen.shao@vanderbilt.edu>
 Date: 2022-04-13"""
 
 from __future__ import annotations
+from dataclasses import dataclass
 import logging
 import time
-from typing import List, Tuple, Union
+from typing import Dict, List, Tuple, Union
 from plum import dispatch
 from copy import deepcopy
 import os
@@ -703,3 +704,70 @@ class ClusterJob():
         dummy method for dispatch
         """
         pass
+
+class ClusterJobConfig:
+    """This class describes the configuration for a ClusterJob that contains the cluster and 
+    res_keywords information for ClusterJob.config_job(). This class is created to standardlize
+    the ClusterJob related argument that most science APIs would expose to the user.""" 
+    # NOTE: this is not completely applied in all science APIs yet.
+    #   future APIs will support both dict input and ClusterJobConfig input
+    # TODO apply this in all science APIs that involves cluster_job_config
+    ALLOWED_RES_KEYWORDS = [
+        'core_type',
+        'nodes',
+        'node_cores',
+        'job_name',
+        'partition',
+        'mem_per_core',
+        'walltime',
+        'account',
+    ]
+
+    def __init__(self, cluster: ClusterInterface = None, res_keywords: dict = None):
+        self.cluster = cluster
+        self.res_keywords = res_keywords
+        self.check_res_keys()
+
+    @classmethod
+    def from_dict(cls, source_dict: Dict) -> ClusterJobConfig:
+        """support directly coverting the old cluster_job_config to the new one"""
+        cluster = source_dict.get("cluster", None)
+        res_keywords = source_dict.get("res_keywords", None)
+        return cls(cluster, res_keywords)
+
+    # region == attribute getter ==
+    @property
+    def node_cores(self):
+        return self.res_keywords.get("node_cores", None)
+    # endregion
+
+    # region == checker ==
+    def has_cluster(self):
+        return self.cluster is not None
+
+    def has_res_keywords(self):
+        return self.res_keywords is not None
+
+    def check_res_keys(self):
+        """check if all the keys are valid in res_keywords"""
+        for k in self.res_keywords:
+            if k not in self.ALLOWED_RES_KEYWORDS:
+                _LOGGER.warning(f"unsupported keyword: {k} found in res_keywords. Not used")
+    # endregion
+
+    # region == editor ==
+    def update(self, other: ClusterJobConfig):
+        """update self with other"""
+        if other.has_cluster():
+            self.cluster = other.cluster
+        if other.has_res_keywords():
+            self.res_keywords.update(other.res_keywords)
+    # endregion
+
+    # region == special ==
+    def __or__(self, other: ClusterJobConfig) -> ClusterJobConfig:
+        """define the | operation to mimik dict"""
+        result = deepcopy(self)
+        result.update(other)
+        return result
+    # endregion

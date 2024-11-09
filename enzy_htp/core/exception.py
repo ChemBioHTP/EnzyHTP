@@ -136,3 +136,7 @@ class RosettaError(Exception):
 class ShrapnelChildError(Exception):
     """Exception corresponding to incomplete shrapnel children runs"""
     pass
+
+class AddPDBError(Exception):
+    """Exception corresponding to incomplete prmtop file due to no add_pdb"""
+    pass
