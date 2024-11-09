@@ -17,6 +17,7 @@ from subprocess import CalledProcessError, CompletedProcess, SubprocessError
 from typing import Generator, List, Tuple, Union, Dict, Any
 from dataclasses import dataclass
 from sympy import sympify
+from collections import Iterable
 
 from .base_interface import BaseInterface
 from .handle_types import (
@@ -58,7 +59,7 @@ class AmberParameter(MolDynParameter):
         inpcrd: the path of the .inpcrd input coordinate file
         prmtop: the path of the .prmtop parameter topology file"""
 
-    def __init__(self, inpcrd_path: str, prmtop_path: str, ncaa_chrgspin_mapper: Dict = None):
+    def __init__(self, inpcrd_path: str, prmtop_path: str, ncaa_chrgspin_mapper: Union[Dict, None] = None):
         self._inpcrd = inpcrd_path
         self._prmtop = prmtop_path
         if ncaa_chrgspin_mapper is None:
@@ -131,6 +132,7 @@ class AmberParameterizer(MolDynParameterizer):
         gb_radii
         parameterizer_temp_dir
         additional_tleap_lines
+        keep_tleap_in
     Methods:
         run()
         """
@@ -158,21 +160,23 @@ class AmberParameterizer(MolDynParameterizer):
             solvate_box_size: float,
             gb_radii: int,
             parameterizer_temp_dir: str,
-            additional_tleap_lines: List[str],) -> None:
+            additional_tleap_lines: List[str],
+            keep_tleap_in: bool,) -> None:
         self._parent_interface: AmberInterface = interface
         self.force_fields = force_fields
         self.charge_method = charge_method
-        self.resp_engine = resp_engine
-        self.resp_lvl_of_theory = resp_lvl_of_theory
+        self.resp_engine = resp_engine # TODO make this actually work
+        self.resp_lvl_of_theory = resp_lvl_of_theory # TODO make this actually work
         self.ncaa_param_lib_path = ncaa_param_lib_path
-        self.force_renew_ncaa_parameter = force_renew_ncaa_parameter
-        self.ncaa_net_charge_engine = ncaa_net_charge_engine
-        self.ncaa_net_charge_ph = ncaa_net_charge_ph
+        self.force_renew_ncaa_parameter = force_renew_ncaa_parameter # TODO make this actually work
+        self.ncaa_net_charge_engine = ncaa_net_charge_engine # TODO make this actually work
+        self.ncaa_net_charge_ph = ncaa_net_charge_ph # TODO make this actually work
         self.solvate_box_type = solvate_box_type
         self.solvate_box_size = solvate_box_size
         self.gb_radii = gb_radii
         self.parameterizer_temp_dir = parameterizer_temp_dir
         self.additional_tleap_lines = additional_tleap_lines
+        self.keep_tleap_in = keep_tleap_in
 
     @property
     def engine(self) -> str:
@@ -225,15 +229,16 @@ class AmberParameterizer(MolDynParameterizer):
 
         # 3. write the combining tleap.in
         tleap_content, temp_dry_pdb = self._write_combining_tleap_input(
-                                            stru,
-                                            ligand_parms,
-                                            maa_parms,
-                                            metalcenter_parms,
-                                            result_inpcrd,
-                                            temp_prmtop,)
+                                            stru=stru,
+                                            ligand_parms=ligand_parms,
+                                            maa_parms=maa_parms,
+                                            metalcenter_parms=metalcenter_parms,
+                                            result_inpcrd=result_inpcrd,
+                                            result_prmtop=temp_prmtop,
+                                            additional_tleap_lines=self.additional_tleap_lines,)
 
         # 4. run tleap
-        self.parent_interface.run_tleap(tleap_content)
+        self.parent_interface.run_tleap(tleap_content, keep_in_file=self.keep_tleap_in)
 
         # 5. run add_pdb
         PDBParser().save_structure(temp_ref_pdb, stru, if_renumber=False, if_fix_atomname=False)
@@ -278,7 +283,8 @@ class AmberParameterizer(MolDynParameterizer):
             mol_desc_path = f"{self.ncaa_param_lib_path}/{lig.name}_{target_method}.mol2" # the search ensured no existing file named this
             self.parent_interface.antechamber_ncaa_to_moldesc(ncaa=lig,
                                                               out_path=mol_desc_path,
-                                                              gaff_type=gaff_type)
+                                                              gaff_type=gaff_type,
+                                                              charge_method=self.charge_method)
 
         # 2. run parmchk2 on the PDB
         # (this also runs when mol_desc exsit but not frcmod)
@@ -292,9 +298,23 @@ class AmberParameterizer(MolDynParameterizer):
     def _parameterize_modified_res(self, maa: ModifiedResidue, gaff_type: str) -> Tuple[str, List[str]]:
         """parameterize modified residues for AmberMD, use ncaa_param_lib_path for customized
         parameters. Multiplicity and charge information can be set in ModifiedResidue objects."""
-        fs.safe_mkdir(self.ncaa_param_lib_path)
-        # 0. search parm lib
+        # san check
+        if not gaff_type:
+            _LOGGER.error("The structure contains non-canonical residue"
+                          " (lig or maa) but GAFF/GAFF2 is not used!"
+                          f" Check you force_fields. (current: {self.force_fields})")
+            raise ValueError
 
+        fs.safe_mkdir(self.ncaa_param_lib_path)
+        target_method = f"{self.charge_method}-{gaff_type}"
+        # 0. search parm lib
+        mol_desc_path, frcmod_path_list = search_ncaa_parm_file(maa,
+                                            target_method=target_method,
+                                            ncaa_lib_path=self.ncaa_param_lib_path)
+
+        if mol_desc_path:
+            if frcmod_path_list:
+                return mol_desc_path, frcmod_path_list
         # 1. make maa PDB
 
         # 2. run antechamber on the PDB get ac
@@ -346,7 +366,8 @@ class AmberParameterizer(MolDynParameterizer):
             maa_parms: Dict,
             metalcenter_parms: Dict,
             result_inpcrd: str,
-            result_prmtop: str,) -> Tuple[str, str]:
+            result_prmtop: str,
+            additional_tleap_lines: List[str],) -> Tuple[str, str]:
         """combine mol_desc and parm file of each noncanonical parts and make the content
         of the input file for tleap.
         Returns:
@@ -357,6 +378,16 @@ class AmberParameterizer(MolDynParameterizer):
         lines = []
         for ff in self.force_fields:
             lines.append(f"source {ff}")
+
+        # support for custom lines
+        if (isinstance(additional_tleap_lines, Iterable)
+            and not isinstance(additional_tleap_lines, str)
+            and isinstance(additional_tleap_lines[0], str)
+            ):
+            lines.extend(additional_tleap_lines)
+        else:
+            _LOGGER.error(f"`additional_tleap_line` needs to be a list of str. current: {repr(additional_tleap_lines)}")
+            raise TypeError
 
         # NCAA parts
 
@@ -389,6 +420,7 @@ class AmberParameterizer(MolDynParameterizer):
             f"solvate{self.solvate_box_type} a TIP3PBOX {self.solvate_box_size}",
             f"saveamberparm a {result_prmtop} {result_inpcrd}",
             "quit",
+            "",
         ])
 
         result = "\n".join(lines)
@@ -960,7 +992,9 @@ class AmberInterface(BaseInterface):
         # cmd based
         if_ignore_start_up: bool = True,
         additional_search_path: List[str] = None,
-        tleap_out_path: str = None,) -> None:
+        tleap_out_path: Union[str, None] = None,
+        # debug
+        keep_in_file: bool = False,) -> None:
         """the python wrapper of running tleap
         Args:
             tleap_in_str:
@@ -973,6 +1007,8 @@ class AmberInterface(BaseInterface):
             tleap_out_path:
                 file path for stdout of the tleap command. the _LOGGER level
                 determines if delete the file.
+            keep_in_file:
+                control whether delete tleap.in file
 
         NOTE: run_tleap API should not handle the index alignment since it do
         not carry information of the input pdb"""
@@ -980,7 +1016,9 @@ class AmberInterface(BaseInterface):
         # init file paths (tleap_in_path, tleap_out_path)
         fs.safe_mkdir(eh_config["system.SCRATCH_DIR"])
         tleap_in_path = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/tleap.in")
-        temp_path_list.extend([eh_config["system.SCRATCH_DIR"], tleap_in_path])
+        temp_path_list.append(eh_config["system.SCRATCH_DIR"])
+        if not keep_in_file:
+            temp_path_list.append(tleap_in_path)
         if tleap_out_path is None:
             tleap_out_path = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/tleap.out")
             temp_path_list.append(tleap_out_path)
@@ -1171,7 +1209,7 @@ class AmberInterface(BaseInterface):
     def run_cpptraj(
             self,
             instr_str: str,
-            log_path: str = None,
+            log_path: Union[str, None] = None,
         ):
         """the python wrapper of running cpptraj.
         Based on https://amberhub.chpc.utah.edu/command-line-syntax/.
@@ -1679,9 +1717,11 @@ class AmberInterface(BaseInterface):
             return target_path
         else:
             _LOGGER.info("found file path exceeding length limit of mdin. reducing it.")
+            # 0. resolve path
+            target_path: Path = Path(target_path)
+            target_path = target_path.resolve()
 
             # 1. relative path
-            target_path: Path = Path(target_path)
             result = target_path.relative_to(Path.cwd())
             if len(str(result)) <= 70:
                 return str(result)
@@ -1824,6 +1864,8 @@ class AmberInterface(BaseInterface):
             # temp paths
             parameterizer_temp_dir: str = "default", # default: {config[system.SCRATCH_DIR]}/amber_parameterizer
             additional_tleap_lines: List[str] = None,
+            # debug options
+            keep_tleap_in: Union[bool, str] = "default",
             ) -> AmberParameterizer:
         """the constructor for AmberParameterizer
         Args:
@@ -1867,7 +1909,9 @@ class AmberInterface(BaseInterface):
             parameterizer_temp_dir: (default: {config[system.SCRATCH_DIR]}/amber_parameterizer)
                 The temporary working directory that contains all the files generated by the AmberParameterizer
             additional_tleap_lines:
-                handle for adding additional tleap lines before generating the parameters."""
+                handle for adding additional tleap lines before generating the parameters.
+            keep_tleap_in:
+                whether keep tleap.in file generated during the process. (default: False)"""
         # tool: write the below code
         # print(AmberInterface._generate_default_assigning_lines_for_build_md_parameterizer_or_step(locals().items()))
 
@@ -1895,6 +1939,8 @@ class AmberInterface(BaseInterface):
             solvate_box_size = self.config()["DEFAULT_SOLVATE_BOX_SIZE"]
         if parameterizer_temp_dir == "default":
             parameterizer_temp_dir = self.config()["DEFAULT_PARAMETERIZER_TEMP_DIR"]
+        if keep_tleap_in == "default":
+            keep_tleap_in = self.config()["DEFAULT_KEEP_TLEAP_IN"]
 
         return AmberParameterizer(
             self,
@@ -1910,7 +1956,8 @@ class AmberInterface(BaseInterface):
             solvate_box_size,
             gb_radii,
             parameterizer_temp_dir,
-            additional_tleap_lines,)
+            additional_tleap_lines,
+            keep_tleap_in,)
 
     @staticmethod
     def _generate_default_assigning_lines_for_build_md_parameterizer_or_step(parameter_mapper: dict) -> str:
@@ -1926,7 +1973,7 @@ class AmberInterface(BaseInterface):
 
     def antechamber_ncaa_to_moldesc(self,
                                     ncaa: NonCanonicalBase,
-                                    out_path: str = None,
+                                    out_path: Union[str, None] = None,
                                     gaff_type: str = "GAFF",
                                     charge_method: str = "AM1BCC",
                                     cluster_job_config: Dict=None,) -> str:
@@ -2019,7 +2066,7 @@ class AmberInterface(BaseInterface):
     def build_md_step(self,
                       name: str = "default",
                       # simulation
-                      length: float = None, # ns
+                      length: Union[float, None] = None, # ns
                       timestep: float = "default", # ns
                       minimize: bool = "default",
                       temperature: Union[float, List[Tuple[float]]] = "default",

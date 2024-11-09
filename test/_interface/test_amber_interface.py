@@ -326,6 +326,30 @@ def test_amber_parameterizer_run_lv_6(): #TODO
     test_param_worker.run(test_stru)
 
 
+def test_amber_parameterizer_run_lv_1_add_lines():
+    """level 1 test of the parameterizer with additional custom lines to tleap.in.
+    Test structure diversity:
+    - single polypeptide chain"""
+    ai = interface.amber
+    test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
+        ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib_empty",
+        additional_tleap_lines=["#this is a test line"],
+        keep_tleap_in=True,
+    )
+    test_stru = struct.PDBParser().get_structure(
+        f"{MM_DATA_DIR}/KE_wo_S.pdb")
+    params = test_param_worker.run(test_stru)
+
+    # NOTE potential failed test due to a different temp path is generated
+    with open(f"{eh_config['system.SCRATCH_DIR']}/tleap.in") as f:
+        assert "#this is a test line" in f.read()
+
+    for f in params.file_list:
+        fs.safe_rm(f)
+    fs.safe_rmdir(test_param_worker.parameterizer_temp_dir)
+    fs.safe_rmdir(eh_config["system.SCRATCH_DIR"])
+
+
 def test_check_gaff_type():
     """test _check_gaff_type in AmberParameterizer"""
     ai = interface.amber
