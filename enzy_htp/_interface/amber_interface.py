@@ -1997,6 +1997,9 @@ class AmberInterface(BaseInterface):
                           f"(Supported keywords: {self.SUPPORTED_CHARGE_METHOD_MAPPER.keys()})")
             raise ValueError
 
+        if ncaa.is_modified():
+            gaff_type = "AMBER"
+        
         # 3. run antechamber on the PDB get mol2
         self.run_antechamber(in_file=input_file,
                              out_file=out_path,

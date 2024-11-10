@@ -1035,3 +1035,15 @@ def test_reduce_path_in_mdin():
 
     result = ai._reduce_path_in_mdin(test_path)
     assert len(result) <= 70
+
+def test_ncaa_to_moldesc_modaa():
+    file = f"{MM_DATA_DIR}/LLP.pdb"
+    stru = struct.PDBParser().get_structure(file)
+    stru.assign_ncaa_chargespin({"LLP": (0, 1)})
+    ncaa = stru.ligands[0]
+
+    ai = interface.amber
+    try:
+        ai.antechamber_ncaa_to_moldesc(ncaa=ncaa)
+    except:
+        assert False, f"ncaa_to_moldesc failed with modaa"
