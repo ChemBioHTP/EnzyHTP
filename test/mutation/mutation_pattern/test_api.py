@@ -175,6 +175,46 @@ def test_decode_all_mutation_m_flag():
     assert len(mutants) == 361
 
 
+def test_decode_all_mutation_cap_2():
+    """test the function with the flag X=2 specificed
+    works as expected using a made up pattern and manually
+    curated answer."""
+    test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
+    test_stru = sp.get_structure(test_pdb)
+    test_pattern = (
+        "a:2["
+        "resi 253:all not self, "
+        "resi 252:larger, "
+        "resi 251:all not self, "
+        "resi 250:all not self]"
+        )
+
+    mutants = m_p.decode_all_mutation(test_stru, test_pattern)
+    assert len(mutants) == 2243
+    for mut in mutants:
+        assert len(mut) <= 2
+
+
+def test_decode_all_mutation_cap_2_m_flog():
+    """test the function with the flag M and X=2 specificed
+    works as expected using a made up pattern and manually
+    curated answer."""
+    test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
+    test_stru = sp.get_structure(test_pdb)
+    test_pattern = (
+        "a:2M["
+        "resi 253:all not self, "
+        "resi 252:larger, "
+        "resi 251:all not self, "
+        "resi 250:all not self]"
+        )
+
+    mutants = m_p.decode_all_mutation(test_stru, test_pattern)
+    assert len(mutants) == 2166
+    for mut in mutants:
+        assert len(mut) == 2
+
+
 def test_combine_section_mutant_one_to_many():
     """test the function works as expected in the case that
     single mutant combine with many mutants"""

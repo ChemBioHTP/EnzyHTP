@@ -161,7 +161,7 @@ def decode_random_mutation(stru: Structure, section_pattern: str) -> List[List[M
 
 
 # a:
-def decode_all_mutation(stru: Structure, section_pattern: str) -> List[List[Mutation]]: # TODO support a number cap
+def decode_all_mutation(stru: Structure, section_pattern: str) -> List[List[Mutation]]:
     """decode the mutation pattern section that mutate all in the mutation set.
     There will be the maxium same number of mutations as the number of positions.
     If "M" is not specificed, non-mutation of each site will also be included.
@@ -169,6 +169,10 @@ def decode_all_mutation(stru: Structure, section_pattern: str) -> List[List[Muta
     1 point and a WT.
     If "M" is specificed, each point will be mutated and there will be the same number of
     point mutations in each mutant as the number of positions in the mutation_esm_pattern.
+    If "X" is specificed, only <=X points will be mutated. 
+    (e.g.: X=2 will only generate double, single point mutations, and WT)
+    If both "X" and "M" are specified, strictly X points will be mutated. 
+    (e.g.: X=1 will only generate single point mutations.)
     Args:
         stru: the reference structure
         section_pattern: the section pattern to be decode
@@ -176,15 +180,34 @@ def decode_all_mutation(stru: Structure, section_pattern: str) -> List[List[Muta
         A list of mutants, each is a list of Mutation()
 
     pattern_example:
-        a:[xxx:yyy] or a:M[xxx:yyy]"""
-    result: List[List[Mutation]] = []
-    re_pattern = r"a:(M?)\[(.+)\]"
-    force_mutate_each_point, mutation_esm_patterns = re.match(re_pattern, section_pattern).groups()
+        a:[xxx:yyy] or a:M[xxx:yyy] or a:X[xxx:yyy]"""
+    re_pattern = r"a:(\d*)(M?)\[(.+)\]"
+    mutation_cap_num, force_mutate_each_point, mutation_esm_patterns = re.match(
+        re_pattern, section_pattern
+        ).groups()
     mutation_esm_mapper = decode_mutation_esm_pattern(stru, mutation_esm_patterns)  #{position: mutations}
-    if force_mutate_each_point:
-        result = list(itertools.product(*mutation_esm_mapper.values()))
-    else:
-        result = product_lists_allow_empty(list(mutation_esm_mapper.values()))
+    # mutation cap: X
+    target_positions: List[List] = [list(mutation_esm_mapper.keys()),]
+    if mutation_cap_num:
+        mutation_cap_num = int(mutation_cap_num)
+        if mutation_cap_num < len(mutation_esm_mapper):
+            # This case we need new target positions as combinations of picking X from all positions
+            target_positions = itertools.combinations(target_positions[0], mutation_cap_num)
+    
+    result = set()
+    for positions in target_positions:
+        position_mutation_esm = [mutation_esm_mapper[i] for i in positions]
+        # the force mutate flag: M
+        if force_mutate_each_point:
+            posi_result = list(itertools.product(*position_mutation_esm))
+        else:
+            posi_result = product_lists_allow_empty(position_mutation_esm)
+        for mut in posi_result:
+            result.add(tuple(mut))
+    
+    # remove duplicated ones 
+    # (since when X < total_sites and not force mutate there will be repeating ones)
+    result = [list(i) for i in result]
 
     return result
 
