@@ -45,7 +45,7 @@ def assign_mutant(
     pattern: str,
     chain_sync_list: List[tuple] = None,
     chain_index_mapper: Dict[str, int] = None,
-    random_state: int = 100,
+    random_state: int = None,
     if_check: bool = True,
 ) -> List[List[Mutation]]:
     """
@@ -125,7 +125,8 @@ def assign_mutant(
         A language that helps user to assign mutations is defined above.
     """
     # decode the pattern
-    np.random.seed(random_state)  # this changes globaly
+    if random_state is not None:
+        np.random.seed(random_state)  # this changes globaly
     mutants = decode_mutation_pattern(stru, pattern)
     # sync over polymers
     if chain_sync_list:

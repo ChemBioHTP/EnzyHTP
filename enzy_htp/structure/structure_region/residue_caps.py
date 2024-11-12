@@ -420,7 +420,7 @@ class NHCH3Cap(ResidueCap):
             self.atoms[1].coord = np.array(self.atoms[0].coord) + 1.05*d0
         else:
             self.atoms[0].coord = np.array(self.socket_atom.coord)
-            self.atoms[1].coord = np.array(self.socket_atom.parent.find_atom_name('H').coord)
+            self.atoms[1].coord = np.array(self.socket_atom.parent.find_atom_name('H').coord) # NOTE this does not work for PRO which do not have a 'H'. Can be fixed by aligning CP with CA. 
 
         for aa in self.atoms[2:]:
             aa.coord = np.array(aa.coord) - np.array([1.5, 0, 0])

@@ -14,6 +14,7 @@ from .structure import Structure
 from .structure_io import StructureParserInterface
 from . import structure_operation as stru_oper
 from enzy_htp.core.general import get_itself
+from enzy_htp.core.logger import _LOGGER
 
 
 class StructureEnsemble:
@@ -70,6 +71,15 @@ class StructureEnsemble:
             return self._topology
         else:
             return self.top_parser(self._topology)
+
+    @property
+    def topology_source_file(self) -> str:
+        """getter for topology source file"""
+        if isinstance(self._topology, str):
+            return self._topology
+        else:
+            _LOGGER.error("self._topology is not a path. There is not source file stored for it")
+            raise AttributeError
 
     @property
     def structure_0(self) -> Structure:
