@@ -241,8 +241,8 @@ def test_capping_modaa():
         test_stru, "resn LLP")
     test_region = stru_regi.StructureRegion(atoms=sele.atoms)
 
-    cterm_cap = SUPPORTED_CAPS["OH"]
-    nterm_cap = SUPPORTED_CAPS["H"]
+    cterm_cap = "OH"
+    nterm_cap = "H"
 
     try:                
         capping.capping_with_residue_terminals(test_region, nterm_cap=nterm_cap, cterm_cap=cterm_cap)

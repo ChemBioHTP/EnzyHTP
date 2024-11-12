@@ -562,32 +562,14 @@ class OHCap(ResidueCap):
 
 
     def anchor(self) -> None:
-        """Straightforward anchoring that is mostly identifcal for both n-terminal and c-terminal capping."""
-
-        if self.is_cterm_cap():
-            self.atoms[0].coord = self.socket_atom.parent.find_atom_name('N').coord
-            self.atoms[1].coord = self.socket_atom.parent.find_atom_name('H').coord
-            
-            p0 = np.array(self.atoms[0].coord)
-            p1 = np.array(self.atoms[1].coord)
-            
-            d0 = mh.direction_unit_vector(p0, p1)
-           
-            self.atoms[1].coord = 1.2*d0 + p0 
-            
-        elif self.is_nterm_cap():
-            self.atoms[0].coord = self.socket_atom.parent.find_atom_name('C').coord
-            self.atoms[1].coord = self.socket_atom.parent.find_atom_name('O').coord
-
-
-        for aa in self.atoms[2:]:
-            aa.coord = np.array(aa.coord) - np.array([1.507, 0.0, 0.0])
-
-        p0 = np.array(self.socket_atom.coord)
-        p1 = np.array(self.socket_atom.parent.find_atom_name('CA').coord)
-
+        """Straightforward anchoring that is identical for both n-terminal and c-terminal capping."""
+        
+        p0 = np.array(self.link_atom.coord)
+        p1 = np.array(self.socket_atom.coord)
+        
         d0 = mh.direction_unit_vector(p0, p1)
-        self.align_rigid_atoms(self.atoms[2:], d0, p0, 1.4 )
+
+        self.align_rigid_atoms(self.atoms, d0, p0)
 
     def net_charge(self) -> int:
         return -1
