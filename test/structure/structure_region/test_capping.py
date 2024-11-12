@@ -236,7 +236,7 @@ def test_capping_with_residue_terminals(helpers):
 
 def test_capping_modaa():
     # caps a modaa with OH and H at the cterm and nterm, respectively
-    test_stru = sp.get_structure(f"{DATA_DIR}tri_alanine.pdb")
+    test_stru = sp.get_structure(f"{DATA_DIR}3FCR_modified.pdb")
     sele = stru_sele.select_stru(
         test_stru, "resn LLP")
     test_region = stru_regi.StructureRegion(atoms=sele.atoms)
@@ -248,3 +248,5 @@ def test_capping_modaa():
         capping.capping_with_residue_terminals(test_region, nterm_cap=nterm_cap, cterm_cap=cterm_cap)
     except Exception as exc:
         assert False, f"capping_with_residue_terminals() failed with {nterm_cap=} {cterm_cap=}"
+
+
