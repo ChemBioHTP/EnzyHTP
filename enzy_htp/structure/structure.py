@@ -108,6 +108,7 @@ from .metal_atom import MetalUnit
 from .ligand import Ligand
 from .solvent import Solvent
 from .metal_atom import MetalUnit
+from .modified_residue import ModifiedResidue
 
 
 class Structure(DoubleLinkedNode):
@@ -252,7 +253,8 @@ class Structure(DoubleLinkedNode):
         return result
 
     def find_residue_with_key(self, key: Tuple[str, int]) -> Union[Residue, None]:
-        """find residues base on its (chain_id, idx). Return the matching residues"""
+        """find residues base on its (chain_id, idx). Return the matching residues
+        NOT! suitable for heavy duty jobs. pretty slow. use residue_mapper instead"""
         result = list(filter(lambda r: r.key() == key, self.residues))
         if len(result) == 0:
             _LOGGER.info(f"Didn't find any residue with key: {key} in {self}")
@@ -889,7 +891,9 @@ class Structure(DoubleLinkedNode):
         format: {"RES" : (charge, spin), ...}
             RES is the 3-letter name of NCAAs (or "LIGAND", "MODAA" for all of that kind)
             charge is the net charge
-            spin the 2S+1 number for multiplicity"""
+            spin the 2S+1 number for multiplicity\
+        Note: will not abort when a 3-letter name does not exist. This is to support user
+            use a general library of ncaa charge spin mapping."""
         for resname, (charge, spin) in net_charge_mapper.items():
             if resname == "LIGAND":
                 target_ncaa = self.ligands
@@ -904,6 +908,23 @@ class Structure(DoubleLinkedNode):
                 ncaa: NonCanonicalBase
                 ncaa.net_charge = charge
                 ncaa.multiplicity = spin
+
+    def assign_mod_aa_mainchain(self, mainchian_atom_names_mapper: Dict[str, Tuple[int, int]]):
+        """assign mod_aa_mainchain to mod AAs in Structure() based on mainchian_atom_names_mapper
+        format: {"RES" : "atom_names", ...} example: {"XYZ" : ["C", "CA", "N"]}
+            RES is the 3-letter name of NCAAs (or "LIGAND", "MODAA" for all of that kind)
+            atom_names is a list of atom names"""
+        for resname, mainchian_atom_names in mainchian_atom_names_mapper.items():
+            if resname == "ALL":
+                target_ncaa = self.modified_residue
+            else:
+                target_ncaa = self.find_residue_name(resname)
+            for ncaa in target_ncaa:
+                if not ncaa.is_modified():
+                    _LOGGER.error(f"the assigning residue name {resname} is not a mod AA")
+                    raise ValueError
+                ncaa: ModifiedResidue
+                ncaa.set_mainchain_atoms(mainchian_atom_names)
 
     @dispatch
     def apply_geom(self, source: List[Union[List[float], Tuple[float]]]):

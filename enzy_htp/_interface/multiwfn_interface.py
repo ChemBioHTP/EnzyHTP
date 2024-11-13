@@ -113,11 +113,11 @@ class MultiwfnInterface(BaseInterface):
         # dispatch for running types
         if cluster_job_config is None:
             # running locally
-            this_spe_run = self.env_manager_.run_command(
+            this_run = self.env_manager_.run_command(
                 exe=multiwfn_exe,
                 args=multiwfn_args,
             )
-            self.check_multiwfn_error(log_path, this_spe_run)
+            self.check_multiwfn_error(log_path, this_run)
             # clean up
             fs.clean_temp_file_n_dir(temp_path_list)
             return None
@@ -143,6 +143,8 @@ class MultiwfnInterface(BaseInterface):
                 "temp_path_list" : temp_path_list
             }
             return job
+            # NOTE(qz): not entirely sure why written this way at the time. 
+            # (see AmberInterface.run_mmpbsa for another set up)
 
     def check_multiwfn_error(self, out_file, stdstream_source):
         """TODO make this error checker when encounters a need."""

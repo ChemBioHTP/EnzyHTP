@@ -3,9 +3,14 @@ Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2023-02-03
 """
 
+import os
 import numpy as np
 from enzy_htp.core import general as eg
 from enzy_htp.core import _LOGGER
+
+CURR_FILE = os.path.abspath(__file__)
+CURR_DIR = os.path.dirname(CURR_FILE)
+DATA_DIR = f"{CURR_DIR}/data"
 
 def test_pop_random_list_elem():
     """test function works as expected"""
@@ -86,3 +91,14 @@ def test_split_but_brackets_more_layer():
     """as name. a failed case. TODO"""
     test_pattern = "'[1,1, [1,1], 1], (0,10,(1,1))"
     assert len(eg.split_but_brackets(test_pattern, ",")) == 2
+
+def test_load_obj():
+    """test load_obj()"""
+    test_pickle_file = f"{DATA_DIR}/test_multi.pickle"
+    result = eg.load_obj(test_pickle_file)
+    assert isinstance(result, list)
+    assert len(result) == 3
+
+    test_pickle_file = f"{DATA_DIR}/test_single.pickle"
+    result = eg.load_obj(test_pickle_file)
+    assert isinstance(result, int)

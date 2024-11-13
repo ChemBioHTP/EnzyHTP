@@ -334,7 +334,10 @@ class GaussianSinglePointEngine(QMSinglePointEngine):
 
         Return: the path of the temp gjf file."""
         # path
-        temp_gjf_file_path = fs.get_valid_temp_name(f"{self.work_dir}/{self.name}.gjf")
+        temp_gjf_file_path = fs.get_valid_temp_name(
+            f"{self.work_dir}/{self.name}.gjf",
+            ext_set=[".out", ".chk", ".fchk"]
+            ) # prevent from overwriting the output files when their gjf is cleaned up
         temp_chk_file_path = temp_gjf_file_path.replace(".gjf",".chk")
 
         # content
@@ -388,6 +391,9 @@ class GaussianInterface(BaseInterface):
     # region == mappers ==
     METHOD_KEYWORD_MAPPER = {
         "pbe0": "pbe1pbe",
+        "def2-svp" : "def2svp",
+        "def2-tzvp" : "def2tzvp",
+        "def2-qzvpp" : "def2qzvpp",
     }
     """map Schrodinger eq. solving method name to gaussian keyword. mostly record special ones."""
 
@@ -460,7 +466,7 @@ class GaussianInterface(BaseInterface):
 
         return result, gen_section_lines
 
-    def get_solvation_keyword_from_name(self, solvent: str, method: str) -> Tuple[str, List[str]]:
+    def get_solvation_keyword_from_name(self, solvent: Union[str, None], method: Union[str, None]) -> Tuple[str, List[str]]:
         """map solvation setting to gaussian keyword
         http://gaussian.com/scrf/?tabid=7
         http://sobereva.com/327"""
@@ -509,15 +515,15 @@ class GaussianInterface(BaseInterface):
         # mol spec
         stru: Structure,
         stru_regions: List[StructureRegion],
-        constraints: List[StructureConstraint] = None,
+        constraints: Union[List[StructureConstraint], None] = None,
         # link0
-        num_core: str = None,
-        mem: str = None,
-        gchk_path: str = None,
+        num_core: Union[str, None] = None,
+        mem: Union[str, None] = None,
+        gchk_path: Union[str, None] = None,
         # route
-        job_type: str = None,
-        job_type_additional_keyword: List[str] = None,
-        additional_keywords: List[str] = None,
+        job_type: Union[str, None] = None,
+        job_type_additional_keyword: Union[List[str], None] = None,
+        additional_keywords: Union[List[str], None] = None,
         geom_all_check: bool = False,
         # title
         title: str = "Title",
@@ -788,10 +794,10 @@ class GaussianInterface(BaseInterface):
         self,
         # calculation config
         method: QMLevelOfTheory = "default",
-        region: StructureRegion = None,
+        region: Union[StructureRegion, None] = None,
         keep_geom: bool = "default",
         # calculation config (alternative)
-        gjf_file: str = None,
+        gjf_file: Union[str, None] = None,
         # execution config
         name: str = "default",
         cluster_job_config: Dict = "default",

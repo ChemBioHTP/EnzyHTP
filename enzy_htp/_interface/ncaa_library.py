@@ -89,23 +89,23 @@ def search_ncaa_parm_file(target_res: NonCanonicalBase, target_method: str,
             # == all file support goes here ==
             # prepin
             if fs.get_file_ext(parm_file) in [".prepin", ".prepi"]:
-                # 2.1 find 3-letter name in file
-                parm_stru = PrepinParser().get_structure(parm_file)
-                res_name = parm_stru.residues[0].name
+                # 2.1 find 3-letter name in filename
+                res_name = _get_res_name_from_filename(parm_file)
                 if res_name in [None, "UNK"]:
-                    # 2.2 find 3-letter name in filename
-                    res_name = _get_res_name_from_filename(parm_file)
+                    # 2.2 find 3-letter name in file
+                    parm_stru = PrepinParser().get_structure(parm_file)
+                    res_name = parm_stru.residues[0].name
                 # 2.3 find method name in filename
                 parm_method = _get_parm_method_from_filename(parm_file)
 
             # mol2
             elif fs.get_file_ext(parm_file) in [".mol2"]:
-                # 2.1. find 3-letter name in file
-                parm_stru = Mol2Parser().get_structure(parm_file)
-                res_name = parm_stru.residues[0].name
+                # 2.1 find 3-letter name in filename
+                res_name = _get_res_name_from_filename(parm_file)
                 if res_name in [None, "UNK"]:
-                    # 2.2 find 3-letter name in filename
-                    res_name = _get_res_name_from_filename(parm_file)
+                    # 2.2. find 3-letter name in file
+                    parm_stru = Mol2Parser().get_structure(parm_file)
+                    res_name = parm_stru.residues[0].name
                 # 2.3 find method name in filename
                 parm_method = _get_parm_method_from_filename(parm_file)
 

@@ -42,13 +42,32 @@ def remove_counterions(stru: Structure) -> Structure:
 
     return stru
 
-def remove_hydrogens(operation_object: Union[Structure, Residue], polypeptide_only: bool=False) -> Structure:
-    """Remove all hydrogen atom(s) from a Structure instance or a Residue instance.
-    Make changes in-place and return a reference of the changed original Structure / Residue / NonCanonicalBase / Ligand.
+@dispatch
+def remove_hydrogens(stru: Structure, polypeptide_only: bool = False) -> Structure:
+    """
+    remove all hydrogen Atom()s for {stru}.
+    Make changes in-place and return a reference of the changed
+    original object.
+    """
+    hydrogens = stru.hydrogens(polypeptide_only=polypeptide_only)
+    _LOGGER.debug(f"removing {len(hydrogens)} hydrogens")
+    for h in hydrogens:
+        h: Atom
+        h.delete_from_parent()
+
+    return stru
+
+@dispatch
+def remove_hydrogens(residue: Residue) -> Residue:
+    """Remove all hydrogen atom(s) from {residue}.
+    Make changes in-place and return a reference of the changed original Residue / NonCanonicalBase / Ligand.
 
     Args:
-        operation_object: An instance of Structure / Residue / NonCanonicalBase / Ligand.
-        polypeptide_only: Indicate if only hydrogens in the polypeptides are removed. Valid only when `operation_object` is a Structure instance.
+        residue: An instance of Residue / NonCanonicalBase / Ligand.
+        (dispatch)
+        stru: A instance of Structure. And when stru is used, `polypeptide_only` needs to be specified for whether hydrogens are only removed for
+            polypeptides (exclude ligands). NOTE that this value have to be given as a positional argument! Otherwise there will be an
+            dispatch error. 
     
     Returns:
         The reference of the changed original Structure / Residue / NonCanonicalBase / Ligand.

@@ -204,12 +204,6 @@ class Chain(DoubleLinkedNode):
     def has_trash(self) -> bool:
         return sum(list(map(lambda rr: rr.is_trash(), self._residues)))
 
-    def is_HET(self) -> bool:
-        for rr in self._residues:
-            if not rr.is_canonical():
-                return False
-        return True
-
     def is_empty(self) -> bool:
         """Does the chain have any Residue()"s."""
         return len(self._residues) == 0
