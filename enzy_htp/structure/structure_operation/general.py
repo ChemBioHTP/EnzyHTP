@@ -64,30 +64,17 @@ def remove_hydrogens(residue: Residue) -> Residue:
 
     Args:
         residue: An instance of Residue / NonCanonicalBase / Ligand.
-        (dispatch)
-        stru: A instance of Structure. And when stru is used, `polypeptide_only` needs to be specified for whether hydrogens are only removed for
-            polypeptides (exclude ligands). NOTE that this value have to be given as a positional argument! Otherwise there will be an
-            dispatch error. 
     
     Returns:
         The reference of the changed original Structure / Residue / NonCanonicalBase / Ligand.
     """
-    if isinstance(operation_object, Residue):
-        hydrogens = operation_object.hydrogens
-        if len(hydrogens) >= 1:
-            _LOGGER.info(f"Removing {len(hydrogens)} hydrogens from {operation_object.name}.")
-            for h in hydrogens:
-                h: Atom
-                h.delete_from_parent()
-    elif isinstance(operation_object, Structure):
-        hydrogens = operation_object.hydrogens(polypeptide_only=polypeptide_only)
-        _LOGGER.debug(f"Removing {len(hydrogens)} hydrogens.")
+    hydrogens = residue.hydrogens
+    if len(hydrogens) >= 1:
+        _LOGGER.info(f"Removing {len(hydrogens)} hydrogens from {residue.name}.")
         for h in hydrogens:
             h: Atom
             h.delete_from_parent()
-    else:
-        pass
-    return operation_object
+    return residue
 
 # test_rmsd.py:79: 
 # _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _

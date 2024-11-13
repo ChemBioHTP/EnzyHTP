@@ -26,7 +26,7 @@ ACCEPTED_INTERFACES: Dict[str, Union[PyMolInterface, AmberInterface]] = {
 }
 
 def compose_mask_pattern(mask_region: List[Residue] = list(), interface: str = "amber", ca_only: bool = True) -> str:
-    """Compose the mask pattern from the given mask region for PyMOL interface.
+    """Compose the mask pattern from the given mask region for Amber/CppTraj or PyMOL interface.
     
     Args:
         mask_region (List[Residue], optional): A list of Residues to calculation RMSD value. If the list is empty, then all residues are selected.
@@ -56,27 +56,7 @@ def compose_mask_pattern(mask_region: List[Residue] = list(), interface: str = "
             mask_pattern += " and name CA"
 
     elif (interface not in ACCEPTED_INTERFACES.keys()):
-        raise KeyError(f"Unacceptable interface value. Please choose from {' and '.join(ACCEPTED_INTERFACES.keys())}")
-    return mask_pattern
-
-def compose_amber_mask_pattern(mask_region: List[Residue] = list(), ca_only: bool = True) -> str:
-    """Compose the mask pattern from the given mask region for Amber/CppTraj interface.
-    
-    Args:
-        mask_region (List[Residue], optional): A list of Residues to calculation RMSD value. If the list is empty, then all residues are selected.
-        include_ligand (bool, optional): Indicate if ligands are included in RMSD calculation. Default True.
-        ca_only (bool, optional): Indicate if only C-alpha are included in RMSD calculation; otherwise all atoms except hydrogens are included. Default True.
-    """
-    mask_pattern = str()
-    if (mask_region):
-        mask_pattern = f":{','.join([str(residue.idx) for residue in mask_region])}"
-    else:
-        mask_pattern = ""
-
-    if (ca_only):
-        if mask_pattern:
-            mask_pattern += "&"
-        mask_pattern += "@CA"
+        raise ValueError(f"Unacceptable interface value. Please choose from {' and '.join(ACCEPTED_INTERFACES.keys())}")
     return mask_pattern
 
 def rmsd_of_structure(structure_ensemble: StructureEnsemble, interface: str = "amber", reference_structure: Structure = None, include_ligand: bool = True, ca_only: bool = True) -> float:
@@ -132,7 +112,7 @@ def rmsd_with_pattern(structure_ensemble: StructureEnsemble, interface: str = "a
     """
     interface = interface.lower()
     if (interface == "amber"):
-        return ACCEPTED_INTERFACES[interface].get_rmsd(traj_path=structure_ensemble.coordinate_list, prmtop_path=structure_ensemble._topology, mask_pattern=mask_pattern)
+        return ACCEPTED_INTERFACES[interface].get_rmsd(traj_path=structure_ensemble.coordinate_list, prmtop_path=structure_ensemble.topology_source_file, mask_pattern=mask_pattern)
     elif (interface == "pymol"):
         return ACCEPTED_INTERFACES[interface].get_rmsd(structure_ensemble=structure_ensemble, reference_structure=reference_structure, mask_pattern=mask_pattern)
 
