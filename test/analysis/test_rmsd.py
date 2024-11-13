@@ -10,6 +10,7 @@
 
 # Here put the import lib.
 import glob
+from typing import List
 import pytest
 import os
 import numpy as np
@@ -110,3 +111,26 @@ def test_amber_rmsd_with_pattern():
     # fs.safe_rmdir("scratch")
 
     assert rmsd < 10
+
+def test_rmsd_api():
+    """test the rmsd API"""
+    stru_esm = interface.amber.load_traj(
+        prmtop_path=f"{DATA_DIR}/test_spi.prmtop",
+        traj_path=f"{DATA_DIR}/test_spi.mdcrd",
+        ref_pdb=f"{DATA_DIR}/test_spi.pdb"
+    )
+    pattern = "br. resi 254 around 4 & polymer.protein and not elem H"
+    # this equals to 
+    # :9,11,48,50,101,128,169,201,202,222,224&!@H=
+
+    answer = [
+    # calculate the rmsd values for each frame manually using cpptraj or old EnzyHTP and put them here.
+    ] 
+    result: List[float] = rmsd(
+        stru_esm = stru_esm,
+        region_pattern = pattern,
+        engine = "cpptraj",
+    )
+
+    for r, a in zip(result, answer):
+        assert np.isclose(r, a, atol=0.001)
