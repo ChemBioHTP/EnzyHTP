@@ -764,64 +764,6 @@ class PyMolInterface(BaseInterface):
             mask.append( atom.key in sele_set )            
 
         return mask
-
-    def get_rmsd(self, structure_ensemble: StructureEnsemble, reference_structure: Structure = None, mask_pattern: str = str()) -> float:
-        """Calculates the Root Mean Square Deviation (RMSD) for a structure ensemble compared with its average structure.
-        Ligands, solvents and ions are not included. The lower the RMSD value is, the more stable the structure is.
-
-        Args:
-            structure_ensemble (StructureEnsemble): A collection of different geometries of the same enzyme structure.
-            reference_structure (Structure, optional): The reference structure, which should have the same sequences and ligangs as the structure_ensemble. Default: Average structure.
-            mask_pattern (str, optional): A pymol-formatted selection string which defines the region for calculating RMSD value.
-
-        Returns:
-            The calculated RMSD value as a float.
-        """
-        ref_sele_name = "reference"
-        frame_sele_name = "mobile"
-        if (StructureEnsemble is None):
-            reference_structure = structure_ensemble.average(remove_solvent=True)
-        with OpenPyMolSession(self) as pms:
-            # remove_non_peptide(reference_structure)
-            # remove_hydrogens(reference_structure, polypeptide_only=False)
-            ref_stru_name, _ = self.load_enzy_htp_stru(pms, reference_structure)
-            self.general_cmd(pms, [
-                # ('select', ref_sele_name, f"{mask_pattern} and object {ref_stru_name}"),
-                ('create', ref_sele_name, f"{mask_pattern} and object {ref_stru_name}"),
-            ])
-            rmsd_list = list()
-            for frame_stru in structure_ensemble.structures(remove_solvent=True):
-                # remove_non_peptide(frame_stru)
-                # remove_hydrogens(frame_stru, polypeptide_only=False)
-                frame_stru_name, _ = self.load_enzy_htp_stru(pms, stru=frame_stru)
-                results: List[Any] = self.general_cmd(pms, [
-                    ('select', frame_sele_name, f"{mask_pattern} and object {frame_stru_name}"),
-
-                    ('align', frame_sele_name, ref_sele_name),
-                    # This returns a tuple with 7 items:
-                    # 1. RMSD after refinement
-                    # 2. Number of aligned atoms after refinement
-                    # 3. Number of refinement cycles
-                    # 4. RMSD before refinement
-                    # 5. Number of aligned atoms before refinement
-                    # 6. Raw alignment score
-                    # 7. Number of residues aligned
-                    # https://pymolwiki.org/index.php/Align
-
-                    # ('create', frame_sele_name, f"{mask_pattern} and object {frame_stru_name}"),
-                    # ('super', frame_sele_name, ref_sele_name),
-
-                    ('remove', frame_stru_name),
-                    # ('remove', frame_sele_name),
-                ])
-                    
-                # import pdb;pdb.set_trace()
-                
-                rmsd_list.append(results[-2][0])
-                # rmsd_list.append(results[-3][0])
-                continue
-            print(rmsd_list)
-            return sum(rmsd_list) / len(rmsd_list)
         
     def get_spi(self, stru: Structure, ligand:Ligand, pocket_sele:str) -> float:
         """Calculates substrate positioning index (SPI) for a given Ligand in a given Structure. SPI roughly corresponds to the
