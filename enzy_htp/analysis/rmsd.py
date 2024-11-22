@@ -46,7 +46,7 @@ def compose_pymol_pattern(mask_region: List[Residue] = list(), ca_only: bool = T
         region_pattern += " and (not elem H)"
     return region_pattern
 
-def rmsd_calculation(stru_esm: StructureEnsemble, region_pattern: str = "all") -> float:
+def rmsd_calculation(stru_esm: StructureEnsemble, region_pattern: str = "all and (not elem H)") -> float:
     """Calculate the RMSD value of a StructureEnsemble instance with specified mask pattern.
     
     Args:
@@ -55,7 +55,7 @@ def rmsd_calculation(stru_esm: StructureEnsemble, region_pattern: str = "all") -
     """
     stru = remove_solvent(stru_esm.structure_0, in_place=False)
     stru_sele = select_stru(stru, pattern=region_pattern)
-    return eh_interface.amber.get_rmsd(traj_path=stru_esm.coordinate_list, prmtop_path=stru_esm.topology_source_file, mask_selection=stru_sele)
+    return eh_interface.amber.get_rmsd(stru_esm=stru_esm, stru_selection=stru_sele)
 
 def rmsd_of_region(stru_esm: StructureEnsemble, mask_region: List[Residue] = list(), ca_only: bool = True) -> float:
     """Get RMSD value from MD simulation result with a mask region (a list of residues).

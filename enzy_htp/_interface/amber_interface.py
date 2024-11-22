@@ -2836,26 +2836,31 @@ class AmberInterface(BaseInterface):
 
     def get_rmsd(
             self,
-            traj_path: str,
-            prmtop_path: str,
-            mask_selection: StruSelection,
+            stru_esm: StructureEnsemble,
+            stru_selection: StruSelection,
         ) -> float:
-        """Calculate the RMSD value of a trajectory file.
+        """Calculate the RMSD value of a StructureEnsemble instance.
         
         Args:
-            traj_path (str): The path to the .nc/.mdcrd file.
-            prmtop_path (str): The path to the prmtop file.
-            mask_selection (StruSelection): A StruSelection instance representing the region for calculating RMSD value.
+            stru_esm (StructureEnsemble): A collection of different geometries of the same enzyme structure.
+            stru_selection (StruSelection): A StruSelection instance representing the region for calculating RMSD value.
             
         Returns:
             rmsd_value (float): The average RMSD value of all the frames comparing with the average structure.    
         """
+        tmp_dir = eh_config['system.SCRATCH_DIR']
+        tmp_nc_path=os.path.join(tmp_dir, "tmp_amber_traj.nc")
+        tmp_prmtop_path=os.path.join(tmp_dir, "tmp_amber_topology.prmtop")
+        
+        self.convert_top_to_prmtop(stru_esm.topology_source_file, tmp_prmtop_path)
+        self.convert_traj_to_nc(stru_esm.coordinate_list, tmp_nc_path)
+
         rmsd_csv_filename = os.path.join(eh_config.system.SCRATCH_DIR, "temp_rmsd.csv")
-        amber_mask = self.get_amber_mask(mask_selection, reduce=True)
+        amber_mask = self.get_amber_mask(stru_selection, reduce=True)
         # print(amber_mask)
         contents: List[str] = [
-            f"parm {prmtop_path}",
-            f"trajin {traj_path}",
+            f"parm {tmp_prmtop_path}",
+            f"trajin {tmp_nc_path}",
             "autoimage",
             f"rmsd {amber_mask} first mass",
             f"average crdset AVE {amber_mask}",
@@ -2873,6 +2878,11 @@ class AmberInterface(BaseInterface):
         rmsd_value = result_df.iloc[:, 1].mean()
 
         fs.safe_rm(rmsd_csv_filename)
+        fs.clean_temp_file_n_dir([
+            tmp_dir,
+            tmp_nc_path,
+            tmp_prmtop_path,
+        ])
         return rmsd_value
 
     def load_traj(self, prmtop_path: str, traj_path: str, ref_pdb: str = None) -> StructureEnsemble:

@@ -1,12 +1,8 @@
-#! python3
-# -*- encoding: utf-8 -*-
-'''
-@File    :   test_rmsd.py
-@Created :   2024/08/21 20:37
-@Author  :   Zhong, Yinjie
-@Version :   2.0
-@Contact :   yinjie.zhong@vanderbilt.edu
-'''
+"""Testing enzy_htp.analysis.
+
+Author: Zhong, Yinjie <yinjie.zhong@vanderbilt.edu>
+Created: 2024-08-21
+"""
 
 # Here put the import lib.
 import glob
