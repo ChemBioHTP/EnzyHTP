@@ -991,15 +991,34 @@ class AmberInterface(BaseInterface):
             return "frcmod"
         return self.AMBER_FILE_FORMAT_MAPPER.get(ext, ext[1:])
 
-    def convert_traj_to_nc(self, fpath: str, out_path: str) -> None:
-        """convert the given trajectory file to the Amber .nc file in the out_path"""
-        in_format = self.get_file_format(fpath)
+    def convert_traj_to_nc(self, traj_path: str, out_path: str, topology_path: str = str()) -> None:
+        """Convert the given trajectory file to the Amber `.nc` format file in the out_path.
+        
+        Args:
+            traj_path (str): Path to the input trajectory file.
+            out_path (str): Path to the output Amber `.nc` format trajectory file.
+            topology_path (str, optional): Path to the topology file. Default empty.
+        """
+        in_format = self.get_file_format(traj_path)
 
         if in_format == "nc":
-            fs.safe_cp(fpath, out_path)
+            fs.safe_cp(traj_path, out_path)
+        elif in_format == "mdcrd":
+            if (not topology_path or not fs.is_path_exist(topology_path)):
+                _LOGGER.error(f"Topology filepath ({topology_path if len(topology_path) else 'N/A'}) doesn't exist.")
+                raise FileNotFoundError
+            contents = [
+                f"parm {topology_path}",
+                f"trajin {traj_path}",
+                f"trajout {out_path}",
+                "run",
+                "quit"
+            ]
+            contents = "\n".join(contents)
+            self.run_cpptraj(contents)
         else:
             # TODO for other formats. We probably need a central format to reduce the engineering overhead
-            _LOGGER.error(f"found unsupported file format: {in_format} ({fpath})")
+            _LOGGER.error(f"found unsupported file format: {in_format} ({traj_path})")
             raise ValueError
 
     def convert_top_to_prmtop(self, fpath: str, out_path: str) -> None:
@@ -2904,22 +2923,10 @@ class AmberInterface(BaseInterface):
         tmp_prmtop_path=fs.get_valid_temp_name(os.path.join(tmp_dir, "tmp_amber_topology.prmtop"))
         
         self.convert_top_to_prmtop(stru_esm.topology_source_file, tmp_prmtop_path)
+        self.convert_traj_to_nc(stru_esm.coordinate_list, tmp_nc_path, topology_path=tmp_prmtop_path)
 
-        fs.safe_cp(stru_esm.coordinate_list, tmp_nc_path)   # TODO: Remove it after `convert_traj_to_nc` is fixed.
-        # self.convert_traj_to_nc(stru_esm.coordinate_list, tmp_nc_path)  # TODO: Fix the issue with this function.
-        # If we want to convert mdcrd to nc, we use the following commands in cpptraj:
-        # ```
-        # parm topology.prmtop
-        # trajin input.mdcrd
-        # trajout output.nc
-        # ```
-
-        # Thus, `prmtop` param is required in `convert_traj_to_nc` function.
-
-
-        rmsd_csv_filename = os.path.join(eh_config.system.SCRATCH_DIR, "temp_rmsd.csv")
+        rmsd_csv_filename = fs.get_valid_temp_name(os.path.join(eh_config.system.SCRATCH_DIR, "temp_rmsd.csv"))
         amber_mask = self.get_amber_mask(stru_selection, reduce=True)
-        # print(amber_mask)
         contents: List[str] = [
             f"parm {tmp_prmtop_path}",
             f"trajin {tmp_nc_path}",
