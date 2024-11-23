@@ -16,37 +16,21 @@ from typing import List, Dict, Union
 
 # Here put EnzyHTP imports.
 from enzy_htp import interface as eh_interface
-from enzy_htp import config as eh_config
-from enzy_htp.core import file_system as fs
 from enzy_htp.preparation import remove_solvent
-from enzy_htp.structure import Residue, Structure
+from enzy_htp.structure import StruSelection
 from enzy_htp.structure.structure_ensemble import StructureEnsemble
 from enzy_htp.structure.structure_selection import select_stru
 
-def compose_pymol_pattern(mask_region: List[Residue] = list(), ca_only: bool = True) -> str:
-    """Compose the given list of Residue instances to PyMOL-format pattern.
+def rmsd_calculation(stru_esm: StructureEnsemble, stru_selection: StruSelection) -> List[float]:
+    """Calculate the RMSD value of a StructureEnsemble instance with selection.
     
     Args:
-        mask_region (List[Residue], optional): A list of Residues to calculation RMSD value. If the list is empty, then all residues are selected.
-        include_ligand (bool, optional): Indicate if ligands are included in RMSD calculation. Default True.
-        ca_only (bool, optional): Indicate if only C-alpha are included in RMSD calculation; otherwise all atoms are included. Default True.
-    
-    Returns:
-        region_pattern (str): A pymol-formatted selection string which defines the region for calculating RMSD value.
+        stru_esm (StructureEnsemble): A collection of different geometries of the same enzyme structure.
+        stru_selection (StruSelection): A StruSelection instance representing the region for calculating RMSD value.
     """
-    region_pattern = str()
+    return eh_interface.amber.get_rmsd(stru_esm=stru_esm, stru_selection=stru_selection)
 
-    if (mask_region):
-        region_pattern = f"resi {'+'.join([str(residue.idx) for residue in mask_region])}"
-    else:
-        region_pattern = "all"
-    if (ca_only):
-        region_pattern += " and name CA"
-    else:
-        region_pattern += " and (not elem H)"
-    return region_pattern
-
-def rmsd_calculation(stru_esm: StructureEnsemble, region_pattern: str = "all and (not elem H)") -> float:
+def rmsd_of_pattern(stru_esm: StructureEnsemble, region_pattern: str = "all and (not elem H)") -> List[float]:
     """Calculate the RMSD value of a StructureEnsemble instance with specified mask pattern.
     
     Args:
@@ -55,23 +39,9 @@ def rmsd_calculation(stru_esm: StructureEnsemble, region_pattern: str = "all and
     """
     stru = remove_solvent(stru_esm.structure_0, in_place=False)
     stru_sele = select_stru(stru, pattern=region_pattern)
-    return eh_interface.amber.get_rmsd(stru_esm=stru_esm, stru_selection=stru_sele)
+    return rmsd_calculation(stru_esm=stru_esm, stru_selection=stru_sele)
 
-def rmsd_of_region(stru_esm: StructureEnsemble, mask_region: List[Residue] = list(), ca_only: bool = True) -> float:
-    """Get RMSD value from MD simulation result with a mask region (a list of residues).
-    
-    Args:
-        stru_esm (StructureEnsemble): A collection of different geometries of the same enzyme structure.
-        mask_region (List[Residue], optional): A list of Residues to calculation RMSD value. If the list is empty, then all residues are selected.
-        ca_only (bool, optional): Indicate if only C-alpha are included in RMSD calculation; otherwise all atoms except hydrogens are included. Default True.
-    """
-    region_pattern = compose_pymol_pattern(mask_region=mask_region, ca_only=ca_only)
-    return rmsd_calculation(
-        stru_esm=stru_esm, 
-        region_pattern=region_pattern
-    )
-
-def rmsd_of_structure(stru_esm: StructureEnsemble, include_ligand: bool = True, ca_only: bool = True) -> float:
+def rmsd_of_structure(stru_esm: StructureEnsemble, include_ligand: bool = True, ca_only: bool = True) -> List[float]:
     """Get RMSD value from MD simulation result of the whole structure. Solvents are not included.
     
     Args:
@@ -80,11 +50,16 @@ def rmsd_of_structure(stru_esm: StructureEnsemble, include_ligand: bool = True, 
         ca_only (bool, optional): Indicate if only C-alpha are included in RMSD calculation; otherwise all atoms except hydrogens are included. Default True.
     """
     stru = remove_solvent(stru_esm.structure_0, in_place=False)
-    mask_region = stru.residues
+    region_pattern = "(not solvent) and (not inorganic)"
     if (not include_ligand):
-        mask_region = list(filter(lambda residue: (not residue.is_noncanonical()), mask_region))
-    return rmsd_of_region(
+        ligand_list = list(filter(lambda residue: (residue.is_noncanonical()), stru.residues))
+        region_pattern += f"and (not resi {'+'.join([str(ligand.idx) for ligand in ligand_list])})"
+    if (ca_only):
+        region_pattern += f" and (name CA)"
+    else:
+        region_pattern += f" and (not elem H)"
+    stru_sele = select_stru(stru, pattern=region_pattern)
+    return rmsd_calculation(
         stru_esm=stru_esm, 
-        mask_region=mask_region, 
-        ca_only=ca_only
+        stru_selection=stru_sele,
     )

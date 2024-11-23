@@ -2834,57 +2834,6 @@ class AmberInterface(BaseInterface):
         contents = "\n".join(contents)
         self.run_cpptraj(contents)
 
-    def get_rmsd(
-            self,
-            stru_esm: StructureEnsemble,
-            stru_selection: StruSelection,
-        ) -> float:
-        """Calculate the RMSD value of a StructureEnsemble instance.
-        
-        Args:
-            stru_esm (StructureEnsemble): A collection of different geometries of the same enzyme structure.
-            stru_selection (StruSelection): A StruSelection instance representing the region for calculating RMSD value.
-            
-        Returns:
-            rmsd_value (float): The average RMSD value of all the frames comparing with the average structure.    
-        """
-        tmp_dir = eh_config['system.SCRATCH_DIR']
-        tmp_nc_path=os.path.join(tmp_dir, "tmp_amber_traj.nc")
-        tmp_prmtop_path=os.path.join(tmp_dir, "tmp_amber_topology.prmtop")
-        
-        self.convert_top_to_prmtop(stru_esm.topology_source_file, tmp_prmtop_path)
-        self.convert_traj_to_nc(stru_esm.coordinate_list, tmp_nc_path)
-
-        rmsd_csv_filename = os.path.join(eh_config.system.SCRATCH_DIR, "temp_rmsd.csv")
-        amber_mask = self.get_amber_mask(stru_selection, reduce=True)
-        # print(amber_mask)
-        contents: List[str] = [
-            f"parm {tmp_prmtop_path}",
-            f"trajin {tmp_nc_path}",
-            "autoimage",
-            f"rmsd {amber_mask} first mass",
-            f"average crdset AVE {amber_mask}",
-            "run",
-            "autoimage",
-            f"rmsd {amber_mask} ref AVE * out {rmsd_csv_filename} mass",
-            "run",
-            "quit"
-        ]
-        contents = "\n".join(contents)
-        self.run_cpptraj(contents)
-
-        from pandas import read_csv
-        result_df = read_csv(rmsd_csv_filename, delim_whitespace=True)
-        rmsd_value = result_df.iloc[:, 1].mean()
-
-        fs.safe_rm(rmsd_csv_filename)
-        fs.clean_temp_file_n_dir([
-            tmp_dir,
-            tmp_nc_path,
-            tmp_prmtop_path,
-        ])
-        return rmsd_value
-
     def load_traj(self, prmtop_path: str, traj_path: str, ref_pdb: str = None) -> StructureEnsemble:
         """load StructureEnsemble from Amber prmtop and nc/mdcrd files"""
         coord_parser_mapper = {
@@ -2933,6 +2882,68 @@ class AmberInterface(BaseInterface):
         fs.clean_temp_file_n_dir([temp_log_path, temp_dir])
 
         return result
+
+    # RMSD value.
+
+    def get_rmsd(
+            self,
+            stru_esm: StructureEnsemble,
+            stru_selection: StruSelection,
+        ) -> List[float]:
+        """Calculate the RMSD value of a StructureEnsemble instance.
+        
+        Args:
+            stru_esm (StructureEnsemble): A collection of different geometries of the same enzyme structure.
+            stru_selection (StruSelection): A StruSelection instance representing the region for calculating RMSD value.
+            
+        Returns:
+            rmsd_value (List[float]): A list of RMSD values for each frame in a StructureEnsemble instance comparing with the average structure.    
+        """
+        tmp_dir = eh_config['system.SCRATCH_DIR']
+        tmp_nc_path=fs.get_valid_temp_name(os.path.join(tmp_dir, "tmp_amber_traj.nc"))
+        tmp_prmtop_path=fs.get_valid_temp_name(os.path.join(tmp_dir, "tmp_amber_topology.prmtop"))
+        
+        self.convert_top_to_prmtop(stru_esm.topology_source_file, tmp_prmtop_path)
+
+        fs.safe_cp(stru_esm.coordinate_list, tmp_nc_path)   # TODO: Remove it after `convert_traj_to_nc` is fixed.
+        # self.convert_traj_to_nc(stru_esm.coordinate_list, tmp_nc_path)  # TODO: Fix the issue with this function.
+        # If we want to convert mdcrd to nc, we use the following commands in cpptraj:
+        # ```
+        # parm topology.prmtop
+        # trajin input.mdcrd
+        # trajout output.nc
+        # ```
+
+        # Thus, `prmtop` param is required in `convert_traj_to_nc` function.
+
+
+        rmsd_csv_filename = os.path.join(eh_config.system.SCRATCH_DIR, "temp_rmsd.csv")
+        amber_mask = self.get_amber_mask(stru_selection, reduce=True)
+        # print(amber_mask)
+        contents: List[str] = [
+            f"parm {tmp_prmtop_path}",
+            f"trajin {tmp_nc_path}",
+            "autoimage",
+            f"rmsd {amber_mask} first mass",
+            f"average crdset AVE {amber_mask}",
+            "run",
+            "autoimage",
+            f"rmsd {amber_mask} ref AVE * out {rmsd_csv_filename} mass",
+            "run",
+            "quit"
+        ]
+        contents = "\n".join(contents)
+        self.run_cpptraj(contents)
+
+        result_df = pd.read_csv(rmsd_csv_filename, delim_whitespace=True)
+        rmsd_value = result_df.iloc[:, 1]
+
+        fs.clean_temp_file_n_dir([
+            tmp_nc_path,
+            tmp_prmtop_path,
+            rmsd_csv_filename,
+        ])
+        return rmsd_value
 
     # -- MMPB/GBSA --
     def get_mmpbgbsa_energy(
