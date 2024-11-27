@@ -4,6 +4,7 @@ the target start structure on the energy surface defined by a certain energy fun
 Science API:
     + md_simulation()
     + equi_md_sampling()
+    + deployable_equi_md_sampling()
 
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2023-7-30
@@ -167,6 +168,64 @@ def equi_md_sampling(stru: Structure,
             coord_parser=prod_result.traj_parser,))
 
     return result
+
+def deployable_equi_md_sampling(
+        stru: Structure,
+        param_method: MolDynParameterizer, # TODO support using engine + kwarg to specify
+        parallel_runs: int= 3,
+        parallel_method: str= "cluster_job", # TODO prepare_only for just export files and cmd
+        work_dir: str="./MD",
+        # config for steps
+        prod_time: float= 50.0, # ns
+        prod_temperature: float = 300.0, #K
+        prod_constrain: List[stru_cons.StructureConstraint]= None,
+        record_period: float= 0.5, # ns
+        cluster_job_config: Dict= None,
+        cpu_equi_step: bool= False,
+        cpu_equi_job_config: Dict= None,
+        job_check_period: int=210, # s
+        ) -> Dict:
+    """this function prepare files for a submission ready MD task of HPCs.
+    The task is to perform a production run of molecular dynamics simulation with the
+    system equilibrated by several short md simulations from the starting {stru}
+    (Basically md_simulation() with preset steps)
+    min (micro) -> heat (NVT) -> equi (NPT) -> prod (NPT)
+    Args:
+        stru: 
+            the starting structure
+        param_method: 
+            the Parameterizer() used for parameterization. This determines the engine.
+        parallel_runs: 
+            the number of desired parallel runs of the steps.
+        parallel_method: 
+            the method to parallelize the multiple runs
+        work_dir: 
+            the directory that contains all the MD files input/intermediate/output
+        prod_time: 
+            the simulation time in production step (unit: ns)
+        prod_temperature: 
+            the production temperature
+        prod_constrain: 
+            the constrain applied in the production step
+        record_period: 
+            the simulation time period for recording the geom. (unit: ns)
+        cluster_job_config: 
+            the config for cluster_job if it is used as the parallel method.
+        cpu_equi_step: 
+            whether use cpu for equi step
+        cpu_equi_job_config: 
+            the job config for the cpu equi step if specified
+        job_check_period:
+            the check period for wait_to_2d_array_end. Used when parallel_method='cluster_job'.
+            (Unit: s, default: 210s)
+    Returns:
+        a dictionary in the structure of
+            {
+            "structure_files" : [...],
+            "config_files" : [...],
+            "sub_script" : "...",
+            }
+    """
 
 # == general building blocks ==
 def md_simulation(stru: Structure,
@@ -359,4 +418,9 @@ def _serial_md_steps(
         results.append(result_ele)
 
     return results
+
+# == helper tools ==
+def get_deployable_md_cli() -> str:
+    """get the content of a CLI tool that manage deployed
+    MD tasks in batch"""
 
