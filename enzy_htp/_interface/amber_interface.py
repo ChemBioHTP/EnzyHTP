@@ -384,14 +384,15 @@ class AmberParameterizer(MolDynParameterizer):
             lines.append(f"source {ff}")
 
         # support for custom lines
-        if (isinstance(additional_tleap_lines, Iterable)
-            and not isinstance(additional_tleap_lines, str)
-            and isinstance(additional_tleap_lines[0], str)
-            ):
-            lines.extend(additional_tleap_lines)
-        else:
-            _LOGGER.error(f"`additional_tleap_line` needs to be a list of str. current: {repr(additional_tleap_lines)}")
-            raise TypeError
+        if additional_tleap_lines is not None:
+            if (isinstance(additional_tleap_lines, Iterable)
+                and not isinstance(additional_tleap_lines, str)
+                and isinstance(additional_tleap_lines[0], str)
+                ):
+                lines.extend(additional_tleap_lines)
+            else:
+                _LOGGER.error(f"`additional_tleap_line` needs to be a list of str. current: {repr(additional_tleap_lines)}")
+                raise TypeError
 
         # NCAA parts
 
