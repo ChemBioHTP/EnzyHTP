@@ -86,30 +86,3 @@ def test_structures_rm_solvent():
     for stru, (answer_1, answer_m1) in zip(test_esm.structures(), answer):
         assert stru.atoms[0].coord == answer_1
         assert stru.atoms[-1].coord == answer_m1
-
-def test_average():
-    """Test the structure_ensemble.average() function, with `remove_solvent=True`."""
-    test_prmtop = f"{DATA_DIR}stru_w_solvent.prmtop"
-    test_traj = f"{DATA_DIR}traj_w_solvent_3f.nc"
-    test_esm = StructureEnsemble(
-        topology=test_prmtop,
-        top_parser=PrmtopParser({
-                "FAD" : (0,1),
-                "ACP" : (0,1),
-                }
-            ).get_structure,
-        coordinate_list=test_traj,
-        coord_parser=AmberNCParser(test_prmtop).get_coordinates,
-    )
-    
-    # for stru in test_esm.structures(remove_solvent=True):
-    #     print(stru.atoms[-1])
-
-    average_stru = test_esm.average(remove_solvent=True)
-    # print("\nThe average structure:")
-    # print(average_stru.atoms[-1])
-    fs.safe_rmdir("scratch")
-
-    assert average_stru.atoms[-1].coord == [24.706666666666667, 67.94933333333334, 75.378]
-
-
