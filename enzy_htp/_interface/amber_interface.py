@@ -2910,7 +2910,7 @@ class AmberInterface(BaseInterface):
             stru_esm: StructureEnsemble,
             stru_selection: StruSelection,
         ) -> List[float]:
-        """Calculate the RMSD value of a StructureEnsemble instance.
+        """Calculate the RMSD value of a specified StruSelection object within a StructureEnsemble instance.
         
         Args:
             stru_esm (StructureEnsemble): A collection of different geometries of the same enzyme structure.
