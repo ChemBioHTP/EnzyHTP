@@ -22,9 +22,7 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core import _LOGGER, check_var_type
 from enzy_htp._config.pymol_config import PyMolConfig, default_pymol_config
 from enzy_htp.structure import Structure, PDBParser, Ligand
-from enzy_htp.structure.structure_operation import remove_non_peptide, remove_hydrogens
 import enzy_htp.chemical as chem
-from enzy_htp.structure.structure_ensemble import StructureEnsemble
 
 from .base_interface import BaseInterface
 
@@ -179,21 +177,6 @@ class PyMolInterface(BaseInterface):
 
 
         return (pymol_obj_name, session)
-    
-    def load_enzy_htp_stru_esm(self, session: pymol2.PyMOL, stru_esm: StructureEnsemble) -> Tuple[str, pymol2.PyMOL]:
-        """Convert enzy_htp.structure.StructureEnsemble object into a pymol object in a pymol2.PyMOL() session.
-        
-        Args:
-            session (pymol2.PyMOL): Current pymol2.PyMOL() session instance.
-            stru_esm (StructureEnsemble): A StructureEnsemble instance.
-
-        Returns:
-            pymol_obj_name (str): The name of the loaded PyMOL object.
-            session (pymol2.PyMOL): Current pymol2.PyMOL() session instance.
-        """
-        self.check_pymol2_installed()
-        prmtop_str = stru_esm._topology
-        pass
 
     def select_pymol_obj(self, session: pymol2.PyMOL, pattern: str, pymol_obj_name: str) -> List[int]:
         """an internal function return atom indexes of a pymol selection of a pymol obj 

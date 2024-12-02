@@ -5,7 +5,6 @@ Created: 2024-08-21
 """
 
 # Here put the import lib.
-from typing import List
 from os import path
 import glob
 import pytest
@@ -14,13 +13,12 @@ import numpy as np
 import enzy_htp.core.file_system as fs
 from enzy_htp import PDBParser, interface, config as eh_config, _LOGGER
 
-from enzy_htp.analysis import rmsd_of_pattern, rmsd_of_structure
+from enzy_htp.analysis import rmsd, rmsd_of_structure
 
 from enzy_htp.structure.structure_ensemble import StructureEnsemble
-from enzy_htp.core.general import EnablePropagate, get_itself
 
 from enzy_htp._interface.amber_interface import AmberMDCRDParser
-from enzy_htp.structure.structure_io import PrmtopParser, PDBParser
+from enzy_htp.structure.structure_io import PDBParser
 
 DATA_DIR = f"{path.dirname(path.abspath(__file__))}/data/"
 STRU_DATA_DIR = f"{path.dirname(path.abspath(__file__))}/../test_data/diversed_stru/"
@@ -34,19 +32,13 @@ ref_pdb = path.join(DATA_DIR, "test_spi_chainid.pdb")
 mdcrd_data = path.join(DATA_DIR, "test_spi.mdcrd")
 mdcrd_parser = AmberMDCRDParser(prmtop_path).get_coordinates
 
-def test_rmsd_of_pattern():
-    """Test the `rmsd_calculation` API."""
-    structure_ensemble = interface.amber.load_traj(
+def test_rmsd():
+    """Test the `rmsd` API."""
+    structure_ensemble: StructureEnsemble = interface.amber.load_traj(
         prmtop_path=prmtop_path,
         traj_path=traj_path,
         ref_pdb=ref_pdb,
     )
-    # structure_ensemble = StructureEnsemble(
-    #     topology=ref_pdb,
-    #     top_parser=sp.get_structure,
-    #     coord_parser=mdcrd_parser,
-    #     coordinate_list=mdcrd_data,
-    # )
     pattern = "(br. resi 254 around 4 & polymer.protein) and (not elem H)"
     # this equals to 
     # :9,50,101,103,128,130,144,201-202&!@H=
@@ -64,9 +56,9 @@ def test_rmsd_of_pattern():
         0.5346,
         0.6015,
     ]
-    result = rmsd_of_pattern(
-        stru_esm = structure_ensemble,
-        region_pattern = pattern,
+    result = rmsd(
+        stru_esm=structure_ensemble,
+        region_pattern=pattern,
     )
     fs.safe_rmdir(scratch_dir)
     for r, a in zip(result[:len(answer)], answer):
@@ -74,7 +66,7 @@ def test_rmsd_of_pattern():
 
 def test_rmsd_of_structure():
     """Test the `rmsd_of_structure` API."""
-    structure_ensemble = interface.amber.load_traj(
+    structure_ensemble: StructureEnsemble = interface.amber.load_traj(
         prmtop_path=prmtop_path,
         traj_path=traj_path,
         ref_pdb=ref_pdb,

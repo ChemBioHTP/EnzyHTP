@@ -5,6 +5,7 @@ equilibration.
 
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Author: Zhong, Yinjie <yinjie.zhong@vanderbilt.edu>
 Date: 2022-06-02
 """
 import copy
