@@ -1106,6 +1106,8 @@ def test_get_rmsd():
         stru_esm=structure_ensemble,
         stru_selection=stru_sele,
     )
+
+    fs.safe_rm(structure_ensemble.topology_source_file)
     for r, a in zip(result[:len(answer)], answer):
         assert np.isclose(r, a, atol=0.001)
 
