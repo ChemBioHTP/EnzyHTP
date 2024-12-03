@@ -31,32 +31,29 @@ ref_pdb = path.join(DATA_DIR, "test_spi_chainid.pdb")
 mdcrd_data = path.join(DATA_DIR, "test_spi.mdcrd")
 mdcrd_parser = AmberMDCRDParser(prmtop_path).get_coordinates
 
-#region How to Calculate the RMSD Values Manually using CppTraj?
-
-# # rmsd.cpptraj
+# >>> rmsd.cpptraj content <<<
+# 
 # parm test_spi.prmtop
 # trajin test_spi.mdcrd
 # autoimage
-
+#
 # rmsd :9,50,101,103,128,130,144,201-202&!@H= first mass
 # #rmsd :3,8,54,70,89,97,105-106,117,124,130-131,165,200,204,213,216,218,220-221,223&!@H= first mass
 # #rmsd :1-253&!@H= first mass
-
+#
 # average crdset AVE :9,50,101,103,128,130,144,201-202&!@H=
 # #average crdset AVE :3,8,54,70,89,97,105-106,117,124,130-131,165,200,204,213,216,218,220-221,223&!@H=
 # #average crdset AVE :1-253&!@H=
 # run
 # autoimage
-
+#
 # rmsd :9,50,101,103,128,130,144,201-202&!@H= ref AVE * out rmsd.csv mass
 # #rmsd :3,8,54,70,89,97,105-106,117,124,130-131,165,200,204,213,216,218,220-221,223&!@H= ref AVE * out rmsd.csv mass
 # #rmsd :1-253&!@H= ref AVE * out rmsd.csv mass
 # run
 
-#endregion
-
 def test_rmsd():
-    """Test the `rmsd` API."""
+    """Test the `rmsd` API. The answer is calculated using the rmsd.cpptraj script above"""
     structure_ensemble: StructureEnsemble = interface.amber.load_traj(
         prmtop_path=prmtop_path,
         traj_path=traj_path,
@@ -88,7 +85,7 @@ def test_rmsd():
         assert np.isclose(r, a, atol=0.001)
 
 def test_rmsd_of_structure():
-    """Test the `rmsd_of_structure` API."""
+    """Test the `rmsd_of_structure` API. The answer is calculated using the rmsd.cpptraj script above"""
     structure_ensemble: StructureEnsemble = interface.amber.load_traj(
         prmtop_path=prmtop_path,
         traj_path=traj_path,
