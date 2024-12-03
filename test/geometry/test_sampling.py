@@ -388,7 +388,7 @@ def test_equi_md_sampling_wrong_cons():
 
 @pytest.mark.accre
 def test_deployable_equi_md_sampling():
-    """test for deployable_equi_md_sampling"""
+    """test for deployable_equi_md_sampling. simply make sure no error."""
     test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
     test_stru.assign_ncaa_chargespin({"H5J" : (0,1)})
     test_param_method = amber_interface.build_md_parameterizer(

@@ -6,7 +6,7 @@ TODO it could also contain some concrete methods
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2023-09-19
 """
-from typing import Callable
+from typing import Callable, List
 from abc import ABC, abstractmethod
 
 from enzy_htp.structure import Structure
@@ -31,6 +31,11 @@ class MolDynParameter(ABC):
     @property
     def topology_parser(self) -> Callable:
         """return the parser object for topology_file"""
+        pass
+
+    @property
+    def file_list(self) -> List[str]:
+        """return a list of files that composes the parameter"""
         pass
 
 class MolDynParameterizer(ABC):

@@ -186,13 +186,14 @@ def deployable_equi_md_sampling(
     )
 
     # 2. deploy files
-    params, md_result = deployable_md_simulation(
+    result = deployable_md_simulation(
         stru, param_method,
         steps=[min_step, heat_step, equi_step_1, equi_step_2, prod_step],
         parallel_runs=parallel_runs,
         work_dir=work_dir,
         )
 
+    return result
 
 def _process_equi_md_sampling_arguments(
         stru: Structure,
@@ -394,7 +395,6 @@ def deployable_md_simulation(
         steps: List[MolDynStep],
         parallel_runs: int=1,
         work_dir: str="./MD",
-        sub_script_dir = None,
     ) -> Tuple[MolDynParameter, List[List[MolDynResult]]]:
     """This science API deploy a Molecular Dynamics simulation task as submission
     ready files.
@@ -414,9 +414,6 @@ def deployable_md_simulation(
             the number of desired parallel runs of the steps.
         work_dir:
             the directory that contains all the MD files input/intermediate/output
-        sub_script_path:
-            The directory of the submission script. (default: work_dir)
-            Specify this argument to unify multiple subscript of MD tasks with same set up
 
     Return:
         a dictionary in the structure below
@@ -442,7 +439,6 @@ def deployable_md_simulation(
     params = param_method.run(stru)
 
     # IV. generate MD files
-    result_eggs = []
     results = []
     for i in range(parallel_runs):
         job_list = []
@@ -456,23 +452,20 @@ def deployable_md_simulation(
             # 1. make job list
             step.work_dir = sub_work_dir
             if output: # steps after will use output from the previous one
-                job, output = step.make_job(output)
+                job, output = step.make_job(output, path_rel_to=sub_work_dir)
             else: # the 1st step
-                job, output = step.make_job(params)
+                job, output = step.make_job(params, path_rel_to=sub_work_dir)
             job_list.append(job)
             # 2. make output (we need to translate all since error checking and cleaning is needed)
             result_egg_ele.append((step, output))
 
         job_list = type(step).try_merge_jobs(job_list)
-        for j in job_list:
-            j._deploy_sub_script(j.sub_script_path)
 
-        result_eggs.append(result_egg_ele)  # eggs are filenames that can be translated to give birth actual data
         parallel_result = {
-            "structure_files" : [...],
-            "config_files" : [...],
-            "sub_script" : "...",
+            "structure_files" : params.file_list,
+            "job_list" : job_list,
         }
+        results.append(parallel_result)
 
     return results
 
