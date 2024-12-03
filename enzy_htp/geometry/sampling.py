@@ -159,15 +159,11 @@ def deployable_equi_md_sampling(
             whether use cpu for equi step
         cpu_equi_job_config: 
             the job config for the cpu equi step if specified
-        job_check_period:
-            the check period for wait_to_2d_array_end. Used when parallel_method='cluster_job'.
-            (Unit: s, default: 210s)
     Returns:
         a dictionary in the structure of
             {
-            "structure_files" : [...],
-            "config_files" : [...],
-            "sub_script" : "...",
+            "structure_files" : List[str],
+            "job_list" : List[ClusterJob],
             }
     """
     # 1. make building blocks
@@ -395,7 +391,7 @@ def deployable_md_simulation(
         steps: List[MolDynStep],
         parallel_runs: int=1,
         work_dir: str="./MD",
-    ) -> Tuple[MolDynParameter, List[List[MolDynResult]]]:
+    ) -> Dict[str, List]:
     """This science API deploy a Molecular Dynamics simulation task as submission
     ready files.
 
@@ -418,9 +414,8 @@ def deployable_md_simulation(
     Return:
         a dictionary in the structure below
             {
-            "structure_files" : [...],
-            "config_files" : [...],
-            "sub_script" : "...",
+            "structure_files" : List[str],
+            "job_list" : List[ClusterJob],
             }"""
     # I. san check
     #   - MD engine consistency
