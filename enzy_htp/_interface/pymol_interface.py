@@ -747,8 +747,7 @@ class PyMolInterface(BaseInterface):
             mask.append( atom.key in sele_set )            
 
         return mask
-
-
+        
     def get_spi(self, stru: Structure, ligand:Ligand, pocket_sele:str) -> float:
         """Calculates substrate positioning index (SPI) for a given Ligand in a given Structure. SPI roughly corresponds to the
         ratio of the ligand's solvent accessible surface area (SASA) dived by protein binding pocket SASA. The citation for 
