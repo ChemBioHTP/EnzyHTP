@@ -303,12 +303,12 @@ def clean_temp_file_n_dir(temp_path_list: List[str]) -> None:
             safe_rmdir(dir_path, empty_only=True)
 
 
-def relative_path_of(source_path: str, target_path: str) -> str:
-    """return the relative path of source path to target path"""
+def relative_path_of(source_path: str, ref_path: str) -> str:
+    """return the relative path of source path to ref path"""
     source_path = Path(source_path).absolute()
-    target_path = Path(target_path).absolute()
+    ref_path = Path(ref_path).absolute()
 
-    return Path(source_path).relative_to(target_path)
+    return os.path.relpath(source_path, ref_path)
 
 # make own lock function that python ones not really work
 def is_locked(f: IOBase) -> bool:

@@ -414,9 +414,6 @@ def test_deployable_equi_md_sampling():
         work_dir=f"{WORK_DIR}MD/")
 
     # clean up
-    # fs.safe_rmdir(f"{WORK_DIR}MD/")
-    # fs.clean_temp_file_n_dir([
-    # ] + glob.glob("slurm-*.out")
-    # + glob.glob("scratch/amber_parameterizer/*")
-    # + glob.glob(f"{WORK_DIR}/ncaa_lib/H5J*"))
+    fs.safe_rmdir(f"{WORK_DIR}MD/")
+    fs.clean_temp_file_n_dir(glob.glob(f"{WORK_DIR}/ncaa_lib/H5J*"))
 

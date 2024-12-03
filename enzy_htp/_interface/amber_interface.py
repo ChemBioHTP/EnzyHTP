@@ -625,8 +625,16 @@ class AmberMDStep(MolDynStep):
     # endregion
 
     # methods
-    def make_job(self, input_data: Union[AmberParameter, AmberMDResultEgg]) -> Tuple[ClusterJob, MolDynResultEgg]:
-        """the method that make a ClusterJob that runs the step"""
+    def make_job(self, input_data: Union[AmberParameter, AmberMDResultEgg],
+                path_rel_to: str = None,) -> Tuple[ClusterJob, MolDynResultEgg]:
+        """the method that make a ClusterJob that runs the step
+        Args:
+            input_data: the input data of the step
+            path_rel_to: 
+                if this argument is specified, the file path inside of the .in file
+                will be written as the relative path to {path_rel_to}. However, the
+                path stored in python variables are still absolute or relative to cwd
+                so that they can be valid."""
         # 1. parse input
         if isinstance(input_data, AmberParameter): # build from parameter
             coord = input_data.input_coordinate_file
@@ -640,13 +648,14 @@ class AmberMDStep(MolDynStep):
 
         # 2. make .in file
         fs.safe_mkdir(self.work_dir)
-        temp_mdin_file = self._make_mdin_file()
+        temp_mdin_file = self._make_mdin_file(path_rel_to=path_rel_to)
 
         # 3. make cmd
         md_step_cmd, traj_path, mdout_path, mdrst_path = self._make_md_cmd(
             temp_mdin_file,
             prmtop,
-            coord)
+            coord,
+            path_rel_to=path_rel_to)
 
         # 4. assemble ClusterJob
         cluster = self.cluster_job_config["cluster"]
@@ -748,38 +757,63 @@ class AmberMDStep(MolDynStep):
         return result
 
 
-    def _make_mdin_file(self) -> str:
+    def _make_mdin_file(self, path_rel_to: str = None,) -> str:
         """make a temporary mdin file.
         *path* is based on self.work_dir and self.name.
         If the file exists, will change the filename to {self.name}_{index}.in
         The index start from 1.
         *content* is based on attributes of the instance.
+        
+        Args:
+            path_rel_to: 
+                if this argument is specified, the file path inside of the .in file
+                will be written as the relative path to {path_rel_to}. However, the
+                path stored in python variables are still absolute or relative to cwd
+                so that they can be valid.
 
         Return: the path of the temp mdin file."""
         # path
         temp_mdin_file_path = fs.get_valid_temp_name(f"{self.work_dir}/{self.name}.in")
         # content
-        self.parent_interface.write_to_mdin(self.md_config_dict, temp_mdin_file_path)
+        self.parent_interface.write_to_mdin(self.md_config_dict, temp_mdin_file_path, path_rel_to=path_rel_to)
         return temp_mdin_file_path
 
-    def _make_md_cmd(self, temp_mdin_file, prmtop, coord) -> str:
-        """compile the sander/pmemd cmd from config"""
+    def _make_md_cmd(self, temp_mdin_file, prmtop, coord, path_rel_to: str = None,) -> str:
+        """compile the sander/pmemd cmd from config
+        path_rel_to: 
+            if this argument is specified, the file path inside of the .in file
+            will be written as the relative path to {path_rel_to}. However, the
+            path stored in python variables are still absolute or relative to cwd
+            so that they can be valid."""
         num_cores = self.cluster_job_config["res_keywords"]["node_cores"]
         executable = self.parent_interface.get_md_executable(self.core_type, num_cores)
         mdout_path = f"{self.work_dir}/{self.name}.out"
         mdrst_path = f"{self.work_dir}/{self.name}.rst"
         traj_path = f"{self.work_dir}/{self.name}.nc"
-        md_step_cmd= (
-            f"{executable} "
-            f"-O " # overwrite; note that AmberMDStep() with same name will overwrite each other
-            f"-i {temp_mdin_file} " # mdin file
-            f"-o {mdout_path} " # mdout file path
-            f"-p {prmtop} " # prmtop path
-            f"-c {coord} " # init coord
-            f"-r {mdrst_path} " # last frame coord
-            f"-ref {coord} " # reference coord used only when nmropt=1
-            f"-x {traj_path} " # the output md trajectory
-        )
+        if path_rel_to:
+            md_step_cmd= (
+                f"{executable} "
+                f"-O " # overwrite; note that AmberMDStep() with same name will overwrite each other
+                f"-i {fs.relative_path_of(temp_mdin_file, path_rel_to)} " # mdin file
+                f"-o {fs.relative_path_of(mdout_path, path_rel_to)} " # mdout file path
+                f"-p {fs.relative_path_of(prmtop, path_rel_to)} " # prmtop path
+                f"-c {fs.relative_path_of(coord, path_rel_to)} " # init coord
+                f"-r {fs.relative_path_of(mdrst_path, path_rel_to)} " # last frame coord
+                f"-ref {fs.relative_path_of(coord, path_rel_to)} " # reference coord used only when nmropt=1
+                f"-x {fs.relative_path_of(traj_path, path_rel_to)} " # the output md trajectory
+            )
+        else:
+            md_step_cmd= (
+                f"{executable} "
+                f"-O " # overwrite; note that AmberMDStep() with same name will overwrite each other
+                f"-i {temp_mdin_file} " # mdin file
+                f"-o {mdout_path} " # mdout file path
+                f"-p {prmtop} " # prmtop path
+                f"-c {coord} " # init coord
+                f"-r {mdrst_path} " # last frame coord
+                f"-ref {coord} " # reference coord used only when nmropt=1
+                f"-x {traj_path} " # the output md trajectory
+            )
         return md_step_cmd, traj_path, mdout_path, mdrst_path
 
     def translate(self, result_egg: AmberMDResultEgg) -> MolDynResult:
@@ -1939,12 +1973,12 @@ class AmberInterface(BaseInterface):
         "DISANG" : write_disang_file,
     }
 
-    def write_to_mdin(self, md_config_dict: Dict, out_path: str):
+    def write_to_mdin(self, md_config_dict: Dict, out_path: str, path_rel_to: str = None):
         """parse a AmberMDStep.md_config_dict to a mdin file."""
         # parse data_dict
         raw_data_dict = self._parse_md_config_dict_to_raw(md_config_dict)
         # write to file
-        self._write_to_mdin_from_raw_dict(raw_data_dict, out_path)
+        self._write_to_mdin_from_raw_dict(raw_data_dict, out_path, path_rel_to=path_rel_to)
 
     def _parse_md_config_dict_to_raw(self, md_config_dict: Dict) -> Dict:
         """parse AmberMDStep.md_config_dict to the raw data dict for mdin
@@ -2187,7 +2221,7 @@ class AmberInterface(BaseInterface):
                 reduce=reduce)
             return result
 
-    def _write_to_mdin_from_raw_dict(self, raw_dict: Dict, out_path: str):
+    def _write_to_mdin_from_raw_dict(self, raw_dict: Dict, out_path: str, path_rel_to: str = None):
         """write to mdin file from a raw dictionary
         where key is Amber keywords.
         Based on section 19.5 of Amber20 manual.
@@ -2202,7 +2236,13 @@ class AmberInterface(BaseInterface):
                 'DISANG': './MD/0.rs'},
             'group_info': [],}
             The 4 main keys are required.
-        (see example in test_amber_interface.py::test_write_to_mdin_from_raw_dict)"""
+        (see example in test_amber_interface.py::test_write_to_mdin_from_raw_dict)
+        
+        path_rel_to: 
+            if this argument is specified, the file path inside of the .in file
+            will be written as the relative path to {path_rel_to}. However, the
+            path stored in python variables are still absolute or relative to cwd
+            so that they can be valid."""
         # title
         mdin_lines: List[str] = [
             f"{raw_dict['title']}",
@@ -2219,7 +2259,10 @@ class AmberInterface(BaseInterface):
             v_path = self._reduce_path_in_mdin(v_path)
             v_content = v["content"]
             # add the redirection line
-            mdin_lines.append(f" {k}={v_path}")
+            if path_rel_to:
+                mdin_lines.append(f" {k}={fs.relative_path_of(v_path, path_rel_to)}")
+            else:
+                mdin_lines.append(f" {k}={v_path}")
             # write the redirection file
             if v_content:
                 self.REDIRECTION_FILE_WRITER[k](self, v_content, v_path)
