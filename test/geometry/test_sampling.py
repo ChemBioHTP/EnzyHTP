@@ -10,7 +10,7 @@ import os
 from enzy_htp.core.clusters.accre import Accre
 import enzy_htp.core.file_system as fs
 from enzy_htp.structure import structure_constraint as stru_cons
-from enzy_htp.geometry import md_simulation, equi_md_sampling
+from enzy_htp.geometry import md_simulation, equi_md_sampling, deployable_equi_md_sampling
 from enzy_htp import interface
 from enzy_htp import PDBParser
 
@@ -385,3 +385,38 @@ def test_equi_md_sampling_wrong_cons():
             prod_time=0.5,
             record_period=0.05,
             work_dir=f"{WORK_DIR}MD/")
+
+@pytest.mark.accre
+def test_deployable_equi_md_sampling():
+    """test for deployable_equi_md_sampling"""
+    test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
+    test_stru.assign_ncaa_chargespin({"H5J" : (0,1)})
+    test_param_method = amber_interface.build_md_parameterizer(
+        ncaa_param_lib_path=f"{WORK_DIR}/ncaa_lib",
+    )
+    cluster_job_config = {
+        "cluster" : Accre(),
+        "res_keywords" : {"account" : "csb_gpu_acc",
+                         "partition" : "turing"}
+    }
+    constrain = [stru_cons.create_distance_constraint(
+                    "B.254.H2", "A.101.OE2", 2.4, test_stru),
+                 stru_cons.create_angle_constraint(
+                    "B.254.CAE", "B.254.H2", "A.101.OE2", 180.0, test_stru),]
+    md_result = deployable_equi_md_sampling(
+        stru = test_stru,
+        param_method = test_param_method,
+        cluster_job_config = cluster_job_config,
+        prod_constrain=constrain,
+        # shorter sim for test
+        prod_time=0.5,
+        record_period=0.05,
+        work_dir=f"{WORK_DIR}MD/")
+
+    # clean up
+    # fs.safe_rmdir(f"{WORK_DIR}MD/")
+    # fs.clean_temp_file_n_dir([
+    # ] + glob.glob("slurm-*.out")
+    # + glob.glob("scratch/amber_parameterizer/*")
+    # + glob.glob(f"{WORK_DIR}/ncaa_lib/H5J*"))
+

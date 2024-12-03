@@ -26,7 +26,7 @@ from enzy_htp._interface.handle_types import (
 def equi_md_sampling(stru: Structure,
                      param_method: MolDynParameterizer, # TODO support using engine + kwarg to specify
                      parallel_runs: int= 3,
-                     parallel_method: str= "cluster_job", # TODO prepare_only for just export files and cmd
+                     parallel_method: str= "cluster_job",
                      work_dir: str="./MD",
                      # config for steps
                      prod_time: float= 50.0, # ns
@@ -80,6 +80,132 @@ def equi_md_sampling(stru: Structure,
                           "You need to at least specify the account and partition. "
                           "See test/geometry/test_sampling.py::test_equi_md_sampling_lv1() for an example.")
             raise ValueError
+
+    param_method, (
+        min_step, heat_step, equi_step_1, equi_step_2, prod_step
+    ) = _process_equi_md_sampling_arguments(
+        stru = stru,
+        param_method = param_method,
+        prod_time = prod_time,
+        prod_temperature = prod_temperature,
+        prod_constrain = prod_constrain,
+        record_period = record_period,
+        cluster_job_config = cluster_job_config,
+        cpu_equi_step = cpu_equi_step,
+        cpu_equi_job_config = cpu_equi_job_config,
+    )
+
+    # 2. run simulation
+    params, md_result = md_simulation(
+        stru, param_method,
+        steps=[min_step, heat_step, equi_step_1, equi_step_2, prod_step],
+        parallel_runs=parallel_runs,
+        parallel_method=parallel_method,
+        work_dir=work_dir,
+        job_check_period=job_check_period,)
+
+    # 3. format output
+    for rep_result in md_result:
+        prod_result = rep_result[-1]
+        result.append(StructureEnsemble(
+            topology=params.topology_file,
+            top_parser=params.topology_parser,
+            coordinate_list=prod_result.traj_file,
+            coord_parser=prod_result.traj_parser,))
+
+    return result
+
+def deployable_equi_md_sampling(
+        stru: Structure,
+        param_method: MolDynParameterizer,
+        parallel_runs: int= 3,
+        work_dir: str="./MD",
+        # config for steps
+        prod_time: float= 50.0, # ns
+        prod_temperature: float = 300.0, #K
+        prod_constrain: List[stru_cons.StructureConstraint]= None,
+        record_period: float= 0.5, # ns
+        cluster_job_config: Dict= None,
+        cpu_equi_step: bool= False,
+        cpu_equi_job_config: Dict= None,
+        ) -> Dict:
+    """this function prepare files for a submission ready MD task of HPCs.
+    The task is to perform a production run of molecular dynamics simulation with the
+    system equilibrated by several short md simulations from the starting {stru}
+    (Basically md_simulation() with preset steps)
+    min (micro) -> heat (NVT) -> equi (NPT) -> prod (NPT)
+    Args:
+        stru: 
+            the starting structure
+        param_method: 
+            the Parameterizer() used for parameterization. This determines the engine.
+        parallel_runs: 
+            the number of desired parallel runs of the steps.
+        work_dir: 
+            the directory that contains all the MD files input/intermediate/output
+        prod_time: 
+            the simulation time in production step (unit: ns)
+        prod_temperature: 
+            the production temperature
+        prod_constrain: 
+            the constrain applied in the production step
+        record_period: 
+            the simulation time period for recording the geom. (unit: ns)
+        cluster_job_config: 
+            the config for cluster_job if it is used as the parallel method.
+        cpu_equi_step: 
+            whether use cpu for equi step
+        cpu_equi_job_config: 
+            the job config for the cpu equi step if specified
+        job_check_period:
+            the check period for wait_to_2d_array_end. Used when parallel_method='cluster_job'.
+            (Unit: s, default: 210s)
+    Returns:
+        a dictionary in the structure of
+            {
+            "structure_files" : [...],
+            "config_files" : [...],
+            "sub_script" : "...",
+            }
+    """
+    # 1. make building blocks
+    param_method, (
+        min_step, heat_step, equi_step_1, equi_step_2, prod_step
+    ) = _process_equi_md_sampling_arguments(
+        stru = stru,
+        param_method = param_method,
+        prod_time = prod_time,
+        prod_temperature = prod_temperature,
+        prod_constrain = prod_constrain,
+        record_period = record_period,
+        cluster_job_config = cluster_job_config,
+        cpu_equi_step = cpu_equi_step,
+        cpu_equi_job_config = cpu_equi_job_config,
+    )
+
+    # 2. deploy files
+    params, md_result = deployable_md_simulation(
+        stru, param_method,
+        steps=[min_step, heat_step, equi_step_1, equi_step_2, prod_step],
+        parallel_runs=parallel_runs,
+        work_dir=work_dir,
+        )
+
+
+def _process_equi_md_sampling_arguments(
+        stru: Structure,
+        param_method: MolDynParameterizer,
+        # config for steps
+        prod_time: float= 50.0, # ns
+        prod_temperature: float = 300.0, #K
+        prod_constrain: List[stru_cons.StructureConstraint]= None,
+        record_period: float= 0.5, # ns
+        cluster_job_config: Dict= None,
+        cpu_equi_step: bool= False,
+        cpu_equi_job_config: Dict= None,
+    ):
+    """process the arguments of equi_md_sampling and deployable_equi_md_sampling
+    into MolDynStep()s and MolDynParameterizer()"""
     if prod_constrain is None:
         prod_constrain = []
     for cons in prod_constrain:
@@ -149,83 +275,7 @@ def equi_md_sampling(stru: Structure,
         record_period=record_period,
         constrain=prod_constrain)
 
-    # 2. run simulation
-    params, md_result = md_simulation(
-        stru, param_method,
-        steps=[min_step, heat_step, equi_step_1, equi_step_2, prod_step],
-        parallel_runs=parallel_runs,
-        parallel_method=parallel_method,
-        work_dir=work_dir,
-        job_check_period=job_check_period,)
-
-    # 3. format output
-    for rep_result in md_result:
-        prod_result = rep_result[-1]
-        result.append(StructureEnsemble(
-            topology=params.topology_file,
-            top_parser=params.topology_parser,
-            coordinate_list=prod_result.traj_file,
-            coord_parser=prod_result.traj_parser,))
-
-    return result
-
-def deployable_equi_md_sampling(
-        stru: Structure,
-        param_method: MolDynParameterizer, # TODO support using engine + kwarg to specify
-        parallel_runs: int= 3,
-        parallel_method: str= "cluster_job", # TODO prepare_only for just export files and cmd
-        work_dir: str="./MD",
-        # config for steps
-        prod_time: float= 50.0, # ns
-        prod_temperature: float = 300.0, #K
-        prod_constrain: List[stru_cons.StructureConstraint]= None,
-        record_period: float= 0.5, # ns
-        cluster_job_config: Dict= None,
-        cpu_equi_step: bool= False,
-        cpu_equi_job_config: Dict= None,
-        job_check_period: int=210, # s
-        ) -> Dict:
-    """this function prepare files for a submission ready MD task of HPCs.
-    The task is to perform a production run of molecular dynamics simulation with the
-    system equilibrated by several short md simulations from the starting {stru}
-    (Basically md_simulation() with preset steps)
-    min (micro) -> heat (NVT) -> equi (NPT) -> prod (NPT)
-    Args:
-        stru: 
-            the starting structure
-        param_method: 
-            the Parameterizer() used for parameterization. This determines the engine.
-        parallel_runs: 
-            the number of desired parallel runs of the steps.
-        parallel_method: 
-            the method to parallelize the multiple runs
-        work_dir: 
-            the directory that contains all the MD files input/intermediate/output
-        prod_time: 
-            the simulation time in production step (unit: ns)
-        prod_temperature: 
-            the production temperature
-        prod_constrain: 
-            the constrain applied in the production step
-        record_period: 
-            the simulation time period for recording the geom. (unit: ns)
-        cluster_job_config: 
-            the config for cluster_job if it is used as the parallel method.
-        cpu_equi_step: 
-            whether use cpu for equi step
-        cpu_equi_job_config: 
-            the job config for the cpu equi step if specified
-        job_check_period:
-            the check period for wait_to_2d_array_end. Used when parallel_method='cluster_job'.
-            (Unit: s, default: 210s)
-    Returns:
-        a dictionary in the structure of
-            {
-            "structure_files" : [...],
-            "config_files" : [...],
-            "sub_script" : "...",
-            }
-    """
+    return param_method, [min_step, heat_step, equi_step_1, equi_step_2, prod_step]
 
 # == general building blocks ==
 def md_simulation(stru: Structure,
@@ -335,6 +385,95 @@ def md_simulation(stru: Structure,
         results = _serial_md_steps(parallel_runs, work_dir, steps, params)
 
     return params, results
+
+def deployable_md_simulation(
+        stru: Structure,
+        param_method: MolDynParameterizer,
+        steps: List[MolDynStep],
+        parallel_runs: int=1,
+        work_dir: str="./MD",
+    ) -> Tuple[MolDynParameter, List[List[MolDynResult]]]:
+    """This science API deploy a Molecular Dynamics simulation task as submission
+    ready files.
+
+    Args:
+        stru:
+            the starting structure
+        param_method:
+            the Parameterizer() used for parameterization. This is a
+            special step that covert enzy_htp.Structure() to the input format
+            MolDynStep takes. Normally it will be topology, initial coordinate,
+            and MM parameters etc.
+        steps:
+            a list of steps each is a MolDynStep() that defines a molecular
+            dynamics step.
+        parallel_runs:
+            the number of desired parallel runs of the steps.
+        work_dir:
+            the directory that contains all the MD files input/intermediate/output
+        job_check_period:
+            the check period for wait_to_2d_array_end. Used when parallel_method='cluster_job'.
+            (Unit: s, default: 210s)
+
+    Return:
+        a dictionary in the structure below
+            {
+            "structure_files" : [...],
+            "config_files" : [...],
+            "sub_script" : "...",
+            }"""
+    # I. san check
+    #   - MD engine consistency
+    for i, step in enumerate(steps):
+        if step.engine != param_method.engine:
+            _LOGGER.error(
+                f"The engine of step #{i} ({step.engine}) does not match the parameterizer ({param_method.engine})!")
+            raise InconsistentMDEngine
+
+    # II. make work dir
+    fs.safe_mkdir(work_dir)
+
+    # III. parameterize
+    if (param_method.parameterizer_temp_dir is None or 
+        param_method.parameterizer_temp_dir == "default"):
+        param_method.parameterizer_temp_dir = work_dir
+    params = param_method.run(stru)
+
+    # IV. generate MD files
+    result_eggs = []
+    results = []
+    for i in range(parallel_runs):
+        job_list = []
+        result_egg_ele = []
+        # create job path
+        sub_work_dir = fs.get_valid_temp_name(f"{work_dir}/rep_{i}")
+        fs.safe_mkdir(sub_work_dir)
+        output = None  # the output place holder; the output between steps are very different for different packages so it will prob also becomes a class
+
+        for step in steps:
+            # 1. make job list
+            step.work_dir = sub_work_dir
+            if output: # steps after will use output from the previous one
+                job, output = step.make_job(output)
+            else: # the 1st step
+                job, output = step.make_job(params)
+            job_list.append(job)
+            # 2. make output (we need to translate all since error checking and cleaning is needed)
+            result_egg_ele.append((step, output))
+
+        job_list = type(step).try_merge_jobs(job_list)
+        for j in job_list:
+            j._deploy_sub_script(j.sub_script_path)
+
+        result_eggs.append(result_egg_ele)  # eggs are filenames that can be translated to give birth actual data
+        parallel_result = {
+            "structure_files" : [...],
+            "config_files" : [...],
+            "sub_script" : "...",
+        }
+
+    return results
+
 
 def _parallelize_md_steps_with_cluster_job(
         parallel_runs: int,
