@@ -19,6 +19,7 @@ from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
 import enzy_htp.chemical as chem
 from enzy_htp.core.exception import IndexMappingError
+from enzy_htp.core.general import EnablePropagate
 from enzy_htp.structure.structure_io.pdb_io import (PDBParser, restore_pdb_index, get_index_mapper_from_pdb, get_pdb_index_key)
 from enzy_htp.structure.structure_io._interface import StructureParserInterface
 from enzy_htp.structure import (
@@ -71,33 +72,30 @@ def test_check_valid_pdb_bad_input():
     # non pdb file
     txt_file = 'not_pdb.txt'
     assert not os.path.exists(txt_file)
-    with pytest.raises(SystemExit) as exe:
+    with pytest.raises(ValueError) as exe:
         sp._check_valid_pdb(txt_file)
 
     assert exe
-    assert exe.type == SystemExit
-    assert exe.value.code == 1
+    assert exe.type == ValueError
 
     # pdb that doesn't exist
     pdb_imaginary = 'not_real.pdb'
-    with pytest.raises(SystemExit) as exe:
+    with pytest.raises(ValueError) as exe:
         sp._check_valid_pdb(pdb_imaginary)
 
     assert exe
-    assert exe.type == SystemExit
-    assert exe.value.code == 1
+    assert exe.type == ValueError
 
     non_ascii_pdb = f'{CURRDIR}/bad_pdb.pdb'
     assert not os.path.exists(non_ascii_pdb)
     fs.write_lines(non_ascii_pdb, ['日本人 中國的'])
     assert os.path.exists(non_ascii_pdb)
 
-    with pytest.raises(SystemExit) as exe:
+    with pytest.raises(ValueError) as exe:
         sp._check_valid_pdb(non_ascii_pdb)
 
     assert exe
-    assert exe.type == SystemExit
-    assert exe.value.code == 1
+    assert exe.type == ValueError
 
     fs.safe_rm(non_ascii_pdb)
     assert not os.path.exists(non_ascii_pdb)
@@ -299,11 +297,10 @@ def test_resolve_missing_chain_id_missing_with_multi_chainid():
     target_df = pd.concat((test_mdl_pdb.df['ATOM'], test_mdl_pdb.df['HETATM']), ignore_index=True)
     target_ter_df = test_mdl_pdb.df['OTHERS'].query('record_name == "TER"')
 
-    with pytest.raises(SystemExit) as exe:
+    with pytest.raises(ValueError) as exe:
         sp._resolve_missing_chain_id(target_df, target_ter_df)
     assert exe
-    assert exe.type == SystemExit
-    assert exe.value.code == 1
+    assert exe.type == ValueError
 
 
 def test_resolve_missing_chain_id_with_same_chainid_in_2_ATOM():
@@ -314,11 +311,10 @@ def test_resolve_missing_chain_id_with_same_chainid_in_2_ATOM():
     target_df = pd.concat((test_mdl_pdb.df['ATOM'], test_mdl_pdb.df['HETATM']), ignore_index=True)
     target_ter_df = test_mdl_pdb.df['OTHERS'].query('record_name == "TER"')
 
-    with pytest.raises(SystemExit) as exe:
+    with pytest.raises(ValueError) as exe:
         sp._resolve_missing_chain_id(target_df, target_ter_df)
     assert exe
-    assert exe.type == SystemExit
-    assert exe.value.code == 1
+    assert exe.type == ValueError
 
 
 def test_resolve_missing_chain_id_repeat():
@@ -496,13 +492,11 @@ def test_get_structure_solvated_fast():
 
 @pytest.mark.interface
 def test_get_structure_bad_input():
-    with pytest.raises(SystemExit) as exe:
+    with pytest.raises(ValueError) as exe:
         sp.get_structure('dne.pdb')
 
     assert exe
-    assert exe.type == SystemExit
-    assert exe.value.code == 1
-
+    assert exe.type == ValueError
 
 @pytest.mark.interface
 def test_get_structure_simple():
