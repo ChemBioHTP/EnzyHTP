@@ -192,6 +192,10 @@ class AmberParameterizer(MolDynParameterizer):
     def parameterizer_temp_dir(self) -> str:
         return self._parameterizer_temp_dir
 
+    @parameterizer_temp_dir.setter
+    def parameterizer_temp_dir(self, val: str) -> None:
+        self._parameterizer_temp_dir = val
+
     def run(self, stru: Structure) -> AmberParameter:
         """the parameterizer convert stru to amber parameter (inpcrd, prmtop)"""
         # 0. set up paths

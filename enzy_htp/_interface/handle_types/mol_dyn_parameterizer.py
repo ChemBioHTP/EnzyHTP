@@ -49,6 +49,12 @@ class MolDynParameterizer(ABC):
         """the directory that contain the generated parm files"""
         pass
 
+    @parameterizer_temp_dir.setter
+    @abstractmethod
+    def parameterizer_temp_dir(self, value: str) -> None:
+        """set the directory that contain the generated parm files"""
+        pass
+
     @property
     @abstractmethod
     def parent_interface(self) -> BaseInterface:

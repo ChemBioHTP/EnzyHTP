@@ -9,6 +9,8 @@ Science API:
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2023-7-30
 """
+import copy
+from pathlib import Path
 from typing import List, Dict, Tuple
 
 import enzy_htp.core.file_system as fs
@@ -392,6 +394,7 @@ def deployable_md_simulation(
         steps: List[MolDynStep],
         parallel_runs: int=1,
         work_dir: str="./MD",
+        sub_script_dir = None,
     ) -> Tuple[MolDynParameter, List[List[MolDynResult]]]:
     """This science API deploy a Molecular Dynamics simulation task as submission
     ready files.
@@ -411,9 +414,9 @@ def deployable_md_simulation(
             the number of desired parallel runs of the steps.
         work_dir:
             the directory that contains all the MD files input/intermediate/output
-        job_check_period:
-            the check period for wait_to_2d_array_end. Used when parallel_method='cluster_job'.
-            (Unit: s, default: 210s)
+        sub_script_path:
+            The directory of the submission script. (default: work_dir)
+            Specify this argument to unify multiple subscript of MD tasks with same set up
 
     Return:
         a dictionary in the structure below
@@ -434,9 +437,8 @@ def deployable_md_simulation(
     fs.safe_mkdir(work_dir)
 
     # III. parameterize
-    if (param_method.parameterizer_temp_dir is None or 
-        param_method.parameterizer_temp_dir == "default"):
-        param_method.parameterizer_temp_dir = work_dir
+    param_method = copy.deepcopy(param_method)
+    param_method.parameterizer_temp_dir = work_dir
     params = param_method.run(stru)
 
     # IV. generate MD files
