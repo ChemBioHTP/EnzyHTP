@@ -45,6 +45,12 @@ class MolDynParameterizer(ABC):
 
     @property
     @abstractmethod
+    def parameterizer_temp_dir(self) -> str:
+        """the directory that contain the generated parm files"""
+        pass
+
+    @property
+    @abstractmethod
     def parent_interface(self) -> BaseInterface:
         """the interface of the corresponding engine software.
         normally contains all the constructors"""

@@ -176,7 +176,7 @@ class AmberParameterizer(MolDynParameterizer):
         self.solvate_box_type = solvate_box_type
         self.solvate_box_size = solvate_box_size
         self.gb_radii = gb_radii
-        self.parameterizer_temp_dir = parameterizer_temp_dir
+        self._parameterizer_temp_dir = parameterizer_temp_dir
         self.additional_tleap_lines = additional_tleap_lines
         self.keep_tleap_in = keep_tleap_in
 
@@ -187,6 +187,10 @@ class AmberParameterizer(MolDynParameterizer):
     @property
     def parent_interface(self):
         return self._parent_interface
+
+    @property
+    def parameterizer_temp_dir(self) -> str:
+        return self._parameterizer_temp_dir
 
     def run(self, stru: Structure) -> AmberParameter:
         """the parameterizer convert stru to amber parameter (inpcrd, prmtop)"""
