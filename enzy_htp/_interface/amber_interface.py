@@ -9,6 +9,7 @@ Date: 2022-06-02
 """
 import copy
 import glob
+from io import StringIO
 import os
 import re
 import shutil
@@ -16,7 +17,9 @@ from pathlib import Path
 from subprocess import CalledProcessError, CompletedProcess, SubprocessError
 from typing import Generator, List, Tuple, Union, Dict, Any
 from dataclasses import dataclass
+import pandas as pd
 from sympy import sympify
+from collections import Iterable
 
 from .base_interface import BaseInterface
 from .handle_types import (
@@ -29,8 +32,8 @@ from .gaussian_interface import gaussian_interface
 from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import math_helper as mh
-from enzy_htp.core.job_manager import ClusterJob
-from enzy_htp.core.exception import UnsupportedMethod, tLEaPError, AmberMDError
+from enzy_htp.core.job_manager import ClusterJob, ClusterJobConfig
+from enzy_htp.core.exception import AddPDBError, tLEaPError, AmberMDError
 from enzy_htp.core.general import get_interval_str_from_list
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
 from enzy_htp.structure.structure_io import pdb_io, prmtop_io
@@ -58,7 +61,7 @@ class AmberParameter(MolDynParameter):
         inpcrd: the path of the .inpcrd input coordinate file
         prmtop: the path of the .prmtop parameter topology file"""
 
-    def __init__(self, inpcrd_path: str, prmtop_path: str, ncaa_chrgspin_mapper: Dict = None):
+    def __init__(self, inpcrd_path: str, prmtop_path: str, ncaa_chrgspin_mapper: Union[Dict, None] = None):
         self._inpcrd = inpcrd_path
         self._prmtop = prmtop_path
         if ncaa_chrgspin_mapper is None:
@@ -131,6 +134,7 @@ class AmberParameterizer(MolDynParameterizer):
         gb_radii
         parameterizer_temp_dir
         additional_tleap_lines
+        keep_tleap_in
     Methods:
         run()
         """
@@ -158,21 +162,23 @@ class AmberParameterizer(MolDynParameterizer):
             solvate_box_size: float,
             gb_radii: int,
             parameterizer_temp_dir: str,
-            additional_tleap_lines: List[str],) -> None:
+            additional_tleap_lines: List[str],
+            keep_tleap_in: bool,) -> None:
         self._parent_interface: AmberInterface = interface
         self.force_fields = force_fields
         self.charge_method = charge_method
-        self.resp_engine = resp_engine
-        self.resp_lvl_of_theory = resp_lvl_of_theory
+        self.resp_engine = resp_engine # TODO make this actually work
+        self.resp_lvl_of_theory = resp_lvl_of_theory # TODO make this actually work
         self.ncaa_param_lib_path = ncaa_param_lib_path
-        self.force_renew_ncaa_parameter = force_renew_ncaa_parameter
-        self.ncaa_net_charge_engine = ncaa_net_charge_engine
-        self.ncaa_net_charge_ph = ncaa_net_charge_ph
+        self.force_renew_ncaa_parameter = force_renew_ncaa_parameter # TODO make this actually work
+        self.ncaa_net_charge_engine = ncaa_net_charge_engine # TODO make this actually work
+        self.ncaa_net_charge_ph = ncaa_net_charge_ph # TODO make this actually work
         self.solvate_box_type = solvate_box_type
         self.solvate_box_size = solvate_box_size
         self.gb_radii = gb_radii
         self.parameterizer_temp_dir = parameterizer_temp_dir
         self.additional_tleap_lines = additional_tleap_lines
+        self.keep_tleap_in = keep_tleap_in
 
     @property
     def engine(self) -> str:
@@ -200,6 +206,8 @@ class AmberParameterizer(MolDynParameterizer):
         maa_parms = {}
         metalcenter_parms = {}
         gaff_type = self._check_gaff_type()
+        if gaff_type == "GAFF2" and self.charge_method == "AM1BCC":
+            _LOGGER.warning("found combinations of GAFF2 and AM1BCC is not recommend per Amber Manual! Consider GAFF2/ABCG2")
         if "ligand" in diversity:
             for lig in stru.ligands:
                 if lig.name not in ligand_parms: # avoid repeating calculation
@@ -225,15 +233,16 @@ class AmberParameterizer(MolDynParameterizer):
 
         # 3. write the combining tleap.in
         tleap_content, temp_dry_pdb = self._write_combining_tleap_input(
-                                            stru,
-                                            ligand_parms,
-                                            maa_parms,
-                                            metalcenter_parms,
-                                            result_inpcrd,
-                                            temp_prmtop,)
+                                            stru=stru,
+                                            ligand_parms=ligand_parms,
+                                            maa_parms=maa_parms,
+                                            metalcenter_parms=metalcenter_parms,
+                                            result_inpcrd=result_inpcrd,
+                                            result_prmtop=temp_prmtop,
+                                            additional_tleap_lines=self.additional_tleap_lines,)
 
         # 4. run tleap
-        self.parent_interface.run_tleap(tleap_content)
+        self.parent_interface.run_tleap(tleap_content, keep_in_file=self.keep_tleap_in)
 
         # 5. run add_pdb
         PDBParser().save_structure(temp_ref_pdb, stru, if_renumber=False, if_fix_atomname=False)
@@ -278,7 +287,8 @@ class AmberParameterizer(MolDynParameterizer):
             mol_desc_path = f"{self.ncaa_param_lib_path}/{lig.name}_{target_method}.mol2" # the search ensured no existing file named this
             self.parent_interface.antechamber_ncaa_to_moldesc(ncaa=lig,
                                                               out_path=mol_desc_path,
-                                                              gaff_type=gaff_type)
+                                                              gaff_type=gaff_type,
+                                                              charge_method=self.charge_method)
 
         # 2. run parmchk2 on the PDB
         # (this also runs when mol_desc exsit but not frcmod)
@@ -292,9 +302,23 @@ class AmberParameterizer(MolDynParameterizer):
     def _parameterize_modified_res(self, maa: ModifiedResidue, gaff_type: str) -> Tuple[str, List[str]]:
         """parameterize modified residues for AmberMD, use ncaa_param_lib_path for customized
         parameters. Multiplicity and charge information can be set in ModifiedResidue objects."""
-        fs.safe_mkdir(self.ncaa_param_lib_path)
-        # 0. search parm lib
+        # san check
+        if not gaff_type:
+            _LOGGER.error("The structure contains non-canonical residue"
+                          " (lig or maa) but GAFF/GAFF2 is not used!"
+                          f" Check you force_fields. (current: {self.force_fields})")
+            raise ValueError
 
+        fs.safe_mkdir(self.ncaa_param_lib_path)
+        target_method = f"{self.charge_method}-{gaff_type}"
+        # 0. search parm lib
+        mol_desc_path, frcmod_path_list = search_ncaa_parm_file(maa,
+                                            target_method=target_method,
+                                            ncaa_lib_path=self.ncaa_param_lib_path)
+
+        if mol_desc_path:
+            if frcmod_path_list:
+                return mol_desc_path, frcmod_path_list
         # 1. make maa PDB
 
         # 2. run antechamber on the PDB get ac
@@ -346,7 +370,8 @@ class AmberParameterizer(MolDynParameterizer):
             maa_parms: Dict,
             metalcenter_parms: Dict,
             result_inpcrd: str,
-            result_prmtop: str,) -> Tuple[str, str]:
+            result_prmtop: str,
+            additional_tleap_lines: List[str],) -> Tuple[str, str]:
         """combine mol_desc and parm file of each noncanonical parts and make the content
         of the input file for tleap.
         Returns:
@@ -357,6 +382,16 @@ class AmberParameterizer(MolDynParameterizer):
         lines = []
         for ff in self.force_fields:
             lines.append(f"source {ff}")
+
+        # support for custom lines
+        if (isinstance(additional_tleap_lines, Iterable)
+            and not isinstance(additional_tleap_lines, str)
+            and isinstance(additional_tleap_lines[0], str)
+            ):
+            lines.extend(additional_tleap_lines)
+        else:
+            _LOGGER.error(f"`additional_tleap_line` needs to be a list of str. current: {repr(additional_tleap_lines)}")
+            raise TypeError
 
         # NCAA parts
 
@@ -389,6 +424,7 @@ class AmberParameterizer(MolDynParameterizer):
             f"solvate{self.solvate_box_type} a TIP3PBOX {self.solvate_box_size}",
             f"saveamberparm a {result_prmtop} {result_inpcrd}",
             "quit",
+            "",
         ])
 
         result = "\n".join(lines)
@@ -946,12 +982,35 @@ class AmberInterface(BaseInterface):
         self.config_.display()
 
     # == general amber app interface ==
+
+    # -- file format --
     def get_file_format(self, fname: str) -> str:
         """determine the file type give file path"""
         ext = fs.get_file_ext(fname)
         if "frcmod" in ext:
             return "frcmod"
         return self.AMBER_FILE_FORMAT_MAPPER.get(ext, ext[1:])
+
+    def convert_traj_to_nc(self, fpath: str, out_path: str) -> None:
+        """convert the given trajectory file to the Amber .nc file in the out_path"""
+        in_format = self.get_file_format(fpath)
+
+        if in_format == "nc":
+            fs.safe_cp(fpath, out_path)
+        else:
+            # TODO for other formats. We probably need a central format to reduce the engineering overhead
+            _LOGGER.error(f"found unsupported file format: {in_format} ({fpath})")
+            raise ValueError
+
+    def convert_top_to_prmtop(self, fpath: str, out_path: str) -> None:
+        """convert the given topology file to the Amber .prmtop file in the out_path"""
+        in_format = self.get_file_format(fpath)
+
+        if in_format == "prmtop":
+            fs.safe_cp(fpath, out_path)
+        else:
+            _LOGGER.error(f"found unsupported file format: {in_format} ({fpath})")
+            raise ValueError
 
     # -- tleap --
     def run_tleap(
@@ -960,7 +1019,9 @@ class AmberInterface(BaseInterface):
         # cmd based
         if_ignore_start_up: bool = True,
         additional_search_path: List[str] = None,
-        tleap_out_path: str = None,) -> None:
+        tleap_out_path: Union[str, None] = None,
+        # debug
+        keep_in_file: bool = False,) -> None:
         """the python wrapper of running tleap
         Args:
             tleap_in_str:
@@ -973,6 +1034,8 @@ class AmberInterface(BaseInterface):
             tleap_out_path:
                 file path for stdout of the tleap command. the _LOGGER level
                 determines if delete the file.
+            keep_in_file:
+                control whether delete tleap.in file
 
         NOTE: run_tleap API should not handle the index alignment since it do
         not carry information of the input pdb"""
@@ -980,7 +1043,9 @@ class AmberInterface(BaseInterface):
         # init file paths (tleap_in_path, tleap_out_path)
         fs.safe_mkdir(eh_config["system.SCRATCH_DIR"])
         tleap_in_path = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/tleap.in")
-        temp_path_list.extend([eh_config["system.SCRATCH_DIR"], tleap_in_path])
+        temp_path_list.append(eh_config["system.SCRATCH_DIR"])
+        if not keep_in_file:
+            temp_path_list.append(tleap_in_path)
         if tleap_out_path is None:
             tleap_out_path = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/tleap.out")
             temp_path_list.append(tleap_out_path)
@@ -1167,11 +1232,19 @@ class AmberInterface(BaseInterface):
             cmd_args = f"{cmd_args} -guess"
         self.env_manager_.run_command("add_pdb", cmd_args)
 
+    def clean_up_add_pdb_info(self, in_prmtop: str, out_path: str):
+        """remove add_pdb info in prmtop"""
+        with open(in_prmtop, "r") as f, open(out_path, "w") as of:
+            for line in f:
+                if "RESIDUE_CHAINID" in line: # TODO move this function to PrmtopIO and make a better solution
+                    break
+                of.write(line)
+        
     # -- cpptraj --
     def run_cpptraj(
             self,
             instr_str: str,
-            log_path: str = None,
+            log_path: Union[str, None] = None,
         ):
         """the python wrapper of running cpptraj.
         Based on https://amberhub.chpc.utah.edu/command-line-syntax/.
@@ -1202,6 +1275,490 @@ class AmberInterface(BaseInterface):
         # clean up temp file if success
         fs.clean_temp_file_n_dir(temp_path_list)
 
+    def get_n_frames_cpptraj_log(self, cpptraj_log: str) -> int:
+        """get the num of frames from a cpptraj log. (this will always be in the output)"""
+        with open(cpptraj_log, "r") as f:
+            content = f.read()
+        pattern = r"INPUT TRAJECTORIES.*\n.*\(reading 1 of (\d+)\)"
+        result = int(re.search(pattern, content).group(1))
+        return result
+
+    # -- MMPBSA.py --
+    def run_mmpbsa(
+        self,
+        # IO data
+        dr_prmtop: str, dl_prmtop: str, dc_prmtop: str, sc_prmtop: str, traj_file: str,
+        out_path: str, 
+        # choose algorithm
+        solvent_model: str,
+        # algorithm config
+        ion_strength: float = 0.15,
+        igb: int = 5,
+        fillratio: float = None, # default: 4.0
+        exdi: float = None, # default: 80.0
+        indi: float = None, # default: 1.0
+        # operation config
+        startframe: int = 1,
+        endframe: int = None, # default: last frame
+        interval: int = 1,
+        verbose: int = 1,
+        keep_files: int = 0, # NOTE seems the keep files option no longer works in terms of removing the intermediate files when prefix is used
+        use_sander: bool = True,
+        cluster_job_config: ClusterJobConfig = None,
+        job_check_period: int = 30,
+        non_armer_cpu_num: int = None,
+        keep_in_file: bool = False,
+        in_file: str = None,
+        work_dir: str = None,
+        result_in_each_frames: bool = True,
+        ) -> None:
+        """the python wrapper for running MMPBSA.py.MPI (MMPBSA.py not supported yet)
+        Handle dispatch of using ClusterJob or not in this function.
+        Args:
+            dr_prmtop, dl_prmtop, dc_prmtop, sc_prmtop, traj_file:
+                The input prmtop files of dry receptor, dry ligand, dry complex, solvated
+                complex, and the .nc/.mdcrd file of the trajectory
+            out_path:
+                the path for output the .dat file
+            solvent_model:
+                choose between PBSA and GBSA by keywords "pbsa" or "gbsa".
+            ion_strength:
+                this is istrng for PB and saltcon for GB.
+            startframe, endframe, interval, keep_files, igb, fillratio, verbose, 
+            use_sander, exdi, indi:
+                These arguments means the same as the original keywords in the .in file of
+                MMPB/GBSA. See the Amber Manual (Section 34.3.1 in Amber20's case) for details.
+                Only commonly used ones are included. Contact developer if you need more.
+            cluster_job_config, job_check_period, non_armer_cpu_num:
+                arguments for ARMer setup. 
+                (see the docstring of `enzy_htp.analysis.binding.binding_energy`)
+            
+            keep_in_file:
+                control whether clean up the .in file after finish. (force keep if in_file
+                is provided by user through {in_file})
+            in_file:
+                this argument allows user to provide their own .in files. This will overwrite
+                all the .in file related arguments.
+            """
+        if work_dir is None:
+            work_dir = eh_config.system.SCRATCH_DIR
+        fs.safe_mkdir(work_dir)
+        clean_up_targets = []
+
+        # make .in file if not provided
+        if not in_file:
+            in_file = fs.get_valid_temp_name(f"{work_dir}/mmpbsa.in")
+            self._create_mmpbgbsa_in_file(
+                in_file = in_file,
+                solvent_model = solvent_model,
+                ion_strength = ion_strength,
+                igb = igb,
+                startframe = startframe,
+                endframe = endframe,
+                interval = interval,
+                verbose = verbose,
+                keep_files = keep_files,
+                use_sander = use_sander,
+                fillratio = fillratio,
+                exdi = exdi,
+                indi = indi,
+            )
+        else:
+            keep_in_file = True # force keep in file if it is provided.
+
+        if cluster_job_config is not None:
+            num_cores = int(cluster_job_config.node_cores)
+        else:
+            num_cores = non_armer_cpu_num
+        # MMPBSA need num_cores <= num of frames
+        num_of_frames = self.count_num_of_frames_traj(sc_prmtop, traj_file)
+        if num_cores > num_of_frames:
+            num_cores = num_of_frames
+
+        if result_in_each_frames:
+            temp_out_path = fs.get_valid_temp_name(f"{work_dir}/temp_mmpbsa_out.dat")
+            clean_up_targets.append(temp_out_path)
+        else:
+            temp_out_path = None
+
+        int_file_prefix = f"{work_dir}/_MMPBSA_"
+        mmpbgbsa_command = self._make_mmpbgbsa_command(
+            num_cores = num_cores,
+            dr_prmtop = dr_prmtop,
+            dl_prmtop = dl_prmtop,
+            dc_prmtop = dc_prmtop,
+            sc_prmtop = sc_prmtop,
+            traj_file = traj_file,
+            in_path = in_file,
+            out_path = out_path,
+            prefix = int_file_prefix, # control the intermediate file 
+            result_in_each_frames=result_in_each_frames,
+            temp_out_path=temp_out_path,
+        )
+
+        # dispatch for ARMer
+        if cluster_job_config is None:
+            # running locally
+            mmpbgbsa_exec, mmpbgbsa_args = mmpbgbsa_command.split(" ", 1)
+            this_run = self.env_manager_.run_command(
+                exe=mmpbgbsa_exec,
+                args=mmpbgbsa_args,
+            )
+            self.check_mmpbgbsa_error(out_path, this_run)
+        else:
+            # make job
+            cluster = cluster_job_config.cluster
+            res_keywords = cluster_job_config.res_keywords
+            env_settings = cluster.AMBER_ENV["CPU"]
+            sub_script_path = fs.get_valid_temp_name(f"{work_dir}/submit_mmpbgbsa.cmd")
+            
+            job = ClusterJob.config_job(
+                commands=mmpbgbsa_command,
+                cluster=cluster,
+                env_settings=env_settings,
+                res_keywords=res_keywords,
+                sub_dir="./",  # because path are relative
+                sub_script_path=sub_script_path)
+            job.submit()
+            job.wait_to_end(period=job_check_period)
+            self.check_mmpbgbsa_error(out_path, job)
+            clean_up_targets.extend([job.job_cluster_log, sub_script_path])
+        
+        # clean up
+        if not keep_in_file:
+            clean_up_targets.append(in_file)
+        clean_up_targets.extend(glob.glob(f"{int_file_prefix}*"))
+        fs.clean_temp_file_n_dir(clean_up_targets)
+
+    def _create_mmpbgbsa_in_file(self, in_file,
+            solvent_model,
+            ion_strength,
+            igb,
+            startframe,
+            endframe,
+            interval,
+            verbose,
+            keep_files,
+            use_sander,
+            fillratio,
+            exdi,
+            indi,
+        ):
+        """create a mmpbgbsa .in file in {in_file}"""
+        general_optional_namelist = [
+            "startframe", "endframe", "interval", "verbose", "keep_files", 
+            "use_sander",]
+        pb_optional_namelist = [
+            "fillratio", "exdi", "indi",]
+        gb_optional_namelist = []
+
+        # create in file
+        in_file_lines = [
+            "config generated by EnzyHTP",
+        ]
+        general_lines = [
+            "&general",
+        ]
+        # general namelist
+        arguments = locals()
+        for k in general_optional_namelist:
+            v = arguments[k]
+            if v is not None:
+                if isinstance(v, bool):
+                    v = int(v)
+                general_lines.append(f"  {k}={v},")
+        general_lines.append("/")
+        in_file_lines.extend(general_lines)
+
+        if solvent_model == "pbsa":
+        # pb namelist
+            pb_lines = [
+                "&pb",
+                f"  istrng={ion_strength},",
+            ]
+            for k in pb_optional_namelist:
+                v = arguments[k]
+                if v is not None:
+                    if isinstance(v, bool):
+                        v = int(v)
+                    pb_lines.append(f"  {k}={v},")
+            pb_lines.append("/")
+            in_file_lines.extend(pb_lines)
+
+        elif solvent_model == "gbsa":
+        # gb namelist
+            gb_lines = [
+                "&gb",
+                f"  saltcon={ion_strength},",
+                f"  igb={igb},",
+            ]
+            for k in gb_optional_namelist:
+                v = arguments[k]
+                if v is not None:
+                    if isinstance(v, bool):
+                        v = int(v)
+                    gb_lines.append(f"  {k}={v},")
+            gb_lines.append("/")
+            in_file_lines.extend(gb_lines)
+        
+        else:
+            _LOGGER.error(
+                f"solvent_model ({solvent_model}) not supported. Supported: [pbsa, gbsa]")
+            raise ValueError
+
+        fs.write_lines(in_file, in_file_lines)
+
+    def check_mmpbgbsa_error(
+            self, 
+            out_file: str, 
+            stdstream_source: Union[ClusterJob, CompletedProcess, SubprocessError]
+        ):
+        """avoid slient error from mmpbsa run"""
+        if not Path(out_file).exists():
+            # collect error info
+            error_info_list = []
+            # 1. stdout stderr
+            # error types: Fall of bus, periodic box has changed too much, illegel mem
+            if isinstance(stdstream_source, ClusterJob):
+                with open(stdstream_source.job_cluster_log) as f:
+                    stderr_stdout = f.read()
+                    error_info_list.append(f"stdout/stderr(from job log):{os.linesep*2}{stderr_stdout}")
+            elif isinstance(stdstream_source, CompletedProcess):
+                error_info_list.append(f"stdout:{os.linesep*2}{stdstream_source.stdout}")
+                error_info_list.append(f"stderr:{os.linesep*2}{stdstream_source.stderr}")
+            elif isinstance(stdstream_source, SubprocessError):
+                error_info_list.append(f"stdout:{os.linesep*2}{stdstream_source.stdout}")
+                error_info_list.append(f"stderr:{os.linesep*2}{stdstream_source.stderr}")
+            else:
+                _LOGGER.error("Only allow ClusterJob, CompletedProcess, SubprocessError as input types for `stdstream_source`")
+                raise TypeError
+            # 2. mdout file
+            # have no experience that error pops here yet. Add when observed
+            # 3. traj analysis 
+            # TODO
+            # Note that if_report = 0 will make traj_path = None
+            # TODO give suggestion for each detected types of errors.
+
+            _LOGGER.error(f"MMPBSA didn't finish normally.{os.linesep}{os.linesep.join(error_info_list)}")
+            raise AmberMDError(error_info_list)
+
+    def _make_mmpbgbsa_command(
+            self, 
+            num_cores: int,
+            dr_prmtop: str, dl_prmtop: str, dc_prmtop: str, sc_prmtop: str, traj_file: str,
+            in_path: str, out_path: str, temp_out_path: str, prefix: str,
+            result_in_each_frames: bool = True,
+        ) -> str:
+        """make the mmpb/gbsa command. Overwrite existing files by default by "-O"."""
+        mpi_exec = eh_config.system.get_mpi_executable(num_cores)
+        mmpbsa_exec = self.config()["HARDCODE_MMMPBSA_MPI_ENGINE"]
+        result = (
+            f"{mpi_exec} {mmpbsa_exec} "
+            f"-O "
+            f"-i {in_path} "
+            f"-sp {sc_prmtop} "
+            f"-cp {dc_prmtop} "
+            f"-rp {dr_prmtop} "
+            f"-lp {dl_prmtop} "
+            f"-y {traj_file} "
+            f"-prefix {prefix} "
+        )
+        if result_in_each_frames:
+            result += f"-eo {out_path} -o {temp_out_path}"
+        else:
+            result += f"-o {out_path} "
+
+        return result
+
+    def run_ante_mmpbsa(
+        self,
+        complex_prmtop_in: str,
+        dry_complex_out: str,
+        dry_receptor_out: str,
+        dry_ligand_out: str,
+        strip_mask: str,
+        radii: str,
+        receptor_mask: str = None,
+        ligand_mask: str = None,
+        ):
+        """the python wrapper for running ante-MMPBSA.py"""
+        if receptor_mask is None:
+            if ligand_mask is None:
+                _LOGGER.error("Must specify either 'receptor_mask' or 'ligand_mask'!")
+                raise ValueError
+            else:
+                selection_args = ["-n", ligand_mask]
+        elif ligand_mask is None:
+            selection_args = ["-m", receptor_mask]
+        else:
+            _LOGGER.error("Must specify either 'receptor_mask' OR 'ligand_mask'! (not both) ")
+            raise ValueError
+
+        cmd_args = [
+            "-p", complex_prmtop_in,
+            "-c", dry_complex_out,
+            "-r", dry_receptor_out,
+            "-l", dry_ligand_out,
+            "--radii", radii,
+            "-s", strip_mask,
+        ] + selection_args
+
+        self.env_manager_.run_command("ante-MMPBSA.py", cmd_args)
+
+    def parse_mmpbsa_result(self, mmpbsa_out_file: str, by_frames: bool) -> Dict[str, pd.DataFrame]:
+        """parse the resulting mmpbsa.dat file from MMPBSA to a dictionary
+        Args:
+            mmpbsa_out_file: 
+                the data file generated by MMPBSA.py
+            by_frames: 
+                specify the format of the data file to be the average one (.dat) or
+                the by frames one (.csv)"""
+        if by_frames:
+            result = self._parse_mmpbsa_result_by_frames(mmpbsa_out_file)
+        else:
+            result = self._parse_mmpbsa_result_average(mmpbsa_out_file)
+    
+        if not result:
+            _LOGGER.warning(
+                f"The provided mmpbsa data file ({mmpbsa_out_file}) does not contain any data!"
+            )
+
+        return result
+    
+    def _parse_mmpbsa_result_by_frames(self, mmpbsa_out_file: str) -> Dict[str, pd.DataFrame]:
+        """parse the result when -eo is specified for the output"""
+        gb_pattern = (
+            r"GENERALIZED BORN:(?:.|\n)+?DELTA Energy Terms\n"
+            r"((?:.|\n)+?)"
+            r"\n\n"
+        )
+        pb_pattern = (
+            r"POISSON BOLTZMANN:(?:.|\n)+?DELTA Energy Terms\n"
+            r"((?:.|\n)+?)"
+            r"\n\n"
+        )
+        result = {}
+
+        with open(mmpbsa_out_file) as f:
+            f_str = f.read()
+        # GB
+        gb_search = re.search(gb_pattern, f_str)
+        if gb_search is not None:
+            gb_table = gb_search.group(1).strip()
+            gb_result = pd.read_csv(StringIO(gb_table))
+            result["gbsa"] = gb_result
+        # PB
+        pb_search = re.search(pb_pattern, f_str)
+        if pb_search is not None:
+            pb_table = pb_search.group(1).strip()
+            pb_result = pd.read_csv(StringIO(pb_table))
+            result["pbsa"] = pb_result
+
+        return result
+
+    def _parse_mmpbsa_result_average(self, mmpbsa_out_file: str) -> Dict[str, pd.DataFrame]:
+        gb_pattern = (
+            r"GENERALIZED BORN:(?:.|\n)+?Differences \(Complex - Receptor - Ligand\):\n"
+            r"((?:.|\n)+?)"
+            r"-------------------------------------------------------------------------------\n"
+            r"-------------------------------------------------------------------------------"
+        )
+        pb_pattern = (
+            r"POISSON BOLTZMANN:(?:.|\n)+?Differences \(Complex - Receptor - Ligand\):\n"
+            r"((?:.|\n)+?)"
+            r"-------------------------------------------------------------------------------\n"
+            r"-------------------------------------------------------------------------------"
+        )
+        result = {}
+
+        with open(mmpbsa_out_file) as f:
+            f_str = f.read()
+        # GB
+        gb_search = re.search(gb_pattern, f_str)
+        if gb_search is not None:
+            gb_table = gb_search.group(1).strip()
+            gb_result = self._parse_pb_gb_table(gb_table)
+            result["gbsa"] = gb_result
+        # PB
+        pb_search = re.search(pb_pattern, f_str)
+        if pb_search is not None:
+            pb_table = pb_search.group(1).strip()
+            pb_result = self._parse_pb_gb_table(pb_table)
+            result["pbsa"] = pb_result
+
+        return result
+    
+    def _parse_pb_gb_table(self, table_str: str) -> pd.DataFrame:
+        """the table looks like this:
+        Energy Component            Average              Std. Dev.   Std. Err. of Mean
+        -------------------------------------------------------------------------------
+        VDWAALS                    -20.3834                3.1308              0.3131
+        EEL                        -19.1765                7.2973              0.7297
+        EGB                         20.8964                4.2728              0.4273
+        ESURF                       -3.8046                0.1256              0.0126
+
+        DELTA G gas                -39.5599                8.4658              0.8466
+        DELTA G solv                17.0918                4.2257              0.4226
+
+        DELTA TOTAL                -22.4680                5.2186              0.5219
+        Returns: (like this) pd.DataFrame
+                          mean      sd     sem
+            VDWAALS      -20.3834  3.1308  0.3131
+            EEL          -19.1765  7.2973  0.7297
+            EGB           20.8964  4.2728  0.4273
+            ESURF         -3.8046  0.1256  0.0126
+            DELTA G gas  -39.5599  8.4658  0.8466
+            DELTA G solv  17.0918  4.2257  0.4226
+            DELTA TOTAL  -22.4680  5.2186  0.5219"""
+
+        data_pattern = r"([A-z]+(?: [A-z]+)*)( *[0-9\-\.]+)( *[0-9\-\.]+)( *[0-9\-\.]+)"
+        data_lines = re.findall(data_pattern, table_str)
+        data_dict = {}
+        for line in data_lines:
+            data_dict[line[0].strip()] = [float(line[1].strip()), float(line[2].strip()), float(line[3].strip())]
+        
+        result_df = pd.DataFrame.from_dict(
+            data_dict, 
+            orient="index",
+            columns=["mean", "sd", "sem"]
+            )
+        
+        return result_df
+
+    # -- parmed --
+    def run_parmed(
+        self,
+        parmed_in_str: str,
+        prmtop_file: str,
+        inpcrd_file: str = None,
+        log_file: str = None,
+        overwrite: bool = True,
+        ):
+        """the python wrapper for running parmed"""
+        temp_dir = eh_config.system.SCRATCH_DIR
+        fs.safe_mkdir(temp_dir)
+        temp_in_file = fs.get_valid_temp_name(f"{temp_dir}/temp_parmed.in")
+        with open(temp_in_file, "w") as of:
+            of.write(parmed_in_str)
+
+        cmd_args = [
+            "-i", temp_in_file,
+            "-p", prmtop_file,
+        ]
+        if inpcrd_file is not None:
+            cmd_args += ["-c", inpcrd_file]
+        if log_file is not None:
+            cmd_args += ["-l", log_file]
+        if overwrite:
+            cmd_args += ["-O"]
+
+        self.env_manager_.run_command("parmed", cmd_args)
+
+        # clean up
+        fs.clean_temp_file_n_dir([
+            temp_in_file
+        ])
+
     # -- index mapping --
     def get_amber_index_mapper(self, stru: Structure) -> Dict[str, Dict[Union[Residue, Atom], Union[int, tuple]]]:
         """get a mapper for objects in {stru} and in Amberilzed PDB of stru
@@ -1211,6 +1768,9 @@ class AmberInterface(BaseInterface):
             "residue" : {Residue(): amber_1_index_residue_idx_1, ...},
             "atom" : {Atom(): amber_1_index_atom_idx_1}
             }
+
+        This will work as long as the order of residues remains the same after tleap process and atom
+        have unique names in each residue.
         TODO solve this for the 1Q4T case."""
         # init files
         temp_dir = eh_config['system.SCRATCH_DIR']
@@ -1233,11 +1793,12 @@ class AmberInterface(BaseInterface):
             "residue" : {},
             "atom" : {},
         }
+        ref_reskey_mapper = ref_stru.residue_mapper
         for k, res in stru.residue_mapper.items():
             amber_key = ref_mapper[k]
             result["residue"][res] = amber_key
             for atom in res.atoms:
-                amber_atom_idx = ref_stru.find_residue_with_key(amber_key).find_atom_name(atom.name).idx
+                amber_atom_idx = ref_reskey_mapper[amber_key].find_atom_name(atom.name).idx
                 result["atom"][atom] = amber_atom_idx
         fs.clean_temp_file_n_dir([
             temp_dir,
@@ -1252,7 +1813,6 @@ class AmberInterface(BaseInterface):
         stru = atoms[0].root()
         aid_mapper = self.get_amber_index_mapper(stru)
         return [aid_mapper["atom"][at] for at in atoms]
-
 
     def rename_atoms(self, stru: Structure) -> None: # TODO(high piror) move to structure_io https://github.com/ChemBioHTP/EnzyHTP/pull/162#discussion_r1473217587
         """Renames residues and atoms to be compatible with Amber naming and functions.
@@ -1287,7 +1847,6 @@ class AmberInterface(BaseInterface):
                         changed_atoms += 1                            
         
         _LOGGER.info(f"Finished renaming! Changed {changed_residues} residues and {changed_atoms} atoms.")
-
 
     def get_amber_residue_index(self, residues: List[Atom]) -> List[int]:
         """"""
@@ -1569,6 +2128,7 @@ class AmberInterface(BaseInterface):
         }
 
         return raw_dict
+
     def _parse_cons_to_raw_rs_dict(self, cons: StructureConstraint) -> Dict:
         """parse StructureConstraint() to a raw dict for writing the DISANG file.
         Expression containing value are also parsed in this function.
@@ -1679,9 +2239,11 @@ class AmberInterface(BaseInterface):
             return target_path
         else:
             _LOGGER.info("found file path exceeding length limit of mdin. reducing it.")
+            # 0. resolve path
+            target_path: Path = Path(target_path)
+            target_path = target_path.resolve()
 
             # 1. relative path
-            target_path: Path = Path(target_path)
             result = target_path.relative_to(Path.cwd())
             if len(str(result)) <= 70:
                 return str(result)
@@ -1714,7 +2276,6 @@ class AmberInterface(BaseInterface):
             _LOGGER.warning(f"4nd attempt failed. making {result} for {target_path}.")
             Path(result).symlink_to(target_path)
             return result
-
 
     def read_from_mdout(self, mdout_file_path: str) -> Dict:
         """the knowledge of the mdout format as the log of sander/pmemd.
@@ -1824,12 +2385,17 @@ class AmberInterface(BaseInterface):
             # temp paths
             parameterizer_temp_dir: str = "default", # default: {config[system.SCRATCH_DIR]}/amber_parameterizer
             additional_tleap_lines: List[str] = None,
+            # debug options
+            keep_tleap_in: Union[bool, str] = "default",
             ) -> AmberParameterizer:
         """the constructor for AmberParameterizer
         Args:
             force_fields:
                 The list of force fields used for parameterization in Amber tleap format
                 (e.g.: ["leaprc.protein.ff14SB", "leaprc.gaff", "leaprc.water.tip3p"])
+                (NOTE that if the user has access to AmberTools24 or later. It is recommend
+                to use `abcg2` charge method for gaff2 and `bcc` for gaff according to Page
+                312 of Amber24 manual.)
             charge_method:
                 The method used for determine the atomic charge.
                 This method is applied to parameterization of ligand, modified AA,
@@ -1867,7 +2433,9 @@ class AmberInterface(BaseInterface):
             parameterizer_temp_dir: (default: {config[system.SCRATCH_DIR]}/amber_parameterizer)
                 The temporary working directory that contains all the files generated by the AmberParameterizer
             additional_tleap_lines:
-                handle for adding additional tleap lines before generating the parameters."""
+                handle for adding additional tleap lines before generating the parameters.
+            keep_tleap_in:
+                whether keep tleap.in file generated during the process. (default: False)"""
         # tool: write the below code
         # print(AmberInterface._generate_default_assigning_lines_for_build_md_parameterizer_or_step(locals().items()))
 
@@ -1895,6 +2463,8 @@ class AmberInterface(BaseInterface):
             solvate_box_size = self.config()["DEFAULT_SOLVATE_BOX_SIZE"]
         if parameterizer_temp_dir == "default":
             parameterizer_temp_dir = self.config()["DEFAULT_PARAMETERIZER_TEMP_DIR"]
+        if keep_tleap_in == "default":
+            keep_tleap_in = self.config()["DEFAULT_KEEP_TLEAP_IN"]
 
         return AmberParameterizer(
             self,
@@ -1910,7 +2480,8 @@ class AmberInterface(BaseInterface):
             solvate_box_size,
             gb_radii,
             parameterizer_temp_dir,
-            additional_tleap_lines,)
+            additional_tleap_lines,
+            keep_tleap_in,)
 
     @staticmethod
     def _generate_default_assigning_lines_for_build_md_parameterizer_or_step(parameter_mapper: dict) -> str:
@@ -1926,7 +2497,7 @@ class AmberInterface(BaseInterface):
 
     def antechamber_ncaa_to_moldesc(self,
                                     ncaa: NonCanonicalBase,
-                                    out_path: str = None,
+                                    out_path: Union[str, None] = None,
                                     gaff_type: str = "GAFF",
                                     charge_method: str = "AM1BCC",
                                     cluster_job_config: Dict=None,) -> str:
@@ -2019,7 +2590,7 @@ class AmberInterface(BaseInterface):
     def build_md_step(self,
                       name: str = "default",
                       # simulation
-                      length: float = None, # ns
+                      length: Union[float, None] = None, # ns
                       timestep: float = "default", # ns
                       minimize: bool = "default",
                       temperature: Union[float, List[Tuple[float]]] = "default",
@@ -2263,47 +2834,251 @@ class AmberInterface(BaseInterface):
         contents = "\n".join(contents)
         self.run_cpptraj(contents)
 
-    # region == TODO ==
-    def add_charges(self, stru: Structure, prmtop: str) -> None:
-        """Method that adds RESP charges from a .prmtop file to the supplied Structure object. If the supplied prmtop
-        file does not line up with the structure, an error is thrown. Performs operation in place.
-        Will also throw an error if some of the resulting atoms do not get assigned charges.
+    def load_traj(self, prmtop_path: str, traj_path: str, ref_pdb: str = None) -> StructureEnsemble:
+        """load StructureEnsemble from Amber prmtop and nc/mdcrd files"""
+        coord_parser_mapper = {
+            ".nc" : AmberNCParser(prmtop_file=prmtop_path),
+            ".mdcrd" : AmberMDCRDParser(prmtop_file=prmtop_path),
+        }
+        if not prmtop_io.PrmtopParser.has_add_pdb(prmtop_path):
+            scratch_dir = eh_config["system.SCRATCH_DIR"]
+            fs.safe_mkdir(scratch_dir)
+            temp_prmtop = fs.get_valid_temp_name(f"{scratch_dir}/load_traj.prmtop")
+            self.run_add_pdb(
+                in_prmtop=prmtop_path,
+                out_path=temp_prmtop,
+                ref_pdb=ref_pdb
+            )
+            prmtop_path = temp_prmtop
 
+        result = StructureEnsemble(
+            topology=prmtop_path,
+            top_parser=prmtop_io.PrmtopParser().get_structure,
+            coordinate_list=traj_path,
+            coord_parser=coord_parser_mapper[Path(traj_path).suffix].get_coordinates,
+        )
+
+        return result
+
+    def count_num_of_frames_traj(self, prmtop_path: str, traj_path: str) -> int:
+        """count the num of frames of the trajectory from
+        the traj_path. Considered to be a faster approach then using
+        StructureEnsemble"""
+        contents: List[str] = [
+            f"parm {prmtop_path}",
+            f"trajin {traj_path} 1 1",
+            "run",
+            "quit",
+        ]
+        contents = "\n".join(contents)
+        # prepare log
+        temp_dir = eh_config.system.SCRATCH_DIR
+        temp_log_path = fs.get_valid_temp_name(f"{temp_dir}/cpptraj.log")
+        fs.safe_mkdir(temp_dir)
+        # run
+        self.run_cpptraj(contents, temp_log_path)
+        # read log
+        result = self.get_n_frames_cpptraj_log(temp_log_path)
+        fs.clean_temp_file_n_dir([temp_log_path, temp_dir])
+
+        return result
+
+    # -- MMPB/GBSA --
+    def get_mmpbgbsa_energy(
+        self,
+        # Input Data
+        stru_esm: StructureEnsemble,
+        ligand: StruSelection,
+        # Config
+        work_dir: str="./binding",
+        keep_in_file: bool=False,
+        cluster_job_config: Union[Dict, ClusterJobConfig]= "default",
+        job_check_period: int= 30, # s
+        non_armer_cpu_num: int = None,
+        # method specifics
+        in_file: str = None,
+        strip_mask: str = ":WAT,Na+,Cl-",
+        solvent_model: str = "pbsa",
+        igb: int = 5,
+        use_sander: bool = True,
+        ion_strength: float = 0.15,
+        fillratio: float = 4.0,
+        exdi: float = None, # amber default: 80.0
+        indi: float = None, # amber default: 1.0
+        ) -> List[float]:
+        """Function that calculate the MMPB/GBSA energy for a given structure/structure ensemble with
+        a selection pattern for the ligand.
+        
         Args:
-            stru: The Structure object that charges will be added to.
-            prmtop: The str() path of an Amber paramter file.
-
+            stru, ligand, cluster_job_config, job_check_period, work_dir, keep_in_file:
+                see the docstring of `enzy_htp.analysis.binding.binding_energy`
+            strip_mask:
+                the Amber mask for stripping unwanted parts (e.g.: solvent) in the structure ensemble
+            solvent_model:
+                the model for the implicit solvation. (default: pbsa)
+                Supported keywords: [pbsa, gbsa]
+            igb:
+                the GB model to use. (default: 5 ; when solvent_model="gbsa")
+                Supported value: (based on https://ambermd.org/Manuals.php)
+                    0               No generalized Born term
+                    1,2,5,6,7,8     Different GB models/parameters
+                    3,4             Unused
+                    10              numerical Poisson-Boltzmann (NOT generalized Born)
+            use_sander:
+                force using sander to calculate the energy
+            ion_strength:
+                the ion strength of the model in Molarity.
+                Used as "saltcon" for gb and "istrng" for pb.
+            fillratio:
+                the fill ratio for PB
+            in_file:
+                this argument allows user to provide their own .in files. This will overwrite
+                all the .in file related arguments.
+        
         Returns:
-            Nothing.
-        """
-        p_dict = self.parse_prmtop(prmtop)
+            the MMPB/GBSA energies as a list"""
+        # init cluster_job_config
+        type_hint_sticker: AmberConfig
+        default_cluster_job_config = ClusterJobConfig.from_dict(
+            self.config().get_default_mmpbsa_cluster_job_config()
+            )
+        if cluster_job_config == "default":
+            cluster_job_config = default_cluster_job_config
+        elif cluster_job_config is not None:
+            if not isinstance(cluster_job_config, ClusterJobConfig):
+                cluster_job_config = ClusterJobConfig.from_dict(cluster_job_config)
+            cluster_job_config = default_cluster_job_config | cluster_job_config
+        # resolve ligand mask
+        ligand_mask = self.get_amber_mask(ligand, reduce=True)
 
-        charges: List[float] = p_dict['CHARGE']
-        anames: List[str] = p_dict['ATOM_NAME']
-        res_pointers: List[int] = p_dict['RESIDUE_POINTER']
-        res_names: List[int] = p_dict['RESIDUE_LABEL']
+        # make MMPBSA .prmtop files
+        temp_dr_prmtop = fs.get_valid_temp_name(f"{work_dir}/temp_dr.prmtop")
+        temp_dl_prmtop = fs.get_valid_temp_name(f"{work_dir}/temp_dl.prmtop")
+        temp_dc_prmtop = fs.get_valid_temp_name(f"{work_dir}/temp_dc.prmtop")
+        temp_sc_prmtop = fs.get_valid_temp_name(f"{work_dir}/temp_sc.prmtop")
+        fs.safe_mkdir(work_dir)
 
-        temp = []
-        for (ridx, rp), rn in zip(enumerate(res_pointers[:-1]), res_names):
-            temp.extend([rn] * (res_pointers[ridx + 1] - rp))
+        self.make_mmpbgbsa_prmtop_files(
+            stru_esm = stru_esm,
+            ligand_mask = ligand_mask,
+            strip_mask = strip_mask,
+            igb = igb,
+            temp_dr_prmtop = temp_dr_prmtop,
+            temp_dl_prmtop = temp_dl_prmtop,
+            temp_dc_prmtop = temp_dc_prmtop,
+            temp_sc_prmtop = temp_sc_prmtop,
+        )
 
-        temp.extend((len(anames) - len(temp)) * [rn[-1]])
-        res_names = temp
+        # make .nc file
+        temp_nc = fs.get_valid_temp_name(f"{work_dir}/temp_mmpbsa.nc")
+        self.make_mmpbgbsa_nc_file(stru_esm, temp_nc)
 
-        for c, an, rn, aa in zip(charges, anames, res_names, stru.atoms):
+        # execute
+        mmpbsa_result_file = fs.get_valid_temp_name(f"{work_dir}/mmpbsa_by_frames.csv")
+        self.run_mmpbsa(
+            dr_prmtop = temp_dr_prmtop,
+            dl_prmtop = temp_dl_prmtop,
+            dc_prmtop = temp_dc_prmtop,
+            sc_prmtop = temp_sc_prmtop,
+            traj_file = temp_nc,
+            out_path = mmpbsa_result_file,
+            work_dir=work_dir,
+            keep_in_file = keep_in_file,
+            solvent_model = solvent_model,
+            cluster_job_config = cluster_job_config,
+            job_check_period = job_check_period,
+            non_armer_cpu_num = non_armer_cpu_num,
+            in_file = in_file,
+            igb = igb,
+            use_sander = use_sander,
+            ion_strength = ion_strength,
+            fillratio = fillratio,
+            exdi = exdi,
+            indi = indi,
+            result_in_each_frames=True,
+        )
 
-            if not (an == aa.name and aa.residue.name == rn):
-                _LOGGER.error(f"There is a mismatch in the atoms. Make sure the supplied prmtop file is correct. Exiting..")
-                exit(1)
-            aa.charge = c
+        # extract output
+        result = self.parse_mmpbsa_result(mmpbsa_result_file, by_frames = True)
+        result = list(result[solvent_model]["DELTA TOTAL"])
 
-        if not stru.has_charges():
-            _LOGGER.error("Not all atoms in the supplied structure were assigned charges. Exiting...")
-            exit(1)
-            pass
+        # clean up
+        fs.clean_temp_file_n_dir([
+            temp_dr_prmtop,
+            temp_dl_prmtop,
+            temp_dc_prmtop,
+            temp_sc_prmtop,
+            temp_nc,
+        ])
 
-    # endregion == TODO ==
+        return result
 
+    def make_mmpbgbsa_prmtop_files(
+        self,
+        stru_esm: StructureEnsemble,
+        ligand_mask: str,
+        strip_mask: str,
+        igb: int,
+        temp_dr_prmtop: str,
+        temp_dl_prmtop: str,
+        temp_dc_prmtop: str,
+        temp_sc_prmtop: str,
+        ) -> None:
+        """make the prmtop files needed by the MMPB/GBSA calculation and
+        generate them in temp_dr_prmtop, temp_dl_prmtop, temp_dc_prmtop, temp_sc_prmtop"""
+        radii = self.config()["RADII_MAP"][str(igb)]
+        temp_dir = eh_config['system.SCRATCH_DIR']
+        fs.safe_mkdir(temp_dir)
+        temp_in_prmtop = fs.get_valid_temp_name(f"{temp_dir}/temp_in.prmtop")
+        temp_in2_prmtop = fs.get_valid_temp_name(f"{temp_dir}/temp_in_2.prmtop")
+        self.convert_top_to_prmtop(stru_esm.topology_source_file, temp_in_prmtop)
+        self.clean_up_add_pdb_info(temp_in_prmtop, temp_in2_prmtop) # the add_pdb info in prmtop will cause bug in ante-MMPBSA
+        self.run_ante_mmpbsa(
+            complex_prmtop_in = temp_in2_prmtop,
+            dry_complex_out = temp_dc_prmtop,
+            dry_receptor_out = temp_dr_prmtop,
+            dry_ligand_out = temp_dl_prmtop,
+            strip_mask = strip_mask,
+            radii = radii,
+            ligand_mask = ligand_mask,
+        )
+
+        self.update_radii(
+            prmtop_path=temp_in2_prmtop,
+            out_path=temp_sc_prmtop,
+            radii=radii
+        )
+
+        # clean up
+        fs.clean_temp_file_n_dir([temp_in_prmtop, temp_in2_prmtop])
+
+    def update_radii(self, prmtop_path: str, out_path: str, radii: str) -> None:
+        """update the radii of the prmtop_path and generate the updated file in out_path"""
+
+        temp_dir = eh_config['system.SCRATCH_DIR']
+        fs.safe_mkdir(temp_dir)
+
+        parmed_in_lines = [
+            f"changeRadii {radii}",
+            f"parmout {out_path}",
+            ""
+        ]
+        parmed_in_str = "\n".join(parmed_in_lines)
+
+        self.run_parmed(
+            parmed_in_str,
+            prmtop_path,
+        )
+
+    def make_mmpbgbsa_nc_file(
+        self,
+        stru_esm: StructureEnsemble,
+        temp_nc: str,    
+        ) -> None:
+        """make the nc file for the MMPB/GBSA calculation.
+        Generate the file in {temp_nc}"""
+
+        self.convert_traj_to_nc(stru_esm.coordinate_list, temp_nc)
 
 amber_interface = AmberInterface(None, eh_config._amber)
 """The singleton of AmberInterface() that handles all Amber related operations in EnzyHTP

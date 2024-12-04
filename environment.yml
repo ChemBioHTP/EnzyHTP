@@ -162,7 +162,7 @@ dependencies:
   - matplotlib-base=3.8.0=py39h1128e8f_0
   - mesalib=23.2.1=h6b56f8e_0
   - mmcif_pdbx=2.0.0=pyh44b312d_0
-  - modeller=10.4=py39h9bf148f_0
+  # - modeller=10.4=py39h9bf148f_0
   - mpc=1.1.0=h10f8cd9_1
   - mpfr=4.0.2=hb69a4c5_1
   - mpg123=1.32.3=h59595ed_0

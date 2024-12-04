@@ -14,7 +14,7 @@ import pandas as pd
 from openpyxl import load_workbook
 
 from io import IOBase
-from typing import List, Any, Dict
+from typing import Iterable, List, Any, Dict, Union
 from pathlib import Path
 
 from .logger import _LOGGER
@@ -49,6 +49,26 @@ def safe_mv(src: str, dest: str) -> str:
         dest = dest / src.name
 
     return str(shutil.move(src, dest))
+
+def safe_cp(src: str, dest: str) -> str:
+    """Robust move method that replicates shell 'cp' command. Creates temporary directories
+    when needed.
+    
+    Args:
+        src: Initial path to file object.
+        dest: Where the src will be placed. Either a new filename or destination directory.
+
+    Returns:
+        Path to the final location of the src file object.        
+    """
+    src = Path(src)
+    dest = Path(dest)
+
+    if dest.is_dir():
+        safe_mkdir(dest)
+        dest = dest / src.name
+
+    return str(shutil.copy(src, dest))
 
 # == dir ==
 def is_empty_dir(dir_path: str) -> bool:
@@ -182,37 +202,67 @@ def write_data_to_excel(output_directory: str, excel_filename: str = "result.xls
             else:
                 data_df.to_excel(writer, sheet_name=sheet_name, index=False)
 
-def get_valid_temp_name(fname: str, is_symlink: bool = False) -> str:
-    """find a vaild name for a temporary file of {fname}. 
+def get_valid_temp_name(fname: str, is_symlink: bool = False, ext_set: Union[None, Iterable] = None) -> str:
+    """Find a vaild name for a temporary file of {fname}. 
     If {fname} exists, add a index after it.
+
     Args:
-        fname: the filename of need.
-        is_symlink: whether the target filename is a symlink
+        fname: 
+            the filename of need.
+        is_symlink: 
+            whether the target filename is a symlink
+        ext_set: 
+            a set of extensions that applies in the valid name check.
+            This argument is used when the target filename is coupled with another filename with just
+            different extensions. (For example: the Gaussian input file .gjf needs to have a instinct name
+            with not only all the .gjf file but also all the .out and .chk file otherwise they will be overwritten)
+    
     Return:
-        result_fname: the valid filename that is unique to use"""
+        result_fname: the valid filename that is unique to use
+    """
     idx = 0
     suffix = ''.join(Path(fname).suffixes)
     result_fname = fname
-    if is_symlink:
-        while Path(result_fname).is_symlink():
-            idx += 1
-            if len(suffix) == 0: # the fname is a dir
-                while fname.endswith("/"):
-                    fname = fname[:-1]
-                result_fname = f"{fname}_{idx:06d}{suffix}"
-            else:
-                result_fname = f"{fname[:-len(suffix)]}_{idx:06d}{suffix}"
-    else:
-        while os.path.isfile(result_fname) or os.path.isdir(result_fname):
-            idx += 1
-            if len(suffix) == 0: # the fname is a dir
-                while fname.endswith("/"):
-                    fname = fname[:-1]
-                result_fname = f"{fname}_{idx:06d}{suffix}"
-            else:
-                result_fname = f"{fname[:-len(suffix)]}_{idx:06d}{suffix}"
+    while is_path_exist(result_fname, is_symlink=is_symlink, ext_set=ext_set):
+        idx += 1
+        if len(suffix) == 0: # the fname is a dir
+            while fname.endswith("/"):
+                fname = fname[:-1]
+            result_fname = f"{fname}_{idx:06d}{suffix}"
+        else:
+            result_fname = f"{fname[:-len(suffix)]}_{idx:06d}{suffix}"
     return result_fname
 
+def is_path_exist(target_path: str, is_symlink: bool = False, ext_set: Union[None, Iterable] = None) -> bool:
+    """Function that judge if the {target_path} exists. Return a boolean for the existance.
+    Supports symlink by enabling {is_symlink} and also check through all the paths with any
+    extensions from the {ext_set}."""
+    # init
+    if ext_set is None:
+        ext_set = set()
+    if not isinstance(ext_set, set):
+        ext_set = set(ext_set)
+    suffix = ''.join(Path(target_path).suffixes)
+    ext_set.add(suffix)
+
+    if is_symlink:
+        return sum([
+            Path(f"{remove_suffix(target_path)}{ext}").is_symlink() 
+            for ext in ext_set
+        ]) # this return True if any of the with_suffix exists
+    else:
+        return sum([
+            Path(f"{remove_suffix(target_path)}{ext}").exists()
+            for ext in ext_set
+        ]) # this return True if any of the with_suffix exists
+
+def remove_suffix(target_path: str) -> str:
+    """remove all suffix of the given path"""
+    suffix = ''.join(Path(target_path).suffixes)
+    if len(suffix) == 0:
+        return target_path
+    else:
+        return target_path[:-len(suffix)]
 
 def check_file_exists(fname: str, exit_script: bool = True) -> None:
     """Function that checks if a file exists. Will either exit the script or raise

@@ -4,7 +4,7 @@
 initial_dir=$(pwd)
 
 # Change the working directory to the parent directory of this script
-cd "$(dirname "$0")"/..
+cd "$(dirname "${BASH_SOURCE[0]}")"/..
 
 # Set a default environment name
 target_env_name=$CONDA_DEFAULT_ENV
@@ -23,7 +23,7 @@ show_help() {
 OPTS=$(getopt -o hn: --long help,name: -- "$@")
 
 # Exit if the options have not been correctly specified.
-if [ $? != 0 ]; then exit 1; fi
+if [ $? != 0 ]; then return; fi
 
 # Extract options and their arguments into variables.
 eval set -- "$OPTS"
@@ -32,7 +32,7 @@ while true; do
     case "$1" in
         -h|--help)
             show_help
-            exit 0;;
+            return;;
         -n|--name)
             target_env_name="$2"; shift 2;;
         --)
@@ -68,7 +68,7 @@ prompt_yes_no() {
         read -p "$1 (yes/no): " yn
         case $yn in
             [Yy]* ) break;;
-            [Nn]* ) exit;;
+            [Nn]* ) return;;
             * ) echo "Please answer yes or no.";;
         esac
     done
@@ -89,7 +89,7 @@ update_env() {
     echo "Updating conda environment: $target_env_name"
     conda env update -n "$target_env_name" --file environment.yml
     activate_env
-    conda develop .
+    dev-tools/pip-install
 }
 
 # Check current conda environment and extract environment name.
