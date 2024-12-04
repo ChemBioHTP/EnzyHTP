@@ -5,6 +5,7 @@ equilibration.
 
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Author: Zhong, Yinjie <yinjie.zhong@vanderbilt.edu>
 Date: 2022-06-02
 """
 import copy
@@ -991,15 +992,34 @@ class AmberInterface(BaseInterface):
             return "frcmod"
         return self.AMBER_FILE_FORMAT_MAPPER.get(ext, ext[1:])
 
-    def convert_traj_to_nc(self, fpath: str, out_path: str) -> None:
-        """convert the given trajectory file to the Amber .nc file in the out_path"""
-        in_format = self.get_file_format(fpath)
+    def convert_traj_to_nc(self, traj_path: str, out_path: str, topology_path: str = str()) -> None:
+        """Convert the given trajectory file to the Amber `.nc` format file in the out_path.
+        
+        Args:
+            traj_path (str): Path to the input trajectory file.
+            out_path (str): Path to the output Amber `.nc` format trajectory file.
+            topology_path (str, optional): Path to the topology file. Default empty.
+        """
+        in_format = self.get_file_format(traj_path)
 
         if in_format == "nc":
-            fs.safe_cp(fpath, out_path)
+            fs.safe_cp(traj_path, out_path)
+        elif in_format == "mdcrd":
+            if (not topology_path or not fs.is_path_exist(topology_path)):
+                _LOGGER.error(f"Topology filepath ({topology_path if len(topology_path) else 'N/A'}) doesn't exist.")
+                raise FileNotFoundError
+            contents = [
+                f"parm {topology_path}",
+                f"trajin {traj_path}",
+                f"trajout {out_path}",
+                "run",
+                "quit"
+            ]
+            contents = "\n".join(contents)
+            self.run_cpptraj(contents)
         else:
             # TODO for other formats. We probably need a central format to reduce the engineering overhead
-            _LOGGER.error(f"found unsupported file format: {in_format} ({fpath})")
+            _LOGGER.error(f"found unsupported file format: {in_format} ({traj_path})")
             raise ValueError
 
     def convert_top_to_prmtop(self, fpath: str, out_path: str) -> None:
@@ -2882,6 +2902,56 @@ class AmberInterface(BaseInterface):
         fs.clean_temp_file_n_dir([temp_log_path, temp_dir])
 
         return result
+
+    # RMSD value.
+
+    def get_rmsd(
+            self,
+            stru_esm: StructureEnsemble,
+            stru_selection: StruSelection,
+        ) -> List[float]:
+        """Calculate the RMSD value of a specified StruSelection object within a StructureEnsemble instance.
+        
+        Args:
+            stru_esm (StructureEnsemble): A collection of different geometries of the same enzyme structure.
+            stru_selection (StruSelection): A StruSelection instance representing the region for calculating RMSD value.
+            
+        Returns:
+            rmsd_value (List[float]): A list of RMSD values for each frame in a StructureEnsemble instance comparing with the average structure.    
+        """
+        tmp_dir = eh_config['system.SCRATCH_DIR']
+        tmp_nc_path=fs.get_valid_temp_name(os.path.join(tmp_dir, "tmp_amber_traj.nc"))
+        tmp_prmtop_path=fs.get_valid_temp_name(os.path.join(tmp_dir, "tmp_amber_topology.prmtop"))
+        
+        self.convert_top_to_prmtop(stru_esm.topology_source_file, tmp_prmtop_path)
+        self.convert_traj_to_nc(stru_esm.coordinate_list, tmp_nc_path, topology_path=tmp_prmtop_path)
+
+        rmsd_csv_filename = fs.get_valid_temp_name(os.path.join(eh_config.system.SCRATCH_DIR, "temp_rmsd.csv"))
+        amber_mask = self.get_amber_mask(stru_selection, reduce=True)
+        contents: List[str] = [
+            f"parm {tmp_prmtop_path}",
+            f"trajin {tmp_nc_path}",
+            "autoimage",
+            f"rmsd {amber_mask} first mass",
+            f"average crdset AVE {amber_mask}",
+            "run",
+            "autoimage",
+            f"rmsd {amber_mask} ref AVE * out {rmsd_csv_filename} mass",
+            "run",
+            "quit"
+        ]
+        contents = "\n".join(contents)
+        self.run_cpptraj(contents)
+
+        result_df = pd.read_csv(rmsd_csv_filename, delim_whitespace=True)
+        rmsd_value = result_df.iloc[:, 1]
+
+        fs.clean_temp_file_n_dir([
+            tmp_nc_path,
+            tmp_prmtop_path,
+            rmsd_csv_filename,
+        ])
+        return rmsd_value
 
     # -- MMPB/GBSA --
     def get_mmpbgbsa_energy(

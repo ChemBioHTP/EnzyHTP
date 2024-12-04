@@ -220,17 +220,20 @@ class PDBParser(StructureParserInterface):
         # check for right extension
         ext: str = fs.get_file_ext(pdb_path)
         if ext.lower() != ".pdb":
-            _LOGGER.error(f"Supplied file '{pdb_path}' is NOT a PDB file. Exiting...")
-            sys.exit(1)
+            message = f"Supplied file '{pdb_path}' is NOT a PDB file."
+            _LOGGER.error(message)
+            raise ValueError(message)
         #check for file existance
         if not os.path.exists(pdb_path):
-            _LOGGER.error(f"Supplied file '{pdb_path}' does NOT exist. Exiting...")
-            sys.exit(1)
+            message = f"Supplied file '{pdb_path}' does NOT exist."
+            _LOGGER.error(message)
+            raise ValueError(message)
         # check for character encoding
         for idx, ll in enumerate(fs.lines_from_file(pdb_path)):
             if not ll.isascii():
-                _LOGGER.error(f"The PDB '{pdb_path}' contains non-ASCII text and is invalid in line {idx}: '{ll}'. Exiting...")
-                sys.exit(1)
+                message = f"The PDB '{pdb_path}' contains non-ASCII text and is invalid in line {idx}: '{ll}'."
+                _LOGGER.error(message)
+                raise ValueError(message)
 
     @staticmethod
     def _get_target_model(df: pd.DataFrame, model: int) -> Union[pd.DataFrame, None]:
@@ -261,8 +264,9 @@ class PDBParser(StructureParserInterface):
                     first = 0
                     continue
                 if ind[0] == last_ind[0]:
-                    _LOGGER.error(f"Unclosed MODEL section is detected in pdb file. line: {last_ind[-1]}")
-                    sys.exit(1)
+                    message = f"Unclosed MODEL section is detected in pdb file. line: {last_ind[-1]}"
+                    _LOGGER.error(message)
+                    raise ValueError(message)
                 last_ind = ind
             # get target model unit range
             mdl_start_lines = list(df["OTHERS"][df["OTHERS"].record_name == "MODEL"]["line_idx"])
@@ -375,8 +379,9 @@ class PDBParser(StructureParserInterface):
                     if "ATOM" in current_chain_records:
                         # case: no missing chain id; single chain id; ATOM chain
                         if current_chain_id in recorded_chain_ids:
-                            _LOGGER.error("Found the same chain id in 2 different ATOM chains. Check your PDB.")
-                            sys.exit(1)
+                            message = "Found the same chain id in 2 different ATOM chains. Check your PDB."
+                            _LOGGER.error(message)
+                            raise ValueError(message)
                         recorded_chain_ids.append(current_chain_id)
                     else:
                         # case: no missing chain id; single chain id; HET chain
@@ -393,8 +398,9 @@ class PDBParser(StructureParserInterface):
                     if "ATOM" in current_chain_records:
                         if not allow_multichain_in_atom:
                             # ATOM chain: multiple chain id not allowed
-                            _LOGGER.error("Found multiple chain id in ATOM chain. Not allowed.")
-                            sys.exit(1)
+                            message = "Found multiple chain id in ATOM chain. Not allowed."
+                            _LOGGER.error(message)
+                            raise ValueError(message)
                         else:
                             # ATOM chain: (user option) multiple chain id allowed
                             _LOGGER.warning(
@@ -403,8 +409,9 @@ class PDBParser(StructureParserInterface):
                             chains_in_chain = chain.groupby("chain_id", sort=False)
                             for chain_id_in_chain, chain_in_chain in chains_in_chain:
                                 if chain_id_in_chain in recorded_chain_ids:
-                                    _LOGGER.error("Found the repeating chain id in a ATOM chain with multiple chain id. Check your PDB.")
-                                    sys.exit(1)
+                                    message = "Found the repeating chain id in a ATOM chain with multiple chain id. Check your PDB."
+                                    _LOGGER.error(message)
+                                    raise ValueError(message)
                                 else:
                                     recorded_chain_ids.append(chain_id_in_chain)
                             continue
@@ -434,8 +441,9 @@ class PDBParser(StructureParserInterface):
                         # divid into ATOM and HET chain
                         current_chain_records = set(list(map(lambda c_id: c_id.strip(), chain["record_name"])))
                         if "ATOM" in current_chain_records:
-                            _LOGGER.error("Found the same chain id in 2 different ATOM chains. Check your PDB.")
-                            sys.exit(1)
+                            message = "Found the same chain id in 2 different ATOM chains. Check your PDB."
+                            _LOGGER.error(message)
+                            raise ValueError(message)
                         else:
                             new_chain_id = legal_ids.pop()
                             _LOGGER.debug(f"Found repeating chain id in a HETATM chain: assigning a new chain: {new_chain_id}")
@@ -445,8 +453,9 @@ class PDBParser(StructureParserInterface):
                         result_loc_map.extend(list(zip(atom_missing_c_id.index, [current_chain_id] * len(atom_missing_c_id))))
                 else:
                     # case: more than 1 chain id in chain
-                    _LOGGER.error("Found multiple chain id together with missing chain id in 1 chain. Impossible to solve.")
-                    sys.exit(1)
+                    message = "Found multiple chain id together with missing chain id in 1 chain. Impossible to solve."
+                    _LOGGER.error(message)
+                    raise ValueError(message)
         # add missing chain id
         batch_edit_df_loc_value(df, result_loc_map, "chain_id")
         return idx_change_mapper
@@ -589,9 +598,9 @@ class PDBParser(StructureParserInterface):
                 for i, residue in enumerate(residues):
                     if residue.rtype == chem.ResidueType.UNKNOWN:
                         if residue.name in list(chem.METAL_MAPPER.keys()) + chem.RD_SOLVENT_LIST + add_solvent_list:
-                            _LOGGER.error(
-                                f"a metal or solvent residue name is found in an peptide chain {chain_id}: {residue.idx} {residue.name}")
-                            sys.exit(1)
+                            message = f"A metal or solvent residue name is found in an peptide chain {chain_id}: {residue.idx} {residue.name}"
+                            _LOGGER.error(message)
+                            raise ValueError(message)
                         _LOGGER.debug(f"found modified residue {chain_id} {residue.idx}")
                         residue_mapper[chain_id][i] = residue_to_modified_residue(residue)
                 continue
