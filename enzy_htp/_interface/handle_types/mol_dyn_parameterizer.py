@@ -6,7 +6,7 @@ TODO it could also contain some concrete methods
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2023-09-19
 """
-from typing import Callable
+from typing import Callable, List
 from abc import ABC, abstractmethod
 
 from enzy_htp.structure import Structure
@@ -33,6 +33,11 @@ class MolDynParameter(ABC):
         """return the parser object for topology_file"""
         pass
 
+    @property
+    def file_list(self) -> List[str]:
+        """return a list of files that composes the parameter"""
+        pass
+
 class MolDynParameterizer(ABC):
     """The parameterizer for Molecular Dynamics simulation.
     Solvation is also contained in this step"""
@@ -41,6 +46,18 @@ class MolDynParameterizer(ABC):
     @abstractmethod
     def engine(self) -> str:
         """the engine name that should be hardcoded in each concrete class"""
+        pass
+
+    @property
+    @abstractmethod
+    def parameterizer_temp_dir(self) -> str:
+        """the directory that contain the generated parm files"""
+        pass
+
+    @parameterizer_temp_dir.setter
+    @abstractmethod
+    def parameterizer_temp_dir(self, value: str) -> None:
+        """set the directory that contain the generated parm files"""
         pass
 
     @property
