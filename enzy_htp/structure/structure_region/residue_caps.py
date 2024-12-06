@@ -602,8 +602,6 @@ class OHCap(ResidueCap):
             pt += (d0*bd) + p0
             aa.coord = pt
 
-        
-
 
     def anchor(self) -> None:
         """Specialized anchoring that is identical for both n-terminal and c-terminal capping."""

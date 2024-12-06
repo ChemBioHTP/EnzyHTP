@@ -234,7 +234,7 @@ def test_capping_with_residue_terminals(helpers):
 
     fs.safe_rm(test_file)
 
-def test_capping_modaa():
+def test_capping_modaa(helpers):
     # caps a modaa with OH and H at the cterm and nterm, respectively
     test_stru = sp.get_structure(f"{DATA_DIR}3FCR_modified.pdb")
     sele = stru_sele.select_stru(
@@ -248,4 +248,18 @@ def test_capping_modaa():
         capping.capping_with_residue_terminals(test_region, nterm_cap=nterm_cap, cterm_cap=cterm_cap)
     except Exception as exc:
         assert False, f"capping_with_residue_terminals() failed with {nterm_cap=} {cterm_cap=}"
+
+    # test
+    atoms = test_region.atoms
+    test_file = f"{WORK_DIR}test_capping_6.xyz"
+    answer_file = f"{DATA_DIR}answer_capping_6.xyz"
+    lines = [
+        str(len(atoms)),
+        "",]
+    for at in atoms:
+        lines.append(f"{at.element} {at.coord[0]} {at.coord[1]} {at.coord[2]}")
+    fs.write_lines(test_file, lines)
+    assert helpers.equiv_files(test_file, answer_file, consider_order=False)
+
+    fs.safe_rm(test_file)
 
