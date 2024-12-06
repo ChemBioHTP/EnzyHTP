@@ -782,15 +782,15 @@ class PyMolInterface(BaseInterface):
             ])
             return results[-2] / results[-1]
 
-    def get_exposed_residues(self, stru: Structure, cutoff = None,) -> List[Residue]:
+    def get_exposed_residues(self, stru: Structure, cutoff = 0.1,) -> List[Residue]:
         """see get_exposed_or_buried_residues"""
         return self.get_exposed_or_buried_residues(stru, "exposed", cutoff)
 
-    def get_buried_residues(self, stru: Structure, cutoff = None,) -> List[Residue]:
+    def get_buried_residues(self, stru: Structure, cutoff = 0.1,) -> List[Residue]:
         """see get_exposed_or_buried_residues"""
         return self.get_exposed_or_buried_residues(stru, "buried", cutoff)
 
-    def get_exposed_or_buried_residues(self, stru: Structure, result_type: str, cutoff = None,) -> List[Residue]:
+    def get_exposed_or_buried_residues(self, stru: Structure, result_type: str, cutoff = 0.1,) -> List[Residue]:
         """find all surface residues in a {stru} given {cutoff}.
         Args:
             stru: the target protein structure
@@ -802,7 +802,9 @@ class PyMolInterface(BaseInterface):
 
         Details: 
             calculate the RSA = ASA/MaxASA (https://en.wikipedia.org/wiki/Relative_accessible_surface_area)
-            determine whether a residue is a surface one using a RSA cutoff"""
+            determine whether a residue is a surface one using a RSA cutoff
+            NOTE that the result is not equal to surface residues since a exposed residue can also
+            by pocket residus. A convex analysis is needed to determine the surface residues"""
         result = []
 
         with OpenPyMolSession(self) as pms:
