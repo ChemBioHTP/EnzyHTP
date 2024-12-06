@@ -304,3 +304,8 @@ def direction_unit_vector(p1:npt.NDArray, p2:npt.NDArray) ->  npt.NDArray:
 
     return result / np.linalg.norm(result)
 
+def rot_vec_from_dihedral(dihedral:float, value:float, direction:npt.NDArray) -> npt.NDArray:
+    """Provides a rotation vector that sets the dihedral to a given value in the specified
+    direction."""
+    v = value - dihedral
+    return (direction * v)

@@ -143,3 +143,10 @@ def test_atoms_from_geom(helpers):
 
     fs.safe_rm(test_file)
 
+def test_topology():
+    test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
+    test_stru_region = stru_regi.create_region_from_selection_pattern(
+        test_stru, "all"
+    )
+    test_stru_2 = test_stru_region.topology
+    assert test_stru.is_same_topology(test_stru_2)

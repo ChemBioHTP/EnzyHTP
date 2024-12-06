@@ -2525,7 +2525,7 @@ class AmberInterface(BaseInterface):
         # init_path
         if out_path is None:
             if ncaa.is_modified():
-                out_path = f"{eh_config['system.NCAA_LIB_PATH']}/{ncaa.name}_{charge_method}-{gaff_type}.ac"
+                out_path = fs.get_valid_temp_name(f"{eh_config['system.NCAA_LIB_PATH']}/{ncaa.name}_{charge_method}-{gaff_type}.ac")
             else:
                 out_path = f"{eh_config['system.NCAA_LIB_PATH']}/{ncaa.name}_{charge_method}-{gaff_type}.mol2"
 
@@ -2535,7 +2535,7 @@ class AmberInterface(BaseInterface):
         temp_pdb_path = fs.get_valid_temp_name(f"{temp_dir}/{ncaa.name}.pdb")
         if ncaa.is_modified():
             # capping - cap C with OH and N with H
-            ncaa = create_region_from_selection_pattern(stru=ncaa, pattern="all", nterm_cap="H", cterm_cap="OH")
+            ncaa = create_region_from_selection_pattern(stru=ncaa, pattern="all", nterm_cap="H", cterm_cap="OH").topology
         pdb_io.PDBParser().save_structure(temp_pdb_path, ncaa)
         input_file = temp_pdb_path
 
@@ -2554,7 +2554,8 @@ class AmberInterface(BaseInterface):
             raise ValueError
 
         if ncaa.is_modified():
-            gaff_type = "AMBER"
+            atom_type = "AMBER"
+            gaff_type = atom_type
         
         # 3. run antechamber on the PDB get mol2
         self.run_antechamber(in_file=input_file,
