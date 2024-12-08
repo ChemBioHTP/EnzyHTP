@@ -172,6 +172,18 @@ class PDBParser(StructureParserInterface):
         result_str = cls._write_pdb_residue(stru)
         result_str += f"TER{os.linesep}END{os.linesep}"
         return result_str
+    
+    @classmethod
+    @dispatch
+    def get_file_str(cls, stru: ModifiedResidue, if_renumber: bool = True, if_fix_atomname: bool = True) -> str:  # pylint: disable=function-redefined
+        """
+        dispatch for supporting get pdb file str with Residue only
+        """
+        if if_renumber:
+            stru.parent.parent.renumber_atoms()
+        result_str = cls._write_pdb_residue(stru)
+        result_str += f"TER{os.linesep}END{os.linesep}"
+        return result_str
 
     @classmethod
     @dispatch

@@ -20,6 +20,7 @@ from dataclasses import dataclass
 import pandas as pd
 from sympy import sympify
 from collections import Iterable
+from enzy_htp.structure.chain import Chain
 from enzy_htp.structure.structure_region.api import create_region_from_selection_pattern
 
 from .base_interface import BaseInterface
@@ -324,7 +325,7 @@ class AmberParameterizer(MolDynParameterizer):
             if frcmod_path_list:
                 return mol_desc_path, frcmod_path_list
         else:
-            # 1. generate ac if not found (MAKE PDB FILE IN NCAA_TO_MOLDESC w/ capping)
+            # 1. generate ac if not found
             mol_desc_path = f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.ac" # the search ensured no existing file named this
             self.parent_interface.antechamber_ncaa_to_moldesc(ncaa=maa,
                                                               out_path=mol_desc_path,
@@ -2522,6 +2523,11 @@ class AmberInterface(BaseInterface):
                           " ALWAYS check and explicit assign it using"
                           " Structure.assign_ncaa_chargespin()")
             raise ValueError
+
+        if ncaa.is_modified():
+            atom_type = "AMBER"
+            gaff_type = atom_type
+
         # init_path
         if out_path is None:
             if ncaa.is_modified():
@@ -2535,7 +2541,9 @@ class AmberInterface(BaseInterface):
         temp_pdb_path = fs.get_valid_temp_name(f"{temp_dir}/{ncaa.name}.pdb")
         if ncaa.is_modified():
             # capping - cap C with OH and N with H
-            ncaa = create_region_from_selection_pattern(stru=ncaa, pattern="all", nterm_cap="H", cterm_cap="OH").topology
+            ncaa_region = create_region_from_selection_pattern(stru=ncaa, pattern="all", nterm_cap="H", cterm_cap="OH")
+            ncaa = ModifiedResidue(1, ncaa.name, ncaa_region.atoms, ncaa.parent)
+            ncaa.renumber_atoms(range(1,len(ncaa_region.atoms)+3))
         pdb_io.PDBParser().save_structure(temp_pdb_path, ncaa)
         input_file = temp_pdb_path
 
@@ -2553,10 +2561,6 @@ class AmberInterface(BaseInterface):
                           f"(Supported keywords: {self.SUPPORTED_CHARGE_METHOD_MAPPER.keys()})")
             raise ValueError
 
-        if ncaa.is_modified():
-            atom_type = "AMBER"
-            gaff_type = atom_type
-        
         # 3. run antechamber on the PDB get mol2
         self.run_antechamber(in_file=input_file,
                              out_file=out_path,

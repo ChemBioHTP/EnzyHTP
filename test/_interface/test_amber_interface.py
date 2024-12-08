@@ -1280,13 +1280,15 @@ def test_parse_mmpbsa_result_by_frames():
     assert np.isclose(result["gbsa"]["DELTA TOTAL"].mean(), -12.234, atol=0.01)
 
 def test_ncaa_to_moldesc_modaa():
-    file = f"{MM_DATA_DIR}/LLP.pdb"
+    file = f"{MM_DATA_DIR}/3FCR_protonated.pdb"
     stru = struct.PDBParser().get_structure(file)
     stru.assign_ncaa_chargespin({"LLP": (0, 1)})
-    ncaa = stru.ligands[0]
+    ncaa = stru.modified_residue[0]
 
     ai = interface.amber
+    out_path = None
     try:
-        ai.antechamber_ncaa_to_moldesc(ncaa=ncaa)
+        out_path = ai.antechamber_ncaa_to_moldesc(ncaa=ncaa)
     except:
         assert False, f"ncaa_to_moldesc failed with modaa"
+
