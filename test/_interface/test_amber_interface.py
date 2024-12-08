@@ -1282,7 +1282,7 @@ def test_parse_mmpbsa_result_by_frames():
 def test_ncaa_to_moldesc_modaa():
     file = f"{MM_DATA_DIR}/3FCR_protonated.pdb"
     stru = struct.PDBParser().get_structure(file)
-    stru.assign_ncaa_chargespin({"LLP": (0, 1)})
+    stru.assign_ncaa_chargespin({"LLP": (-2, 1)})
     ncaa = stru.modified_residue[0]
 
     ai = interface.amber

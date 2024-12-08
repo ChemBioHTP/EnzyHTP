@@ -2542,7 +2542,7 @@ class AmberInterface(BaseInterface):
         if ncaa.is_modified():
             # capping - cap C with OH and N with H
             ncaa_region = create_region_from_selection_pattern(stru=ncaa, pattern="all", nterm_cap="H", cterm_cap="OH")
-            ncaa = ModifiedResidue(1, ncaa.name, ncaa_region.atoms, ncaa.parent)
+            ncaa = ModifiedResidue(1, ncaa.name, ncaa_region.atoms, ncaa.parent, net_charge=ncaa.net_charge)
             ncaa.renumber_atoms(range(1,len(ncaa_region.atoms)+3))
         pdb_io.PDBParser().save_structure(temp_pdb_path, ncaa)
         input_file = temp_pdb_path
@@ -2560,6 +2560,7 @@ class AmberInterface(BaseInterface):
             _LOGGER.error(f"found unsupported charge method {charge_method}."
                           f"(Supported keywords: {self.SUPPORTED_CHARGE_METHOD_MAPPER.keys()})")
             raise ValueError
+        
 
         # 3. run antechamber on the PDB get mol2
         self.run_antechamber(in_file=input_file,
