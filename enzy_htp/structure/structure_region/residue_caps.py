@@ -560,7 +560,7 @@ class OHCap(ResidueCap):
         """This is the OH/hydroxyl ResidueCap."""
         return "OH"
 
-    def align_rigid_atoms(self, atoms, d0, p0, bd = None):
+    def align_rigid_atoms(self, atoms:List[Atom], d0 : npt.NDArray, p0 : npt.NDArray, bd:float=None) -> None:
         """Method that aligns a rigid List[Atom] to the supplied distance (d0) and from the given point (p0). There are overall 
         two steps, rotation, and translation. Both are specified by parameters above. Specialized case for OHCap only; adds 
         dihedral rotation support.
@@ -578,27 +578,33 @@ class OHCap(ResidueCap):
         if bd is None:
             bd = self.CAP_BOND_DISTANCE[self.link_atom.name]
         
-        # find dihedral angle
         oxygen = np.array(self.atoms[0].coord)
         hydrogen = np.array(self.atoms[1].coord)
         p2 = np.array(self.link_atom.parent.find_atom_name('O').coord)
 
-        test_pt = hydrogen
-        test_pt = np.transpose(np.matmul(rot_mat, np.transpose( test_pt  )))
-        test_pt += (d0*bd) + p0
+        # find and preemptively align the atoms that define the dihedral
+        prob_p1 = hydrogen
+        prob_p1 = np.transpose(np.matmul(rot_mat, np.transpose( prob_p1  )))
+        prob_p1 += (d0*bd) + p0
 
-        test_pt_2 = oxygen
-        test_pt_2 = np.transpose(np.matmul(rot_mat, np.transpose( test_pt_2  )))
-        test_pt_2 += (d0*bd) + p0
+        prob_p2 = oxygen
+        prob_p2 = np.transpose(np.matmul(rot_mat, np.transpose( prob_p2  )))
+        prob_p2 += (d0*bd) + p0
         
-        dihedral = mh.get_dihedral(test_pt, test_pt_2, p0, p2)
-        rv = mh.rot_vec_from_dihedral(dihedral, 0, d0)
+        # calculate rotation vector that sets the dihedral formed by the four points to 0
+        rv = mh.rot_vec_from_dihedral(prob_p1, prob_p2, p0, p2, 0, d0)
         rot = R.from_rotvec(rv, degrees=True)
 
         for aa in atoms:
             pt = np.array(aa.coord)
+
+            # rotate to align the angle
             pt = np.transpose(np.matmul(rot_mat, np.transpose( pt  )))
+
+            # rotate to align the dihedral
             pt = rot.apply(pt)
+
+            # translate
             pt += (d0*bd) + p0
             aa.coord = pt
 

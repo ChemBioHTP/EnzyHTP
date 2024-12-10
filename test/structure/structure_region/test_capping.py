@@ -15,12 +15,14 @@ import enzy_htp.structure.structure_region.capping as capping
 import enzy_htp.structure.structure_region as stru_regi
 import enzy_htp.structure.structure_selection as stru_sele
 from enzy_htp.structure.structure_region.residue_caps import SUPPORTED_CAPS, ResidueCap, CH3Cap 
+from enzy_htp.structure.structure_io.xyz_io import XYZParser
 
 CURR_FILE = os.path.abspath(__file__)
 CURR_DIR = os.path.dirname(CURR_FILE)
 DATA_DIR = f"{CURR_DIR}/../data/"
 WORK_DIR = f"{CURR_DIR}/../work_dir/"
 sp = PDBParser()
+xyzp = XYZParser()
 
 def test_capping_with_residue_terminals_tri_a(helpers):
     """as name. use an example region from selection.
@@ -244,21 +246,13 @@ def test_capping_modaa(helpers):
     cterm_cap = "OH"
     nterm_cap = "H"
 
-    try:                
-        capping.capping_with_residue_terminals(test_region, nterm_cap=nterm_cap, cterm_cap=cterm_cap)
-    except Exception as exc:
-        assert False, f"capping_with_residue_terminals() failed with {nterm_cap=} {cterm_cap=}"
+    capping.capping_with_residue_terminals(test_region, nterm_cap=nterm_cap, cterm_cap=cterm_cap)
 
-    # test
+    answer_file = f"{DATA_DIR}answer_capping_3.xyz"
     atoms = test_region.atoms
-    test_file = f"{WORK_DIR}test_capping_6.xyz"
-    answer_file = f"{DATA_DIR}answer_capping_6.xyz"
-    lines = [
-        str(len(atoms)),
-        "",]
-    for at in atoms:
-        lines.append(f"{at.element} {at.coord[0]} {at.coord[1]} {at.coord[2]}")
-    fs.write_lines(test_file, lines)
+    file_path = f"{WORK_DIR}test_capping_3.xyz"
+    
+    test_file = xyzp.make_xyz_from_atoms(file_path, atoms)
     assert helpers.equiv_files(test_file, answer_file, consider_order=False)
 
     fs.safe_rm(test_file)

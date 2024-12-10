@@ -1292,3 +1292,6 @@ def test_ncaa_to_moldesc_modaa():
     except:
         assert False, f"ncaa_to_moldesc failed with modaa"
 
+    #TODO: Compare to correct one
+    fs.safe_rm(out_path)
+

@@ -12,6 +12,7 @@ from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.general import EnablePropagate
 import enzy_htp.core.file_system as fs
 from enzy_htp.preparation.protonate import protonate_stru
+from enzy_htp.structure.structure_io.xyz_io import XYZParser
 import enzy_htp.structure.structure_region.capping as capping
 import enzy_htp.structure.structure_region as stru_regi
 import enzy_htp.structure.structure_selection as stru_sele
@@ -22,6 +23,7 @@ CURR_DIR = os.path.dirname(CURR_FILE)
 DATA_DIR = f"{CURR_DIR}/../data/"
 WORK_DIR = f"{CURR_DIR}/../work_dir/"
 sp = PDBParser()
+xyzp = XYZParser()
 
 def test_residue_cap_deepcopy():
     """test the behavior of deepcopy for residue cap"""
@@ -48,16 +50,13 @@ def test_nhch3_cap(helpers):
         test_stru, "resi 288")
     test_region = stru_regi.StructureRegion(atoms=sele.atoms)
     capping.capping_with_residue_terminals(test_region, nterm_cap='COCH3', cterm_cap='NHCH3')
-    # test
-    atoms = test_region.atoms
-    test_file = f"{WORK_DIR}test_capping_2.xyz"
+
     answer_file = f"{DATA_DIR}answer_capping_2.xyz"
-    lines = [
-        str(len(atoms)),
-        "",]
-    for at in atoms:
-        lines.append(f"{at.element} {at.coord[0]} {at.coord[1]} {at.coord[2]}")
-    fs.write_lines(test_file, lines)
+    atoms = test_region.atoms
+    file_path = f"{WORK_DIR}test_capping_2.xyz"
+    
+    test_file = xyzp.make_xyz_from_atoms(file_path, atoms)
+
     assert helpers.equiv_files(test_file, answer_file, consider_order=False)
     fs.safe_rm(test_file)
 
@@ -69,16 +68,13 @@ def test_oh_cap_llp(helpers):
         test_stru, "resi 288")
     test_region = stru_regi.StructureRegion(atoms=sele.atoms)
     capping.capping_with_residue_terminals(test_region, nterm_cap='H', cterm_cap='OH')
-    # test
-    atoms = test_region.atoms
-    test_file = f"{WORK_DIR}test_capping_3.xyz"
+
     answer_file = f"{DATA_DIR}answer_capping_3.xyz"
-    lines = [
-        str(len(atoms)),
-        "",]
-    for at in atoms:
-        lines.append(f"{at.element} {at.coord[0]} {at.coord[1]} {at.coord[2]}")
-    fs.write_lines(test_file, lines)
+    atoms = test_region.atoms
+    file_path = f"{WORK_DIR}test_capping_3.xyz"
+    
+    test_file = xyzp.make_xyz_from_atoms(file_path, atoms)
+
     assert helpers.equiv_files(test_file, answer_file, consider_order=False)
     fs.safe_rm(test_file)
 
@@ -90,16 +86,13 @@ def test_oh_cap_pro(helpers):
         test_stru, "resi 18")
     test_region = stru_regi.StructureRegion(atoms=sele.atoms)
     capping.capping_with_residue_terminals(test_region, nterm_cap='H', cterm_cap='OH')
-    # test
-    atoms = test_region.atoms
-    test_file = f"{WORK_DIR}test_capping_4.xyz"
+
     answer_file = f"{DATA_DIR}answer_capping_4.xyz"
-    lines = [
-        str(len(atoms)),
-        "",]
-    for at in atoms:
-        lines.append(f"{at.element} {at.coord[0]} {at.coord[1]} {at.coord[2]}")
-    fs.write_lines(test_file, lines)
+    atoms = test_region.atoms
+    file_path = f"{WORK_DIR}test_capping_4.xyz"
+    
+    test_file = xyzp.make_xyz_from_atoms(file_path, atoms)
+
     assert helpers.equiv_files(test_file, answer_file, consider_order=False)
     fs.safe_rm(test_file)
 
@@ -111,15 +104,12 @@ def test_oh_cap_glu(helpers):
         test_stru, "resi 44")
     test_region = stru_regi.StructureRegion(atoms=sele.atoms)
     capping.capping_with_residue_terminals(test_region, nterm_cap='H', cterm_cap='OH')
-    # test
-    atoms = test_region.atoms
-    test_file = f"{WORK_DIR}test_capping_5.xyz"
+
     answer_file = f"{DATA_DIR}answer_capping_5.xyz"
-    lines = [
-        str(len(atoms)),
-        "",]
-    for at in atoms:
-        lines.append(f"{at.element} {at.coord[0]} {at.coord[1]} {at.coord[2]}")
-    fs.write_lines(test_file, lines)
+    atoms = test_region.atoms
+    file_path = f"{WORK_DIR}test_capping_5.xyz"
+    
+    test_file = xyzp.make_xyz_from_atoms(file_path, atoms)
+
     assert helpers.equiv_files(test_file, answer_file, consider_order=False)
     fs.safe_rm(test_file)
