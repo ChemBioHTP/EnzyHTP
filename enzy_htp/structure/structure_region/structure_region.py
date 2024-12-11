@@ -11,6 +11,8 @@ from typing import Callable, Dict, List, Tuple, Union
 
 from enzy_htp.chemical.enum import RESIDUE_TYPE_MAPPER
 from enzy_htp.structure.chain import Chain
+from enzy_htp.structure.ligand import Ligand
+from enzy_htp.structure.metal_atom import MetalUnit
 from enzy_htp.structure.modified_residue import ModifiedResidue
 
 from ..structure import Structure, Atom
@@ -342,14 +344,25 @@ class StructureRegion:
 
         residues = []
         for res, atoms in residue_mapper.items():
+            if res not in res_to_cap_atoms.keys():
+                res_to_cap_atoms[res] = 0
+            
             if res.rtype == chem.ResidueType.MODIFIED:
                 new_res = ModifiedResidue(int(res.idx), res.name, atoms, res.parent, net_charge=int(res.net_charge), multiplicity=int(res.multiplicity))
-                if not res_to_cap_atoms[res]:
-                    res_to_cap_atoms[res] = 0
-                new_res.renumber_atoms(range(1, len(atoms) + res_to_cap_atoms[res]))
+                new_res.renumber_atoms(range(1, len(atoms) + res_to_cap_atoms[res] + 1))
                 residues.append(new_res)
+            elif res.rtype == chem.ResidueType.LIGAND:
+                new_res = Ligand(int(res.idx), res.name, atoms, res.parent, net_charge=int(res.net_charge), multiplicity=int(res.multiplicity))
+                new_res.renumber_atoms(range(1, len(atoms) + res_to_cap_atoms[res] + 1))
+                residues.append(new_res)
+            elif res.rtype == chem.ResidueType.METAL:
+                new_res = MetalUnit(int(res.idx), res.name, atoms, res.parent)
+                new_res.renumber_atoms(range(1, len(atoms) + res_to_cap_atoms[res] + 1))
+                residues.append(new_res)            
             else:
-                residues.append(Residue(int(res.idx), res.name, atoms, res.parent))
+                new_res = Residue(int(res.idx), res.name, atoms, res.parent)
+                new_res.renumber_atoms(range(1, len(atoms) + res_to_cap_atoms[res] + 1))
+                residues.append(new_res)
 
         chain_mapper: {Chain, List[Residue]} = {}
         for res in residues:
@@ -361,7 +374,9 @@ class StructureRegion:
         for chain, residues in chain_mapper.items():
             chains.append(Chain(chain.name, residues))
         
-        return Structure(chains)
+        stru = Structure(chains)
+        stru.renumber_atoms()
+        return stru
     # endregion
 
     # region == checker ==
