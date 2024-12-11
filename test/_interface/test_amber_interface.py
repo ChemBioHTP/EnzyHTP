@@ -38,6 +38,7 @@ from enzy_htp.structure.structure_selection.general import select_stru
 
 MM_BASE_DIR = Path(__file__).absolute().parent
 MM_DATA_DIR = f"{MM_BASE_DIR}/data/"
+MM_NCAA_DIR = f"{MM_BASE_DIR}/../ncaa_lib/"
 STRU_DATA_DIR = f"{MM_BASE_DIR}/../structure/data/"
 MM_WORK_DIR = f"{MM_BASE_DIR}/work_dir/"
 MINIMIZE_INPUT_1 = f"{MM_DATA_DIR}/min_1.inp"
@@ -1286,12 +1287,7 @@ def test_ncaa_to_moldesc_modaa():
     ncaa = stru.modified_residue[0]
 
     ai = interface.amber
-    out_path = None
-    try:
-        out_path = ai.antechamber_ncaa_to_moldesc(ncaa=ncaa)
-    except:
-        assert False, f"ncaa_to_moldesc failed with modaa"
+    out_path = ai.antechamber_ncaa_to_moldesc(ncaa=ncaa)
 
-    #TODO: Compare to correct one
+    assert fs.content_from_file(out_path) == fs.content_from_file(f"{MM_NCAA_DIR}/LLP_AM1BCC-AMBER.ac")
     fs.safe_rm(out_path)
-
