@@ -9,11 +9,16 @@ from copy import deepcopy
 import numpy as np
 from typing import Callable, Dict, List, Tuple, Union
 
+from enzy_htp.chemical.enum import RESIDUE_TYPE_MAPPER
+from enzy_htp.structure.chain import Chain
+from enzy_htp.structure.modified_residue import ModifiedResidue
+
 from ..structure import Structure, Atom
 from ..residue import Residue
 from ..noncanonical_base import NonCanonicalBase
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.math_helper import round_by, is_integer
+import enzy_htp.chemical as chem
 
 from .residue_caps import ResidueCap
 
@@ -311,6 +316,52 @@ class StructureRegion:
         for atom in self.atoms:
             if not atom.parent.is_residue_cap():
                 return atom.root()
+            
+    def convert_to_structure(self, cap_as_residue = False) -> Structure:
+        """Converts all atoms in the region to a Structure
+        Args:
+            cap_as_residue: will not include the cap in the residue if True
+        Returns:
+            The corresponding Structure of the structure region"""
+        residue_mapper: {Residue, List[Atom]} = {}
+        res_to_cap_atoms: {Residue, int} = {}
+
+        for aa in self.atoms:
+            if isinstance(aa.parent, ResidueCap):
+                if cap_as_residue:
+                    continue
+                else:
+                    aa.residue = aa.parent.link_atom.residue
+                if aa.residue not in res_to_cap_atoms:
+                    res_to_cap_atoms[aa.residue] = 0
+                res_to_cap_atoms[aa.residue] += 1
+
+            if aa.residue not in residue_mapper:
+                residue_mapper[aa.residue] = []
+            residue_mapper[aa.residue].append(aa)
+
+        residues = []
+        for res, atoms in residue_mapper.items():
+            if res.rtype == chem.ResidueType.MODIFIED:
+                new_res = ModifiedResidue(int(res.idx), res.name, atoms, res.parent, net_charge=int(res.net_charge), multiplicity=int(res.multiplicity))
+                if not res_to_cap_atoms[res]:
+                    res_to_cap_atoms[res] = 0
+                new_res.renumber_atoms(range(1, len(atoms) + res_to_cap_atoms[res]))
+                residues.append(new_res)
+            else:
+                residues.append(Residue(int(res.idx), res.name, atoms, res.parent))
+
+        chain_mapper: {Chain, List[Residue]} = {}
+        for res in residues:
+            if res.parent not in chain_mapper:
+                chain_mapper[res.parent] = []
+            chain_mapper[res.parent].append(res)
+        
+        chains = []
+        for chain, residues in chain_mapper.items():
+            chains.append(Chain(chain.name, residues))
+        
+        return Structure(chains)
     # endregion
 
     # region == checker ==

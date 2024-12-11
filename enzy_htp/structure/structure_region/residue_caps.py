@@ -610,7 +610,12 @@ class OHCap(ResidueCap):
 
 
     def anchor(self) -> None:
-        """Specialized anchoring that is identical for both n-terminal and c-terminal capping."""
+        """Specialized anchoring that is identical for both n-terminal and c-terminal capping. 
+        Raises warning if user attempts to use OH for n-ter"""
+
+        if self.is_nterm_cap():
+            # just raise a TypeError or something here and report to logger. Contact devs if they need it
+            _LOGGER.warning("WARNING: You are trying to add a methylamide cap on the n-terminal side of an amino acid!")
         
         link = np.array(self.link_atom.coord)
         socket = np.array(self.socket_atom.coord)

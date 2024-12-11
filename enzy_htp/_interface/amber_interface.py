@@ -2540,10 +2540,9 @@ class AmberInterface(BaseInterface):
         fs.safe_mkdir(temp_dir)
         temp_pdb_path = fs.get_valid_temp_name(f"{temp_dir}/{ncaa.name}.pdb")
         if ncaa.is_modified():
-            # capping - cap C with OH and N with H
+            # 1.1. Capping - cap C-terminal with OH and N-terminal with H
             ncaa_region = create_region_from_selection_pattern(stru=ncaa, pattern="all", nterm_cap="H", cterm_cap="OH")
-            ncaa = ModifiedResidue(1, ncaa.name, ncaa_region.atoms, ncaa.parent, net_charge=ncaa.net_charge)
-            ncaa.renumber_atoms(range(1,len(ncaa_region.atoms)+3))
+            ncaa = ncaa_region.convert_to_structure().modified_residue[0]
         pdb_io.PDBParser().save_structure(temp_pdb_path, ncaa)
         input_file = temp_pdb_path
 

@@ -310,5 +310,6 @@ def rot_vec_from_dihedral(p0:npt.NDArray, p1:npt.NDArray, p2:npt.NDArray, p3:npt
     to a given value in the specified direction."""
     # TODO: Write unit test for this function
     dihedral = get_dihedral(p0, p1, p2, p3)
+    direction = direction / np.linalg.norm(direction)
     v = value - dihedral
     return (direction * v)
