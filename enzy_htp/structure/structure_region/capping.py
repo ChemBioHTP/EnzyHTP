@@ -14,7 +14,7 @@ from abc import abstractmethod, ABC
 from copy import deepcopy
 import numpy as np
 from scipy.spatial.transform import Rotation as R
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Union
 
 from ..structure import Structure, Residue, Atom
 
