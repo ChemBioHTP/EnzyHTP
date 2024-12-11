@@ -1977,7 +1977,7 @@ class AmberInterface(BaseInterface):
                 "&rst"
             ]
             for k, v in raw_dict.items():
-                if k == "iat":
+                if k == "iat" or k.startswith("igr"):
                     v = map(str, v)
                     cons_lines.append(f" {k}={','.join(v)},")
                 else:
@@ -2204,9 +2204,15 @@ class AmberInterface(BaseInterface):
         }"""
         target_keys = "r1 r2 r3 r4 rk2 rk3 ir6 ialtd ifvari".split() # TODO add more when needed
         source_dict = cons.params["amber"]
-        # iat
-        atom_idxes = self.get_amber_atom_index(cons.atoms)
-        result = {"iat": atom_idxes}
+        # iat & igr
+        if cons.is_group_constraint():
+            atom_idxes = [-1] * cons.num_groups
+            result = {"iat": atom_idxes}
+            for i, grp_atom in enumerate(cons.atoms_by_groups):
+                result[f"igr{i+1}"] = self.get_amber_atom_index(grp_atom)
+        else:
+            atom_idxes = self.get_amber_atom_index(cons.atoms)
+            result = {"iat": atom_idxes}
 
         # other keys
         for k in target_keys:

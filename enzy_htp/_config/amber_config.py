@@ -151,7 +151,7 @@ class AmberConfig(BaseConfig):
     # endregion
 
     # region == Default values for StructureConstrain ==
-    SUPPORTED_CONSTRAINT_TYPE = ["cartesian_freeze", "backbone_freeze", "distance_constraint",
+    SUPPORTED_CONSTRAINT_TYPE = ["cartesian_freeze", "backbone_freeze", "distance_constraint", "group_distance_constraint",
                                  "angle_constraint", "dihedral_constraint", "residue_pair_constraint"]
 
     DEFAULT_CARTESIAN_FREEZE_WEIGHT = 2.0

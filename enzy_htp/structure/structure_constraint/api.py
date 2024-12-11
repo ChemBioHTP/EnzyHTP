@@ -198,6 +198,14 @@ class StructureConstraint(ABC):
         """Is this a distance constraint?"""
         return False
 
+    def is_group_distance_constraint(self) -> bool:
+        """Is this a group distance constraint?"""
+        return False
+
+    def is_group_constraint(self) -> bool:
+        """Is this a group constraint including group_distance_constraint etc.?"""
+        return False
+
     def is_angle_constraint(self) -> bool:
         """Is this an angle constraint?"""
         return False
@@ -346,7 +354,7 @@ class DistanceConstraint(StructureConstraint):
         return self.atoms[0].distance_to(self.atoms[1])
 
 
-class GroupDistanceConstraint(StructureConstraint):
+class GroupDistanceConstraint(StructureConstraint): # TODO make base class for group constriants when we need more
     """Specialization of StructureConstraint() for the distance between two Atom()'s."""
 
     DEFAULT_PARAMS = {
@@ -382,12 +390,27 @@ class GroupDistanceConstraint(StructureConstraint):
         return self.atoms[self.grp_sep_idx_:]
 
     @property
+    def atoms_by_groups(self) -> List[List[Atom]]:
+        """return atoms seperated by groups. This method is part of the
+        API for all 'group constraints'."""
+        return [self.group_1_atoms, self.group_2_atoms]
+
+    @property
     def constraint_type(self) -> str:
         """hard coded constraint type"""
         return "group_distance_constraint"
 
+    @property
+    def num_groups(self) -> int:
+        """hard coded number of constraint groups"""
+        return 2
+
     def is_group_distance_constraint(self) -> bool:
         """Is this a group distance constraint? Always True for this class."""
+        return True
+
+    def is_group_constraint(self) -> bool:
+        """Is this a group constraint?"""
         return True
 
     def correct_num_atoms(self) -> bool:

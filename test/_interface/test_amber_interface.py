@@ -31,7 +31,8 @@ from enzy_htp.structure.structure_constraint import (
     create_cartesian_freeze,
     create_backbone_freeze,
     create_distance_constraint,
-    create_angle_constraint,)
+    create_angle_constraint,
+    create_group_distance_constraint)
 from enzy_htp import interface
 from enzy_htp import config as eh_config
 from enzy_htp.structure.structure_ensemble import StructureEnsemble
@@ -634,6 +635,36 @@ def test_write_disang_file():
     fs.safe_rm(test_disang)
 
 
+def test_write_disang_file_group_cons():
+    """test using an example raw dict list containing group constraint"""
+    test_dict_list = [
+        {'ialtd': 0,
+        'iat': [-1, -1],
+        'igr1': [1567, 1569, 1580],
+        'igr2': [3424, 3426, 3444],
+        'r1': 2.150,
+        'r2': 2.350,
+        'r3': 2.450,
+        'r4': 2.650,
+        'rk2': 200.0,
+        'rk3': 200.0},
+        {'ialtd': 0,
+        'iat': [3975,3976,1579],
+        'r1': 150.0,
+        'r2': 170.0,
+        'r3': 190.0,
+        'r4': 210.0,
+        'rk2': 200.0,
+        'rk3': 200.0}]
+    test_disang = f"{MM_WORK_DIR}/answer_disang_from_raw_dict_group_cons.rs"
+    answer_disang = f"{MM_DATA_DIR}/answer_disang_from_raw_dict_group_cons.rs"
+    ai = interface.amber
+    ai.write_disang_file(test_dict_list, test_disang)
+    assert files_equivalent(test_disang, answer_disang)
+
+    fs.safe_rm(test_disang)
+
+
 def test_parse_md_config_dict_to_raw_wo_cons():
     """test to make sure _parse_md_config_dict_to_raw() works as expected.
     using a dict from old EnzyHTP Class_Conf.Amber.conf_heat as an example"""
@@ -1067,6 +1098,30 @@ def test_parse_cons_to_raw_rs_dict():
         else:
             assert v == answer_raw_dict[k]
 
+def test_parse_group_cons_to_raw_rs_dict():
+    """test using KE and example cons and manually curated answer from PDB"""
+    test_pdb = f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb"
+    test_stru = struct.PDBParser().get_structure(test_pdb)
+    test_cons = create_group_distance_constraint(
+        "resi 101 & n. C+CA+N", "resi 222 & n. C+CA+N", 2.4, test_stru)
+    answer_raw_dict = {
+        'ialtd': 0,
+        'iat': [-1, -1],
+        'igr1': [1567, 1569, 1580],
+        'igr2': [3424, 3426, 3444],
+        'r1': 2.15,
+        'r2': 2.35,
+        'r3': 2.45,
+        'r4': 2.65,
+        'rk2': 200.0,
+        'rk3': 200.0}
+    ai = interface.amber
+    test_raw_dict = ai._parse_cons_to_raw_rs_dict(test_cons)
+    for k, v in test_raw_dict.items():
+        if k in "r1 r2 r3 r4".split():
+            assert np.isclose(v, answer_raw_dict[k], atol=1e-3)
+        else:
+            assert v == answer_raw_dict[k]
 
 def test_reduce_path_in_mdin():
     """test using an path that is too long"""
