@@ -56,7 +56,7 @@ def equi_md_sampling(stru: Structure,
         record_period: The simulation time period for recording the geom. (unit: ns)
         cluster_job_config: The config for cluster_job if it is used as the parallel method.
         cpu_equi_step: Whether use cpu for equi step
-        cpu_job_config: The job config for the cpu equi step if specified
+        cpu_equi_job_config: The job config for the cpu equi step if specified
         job_check_period: The check period for wait_to_2d_array_end. Used when parallel_method='cluster_job'. (Unit: s, default: 210s)
     Returns:
         A list trajectories for each replica in StructureEnsemble format."""
@@ -302,8 +302,8 @@ def _process_equi_md_sampling_arguments(
     equi_job_config = cluster_job_config
     if cpu_equi_step:
         equi_core = "cpu"
-        equi_job_config = cpu_job_config
-        if not cpu_job_config:
+        equi_job_config = cpu_equi_job_config
+        if not cpu_equi_job_config:
             _LOGGER.error("cpu_equi_step is used but cpu_equi_job_config is not given! "
                           "You need to at least specify the account and partition. ")
             raise ValueError
@@ -320,7 +320,7 @@ def _process_equi_md_sampling_arguments(
     heat_step = parent_interface.build_md_step(
         name="heat_nvt",
         length=0.05, # ns
-        cluster_job_config=cpu_job_config,
+        cluster_job_config=cpu_equi_job_config,
         core_type="cpu",
         temperature=[(0, 0), (0.05*0.9, prod_temperature), (-1, prod_temperature)],
         constrain=[freeze_backbone] + prod_constrain)
