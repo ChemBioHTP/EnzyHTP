@@ -194,9 +194,16 @@ class StructureConstraint(ABC):
         """Is this a backbone freeze constraint?"""
         return False
 
-
     def is_distance_constraint(self) -> bool:
         """Is this a distance constraint?"""
+        return False
+
+    def is_group_distance_constraint(self) -> bool:
+        """Is this a group distance constraint?"""
+        return False
+
+    def is_group_constraint(self) -> bool:
+        """Is this a group constraint including group_distance_constraint etc.?"""
         return False
 
     def is_angle_constraint(self) -> bool:
@@ -210,7 +217,6 @@ class StructureConstraint(ABC):
     def is_residue_pair_constraint(self) -> bool:
         """Is this a residue pair constraint?"""
         return False
-
 
     @abstractmethod
     def correct_num_atoms(self) -> bool:
@@ -273,7 +279,6 @@ class StructureConstraint(ABC):
     #TODO(CJ): add function that checks if topology and constraints are compatible
     #TODO(CJ): will need to make a version of this that actually works for the ResiduePairConstraint
     
-
 
 class CartesianFreeze(StructureConstraint):
     """Specialization of StructureConstraint() for Atoms() that are frozen in Cartesian space. Many
@@ -347,6 +352,74 @@ class DistanceConstraint(StructureConstraint):
     def current_geometry(self) -> float:
         """The cartesian distance between two 3D points."""
         return self.atoms[0].distance_to(self.atoms[1])
+
+
+class GroupDistanceConstraint(StructureConstraint): # TODO make base class for group constriants when we need more
+    """Specialization of StructureConstraint() for the distance between two Atom()'s."""
+
+    DEFAULT_PARAMS = {
+        "amber": {
+            "rs_filepath": eh_config["amber.DEFAULT_DISANG_FILEPATH"],
+        } | eh_config["amber.DEFAULT_DISTANCE_CONSTRAINT_SETTING"],
+        
+        "rosetta": None,
+    }
+    
+    def __init__(
+        self,
+        grp_1_atoms:List[Atom],
+        grp_2_atoms:List[Atom],
+        target_value: float
+        ):
+        """init for applying default params"""
+        self.atoms_ = grp_1_atoms + grp_2_atoms
+        self.grp_sep_idx_ = len(grp_1_atoms)
+        self.target_value_ = target_value 
+        self.params_ = deepcopy( self.DEFAULT_PARAMS ) 
+
+    @property
+    def group_1_atoms(self) -> List[Atom]:
+        """derive group_1 atoms. made this way so that methods like
+        change_topology will still work"""
+        return self.atoms[:self.grp_sep_idx_]
+
+    @property
+    def group_2_atoms(self) -> List[Atom]:
+        """derive group_2 atoms. made this way so that methods like
+        change_topology will still work"""
+        return self.atoms[self.grp_sep_idx_:]
+
+    @property
+    def atoms_by_groups(self) -> List[List[Atom]]:
+        """return atoms seperated by groups. This method is part of the
+        API for all 'group constraints'."""
+        return [self.group_1_atoms, self.group_2_atoms]
+
+    @property
+    def constraint_type(self) -> str:
+        """hard coded constraint type"""
+        return "group_distance_constraint"
+
+    @property
+    def num_groups(self) -> int:
+        """hard coded number of constraint groups"""
+        return 2
+
+    def is_group_distance_constraint(self) -> bool:
+        """Is this a group distance constraint? Always True for this class."""
+        return True
+
+    def is_group_constraint(self) -> bool:
+        """Is this a group constraint?"""
+        return True
+
+    def correct_num_atoms(self) -> bool:
+        """A group distance constraint can have any number of atoms greater than 1."""
+        return len(self.atoms) > 1
+
+    def current_geometry(self) -> float:
+        """The cartesian distance between two COG points."""
+        raise Exception("TODO error. contact developers if you really need this.")
 
 
 class AngleConstraint(StructureConstraint):
