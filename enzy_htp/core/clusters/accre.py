@@ -108,7 +108,8 @@ export ROSETTA3=/data/yang_lab/shaoqz/software/Rosetta313/main/""",
         "partition" : "partition=",
         "mem_per_core" : {"cpu": "mem-per-cpu=", "gpu": "mem="}, # previously using mem-per-gpu= change to mem= (calculate the total memory) base on issue #57
         "walltime" : "time=",
-        "account" : "account="
+        "account" : "account=",
+        "exclude_node_id" : "exclude="
     }
 
     PARTITION_VALUE_MAP = {
@@ -176,7 +177,6 @@ export ROSETTA3=/data/yang_lab/shaoqz/software/Rosetta313/main/""",
             res_line = f"#SBATCH --{k}{v}\n"
             res_str += res_line
         res_str += "#SBATCH --export=NONE\n"
-        res_str += "#SBATCH --exclude=gpu0022,gpu0002\n"
         return res_str
     
     @classmethod
