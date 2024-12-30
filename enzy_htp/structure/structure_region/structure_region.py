@@ -216,6 +216,26 @@ class StructureRegion:
         for atom in self.atoms:
             result[atom.parent].append(atom)
         return result
+    
+    def involved_residue_atom_mapper(self, cap_as_residue=False) -> Dict[Residue, List[Atom]]:
+        """ Creates a mapper between involved resiudes and their atoms.
+        Args:
+            cap_as_residue: will not include the cap in the residue if True
+        Returns:
+            A mapper between all involved residues in the StructureRegion and their atoms."""
+        residue_mapper: {Residue, List[Atom]} = {}
+        for res in self.involved_residues:
+            for aa in res.atoms:                    
+                if aa.residue not in residue_mapper:
+                    residue_mapper[aa.residue] = []
+                residue_mapper[aa.residue].append(aa)
+
+        if not cap_as_residue:
+            for cap in self.caps:
+                for aa in cap:
+                    residue_mapper[aa.parent.link_atom.residue].append(aa)
+
+        return residue_mapper
 
     def involved_residues_with_free_terminal(self) -> Dict[str, List[Residue]]:
         """get all involved residue that have a terminal free valance
@@ -325,50 +345,20 @@ class StructureRegion:
             cap_as_residue: will not include the cap in the residue if True
         Returns:
             The corresponding Structure of the structure region"""
-        residue_mapper: {Residue, List[Atom]} = {}
-        res_to_cap_atoms: {Residue, int} = {}
 
-        for aa in self.atoms:
-            if isinstance(aa.parent, ResidueCap):
-                if cap_as_residue:
-                    continue
-                else:
-                    aa.residue = aa.parent.link_atom.residue
-                if aa.residue not in res_to_cap_atoms:
-                    res_to_cap_atoms[aa.residue] = 0
-                res_to_cap_atoms[aa.residue] += 1
+        residue_mapper = self.involved_residue_atom_mapper(cap_as_residue=cap_as_residue)
 
-            if aa.residue not in residue_mapper:
-                residue_mapper[aa.residue] = []
-            residue_mapper[aa.residue].append(aa)
+        residues: List[Residue] = []
+        for res in self.involved_residues:
+            new_res = deepcopy(res)
+            new_res.atoms = residue_mapper[res]
+            new_res.chain = res.chain
+            new_res.renumber_atoms(range(1, len(new_res.atoms) + 1))
+            residues.append(new_res)
 
-        residues = []
-        for res, atoms in residue_mapper.items():
-            if res not in res_to_cap_atoms.keys():
-                res_to_cap_atoms[res] = 0
-            
-            if res.rtype == chem.ResidueType.MODIFIED:
-                new_res = ModifiedResidue(int(res.idx), res.name, atoms, res.parent, net_charge=int(res.net_charge), multiplicity=int(res.multiplicity))
-                new_res.renumber_atoms(range(1, len(atoms) + res_to_cap_atoms[res] + 1))
-                residues.append(new_res)
-            elif res.rtype == chem.ResidueType.LIGAND:
-                new_res = Ligand(int(res.idx), res.name, atoms, res.parent, net_charge=int(res.net_charge), multiplicity=int(res.multiplicity))
-                new_res.renumber_atoms(range(1, len(atoms) + res_to_cap_atoms[res] + 1))
-                residues.append(new_res)
-            elif res.rtype == chem.ResidueType.METAL:
-                new_res = MetalUnit(int(res.idx), res.name, atoms, res.parent)
-                new_res.renumber_atoms(range(1, len(atoms) + res_to_cap_atoms[res] + 1))
-                residues.append(new_res)            
-            else:
-                new_res = Residue(int(res.idx), res.name, atoms, res.parent)
-                new_res.renumber_atoms(range(1, len(atoms) + res_to_cap_atoms[res] + 1))
-                residues.append(new_res)
-
-        chain_mapper: {Chain, List[Residue]} = {}
+        chain_mapper: {Chain, List[Residue]} = defaultdict(list)
         for res in residues:
-            if res.parent not in chain_mapper:
-                chain_mapper[res.parent] = []
-            chain_mapper[res.parent].append(res)
+            chain_mapper[res.chain].append(res)
         
         chains = []
         for chain, residues in chain_mapper.items():
