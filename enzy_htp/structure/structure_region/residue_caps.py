@@ -592,7 +592,7 @@ class OHCap(ResidueCap):
         prob_p2 += (d0*bd) + p0
         
         # calculate rotation vector that sets the dihedral formed by the four points to 0
-        rv = mh.rot_vec_from_dihedral(prob_p1, prob_p2, p0, p2, 0, d0)
+        rv = mh.rot_vec_from_dihedral(prob_p1, prob_p2, p0, p2, 0)
         rot = R.from_rotvec(rv, degrees=True)
 
         for aa in atoms:
@@ -608,14 +608,13 @@ class OHCap(ResidueCap):
             pt += (d0*bd) + p0
             aa.coord = pt
 
-
     def anchor(self) -> None:
         """Specialized anchoring that is identical for both n-terminal and c-terminal capping. 
         Raises warning if user attempts to use OH for n-ter"""
 
         if self.is_nterm_cap():
             # just raise a TypeError or something here and report to logger. Contact devs if they need it
-            _LOGGER.warning("WARNING: You are trying to add a methylamide cap on the n-terminal side of an amino acid!")
+            _LOGGER.warning("WARNING: You are trying to add a hydroxyl cap on the n-terminal side of an amino acid!")
         
         link = np.array(self.link_atom.coord)
         socket = np.array(self.socket_atom.coord)
@@ -625,7 +624,7 @@ class OHCap(ResidueCap):
         self.align_rigid_atoms(self.atoms, d0, link)
 
     def net_charge(self) -> int:
-        return -1
+        return 0
 
     def get_nterm_atoms(self) -> List[Atom]:
         """Create the default n-terminal version of the OHCap with appropriate names."""

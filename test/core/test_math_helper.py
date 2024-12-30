@@ -194,19 +194,25 @@ def test_rot_vec_from_dihedral():
     test_pt3 = np.array([1, 0, 5])
     test_pt4 = np.array([4, -5, 7])
 
-    v1 = test_pt2 - test_pt1
-    v2 = test_pt3 - test_pt1
-    n1 = np.cross(v1, v2) / np.linalg.norm(np.cross(v1,v2))
+    rv = mh.rot_vec_from_dihedral(test_pt1, test_pt2, test_pt3, test_pt4, 0)
+    rot = R.from_rotvec(rv, degrees=True)
 
-    v3 = test_pt3 - test_pt2
-    v4 = test_pt4 - test_pt2
-    n2 = np.cross(v3, v4) / np.linalg.norm(np.cross(v3,v4))
-
-    d0 = np.cross(n1, n2) / np.linalg.norm(np.cross(n1, n2))
-
-    rv = mh.rot_vec_from_dihedral(test_pt1, test_pt2, test_pt3, test_pt4, 0, d0)
-    rot = R.from_rotvec(-rv, degrees=True)
+    dv = test_pt4 - test_pt3
  
-    test_pt4 = rot.apply(test_pt4)
+    test_pt4 = test_pt3 + rot.apply(dv)
 
     assert abs(mh.get_dihedral(test_pt1, test_pt2, test_pt3, test_pt4)) <= 0.05
+
+    test_pt1_2 = np.array([1, 0, 0])
+    test_pt2_2 = np.array([5, 7, 3])
+    test_pt3_2 = np.array([1, 0, 5])
+    test_pt4_2 = np.array([4, -5, 7])
+
+    rv2 = mh.rot_vec_from_dihedral(test_pt1_2, test_pt2_2, test_pt3_2, test_pt4_2, 120)
+    rot2 = R.from_rotvec(rv2, degrees=True)
+
+    dv2 = test_pt4_2 - test_pt3_2
+ 
+    test_pt4_2 = test_pt3_2 + rot2.apply(dv2)
+
+    assert abs(mh.get_dihedral(test_pt1_2, test_pt2_2, test_pt3_2, test_pt4_2)) <= 0.05
