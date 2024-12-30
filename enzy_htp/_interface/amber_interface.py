@@ -2526,12 +2526,13 @@ class AmberInterface(BaseInterface):
 
         if ncaa.is_modified():
             atom_type = "AMBER"
-            gaff_type = atom_type
+        else:
+            atom_type = gaff_type
 
         # init_path
         if out_path is None:
             if ncaa.is_modified():
-                out_path = fs.get_valid_temp_name(f"{eh_config['system.NCAA_LIB_PATH']}/{ncaa.name}_{charge_method}-{gaff_type}.ac")
+                out_path = fs.get_valid_temp_name(f"{eh_config['system.NCAA_LIB_PATH']}/{ncaa.name}_{charge_method}-{atom_type}.ac")
             else:
                 out_path = f"{eh_config['system.NCAA_LIB_PATH']}/{ncaa.name}_{charge_method}-{gaff_type}.mol2"
 
@@ -2567,7 +2568,7 @@ class AmberInterface(BaseInterface):
                              charge_method=charge_method,
                              spin=ncaa.multiplicity,
                              net_charge=ncaa.net_charge,
-                             atom_type=gaff_type,)
+                             atom_type=atom_type,)
 
         # 4. clean up
         fs.clean_temp_file_n_dir([
