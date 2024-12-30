@@ -1,13 +1,15 @@
-"""Generation/construction of Structure objects from PDB files and exporting it vice versa
-Definition of PDB file format (http://www.wwpdb.org/documentation/file-format-content/format33/v3.3.html)
-Also contains util function that requires knoweledge of PDB format
+"""Generation/construction of Structure objects from XYZ files and exporting it vice versa
 
-Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
-Date: 2022-08-01
+Author: Sebastian Stull, <sebastian.l.stull@vanderbilt.edu>
+Date: 2024-12-14
 """
+import os
 from typing import List, Union
 
+from plum import dispatch
+
 import enzy_htp.core.file_system as fs
+from enzy_htp.structure.structure_region.structure_region import StructureRegion
 from ._interface import StructureParserInterface
 from ..atom import Atom
 from ..structure import Structure
@@ -28,15 +30,19 @@ class XYZParser(StructureParserInterface):
         pass
 
     @classmethod
-    def get_file_str(self, stru: Structure) -> str:
-        pass
-
+    @dispatch
+    def get_file_str(self, stru: Structure) -> List[str]:
+        result = f"{str(len(stru.atoms))}{os.linesep}{os.linesep}"
+        for at in stru.atoms:
+            result += f"{at.element} {at.coord[0]} {at.coord[1]} {at.coord[2]}{os.linesep}"
+        result  = result[:-1]
+        return result
+    
     @classmethod
-    def make_xyz_from_atoms(self, file_path: str, atoms: List[Atom]):
-        lines = [
-            str(len(atoms)),
-            "",]
-        for at in atoms:
-            lines.append(f"{at.element} {at.coord[0]} {at.coord[1]} {at.coord[2]}")
-        fs.write_lines(file_path, lines)
-        return file_path
+    @dispatch
+    def get_file_str(self, stru: StructureRegion) -> str:
+        result = f"{str(len(stru.atoms))}{os.linesep}{os.linesep}"
+        for at in stru.atoms:
+            result += f"{at.element} {at.coord[0]} {at.coord[1]} {at.coord[2]}{os.linesep}"
+        result  = result[:-1]
+        return result

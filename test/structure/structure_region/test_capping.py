@@ -249,11 +249,8 @@ def test_capping_modaa(helpers):
     capping.capping_with_residue_terminals(test_region, nterm_cap=nterm_cap, cterm_cap=cterm_cap)
 
     answer_file = f"{DATA_DIR}answer_capping_3.xyz"
-    atoms = test_region.atoms
-    file_path = f"{WORK_DIR}test_capping_3.xyz"
     
-    test_file = xyzp.make_xyz_from_atoms(file_path, atoms)
-    assert helpers.equiv_files(test_file, answer_file, consider_order=False)
+    result = xyzp.get_file_str(test_region)
 
-    fs.safe_rm(test_file)
+    assert fs.content_from_file(answer_file) == result
 

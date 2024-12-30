@@ -52,14 +52,10 @@ def test_nhch3_cap(helpers):
     capping.capping_with_residue_terminals(test_region, nterm_cap='COCH3', cterm_cap='NHCH3')
 
     answer_file = f"{DATA_DIR}answer_capping_2.xyz"
-    atoms = test_region.atoms
-    file_path = f"{WORK_DIR}test_capping_2.xyz"
     
-    test_file = xyzp.make_xyz_from_atoms(file_path, atoms)
+    result = xyzp.get_file_str(test_region)
 
-    assert helpers.equiv_files(test_file, answer_file, consider_order=False)
-    fs.safe_rm(test_file)
-
+    assert fs.content_from_file(answer_file) == result
 def test_oh_cap_llp(helpers):
     """tests OHCap to ensure region is capped properly for LLP residue"""
     test_stru = sp.get_structure(f"{DATA_DIR}3FCR_modified.pdb")
@@ -70,13 +66,10 @@ def test_oh_cap_llp(helpers):
     capping.capping_with_residue_terminals(test_region, nterm_cap='H', cterm_cap='OH')
 
     answer_file = f"{DATA_DIR}answer_capping_3.xyz"
-    atoms = test_region.atoms
-    file_path = f"{WORK_DIR}test_capping_3.xyz"
     
-    test_file = xyzp.make_xyz_from_atoms(file_path, atoms)
+    result = xyzp.get_file_str(test_region)
 
-    assert helpers.equiv_files(test_file, answer_file, consider_order=False)
-    fs.safe_rm(test_file)
+    assert fs.content_from_file(answer_file) == result
 
 def test_oh_cap_pro(helpers):
     """tests OHCap to ensure region is capped properly for PRO residue"""
@@ -88,13 +81,10 @@ def test_oh_cap_pro(helpers):
     capping.capping_with_residue_terminals(test_region, nterm_cap='H', cterm_cap='OH')
 
     answer_file = f"{DATA_DIR}answer_capping_4.xyz"
-    atoms = test_region.atoms
-    file_path = f"{WORK_DIR}test_capping_4.xyz"
     
-    test_file = xyzp.make_xyz_from_atoms(file_path, atoms)
+    result = xyzp.get_file_str(test_region)
 
-    assert helpers.equiv_files(test_file, answer_file, consider_order=False)
-    fs.safe_rm(test_file)
+    assert fs.content_from_file(answer_file) == result
 
 def test_oh_cap_glu(helpers):
     """tests OHCap to ensure region is capped properly for GLU residue"""
@@ -106,10 +96,7 @@ def test_oh_cap_glu(helpers):
     capping.capping_with_residue_terminals(test_region, nterm_cap='H', cterm_cap='OH')
 
     answer_file = f"{DATA_DIR}answer_capping_5.xyz"
-    atoms = test_region.atoms
-    file_path = f"{WORK_DIR}test_capping_5.xyz"
     
-    test_file = xyzp.make_xyz_from_atoms(file_path, atoms)
+    result = xyzp.get_file_str(test_region)
 
-    assert helpers.equiv_files(test_file, answer_file, consider_order=False)
-    fs.safe_rm(test_file)
+    assert fs.content_from_file(answer_file) == result
