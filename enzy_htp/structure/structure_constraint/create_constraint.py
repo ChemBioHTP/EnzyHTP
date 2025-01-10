@@ -185,6 +185,8 @@ def create_backbone_freeze(stru: Structure, params:Dict=None,) -> BackBoneFreeze
         A BackBoneFreeze StructureConstraint for the supplied Structure.
     """
     atoms = stru.backbone_atoms()
+    if not atoms:
+        return atoms
     result = BackBoneFreeze(atoms=atoms)
     if params is not None:
         result.update_params( params )

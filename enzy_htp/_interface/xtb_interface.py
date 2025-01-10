@@ -314,6 +314,11 @@ class XTBInterface(BaseInterface):
         args:List[str] = ["--chrg", str(charge), "--iterations",
                         str(n_iter), "--parallel",
                         str(n_proc), "--norestart", ]
+
+        if lot.solvent:
+            if lot.solv_method == 'ALPB':
+                args.extend( ['--alpb', lot.solvent] )
+
         if geo_opt:
             if constraints:
                 xtb_inp_file:str=f"{work_dir_abs}/xtb_settings.inp"

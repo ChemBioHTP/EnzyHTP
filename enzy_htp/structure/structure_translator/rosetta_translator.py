@@ -45,6 +45,19 @@ class RosettaTranslator(TranslatorBase):
             else:
                 raise ValueError()
             res.name = new_name
+        elif res.name == 'ASP':
+            atom_names = [aa.name for aa in res.atoms]
+            
+            has_hd2:bool = 'HD2' in atom_names
+            
+            new_name:str = None
+            
+            if has_hd2:
+                new_name = 'ASH'
+            else:
+                new_name = 'ASP'
+            res.name = new_name
+
         else:
             super().to_standard(res)    
 
@@ -59,6 +72,10 @@ class RosettaTranslator(TranslatorBase):
                                 'ASN', ['1HB', '2HB', '1HD2', '2HD2', '1H', '2H', '3H'])
         self.register_mapping('ASP', ['HB3', 'HB2', 'H1', 'H2', 'H3'], 
                                 'ASP', ['1HB', '2HB', '1H', '2H', '3H'])
+        
+        self.register_mapping('ASH', ['HB3', 'HB2', 'H1', 'H2', 'H3'], 
+                                'ASP', ['1HB', '2HB', '1H', '2H', '3H'])
+
         self.register_mapping('CYS', ['HB3', 'HB2', 'H1', 'H2', 'H3'],
                                 'CYS', ['1HB', '2HB', '1H', '2H', '3H'])
         self.register_mapping('GLN', ['HB3', 'HB2', 'HG3', 'HG2', 'HE21', 'HE22', 'H1', 'H2', 'H3'], 

@@ -50,7 +50,7 @@ remove_hydrogens(wt_stru, polypeptide_only=True)
 protonate_stru(wt_stru, protonate_ligand=False)
 
 # 3. create mutant library
-mutant_pattern = "WT, r:2[resi 254 around 4 and not resi 101: all not self]*2"
+mutant_pattern = "WT, r:1[resi 254 around 4 and not resi 101: all not self]*10"
 mutants = assign_mutant(wt_stru, mutant_pattern)
 
 for i, mut in enumerate(mutants):
@@ -84,7 +84,8 @@ for i, mut in enumerate(mutants):
         cluster_job_config = md_hpc_job_config,
         job_check_period=10,
         prod_constrain=mut_constraints,
-        prod_time= 0.1, #ns
+        prod_time= 0.4, #ns
+        record_period=0.1,
         work_dir=f"{mutant_dir}/MD/"
     )
 
@@ -128,6 +129,6 @@ for i, mut in enumerate(mutants):
     result_dict[tuple(mut)] = mutant_result
 
 # save the result
-with open(result_path, "wb") as of:
-    pickle.dump(result_dict, of)
+    with open(result_path, "wb") as of:
+        pickle.dump(result_dict, of)
 

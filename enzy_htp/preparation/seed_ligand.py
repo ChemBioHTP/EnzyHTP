@@ -351,6 +351,7 @@ def seed_with_pdb_structure(ligand:Ligand,
                      ligand_sele:str,
                      #similarity_metric:str,
                      #similarity_cutoff:float = 0.45,
+                     align_sele:str=None,
                      minimize:bool=False,
                      min_iter:int=1,
                      use_cache:bool=False,
@@ -377,12 +378,17 @@ def seed_with_pdb_structure(ligand:Ligand,
     session = interface.pymol.new_session() 
     stru = ligand.parent.parent
     (stru_sele, session) = interface.pymol.load_enzy_htp_stru(session, stru)
-    
+   
+    if align_sele is None:
+        align_sele = ''
+    else:
+        align_sele = f"and ({align_sele})"
+        
     temp_file = "./temp.mol2"
     args = [
         ('fetch', pdb_code),
         ('remove', 'solvent'),
-        ('align', pdb_code, stru_sele),
+        ('align', f"{pdb_code} {align_sele}", f"{stru_sele} {align_sele}"),
         ('save', temp_file, ligand_sele)
         ]
     interface.pymol.general_cmd(session, args )
@@ -415,22 +421,22 @@ def seed_with_pdb_structure(ligand:Ligand,
         lconf = lmol.GetConformer()
         tconf = tmol.GetConformer()
         
-        ff = AllChem.UFFGetMoleculeForceField(lmol)
+        #ff = AllChem.UFFGetMoleculeForceField(lmol)
         for tidx, lidx in template_to_ligand.items():
             
             lconf.SetAtomPosition(lidx, tconf.GetAtomPosition(tidx))
 
-            ff.UFFAddPositionConstraint(lidx, 0.05, 10000)
-        ff.Minimize()
+        #    ff.UFFAddPositionConstraint(lidx, 0.05, 10000)
+        #ff.Minimize()
 
-        ff = AllChem.UFFGetMoleculeForceField(lmol)
-        for idx in range(lmol.GetNumAtoms()):
-            atom = lmol.GetAtomWithIdx(idx)
-            if atom.GetAtomicNum() != 1:
-                ff.UFFAddPositionConstraint(idx, 0.05, 10000)
-        
-                
-        ff.Minimize()
+        #ff = AllChem.UFFGetMoleculeForceField(lmol)
+        #for idx in range(lmol.GetNumAtoms()):
+        #    atom = lmol.GetAtomWithIdx(idx)
+        #    if atom.GetAtomicNum() != 1:
+        #        ff.UFFAddPositionConstraint(idx, 0.05, 10000)
+        #
+        #        
+        #ff.Minimize()
         interface.rdkit.update_ligand_positions(ligand, lmol)
     else:
         assert False

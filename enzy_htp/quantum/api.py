@@ -236,6 +236,8 @@ def optimize(stru: Union[Structure, StructureEnsemble],
         capping_method: str = "res_ter_cap",
         embedding_method: str= "mechanical", # TODO probably not a good default choice
         parallel_method: str="cluster_job",
+        nterm_cap:str=None,
+        cterm_cap:str=None,
         cluster_job_config: Dict= None,
         job_check_period: int= 210, # s
         job_array_size: int= 20,
@@ -286,7 +288,10 @@ def optimize(stru: Union[Structure, StructureEnsemble],
             qm_region = create_region_from_selection_pattern(
                 stru_esm.topology,
                 regions[0],
-                capping_method)
+                capping_method,
+                nterm_cap=nterm_cap,
+                cterm_cap=cterm_cap,
+                )
             init_charge(qm_region)
         
         qm_engine: QMOptimizationEngine = qm_engine_ctor(

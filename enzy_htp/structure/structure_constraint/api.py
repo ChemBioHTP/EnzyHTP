@@ -283,6 +283,13 @@ class StructureConstraint(ABC):
 
         return False
 
+
+    def is_compatible(self, other:Structure) -> bool: #TODO(CJ)
+        for atom in self.atoms:
+            if not other.has_atom(atom.key):
+                return False
+        return True 
+
 class CartesianFreeze(StructureConstraint):
     """Specialization of StructureConstraint() for Atoms() that are frozen in Cartesian space. Many
     of the methods yield junk values since no measurement is needed for this Class.

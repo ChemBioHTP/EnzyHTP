@@ -14,6 +14,9 @@ from ..residue import Residue
 from ..noncanonical_base import NonCanonicalBase
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.math_helper import round_by, is_integer
+from enzy_htp.chemical.residue import (
+    CAA_CHARGE_MAPPER
+)
 
 from .residue_caps import ResidueCap
 
@@ -271,7 +274,11 @@ class StructureRegion:
                         raise ValueError
                     net_charge += res.net_charge
                     continue
-    
+                 
+            if res.is_canonical() and self.has_whole_residue(res):
+                net_charge += CAA_CHARGE_MAPPER[res.name]                
+                continue
+
             for atom in atoms:
                 atom: Atom
                 if not atom.has_init_charge():

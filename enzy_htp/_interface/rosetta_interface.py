@@ -429,6 +429,17 @@ class RosettaScriptsProtocol:
             RosettaScriptsElement('', **kwargs)
         )
 
+    @dispatch
+    def add_task_operations(self, task_op: RosettaScriptsElement) -> RosettaScriptsProtocol:
+
+        return self.add_element("TASKOPERATIONS", task_opt)
+
+    @dispatch
+    def add_task_operations(self, to_name:str, **kwargs ) -> RosettaScriptsProtocol:
+        return self.add_element("TASKOPERATIONS", 
+            RosettaScriptsElement(to_name, **kwargs)
+        )
+
 
 
     def to_file(self, fname:str) -> str:
@@ -468,17 +479,20 @@ class RosettaScriptsProtocol:
 
         return fname
 
+@dataclass
 class RosettaScriptsEgg(ModelingResultEgg):
     score_file:str
     pdb_files:List[str]
+    parent_job: ClusterJob
 
 class RosettaScriptsEngine(ModelingEngine):
 
-    def __init__(self, interface, protocol: RosettaScriptsProtocol, opts:RosettaOptions, work_dir:str):
+    def __init__(self, interface, protocol: RosettaScriptsProtocol, opts:RosettaOptions, cluster_job_config:Dict, work_dir:str):
         self._parent_interface = interface
         self._work_dir = work_dir
         self._protocol = protocol
         self._opts = opts
+        self._cluster_job_config = cluster_job_config
 
     @property
     def parent_interface(self):
@@ -496,32 +510,70 @@ class RosettaScriptsEngine(ModelingEngine):
     def opts(self) -> RosettaOptions:
         return self._opts
 
+    @property
+    def cluster_job_config(self):
+        return self._cluster_job_config
+
     def engine(self) -> str:
         return "rosetta"
         pass
 
+    @property
+    def name(self) -> str:
+        return "rosetta_scripts"
+
     def make_input_files(self, stru: Structure):
         pass
 
-    def make_job(self, stru:Structure,  opts:RosettaOptions) -> Tuple[ClusterJob, RosettaScriptsEgg]:
+    def make_job(self, stru:Structure) -> Tuple[ClusterJob, RosettaScriptsEgg]:
         if not isinstance(stru, Structure):
             _LOGGER.error("only allow Structure as `stru`")
             raise TypeError
 
         # 2. make .gjf file
         fs.safe_mkdir(self.work_dir)
-        temp_gjf_file, gchk_path = self._make_gjf_file(stru)
+        #temp_gjf_file, gchk_path = self._make_gjf_file(stru)
+        pdb_start = Path(f"{self.work_dir}/start.pdb")
+        sp = PDBParser()
+        sp.save_structure(str(pdb_start), stru)
+        nstruct = 1
+        if self.opts.has('nstruct'):
+            nstruct = self.opts['nstruct']
 
-        # 3. make cmd
-        spe_cmd, gout_path = self.parent_interface.make_gaussian_cmd(temp_gjf_file)
+        prefix:str=""
+        if self.opts.has('out:prefix'):
+            prefix = self.opts['out:prefix']
+
+        prot_file = self.protocol.to_file( f"{self.work_dir}/protocol.xml" )
+        self.opts['in:file:s'] = pdb_start.name
+        self.opts['parser:protocol'] = str(Path(prot_file).absolute())
+
+
+        opt_file = self.opts.to_file( f"{self.work_dir}/rosetta_opts.txt" )
+        logfile = str( (Path(self.work_dir) / 'log.txt').absolute())
+
+        cmd_str = f"cd {Path(self.work_dir).absolute()} && {self.parent_interface.config_.ROSETTA_SCRIPTS} @{Path(opt_file).name} > {Path(logfile).name}"
 
         # 4. assemble ClusterJob
         cluster = self.cluster_job_config["cluster"]
+        #print(cluster)
+        #exit( 0 )
         res_keywords = self.cluster_job_config["res_keywords"]
-        env_settings = cluster.G16_ENV["CPU"]
+        #env_settings = cluster.G16_ENV["CPU"]
+        env_settings = [
+            #'export ROSETTA3=/dors/meilerlab/apps/rosetta/rosetta-3.13/main/',
+            'export ROSETTA3=/panfs/accrepfs.vampire/data/yang_lab/jurichc/main',
+            #'export LD_LIBRARY_PATH=$ROSETTA/source/build/external/release/linux//2.6/64/x86/gcc/5.2/default/:$LD_LIBRARY_PATH',
+            'export LD_LIBRARY_PATH=/panfs/accrepfs.vampire/data/yang_lab/jurichc/main/source/cmake/build_release//:$LD_LIBRARY_PATH',
+            'module load GCC/8',
+            'module load OpenMPI/3.1.4',
+            'export ORCA_HOME=$DATA/orca_6_0_0_shared_openmpi416/orca',
+            'export LD_LIBRARY_PATH=$ORCA_HOME:$LD_LIBRARY_PATH',
+
+        ]
         sub_script_path = fs.get_valid_temp_name(f"{self.work_dir}/submit_{self.name}.cmd")
         job = ClusterJob.config_job(
-            commands = spe_cmd,
+            commands = cmd_str,
             cluster = cluster,
             env_settings = env_settings,
             res_keywords = res_keywords,
@@ -529,20 +581,20 @@ class RosettaScriptsEngine(ModelingEngine):
             sub_script_path = sub_script_path
         )
         job.mimo = { # only used for translate clean up
-            "temp_gin": [temp_gjf_file],
+            #"temp_gin": [temp_gjf_file],
         }
 
         # 5. make result egg
-        result_egg = GaussianQMResultEgg(
-            gout_path = gout_path,
-            gchk_path = gchk_path,
-            stru=stru,
+        pdb_files = [f"{self.work_dir}/{prefix}start_{idx+1:04d}.pdb" for idx in range(nstruct)]
+        result_egg = RosettaScriptsEgg(
+            score_file=f"{self.work_dir}/{prefix}score.sc",
+            pdb_files=pdb_files,
+            #gchk_path = gchk_path,
+            #stru=stru,
             parent_job = job,
         )
 
         return (job, result_egg)
-
-        pass
 
     def run(self, stru:Structure) -> List[Structure]:
 
@@ -1451,16 +1503,21 @@ class RosettaInterface(BaseInterface):
         
         results:List[float] = list()
         for stru in structure.structures():
-            score_file:str=self.run_rosetta_scripts(
-                    stru,
-                    protocol,
-                    opts,
-                    prefix=prefix,
-                    work_dir=work_dir
-                    )
-            results.append(
-                self.parse_score_file( score_file ).iloc[0].score
-            )
+            try:
+                score_file:str=self.run_rosetta_scripts(
+                        stru,
+                        protocol,
+                        opts,
+                        prefix=prefix,
+                        work_dir=work_dir
+                        )
+                results.append(
+                    self.parse_score_file( score_file ).iloc[0].score
+                )
+            except:
+                _LOGGER.error(f"Unable to score {stru}. Setting 'rosetta_score' to 0.0. Continuing...")                
+                results.append( 0 )
+
             stru.data['rosetta_score'] = results[-1]
         return results
 
@@ -1529,6 +1586,19 @@ class RosettaInterface(BaseInterface):
                         )
                     else:
                         assert False
+            elif cst.is_cartesian_freeze():
+                for atom in cst.atoms:
+                    ridx_1:int=stru.absolute_index(atom.parent, indexed=1)
+                    lines.append(
+                        f"CoordinateConstraint "
+                        f"{atom.name} {ridx_1} "
+                        f"{atom.name} {ridx_1} "
+                        f"0 0 0 "
+                        f"{functional} "
+                        f"1"
+                    )
+
+                    
 
         fs.safe_mkdir(work_dir)
         fname:str = f"{work_dir}/constraints.cst"

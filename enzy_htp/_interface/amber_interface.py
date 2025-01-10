@@ -1495,7 +1495,11 @@ class AmberInterface(BaseInterface):
         cart_freeze = []
         geom_cons = []
         if constraints:
+            
             for cons in constraints:
+                if isinstance(cons, list) and not cons:
+                    continue
+
                 cons: StructureConstraint
                 if cons.constraint_type in self.config["SUPPORTED_CONSTRAINT_TYPE"]:
                     if cons.is_cartesian_freeze():
