@@ -215,4 +215,4 @@ def test_rot_vec_from_dihedral():
  
     test_pt4_2 = test_pt3_2 + rot2.apply(dv2)
 
-    assert abs(mh.get_dihedral(test_pt1_2, test_pt2_2, test_pt3_2, test_pt4_2)) <= 0.05
+    assert abs(abs(mh.get_dihedral(test_pt1_2, test_pt2_2, test_pt3_2, test_pt4_2)) - 120.0) <= 0.05

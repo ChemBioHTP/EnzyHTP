@@ -309,6 +309,6 @@ def rot_vec_from_dihedral(p0:npt.NDArray, p1:npt.NDArray, p2:npt.NDArray, p3:npt
     """Provides a rotation vector that sets the dihedral of the four given points 
     to a given value in the specified direction."""
     dihedral = get_dihedral(p0, p1, p2, p3)
-    direction = direction_unit_vector(p2, p1)
+    direction = direction_unit_vector(p1, p2)
     v = value - dihedral
     return (direction * v)
