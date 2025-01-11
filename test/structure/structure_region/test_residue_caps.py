@@ -56,6 +56,7 @@ def test_nhch3_cap(helpers):
     result = xyzp.get_file_str(test_region)
 
     assert fs.content_from_file(answer_file) == result
+
 def test_oh_cap_llp(helpers):
     """tests OHCap to ensure region is capped properly for LLP residue"""
     test_stru = sp.get_structure(f"{DATA_DIR}3FCR_modified.pdb")
