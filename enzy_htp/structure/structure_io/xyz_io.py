@@ -30,17 +30,7 @@ class XYZParser(StructureParserInterface):
         pass
 
     @classmethod
-    @dispatch
-    def get_file_str(self, stru: Structure) -> List[str]:
-        result = f"{str(len(stru.atoms))}{os.linesep}{os.linesep}"
-        for at in stru.atoms:
-            result += f"{at.element} {at.coord[0]} {at.coord[1]} {at.coord[2]}{os.linesep}"
-        result  = result[:-1]
-        return result
-    
-    @classmethod
-    @dispatch
-    def get_file_str(self, stru: StructureRegion) -> str:
+    def get_file_str(self, stru: Union[Structure, StructureRegion]) -> str:
         result = f"{str(len(stru.atoms))}{os.linesep}{os.linesep}"
         for at in stru.atoms:
             result += f"{at.element} {at.coord[0]} {at.coord[1]} {at.coord[2]}{os.linesep}"
