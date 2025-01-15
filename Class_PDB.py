@@ -3243,7 +3243,7 @@ class PDB():
         relax_job = job_manager.ClusterJob.config_job(
                     commands = relax_cmd,
                     cluster = cluster,
-                    env_settings = ['module load GCC/5.4.0-2.26', 'module load OpenMPI'],
+                    env_settings = ['module load GCC/11.3.0', 'module load OpenMPI'],
                     res_keywords = TEMP_ROSETTA_RES,
                     sub_dir = self.dir,
                     sub_script_path = f'{self.dir}/submit_relax.cmd')
@@ -3670,7 +3670,8 @@ outtraj {tmp_traj_2}
         # clean
         if Config.debug < 2:
             run('rm reference.frc _MMPBSA_info', check=0, text=True, shell=True, capture_output=True)
-            os.remove("./tmp/MMPBSA.in")
+            if not in_file:
+                os.remove("./tmp/MMPBSA.in")
             os.remove(mmpbsa_job.sub_script_path)
 
         return mmpbsa_out_path
