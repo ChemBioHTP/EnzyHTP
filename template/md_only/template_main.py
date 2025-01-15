@@ -40,6 +40,10 @@ constraints = [
 ]
 # length on MD simulation
 prod_time = 10.0 # unit: ns
+# number of replica
+num_rep = 3 
+# temp of MD
+prod_temperature = 300.0 #unit: K
 # set up your ACCRE info
 accre_res_account = "csb_gpu_acc"
 accre_gpu_queue = "pascal"
@@ -93,7 +97,9 @@ for i, mut in enumerate(mutants):
         job_check_period=30,
         prod_constrain=mut_constraints,
         prod_time= prod_time, #ns
-        work_dir=f"{mutant_dir}/MD/"
+        work_dir=f"{mutant_dir}/MD/",
+        parallel_runs=num_rep,
+        prod_temperature=prod_temperature,
     )
 
 
