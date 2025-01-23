@@ -238,19 +238,22 @@ def test_capping_with_residue_terminals(helpers):
 
 def test_capping_modaa(helpers):
     # caps a modaa with OH and H at the cterm and nterm, respectively
-    test_stru = sp.get_structure(f"{DATA_DIR}3FCR_modified.pdb")
-    sele = stru_sele.select_stru(
-        test_stru, "resi 288")
-    test_region = stru_regi.StructureRegion(atoms=sele.atoms)
 
-    cterm_cap = "OH"
-    nterm_cap = "H"
+    for _ in range(3):
+        test_stru = sp.get_structure(f"{DATA_DIR}3FCR_modified.pdb")
+        sele = stru_sele.select_stru(
+            test_stru, "resi 288")
+        test_region = stru_regi.StructureRegion(atoms=sele.atoms)
 
-    capping.capping_with_residue_terminals(test_region, nterm_cap=nterm_cap, cterm_cap=cterm_cap)
+        cterm_cap = "OH"
+        nterm_cap = "H"
 
-    answer_file = f"{DATA_DIR}answer_capping_3.xyz"
-    
-    result = xyzp.get_file_str(test_region)
 
-    assert fs.content_from_file(answer_file) == result
+        capping.capping_with_residue_terminals(test_region, nterm_cap=nterm_cap, cterm_cap=cterm_cap)
+
+        answer_file = f"{DATA_DIR}answer_capping_3.xyz"
+        
+        result = xyzp.get_file_str(test_region)
+
+        assert fs.content_from_file(answer_file) == result
 
