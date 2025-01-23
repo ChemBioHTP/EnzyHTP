@@ -69,6 +69,50 @@ def create_region_from_selection_pattern(
 
     return raw_region
 
+def create_region_from_residues(
+        residues: List[Residue],
+        capping_method: str = "res_ter_cap",
+        **kwargs,
+    ) -> StructureRegion:
+    """Create StructureRegion from a list of Residue()s and cap terminal Residue()'s.
+
+    Args:
+        residues:
+            the residues that compose the target region. 
+            These residues need to belong to the same Structure().
+        capping_method:
+            the keyword of the capping method.
+            See CAPPING_METHOD_MAPPER for more info
+        (method specific options)
+        When "res_ter_cap"
+            nterm_cap: the name of the cap added to the N-ter
+            cterm_cap: the name of the cap added to the C-ter
+    Returns:
+        the StructureRegion"""
+    # san check (context consistency)
+    stru = residues[0].root()
+    for res in residues:
+        if res.root() is not stru:
+            _LOGGER.error(f"Found in consistent Structure() context between {residues[0]} and {res}")
+            raise ValueError
+    # create region
+    atoms = []
+    for res in residues:
+        atoms.extend(res.atoms)
+    raw_region = StructureRegion(atoms=atoms)
+    if not raw_region.atoms:
+        _LOGGER.error("region have no atoms! check your input")
+        raise ValueError
+    # capping
+    if capping_method not in CAPPING_METHOD_MAPPER:
+        _LOGGER.error(f"capping method ({capping_method}) not supported. Supported: {CAPPING_METHOD_MAPPER.keys()}")
+        raise ValueError
+    capping_func = CAPPING_METHOD_MAPPER[capping_method]
+    #TODO(CJ): add the ole logic in here about return_copy
+    capping_func(raw_region, **kwargs)
+
+    return raw_region
+
 def create_region_from_full_stru(stru: Structure) -> StructureRegion:
     """Create StructureRegion of the full structure. Essentially acts as a constructor/translation function
     that converts Structure to StructureRegion.
