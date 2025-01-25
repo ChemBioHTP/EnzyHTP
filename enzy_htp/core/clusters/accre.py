@@ -42,8 +42,8 @@ class Accre(ClusterInterface):
 
     # environment presets #
     AMBER_ENV = {
-        "CPU": "source /home/shaoq1/bin/amber_env/amber22.sh",
-        "GPU": "source /home/shaoq1/bin/amber_env/amber22.sh",
+        "CPU": "source /sb/apps/amber22/amber.sh",
+        "GPU": "source /sb/apps/amber22/amber.sh",
     }
 
     G16_ENV = {
