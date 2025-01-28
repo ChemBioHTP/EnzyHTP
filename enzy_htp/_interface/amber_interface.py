@@ -21,7 +21,7 @@ import pandas as pd
 from sympy import sympify
 from collections import Iterable
 from enzy_htp.structure.chain import Chain
-from enzy_htp.structure.structure_region.api import create_region_from_selection_pattern
+from enzy_htp.structure.structure_region.api import create_region_from_residues, create_region_from_selection_pattern
 
 from .base_interface import BaseInterface
 from .handle_types import (
@@ -2529,6 +2529,9 @@ class AmberInterface(BaseInterface):
         else:
             atom_type = gaff_type
 
+        multiplicity = ncaa.multiplicity
+        net_charge = ncaa.net_charge
+
         # init_path
         if out_path is None:
             if ncaa.is_modified():
@@ -2542,8 +2545,8 @@ class AmberInterface(BaseInterface):
         temp_pdb_path = fs.get_valid_temp_name(f"{temp_dir}/{ncaa.name}.pdb")
         if ncaa.is_modified():
             # 1.1. Capping - cap C-terminal with OH and N-terminal with H
-            ncaa_region = create_region_from_selection_pattern(stru=ncaa, pattern="all", nterm_cap="H", cterm_cap="OH")
-            ncaa = ncaa_region.convert_to_structure().modified_residue[0]
+            ncaa_region = create_region_from_residues(residues=[ncaa], nterm_cap="H", cterm_cap="OH")
+            ncaa = ncaa_region.convert_to_structure(cap_as_residue=False)
         pdb_io.PDBParser().save_structure(temp_pdb_path, ncaa)
         input_file = temp_pdb_path
 
@@ -2566,8 +2569,8 @@ class AmberInterface(BaseInterface):
         self.run_antechamber(in_file=input_file,
                              out_file=out_path,
                              charge_method=charge_method,
-                             spin=ncaa.multiplicity,
-                             net_charge=ncaa.net_charge,
+                             spin=multiplicity,
+                             net_charge=net_charge,
                              atom_type=atom_type,)
 
         # 4. clean up

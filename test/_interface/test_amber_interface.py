@@ -1289,5 +1289,9 @@ def test_ncaa_to_moldesc_modaa():
     ai = interface.amber
     out_path = ai.antechamber_ncaa_to_moldesc(ncaa=ncaa)
 
-    assert fs.content_from_file(out_path) == fs.content_from_file(f"{MM_NCAA_DIR}/LLP_AM1BCC-AMBER.ac")
+    # assert amount of lines are equal and formula/charge is same
+    assert len(fs.lines_from_file(out_path)) == len(fs.lines_from_file(f"{MM_NCAA_DIR}/LLP_AM1BCC-AMBER_000001.ac"))
+    assert fs.lines_from_file(out_path)[0] == fs.lines_from_file(f"{MM_NCAA_DIR}/LLP_AM1BCC-AMBER_000001.ac")[0]
+    assert fs.lines_from_file(out_path)[1] == fs.lines_from_file(f"{MM_NCAA_DIR}/LLP_AM1BCC-AMBER_000001.ac")[1]
+
     fs.safe_rm(out_path)

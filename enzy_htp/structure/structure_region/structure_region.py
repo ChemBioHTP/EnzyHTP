@@ -217,23 +217,20 @@ class StructureRegion:
             result[atom.parent].append(atom)
         return result
     
-    def involved_residue_atom_mapper(self, cap_as_residue=False) -> Dict[Residue, List[Atom]]:
-        """ Creates a mapper between involved resiudes and their atoms.
+    def involved_residue_atom_mapper(self, cap_as_residue=True) -> Dict[Residue, List[Atom]]:
+        """ Creates a mapper between involved residues and their atoms.
         Args:
-            cap_as_residue: will not include the cap in the residue if True
+            cap_as_residue: will treat caps as own residues if True. Else, add cap atoms to parent residues.
         Returns:
             A mapper between all involved residues in the StructureRegion and their atoms."""
-        residue_mapper: {Residue, List[Atom]} = {}
+        residue_mapper: {Union[Residue, ResidueCap], List[Atom]} = defaultdict(list)
         for res in self.involved_residues:
-            for aa in res.atoms:                    
-                if aa.residue not in residue_mapper:
-                    residue_mapper[aa.residue] = []
+            for aa in res.atoms:
                 residue_mapper[aa.residue].append(aa)
 
-        if not cap_as_residue:
-            for cap in self.caps:
-                for aa in cap:
-                    residue_mapper[aa.parent.link_atom.residue].append(aa)
+        for cap in self.caps:
+            for aa in cap:
+                residue_mapper[cap].append(aa) if cap_as_residue else residue_mapper[aa.parent.link_atom.residue].append(aa) 
 
         return residue_mapper
 
@@ -339,26 +336,32 @@ class StructureRegion:
             if not atom.parent.is_residue_cap():
                 return atom.root()
             
-    def convert_to_structure(self, cap_as_residue = False) -> Structure:
+    def convert_to_structure(self, cap_as_residue = True) -> Structure:
         """Converts all atoms in the region to a Structure
         Args:
-            cap_as_residue: will not include the cap in the residue if True
+            cap_as_residue: will treat caps as own residues if True. Else, add cap atoms to parent residues.
         Returns:
             The corresponding Structure of the structure region"""
 
         residue_mapper = self.involved_residue_atom_mapper(cap_as_residue=cap_as_residue)
 
         residues: List[Residue] = []
-        for res in self.involved_residues:
+
+        for res in residue_mapper:
             new_res = deepcopy(res)
             new_res.atoms = residue_mapper[res]
-            new_res.chain = res.chain
-            new_res.renumber_atoms(range(1, len(new_res.atoms) + 1))
+
+            if isinstance(res, ResidueCap):
+                new_res.parent = res.link_residue.parent
+            else:
+                new_res.parent = res.parent
+                
+            new_res.renumber_atoms(range(1, new_res.num_atoms + 1))
             residues.append(new_res)
 
         chain_mapper: {Chain, List[Residue]} = defaultdict(list)
         for res in residues:
-            chain_mapper[res.chain].append(res)
+            chain_mapper[res.parent].append(res)
         
         chains = []
         for chain, residues in chain_mapper.items():
