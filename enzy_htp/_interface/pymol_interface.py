@@ -477,7 +477,7 @@ class PyMolInterface(BaseInterface):
             except Exception as e:
                 _LOGGER.error(f"{e}")
                 _LOGGER.error(f"PyMOL function call '{cmd_str}' resulted in an error. Exiting...")
-                exit(1)
+                raise e
 
         return result
 
@@ -760,7 +760,7 @@ class PyMolInterface(BaseInterface):
 
     @dispatch
     def get_spi(self, stru: Structure, ligand_sele: str, pocket_sele: str) -> float:
-        """Calculates substrate positioning index (SPI) for a given Ligand selection in a given Structure. SPI roughly corresponds to the
+        """Calculates substrate positioning index (SPI) for a given Ligand selection pattern in a given Structure. SPI roughly corresponds to the
         ratio of the ligand's solvent accessible surface area (SASA) dived by protein binding pocket SASA. The citation for 
         this paper is here: DOI:https://doi.org/10.1021/acs.jpclett.3c02444.
 
@@ -777,7 +777,7 @@ class PyMolInterface(BaseInterface):
             results:List[Any] = self.general_cmd(pms,[
                 ('set', 'dot_solvent', 1),
                 ('create', 'ligand', f'{ligand_sele} and not solvent'),
-                ('create', 'protein', f'not ({ligand_sele} and not solvent'),
+                ('create', 'protein', f'not {ligand_sele} and not solvent'),
                 ('get_area', 'ligand'),
                 ('get_area', f'protein and ({pocket_sele})')
             ])

@@ -17,11 +17,39 @@ from enzy_htp import interface, _LOGGER
 
 from typing import List, Union, Any
 
-from enzy_htp.structure import (Structure, StructureEnsemble, Ligand, PDBParser, Residue)
+from enzy_htp.structure import (Structure, StructureEnsemble, Ligand, Residue)
 
 from plum import dispatch
-from enzy_htp._interface.pymol_interface import OpenPyMolSession
 
+
+@dispatch
+def spi_metric(
+    stru: StructureEnsemble,
+    ligand_sele: str,
+    pocket_sele: str 
+) -> List[float]:
+    """Calculates the spi metric for a StructureEnsemble using a pymol-formatted pocket sele str. 
+    Note: The pocket_sele expression is applied to each Structure(), so it is recommended to use a selection which specifies
+    individual Residue()'s as the expression defined based on distance will be re-evaluated for each Structure() geometry.
+
+    Args:
+        stru: The `StructureEnsemble` instance to analyze.
+        ligand: A pymol-formatted sele str which defines the ligand (the numerator) in the spi metric.
+        pocket_sele: A pymol-formatted sele str which defines the pocket (the denominator) in the spi metric.
+
+    Returns:
+        A List[float] have the same length of `StructureEnsemble.structures`, with each value being a different spi metric for each `Structure` instance.
+    """
+    
+    if isinstance(stru, Structure):
+        stru = stru.from_single_stru(stru)
+
+    result = list()
+    for single_stru in stru.structures():
+        result.append(
+            interface.pymol.get_spi(single_stru, ligand_sele, pocket_sele)
+        )
+    return result
 
 @dispatch
 def spi_metric(
@@ -31,7 +59,7 @@ def spi_metric(
 ) -> List[float]:
     """Calculates the spi metric for a StructureEnsemble using a pymol-formatted pocket sele str. 
     Note: The pocket_sele expression is applied to each Structure(), so it is recommended to use a selection which specifies
-    individual Residue()'s as the expression will be re-evaluated for each Structure() geometry.
+    individual Residue()'s as the expression defined based on distance will be re-evaluated for each Structure() geometry.
 
     Args:
         stru: The StructureEnsemble() to analyze.
@@ -79,7 +107,7 @@ def spi_metric(
     result = list()
     for ss in stru.structures():
         result.append(
-            spi_metric( ss, ligand, pocket_sele )
+            spi_metric(ss, ligand, pocket_sele)
         )
 
     return result
