@@ -40,6 +40,7 @@ from enzy_htp.structure.structure_selection.general import select_stru
 
 MM_BASE_DIR = Path(__file__).absolute().parent
 MM_DATA_DIR = f"{MM_BASE_DIR}/data/"
+MM_NCAA_DIR = f"{MM_BASE_DIR}/../ncaa_lib/"
 STRU_DATA_DIR = f"{MM_BASE_DIR}/../structure/data/"
 MM_WORK_DIR = f"{MM_BASE_DIR}/work_dir/"
 MINIMIZE_INPUT_1 = f"{MM_DATA_DIR}/min_1.inp"
@@ -1369,3 +1370,19 @@ def test_parse_mmpbsa_result_by_frames():
 
     assert np.isclose(result["pbsa"]["DELTA TOTAL"].mean(), -1.3130, atol=0.01)
     assert np.isclose(result["gbsa"]["DELTA TOTAL"].mean(), -12.234, atol=0.01)
+
+def test_ncaa_to_moldesc_modaa():
+    file = f"{MM_DATA_DIR}/3FCR_protonated.pdb"
+    stru = struct.PDBParser().get_structure(file)
+    stru.assign_ncaa_chargespin({"LLP": (-2, 1)})
+    ncaa = stru.modified_residue[0]
+
+    ai = interface.amber
+    out_path = ai.antechamber_ncaa_to_moldesc(ncaa=ncaa)
+
+    # assert amount of lines are equal and formula/charge is same
+    assert len(fs.lines_from_file(out_path)) == len(fs.lines_from_file(f"{MM_NCAA_DIR}/LLP_AM1BCC-AMBER_000001.ac"))
+    assert fs.lines_from_file(out_path)[0] == fs.lines_from_file(f"{MM_NCAA_DIR}/LLP_AM1BCC-AMBER_000001.ac")[0]
+    assert fs.lines_from_file(out_path)[1] == fs.lines_from_file(f"{MM_NCAA_DIR}/LLP_AM1BCC-AMBER_000001.ac")[1]
+
+    fs.safe_rm(out_path)

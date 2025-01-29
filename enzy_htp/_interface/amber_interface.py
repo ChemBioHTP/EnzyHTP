@@ -21,6 +21,8 @@ from dataclasses import dataclass
 import pandas as pd
 from sympy import sympify
 from collections import Iterable
+from enzy_htp.structure.chain import Chain
+from enzy_htp.structure.structure_region.api import create_region_from_residues, create_region_from_selection_pattern
 
 from .base_interface import BaseInterface
 from .handle_types import (
@@ -311,16 +313,19 @@ class AmberParameterizer(MolDynParameterizer):
     def _parameterize_modified_res(self, maa: ModifiedResidue, gaff_type: str) -> Tuple[str, List[str]]:
         """parameterize modified residues for AmberMD, use ncaa_param_lib_path for customized
         parameters. Multiplicity and charge information can be set in ModifiedResidue objects."""
+
         # san check
         if not gaff_type:
             _LOGGER.error("The structure contains non-canonical residue"
                           " (lig or maa) but GAFF/GAFF2 is not used!"
                           f" Check you force_fields. (current: {self.force_fields})")
             raise ValueError
-
+    
+        # init
         fs.safe_mkdir(self.ncaa_param_lib_path)
         target_method = f"{self.charge_method}-{gaff_type}"
-        # 0. search parm lib
+
+        # 0. search parm lib - same as ligand
         mol_desc_path, frcmod_path_list = search_ncaa_parm_file(maa,
                                             target_method=target_method,
                                             ncaa_lib_path=self.ncaa_param_lib_path)
@@ -328,11 +333,12 @@ class AmberParameterizer(MolDynParameterizer):
         if mol_desc_path:
             if frcmod_path_list:
                 return mol_desc_path, frcmod_path_list
-        # 1. make maa PDB
-
-        # 2. run antechamber on the PDB get ac
-        ac_path = fs.get_valid_temp_name(
-            f"{self.ncaa_param_lib_path}/{maa.name}.ac")
+        else:
+            # 1. generate ac if not found
+            mol_desc_path = f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.ac" # the search ensured no existing file named this
+            self.parent_interface.antechamber_ncaa_to_moldesc(ncaa=maa,
+                                                              out_path=mol_desc_path,
+                                                              gaff_type=gaff_type)
         # 2.1 fix the wrong atom type given by antechamber
 
         # 3. run prepgen on ac & mc get prepin
@@ -2595,14 +2601,30 @@ class AmberInterface(BaseInterface):
                           " ALWAYS check and explicit assign it using"
                           " Structure.assign_ncaa_chargespin()")
             raise ValueError
+
+        if ncaa.is_modified():
+            atom_type = "AMBER"
+        else:
+            atom_type = gaff_type
+
+        multiplicity = ncaa.multiplicity
+        net_charge = ncaa.net_charge
+
         # init_path
         if out_path is None:
-            out_path = f"{eh_config['system.NCAA_LIB_PATH']}/{ncaa.name}_{charge_method}-{gaff_type}.mol2"
+            if ncaa.is_modified():
+                out_path = fs.get_valid_temp_name(f"{eh_config['system.NCAA_LIB_PATH']}/{ncaa.name}_{charge_method}-{atom_type}.ac")
+            else:
+                out_path = f"{eh_config['system.NCAA_LIB_PATH']}/{ncaa.name}_{charge_method}-{gaff_type}.mol2"
 
         # 1. make ligand PDB
         temp_dir = eh_config["system.SCRATCH_DIR"]
         fs.safe_mkdir(temp_dir)
         temp_pdb_path = fs.get_valid_temp_name(f"{temp_dir}/{ncaa.name}.pdb")
+        if ncaa.is_modified():
+            # 1.1. Capping - cap C-terminal with OH and N-terminal with H
+            ncaa_region = create_region_from_residues(residues=[ncaa], nterm_cap="H", cterm_cap="OH")
+            ncaa = ncaa_region.convert_to_structure(cap_as_residue=False)
         pdb_io.PDBParser().save_structure(temp_pdb_path, ncaa)
         input_file = temp_pdb_path
 
@@ -2619,14 +2641,15 @@ class AmberInterface(BaseInterface):
             _LOGGER.error(f"found unsupported charge method {charge_method}."
                           f"(Supported keywords: {self.SUPPORTED_CHARGE_METHOD_MAPPER.keys()})")
             raise ValueError
+        
 
         # 3. run antechamber on the PDB get mol2
         self.run_antechamber(in_file=input_file,
                              out_file=out_path,
                              charge_method=charge_method,
-                             spin=ncaa.multiplicity,
-                             net_charge=ncaa.net_charge,
-                             atom_type=gaff_type,)
+                             spin=multiplicity,
+                             net_charge=net_charge,
+                             atom_type=atom_type,)
 
         # 4. clean up
         fs.clean_temp_file_n_dir([
