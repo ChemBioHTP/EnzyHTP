@@ -10,6 +10,7 @@ Date: 2022-02-15
 """
 from pathlib import Path
 from typing import List, Dict, Any, Union, Tuple
+from plum import dispatch
 
 import pymol2
 import numpy as np
@@ -476,7 +477,7 @@ class PyMolInterface(BaseInterface):
             except Exception as e:
                 _LOGGER.error(f"{e}")
                 _LOGGER.error(f"PyMOL function call '{cmd_str}' resulted in an error. Exiting...")
-                exit(1)
+                raise e
 
         return result
 
@@ -756,7 +757,34 @@ class PyMolInterface(BaseInterface):
         return result
 
     # == engines ==
-    def get_spi(self, stru: Structure, ligand:Ligand, pocket_sele:str) -> float:
+
+    @dispatch
+    def get_spi(self, stru: Structure, ligand_sele: str, pocket_sele: str) -> float:
+        """Calculates substrate positioning index (SPI) for a given Ligand selection pattern in a given Structure. SPI roughly corresponds to the
+        ratio of the ligand's solvent accessible surface area (SASA) dived by protein binding pocket SASA. The citation for 
+        this paper is here: DOI:https://doi.org/10.1021/acs.jpclett.3c02444.
+
+        Args:
+            stru (Structure): The Structure containing the Ligand and active site.
+            ligand_sele (str): A str describing the ligand we are calculating SPI for. 
+            pocket_sele (str): A str describing the active site of the protein in pymol format.
+        
+        Returns:
+            The calculated SPI as a float.
+        """
+        with OpenPyMolSession(self) as pms:
+            self.load_enzy_htp_stru(pms, stru )
+            results:List[Any] = self.general_cmd(pms,[
+                ('set', 'dot_solvent', 1),
+                ('create', 'ligand', f'{ligand_sele} and not solvent'),
+                ('create', 'protein', f'not {ligand_sele} and not solvent'),
+                ('get_area', 'ligand'),
+                ('get_area', f'protein and ({pocket_sele})')
+            ])
+            return results[-2] / results[-1]
+
+    @dispatch
+    def get_spi(self, stru: Structure, ligand: Ligand, pocket_sele: str) -> float:
         """Calculates substrate positioning index (SPI) for a given Ligand in a given Structure. SPI roughly corresponds to the
         ratio of the ligand's solvent accessible surface area (SASA) dived by protein binding pocket SASA. The citation for 
         this paper is here: DOI:https://doi.org/10.1021/acs.jpclett.3c02444.
@@ -768,7 +796,6 @@ class PyMolInterface(BaseInterface):
         
         Returns:
             The calculated SPI as a float.
-
         """
         (lig_chain, lig_idx) = ligand.key()
         with OpenPyMolSession(self) as pms:

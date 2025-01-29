@@ -32,6 +32,37 @@ STRU_DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/../test_data/dive
 WORK_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/work_dir/"
 sp = PDBParser()
 
+def test_spi_ligand_sele():
+    """To validate that SPI calculation support ligand_sele pattern, 
+    which enables SPI calculation can be performed on a substrate or ligand with multiple residues."""
+    pdb_file = f"{DATA_DIR}/test_spi.pdb"
+    prmtop = f"{DATA_DIR}/test_spi.prmtop"
+    data = f"{DATA_DIR}/test_spi.mdcrd"
+    target_spi:float = 1.555860632049337
+    stru = sp.get_structure(pdb_file)
+
+    for tt in stru.residues:
+        if tt.name == 'H5J':    
+            break
+
+    mdcrd_parser=AmberMDCRDParser(prmtop).get_coordinates
+
+    stru_esm = StructureEnsemble(
+        topology=stru,
+        top_parser=get_itself,
+        coord_parser=mdcrd_parser,
+        coordinate_list=data
+    )
+    
+    for single_stru in stru_esm.structures():
+        remove_solvent(single_stru)
+    
+    pocket_sele = "resi 9+11+48+50+101+128+201+202+222"
+    ligand_sele = "resn H5J"
+
+    spis = spi_metric(stru_esm, ligand_sele, pocket_sele)
+
+    assert abs(np.mean(np.array(spis)) - target_spi) <= 0.01
 
 def test_spi_consistent_with_old_enzyhtp():
     """To validate that the SPI calculated here is accurate, we compare a value calculated with spi_metric() to a value from the original/old EnzyHTP"""
@@ -39,9 +70,8 @@ def test_spi_consistent_with_old_enzyhtp():
     prmtop = f"{DATA_DIR}/test_spi.prmtop"
     data = f"{DATA_DIR}/test_spi.mdcrd"
     target_spi:float = 1.555860632049337
-    parser = PDBParser()
 
-    stru = parser.get_structure(pdb_file)
+    stru = sp.get_structure(pdb_file)
 
     for tt in stru.residues:
         if tt.name == 'H5J':    
