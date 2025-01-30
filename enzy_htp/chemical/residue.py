@@ -479,6 +479,7 @@ CAA_CHARGE_MAPPER: Dict[str, int] = {
         "ALA": 0,
         "CYS": 0,
         "ASP": -1,
+        "ASH": 0,
         "GLU": -1,
         "PHE": 0,
         "GLY": 0,
@@ -492,9 +493,12 @@ CAA_CHARGE_MAPPER: Dict[str, int] = {
         "ARG": 1,
         "SER": 0,
         "THR": 0,
+        "TYR": 0,
         "VAL": 0,
         "TRP": 0,
-        "TYR": 0
+        "HID": 0,
+        "HIE": 0,
+        "HIP": 1,
 }
 """dict() that maps three-letter canonical amino-acid codes to their formal charge. 
 Note that HIS is temporarily removed from the map due to its potential 3 titration state.

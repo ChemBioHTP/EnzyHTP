@@ -9,6 +9,7 @@ Date: 2023-09-25
 from .sampling import (
     md_simulation,
     equi_md_sampling,
+    conformer_sampling,
 )
 
 from .minimize import (

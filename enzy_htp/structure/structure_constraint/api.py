@@ -251,8 +251,9 @@ class StructureConstraint(ABC):
         """
 
         if key not in self.params_:
-            _LOGGER.error(f"The attribute '{key}' is not in the constrained geometry params. Exiting...")
-            exit( 1 )
+            err_msg:str=f"The attribute '{key}' is not in the constrained geometry params."
+            _LOGGER.error(err_msg)
+            raise KeyError(err_msg)
         
         return self.params_[key]        
 
@@ -281,6 +282,13 @@ class StructureConstraint(ABC):
                     return True
 
         return False
+
+
+    def is_compatible(self, other:Structure) -> bool: #TODO(CJ)
+        for atom in self.atoms:
+            if not other.has_atom(atom.key):
+                return False
+        return True 
 
 class CartesianFreeze(StructureConstraint):
     """Specialization of StructureConstraint() for Atoms() that are frozen in Cartesian space. Many

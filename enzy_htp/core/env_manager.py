@@ -218,7 +218,8 @@ class EnvironmentManager:
 
         # exceed the try time
         _LOGGER.error(f"Failed running `{cmd}` after {try_time} tries @{get_localtime()}")
-        raise this_error
+        if not quiet_fail:
+            raise this_error
 
     #endregion
 

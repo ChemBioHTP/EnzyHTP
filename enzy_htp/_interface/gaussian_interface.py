@@ -477,7 +477,7 @@ class GaussianInterface(BaseInterface):
             if result_sol is None:
                 result_sol = solvent
             if method is None:
-                method = self.config()["DEFAULT_SOLVENT_MODEL"]
+                method = self.config["DEFAULT_SOLVENT_MODEL"]
                 _LOGGER.info(f"using default solvent model: {method}")
             result_sol_method = self.SOLV_MODEL_KEYWORD_MAPPER.get(method, None)
             if result_sol_method is None:
@@ -491,7 +491,7 @@ class GaussianInterface(BaseInterface):
     # region == general Gaussian app interface ==
     # -- g16 --
     def get_gaussian_executable(self) -> str:
-        return self.config()["GAUSSIAN_EXE"]
+        return self.config["GAUSSIAN_EXE"]
 
     def make_gaussian_cmd(self, temp_gjf_file_path) -> Tuple[str]:
         """compile the g16 cmd from config. This is general for all gaussian
@@ -848,21 +848,21 @@ class GaussianInterface(BaseInterface):
         # init default values
         type_hint_sticker: GaussianConfig
         if name == "default":
-            name = self.config()["DEFAULT_SPE_NAME"]
+            name = self.config["DEFAULT_SPE_NAME"]
         if method == "default":
-            method = self.config()["DEFAULT_SPE_METHOD"]
+            method = self.config["DEFAULT_SPE_METHOD"]
         if keep_geom == "default":
-            keep_geom = self.config()["DEFAULT_SPE_KEEP_GEOM"]
+            keep_geom = self.config["DEFAULT_SPE_KEEP_GEOM"]
         if cluster_job_config == "default":
-            cluster_job_config = self.config().get_default_qm_spe_cluster_job_config()
+            cluster_job_config = self.config.get_default_qm_spe_cluster_job_config
         else:
             # For res_keywords, it updates the default config
             cluster_job_config = copy.deepcopy(cluster_job_config) # because we will change it in place.
             res_keywords_update = cluster_job_config["res_keywords"]
-            default_res_keywords = self.config().get_default_qm_spe_cluster_job_res_keywords()
+            default_res_keywords = self.config.get_default_qm_spe_cluster_job_res_keywords()
             cluster_job_config["res_keywords"] = default_res_keywords | res_keywords_update
         if work_dir == "default":
-            work_dir = self.config()["DEFAULT_SPE_WORK_DIR"]
+            work_dir = self.config["DEFAULT_SPE_WORK_DIR"]
 
         return GaussianSinglePointEngine(
             interface=self,

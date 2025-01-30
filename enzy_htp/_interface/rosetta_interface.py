@@ -4,7 +4,7 @@ relaxation (minimization), scoring, ligand parameterization, and the ability to 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-03-28
 """
-from __future__ import annotations
+from __future__ import annotations 
 import copy
 import os
 import re
@@ -27,7 +27,14 @@ from enzy_htp.core.general import HiddenPrints
 import enzy_htp.chemical as chem
 from enzy_htp import config as eh_config
 from enzy_htp.mutation_class.mutation import Mutation
-from enzy_htp.structure import Structure, PDBParser, Mol2Parser, Ligand, Chain
+from enzy_htp.structure import (
+    Structure, 
+    StructureEnsemble,
+    PDBParser,
+    Mol2Parser,
+    Ligand,
+    Chain
+)
 from enzy_htp.structure.structure_operation import remove_non_peptide
 from enzy_htp.structure import translate_structure
 from enzy_htp.structure.structure_constraint import StructureConstraint, ResiduePairConstraint
@@ -56,6 +63,14 @@ class RosettaOptions:
 
         self.data_ = dict()
         self.script_vars_ = dict()
+        self.extra_res_fa_ = list()
+
+    def add_extra_res_fa(self, params_file):
+        self.extra_res_fa_.append(params_file)
+
+    @property
+    def extra_res_fa(self):
+        return self.extra_res_fa_
 
     def convert_script_vars_(self) -> None:
         """Private method which converts the script variables to a 'parser:script_vars' variable."""
@@ -63,7 +78,7 @@ class RosettaOptions:
         if not self.script_vars:
             return
 
-        result = str()
+        result = list()
 
         for key_name, value in self.script_vars.items():
             temp_value:str = self.convert_value_(value)
@@ -73,9 +88,11 @@ class RosettaOptions:
             if temp_value[-1] == "'":
                 temp_value = temp_value[:-1]
 
-            result += f" {key_name}={temp_value}"
+            result.extend([f"{key_name}={temp_value} ", "\\\n\t\t\t"])
+        
+        result.pop(-1)
 
-        self['parser:script_vars'] = result
+        self['parser:script_vars'] = ''.join(result)
 
     def add_script_variable(self, key:str, value:Any) -> None:
 
@@ -139,6 +156,7 @@ class RosettaOptions:
         Returns:
             The value associated with the key.
         """
+
         tks:List[str] = key.split(':')
         ptr = self.data_
         tks = list(reversed(tks))
@@ -198,6 +216,19 @@ class RosettaOptions:
         self.convert_script_vars_()
         depth:int = 0
         lines:List[str] = list()
+        
+        if self.extra_res_fa:
+            tks = ['-extra_res_fa'] 
+            
+            for idx, erf in enumerate(self.extra_res_fa):
+                prefix = ''
+                if idx:
+                    prefix = '\t\t\t'
+                tks.append( f"{prefix}'{erf}'")
+                tks.append( "\\\n" )
+            tks.pop(-1)
+            lines.append(' '.join(tks))
+
         self.traverse_options_(self.data_, lines, depth)
         fs.write_lines(fname, lines)
         return fname
@@ -244,9 +275,15 @@ class RosettaScriptsElement:
 
             for cidx, cc in enumerate( self.children_ ):
                 if not isinstance( cc, RosettaScriptsElement ):
-                    self.children_[cidx] = RosettaScriptsElement(
-                        cc[0], **cc[1]
-                    )
+                    if len(cc) > 1:
+                        self.children_[cidx] = RosettaScriptsElement(
+                            cc[0], **cc[1]
+                        )
+                    else:
+                        self.children_[cidx] = RosettaScriptsElement(
+                            cc[0]
+                        )
+
 
         for k, v in kwargs.items():
             self.attrib[k] = v
@@ -298,7 +335,7 @@ class RosettaScriptsProtocol:
 
     def __init__(self):
         self.sections = defaultdict(list)
-        self.section_names = "SCORINGGRIDS SCOREFXNS RESIDUE_SELECTORS PACKER_PALETTES TASKOPERATIONS MOVE_MAP_FACTORIES SIMPLE_METRICS CONSTRAINT_GENERATORS FILTERS MOVERS PROTOCOLS OUTPUT".split()
+        self.section_names = "SCORINGGRIDS RESIDUE_SELECTORS SCOREFXNS  PACKER_PALETTES TASKOPERATIONS MOVE_MAP_FACTORIES SIMPLE_METRICS CONSTRAINT_GENERATORS FILTERS MOVERS PROTOCOLS OUTPUT".split()
     
     def add_element(self, section:str, element:RosettaScriptsElement) -> None:
         #TODO(CJ): add checks
@@ -350,10 +387,16 @@ class RosettaScriptsProtocol:
         return self.add_element("FILTERS", 
             RosettaScriptsElement( rf_name, **kwargs )
         )
-
-
-    def add_simple_metric(self, simple_metric: RosettaScriptsElement) -> None:
+    
+    @dispatch
+    def add_simple_metric(self, simple_metric: RosettaScriptsElement) -> RosettaScriptsProtocol:
         return self.add_element("SIMPLE_METRICS", simple_metric)
+
+    @dispatch
+    def add_simple_metric(self, sm_name:str, **kwargs) -> RosettaScriptsProtocol:
+        return self.add_element("SIMPLE_METRICS", 
+            RosettaScriptsElement( sm_name,  **kwargs )
+        )
 
     @dispatch
     def add_protocol(self, protocol: RosettaScriptsElement) -> RosettaScriptsProtocol:
@@ -384,6 +427,17 @@ class RosettaScriptsProtocol:
     def add_scoring_grid(self, **kwargs ) -> RosettaScriptsProtocol:
         return self.add_element("SCORINGGRIDS", 
             RosettaScriptsElement('', **kwargs)
+        )
+
+    @dispatch
+    def add_task_operations(self, task_op: RosettaScriptsElement) -> RosettaScriptsProtocol:
+
+        return self.add_element("TASKOPERATIONS", task_opt)
+
+    @dispatch
+    def add_task_operations(self, to_name:str, **kwargs ) -> RosettaScriptsProtocol:
+        return self.add_element("TASKOPERATIONS", 
+            RosettaScriptsElement(to_name, **kwargs)
         )
 
 
@@ -425,17 +479,20 @@ class RosettaScriptsProtocol:
 
         return fname
 
+@dataclass
 class RosettaScriptsEgg(ModelingResultEgg):
     score_file:str
     pdb_files:List[str]
+    parent_job: ClusterJob
 
 class RosettaScriptsEngine(ModelingEngine):
 
-    def __init__(self, interface, protocol: RosettaScriptsProtocol, opts:RosettaOptions, work_dir:str):
+    def __init__(self, interface, protocol: RosettaScriptsProtocol, opts:RosettaOptions, cluster_job_config:Dict, work_dir:str):
         self._parent_interface = interface
         self._work_dir = work_dir
         self._protocol = protocol
         self._opts = opts
+        self._cluster_job_config = cluster_job_config
 
     @property
     def parent_interface(self):
@@ -453,32 +510,70 @@ class RosettaScriptsEngine(ModelingEngine):
     def opts(self) -> RosettaOptions:
         return self._opts
 
+    @property
+    def cluster_job_config(self):
+        return self._cluster_job_config
+
     def engine(self) -> str:
         return "rosetta"
         pass
 
+    @property
+    def name(self) -> str:
+        return "rosetta_scripts"
+
     def make_input_files(self, stru: Structure):
         pass
 
-    def make_job(self, stru:Structure,  opts:RosettaOptions) -> Tuple[ClusterJob, RosettaScriptsEgg]:
+    def make_job(self, stru:Structure) -> Tuple[ClusterJob, RosettaScriptsEgg]:
         if not isinstance(stru, Structure):
             _LOGGER.error("only allow Structure as `stru`")
             raise TypeError
 
         # 2. make .gjf file
         fs.safe_mkdir(self.work_dir)
-        temp_gjf_file, gchk_path = self._make_gjf_file(stru)
+        #temp_gjf_file, gchk_path = self._make_gjf_file(stru)
+        pdb_start = Path(f"{self.work_dir}/start.pdb")
+        sp = PDBParser()
+        sp.save_structure(str(pdb_start), stru)
+        nstruct = 1
+        if self.opts.has('nstruct'):
+            nstruct = self.opts['nstruct']
 
-        # 3. make cmd
-        spe_cmd, gout_path = self.parent_interface.make_gaussian_cmd(temp_gjf_file)
+        prefix:str=""
+        if self.opts.has('out:prefix'):
+            prefix = self.opts['out:prefix']
+
+        prot_file = self.protocol.to_file( f"{self.work_dir}/protocol.xml" )
+        self.opts['in:file:s'] = pdb_start.name
+        self.opts['parser:protocol'] = str(Path(prot_file).absolute())
+
+
+        opt_file = self.opts.to_file( f"{self.work_dir}/rosetta_opts.txt" )
+        logfile = str( (Path(self.work_dir) / 'log.txt').absolute())
+
+        cmd_str = f"cd {Path(self.work_dir).absolute()} && {self.parent_interface.config_.ROSETTA_SCRIPTS} @{Path(opt_file).name} > {Path(logfile).name}"
 
         # 4. assemble ClusterJob
         cluster = self.cluster_job_config["cluster"]
+        #print(cluster)
+        #exit( 0 )
         res_keywords = self.cluster_job_config["res_keywords"]
-        env_settings = cluster.G16_ENV["CPU"]
+        #env_settings = cluster.G16_ENV["CPU"]
+        env_settings = [
+            #'export ROSETTA3=/dors/meilerlab/apps/rosetta/rosetta-3.13/main/',
+            'export ROSETTA3=/panfs/accrepfs.vampire/data/yang_lab/jurichc/main',
+            #'export LD_LIBRARY_PATH=$ROSETTA/source/build/external/release/linux//2.6/64/x86/gcc/5.2/default/:$LD_LIBRARY_PATH',
+            'export LD_LIBRARY_PATH=/panfs/accrepfs.vampire/data/yang_lab/jurichc/main/source/cmake/build_release//:$LD_LIBRARY_PATH',
+            'module load GCC/8',
+            'module load OpenMPI/3.1.4',
+            'export ORCA_HOME=$DATA/orca_6_0_0_shared_openmpi416/orca',
+            'export LD_LIBRARY_PATH=$ORCA_HOME:$LD_LIBRARY_PATH',
+
+        ]
         sub_script_path = fs.get_valid_temp_name(f"{self.work_dir}/submit_{self.name}.cmd")
         job = ClusterJob.config_job(
-            commands = spe_cmd,
+            commands = cmd_str,
             cluster = cluster,
             env_settings = env_settings,
             res_keywords = res_keywords,
@@ -486,20 +581,20 @@ class RosettaScriptsEngine(ModelingEngine):
             sub_script_path = sub_script_path
         )
         job.mimo = { # only used for translate clean up
-            "temp_gin": [temp_gjf_file],
+            #"temp_gin": [temp_gjf_file],
         }
 
         # 5. make result egg
-        result_egg = GaussianQMResultEgg(
-            gout_path = gout_path,
-            gchk_path = gchk_path,
-            stru=stru,
+        pdb_files = [f"{self.work_dir}/{prefix}start_{idx+1:04d}.pdb" for idx in range(nstruct)]
+        result_egg = RosettaScriptsEgg(
+            score_file=f"{self.work_dir}/{prefix}score.sc",
+            pdb_files=pdb_files,
+            #gchk_path = gchk_path,
+            #stru=stru,
             parent_job = job,
         )
 
         return (job, result_egg)
-
-        pass
 
     def run(self, stru:Structure) -> List[Structure]:
 
@@ -987,7 +1082,10 @@ class RosettaInterface(BaseInterface):
                     stru: Structure,
                     protocol:RosettaScriptsProtocol,
                     opts:RosettaOptions,
-                    work_dir:str=None) -> str:
+                    prefix:str="rosetta_scripts",
+                    work_dir:str=None,
+                    remove_temp_files:bool=False
+                    ) -> str:
         """
             opts: a list() of str() to be run by the RosettaScripts executable.  logfile: The file to output the stdout log to. Optional.
         """
@@ -996,25 +1094,31 @@ class RosettaInterface(BaseInterface):
                 work_dir = opts['out:path:all']
             else:
                 #TODO(CJ): put an error code here
-                work_dir = config['system.SCRATCH_DIR']
+                work_dir = eh_config['system.SCRATCH_DIR']
                 opts['out:path:all'] = work_dir
-
-        opts_file:str = str(Path(f"{work_dir}/rosetta_options.txt").absolute())
-        xml_file:str = str(Path(f"{work_dir}/rosetta_protocol.xml").absolute())
+        
+        opts_file:str = str(Path(f"{work_dir}/{prefix}_options.txt").absolute())
+        xml_file:str = str(Path(f"{work_dir}/{prefix}_protocol.xml").absolute())
 
         opts['parser:protocol'] = str(Path(xml_file).absolute())
 
-        fname:str = f"{work_dir}/rosettascripts_start.pdb"
+        fname:str = f"{work_dir}/{prefix}_start.pdb"
+        old_pattern:str = f"{prefix}_start_????.pdb"
+        
         parser = PDBParser()
         parser.save_structure(fname, stru)
 
         opts['in:file:s'] = str(Path(fname).absolute())
-
-        opts.to_file(opts_file)
         protocol.to_file(xml_file)
 
-        opts['out:file:scorefile'] = f"{work_dir}/score.sc"
-        fs.safe_rm( f"{work_dir}/score.sc" )
+        opts['out:file:scorefile'] = f"{work_dir}/{prefix}_score.sc"
+
+        for op in Path(work_dir).glob(old_pattern):
+            fs.safe_rm( op )
+
+        fs.safe_rm( f"{work_dir}/{prefix}_score.sc" )
+        
+        opts.to_file(opts_file)
 
         work_dir = Path(opts_file).parent.absolute()
         start_dir:str = os.getcwd()
@@ -1022,6 +1126,13 @@ class RosettaInterface(BaseInterface):
         self.env_manager_.run_command(self.config_.ROSETTA_SCRIPTS, [f"@{opts_file}"], quiet_fail=True)
 
         os.chdir( start_dir )
+
+        assert Path(opts['out:file:scorefile']).exists(),  opts['out:file:scorefile'] #TODO(CJ): update this
+
+        if remove_temp_files:
+            fs.safe_rm( opts_file )
+            fs.safe_rm( xml_file )
+            fs.safe_rm( fname )
 
         return opts['out:file:scorefile'] #TODO(CJ): add some stuff in for this
 
@@ -1037,7 +1148,7 @@ class RosettaInterface(BaseInterface):
         """
 
         if not Path(fname).exists():
-            _LOGGER.error(f"The suppliied file '{fname}' does not exist. Exiting...")
+            _LOGGER.error(f"The supplied file '{fname}' does not exist. Exiting...")
             exit(1)
 
         lines: List[str] = fs.lines_from_file(fname)
@@ -1120,7 +1231,6 @@ class RosettaInterface(BaseInterface):
 
         res_name:str=mol.name
         molfile:str = f"{work_dir}/{res_name}.mol2"
-        conformers:str=f"{work_dir}/{res_name}_conformers.pdb"
         params_file:str=f"./{res_name}.params"
         _parser = Mol2Parser()
         _parser.save_ligand(molfile, mol)
@@ -1134,7 +1244,6 @@ class RosettaInterface(BaseInterface):
             
         if len(indices) <= 2:            
             flags.append( f"--nbr_atom={indices[0]}" )
-        
 
         self.env_manager_.run_command(self.config_.PY_2_7, flags)
         fs.safe_rm(f"{res_name}_0001.pdb")
@@ -1148,30 +1257,20 @@ class RosettaInterface(BaseInterface):
             )
 
         _LOGGER.info(params_file)
+        if mol.has_ensemble:
+            mapper:Dict[str, str] = dict()
+            for ll in fs.lines_from_file( params_file ):
+                if ll.startswith('ATOM'):
+                    mapper[ll[5:9].strip()] = ll[5:9]
+            
+            mol.ensemble.fix_atom_names( mapper )
 
-        n_conformers:int=mol.n_conformers()
-        if n_conformers > 1:
-            conformer_file_content:List[str] = list()
-            mol2_temp:str=f"{work_dir}/__temp_ligand_mol2.mol2"
-            _LOGGER.info(f"Detected {n_conformers} in ligand {res_name}")
-            _parser = Mol2Parser()
-            session = self.parent().pymol.new_session()
-            for cidx in range(1, n_conformers):
-                conf = mol.get_ligand_conformer(cidx)
-                fs.safe_rm(mol2_temp)
-                _parser.save_ligand(mol2_temp, conf)
-                pdb_conf:str=self.parent().pymol.convert(session, mol2_temp, new_ext='.pdb')
-                conformer_file_content.extend(fs.lines_from_file(pdb_conf))
-                fs.safe_rm(pdb_conf)
-
-            conformer_file_content = list(filter(lambda ll: ll.startswith('HETATM') or ll.startswith('END'), conformer_file_content))
-
-            fs.write_lines(conformers, conformer_file_content) 
-
+            conformers:str=f"{work_dir}/{res_name}_conformers.pdb"
+            conformers = str(Path(conformers).absolute())
+            _LOGGER.info(f"Detected {mol.ensemble.n_conformers()} in ligand {res_name}")
+            _parser = PDBParser()
+            _parser.save_ensemble( conformers, mol.ensemble )
             params_content.append(f"PDB_ROTAMERS {conformers}")
-
-            fs.safe_rm(mol2_temp)
-
         fs.write_lines(params_file, params_content)
         
         return params_file 
@@ -1356,474 +1455,77 @@ class RosettaInterface(BaseInterface):
 
     def score(
         self,
-        infile: str,
-        ignore_zero_occupancy: bool = True,
-        overwrite: bool = True,
-        extra_flags: List[str] = None,
-        output_dir: str = './',
-        delete_scores: bool = True,
-        delete_crash: bool = True,
-    ) -> float:
+        structure:Union[Structure, StructureEnsemble],
+        opts:RosettaOptions=None,
+        protocol:RosettaScriptsProtocol=None,
+        score_fxn:RosettaScriptsElement=None,
+        prefix:str=None,
+        work_dir:str=None        
+    ) -> List[float]:
         """Provides the total score in Rosetta Energy Units (REU) for a given structure. Uses default flags but can have behavior modified
         via supplied extra_flags. Returns the total score in REU.
 
         Arguments:
-            infile: A str() with the path to the .pdb file to relax. 
-            ignore_zero_occupancy: If relax should ignore atoms with zero occupancy. True by default.
-            overwrite: If results should be overwritten. True by default.
-            extra_flags: A List[str] of extra flags to be added to the commandline. Empty by default. NOT CHECKED FOR CORRECTNESS. 
-            output_dir: The output directory where the files will be saved. './' by default.
-            delete_scores: Whether the score.sc file should be deleted after running. True by default.
-            delete_crash: Whether the ROSETTA_CRASH.log file should be deleted after running. True by default.
+            structure:
+            opts:
+            residue_selectors:
+            score_fxn:
+            work_dir:
 
         Returns:
             Score of structure in file in REU.
 
-        """
-        fs.check_file_exists(infile)
+        """ #TODO(CJ): update this
+        if prefix is None:
+            prefix = "rosetta_score"
 
-        flags: List[str] = [
-            f"-in:file:s '{infile}'",
-            "-ignore_unrecognized_res",
-        ]
+        if opts is None:
+            opts = RosettaOptions()
 
-        flags.append(f"-ignore_zero_occupancy {'true' if ignore_zero_occupancy else 'false'}")
-        flags.append(f"-out:path:all {output_dir}")
+        if score_fxn is None:
+            score_fxn = RosettaScriptsElement('ScoreFunction', name='sfxn', weights='ref2015')
 
-        if overwrite:
-            flags.append("-overwrite")
+        if isinstance(structure, Structure):
+            structure = StructureEnsemble.from_single_stru( structure )
 
-        if extra_flags:
-            flags.extend(extra_flags)
+        if protocol is None:
+            protocol = RosettaScriptsProtocol()
 
-        fs.safe_rm(f"{output_dir}/score.sc")
+        protocol.add_scorefunction(
+            score_fxn            
+        ).add_simple_metric(
+            'TotalEnergyMetric', name='score', scorefxn='sfxn'
+        ).add_protocol(
+            metrics='score'
+        )
 
-        fs.safe_mkdir(output_dir)
-
-        self.env_manager_.run_command(self.config_.SCORE, flags)
-
-        df: pd.DataFrame = self.parse_score_file(f"{output_dir}/score.sc")
-
-        if len(df) != 1:
-            _LOGGER.error("Found more than one entry in score.sc file. Exiting...")
-            exit(1)
-
-        if delete_scores:
-            self._delete_score_file(output_dir)
-
-        if delete_crash:
-            self._delete_crash_log()
-
-        return df.iloc[0].total_score
-
-    def relax_loops(
-        self,
-        infile: str,
-        nstruct: int,
-        ignore_zero_occupancy: bool = True,
-        full_atom: bool = True,
-        detect_disulf: bool = True,
-        linmem_ig: int = 10,
-        constrain_relax_to_start_coords: bool = True,
-        coord_constrain_sidechains: bool = True,
-        ramp_constraints: bool = True,
-        prefix: str = None,
-        overwrite: bool = True,
-        extra_flags: List[str] = None,
-        output_dir: str = './',
-        delete_scores: bool = True,
-        delete_crash: bool = True,
-    ) -> pd.DataFrame:
-        """
-
-        Args:
-            infile: A str() with the path to the .pdb file to relax. 
-            nstruct: Number of structures to create. 
-            ignore_zero_occupancy: If relax should ignore atoms with zero occupancy. True by default.
-            full_atom: If relax should do full atom relaxation. True by default.
-            detect_disulf: If Rosetta should detect disulfide bonds. True by default.
-            linmem_ig: Number of recent rotamers to store. 10 by default.
-            constrain_relax_to_start_coords: If the backbone atoms should be constrained. True by default.
-            coord_constrain_sidechains: If the sidechain heavy atoms should be constrained. True by default.
-            ramp_constraints: If the constraints should be ramped during initial relaxation stage. True by default.
-            prefix: str() with prefix for output file names. None and not used by default.
-            overwrite: If results should be overwritten. True by default.
-            extra_flags: A List[str] of extra flags to be added to the commandline. Empty by default. NOT CHECKED FOR CORRECTNESS. 
-            output_dir: The output directory where the files will be saved. './' by default.
-            delete_scores: Whether the score.sc file should be deleted after running. True by default.
-            delete_crash: Whether the ROSETTA_CRASH.log file should be deleted after running. True by default.
-
-
-        Returns:
-            pandas DataFrame containing the results and energies of the relaxed structures. Description column contains
-            full paths to relaxed files. 
-        """
-        #TODO(CJ):should also be able to take a Structure as input.
-        fs.check_file_exists(infile)
-
-        if Path(infile).suffix != '.pdb':
-            _LOGGER.error(f"Expected input file format is .pdb. {infile} is an invalid entry. Exiting...")
-            exit(1)
-
-        fs.safe_rm(f'{output_dir}/score.sc')
-        #/dors/meilerlab/apps/rosetta/rosetta-3.13/main/source/bin/relax.default.linuxgccrelease
-        #-out:prefix $prefix
-        #-out:file:scorefile ${prefix}.sc &
-        flags: List[str] = [
-            f"-in:file:s '{infile}'",
-            f"-nstruct {nstruct}",
-            f"-linmem_ig {linmem_ig}",
-        ]
-
-        flags.append(f"-ignore_zero_occupancy {'true' if ignore_zero_occupancy else 'false'}")
-        flags.append(f"-relax:constrain_relax_to_start_coords {'true' if constrain_relax_to_start_coords else 'false'}")
-        flags.append(f"-coord_constrain_sidechains {'true' if coord_constrain_sidechains else 'false'}")
-        flags.append(f"-ramp_constraints {'true' if ramp_constraints else 'false'}")
-        flags.append(f"-out:path:all {output_dir}")
-
-        if full_atom:
-            flags.append("-in:file:fullatom")
-
-        if detect_disulf:
-            flags.append("-in:detect_disulf")
-
-        if prefix:
-            flags.append(f"-out:prefix '{prefix}'")
-
-        if overwrite:
-            flags.append("-overwrite")
-
-        if extra_flags:
-            flags.extend(extra_flags)
-
-        fs.safe_mkdir(output_dir)
-
-        self.env_manager_.run_command(self.config_.RELAX, flags)
-
-        df: pd.DataFrame = self.parse_score_file(f'{output_dir}/score.sc')
-
-        df['description'] = df.apply(lambda row: f"{output_dir}/{row.description}.pdb", axis=1)
-
-        if delete_scores:
-            self._delete_score_file(output_dir)
-
-        if delete_crash:
-            self._delete_crash_log()
-
-        return df
-
-    def write_script(self, fname: str, args: List[Dict]) -> str:
-        """Writes an XML script to be used with RosettaScripts. Each element of the XML script is represented
-        as a dict() within a list() of args. Note that each element dict() is required to have two keys, "parent"
-        and "tag". "parent" refers to which element it should be nested under. In the case that there are multiple
-        levels of nesting, they are joined by "." characters. The "tag" is the tag name of the element but note
-        that there is NO checking for whether or not the included element tags are valid.
+        opts['overwrite'] = True
         
-        Args:
-            fname: The .xml file to save the script contents to.
-            args: A list() of dict()'s where each is an element in the final .xml file. 
-            
-        Returns:
-            The name of the script file.
-        """
+        results:List[float] = list()
+        for stru in structure.structures():
+            try:
+                score_file:str=self.run_rosetta_scripts(
+                        stru,
+                        protocol,
+                        opts,
+                        prefix=prefix,
+                        work_dir=work_dir
+                        )
+                results.append(
+                    self.parse_score_file( score_file ).iloc[0].score
+                )
+            except:
+                _LOGGER.error(f"Unable to score {stru}. Setting 'rosetta_score' to 0.0. Continuing...")                
+                results.append( 0 )
 
-        def _find_node(elem: ET.Element, name: str) -> ET.Element:
-            """Helper function that recursively finds the specified parent XML node. Assumes that supplied name
-            str() is correctly delimited with '.' characters. DOES NOT check for correctness of nam.e
+            stru.data['rosetta_score'] = results[-1]
+        return results
 
-            Args:
-                elem: The ET.Element to search within.
-                name: The str() name to search for.
-
-            Return:
-                The XML node with the target tag name.
-            """
-            tks: List[str] = name.split('.', 1)
-
-            target: str = tks[0]
-
-            result: ET.Element = None
-            if elem.tag == target:
-                result = elem
-            else:
-                for ee in elem:
-                    if ee.tag == target:
-                        result = ee
-                        break
-                else:
-                    _LOGGER.error(f"There is no element with tag name '{target}' at this level. Exiting...")
-                    exit(1)
-
-            if len(tks) > 1:
-                return _find_node(result, tks[1])
-            else:
-                return result
-
-        root = ET.Element("ROSETTASCRIPTS")
-        ET.SubElement(root, "RESIDUE_SELECTORS")
-        ET.SubElement(root, "SCOREFXNS")
-        ET.SubElement(root, "LIGAND_AREAS")
-        ET.SubElement(root, "INTERFACE_BUILDERS")
-        ET.SubElement(root, "MOVEMAP_BUILDERS")
-        #ET.SubElement(root, "SCORINGGRIDS")
-        ET.SubElement(root, "TASKOPERATIONS")
-        ET.SubElement(root, "SIMPLE_METRICS")
-        ET.SubElement(root, "FILTERS")
-        ET.SubElement(root, "MOVERS")
-        ET.SubElement(root, "PROTOCOLS")
-        ET.SubElement(root, "OUTPUT")
-
-        for arg in args:
-            parent_name = arg.pop("parent", None)
-            tag_name = arg.pop("tag", None)
-            target_node = None
-
-            bad: bool = False
-
-            if not parent_name:
-                #TODO(CJ): check if the parent name has an equal sign specifying the target node
-                # more than what you would specify it otherwise
-                _LOGGER.error("No parent name supplied in XML element dict()!")
-                bad = True
-
-            if bad:
-                _LOGGER.error("Problems with XML elements detected. Exiting...")
-                exit(1)
-
-            child_nodes = arg.pop('child_nodes', list())
-            #if arg.get('append_elements_only', False):
-            #    _ = arg.pop('append_elements_only')
-            #    target_node = _find_node(root, tag_name)
-            #    for attrib, value in arg.items():
-            #        target_node.set( attrib, value )
-
-            #else:
-            parent: ET.Element = _find_node(root, parent_name)
-
-            if arg.get('append_elements_only', False):
-                _ = arg.pop('append_elements_only')
-                if tag_name == "SCORINGGRIDS":
-                    parent: ET.Element = _find_node(root, 'ROSETTASCRIPTS')
-                    target_node = ET.Element(tag_name)
-                    parent.insert(0, target_node)
-                    #target_node = ET.SubElement(parent[0], tag_name )
-                else:
-                    target_node = ET.SubElement(parent, tag_name)
-
-                for attrib, value in arg.items():
-                    target_node.set(attrib, value)
-            else:
-                target_node = ET.SubElement(parent, tag_name, attrib=arg)
-
-            if child_nodes:
-                for cn in child_nodes:
-                    child_child_nodes = cn.pop('child_nodes', None)
-                    tag_name = cn.pop('tag', None)
-                    _ = cn.pop('parent', None)
-                    #TODO(CJ): make this recursive so it actually works for super nested things
-                    placed_child = ET.SubElement(target_node, tag_name, attrib=cn)
-
-                    if child_child_nodes:
-                        for ccn in child_child_nodes:
-                            tag_name = ccn.pop('tag', None)
-                            _ = ccn.pop('parent', None)
-                            _ = ET.SubElement(placed_child, tag_name, attrib=ccn)
-
-        for rr in root:
-            rr.text = "\n\t"
-
-        xmlstr: str = minidom.parseString(ET.tostring(root)).toprettyxml()
-        xml_content: List[str] = xmlstr.replace('<?xml version="1.0" ?>\n', '').splitlines()
-
-        xml_content = list(filter(lambda ll: len(ll.strip()) > 0, xml_content))
-
-        fs.write_lines(fname, xml_content)
-
-        return fname
-
-    def loop_relax(
-        self,
-        infile: str,
-        nstruct: int,
-        ignore_zero_occupancy: bool = True,
-        detect_disulf: bool = True,
-        linmem_ig: int = 10,
-        overwrite: bool = True,
-        extra_flags: List[str] = None,
-        output_dir: str = './',
-        delete_scores: bool = True,
-        delete_crash: bool = True,
-    ) -> pd.DataFrame:
-        """TODO
-        Args:
-            infile: A str() with the path to the .pdb file to relax. 
-            nstruct: Number of structures to create. 
-            ignore_zero_occupancy: If relax should ignore atoms with zero occupancy. True by default.
-            detect_disulf: If Rosetta should detect disulfide bonds. True by default.
-            linmem_ig: Number of recent rotamers to store. 10 by default.
-            overwrite: If results should be overwritten. True by default.
-            extra_flags: A List[str] of extra flags to be added to the commandline. Empty by default. NOT CHECKED FOR CORRECTNESS. 
-            output_dir: The output directory where the files will be saved. './' by default.
-            delete_scores: Whether the score.sc file should be deleted after running. True by default.
-            delete_crash: Whether the ROSETTA_CRASH.log file should be deleted after running. True by default.
-
-        Returns:
-            pandas DataFrame containing the results and energies of the relaxed structures. Description column contains
-            full paths to relaxed files. 
-        """
-        fs.check_file_exists(infile)
-
-        if Path(infile).suffix != '.pdb':
-            _LOGGER.error(f"Expected input file format is .pdb. {infile} is an invalid entry. Exiting...")
-            exit(1)
-
-        fs.safe_rm(f'{output_dir}/score.sc')
-        flags: List[str] = [
-            f"-in:file:s '{infile}'",
-            f"-nstruct {nstruct}",
-            f"-linmem_ig {linmem_ig}",
-        ]
-
-        df: pd.DataFrame = self.parent().pymol.collect('production.pdb', 'resi ss resn'.split(), sele='name CA')
-        df['resi'] = df.resi.astype(int)
-
-        ss = []
-        for i, row in df.iterrows():
-            if row.resn.upper() in "MG ZN HG".split():
-                ss.append('M')
-            else:
-                ss.append(row.ss)
-
-        df['ss'] = ss
-
-        elements: List[Dict] = [
-            {
-                'parent': 'SCOREFXNS',
-                'tag': 'ScoreFunction',
-                'name': 'score_fxn',
-                'weights': 'ref2015'
-            },
-            {
-                'parent': 'MOVERS',
-                'tag': 'FastRelax',
-                'name': 'fast_relax',
-                'scorefxn': 'score_fxn'
-            },
-            {
-                'parent': 'MOVERS.FastRelax',
-                'tag': 'MoveMap',
-                'name': 'move_map'
-            },
-        ]
-
-        temp: Dict[str, str] = deepcopy({
-            'state': df.iloc[0].ss,
-            'start': df.iloc[0].resi,
-            'end': df.iloc[0].resi,
-        })
-
-        for i, row in df.iterrows():
-            #TODO(CJ): need to ignore the non-amino acid stuff here
-            if row.ss == temp['state']:
-                temp['end'] = row.resi
-            else:
-                elements.append(
-                    deepcopy({
-                        'parent': 'MOVERS.FastRelax.MoveMap',
-                        'tag': 'Span',
-                        'begin': str(temp['start']),
-                        'end': str(temp['end']),
-                        'chi': 'true',
-                        'bb': 'true' if temp['state'] == 'L' else 'false'
-                    }))
-                temp = deepcopy({
-                    'state': row.ss,
-                    'start': row.resi,
-                    'end': row.resi,
-                })
-
-        elements.append(
-            deepcopy({
-                'parent': 'MOVERS.FastRelax.MoveMap',
-                'tag': 'Span',
-                'begin': str(temp['start']),
-                'end': str(temp['end']),
-                'chi': 'true',
-                'bb': 'true' if temp['state'] == 'L' else 'false'
-            }))
-
-        elements.append({'parent': 'PROTOCOLS', 'tag': 'Add', 'mover_name': 'fast_relax'})
-
-        fpath = Path(infile)
-        xml_input: str = fpath.parent / "__temp.xml"
-        xml_script = self.write_script(xml_input, elements)
-
-        flags.extend(['-parser:protocol', str(xml_input.absolute())])
-
-        flags.append(f"-ignore_zero_occupancy {'true' if ignore_zero_occupancy else 'false'}")
-        flags.append(f"-out:path:all {output_dir}")
-
-        if detect_disulf:
-            flags.append("-in:detect_disulf")
-
-        if overwrite:
-            flags.append("-overwrite")
-
-        if extra_flags:
-            flags.extend(extra_flags)
-
-        fs.safe_mkdir(output_dir)
-
-        self.run_rosetta_scripts(flags)
-
-        df: pd.DataFrame = self.parse_score_file(f'{output_dir}/score.sc')
-
-        df['description'] = df.apply(lambda row: f"{output_dir}/{row.description}.pdb", axis=1)
-
-        if delete_scores:
-            self._delete_score_file(output_dir)
-
-        if delete_crash:
-            self._delete_crash_log()
-
-        return df
-
-    def create_cst_pdb_line(self, cst:ResiduePairConstraint, idx: int) -> str:
-        """Creates a str() PDB line in the appropriate format so that Rosetta can apply the constrained geometry
-        described by the RosettaCst. This line goes in the corresponding PDB file.
-        
-        Args:
-            idx: The index of the RosettaCst as an int().
-            
-        Returns:
-            The PDB line corresponding to the RosettaCst.
-
-        """
-        return f"REMARK 666 MATCH TEMPLATE {cst.residue1.parent.name} {cst.residue1.name}  {cst.residue1.idx:>3} MATCH MOTIF {cst.residue2.parent.name} {cst.residue2.name}  {cst.residue2.idx:>3}  {idx:>3}  1"
-
-    def create_cst_lines(self, cst:ResiduePairConstraint) -> List[str]:
-        """Creates a List[str] which describes the constrained geometries in the required enzyme design format for Rosetta.
-        These lines go into the corresponding .cst file."""
-        cst_content: List[str] = list()
-        cst_content.append("CST::BEGIN")
-        cst_content.append(f"   TEMPLATE::  ATOM_MAP: 1 atom_name: {' '.join(map(lambda aa: aa.name, cst.residue1_atoms))}")
-        cst_content.append(f"   TEMPLATE::  ATOM_MAP: 1 residue3: {cst.residue1.name}")
-        cst_content.append("")
-        cst_content.append(f"   TEMPLATE::  ATOM_MAP: 2 atom_name: {' '.join(map(lambda aa: aa.name, cst.residue2_atoms))}")
-        cst_content.append(f"   TEMPLATE::  ATOM_MAP: 2 residue3: {cst.residue2.name}")
-        cst_content.append("")
-
-        for ridx, (rname, rule) in enumerate(cst.child_constraints):
-            end = 0                
-            if rule.is_angle_constraint() or rule.is_dihedral_constraint():
-                end = 1
-            cst_content.append(f"   CONSTRAINT::  {rname:>10}: {float(rule.target_value):6.2f} {float(rule.params['rosetta']['tolerance']):6.2f} {float(rule.params['rosetta']['penalty']):6.2f} {end}")
-
-        cst_content.append("CST::END")
-
-        return cst_content
-
-    def write_constraint_file(self, stru:Structure, constraints:List[StructureConstraint], work_dir:str = None) -> str:
+    def write_constraint_file(self, 
+        stru:Structure, 
+        constraints:List[StructureConstraint], 
+        functional:str="LINEAR_PENALTY",
+        work_dir:str = None) -> str:
         #TODO(CJ): this!
         if work_dir is None:
             work_dir = "./"
@@ -1834,7 +1536,11 @@ class RosettaInterface(BaseInterface):
                 ridx_1:int=stru.absolute_index(cst.atoms[0].parent, indexed=1)
                 ridx_2:int=stru.absolute_index(cst.atoms[1].parent, indexed=1)
                 lines.append(
-                    f"AtomPair {cst.atoms[0].name} {ridx_1} {cst.atoms[1].name} {ridx_2} LINEAR_PENALTY {cst.target_value:.2f} 0.00 {cst['rosetta']['tolerance']:.2f} {cst['rosetta']['penalty']:.2f}"
+                    f"AtomPair "
+                    f"{cst.atoms[0].name} {ridx_1} "
+                    f"{cst.atoms[1].name} {ridx_2} "
+                    f"{functional} "
+                    f"{cst.target_value:.2f} 0.00 {cst['rosetta']['tolerance']:.2f} {cst['rosetta']['penalty']:.2f}"
                 )
 
             elif cst.is_angle_constraint():
@@ -1842,70 +1548,64 @@ class RosettaInterface(BaseInterface):
                 ridx_2:int=stru.absolute_index(cst.atoms[1].parent, indexed=1)
                 ridx_3:int=stru.absolute_index(cst.atoms[2].parent, indexed=1)
                 lines.append(
-                    f"Angle {cst.atoms[0].name} {ridx_1} {cst.atoms[1].name} {ridx_2} {cst.atoms[2].name} {ridx_3} LINEAR_PENALTY {np.radians(cst.target_value):.2f} 0.00 {np.radians(cst['rosetta']['tolerance']):.2f} {cst['rosetta']['penalty']/np.radians(1):.2f}"
+                    f"Angle "
+                    f"{cst.atoms[0].name} {ridx_1} "
+                    f"{cst.atoms[1].name} {ridx_2} "
+                    f"{cst.atoms[2].name} {ridx_3} "
+                    f"{functional} "
+                    f"{np.radians(cst.target_value):.2f} 0.00 {np.radians(cst['rosetta']['tolerance']):.2f} {cst['rosetta']['penalty']/np.radians(1):.2f}"
                 )
             elif cst.is_dihedral_constraint():
-                assert False
+                ridx_1:int=stru.absolute_index(cst.atoms[0].parent, indexed=1)
+                ridx_2:int=stru.absolute_index(cst.atoms[1].parent, indexed=1)
+                ridx_3:int=stru.absolute_index(cst.atoms[2].parent, indexed=1)
+                ridx_4:int=stru.absolute_index(cst.atoms[3].parent, indexed=1)
+                lines.append(
+                    f"Dihedral "
+                    f"{cst.atoms[0].name} {ridx_1} "
+                    f"{cst.atoms[1].name} {ridx_2} "
+                    f"{cst.atoms[2].name} {ridx_3} "
+                    f"{cst.atoms[3].name} {ridx_4} "
+                    f"{functional} "
+                    f"{np.radians(cst.target_value):.2f} 0.00 {np.radians(cst['rosetta']['tolerance']):.2f} {cst['rosetta']['penalty']/np.radians(1):.2f}"
+                )
             elif cst.is_residue_pair_constraint():
                 for (cst_name, child_cst) in cst.child_constraints:
                     if child_cst.is_distance_constraint():
                         ridx_1:int=stru.absolute_index(child_cst.atoms[0].parent, indexed=1)
                         ridx_2:int=stru.absolute_index(child_cst.atoms[1].parent, indexed=1)
                         lines.append(
-                            f"AtomPair {child_cst.atoms[0].name} {ridx_1} {child_cst.atoms[1].name} {ridx_2} LINEAR_PENALTY {child_cst.target_value:.2f} 0.00 {child_cst['rosetta']['tolerance']:.2f} {child_cst['rosetta']['penalty']:.2f}"
+                            f"AtomPair {child_cst.atoms[0].name} {ridx_1} {child_cst.atoms[1].name} {ridx_2} {functional} {child_cst.target_value:.2f} 0.00 {child_cst['rosetta']['tolerance']:.2f} {child_cst['rosetta']['penalty']:.2f}"
                         )
                     elif child_cst.is_angle_constraint():
                         ridx_1:int=stru.absolute_index(child_cst.atoms[0].parent, indexed=1)
                         ridx_2:int=stru.absolute_index(child_cst.atoms[1].parent, indexed=1)
                         ridx_3:int=stru.absolute_index(child_cst.atoms[2].parent, indexed=1)
                         lines.append(
-                            f"Angle {child_cst.atoms[0].name} {ridx_1} {child_cst.atoms[1].name} {ridx_2} {child_cst.atoms[2].name} {ridx_3} LINEAR_PENALTY {np.radians(child_cst.target_value):.2f} 0.00 {np.radians(child_cst['rosetta']['tolerance']):.2f} {child_cst['rosetta']['penalty']/np.radians(1):.2f}"
+                            f"Angle {child_cst.atoms[0].name} {ridx_1} {child_cst.atoms[1].name} {ridx_2} {child_cst.atoms[2].name} {ridx_3} {functional} {np.radians(child_cst.target_value):.2f} 0.00 {np.radians(child_cst['rosetta']['tolerance']):.2f} {child_cst['rosetta']['penalty']/np.radians(1):.2f}"
                         )
                     else:
                         assert False
+            elif cst.is_cartesian_freeze():
+                for atom in cst.atoms:
+                    ridx_1:int=stru.absolute_index(atom.parent, indexed=1)
+                    lines.append(
+                        f"CoordinateConstraint "
+                        f"{atom.name} {ridx_1} "
+                        f"{atom.name} {ridx_1} "
+                        f"0 0 0 "
+                        f"{functional} "
+                        f"1"
+                    )
+
+                    
 
         fs.safe_mkdir(work_dir)
         fname:str = f"{work_dir}/constraints.cst"
         fs.write_lines(fname, lines )
         return fname 
 
-    def integrate_enzdes_constraints(self, stru:Structure, constraints:List[StructureConstraint], work_dir:str=None) -> Tuple[str,str]:
-        #TODO(CJ): update this
-
-        if work_dir is None:
-            work_dir = "./"
-
-        fs.safe_mkdir(work_dir)
-
-        _LOGGER.info("Beginning RosettaCst constraint integration...")
-        parser = PDBParser()
-        file_str = parser.get_file_str(stru, if_renumber=False, if_fix_atomname=False)
-    
-        pdb_content: List[str] = ["HEADER                                            xx-MMM-xx"]
-        cst_content: List[str] = list()
-        counter = 1
-        for cidx, cst in enumerate(constraints):
-            if cst.is_residue_pair_constraint():
-                pdb_content.append(self.create_cst_pdb_line(cst, counter))
-                cst_content.extend(self.create_cst_lines(cst))
-                counter += 1
-    
-        pdb_file: str = f"{work_dir}/start.pdb"
-        cst_file: str = f"{work_dir}/rdock.cst"
-    
-        if not Path(pdb_file).exists():
-            fs.write_lines(pdb_file, pdb_content + file_str.splitlines())
-    
-        if not Path(cst_file).exists():
-            fs.write_lines(cst_file, cst_content)
-    
-        _LOGGER.info("RosettaCst constraint integration successful! Relevant files:")
-        _LOGGER.info(f"\t.pdb file: {Path(pdb_file).absolute()}")
-        _LOGGER.info(f"\t.cst file: {Path(cst_file).absolute()}")
-    
-        return (pdb_file, cst_file)
-
-    def score_energy(self, cst) -> float: 
+    def score_energy(self, cst:StructureConstraint) -> float: 
         """TODO(CJ): add documentation"""
 
         if cst.is_residue_pair_constraint():
@@ -2134,14 +1834,26 @@ class RosettaInterface(BaseInterface):
         stru.chains = filled_stru.chains
 
 
-    def parameterize_structure(self, stru:Structure, param_dir:str) -> None:
-        """TODO(CJ)"""
+    def parameterize_structure(self, stru:Structure, param_dir:str, overwrite:bool=False) -> None:
+        """Setup non-standad residues and ligands for use in Rosetta. All files are created in the standard
+        .params format, and saved to the supplied param_dir. The params list() is stored in the .data attribute
+        of the supplied Structure() with the key 'rosetta_params'.
+        
+        Args:
+            stru: The Structure() to add params files to.
+            param_dir: Where the .params files should be stored.
+    
+        Returns:
+            Nothing.
+        """
+        fs.safe_mkdir( param_dir )
+
         params_list:List[str] = list()
         for res in stru.residues:
             if res.is_ligand():
                 lname:str = res.name
                 params_file:str = Path(param_dir)/ f"{lname}.params"
-                if not params_file.exists():
+                if not params_file.exists() or overwrite:
                     self.parameterize_ligand(res, charge=res.net_charge, work_dir=param_dir)
                 
                 params_list.append( str(params_file) )

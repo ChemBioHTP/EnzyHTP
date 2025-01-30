@@ -37,7 +37,8 @@ from .structure import (
     MetalUnit,
     Solvent,
     PDBParser,
-    Mol2Parser
+    Mol2Parser,
+    get_metal
 )
 
 from .mutation_class import Mutation
