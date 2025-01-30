@@ -266,8 +266,12 @@ class MultiwfnInterface(BaseInterface):
 
         # parse the dipole result
         dipoles_data = self.parse_two_center_dp_moments(result_file)
+        print(dipoles_data)
         atom_1_id = ele_stru.geometry.get_atom_index(atom_1, indexing=1)
         atom_2_id = ele_stru.geometry.get_atom_index(atom_2, indexing=1)
+        print(atom_1_id)
+        print(atom_2_id)
+
 
         dipole_vec = np.array((0.0, 0.0, 0.0))
         target_dipoles = dipoles_data[(atom_1_id, atom_2_id)]

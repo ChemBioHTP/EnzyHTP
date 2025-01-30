@@ -215,7 +215,7 @@ def dock_reactants(structure: Structure,
         qm_minimization_xtb(structure, ligands, constraints, cluster_distance, False, work_dir)
         sp.save_structure("./snapshots/qm_structure_01.pdb", structure)
 
-    opts.add_script_variable('ramp_constraints', True)
+    #opts.add_script_variable('ramp_constraints', True)
     mm_minimization(structure, constraints, opts, False, cpu_config)
     sp.save_structure("./snapshots/mm_structure_02.pdb", structure)
 
