@@ -3664,6 +3664,8 @@ outtraj {tmp_traj_2}
                 sub_dir = './', # because path are relative
                 sub_script_path = f'{temp_dir}/submit_MMPBSA.cmd')
             mmpbsa_job.submit()
+            if Config.debug > 0:
+                print(f'''Running MMPBSA on {cluster.NAME}: job_id: {mmpbsa_job.job_id} script: {mmpbsa_job.sub_script_path} period: {period}''')
             mmpbsa_job.wait_to_end(period=period)
         else:
             raise Exception("only support cluster job mode right now")
