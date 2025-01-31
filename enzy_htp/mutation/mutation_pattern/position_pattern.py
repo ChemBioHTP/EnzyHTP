@@ -53,11 +53,14 @@ def decode_position_pattern(stru: Structure, pattern: str, if_name: bool = False
 def decode_builtin_function(stru: Structure, pattern: str) -> Iterable[Residue]:
     """decode the position pattern in builtin function format.
     example: '$ef_hotspot('B.254.CAE', 'B.254.H2', (0,10))'"""
-    pattern_format = r"\$(\w+)\((.+)+\)"
+    pattern_format = r"\$(\w+)\((.+)*\)"
     funcname, args = re.match(pattern_format, pattern).groups()
     
     func = PATTERN_BUILTIN_FUNCTION_MAPPER[funcname]
-    args = [eval(i.strip()) for i in split_but_brackets(args, ",")]
+    if args:
+        args = [eval(i.strip()) for i in split_but_brackets(args, ",")]
+    else:
+        args = []
 
     return func(stru, *args)
 
