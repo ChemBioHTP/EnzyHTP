@@ -14,6 +14,7 @@ from enzy_htp.core.general import split_but_brackets
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.structure import Structure, Residue
 from enzy_htp.structure.structure_selection import select_stru
+from enzy_htp import interface
 
 
 def decode_position_pattern(stru: Structure, pattern: str, if_name: bool = False) -> List[tuple]:
@@ -59,7 +60,6 @@ def decode_builtin_function(stru: Structure, pattern: str) -> Iterable[Residue]:
     args = [eval(i.strip()) for i in split_but_brackets(args, ",")]
 
     return func(stru, *args)
-
 
 def decode_pymol_selection(stru: Structure, pattern: str) -> Iterable[Residue]:
     """decode the position pattern in pymol selection format.
@@ -138,9 +138,18 @@ def ef_hotspot(stru: Structure, dipole_vec: Tuple, dipole_center: Tuple, cutoff:
             _LOGGER.debug(f"found {res.key_str} - {angle}°")
             result.append(res)
     return result
-    
+
+def surface(stru: Structure, cutoff: float=0.1, engine: str="pymol") -> List[Residue]:
+    surface_engine = SURFACE_ENGINE_MAPPER[engine]
+    return surface_engine(stru, cutoff)
 
 PATTERN_BUILTIN_FUNCTION_MAPPER = {
     "ef_hotspot" : ef_hotspot,
+    "surface" : surface,
 }
+"""map keywords to functions that select positions"""
 
+SURFACE_ENGINE_MAPPER = {
+    "pymol" : interface.pymol.get_exposed_residues
+}
+"""map keywords to engines that find surface positions"""
