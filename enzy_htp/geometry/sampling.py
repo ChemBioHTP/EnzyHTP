@@ -358,6 +358,7 @@ def _process_equi_md_sampling_arguments(
 def md_simulation(stru: Structure,
                   param_method: MolDynParameterizer,
                   steps: List[MolDynStep],
+                  params_in: MolDynParameter = None,
                   parallel_runs: int=1,
                   parallel_method: str="cluster_job",
                   work_dir: str="./MD",
@@ -435,11 +436,21 @@ def md_simulation(stru: Structure,
     """
     supported_parallel_method = ["cluster_job"]
     # I. san check
+    #   - params
+    if not isinstance(param_method, MolDynParameterizer) and not isinstance(params_in, MolDynParameter):
+        _LOGGER.error(f"Please either provide param_method (current: {param_method}) or params_in (current: {params_in})")
+        raise ValueError
+    if isinstance(param_method, MolDynParameterizer) and isinstance(params_in, MolDynParameter):
+        _LOGGER.warning("Both param_method and params_in are provided. Only params_in is used.")
+    if isinstance(params_in, MolDynParameter):
+        params_engine = params_in.engine
+    else:
+        params_engine = param_method.engine
     #   - MD engine consistency
     for i, step in enumerate(steps):
-        if step.engine != param_method.engine:
+        if step.engine != params_engine:
             _LOGGER.error(
-                f"The engine of step #{i} ({step.engine}) does not match the parameterizer ({param_method.engine})!")
+                f"The engine of step #{i} ({step.engine}) does not match the parameterizer/parameter ({params_engine})!")
             raise InconsistentMDEngine
     #   - Parallel method suppoort
     if parallel_method and (parallel_method not in supported_parallel_method):
@@ -451,7 +462,10 @@ def md_simulation(stru: Structure,
     fs.safe_mkdir(work_dir)
 
     # III. parameterize
-    params = param_method.run(stru)
+    if isinstance(params_in, MolDynParameter):
+        params = params_in
+    else:
+        params = param_method.run(stru)
 
     # IV. run MD steps
     ## parallelize

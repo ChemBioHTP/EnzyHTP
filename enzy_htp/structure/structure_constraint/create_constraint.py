@@ -28,6 +28,7 @@ from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.exception import WrongTopology
 from ..structure import Structure, Solvent, Chain, Residue, Atom
 from ..structure_region import StructureRegion, ResidueCap
+from ..structure_selection_class import StruSelection
 from enzy_htp import config as eh_config
 
 from abc import ABC, abstractmethod
@@ -40,7 +41,8 @@ from .api import (
     AngleConstraint,
     DihedralConstraint,
     ResiduePairConstraint,
-    BackBoneFreeze
+    BackBoneFreeze,
+    GroupDistanceConstraint,
     )
 
 
@@ -218,6 +220,43 @@ def create_distance_constraint(
     result = DistanceConstraint(
         atoms=[atom_1, atom_2],
         target_value=target_value
+    )
+    result.check_consistent_topology()
+
+    if params is not None:
+        result.update_params(params)
+    return result
+
+def create_group_distance_constraint(
+        atom_grp_1: str,
+        atom_grp_2: str,
+        target_value: float,
+        topology: Structure= None,
+        params:Dict=None
+        ) -> GroupDistanceConstraint:
+    """Constructor for GroupDistanceConstraint between two groups of atoms.
+    Args:
+        atom_grp_1, atom_grp_2:
+            the 2 atom groups of the distance constraint. they are specified
+            through a structure selection pattern in PyMol style.
+            (https://pymolwiki.org/index.php/Selection_Algebra)
+        target_value:
+            the target distance of the constraint
+        topology:
+            the reference topology if keyword str is used for atom_1, atom_2.
+        params:
+            The energy constraint parameters to apply to the GroupDistanceConstraint. Optional.
+
+    Returns:
+        The GroupDistanceConstraint object described by the supplied variables.
+    """
+    from ..structure_selection import select_stru # TODO see structure region comment
+    atom_grp_1 = select_stru(topology, atom_grp_1).atoms
+    atom_grp_2 = select_stru(topology, atom_grp_2).atoms
+    result = GroupDistanceConstraint(
+        grp_1_atoms=atom_grp_1,
+        grp_2_atoms=atom_grp_2,
+        target_value=target_value,
     )
     result.check_consistent_topology()
 

@@ -8,6 +8,7 @@ import os
 from enzy_htp import PDBParser
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.general import EnablePropagate
+from enzy_htp.structure.structure_selection import select_stru
 import enzy_htp.structure.structure_constraint as stru_cons
 
 CURR_FILE = os.path.abspath(__file__)
@@ -33,6 +34,29 @@ def test_create_distance_constraint():
     assert test_cons.constraint_type == "distance_constraint"
     assert test_cons.atom_names == {"H2", "OE2"}
     assert test_cons.target_value == 2.4
+
+def test_create_group_distance_constraint():
+    "test function works as expected"
+    test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
+    test_stru = sp.get_structure(test_pdb)
+    test_cons = stru_cons.create_group_distance_constraint(
+        "resi 10 & n. C+CA+N",
+        "resi 101 & n. C+CA+N",
+        4.4, test_stru)
+
+    assert len(test_cons.atoms) == 6
+    assert test_cons.params["amber"] == {
+        "rs_filepath": "{mdstep_dir}/0.rs",
+        "ialtd" : 0,
+        "r1" : "x-0.25",
+        "r2" : "x-0.05",
+        "r3" : "x+0.05",
+        "r4" : "x+0.25",
+        "rk2": 200.0, "rk3": 200.0,
+    }
+    assert test_cons.constraint_type == "group_distance_constraint"
+    assert test_cons.atom_names == {"C", "CA", "N"}
+    assert test_cons.target_value == 4.4
 
 def test_create_angle_constraint():
     "test function works as expected"

@@ -26,7 +26,8 @@ from .create_constraint import (
     create_angle_constraint,
     create_dihedral_constraint,
     merge_cartesian_freeze,
-    create_hydrogen_bond_freeze 
+    create_hydrogen_bond_freeze,
+    create_group_distance_constraint,
     )
 
 from .xml_io import (
