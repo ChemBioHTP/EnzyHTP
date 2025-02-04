@@ -11,7 +11,7 @@ from __future__ import annotations
 from copy import deepcopy
 
 from .atom import Atom
-from typing import List
+from typing import Dict, List
 from .residue import Residue
 from .noncanonical_base import NonCanonicalBase
 import enzy_htp.chemical as chem

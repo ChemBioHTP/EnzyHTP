@@ -9,7 +9,7 @@ from __future__ import annotations
 import copy
 import sys
 import math
-from typing import Tuple, List, Union
+from typing import Dict, Tuple, List, Union
 
 import numpy as np
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
@@ -203,6 +203,11 @@ class Residue(DoubleLinkedNode):
         return result
     
     @property
+    def atom_idx_mapper(self) -> Dict[int, Atom]:
+        """the mapper for idx -> atom"""
+        return {atom.idx : atom for atom in self.atoms}
+    
+    @property
     def hydrogens(self) -> List[Atom]:
         """Return all the hydrogen atoms in the Residue/Ligand."""
         result: List[Atom] = list(filter(lambda atom: atom.is_hydrogen() , self.atoms))
@@ -269,6 +274,14 @@ class Residue(DoubleLinkedNode):
                 _LOGGER.warning(f"{self} have no N-side residue but it is not a N-ter."
                                 " Something wrong in your residue indexing. "
                                 "It could be your index is not continous")
+        return result
+    
+    def find_idxes_atom_list(self, atom_idx_list: int) -> List[Atom]:
+        """find atom base on its idx. return a list reference of the atoms."""
+        result = []
+        atom_mapper = self.atom_idx_mapper
+        for idx in atom_idx_list:
+            result.append(atom_mapper[idx])
         return result
     #endregion
 
