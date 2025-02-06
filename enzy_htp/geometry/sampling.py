@@ -387,6 +387,8 @@ def md_simulation(stru: Structure,
     if isinstance(params_in, MolDynParameter):
         params = params_in
     else:
+        param_method = copy.deepcopy(param_method)
+        param_method.parameterizer_temp_dir = work_dir
         params = param_method.run(stru)
 
     # IV. run MD steps
@@ -459,7 +461,7 @@ def deployable_md_simulation(
 
         for step in steps:
             # 1. make job list
-            step.work_dir = sub_work_dir
+            step.work_dir = sub_work_dir # NOTE(QZ): this could case a bug. Consider deepcopy it
             if output: # steps after will use output from the previous one
                 job, output = step.make_job(output, path_rel_to=sub_work_dir)
             else: # the 1st step
@@ -477,7 +479,6 @@ def deployable_md_simulation(
         results.append(parallel_result)
 
     return results
-
 
 def _parallelize_md_steps_with_cluster_job(
         parallel_runs: int,
