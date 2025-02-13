@@ -1295,3 +1295,6 @@ def test_ncaa_to_moldesc_modaa():
     assert fs.lines_from_file(out_path)[1] == fs.lines_from_file(f"{MM_NCAA_DIR}/LLP_AM1BCC-AMBER_000001.ac")[1]
 
     fs.safe_rm(out_path)
+
+def test_make_mc_file():
+    pass

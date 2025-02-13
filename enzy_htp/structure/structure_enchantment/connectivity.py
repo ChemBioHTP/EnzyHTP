@@ -238,7 +238,6 @@ def _connect_ligand(lig: Ligand, method: str, ncaa_lib: str) -> None:
 
 def _connect_maa(maa: ModifiedResidue, method: str, ncaa_lib: str) -> None:
     """initiate connectivity for modified residue"""
-    raise Exception("TODO") # TODO look into whether .ac is just enough
     support_method_list = ["antechamber"]
     if method in MOL_DESC_METHODS:
         _mol_desc_based_ncaa_method(maa, method, ncaa_lib)

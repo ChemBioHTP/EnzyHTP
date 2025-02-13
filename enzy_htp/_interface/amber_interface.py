@@ -332,6 +332,11 @@ class AmberParameterizer(MolDynParameterizer):
                                                               gaff_type=gaff_type)
         # 2.1 fix the wrong atom type given by antechamber
 
+
+        # create mc file
+        mc_path = f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.mc" # the search ensured no existing file named this
+        self.parent_interface.make_mc_file(ncaa=maa, out_path=mc_path)
+
         # 3. run prepgen on ac & mc get prepin
         prepin_path = fs.get_valid_temp_name(
             f"{self.ncaa_param_lib_path}/{maa.name}.prepin")
@@ -3102,6 +3107,10 @@ class AmberInterface(BaseInterface):
         Generate the file in {temp_nc}"""
 
         self.convert_traj_to_nc(stru_esm.coordinate_list, temp_nc)
+
+    def make_mc_file(self, ncaa: Structure, out_path: str):
+        """make the mc file for parameterization"""
+        pass
 
 amber_interface = AmberInterface(None, eh_config._amber)
 """The singleton of AmberInterface() that handles all Amber related operations in EnzyHTP
