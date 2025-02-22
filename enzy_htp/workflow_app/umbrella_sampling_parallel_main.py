@@ -378,5 +378,29 @@ def grow_each_window(args):
         last_prod_result: MolDynResult = md_result[0][-1]
         last_frame_path = last_prod_result.last_frame_file
 
+def a_pymol_bug_related_to_this_app():
+    """see https://github.com/schrodinger/pymol-open-source/issues/436"""
+    import multiprocessing
+    import pymol2
+
+    def grow_each_window(args):
+        print("start")
+        call_read_pdbstr()
+        print("pass")
+
+    def call_read_pdbstr():
+        pms = pymol2.PyMOL()
+        pms.start()
+        pdb_str = "ATOM      1  N   ASP A   1      45.117  64.639  61.562  1.00  0.00"
+        pms.cmd.read_pdbstr(pdb_str, "obj1")
+        pms.stop()
+
+    if __name__ == "__main__":
+        # multiprocessing.set_start_method("spawn")
+        call_read_pdbstr()
+        with multiprocessing.Pool(processes=4) as pool:
+            pool.map(grow_each_window, range(3))
+
 if __name__ == "__main__":
+    multiprocessing.set_start_method("spawn")
     parallel_umbrella_sampling_w_start_points()
