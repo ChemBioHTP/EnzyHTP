@@ -79,7 +79,7 @@ class Interface:
         self.xtb = xtb_interface
         xtb_interface.set_parent(self)
 
-        self.check_environment()
+        #self.check_environment() CJ: This saves so much time!
     
     @property
     def config(self) -> Config:

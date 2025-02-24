@@ -536,6 +536,11 @@ of the original residue when charge related keyword for mutation is used"""
 
 RESIDUE_CHARGE_MAP = {
     "ff19sb" : {
+        'HOH': {
+            'O' :0.0, #TODO(CJ)            
+            'H1':0.0, #TODO(CJ)            
+            'H2':0.0 #TODO(CJ)            
+        },
         'ALA': {
             'N': -0.4157,
             'H': 0.2719,
@@ -1880,7 +1885,9 @@ RESIDUE_CHARGE_MAP_NTERMINAL = {
             'CA': 0.1,
             'HA': 0.1,
             'C': 0.526,
-            'O': -0.5
+            'O': -0.5,
+            'HNN':0.26 #TODO(CJ): check
+
         },
         'SER': {
             'N': 0.1849,

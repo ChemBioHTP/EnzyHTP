@@ -29,7 +29,7 @@ from enzy_htp.structure.structure_enchantment import init_connectivity
 
 from pdb2pqr.main import main_driver as run_pdb2pqr
 from pdb2pqr.main import build_main_parser as build_pdb2pqr_parser
-import openbabel.pybel as pybel
+#import openbabel.pybel as pybel
 from .pdb_line import read_pdb_lines
 
 

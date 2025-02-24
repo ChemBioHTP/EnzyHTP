@@ -47,7 +47,9 @@ class Accre(ClusterInterface):
     }
 
     G16_ENV = {
-        "CPU":{ "head" : """module load Gaussian/16.B.01
+        "CPU":{ "head" : """
+setup_accre_software_stack
+module load Gaussian/16.B.01
 mkdir $TMPDIR/$SLURM_JOB_ID
 export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID""",
                 "tail" : """rm -rf $TMPDIR/$SLURM_JOB_ID"""},
@@ -77,6 +79,9 @@ export ROSETTA3=/data/yang_lab/shaoqz/software/Rosetta313/main/""",
 {AMBER_ENV['CPU']}
 {MULTIWFN_ENV['CPU']}""",
         "GPU": None,
+    }
+    XTB_ENV = {
+        "CPU": "source /home/jurichc/setup-accre.sh"
     }
     #############################
     ### Internal use constant ###
@@ -176,7 +181,7 @@ export ROSETTA3=/data/yang_lab/shaoqz/software/Rosetta313/main/""",
             res_line = f"#SBATCH --{k}{v}\n"
             res_str += res_line
         res_str += "#SBATCH --export=NONE\n"
-        res_str += "#SBATCH --exclude=gpu0022,gpu0002\n"
+        #res_str += "#SBATCH --exclude=gpu0022,gpu0002\n"
         return res_str
     
     @classmethod

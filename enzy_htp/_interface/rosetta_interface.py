@@ -1096,7 +1096,7 @@ class RosettaInterface(BaseInterface):
                 #TODO(CJ): put an error code here
                 work_dir = eh_config['system.SCRATCH_DIR']
                 opts['out:path:all'] = work_dir
-        
+       
         opts_file:str = str(Path(f"{work_dir}/{prefix}_options.txt").absolute())
         xml_file:str = str(Path(f"{work_dir}/{prefix}_protocol.xml").absolute())
 
@@ -1104,6 +1104,11 @@ class RosettaInterface(BaseInterface):
 
         fname:str = f"{work_dir}/{prefix}_start.pdb"
         old_pattern:str = f"{prefix}_start_????.pdb"
+       
+        # This will get rid of the temp files
+        fs.safe_rm( xml_file )
+        fs.safe_rm( opts_file )
+        fs.safe_rm( fname )
         
         parser = PDBParser()
         parser.save_structure(fname, stru)
