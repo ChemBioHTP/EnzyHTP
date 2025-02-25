@@ -332,7 +332,7 @@ def grow_each_window(args):
     start_point_dir = f"MD_w{i}"
     last_frame_path = glob.glob(f"{start_point_dir}/rep_0*/prod_npt.rst")[0]
     print(f"starting from {last_frame_path}")
-    filling_windows = [[start_point[0]+(j+1)*0.25] for j in range(3)]
+    filling_windows = [[start_point[0]+(j+1)*0.25]+start_point[1:] for j in range(3)]
 
     for k, window in enumerate(filling_windows):
         params = AmberParameter(last_frame_path, wt_prmtop_path, stru.ncaa_chrgspin_mapper) # use last rst as input
