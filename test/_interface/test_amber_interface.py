@@ -8,6 +8,9 @@ import os
 import re
 import shutil
 from subprocess import CompletedProcess
+from enzy_htp.preparation.clean import remove_solvent
+from enzy_htp.structure.structure_enchantment import connectivity
+from enzy_htp.structure.structure_region.api import create_region_from_residues
 import pytest
 import numpy as np
 from pathlib import Path
@@ -1297,4 +1300,19 @@ def test_ncaa_to_moldesc_modaa():
     fs.safe_rm(out_path)
 
 def test_make_mc_file():
-    pass
+    file = f"{MM_DATA_DIR}/3FCR_connect.pdb"
+    stru = struct.PDBParser().get_structure(file)
+    stru.assign_ncaa_chargespin({"LLP": (-2, 1)})
+    remove_solvent(stru)
+    connectivity.init_connectivity(stru)
+
+    ai = interface.amber
+
+    maa = stru.modified_residue[0]
+    maa_region = create_region_from_residues(residues=[maa], nterm_cap="H", cterm_cap="OH")
+    for cap in maa_region.caps:
+        print(cap.atoms)
+
+    out_path = f"{MM_WORK_DIR}/LLP.mc"
+    
+    ai.make_mc_file(maa_region, out_path)

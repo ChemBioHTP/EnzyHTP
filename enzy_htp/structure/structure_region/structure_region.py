@@ -348,7 +348,7 @@ class StructureRegion:
         residues: List[Residue] = []
 
         for res in residue_mapper:
-            new_res = deepcopy(res)
+            new_res = deepcopy(res) if not isinstance(res, ResidueCap) else res
             new_res.atoms = residue_mapper[res]
 
             if isinstance(res, ResidueCap):

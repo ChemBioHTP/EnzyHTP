@@ -128,8 +128,13 @@ class ModifiedResidue(NonCanonicalBase):
         
         main_chain.append(curr_atom)
         main_chain.reverse()
-        return main_chain
 
+        # get rid of first and last element
+        main_chain.pop(0)
+        main_chain.pop()
+        
+        return main_chain
+    
     # === Special ===
     def __str__(self) -> str:
         return f"ModifiedResidue({self._idx}, {self._name}, atom:{len(self._atoms)}, {self._parent})"
