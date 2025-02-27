@@ -1338,7 +1338,7 @@ class AmberInterface(BaseInterface):
             of.write(instr_str)
 
         # run cpptraj command
-        cmd_args = f"-i {in_path} > {log_path}"
+        cmd_args = f"-i {in_path} > {log_path} 2>&1"
         self.env_manager_.run_command("cpptraj", cmd_args)
 
         # clean up temp file if success
