@@ -384,7 +384,7 @@ def md_simulation(stru: Structure,
     fs.safe_mkdir(work_dir)
 
     # III. parameterize
-    if isinstance(params_in, MolDynParameter):
+    if isinstance(params_in, MolDynParameter): # TODO remove the stru/param_method requirement
         params = params_in
     else:
         param_method = copy.deepcopy(param_method)
