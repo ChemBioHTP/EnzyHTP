@@ -1386,3 +1386,21 @@ def test_ncaa_to_moldesc_modaa():
     assert fs.lines_from_file(out_path)[1] == fs.lines_from_file(f"{MM_NCAA_DIR}/LLP_AM1BCC-AMBER_000001.ac")[1]
 
     fs.safe_rm(out_path)
+
+def test_get_atom_number_consistency_cpptraj_log():
+    example_cpptraj_log = f"{MM_DATA_DIR}/cpptraj_inconsistent_atom_num.out"
+
+    ai = interface.amber
+
+    result = ai._check_atom_number_consistency_cpptraj_log(example_cpptraj_log)
+
+    assert result == False
+
+def test_check_prmtop_nc_consistency():
+    test_prmtop = f"{MM_DATA_DIR}/KE_07_R7_S.prmtop"
+    test_nc = f"{MM_DATA_DIR}/mmpbsa_test_sol_10f.nc"
+
+    ai = interface.amber
+    result = ai.check_prmtop_nc_consistency(test_prmtop, test_nc)
+
+    assert result == False
