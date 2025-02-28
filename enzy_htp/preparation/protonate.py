@@ -151,8 +151,11 @@ def protonate_peptide_with_pdb2pqr(stru: Structure,
     with open(int_pdb_path, "w") as of:
         of.write(sp.get_file_str(stru))  # give the whole structure as input here as PropKa can use ligand
     pdb2pqr_protonate_pdb(int_pdb_path, int_pqr_path, ph)
-    peptide_protonated_stru = sp.get_structure(int_pqr_path) # TODO(bug): pdb2pqr eraser all the chain ID along with all ligands. This cause a bug on PDB: 1M15. This can be fixed by aligning the chain id using residue idx
+    peptide_protonated_stru = sp.get_structure(int_pqr_path) 
+
     stru_oper.remove_non_peptide(peptide_protonated_stru)  # keep the peptide only (sometime it has solvent)
+    peptide_protonated_stru.clone_residue_keys(stru, amino_acid_only=True)
+
     stru_oper.update_residues(stru, peptide_protonated_stru)
     protonate_peptide_fix_metal_donor(stru, method=metal_fix_method)
 

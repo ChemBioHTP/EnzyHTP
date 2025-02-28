@@ -743,6 +743,23 @@ class Structure(DoubleLinkedNode):
                 return False
         return True                      
 
+    def is_same_sequence(self, other: Structure, amino_acid_only: bool) -> bool:
+        """check if self and other has the same sequence:
+        - chain order needs to be the same
+        - sequence needs to be the same for each chain"""
+        if amino_acid_only:
+            self_chains = self.polypeptides
+            other_chains = other.polypeptides
+        else:
+            self_chains = self.chains
+            other_chains = other.chains
+
+        for schain, ochain in zip(self_chains, other_chains):
+            if not schain.is_same_sequence(ochain):
+                _LOGGER.debug(f"found different sequence between {schain} and {ochain}")
+                return False
+        return True
+
     #endregion
 
     #region === Editor ===
@@ -946,6 +963,24 @@ class Structure(DoubleLinkedNode):
             for atom, source_atom in zip(self.atoms, source.atoms):
                 atom.coord = source_atom.coord
 
+    def clone_residue_keys(self, other: Structure, amino_acid_only: bool =True):
+        """clone residue keys from {other} to {self}.
+        IMPORTANT: assume the chain order and sequence are the same between self and other"""
+        # san check
+        # - chain sequence consistency
+        if self.is_same_sequence(other, amino_acid_only=amino_acid_only):
+            _LOGGER.error(f"Inconsistent sequence betweem {self} and {other}. Clone rejected.")
+            raise ValueError("inconsistent sequence")
+        if amino_acid_only:
+            self_residues = self.amino_acids
+            other_residues = other.amino_acids
+        else:
+            self_residues = self.residues
+            other_residues = other.residues
+    
+        for s_res, o_res in zip(self_residues, other_residues):
+            s_res.chain.name = o_res.chain.name
+            s_res.idx = o_res.idx
     #endregion
 
     #region === Special ===

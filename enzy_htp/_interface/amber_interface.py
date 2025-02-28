@@ -1314,6 +1314,7 @@ class AmberInterface(BaseInterface):
             self,
             instr_str: str,
             log_path: Union[str, None] = None,
+            temp_in_path: str = None,
         ):
         """the python wrapper of running cpptraj.
         Based on https://amberhub.chpc.utah.edu/command-line-syntax/.
@@ -1327,7 +1328,10 @@ class AmberInterface(BaseInterface):
         temp_path_list = []
         # init file paths
         fs.safe_mkdir(eh_config["system.SCRATCH_DIR"])
-        in_path = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/cpptraj.in")
+        if temp_in_path is None:
+            in_path = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/cpptraj.in")
+        else:
+            in_path = temp_in_path
         temp_path_list.extend([eh_config["system.SCRATCH_DIR"], in_path])
         if log_path is None:
             log_path = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/cpptraj.out")
@@ -1338,7 +1342,7 @@ class AmberInterface(BaseInterface):
             of.write(instr_str)
 
         # run cpptraj command
-        cmd_args = f"-i {in_path} > {log_path}"
+        cmd_args = f"-i {in_path} > {log_path} 2>&1"
         self.env_manager_.run_command("cpptraj", cmd_args)
 
         # clean up temp file if success
@@ -2935,12 +2939,63 @@ class AmberInterface(BaseInterface):
         contents = "\n".join(contents)
         self.run_cpptraj(contents)
 
+    def check_prmtop_nc_consistency(self, prmtop_path: str, traj_path: str) -> bool:
+        """check if the atomic number is consistent between a .nc file and a .prmtop file.
+        Use cpptraj to check."""
+        result = True
+        contents: List[str] = [
+            f"parm {prmtop_path}",
+            f"trajin {traj_path} 1 1 1",
+            "run",
+            "quit",
+        ]
+        contents = "\n".join(contents)
+        # prepare log
+        temp_dir = eh_config.system.SCRATCH_DIR
+        temp_log_path = fs.get_valid_temp_name(f"{temp_dir}/cpptraj.log")
+        temp_in_path = fs.get_valid_temp_name(f"{temp_dir}/cpptraj.in")
+        fs.safe_mkdir(temp_dir)
+        # run
+        try:
+            self.run_cpptraj(contents, temp_log_path, temp_in_path=temp_in_path)
+        except CalledProcessError as e:
+            result = False
+        # read log and double check it is the right Error not sth else
+        result_1 = self._check_atom_number_consistency_cpptraj_log(temp_log_path)
+    
+        if result == result_1:
+            fs.clean_temp_file_n_dir([temp_log_path, temp_dir, temp_in_path])
+            return result
+        else:
+            _LOGGER.error(f"Something else happened in cpptraj! (instead of the atom number consistency.) check: {temp_log_path}")
+            raise AmberMDError([])
+
+    def _check_atom_number_consistency_cpptraj_log(self, cpptraj_log: str) -> bool:
+        """determine if the cpptraj log file reported an Error caused by
+        inconsistent atom number
+        return True for consistent and False for not"""
+        with open(cpptraj_log, "r") as f:
+            content = f.read()
+        pattern = r"Error: Number of atoms in NetCDF file \(\d+\) does not match"
+        result = (
+            re.search(pattern, content) is None
+        )
+        return result
+
     def load_traj(self, prmtop_path: str, traj_path: str, ref_pdb: str = None) -> StructureEnsemble:
         """load StructureEnsemble from Amber prmtop and nc/mdcrd files"""
         coord_parser_mapper = {
             ".nc" : AmberNCParser(prmtop_file=prmtop_path),
             ".mdcrd" : AmberMDCRDParser(prmtop_file=prmtop_path),
         }
+        # san check
+        # - make sure the topology in {prmtop_path} is consistent with {traj_path} 
+        # (check target: atom number)
+        consistent = self.check_prmtop_nc_consistency(prmtop_path, traj_path)
+        if not consistent:
+            _LOGGER.error(f"Inconsistent atom number found between {prmtop_path} and {traj_path}")
+            raise ValueError("Inconsistent atom number")
+
         if not prmtop_io.PrmtopParser.has_add_pdb(prmtop_path):
             scratch_dir = eh_config["system.SCRATCH_DIR"]
             fs.safe_mkdir(scratch_dir)

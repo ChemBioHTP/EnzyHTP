@@ -65,7 +65,7 @@ class Residue(DoubleLinkedNode):
 
     @property
     def chain(self):
-        """Getter for the Residue()'s parent chain id."""
+        """Getter for the Residue()'s parent chain object."""
         return self.get_parent()
 
     @chain.setter

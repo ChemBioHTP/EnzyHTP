@@ -1,0 +1,22 @@
+CPPTRAJ: Trajectory Analysis. V6.18.1 (AmberTools)
+    ___  ___  ___  ___
+     | \/ | \/ | \/ | 
+    _|_/\_|_/\_|_/\_|_
+
+| Date/time: 02/27/25 17:59:30
+| Available memory: 69.841 GB
+
+INPUT: Reading input from '/panfs/accrepfs.vampire/data/yang_lab/zhongy8/drug_resistance_colab/sim_7si9/cluster_trial_8/job_12/scratch/cpptraj_000001.in'
+  [parm /panfs/accrepfs.vampire/data/yang_lab/zhongy8/drug_resistance_colab/sim_7si9/cluster_trial_8/job_12/scratch/amber_parameterizer/amber_parm.prmtop]
+        Reading '/panfs/accrepfs.vampire/data/yang_lab/zhongy8/drug_resistance_colab/sim_7si9/cluster_trial_8/job_12/scratch/amber_parameterizer/amber_parm.prmtop' as Amber Topology
+        Radius Set: modified Bondi radii (mbondi)
+Warning: Amber topology flag 'ATOM_ELEMENT' is unrecognized and will be skipped.
+  [trajin /panfs/accrepfs.vampire/data/yang_lab/zhongy8/drug_resistance_colab/sim_7si9/cluster_trial_8/job_12/mutant__HA172Q/MD/rep_0/prod_npt.nc 1 last 1]
+        Reading '/panfs/accrepfs.vampire/data/yang_lab/zhongy8/drug_resistance_colab/sim_7si9/cluster_trial_8/job_12/mutant__HA172Q/MD/rep_0/prod_npt.nc' as Amber NetCDF
+Error: Number of atoms in NetCDF file (52735) does not match number
+Error:  in associated topology (53121)!
+Error: Could not set up '/panfs/accrepfs.vampire/data/yang_lab/zhongy8/drug_resistance_colab/sim_7si9/cluster_trial_8/job_12/mutant__HA172Q/MD/rep_0/prod_npt.nc' for reading.
+Error: Could not set up input trajectory '/panfs/accrepfs.vampire/data/yang_lab/zhongy8/drug_resistance_colab/sim_7si9/cluster_trial_8/job_12/mutant__HA172Q/MD/rep_0/prod_npt.nc'.
+        1 errors encountered reading input.
+TIME: Total execution time: 0.0620 seconds.
+Error: Error(s) occurred during execution.

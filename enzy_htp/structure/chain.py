@@ -208,7 +208,7 @@ class Chain(DoubleLinkedNode):
         """Does the chain have any Residue()"s."""
         return len(self._residues) == 0
 
-    def is_same_sequence(self, other: Chain) -> bool:  # TODO
+    def is_same_sequence(self, other: Chain) -> bool:
         """Comparison operator for use with other Chain() objects. Checks if residue list is identical in terms of residue name only."""
         self_residues: List[Residue] = self._residues
         other_residues: List[Residue] = other.residues
