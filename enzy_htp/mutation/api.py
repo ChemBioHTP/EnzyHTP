@@ -14,7 +14,6 @@ The function naming format in the module:
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2022-10-24
 """
-#TODO(CJ): if its "in-place" it shouldnt return anything
 import copy
 from pathlib import Path
 from typing import Any, Dict, List, Tuple, Union
@@ -45,7 +44,7 @@ def assign_mutant(
     pattern: str,
     chain_sync_list: List[tuple] = None,
     chain_index_mapper: Dict[str, int] = None,
-    random_state: int = 100,
+    random_state: int = None,
     if_check: bool = True,
 ) -> List[List[Mutation]]:
     """
@@ -94,7 +93,7 @@ def assign_mutant(
                                                   or a:M[mutation_esm_patterns]
                                                   (M stands for force mutate each position so that
                                                   no mutation on any position is not allowed)
-                                                  or a:X[mutation_esm_patterns] TODO
+                                                  or a:X[mutation_esm_patterns]
                                                   (X stands for a maximum number of point mutations
                                                   allowed. e.g.: X=1 means only single point mutations
                                                   are yielded)
@@ -125,7 +124,8 @@ def assign_mutant(
         A language that helps user to assign mutations is defined above.
     """
     # decode the pattern
-    np.random.seed(random_state)  # this changes globaly
+    if random_state is not None:
+        np.random.seed(random_state)  # this changes globaly
     mutants = decode_mutation_pattern(stru, pattern)
     # sync over polymers
     if chain_sync_list:

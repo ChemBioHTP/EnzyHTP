@@ -10,6 +10,7 @@ Date: 2022-02-15
 """
 from pathlib import Path
 from typing import List, Dict, Any, Union, Tuple
+from plum import dispatch
 
 import pymol2
 import numpy as np
@@ -21,7 +22,7 @@ from enzy_htp.core import env_manager as em
 from enzy_htp.core import file_system as fs
 from enzy_htp.core import _LOGGER, check_var_type
 from enzy_htp._config.pymol_config import PyMolConfig, default_pymol_config
-from enzy_htp.structure import Structure, PDBParser, Ligand
+from enzy_htp.structure import Structure, PDBParser, Ligand, Residue
 import enzy_htp.chemical as chem
 
 from .base_interface import BaseInterface
@@ -476,7 +477,7 @@ class PyMolInterface(BaseInterface):
             except Exception as e:
                 _LOGGER.error(f"{e}")
                 _LOGGER.error(f"PyMOL function call '{cmd_str}' resulted in an error. Exiting...")
-                exit(1)
+                raise e
 
         return result
 
@@ -748,8 +749,42 @@ class PyMolInterface(BaseInterface):
 
         return mask
 
+    def get_sasa_relative(self, session, sele) -> Dict:
+        """wrapper of pms.cmd.get_sasa_relative"""
+        result = {}
+        session.cmd.get_sasa_relative(sele) # calculates sasa_rel for every residue and save into b
+        session.cmd.iterate(sele, "result[(chain,resi)]=b", space=locals())
+        return result
 
-    def get_spi(self, stru: Structure, ligand:Ligand, pocket_sele:str) -> float:
+    # == engines ==
+
+    @dispatch
+    def get_spi(self, stru: Structure, ligand_sele: str, pocket_sele: str) -> float:
+        """Calculates substrate positioning index (SPI) for a given Ligand selection pattern in a given Structure. SPI roughly corresponds to the
+        ratio of the ligand's solvent accessible surface area (SASA) dived by protein binding pocket SASA. The citation for 
+        this paper is here: DOI:https://doi.org/10.1021/acs.jpclett.3c02444.
+
+        Args:
+            stru (Structure): The Structure containing the Ligand and active site.
+            ligand_sele (str): A str describing the ligand we are calculating SPI for. 
+            pocket_sele (str): A str describing the active site of the protein in pymol format.
+        
+        Returns:
+            The calculated SPI as a float.
+        """
+        with OpenPyMolSession(self) as pms:
+            self.load_enzy_htp_stru(pms, stru )
+            results:List[Any] = self.general_cmd(pms,[
+                ('set', 'dot_solvent', 1),
+                ('create', 'ligand', f'{ligand_sele} and not solvent'),
+                ('create', 'protein', f'not {ligand_sele} and not solvent'),
+                ('get_area', 'ligand'),
+                ('get_area', f'protein and ({pocket_sele})')
+            ])
+            return results[-2] / results[-1]
+
+    @dispatch
+    def get_spi(self, stru: Structure, ligand: Ligand, pocket_sele: str) -> float:
         """Calculates substrate positioning index (SPI) for a given Ligand in a given Structure. SPI roughly corresponds to the
         ratio of the ligand's solvent accessible surface area (SASA) dived by protein binding pocket SASA. The citation for 
         this paper is here: DOI:https://doi.org/10.1021/acs.jpclett.3c02444.
@@ -761,7 +796,6 @@ class PyMolInterface(BaseInterface):
         
         Returns:
             The calculated SPI as a float.
-
         """
         (lig_chain, lig_idx) = ligand.key()
         with OpenPyMolSession(self) as pms:
@@ -774,6 +808,51 @@ class PyMolInterface(BaseInterface):
                 ('get_area', f'protein and ({pocket_sele})')
             ])
             return results[-2] / results[-1]
+
+    def get_exposed_residues(self, stru: Structure, cutoff = 0.1,) -> List[Residue]:
+        """see get_exposed_or_buried_residues"""
+        return self.get_exposed_or_buried_residues(stru, "exposed", cutoff)
+
+    def get_buried_residues(self, stru: Structure, cutoff = 0.1,) -> List[Residue]:
+        """see get_exposed_or_buried_residues"""
+        return self.get_exposed_or_buried_residues(stru, "buried", cutoff)
+
+    def get_exposed_or_buried_residues(self, stru: Structure, result_type: str, cutoff = 0.1,) -> List[Residue]:
+        """find all surface residues in a {stru} given {cutoff}.
+        Args:
+            stru: the target protein structure
+            type: exposed or buried
+            cutoff: the RSA cutoff
+
+        Returns:
+            a list of surface residues
+
+        Details: 
+            calculate the RSA = ASA/MaxASA (https://en.wikipedia.org/wiki/Relative_accessible_surface_area)
+            determine whether a residue is a surface one using a RSA cutoff
+            NOTE that the result is not equal to surface residues since a exposed residue can also
+            by pocket residus. A convex analysis is needed to determine the surface residues"""
+        result = []
+
+        with OpenPyMolSession(self) as pms:
+            obj_name = self.load_enzy_htp_stru(pms, stru)[0]
+            sasa_rel = self.get_sasa_relative(pms, "polymer")
+        
+        for k,v in sasa_rel.items():
+            if result_type == "exposed":
+                if v > cutoff:
+                    result.append(k)
+            elif result_type == "buried":
+                if v < cutoff:
+                    result.append(k)
+            else:
+                _LOGGER.error(f"unsupported result type {result_type}")
+                raise ValueError
+        
+        resi_mapper = stru.residue_mapper
+        result = [resi_mapper[(ch, int(idx))] for ch, idx in result]
+
+        return result
 
 class OpenPyMolSession:
     """a context manager that open a pymol session once enter and close once exit"""

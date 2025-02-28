@@ -45,6 +45,26 @@ def safe_mv(src: str, dest: str) -> str:
 
     return str(shutil.move(src, dest))
 
+def safe_cp(src: str, dest: str) -> str:
+    """Robust move method that replicates shell 'cp' command. Creates temporary directories
+    when needed.
+    
+    Args:
+        src: Initial path to file object.
+        dest: Where the src will be placed. Either a new filename or destination directory.
+
+    Returns:
+        Path to the final location of the src file object.        
+    """
+    src = Path(src)
+    dest = Path(dest)
+
+    if dest.is_dir():
+        safe_mkdir(dest)
+        dest = dest / src.name
+
+    return str(shutil.copy(src, dest))
+
 # == dir ==
 def is_empty_dir(dir_path: str) -> bool:
     """Is the supplied directory empty?"""
@@ -228,8 +248,9 @@ def check_file_exists(fname: str, exit_script: bool = True) -> None:
         _LOGGER.error(f"The file '{fname}' does not exist. Exiting...")
         exit(1)
     else:
-        _LOGGER.error(f"The file '{fname}' does not exist. Exiting...")
-        raise FileNotFoundError(f"The file '{fname}' does not exist.")
+        message = f"The file '{fname}' does not exist."
+        _LOGGER.error(message)
+        raise FileNotFoundError(message)
 
 
 def check_not_empty(fname: str) -> None:
@@ -282,6 +303,13 @@ def clean_temp_file_n_dir(temp_path_list: List[str]) -> None:
         for dir_path in dir_list:
             safe_rmdir(dir_path, empty_only=True)
 
+
+def relative_path_of(source_path: str, ref_path: str) -> str:
+    """return the relative path of source path to ref path"""
+    source_path = Path(source_path).absolute()
+    ref_path = Path(ref_path).absolute()
+
+    return os.path.relpath(source_path, ref_path)
 
 # make own lock function that python ones not really work
 def is_locked(f: IOBase) -> bool:

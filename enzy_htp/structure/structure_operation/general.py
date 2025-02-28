@@ -44,10 +44,15 @@ def remove_counterions(stru: Structure) -> Structure:
 
 @dispatch
 def remove_hydrogens(stru: Structure, polypeptide_only: bool = False) -> Structure:
-    """
-    remove all hydrogen Atom()s for {stru}.
-    Make changes in-place and return a reference of the changed
-    original object.
+    """Remove all hydrogen atoms for {stru}.
+    Make changes in-place and return a reference of the changed original object.
+
+    Args:
+        stru (Structure): A Structure instance whose hydrogens to be removed.
+        polypeptide_only (bool, optional): Indicate if only hydrogens on the polypeptides should be removed.
+
+    Returns:
+        The reference of the changed original Structure instance.
     """
     hydrogens = stru.hydrogens(polypeptide_only=polypeptide_only)
     _LOGGER.debug(f"removing {len(hydrogens)} hydrogens")
@@ -63,14 +68,13 @@ def remove_hydrogens(residue: Residue) -> Residue:
     Make changes in-place and return a reference of the changed original Residue / NonCanonicalBase / Ligand.
 
     Args:
-        residue: An instance of Residue / NonCanonicalBase / Ligand.
-        (dispatch)
-        stru: A instance of Structure. And when stru is used, `polypeptide_only` needs to be specified for whether hydrogens are only removed for
-            polypeptides (exclude ligands). NOTE that this value have to be given as a positional argument! Otherwise there will be an
-            dispatch error. 
+        residue (Residue): A `Residue` or `NonCanonicalBase` or `Ligand` instance.
+        stru (Structure, dispatch argument to `residue`): A instance of Structure, and when `stru` is used, 
+            `polypeptide_only` needs to be specified for whether hydrogens are only removed for polypeptides (exclude ligands).
+            NOTE that this value have to be given as a positional argument! Otherwise there will be an dispatch error. 
     
     Returns:
-        The reference of the changed original Residue / NonCanonicalBase / Ligand
+        The reference of the changed original `Residue` or `NonCanonicalBase` or `Ligand` instance.
     """
     hydrogens = residue.hydrogens
     if len(hydrogens) >= 1:

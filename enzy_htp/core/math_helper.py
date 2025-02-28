@@ -281,6 +281,8 @@ def rotation_matrix_from_vectors(vec1, vec2): # TODO complete type hinting
     :param vec1: A 3d "source" vector
     :param vec2: A 3d "destination" vector
     :return mat: A transform matrix (3x3) which when applied to vec1, aligns it with vec2.
+    
+    NOTE: probably should use R.from_rotvec instead
     """ # TODO make unit test
     a, b = (vec1 / np.linalg.norm(vec1)).reshape(3), (vec2 / np.linalg.norm(vec2)).reshape(3)
     v = np.cross(a, b)
@@ -304,3 +306,11 @@ def direction_unit_vector(p1:npt.NDArray, p2:npt.NDArray) ->  npt.NDArray:
 
     return result / np.linalg.norm(result)
 
+def rot_vec_from_dihedral(p0:npt.NDArray, p1:npt.NDArray, p2:npt.NDArray, p3:npt.NDArray, 
+                          value:float) -> npt.NDArray:
+    """Provides a rotation vector that sets the dihedral of the four given points 
+    to a given value in the specified direction."""
+    dihedral = get_dihedral(p0, p1, p2, p3)
+    direction = direction_unit_vector(p1, p2)
+    v = value - dihedral
+    return (direction * v)

@@ -9,7 +9,7 @@ from __future__ import annotations
 import copy
 import sys
 import math
-from typing import Tuple, List, Union
+from typing import Dict, Tuple, List, Union
 
 import numpy as np
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
@@ -65,7 +65,7 @@ class Residue(DoubleLinkedNode):
 
     @property
     def chain(self):
-        """Getter for the Residue()'s parent chain id."""
+        """Getter for the Residue()'s parent chain object."""
         return self.get_parent()
 
     @chain.setter
@@ -197,13 +197,15 @@ class Residue(DoubleLinkedNode):
     def mainchain_atoms(self) -> List[Atom]:
         """return a list of mainchain atoms"""
         result = []
-        if self.is_modified():
-            raise Exception("TODO prob determine start/end atom and deduce mainchain")
-        else:
-            atom_names = "C CA N".split() # TODO do we add CP1 CP2?
-            for name in atom_names:
-                result.append(self.find_atom_name(name))
+        atom_names = "C CA N".split() # TODO do we add CP1 CP2?
+        for name in atom_names:
+            result.append(self.find_atom_name(name))
         return result
+    
+    @property
+    def atom_idx_mapper(self) -> Dict[int, Atom]:
+        """the mapper for idx -> atom"""
+        return {atom.idx : atom for atom in self.atoms}
     
     @property
     def hydrogens(self) -> List[Atom]:
@@ -272,6 +274,14 @@ class Residue(DoubleLinkedNode):
                 _LOGGER.warning(f"{self} have no N-side residue but it is not a N-ter."
                                 " Something wrong in your residue indexing. "
                                 "It could be your index is not continous")
+        return result
+    
+    def find_idxes_atom_list(self, atom_idx_list: int) -> List[Atom]:
+        """find atom base on its idx. return a list reference of the atoms."""
+        result = []
+        atom_mapper = self.atom_idx_mapper
+        for idx in atom_idx_list:
+            result.append(atom_mapper[idx])
         return result
     #endregion
 

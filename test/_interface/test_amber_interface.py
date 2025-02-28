@@ -1,6 +1,7 @@
 """Testing the enzy_htp._interface.AmberInterface class.
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Author: QZ Shao <shaoqz@icloud.com>
+Author: Zhong, Yinjie <yinjie.zhong@vanderbilt.edu>
 Date: 2022-06-03
 """
 import glob
@@ -13,10 +14,11 @@ import numpy as np
 from pathlib import Path
 from typing import Union
 
+from enzy_htp.core.clusters.accre import Accre
 from enzy_htp.core.exception import tLEaPError, AmberMDError
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.general import EnablePropagate
-from enzy_htp.core.job_manager import ClusterJob
+from enzy_htp.core.job_manager import ClusterJob, ClusterJobConfig
 from enzy_htp.core import file_system as fs
 from enzy_htp._interface.amber_interface import (
     AmberParameterizer,
@@ -29,12 +31,17 @@ from enzy_htp.structure.structure_constraint import (
     create_cartesian_freeze,
     create_backbone_freeze,
     create_distance_constraint,
-    create_angle_constraint,)
+    create_angle_constraint,
+    create_group_distance_constraint)
 from enzy_htp import interface
 from enzy_htp import config as eh_config
+from enzy_htp.structure.structure_ensemble import StructureEnsemble
+from enzy_htp.structure.structure_selection.general import select_stru
 
 MM_BASE_DIR = Path(__file__).absolute().parent
 MM_DATA_DIR = f"{MM_BASE_DIR}/data/"
+MM_NCAA_DIR = f"{MM_BASE_DIR}/../ncaa_lib/"
+STRU_DATA_DIR = f"{MM_BASE_DIR}/../structure/data/"
 MM_WORK_DIR = f"{MM_BASE_DIR}/work_dir/"
 MINIMIZE_INPUT_1 = f"{MM_DATA_DIR}/min_1.inp"
 TARGET_MINIMIZE_INPUT_1 = f"{MM_DATA_DIR}/target_min_1.inp"
@@ -326,6 +333,30 @@ def test_amber_parameterizer_run_lv_6(): #TODO
     test_param_worker.run(test_stru)
 
 
+def test_amber_parameterizer_run_lv_1_add_lines():
+    """level 1 test of the parameterizer with additional custom lines to tleap.in.
+    Test structure diversity:
+    - single polypeptide chain"""
+    ai = interface.amber
+    test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
+        ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib_empty",
+        additional_tleap_lines=["#this is a test line"],
+        keep_tleap_in=True,
+    )
+    test_stru = struct.PDBParser().get_structure(
+        f"{MM_DATA_DIR}/KE_wo_S.pdb")
+    params = test_param_worker.run(test_stru)
+
+    # NOTE potential failed test due to a different temp path is generated
+    with open(f"{eh_config['system.SCRATCH_DIR']}/tleap.in") as f:
+        assert "#this is a test line" in f.read()
+
+    for f in params.file_list:
+        fs.safe_rm(f)
+    fs.safe_rmdir(test_param_worker.parameterizer_temp_dir)
+    fs.safe_rmdir(eh_config["system.SCRATCH_DIR"])
+
+
 def test_check_gaff_type():
     """test _check_gaff_type in AmberParameterizer"""
     ai = interface.amber
@@ -598,6 +629,36 @@ def test_write_disang_file():
         'rk3': 200.0}]
     test_disang = f"{MM_WORK_DIR}/test_disang_from_raw_dict.rs"
     answer_disang = f"{MM_DATA_DIR}/answer_disang_from_raw_dict.rs"
+    ai = interface.amber
+    ai.write_disang_file(test_dict_list, test_disang)
+    assert files_equivalent(test_disang, answer_disang)
+
+    fs.safe_rm(test_disang)
+
+
+def test_write_disang_file_group_cons():
+    """test using an example raw dict list containing group constraint"""
+    test_dict_list = [
+        {'ialtd': 0,
+        'iat': [-1, -1],
+        'igr1': [1567, 1569, 1580],
+        'igr2': [3424, 3426, 3444],
+        'r1': 2.150,
+        'r2': 2.350,
+        'r3': 2.450,
+        'r4': 2.650,
+        'rk2': 200.0,
+        'rk3': 200.0},
+        {'ialtd': 0,
+        'iat': [3975,3976,1579],
+        'r1': 150.0,
+        'r2': 170.0,
+        'r3': 190.0,
+        'r4': 210.0,
+        'rk2': 200.0,
+        'rk3': 200.0}]
+    test_disang = f"{MM_WORK_DIR}/answer_disang_from_raw_dict_group_cons.rs"
+    answer_disang = f"{MM_DATA_DIR}/answer_disang_from_raw_dict_group_cons.rs"
     ai = interface.amber
     ai.write_disang_file(test_dict_list, test_disang)
     assert files_equivalent(test_disang, answer_disang)
@@ -999,9 +1060,20 @@ def test_get_amber_atom_index(): # TODO
     raise Exception("TODO")
 
 
-def test_get_amber_index_mapper(): # TODO VIP
-    """this dont work for the 1Q4T case."""
-    raise Exception("TODO")
+def test_get_amber_index_mapper():
+    """this dont work for the 1Q4T case.
+    Update: 2024.11.6 seems it works for 1Q4T?"""
+    ai = interface.amber
+    test_pdb = f"{STRU_DATA_DIR}/1Q4T_ligand_test.pdb"
+    test_stru = struct.PDBParser().get_structure(test_pdb)
+    test_res_1 = test_stru.get("A.12")
+    test_res_2 = test_stru.get("B.12")
+    test_atom_1 = test_stru.get("D.371.N1A")
+
+    index_mapper = ai.get_amber_index_mapper(test_stru)
+    assert index_mapper["residue"][test_res_1][1] == 3
+    assert index_mapper["residue"][test_res_2][1] == 143
+    assert index_mapper["atom"][test_atom_1] == 4434
 
 
 def test_parse_cons_to_raw_rs_dict():
@@ -1027,6 +1099,30 @@ def test_parse_cons_to_raw_rs_dict():
         else:
             assert v == answer_raw_dict[k]
 
+def test_parse_group_cons_to_raw_rs_dict():
+    """test using KE and example cons and manually curated answer from PDB"""
+    test_pdb = f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb"
+    test_stru = struct.PDBParser().get_structure(test_pdb)
+    test_cons = create_group_distance_constraint(
+        "resi 101 & n. C+CA+N", "resi 222 & n. C+CA+N", 2.4, test_stru)
+    answer_raw_dict = {
+        'ialtd': 0,
+        'iat': [-1, -1],
+        'igr1': [1567, 1569, 1580],
+        'igr2': [3424, 3426, 3444],
+        'r1': 2.15,
+        'r2': 2.35,
+        'r3': 2.45,
+        'r4': 2.65,
+        'rk2': 200.0,
+        'rk3': 200.0}
+    ai = interface.amber
+    test_raw_dict = ai._parse_cons_to_raw_rs_dict(test_cons)
+    for k, v in test_raw_dict.items():
+        if k in "r1 r2 r3 r4".split():
+            assert np.isclose(v, answer_raw_dict[k], atol=1e-3)
+        else:
+            assert v == answer_raw_dict[k]
 
 def test_reduce_path_in_mdin():
     """test using an path that is too long"""
@@ -1035,3 +1131,276 @@ def test_reduce_path_in_mdin():
 
     result = ai._reduce_path_in_mdin(test_path)
     assert len(result) <= 70
+
+def test_get_rmsd():
+    """Test the function using RMSD value calculated by CppTraj script."""
+    prmtop_path = os.path.join(MM_DATA_DIR, "test_rmsd.prmtop")
+    traj_path = os.path.join(MM_DATA_DIR, "test_rmsd.mdcrd")
+    ref_pdb = os.path.join(MM_DATA_DIR, "test_rmsd_chainid.pdb")
+
+    structure_ensemble = interface.amber.load_traj(
+        prmtop_path=prmtop_path,
+        traj_path=traj_path,
+        ref_pdb=ref_pdb,
+    )
+    region_pattern = "(br. resi 254 around 4 & polymer.protein) and (not elem H)"
+    stru_sele = select_stru(structure_ensemble.structure_0, pattern=region_pattern)
+
+    answer = [  # Calculate the rmsd values manually using cpptraj.
+        0.5866,
+        0.5253,
+        0.6249,
+        0.4517,
+        0.8457,
+        0.5998,
+        0.6588,
+        0.6615,
+        0.5346,
+        0.6015,
+    ]
+    result = interface.amber.get_rmsd(
+        stru_esm=structure_ensemble,
+        stru_selection=stru_sele,
+    )
+
+    fs.safe_rm(structure_ensemble.topology_source_file)
+    for r, a in zip(result[:len(answer)], answer):
+        assert np.isclose(r, a, atol=0.001)
+
+def test_get_mmpbsa_energy():
+    """test the function using old data generated by EnzyHTP 1.0"""
+    ai = interface.amber
+    stru_esm = ai.load_traj(
+        prmtop_path=f"{MM_DATA_DIR}/mmpbsa_test_sol.prmtop",
+        traj_path=f"{MM_DATA_DIR}/mmpbsa_test_sol_10f.nc",
+        ref_pdb=f"{MM_DATA_DIR}/mmpbsa_test_sol.pdb"
+    )
+    ligand = select_stru(stru_esm.structure_0, "resi 290")
+    cluster_job_config = {
+        "cluster" : Accre(),
+        "res_keywords" : {
+            "partition" : "production",
+            "account" : "yang_lab",}
+    }
+    answer = [
+        1.6840000000016948, 
+        -0.6804000000007093, 
+        5.076199999997218, 
+        0.3467999999985514, 
+        -5.959400000001956, 
+        -5.139099999993475, 
+        -3.543699999996821, 
+        -5.468999999998417, 
+        -3.973000000000989, 
+        4.527400000004005
+    ]
+    
+    result = ai.get_mmpbgbsa_energy(
+        stru_esm, ligand, work_dir=MM_WORK_DIR,
+        cluster_job_config=cluster_job_config,
+    )
+    for r, a in zip(result, answer):
+        assert np.isclose(r, a, atol=0.01)
+    
+    fs.clean_temp_file_n_dir([f"{MM_WORK_DIR}/mmpbsa_by_frames.csv"])
+
+def test_run_ante_mmpbsa():
+    """test the function"""
+    ai = interface.amber
+    dry_complex_out = f"{MM_WORK_DIR}/antemmpbsa_dc.prmtop"
+    dry_receptor_out = f"{MM_WORK_DIR}/antemmpbsa_dr.prmtop"
+    dry_ligand_out = f"{MM_WORK_DIR}/antemmpbsa_dl.prmtop"
+
+    ai.run_ante_mmpbsa(
+        complex_prmtop_in=f"{MM_DATA_DIR}/mmpbsa_test_sol.prmtop",
+        dry_complex_out = dry_complex_out,
+        dry_receptor_out = dry_receptor_out,
+        dry_ligand_out = dry_ligand_out,
+        strip_mask = ":WAT,Na+,Cl-",
+        radii = "mbondi2",
+        ligand_mask = ":290"
+    )
+
+    assert os.path.getsize(dry_complex_out)
+    assert os.path.getsize(dry_receptor_out)
+    assert os.path.getsize(dry_ligand_out)
+
+    fs.clean_temp_file_n_dir([
+        dry_complex_out,
+        dry_receptor_out,
+        dry_ligand_out,
+    ])
+
+def test_update_radii():
+    """test the function"""
+    ai = interface.amber
+    test_out_path = f"{MM_WORK_DIR}/update_radii_test.prmtop"
+
+    ai.update_radii(
+        prmtop_path=f"{MM_DATA_DIR}/mmpbsa_test_sol.prmtop",
+        out_path=test_out_path,
+        radii="mbondi2"
+    )
+
+    assert os.path.getsize(test_out_path)
+
+    fs.clean_temp_file_n_dir([test_out_path])
+
+def test_make_mmpbgbsa_prmtop_files():
+    """test the function"""
+    ai = interface.amber
+    stru_esm = ai.load_traj(
+        prmtop_path=f"{MM_DATA_DIR}/mmpbsa_test_sol.prmtop",
+        traj_path=f"{MM_DATA_DIR}/mmpbsa_test_sol_10f.nc",
+        ref_pdb=f"{MM_DATA_DIR}/mmpbsa_test_sol.pdb"
+    )
+    test_dr_prmtop = f"{MM_WORK_DIR}/test_make_mmpbsa_prmtop_dr.prmtop"
+    test_dl_prmtop = f"{MM_WORK_DIR}/test_make_mmpbsa_prmtop_dl.prmtop"
+    test_dc_prmtop = f"{MM_WORK_DIR}/test_make_mmpbsa_prmtop_dc.prmtop"
+    test_sc_prmtop = f"{MM_WORK_DIR}/test_make_mmpbsa_prmtop_sc.prmtop"
+
+    ai.make_mmpbgbsa_prmtop_files(
+        stru_esm=stru_esm,
+        ligand_mask=":290",
+        strip_mask=":WAT,Na+,Cl-",
+        igb=5,
+        temp_dr_prmtop = test_dr_prmtop,
+        temp_dl_prmtop = test_dl_prmtop,
+        temp_dc_prmtop = test_dc_prmtop,
+        temp_sc_prmtop = test_sc_prmtop,
+    )
+
+    assert os.path.getsize(test_dr_prmtop)
+    assert os.path.getsize(test_dl_prmtop)
+    assert os.path.getsize(test_dc_prmtop)
+    assert os.path.getsize(test_sc_prmtop)
+
+    fs.clean_temp_file_n_dir([
+      test_dr_prmtop,test_dl_prmtop,test_dc_prmtop,test_sc_prmtop,stru_esm.topology_source_file
+    ])
+
+def test_count_num_of_frames_traj():
+    ai = interface.amber
+    prmtop_path = f"{MM_DATA_DIR}/mmpbsa_test_sol.prmtop"
+    traj = f"{MM_DATA_DIR}/mmpbsa_test_sol_10f.nc"
+    result = ai.count_num_of_frames_traj(
+        prmtop_path=prmtop_path,
+        traj_path=traj,
+    )
+    assert result == 10
+    
+def test_run_mmpbsa():
+    """test the function"""
+    ai = interface.amber
+    dry_complex = f"{MM_DATA_DIR}/mmpbsa_test_dc.prmtop"
+    dry_receptor = f"{MM_DATA_DIR}/mmpbsa_test_dr.prmtop"
+    dry_ligand = f"{MM_DATA_DIR}/mmpbsa_test_dl.prmtop"
+    sol_complex = f"{MM_DATA_DIR}/mmpbsa_test_sol.prmtop"
+    traj = f"{MM_DATA_DIR}/mmpbsa_test_sol_10f.nc"
+    out_path = f"{MM_WORK_DIR}/mmpbsa_test.csv"
+    cluster_job_config = ClusterJobConfig.from_dict({
+        "cluster" : Accre(),
+        "res_keywords" : {
+        'core_type' : 'cpu',
+        'nodes':'1',
+        'node_cores' : '24',
+        'job_name' : 'mmpbsa_EnzyHTP',
+        'partition' : 'production',
+        'mem_per_core' : '2G', # in GB.
+        'walltime' : '24:00:00',
+        'account' : 'yang_lab',
+        }
+    })
+
+    ai.run_mmpbsa(
+        dr_prmtop=dry_receptor,
+        dl_prmtop=dry_ligand,
+        dc_prmtop=dry_complex,
+        sc_prmtop=sol_complex,
+        traj_file=traj,
+        out_path=out_path,
+        solvent_model="pbsa",
+        cluster_job_config=cluster_job_config,
+        job_check_period = 5,
+    )
+
+    assert os.path.exists(out_path)
+    fs.clean_temp_file_n_dir([out_path])
+
+def test_run_mmpbsa_local():
+    """test the function"""
+    ai = interface.amber
+    dry_complex = f"{MM_DATA_DIR}/mmpbsa_test_dc.prmtop"
+    dry_receptor = f"{MM_DATA_DIR}/mmpbsa_test_dr.prmtop"
+    dry_ligand = f"{MM_DATA_DIR}/mmpbsa_test_dl.prmtop"
+    sol_complex = f"{MM_DATA_DIR}/mmpbsa_test_sol.prmtop"
+    traj = f"{MM_DATA_DIR}/mmpbsa_test_sol_10f.nc"
+    out_path = f"{MM_WORK_DIR}/mmpbsa_test.csv"
+
+    ai.run_mmpbsa(
+        dr_prmtop=dry_receptor,
+        dl_prmtop=dry_ligand,
+        dc_prmtop=dry_complex,
+        sc_prmtop=sol_complex,
+        traj_file=traj,
+        out_path=out_path,
+        solvent_model="pbsa",
+        non_armer_cpu_num=10,
+    )
+
+    assert os.path.exists(out_path)
+    fs.clean_temp_file_n_dir([out_path])
+
+def test_parse_mmpbsa_result_not_by_frame():
+    """test the function using an example data file"""
+    ai = interface.amber
+    test_dat_file = f"{MM_DATA_DIR}/mmpbsa_test.dat"
+
+    result = ai.parse_mmpbsa_result(test_dat_file, by_frames=False)
+
+    assert "gbsa" not in result
+    assert result["pbsa"]["mean"]["DELTA TOTAL"] == -1.3130
+
+def test_parse_mmpbsa_result_by_frames():
+    """test the function using an example data file. Using manually confirmed data as reference."""
+    ai = interface.amber
+    test_dat_file = f"{MM_DATA_DIR}/mmpbsa_test.csv"
+
+    result = ai.parse_mmpbsa_result(test_dat_file, by_frames=True)
+
+    assert np.isclose(result["pbsa"]["DELTA TOTAL"].mean(), -1.3130, atol=0.01)
+    assert np.isclose(result["gbsa"]["DELTA TOTAL"].mean(), -12.234, atol=0.01)
+
+def test_ncaa_to_moldesc_modaa():
+    file = f"{MM_DATA_DIR}/3FCR_protonated.pdb"
+    stru = struct.PDBParser().get_structure(file)
+    stru.assign_ncaa_chargespin({"LLP": (-2, 1)})
+    ncaa = stru.modified_residue[0]
+
+    ai = interface.amber
+    out_path = ai.antechamber_ncaa_to_moldesc(ncaa=ncaa)
+
+    # assert amount of lines are equal and formula/charge is same
+    assert len(fs.lines_from_file(out_path)) == len(fs.lines_from_file(f"{MM_NCAA_DIR}/LLP_AM1BCC-AMBER_000001.ac"))
+    assert fs.lines_from_file(out_path)[0] == fs.lines_from_file(f"{MM_NCAA_DIR}/LLP_AM1BCC-AMBER_000001.ac")[0]
+    assert fs.lines_from_file(out_path)[1] == fs.lines_from_file(f"{MM_NCAA_DIR}/LLP_AM1BCC-AMBER_000001.ac")[1]
+
+    fs.safe_rm(out_path)
+
+def test_get_atom_number_consistency_cpptraj_log():
+    example_cpptraj_log = f"{MM_DATA_DIR}/cpptraj_inconsistent_atom_num.out"
+
+    ai = interface.amber
+
+    result = ai._check_atom_number_consistency_cpptraj_log(example_cpptraj_log)
+
+    assert result == False
+
+def test_check_prmtop_nc_consistency():
+    test_prmtop = f"{MM_DATA_DIR}/KE_07_R7_S.prmtop"
+    test_nc = f"{MM_DATA_DIR}/mmpbsa_test_sol_10f.nc"
+
+    ai = interface.amber
+    result = ai.check_prmtop_nc_consistency(test_prmtop, test_nc)
+
+    assert result == False

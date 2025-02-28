@@ -14,7 +14,9 @@ from .structure import Structure
 from .structure_io import StructureParserInterface
 from . import structure_operation as stru_oper
 from enzy_htp.core.general import get_itself
+from enzy_htp.core.logger import _LOGGER
 
+# amber_interface = interface.amber
 
 class StructureEnsemble:
     """A collection of different geometries of the same enzyme structure.
@@ -72,16 +74,25 @@ class StructureEnsemble:
             return self.top_parser(self._topology)
 
     @property
+    def topology_source_file(self) -> str:
+        """getter for topology source file"""
+        if isinstance(self._topology, str):
+            return self._topology
+        else:
+            _LOGGER.error("self._topology is not a path. There is not source file stored for it")
+            raise AttributeError
+
+    @property
     def structure_0(self) -> Structure:
-        """getter for the 1st structure in the ensemble"""
+        """getter for the 1st Structure (state) in the ensemble."""
         coord_0 = next(self.coord_parser(self.coordinate_list))
         result = deepcopy(self.topology)
         result.apply_geom(coord_0)
-        return result    
-
+        return result
+    
     @classmethod
     def from_single_stru(cls, stru: Structure) -> StructureEnsemble:
-        """create an ensemble of 1 snapshot from a stru"""
+        """create an ensemble of 1 snapshot from a Structure instance"""
         return cls(
             topology=stru,
             top_parser=get_itself,

@@ -11,7 +11,7 @@ from __future__ import annotations
 from copy import deepcopy
 
 from .atom import Atom
-from typing import List
+from typing import Dict, List
 from .residue import Residue
 from .noncanonical_base import NonCanonicalBase
 import enzy_htp.chemical as chem
@@ -37,11 +37,24 @@ class ModifiedResidue(NonCanonicalBase):
         NonCanonicalBase.__init__(self, residue_idx, residue_name, atoms, parent, **kwargs)
         self.rtype = chem.ResidueType.MODIFIED
 
+        # mainchian
+        mainchain_atom_names = kwargs.get("mainchain_atom_names", list())
+        self.set_mainchain_atoms(mainchain_atom_names)
+
     # === Getter-Attr ===
     # === Getter-Prop ===
     def clone(self) -> ModifiedResidue:
         """Creates deecopy of self."""
         return deepcopy(self)
+
+    @property
+    def mainchain_atoms(self) -> List[Atom]:
+        """return a list of mainchain atoms"""
+        if len(self._mainchain_atoms) > 0:
+            return self._mainchain_atoms
+        else:
+            raise AttributeError(f"Missing mainchain information for {self.name} at {self.key_str}! "
+                                  "You can assign it using assign_mod_aa_mainchain()")
 
     # === Checker ===
     def is_modified_residue(self) -> bool:
@@ -49,6 +62,13 @@ class ModifiedResidue(NonCanonicalBase):
         return True
 
     # === Editor ===
+    def set_mainchain_atoms(self, mainchain_atom_names: List[str]) -> List[Atom]:
+        """set the mainchain_atoms by a list of names"""
+        result = []
+        for name in mainchain_atom_names:
+            result.append(self.find_atom_name(name))
+        self._mainchain_atoms = result
+
     def fix_atom_names(self) -> None:
         """
         Atom names should be unique in a modified_residue.

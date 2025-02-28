@@ -15,12 +15,14 @@ import enzy_htp.structure.structure_region.capping as capping
 import enzy_htp.structure.structure_region as stru_regi
 import enzy_htp.structure.structure_selection as stru_sele
 from enzy_htp.structure.structure_region.residue_caps import SUPPORTED_CAPS, ResidueCap, CH3Cap 
+from enzy_htp.structure.structure_io.xyz_io import XYZParser
 
 CURR_FILE = os.path.abspath(__file__)
 CURR_DIR = os.path.dirname(CURR_FILE)
 DATA_DIR = f"{CURR_DIR}/../data/"
 WORK_DIR = f"{CURR_DIR}/../work_dir/"
 sp = PDBParser()
+xyzp = XYZParser()
 
 def test_capping_with_residue_terminals_tri_a(helpers):
     """as name. use an example region from selection.
@@ -233,4 +235,25 @@ def test_capping_with_residue_terminals(helpers):
     assert helpers.equiv_files(test_file, answer_file, consider_order=False)
 
     fs.safe_rm(test_file)
+
+def test_capping_modaa(helpers):
+    # caps a modaa with OH and H at the cterm and nterm, respectively
+
+    for _ in range(3):
+        test_stru = sp.get_structure(f"{DATA_DIR}3FCR_modified.pdb")
+        sele = stru_sele.select_stru(
+            test_stru, "resi 288")
+        test_region = stru_regi.StructureRegion(atoms=sele.atoms)
+
+        cterm_cap = "OH"
+        nterm_cap = "H"
+
+
+        capping.capping_with_residue_terminals(test_region, nterm_cap=nterm_cap, cterm_cap=cterm_cap)
+
+        answer_file = f"{DATA_DIR}answer_capping_3.xyz"
+        
+        result = xyzp.get_file_str(test_region)
+
+        assert fs.content_from_file(answer_file) == result
 
