@@ -311,6 +311,12 @@ def test_protonate_stru_jumping_chain_id():
     
     assert len(stru.hydrogens()) == 2391
 
+    pdb_file = f"{DATA_DIR}/7dvp_A41H_no_water.pdb"
+    stru = sp.get_structure(pdb_file)
+    prot.protonate_stru(stru)
+    
+    assert len(stru.hydrogens()) == 2391
+
 def test_protonate_stru_imputed():
     """Testing the protonate_stru() method for a structure that has been imputed.
     TODO: those files are missing @CJ"""
