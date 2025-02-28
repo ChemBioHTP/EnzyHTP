@@ -303,6 +303,13 @@ def test_fix_pybel_output_4WI_H_end():
     assert os.path.isfile(out_pdb_file)
     fs.clean_temp_file_n_dir([out_pdb_file])
 
+def test_protonate_stru_jumping_chain_id():
+    """test the protonate_stru() method for a structure that contains non-consecutive chain IDs"""
+    pdb_file = f"{DATA_DIR}/7dvp_A41H.pdb"
+    stru = sp.get_structure(pdb_file)
+    prot.protonate_stru(stru)
+    
+    assert len(stru.hydrogens()) == 2391
 
 def test_protonate_stru_imputed():
     """Testing the protonate_stru() method for a structure that has been imputed.
