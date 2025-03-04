@@ -9,6 +9,9 @@ import os
 import re
 import shutil
 from subprocess import CompletedProcess
+from enzy_htp.preparation.clean import remove_solvent
+from enzy_htp.structure.structure_enchantment import connectivity
+from enzy_htp.structure.structure_region.api import create_region_from_residues
 import pytest
 import numpy as np
 from pathlib import Path
@@ -1375,10 +1378,10 @@ def test_ncaa_to_moldesc_modaa():
     file = f"{MM_DATA_DIR}/3FCR_protonated.pdb"
     stru = struct.PDBParser().get_structure(file)
     stru.assign_ncaa_chargespin({"LLP": (-2, 1)})
-    ncaa = stru.modified_residue[0]
+    maa_region = create_region_from_residues([stru.modified_residue[0]], nterm_cap="H", cterm_cap="OH")
 
     ai = interface.amber
-    out_path = ai.antechamber_ncaa_to_moldesc(ncaa=ncaa)
+    out_path = ai.antechamber_ncaa_to_moldesc(ncaa=maa_region)
 
     # assert amount of lines are equal and formula/charge is same
     assert len(fs.lines_from_file(out_path)) == len(fs.lines_from_file(f"{MM_NCAA_DIR}/LLP_AM1BCC-AMBER_000001.ac"))
@@ -1386,6 +1389,25 @@ def test_ncaa_to_moldesc_modaa():
     assert fs.lines_from_file(out_path)[1] == fs.lines_from_file(f"{MM_NCAA_DIR}/LLP_AM1BCC-AMBER_000001.ac")[1]
 
     fs.safe_rm(out_path)
+
+def test_make_mc_file():
+    file = f"{MM_DATA_DIR}/3FCR_connect.pdb"
+    stru = struct.PDBParser().get_structure(file)
+    stru.assign_ncaa_chargespin({"LLP": (-2, 1)})
+    remove_solvent(stru)
+    connectivity.init_connectivity(stru)
+
+    ai = interface.amber
+
+    maa = stru.modified_residue[0]
+    maa_region = create_region_from_residues(residues=[maa], nterm_cap="H", cterm_cap="OH")
+
+    out_path = f"{MM_WORK_DIR}/LLP.mc"
+    
+    ai.make_mc_file(maa_region, out_path)
+
+    fs.safe_rm(f"{MM_NCAA_DIR}/LLP_any.prepin")
+
 
 def test_get_atom_number_consistency_cpptraj_log():
     example_cpptraj_log = f"{MM_DATA_DIR}/cpptraj_inconsistent_atom_num.out"

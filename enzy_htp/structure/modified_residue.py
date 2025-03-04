@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from copy import deepcopy
 
+from enzy_htp.core.general import swapped_dict
+
 from .atom import Atom
 from typing import Dict, List
 from .residue import Residue
@@ -81,6 +83,93 @@ class ModifiedResidue(NonCanonicalBase):
                 _LOGGER.info(f"found atom with invalid name {atom}. changing it to {name}")
                 atom.name = name
 
+
+    def find_mainchain(self) -> List[Atom]:
+        """
+        Finds the shortest path from the N-terminal to the C-terminal using connectivity information
+        and breadth-first-search
+        """
+
+        graph: dict[Atom, List[Atom]] = {aa: [] for aa in self.atoms}
+        parent: dict[Atom, Atom] = {aa: None for aa in self.atoms}
+
+        start_atom: Atom = self.find_atom_name("N")
+        end_atom: Atom = self.find_atom_name("C")
+
+        # create "graph" of atoms
+        for aa in self.atoms:
+            for oa in aa.connect:
+                graph[aa].append(oa[0])
+
+        q: List[str] = [start_atom]
+
+        visited = [start_atom]
+
+        # breadth-first search
+        while q:
+            curr_atom = q.pop(0)
+            for aa in graph[curr_atom]:
+                if aa not in visited:
+                    q.append(aa)
+                    visited.append(aa)
+                    parent[aa] = curr_atom
+
+                if aa == end_atom:
+                    break
+    
+        # hopefully, we have found the c-terminal. If not, throw an error
+        if parent[end_atom] is None:
+            raise AttributeError(f"Path from n-term to c-term does not exist for {self.name}")
+        
+        # find main chain atoms through searching parent
+        curr_atom = end_atom
+        main_chain = []
+        while parent[curr_atom] is not None:
+            main_chain.append(curr_atom)
+            curr_atom = parent[curr_atom]
+        
+        main_chain.append(curr_atom)
+        main_chain.reverse()
+
+        # get rid of first and last element
+        main_chain.pop(0)
+        main_chain.pop()
+        
+        return main_chain
+    
+    def clone_connectivity(self, other):
+        """clone connectivity from {other}.
+        The atoms are aligned and a connect record is added to each atom referencing
+        the connect from the aligned atom from other"""
+        # 1. san check
+        # - make sure other's atoms are not less than self's atoms
+
+        if len(self.atom_name_list) > len(other.atom_name_list):
+            _LOGGER.error(f"Atom names are not consistent between {self} and {other}. Cannot align.")
+            raise ValueError
+        
+        # - make sure other is connected
+        if not other.is_connected():
+            _LOGGER.error(f"clone target not connected: {other}.")
+            raise ValueError
+
+        # 2. align
+        self_other_atom_mapper = {}
+        for atom in self.atoms:
+            self_other_atom_mapper[atom] = other.find_atom_name(atom.name)
+        other_self_atom_mapper = swapped_dict(self_other_atom_mapper)
+
+
+        # 3. clone
+        for self_atom in self.atoms:
+            result = []
+            other_atom: Atom = self_other_atom_mapper[self_atom]
+            for other_cnt_atom, bond_type in other_atom.connect:
+                if other_cnt_atom in other_self_atom_mapper:
+                    self_cnt_atom = other_self_atom_mapper[other_cnt_atom]
+                    result.append((self_cnt_atom, bond_type))
+            self_atom.connect = result
+    
     # === Special ===
     def __str__(self) -> str:
         return f"ModifiedResidue({self._idx}, {self._name}, atom:{len(self._atoms)}, {self._parent})"

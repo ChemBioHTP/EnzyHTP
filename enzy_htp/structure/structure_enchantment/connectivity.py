@@ -5,6 +5,8 @@ Author: Qianzhen (QZ) Shao, <shaoqz@icloud.com>
 Date: 2023-10-17
 """
 # pylint: disable=function-redefined
+from enzy_htp.structure.structure_region.api import create_region_from_residues
+from enzy_htp.structure.structure_region.structure_region import StructureRegion
 from plum import dispatch
 from typing import Union
 import sys
@@ -238,7 +240,6 @@ def _connect_ligand(lig: Ligand, method: str, ncaa_lib: str) -> None:
 
 def _connect_maa(maa: ModifiedResidue, method: str, ncaa_lib: str) -> None:
     """initiate connectivity for modified residue"""
-    raise Exception("TODO") # TODO look into whether .ac is just enough
     support_method_list = ["antechamber"]
     if method in MOL_DESC_METHODS:
         _mol_desc_based_ncaa_method(maa, method, ncaa_lib)
@@ -264,6 +265,7 @@ def _mol_desc_based_ncaa_method(ncaa: NonCanonicalBase, engine: str, ncaa_lib: s
     # 2. parse mol describing and clone into connectivity
     cnt_stru = MOL_DESC_PARSER_MAPPER[fs.get_file_ext(mol_desc_path)](mol_desc_path)
     cnt_ncaa = cnt_stru.residues[0]
+
     ncaa.clone_connectivity(cnt_ncaa)
 
 def _connect_solvent(sol: Solvent, method: str) -> None:

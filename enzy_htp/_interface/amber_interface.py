@@ -19,6 +19,7 @@ from subprocess import CalledProcessError, CompletedProcess, SubprocessError
 from typing import Generator, List, Tuple, Union, Dict, Any
 from dataclasses import dataclass
 import pandas as pd
+from enzy_htp.structure.structure_region.structure_region import StructureRegion
 from sympy import sympify
 from collections import Iterable
 from enzy_htp.structure.chain import Chain
@@ -324,6 +325,7 @@ class AmberParameterizer(MolDynParameterizer):
         # init
         fs.safe_mkdir(self.ncaa_param_lib_path)
         target_method = f"{self.charge_method}-{gaff_type}"
+        maa_region = create_region_from_residues(residues=[maa], nterm_cap="H", cterm_cap="OH")
 
         # 0. search parm lib - same as ligand
         mol_desc_path, frcmod_path_list = search_ncaa_parm_file(maa,
@@ -336,10 +338,15 @@ class AmberParameterizer(MolDynParameterizer):
         else:
             # 1. generate ac if not found
             mol_desc_path = f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.ac" # the search ensured no existing file named this
-            self.parent_interface.antechamber_ncaa_to_moldesc(ncaa=maa,
+            self.parent_interface.antechamber_ncaa_to_moldesc(ncaa=maa_region,
                                                               out_path=mol_desc_path,
                                                               gaff_type=gaff_type)
         # 2.1 fix the wrong atom type given by antechamber
+
+
+        # create mc file
+        mc_path = f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.mc" # the search ensured no existing file named this
+        self.parent_interface.make_mc_file(maa_region=maa_region, out_path=mc_path)
 
         # 3. run prepgen on ac & mc get prepin
         prepin_path = fs.get_valid_temp_name(
@@ -2584,7 +2591,7 @@ class AmberInterface(BaseInterface):
         return result
 
     def antechamber_ncaa_to_moldesc(self,
-                                    ncaa: NonCanonicalBase,
+                                    ncaa: Union[NonCanonicalBase, StructureRegion],
                                     out_path: Union[str, None] = None,
                                     gaff_type: str = "GAFF",
                                     charge_method: str = "AM1BCC",
@@ -2599,6 +2606,13 @@ class AmberInterface(BaseInterface):
         Return:
             the out_path
             """
+        
+        maa_region = None
+
+        if isinstance(ncaa, StructureRegion):
+            maa_region = ncaa
+            ncaa = ncaa.involved_residues[0]
+
         # san check
         if (ncaa.multiplicity is None) or (ncaa.net_charge is None):
             _LOGGER.error(f"supplied NCAA ({ncaa.name}) does not have charge and spin."
@@ -2624,11 +2638,15 @@ class AmberInterface(BaseInterface):
         # 1. make ligand PDB
         temp_dir = eh_config["system.SCRATCH_DIR"]
         fs.safe_mkdir(temp_dir)
-        temp_pdb_path = fs.get_valid_temp_name(f"{temp_dir}/{ncaa.name}.pdb")
+
         if ncaa.is_modified():
-            # 1.1. Capping - cap C-terminal with OH and N-terminal with H
-            ncaa_region = create_region_from_residues(residues=[ncaa], nterm_cap="H", cterm_cap="OH")
-            ncaa = ncaa_region.convert_to_structure(cap_as_residue=False)
+            temp_pdb_path = fs.get_valid_temp_name(f"{temp_dir}/{ncaa.name}.pdb")
+        else:
+            temp_pdb_path = fs.get_valid_temp_name(f"{temp_dir}/{ncaa.name}.pdb")
+
+        if ncaa.is_modified():
+            if maa_region:
+                ncaa = maa_region.convert_to_structure(cap_as_residue=False)
         pdb_io.PDBParser().save_structure(temp_pdb_path, ncaa)
         input_file = temp_pdb_path
 
@@ -3285,6 +3303,51 @@ class AmberInterface(BaseInterface):
         Generate the file in {temp_nc}"""
 
         self.convert_traj_to_nc(stru_esm.coordinate_list, temp_nc)
+
+    def make_mc_file(self, maa_region: StructureRegion, out_path: str):
+        """make the mc file for parameterization"""
+        maa: ModifiedResidue = maa_region.involved_residues[0]
+        
+        if not maa.is_connected():
+            raise AttributeError(f"maa is not connected; use init_connectivity() first.") 
+
+        # main chain
+        mc_atoms = maa.find_mainchain()
+        lines = ["HEAD_NAME: N", "TAIL_NAME: C"]
+        
+        for aa in mc_atoms:
+            lines.append(f"MAIN_CHAIN: {aa.name}")
+
+        # omit cap atom names
+        for cap in maa_region.caps:
+            for aa in cap.atoms:
+                lines.append(f"OMIT_NAME: {aa.name}")
+
+        # find pre_head and post_tail atom types
+        for cap in maa_region.caps:
+            if cap.link_atom.element == "N":
+                if cap.socket_atom.element != "C":
+                    _LOGGER.warning("Bond is not a classical peptide bond. MC generation may not work correctly.")
+                lines.append(f"PRE_HEAD_TYPE: {cap.socket_atom.element}")
+            
+        for cap in maa_region.caps:
+            if cap.link_atom.element == "C":
+                if cap.socket_atom.element != "N":
+                    _LOGGER.warning("Bond is not a classical peptide bond. MC generation may not work correctly.")
+                lines.append(f"POST_TAIL_TYPE: {cap.socket_atom.element}")
+
+        # charge of maa
+        lines.append(f"CHARGE: {maa.net_charge}")
+
+        fs.write_lines(out_path, lines)
+        return out_path
+                
+
+        
+
+        
+        
+        
 
 amber_interface = AmberInterface(None, eh_config._amber)
 """The singleton of AmberInterface() that handles all Amber related operations in EnzyHTP
