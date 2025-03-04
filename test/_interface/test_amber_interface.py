@@ -1314,3 +1314,5 @@ def test_make_mc_file():
     out_path = f"{MM_WORK_DIR}/LLP.mc"
     
     ai.make_mc_file(maa_region, out_path)
+
+    fs.safe_rm(out_path)

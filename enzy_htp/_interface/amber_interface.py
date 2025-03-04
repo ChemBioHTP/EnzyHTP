@@ -2524,6 +2524,8 @@ class AmberInterface(BaseInterface):
         Return:
             the out_path
             """
+        
+        maa_region = None
 
         if isinstance(ncaa, StructureRegion):
             maa_region = ncaa
@@ -2562,7 +2564,8 @@ class AmberInterface(BaseInterface):
 
         if ncaa.is_modified():
             # 1.1. Capping - cap C-terminal with OH and N-terminal with H
-            ncaa = maa_region.convert_to_structure(cap_as_residue=False)
+            if maa_region:
+                ncaa = maa_region.convert_to_structure(cap_as_residue=False)
         pdb_io.PDBParser().save_structure(temp_pdb_path, ncaa)
         input_file = temp_pdb_path
 
