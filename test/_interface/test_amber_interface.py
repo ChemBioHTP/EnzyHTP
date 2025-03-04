@@ -1315,4 +1315,4 @@ def test_make_mc_file():
     
     ai.make_mc_file(maa_region, out_path)
 
-    fs.safe_rm(out_path)
+    fs.safe_rm(f"{MM_NCAA_DIR}/LLP_any.prepin")
