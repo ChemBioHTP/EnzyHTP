@@ -27,7 +27,7 @@ def test_connectivity_maa():
 
     connectivity.init_connectivity(test_stru)
 
-    fs.safe_rm(f"{NCAA_LIB}/LLP_any.prepin")
+    # fs.safe_rm(f"{NCAA_LIB}/LLP_any.prepin")
 
     for atom in test_stru.modified_residue[0].atoms:
         print(atom.name, atom.connect)

@@ -6,6 +6,7 @@ Date: 2023-10-17
 """
 # pylint: disable=function-redefined
 from enzy_htp.structure.structure_region.api import create_region_from_residues
+from enzy_htp.structure.structure_region.structure_region import StructureRegion
 from plum import dispatch
 from typing import Union
 import sys
@@ -259,7 +260,10 @@ def _mol_desc_based_ncaa_method(ncaa: NonCanonicalBase, engine: str, ncaa_lib: s
 
     # 1. make mol describing file for ncaa
     if not mol_desc_path:
-        mol_desc_path = f"{ncaa_lib}/{ncaa.name}_any.prepin"  # swicth to mol2 after finish all unit tests of mol2_io
+        if isinstance(ncaa, StructureRegion):
+            mol_desc_path = f"{ncaa_lib}/{ncaa.involved_residues[0].name}_any.prepin"
+        else:
+            mol_desc_path = f"{ncaa_lib}/{ncaa.name}_any.prepin"  # swicth to mol2 after finish all unit tests of mol2_io
         MOL_DESC_GEN_MAPPER[engine](ncaa=ncaa, out_path=mol_desc_path)
     # 2. parse mol describing and clone into connectivity
     cnt_stru = MOL_DESC_PARSER_MAPPER[fs.get_file_ext(mol_desc_path)](mol_desc_path)

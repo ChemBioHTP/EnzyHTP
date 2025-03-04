@@ -2563,7 +2563,6 @@ class AmberInterface(BaseInterface):
             temp_pdb_path = fs.get_valid_temp_name(f"{temp_dir}/{ncaa.name}.pdb")
 
         if ncaa.is_modified():
-            # 1.1. Capping - cap C-terminal with OH and N-terminal with H
             if maa_region:
                 ncaa = maa_region.convert_to_structure(cap_as_residue=False)
         pdb_io.PDBParser().save_structure(temp_pdb_path, ncaa)
