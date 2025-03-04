@@ -2525,25 +2525,28 @@ class AmberInterface(BaseInterface):
             the out_path
             """
 
+        if isinstance(ncaa, StructureRegion):
+            maa_region = ncaa
+            ncaa = ncaa.involved_residues[0]
+
         # san check
-        if not isinstance(ncaa, StructureRegion) and ((ncaa.multiplicity is None) or (ncaa.net_charge is None)):
+        if (ncaa.multiplicity is None) or (ncaa.net_charge is None):
             _LOGGER.error(f"supplied NCAA ({ncaa.name}) does not have charge and spin."
                           " ALWAYS check and explicit assign it using"
                           " Structure.assign_ncaa_chargespin()")
             raise ValueError
 
-        if isinstance(ncaa, StructureRegion):
+        if ncaa.is_modified():
             atom_type = "AMBER"
         else:
             atom_type = gaff_type
 
-        if not isinstance(ncaa, StructureRegion):
-            multiplicity = ncaa.multiplicity
-            net_charge = ncaa.net_charge
+        multiplicity = ncaa.multiplicity
+        net_charge = ncaa.net_charge
 
         # init_path
         if out_path is None:
-            if isinstance(ncaa, StructureRegion):
+            if ncaa.is_modified():
                 out_path = fs.get_valid_temp_name(f"{eh_config['system.NCAA_LIB_PATH']}/{ncaa.name}_{charge_method}-{atom_type}.ac")
             else:
                 out_path = f"{eh_config['system.NCAA_LIB_PATH']}/{ncaa.name}_{charge_method}-{gaff_type}.mol2"
@@ -2551,10 +2554,15 @@ class AmberInterface(BaseInterface):
         # 1. make ligand PDB
         temp_dir = eh_config["system.SCRATCH_DIR"]
         fs.safe_mkdir(temp_dir)
-        temp_pdb_path = fs.get_valid_temp_name(f"{temp_dir}/{ncaa.name}.pdb")
-        if isinstance(ncaa, StructureRegion):
+
+        if ncaa.is_modified():
+            temp_pdb_path = fs.get_valid_temp_name(f"{temp_dir}/{ncaa.name}.pdb")
+        else:
+            temp_pdb_path = fs.get_valid_temp_name(f"{temp_dir}/{ncaa.name}.pdb")
+
+        if ncaa.is_modified():
             # 1.1. Capping - cap C-terminal with OH and N-terminal with H
-            ncaa = ncaa.convert_to_structure(cap_as_residue=False)
+            ncaa = maa_region.convert_to_structure(cap_as_residue=False)
         pdb_io.PDBParser().save_structure(temp_pdb_path, ncaa)
         input_file = temp_pdb_path
 
@@ -3136,7 +3144,9 @@ class AmberInterface(BaseInterface):
                 if cap.socket_atom.element != "C":
                     _LOGGER.warning("Bond is not a classical peptide bond. MC generation may not work correctly.")
                 lines.append(f"PRE_HEAD_TYPE: {cap.socket_atom.element}")
-            elif cap.link_atom.element == "C":
+            
+        for cap in maa_region.caps:
+            if cap.link_atom.element == "C":
                 if cap.socket_atom.element != "N":
                     _LOGGER.warning("Bond is not a classical peptide bond. MC generation may not work correctly.")
                 lines.append(f"POST_TAIL_TYPE: {cap.socket_atom.element}")

@@ -1287,10 +1287,10 @@ def test_ncaa_to_moldesc_modaa():
     file = f"{MM_DATA_DIR}/3FCR_protonated.pdb"
     stru = struct.PDBParser().get_structure(file)
     stru.assign_ncaa_chargespin({"LLP": (-2, 1)})
-    ncaa = stru.modified_residue[0]
+    maa_region = create_region_from_residues([stru.modified_residue[0]], nterm_cap="H", cterm_cap="OH")
 
     ai = interface.amber
-    out_path = ai.antechamber_ncaa_to_moldesc(ncaa=ncaa)
+    out_path = ai.antechamber_ncaa_to_moldesc(ncaa=maa_region)
 
     # assert amount of lines are equal and formula/charge is same
     assert len(fs.lines_from_file(out_path)) == len(fs.lines_from_file(f"{MM_NCAA_DIR}/LLP_AM1BCC-AMBER_000001.ac"))
@@ -1310,8 +1310,6 @@ def test_make_mc_file():
 
     maa = stru.modified_residue[0]
     maa_region = create_region_from_residues(residues=[maa], nterm_cap="H", cterm_cap="OH")
-    for cap in maa_region.caps:
-        print(cap.atoms)
 
     out_path = f"{MM_WORK_DIR}/LLP.mc"
     
