@@ -9,6 +9,8 @@ import os
 import pickle
 
 from enzy_htp.core.exception import InvalidMutationPatternSyntax
+from enzy_htp.core.logger import _LOGGER
+from enzy_htp.core.general import EnablePropagate
 from enzy_htp import PDBParser
 from enzy_htp.mutation_class import Mutation
 import enzy_htp.mutation.mutation_pattern.api as m_p
@@ -125,11 +127,12 @@ def test_decode_random_mutation(caplog):
     #     if "repeating" in caplog.text:
     #         i=False
     np.random.seed(457)
-    mutants = m_p.decode_random_mutation(test_stru, test_pattern)
-    assert len(mutants) == 10
-    for i in mutants:
-        assert len(i) == 2
-    assert "repeating MUTANT is generated" in caplog.text
+    with EnablePropagate(_LOGGER):
+        mutants = m_p.decode_random_mutation(test_stru, test_pattern)
+        assert len(mutants) == 10
+        for i in mutants:
+            assert len(i) == 2
+        assert "repeating MUTANT is generated" in caplog.text
 
 
 def test_decode_random_mutation_allow_repeat(caplog):
@@ -141,11 +144,12 @@ def test_decode_random_mutation_allow_repeat(caplog):
     test_pattern = "r:2R[resi 254 around 3:all not self]*10R"
     np.random.seed(457)  # seed that contains a repeating mutant
 
-    mutants = m_p.decode_random_mutation(test_stru, test_pattern)
-    assert len(mutants) == 10
-    for i in mutants:
-        assert len(i) > 0
-    assert "repeating mutation is generated" in caplog.text
+    with EnablePropagate(_LOGGER):
+        mutants = m_p.decode_random_mutation(test_stru, test_pattern)
+        assert len(mutants) == 10
+        for i in mutants:
+            assert len(i) > 0
+        assert "repeating mutation is generated" in caplog.text
 
 
 def test_decode_all_mutation():
@@ -169,6 +173,46 @@ def test_decode_all_mutation_m_flag():
 
     mutants = m_p.decode_all_mutation(test_stru, test_pattern)
     assert len(mutants) == 361
+
+
+def test_decode_all_mutation_cap_2():
+    """test the function with the flag X=2 specificed
+    works as expected using a made up pattern and manually
+    curated answer."""
+    test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
+    test_stru = sp.get_structure(test_pdb)
+    test_pattern = (
+        "a:2["
+        "resi 253:all not self, "
+        "resi 252:larger, "
+        "resi 251:all not self, "
+        "resi 250:all not self]"
+        )
+
+    mutants = m_p.decode_all_mutation(test_stru, test_pattern)
+    assert len(mutants) == 2243
+    for mut in mutants:
+        assert len(mut) <= 2
+
+
+def test_decode_all_mutation_cap_2_m_flog():
+    """test the function with the flag M and X=2 specificed
+    works as expected using a made up pattern and manually
+    curated answer."""
+    test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
+    test_stru = sp.get_structure(test_pdb)
+    test_pattern = (
+        "a:2M["
+        "resi 253:all not self, "
+        "resi 252:larger, "
+        "resi 251:all not self, "
+        "resi 250:all not self]"
+        )
+
+    mutants = m_p.decode_all_mutation(test_stru, test_pattern)
+    assert len(mutants) == 2166
+    for mut in mutants:
+        assert len(mut) == 2
 
 
 def test_combine_section_mutant_one_to_many():

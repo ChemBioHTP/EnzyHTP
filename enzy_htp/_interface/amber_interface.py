@@ -5,6 +5,7 @@ equilibration.
 
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Author: Zhong, Yinjie <yinjie.zhong@vanderbilt.edu>
 Date: 2022-06-02
 """
 import copy
@@ -179,7 +180,7 @@ class AmberParameterizer(MolDynParameterizer):
         self.solvate_box_type = solvate_box_type
         self.solvate_box_size = solvate_box_size
         self.gb_radii = gb_radii
-        self.parameterizer_temp_dir = parameterizer_temp_dir
+        self._parameterizer_temp_dir = parameterizer_temp_dir
         self.additional_tleap_lines = additional_tleap_lines
         self.keep_tleap_in = keep_tleap_in
 
@@ -190,6 +191,14 @@ class AmberParameterizer(MolDynParameterizer):
     @property
     def parent_interface(self):
         return self._parent_interface
+
+    @property
+    def parameterizer_temp_dir(self) -> str:
+        return self._parameterizer_temp_dir
+
+    @parameterizer_temp_dir.setter
+    def parameterizer_temp_dir(self, val: str) -> None:
+        self._parameterizer_temp_dir = val
 
     def run(self, stru: Structure) -> AmberParameter:
         """the parameterizer convert stru to amber parameter (inpcrd, prmtop)"""
@@ -397,14 +406,15 @@ class AmberParameterizer(MolDynParameterizer):
             lines.append(f"source {ff}")
 
         # support for custom lines
-        if (isinstance(additional_tleap_lines, Iterable)
-            and not isinstance(additional_tleap_lines, str)
-            and isinstance(additional_tleap_lines[0], str)
-            ):
-            lines.extend(additional_tleap_lines)
-        else:
-            _LOGGER.error(f"`additional_tleap_line` needs to be a list of str. current: {repr(additional_tleap_lines)}")
-            raise TypeError
+        if additional_tleap_lines is not None:
+            if (isinstance(additional_tleap_lines, Iterable)
+                and not isinstance(additional_tleap_lines, str)
+                and isinstance(additional_tleap_lines[0], str)
+                ):
+                lines.extend(additional_tleap_lines)
+            else:
+                _LOGGER.error(f"`additional_tleap_line` needs to be a list of str. current: {repr(additional_tleap_lines)}")
+                raise TypeError
 
         # NCAA parts
 
@@ -629,8 +639,16 @@ class AmberMDStep(MolDynStep):
     # endregion
 
     # methods
-    def make_job(self, input_data: Union[AmberParameter, AmberMDResultEgg]) -> Tuple[ClusterJob, MolDynResultEgg]:
-        """the method that make a ClusterJob that runs the step"""
+    def make_job(self, input_data: Union[AmberParameter, AmberMDResultEgg],
+                path_rel_to: str = None,) -> Tuple[ClusterJob, MolDynResultEgg]:
+        """the method that make a ClusterJob that runs the step
+        Args:
+            input_data: the input data of the step
+            path_rel_to: 
+                if this argument is specified, the file path inside of the .in file
+                will be written as the relative path to {path_rel_to}. However, the
+                path stored in python variables are still absolute or relative to cwd
+                so that they can be valid."""
         # 1. parse input
         if isinstance(input_data, AmberParameter): # build from parameter
             coord = input_data.input_coordinate_file
@@ -644,13 +662,14 @@ class AmberMDStep(MolDynStep):
 
         # 2. make .in file
         fs.safe_mkdir(self.work_dir)
-        temp_mdin_file = self._make_mdin_file()
+        temp_mdin_file = self._make_mdin_file(path_rel_to=path_rel_to)
 
         # 3. make cmd
         md_step_cmd, traj_path, mdout_path, mdrst_path = self._make_md_cmd(
             temp_mdin_file,
             prmtop,
-            coord)
+            coord,
+            path_rel_to=path_rel_to)
 
         # 4. assemble ClusterJob
         cluster = self.cluster_job_config["cluster"]
@@ -752,38 +771,63 @@ class AmberMDStep(MolDynStep):
         return result
 
 
-    def _make_mdin_file(self) -> str:
+    def _make_mdin_file(self, path_rel_to: str = None,) -> str:
         """make a temporary mdin file.
         *path* is based on self.work_dir and self.name.
         If the file exists, will change the filename to {self.name}_{index}.in
         The index start from 1.
         *content* is based on attributes of the instance.
+        
+        Args:
+            path_rel_to: 
+                if this argument is specified, the file path inside of the .in file
+                will be written as the relative path to {path_rel_to}. However, the
+                path stored in python variables are still absolute or relative to cwd
+                so that they can be valid.
 
         Return: the path of the temp mdin file."""
         # path
         temp_mdin_file_path = fs.get_valid_temp_name(f"{self.work_dir}/{self.name}.in")
         # content
-        self.parent_interface.write_to_mdin(self.md_config_dict, temp_mdin_file_path)
+        self.parent_interface.write_to_mdin(self.md_config_dict, temp_mdin_file_path, path_rel_to=path_rel_to)
         return temp_mdin_file_path
 
-    def _make_md_cmd(self, temp_mdin_file, prmtop, coord) -> str:
-        """compile the sander/pmemd cmd from config"""
+    def _make_md_cmd(self, temp_mdin_file, prmtop, coord, path_rel_to: str = None,) -> str:
+        """compile the sander/pmemd cmd from config
+        path_rel_to: 
+            if this argument is specified, the file path inside of the .in file
+            will be written as the relative path to {path_rel_to}. However, the
+            path stored in python variables are still absolute or relative to cwd
+            so that they can be valid."""
         num_cores = self.cluster_job_config["res_keywords"]["node_cores"]
         executable = self.parent_interface.get_md_executable(self.core_type, num_cores)
         mdout_path = f"{self.work_dir}/{self.name}.out"
         mdrst_path = f"{self.work_dir}/{self.name}.rst"
         traj_path = f"{self.work_dir}/{self.name}.nc"
-        md_step_cmd= (
-            f"{executable} "
-            f"-O " # overwrite; note that AmberMDStep() with same name will overwrite each other
-            f"-i {temp_mdin_file} " # mdin file
-            f"-o {mdout_path} " # mdout file path
-            f"-p {prmtop} " # prmtop path
-            f"-c {coord} " # init coord
-            f"-r {mdrst_path} " # last frame coord
-            f"-ref {coord} " # reference coord used only when nmropt=1
-            f"-x {traj_path} " # the output md trajectory
-        )
+        if path_rel_to:
+            md_step_cmd= (
+                f"{executable} "
+                f"-O " # overwrite; note that AmberMDStep() with same name will overwrite each other
+                f"-i {fs.relative_path_of(temp_mdin_file, path_rel_to)} " # mdin file
+                f"-o {fs.relative_path_of(mdout_path, path_rel_to)} " # mdout file path
+                f"-p {fs.relative_path_of(prmtop, path_rel_to)} " # prmtop path
+                f"-c {fs.relative_path_of(coord, path_rel_to)} " # init coord
+                f"-r {fs.relative_path_of(mdrst_path, path_rel_to)} " # last frame coord
+                f"-ref {fs.relative_path_of(coord, path_rel_to)} " # reference coord used only when nmropt=1
+                f"-x {fs.relative_path_of(traj_path, path_rel_to)} " # the output md trajectory
+            )
+        else:
+            md_step_cmd= (
+                f"{executable} "
+                f"-O " # overwrite; note that AmberMDStep() with same name will overwrite each other
+                f"-i {temp_mdin_file} " # mdin file
+                f"-o {mdout_path} " # mdout file path
+                f"-p {prmtop} " # prmtop path
+                f"-c {coord} " # init coord
+                f"-r {mdrst_path} " # last frame coord
+                f"-ref {coord} " # reference coord used only when nmropt=1
+                f"-x {traj_path} " # the output md trajectory
+            )
         return md_step_cmd, traj_path, mdout_path, mdrst_path
 
     def translate(self, result_egg: AmberMDResultEgg) -> MolDynResult:
@@ -1004,15 +1048,34 @@ class AmberInterface(BaseInterface):
             return "frcmod"
         return self.AMBER_FILE_FORMAT_MAPPER.get(ext, ext[1:])
 
-    def convert_traj_to_nc(self, fpath: str, out_path: str) -> None:
-        """convert the given trajectory file to the Amber .nc file in the out_path"""
-        in_format = self.get_file_format(fpath)
+    def convert_traj_to_nc(self, traj_path: str, out_path: str, topology_path: str = str()) -> None:
+        """Convert the given trajectory file to the Amber `.nc` format file in the out_path.
+        
+        Args:
+            traj_path (str): Path to the input trajectory file.
+            out_path (str): Path to the output Amber `.nc` format trajectory file.
+            topology_path (str, optional): Path to the topology file. Default empty.
+        """
+        in_format = self.get_file_format(traj_path)
 
         if in_format == "nc":
-            fs.safe_cp(fpath, out_path)
+            fs.safe_cp(traj_path, out_path)
+        elif in_format == "mdcrd":
+            if (not topology_path or not fs.is_path_exist(topology_path)):
+                _LOGGER.error(f"Topology filepath ({topology_path if len(topology_path) else 'N/A'}) doesn't exist.")
+                raise FileNotFoundError
+            contents = [
+                f"parm {topology_path}",
+                f"trajin {traj_path}",
+                f"trajout {out_path}",
+                "run",
+                "quit"
+            ]
+            contents = "\n".join(contents)
+            self.run_cpptraj(contents)
         else:
             # TODO for other formats. We probably need a central format to reduce the engineering overhead
-            _LOGGER.error(f"found unsupported file format: {in_format} ({fpath})")
+            _LOGGER.error(f"found unsupported file format: {in_format} ({traj_path})")
             raise ValueError
 
     def convert_top_to_prmtop(self, fpath: str, out_path: str) -> None:
@@ -1258,6 +1321,7 @@ class AmberInterface(BaseInterface):
             self,
             instr_str: str,
             log_path: Union[str, None] = None,
+            temp_in_path: str = None,
         ):
         """the python wrapper of running cpptraj.
         Based on https://amberhub.chpc.utah.edu/command-line-syntax/.
@@ -1271,7 +1335,10 @@ class AmberInterface(BaseInterface):
         temp_path_list = []
         # init file paths
         fs.safe_mkdir(eh_config["system.SCRATCH_DIR"])
-        in_path = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/cpptraj.in")
+        if temp_in_path is None:
+            in_path = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/cpptraj.in")
+        else:
+            in_path = temp_in_path
         temp_path_list.extend([eh_config["system.SCRATCH_DIR"], in_path])
         if log_path is None:
             log_path = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/cpptraj.out")
@@ -1282,7 +1349,7 @@ class AmberInterface(BaseInterface):
             of.write(instr_str)
 
         # run cpptraj command
-        cmd_args = f"-i {in_path} > {log_path}"
+        cmd_args = f"-i {in_path} > {log_path} 2>&1"
         self.env_manager_.run_command("cpptraj", cmd_args)
 
         # clean up temp file if success
@@ -1927,7 +1994,7 @@ class AmberInterface(BaseInterface):
                 "&rst"
             ]
             for k, v in raw_dict.items():
-                if k == "iat":
+                if k == "iat" or k.startswith("igr"):
                     v = map(str, v)
                     cons_lines.append(f" {k}={','.join(v)},")
                 else:
@@ -1943,12 +2010,12 @@ class AmberInterface(BaseInterface):
         "DISANG" : write_disang_file,
     }
 
-    def write_to_mdin(self, md_config_dict: Dict, out_path: str):
+    def write_to_mdin(self, md_config_dict: Dict, out_path: str, path_rel_to: str = None):
         """parse a AmberMDStep.md_config_dict to a mdin file."""
         # parse data_dict
         raw_data_dict = self._parse_md_config_dict_to_raw(md_config_dict)
         # write to file
-        self._write_to_mdin_from_raw_dict(raw_data_dict, out_path)
+        self._write_to_mdin_from_raw_dict(raw_data_dict, out_path, path_rel_to=path_rel_to)
 
     def _parse_md_config_dict_to_raw(self, md_config_dict: Dict) -> Dict:
         """parse AmberMDStep.md_config_dict to the raw data dict for mdin
@@ -2154,9 +2221,15 @@ class AmberInterface(BaseInterface):
         }"""
         target_keys = "r1 r2 r3 r4 rk2 rk3 ir6 ialtd ifvari".split() # TODO add more when needed
         source_dict = cons.params["amber"]
-        # iat
-        atom_idxes = self.get_amber_atom_index(cons.atoms)
-        result = {"iat": atom_idxes}
+        # iat & igr
+        if cons.is_group_constraint():
+            atom_idxes = [-1] * cons.num_groups
+            result = {"iat": atom_idxes}
+            for i, grp_atom in enumerate(cons.atoms_by_groups):
+                result[f"igr{i+1}"] = self.get_amber_atom_index(grp_atom)
+        else:
+            atom_idxes = self.get_amber_atom_index(cons.atoms)
+            result = {"iat": atom_idxes}
 
         # other keys
         for k in target_keys:
@@ -2191,7 +2264,7 @@ class AmberInterface(BaseInterface):
                 reduce=reduce)
             return result
 
-    def _write_to_mdin_from_raw_dict(self, raw_dict: Dict, out_path: str):
+    def _write_to_mdin_from_raw_dict(self, raw_dict: Dict, out_path: str, path_rel_to: str = None):
         """write to mdin file from a raw dictionary
         where key is Amber keywords.
         Based on section 19.5 of Amber20 manual.
@@ -2206,7 +2279,13 @@ class AmberInterface(BaseInterface):
                 'DISANG': './MD/0.rs'},
             'group_info': [],}
             The 4 main keys are required.
-        (see example in test_amber_interface.py::test_write_to_mdin_from_raw_dict)"""
+        (see example in test_amber_interface.py::test_write_to_mdin_from_raw_dict)
+        
+        path_rel_to: 
+            if this argument is specified, the file path inside of the .in file
+            will be written as the relative path to {path_rel_to}. However, the
+            path stored in python variables are still absolute or relative to cwd
+            so that they can be valid."""
         # title
         mdin_lines: List[str] = [
             f"{raw_dict['title']}",
@@ -2223,7 +2302,10 @@ class AmberInterface(BaseInterface):
             v_path = self._reduce_path_in_mdin(v_path)
             v_content = v["content"]
             # add the redirection line
-            mdin_lines.append(f" {k}={v_path}")
+            if path_rel_to:
+                mdin_lines.append(f" {k}={fs.relative_path_of(v_path, path_rel_to)}")
+            else:
+                mdin_lines.append(f" {k}={v_path}")
             # write the redirection file
             if v_content:
                 self.REDIRECTION_FILE_WRITER[k](self, v_content, v_path)
@@ -2875,12 +2957,63 @@ class AmberInterface(BaseInterface):
         contents = "\n".join(contents)
         self.run_cpptraj(contents)
 
+    def check_prmtop_nc_consistency(self, prmtop_path: str, traj_path: str) -> bool:
+        """check if the atomic number is consistent between a .nc file and a .prmtop file.
+        Use cpptraj to check."""
+        result = True
+        contents: List[str] = [
+            f"parm {prmtop_path}",
+            f"trajin {traj_path} 1 1 1",
+            "run",
+            "quit",
+        ]
+        contents = "\n".join(contents)
+        # prepare log
+        temp_dir = eh_config.system.SCRATCH_DIR
+        temp_log_path = fs.get_valid_temp_name(f"{temp_dir}/cpptraj.log")
+        temp_in_path = fs.get_valid_temp_name(f"{temp_dir}/cpptraj.in")
+        fs.safe_mkdir(temp_dir)
+        # run
+        try:
+            self.run_cpptraj(contents, temp_log_path, temp_in_path=temp_in_path)
+        except CalledProcessError as e:
+            result = False
+        # read log and double check it is the right Error not sth else
+        result_1 = self._check_atom_number_consistency_cpptraj_log(temp_log_path)
+    
+        if result == result_1:
+            fs.clean_temp_file_n_dir([temp_log_path, temp_dir, temp_in_path])
+            return result
+        else:
+            _LOGGER.error(f"Something else happened in cpptraj! (instead of the atom number consistency.) check: {temp_log_path}")
+            raise AmberMDError([])
+
+    def _check_atom_number_consistency_cpptraj_log(self, cpptraj_log: str) -> bool:
+        """determine if the cpptraj log file reported an Error caused by
+        inconsistent atom number
+        return True for consistent and False for not"""
+        with open(cpptraj_log, "r") as f:
+            content = f.read()
+        pattern = r"Error: Number of atoms in NetCDF file \(\d+\) does not match"
+        result = (
+            re.search(pattern, content) is None
+        )
+        return result
+
     def load_traj(self, prmtop_path: str, traj_path: str, ref_pdb: str = None) -> StructureEnsemble:
         """load StructureEnsemble from Amber prmtop and nc/mdcrd files"""
         coord_parser_mapper = {
             ".nc" : AmberNCParser(prmtop_file=prmtop_path),
             ".mdcrd" : AmberMDCRDParser(prmtop_file=prmtop_path),
         }
+        # san check
+        # - make sure the topology in {prmtop_path} is consistent with {traj_path} 
+        # (check target: atom number)
+        consistent = self.check_prmtop_nc_consistency(prmtop_path, traj_path)
+        if not consistent:
+            _LOGGER.error(f"Inconsistent atom number found between {prmtop_path} and {traj_path}")
+            raise ValueError("Inconsistent atom number")
+
         if not prmtop_io.PrmtopParser.has_add_pdb(prmtop_path):
             scratch_dir = eh_config["system.SCRATCH_DIR"]
             fs.safe_mkdir(scratch_dir)
@@ -2923,6 +3056,56 @@ class AmberInterface(BaseInterface):
         fs.clean_temp_file_n_dir([temp_log_path, temp_dir])
 
         return result
+
+    # RMSD value.
+
+    def get_rmsd(
+            self,
+            stru_esm: StructureEnsemble,
+            stru_selection: StruSelection,
+        ) -> List[float]:
+        """Calculate the RMSD value of a specified StruSelection object within a StructureEnsemble instance.
+        
+        Args:
+            stru_esm (StructureEnsemble): A collection of different geometries of the same enzyme structure.
+            stru_selection (StruSelection): A StruSelection instance representing the region for calculating RMSD value.
+            
+        Returns:
+            rmsd_value (List[float]): A list of RMSD values for each frame in a StructureEnsemble instance comparing with the average structure.    
+        """
+        tmp_dir = eh_config['system.SCRATCH_DIR']
+        tmp_nc_path=fs.get_valid_temp_name(os.path.join(tmp_dir, "tmp_amber_traj.nc"))
+        tmp_prmtop_path=fs.get_valid_temp_name(os.path.join(tmp_dir, "tmp_amber_topology.prmtop"))
+        
+        self.convert_top_to_prmtop(stru_esm.topology_source_file, tmp_prmtop_path)
+        self.convert_traj_to_nc(stru_esm.coordinate_list, tmp_nc_path, topology_path=tmp_prmtop_path)
+
+        rmsd_csv_filename = fs.get_valid_temp_name(os.path.join(eh_config.system.SCRATCH_DIR, "temp_rmsd.csv"))
+        amber_mask = self.get_amber_mask(stru_selection, reduce=True)
+        contents: List[str] = [
+            f"parm {tmp_prmtop_path}",
+            f"trajin {tmp_nc_path}",
+            "autoimage",
+            f"rmsd {amber_mask} first mass",
+            f"average crdset AVE {amber_mask}",
+            "run",
+            "autoimage",
+            f"rmsd {amber_mask} ref AVE * out {rmsd_csv_filename} mass",
+            "run",
+            "quit"
+        ]
+        contents = "\n".join(contents)
+        self.run_cpptraj(contents)
+
+        result_df = pd.read_csv(rmsd_csv_filename, delim_whitespace=True)
+        rmsd_value = result_df.iloc[:, 1]
+
+        fs.clean_temp_file_n_dir([
+            tmp_nc_path,
+            tmp_prmtop_path,
+            rmsd_csv_filename,
+        ])
+        return rmsd_value
 
     # -- MMPB/GBSA --
     def get_mmpbgbsa_energy(

@@ -50,3 +50,28 @@ def test_parser_resource_str_gpu():
 #SBATCH --account=xxx
 #SBATCH --export=NONE
 '''
+
+def test_parser_resource_str_exclude_node():
+    res_dict = {
+        'core_type' : 'gpu',
+        'nodes':'1',
+        'node_cores' : '1',
+        'job_name' : 'EnzyHTP_MD',
+        'partition' : 'pascal',
+        'mem_per_core' : '32G',
+        'walltime' : '3-00:00:00',
+        'account' : 'xxx',
+        'exclude_node_id' : "gpu0022,gpu0002",
+    }
+    res_str = Accre().parser_resource_str(res_dict)
+    assert res_str == '''#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:1
+#SBATCH --job-name=EnzyHTP_MD
+#SBATCH --partition=pascal
+#SBATCH --mem=32G
+#SBATCH --time=3-00:00:00
+#SBATCH --account=xxx
+#SBATCH --exclude=gpu0022,gpu0002
+#SBATCH --export=NONE
+'''
