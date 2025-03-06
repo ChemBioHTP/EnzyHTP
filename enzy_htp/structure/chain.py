@@ -170,6 +170,8 @@ class Chain(DoubleLinkedNode):
             chain_type.append("trash")
         if self.has_solvent():
             chain_type.append("solvent")
+        if self.has_residue_cap():
+            chain_type.append("caps")
         return ",".join(chain_type)
 
     @property
@@ -203,6 +205,9 @@ class Chain(DoubleLinkedNode):
 
     def has_trash(self) -> bool:
         return sum(list(map(lambda rr: rr.is_trash(), self._residues)))
+
+    def has_residue_cap(self) -> bool:
+        return sum(list(map(lambda rr: rr.is_residue_cap(), self._residues)))
 
     def is_empty(self) -> bool:
         """Does the chain have any Residue()"s."""
