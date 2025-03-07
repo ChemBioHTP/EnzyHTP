@@ -193,6 +193,12 @@ class Chain(DoubleLinkedNode):
         """
         return not sum(list(map(lambda rr: (not rr.is_canonical()) and (not rr.is_modified()), self._residues)))
 
+    def is_solvent_chain(self) -> bool:
+        """
+        if there are only solvent in chain
+        """
+        return all(list(map(lambda rr: rr.is_solvent(), self._residues)))
+
     def has_metal(self) -> bool:
         """Checks if any metals are contained within the current chain."""
         return sum(list(map(lambda rr: rr.is_metal(), self._residues)))

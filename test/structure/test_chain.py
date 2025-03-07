@@ -162,3 +162,9 @@ def test_has_metal():
     structure: Structure = sp.get_structure(pdb_file)
     assert not structure.chains[0].has_metal()
     assert structure.chains[1].has_metal()
+
+def test_is_solvent_chain():
+    pdb_file = f"{DATA_DIR}/solvent_only.pdb"
+    structure: Structure = sp.get_structure(pdb_file)
+    print(structure.residues)
+    assert structure.chains[0].is_solvent_chain()
