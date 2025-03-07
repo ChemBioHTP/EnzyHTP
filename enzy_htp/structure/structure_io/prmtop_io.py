@@ -76,7 +76,9 @@ class PrmtopParser(StructureParserInterface):
         chains = PDBParser._build_chains(residue_mapper, False)
 
         # build structure
-        result = Structure(chains)
+        pbc_angle = data["BOX_DIMENSIONS"][0]
+        pbc_edges = tuple(data["BOX_DIMENSIONS"][1:])
+        result = Structure(chains, pbc_box_shape=pbc_edges+(pbc_angle,)*3)
         result.assign_ncaa_chargespin(self.ncaa_chrgspin_mapper)
 
         return result
@@ -708,10 +710,9 @@ class PrmtopParser(StructureParserInterface):
 
     @classmethod
     def _parse_box_dimensions(cls, content: str) -> Dict:
-        """parse the 'box_dimensions' section of prmtop file format. TODO"""
-        # return cls._parse_general(content)
-        result = {}
-
+        """parse the 'box_dimensions' section of prmtop file format."""
+        result = cls._parse_general(content)
+        cls._remove_empty_data(result)
         return result
 
     @classmethod
