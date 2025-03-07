@@ -88,15 +88,18 @@ class PrmtopParser(StructureParserInterface):
         """build atoms step during get_structure"""
         atoms = []
         atom_data_list = zip(data["ATOM_NAME"], data["CHARGE"], data["ATOMIC_NUMBER"], data["ATOM_NUMBER"])
-        taken_idx = []
+        taken_idx = set()
+        current_max_idx = 0
         for name, charge, ele_num, idx in atom_data_list:
             # fix charge
             charge = charge / 18.2223 # unit: e
             # fix index
-            if idx == 1:
-                if 1 in taken_idx:
-                    # fix index when duplicated
-                    idx = cls._get_next_legal_atom_idx(taken_idx)
+            if idx == 1 and idx in taken_idx:
+                # fix index when duplicated
+                current_max_idx += 1
+                idx = current_max_idx
+            else:
+                current_max_idx = max(current_max_idx, idx)
 
             atom = Atom(
                 name = name,
@@ -105,7 +108,7 @@ class PrmtopParser(StructureParserInterface):
                 element = str(periodictable.elements[ele_num]),
                 charge = charge,
             )
-            taken_idx.append(idx)
+            taken_idx.add(idx)
             atoms.append(atom)
 
         return atoms
@@ -176,13 +179,6 @@ class PrmtopParser(StructureParserInterface):
         max_id = max(taken_ids)
         result = list(range(max_id+1, max_id+100000))
         return list(reversed(result))
-
-    @classmethod
-    def _get_next_legal_atom_idx(cls, taken_ids: List) -> int:
-        """get the next legal atom indexes"""
-        max_id = max(taken_ids)
-        result = max_id + 1
-        return result
 
     @classmethod
     def get_file_str(cls, stru: Structure) -> str:
