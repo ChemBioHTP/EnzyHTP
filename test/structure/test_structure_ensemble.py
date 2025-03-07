@@ -80,11 +80,11 @@ def test_structures_rm_solvent():
         coord_parser=AmberNCParser(test_prmtop).get_coordinates,
     )
     answer = [
-        ([69.168, 45.518, 83.438], [33.796, 76.501,  9.040]),
-        ([68.969, 46.198, 82.766], [32.082, 77.429, 12.821]),
-        ([68.605, 45.599, 82.123], [30.553, 75.828,  9.951]),
+        ([69.168, 45.518, 83.438], [24.406, 67.537, 75.136]),
+        ([68.969, 46.198, 82.766], [24.117, 67.953, 74.616]),
+        ([68.605, 45.599, 82.123], [25.597, 68.358, 76.382]),
     ]
 
-    for stru, (answer_1, answer_m1) in zip(test_esm.structures(), answer):
+    for stru, (answer_1, answer_m1) in zip(test_esm.structures(remove_solvent=True), answer):
         assert stru.atoms[0].coord == answer_1
         assert stru.atoms[-1].coord == answer_m1
