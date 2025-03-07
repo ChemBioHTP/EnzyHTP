@@ -24,7 +24,8 @@ from enzy_htp._interface.amber_interface import (
     AmberParameterizer,
     AmberParameter,
     AmberMDStep,
-    AmberMDResultEgg,)
+    AmberMDResultEgg,
+    AmberMDCRDParser,)
 import enzy_htp.structure as struct
 from enzy_htp.structure.structure_constraint import (
     StructureConstraint,
@@ -1404,3 +1405,26 @@ def test_check_prmtop_nc_consistency():
     result = ai.check_prmtop_nc_consistency(test_prmtop, test_nc)
 
     assert result == False
+
+def test_mdcrd_parser_get_coordinates():
+    test_prmtop = f"{STRU_DATA_DIR}/KE_07_R7_2_S_10f.prmtop"
+    test_mdcrd = f"{STRU_DATA_DIR}/KE_07_R7_2_S_10f.mdcrd"
+    answer = [
+        ([32.586, 55.789, 30.602], [39.661, 27.409, 36.51], (66.957, 66.957, 66.957)),
+        ([34.88, 53.201, 22.495], [36.392, 27.392, 38.547], (66.937, 66.937, 66.937)),
+        ([37.41, 54.562, 25.501], [35.305, 27.228, 38.266], (66.897, 66.897, 66.897)),
+        ([27.814, 51.521, 21.567], [37.699, 30.371, 39.822], (66.918, 66.918, 66.918)),
+        ([30.507, 43.798, 13.187], [35.46, 35.527, 40.971], (66.848, 66.848, 66.848)),
+        ([30.84, 19.298, 14.47], [35.6, 39.992, 38.233], (66.882, 66.882, 66.882)),
+        ([29.9, 19.785, 17.46], [36.833, 40.408, 37.839], (66.855, 66.855, 66.855)),
+        ([29.248, 19.402, 17.4], [38.487, 38.876, 37.831], (66.923, 66.923, 66.923)),
+        ([25.089, 14.023, 21.701], [36.193, 41.793, 35.419], (66.842, 66.842, 66.842)),
+        ([22.332, 17.39, 19.672], [38.004, 39.988, 36.79], (66.896, 66.896, 66.896)),
+        ([39.391, 19.22, 17.043], [37.366, 39.457, 37.706], (66.934, 66.934, 66.934)),
+    ]
+    tp = AmberMDCRDParser(test_prmtop)
+    result = tp.get_coordinates(test_mdcrd)
+    for (coords, pbc_box_edges), (answer_1, answer_m1, answer_pbc_edgs) in zip(result, answer):
+        assert coords[0] == answer_1
+        assert coords[-1] == answer_m1
+        assert pbc_box_edges == answer_pbc_edgs

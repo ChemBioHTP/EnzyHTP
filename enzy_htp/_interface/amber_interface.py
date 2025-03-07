@@ -2694,7 +2694,7 @@ class AmberInterface(BaseInterface):
 
     def build_md_step(self,
                       name: str = "default",
-                      # simulation
+                      # simulation (classical MD)
                       length: Union[float, None] = None, # ns
                       timestep: float = "default", # ns
                       minimize: bool = "default",
@@ -2703,6 +2703,20 @@ class AmberInterface(BaseInterface):
                       pressure_scaling: str = "default",
                       constrain: List[StructureConstraint] = "default",
                       restart: bool = "default",
+                      # simulation (QM/MM & QM/MM MD)
+                      use_qmmm: bool = False,
+                      qm_region_pattern: str = None, # use qmmask
+                      qm_region_charge_spin: Tuple[int, int] = None, # do san check 
+                      qm_level_of_theory: QMLevelOfTheory = None,
+                      qm_engine: str = "default", # by default sqm
+                      qm_region_pdb_path: str = None,
+                      qm_ele_cutoff: float = "default",
+                      qm_ewald: int = "default",
+                      qm_adjust_q: int = "default",
+                      # simulation (QM/MM: adaptive solvent)
+                      qm_adaptive_solvent_type: Union[str, None] = None, # turns on when not None
+                      qm_num_adaptive_solvent: str = "default",
+                      qm_num_transition_solvent: str = "default",
                       # simulation (alternative)
                       amber_md_in_file: str = None,
                       # execution
@@ -3357,8 +3371,10 @@ class AmberMDCRDParser():
                     if re.match(frame_sep_pattern, line) != None:
                         # this line is an end line -> previous line is a fake end line
                         coord.append(holder)
-                        # this line contains the PBC info
-                        yield coord
+                        # this line contains PBC info
+                        lp = re.split(' +', line.strip())
+                        pbc_box_edges = (float(lp[0]), float(lp[1]), float(lp[2]))
+                        yield coord, pbc_box_edges
                         # empty for next loop
                         coord = []
                         end_flag_1 = 0
@@ -3366,7 +3382,8 @@ class AmberMDCRDParser():
                         continue
                     else:                        
                         # previous line is a real end line
-                        yield coord
+                        pbc_box_edges = tuple(holder)
+                        yield coord, pbc_box_edges
                         # empty for next loop
                         coord = []
                         end_flag_1 = 0
@@ -3381,7 +3398,7 @@ class AmberMDCRDParser():
                 else:
                     if re.match(frame_sep_pattern, line) != None:
                         # find line that mark the end of a frame // possible fake line
-                        # store the last frame and empty the holder in next iteration
+                        # store the last frame in next iteration (NOTE holder is not emptied for the current design)
                         end_flag_1 = 1 
                         lp = re.split(' +', line.strip())
                         # hold the info
