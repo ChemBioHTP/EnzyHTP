@@ -89,7 +89,19 @@ class StructureEnsemble:
         result = deepcopy(self.topology)
         result.apply_geom(coord_0)
         return result
-    
+
+    @property
+    def pbc_box_shape(self) -> Tuple[float]:
+        """derive the shape of the periodic boundary condition box
+        and return a 6-D tuple containing first three for edges and last
+        three for angles"""
+        pbc_box_shape = getattr(self.topology, "pbc_box_shape", None)
+        if pbc_box_shape:
+            return pbc_box_shape
+        else:
+            _LOGGER.error("the topology Structure() has no pbc information found!")
+            raise AttributeError
+
     @classmethod
     def from_single_stru(cls, stru: Structure) -> StructureEnsemble:
         """create an ensemble of 1 snapshot from a Structure instance"""
