@@ -131,7 +131,8 @@ class PDBParser(StructureParserInterface):
                     outfile:str,
                     stru: Structure,
                     if_renumber: bool = True,
-                    if_fix_atomname: bool = True ) -> str:
+                    if_fix_atomname: bool = True,
+                    same_chain_id_for_solvent: bool = False, ) -> str:
         """Inverse of PDBParser.get_structure(). Given a Structure(), save it to the given .pdb path.
 
         Args:
@@ -143,7 +144,7 @@ class PDBParser(StructureParserInterface):
         Returns: 
             Path to the saved Structure() as a str().
         """            
-        content:str = cls.get_file_str( stru, if_renumber, if_fix_atomname )
+        content:str = cls.get_file_str( stru, if_renumber, if_fix_atomname, same_chain_id_for_solvent )
 
         fs.write_lines( outfile, content.splitlines() )
 
@@ -189,7 +190,8 @@ class PDBParser(StructureParserInterface):
             cls,
             stru: Structure,  
             if_renumber: bool = True,
-            if_fix_atomname: bool = True) -> str:
+            if_fix_atomname: bool = True,
+            same_chain_id_for_solvent: bool = False,) -> str:
         """
         Convert Structure() into PDB file string. Only the simplest function is need for
         enzyme modeling.
@@ -206,8 +208,15 @@ class PDBParser(StructureParserInterface):
         if if_renumber:
             stru.renumber_atoms()
         result_str = ""
+        solvent_chain_id = None
         for chain in stru:
             chain: Chain
+            if chain.is_solvent_chain() and same_chain_id_for_solvent:
+                if solvent_chain_id:
+                    chain.name = solvent_chain_id
+                else:
+                    solvent_chain_id = chain.name
+
             result_str += cls._write_pdb_chain(chain)
         result_str += f"END{os.linesep}"
         return result_str
