@@ -21,8 +21,6 @@ from dataclasses import dataclass
 import pandas as pd
 from sympy import sympify
 from collections import Iterable
-from enzy_htp.structure.chain import Chain
-from enzy_htp.structure.structure_region.api import create_region_from_residues, create_region_from_selection_pattern
 
 from .base_interface import BaseInterface
 from .handle_types import (
@@ -38,6 +36,7 @@ from enzy_htp.core import math_helper as mh
 from enzy_htp.core.job_manager import ClusterJob, ClusterJobConfig
 from enzy_htp.core.exception import AddPDBError, tLEaPError, AmberMDError
 from enzy_htp.core.general import get_interval_str_from_list
+from enzy_htp.chemical import QMLevelOfTheory
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
 from enzy_htp.structure.structure_io import pdb_io, prmtop_io
 from enzy_htp.structure.structure_constraint import (
@@ -55,6 +54,7 @@ from enzy_htp.structure import (
     NonCanonicalBase,
     StructureEnsemble,
     PDBParser)
+from enzy_htp.structure.structure_region.api import create_region_from_residues, create_region_from_selection_pattern
 from enzy_htp import config as eh_config
 
 class AmberParameter(MolDynParameter):
@@ -3315,16 +3315,16 @@ class AmberMDCRDParser():
         self.prmtop_file = prmtop_file
         self.parent_interface = interface
     
-    def get_coordinates(self, mdcrd: str, remove_solvent: bool=False) -> Generator[List[List[float]], None, None]:
-        """parse a mdcrd file to a Generator of coordinates. Intermediate files are created."""
+    def get_coordinates(self, mdcrd: str, remove_solvent: bool=False) -> Generator[Tuple[List[Tuple[float]],Tuple[float]], None, None]:
+        """parse a mdcrd file to a Generator of (coordinates, pbc_box_edges). Intermediate files are created."""
         coord = [] # coords of 1 frame
         atom_coord = [] # coord of 1 atom
         counter = 1 # collect coord every 3 count
-        end_flag_1 = 0
-        fake_end_flag = 0
+        end_flag_1 = 0 # flag for matching the frame_sep_pattern
+        fake_end_flag = 0 # flag for a line that fits the frame_sep_pattern but actually the coordinate of the last atom in this frame. (i.e.: by coincidence the last line of this frame have only 3 coordinates)
         line_feed = os.linesep
         digit_pattern = r'[ ,\-,0-9][ ,\-,0-9][ ,\-,0-9][0-9]\.[0-9][0-9][0-9]' # a number
-        frame_sep_pattern = digit_pattern * 3 + line_feed
+        frame_sep_pattern = digit_pattern * 3 + line_feed # the PBC box edges line pattern
 
         # remove solvent
         if remove_solvent:
@@ -3342,21 +3342,22 @@ class AmberMDCRDParser():
                 if re.match(digit_pattern, line) == None:
                     # not data line
                     if not end_flag_1 and not fake_end_flag:
-                        # last line is not end line & 
+                        # previous line is not end line & 
                         continue
                 
                 if fake_end_flag:
-                    # this line is an end line
+                    # this line (i.e.: next line of a fake_end_line) is an end line
                     # if next line of end is the file end
                     fake_end_flag = 0
                     if line == '':
                         break
 
                 if end_flag_1:
-                    # last line is an end line
+                    # previous line is an end line
                     if re.match(frame_sep_pattern, line) != None:
-                        # this line is an end line -> last line is a fake end line
+                        # this line is an end line -> previous line is a fake end line
                         coord.append(holder)
+                        # this line contains the PBC info
                         yield coord
                         # empty for next loop
                         coord = []
@@ -3364,13 +3365,13 @@ class AmberMDCRDParser():
                         fake_end_flag = 1
                         continue
                     else:                        
-                        # last line is a real end line
+                        # previous line is a real end line
                         yield coord
                         # empty for next loop
                         coord = []
                         end_flag_1 = 0
                         if line == '':
-                            #the last line
+                            #the final line
                             break
                         if line == line_feed:
                             _LOGGER.warning("unexpected empty line detected. Treat as EOF. exit reading")
@@ -3380,7 +3381,7 @@ class AmberMDCRDParser():
                 else:
                     if re.match(frame_sep_pattern, line) != None:
                         # find line that mark the end of a frame // possible fake line
-                        # store the last frame and empty the holder
+                        # store the last frame and empty the holder in next iteration
                         end_flag_1 = 1 
                         lp = re.split(' +', line.strip())
                         # hold the info
@@ -3428,7 +3429,7 @@ class AmberNCParser():
             nc_file: str,
             autoimage: bool=True,
             remove_solvent: bool=False,
-        ) -> Generator[List[List[float]], None, None]:
+        ) -> Generator[Tuple[List[Tuple[float]],Tuple[float]], None, None]:
         """parse a nc file to a Generator of coordinates. Intermediate mdcrd file is created."""
         # 0. init temp path
         if self.mdcrd.get((autoimage, remove_solvent), None) is None:
