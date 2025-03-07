@@ -637,6 +637,10 @@ class Structure(DoubleLinkedNode):
                 return False
         return True
 
+    def has_pbc_box(self) -> bool:
+        """check if there is a PBC box in the current Structure"""
+        return self.pbc_box_shape is not None
+
     def has_duplicate_chain_name(self) -> bool:
         """check if self._chain have duplicated chain name
         give warning if do."""
@@ -991,6 +995,15 @@ class Structure(DoubleLinkedNode):
         else:
             for atom, source_atom in zip(self.atoms, source.atoms):
                 atom.coord = source_atom.coord
+
+    def update_pbc_box_edges(self, pbc_box_edges: Tuple[float]):
+        """update the pbc box edges and keep the original angles. This is common in a
+        NPT simulation."""
+        if self.has_pbc_box():
+            self.pbc_box_shape = pbc_box_edges + self.pbc_box_shape[3:]
+        else:
+            _LOGGER.error("Structure does not have PBC. cant update. angles unknown")
+            raise ValueError
 
     def clone_residue_keys(self, other: Structure, amino_acid_only: bool =True):
         """clone residue keys from {other} to {self}.
