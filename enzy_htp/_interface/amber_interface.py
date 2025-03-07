@@ -1081,6 +1081,35 @@ class AmberInterface(BaseInterface):
             _LOGGER.error(f"found unsupported file format: {in_format} ({fpath})")
             raise ValueError
 
+    def convert_stru_to_inpcrd(self, stru: Structure, out_path: str) -> None:
+        """convert the given Structure() to the Amber .inpcrd file in the out_path
+        NOTE this could refactor to the inpcrd parser but MVP here."""
+        # save a temp PDB
+        fs.safe_mkdir(eh_config["system.SCRATCH_DIR"])
+        temp_pdb_path = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/stru_to_inpcrd.pdb")
+        temp_rst_path = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/stru_to_inpcrd.rst")
+        PDBParser().save_structure(temp_pdb_path, stru, same_chain_id_for_solvent=True) # if the chain id overflow the coord will be messed up by cpptraj
+
+        # convert PDB to inpcrd
+        contents = [
+            f"parm {temp_pdb_path}",
+            f"trajin {temp_pdb_path}",
+            f"trajout {temp_rst_path}",
+            "run",
+            "quit"
+        ]
+        contents = "\n".join(contents)
+        self.run_cpptraj(contents)
+
+        if stru.has_pbc_box():
+            pbc_line = "".join([f"{digit:12.7f}" for digit in stru.pbc_box_shape])
+            with open(temp_rst_path, "a") as of:
+                of.write(f"{pbc_line}\n")
+        # cp to dest
+        fs.safe_mv(temp_rst_path, out_path)
+        # clean up
+        fs.clean_temp_file_n_dir([temp_pdb_path, temp_rst_path, eh_config["system.SCRATCH_DIR"]])
+
     # -- tleap --
     def run_tleap(
         self,

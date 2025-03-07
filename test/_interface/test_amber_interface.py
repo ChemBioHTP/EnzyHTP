@@ -887,12 +887,12 @@ def test_amber_md_step_make_job():
 
 source /home/shaoq1/bin/amber_env/amber22\.sh
 
-pmemd\.cuda -O -i \./MD/amber_md_step_?[0-9]*\.in -o \./MD/amber_md_step\.out -p .*test/_interface/data//KE_07_R7_S\.prmtop -c .*test/_interface/data//KE_07_R7_S\.inpcrd -r \./MD/amber_md_step\.rst -ref .*test/_interface/data//KE_07_R7_S\.inpcrd -x \./MD/amber_md_step\.nc 
+pmemd\.cuda -O -i \./MD/amber_md_step_?[0-9]*\.in -o \./MD/amber_md_step\.out -p .*test/_interface/data//KE_07_R7_S\.prmtop -c .*test/_interface/data//KE_07_R7_S\.inpcrd -r \./MD/amber_md_step\.inpcrd -ref .*test/_interface/data//KE_07_R7_S\.inpcrd -x \./MD/amber_md_step\.nc 
 """
     assert re.match(answer_pattern, test_job.sub_script_str)
     assert test_md_egg.traj_path == './MD/amber_md_step.nc'
     assert test_md_egg.traj_log_path == './MD/amber_md_step.out'
-    assert test_md_egg.rst_path == './MD/amber_md_step.rst'
+    assert test_md_egg.inpcrd_path == './MD/amber_md_step.inpcrd'
     assert Path(test_md_egg.prmtop_path) == Path('test/_interface/data//KE_07_R7_S.prmtop').absolute()
     fs.safe_rmdir(md_step.work_dir)
 
@@ -933,7 +933,7 @@ def test_amber_md_step_make_job_w_cons():
 
 source /home/shaoq1/bin/amber_env/amber22\.sh
 
-pmemd\.cuda -O -i \./MD/amber_md_step_?[0-9]*\.in -o \./MD/amber_md_step\.out -p .*test/_interface/data//KE_07_R7_S\.prmtop -c .*test/_interface/data//KE_07_R7_S\.inpcrd -r \./MD/amber_md_step\.rst -ref .*test/_interface/data//KE_07_R7_S\.inpcrd -x \./MD/amber_md_step\.nc 
+pmemd\.cuda -O -i \./MD/amber_md_step_?[0-9]*\.in -o \./MD/amber_md_step\.out -p .*test/_interface/data//KE_07_R7_S\.prmtop -c .*test/_interface/data//KE_07_R7_S\.inpcrd -r \./MD/amber_md_step\.inpcrd -ref .*test/_interface/data//KE_07_R7_S\.inpcrd -x \./MD/amber_md_step\.nc 
 """
     assert re.match(answer_pattern, test_job.sub_script_str)
     fs.safe_rmdir(md_step.work_dir)
@@ -955,8 +955,8 @@ def test_amber_md_step_try_merge_jobs(caplog):
         merged_jobs = AmberMDStep.try_merge_jobs([test_job_1,test_job_2,test_job_3])
         assert len(merged_jobs) == 2
         for test, answer in zip(merged_jobs[0].mimo["commands"], [
-                r'pmemd.cuda -O -i ./MD/amber_md_step_?[0-9]*.in -o ./MD/amber_md_step.out -p .*test/_interface/data//KE_07_R7_S.prmtop -c .*test/_interface/data//KE_07_R7_S.inpcrd -r ./MD/amber_md_step.rst -ref .*test/_interface/data//KE_07_R7_S.inpcrd -x ./MD/amber_md_step.nc ',
-                r'pmemd.cuda -O -i ./MD/amber_md_step_?[0-9]*.in -o ./MD/amber_md_step.out -p .*test/_interface/data//KE_07_R7_S.prmtop -c ./MD/amber_md_step.rst -r ./MD/amber_md_step.rst -ref ./MD/amber_md_step.rst -x ./MD/amber_md_step.nc '
+                r'pmemd.cuda -O -i ./MD/amber_md_step_?[0-9]*.in -o ./MD/amber_md_step.out -p .*test/_interface/data//KE_07_R7_S.prmtop -c .*test/_interface/data//KE_07_R7_S.inpcrd -r ./MD/amber_md_step.inpcrd -ref .*test/_interface/data//KE_07_R7_S.inpcrd -x ./MD/amber_md_step.nc ',
+                r'pmemd.cuda -O -i ./MD/amber_md_step_?[0-9]*.in -o ./MD/amber_md_step.out -p .*test/_interface/data//KE_07_R7_S.prmtop -c ./MD/amber_md_step.inpcrd -r ./MD/amber_md_step.inpcrd -ref ./MD/amber_md_step.inpcrd -x ./MD/amber_md_step.nc '
                 ]):
             assert re.match(answer, test)
         assert len(merged_jobs[0].mimo["temp_mdin"]) == 2
@@ -970,7 +970,7 @@ def test_amber_md_step_translate():
     test_result_egg = AmberMDResultEgg(
         traj_path = "traj_path",
         traj_log_path = "traj_log_path",
-        rst_path = "rst_path",
+        inpcrd_path = "inpcrd_path",
         prmtop_path = "prmtop_pat",
     )
     ai = interface.amber
@@ -979,7 +979,7 @@ def test_amber_md_step_translate():
 
     assert result.traj_file == "traj_path"
     assert result.traj_log_file == "traj_log_path"
-    assert result.last_frame_file == "rst_path"
+    assert result.last_frame_file == "inpcrd_path"
 
 
 @pytest.mark.accre
@@ -995,7 +995,7 @@ def test_amber_md_step_run():
     test_params = AmberParameter(test_inpcrd, test_prmtop)
     test_md_result = md_step.run(test_params)
     
-    assert test_md_result.last_frame_file == "./MD/amber_md_step.rst"
+    assert test_md_result.last_frame_file == "./MD/amber_md_step.inpcrd"
     fs.clean_temp_file_n_dir([
         test_md_result.last_frame_file,
         test_md_result.traj_log_file,
@@ -1428,3 +1428,17 @@ def test_mdcrd_parser_get_coordinates():
         assert coords[0] == answer_1
         assert coords[-1] == answer_m1
         assert pbc_box_edges == answer_pbc_edgs
+
+def test_convert_stru_to_inpcrd():
+    test_pdb = f"{STRU_DATA_DIR}/test_pdb_parser_solvated.pdb"
+    test_stru = struct.PDBParser().get_structure(test_pdb)
+    test_stru.pbc_box_shape = (66.957, 66.957, 66.957, 109.471219, 109.471219, 109.471219)
+    test_out_path = f"{MM_WORK_DIR}/test_convert_stru_to_inpcrd.inpcrd"
+    answer_inpcrd_file = f"{MM_DATA_DIR}/answer_convert_stru_to_inpcrd.inpcrd"
+    
+    ai = interface.amber
+    ai.convert_stru_to_inpcrd(test_stru, test_out_path)
+
+    assert files_equivalent(test_out_path, answer_inpcrd_file)
+
+    fs.clean_temp_file_n_dir(test_out_path)
