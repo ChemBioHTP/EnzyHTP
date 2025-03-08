@@ -2733,8 +2733,8 @@ class AmberInterface(BaseInterface):
                       constrain: List[StructureConstraint] = "default",
                       restart: bool = "default",
                       # simulation (QM/MM & QM/MM MD)
-                      use_qmmm: bool = False,
-                      qm_region_pattern: str = None, # use qmmask
+                      use_qmmm: bool = "default",
+                      qm_region_pattern: str = None, # TODO may be also manually dispatch to an un-capped StructureRegion?
                       qm_region_charge_spin: Tuple[int, int] = None, # do san check 
                       qm_level_of_theory: QMLevelOfTheory = None,
                       qm_engine: str = "default", # by default sqm
@@ -2743,7 +2743,7 @@ class AmberInterface(BaseInterface):
                       qm_ewald: int = "default",
                       qm_adjust_q: int = "default",
                       # simulation (QM/MM: adaptive solvent)
-                      qm_adaptive_solvent_type: Union[str, None] = None, # turns on when not None
+                      qm_adaptive_solvent_type: Union[str, None] = "default", # turns on when not None
                       qm_num_adaptive_solvent: str = "default",
                       qm_num_transition_solvent: str = "default",
                       # simulation (alternative)
@@ -2780,6 +2780,37 @@ class AmberInterface(BaseInterface):
                 a list of StructureConstraint objects that indicates geometry constrains in the step.
             restart:
                 whether restart this md from the volecity of a previous md step.
+            use_qmmm: bool
+                whether this step is based on QM/MM (based on Amber20 Manual 10.1)
+            qm_region_pattern: str (enabled & required when use_qmmm=True)
+                a PyMol style selection syntax that specify the QM region
+            qm_region_charge_spin: Tuple[int, int] (enabled & required when use_qmmm=True)
+                the charge and multiplicity of the QM region
+            qm_level_of_theory: QMLevelOfTheory (enabled & required when use_qmmm=True)
+                the level of theory of the QM/MM
+            qm_engine: str (enabled & required when use_qmmm=True)
+                the QM engine
+            qm_region_pdb_path: str (enabled when use_qmmm=True)
+                the path of a PDB file of the QM region for debug purpose
+            qm_ele_cutoff: float (enabled when use_qmmm=True)
+                the QM/MM electrostatic embedding cut-off distance
+            qm_ewald: int (enabled when use_qmmm=True)
+                This option specifies how long range electrostatics for the QM region should be treated
+                (See Amber20 Manual 10.1.6 for details)
+            qm_adjust_q: int (enabled when use_qmmm=True)
+                This controls how charge is conserved during a QMMM calculation involving link atoms.
+                (See Amber20 Manual 10.1.7 for details)
+            qm_adaptive_solvent_type: Union[str, None] (enabled when use_qmmm=True)
+                This turns on/off and specify the type of adaptive QM/MM solvent treatmemt
+                None turns it off and options are:
+                    - single_point # fixed number of solvent only two region so only suitable for SPE
+                    - num_of_solvent # fixed number of solvent but three regions including a T region
+                    - fixed_size # fixed size of solvent shell and three regions including a T region
+                (See Amber20 Manual 10.3 for details)
+            qm_num_adaptive_solvent: str (enabled when use_qmmm=True)
+                The number of adaptive solvent
+            qm_num_transition_solvent: str (enabled when use_qmmm=True)
+                The number of solvent in the T region
             core_type:
                 the type of computing core that runs the MD. This will affect both the command
                 and the cluster_job config if cluster_job_config is not None.
@@ -2834,6 +2865,18 @@ class AmberInterface(BaseInterface):
             record_period_mdin = mdin_config.get("record_period", None)
             constrain_mdin = mdin_config.get("constrain", None)
             restart_mdin = mdin_config.get("restart", None)
+            use_qmmm_mdin = mdin_config("use_qmmm", None)
+            qm_region_pattern_mdin = mdin_config("qm_region_pattern", None)
+            qm_region_charge_spin_mdin = mdin_config("qm_region_charge_spin", None)
+            qm_level_of_theory_mdin = mdin_config("qm_level_of_theory", None)
+            qm_engine_mdin = mdin_config("qm_engine", None)
+            qm_region_pdb_path_mdin = mdin_config("qm_region_pdb_path", None)
+            qm_ele_cutoff_mdin = mdin_config("qm_ele_cutoff", None)
+            qm_ewald_mdin = mdin_config("qm_ewald", None)
+            qm_adjust_q_mdin = mdin_config("qm_adjust_q", None)
+            qm_adaptive_solvent_type_mdin = mdin_config("qm_adaptive_solvent_type", None)
+            qm_num_adaptive_solvent_mdin = mdin_config("qm_num_adaptive_solvent", None)
+            qm_num_transition_solvent_mdin = mdin_config("qm_num_transition_solvent", None)
 
             if length is None and length_mdin is not None:
                length = length_mdin
@@ -2853,6 +2896,31 @@ class AmberInterface(BaseInterface):
                constrain = constrain_mdin
             if restart == "default" and restart_mdin is not None:
                restart = restart_mdin
+            # QM/MM
+            if use_qmmm == "default" and use_qmmm_mdin is not None:
+                use_qmmm = use_qmmm_mdin
+            if qm_region_pattern is None and qm_region_pattern_mdin is not None:
+                qm_region_pattern = qm_region_pattern_mdin
+            if qm_region_charge_spin is None and qm_region_charge_spin_mdin is not None:
+                qm_region_charge_spin = qm_region_charge_spin_mdin
+            if qm_level_of_theory is None and qm_level_of_theory_mdin is not None:
+                qm_level_of_theory = qm_level_of_theory_mdin
+            if qm_engine == "default" and qm_engine_mdin is not None:
+                qm_engine = qm_engine_mdin
+            if qm_region_pdb_path is None and qm_region_pdb_path_mdin is not None:
+                qm_region_pdb_path = qm_region_pdb_path_mdin
+            if qm_ele_cutoff == "default" and qm_ele_cutoff_mdin is not None:
+                qm_ele_cutoff = qm_ele_cutoff_mdin
+            if qm_ewald == "default" and qm_ewald_mdin is not None:
+                qm_ewald = qm_ewald_mdin
+            if qm_adjust_q == "default" and qm_adjust_q_mdin is not None:
+                qm_adjust_q = qm_adjust_q_mdin
+            if qm_adaptive_solvent_type == "default" and qm_adaptive_solvent_type_mdin is not None:
+                qm_adaptive_solvent_type = qm_adaptive_solvent_type_mdin
+            if qm_num_adaptive_solvent == "default" and qm_num_adaptive_solvent_mdin is not None:
+                qm_num_adaptive_solvent = qm_num_adaptive_solvent_mdin
+            if qm_num_transition_solvent == "default" and qm_num_transition_solvent_mdin is not None:
+                qm_num_transition_solvent = qm_num_transition_solvent_mdin
 
         if length is None:
             _LOGGER.error("At least one of `length` or `nstlim` (through `amber_md_in_file`) needs to be "
@@ -2898,6 +2966,23 @@ class AmberInterface(BaseInterface):
         if work_dir == "default":
             work_dir = self.config()["DEFAULT_MD_WORK_DIR"]
             
+        # QM/MM
+        if use_qmmm == "default":
+            use_qmmm = self.config()["DEFAULT_MD_USE_QMMM"]
+        if qm_engine == "default":
+            qm_engine = self.config()["DEFAULT_MD_QM_ENGINE"]
+        if qm_ele_cutoff == "default":
+            qm_ele_cutoff = self.config()["DEFAULT_MD_QM_ELE_CUTOFF"]
+        if qm_ewald == "default":
+            qm_ewald = self.config()["DEFAULT_MD_QM_EWALD"]
+        if qm_adjust_q == "default":
+            qm_adjust_q = self.config()["DEFAULT_MD_QM_ADJUST_Q"]
+        if qm_adaptive_solvent_type == "default":
+            qm_adaptive_solvent_type = self.config()["DEFAULT_MD_QM_ADAPTIVE_SOLVENT_TYPE"]
+        if qm_num_adaptive_solvent == "default":
+            qm_num_adaptive_solvent = self.config()["DEFAULT_MD_QM_NUM_ADAPTIVE_SOLVENT"]
+        if qm_num_transition_solvent == "default":
+            qm_num_transition_solvent = self.config()["DEFAULT_MD_QM_NUM_TRANSITION_SOLVENT"]
 
         return AmberMDStep(
             interface = self,
@@ -2910,6 +2995,18 @@ class AmberInterface(BaseInterface):
             pressure_scaling = pressure_scaling,
             constrain = constrain,
             restart = restart,
+            use_qmmm = use_qmmm,
+            qm_region_pattern = qm_region_pattern,
+            qm_region_charge_spin = qm_region_charge_spin,
+            qm_level_of_theory = qm_level_of_theory,
+            qm_engine = qm_engine,
+            qm_region_pdb_path = qm_region_pdb_path,
+            qm_ele_cutoff = qm_ele_cutoff,
+            qm_ewald = qm_ewald,
+            qm_adjust_q = qm_adjust_q,
+            qm_adaptive_solvent_type = qm_adaptive_solvent_type,
+            qm_num_adaptive_solvent = qm_num_adaptive_solvent,
+            qm_num_transition_solvent = qm_num_transition_solvent,
             core_type = core_type,
             cluster_job_config = cluster_job_config,
             if_report = if_report,
