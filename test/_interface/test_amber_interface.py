@@ -685,6 +685,7 @@ def test_parse_md_config_dict_to_raw_wo_cons():
                 'ntb': 1, 'ntp':0,
                 'iwrap': 1,
                 'ig': -1,
+                'ifqnt' : 0,
                 }
             },
            {'type': 'wt',
@@ -723,6 +724,19 @@ def test_parse_md_config_dict_to_raw_wo_cons():
             "if_report" : True,
             "record_period" : 0.0004, # ns
             "mdstep_dir" : "./MD",
+            "use_qmmm" : False,
+            "qm_region_pattern" : None,
+            "qm_region_charge_spin" : None,
+            "qm_level_of_theory" : None,
+            "qm_engine" : None,
+            "qm_region_pdb_path" : None,
+            "qm_ele_cutoff" : None,
+            "qm_ewald" : None,
+            "qm_adjust_q" : None,
+            "qm_adaptive_solvent_type" : None,
+            "qm_num_adaptive_solvent" : None,
+            "qm_num_transition_solvent" : None,
+            "cluster_job_config" : None,
     }
 
     ai = interface.amber
@@ -743,6 +757,7 @@ def test_parse_md_config_dict_to_raw_minimize():
                 'cut': 10.0,
                 'maxcyc': 20000, 'ncyc': 10000,
                 'ntpr': 200, 'ntwx': 0,
+                'ifqnt' : 0,
                 }
             },
         ],
@@ -762,6 +777,19 @@ def test_parse_md_config_dict_to_raw_minimize():
             "if_report" : True,
             "record_period" : 0.0004, # ns
             "mdstep_dir" : "./MD",
+            "use_qmmm" : False,
+            "qm_region_pattern" : None,
+            "qm_region_charge_spin" : None,
+            "qm_level_of_theory" : None,
+            "qm_engine" : None,
+            "qm_region_pdb_path" : None,
+            "qm_ele_cutoff" : None,
+            "qm_ewald" : None,
+            "qm_adjust_q" : None,
+            "qm_adaptive_solvent_type" : None,
+            "qm_num_adaptive_solvent" : None,
+            "qm_num_transition_solvent" : None,
+            "cluster_job_config" : None,
     }
 
     ai = interface.amber
@@ -791,6 +819,7 @@ def test_parse_md_config_dict_to_raw_w_cons():
                 'nmropt': 1,
                 'ig': -1,
                 'ntr': 1, 'restraint_wt': 2.0, 'restraintmask': "'@C,CA,N'",
+                'ifqnt' : 0,
                 }
             },
            {'type': 'wt',
@@ -855,6 +884,19 @@ def test_parse_md_config_dict_to_raw_w_cons():
         "if_report" : True,
         "record_period" : 0.0004,
         "mdstep_dir" : "./MD",
+        "use_qmmm" : False,
+        "qm_region_pattern" : None,
+        "qm_region_charge_spin" : None,
+        "qm_level_of_theory" : None,
+        "qm_engine" : None,
+        "qm_region_pdb_path" : None,
+        "qm_ele_cutoff" : None,
+        "qm_ewald" : None,
+        "qm_adjust_q" : None,
+        "qm_adaptive_solvent_type" : None,
+        "qm_num_adaptive_solvent" : None,
+        "qm_num_transition_solvent" : None,
+        "cluster_job_config" : None,
     }
 
     ai = interface.amber
