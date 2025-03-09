@@ -1188,7 +1188,7 @@ class AmberInterface(BaseInterface):
         fs.safe_mkdir(eh_config["system.SCRATCH_DIR"])
         temp_pdb_path = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/stru_to_inpcrd.pdb")
         temp_rst_path = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/stru_to_inpcrd.rst")
-        PDBParser().save_structure(temp_pdb_path, stru, same_chain_id_for_solvent=True) # if the chain id overflow the coord will be messed up by cpptraj
+        PDBParser().save_structure(temp_pdb_path, stru, same_chain_id_for_9999_solvent=True) # if the chain id overflow the coord will be messed up by cpptraj
 
         # convert PDB to inpcrd
         contents = [
@@ -2002,8 +2002,10 @@ class AmberInterface(BaseInterface):
         for k, res in stru.residue_mapper.items():
             amber_key = ref_mapper[k]
             result["residue"][res] = amber_key
+            ref_res = ref_reskey_mapper[amber_key]
+            ref_res_atom_name_mapper = ref_res.atom_name_mapper
             for atom in res.atoms:
-                amber_atom_idx = ref_reskey_mapper[amber_key].find_atom_name(atom.name).idx
+                amber_atom_idx = ref_res_atom_name_mapper[atom.name].idx
                 result["atom"][atom] = amber_atom_idx
         fs.clean_temp_file_n_dir([
             temp_dir,
