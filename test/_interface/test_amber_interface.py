@@ -20,12 +20,15 @@ from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.general import EnablePropagate
 from enzy_htp.core.job_manager import ClusterJob, ClusterJobConfig
 from enzy_htp.core import file_system as fs
+from enzy_htp.chemical.level_of_theory import QMLevelOfTheory
 from enzy_htp._interface.amber_interface import (
     AmberParameterizer,
     AmberParameter,
     AmberMDStep,
-    AmberMDResultEgg,)
+    AmberMDResultEgg,
+    AmberMDCRDParser,)
 import enzy_htp.structure as struct
+from enzy_htp.structure.structure_io.prmtop_io import PrmtopParser
 from enzy_htp.structure.structure_constraint import (
     StructureConstraint,
     create_cartesian_freeze,
@@ -684,6 +687,7 @@ def test_parse_md_config_dict_to_raw_wo_cons():
                 'ntb': 1, 'ntp':0,
                 'iwrap': 1,
                 'ig': -1,
+                'ifqnt' : 0,
                 }
             },
            {'type': 'wt',
@@ -722,6 +726,129 @@ def test_parse_md_config_dict_to_raw_wo_cons():
             "if_report" : True,
             "record_period" : 0.0004, # ns
             "mdstep_dir" : "./MD",
+            "use_qmmm" : False,
+            "qm_region" : None,
+            "qm_region_charge_spin" : None,
+            "qm_level_of_theory" : None,
+            "qm_engine" : None,
+            "qm_region_pdb_path" : None,
+            "qm_ele_cutoff" : None,
+            "qm_ewald" : None,
+            "qm_adjust_q" : None,
+            "qm_adaptive_solvent_type" : None,
+            "qm_num_adaptive_solvent" : None,
+            "qm_num_transition_solvent" : None,
+            "available_cores" : 9,
+            "available_mem_per_core" : "2GB",
+    }
+
+    ai = interface.amber
+    test_raw_dict = ai._parse_md_config_dict_to_raw(test_md_config_dict)
+    assert test_raw_dict == answer_raw_dict
+
+
+def test_parse_md_config_dict_to_raw_qmmm():
+    """test to make sure _parse_md_config_dict_to_raw() works as expected.
+    using a dict from old EnzyHTP Class_Conf.Amber.conf_heat as an example"""
+    answer_raw_dict = {
+        'title': 'Heat',
+        'namelists': [
+           {'type': 'cntrl',
+            'config': {
+                'imin': 0, 'ntx': 1, 'irest': 0,
+                'ntc': 2, 'ntf': 2,
+                'cut': 10.0,
+                'nstlim': 20000, 'dt': 0.002,
+                'tempi': 0.0, 'temp0': 300.0,
+                'ntpr': 200, 'ntwx': 200,
+                'ntt': 3, 'gamma_ln': 5.0,
+                'ntb': 1, 'ntp':0,
+                'iwrap': 1,
+                'ig': -1,
+                'ifqnt' : 1,
+                }
+            },
+           {'type': 'qmmm',
+            'config': {
+                'adjust_q': 1,
+                'qm_ewald': 'amber_default',
+                'qm_theory': "'EXTERN'",
+                'qmcharge': -1,
+                'qmcut': 12.0,
+                'qmmask': "'@1567-1581,3963-3978'",
+                'spin': 1,
+                'vsolv': 1,
+                'writepdb': 0
+                }
+           },        
+           {'type': 'gau',
+            'config': {
+                    'basis': "'def2svp'",
+                    'mem': "'16GB'",
+                    'method': "'PBE0'",
+                    'num_threads': 8
+                }
+            },
+           {'type': 'vsolv',
+            'config': {
+                'nearest_qm_solvent': 10,
+                }
+           },
+           {'type': 'wt',
+            'config': {
+                'type': "'TEMP0'",
+                'istep1': 0, 'istep2': 18000,
+                'value1': 0.0, 'value2': 300.0,
+                }
+            },
+           {'type': 'wt',
+            'config': {
+                'type': "'TEMP0'",
+                'istep1': 18001, 'istep2': 20000,
+                'value1': 300.0, 'value2': 300.0,
+                }
+            },
+           {'type': 'wt',
+            'config': {
+                'type': "'END'",
+                }
+            },
+        ],
+        'file_redirection': {},
+        'group_info': [],
+    }
+    test_pdb = f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb"
+    test_stru = struct.PDBParser().get_structure(test_pdb)
+    test_md_config_dict = {
+            "name" : "Heat",
+            "length" : 0.04, # ns
+            "timestep" : 0.000002, # ns
+            "minimize" : False,
+            "temperature" : [(0.0, 0.0), (0.036, 300.0), (0.04, 300.0)],
+            "thermostat" : "langevin",
+            "pressure_scaling" : "none",
+            "constrain" : None,
+            "restart" : False,
+            "if_report" : True,
+            "record_period" : 0.0004, # ns
+            "mdstep_dir" : "./MD",
+            "use_qmmm" : True,
+            "qm_region" : select_stru(test_stru, "resi 101+254"),
+            "qm_region_charge_spin" : (-1, 1),
+            "qm_level_of_theory" : QMLevelOfTheory(
+                                    basis_set="def2svp",
+                                    method="PBE0",
+                                   ),
+            "qm_engine" : "g16",
+            "qm_region_pdb_path" : None,
+            "qm_ele_cutoff" : 12.0,
+            "qm_ewald" : "amber_default",
+            "qm_adjust_q" : 1,
+            "qm_adaptive_solvent_type" : "single_point",
+            "qm_num_adaptive_solvent" : 10,
+            "qm_num_transition_solvent" : 0,
+            "available_cores" : 9,
+            "available_mem_per_core" : "2GB",
     }
 
     ai = interface.amber
@@ -742,6 +869,7 @@ def test_parse_md_config_dict_to_raw_minimize():
                 'cut': 10.0,
                 'maxcyc': 20000, 'ncyc': 10000,
                 'ntpr': 200, 'ntwx': 0,
+                'ifqnt' : 0,
                 }
             },
         ],
@@ -761,6 +889,20 @@ def test_parse_md_config_dict_to_raw_minimize():
             "if_report" : True,
             "record_period" : 0.0004, # ns
             "mdstep_dir" : "./MD",
+            "use_qmmm" : False,
+            "qm_region" : None,
+            "qm_region_charge_spin" : None,
+            "qm_level_of_theory" : None,
+            "qm_engine" : None,
+            "qm_region_pdb_path" : None,
+            "qm_ele_cutoff" : None,
+            "qm_ewald" : None,
+            "qm_adjust_q" : None,
+            "qm_adaptive_solvent_type" : None,
+            "qm_num_adaptive_solvent" : None,
+            "qm_num_transition_solvent" : None,
+            "available_cores" : 9,
+            "available_mem_per_core" : "2GB",
     }
 
     ai = interface.amber
@@ -790,6 +932,7 @@ def test_parse_md_config_dict_to_raw_w_cons():
                 'nmropt': 1,
                 'ig': -1,
                 'ntr': 1, 'restraint_wt': 2.0, 'restraintmask': "'@C,CA,N'",
+                'ifqnt' : 0,
                 }
             },
            {'type': 'wt',
@@ -854,6 +997,20 @@ def test_parse_md_config_dict_to_raw_w_cons():
         "if_report" : True,
         "record_period" : 0.0004,
         "mdstep_dir" : "./MD",
+        "use_qmmm" : False,
+        "qm_region" : None,
+        "qm_region_charge_spin" : None,
+        "qm_level_of_theory" : None,
+        "qm_engine" : None,
+        "qm_region_pdb_path" : None,
+        "qm_ele_cutoff" : None,
+        "qm_ewald" : None,
+        "qm_adjust_q" : None,
+        "qm_adaptive_solvent_type" : None,
+        "qm_num_adaptive_solvent" : None,
+        "qm_num_transition_solvent" : None,
+        "available_cores" : 9,
+        "available_mem_per_core" : "2GB",
     }
 
     ai = interface.amber
@@ -881,19 +1038,80 @@ def test_amber_md_step_make_job():
 #SBATCH --account=<fillthis>
 #SBATCH --export=NONE
 (?:#SBATCH --exclude=.+)?
-
 # Script generated by EnzyHTP [0-9]\.[0-9]\.[0-9] in [0-9]+-[0-9]+-[0-9]+ [0-9]+:[0-9]+:[0-9]+
 
-source /home/shaoq1/bin/amber_env/amber22\.sh
+source /sb/apps/amber22/amber\.sh
 
 pmemd\.cuda -O -i \./MD/amber_md_step_?[0-9]*\.in -o \./MD/amber_md_step\.out -p .*test/_interface/data//KE_07_R7_S\.prmtop -c .*test/_interface/data//KE_07_R7_S\.inpcrd -r \./MD/amber_md_step\.rst -ref .*test/_interface/data//KE_07_R7_S\.inpcrd -x \./MD/amber_md_step\.nc 
 """
+
     assert re.match(answer_pattern, test_job.sub_script_str)
     assert test_md_egg.traj_path == './MD/amber_md_step.nc'
     assert test_md_egg.traj_log_path == './MD/amber_md_step.out'
     assert test_md_egg.rst_path == './MD/amber_md_step.rst'
     assert Path(test_md_egg.prmtop_path) == Path('test/_interface/data//KE_07_R7_S.prmtop').absolute()
     fs.safe_rmdir(md_step.work_dir)
+
+
+def test_amber_md_step_make_job_qmmm():
+    """test to make sure AmberMDStep.make_job() works as expected.
+    w/o constraint.
+    w/ QMMM."""
+    ai = interface.amber
+    test_pdb = f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb"
+    test_stru = struct.PDBParser().get_structure(test_pdb)
+    test_qm_lot = QMLevelOfTheory(
+        basis_set="def2svp",
+        method="PBE0",
+    )
+    md_step = ai.build_md_step(
+        minimize=True,
+        length=1, # i.e.: single point energy
+        core_type="cpu",
+        # qmmm settings
+        use_qmmm = True,
+        qm_region = select_stru(test_stru, "resi 101+254"),
+        qm_region_charge_spin = (-1, 1),
+        qm_level_of_theory  = test_qm_lot,
+        qm_engine = "g16",
+        qm_ele_cutoff = 12.0,
+        qm_adaptive_solvent_type = "single_point", # num_of_solvent, fixed_size
+        qm_num_adaptive_solvent = 10,
+    )
+    test_inpcrd = f"{MM_DATA_DIR}/KE_07_R7_S.inpcrd"
+    test_prmtop = f"{MM_DATA_DIR}/KE_07_R7_S.prmtop"
+    test_params = AmberParameter(test_inpcrd, test_prmtop)
+    test_job, test_md_egg = md_step.make_job(test_params)
+    
+    answer_pattern = r"""#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=16
+#SBATCH --job-name=MD_EnzyHTP
+#SBATCH --partition=<fillthis>
+#SBATCH --mem-per-cpu=3G
+#SBATCH --time=1-00:00:00
+#SBATCH --account=<fillthis>
+#SBATCH --export=NONE
+(?:#SBATCH --exclude=.+)?
+# Script generated by EnzyHTP [0-9]\.[0-9]\.[0-9] in [0-9]+-[0-9]+-[0-9]+ [0-9]+:[0-9]+:[0-9]+
+
+source /sb/apps/amber22/amber\.sh
+module load Gaussian/16\.B\.01
+mkdir \$TMPDIR/\$SLURM_JOB_ID
+export GAUSS_SCRDIR=\$TMPDIR/\$SLURM_JOB_ID
+
+mpirun -np 16 sander\.MPI -O -i \./MD/amber_md_step_?[0-9]*\.in -o \./MD/amber_md_step\.out -p .*test/_interface/data//KE_07_R7_S\.prmtop -c .*test/_interface/data//KE_07_R7_S\.inpcrd -r \./MD/amber_md_step\.rst -ref .*test/_interface/data//KE_07_R7_S\.inpcrd -x \./MD/amber_md_step\.nc 
+
+
+rm -rf \$TMPDIR/\$SLURM_JOB_ID"""
+    print(test_job.sub_script_str)
+    assert re.match(answer_pattern, test_job.sub_script_str)
+    assert test_md_egg.traj_path == './MD/amber_md_step.nc'
+    assert test_md_egg.traj_log_path == './MD/amber_md_step.out'
+    assert test_md_egg.rst_path == './MD/amber_md_step.rst'
+    assert Path(test_md_egg.prmtop_path) == Path('test/_interface/data//KE_07_R7_S.prmtop').absolute()
+    fs.safe_rmdir(md_step.work_dir)
+    assert False # TODO add more QMMM result assert 
 
 
 def test_amber_md_step_make_job_w_cons():
@@ -927,7 +1145,6 @@ def test_amber_md_step_make_job_w_cons():
 #SBATCH --account=<fillthis>
 #SBATCH --export=NONE
 (?:#SBATCH --exclude=.+)?
-
 # Script generated by EnzyHTP [0-9]\.[0-9]\.[0-9] in [0-9]+-[0-9]+-[0-9]+ [0-9]+:[0-9]+:[0-9]+
 
 source /home/shaoq1/bin/amber_env/amber22\.sh
@@ -955,7 +1172,7 @@ def test_amber_md_step_try_merge_jobs(caplog):
         assert len(merged_jobs) == 2
         for test, answer in zip(merged_jobs[0].mimo["commands"], [
                 r'pmemd.cuda -O -i ./MD/amber_md_step_?[0-9]*.in -o ./MD/amber_md_step.out -p .*test/_interface/data//KE_07_R7_S.prmtop -c .*test/_interface/data//KE_07_R7_S.inpcrd -r ./MD/amber_md_step.rst -ref .*test/_interface/data//KE_07_R7_S.inpcrd -x ./MD/amber_md_step.nc ',
-                r'pmemd.cuda -O -i ./MD/amber_md_step_?[0-9]*.in -o ./MD/amber_md_step.out -p .*test/_interface/data//KE_07_R7_S.prmtop -c ./MD/amber_md_step.rst -r ./MD/amber_md_step.rst -ref ./MD/amber_md_step.rst -x ./MD/amber_md_step.nc '
+                r'pmemd.cuda -O -i ./MD/amber_md_step_?[0-9]*.in -o ./MD/amber_md_step.out -p .*test/_interface/data//KE_07_R7_S.prmtop -c ./MD/amber_md_step.inpcrd -r ./MD/amber_md_step.rst -ref ./MD/amber_md_step.inpcrd -x ./MD/amber_md_step.nc '
                 ]):
             assert re.match(answer, test)
         assert len(merged_jobs[0].mimo["temp_mdin"]) == 2
@@ -1404,3 +1621,58 @@ def test_check_prmtop_nc_consistency():
     result = ai.check_prmtop_nc_consistency(test_prmtop, test_nc)
 
     assert result == False
+
+def test_mdcrd_parser_get_coordinates():
+    test_prmtop = f"{STRU_DATA_DIR}/KE_07_R7_2_S_10f.prmtop"
+    test_mdcrd = f"{STRU_DATA_DIR}/KE_07_R7_2_S_10f.mdcrd"
+    answer = [
+        ([32.586, 55.789, 30.602], [39.661, 27.409, 36.51], (66.957, 66.957, 66.957)),
+        ([34.88, 53.201, 22.495], [36.392, 27.392, 38.547], (66.937, 66.937, 66.937)),
+        ([37.41, 54.562, 25.501], [35.305, 27.228, 38.266], (66.897, 66.897, 66.897)),
+        ([27.814, 51.521, 21.567], [37.699, 30.371, 39.822], (66.918, 66.918, 66.918)),
+        ([30.507, 43.798, 13.187], [35.46, 35.527, 40.971], (66.848, 66.848, 66.848)),
+        ([30.84, 19.298, 14.47], [35.6, 39.992, 38.233], (66.882, 66.882, 66.882)),
+        ([29.9, 19.785, 17.46], [36.833, 40.408, 37.839], (66.855, 66.855, 66.855)),
+        ([29.248, 19.402, 17.4], [38.487, 38.876, 37.831], (66.923, 66.923, 66.923)),
+        ([25.089, 14.023, 21.701], [36.193, 41.793, 35.419], (66.842, 66.842, 66.842)),
+        ([22.332, 17.39, 19.672], [38.004, 39.988, 36.79], (66.896, 66.896, 66.896)),
+        ([39.391, 19.22, 17.043], [37.366, 39.457, 37.706], (66.934, 66.934, 66.934)),
+    ]
+    tp = AmberMDCRDParser(test_prmtop)
+    result = tp.get_coordinates(test_mdcrd)
+    for (coords, pbc_box_edges), (answer_1, answer_m1, answer_pbc_edgs) in zip(result, answer):
+        assert coords[0] == answer_1
+        assert coords[-1] == answer_m1
+        assert pbc_box_edges == answer_pbc_edgs
+
+def test_convert_stru_to_inpcrd():
+    test_pdb = f"{STRU_DATA_DIR}/test_pdb_parser_solvated.pdb"
+    test_stru = struct.PDBParser().get_structure(test_pdb)
+    test_stru.pbc_box_shape = (66.957, 66.957, 66.957, 109.471219, 109.471219, 109.471219)
+    test_out_path = f"{MM_WORK_DIR}/test_convert_stru_to_inpcrd.inpcrd"
+    answer_inpcrd_file = f"{MM_DATA_DIR}/answer_convert_stru_to_inpcrd.inpcrd"
+    
+    ai = interface.amber
+    ai.convert_stru_to_inpcrd(test_stru, test_out_path)
+
+    assert files_equivalent(test_out_path, answer_inpcrd_file)
+
+    fs.clean_temp_file_n_dir([test_out_path])
+
+def test_convert_stru_to_inpcrd_too_many_solvent():
+    test_crd = f"{MM_DATA_DIR}/AMY_1f.mdcrd"
+    test_prmtop = f"{MM_DATA_DIR}/AMY.prmtop"
+    coord_0, pbc_box_edges = next(
+        AmberMDCRDParser(test_prmtop).get_coordinates(test_crd))
+    test_stru = PrmtopParser().get_structure(test_prmtop)
+    test_stru.apply_geom(coord_0)
+
+    test_out_path = f"{MM_WORK_DIR}/test_convert_stru_to_inpcrd.inpcrd"
+    answer_inpcrd_file = f"{MM_DATA_DIR}/answer_convert_stru_to_inpcrd_many_solvent.inpcrd"
+    
+    ai = interface.amber
+    ai.convert_stru_to_inpcrd(test_stru, test_out_path)
+
+    assert files_equivalent(test_out_path, answer_inpcrd_file)
+
+    fs.clean_temp_file_n_dir([test_out_path])

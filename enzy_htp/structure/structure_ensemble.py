@@ -39,7 +39,7 @@ class StructureEnsemble:
         topology: str, 
         top_parser: Callable[[str], Structure], 
         coordinate_list: str,
-        coord_parser: Callable[[str], Generator[List[Tuple[float]], None, None]]
+        coord_parser: Callable[[str], Generator[Tuple[List[Tuple[float]],Tuple[float]], None, None]]
     ) -> None:
         self._topology = topology
         self.top_parser = top_parser
@@ -54,7 +54,7 @@ class StructureEnsemble:
             stru_oper.remove_solvent(stru)
             stru_oper.remove_counterions(stru)
 
-        for this_coord in self.coord_parser(
+        for this_coord, this_pbc_box_edges in self.coord_parser(
                 self.coordinate_list,
                 remove_solvent=remove_solvent
             ):
@@ -63,6 +63,7 @@ class StructureEnsemble:
                 stru_oper.remove_solvent(result)
                 stru_oper.remove_counterions(result)
             result.apply_geom(this_coord)
+            result.update_pbc_box_edges(this_pbc_box_edges)
             yield result
 
     @property
@@ -85,11 +86,12 @@ class StructureEnsemble:
     @property
     def structure_0(self) -> Structure:
         """getter for the 1st Structure (state) in the ensemble."""
-        coord_0 = next(self.coord_parser(self.coordinate_list))
+        coord_0, pbc_box_edges = next(self.coord_parser(self.coordinate_list))
         result = deepcopy(self.topology)
         result.apply_geom(coord_0)
+        result.update_pbc_box_edges(pbc_box_edges)
         return result
-    
+
     @classmethod
     def from_single_stru(cls, stru: Structure) -> StructureEnsemble:
         """create an ensemble of 1 snapshot from a Structure instance"""
@@ -97,8 +99,9 @@ class StructureEnsemble:
             topology=stru,
             top_parser=get_itself,
             coordinate_list=[stru],
-            coord_parser=iter,
+            coord_parser=lambda stru_list: ((stru_i, stru_i.pbc_box_shape) for stru_i in stru_list),
         )
+
 
     # region == special ==
     def __iter__(self):

@@ -170,6 +170,8 @@ class Chain(DoubleLinkedNode):
             chain_type.append("trash")
         if self.has_solvent():
             chain_type.append("solvent")
+        if self.has_residue_cap():
+            chain_type.append("caps")
         return ",".join(chain_type)
 
     @property
@@ -191,6 +193,12 @@ class Chain(DoubleLinkedNode):
         """
         return not sum(list(map(lambda rr: (not rr.is_canonical()) and (not rr.is_modified()), self._residues)))
 
+    def is_solvent_chain(self) -> bool:
+        """
+        if there are only solvent in chain
+        """
+        return all(list(map(lambda rr: rr.is_solvent(), self._residues)))
+
     def has_metal(self) -> bool:
         """Checks if any metals are contained within the current chain."""
         return sum(list(map(lambda rr: rr.is_metal(), self._residues)))
@@ -203,6 +211,9 @@ class Chain(DoubleLinkedNode):
 
     def has_trash(self) -> bool:
         return sum(list(map(lambda rr: rr.is_trash(), self._residues)))
+
+    def has_residue_cap(self) -> bool:
+        return sum(list(map(lambda rr: rr.is_residue_cap(), self._residues)))
 
     def is_empty(self) -> bool:
         """Does the chain have any Residue()"s."""

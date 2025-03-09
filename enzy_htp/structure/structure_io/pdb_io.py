@@ -131,7 +131,8 @@ class PDBParser(StructureParserInterface):
                     outfile:str,
                     stru: Structure,
                     if_renumber: bool = True,
-                    if_fix_atomname: bool = True ) -> str:
+                    if_fix_atomname: bool = True,
+                    same_chain_id_for_9999_solvent: bool = False, ) -> str:
         """Inverse of PDBParser.get_structure(). Given a Structure(), save it to the given .pdb path.
 
         Args:
@@ -139,11 +140,12 @@ class PDBParser(StructureParserInterface):
             stru: The Structure() to save.
             if_renumber: Should atoms be renumbered from 1?
             if_fix_atomname: Should atoms be ranemed to PDB convention?
+            same_chain_id_for_9999_solvent: for each 9999 solvent the chain id is the same
 
         Returns: 
             Path to the saved Structure() as a str().
         """            
-        content:str = cls.get_file_str( stru, if_renumber, if_fix_atomname )
+        content:str = cls.get_file_str( stru, if_renumber, if_fix_atomname, same_chain_id_for_9999_solvent )
 
         fs.write_lines( outfile, content.splitlines() )
 
@@ -189,7 +191,8 @@ class PDBParser(StructureParserInterface):
             cls,
             stru: Structure,  
             if_renumber: bool = True,
-            if_fix_atomname: bool = True) -> str:
+            if_fix_atomname: bool = True,
+            same_chain_id_for_9999_solvent: bool = False,) -> str:
         """
         Convert Structure() into PDB file string. Only the simplest function is need for
         enzyme modeling.
@@ -206,9 +209,42 @@ class PDBParser(StructureParserInterface):
         if if_renumber:
             stru.renumber_atoms()
         result_str = ""
+        new_solvent_chain = []
+        new_chain_name = None
+        res_count = 0
+        reduce_number = 0
         for chain in stru:
             chain: Chain
+            res_count += chain.num_residues
+            if chain.is_solvent_chain() and same_chain_id_for_9999_solvent:
+                if not new_chain_name:
+                    new_chain_name = chain.name
+                if res_count < 10000:
+                    new_solvent_chain.extend(chain.residues)
+                    continue
+                else:
+                    # conclude a chain and reset count
+                    for res in new_solvent_chain:
+                        res: Residue
+                        res.idx -= reduce_number
+                    # reset
+                    reduce_number += (res_count - chain.num_residues)
+                    res_count = chain.num_residues
+                    holder = chain.residues
+                    # produce
+                    chain = Chain(new_chain_name, new_solvent_chain)
+                    new_chain_name = chr(ord(new_chain_name) + 1) # TODO put this in core
+                    new_solvent_chain = holder
+
             result_str += cls._write_pdb_chain(chain)
+        if new_solvent_chain:
+            # collect remaining solvent within last 9999 cycle
+            for res in new_solvent_chain:
+                res: Residue
+                res.idx -= reduce_number
+            chain = Chain(new_chain_name, new_solvent_chain)
+            result_str += cls._write_pdb_chain(chain)
+
         result_str += f"END{os.linesep}"
         return result_str
 

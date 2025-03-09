@@ -439,7 +439,7 @@ class GaussianInterface(BaseInterface):
             name = re.sub(d3bj_pattern, "", name)
             em_part = " em=gd3bj"
 
-        result = self.METHOD_KEYWORD_MAPPER.get(name, None)
+        result = self.METHOD_KEYWORD_MAPPER.get(name.lower(), None)
         if result is None:
             result = name
         result = result + em_part

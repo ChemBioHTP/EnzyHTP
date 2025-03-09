@@ -41,6 +41,9 @@ class GaussianConfig(BaseConfig):
     FORMCHK_EXE: str = "formchk"
     """Variable for the the exe of formchk."""
 
+    ALTERNATIVE_GAUSSIAN_NAMES: List[str] = ["gaussian", "Gaussian", "g16", "gaussian16", "Gaussian16"]
+    """Alternative names that points to the same concept"""
+
     # region == Default values for build_single_point_engine() ==
     DEFAULT_SPE_NAME: str = "gaussian_spe"
     """The default value for the name tag of the SPE engine"""
