@@ -681,7 +681,7 @@ class AmberMDStep(MolDynStep):
             "qm_adaptive_solvent_type" : self.qm_adaptive_solvent_type,
             "qm_num_adaptive_solvent" : self.qm_num_adaptive_solvent,
             "qm_num_transition_solvent" : self.qm_num_transition_solvent,
-            "available_core" : available_cores,
+            "available_cores" : available_cores,
             "available_mem_per_core" : available_mem_per_core,
         }
     # endregion
@@ -722,7 +722,21 @@ class AmberMDStep(MolDynStep):
         # 4. assemble ClusterJob
         cluster = self.cluster_job_config["cluster"]
         res_keywords = self.cluster_job_config["res_keywords"]
-        env_settings = cluster.AMBER_ENV[self.core_type.upper()]
+        env_settings = {
+            "head" : cluster.AMBER_ENV[self.core_type.upper()],
+            "tail" : "",
+            }
+        # env settings for possible QM engine
+        if self.use_qmmm and self.qm_engine != "sqm":
+            qm_engine_name_mapper = {
+                "G16" : "G16",
+                "Gaussian" : "G16",
+                "gaussian" : "G16",
+            } #TODO put this maybe in general config of the interface?
+            qm_engine_name = qm_engine_name_mapper[self.qm_engine.upper()]
+            qm_engine_env = getattr(cluster, f"{qm_engine_name}_ENV")
+            env_settings["head"] += f"\n{qm_engine_env[self.core_type.upper()]['head']}"
+            env_settings["tail"] += f"\n{qm_engine_env[self.core_type.upper()]['tail']}"
         sub_script_path = fs.get_valid_temp_name(f"{self.work_dir}/submit_{self.name}.cmd")
         job = ClusterJob.config_job(
             commands = md_step_cmd,
