@@ -1110,6 +1110,7 @@ rm -rf $TMPDIR/$SLURM_JOB_ID"""
     assert test_md_egg.rst_path == './MD/amber_md_step.rst'
     assert Path(test_md_egg.prmtop_path) == Path('test/_interface/data//KE_07_R7_S.prmtop').absolute()
     fs.safe_rmdir(md_step.work_dir)
+    assert False # TODO add more QMMM result assert 
 
 
 def test_amber_md_step_make_job_w_cons():
