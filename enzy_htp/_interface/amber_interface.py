@@ -2947,7 +2947,7 @@ class AmberInterface(BaseInterface):
                       qm_region_charge_spin: Tuple[int, int] = None, 
                       qm_level_of_theory: QMLevelOfTheory = None,
                       qm_engine: str = "default", # by default sqm
-                      qm_region_pdb_path: str = None,
+                      qm_region_pdb_path: str = None, # TODO this option doesnot function for now. add it in AmberMDStep
                       qm_ele_cutoff: float = "default",
                       qm_ewald: int = "default",
                       qm_adjust_q: int = "default",
