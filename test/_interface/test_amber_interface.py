@@ -20,6 +20,7 @@ from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.general import EnablePropagate
 from enzy_htp.core.job_manager import ClusterJob, ClusterJobConfig
 from enzy_htp.core import file_system as fs
+from enzy_htp.chemical.level_of_theory import QMLevelOfTheory
 from enzy_htp._interface.amber_interface import (
     AmberParameterizer,
     AmberParameter,
@@ -725,7 +726,7 @@ def test_parse_md_config_dict_to_raw_wo_cons():
             "record_period" : 0.0004, # ns
             "mdstep_dir" : "./MD",
             "use_qmmm" : False,
-            "qm_region_pattern" : None,
+            "qm_region" : None,
             "qm_region_charge_spin" : None,
             "qm_level_of_theory" : None,
             "qm_engine" : None,
@@ -736,7 +737,117 @@ def test_parse_md_config_dict_to_raw_wo_cons():
             "qm_adaptive_solvent_type" : None,
             "qm_num_adaptive_solvent" : None,
             "qm_num_transition_solvent" : None,
-            "cluster_job_config" : None,
+            "available_cores" : 9,
+            "available_mem_per_core" : "2GB",
+    }
+
+    ai = interface.amber
+    test_raw_dict = ai._parse_md_config_dict_to_raw(test_md_config_dict)
+    assert test_raw_dict == answer_raw_dict
+
+
+def test_parse_md_config_dict_to_raw_qmmm():
+    """test to make sure _parse_md_config_dict_to_raw() works as expected.
+    using a dict from old EnzyHTP Class_Conf.Amber.conf_heat as an example"""
+    answer_raw_dict = {
+        'title': 'Heat',
+        'namelists': [
+           {'type': 'cntrl',
+            'config': {
+                'imin': 0, 'ntx': 1, 'irest': 0,
+                'ntc': 2, 'ntf': 2,
+                'cut': 10.0,
+                'nstlim': 20000, 'dt': 0.002,
+                'tempi': 0.0, 'temp0': 300.0,
+                'ntpr': 200, 'ntwx': 200,
+                'ntt': 3, 'gamma_ln': 5.0,
+                'ntb': 1, 'ntp':0,
+                'iwrap': 1,
+                'ig': -1,
+                'ifqnt' : 1,
+                }
+            },
+           {'type': 'qmmm',
+            'config': {
+                'adjust_q': 1,
+                'qm_ewald': 'amber_default',
+                'qm_theory': "'EXTERN'",
+                'qmcharge': -1,
+                'qmcut': 12.0,
+                'qmmask': "'@1567-1581,3963-3978'",
+                'spin': 1,
+                'vsolv': 1,
+                'writepdb': 0
+                }
+           },        
+           {'type': 'gau',
+            'config': {
+                    'basis': "'def2svp'",
+                    'mem': "'16GB'",
+                    'method': "'PBE0'",
+                    'num_threads': 8
+                }
+            },
+           {'type': 'vsolv',
+            'config': {
+                'nearest_qm_solvent': 10,
+                }
+           },
+           {'type': 'wt',
+            'config': {
+                'type': "'TEMP0'",
+                'istep1': 0, 'istep2': 18000,
+                'value1': 0.0, 'value2': 300.0,
+                }
+            },
+           {'type': 'wt',
+            'config': {
+                'type': "'TEMP0'",
+                'istep1': 18001, 'istep2': 20000,
+                'value1': 300.0, 'value2': 300.0,
+                }
+            },
+           {'type': 'wt',
+            'config': {
+                'type': "'END'",
+                }
+            },
+        ],
+        'file_redirection': {},
+        'group_info': [],
+    }
+    test_pdb = f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb"
+    test_stru = struct.PDBParser().get_structure(test_pdb)
+    test_md_config_dict = {
+            "name" : "Heat",
+            "length" : 0.04, # ns
+            "timestep" : 0.000002, # ns
+            "minimize" : False,
+            "temperature" : [(0.0, 0.0), (0.036, 300.0), (0.04, 300.0)],
+            "thermostat" : "langevin",
+            "pressure_scaling" : "none",
+            "constrain" : None,
+            "restart" : False,
+            "if_report" : True,
+            "record_period" : 0.0004, # ns
+            "mdstep_dir" : "./MD",
+            "use_qmmm" : True,
+            "qm_region" : select_stru(test_stru, "resi 101+254"),
+            "qm_region_charge_spin" : (-1, 1),
+            "qm_level_of_theory" : QMLevelOfTheory(
+                                    basis_set="def2svp",
+                                    method="PBE0",
+                                   ),
+            "qm_engine" : "g16",
+            "qm_region_pdb_path" : None,
+            "qm_ele_cutoff" : 12.0,
+            "qm_ewald" : "amber_default",
+            "qm_adjust_q" : 1,
+            "qm_adaptive_solvent_type" : "single_point",
+            "qm_num_adaptive_solvent" : 10,
+            "qm_num_transition_solvent" : 0,
+            "available_cores" : 9,
+            "available_mem_per_core" : "2GB",
     }
 
     ai = interface.amber
@@ -778,7 +889,7 @@ def test_parse_md_config_dict_to_raw_minimize():
             "record_period" : 0.0004, # ns
             "mdstep_dir" : "./MD",
             "use_qmmm" : False,
-            "qm_region_pattern" : None,
+            "qm_region" : None,
             "qm_region_charge_spin" : None,
             "qm_level_of_theory" : None,
             "qm_engine" : None,
@@ -789,7 +900,8 @@ def test_parse_md_config_dict_to_raw_minimize():
             "qm_adaptive_solvent_type" : None,
             "qm_num_adaptive_solvent" : None,
             "qm_num_transition_solvent" : None,
-            "cluster_job_config" : None,
+            "available_cores" : 9,
+            "available_mem_per_core" : "2GB",
     }
 
     ai = interface.amber
@@ -885,7 +997,7 @@ def test_parse_md_config_dict_to_raw_w_cons():
         "record_period" : 0.0004,
         "mdstep_dir" : "./MD",
         "use_qmmm" : False,
-        "qm_region_pattern" : None,
+        "qm_region" : None,
         "qm_region_charge_spin" : None,
         "qm_level_of_theory" : None,
         "qm_engine" : None,
@@ -896,7 +1008,8 @@ def test_parse_md_config_dict_to_raw_w_cons():
         "qm_adaptive_solvent_type" : None,
         "qm_num_adaptive_solvent" : None,
         "qm_num_transition_solvent" : None,
-        "cluster_job_config" : None,
+        "available_cores" : 9,
+        "available_mem_per_core" : "2GB",
     }
 
     ai = interface.amber
