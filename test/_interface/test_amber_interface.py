@@ -28,6 +28,7 @@ from enzy_htp._interface.amber_interface import (
     AmberMDResultEgg,
     AmberMDCRDParser,)
 import enzy_htp.structure as struct
+from enzy_htp.structure.structure_io.prmtop_io import PrmtopParser
 from enzy_htp.structure.structure_constraint import (
     StructureConstraint,
     create_cartesian_freeze,
@@ -1656,4 +1657,22 @@ def test_convert_stru_to_inpcrd():
 
     assert files_equivalent(test_out_path, answer_inpcrd_file)
 
-    fs.clean_temp_file_n_dir(test_out_path)
+    fs.clean_temp_file_n_dir([test_out_path])
+
+def test_convert_stru_to_inpcrd_too_many_solvent():
+    test_crd = f"{MM_DATA_DIR}/AMY_1f.mdcrd"
+    test_prmtop = f"{MM_DATA_DIR}/AMY.prmtop"
+    coord_0, pbc_box_edges = next(
+        AmberMDCRDParser(test_prmtop).get_coordinates(test_crd))
+    test_stru = PrmtopParser().get_structure(test_prmtop)
+    test_stru.apply_geom(coord_0)
+
+    test_out_path = f"{MM_WORK_DIR}/test_convert_stru_to_inpcrd.inpcrd"
+    answer_inpcrd_file = f"{MM_DATA_DIR}/answer_convert_stru_to_inpcrd_many_solvent.inpcrd"
+    
+    ai = interface.amber
+    ai.convert_stru_to_inpcrd(test_stru, test_out_path)
+
+    assert files_equivalent(test_out_path, answer_inpcrd_file)
+
+    fs.clean_temp_file_n_dir([test_out_path])
