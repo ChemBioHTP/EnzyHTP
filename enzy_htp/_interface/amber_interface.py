@@ -757,7 +757,7 @@ class AmberMDStep(MolDynStep):
         }
 
         # 5. make result egg
-        result_egg = AmberMDResultEgg(
+        result_egg = AmberMDResultEgg( # TODO for a QMMM job there are more to pick up
             traj_path=traj_path,
             traj_log_path=mdout_path,
             rst_path=mdrst_path,
