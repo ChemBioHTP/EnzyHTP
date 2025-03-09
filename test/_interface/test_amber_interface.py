@@ -1096,14 +1096,14 @@ def test_amber_md_step_make_job_qmmm():
 
 source /sb/apps/amber22/amber\.sh
 module load Gaussian/16\.B\.01
-mkdir $TMPDIR/$SLURM_JOB_ID
-export GAUSS_SCRDIR=$TMPDIR/$SLURM_JOB_ID
+mkdir \$TMPDIR/\$SLURM_JOB_ID
+export GAUSS_SCRDIR=\$TMPDIR/\$SLURM_JOB_ID
 
 mpirun -np 16 sander\.MPI -O -i \./MD/amber_md_step_?[0-9]*\.in -o \./MD/amber_md_step\.out -p .*test/_interface/data//KE_07_R7_S\.prmtop -c .*test/_interface/data//KE_07_R7_S\.inpcrd -r \./MD/amber_md_step\.rst -ref .*test/_interface/data//KE_07_R7_S\.inpcrd -x \./MD/amber_md_step\.nc 
 
 
-rm -rf $TMPDIR/$SLURM_JOB_ID"""
-
+rm -rf \$TMPDIR/\$SLURM_JOB_ID"""
+    print(test_job.sub_script_str)
     assert re.match(answer_pattern, test_job.sub_script_str)
     assert test_md_egg.traj_path == './MD/amber_md_step.nc'
     assert test_md_egg.traj_log_path == './MD/amber_md_step.out'
