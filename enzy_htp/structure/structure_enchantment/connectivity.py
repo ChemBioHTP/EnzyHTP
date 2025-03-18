@@ -242,13 +242,14 @@ def _connect_maa(maa: ModifiedResidue, method: str, ncaa_lib: str) -> None:
     """initiate connectivity for modified residue"""
     support_method_list = ["antechamber"]
     if method in MOL_DESC_METHODS:
+        maa_region = create_region_from_residues(residues=[maa], nterm_cap="H", cterm_cap="OH")
         _mol_desc_based_ncaa_method(maa, method, ncaa_lib)
         return
 
     if method not in support_method_list:
         _LOGGER.error(f"Method {method} not in supported list: {support_method_list}")
 
-def _mol_desc_based_ncaa_method(ncaa: NonCanonicalBase, engine: str, ncaa_lib: str):
+def _mol_desc_based_ncaa_method(ncaa: Union[NonCanonicalBase, StructureRegion], engine: str, ncaa_lib: str):
     """mol desc based method to generate connectivty for ncaa"""
     # 0. search lib for prepin/mol2 of ncaa
     if ncaa_lib is None:
@@ -260,13 +261,16 @@ def _mol_desc_based_ncaa_method(ncaa: NonCanonicalBase, engine: str, ncaa_lib: s
 
     # 1. make mol describing file for ncaa
     if not mol_desc_path:
-        mol_desc_path = f"{ncaa_lib}/{ncaa.name}_any.prepin"  # swicth to mol2 after finish all unit tests of mol2_io
+        if isinstance(ncaa, StructureRegion):
+            mol_desc_path = f"{ncaa_lib}/{ncaa.involved_residues[0].name}_any.prepin"
+        else:
+            mol_desc_path = f"{ncaa_lib}/{ncaa.name}_any.prepin"  # swicth to mol2 after finish all unit tests of mol2_io
         MOL_DESC_GEN_MAPPER[engine](ncaa=ncaa, out_path=mol_desc_path)
     # 2. parse mol describing and clone into connectivity
     cnt_stru = MOL_DESC_PARSER_MAPPER[fs.get_file_ext(mol_desc_path)](mol_desc_path)
     cnt_ncaa = cnt_stru.residues[0]
 
-    ncaa.clone_connectivity(cnt_ncaa)
+    ncaa.clone_connectivity(cnt_ncaa) if not isinstance(ncaa, StructureRegion) else ncaa.involved_residues[0].clone_connectivity(cnt_ncaa)
 
 def _connect_solvent(sol: Solvent, method: str) -> None:
     """initate connectivity for solvent."""

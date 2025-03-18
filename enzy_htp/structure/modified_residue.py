@@ -18,6 +18,7 @@ from .residue import Residue
 from .noncanonical_base import NonCanonicalBase
 import enzy_htp.chemical as chem
 from enzy_htp.core import _LOGGER
+import networkx as nx
 
 
 class ModifiedResidue(NonCanonicalBase):
@@ -90,8 +91,8 @@ class ModifiedResidue(NonCanonicalBase):
         and breadth-first-search
         """
 
-        graph: dict[Atom, List[Atom]] = {aa: [] for aa in self.atoms}
-        parent: dict[Atom, Atom] = {aa: None for aa in self.atoms}
+        graph = nx.Graph()
+        graph.add_nodes_from([aa for aa in self.atoms])
 
         start_atom: Atom = self.find_atom_name("N")
         end_atom: Atom = self.find_atom_name("C")
@@ -99,43 +100,13 @@ class ModifiedResidue(NonCanonicalBase):
         # create "graph" of atoms
         for aa in self.atoms:
             for oa in aa.connect:
-                graph[aa].append(oa[0])
-
-        q: List[str] = [start_atom]
-
-        visited = [start_atom]
-
-        # breadth-first search
-        while q:
-            curr_atom = q.pop(0)
-            for aa in graph[curr_atom]:
-                if aa not in visited:
-                    q.append(aa)
-                    visited.append(aa)
-                    parent[aa] = curr_atom
-
-                if aa == end_atom:
-                    break
-    
-        # hopefully, we have found the c-terminal. If not, throw an error
-        if parent[end_atom] is None:
+                graph.add_edge(aa, oa[0])
+        try:
+            path = nx.shortest_path(graph, start_atom, end_atom)
+        except nx.NodeNotFound:
             raise AttributeError(f"Path from n-term to c-term does not exist for {self.name}")
         
-        # find main chain atoms through searching parent
-        curr_atom = end_atom
-        main_chain = []
-        while parent[curr_atom] is not None:
-            main_chain.append(curr_atom)
-            curr_atom = parent[curr_atom]
-        
-        main_chain.append(curr_atom)
-        main_chain.reverse()
-
-        # get rid of first and last element
-        main_chain.pop(0)
-        main_chain.pop()
-        
-        return main_chain
+        return path
     
     def clone_connectivity(self, other):
         """clone connectivity from {other}.
@@ -144,7 +115,7 @@ class ModifiedResidue(NonCanonicalBase):
         # 1. san check
         # - make sure other's atoms are not less than self's atoms
 
-        if len(self.atom_name_list) > len(other.atom_name_list):
+        if len(self.atom_name_list) > len(other.atom_name_list) or not set(self.atom_name_list).issubset(set(other.atom_name_list)):
             _LOGGER.error(f"Atom names are not consistent between {self} and {other}. Cannot align.")
             raise ValueError
         

@@ -168,3 +168,10 @@ def test_convert_to_structure():
     test_stru_4 = test_stru_region_2.convert_to_structure()
     assert test_stru_3.is_same_topology(test_stru_4)
 
+    test_stru_5 = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
+    test_stru_5.assign_ncaa_chargespin({"H5J": (0,1)})
+    test_stru_region_3 = stru_regi.create_region_from_full_stru(
+        test_stru_5
+    )
+    test_stru_6 = test_stru_region_3.convert_to_structure(cap_as_residue=True)
+    assert test_stru_5.is_same_topology(test_stru_6)

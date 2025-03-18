@@ -348,11 +348,16 @@ class StructureRegion:
         residues: List[Residue] = []
 
         for res in residue_mapper:
-            new_res = deepcopy(res) if not isinstance(res, ResidueCap) else res
+            
+            if isinstance(res, ResidueCap):
+                link_residue = res.link_residue
+
+            new_res = deepcopy(res)
             new_res.atoms = residue_mapper[res]
 
             if isinstance(res, ResidueCap):
                 new_res.parent = res.link_residue.parent
+                new_res.link_residue = link_residue
             else:
                 new_res.parent = res.parent
                 

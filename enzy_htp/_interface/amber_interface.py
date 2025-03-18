@@ -2598,7 +2598,7 @@ class AmberInterface(BaseInterface):
                                     cluster_job_config: Dict=None,) -> str:
         """use antechamber to generate .mol2/.ac file for ligand/modified amino acid.
         Args:
-            ncaa: the target Ligand/ModifiedAminoAcid
+            ncaa: the target Ligand/ModifiedAminoAcid. Modified amino acids can be passed in as StructureRegion objects.
             out_path: the path of the output molecule description file. (use ext here to determine target format)
             gaff_type: the ff type used for NCAA. This influence the atom type in the moldesc file
             charge_method: the method for generation of atomic charges
@@ -2606,11 +2606,15 @@ class AmberInterface(BaseInterface):
         Return:
             the out_path
             """
-        
+        # init ncaa object
         maa_region = None
 
         if isinstance(ncaa, StructureRegion):
             maa_region = ncaa
+
+            if len(maa_region.involved_residues) > 1:
+                _LOGGER.error("Please provide a ncaa StructureRegion with exactly 1 involved residue")
+
             ncaa = ncaa.involved_residues[0]
 
         # san check
@@ -2639,14 +2643,16 @@ class AmberInterface(BaseInterface):
         temp_dir = eh_config["system.SCRATCH_DIR"]
         fs.safe_mkdir(temp_dir)
 
-        if ncaa.is_modified():
-            temp_pdb_path = fs.get_valid_temp_name(f"{temp_dir}/{ncaa.name}.pdb")
-        else:
-            temp_pdb_path = fs.get_valid_temp_name(f"{temp_dir}/{ncaa.name}.pdb")
+        temp_pdb_path = fs.get_valid_temp_name(f"{temp_dir}/{ncaa.name}.pdb")
 
         if ncaa.is_modified():
             if maa_region:
                 ncaa = maa_region.convert_to_structure(cap_as_residue=False)
+            # else:
+            #     # 1.1. Capping - cap C-terminal with OH and N-terminal with H  
+            #     ncaa_region = create_region_from_residues(residues=[ncaa], nterm_cap="H", cterm_cap="OH")  
+            #     ncaa = ncaa_region.convert_to_structure(cap_as_residue=False)
+
         pdb_io.PDBParser().save_structure(temp_pdb_path, ncaa)
         input_file = temp_pdb_path
 
@@ -3306,14 +3312,22 @@ class AmberInterface(BaseInterface):
 
     def make_mc_file(self, maa_region: StructureRegion, out_path: str):
         """make the mc file for parameterization"""
+
+        if len(maa_region.involved_residues) > 1:
+            _LOGGER.error("Please provide a maa_region with exactly 1 involved residue")
+
         maa: ModifiedResidue = maa_region.involved_residues[0]
         
         if not maa.is_connected():
-            raise AttributeError(f"maa is not connected; use init_connectivity() first.") 
+            _LOGGER.warning(f"maa is not connected; use init_connectivity() first.") 
 
         # main chain
         mc_atoms = maa.find_mainchain()
-        lines = ["HEAD_NAME: N", "TAIL_NAME: C"]
+        lines = [f"HEAD_NAME: {mc_atoms[0].name}", f"TAIL_NAME: {mc_atoms[-1].name}"]
+
+        # get rid of first and last element
+        mc_atoms.pop(0)
+        mc_atoms.pop()
         
         for aa in mc_atoms:
             lines.append(f"MAIN_CHAIN: {aa.name}")
@@ -3325,14 +3339,14 @@ class AmberInterface(BaseInterface):
 
         # find pre_head and post_tail atom types
         for cap in maa_region.caps:
-            if cap.link_atom.element == "N":
-                if cap.socket_atom.element != "C":
+            if cap.link_atom.name == "N":
+                if cap.socket_atom.name != "C":
                     _LOGGER.warning("Bond is not a classical peptide bond. MC generation may not work correctly.")
                 lines.append(f"PRE_HEAD_TYPE: {cap.socket_atom.element}")
             
         for cap in maa_region.caps:
-            if cap.link_atom.element == "C":
-                if cap.socket_atom.element != "N":
+            if cap.link_atom.name == "C":
+                if cap.socket_atom.name != "N":
                     _LOGGER.warning("Bond is not a classical peptide bond. MC generation may not work correctly.")
                 lines.append(f"POST_TAIL_TYPE: {cap.socket_atom.element}")
 
@@ -3341,13 +3355,6 @@ class AmberInterface(BaseInterface):
 
         fs.write_lines(out_path, lines)
         return out_path
-                
-
-        
-
-        
-        
-        
 
 amber_interface = AmberInterface(None, eh_config._amber)
 """The singleton of AmberInterface() that handles all Amber related operations in EnzyHTP

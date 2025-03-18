@@ -41,6 +41,13 @@ class NonCanonicalBase(Residue):
     @property
     def net_charge(self) -> int:
         """Getter for the net_charge attribute."""
+
+        if self._net_charge is None:  
+            _LOGGER.error(f"NCAA does not have charge."  
+                          " ALWAYS check and explicit assign it using"  
+                          " Structure.assign_ncaa_chargespin()")  
+            raise ValueError  
+        
         return self._net_charge
 
     @net_charge.setter
@@ -51,6 +58,13 @@ class NonCanonicalBase(Residue):
     @property
     def multiplicity(self) -> int:
         """Getter for the multiplicity attribute."""
+
+        if self._multiplicity is None:  
+            _LOGGER.error(f"NCAA does not have spin."  
+                          " ALWAYS check and explicit assign it using"  
+                          " Structure.assign_ncaa_chargespin()")  
+            raise ValueError  
+        
         return self._multiplicity
 
     @multiplicity.setter
