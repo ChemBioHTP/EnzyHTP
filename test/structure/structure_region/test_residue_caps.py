@@ -58,6 +58,7 @@ def test_updated_residue_cap_deepcopy():
     assert ch3_copy.link_residue is None
     assert ch3_copy.link_atom is None
     assert ch3_copy.socket_atom is None
+    assert len(ch3_copy.atoms) == len(test_ch3.atoms)
 
 def test_nhch3_cap(helpers):
     """tests NHCH3Cap to ensure region is capped properly"""
