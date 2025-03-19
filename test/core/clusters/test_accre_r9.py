@@ -2,6 +2,10 @@
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2025-03-19
 """
+import pytest
+
+from enzy_htp.core.general import EnablePropagate
+from enzy_htp.core import _LOGGER
 from enzy_htp.core.clusters.accre_r9 import AccreR9
 
 def test_parser_resource_str_gpu():
@@ -50,3 +54,19 @@ def test_parser_resource_str_gpu():
 #SBATCH --account=xxx
 #SBATCH --export=NONE
 '''
+
+def test_parser_resource_str_gpu_no_type(caplog):
+    res_dict = {
+        'core_type' : 'gpu',
+        'nodes':'1',
+        'node_cores' : '1',
+        'job_name' : 'EnzyHTP_MD',
+        'partition' : 'batch_gpu',
+        'mem_per_core' : '32G',
+        'walltime' : '3-00:00:00',
+        'account' : 'xxx'
+    }
+    with pytest.raises(ValueError) as e:
+        with EnablePropagate(_LOGGER):
+            res_str = AccreR9().parser_resource_str(res_dict)
+            assert "wants you to put GPU type in node_cores" in caplog.text

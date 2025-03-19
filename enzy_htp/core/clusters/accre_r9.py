@@ -148,6 +148,13 @@ export ROSETTA3=/data/yang_lab/shaoqz/software/Rosetta313/main/""",
         parser keywords into ACCRE_R9 style
         """
         new_dict = {}
+        # san check
+        if "node_cores" in res_dict and res_dict["core_type"] == "gpu":
+            match = re.match(r"(.*):([0-9]+)", str(res_dict["node_cores"]))
+            if not match:
+                _LOGGER.error("ACCRE R9 wants you to put GPU type in node_cores. (e.g.: 'nvidia_rtx_a6000:1')")
+                raise ValueError
+
         for k, v in res_dict.items():
             # remove core type line
             if k == "core_type":
