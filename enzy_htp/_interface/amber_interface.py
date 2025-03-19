@@ -20,7 +20,7 @@ from typing import Generator, List, Tuple, Union, Dict, Any
 from dataclasses import dataclass
 import pandas as pd
 from sympy import sympify
-from collections import Iterable
+from collections.abc import Iterable
 
 from .base_interface import BaseInterface
 from .handle_types import (
