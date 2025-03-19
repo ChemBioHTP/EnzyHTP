@@ -1172,7 +1172,7 @@ def test_amber_md_step_try_merge_jobs(caplog):
         assert len(merged_jobs) == 2
         for test, answer in zip(merged_jobs[0].mimo["commands"], [
                 r'pmemd.cuda -O -i ./MD/amber_md_step_?[0-9]*.in -o ./MD/amber_md_step.out -p .*test/_interface/data//KE_07_R7_S.prmtop -c .*test/_interface/data//KE_07_R7_S.inpcrd -r ./MD/amber_md_step.rst -ref .*test/_interface/data//KE_07_R7_S.inpcrd -x ./MD/amber_md_step.nc ',
-                r'pmemd.cuda -O -i ./MD/amber_md_step_?[0-9]*.in -o ./MD/amber_md_step.out -p .*test/_interface/data//KE_07_R7_S.prmtop -c ./MD/amber_md_step.inpcrd -r ./MD/amber_md_step.rst -ref ./MD/amber_md_step.inpcrd -x ./MD/amber_md_step.nc '
+                r'pmemd.cuda -O -i ./MD/amber_md_step_?[0-9]*.in -o ./MD/amber_md_step.out -p .*test/_interface/data//KE_07_R7_S.prmtop -c ./MD/amber_md_step.rst -r ./MD/amber_md_step.rst -ref ./MD/amber_md_step.rst -x ./MD/amber_md_step.nc '
                 ]):
             assert re.match(answer, test)
         assert len(merged_jobs[0].mimo["temp_mdin"]) == 2
