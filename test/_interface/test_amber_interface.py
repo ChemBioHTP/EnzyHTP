@@ -785,7 +785,7 @@ def test_parse_md_config_dict_to_raw_qmmm():
             'config': {
                     'basis': "'def2svp'",
                     'mem': "'16GB'",
-                    'method': "'PBE0'",
+                    'method': "'pbe1pbe'",
                     'num_threads': 8
                 }
             },
