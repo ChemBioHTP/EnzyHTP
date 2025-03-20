@@ -28,6 +28,7 @@ def test_prmtop_parser_get_stru():
     ])
     assert test_stru.atoms[-1].charge == 0.417
     assert test_stru.atom_idx_list.count(1) == 1
+    assert test_stru.pbc_box_shape == (70.6221139, 70.6221139, 70.6221139, 109.471219, 109.471219, 109.471219)
 
 def test_parse_version():
     """test using content from an example file: {DATA_DIR}/KE_07_R7_2_S_10f.prmtop"""
@@ -173,3 +174,11 @@ def test_parse_prmtop_file_add_pdb():
     assert len(data['ATOM_ELEMENT']) == n_atoms
     assert len(data['RESIDUE_CHAINID']) == n_res
     assert len(data['RESIDUE_NUMBER']) == n_res
+
+def test_parse_box_dimensions():
+    """test _parse_box_dimensions"""
+    test_content = """ BOX_DIMENSIONS                                                            
+%FORMAT(5E16.8)                                                                 
+  1.09471219E+02  7.06221139E+01  7.06221139E+01  7.06221139E+01
+"""
+    assert PrmtopParser._parse_box_dimensions(test_content) == {'BOX_DIMENSIONS': [109.471219, 70.6221139, 70.6221139, 70.6221139]}

@@ -65,7 +65,7 @@ class Residue(DoubleLinkedNode):
 
     @property
     def chain(self):
-        """Getter for the Residue()'s parent chain id."""
+        """Getter for the Residue()'s parent chain object."""
         return self.get_parent()
 
     @chain.setter
@@ -206,7 +206,12 @@ class Residue(DoubleLinkedNode):
     def atom_idx_mapper(self) -> Dict[int, Atom]:
         """the mapper for idx -> atom"""
         return {atom.idx : atom for atom in self.atoms}
-    
+
+    @property
+    def atom_name_mapper(self) -> Dict[str, Atom]:
+        """the mapper for name -> atom"""
+        return {atom.name : atom for atom in self.atoms}
+
     @property
     def hydrogens(self) -> List[Atom]:
         """Return all the hydrogen atoms in the Residue/Ligand."""
