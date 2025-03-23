@@ -242,7 +242,6 @@ def _connect_maa(maa: ModifiedResidue, method: str, ncaa_lib: str) -> None:
     """initiate connectivity for modified residue"""
     support_method_list = ["antechamber"]
     if method in MOL_DESC_METHODS:
-        maa_region = create_region_from_residues(residues=[maa], nterm_cap="H", cterm_cap="OH")
         _mol_desc_based_ncaa_method(maa, method, ncaa_lib)
         return
 

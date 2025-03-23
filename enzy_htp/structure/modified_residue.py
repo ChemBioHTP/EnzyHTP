@@ -52,12 +52,15 @@ class ModifiedResidue(NonCanonicalBase):
 
     @property
     def mainchain_atoms(self) -> List[Atom]:
-        """return a list of mainchain atoms"""
+        """return a list of mainchain atoms. If the mainchain is already set, return those atoms. Otherwise, 
+           find the shortest path between N-term and C-term with find_mainchain(), then return it."""
         if len(self._mainchain_atoms) > 0:
             return self._mainchain_atoms
         else:
-            raise AttributeError(f"Missing mainchain information for {self.name} at {self.key_str}! "
-                                  "You can assign it using assign_mod_aa_mainchain()")
+            self._mainchain_atoms = self.find_mainchain()
+            return self._mainchain_atoms
+            # raise AttributeError(f"Missing mainchain information for {self.name} at {self.key_str}! "
+            #                       "You can assign it using assign_mod_aa_mainchain()")
 
     # === Checker ===
     def is_modified_residue(self) -> bool:

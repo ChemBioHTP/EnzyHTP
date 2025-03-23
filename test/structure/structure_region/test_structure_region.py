@@ -10,6 +10,7 @@ from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.general import EnablePropagate
 import enzy_htp.core.file_system as fs
 import enzy_htp.structure.structure_region as stru_regi
+from enzy_htp.structure.structure_region.residue_caps import ResidueCap
 import enzy_htp.structure.structure_selection as stru_sele
 from enzy_htp.structure.structure_enchantment import init_charge
 
@@ -157,21 +158,36 @@ def test_convert_to_structure():
     test_stru_region = stru_regi.create_region_from_selection_pattern(
         test_stru, "all"
     )
+
     test_stru_2 = test_stru_region.convert_to_structure()
     assert test_stru.is_same_topology(test_stru_2)
+
+    # assert that original atoms point back to own residues
+    for residue in test_stru.residues:
+        for aa in residue:
+            assert aa.parent == residue
 
     test_stru_3 = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
     test_stru_3.assign_ncaa_chargespin({"H5J": (0,1)})
     test_stru_region_2 = stru_regi.create_region_from_full_stru(
         test_stru_3
     )
-    test_stru_4 = test_stru_region_2.convert_to_structure()
+    test_stru_4 = test_stru_region_2.convert_to_structure(cap_as_residue=False)
     assert test_stru_3.is_same_topology(test_stru_4)
 
-    test_stru_5 = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
-    test_stru_5.assign_ncaa_chargespin({"H5J": (0,1)})
-    test_stru_region_3 = stru_regi.create_region_from_full_stru(
-        test_stru_5
+    # assert that original atoms point back to own residues
+    for residue in test_stru.residues:
+        for aa in residue:
+            assert aa.parent == residue
+
+    test_stru_5 = sp.get_structure(f"{DATA_DIR}3FCR_modified.pdb")
+    test_stru_5.assign_ncaa_chargespin({"LLP": (-2, 1)})
+    test_stru_region_3 = stru_regi.create_region_from_residues(
+        [test_stru_5.modified_residue[0]], nterm_cap="H", cterm_cap="OH"
     )
-    test_stru_6 = test_stru_region_3.convert_to_structure(cap_as_residue=True)
-    assert test_stru_5.is_same_topology(test_stru_6)
+
+    test_stru_6 = test_stru_region_3.convert_to_structure()
+    for res in test_stru_6.residues:
+        if isinstance(res, ResidueCap):
+            assert res.link_residue.name == test_stru_5.modified_residue[0].name
+            assert res.link_atom.name in [atom.name for atom in test_stru_5.modified_residue[0].atoms]

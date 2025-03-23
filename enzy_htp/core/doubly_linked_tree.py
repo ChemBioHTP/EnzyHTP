@@ -134,7 +134,7 @@ class DoubleLinkedNode():
         # in case this is the first copied item
         if memo is None:
             memo = {}
-        # treat copying action on parent  - TODO: DO THIS IN __deepcopy__ for ResidueCaps - remove socket_atom
+        # treat copying action on parent
         if self.parent is not None:
             # not the root.
             parent_id = id(self.parent)

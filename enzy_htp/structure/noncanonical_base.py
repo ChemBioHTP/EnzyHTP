@@ -46,7 +46,7 @@ class NonCanonicalBase(Residue):
             _LOGGER.error(f"NCAA does not have charge."  
                           " ALWAYS check and explicit assign it using"  
                           " Structure.assign_ncaa_chargespin()")  
-            raise ValueError  
+            raise AttributeError  
         
         return self._net_charge
 
@@ -63,7 +63,7 @@ class NonCanonicalBase(Residue):
             _LOGGER.error(f"NCAA does not have spin."  
                           " ALWAYS check and explicit assign it using"  
                           " Structure.assign_ncaa_chargespin()")  
-            raise ValueError  
+            raise AttributeError  
         
         return self._multiplicity
 

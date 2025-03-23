@@ -2648,10 +2648,10 @@ class AmberInterface(BaseInterface):
         if ncaa.is_modified():
             if maa_region:
                 ncaa = maa_region.convert_to_structure(cap_as_residue=False)
-            # else:
-            #     # 1.1. Capping - cap C-terminal with OH and N-terminal with H  
-            #     ncaa_region = create_region_from_residues(residues=[ncaa], nterm_cap="H", cterm_cap="OH")  
-            #     ncaa = ncaa_region.convert_to_structure(cap_as_residue=False)
+            else:
+                # 1.1. Capping - cap C-terminal with OH and N-terminal with H  
+                ncaa_region = create_region_from_residues(residues=[ncaa], nterm_cap="H", cterm_cap="OH")  
+                ncaa = ncaa_region.convert_to_structure(cap_as_residue=False)
 
         pdb_io.PDBParser().save_structure(temp_pdb_path, ncaa)
         input_file = temp_pdb_path
@@ -3322,7 +3322,7 @@ class AmberInterface(BaseInterface):
             _LOGGER.warning(f"maa is not connected; use init_connectivity() first.") 
 
         # main chain
-        mc_atoms = maa.find_mainchain()
+        mc_atoms = maa.mainchain_atoms
         lines = [f"HEAD_NAME: {mc_atoms[0].name}", f"TAIL_NAME: {mc_atoms[-1].name}"]
 
         # get rid of first and last element

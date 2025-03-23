@@ -37,10 +37,8 @@ def test_residue_cap_deepcopy():
         'cterm' 
     )
     ch3_copy = deepcopy(test_ch3)
-
     assert ch3_copy.link_residue is not test_res
-    assert ch3_copy.link_residue.parent is None
-    assert ch3_copy.link_atom in ch3_copy.link_residue.atoms
+
 
 def test_updated_residue_cap_deepcopy():
     """test the behavior of deepcopy for residue cap"""

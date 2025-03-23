@@ -165,7 +165,7 @@ def num_ele_2d(list_2d: List[list]) -> int:
 #     return [[x] + y if x != GHOST_LIST_ELEMENT else y for x in curr_list
 #             for y in next_list]
 
-# The breadth-first-search algorithm I made for finding the mainchain of a modified residue
+# Sebastian - The breadth-first-search algorithm I made for finding the mainchain of a modified residue
 # graph: dict[Atom, List[Atom]] = {aa: [] for aa in self.atoms}
 # parent: dict[Atom, Atom] = {aa: None for aa in self.atoms}
 
