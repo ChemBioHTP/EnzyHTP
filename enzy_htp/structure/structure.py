@@ -1010,7 +1010,7 @@ class Structure(DoubleLinkedNode):
         IMPORTANT: assume the chain order and sequence are the same between self and other"""
         # san check
         # - chain sequence consistency
-        if self.is_same_sequence(other, amino_acid_only=amino_acid_only):
+        if not self.is_same_sequence(other, amino_acid_only=amino_acid_only):
             _LOGGER.error(f"Inconsistent sequence betweem {self} and {other}. Clone rejected.")
             raise ValueError("inconsistent sequence")
         if amino_acid_only:
