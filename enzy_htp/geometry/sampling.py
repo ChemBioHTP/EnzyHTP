@@ -320,8 +320,8 @@ def _process_equi_md_sampling_arguments(
     heat_step = parent_interface.build_md_step(
         name="heat_nvt",
         length=0.05, # ns
-        cluster_job_config=cpu_equi_job_config,
-        core_type="cpu",
+        cluster_job_config=cluster_job_config,
+        core_type="gpu",
         temperature=[(0, 0), (0.05*0.9, prod_temperature), (-1, prod_temperature)],
         constrain=[freeze_backbone] + prod_constrain)
 
