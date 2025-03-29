@@ -254,7 +254,7 @@ class StatusCode():
                                     that the workflow is running but an inner unit is paused as expected. Value: -2
         EXPECTED_PAUSE (int): Specific to Basic WorkUnit instances. Indicates that a unit is paused and its outer
                               layers should be marked as `RUNNING_WITH_PAUSE_IN_INNER_UNITS`. Value: -1
-        EXIT_WITH_OK (int): Indicates successful completion of the work unit or workflow. Value: 0
+        EXIT_OK (int): Indicates successful completion of the work unit or workflow. Value: 0
         ERROR_IN_INNER_UNITS (int): Specific to WorkFlow and ControlWorkUnit. Indicates error(s) in the
                                     inner units of a workflow. Value: 1
         EXIT_WITH_ERROR (int): Specific to Basic WorkUnit instances. Indicates that the work unit or workflow

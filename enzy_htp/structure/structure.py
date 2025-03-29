@@ -121,6 +121,7 @@ class Structure(DoubleLinkedNode):
 
     Attributes:
         children/chains: List[Chain]
+        pbc_box_shape: Tuple[float,float,float,float,float,float]
 
     Derived properties:
         residue_state : List[Tuple[str, str, int]]
@@ -138,12 +139,14 @@ class Structure(DoubleLinkedNode):
                              'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',
                              'U', 'V', 'W', 'X', 'Y', 'Z',] + [str(x) for x in range(50000)]
 
-    def __init__(self, chains: List[Chain]):
+    def __init__(self, chains: List[Chain], pbc_box_shape: Tuple[float] = None):
         """Constructor that takes just a list of Chain() objects as input."""
         self.set_children(chains)
         self.set_ghost_parent()
         if self.has_duplicate_chain_name():
             self.resolve_duplicated_chain_name()
+        # PBC
+        self._pbc_box_shape = pbc_box_shape
 
     #region === Getters-attr ===
     @property
@@ -180,6 +183,32 @@ class Structure(DoubleLinkedNode):
         """Gets a chain of the given name. Returns None if the Chain() is not present."""
         return self.chain_mapper.get(chain_name, None)
 
+    @property
+    def pbc_box_shape(self) -> Union[None, Tuple[float,float,float,float,float,float]]:
+        """a 6-D tuple for (edge_1, edge_2, edge_3, angle_1, angle_2, angle_3)
+        of the periodic boundary condition box.
+        Alternatively, None indicate the current Structure() does not have a PBC"""
+        return self._pbc_box_shape
+
+    @pbc_box_shape.setter
+    def pbc_box_shape(self, val: Union[None, Tuple[float,float,float,float,float,float]]):
+        """setter for pbc_box_shape"""
+        # san check
+        if val is not None:
+            if isinstance(val, tuple):
+                if len(val) == 6:
+                    for digit in val:
+                        if not isinstance(digit, float):
+                            _LOGGER.error(f"the pbc_box_shape expect float in a tuple, got: {val}")
+                            raise ValueError
+                else:
+                    _LOGGER.error(f"the pbc_box_shape expect 6 float in a tuple, got: {val}")
+                    raise ValueError
+            else:
+                _LOGGER.error(f"the pbc_box_shape expect a tuple or None, got: {val}")
+                raise TypeError
+
+        self._pbc_box_shape = val
     #endregion
 
     #region === Getter-Prop ===
@@ -608,6 +637,10 @@ class Structure(DoubleLinkedNode):
                 return False
         return True
 
+    def has_pbc_box(self) -> bool:
+        """check if there is a PBC box in the current Structure"""
+        return self.pbc_box_shape is not None
+
     def has_duplicate_chain_name(self) -> bool:
         """check if self._chain have duplicated chain name
         give warning if do."""
@@ -742,6 +775,23 @@ class Structure(DoubleLinkedNode):
             else: # need to have same chain id
                 return False
         return True                      
+
+    def is_same_sequence(self, other: Structure, amino_acid_only: bool) -> bool:
+        """check if self and other has the same sequence:
+        - chain order needs to be the same
+        - sequence needs to be the same for each chain"""
+        if amino_acid_only:
+            self_chains = self.polypeptides
+            other_chains = other.polypeptides
+        else:
+            self_chains = self.chains
+            other_chains = other.chains
+
+        for schain, ochain in zip(self_chains, other_chains):
+            if not schain.is_same_sequence(ochain):
+                _LOGGER.debug(f"found different sequence between {schain} and {ochain}")
+                return False
+        return True
 
     #endregion
 
@@ -946,6 +996,33 @@ class Structure(DoubleLinkedNode):
             for atom, source_atom in zip(self.atoms, source.atoms):
                 atom.coord = source_atom.coord
 
+    def update_pbc_box_edges(self, pbc_box_edges: Tuple[float]):
+        """update the pbc box edges and keep the original angles. This is common in a
+        NPT simulation."""
+        if self.has_pbc_box():
+            self.pbc_box_shape = pbc_box_edges + self.pbc_box_shape[3:]
+        else:
+            _LOGGER.error("Structure does not have PBC. cant update. angles unknown")
+            raise ValueError
+
+    def clone_residue_keys(self, other: Structure, amino_acid_only: bool =True):
+        """clone residue keys from {other} to {self}.
+        IMPORTANT: assume the chain order and sequence are the same between self and other"""
+        # san check
+        # - chain sequence consistency
+        if not self.is_same_sequence(other, amino_acid_only=amino_acid_only):
+            _LOGGER.error(f"Inconsistent sequence betweem {self} and {other}. Clone rejected.")
+            raise ValueError("inconsistent sequence")
+        if amino_acid_only:
+            self_residues = self.amino_acids
+            other_residues = other.amino_acids
+        else:
+            self_residues = self.residues
+            other_residues = other.residues
+    
+        for s_res, o_res in zip(self_residues, other_residues):
+            s_res.chain.name = o_res.chain.name
+            s_res.idx = o_res.idx
     #endregion
 
     #region === Special ===
