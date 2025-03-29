@@ -369,6 +369,10 @@ class Residue(DoubleLinkedNode):
         """Does the residue contain hydrogen atoms?"""
         element_list = self.element_composition
         return ('H' in element_list)
+    
+    def is_same_residue(self, other: Residue) -> bool:
+        """determine if self and other is the same amino acid residue"""
+        return self.sequence_name == other.sequence_name
 
     #endregion
 

@@ -223,14 +223,13 @@ class Chain(DoubleLinkedNode):
         """Comparison operator for use with other Chain() objects. Checks if residue list is identical in terms of residue name only."""
         self_residues: List[Residue] = self._residues
         other_residues: List[Residue] = other.residues
-        # print(len(self_residues),"\t",len(other_residues))
         if len(self_residues) != len(other_residues):
             return False
 
         for s, o in zip(self_residues, other_residues):
             s: Residue
             o: Residue
-            if not s.name == o.name:
+            if not s.is_same_residue(o):
                 return False
         return True
 
