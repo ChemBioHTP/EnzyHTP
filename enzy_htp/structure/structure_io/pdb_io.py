@@ -153,19 +153,29 @@ class PDBParser(StructureParserInterface):
 
     @classmethod
     @dispatch
-    def get_file_str(cls, stru: Chain, if_renumber: bool = True, if_fix_atomname: bool = True) -> str:  # pylint: disable=function-redefined
+    def get_file_str(
+            cls,
+            stru: Chain, 
+            if_renumber: bool = True, 
+            if_fix_atomname: bool = True, 
+            same_chain_id_for_9999_solvent: bool = False,) -> str:  # pylint: disable=function-redefined
         """
         dispatch for supporting get pdb file str with Chain only
         """
         if if_renumber:
             stru.parent.renumber_atoms()
-        result_str = cls._write_pdb_chain(stru)
+        result_str = cls._write_pdb_chain(stru)  # TODO really apply same_chain_id_for_9999_solvent when needed
         result_str += f"END{os.linesep}"
         return result_str
 
     @classmethod
     @dispatch
-    def get_file_str(cls, stru: Residue, if_renumber: bool = True, if_fix_atomname: bool = True) -> str:  # pylint: disable=function-redefined
+    def get_file_str(
+            cls,
+            stru: Residue,
+            if_renumber: bool = True,
+            if_fix_atomname: bool = True,
+            same_chain_id_for_9999_solvent: bool = False) -> str:  # pylint: disable=function-redefined
         """
         dispatch for supporting get pdb file str with Residue only
         """
@@ -177,7 +187,12 @@ class PDBParser(StructureParserInterface):
 
     @classmethod
     @dispatch
-    def get_file_str(cls, stru: Atom) -> str:  # pylint: disable=function-redefined
+    def get_file_str(
+            cls, 
+            stru: Atom, 
+            if_renumber: bool = True, 
+            if_fix_atomname: bool = True, 
+            same_chain_id_for_9999_solvent: bool = False) -> str:  # pylint: disable=function-redefined
         """
         dispatch for supporting get pdb file str with Atom only
         """
