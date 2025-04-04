@@ -545,7 +545,7 @@ class AmberMDStep(MolDynStep):
                  qm_num_adaptive_solvent: str,
                  qm_num_transition_solvent: str,
                  core_type: str,
-                 cluster_job_config: Dict,
+                 cluster_job_config: ClusterJobConfig,
                  if_report: bool,
                  record_period: float,
                  keep_in_file: bool,
@@ -652,9 +652,8 @@ class AmberMDStep(MolDynStep):
     @property
     def md_config_dict(self) -> Dict:
         """get md configuration related attributes in a dictionary form"""
-        res_keywords: dict = self.cluster_job_config["res_keywords"]
-        available_cores = int(res_keywords["node_cores"])
-        available_mem_per_core = res_keywords["mem_per_core"]
+        available_cores = int(self.cluster_job_config.node_cores)
+        available_mem_per_core = self.cluster_job_config.mem_per_core
 
         return {
             "name" : self.name,
@@ -720,8 +719,8 @@ class AmberMDStep(MolDynStep):
             path_rel_to=path_rel_to)
 
         # 4. assemble ClusterJob
-        cluster = self.cluster_job_config["cluster"]
-        res_keywords = self.cluster_job_config["res_keywords"]
+        cluster = self.cluster_job_config.cluster
+        res_keywords = self.cluster_job_config.res_keywords
         env_settings = {
             "head" : cluster.AMBER_ENV[self.core_type.upper()],
             "tail" : "",
@@ -861,7 +860,7 @@ class AmberMDStep(MolDynStep):
             will be written as the relative path to {path_rel_to}. However, the
             path stored in python variables are still absolute or relative to cwd
             so that they can be valid."""
-        num_cores = self.cluster_job_config["res_keywords"]["node_cores"]
+        num_cores = self.cluster_job_config.node_cores
         executable = self.parent_interface.get_md_executable(self.core_type, num_cores)
         mdout_path = f"{self.work_dir}/{self.name}.out"
         mdrst_path = f"{self.work_dir}/{self.name}.rst"
@@ -2959,7 +2958,7 @@ class AmberInterface(BaseInterface):
                       amber_md_in_file: str = None,
                       # execution
                       core_type: str = "default",
-                      cluster_job_config: Dict = "default",
+                      cluster_job_config: ClusterJobConfig = "default",
                       # output
                       if_report: bool = False,
                       record_period: float = "default", # ns
@@ -3025,7 +3024,7 @@ class AmberInterface(BaseInterface):
                 and the cluster_job config if cluster_job_config is not None.
                 options: [cpu, gpu]
             cluster_job_config:
-                dictionary that assign arguments for ClusterJob.config_job
+                dictionary or ClusterJobConfig that assign arguments for ClusterJob.config_job
                 For `res_keywords` it works as it updates the default dict in ARMerConfig.MD_GPU_RES or
                 ARMerConfig.MD_CPU_RES depending on the core_type.
                 NOTE that it is also used to config resources even if local run is specified.
@@ -3164,12 +3163,16 @@ class AmberInterface(BaseInterface):
             core_type = self.config()["DEFAULT_MD_CORE_TYPE"]
         if cluster_job_config == "default":
             cluster_job_config = self.config().get_default_md_cluster_job(core_type)
+            cluster_job_config = ClusterJobConfig.from_dict(cluster_job_config)
         else:
             # For res_keywords, it updates the default config
             cluster_job_config = copy.deepcopy(cluster_job_config)
-            res_keywords_update = cluster_job_config["res_keywords"]
+            if not isinstance(cluster_job_config, ClusterJobConfig):
+                cluster_job_config = ClusterJobConfig.from_dict(cluster_job_config)
+            res_keywords_update = cluster_job_config.res_keywords
             default_res_keywords = self.config().get_default_md_cluster_job_res_keywords(core_type)
-            cluster_job_config["res_keywords"] = default_res_keywords | res_keywords_update
+            cluster_job_config.res_keywords = default_res_keywords | res_keywords_update # NOTE: dont need to do this in the new framework but still left this way to minimize the change
+
         if record_period == "default":
             record_period = self.config()["DEFAULT_MD_RECORD_PERIOD_FACTOR"] * length
         if work_dir == "default":
