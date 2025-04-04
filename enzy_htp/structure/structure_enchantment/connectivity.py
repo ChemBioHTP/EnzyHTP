@@ -269,7 +269,10 @@ def _mol_desc_based_ncaa_method(ncaa: Union[NonCanonicalBase, StructureRegion], 
     cnt_stru = MOL_DESC_PARSER_MAPPER[fs.get_file_ext(mol_desc_path)](mol_desc_path)
     cnt_ncaa = cnt_stru.residues[0]
 
-    ncaa.clone_connectivity(cnt_ncaa) if not isinstance(ncaa, StructureRegion) else ncaa.involved_residues[0].clone_connectivity(cnt_ncaa)
+    if not isinstance(ncaa, StructureRegion):
+        ncaa.clone_connectivity(cnt_ncaa)
+    else:
+        ncaa.involved_residues[0].clone_connectivity(cnt_ncaa)
 
 def _connect_solvent(sol: Solvent, method: str) -> None:
     """initate connectivity for solvent."""

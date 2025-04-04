@@ -37,21 +37,6 @@ def test_residue_cap_deepcopy():
         'cterm' 
     )
     ch3_copy = deepcopy(test_ch3)
-    assert ch3_copy.link_residue is not test_res
-
-
-def test_updated_residue_cap_deepcopy():
-    """test the behavior of deepcopy for residue cap"""
-    test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
-    test_res = test_stru.residues[0]
-    test_res_2 = test_stru.residues[1]
-    test_ch3 = CH3Cap(
-        test_res,
-        test_res.find_atom_name('C'),
-        test_res_2.find_atom_name('N'),
-        'cterm' 
-    )
-    ch3_copy = deepcopy(test_ch3)
 
     assert ch3_copy.link_residue is None
     assert ch3_copy.link_atom is None
