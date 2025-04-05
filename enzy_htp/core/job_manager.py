@@ -18,6 +18,7 @@ Date: 2022-04-13"""
 from __future__ import annotations
 from dataclasses import dataclass
 import logging
+import re
 import time
 from typing import Dict, List, Tuple, Union
 from plum import dispatch
@@ -738,7 +739,17 @@ class ClusterJobConfig:
     # region == attribute getter ==
     @property
     def node_cores(self):
+        raw_node_cores = self.raw_node_cores
+        num_cores = re.match(r"(?:.*:)?([0-9]+)", raw_node_cores).group(1)
+        return num_cores
+
+    @property
+    def raw_node_cores(self):
         return self.res_keywords.get("node_cores", None)
+
+    @property
+    def mem_per_core(self):
+        return self.res_keywords.get("mem_per_core", None)
     # endregion
 
     # region == checker ==
