@@ -1971,7 +1971,7 @@ class AmberInterface(BaseInterface):
         Use tLeap to get a PDB and align indexes.
         Returns:
             {
-            "residue" : {(residue_key): amber_1_index_residue_idx_1, ...},
+            "residue" : {(residue_key): (amber_chain_name, amber_1_index_residue_idx_1), ...},
             "atom" : {(atom_key, atom_idx): amber_1_index_atom_idx_1, ...}
             }
 
@@ -3479,6 +3479,85 @@ class AmberInterface(BaseInterface):
             rmsd_csv_filename,
         ])
         return rmsd_value
+
+    def get_rmsf(
+            self,
+            stru_esm: StructureEnsemble,
+            stru_selection: StruSelection,
+            by_residue: bool,
+        ) -> Dict[str, float]:
+        """Calculate the RMSF values of each atoms in the stru_selection of a StructureEnsemble
+        instance. use the atomicfluct from Cpptraj referencing https://amberhub.chpc.utah.edu/atomicfluct-rmsf/.
+
+        Args:
+            stru_esm: 
+                A conformational ensemble of a structure.
+            stru_selection: 
+                A StruSelection object
+            by_residue: 
+                control if return values are grouped by residues or not. If True, the mass-weighted average of atomic
+                fluctuations of each atom for each residue will be calculated.
+
+        Returns:
+            A dictionary that map a EnzyHTP get pattern (<chain_name>.<residue_index>.<atom_name>) to the RMSF value.
+            Unit: Angstrom
+            Example: {"A.1.CA" : 0.1} or {"A.2" : 1.1}
+            WARNING: the result will be impossible if your stru_selection is based on a Structure that does not have
+            chain name or have repeating residue indexes or repeating atom names with a residue!
+        """
+        tmp_dir = eh_config['system.SCRATCH_DIR']
+        tmp_nc_path=fs.get_valid_temp_name(os.path.join(tmp_dir, "tmp_amber_traj.nc"))
+        tmp_prmtop_path=fs.get_valid_temp_name(os.path.join(tmp_dir, "tmp_amber_topology.prmtop"))
+        # TODO(qz): consider make a function for converting a stru_esm to Amber files so that these line are reused
+        self.convert_top_to_prmtop(stru_esm.topology_source_file, tmp_prmtop_path)
+        self.convert_traj_to_nc(stru_esm.coordinate_list, tmp_nc_path, topology_path=tmp_prmtop_path)
+
+        rmsf_dat_filename = fs.get_valid_temp_name(os.path.join(eh_config.system.SCRATCH_DIR, "temp_rmsf.dat"))
+        amber_mask = self.get_amber_mask(stru_selection, reduce=True)
+        amber_idx_mapper = self.get_amber_index_mapper(stru_selection.atoms[0].root())
+        if by_residue:
+            rmsf_line = f"atomicfluct out {rmsf_dat_filename} {amber_mask} byres"
+            reverse_amber_idx_mapper = {v[1] : k for k, v in amber_idx_mapper["residue"].items()}
+        else:
+            rmsf_line = f"atomicfluct out {rmsf_dat_filename} {amber_mask}"
+            reverse_amber_idx_mapper = {v : k for k, v in amber_idx_mapper["atom"].items()}
+
+        contents: List[str] = [
+            f"parm {tmp_prmtop_path}",
+            f"trajin {tmp_nc_path}",
+            "autoimage",
+            f"rms {amber_mask} first mass",
+            f"average crdset AVE {amber_mask}",
+            "run",
+            "autoimage",
+            rmsf_line,
+            "run",
+            "quit"
+        ]
+        contents = "\n".join(contents)
+        self.run_cpptraj(contents)
+
+        result_df = pd.read_csv(rmsf_dat_filename, delim_whitespace=True)
+        indexes = result_df.iloc[:, 0].values
+        rmsf_value = result_df.iloc[:, 1].values
+        result = {}
+
+        # map result values
+        for idx, rmsf in zip(indexes, rmsf_value):
+            idx = int(idx)
+            enzyhtp_key = reverse_amber_idx_mapper[idx]
+            if by_residue:
+                enzyhtp_key = ".".join(str(i) for i in enzyhtp_key)
+            else:
+                enzyhtp_key = enzyhtp_key[0]
+            result[enzyhtp_key] = rmsf
+
+        fs.clean_temp_file_n_dir([
+            tmp_nc_path,
+            tmp_prmtop_path,
+            rmsf_dat_filename,
+        ])
+        return result
 
     # -- MMPB/GBSA --
     def get_mmpbgbsa_energy(
