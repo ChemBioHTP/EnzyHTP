@@ -83,8 +83,10 @@ Date: 2022-04-03
 """
 #TODO(CJ): add a method for changing/accessing a specific residue
 from __future__ import annotations
+import hashlib
 import itertools
 import os
+import numpy as np
 from plum import dispatch
 import string
 from copy import deepcopy
@@ -1067,13 +1069,46 @@ class Structure(DoubleLinkedNode):
 
     def __eq__(self, other: Structure) -> bool:
         """Structure comparsion is a multi-demension task. Vaguely asking for comparing just structures is not allowed."""
-        _LOGGER.error("Vaguely asking for comparing just structures is not allowed. Please use Structure().same_xxx. (xxx stands for a specific demension)")
-        raise NameError
+        if not isinstance(other, Structure):
+            return NotImplemented
+        _LOGGER.warning("User should never just vaguely asking for comparing just structures. Please use Structure().same_xxx. (xxx stands for a specific demension). Ignore this if you didn't explicitly use this.")
+        return (self._topology_signature() == other._topology_signature()
+                and 
+                self._geometry_digest() == other._geometry_digest())
 
     def __ne__(self, other: Structure) -> bool:
         """Structure comparsion is a multi-demension task. Vaguely asking for comparing just structures is not allowed."""
         _LOGGER.error("Vaguely asking for comparing just structures is not allowed. Please use Structure().same_xxx. (xxx stands for a specific demension)")
         raise NameError
+
+    def __hash__(self) -> int:
+        """make Structure hashable"""
+        return hash((self._topology_signature(), self._geometry_digest()))
+
+    def _topology_signature(self) -> tuple:
+        """
+        (chain name, residue idx, residue name, sorted atom name tuple) immutable sequence consisting of
+        are consistent as long as the topology is the same; independent of coordinates.
+        """
+        sig = []
+        for chain in sorted(self.chains, key=lambda c: c.name):
+            for res in sorted(chain.residues, key=lambda r: r.idx):
+                atom_names = tuple(sorted(a.name for a in res.atoms))
+                sig.append((chain.name, res.idx, res.name, atom_names))            
+        return tuple(sig)
+
+    def _geometry_digest(self, digits: int = 8) -> bytes:
+        """
+        Returns a coordinate-based SHA-1 summary (20 bytes).
+        digits controls how many decimal places the coordinates are preserved; the larger the stricter (default 1e-8).
+        """
+        # same order as topology_signature
+        coords = np.asarray([np.round(a.coord, digits)                         # -> (N,3) float32
+                             for chain in sorted(self.chains, key=lambda c: c.name)
+                             for res   in sorted(chain.residues, key=lambda r: r.idx)
+                             for a     in sorted(res.atoms, key=lambda x: x.name)],
+                            dtype=np.float32)
+        return hashlib.sha1(coords.tobytes()).digest()
     #endregion
 
     @dispatch
