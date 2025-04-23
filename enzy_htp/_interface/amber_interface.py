@@ -12,10 +12,12 @@ import copy
 import glob
 from io import StringIO
 import os
+import pickle
 import re
 import shutil
 from pathlib import Path
 from subprocess import CalledProcessError, CompletedProcess, SubprocessError
+import time
 from typing import Generator, List, Tuple, Union, Dict, Any
 from dataclasses import dataclass
 import pandas as pd
@@ -35,7 +37,7 @@ from enzy_htp.core import file_system as fs
 from enzy_htp.core import math_helper as mh
 from enzy_htp.core.job_manager import ClusterJob, ClusterJobConfig
 from enzy_htp.core.exception import AddPDBError, tLEaPError, AmberMDError
-from enzy_htp.core.general import get_interval_str_from_list
+from enzy_htp.core.general import get_interval_str_from_list, load_obj, save_obj
 from enzy_htp.chemical import QMLevelOfTheory
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
 from enzy_htp.structure.structure_io import pdb_io, prmtop_io
@@ -1964,18 +1966,34 @@ class AmberInterface(BaseInterface):
     # endregion
 
     # region -- index mapping --
-    def get_amber_index_mapper(self, stru: Structure) -> Dict[str, Dict[Union[Residue, Atom], Union[int, tuple]]]:
+    def get_amber_index_mapper(self, stru: Structure, cache_file_path: str = None) -> Dict[str, Dict[Union[Residue, Atom], Union[int, tuple]]]:
         """get a mapper for objects in {stru} and in Amberilzed PDB of stru
         Use tLeap to get a PDB and align indexes.
         Returns:
             {
-            "residue" : {Residue(): amber_1_index_residue_idx_1, ...},
-            "atom" : {Atom(): amber_1_index_atom_idx_1}
+            "residue" : {(residue_key): amber_1_index_residue_idx_1, ...},
+            "atom" : {(atom_key, atom_idx): amber_1_index_atom_idx_1, ...}
             }
 
         This will work as long as the order of residues remains the same after tleap process and atom
         have unique names in each residue.
-        TODO solve this for the 1Q4T case."""
+        TODO solve this for the 1Q4T case.""" #TODO speed up when solvent presence
+        # load cache TODO refactor this into core
+        if cache_file_path is None:
+            scratch_dir = eh_config['system.SCRATCH_DIR']
+            fs.safe_mkdir(scratch_dir)
+            cache_file_path = f"{scratch_dir}/.cache_amber_index_mapper.pickle"
+        if not Path(cache_file_path).exists():
+            save_obj({}, cache_file_path)
+        with open(cache_file_path, "rb") as f:
+            while fs.is_locked(f): # wait if the file is writing by other workflow
+                time.sleep(0.1)
+            cache_stru_amber_idx_map_mapper = pickle.load(f)
+        result = cache_stru_amber_idx_map_mapper.get(stru, None)
+        if result:
+            return result
+
+        # calculate if not in cache
         # init files
         temp_dir = eh_config['system.SCRATCH_DIR']
         fs.safe_mkdir(temp_dir)
@@ -2000,25 +2018,32 @@ class AmberInterface(BaseInterface):
         ref_reskey_mapper = ref_stru.residue_mapper
         for k, res in stru.residue_mapper.items():
             amber_key = ref_mapper[k]
-            result["residue"][res] = amber_key
+            result["residue"][k] = amber_key
             ref_res = ref_reskey_mapper[amber_key]
             ref_res_atom_name_mapper = ref_res.atom_name_mapper
             for atom in res.atoms:
                 amber_atom_idx = ref_res_atom_name_mapper[atom.name].idx
-                result["atom"][atom] = amber_atom_idx
+                result["atom"][(atom.key, atom.idx)] = amber_atom_idx
         fs.clean_temp_file_n_dir([
             temp_dir,
             temp_pdb,
             temp_amber_pdb,
         ])
-        # TODO add a cache mechanism
+
+        # save cache
+        cache_stru_amber_idx_map_mapper[stru] = result
+        with open(cache_file_path, "wb") as of:
+            fs.lock(of)
+            pickle.dump(cache_stru_amber_idx_map_mapper, of)
+            fs.unlock(of)
+
         return result
 
     def get_amber_atom_index(self, atoms: List[Atom]) -> List[int]:
         """get atom index in an Amberized PDB of the Structre() containing these Atom()s"""
         stru = atoms[0].root()
         aid_mapper = self.get_amber_index_mapper(stru)
-        return [aid_mapper["atom"][at] for at in atoms]
+        return [aid_mapper["atom"][(at.key, at.idx)] for at in atoms]
 
     def rename_atoms(self, stru: Structure) -> None: # TODO(high piror) move to structure_io https://github.com/ChemBioHTP/EnzyHTP/pull/162#discussion_r1473217587
         """Renames residues and atoms to be compatible with Amber naming and functions.
@@ -3406,8 +3431,6 @@ class AmberInterface(BaseInterface):
         fs.clean_temp_file_n_dir([temp_log_path, temp_dir])
 
         return result
-
-    # RMSD value.
 
     def get_rmsd(
             self,
