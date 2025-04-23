@@ -23,5 +23,8 @@ from .rmsd import (
     rmsd,
     rmsd_of_structure,
 )
+from .rmsf import(
+    rmsf
+)
 from .binding import binding_energy
 from .spi import spi_metric
