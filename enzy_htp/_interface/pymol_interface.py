@@ -772,7 +772,7 @@ class PyMolInterface(BaseInterface):
         Returns:
             The calculated SPI as a float.
         """
-        with OpenPyMolSession(self) as pms:
+        with OpenPyMolSession(self, thread_safe=False) as pms: #NOTE maybe should allow it to multi-thread?
             self.load_enzy_htp_stru(pms, stru )
             results:List[Any] = self.general_cmd(pms,[
                 ('set', 'dot_solvent', 1),
@@ -798,7 +798,7 @@ class PyMolInterface(BaseInterface):
             The calculated SPI as a float.
         """
         (lig_chain, lig_idx) = ligand.key()
-        with OpenPyMolSession(self) as pms:
+        with OpenPyMolSession(self, thread_safe=False) as pms:
             self.load_enzy_htp_stru(pms, stru )
             results:List[Any] = self.general_cmd(pms,[
                 ('set', 'dot_solvent', 1),
@@ -857,12 +857,15 @@ class PyMolInterface(BaseInterface):
 class OpenPyMolSession:
     """a context manager that open a pymol session once enter and close once exit"""
 
-    def __init__(self, pymol_interface: PyMolInterface) -> None:
+    def __init__(self, pymol_interface: PyMolInterface, thread_safe: bool=True) -> None:
         self.interface = pymol_interface
+        self.thread_safe = thread_safe
 
     def __enter__(self):
         """open a pymol session once enter"""
         self.session = self.interface.new_session()
+        if self.thread_safe:
+            self.session.cmd.set("max_threads", 1)
         return self.session
 
     def __exit__(self, exc_type, exc_val, exc_tb):
