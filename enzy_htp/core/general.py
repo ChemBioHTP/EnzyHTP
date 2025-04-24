@@ -40,6 +40,7 @@ from typing import Any, List, Iterable, Tuple, Dict, Callable
 import itertools
 import pickle
 import inspect
+from contextlib import contextmanager
 
 from .logger import _LOGGER
 from .file_system import write_lines
@@ -211,8 +212,6 @@ def get_str_for_print_class_var(cls) -> str:
     return result
 
 
-
-
 # == context manager ==
 class HiddenPrints:
     """block or redirect stdout/stderr prints to 'redirect'
@@ -291,6 +290,17 @@ class CaptureLogging:
         # set position for read
         self.log_stream.seek(0)
 
+
+@contextmanager
+def trace_threads(tag: str = ""):
+    """trace the thread change before and after the block.
+    Need to install psutil for this"""
+    import psutil
+    proc = psutil.Process()
+    before = proc.num_threads()
+    yield
+    after = proc.num_threads()
+    _LOGGER.info(f"==> {tag} Threads: {before} → {after}")
 
 # == misc ===
 def timer(fn):
