@@ -17,7 +17,8 @@ from enzy_htp.structure.structure_selection import select_stru
 def rmsf(stru_esm: StructureEnsemble, region_pattern: str = "polymer and (not elem H)",
         by_residue: bool = True, ignore_solvent: bool = True) -> Dict[str, float]:
     """Calculate the RMSF values of each atoms in the region_pattern of a StructureEnsemble
-    instance. Powered by the atomicfluct from Cpptraj from AmberTools for now.
+    instance. RMSF is calculated based on the average structure.
+    Powered by the atomicfluct from Cpptraj from AmberTools for now.
 
     Args:
         stru_esm: 

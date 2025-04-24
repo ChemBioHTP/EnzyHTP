@@ -3488,7 +3488,8 @@ class AmberInterface(BaseInterface):
         ) -> Dict[str, float]:
         """Calculate the RMSF values of each atoms in the stru_selection of a StructureEnsemble
         instance. use the atomicfluct from Cpptraj referencing https://amberhub.chpc.utah.edu/atomicfluct-rmsf/.
-
+        RMSF is calculated based on the average structure.
+        
         Args:
             stru_esm: 
                 A conformational ensemble of a structure.
@@ -3530,6 +3531,7 @@ class AmberInterface(BaseInterface):
             f"average crdset AVE {amber_mask}",
             "run",
             "autoimage",
+            f"rms refave {amber_mask} ref AVE * mass",
             rmsf_line,
             "run",
             "quit"
