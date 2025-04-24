@@ -40,4 +40,4 @@ def rmsf(stru_esm: StructureEnsemble, region_pattern: str = "polymer and (not el
     else:
         stru = stru_esm.structure_0
     stru_sele: StruSelection = select_stru(stru, pattern=region_pattern)
-    return eh_interface.amber.get_rmsd(stru_esm=stru_esm, stru_selection=stru_sele, by_residue=by_residue)
+    return eh_interface.amber.get_rmsf(stru_esm=stru_esm, stru_selection=stru_sele, by_residue=by_residue)
