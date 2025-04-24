@@ -138,5 +138,5 @@ def test_get_exposed_residues():
 
 
     results = pi.get_exposed_residues(stru, 0.1)
-    for res_idx, ans_idx in zip(results, answer):
-        assert res_idx == ans_idx
+    for res, ans_idx in zip(results, answer):
+        assert res.idx == ans_idx
