@@ -1,5 +1,9 @@
 """This is MVP of running a Gaussian/Amber based QMMM single point for every frame in a trajectory.
-TODO convert it into an engine of the science API"""
+TODO convert it into an engine of the science API
+
+Author: QZ Shao <shaoqz@icloud.com>
+Date: 2025-03-09
+"""
 
 import csv
 import glob

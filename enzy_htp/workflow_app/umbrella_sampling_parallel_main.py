@@ -1,4 +1,8 @@
-"""MVP script for doing umbrella sampling in parallel in EnzyHTP."""
+"""MVP script for doing umbrella sampling in parallel in EnzyHTP.
+
+Author: QZ Shao <shaoqz@icloud.com>
+Date: 2025-01-10
+"""
 from functools import partial
 import glob
 import pickle
