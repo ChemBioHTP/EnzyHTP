@@ -5,6 +5,7 @@ Author: Zhong, Yinjie <yinjie.zhong@vanderbilt.edu>
 Date: 2022-06-03
 """
 import glob
+import io
 import os
 import re
 import shutil
@@ -1471,6 +1472,64 @@ def test_get_rmsf():
     for (rk, rv), (ak, av) in zip(result.items(), answer.items()):
         assert rk == ak
         assert np.isclose(rv, av, atol=0.001)
+
+    fs.safe_rm(structure_ensemble.topology_source_file)
+
+def test_get_coord_covariance():
+    """Test the function using manually curated covariance value."""
+    prmtop_path = os.path.join(MM_DATA_DIR, "test_rmsd.prmtop")
+    traj_path = os.path.join(MM_DATA_DIR, "test_rmsd.mdcrd")
+    ref_pdb = os.path.join(MM_DATA_DIR, "test_rmsd_chainid.pdb")
+
+    structure_ensemble = interface.amber.load_traj(
+        prmtop_path=prmtop_path,
+        traj_path=traj_path,
+        ref_pdb=ref_pdb,
+    )
+    region_pattern = "resi 8-10 and (n. CA)"
+    stru_sele = select_stru(remove_solvent(structure_ensemble.structure_0), pattern=region_pattern)
+
+    answer = np.loadtxt(io.StringIO(
+        """
+        0.008  0.006  0.005 -0.011  0.003  0.001  0.003 -0.009 -0.006
+        0.006  0.005  0.004 -0.008  0.002  0.000  0.002 -0.007 -0.005
+        0.005  0.004  0.004 -0.007  0.002  0.000  0.002 -0.006 -0.004
+       -0.011 -0.008 -0.007  0.016 -0.004 -0.001 -0.004  0.012  0.008
+        0.003  0.002  0.002 -0.004  0.002  0.001  0.001 -0.004 -0.003
+        0.001  0.000  0.000 -0.001  0.001  0.000  0.000 -0.001 -0.001
+        0.003  0.002  0.002 -0.004  0.001  0.000  0.001 -0.003 -0.002
+       -0.009 -0.007 -0.006  0.012 -0.004 -0.001 -0.003  0.011  0.007
+       -0.006 -0.005 -0.004  0.008 -0.003 -0.001 -0.002  0.007  0.005
+        """
+    ))
+    result = interface.amber.get_coord_covariance(
+        stru_esm=structure_ensemble,
+        stru_selection=stru_sele,
+        reference_type="average", 
+        mass_weighted=False,
+    )
+    assert np.allclose(result, answer, atol=1e-8)
+
+    answer = np.loadtxt(io.StringIO(
+        """
+        12.203  3.979 -4.034  7.911  6.868 -0.535  9.176 12.091  1.348
+         3.979  2.139 -1.789  2.506  2.889 -0.233  2.834  4.665  0.629
+        -4.034 -1.789  4.170 -2.306 -3.540  2.656 -2.939 -6.418  3.655
+         7.911  2.506 -2.306  5.419  4.172  0.075  6.309  7.289  1.734
+         6.868  2.889 -3.540  4.172  4.795 -1.298  4.873  8.263 -0.841
+        -0.535 -0.233  2.656  0.075 -1.298  2.564 -0.177 -2.708  4.410
+         9.176  2.834 -2.939  6.309  4.873 -0.177  7.457  8.581  1.575
+        12.091  4.665 -6.418  7.289  8.263 -2.708  8.581 14.716 -2.396
+         1.348  0.629  3.655  1.734 -0.841  4.410  1.575 -2.396  8.312
+        """
+    ))
+    result = interface.amber.get_coord_covariance(
+        stru_esm=structure_ensemble,
+        stru_selection=stru_sele,
+        reference_type="first", 
+        mass_weighted=False,
+    )
+    assert np.allclose(result, answer, atol=1e-8)
 
     fs.safe_rm(structure_ensemble.topology_source_file)
 

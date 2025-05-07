@@ -20,6 +20,7 @@ from subprocess import CalledProcessError, CompletedProcess, SubprocessError
 import time
 from typing import Generator, List, Tuple, Union, Dict, Any
 from dataclasses import dataclass
+import numpy as np
 import pandas as pd
 from sympy import sympify
 from collections.abc import Iterable
@@ -3559,6 +3560,98 @@ class AmberInterface(BaseInterface):
             tmp_prmtop_path,
             rmsf_dat_filename,
         ])
+        return result
+
+    def get_coord_covariance(
+            self,
+            stru_esm: StructureEnsemble,
+            stru_selection: Union[StruSelection, Tuple[StruSelection]],
+            reference_type: str, 
+            mass_weighted: bool,
+        ) -> Dict[str, float]:
+        """Calculate the atomic coordinate covariance matrix the region_pattern of a StructureEnsemble
+        instance. Covariance is calculated based on the average structure or the first structure.
+        Powered by the matrix covar/mwcovar from Cpptraj from AmberTools for now. 
+        (ref: https://amberhub.chpc.utah.edu/matrix-2/)
+        
+        Args:
+            stru_esm: 
+                A conformational ensemble of a structure.
+            stru_selection: 
+                A StruSelection object, or a tuple of two StruSelection object
+            reference_type:
+                control the reference coordinate of calculating the variance of each atom.
+                "average" - use an average structure of the ensemble
+                "first" - use the first structure of the ensemble
+            mass_weigthed:
+                control whether the atomic mass is used to weight the covariance.
+
+        Returns:
+            a 2D numpy matrix. i.e., the cartesian coordinate covariance matrix.
+                When one stru_selection is provided it is 3N*3N
+                When two stru_selection is provided it is 3N*3M (N, M are number of atoms from each selection)
+        """
+        tmp_dir = eh_config['system.SCRATCH_DIR']
+        tmp_nc_path=fs.get_valid_temp_name(os.path.join(tmp_dir, "tmp_amber_traj.nc"))
+        tmp_prmtop_path=fs.get_valid_temp_name(os.path.join(tmp_dir, "tmp_amber_topology.prmtop"))
+        # TODO(qz): consider make a function for converting a stru_esm to Amber files so that these line are reused
+        self.convert_top_to_prmtop(stru_esm.topology_source_file, tmp_prmtop_path)
+        self.convert_traj_to_nc(stru_esm.coordinate_list, tmp_nc_path, topology_path=tmp_prmtop_path)
+
+        covar_dat_filename = fs.get_valid_temp_name(os.path.join(eh_config.system.SCRATCH_DIR, "temp_coord_covar.dat"))
+        
+        if isinstance(stru_selection, tuple) and len(stru_selection) == 2:
+            amber_mask_1 = self.get_amber_mask(stru_selection[0], reduce=True)
+            amber_mask_2 = self.get_amber_mask(stru_selection[1], reduce=True)
+            delim = "'"
+            amber_mask = f"'({amber_mask_1.strip(delim)}) | ({amber_mask_2.strip(delim)})'"
+        elif isinstance(stru_selection, StruSelection):
+            amber_mask_1 = self.get_amber_mask(stru_selection, reduce=True)
+            amber_mask_2 = ""
+            amber_mask = amber_mask_1
+        else:
+            _LOGGER.error("only support StruSelection or a tuple of two StruSelection()s")
+
+        # handle command variants
+        if reference_type == "average":
+            ave_lines = [
+                f"rms {amber_mask} first mass",
+                f"average crdset AVE {amber_mask}",
+                "run",
+                "autoimage",
+                f"rms refave {amber_mask} ref AVE * mass",
+            ]
+        elif reference_type == "first":
+            ave_lines = []
+        else:
+            _LOGGER.error("reference_type can only be 'average' or 'first' now. Contact developer if you need more.")
+            raise ValueError
+
+        if mass_weighted:
+            covar_line = f"matrix out {covar_dat_filename} mwcovar {amber_mask_1} {amber_mask_2}"
+        else:
+            covar_line = f"matrix out {covar_dat_filename} covar {amber_mask_1} {amber_mask_2}"
+
+        contents: List[str] = [
+            f"parm {tmp_prmtop_path}",
+            f"trajin {tmp_nc_path}",
+            "autoimage",
+        ] + ave_lines + [
+            covar_line,
+            "run",
+            "quit"
+        ]
+        contents = "\n".join(contents)
+        self.run_cpptraj(contents)
+
+        result = np.genfromtxt(covar_dat_filename, dtype=float)
+
+        fs.clean_temp_file_n_dir([
+            tmp_nc_path,
+            tmp_prmtop_path,
+            covar_dat_filename,
+        ])
+
         return result
 
     # -- MMPB/GBSA --
