@@ -7,7 +7,7 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-08-17
 """
 #TODO(CJ): update this stuff
-from typing import List
+from typing import List, Union
 from copy import deepcopy
 
 from .base_config import BaseConfig
@@ -50,6 +50,9 @@ class XTBConfig(BaseConfig):
 
     SUPPORTED_XTB_THEORY_LEVELS:List[str] = "GFN0 GFN1 GFN2".split()
     """Allowed levels of theory for xtb to use."""
+
+    FORCE_CONSTANT:Union[None,float]=None
+    #TODO(CJ)
 
     def required_executables(self) -> List[str]:
         """A hardcoded list of required executables for xtb."""

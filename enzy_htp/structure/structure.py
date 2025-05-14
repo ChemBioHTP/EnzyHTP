@@ -849,7 +849,7 @@ class Structure(DoubleLinkedNode):
 
     @dispatch
     def add(self, target: Residue, # pylint: disable=function-redefined
-            sort: bool = False, chain_name:str=None, net_charge:int=None, multiplicity:int=None) -> None: 
+            sort: bool = False, chain_name:Union[str, None]=None, net_charge:Union[int, None]=None, multiplicity:Union[int,None]=None) -> None: 
         """add a residue into the structure."""
         res_type = target.rtype
         if res_type in [ResidueType.CANONICAL,
