@@ -69,7 +69,7 @@ class Interface:
         self.bcl = BCLInterface(self, config._bcl)
         gaussian_interface.set_parent(self)
         self.gaussian = gaussian_interface
-        self.modeller = ModellerInterface(self, config._modeller)
+        #self.modeller = ModellerInterface(self, config._modeller)
         self.moe = MOEInterface(self, config._moe)
         self.mole2 = Mole2Interface(self, config._mole2)
         self.multiwfn = MultiwfnInterface(self, config._multiwfn)

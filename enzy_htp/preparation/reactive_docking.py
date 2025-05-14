@@ -41,8 +41,9 @@ from enzy_htp.quantum import optimize as qm_optimize
 
 def dock_reactants(structure: Structure,
                    ligands:List[Ligand],
-                   constraints:List[StructureConstraint]=None,
-                   stereo_constraints: List[StructureConstraint]=None,
+                   dock_csts:List[StructureConstraint]=None,
+                   mm_csts:List[StructureConstraint]=None,
+                   qm_csts:List[StructureConstraint]=None,
                    use_qm:bool=True,
                    dock_opts:Dict=None,
                    qm_sele:str=None,
@@ -58,8 +59,14 @@ def dock_reactants(structure: Structure,
     if work_dir is None:
         work_dir = config["system.SCRATCH_DIR"]
 
-    if stereo_constraints is None:
-        stereo_constraints = []
+    if dock_csts is None:
+        dock_csts=[]
+    
+    if mm_csts is None:
+        mm_csts=[]
+
+    if qm_csts is None:
+        qm_csts=[]
 
     fs.safe_mkdir(work_dir)
     if save_snapshots:
@@ -87,31 +94,38 @@ def dock_reactants(structure: Structure,
         lig_cpy = deepcopy(lig)
         wstru.add( lig_cpy, chain_name=lig.key()[0])
         
-        relevant_csts:List[StructureConstraint] = list()
-        for cst in constraints + stereo_constraints:
+        for_docking:List[StructureConstraint] = list()
+        for cst in dock_csts:
             if cst.is_compatible( wstru ):
                 cst.change_topology(wstru)
-                relevant_csts.append( cst )
+                for_docking.append( cst )
 
         
         opts=create_rosetta_opts(structure, ligand, dock_opts)
         
-        dock_ligand(wstru, ligand, relevant_csts, opts, use_qm, qm_sele, cpu_config)
+        dock_ligand(wstru, ligand, for_docking, opts, use_qm, qm_sele, cpu_config, dock_opts.get('chunk_size', 20))
 
     stru_oper.update_residues(structure, wstru)
-    for cst in constraints + stereo_constraints:
+    for_mm=list()
+    for cst in mm_csts:
         cst.change_topology( structure )
+        for_mm.append( cst )
 
     if save_snapshots:
         sp.save_structure("./snapshots/docked_structure.pdb", structure)
     
-    mm_minimization(structure, ligands, constraints, qm_sele, opts, cpu_config)
+    mm_minimization(structure, ligands, for_mm, qm_sele, opts, cpu_config)
 
     if save_snapshots:
         sp.save_structure("./snapshots/mm_structure_01.pdb", structure)
 
     if use_qm:
-        qm_minimization(structure, ligands, constraints, qm_sele, qm_freeze_sele, work_dir, qm_config)
+        for_qm=list()
+        for cst in qm_csts:
+            cst.change_topology( structure )
+            for_qm.append( cst )
+
+        qm_minimization(structure, ligands, for_qm, qm_sele, qm_freeze_sele, work_dir, qm_config)
         if save_snapshots:
             sp.save_structure("./snapshots/qm_structure_01.pdb", structure)
 
@@ -199,8 +213,12 @@ def dock_ligand(structure:Structure,
                     use_qm:bool,
                     qm_sele:str,
                     job_config=None,
+                    chunk_size:int=None
                     ) -> None:
     """TODO(CJ)"""
+
+    if chunk_size is None:
+        chunk_size = 20
 
     jumps=list()
     for cidx,chain in enumerate(structure.chains):
@@ -256,7 +274,7 @@ def dock_ligand(structure:Structure,
         'FastRelax', name="frelax", scorefxn="hard_rep", cst_file="%%cst_file%%", repeats="%%fr_repeats%%", children=[
             ('MoveMap', {'name':"full_enzyme", 'bb':"false", 'chi':"false", 'jump':"false", 'children':[
                 ('ResidueSelector', {'selector':'asite_protein', 'bb':'false', 'chi':'true', }),
-                ] + jumps}
+                ] + jumps} #TODO(CJ): make bb flexibility an option
             )]
     ).add_simple_metric(
         'PerResidueClashMetric', name='clash', residue_selector='ligand', residue_selector2='asite'
@@ -285,7 +303,7 @@ def dock_ligand(structure:Structure,
                 ('Set', {'orca_memory_megabytes':"3000" }), #TODO(CJ): tunable
                 ('Set', {'rosetta_orca_bridge_temp_directory':"xtb_temp" }),
                 ('Set', {'orca_electron_correlation_treatment':"XTB" }),
-                ('Set', {'orca_default_xtb_level': "XTB1"}),
+                ('Set', {'orca_default_xtb_level': "XTB2"}),
                 ('Set', {'clean_rosetta_orca_bridge_temp_directory':"true" }),
                 ('Set', {'orca_deduce_charge':"true" })
             ]
@@ -318,8 +336,15 @@ def dock_ligand(structure:Structure,
     assert len(temp_ct), 'no constraints found'
     
     _LOGGER.info("Beginning RosettaLigand geometry sampling step...")
-    
-    pdb_files = parallel_rs( structure, protocol, opts, job_config, 'nstruct', 10, 'DOCK', './scratch' )
+  
+    if chunk_size >= opts['nstruct']:
+        pdb_files=list()
+        for i, row in interface.rosetta.parse_score_file(
+            interface.rosetta.run_rosetta_scripts( structure, protocol, opts, 'DOCK', './scratch/')
+        ).iterrows():
+            pdb_files.append(f"./scratch/{row.description}.pdb")            
+    else:
+        pdb_files = parallel_rs( structure, protocol, opts, job_config, 'nstruct', chunk_size, 'DOCK', './scratch' ) #TODO(CJ): parameterize
 
     assert pdb_files
 
@@ -424,7 +449,7 @@ def qm_minimization(structure:Structure,
                 engine='xtb',
                 constraints=constraints + [CartesianFreeze(structure.backbone_atoms() + to_freeze)],
                 regions=[qm_sele],
-                region_methods=[chem.QMLevelOfTheory(basis_set='', method='GFN1', solvent='water', solv_method='ALPB')],
+                region_methods=[chem.QMLevelOfTheory(basis_set='', method='GFN2', solvent='water', solv_method='ALPB')],
                 nterm_cap='H',
                 cterm_cap='H',
                 cluster_job_config=cpu_config,
@@ -505,7 +530,7 @@ def create_rosetta_opts(
     opts["packing:ex2"] = True
     opts["packing:ex2aro"] = True
     opts["packing:no_optH"] = False
-    opts["packing:flip_HNQ"] = True
+    #opts["packing:flip_HNQ"] = True
     opts["packing:ignore_ligand_chi"] = True
     opts['ignore_waters'] = False
     opts['include_vrt'] = False

@@ -333,7 +333,7 @@ def _parallelize_md_steps_with_cluster_job(
         job_array.append(job_list)
         result_eggs.append(result_egg_ele)  # eggs are filenames that can be translated to give birth actual data
 
-    job_manager.ClusterJob.wait_to_2d_array_end(job_array, period=period)
+    job_manager.ClusterJob.wait_to_2d_array_end(job_array, period=period )
 
     for rep_md_result in result_eggs:
         rep_result_list = []

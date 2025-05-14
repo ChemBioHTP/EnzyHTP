@@ -166,7 +166,7 @@ export ROSETTA3=/data/yang_lab/shaoqz/software/Rosetta313/main/""",
         for k in new_dict:
             if k == "mem=":
                 mem_per_core_n_gb = new_dict[k].rstrip("GB")
-                total_mem = round_by(float(mem_per_core_n_gb) * float(res_dict["node_cores"]), 0.1) # round up
+                total_mem = round_by(float(mem_per_core_n_gb) * float(res_dict["node_cores"].split(':')[-1]), 0.1) # round up
                 new_dict[k] = f"{total_mem}G"
         return new_dict
 

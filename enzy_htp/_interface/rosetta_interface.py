@@ -1116,7 +1116,7 @@ class RosettaInterface(BaseInterface):
         opts['in:file:s'] = str(Path(fname).absolute())
         protocol.to_file(xml_file)
 
-        opts['out:file:scorefile'] = f"{work_dir}/{prefix}_score.sc"
+        opts['out:file:scorefile'] = Path(f"{work_dir}/{prefix}_score.sc").absolute()
 
         for op in Path(work_dir).glob(old_pattern):
             fs.safe_rm( op )

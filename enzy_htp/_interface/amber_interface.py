@@ -240,12 +240,12 @@ class AmberParameterizer(MolDynParameterizer):
         self.parent_interface.run_add_pdb(temp_prmtop, result_prmtop, temp_ref_pdb)
 
         # 6. clean up
-        fs.clean_temp_file_n_dir([
-            temp_dry_pdb,
-            temp_prmtop,
-            temp_ref_pdb,
-            self.parameterizer_temp_dir,
-        ])
+    #    fs.clean_temp_file_n_dir([
+    #        temp_dry_pdb,
+    #        temp_prmtop,
+    #        temp_ref_pdb,
+    #        self.parameterizer_temp_dir,
+    #    ])
 
         return AmberParameter(result_inpcrd, result_prmtop, stru.ncaa_chrgspin_mapper)
 
@@ -1006,7 +1006,7 @@ class AmberInterface(BaseInterface):
                 raise new_e from e
 
         # clean up temp file if success
-        fs.clean_temp_file_n_dir(temp_path_list)
+        #fs.clean_temp_file_n_dir(temp_path_list)
 
     @staticmethod
     def _find_tleap_error(tleap_out_path: str) -> tLEaPError:
