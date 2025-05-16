@@ -8,6 +8,7 @@ from pathlib import Path
 from collections import defaultdict
 from typing import List, Tuple, Set, Dict
 from copy import deepcopy
+from multiprocessing import Pool
 
 import numpy as np
 import pandas as pd
@@ -52,7 +53,9 @@ def dock_reactants(structure: Structure,
                    save_work_dir: bool=True,
                    save_snapshots:bool=True,
                    cpu_config = None,
-                   qm_config = None
+                   qm_config = None,
+                   local_parallel:bool=False,
+                   local_processes:int=None
                    ) -> None:
     """
     """
@@ -103,7 +106,7 @@ def dock_reactants(structure: Structure,
         
         opts=create_rosetta_opts(structure, ligand, dock_opts)
         
-        dock_ligand(wstru, ligand, for_docking, opts, use_qm, qm_sele, cpu_config, dock_opts.get('chunk_size', 20))
+        dock_ligand(wstru, ligand, for_docking, opts, use_qm, qm_sele, cpu_config, dock_opts.get('chunk_size', 20), local_parallel, local_processes)
 
     stru_oper.update_residues(structure, wstru)
     for_mm=list()
@@ -125,7 +128,7 @@ def dock_reactants(structure: Structure,
             cst.change_topology( structure )
             for_qm.append( cst )
 
-        qm_minimization(structure, ligands, for_qm, qm_sele, qm_freeze_sele, work_dir, qm_config)
+        qm_minimization(structure, ligands, for_qm, qm_sele, qm_freeze_sele, work_dir, qm_config, local_parallel, local_processes)
         if save_snapshots:
             sp.save_structure("./snapshots/qm_structure_01.pdb", structure)
 
@@ -213,7 +216,9 @@ def dock_ligand(structure:Structure,
                     use_qm:bool,
                     qm_sele:str,
                     job_config=None,
-                    chunk_size:int=None
+                    chunk_size:int=None,
+                    local_parallel:bool=False,
+                    local_processes:int=10
                     ) -> None:
     """TODO(CJ)"""
 
@@ -336,15 +341,19 @@ def dock_ligand(structure:Structure,
     assert len(temp_ct), 'no constraints found'
     
     _LOGGER.info("Beginning RosettaLigand geometry sampling step...")
-  
-    if chunk_size >= opts['nstruct']:
-        pdb_files=list()
-        for i, row in interface.rosetta.parse_score_file(
-            interface.rosetta.run_rosetta_scripts( structure, protocol, opts, 'DOCK', './scratch/')
-        ).iterrows():
-            pdb_files.append(f"./scratch/{row.description}.pdb")            
+
+    # this is where the local parallel thing goes
+    if local_parallel:
+        pdb_files = local_parallel_rs( structure, protocol, opts, 'nstruct', local_processes, 'DOCK', './scratch' ) #TODO(CJ): parameterize
     else:
-        pdb_files = parallel_rs( structure, protocol, opts, job_config, 'nstruct', chunk_size, 'DOCK', './scratch' ) #TODO(CJ): parameterize
+        if chunk_size >= opts['nstruct']:
+            pdb_files=list()
+            for i, row in interface.rosetta.parse_score_file(
+                interface.rosetta.run_rosetta_scripts( structure, protocol, opts, 'DOCK', './scratch/')
+            ).iterrows():
+                pdb_files.append(f"./scratch/{row.description}.pdb")            
+        else:
+            pdb_files = parallel_rs( structure, protocol, opts, job_config, 'nstruct', chunk_size, 'DOCK', './scratch' ) #TODO(CJ): parameterize
 
     assert pdb_files
 
@@ -425,7 +434,9 @@ def qm_minimization(structure:Structure,
                 qm_sele:str,
                 qm_freeze_sele:str,
                 work_dir:str,
-                cpu_config:Dict
+                cpu_config:Dict,
+                local_parallel,
+                local_processes
                 ) -> None:
 
     asite_sele=get_active_site_sele(structure, qm_sele)
@@ -445,18 +456,87 @@ def qm_minimization(structure:Structure,
     config['xtb.N_PROC'] = 8
 
     translate_structure(structure, start_naming='rosetta')
-    es = qm_optimize(structure,
-                engine='xtb',
-                constraints=constraints + [CartesianFreeze(structure.backbone_atoms() + to_freeze)],
-                regions=[qm_sele],
-                region_methods=[chem.QMLevelOfTheory(basis_set='', method='GFN2', solvent='water', solv_method='ALPB')],
-                nterm_cap='H',
-                cterm_cap='H',
-                cluster_job_config=cpu_config,
-                job_check_period=20
-                )[0]
+    if local_parallel:
+        es = qm_optimize(structure,
+                    engine='xtb',
+                    constraints=constraints + [CartesianFreeze(structure.backbone_atoms() + to_freeze)],
+                    regions=[qm_sele],
+                    region_methods=[chem.QMLevelOfTheory(basis_set='', method='GFN2', solvent='water', solv_method='ALPB')],
+                    nterm_cap='H',
+                    cterm_cap='H',
+                    parallel_method=None
+                    )[0]
+    else:        
+        es = qm_optimize(structure,
+                    engine='xtb',
+                    constraints=constraints + [CartesianFreeze(structure.backbone_atoms() + to_freeze)],
+                    regions=[qm_sele],
+                    region_methods=[chem.QMLevelOfTheory(basis_set='', method='GFN2', solvent='water', solv_method='ALPB')],
+                    nterm_cap='H',
+                    cterm_cap='H',
+                    cluster_job_config=cpu_config,
+                    job_check_period=20
+                    )[0]
+
     translate_structure(structure, end_naming='rosetta')
 
+def foo(structure, protocol, opts):
+    return interface.rosetta.run_rosetta_scripts(
+        structure,
+        protocol,
+        opts)
+
+
+def local_parallel_rs( 
+    structure, 
+    protocol, 
+    opts, 
+    arr_var,
+    local_processes, 
+    arr_prefix,
+    work_dir=None ):
+
+    if work_dir is None:
+        work_dir = './'
+
+    orig_rng = opts['run:jran']
+    arr_orig = opts[arr_var]
+    orig_out_path = opts['out:path:all']
+    arrays = [0]*local_processes
+    
+    for idx in range(arr_orig):
+        arrays[idx%local_processes] += 1
+    
+    assert sum(arrays) == arr_orig 
+    
+    pool_args=list()
+    
+    for aidx, arr in enumerate(arrays):
+        if arr == 0:
+            continue
+        lopts=deepcopy(opts)
+        lopts['run:jran'] = aidx+orig_rng
+        lopts[arr_var] = arr
+        lopts['out:path:all'] =  str(Path(f"{work_dir}/{arr_prefix}_{aidx:02d}/").absolute())
+        pool_args.append(
+            (structure, protocol, lopts,)
+        )
+        fs.safe_rmdir( lopts['out:path:all'] )
+        fs.safe_mkdir( lopts['out:path:all'] )
+
+    with Pool(local_processes) as p:
+        score_files=p.starmap(
+            foo, 
+            pool_args
+        )
+    
+    result=list()
+    for sf,(_,_,opts) in zip(score_files,pool_args):
+        df=interface.rosetta.parse_score_file(sf)
+        for i,row in df.iterrows():
+            result.append(f"{opts['out:path:all']}/{row.description}.pdb")
+    
+    return result
 
 def parallel_rs( 
     structure, 
