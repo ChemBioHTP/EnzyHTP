@@ -40,7 +40,7 @@ class Mole2Config(BaseConfig):
     MONO:str="mono"
     """Path to mono as a str()."""
 
-    MOLE2:str="~/Downloads/Mole2_plugin/MOLE25_binary/mole2.exe"
+    MOLE2:str="~/bin/Mole2_cmd/mole2.exe"
     """Path to Mole2 .exe as a str()."""
 
 
