@@ -160,8 +160,8 @@ class Mole2Interface(BaseInterface):
             content.append("\t</NonActiveParts>")
 
         content.extend([
-            "\t<Params>",
-           f"\t\t<Cavity ProbeRadius=\"{probe}\" InteriorThreshold=\"{inner}\" IgnoreHETAtoms=\"{ignore_hetatm}\"/>",
+           f"\t<Params ProbeRadius=\"{probe}\" InteriorThreshold=\"{inner}\">",
+           f"\t\t<Cavity IgnoreHETAtoms=\"{ignore_hetatm}\"/>",
             "\t</Params>",
             "\t<Export>",
             "\t\t<Formats Mesh=\"1\" />",
@@ -291,6 +291,6 @@ class Mole2Interface(BaseInterface):
         for mf in mesh_files:
             result.append(self._parse_cavity(mf, probe, inner, mesh_density))
 
-        fs.safe_rm(xml_file)
+        # fs.safe_rm(xml_file)
         
         return result

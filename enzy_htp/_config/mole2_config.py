@@ -28,10 +28,10 @@ class Mole2Config(BaseConfig):
     IGNORE_HETATM:bool=False 
     """Should HETATM records be considered?"""
 
-    PROBE:float=3.5
+    PROBE:float=3
     """The probe radius to use in a run in A."""
 
-    INNER:float=1.5
+    INNER:float=1.25
     """The inner radius to use in a run in A."""
 
     MESH_DENSITY:float=0.5
