@@ -15,10 +15,13 @@ Date: 2023-09-26
 
 from pathlib import Path
 from typing import List, Tuple
+import xml.etree.ElementTree as ET
 
 import numpy as np
 import numpy.typing as npt
 import pyvista as pv
+
+from enzy_htp.structure import Residue
 
 from .base_interface import BaseInterface
 
@@ -160,12 +163,12 @@ class Mole2Interface(BaseInterface):
             content.append("\t</NonActiveParts>")
 
         content.extend([
-           f"\t<Params ProbeRadius=\"{probe}\" InteriorThreshold=\"{inner}\">",
-           f"\t\t<Cavity IgnoreHETAtoms=\"{ignore_hetatm}\"/>",
+           f"\t<Params>",
+           f"\t\t<Cavity IgnoreHETAtoms=\"{ignore_hetatm}\" ProbeRadius=\"{probe}\" InteriorThreshold=\"{inner}\"/>",
             "\t</Params>",
             "\t<Export>",
             "\t\t<Formats Mesh=\"1\" />",
-            "\t\t<Mesh Density=\"0.5\" />",
+            "\t\t<Mesh Density=\"1.33\" />",
             "\t</Export>",
             "</Tunnels>",
         ])
@@ -176,12 +179,37 @@ class Mole2Interface(BaseInterface):
 
         return outfile
 
+    def _read_cavity_from_xml(self, cavities_xml: str, cavity_id: int) -> Tuple[str, str]:
+        """Given a .xml file from a mole2 run, parses the cavity information and returns the boundary
+        and inner residues information.
+        
+        Args:
+            cavities_xml (str): The .xml filepath from a mole2 run.
+            cavity_id (int): The cavity id.
+            
+        Returns:
+            A tuple containing (boundary_residues, inner_residues) as strings.
+        """
+        tree = ET.parse(cavities_xml)
+        root = tree.getroot()
+        
+        # Find the cavity with matching Id
+        cavity = root.find(f".//Cavity[@Id='{cavity_id}']")
+        if cavity is None:
+            raise ValueError(f"Cavity with Id={cavity_id} not found in {cavities_xml}")
+            
+        # Get Boundary and Inner residues text
+        boundary_residues = cavity.find(".//Boundary/Residues").text or ""
+        inner_residues = cavity.find(".//Inner/Residues").text or ""
+        
+        return boundary_residues, inner_residues
+
     def _parse_cavity(self, fname:str, probe:float, inner:float, mesh_density:float) -> Mole2Cavity:
         """Factory function to produce Mole2Cavity objects. Each object stores information about both the
         cavity itself and the settings used to collect it.
 
         Args:
-            fname: The .cavity file from a mole2 run.
+            fname: The .mesh file from a mole2 run.
             probe: Probe radius used during collection in A.
             inner: Inner radius used during collection in A.
             mesh_density: Mesh density used during collection in A.
@@ -190,45 +218,47 @@ class Mole2Interface(BaseInterface):
             A newly constructed Mole2Cavity.
         """
         
-        lines:List[str] = fs.lines_from_file(fname)
+        lines:List[str] = fs.lines_from_file(fname) # Read cavity_X.mesh file lines.
         points = []
-        num_lines = int(lines.pop(0))
+        num_lines = int(lines.pop(0))       # The first line is the number of points.
         
-        for ll in lines[:num_lines]:
+        for ll in lines[:num_lines]:        # Read point coordinates by number.
             points.append(np.array(ll.split()).astype(float))
+        points = np.array(points)           # Convert to numpy array
         
-        lines = lines[num_lines:]
+        lines = lines[num_lines:]       # The remaining rows are surface data.
+        num_pgons = int(lines.pop(0))   # Surface number.
         
-        points = np.array( points )
-        num_pgons = int(lines.pop(0))
-        
-        
-        cnct = list(map(int,lines))
-        cnct.reverse()
-        surface = []
-        
+        cnct = list(map(int,lines))     # Convert face data to integer list
+        cnct.reverse()                  # Reverse for later processing
+
+        surfaces = []
         while cnct:
-            n = cnct.pop()
-        
-            surface.append( [n] + [cnct.pop() for _ in range(n)] )
+            n = cnct.pop()              # Get number of vertices in surface.
+            surfaces.append([n-1] + [cnct.pop() for _ in range(n)][:-1])    # Store [number of vertices + vertex index]
+            continue
+    
         com = 0.0
         verts = list()
-
-        for ss in surface:
-            for idx in ss[1:-1]:
-                verts.append( points[idx] )
+        for ss in surfaces:
+            for idx in ss[1:-1]:            # Get the vertex index of the face (skip the first element: the vertex number).
+                verts.append(points[idx])   # Collect vertex coordinates.
         
         verts = np.array(verts)
-        com = np.mean(verts,axis=0)
+        com = np.mean(verts,axis=0)     # Calculate the geometric center of the cavity.
 
+        # print(f"Surface elements: {len(surfaces)}, Surface count: {num_pgons}")
+        mesh = pv.PolyData(var_inp=points, faces=np.hstack(surfaces))
+        mesh = mesh.clean()
+        mesh = mesh.triangulate()
         return Mole2Cavity(
-            points=points,
-            mesh=pv.PolyData(points, np.hstack(surface)),
+            points=points,      # All vertex coordinates
+            mesh=mesh,          # Building a grid with pyvista
             probe=probe,
             inner=inner,
             mesh_density=mesh_density,
-            com=com
-            )
+            com=com             # Calculated center point
+        )
 
     def identify_cavities(self, molfile:str, 
                                 non_active_parts:List[Tuple[str,int]]=None, 
@@ -285,6 +315,7 @@ class Mole2Interface(BaseInterface):
             self.env_manager_.run_command(self.config_.MOLE2, [xml_file])
         
         mesh_files:List[str] = list(Path(f"{work_dir}/mesh/").glob("cavity_*.mesh"))
+        # cavities_xml_file = Path.joinpath(work_dir, "xml", "cavities.xml")
         _LOGGER.info(f"Found {len(mesh_files)} cavities using probe radius of {probe:.3f} A and inner radius of {inner:.3f} A")
             
         result:List[Mole2Cavity] = list()
