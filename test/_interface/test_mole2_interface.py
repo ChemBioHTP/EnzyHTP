@@ -36,7 +36,7 @@ def test_parse_cavity():
     """Test the `interface.mole2._parse_cavity` function."""
     mesh_filepath = path.join(DATA_DIR, "cavity_calc", "cavity_1.mesh")
     cavity = interface.mole2._parse_cavity(
-        mesh_filepath, 
+        mesh_filepath=mesh_filepath, 
         probe=interface.mole2.config_.PROBE, 
         inner=interface.mole2.config_.INNER,
         mesh_density=interface.mole2.config_.MESH_DENSITY,
