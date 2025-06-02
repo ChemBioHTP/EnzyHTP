@@ -21,7 +21,7 @@ import numpy as np
 import numpy.typing as npt
 import pyvista as pv
 
-from enzy_htp.structure import Residue
+from enzy_htp.structure import Structure, Residue
 
 from .base_interface import BaseInterface
 
@@ -108,6 +108,14 @@ class Mole2Cavity:
     def mesh_density(self) -> float:
         """Getter for the mesh density in A"""
         return self.mesh_density_
+    
+    @property
+    def boundary_residues(self) -> List[Residue]:
+        pass
+
+    @property
+    def inner_residues(self) -> List[Residue]:
+        pass
 
 class Mole2Interface(BaseInterface):
     """Class that provides a direct interface for enzy_htp to utilize Mole2. Supported operations
@@ -197,12 +205,22 @@ class Mole2Interface(BaseInterface):
         cavity = root.find(f".//Cavity[@Id='{cavity_id}']")
         if cavity is None:
             raise ValueError(f"Cavity with Id={cavity_id} not found in {cavities_xml}")
-            
-        # Get Boundary and Inner residues text
-        boundary_residues = cavity.find(".//Boundary/Residues").text or ""
-        inner_residues = cavity.find(".//Inner/Residues").text or ""
         
-        return boundary_residues, inner_residues
+        volume = None
+        try:
+            volume = float(cavity.attrib.get("Volume"))
+        except ValueError as exc:
+            raise ValueError(f"Could not parse cavity volume from {cavities_xml}") from exc
+        
+        # Get Boundary and Inner residues text
+        boundary_residues_text_split = cavity.find(".//Boundary/Residues").text.split(",") or list()
+        inner_residues_text_split = cavity.find(".//Inner/Residues").text.split(",") or list()
+
+        # Parse the text into a list of residues
+        boundary_residue_keys = [(txt.split()[-1], int(txt.split()[-2])) for txt in boundary_residues_text_split]
+        inner_residue_keys = [(txt.split()[-1], int(txt.split()[-2])) for txt in inner_residues_text_split]
+        
+        return volume, boundary_residue_keys, inner_residue_keys
 
     def _parse_cavity(self, fname:str, probe:float, inner:float, mesh_density:float) -> Mole2Cavity:
         """Factory function to produce Mole2Cavity objects. Each object stores information about both the

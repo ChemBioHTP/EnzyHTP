@@ -43,37 +43,27 @@ def test_parse_cavity():
     )
     # print(cavity.volume())
     assert abs(cavity.volume() - 946.993) < 1   # Inconsistent result comparing with Mole2 output.
-    
-    # cavity.mesh_.plot(
-    #     # scalars=np.array(3),
-    #     # cpos=[-1, 1, 0.5],
-    #     show_scalar_bar=False,
-    #     show_edges=True,
-    #     line_width=5,
-    # )
-    # plotter = pv.Plotter(off_screen=True)  # Close screen display
-    # plotter.add_mesh(cavity.mesh_, show_edges=True)
-    # plotter.set_background("white")  # Set background colour.
-    # plotter.screenshot(path.join(WORK_DIR, "cavity_8_mesh_plot.png"))   # Save figure.
-    # plotter.close()
 
 def test_read_cavity_from_xml():
     """Test the `interface.mole2._read_cavity_from_xml` function."""
     xml_filepath = path.join(DATA_DIR, "cavity_calc", "cavities.xml")
     cavity_id = 3  # Use the 3rd cavity for test.
     
-    boundary_residues, inner_residues = interface.mole2._read_cavity_from_xml(xml_filepath, cavity_id)
+    volume, boundary_residue_keys, inner_residue_keys = interface.mole2._read_cavity_from_xml(xml_filepath, cavity_id)
     
     # Verify value type.
-    assert isinstance(boundary_residues, str)
-    assert isinstance(inner_residues, str)
+    assert isinstance(boundary_residue_keys, list)
+    assert isinstance(inner_residue_keys, list)
     
     # Verify content.
-    expected_boundary = "ILE 55 A,ARG 58 A,GLY 63 A,PRO 64 A,ARG 126 A,ASP 127 A,ILE 130 A"
-    expected_inner = "LEU 50 A,LEU 54 A,ILE 61 A,GLY 62 A,LEU 92 A,SER 94 A,PHE 95 A,TYR 97 A,VAL 125 A,GLY 131 A,GLN 132 A,VAL 160 A,TYR 162 A,ILE 195 A"
+    expected_boundary_keys = [("A", 55), ("A", 58), ("A", 63), ("A", 64), ("A", 126), ("A", 127), ("A", 130)]
+    expected_inner_keys = [("A", 50), ("A", 54), ("A", 61), ("A", 62), ("A", 92), ("A", 94), ("A", 95), ("A", 97), ("A", 125), ("A", 131), ("A", 132), ("A", 160), ("A", 162), ("A", 195)]
+    # expected_boundary = "ILE 55 A,ARG 58 A,GLY 63 A,PRO 64 A,ARG 126 A,ASP 127 A,ILE 130 A"
+    # expected_inner = "LEU 50 A,LEU 54 A,ILE 61 A,GLY 62 A,LEU 92 A,SER 94 A,PHE 95 A,TYR 97 A,VAL 125 A,GLY 131 A,GLN 132 A,VAL 160 A,TYR 162 A,ILE 195 A"
     
-    assert boundary_residues == expected_boundary
-    assert inner_residues == expected_inner
+    assert abs(volume - 415.104) < 0.1
+    assert boundary_residue_keys == expected_boundary_keys
+    assert inner_residue_keys == expected_inner_keys
     
     # Test nonexistent cavity_id.
     try:
