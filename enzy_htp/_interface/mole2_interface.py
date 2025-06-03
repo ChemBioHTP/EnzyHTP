@@ -363,7 +363,7 @@ class Mole2Interface(BaseInterface):
         for i, mf in enumerate(mesh_files):
             result.append(self._parse_cavity(mesh_filepath=mf, 
                             probe=probe, inner=inner, mesh_density=mesh_density, 
-                            cavity_id=i, cavity_xml_filepath=cavities_xml_file))
+                            cavity_id=(i+1), cavity_xml_filepath=cavities_xml_file))
 
         fs.safe_rm(input_xml_file)
         

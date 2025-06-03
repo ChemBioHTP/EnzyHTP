@@ -1,4 +1,4 @@
-"""Testing enzy_htp.analysis.
+"""Testing enzy_htp.analysis.rmsd
 
 Author: Zhong, Yinjie <yinjie.zhong@vanderbilt.edu>
 Created: 2024-08-21
