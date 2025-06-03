@@ -23,6 +23,7 @@ from .chain import Chain
 from .structure import Structure
 from .structure_translator import (translate_structure, TranslatorBase)
 from .structure_ensemble import StructureEnsemble
+from .structure_cavity import StructureCavity
 from .structure_io import PDBParser, Mol2Parser, PrepinParser
 
 from .structure_region import (

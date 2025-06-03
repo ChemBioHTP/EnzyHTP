@@ -348,23 +348,23 @@ class Mole2Interface(BaseInterface):
         fs.safe_rmdir(f"{work_dir}/mesh/")
         fs.check_not_empty(pdb_path)
 
-        xml_file:str = self._write_xml_input(pdb_path, work_dir, non_active_parts, probe, inner, mesh_density, ignore_hetatm)
+        input_xml_file: str = self._write_xml_input(pdb_path, work_dir, non_active_parts, probe, inner, mesh_density, ignore_hetatm)
 
         if use_mono:
-            self.env_manager_.run_command(self.config_.MONO, [self.config_.MOLE2, xml_file])
+            self.env_manager_.run_command(self.config_.MONO, [self.config_.MOLE2, input_xml_file])
         else:
-            self.env_manager_.run_command(self.config_.MOLE2, [xml_file])
+            self.env_manager_.run_command(self.config_.MOLE2, [input_xml_file])
         
-        mesh_files:List[str] = list(Path(f"{work_dir}/mesh/").glob("cavity_*.mesh"))
+        mesh_files: List[str] = list(Path(f"{work_dir}/mesh/").glob("cavity_*.mesh"))
         cavities_xml_file = Path(work_dir).joinpath("xml", "cavities.xml")
         _LOGGER.info(f"Found {len(mesh_files)} cavities using probe radius of {probe:.3f} A and inner radius of {inner:.3f} A")
             
-        result:List[Mole2Cavity] = list()
+        result: List[Mole2Cavity] = list()
         for i, mf in enumerate(mesh_files):
             result.append(self._parse_cavity(mesh_filepath=mf, 
                             probe=probe, inner=inner, mesh_density=mesh_density, 
                             cavity_id=i, cavity_xml_filepath=cavities_xml_file))
 
-        # fs.safe_rm(xml_file)
+        fs.safe_rm(input_xml_file)
         
         return result
