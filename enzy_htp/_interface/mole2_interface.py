@@ -182,11 +182,11 @@ class Mole2Interface(BaseInterface):
            f"\t<Input>{pdb_path}</Input>\n"]
 
         if non_active_parts is not None:
-            content.append("\t<NonActiveResidues>")
+            content.append("\t<NonActiveParts>")    # The `NonActiveResidues` described in the official doc is not correct.
             for (chain, rnum) in non_active_parts:
                 content.append(f"\t\t<Residue Chain=\"{chain}\" SequenceNumber=\"{rnum}\" />")
         
-            content.append("\t</NonActiveResidues>")
+            content.append("\t</NonActiveParts>")
 
         content.extend([
            f"\t<Params>",
@@ -362,7 +362,7 @@ class Mole2Interface(BaseInterface):
         cavity_mesh_files: List[str] = list(Path(f"{work_dir}/mesh/").glob("cavity_*.mesh"))
         void_mesh_files: List[str] = list(Path(f"{work_dir}/mesh/").glob("void_*.mesh"))
         cavities_xml_file = Path(work_dir).joinpath("xml", "cavities.xml")
-        _LOGGER.info(f"Found {len(cavity_mesh_files)} cavities using probe radius of {probe:.3f} A and inner radius of {inner:.3f} A")
+        _LOGGER.info(f"Found {len(cavity_mesh_files)} cavities and {len(void_mesh_files)} void cavities using probe radius of {probe:.3f} A and inner radius of {inner:.3f} A")
             
         result: List[Mole2Cavity] = list()
         for i, mf in enumerate(cavity_mesh_files):
