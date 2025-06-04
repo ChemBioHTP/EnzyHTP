@@ -182,11 +182,11 @@ class Mole2Interface(BaseInterface):
            f"\t<Input>{pdb_path}</Input>\n"]
 
         if non_active_parts is not None:
-            content.append("\t<NonActiveParts>")
+            content.append("\t<NonActiveResidues>")
             for (chain, rnum) in non_active_parts:
                 content.append(f"\t\t<Residue Chain=\"{chain}\" SequenceNumber=\"{rnum}\" />")
         
-            content.append("\t</NonActiveParts>")
+            content.append("\t</NonActiveResidues>")
 
         content.extend([
            f"\t<Params>",
