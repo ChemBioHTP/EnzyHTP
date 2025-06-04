@@ -14,7 +14,7 @@ Date: 2023-09-26
 """
 
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Literal
 import xml.etree.ElementTree as ET
 
 import numpy as np
@@ -205,7 +205,7 @@ class Mole2Interface(BaseInterface):
 
         return outfile
 
-    def _read_cavity_from_xml(self, cavities_xml_filepath: str, cavity_id: int) -> Tuple[float, list, list]:
+    def _read_cavity_from_xml(self, cavities_xml_filepath: str, cavity_id: int, cavity_type: Literal["Cavity", "Void"] = "Cavity") -> Tuple[float, list, list]:
         """Given a .xml file from a mole2 run, parses the cavity information and returns the boundary
         and inner residues information.
         
@@ -222,7 +222,7 @@ class Mole2Interface(BaseInterface):
         root = tree.getroot()
         
         # Find the cavity with matching Id
-        cavity = root.find(f".//Cavity[@Id='{cavity_id}']")
+        cavity = root.find(f".//Cavity[@Type='{cavity_type}'][@Id='{cavity_id}']")
         if cavity is None:
             raise ValueError(f"Cavity with Id={cavity_id} not found in {cavities_xml_filepath}")
         
@@ -233,8 +233,10 @@ class Mole2Interface(BaseInterface):
             raise ValueError(f"Could not parse cavity volume from {cavities_xml_filepath}") from exc
         
         # Get Boundary and Inner residues text
-        boundary_residues_text_split = cavity.find(".//Boundary/Residues").text.split(",") or list()
-        inner_residues_text_split = cavity.find(".//Inner/Residues").text.split(",") or list()
+        boundary_residues_text = cavity.find(".//Boundary/Residues").text or ""
+        boundary_residues_text_split = boundary_residues_text.split(",") if boundary_residues_text else list()
+        inner_residues_text = cavity.find(".//Inner/Residues").text or ""
+        inner_residues_text_split = inner_residues_text.split(",") if inner_residues_text else list()
 
         # Parse the text into a list of residues
         boundary_residue_keys = [(txt.split()[-1], int(txt.split()[-2])) for txt in boundary_residues_text_split]
@@ -242,7 +244,9 @@ class Mole2Interface(BaseInterface):
         
         return mole2_volume, boundary_residue_keys, inner_residue_keys
 
-    def _parse_cavity(self, mesh_filepath: str, probe: float, inner: float, mesh_density: float, cavity_id: int = None, cavity_xml_filepath: str = None) -> Mole2Cavity:
+    def _parse_cavity(self, mesh_filepath: str, probe: float, inner: float, 
+            mesh_density: float, cavity_id: int = None, 
+            cavity_xml_filepath: str = None, cavity_type: Literal["Cavity", "Void"] = "Cavity") -> Mole2Cavity:
         """Factory function to produce Mole2Cavity objects. Each object stores information about both the
         cavity itself and the settings used to collect it.
 
@@ -290,7 +294,7 @@ class Mole2Interface(BaseInterface):
         mesh = mesh.clean()
         mesh = mesh.triangulate()
 
-        mole2_volume, boundary_residue_keys, inner_residue_keys = self._read_cavity_from_xml(cavity_xml_filepath, cavity_id)
+        mole2_volume, boundary_residue_keys, inner_residue_keys = self._read_cavity_from_xml(cavity_xml_filepath, cavity_id, cavity_type)
         return Mole2Cavity(
             points=points,      # All vertex coordinates
             mesh=mesh,          # Building a grid with pyvista
@@ -355,15 +359,20 @@ class Mole2Interface(BaseInterface):
         else:
             self.env_manager_.run_command(self.config_.MOLE2, [input_xml_file])
         
-        mesh_files: List[str] = list(Path(f"{work_dir}/mesh/").glob("cavity_*.mesh"))
+        cavity_mesh_files: List[str] = list(Path(f"{work_dir}/mesh/").glob("cavity_*.mesh"))
+        void_mesh_files: List[str] = list(Path(f"{work_dir}/mesh/").glob("void_*.mesh"))
         cavities_xml_file = Path(work_dir).joinpath("xml", "cavities.xml")
-        _LOGGER.info(f"Found {len(mesh_files)} cavities using probe radius of {probe:.3f} A and inner radius of {inner:.3f} A")
+        _LOGGER.info(f"Found {len(cavity_mesh_files)} cavities using probe radius of {probe:.3f} A and inner radius of {inner:.3f} A")
             
         result: List[Mole2Cavity] = list()
-        for i, mf in enumerate(mesh_files):
+        for i, mf in enumerate(cavity_mesh_files):
             result.append(self._parse_cavity(mesh_filepath=mf, 
                             probe=probe, inner=inner, mesh_density=mesh_density, 
-                            cavity_id=(i+1), cavity_xml_filepath=cavities_xml_file))
+                            cavity_id=(i+1), cavity_xml_filepath=cavities_xml_file, cavity_type="Cavity"))
+        for i, mf in enumerate(void_mesh_files):
+            result.append(self._parse_cavity(mesh_filepath=mf, 
+                            probe=probe, inner=inner, mesh_density=mesh_density, 
+                            cavity_id=(i+1), cavity_xml_filepath=cavities_xml_file, cavity_type="Void"))
 
         fs.safe_rm(input_xml_file)
         
