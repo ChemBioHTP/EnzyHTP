@@ -137,3 +137,13 @@ def test_mutate_stru_with_pymol_multiple_chains():
         else:
             for new_atom, old_atom in zip(new_res.atoms, old_res.atoms):
                 assert new_atom.name == old_atom.name
+
+def test_mutate_stru_with_pymol_to_gly():
+    """test to fix the bug when mutate to GLY"""
+    test_pdb = f"{DATA_DIR}KE_07_R7_2_S.pdb"
+    test_stru = sp.get_structure(test_pdb)
+    mutant = mapi.assign_mutant(test_stru, "R154G")[0]
+    mutant_stru = mapi.mutate_stru_with_pymol(test_stru, mutant)
+
+    new_res = mutant_stru.get("A.154")
+    assert set(new_res.atom_name_list) == {'N', 'CA', 'C', 'O', 'H', 'HA3', 'HA2'}

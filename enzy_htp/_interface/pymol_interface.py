@@ -251,6 +251,16 @@ class PyMolInterface(BaseInterface):
 
         pymol_session.cmd.get_wizard().apply()
 
+        # fix atom naming TODO extract into a function from here if more cases exists
+        if target == "GLY": # currently only mutations to GLY have the problem
+            chain = pos_key[0]
+            resi = pos_key[1]
+            if pymol_obj_name:
+                obj = f"{pymol_obj_name} & "
+            else:
+                obj = ""
+            pymol_session.cmd.alter(f"{obj}chain {chain} & resi {resi} & name 3HA", "name='HA3'")
+
     def export_pdb(self, pymol_session: pymol2.PyMOL, pymol_obj_name: str, if_retain_order: bool = True, tag: str = None) -> str:
         """
         Saves a PyMOL object to a PDB file.
