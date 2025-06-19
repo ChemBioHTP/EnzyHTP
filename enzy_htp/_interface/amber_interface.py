@@ -407,10 +407,12 @@ class AmberParameterizer(MolDynParameterizer):
                 and not isinstance(additional_tleap_lines, str)
                 and isinstance(additional_tleap_lines[0], str)
                 ):
-                lines.extend(additional_tleap_lines)
+                pass
             else:
                 _LOGGER.error(f"`additional_tleap_line` needs to be a list of str. current: {repr(additional_tleap_lines)}")
                 raise TypeError
+        else:
+            additional_tleap_lines = []
 
         # NCAA parts
 
@@ -437,6 +439,7 @@ class AmberParameterizer(MolDynParameterizer):
                                           if_renumber=False)
         lines.extend([
             f"a = loadpdb {temp_pdb_path}",
+            ] + additional_tleap_lines + [ # insert additional lines as they sometime depend on obj "a"
             "center a",
             "addions a Na+ 0",
             "addions a Cl- 0",
