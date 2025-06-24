@@ -288,9 +288,6 @@ def mutate_stru(stru: Structure,
             Unknown
 
         MCMC search globally in side-chains:
-        - Modeller
-            Fully consider other side-chain change
-            Not consider backbone change
         - SWISSMODEL
             Fully consider other side-chain change
             Not consider backbone change
