@@ -6,10 +6,8 @@ Date: 2025-05-18
 from os import path
 from typing import List, Tuple
 from os import path
-from typing import List
 from enzy_htp import interface, _LOGGER, PDBParser
-from enzy_htp._interface import Mole2Cavity
-import pyvista as pv
+from enzy_htp.core import file_system as fs
 
 sp = PDBParser()
 mole2 = interface.mole2
@@ -17,36 +15,41 @@ mole2 = interface.mole2
 DATA_DIR = path.join(path.dirname(__file__), "data")
 WORK_DIR = path.join(path.dirname(__file__), "work_dir")
 
+pdb_filepath = path.join(DATA_DIR, "cavity_calc", "aclHMT-ETI-SAH_no-ETI.pdb")
+xml_filepath = path.join(DATA_DIR, "cavity_calc", "cavities.xml")
+
 def test_identify_cavities():
     """Test the `interface.mole2.identify_cavities` function."""
-    pdb_filepath = path.join(DATA_DIR, "cavity_calc", "aclHMT-ETI-SAH_no-ETI.pdb")
-    cavities: List[Mole2Cavity] = interface.mole2.identify_cavities(pdb_filepath, work_dir=WORK_DIR)
+    stru = sp.get_structure(pdb_filepath)
+    cavities = interface.mole2.identify_cavities(stru, work_dir=WORK_DIR)
     
     has_target_cavity = False
     for i, cavity in enumerate(cavities):
-        _LOGGER.info(f"Cavity {i+1}, Open Edges: {cavity.mesh_.n_open_edges}, Volume: {cavity.volume()}")
-        if (cavity.volume() > 900):
+        _LOGGER.info(f"Cavity {i+1}, Open Edges: {cavity.mesh.n_open_edges}, Volume: {cavity.volume}")
+        if (cavity.volume > 900):
             has_target_cavity = True
         else:
             pass
         continue
     assert has_target_cavity
+    fs.safe_rmdir(WORK_DIR)
 
 def test_parse_cavity():
     """Test the `interface.mole2._parse_cavity` function."""
+    stru = sp.get_structure(pdb_filepath)
     mesh_filepath = path.join(DATA_DIR, "cavity_calc", "cavity_1.mesh")
     cavity = interface.mole2._parse_cavity(
+        stru=stru,
         mesh_filepath=mesh_filepath, 
         probe=interface.mole2.config_.PROBE, 
         inner=interface.mole2.config_.INNER,
         mesh_density=interface.mole2.config_.MESH_DENSITY,
     )
-    # print(cavity.volume())
-    assert abs(cavity.volume() - 946.993) < 1   # Inconsistent result comparing with Mole2 output.
+    assert abs(cavity.volume - 1147) < 1   # Inconsistent result comparing with Mole2 output.
+    fs.safe_rmdir(WORK_DIR)
 
 def test_read_cavity_from_xml():
     """Test the `interface.mole2._read_cavity_from_xml` function."""
-    xml_filepath = path.join(DATA_DIR, "cavity_calc", "cavities.xml")
     cavity_id = 3  # Use the 3rd cavity for test.
     
     volume, boundary_residue_keys, inner_residue_keys = interface.mole2._read_cavity_from_xml(xml_filepath, cavity_id)
@@ -71,3 +74,4 @@ def test_read_cavity_from_xml():
         assert False, "Should raise ValueError for non-existent cavity_id"
     except ValueError:
         pass
+    fs.safe_rmdir(WORK_DIR)

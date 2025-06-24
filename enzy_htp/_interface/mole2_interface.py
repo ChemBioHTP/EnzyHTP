@@ -12,7 +12,7 @@ stores information about the cavity. Supported operations include:
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-09-26
 """
-
+from os import path
 from pathlib import Path
 from typing import List, Tuple, Literal
 import xml.etree.ElementTree as ET
@@ -21,15 +21,17 @@ import numpy as np
 import numpy.typing as npt
 import pyvista as pv
 
-from enzy_htp.structure import Structure, Residue
+from enzy_htp.structure import Structure, Residue, Cavity
 
 from .base_interface import BaseInterface
 
-from enzy_htp import config as eh_config
-from enzy_htp import _LOGGER 
+from enzy_htp import _LOGGER, config as eh_config, PDBParser
 from enzy_htp.core import file_system as fs
+from enzy_htp.structure import Structure, Residue, Cavity
 
 from enzy_htp._config.mole2_config import Mole2Config, default_mole2_config
+
+sp = PDBParser()
 
 class Mole2Cavity:
     """Companion class to the Mole2Interface that stores information about individual cavities identified
@@ -43,7 +45,7 @@ class Mole2Cavity:
         inner_ : Inner radius used during collection in Angstroms.
         mesh_density_ : Mesh density used during collection in Angstroms.
         com_ : The center-of-mass of the mesh as a numpy array with format (x, y, z).
-    """ 
+    """
 
     def __init__(self, points :List[npt.NDArray], 
             mesh : pv.PolyData, probe:float, 
@@ -244,13 +246,14 @@ class Mole2Interface(BaseInterface):
         
         return mole2_volume, boundary_residue_keys, inner_residue_keys
 
-    def _parse_cavity(self, mesh_filepath: str, probe: float, inner: float, 
+    def _parse_cavity(self, stru: Structure, mesh_filepath: str, probe: float, inner: float, 
             mesh_density: float, cavity_id: int = None, 
-            cavity_xml_filepath: str = None, cavity_type: Literal["Cavity", "Void"] = "Cavity") -> Mole2Cavity:
+            cavity_xml_filepath: str = None, cavity_type: Literal["Cavity", "Void"] = "Cavity") -> Cavity:
         """Factory function to produce Mole2Cavity objects. Each object stores information about both the
         cavity itself and the settings used to collect it.
 
         Args:
+            stru (Structure): The structure instance to detect cavities from.
             mesh_filepath: The .mesh file from a mole2 run.
             probe: Probe radius used during collection in A.
             inner: Inner radius used during collection in A.
@@ -295,40 +298,42 @@ class Mole2Interface(BaseInterface):
         mesh = mesh.triangulate()
 
         mole2_volume, boundary_residue_keys, inner_residue_keys = self._read_cavity_from_xml(cavity_xml_filepath, cavity_id, cavity_type)
-        return Mole2Cavity(
-            points=points,      # All vertex coordinates
+        boundary_residues = [stru.find_residue_with_key(key) for key in boundary_residue_keys] if boundary_residue_keys else []
+        inner_residues = [stru.find_residue_with_key(key) for key in inner_residue_keys] if inner_residue_keys else []
+        return Cavity(
+            stru=stru,
             mesh=mesh,          # Building a grid with pyvista
             probe=probe,
             inner=inner,
             mesh_density=mesh_density,
-            com=com,            # Calculated center point
-            mole2_volume=mole2_volume,
-            boundary_residue_keys=boundary_residue_keys,
-            inner_residue_keys=inner_residue_keys,
+            software_report_volume=mole2_volume,
+            boundary_residues=boundary_residues,
+            inner_residues=inner_residues,
+            type=cavity_type
         )
 
-    def identify_cavities(self, pdb_path: str, 
-            non_active_parts: List[Tuple[str,int]] = None, 
+    def identify_cavities(self, stru: Structure, 
+            non_active_parts: List[Tuple[str, int]] = None, 
             probe: float = None, 
             inner: float = None, 
             mesh_density: float = None,
             ignore_hetatm: bool = None,
             work_dir: str = None,
             use_mono: bool = True
-        ) -> List[Mole2Cavity]:
+        ) -> List[Cavity]:
         """Identifies cavities in a protein structure using the Mole2 software package. Client method that should be 
         called by users. Results are represented via Mole2Cavity objects that support basic geometry operations.
 
         Args:
-            pdb_path: The .pdb file to look for cavities in.
-            non_active_parts: Residues that should be skipped. 
+            stru (Structure): The structure instance to detect cavities from.
+            non_active_parts (List[Tuple[str, int]], optional): Residues that should be skipped. 
                 Should be in format List[Tuple] where Tuple has format (chain id, residue number).
-            probe: Probe radius to use in A. Defaults to Mole2Config.PROBE if not supplied.
-            inner: Inner radius to use in A. Defaults to Mole2Config.INNER if not supplied.
-            mesh_density: Mesh density to use in A. Defaults to Mole2Config.MESH_DENSITY if not supplied.
-            ignore_hetatm: TODO(CJ)
-            work_dir: Directory to do work in. Defaults to system.SCATCH_DIR if not supplied.
-            use_mono: Does mono need to be used during run time? Defaults to true.
+            probe (float, optional): Probe radius to use in A. Defaults to Mole2Config.PROBE if not supplied.
+            inner (float, optional): Inner radius to use in A. Defaults to Mole2Config.INNER if not supplied.
+            mesh_density (float, optional): Mesh density to use in A. Defaults to Mole2Config.MESH_DENSITY if not supplied.
+            ignore_hetatm (bool, optional): TODO (CJ)
+            work_dir (str, optional): Directory to do work in. Defaults to system.SCATCH_DIR if not supplied.
+            use_mono (bool, optional): Does mono need to be used during run time? Defaults to true.
 
         Returns:
             A list() of Mole2Cavity ebjects.
@@ -350,7 +355,9 @@ class Mole2Interface(BaseInterface):
 
         fs.safe_mkdir(work_dir)
         fs.safe_rmdir(f"{work_dir}/mesh/")
-        fs.check_not_empty(pdb_path)
+        
+        pdb_path = path.join(work_dir, "stru_cavity_temp.pdb")
+        sp.save_structure(outfile=pdb_path, stru=stru)
 
         input_xml_file: str = self._write_xml_input(pdb_path, work_dir, non_active_parts, probe, inner, mesh_density, ignore_hetatm)
 
@@ -363,17 +370,20 @@ class Mole2Interface(BaseInterface):
         void_mesh_files: List[str] = list(Path(f"{work_dir}/mesh/").glob("void_*.mesh"))
         cavities_xml_file = Path(work_dir).joinpath("xml", "cavities.xml")
         _LOGGER.info(f"Found {len(cavity_mesh_files)} cavities and {len(void_mesh_files)} void cavities using probe radius of {probe:.3f} A and inner radius of {inner:.3f} A")
-            
-        result: List[Mole2Cavity] = list()
+        
+        result: List[Cavity] = list()
         for i, mf in enumerate(cavity_mesh_files):
-            result.append(self._parse_cavity(mesh_filepath=mf, 
-                            probe=probe, inner=inner, mesh_density=mesh_density, 
-                            cavity_id=(i+1), cavity_xml_filepath=cavities_xml_file, cavity_type="Cavity"))
+            result.append(
+                self._parse_cavity(stru=stru, mesh_filepath=mf, probe=probe, inner=inner, mesh_density=mesh_density, 
+                    cavity_id=(i+1), cavity_xml_filepath=cavities_xml_file, cavity_type="Cavity")
+            )
         for i, mf in enumerate(void_mesh_files):
-            result.append(self._parse_cavity(mesh_filepath=mf, 
-                            probe=probe, inner=inner, mesh_density=mesh_density, 
-                            cavity_id=(i+1), cavity_xml_filepath=cavities_xml_file, cavity_type="Void"))
+            result.append(
+                self._parse_cavity(stru=stru, mesh_filepath=mf, probe=probe, inner=inner, mesh_density=mesh_density, 
+                    cavity_id=(i+1), cavity_xml_filepath=cavities_xml_file, cavity_type="Void")
+            )
 
         fs.safe_rm(input_xml_file)
+        fs.safe_rm(pdb_path)
         
         return result
