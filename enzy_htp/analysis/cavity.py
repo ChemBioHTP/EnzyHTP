@@ -33,7 +33,7 @@ def identify_stru_cavities(stru: Structure,
         use_mono: bool = True
     ) -> List[Cavity]:
     """Identifies cavities in a protein structure using the Mole2 software package. Client method that should be 
-    called by users. Results are represented via Mole2Cavity objects that support basic geometry operations.
+    called by users. Results are represented via Cavity objects that support basic geometry operations.
 
     Args:
         stru (Structure): The structure instance to detect cavities from.

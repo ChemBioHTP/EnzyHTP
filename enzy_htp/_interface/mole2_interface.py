@@ -11,6 +11,17 @@ stores information about the cavity. Supported operations include:
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-09-26
+
+------------------------------------------------------------------------------
+
+Mole2Cavity class is removed. All its features are relocated to the [Cavity class](../structure/structure_cavity/cavity.py).
+
+    - Mole2Cavity
+
+All the references to the former Mole2Cavity class are replaced by the references to the [Cavity class](../structure/structure_cavity/cavity.py).
+
+Author: Zhong, Yinjie <yinjie.zhong@vanderbilt.edu>
+Date: 2025-06-24
 """
 from os import path
 from pathlib import Path
@@ -32,110 +43,6 @@ from enzy_htp.structure import Structure, Residue, Cavity
 from enzy_htp._config.mole2_config import Mole2Config, default_mole2_config
 
 sp = PDBParser()
-
-class Mole2Cavity:
-    """Companion class to the Mole2Interface that stores information about individual cavities identified
-    by Mole2. Supported operations include cavity volume and center of mass calculations, and indicating if
-    3D cartesian points are contained within the cavity.
-
-    Attributes:
-        points_ : A list() of 3D vertices describing the cavity.
-        mesh_ : A pyvista.PolyData object representing the cavity's mesh.
-        probe_ : Probe radius used during collection in Angstroms.
-        inner_ : Inner radius used during collection in Angstroms.
-        mesh_density_ : Mesh density used during collection in Angstroms.
-        com_ : The center-of-mass of the mesh as a numpy array with format (x, y, z).
-    """
-
-    def __init__(self, points :List[npt.NDArray], 
-            mesh : pv.PolyData, probe:float, 
-            inner: float, mesh_density:float, 
-            com: npt.NDArray, mole2_volume: float,
-            boundary_residue_keys: List[Tuple[str, int]], inner_residue_keys: List[Tuple[str, int]]):
-        """Simplistic constructor. Each attribute is directly set by a parameter.
-        
-        Args:
-            points (List[npt.NDArray]): A list() of 3D vertices describing the cavity.
-            mesh (pv.PolyData): The mesh representing the cavity established with pyvista.
-            probe (float): Probe radius used during collection in Angstroms.
-            inner (float): Inner radius used during collection in Angstroms.
-            com (npt.NDArray): The center-of-mass of the mesh as a numpy array with format (x, y, z).
-            mole2_volume (float): The volume of the cavity in A^3 calculated by Mole2 engine.
-            boundary_residue_keys (List[Tuple[str, int]]): A list() of residue keys forming the cavity that are on the boundary of the structure.
-            inner_residue_keys (List[Tuple[str, int]]): A list() of residue keys forming the cavity that are inside the structure.
-        """
-        self.points_ = points
-        self.mesh_ = mesh
-        self.probe_ = probe
-        self.inner_ = inner
-        self.mesh_density_ = mesh_density
-        self.com_ = com
-        self.mole2_volume = mole2_volume
-        self._boundary_residue_keys = boundary_residue_keys
-        self._inner_residue_keys = inner_residue_keys
-
-    
-    def points(self) -> List[npt.NDArray]:
-        """TODO(CJ)"""
-        return self.points_
-
-    def volume(self) -> float:
-        """The volume of the cavity in A^3. Set at time of construction."""
-        return self.mesh_.volume
-
-    def center_of_mass(self) -> npt.NDArray:
-        """The center-of-mass of the mesh as a numpy array with format (x, y, z). Set at time of construction."""
-        return self.com_
-
-    def contains(self, point: npt.NDArray) -> bool:
-        """Does the mesh contain a given point? Uses pyvista.PolyData and turns off surface checking.
-
-        Args:
-            point: The point in question as a numpy array with format (x, y, z).
-
-        Returns:
-            If the point is contained by the mesh.
-        """
-
-        point = pv.PolyData([point])
-        result = point.select_enclosed_points(
-            self.mesh_,
-            check_surface=False
-        )
-        
-        return bool(result['SelectedPoints'][0])
-
-    def contains_points(self, points: List[npt.NDArray]) -> bool:
-        """TODO(CJ): make this a dispatch and this will be the list version"""
-
-        points = pv.PolyData(points)
-        result = points.select_enclosed_points(
-            self.mesh_,
-            check_surface=False
-        )
-        
-        return result['SelectedPoints']
-
-
-    def probe(self) -> float:
-        """Getter for the probe radius in A"""
-        return self.probe_
-
-    def inner(self) -> float:
-        """Getter for the inner radius in A"""
-        return self.inner_
-    
-    def mesh_density(self) -> float:
-        """Getter for the mesh density in A"""
-        return self.mesh_density_
-    
-    @property
-    def boundary_residue_keys(self) -> List[Residue]:
-        return self._boundary_residue_keys
-
-    @property
-    def inner_residue_keys(self) -> List[Residue]:
-        return self._inner_residue_keys
 
 class Mole2Interface(BaseInterface):
     """Class that provides a direct interface for enzy_htp to utilize Mole2. Supported operations
