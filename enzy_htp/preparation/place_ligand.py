@@ -133,10 +133,9 @@ def _place_mole2(stru: Structure,
                 for z in z_vals:
                     candidates.append(np.array([x, y, z]))
         candidates = np.array(candidates)
-        for included, cp in zip(cavity.contains_points(candidates), candidates):
+        for included, cp in zip(cavity.contains(candidates), candidates):
             if included:
                 seed_locations.append(cp)
-
 
     seed_locations = np.array(seed_locations)
     scores = list()
