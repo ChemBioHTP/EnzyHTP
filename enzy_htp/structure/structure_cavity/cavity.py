@@ -49,6 +49,11 @@ class Cavity():
         return
     
     @property
+    def points(self):
+        """The points of the mesh as a numpy array with format (n, 3)."""
+        return self.mesh.points
+    
+    @property
     def volume(self):
         """The volume of the cavity calculated from the mesh."""
         return self.mesh.volume
