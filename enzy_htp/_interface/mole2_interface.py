@@ -207,7 +207,7 @@ class Mole2Interface(BaseInterface):
             software_report_volume=mole2_volume,
             boundary_residues=boundary_residues,
             inner_residues=inner_residues,
-            type=cavity_type
+            cavity_type=cavity_type
         )
 
     def identify_cavities(self, stru: Structure, 
