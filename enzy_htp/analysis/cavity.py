@@ -9,7 +9,7 @@ Date: 2024-11-15
 """
 from __future__ import annotations
 from os import path
-from typing import List, Tuple
+from typing import Callable, Dict, List, Tuple
 
 import numpy as np
 import numpy.typing as npt
@@ -21,7 +21,9 @@ from enzy_htp import config as eh_config
 from enzy_htp.core import file_system as fs
 
 sp = PDBParser()
-mole2_interface = interface.mole2
+CAVITY_IDENTIFICATION_METHODS: Dict[str, Callable[..., List[Cavity]]] = {
+    "mole2": interface.mole2.identify_cavities
+}
 
 def identify_stru_cavities(stru: Structure,
         non_active_residues: List[Residue] = list(), 
@@ -30,7 +32,8 @@ def identify_stru_cavities(stru: Structure,
         mesh_density: float = None,
         ignore_hetatm: bool = None,
         work_dir: str = None,
-        use_mono: bool = True
+        use_mono: bool = True,
+        engine: str = "mole2",
     ) -> List[Cavity]:
     """Identifies cavities in a protein structure using the Mole2 software package. Client method that should be 
     called by users. Results are represented via Cavity objects that support basic geometry operations.
@@ -43,7 +46,8 @@ def identify_stru_cavities(stru: Structure,
         mesh_density (float, optional): Mesh density to use in A. Defaults to Mole2Config.MESH_DENSITY if not supplied.
         ignore_hetatm (bool, optional): TODO(CJ)
         work_dir (str, optional): Directory to do work in. Defaults to system.SCATCH_DIR if not supplied.
-        use_mono (bool, optional): Does mono need to be used during run time? Defaults to true.
+        use_mono (bool, optional): Indicate if mono need to be used during run time. Defaults to true.
+        engine (str): The engine to use for cavity identification. Defaults to "mole2" (The only available one at present).
 
     Returns:
         A list of Cavity objects.
@@ -52,7 +56,7 @@ def identify_stru_cavities(stru: Structure,
         work_dir = eh_config['system.SCRATCH_DIR']
     non_active_parts = [resi.key() for resi in non_active_residues]
 
-    cavities = mole2_interface.identify_cavities(stru=stru, non_active_parts=non_active_parts,
+    cavities = CAVITY_IDENTIFICATION_METHODS[engine](stru=stru, non_active_parts=non_active_parts,
         probe=probe, inner=inner, mesh_density=mesh_density, ignore_hetatm=ignore_hetatm,
         work_dir=work_dir, use_mono=use_mono)
     

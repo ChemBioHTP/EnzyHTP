@@ -25,10 +25,11 @@ def test_identify_stru_cavities():
     pdb_filepath = path.join(DATA_DIR, "cavity_calc", "aclHMT-ETI-SAH_no-ETI.pdb")
     stru = sp.get_structure(pdb_filepath)
     cavities = identify_stru_cavities(stru=stru, work_dir=WORK_DIR)
-    assert len(cavities) == 10
-    
-    cavity = cavities[0]
+    fs.safe_rmdir(WORK_DIR)
 
+    assert len(cavities) == 10
+    cavity = cavities[0]
     assert len(cavity.boundary_residues) == 4
     assert len(cavity.inner_residues) == 31
-    fs.safe_rmdir(WORK_DIR)
+    assert abs(cavity.volume - 1147) < 1
+    assert abs(cavity.software_report_volume - 947) < 1

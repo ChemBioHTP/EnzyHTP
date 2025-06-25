@@ -3,24 +3,15 @@ class found in enzy_htp/_config/mole2_config.py. Supported operations include:
 
     + getting cavities from a given structure
 
-Sub-module includes a companion Mole2Cavity class that represents a cavity in a structure. The Mole2Cavity objects
-stores information about the cavity. Supported operations include:
+A cavity in a structure is represented by [Cavity class](../structure/structure_cavity/cavity.py).
+The Mole2Cavity objects stores information about the cavity. Supported operations include:
 
     + calculation of cavity volume
     + indication if 3D cartesian points are included in a cavity.
 
-Author: Chris Jurich <chris.jurich@vanderbilt.edu>
-Date: 2023-09-26
-
-------------------------------------------------------------------------------
-
-Mole2Cavity class is removed. All its features are relocated to the [Cavity class](../structure/structure_cavity/cavity.py).
-
-    - Mole2Cavity
-
-All the references to the former Mole2Cavity class are replaced by the references to the [Cavity class](../structure/structure_cavity/cavity.py).
-
-Author: Zhong, Yinjie <yinjie.zhong@vanderbilt.edu>
+Author:
+    - Chris Jurich <chris.jurich@vanderbilt.edu>;
+    - Zhong, Yinjie <yinjie.zhong@vanderbilt.edu>;
 Date: 2025-06-24
 """
 from os import path
@@ -108,7 +99,7 @@ class Mole2Interface(BaseInterface):
             "</Tunnels>",
         ])
 
-        outfile:str = f"{work_dir}/__mole2_input.xml"
+        outfile: str = path.join(work_dir, "mole2_input.xml")
 
         fs.write_lines(outfile, content)
 
@@ -226,7 +217,8 @@ class Mole2Interface(BaseInterface):
             mesh_density: float = None,
             ignore_hetatm: bool = None,
             work_dir: str = None,
-            use_mono: bool = True
+            use_mono: bool = True,
+            **kwargs
         ) -> List[Cavity]:
         """Identifies cavities in a protein structure using the Mole2 software package. Client method that should be 
         called by users. Results are represented via Mole2Cavity objects that support basic geometry operations.
@@ -240,7 +232,7 @@ class Mole2Interface(BaseInterface):
             mesh_density (float, optional): Mesh density to use in A. Defaults to Mole2Config.MESH_DENSITY if not supplied.
             ignore_hetatm (bool, optional): TODO (CJ)
             work_dir (str, optional): Directory to do work in. Defaults to system.SCATCH_DIR if not supplied.
-            use_mono (bool, optional): Does mono need to be used during run time? Defaults to true.
+            use_mono (bool, optional): Indicate if mono need to be used during run time. Defaults to true.
 
         Returns:
             A list() of Mole2Cavity ebjects.
@@ -263,10 +255,10 @@ class Mole2Interface(BaseInterface):
         fs.safe_mkdir(work_dir)
         fs.safe_rmdir(f"{work_dir}/mesh/")
         
-        pdb_path = path.join(work_dir, "stru_cavity_temp.pdb")
-        sp.save_structure(outfile=pdb_path, stru=stru)
+        pdb_filepath = fs.get_valid_temp_name(path.join(work_dir, "stru_cavity_temp.pdb"), ext_set=["pdb"])
+        sp.save_structure(outfile=pdb_filepath, stru=stru)
 
-        input_xml_file: str = self._write_xml_input(pdb_path, work_dir, non_active_parts, probe, inner, mesh_density, ignore_hetatm)
+        input_xml_file: str = self._write_xml_input(pdb_filepath, work_dir, non_active_parts, probe, inner, mesh_density, ignore_hetatm)
 
         if use_mono:
             self.env_manager_.run_command(self.config_.MONO, [self.config_.MOLE2, input_xml_file])
@@ -290,7 +282,6 @@ class Mole2Interface(BaseInterface):
                     cavity_id=(i+1), cavity_xml_filepath=cavities_xml_file, cavity_type="Void")
             )
 
-        fs.safe_rm(input_xml_file)
-        fs.safe_rm(pdb_path)
+        fs.clean_temp_file_n_dir(work_dir)
         
         return result

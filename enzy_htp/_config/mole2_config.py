@@ -40,8 +40,8 @@ class Mole2Config(BaseConfig):
     MONO:str="mono"
     """Path to mono as a str()."""
 
-    MOLE2:str="~/bin/Mole2_cmd/mole2.exe"
-    """Path to Mole2 .exe as a str()."""
+    MOLE2:str="/data/yang_lab/yanglab_enzyhtp_app/shared_software/Mole2_cmd/mole2.exe"
+    """Absolute Path to `mole2.exe` executive file on Vanderbilt ACCRE."""
 
 
     def required_executables(self) -> List[str]:

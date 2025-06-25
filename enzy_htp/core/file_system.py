@@ -167,20 +167,23 @@ def write_data(outfile: str, tag: Any, data: Dict) -> str:
 
     return outfile
 
-def write_data_to_csv(output_directory: str, csv_filename: str = "result.csv", **kwargs):
-    """Write the data to a CSV (.csv) file.
+def write_data_to_csv(output_directory: str, 
+        csv_filename: str = "result.csv", 
+        data: Dict[str, Any] = dict(), **kwargs):
+    """Write a row of data to a CSV (.csv) file.
     
     Args:
         output_directory (str): The directory for data output (Absolute path is recommended).
         csv_filename (str, optional): The filename of the output CSV file.
-        kwargs: The data to be written (keys will be column names).
+        data (Dict[str, Any], optional): The data to be written (keys will be column names).
     """
     # Create the output directory if it does not exist
     safe_mkdir(output_directory)
     filepath = os.path.join(output_directory, csv_filename)
 
     # Convert kwargs to DataFrame
-    data_df = pd.DataFrame([kwargs])
+    data.update(kwargs)
+    data_df = pd.DataFrame([data])
 
     # Append to the CSV file if it exists, otherwise create it with header
     if not os.path.isfile(filepath):
@@ -188,21 +191,24 @@ def write_data_to_csv(output_directory: str, csv_filename: str = "result.csv", *
     else:
         data_df.to_csv(filepath, mode='a', header=False, index=False, encoding='utf-8')
 
-def write_data_to_excel(output_directory: str, excel_filename: str = "result.xlsx", sheet_name: str = "Sheet1", **kwargs):
-    """Write the data to an excel (.xlsx) file.
+def write_data_to_excel(output_directory: str, 
+        excel_filename: str = "result.xlsx", sheet_name: str = "Sheet1", 
+        data: Dict[str, Any] = dict(), **kwargs):
+    """Write a row of data to an excel (.xlsx) file.
     
     Args:
         output_directory (str): The directory for data output (Absolute path is recommended).
         excel_filename (str, optional): The filename of the output Excel file.
         sheet_name (str, optional): The sheet name to write data.
-        kwargs: The data to be written (The key strings in kwargs will be column names.).
+        data (Dict[str, Any], optional): The data to be written (keys will be column names).
     """
     # Create the directory if it doesn't exist.
     safe_mkdir(output_directory)
     filepath = os.path.join(output_directory, excel_filename)
 
     # Convert kwargs to DataFrame
-    data_df = pd.DataFrame([kwargs])
+    data.update(kwargs)
+    data_df = pd.DataFrame([data])
     
     # Check if the file exists
     if not os.path.isfile(filepath):
