@@ -108,7 +108,7 @@ export ROSETTA3=/data/yang_lab/shaoqz/software/Rosetta313/main/""",
     RES_KEYWORDS_MAP = { 
         "core_type" : None,
         "nodes":"nodes=",
-        "node_cores" : {"cpu": "tasks-per-node=", "gpu": "gres=gpu:"},
+        "node_cores" : {"cpu": "tasks-per-node=", "gpu": "gres=gpu:nvidia_rtx_a6000:"},
         "job_name" : "job-name=",
         "partition" : "partition=",
         "mem_per_core" : {"cpu": "mem-per-cpu=", "gpu": "mem="}, # previously using mem-per-gpu= change to mem= (calculate the total memory) base on issue #57
@@ -181,6 +181,7 @@ export ROSETTA3=/data/yang_lab/shaoqz/software/Rosetta313/main/""",
             res_line = f"#SBATCH --{k}{v}\n"
             res_str += res_line
         res_str += "#SBATCH --export=NONE\n"
+        #res_str += "#SBATCH --gres=gpu:nvidia_rtx_a6000:1"
         #res_str += "#SBATCH --exclude=gpu0022,gpu0002\n"
         return res_str
     

@@ -149,7 +149,11 @@ class StructureConstraint(ABC):
         return np.array(
             [aa.idx for aa in self.atoms]
         )
-    
+   
+    def update_target_to_current(self) -> None:
+        #TODO(CJ):
+        self.target_value=self.current_geometry()
+
     @property
     def atom_names(self) -> Set[str]:
         """get all unique atom names of self.atoms"""

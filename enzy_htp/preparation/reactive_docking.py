@@ -46,6 +46,8 @@ def dock_reactants(structure: Structure,
                    mm_csts:List[StructureConstraint]=None,
                    qm_csts:List[StructureConstraint]=None,
                    use_qm:bool=True,
+                   update_qm_csts:bool=False,
+                   extra_qm_no_csts:bool=False,
                    dock_opts:Dict=None,
                    qm_sele:str=None,
                    qm_freeze_sele:str=None,
@@ -55,6 +57,7 @@ def dock_reactants(structure: Structure,
                    cpu_config = None,
                    qm_config = None,
                    local_parallel:bool=False,
+                   rosetta_freeze:str=None,
                    local_processes:int=None
                    ) -> None:
     """
@@ -106,7 +109,7 @@ def dock_reactants(structure: Structure,
         
         opts=create_rosetta_opts(structure, ligand, dock_opts)
         
-        dock_ligand(wstru, ligand, for_docking, opts, use_qm, qm_sele, cpu_config, dock_opts.get('chunk_size', 20), local_parallel, local_processes)
+        dock_ligand(wstru, ligand, for_docking, opts, use_qm, qm_sele, cpu_config, dock_opts.get('chunk_size', 20), local_parallel, local_processes, rosetta_freeze)
 
     stru_oper.update_residues(structure, wstru)
     for_mm=list()
@@ -117,7 +120,7 @@ def dock_reactants(structure: Structure,
     if save_snapshots:
         sp.save_structure("./snapshots/docked_structure.pdb", structure)
     
-    mm_minimization(structure, ligands, for_mm, qm_sele, opts, cpu_config)
+    mm_minimization(structure, ligands, for_mm, qm_sele, opts, cpu_config, rosetta_freeze)
 
     if save_snapshots:
         sp.save_structure("./snapshots/mm_structure_01.pdb", structure)
@@ -128,9 +131,18 @@ def dock_reactants(structure: Structure,
             cst.change_topology( structure )
             for_qm.append( cst )
 
+        if update_qm_csts:
+            for fq in for_qm:
+                fq.update_target_to_current()
+
         qm_minimization(structure, ligands, for_qm, qm_sele, qm_freeze_sele, work_dir, qm_config, local_parallel, local_processes)
         if save_snapshots:
             sp.save_structure("./snapshots/qm_structure_01.pdb", structure)
+
+        if extra_qm_no_csts:
+            qm_minimization(structure, ligands, [], qm_sele, qm_freeze_sele, work_dir, qm_config, local_parallel, local_processes)
+            if save_snapshots:
+                sp.save_structure("./snapshots/qm_structure_02.pdb", structure)
 
     translate_structure(structure, start_naming='rosetta')
 
@@ -144,7 +156,8 @@ def mm_minimization(structure:Structure,
                 constraints:List[StructureConstraint],
                 qm_sele:str,
                 opts:RosettaOptions,
-                job_config
+                job_config,
+                rosetta_freeze:str=None
                 ) -> None:
     """
     """
@@ -165,6 +178,16 @@ def mm_minimization(structure:Structure,
     qm_protein_resnums:str=get_active_site_sele(structure, f"({qm_sele}) and polymer.protein", fmt='rosetta')
 
     protocol = RosettaScriptsProtocol()
+    frozen_res_sels=list()
+    if rosetta_freeze:
+        protocol.add_residue_selector(
+            'Index', name='dock_freeze', resnums=rosetta_freeze
+        )
+        frozen_res_sels.append(
+            ('ResidueSelector', {'selector':'dock_freeze', 'bb':'false', 'chi':'false'})
+        )
+
+
     protocol.add_residue_selector(
 		'Index', name="asite", resnums=qm_protein_resnums
     ).add_scorefunction(
@@ -180,7 +203,7 @@ def mm_minimization(structure:Structure,
         repeats="%%fr_repeats%%", children=[
 			('MoveMap', {'name':"full_enzyme", 'bb':"false", 'chi':"false", 'jump':"false", 'children':[
 				('ResidueSelector', {'selector':"asite", 'bb': "true" , 'chi':"true", 'bondangle':"false" }),
-                ] + jump_seles })]
+                ] + jump_seles + frozen_res_sels})]
     ).add_protocol(
         mover_name='frelax'
     )
@@ -218,7 +241,8 @@ def dock_ligand(structure:Structure,
                     job_config=None,
                     chunk_size:int=None,
                     local_parallel:bool=False,
-                    local_processes:int=10
+                    local_processes:int=10,
+                    rosetta_freeze:str=None
                     ) -> None:
     """TODO(CJ)"""
 
@@ -238,8 +262,22 @@ def dock_ligand(structure:Structure,
 
     qm_resnums:str=get_active_site_sele(structure, qm_sele, fmt='rosetta')
     qm_protein_resnums:str=get_active_site_sele(structure, f"({qm_sele}) and polymer.protein", fmt='rosetta')
+   
+    print(len(qm_protein_resnums))
+    if rosetta_freeze:
+        qm_protein_resnums=",".join(filter(lambda ll: ll not in rosetta_freeze.split(','), qm_protein_resnums.split(',')))
+    print(len(qm_protein_resnums))
+
 
     protocol = RosettaScriptsProtocol()
+    frozen_res_sels=list()
+    if rosetta_freeze:
+        protocol.add_residue_selector(
+            'Index', name='dock_freeze', resnums=rosetta_freeze
+        )
+        frozen_res_sels.append(
+            ('ResidueSelector', {'selector':'dock_freeze', 'bb':'false', 'chi':'false'})
+        )
     protocol.add_scoring_grid(
         ligand_chain='%%ligand_chain%%', width='%%grid_width%%', name='grid',children=[
             ('ClassicGrid', {'grid_name':'classic', 'weight':'1.0'}),
@@ -279,7 +317,7 @@ def dock_ligand(structure:Structure,
         'FastRelax', name="frelax", scorefxn="hard_rep", cst_file="%%cst_file%%", repeats="%%fr_repeats%%", children=[
             ('MoveMap', {'name':"full_enzyme", 'bb':"false", 'chi':"false", 'jump':"false", 'children':[
                 ('ResidueSelector', {'selector':'asite_protein', 'bb':'false', 'chi':'true', }),
-                ] + jumps} #TODO(CJ): make bb flexibility an option
+                ] + jumps + frozen_res_sels } #TODO(CJ): make bb flexibility an option
             )]
     ).add_simple_metric(
         'PerResidueClashMetric', name='clash', residue_selector='ligand', residue_selector2='asite'
@@ -440,6 +478,7 @@ def qm_minimization(structure:Structure,
                 ) -> None:
 
     asite_sele=get_active_site_sele(structure, qm_sele)
+    print(asite_sele)
     session=interface.pymol.new_session()
     (sele, session)=interface.pymol.load_enzy_htp_stru(session, structure)
     df=interface.pymol.collect(
@@ -525,10 +564,15 @@ def local_parallel_rs(
         fs.safe_mkdir( lopts['out:path:all'] )
 
     with Pool(local_processes) as p:
-        score_files=p.starmap(
-            foo, 
-            pool_args
-        )
+        try:
+            score_files=p.starmap(
+                foo, 
+                pool_args
+            )
+        except:
+            pass
+
+    print(len(score_files))
     
     result=list()
     for sf,(_,_,opts) in zip(score_files,pool_args):
