@@ -29,6 +29,10 @@ class AlphaFillConfig(BaseConfig):
     MAXIT:str="maxit"
     """Path to the maxit executable for converting .pdb files to mmCIF."""
 
+    PDB_FASTA:str=""
+    PDB_DIR:str=""
+    LIGANDS:str=""
+
     def required_executables(self) -> List[str]:
         """A hardcoded list of required executables for AlphaFill."""
         return [self.ALPHAFILL_EXE, self.MAXIT]

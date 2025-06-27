@@ -149,7 +149,11 @@ class StructureConstraint(ABC):
         return np.array(
             [aa.idx for aa in self.atoms]
         )
-    
+   
+    def update_target_to_current(self) -> None:
+        #TODO(CJ):
+        self.target_value=self.current_geometry()
+
     @property
     def atom_names(self) -> Set[str]:
         """get all unique atom names of self.atoms"""
@@ -257,8 +261,9 @@ class StructureConstraint(ABC):
         """
 
         if key not in self.params_:
-            _LOGGER.error(f"The attribute '{key}' is not in the constrained geometry params. Exiting...")
-            exit( 1 )
+            err_msg:str=f"The attribute '{key}' is not in the constrained geometry params."
+            _LOGGER.error(err_msg)
+            raise KeyError(err_msg)
         
         return self.params_[key]        
 
@@ -279,6 +284,22 @@ class StructureConstraint(ABC):
     #TODO(CJ): add function that checks if topology and constraints are compatible
     #TODO(CJ): will need to make a version of this that actually works for the ResiduePairConstraint
     
+    def is_constraining(self, residue: Residue) -> bool:
+        """Is this StructureConstraint trying to enforce a constraint on the supplied Residue()?"""
+        for atom in self.atoms:
+            for r_atom in residue.atoms:
+                if atom==r_atom:
+                    return True
+
+        return False
+
+
+    def is_compatible(self, other:Structure) -> bool: 
+        """Can this constraint be successfully applied to constrain the supplied Structure object?"""
+        for atom in self.atoms:
+            if not other.has_atom(atom.key):
+                return False
+        return True 
 
 class CartesianFreeze(StructureConstraint):
     """Specialization of StructureConstraint() for Atoms() that are frozen in Cartesian space. Many

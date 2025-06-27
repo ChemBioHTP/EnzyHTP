@@ -55,8 +55,10 @@ class XTBQMResultEgg(QMResultEgg):
     """Class defining the ResultEgg for an XTB run."""
     charge_path: str
     output_geom: str 
+    logfile:str
     wbo_path: str
     stru: Structure
+    sr:StructureRegion
     parent_job: ClusterJob
 
 
@@ -93,6 +95,10 @@ class XTBSinglePointEngine(QMSinglePointEngine):
         return self._geo_opt
 
     @property
+    def cluster_job_config(self):
+        return self._cluster_job_config
+
+    @property
     def parent_interface(self) -> XTBInterface:
         """Getter for the Engine's parent interface."""
         return self._parent_interface
@@ -122,7 +128,17 @@ class XTBSinglePointEngine(QMSinglePointEngine):
         if not isinstance(stru, Structure):
             _LOGGER.error("The supplied variable stru MUST be a Structure()")
             raise TypeError
-        
+       
+        fs.safe_mkdir(self.work_dir)
+        print(stru)
+        run_info:Dict = self.parent_interface.setup_xtb_run(
+            sr,
+            constraints=self.constraints,
+            lot=self.method,
+            geo_opt=self.geo_opt,
+            work_dir=self.work_dir,
+        )
+
         assert False, "Idk how to do this -CJ"
 
     def run(self, stru: Structure) -> ElectronicStructure:
@@ -147,9 +163,8 @@ class XTBSinglePointEngine(QMSinglePointEngine):
 
         start_dir:str = os.getcwd()
         os.chdir(run_info['work_dir'])
-
         results = self.parent_interface.env_manager_.run_command(
-                self.parent_interface.config()['XTB_EXE'],
+                self.parent_interface.config['XTB_EXE'],
                 run_info['args'])
 
         os.chdir(start_dir)
@@ -196,7 +211,10 @@ class XTBOptimizationEngine(XTBSinglePointEngine, QMOptimizationEngine):
         self._keep_in_file = keep_in_file
         self._work_dir = work_dir
         self._geo_opt = True 
-        
+
+    @property
+    def name(self):
+        return self._name
 
     def run(self, stru: Structure) -> ElectronicStructure:
         """Method that actually runs the XTB single point calculation. Returns results of calculation as an ElectronicStructure() object."""
@@ -222,7 +240,7 @@ class XTBOptimizationEngine(XTBSinglePointEngine, QMOptimizationEngine):
         os.chdir(run_info['work_dir'])
 
         results = self.parent_interface.env_manager_.run_command(
-                self.parent_interface.config()['XTB_EXE'],
+                self.parent_interface.config['XTB_EXE'],
                 run_info['args'])
 
         os.chdir(start_dir)
@@ -238,6 +256,67 @@ class XTBOptimizationEngine(XTBSinglePointEngine, QMOptimizationEngine):
             mo_parser = '',
             source="xtb",
         )
+
+
+    def make_job(self, stru: Structure) -> Tuple[ClusterJob, XTBQMResultEgg]:
+        """The method that makes a ClusterJob that runs the QM."""
+        if not isinstance(stru, Structure):
+            _LOGGER.error("The supplied variable stru MUST be a Structure()")
+            raise TypeError
+       
+        fs.safe_mkdir(self.work_dir)
+        run_info:Dict = self.parent_interface.setup_xtb_run(
+            self.region,
+            constraints=self.constraints,
+            lot=self.method,
+            geo_opt=self.geo_opt,
+            work_dir=self.work_dir,
+        )
+
+        print(run_info)
+        cluster = self.cluster_job_config["cluster"]
+        res_keywords = self.cluster_job_config["res_keywords"]
+        env_settings = cluster.XTB_ENV["CPU"]
+        sub_script_path = fs.get_valid_temp_name(f"{self.work_dir}/submit_{self.name}.cmd")
+        
+        opt_cmd=f"cd {Path(self.work_dir).absolute()} && " + " ".join(["xtb"] + run_info['args'])
+        job = ClusterJob.config_job(
+            commands = opt_cmd,
+            cluster = cluster,
+            env_settings = env_settings,
+            res_keywords = res_keywords,
+            sub_dir = "./", # because path are relative
+            sub_script_path = sub_script_path
+        )
+
+        result_egg=XTBQMResultEgg(
+            charge_path='',
+            output_geom=run_info['expected_outfile'],
+            logfile=run_info['xtb_outfile'],
+            wbo_path='',
+            stru=stru,
+            sr=self.region,
+            parent_job=job
+        )            
+
+        return (job, result_egg)
+
+    def translate(self, result_egg:XTBQMResultEgg) -> ElectronicStructure:
+        
+        #TODO(CJ): add check for result
+        self.parent_interface.update_coords(self.region, result_egg.output_geom)
+        lines:List[str] = fs.lines_from_file( result_egg.logfile  )
+        return  ElectronicStructure(
+            energy_0 = self.parent_interface.parse_spe(lines),
+            geometry = self.region[0].root(),
+            mo = '',
+            mo_parser = '',
+            source="xtb",
+        )
+
+
+
+
 
 
 
@@ -296,10 +375,10 @@ class XTBInterface(BaseInterface):
             charge = stru.get_net_charge()
 
         if n_iter is None:
-            n_iter = self.config().N_ITER
+            n_iter = self.config.N_ITER
 
         if n_proc is None:
-            n_proc = self.config().N_PROC
+            n_proc = self.config.N_PROC
 
         result = dict()
         coord_file:str = self.write_coord_file(stru, work_dir)
@@ -315,6 +394,11 @@ class XTBInterface(BaseInterface):
         args:List[str] = ["--chrg", str(charge), "--iterations",
                         str(n_iter), "--parallel",
                         str(n_proc), "--norestart", ]
+
+        if lot.solvent:
+            if lot.solv_method == 'ALPB':
+                args.extend( ['--alpb', lot.solvent] )
+
         if geo_opt:
             if constraints:
                 xtb_inp_file:str=f"{work_dir_abs}/xtb_settings.inp"
@@ -376,12 +460,12 @@ class XTBInterface(BaseInterface):
             pdb_lines.append( _parser._write_pdb_atom( aa ).replace('\n',''))
         
         fs.write_lines(temp_pdb, pdb_lines)
-        session = self.parent().pymol.new_session()
-        self.parent().pymol.general_cmd(session, [('delete', 'all'), ('load', temp_pdb)])
-        self.parent().pymol.remove_ligand_bonding(session) #TODO(CJ): add something in here about the cap resolution
+        session = self.parent.pymol.new_session()
+        self.parent.pymol.general_cmd(session, [('delete', 'all'), ('load', temp_pdb)])
+        self.parent.pymol.remove_ligand_bonding(session) #TODO(CJ): add something in here about the cap resolution
         fs.safe_rm(temp_pdb)
         
-        self.parent().pymol.general_cmd(session, [("save", coord_file)])
+        self.parent.pymol.general_cmd(session, [("save", coord_file)])
 
         return coord_file
 
@@ -398,6 +482,9 @@ class XTBInterface(BaseInterface):
         keep_in_file: bool = False,
         work_dir: str = None,) -> XTBSinglePointEngine:
         """Simple constructor that builds the XTBSinglePointEngine. Designed to work with quantum.single_point() API."""
+
+        if cluster_job_config == "default":
+            cluster_job_config = self.config.get_default_qm_spe_cluster_job_config
 
         return XTBSinglePointEngine(
             interface=self,
@@ -422,7 +509,10 @@ class XTBInterface(BaseInterface):
         keep_in_file: bool = False,
         work_dir:str = None,) -> XTBOptimizationEngine:
         """Simple constructor that builds the XTBOptimizationEngine. Designed to work with the quantum.optimization() API."""
-        
+       
+        if cluster_job_config == "default":
+            cluster_job_config = self.config.get_default_qm_spe_cluster_job_config
+
         return XTBOptimizationEngine(
             interface=self,
             method=method,
@@ -461,13 +551,27 @@ class XTBInterface(BaseInterface):
                     if stru.has_atom(aa):
                         frozen_indices.append( stru.get_atom_index(aa, indexing=1) )
 
-            else:
+
+        for cst in constraints:
+            if cst.is_cartesian_freeze():
+                continue
+
+            in_frozen=True
+            for aa in cst.atoms:
+                if stru.has_atom(aa):
+                    can_idx=stru.get_atom_index(aa, indexing=1)
+                    if can_idx not in frozen_indices:
+                        in_frozen=False
+
+
+            if not in_frozen:
                 constraint_lines.extend( 
                     self.convert_constraint(stru, cst )
                 )
         
         inp_lines = list()
         if frozen_indices:
+            frozen_indices=list(set(frozen_indices))
             frozen_indices.sort()
             fi_str = ",".join(map(str,frozen_indices))
             inp_lines.extend([            
@@ -475,6 +579,11 @@ class XTBInterface(BaseInterface):
             f"   atoms: {fi_str}",
             "$end"
             ])
+
+        if self.config['FORCE_CONSTANT'] is not None:
+            constraint_lines.append(
+            f"   force constant={self.config['FORCE_CONSTANT']:.6f}",
+            )
 
         if constraint_lines:
             inp_lines.extend(["$constrain"] + constraint_lines + ["$end"])
@@ -536,22 +645,22 @@ class XTBInterface(BaseInterface):
         Returns:
             Nothing.
         """
-        if lot.method and lot.method not in self.config()['SUPPORTED_XTB_THEORY_LEVELS']:
-            _LOGGER.error(f"The method {lot.method} is not supported. Allowed values are: {', '.join(self.config()['SUPPORTED_XTB_THEORY_LEVELS'])}")
+        if lot.method and lot.method not in self.config['SUPPORTED_XTB_THEORY_LEVELS']:
+            _LOGGER.error(f"The method {lot.method} is not supported. Allowed values are: {', '.join(self.config['SUPPORTED_XTB_THEORY_LEVELS'])}")
             raise TypeError()
 
-        if lot.solv_method and lot.solv_method not in self.config()['SOLVATION_METHODS']:
-            _LOGGER.error(f"The solvation method {lot.solv_method} is not supported. Allowed values are: {', '.join(self.config()['SOLVATION_METHODS'])}")
+        if lot.solv_method and lot.solv_method not in self.config['SOLVATION_METHODS']:
+            _LOGGER.error(f"The solvation method {lot.solv_method} is not supported. Allowed values are: {', '.join(self.config['SOLVATION_METHODS'])}")
             raise TypeError()
 
         if lot.solv_method == 'ALPB':
-            if lot.solvent not in self.config()['ALPB_SOLVENTS']:
-                _LOGGER.error(f"The solvent {lot.solvent} is not supported in the ALPB model. Allowed values are: {', '.join(self.config()['ALPB_SOLVENTS'])}")
+            if lot.solvent not in self.config['ALPB_SOLVENTS']:
+                _LOGGER.error(f"The solvent {lot.solvent} is not supported in the ALPB model. Allowed values are: {', '.join(self.config['ALPB_SOLVENTS'])}")
                 raise TypeError()
         
         elif lot.solv_method == 'GBSA':
-            if lot.solvent not in self.config()['ALPB_SOLVENTS']:
-                _LOGGER.error(f"The solvent {lot.solvent} is not supported in the GBSA model. Allowed values are: {', '.join(self.config()['ALPB_SOLVENTS'])}")
+            if lot.solvent not in self.config['ALPB_SOLVENTS']:
+                _LOGGER.error(f"The solvent {lot.solvent} is not supported in the GBSA model. Allowed values are: {', '.join(self.config['ALPB_SOLVENTS'])}")
                 raise TypeError()
 
 
@@ -565,12 +674,12 @@ class XTBInterface(BaseInterface):
         Returns:
             Nothing.
         """
-        session = self.parent().pymol.new_session()
-        df:pd.DataFrame = self.parent().pymol.collect(session, coord_file, "x y z rank elem".split())
+        session = self.parent.pymol.new_session()
+        df:pd.DataFrame = self.parent.pymol.collect(session, coord_file, "x y z rank elem".split())
         df.sort_values(by='rank', inplace=True)
         #TODO(CJ): add some checks in here
         for aa, (i, row) in zip(sr.atoms, df.iterrows()):
-            assert aa.element == row['elem']
+            assert aa.element == row['elem'], f"{aa.element} {row['elem']}"
             aa.coord = np.array([row['x'], row['y'], row['z']])
 
 xtb_interface = XTBInterface(None, eh_config._xtb)

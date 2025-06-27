@@ -809,6 +809,7 @@ class PyMolInterface(BaseInterface):
             ])
             return results[-2] / results[-1]
 
+<<<<<<< HEAD
     def get_exposed_residues(self, stru: Structure, cutoff = 0.1,) -> List[Residue]:
         """see get_exposed_or_buried_residues"""
         return self.get_exposed_or_buried_residues(stru, "exposed", cutoff)
@@ -851,6 +852,78 @@ class PyMolInterface(BaseInterface):
         
         resi_mapper = stru.residue_mapper
         result = [resi_mapper[(ch, int(idx))] for ch, idx in result]
+
+    def get_ligand_area(self, stru:Structure, ligand:Ligand) -> float:
+        """Finds the total solvent accessible surface area (SASA) for a given ligand in a given structure.
+
+        Args:
+            stru: The structure in question.
+            ligand: The ligand in question.
+
+        Returns:
+            The SASA in angstroms as a float.
+
+        Details:
+            Checks that the supplied ligand is a child of the structure and errors if this is not the case.
+
+        """
+        assert ligand.parent.parent == stru
+        (lig_chain, lig_idx) = ligand.key()
+        with OpenPyMolSession(self) as pms:
+            self.load_enzy_htp_stru( pms, stru )
+            results:List[Any] = self.general_cmd(pms,[
+                ('set', 'dot_solvent', 1),
+                ('create', 'ligand', f'chain {lig_chain} and resi {lig_idx} and not solvent'),
+                ('get_area', 'ligand'),
+            ])
+        return results[-1]            
+
+    def rmsd_matrix(self, 
+            structures:List[Structure], 
+            align_sele:str,
+            measure_sele:str
+            ) -> List[List[float]]:
+    #TODO(CJ) 
+        result = np.zeros((len(structures), len(structures)))
+
+        session = self.new_session()
+        obj_names:List[str] = list()
+        for sidx,ss in enumerate(structures):
+            obj_names.append(
+                self.load_enzy_htp_stru(session, ss)[0]
+            )
+            structures[sidx].data["cluster_idx"] = sidx
+
+        args = list()
+        template = obj_names[0]
+        for on in obj_names[1:]:
+            args.append((
+                'align',
+                f"{template} and polymer.protein",
+                f"{on} and polymer.protein",
+                ))                
+        
+        self.general_cmd( session, args )
+        
+        n_obj = len(obj_names )
+        args = list()
+        for oi1 in range( n_obj ):
+            for oi2 in range( oi1+1, n_obj):
+                assert oi1 != oi2
+                o1 = obj_names[oi1]
+                o2 = obj_names[oi2]
+
+                rmsd = self.general_cmd(session, [(
+                    'rms_cur', 
+                    f"{o1} and {measure_sele}",
+                    f"{o2} and {measure_sele}",
+                    "1",
+                    "-1"
+                )])[-1]
+            
+        
+                result[oi1, oi2] = rmsd
+                result[oi2, oi1] = rmsd
 
         return result
 

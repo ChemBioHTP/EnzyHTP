@@ -17,13 +17,21 @@ import enzy_htp.core.file_system as fs
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.exception import InconsistentMDEngine
 from enzy_htp.core import job_manager
-from enzy_htp.structure import Structure, StructureEnsemble
+from enzy_htp.structure import (
+    Structure,
+    StructureEnsemble,
+    Ligand,
+    LigandEnsemble
+)
+
 from enzy_htp.structure import structure_constraint as stru_cons
 from enzy_htp._interface.handle_types import (
     MolDynStep,
     MolDynParameterizer,
     MolDynParameter,
     MolDynResult)
+
+from enzy_htp import interface
 
 def equi_md_sampling(stru: Structure,
                      param_method: MolDynParameterizer, # TODO support using engine + kwarg to specify
@@ -34,6 +42,8 @@ def equi_md_sampling(stru: Structure,
                      prod_time: float= 50.0, # ns
                      prod_temperature: float = 300.0, #K
                      prod_constrain: List[stru_cons.StructureConstraint]= None,
+                     cpu_heat_step:bool=False,
+                     cpu_heat_job_config:Dict=None,
                      record_period: float= 0.5, # ns
                      cluster_job_config: Dict= None,
                      cpu_equi_step: bool= False,
@@ -230,6 +240,15 @@ def _process_equi_md_sampling_arguments(
                           "You need to at least specify the account and partition. ")
             raise ValueError
 
+    # 1.2 heat core
+    heat_core = "gpu"
+    heat_job_config = cluster_job_config
+    if cpu_heat_step:
+        heat_core = "cpu"
+        heat_job_config = cpu_heat_job_config
+        if not cpu_heat_job_config:
+            assert False
+
     freeze_backbone = stru_cons.create_backbone_freeze(stru)
     min_step  = parent_interface.build_md_step(
         name="min_micro",
@@ -242,8 +261,8 @@ def _process_equi_md_sampling_arguments(
     heat_step = parent_interface.build_md_step(
         name="heat_nvt",
         length=0.05, # ns
-        cluster_job_config=cluster_job_config,
-        core_type="gpu",
+        cluster_job_config=heat_job_config,
+        core_type=heat_core,
         temperature=[(0, 0), (0.05*0.9, prod_temperature), (-1, prod_temperature)],
         constrain=[freeze_backbone] + prod_constrain)
 
@@ -517,7 +536,7 @@ def _parallelize_md_steps_with_cluster_job(
         job_array.append(job_list)
         result_eggs.append(result_egg_ele)  # eggs are filenames that can be translated to give birth actual data
 
-    job_manager.ClusterJob.wait_to_2d_array_end(job_array, period=period)
+    job_manager.ClusterJob.wait_to_2d_array_end(job_array, period=period )
 
     for rep_md_result in result_eggs:
         rep_result_list = []
@@ -563,8 +582,39 @@ def _serial_md_steps(
 
     return results
 
+<<<<<<< HEAD
 # == helper tools ==
 def get_deployable_md_cli() -> str:
     """get the content of a CLI tool that manage deployed
     MD tasks in batch"""
 
+=======
+
+def conformer_sampling(
+    ligand:Ligand,
+    n_conformers:int,
+    rms_cutoff:float=0.1,
+    attempts:int=1000,
+    method:str='rdkit',
+    rng:int=1996,
+    ) -> LigandEnsemble:
+    
+    le = LigandEnsemble( ligand )
+    if method == 'rdkit':
+        conformers:List[Ligand] = interface.rdkit.generate_conformers(
+            ligand,
+            n_conformers,
+            rms_cutoff,
+            attempts,
+            rng
+            )
+        
+        for conf in conformers:
+            le.add_conformer( conf )
+        
+        ligand.ensemble = le
+    else:
+        assert False
+
+    return le
+>>>>>>> chrisjurich/reactive_docking

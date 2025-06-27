@@ -119,7 +119,10 @@ class Mol2Parser(StructureParserInterface):
             "@<TRIPOS>ATOM"
         ]
         for aidx,atom in enumerate(ligand.atoms):
-            content.append(f"{aidx+1}\t{atom.name: >4}\t{atom.coord[0]:.3f}\t{atom.coord[1]:.3f}\t{atom.coord[2]:.3f}\t{atom._atom_type}\t{1}\t{ligand.name}{ligand.idx}\t{atom.charge:.3f}")
+            chrg = atom.charge
+            if chrg is None:
+                chrg = 0.0 #TODO(CJ): put a warning here
+            content.append(f"{aidx+1}\t{atom.name: >4}\t{atom.coord[0]:.3f}\t{atom.coord[1]:.3f}\t{atom.coord[2]:.3f}\t{atom._atom_type}\t{1}\t{ligand.name}{ligand.idx}\t{chrg:.3f}")
 
         content.append("@<TRIPOS>BOND")
 

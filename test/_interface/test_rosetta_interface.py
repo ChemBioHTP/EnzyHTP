@@ -18,6 +18,10 @@ from enzy_htp.core.job_manager import ClusterJob
 from enzy_htp.mutation_class.mutation import Mutation
 from enzy_htp.structure.structure import Structure
 
+from enzy_htp._interface.rosetta_interface import (
+    RosettaOptions
+)
+
 DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/data/"
 WORK_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/work_dir/"
 sp = PDBParser()
@@ -130,3 +134,44 @@ def test_check_dgg_fold_error():
     ddg_engine.check_dgg_fold_error(
         test_ddg_file, test_job
         )
+
+def test_rosetta_options_getter_and_setter() -> None:
+    """Making sure the RosettaOptions getter and setters work."""
+    opts = RosettaOptions()
+    opts['nstruct'] = 1
+    opts['in:file:s'] = 'my_file.pdb'
+    assert opts['nstruct'] == 1
+    assert opts['in:file:s'] == 'my_file.pdb'
+
+def test_rosetta_opttions_error_on_bad_key() -> None:
+    """Making sure the RosettaOptions getter fails when a key is not present."""
+
+    opts = RosettaOptions()
+
+    py_err = None
+    with pytest.raises(Exception) as py_err:
+        result = opts['dne']
+
+    assert py_err is not None 
+
+def test_rosetta_opttions_file_write() -> None:
+    """Making sure the RosettaOptions class can write to file correctly."""
+    outfile = f"{DATA_DIR}/test_options.txt"
+    fs.safe_rm( outfile )
+
+    opts = RosettaOptions()
+    opts['a'] = True
+    opts['b'] = False 
+    opts['c:b:d'] = 'A' 
+    opts['c:b:e'] = 'B' 
+    opts.to_file( outfile )
+    target_output = ["-a true",
+        "-b false",
+        "-c",
+        "    -b",
+        "        -d 'A'",
+        "        -e 'B'",
+    ]
+    actual_output = fs.lines_from_file( outfile )
+
+    assert target_output == actual_output

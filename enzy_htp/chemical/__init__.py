@@ -33,4 +33,7 @@ from .level_of_theory import (
 )
 
 from .physics import electric_field_strength
-from .seq_res import SeqRes
+from .seq_res import (
+    SeqRes,
+    same_aa_sequence
+)

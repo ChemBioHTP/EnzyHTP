@@ -42,7 +42,7 @@ class MultiwfnInterface(BaseInterface):
 
     # region == general Multiwfn app interface ==
     def get_multiwfn_executable(self) -> str:
-        return self.config()["EXE"]
+        return self.config["EXE"]
 
     def run_multiwfn(
         self,
@@ -213,12 +213,12 @@ class MultiwfnInterface(BaseInterface):
         # init cluster_job_config
         type_hint_sticker: MultiwfnConfig
         if cluster_job_config == "default":
-            cluster_job_config = self.config().get_default_bond_dipole_cluster_job_config()
+            cluster_job_config = self.config.get_default_bond_dipole_cluster_job_config()
         elif cluster_job_config is not None:
             # For res_keywords, it updates the default config
             cluster_job_config = copy.deepcopy(cluster_job_config)
             res_keywords_update = cluster_job_config["res_keywords"]
-            default_res_keywords = self.config().get_default_bond_dipole_res_keywords()
+            default_res_keywords = self.config.get_default_bond_dipole_res_keywords()
             cluster_job_config["res_keywords"] = default_res_keywords | res_keywords_update
         # init for atoms
         atom_1 = ele_stru.geometry.topology.get_corresponding_atom(atom_1)
@@ -268,8 +268,12 @@ class MultiwfnInterface(BaseInterface):
 
         # parse the dipole result
         dipoles_data = self.parse_two_center_dp_moments(result_file)
+        print(dipoles_data)
         atom_1_id = ele_stru.geometry.get_atom_index(atom_1, indexing=1)
         atom_2_id = ele_stru.geometry.get_atom_index(atom_2, indexing=1)
+        print(atom_1_id)
+        print(atom_2_id)
+
 
         dipole_vec = np.array((0.0, 0.0, 0.0))
         target_dipoles = dipoles_data[(atom_1_id, atom_2_id)]

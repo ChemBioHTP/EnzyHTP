@@ -231,6 +231,10 @@ class MetalUnit(NonCanonicalBase):
 
     #endregion
 
+    @property
+    def bonds(self) -> List:
+        return list()
+
 
 def residue_to_metal(residue: Residue) -> MetalUnit:
     """Convenience function that converts Residue() to MetalUnit() object."""
@@ -238,3 +242,17 @@ def residue_to_metal(residue: Residue) -> MetalUnit:
         _LOGGER.error(f"Found more than 1 atom in a metal residue unit: {residue.idx} {residue.name}")
         sys.exit(1)
     return MetalUnit(residue.idx, residue.name, residue.atoms, residue.parent)
+
+def get_metal(metal_name:str, charge:int=None) -> MetalUnit:
+    """Given the name of a metal and the charge, creaet a MetalUnit object."""
+    #TODO(CJ): add some checks in here
+    return MetalUnit(
+            1,
+            metal_name,
+            atoms=[Atom(
+                name=metal_name,
+                coord=(0.0, 0.0, 0.0),
+                charge=charge,
+                idx=1
+                )]
+            )

@@ -479,6 +479,7 @@ CAA_CHARGE_MAPPER: Dict[str, int] = {
         "ALA": 0,
         "CYS": 0,
         "ASP": -1,
+        "ASH": 0,
         "GLU": -1,
         "PHE": 0,
         "GLY": 0,
@@ -492,9 +493,12 @@ CAA_CHARGE_MAPPER: Dict[str, int] = {
         "ARG": 1,
         "SER": 0,
         "THR": 0,
+        "TYR": 0,
         "VAL": 0,
         "TRP": 0,
-        "TYR": 0
+        "HID": 0,
+        "HIE": 0,
+        "HIP": 1,
 }
 """dict() that maps three-letter canonical amino-acid codes to their formal charge. 
 Note that HIS is temporarily removed from the map due to its potential 3 titration state.
@@ -532,6 +536,11 @@ of the original residue when charge related keyword for mutation is used"""
 
 RESIDUE_CHARGE_MAP = {
     "ff19sb" : {
+        'HOH': {
+            'O' :0.0, #TODO(CJ)            
+            'H1':0.0, #TODO(CJ)            
+            'H2':0.0 #TODO(CJ)            
+        },
         'ALA': {
             'N': -0.4157,
             'H': 0.2719,
@@ -1876,7 +1885,9 @@ RESIDUE_CHARGE_MAP_NTERMINAL = {
             'CA': 0.1,
             'HA': 0.1,
             'C': 0.526,
-            'O': -0.5
+            'O': -0.5,
+            'HNN':0.26 #TODO(CJ): check
+
         },
         'SER': {
             'N': 0.1849,

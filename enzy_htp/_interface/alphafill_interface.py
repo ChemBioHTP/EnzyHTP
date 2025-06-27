@@ -7,14 +7,23 @@ the AlphaFillConfig class found in enzy_htp/_config/alphafill_config.py. Support
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-09-14
 """
+import pandas as pd
+import json
 from typing import List, Tuple
 from pathlib import Path
+from collections import defaultdict
 
 from .base_interface import BaseInterface
 
 from enzy_htp import _LOGGER
 from enzy_htp.core import file_system as fs
 from enzy_htp._config.alphafill_config import AlphaFillConfig, default_alphafill_config
+from enzy_htp.structure import (
+    PDBParser,
+    Mol2Parser,
+    Structure,
+    Ligand
+)
 
 
 class AlphaFillInterface(BaseInterface):
@@ -67,33 +76,47 @@ class AlphaFillInterface(BaseInterface):
 
         return outfile
 
-    def fill_structure(self, molfile: str, outfile: str = None, work_dir: str = None, use_cache: bool = True) -> Tuple[str, str]:
+    def fill_structure(self, 
+            stru: Structure, 
+            work_dir: str = None, 
+            use_cache: bool = True) -> Tuple[str, str]:
         """Using MSA-derived constraints, place ligands into the supplied structure file. File can be either .cif or .pdb format.
         Note that if it is .cif format it MUST be mmCIF, not just .cif
 
         Args:
-            molfile: The str() path to a .cif file to add ligand transplants to.
-            outfile: Where the filled structure will be saved to. Optional.
+            stru: 
             work_dir: Where temporary files will be saved to. Optional.
             use_cache: Should we use existing files when available? Optional.
         
         Returns:
-            A Tuple[str, str] with the format ( .cif file with transplants, .json file from alphafill). 
+            A Tuple[str, str] with the format ( .cif file filled with transplants, .json file from alphafill). 
         """
         if work_dir is None:
-            work_dir = self.parent().config()['system.SCRATCH_DIR']
+            work_dir = self.parent.config['system.SCRATCH_DIR']
 
+
+        ### need to sanitize the input Structure()
+        structure_start:str=f"{work_dir}/afill_temp.pdb"
+        fs.safe_rm(structure_start)
+
+        session = self.parent.pymol.new_session()
+        self.parent.pymol.load_enzy_htp_stru(session,  stru)
+        self.parent.pymol.general_cmd(session, [
+            ('save', structure_start, 'polymer.protein and (not resn SAH)'), #TODO(CJ): make this a config 
+            ('delete', 'all')
+        ])
+    
+        lines:List[str]=fs.lines_from_file(structure_start)
+    
+        for lidx, ll in enumerate(lines): #epic fix
+            lines[lidx] = ll[0:76]
+    
+        fs.write_lines(structure_start, lines)
+        
         fs.safe_mkdir( work_dir )
 
-        if fs.get_file_ext(molfile) == ".pdb":
-            _LOGGER.info(f"The supplied file {molfile} is .pdb format. Converting to mmCIF...")
-            molfile = self.convert_file(molfile)
+        molfile = self.convert_file(structure_start)
 
-        if fs.get_file_ext(molfile) != '.cif':
-            _LOGGER.error(f"The supplied file {mofile} is not a .cif file! Exiting...")
-            exit(1)
-
-        #TODO(CJ): add more options in here
         fs.check_file_exists(molfile)
         temp_path = Path(molfile)
         outfile = str(temp_path.parent / f"{temp_path.stem}_filled.cif")
@@ -103,9 +126,56 @@ class AlphaFillInterface(BaseInterface):
             _LOGGER.info(f"The output files {outfile} and {json_outfile} exist and caching is enabled. Using these files as is.")
             return (outfile, json_outfile)
         else:
-            fs.safe_rm(outfile)
+            pass
+            #fs.safe_rm(outfile)
 
-        results = self.env_manager_.run_command(self.config_.ALPHAFILL_EXE,
-                                                ["--config", self.config_.CONFIG_FILE, "process", molfile, outfile])
-        fs.safe_rm(temp_path)
-        return (outfile, json_outfile)
+        results = self.env_manager_.run_command(self.config.ALPHAFILL_EXE,
+                                                ["--config", self.config.CONFIG_FILE,
+                                                "process", molfile, outfile,
+                                                ])
+        #fs.safe_rm(temp_path)
+
+        transplant_info = json.load(open(json_outfile, 'r'))
+       
+        transplant_data = defaultdict(list)
+        for hit in transplant_info['hits']:
+            #identity = hit['identity']
+            for tt in hit['transplants']:
+                transplant_data['analogue_id'].append( tt['analogue_id'] )
+                #transplant_data['identity'].append( identity )
+                transplant_data['asym_id'].append( tt['asym_id'] )
+                transplant_data['clash_count'].append(tt['clash']['clash_count'])
+        #assert False 
+        a_df = self.parent.pymol.collect(self.parent.pymol.new_session(), outfile, "resn name chain segi x y z".split())
+        df = pd.DataFrame(transplant_data)
+        mols = list()
+        mlp = Mol2Parser()
+        to_delete:List[str] = list()
+        for i, row in df.iterrows():
+            if len(row.analogue_id) == 1:
+                mols.append( None )
+            else:
+                coord_mapper = dict()
+                for aa, arow in a_df[row.asym_id==a_df.chain].iterrows():
+                    coord_mapper[arow['name']] = (arow.x, arow.y, arow.z)
+                session = self.parent.pymol.new_session()
+                args = [
+                    ('fetch', row.analogue_id),
+                    ('remove', 'hydrogens')
+                ]
+                to_delete.append(f"{row.analogue_id}.cif")
+                for aname, (x,y,z) in coord_mapper.items():
+                    args.append(('alter_state', -1, f'name {aname}', f"(x, y, z) = ({x}, {y}, {z})"))
+                
+                args.append(('save', 'afill_temp.mol2'))
+                self.parent.pymol.general_cmd(session, args)
+                mol = mlp.get_ligand('afill_temp.mol2')
+                fs.safe_rm('afill_temp.mol2')
+                mols.append( mol )
+        
+        df['mol'] = mols
+
+        for td in to_delete:
+            fs.safe_rm( td )
+        
+        return (outfile, df)

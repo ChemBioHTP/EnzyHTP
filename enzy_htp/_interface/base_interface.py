@@ -43,7 +43,8 @@ class BaseInterface(ABC):
                                                   py_modules=self.config_.required_py_modules())
         self.env_manager_.check_environment()
         self.compatible_env_ = self.env_manager_.is_missing()
-
+    
+    @property
     def parent(self):
         """Getter for the parent of the <Package>Interface."""
         return self.parent_
@@ -51,8 +52,9 @@ class BaseInterface(ABC):
     def set_parent(self, val):
         """Setter for the parent of the <Package>Interface."""
         self.parent_ = val
-
-    def config(self):
+    
+    @property
+    def config(self) -> Dict:
         """Getter for the <Package>Config() instance belonging to the class."""
         return self.config_
 

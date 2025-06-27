@@ -28,6 +28,10 @@ SUB_MODULES=[
         'enzy_htp.structure.structure_selection',
         'enzy_htp.structure.structure_selection_class',
         'enzy_htp.structure.structure_constraint',
+<<<<<<< HEAD
+=======
+        'enzy_htp.structure.structure_cluster',
+>>>>>>> chrisjurich/reactive_docking
         'enzy_htp.structure.structure_translator',
         'enzy_htp.quantum',
         'enzy_htp.electronic_structure',

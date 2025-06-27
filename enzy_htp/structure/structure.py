@@ -145,6 +145,13 @@ class Structure(DoubleLinkedNode):
         if self.has_duplicate_chain_name():
             self.resolve_duplicated_chain_name()
 
+        self._data = dict()            
+
+    @property
+    def data(self) -> Dict:
+        #TODO(CJ):
+        return self._data
+
     #region === Getters-attr ===
     @property
     def chains(self) -> List[Chain]:
@@ -692,6 +699,19 @@ class Structure(DoubleLinkedNode):
 
         return False
 
+    def has_atom(self, key: str) -> bool: #TODO(CJ)
+        chain, rnum, aname = key.split('.')
+        rnum = int(rnum) 
+
+        for res in self.residues:
+            if res.parent.name == chain and res.idx == rnum:
+                for atom in res.atoms:
+                    if atom.name == aname:
+                        return True
+
+        return False
+
+
     def is_same_topology(self, other: Structure) -> bool:
         """check whether self and other have the same topology.
         i.e.: the same atom composition, connectivity, and indexing.
@@ -839,9 +859,16 @@ class Structure(DoubleLinkedNode):
         if sort:
             self.sort_chains()
 
+    def remove(self, target: str) : #TODO(CJ): finish this off
+        result = self.get( target )
+        chain = result.parent
+        result.delete_from_parent()
+        if len(chain) == 0:
+            chain.delete_from_parent()
+
     @dispatch
     def add(self, target: Residue, # pylint: disable=function-redefined
-            sort: bool = False, chain_name:str=None, net_charge:int=None, multiplicity:int=None) -> None: 
+            sort: bool = False, chain_name:Union[str, None]=None, net_charge:Union[int, None]=None, multiplicity:Union[int,None]=None) -> None: 
         """add a residue into the structure."""
         res_type = target.rtype
         if res_type in [ResidueType.CANONICAL,
@@ -958,7 +985,16 @@ class Structure(DoubleLinkedNode):
         """apply atomic coordinate from source"""
         # 1. topology check
         if not self.is_same_topology_atomic(source):
-            raise Exception("TODO")
+            if not len(self.atoms) ==  len(source.atoms):
+                raise Exception("TODO")
+            
+            for atom in self.atoms:
+                assert source.has_atom(atom.key), atom.key
+
+            for atom in self.atoms:
+                atom.coord = source.get(atom.key).coord
+                            
+
         else:
             for atom, source_atom in zip(self.atoms, source.atoms):
                 atom.coord = source_atom.coord

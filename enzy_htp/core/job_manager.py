@@ -704,6 +704,7 @@ class ClusterJob():
         dummy method for dispatch
         """
         pass
+<<<<<<< HEAD
 
 class ClusterJobConfig:
     """This class describes the configuration for a ClusterJob that contains the cluster and 
@@ -771,3 +772,5 @@ class ClusterJobConfig:
         result.update(other)
         return result
     # endregion
+=======
+>>>>>>> chrisjurich/reactive_docking
