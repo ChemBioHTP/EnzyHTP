@@ -1,3 +1,9 @@
+"""the main script for plotting results from the MultiMutDes-EF workflow.
+Specialized for the optimization of PuO.
+
+Author: QZ Shao <shaoqz@icloud.com>
+Date: 2023-02-11
+"""
 import collections
 from typing import Callable, Dict, Tuple
 import matplotlib.pyplot as plt

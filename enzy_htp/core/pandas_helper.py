@@ -7,7 +7,7 @@ Date: 2022-10-21
 from typing import List
 import pandas as pd
 
-
+# TODO(qz): speed up this function
 def split_df_base_on_column_value(df: pd.DataFrame, column_name: str, split_values: list, copy: bool = False) -> List[pd.DataFrame]:
     """
     split a dataframe base on the value of a column
