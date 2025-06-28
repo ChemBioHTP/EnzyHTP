@@ -63,7 +63,21 @@ class XTBQMResultEgg(QMResultEgg):
 
 
 class XTBSinglePointEngine(QMSinglePointEngine):
-    #TODO(CJ): documentation
+    """Object which encompasses all the information needed to perform a single point calculation with XTB. Inherits
+    from QMSinglePointEngine and is therefore compatible with JobManager and ARMer infrastructure.
+
+    Attributes:
+        _parent_interface: The associated XTBInterface instance.
+        _method: The exact GFN-X method being used.
+        _region: The StructureRegion the calculation is being applied to.
+        _name: The engine's name. 
+        _cluster_job_config: The ClusterJobConfig instance for the engine.
+        _keep_in_file: ???
+        _work_dir: The scratch directory where XTB writes the temp files.
+        _geo_opt: Is this a geometry optimization engine? Answers False.
+        _constraints: Geometry constraints. Always an empty list().
+
+    """
     def __init__(self,
                 interface,
                 method: QMLevelOfTheory,
@@ -74,6 +88,7 @@ class XTBSinglePointEngine(QMSinglePointEngine):
                 keep_in_file: bool,
                 work_dir: str,
                 ):
+        """Simple constructor that sets respective variables."""
         self._parent_interface = interface
         self._method = method
         self._region = region
@@ -180,12 +195,28 @@ class XTBSinglePointEngine(QMSinglePointEngine):
         )
 
     def translate(self, result_egg: XTBQMResultEgg) -> ElectronicStructure:
-        """TODO(CJ)"""
+        """Converts XTB result egg into ElectronciStructure object. Not yet implemented for single point."""
 
         assert False
 
 class XTBOptimizationEngine(XTBSinglePointEngine, QMOptimizationEngine):
-    """TODO(CJ)"""
+    """Object which encompasses all the information needed to perform a geometry optimization with XTB. Inherits
+    from QMSinglePointEngine and XTBSinglePointEngine and is therefore compatible with JobManager and ARMer infrastructure.
+    Mostly identical to XTBSinglePointEngine, though _geo_opt is set to True and _constraints can contain StructureConstraint
+    objects. 
+
+    Attributes:
+        _parent_interface: The associated XTBInterface instance.
+        _method: The exact GFN-X method being used.
+        _region: The StructureRegion the calculation is being applied to.
+        _name: The engine's name. 
+        _cluster_job_config: The ClusterJobConfig instance for the engine.
+        _keep_in_file: ???
+        _work_dir: The scratch directory where XTB writes the temp files.
+        _geo_opt: Is this a geometry optimization engine? Answers True.
+        _constraints: Geometry constraints, a List[StructureConstraint].
+
+    """
     def __init__(self,
                 interface,
                 method: QMLevelOfTheory,
@@ -197,7 +228,7 @@ class XTBOptimizationEngine(XTBSinglePointEngine, QMOptimizationEngine):
                 keep_in_file: bool,
                 work_dir: str,
                 ):
-        #super().__init__(interface, method, region, keep_geom, name, cluster_job_config, keep_in_file, work_dir)
+        """Simple constructor that sets respective variables."""
 
         if constraints is not None:
             self._constraints = constraints
@@ -302,8 +333,8 @@ class XTBOptimizationEngine(XTBSinglePointEngine, QMOptimizationEngine):
         return (job, result_egg)
 
     def translate(self, result_egg:XTBQMResultEgg) -> ElectronicStructure:
+        """Opens up result files for an XTB geometry optimization and creates an ElectronicStructure from them."""
         
-        #TODO(CJ): add check for result
         self.parent_interface.update_coords(self.region, result_egg.output_geom)
         lines:List[str] = fs.lines_from_file( result_egg.logfile  )
         return  ElectronicStructure(
@@ -337,7 +368,7 @@ class XTBInterface(BaseInterface):
         super().__init__(parent, config, default_xtb_config)
 
     def setup_xtb_run(self,
-        stru:Union[StructureRegion],
+        stru:Union[StructureRegion, Structure],
         lot:QMLevelOfTheory, 
         geo_opt:bool = False,
         charge:int = None,
@@ -351,18 +382,18 @@ class XTBInterface(BaseInterface):
         the result dict(). Note that the same method is used for both single point energy calculations and geometry optimizations. 
 
         Args:
-            stru:
-            lot:
-            geo_opt:
-            charge:
-            spin:
-            constraints:
-            n_iter:
-            n_proc:
-            work_dir:
+            stru: The Structure or StructureRegion to perform the calculaion on.
+            lot: The specifc QMLevelOfTheory to be used in the calculation.
+            geo_opt: Is this a geometry optimization run?
+            charge: The integer charge of the system.
+            spin: The integer splin of the system.
+            constraints: A List[StructureConstraint] to be applied to the system if it is a geometry optimization.
+            n_iter: How many SCF iterations should be allowed?
+            n_proc: How many processes is the calculation allowed to use?
+            work_dir: The directory where XTB can work during the calculation.
 
         Returns:
-            TODO(CJ)
+            A Dict with all of the necessary informatio to perform an XTB calculation.
         """
 
         if not isinstance(stru, StructureRegion):
@@ -407,7 +438,7 @@ class XTBInterface(BaseInterface):
             
                 args.extend(["--input", xtb_inp_file])
 
-            args.extend(["--opt", "normal"]) #TODO(CJ): fix this later
+            args.extend(["--opt", "normal"]) #TODO(CJ): make this parameter tunable
 
             result['expected_outfile'] = str( coord_path.parent / f"xtbopt{coord_path.suffix}" )
 
@@ -462,7 +493,7 @@ class XTBInterface(BaseInterface):
         fs.write_lines(temp_pdb, pdb_lines)
         session = self.parent.pymol.new_session()
         self.parent.pymol.general_cmd(session, [('delete', 'all'), ('load', temp_pdb)])
-        self.parent.pymol.remove_ligand_bonding(session) #TODO(CJ): add something in here about the cap resolution
+        self.parent.pymol.remove_ligand_bonding(session) 
         fs.safe_rm(temp_pdb)
         
         self.parent.pymol.general_cmd(session, [("save", coord_file)])
@@ -594,31 +625,11 @@ class XTBInterface(BaseInterface):
 
 
     @dispatch
-    def convert_constraint( self, sr:StructureRegion, cst: ResiduePairConstraint) -> List[str]:
-        """Creates constraint lines from a ResiduePairConstraint that can be used in a .inp file. Performs validation
-        checks to ensure that the supplied StructureRegion and constraints are compatible.
-        
-        Args:
-            sr:
-            cst:
-
-
-
-        """
-    
-        result = list()
-        for (cst_name, child_cst) in cst.child_constraints:
-            result.extend(self.convert_constraint(sr, child_cst ))
-        return result
-
-    @dispatch
     def convert_constraint( self, sr:StructureRegion, cst:AngleConstraint) -> List[str]:
-        #TODO(CJ): put in notes when the constraints are not present. Probably log a warning 
+        """Overloaded class method that converts an AngleConstraint into a List[str] of len 1 with the relevant constraint."""
         result:List[str] = list()
         if not sr.has_atoms(cst.atoms):
             return list()
-            print('error: TODO(CJ): make this better')
-            exit( 0 )
         
         mapped_indices:List[int] = list(map(lambda aa: sr.get_atom_index(aa, indexing=1), cst.atoms))
 
@@ -628,11 +639,10 @@ class XTBInterface(BaseInterface):
 
     @dispatch
     def convert_constraint( self, sr:StructureRegion, cst:DistanceConstraint) -> List[str]:
+        """Overloaded class method that converts a DistanceConstraint into a List[str] of len 1 with the relevant constraint."""
         result:List[str] = list()
         if not sr.has_atoms(cst.atoms):
             return list()
-            print('error: TODO(CJ): make this better')
-            exit( 0 )
         mapped_indices:List[int] = list(map(lambda aa: sr.get_atom_index(aa, indexing=1), cst.atoms))
         
         return [f"   distance: {mapped_indices[0]}, {mapped_indices[1]}, {cst.target_value:.3f}"]
@@ -677,7 +687,6 @@ class XTBInterface(BaseInterface):
         session = self.parent.pymol.new_session()
         df:pd.DataFrame = self.parent.pymol.collect(session, coord_file, "x y z rank elem".split())
         df.sort_values(by='rank', inplace=True)
-        #TODO(CJ): add some checks in here
         for aa, (i, row) in zip(sr.atoms, df.iterrows()):
             assert aa.element == row['elem'], f"{aa.element} {row['elem']}"
             aa.coord = np.array([row['x'], row['y'], row['z']])
