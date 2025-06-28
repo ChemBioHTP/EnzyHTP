@@ -61,7 +61,6 @@ class RosettaOptions:
     
     def __init__(self):
         """Simplistic constructor that initializes the data_ and script_vars_ dict()'s as well as the extra_res_fa_ variable"""
-
         self.data_ = dict()
         self.script_vars_ = dict()
         self.extra_res_fa_ = list()
@@ -263,10 +262,10 @@ class RosettaScriptsElement:
     and essentially serves as dict() with key-value pairs, as well as children.
 
     Attributes:
-        tag_: The 
-        attrib:
-        children_:
-    """TODO(CJ)
+        tag_: The str name of the RosettaScriptsElement.
+        attrib: A dict() of key-value pairs that will be added to the RosettaScripts XML script.
+        children_: Child RosettaScriptsElements that will be included and indented in the XML script
+    """
 
     def __init__(self, tag:str, **kwargs):
         """Constructor that takes tag name, as well as kwarg values. These kwarg values are stored in the .attrib dict(), 
@@ -274,7 +273,6 @@ class RosettaScriptsElement:
         self.tag_ = tag
         self.attrib = dict()
         self.children_ = list()
-
 
         children_temp = kwargs.pop('children', None)
 
@@ -298,22 +296,32 @@ class RosettaScriptsElement:
 
     @property
     def children(self) -> List["RosettaScriptsElement"]:
-        """The 
+        """Getter for the children RosettaScriptsElements that belong to the current instance."""
         return self.children_
 
     @property
     def tag(self) -> str:
+        """Getter for the str tag of the instance."""
         return self.tag_
 
-
     def has_children(self) -> bool:
+        """Does this element have child elements?"""
         return len(self.children_) 
 
     def add_child(self, child: "RosettaScriptsElement") -> None:
-
+        """Adds a new child RosettaScriptsElement directly to the .children_ attribute"""
         self.children_.append( child )
 
     def to_lines(self, offset:int = 2) -> List[str]:
+        """Converts the contents of the RosettaScriptsElement to XML lines that can be saved directly into the
+        RosettaScripts protocol.
+        
+        Args:
+            offset: The int() number of tabs that the lines should be offset from left justification.
+
+        Returns:
+            The List[str] of the completed XML lines.
+        """
 
         prefix:str=' '*offset*4
         content:List[str] = []
@@ -340,9 +348,13 @@ class RosettaScriptsElement:
         return content 
 
 class RosettaScriptsProtocol:
+    """The protocol object which roughly represents the XML file that will be fed to RosettaScripts on the commandline. RosettaScriptsElement objects
+    can be added and removed, then the XML file can be output and run.
+
+    Attributes:
+        sections: A dict() with (key, value) pairs of RosettaScripts sections and List[RosettaScriptsElement]:
+        section_names: The allowed section names as they appear in the finalized XML script. 
     """
-    """
-    #TODO(CJ): documentation
 
     def __init__(self):
         """Simple constructor that creates the .sections and .section_names attribues."""
@@ -462,8 +474,16 @@ class RosettaScriptsProtocol:
         )
 
 
-
     def to_file(self, fname:str) -> str:
+        """Convert the current instance of the RosettaScriptsProtocol into an XML script that can be fed 
+        to the RosettaScripts exectuable on the command line. Returns the output filename.
+
+        Args:
+            fname: The filename to write the RosettaScriptsProtocol to.
+
+        Returns:
+            The finalized XML script.
+        """
         content:List[str] = [ "<ROSETTASCRIPTS>"] 
 
         for sn in self.section_names:
@@ -472,7 +492,6 @@ class RosettaScriptsProtocol:
                     continue
                 opening_line = f"    <SCORINGGRIDS"                
 
-                #TODO(CJ): fix for multiple scoring grids
                 grid = self.sections[sn][0]
 
                 for k, v in grid.attrib.items():

@@ -6,7 +6,6 @@ the XTBConfig() class.
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-08-17
 """
-#TODO(CJ): update this stuff
 from typing import List, Union
 from copy import deepcopy
 
@@ -19,6 +18,15 @@ class XTBConfig(BaseConfig):
     Attributes:
         XTB_EXE : str() corresponding to xtb application.
         N_ITER : int() corresponding to number of scf iterations to run.
+        N_PROC: int() corresponding to number of processors XTB can use.
+        KMP_STACKSIZE: str() corresponding to the KMP stack size.
+        OMP_STACKSIZE : str() corresponding to the OMP stack size.
+        SUPPORTED_EXTENSIONS : List[str] of supported file extensions for xtb.
+        SOLVATION_METHODS : List[str] of supported solvation methods for xtb.
+        ALPB_SOLVENTS : List[str] of supported solvents for the ALPB solvation method
+        GBSA_SOLVENTS : List[str] of supported solvents for the GBSA solvation method
+        SUPPORTED_XTB_THEORY_LEVELS : List[str] of allowed levels of theory for xtb.
+        FORCE_CONSTANT : float() corresponding to force constant used for constraints during geometry optimizations.
     """
 
     XTB_EXE: str = "xtb"
@@ -52,7 +60,7 @@ class XTBConfig(BaseConfig):
     """Allowed levels of theory for xtb to use."""
 
     FORCE_CONSTANT:Union[None,float]=None
-    #TODO(CJ)
+    """The force constant used for constraints during geometry optimizations."""
 
     def required_executables(self) -> List[str]:
         """A hardcoded list of required executables for xtb."""
