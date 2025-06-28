@@ -20,6 +20,7 @@ import pandas as pd
 from enzy_htp import config as eh_config
 from enzy_htp.core import env_manager as em
 from enzy_htp.core import file_system as fs
+from enzy_htp.core import math_helper as mh 
 from enzy_htp.core import _LOGGER, check_var_type
 from enzy_htp._config.pymol_config import PyMolConfig, default_pymol_config
 from enzy_htp.structure import Structure, PDBParser, Ligand, Residue
@@ -558,7 +559,7 @@ class PyMolInterface(BaseInterface):
         lines = list(filter(lambda ll: ll[0] != '>', lines))
         return ''.join(lines)
 
-    def remove_ligand_bonding(self, session: pymol2.PyMOL, clash_cutoff:float=2.0) -> None: #TODO(CJ): bad name here
+    def remove_ligand_bonding(self, session: pymol2.PyMOL, clash_cutoff:float=2.0) -> None: 
         """Given a session with some already present molecule, remove the bonding in between residues presumably due
         to clashes. Essentially loops through all atoms and unbonds if they are within the specified clash_cutoff.
 
@@ -571,10 +572,6 @@ class PyMolInterface(BaseInterface):
         """
 
         self.general_cmd(session, [('set', 'retain_order', 1)])       #NOTE(CJ): this solves so many problems
-        #TODO(CJ): need to add 
-        def dist( p1, p2 ):
-            return np.sqrt(np.sum((p1-p2)**2))
-        #TODO(CJ): documentation
         df: pd.DataFrame = self.collect(session, 'memory', "chain resi resn name x y z".split(), "not polymer.protein")
         df['point'] = df.apply(lambda row: np.array([row.x, row.y, row.z]) ,axis = 1)
         non_aa = set(list(zip(df.chain, df.resi, df.resn)))
@@ -586,7 +583,7 @@ class PyMolInterface(BaseInterface):
         args = list()
         for i, row in df.iterrows():
             for i2, row2 in df2.iterrows():
-                if dist(row.point, row2.point) <= clash_cutoff:
+                if mh.get_distance(row.point, row2.point) <= clash_cutoff:
                     args.append(('unbond',
                         f"chain {row.chain} and resi {row.resi} and resn {row.resn}",
                         f"chain {row2.chain} and resi {row2.resi} and resn {row2.resn}",

@@ -56,20 +56,23 @@ class RosettaOptions:
     Attributes:
         data_: The dict() holding various settings.
         script_vars_: A dict() with a special case of (key, value) pairs that defines script variables for a RosettaScripts run.
+        extra_res_fa_: A list() holding the paths to Rosetta .params files.
     """
     
     def __init__(self):
-        """Simplistic constructor that initializes the data_ and script_vars_ dict()'s"""
+        """Simplistic constructor that initializes the data_ and script_vars_ dict()'s as well as the extra_res_fa_ variable"""
 
         self.data_ = dict()
         self.script_vars_ = dict()
         self.extra_res_fa_ = list()
 
-    def add_extra_res_fa(self, params_file):
+    def add_extra_res_fa(self, params_file:str) -> None:
+        """Special function that adds a new param file path to the extra_res_fa_ list"""
         self.extra_res_fa_.append(params_file)
 
     @property
-    def extra_res_fa(self):
+    def extra_res_fa(self) -> List[str]:
+        """Getter for the extra_res_fa .params files"""
         return self.extra_res_fa_
 
     def convert_script_vars_(self) -> None:
@@ -95,13 +98,12 @@ class RosettaOptions:
         self['parser:script_vars'] = ''.join(result)
 
     def add_script_variable(self, key:str, value:Any) -> None:
-
+        """Updates the script variables, adding a new (key, value) pair."""
         self.script_vars_[key] = value 
 
     def get_script_variable(self, key:stry) -> Any:
-
+        """Returns whatever value is stored for a given script variable key."""
         return self.script_vars_[key]
-
 
     @property
     def script_vars(self) -> Dict:  
@@ -135,6 +137,7 @@ class RosettaOptions:
         ptr[tks[-1]] = value
 
     def has(self, key:str) -> bool:
+        """Does the RosettaOptions class have the supplied option?"""
         #TODO(CJ): documentation
         result = None
         try:
