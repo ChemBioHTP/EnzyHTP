@@ -74,7 +74,6 @@ def spi_metric(
     """
     
     if isinstance(stru, Structure):
-        #TODO(CJ): put some kind of thing here
         stru = stru.from_single_stru( stru )
 
     result = list()
