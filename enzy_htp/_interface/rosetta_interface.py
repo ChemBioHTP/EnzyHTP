@@ -260,11 +260,17 @@ class RosettaOptions:
 
 class RosettaScriptsElement:
     """Represents a single Tag or element in a RosettaScripts. Each instance has a "tag" value 
-    and essentially serves as dict() with attrib-value pairs, as well as 
-    """
+    and essentially serves as dict() with key-value pairs, as well as children.
+
+    Attributes:
+        tag_: The 
+        attrib:
+        children_:
+    """TODO(CJ)
 
     def __init__(self, tag:str, **kwargs):
-
+        """Constructor that takes tag name, as well as kwarg values. These kwarg values are stored in the .attrib dict(), 
+        unless the key is 'children', where instead the .children_ attribute is populated with the respective RosettaScriptsElements."""
         self.tag_ = tag
         self.attrib = dict()
         self.children_ = list()
@@ -292,6 +298,7 @@ class RosettaScriptsElement:
 
     @property
     def children(self) -> List["RosettaScriptsElement"]:
+        """The 
         return self.children_
 
     @property
@@ -333,18 +340,30 @@ class RosettaScriptsElement:
         return content 
 
 class RosettaScriptsProtocol:
+    """
+    """
     #TODO(CJ): documentation
 
     def __init__(self):
+        """Simple constructor that creates the .sections and .section_names attribues."""
         self.sections = defaultdict(list)
         self.section_names = "SCORINGGRIDS RESIDUE_SELECTORS SCOREFXNS  PACKER_PALETTES TASKOPERATIONS MOVE_MAP_FACTORIES SIMPLE_METRICS CONSTRAINT_GENERATORS FILTERS MOVERS PROTOCOLS OUTPUT".split()
     
     def add_element(self, section:str, element:RosettaScriptsElement) -> None:
-        #TODO(CJ): add checks
+        """Generalized method to add a RosettaScriptsElement to a RosettaScriptsProtocol. 
+
+        Args:
+            section: The section that the RosettaScriptsElement should be added to.
+            element: The RosettaScriptsElement that will be added to the Protoco.
+
+        Returns:
+            Nothing.
+        """
 
         if section not in self.section_names:
-            #TODO(CJ):
-            pass
+            err_str=f"The supplied section name '{section}' is not allowed. Supported section names are {', '.join(self.section_names)}"
+            _LOGGER.error(err_str)
+            raise TypeError(err_str)
 
         self.sections[section].append( element )
 
@@ -1093,14 +1112,24 @@ class RosettaInterface(BaseInterface):
                     work_dir:str=None,
                     remove_temp_files:bool=False
                     ) -> str:
-        """
-            opts: a list() of str() to be run by the RosettaScripts executable.  logfile: The file to output the stdout log to. Optional.
+        """Canonical way to run a RosettaScriptsProtocol on a Structure.
+
+        Args:
+            stru: The Structure the protocol will applied to.
+            protocol: The RosettaScriptsPorotocol that will be applied to the given Structure.
+            opts: The RosettaOptions object with commandline options for the RosettaScripts run.
+            prefix: Prefix to be used for all associated files. Optional, default is 'rosetta_scripts'.
+            work_dir: Directory where the temporary files are to be saved. Optional, default is None.
+            remove_temp_files: Should temporary files be removed after the RosettaScripts run? Optional, default is False.
+
+
+        Returns:
+            The .sc scorefile created from the RosettaScripts run.
         """
         if work_dir is None:
             if opts.has('out:path:all'):
                 work_dir = opts['out:path:all']
             else:
-                #TODO(CJ): put an error code here
                 work_dir = eh_config['system.SCRATCH_DIR']
                 opts['out:path:all'] = work_dir
        
@@ -1139,21 +1168,23 @@ class RosettaInterface(BaseInterface):
 
         os.chdir( start_dir )
 
-        assert Path(opts['out:file:scorefile']).exists(),  opts['out:file:scorefile'] #TODO(CJ): update this
+        if not Path(opts['out:file:scorefile']).exists():
+            raise FileNotFoundError(f"The expected outfile {opts['out:file:scorefile']} does not exist!")
 
         if remove_temp_files:
             fs.safe_rm( opts_file )
             fs.safe_rm( xml_file )
             fs.safe_rm( fname )
 
-        return opts['out:file:scorefile'] #TODO(CJ): add some stuff in for this
+        return opts['out:file:scorefile'] 
 
     def parse_score_file(self, fname: str, work_dir:str=None) -> pd.DataFrame:
         """Method that parses a score file into a Pandas Dataframe. Only encodes lines that begin with SCORE.
+        Function will change the values in the 'description' column, so that they are .pdb files that can be loaded.
 
         Args:
             fname: Path to the score file. Will error if does not exist.
-            #TODO(CJ): update docs                
+            work_dir: The directoy where the function will assume the description files exist.
 
         Returns:
             A pandas dataframe containing the data in the supplied score file.
@@ -1222,17 +1253,13 @@ class RosettaInterface(BaseInterface):
         return result
 
     def parameterize_ligand(self, mol: Ligand, charge:int=None, work_dir:str=None) -> Tuple[str, str]:
-        """Parameterizes the input ligand for use in the RosettaLigand protocol. Takes an input file with the ligand,
-        as well as the name of the residue in PDB format (3 capitalized letters) as well as optionally where the output
-        directory where the .params and .pdb files should be saved. The underlying script only supports .mol, .mol2, 
-        and .sdf formats. Can also add conformers to end of .params file when conformers file is supplied. Function 
-        exits on invalid inputs. 
-        TODO(CJ): fix this documentation            
+        """Parameterizes the input Ligand for Rosetta protocol, reating a .params file. Input ligand must have 
+        connectivity information for file to be accurate.
+        
         Args:
-            molfile: The name of the input file as a str().
-            res_name: The all-capitalized, three letter string of the ligand in PDB format.
-            outfile: Where the .params file should be saved. Optional.
-            conformers: The conformers file for the given ligand. Optional.
+            mol: The Ligand to parameterize.
+            charge: The integer formal charge of the ligand. Optional.
+            work_dir: Work directory where .params files are prepared and finally saved.
 
         Returns:
             A tuple() with the layout of (.params file, .pdb file)            
@@ -1538,18 +1565,17 @@ class RosettaInterface(BaseInterface):
         constraints:List[StructureConstraint], 
         functional:str="LINEAR_PENALTY",
         work_dir:str = None) -> str:
-        """
+        """Given a Structure and its respective constraints, writes a Rosetta formatted .cst file. NOT EnzDes constraint format. 
 
         Args:
-            stru:
-            constraints:
-            functional:
-            work_dir:
+            stru: The relevant Structure.
+            constraints: Constraints that will be written.
+            functional: The Rosetta constraint functional to be used. 
+            work_dir: The output directory to save the .cst file to.
 
         Returns:
             The name of the file where the constraints were written.
         """
-        #TODO(CJ): this!
         if work_dir is None:
             work_dir = "./"
     
