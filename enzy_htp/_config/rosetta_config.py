@@ -60,7 +60,7 @@ class RosettaConfig(BaseConfig):
     """Executable or path to the python2.7 executable that Rosetta will use for miscellaneous scripts."""
 
     ORCA_DIR:str = ""
-    #TODO(CJ)
+    """Path to the ORCA directory to use the ORCA QMInterface within Rosetta"""
 
     DEFAULT_DISTANCE_CONSTRAINT_SETTING:Dict[str, float] = {
         'tolerance': 0.5,

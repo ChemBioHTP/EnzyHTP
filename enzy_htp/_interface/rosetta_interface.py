@@ -137,8 +137,7 @@ class RosettaOptions:
         ptr[tks[-1]] = value
 
     def has(self, key:str) -> bool:
-        """Does the RosettaOptions class have the supplied option?"""
-        #TODO(CJ): documentation
+        """Does the RosettaOptions class have the supplied option? Supplied key is checked against main option dict() only."""
         result = None
         try:
             with HiddenPrints() as hp:
@@ -1539,6 +1538,17 @@ class RosettaInterface(BaseInterface):
         constraints:List[StructureConstraint], 
         functional:str="LINEAR_PENALTY",
         work_dir:str = None) -> str:
+        """
+
+        Args:
+            stru:
+            constraints:
+            functional:
+            work_dir:
+
+        Returns:
+            The name of the file where the constraints were written.
+        """
         #TODO(CJ): this!
         if work_dir is None:
             work_dir = "./"
@@ -1619,7 +1629,7 @@ class RosettaInterface(BaseInterface):
         return fname 
 
     def score_energy(self, cst:StructureConstraint) -> float: 
-        """TODO(CJ): add documentation"""
+        """Determines the current energy for the supplied constraint."""
 
         if cst.is_residue_pair_constraint():
             total:float = 0.0

@@ -81,7 +81,6 @@ Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-04-03
 """
-#TODO(CJ): add a method for changing/accessing a specific residue
 from __future__ import annotations
 import hashlib
 import itertools
@@ -154,7 +153,7 @@ class Structure(DoubleLinkedNode):
 
     @property
     def data(self) -> Dict:
-        #TODO(CJ):
+        """Getter for the data dict() in each Structure."""
         return self._data
 
     #region === Getters-attr ===
@@ -734,7 +733,10 @@ class Structure(DoubleLinkedNode):
 
         return False
 
-    def has_atom(self, key: str) -> bool: #TODO(CJ)
+    def has_atom(self, key: str) -> bool:
+        """Does the Structure have an atom which matches the supplied key? 
+        Keys will have the format of "<chain>.<resi>.<name>" where <chain> is the one-letter chain name,
+        <resi> is the residue index, and <name> is the atom name."""
         chain, rnum, aname = key.split('.')
         rnum = int(rnum) 
 
@@ -894,7 +896,8 @@ class Structure(DoubleLinkedNode):
         if sort:
             self.sort_chains()
 
-    def remove(self, target: str) : #TODO(CJ): finish this off
+    def remove(self, target: str) -> None: 
+        """Remove the object specified by the given target key. If a chain is made empty, the chain is also deleted."""
         result = self.get( target )
         chain = result.parent
         result.delete_from_parent()

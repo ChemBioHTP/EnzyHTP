@@ -537,9 +537,9 @@ of the original residue when charge related keyword for mutation is used"""
 RESIDUE_CHARGE_MAP = {
     "ff19sb" : {
         'HOH': {
-            'O' :0.0, #TODO(CJ)            
-            'H1':0.0, #TODO(CJ)            
-            'H2':0.0 #TODO(CJ)            
+            'O' :-0.81,
+            'H1':0.41,
+            'H2':0.41
         },
         'ALA': {
             'N': -0.4157,
@@ -1886,7 +1886,7 @@ RESIDUE_CHARGE_MAP_NTERMINAL = {
             'HA': 0.1,
             'C': 0.526,
             'O': -0.5,
-            'HNN':0.26 #TODO(CJ): check
+            'HNN':0.26 
 
         },
         'SER': {
@@ -2100,9 +2100,8 @@ def residue_polarity(code: str) -> str:
 
 
 def non_polar(code: str) -> bool:
-    # TODO(CJ): should probably check if it is a valid one letter residue code
     """Determines if a one-letter nucleotide amino acid is non-polar. Returns True if it is non-polar."""
-    if len(code) != 1:
+    if len(code) != 1 or code not in AA_LIST:
         raise InvalidResidueCode(f"expecting one letter residue code. '{code}' is invalid")
 
     return code in RESIDUE_CATEGORIES["nonpolar"]
@@ -2110,7 +2109,6 @@ def non_polar(code: str) -> bool:
 
 def polar(code: str) -> bool:
     """Determines if a one-letter nucleotide amino acid is polar. Returns True if it is non-polar."""
-    # TODO(CJ): should probably check if it is a valid one letter residue code
     return not non_polar(code)
 
 
