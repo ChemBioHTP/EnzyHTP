@@ -16,7 +16,6 @@ import pymol2
 import numpy as np
 import pandas as pd
 
-#TODO(CJ): add something to remove "PyMOL not running. Entering library mode (experimental" message on pymol running
 from enzy_htp import config as eh_config
 from enzy_htp.core import env_manager as em
 from enzy_htp.core import file_system as fs
@@ -446,7 +445,6 @@ class PyMolInterface(BaseInterface):
         """Executes a series of commands through the PyMOL/PyMOL2 python module in use. Takes input as a list of Tuple()'s
         where the first item in each tuple is a string specifying the function to use and the rest of the items are the
         arguments for that function.
-        TODO(CJ): add examples
     
         Args:
             session : A pymol2.PyMOL() session to use.
@@ -476,7 +474,6 @@ class PyMolInterface(BaseInterface):
             try:
                 fxn = getattr(session.cmd, cmd_name)
                 if cmd_name == 'alter' and len(cmd_set) == 3:
-                    #TODO(CJ): add some more checking here
                     result.append(session.cmd.alter(
                         cmd_set[1], cmd_set[2]
                     ))
@@ -890,7 +887,17 @@ class PyMolInterface(BaseInterface):
             align_sele:str,
             measure_sele:str
             ) -> List[List[float]]:
-    #TODO(CJ) 
+        """Creates an NxN matrix of RMSDs for a list of N Structures. Only calculates it for protein portions
+        of the supplied selections. Supplied selections are assumed to be in pymol format.
+
+        Args:
+            structures: List of structures that will be used to calculate the RMSD matrix.
+            align_sele: Selection that the proteins will be aligned to.
+            measure_sele: Selection on which the RMSD will be calculated
+
+        Returns:
+            An NxN matrix of Structure-Structure RMSDs.
+        """
         result = np.zeros((len(structures), len(structures)))
 
         session = self.new_session()
