@@ -2,6 +2,7 @@
 found in enzy_htp/molecular_mechanics/amber_config.py. Supported operations include mutation with tLEaP, MolDynParameterizer for MD,
 and MolDynStep for modular MD steps that can be minimization, heating, constant pressure production, or constant pressure
 equilibration.
+NOTE(@shaoqz): use pytraj as much as possible
 
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
