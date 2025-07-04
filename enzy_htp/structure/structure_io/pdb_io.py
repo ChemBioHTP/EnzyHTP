@@ -160,7 +160,17 @@ class PDBParser(StructureParserInterface):
                     if_renumber: bool = True,
                     if_fix_atomname: bool = True
                     ) -> str:
-        """TODO(CJ)"""            
+        """Take a LigandEnsemble and save it in a Rosetta-compatible PDB format for use in rotamer library generation.
+
+        Args:
+            outfile: The file the LigandEnsmemble should be saved ot.
+            le: The LigandEnsemble to be saved.
+            if_renumber: Should the atoms be renumbered from 1?
+            if_fix_atomname: Should atoms be ranemed to PDB convention?
+
+        Returns:
+            Path to the saved LigandEnsemble() as a str().
+        """            
         content:List[str] = list()
         for lig in le.ligands()[1:]:
             if not lig.parent:

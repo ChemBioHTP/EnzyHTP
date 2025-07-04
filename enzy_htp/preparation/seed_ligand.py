@@ -41,23 +41,17 @@ from .ligand_moves import (
     ligand_mcs_score
 )
 
-#TODO(CJ): add more documentation
-
 def seed_with_coordinates(ligand:Ligand,
                             coords:Union[Tuple[float, float, float], List[Tuple[float,float,float]]],
                             rng_seed:int=1996,
-                            minimize:bool=False,
-                            min_iter:int=1,
                             work_dir:str=None) -> None:
     """Seeds the location of the Ligand()'s center of mass using the supplied seeds. If multiple seeds are supplied, one
-    is chosen at random. Ligand() can be minimized at end.
+    is chosen at random. 
 
     Args:
         ligand: The Ligand() to seed.
         coords: A (float, float, float) or List[(float, float, float)] to choose the seed from.
         rng_seed: Random number generation seed. Optional.
-        minimize: Should Ligand()-only minimization be performed?
-        min_iter: How many minimization iterations should be performed? Optional.
         work_dir: temp directory where the work is done.  Optional.
 
 
@@ -79,8 +73,6 @@ def seed_with_coordinates(ligand:Ligand,
 def seed_with_transplants(ligand:Ligand,
                      similarity_metric:str,
                      similarity_cutoff:float = 0.45,
-                     minimize:bool=False,
-                     min_iter:int=1,
                      use_cache:bool=False,
                      work_dir:str=None
 ) -> Ligand:
@@ -88,13 +80,11 @@ def seed_with_transplants(ligand:Ligand,
     algorithm (https://doi.org/10.1038/s41592-022-01685-y). 
 
     Args:
-        ligand:
-        simliarity_metric:
-        similaritY_cutoff:
-        minimize:
-        min_iter:
-        use_cache:
-        work_dir:
+        ligand: The Ligand() object to seed.
+        simliarity_metric: The method by which similarity is scored. Valid options include: atom_names or mcs
+        similaritY_cutoff: The cutoff value for the similarity metric. Default is 0.45.
+        use_cache: Should a file cache be used to avoid calling alphafill again? Default is False.
+        work_dir: Location where temporary and output files should be saved. Optional
 
     Returns:
         An aligned, deepcopied Ligand().
@@ -116,7 +106,9 @@ def seed_with_transplants(ligand:Ligand,
     elif similarity_metric == 'mcs':
         sim_func = ligand_mcs_score
     else:
-        assert False
+        err_str:str=f"The similarity metric {similarity_metric} is not supported!"
+        _LOGGER.error(err_str)
+        raise TypeError(err_str)
     
     df['similarity_score'] = df.apply(lambda row: sim_func( ligand, row.mol ), axis=1 )
     similarity_mask = df.similarity_score >= similarity_cutoff
@@ -147,24 +139,27 @@ def seed_with_analog(ligand:Ligand,
                 analog:Ligand,
                 seed_atom:Atom,
                 analog_atom:Atom,
-                minimize:bool=False,
-                min_iter:int=1,
                 work_dir:str=None) -> None:
+
+    """Seed a Ligand using an Analog Ligand. Aligns the seed Atom from that Ligand to the specified analog Atom.
+
+    Args:
+        ligand: The Ligand to be seeded.
+        analog_template: The analog Ligand that will serve as a template
+        analog: The analog Ligand whose coordinates will be used.
+        seed_atom: The seed Atom that will be aligned to the analog atom.
+        analog_atom: The analog Atom whose coordinates will be used to place the seed Atom.
+        work_dir: Directory where all work will be done. Optional.
+
+    Returns:
+        Nothing.
+    """
 
     if not work_dir:
         work_dir = config['system.SCRATCH_DIR']
 
 
-#    analog_file:str=f"{work_dir}/analog.mol2"
-#    analog_template_file:str=f"{work_dir}/analog_template.mol2"
-#
-#    parser = Mol2Parser()
-#    parser.save_ligand(analog_file, analog)
-#    parser.save_ligand(analog_template_file, analog_template)
-
     mimic_torsions(analog_template, analog)
-    
-    #analog = parser.get_ligand(analog_file)
 
     target_location = None
 
@@ -189,10 +184,21 @@ def seed_with_analog(ligand:Ligand,
 def seed_with_constraints(ligand:Ligand,
         constraints:List[StructureConstraint], 
         delta:float=0.75,
-        minimize:bool=False,
-        min_iter:int=1,
         work_dir:str=None ) -> None:
-    """ TODO(CJ) """
+    """Seed a Ligand using StructureConstraints. First uses Mole2 to identify all cavity spaces, 
+    then loops through a 3D grid of that space, choosing the seed location that doesn't clash with existing Atom()'s
+    and has the best constraint score, i.e. that best satisfies the constraints.
+
+    Args:
+        ligand: The Ligand() to seed. 
+        constraints: The StructureConstraint()'s to be used for scoring purposes.
+        delta: The delta to create the point grid, used for x/y/z axes.
+        work_dir: Where the temporary files should be saved. Optional.
+
+    Returns:
+        Nothing.
+
+    """
     stru = ligand.parent.parent
     assert constraints
     if not work_dir:
@@ -227,7 +233,6 @@ def seed_with_constraints(ligand:Ligand,
     scores = list()
     
     for sl in seed_locations:
-        #TODO(CJ): this is where I put the actual energy/constraint evaluation
     
         lig_start = ligand.geom_center
         shift = sl - lig_start
@@ -270,94 +275,25 @@ def seed_with_constraints(ligand:Ligand,
 
     ligand.shift( seed - ligand.geom_center)
 
-def seed_using_phosphates( metal, phosphate ):
-    def dist( p1, p2 ):
-        return np.sqrt(np.sum(
-            np.power(p1-p2, 2)
-        ))
-
-    def intersect(p1, p2, cutoff=0.50):
-            
-        
-        dists = list()
-        x = np.arange(0, 5.0, 0.1)
-        for dx in x:
-            dists.append(dist(
-                p1['v']*dx+p1['p'], p2['v']*dx+p2['p']
-            ))
-        
-        if np.min(dists) > cutoff:
-            return (False, None)
-        dx = x[np.argmin(dists)]
-        dx = 2.0 #TODO(CJ): update
-    
-        return (True, ( p1['v']*dx+p1['p']+p2['v']*dx+p2['p'] )*0.5)
-    
-   
-    points = dict()
-    
-    for atom in phosphate.atoms:
-        points[atom.name] = np.array(atom.coord)
-
-    p1_vectors = list()
-    
-    for aname in 'O1A O2A'.split():
-        if aname not in points:
-            continue
-        v = points[aname] - points['PA']
-        p1_vectors.append({
-            'v': v / np.linalg.norm(v),
-            'p': points[aname]
-        })
-    
-    p2_vectors = list()
-    
-    for aname in 'O1B O2B O3B'.split():
-        if aname not in points:
-            continue
-        v = points[aname] - points['PB']
-        p2_vectors.append({
-            'v': v / np.linalg.norm(v),
-            'p': points[aname]
-        })
-    
-    pt = None
-    for p1 in p1_vectors:
-        for p2 in p2_vectors:
-            
-            (good,ipt) = intersect(p1, p2)
-            if good:
-                metal.atom.coord = ipt
-                return
-    
-    assert pt
-    
 
 def seed_with_pdb_structure(ligand:Ligand,
                      pdb_code:str,
                      ligand_sele:str,
-                     #similarity_metric:str,
-                     #similarity_cutoff:float = 0.45,
                      align_sele:str=None,
-                     minimize:bool=False,
-                     min_iter:int=1,
-                     use_cache:bool=False,
                      work_dir:str=None
-) -> Ligand:
-    """Implementation function that places a specified ligand into a structure using the alphafill 
-    algorithm (https://doi.org/10.1038/s41592-022-01685-y). 
+) -> None:
+    """Seed a Ligand using coordinates from an existing protein databank database structure. 
+    Requires at least one heavy atom name match between candidate and template Ligand()'s.
 
     Args:
-        ligand:
-        simliarity_metric:
-        similaritY_cutoff:
-        minimize:
-        min_iter:
-        use_cache:
-        work_dir:
+        ligand: The Ligand to be seeded.
+        pdb_code: The four-letter PDB code of the reference entry. Case-insensitive.
+        ligand_sele: The pymol-formatted selection for the reference ligand in the refence PDB entry.
+        align_sele: The pymol-formatted selection that the Ligand()'s parent structure will be aligned to.
+        work_dir: Directory where the work will be done. Optional.
 
     Returns:
-        An aligned, deepcopied Ligand().
+        Nothing.
     """
     _LOGGER.info(f"Beginnning placement of ligand {ligand} into the structure...")
     _LOGGER.info(f"Calling out to AlphaFill to fill structure...")
@@ -401,30 +337,18 @@ def seed_with_pdb_structure(ligand:Ligand,
                     template_to_ligand[aidx] = lidx
                     break
             else:
-                #TODO(CJ): put an error code here
                 pass
-                #assert False, target_name
         
         lconf = lmol.GetConformer()
         tconf = tmol.GetConformer()
         
-        #ff = AllChem.UFFGetMoleculeForceField(lmol)
         for tidx, lidx in template_to_ligand.items():
             
             lconf.SetAtomPosition(lidx, tconf.GetAtomPosition(tidx))
 
-        #    ff.UFFAddPositionConstraint(lidx, 0.05, 10000)
-        #ff.Minimize()
-
-        #ff = AllChem.UFFGetMoleculeForceField(lmol)
-        #for idx in range(lmol.GetNumAtoms()):
-        #    atom = lmol.GetAtomWithIdx(idx)
-        #    if atom.GetAtomicNum() != 1:
-        #        ff.UFFAddPositionConstraint(idx, 0.05, 10000)
-        #
-        #        
-        #ff.Minimize()
         interface.rdkit.update_ligand_positions(ligand, lmol)
     else:
-        assert False
+        err_str="seed_with_pdb_structure(): No heavy atom match between candidate and template Ligand()'s" 
+        _LOGGER.error(err_str)
+        raise TypeError(err_str)
 

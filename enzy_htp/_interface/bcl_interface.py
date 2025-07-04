@@ -76,9 +76,6 @@ class BCLInterface(BaseInterface):
         Returns:
            A str() naming the file with the generated conformers. 
         """
-
-        #TODO(CJ): add the ability to add more flags and that molfile is in the correct format
-
         fs.check_file_exists(molfile)
 
         if not outfile:
@@ -118,8 +115,8 @@ class BCLInterface(BaseInterface):
         if not Path(molfile).suffix == '.sdf':
             _LOGGER.error(f"Function expects .sdf file format. Exiting...")
             exit(1)
-        #TODO(CJ): I want to use the high level scratch directory to do this stuff
-        temp_file: str = "__temp.csv"
+        work_dir:str=self.parent.config()['system.SCRATCH_DIR']
+        temp_file: str = f"{work_dir}/__temp.csv"
 
         flags: List[str] = ["-input_filenames", str(molfile), "-output_table", temp_file, "-tabulate", "TotalFormalCharge"]
 
