@@ -1044,7 +1044,7 @@ class Structure(DoubleLinkedNode):
             self.pbc_box_shape = pbc_box_edges + self.pbc_box_shape[3:]
         else:
             _LOGGER.error("Structure does not have PBC. cant update. angles unknown")
-            raise ValueError
+            #raise ValueError
 
     def clone_residue_keys(self, other: Structure, amino_acid_only: bool =True):
         """clone residue keys from {other} to {self}.

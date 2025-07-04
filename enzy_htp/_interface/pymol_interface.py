@@ -813,7 +813,6 @@ class PyMolInterface(BaseInterface):
             ])
             return results[-2] / results[-1]
 
-<<<<<<< HEAD
     def get_exposed_residues(self, stru: Structure, cutoff = 0.1,) -> List[Residue]:
         """see get_exposed_or_buried_residues"""
         return self.get_exposed_or_buried_residues(stru, "exposed", cutoff)

@@ -24,7 +24,7 @@ from enzy_htp.structure import (
     Ligand,
     Mol2Parser
 )
-
+#TODO(CJ): documentation
 class RDKitInterface(BaseInterface):
     pass
 
@@ -126,7 +126,7 @@ class RDKitInterface(BaseInterface):
                 cleanupSubstructures:bool=True,
                 work_dir:str=None ) -> "rdkit.Chem.Mol":
         if not work_dir:
-            work_dir = self.parent.config['system.SCRATCH_DIR']
+            work_dir = self.parent.config()['system.SCRATCH_DIR']
    
         fs.safe_mkdir( work_dir )
 

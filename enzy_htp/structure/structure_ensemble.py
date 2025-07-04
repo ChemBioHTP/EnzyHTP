@@ -100,7 +100,7 @@ class StructureEnsemble:
             topology=stru,
             top_parser=get_itself,
             coordinate_list=[stru],
-            coord_parser=lambda stru_list: ((stru_i, stru_i.pbc_box_shape) for stru_i in stru_list),
+            coord_parser=lambda stru_list, **kwargs: ((stru_i, stru_i.pbc_box_shape) for stru_i in stru_list),
         )
 
 

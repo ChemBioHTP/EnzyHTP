@@ -20,13 +20,10 @@ from ..residue import Residue
 from ..noncanonical_base import NonCanonicalBase
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.math_helper import round_by, is_integer
-<<<<<<< HEAD
 import enzy_htp.chemical as chem
-=======
 from enzy_htp.chemical.residue import (
     CAA_CHARGE_MAPPER
 )
->>>>>>> chrisjurich/reactive_docking
 
 from .residue_caps import ResidueCap
 

@@ -582,13 +582,11 @@ def _serial_md_steps(
 
     return results
 
-<<<<<<< HEAD
 # == helper tools ==
 def get_deployable_md_cli() -> str:
     """get the content of a CLI tool that manage deployed
     MD tasks in batch"""
-
-=======
+    pass
 
 def conformer_sampling(
     ligand:Ligand,
@@ -598,7 +596,7 @@ def conformer_sampling(
     method:str='rdkit',
     rng:int=1996,
     ) -> LigandEnsemble:
-    
+    #TODO(CJ): add documentation here
     le = LigandEnsemble( ligand )
     if method == 'rdkit':
         conformers:List[Ligand] = interface.rdkit.generate_conformers(
@@ -617,4 +615,3 @@ def conformer_sampling(
         assert False
 
     return le
->>>>>>> chrisjurich/reactive_docking
