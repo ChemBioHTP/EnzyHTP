@@ -113,7 +113,7 @@ class AmberParameter(MolDynParameter):
         result *= Path(self._inpcrd).exists()
         result *= Path(self._prmtop).exists()
         # file size not zero
-        result *= os.path.getsize(self._inpcrd) != 0 #TODO(CJ): use the function I already implemented for this
+        result *= os.path.getsize(self._inpcrd) != 0 
         result *= os.path.getsize(self._prmtop) != 0
         # TODO add upon need
         return bool(result)
