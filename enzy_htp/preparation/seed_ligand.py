@@ -41,8 +41,7 @@ from .ligand_moves import (
     ligand_mcs_score
 )
 
-from enzy_htp.geometry import minimize as geo_minimize
-
+#TODO(CJ): add more documentation
 
 def seed_with_coordinates(ligand:Ligand,
                             coords:Union[Tuple[float, float, float], List[Tuple[float,float,float]]],
@@ -76,8 +75,6 @@ def seed_with_coordinates(ligand:Ligand,
         coord - current
     )
 
-    if minimize:
-        minimize_ligand_only( ligand, min_iter, work_dir )
 
 def seed_with_transplants(ligand:Ligand,
                      similarity_metric:str,
@@ -145,9 +142,6 @@ def seed_with_transplants(ligand:Ligand,
         elif similarity_metric == 'mcs':
             mimic_torsions_mcs( template, ligand )
 
-    if minimize:
-        minimize_ligand_only( ligand, min_iter, [], work_dir )
-
 def seed_with_analog(ligand:Ligand,
                 analog_template:Ligand,
                 analog:Ligand,
@@ -191,10 +185,6 @@ def seed_with_analog(ligand:Ligand,
     shift = target_location - current_location
 
     ligand.shift( shift )
-
-    if minimize:
-        minimize_ligand_only( ligand, min_iter, [], work_dir )
-
 
 def seed_with_constraints(ligand:Ligand,
         constraints:List[StructureConstraint], 
@@ -279,9 +269,6 @@ def seed_with_constraints(ligand:Ligand,
     seed = final_locations[0]
 
     ligand.shift( seed - ligand.geom_center)
-
-    if minimize:
-        minimize_ligand_only( ligand, min_iter, constraints, work_dir )
 
 def seed_using_phosphates( metal, phosphate ):
     def dist( p1, p2 ):
@@ -440,31 +427,4 @@ def seed_with_pdb_structure(ligand:Ligand,
         interface.rdkit.update_ligand_positions(ligand, lmol)
     else:
         assert False
-
-    if minimize:
-        minimize_ligand_only( ligand, min_iter, [], work_dir )
-
-
-
-def minimize_ligand_only(ligand:Ligand, n_iter:int, constraints:List[StructureConstraint], work_dir:str) -> None:
-    """Uses Rosetta to minimize only the supplied Ligand(). Designed to remove clashes,
-    not perform a rigorous optimization of the molecule.
-
-    Args:
-        ligand: Ligand() to minimize.
-        n_iter: How many iter's/trajectories should be used?
-        work_dir: Where should work be done? Note: actually done in <work_dir>/minimize/
-
-    Returns:
-        Nothing.
-    """
-    if work_dir is None:
-        work_dir = config['system.SCRATCH_DIR']
-    sele = f'(chain {ligand.parent.name} and resi {ligand.idx})'
-    stru = ligand.parent.parent
-    geo_minimize(stru, movemap=[
-        {'sele':sele, 'bb':'true', 'chi':'true', 'bondangle':'false'}, 
-        {'sele':f'not ({sele})', 'bb':'false', 'chi':'false', 'bondangle':'false'}, 
-    
-    ],n_iter=n_iter, work_dir=f"{work_dir}/minimize/")
 

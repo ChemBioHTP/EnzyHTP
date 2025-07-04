@@ -39,7 +39,6 @@ from .api import (
     DistanceConstraint,
     AngleConstraint,
     DihedralConstraint,
-    ResiduePairConstraint,
     BackBoneFreeze,
     GroupDistanceConstraint,
     )

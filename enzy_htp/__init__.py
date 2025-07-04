@@ -24,7 +24,7 @@ from .core import (
     write_data,
 )
 
-from .chemical import ResidueType, parse_ec_number
+from .chemical import ResidueType
 
 from ._config import config
 

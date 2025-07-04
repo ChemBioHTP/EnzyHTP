@@ -24,8 +24,6 @@ from .residue import (
     non_polar,
 )
 
-from .enzyme_commission import parse_ec_number
-
 from .level_of_theory import (
     LevelOfTheory,
     QMLevelOfTheory,

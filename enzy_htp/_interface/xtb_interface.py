@@ -30,7 +30,6 @@ from enzy_htp.structure.structure_constraint import (
     DistanceConstraint,
     AngleConstraint,
     DihedralConstraint,
-    ResiduePairConstraint,
     create_hydrogen_bond_freeze
 )
 

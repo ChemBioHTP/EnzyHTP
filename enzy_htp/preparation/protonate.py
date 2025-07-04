@@ -30,7 +30,6 @@ from enzy_htp.structure.structure_enchantment import init_connectivity
 from pdb2pqr.main import main_driver as run_pdb2pqr
 from pdb2pqr.main import build_main_parser as build_pdb2pqr_parser
 #import openbabel.pybel as pybel
-from .pdb_line import read_pdb_lines
 
 
 def protonate_stru(stru: Structure,
@@ -372,23 +371,3 @@ def _fix_pybel_output(pdb_path: str, out_path: str, ref_name_path: str = None) -
 
 
 LIGAND_PROTONATION_METHODS = {"pybel": protonate_ligand_with_pybel}
-
-
-# below TODO
-def _ob_pdb_charge(pdb_path: str) -> int:
-    # TODO(CJ): add tests for this function
-    """
-    extract net charge from openbabel exported pdb file
-    """
-    pdb_ls = read_pdb_lines(pdb_path)
-    net_charge = 0
-    for pdb_l in pdb_ls:
-        if pdb_l.is_HETATM() or pdb_l.is_ATOM():
-            raw: str = pdb_l.get_charge()
-            raw = raw.strip()
-            if not len(raw):
-                continue
-            charge = pdb_l.charge[::-1]
-            core._LOGGER.info(f"Found formal charge: {pdb_l.atom_name} {charge}")  # TODO make this more intuitive/make sense
-            net_charge += int(charge)
-    return net_charge

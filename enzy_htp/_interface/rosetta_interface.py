@@ -37,7 +37,7 @@ from enzy_htp.structure import (
 )
 from enzy_htp.structure.structure_operation import remove_non_peptide
 from enzy_htp.structure import translate_structure
-from enzy_htp.structure.structure_constraint import StructureConstraint, ResiduePairConstraint
+from enzy_htp.structure.structure_constraint import StructureConstraint
 from enzy_htp._config.rosetta_config import RosettaConfig, default_rosetta_config
 from enzy_htp.core import _LOGGER
 from enzy_htp.core import file_system as fs
@@ -1637,23 +1637,6 @@ class RosettaInterface(BaseInterface):
                     f"{functional} "
                     f"{np.radians(cst.target_value):.2f} 0.00 {np.radians(cst['rosetta']['tolerance']):.2f} {cst['rosetta']['penalty']/np.radians(1):.2f}"
                 )
-            elif cst.is_residue_pair_constraint():
-                for (cst_name, child_cst) in cst.child_constraints:
-                    if child_cst.is_distance_constraint():
-                        ridx_1:int=stru.absolute_index(child_cst.atoms[0].parent, indexed=1)
-                        ridx_2:int=stru.absolute_index(child_cst.atoms[1].parent, indexed=1)
-                        lines.append(
-                            f"AtomPair {child_cst.atoms[0].name} {ridx_1} {child_cst.atoms[1].name} {ridx_2} {functional} {child_cst.target_value:.2f} 0.00 {child_cst['rosetta']['tolerance']:.2f} {child_cst['rosetta']['penalty']:.2f}"
-                        )
-                    elif child_cst.is_angle_constraint():
-                        ridx_1:int=stru.absolute_index(child_cst.atoms[0].parent, indexed=1)
-                        ridx_2:int=stru.absolute_index(child_cst.atoms[1].parent, indexed=1)
-                        ridx_3:int=stru.absolute_index(child_cst.atoms[2].parent, indexed=1)
-                        lines.append(
-                            f"Angle {child_cst.atoms[0].name} {ridx_1} {child_cst.atoms[1].name} {ridx_2} {child_cst.atoms[2].name} {ridx_3} {functional} {np.radians(child_cst.target_value):.2f} 0.00 {np.radians(child_cst['rosetta']['tolerance']):.2f} {child_cst['rosetta']['penalty']/np.radians(1):.2f}"
-                        )
-                    else:
-                        assert False
             elif cst.is_cartesian_freeze():
                 for atom in cst.atoms:
                     ridx_1:int=stru.absolute_index(atom.parent, indexed=1)
@@ -1675,12 +1658,6 @@ class RosettaInterface(BaseInterface):
 
     def score_energy(self, cst:StructureConstraint) -> float: 
         """Determines the current energy for the supplied constraint."""
-
-        if cst.is_residue_pair_constraint():
-            total:float = 0.0
-            for (_,child_cst) in self.child_constraints:
-                total += self.score_energy(child_cst)
-            return total
 
         penalty:float = cst['rosetta']['penalty'] 
         tolerance:float = cst['rosetta']['tolerance']

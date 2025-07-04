@@ -14,7 +14,3 @@ from .sampling import (
     conformer_sampling,
 )
 
-from .minimize import (
-    minimize
-)
-
