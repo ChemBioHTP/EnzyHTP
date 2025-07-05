@@ -672,14 +672,18 @@ class PyMolInterface(BaseInterface):
         return np.mean(np.array([df.x.to_numpy(), df.y.to_numpy(), df.z.to_numpy()]),axis=1)
 
     def fetch(self, code: str, out_dir: str = None) -> str:
-        """Given a 
+        """Given a PDB entry or residue name code, get the respective structure file. The outfile will be 
+        in a .cif format.
 
         Args:
-            code:
-            out_dir
+            code: The three or four letter code to be fetched as a str.
+            out_dir: The output directory for the file. Optional. Saves to current directory if not supplied.
 
         Returns:
-            The path to the
+            The path to the saved file.
+    
+        Raises:
+            ValueError if the supplied code is not a valid length.
         """
         outfile = f"{code.upper()}.cif"
         if len(code) == 3:
@@ -687,15 +691,15 @@ class PyMolInterface(BaseInterface):
         elif len(code) == 4:
             url: str = f"{self.config_.STRUCTURE_STEM}/{outfile}"
         else:
-            assert False
+            err_msg=f"The code {code} is invalid. Must have length of 3 or 4"
+            _LOGGER.error(err_msg)
+            raise ValueError(err_msg)
 
         self.env_manager_.run_command(self.config_.WGET, [url])
 
         if out_dir is not None:
             outfile = fs.safe_mv(outfile, f"{out_dir}/")
-        #TODO(CJ): check if the file is downloaded
         return outfile
-
 
     
 

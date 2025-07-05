@@ -3,6 +3,7 @@
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2024-06-10
 """
+from typing import List, Tuple
 from pathlib import Path
 from collections import defaultdict
 
@@ -18,7 +19,16 @@ from enzy_htp import config, interface
 from enzy_htp.structure import Ligand
 
 
-def enumerate_torsions(mol):
+def enumerate_torsions(mol:"rdkit.Chem.Mol") -> List[Tupe[int,int,int,int]]:
+    """Given an rdkit Mol(), identifies all torsion angles, and returns corresponding indicies. Each item 
+    in the resulting List are the 0-index indicies for each angle.
+
+    Args:
+        mol: An rdkit.Chem.Mol to analyze.
+
+    Returns:
+        A List[Tuple[int,int,int,int]] containing 0-indexed indices for each dihedral angle.
+    """
     ri = mol.GetRingInfo()
 
     ring_mapper = defaultdict(list)
@@ -59,6 +69,17 @@ def enumerate_torsions(mol):
     return torsionList
 
 def mimic_torsions(t_ligand:Ligand, r_ligand:Ligand) -> None:
+    """Apply torsion angles from a template Ligand to a result Ligand. Torsion angles are mapped based on 
+    atom names.
+
+    Args:
+        t_ligand: The template Ligand from which torsion angles are derived.
+        r_ligand: The result Ligand to which torsion angles are applied.
+
+    Returns:
+        Nothing.
+
+    """
     
     template = interface.rdkit.mol_from_ligand(t_ligand, removeHs=False, cleanupSubstructures=False)
     ligand  = interface.rdkit.mol_from_ligand(r_ligand, removeHs=False, cleanupSubstructures=False)
@@ -76,9 +97,7 @@ def mimic_torsions(t_ligand:Ligand, r_ligand:Ligand) -> None:
                 template_to_ligand[aidx] = lidx
                 break
         else:
-            #TODO(CJ): put an error code here
             pass
-            #assert False, target_name
 
 
     for (a1,a2,a3,a4) in torsions:
@@ -90,12 +109,21 @@ def mimic_torsions(t_ligand:Ligand, r_ligand:Ligand) -> None:
         )
 
     amapper = list(zip(template_to_ligand.values(), template_to_ligand.keys()))
-    AlignMol( ligand, template, atomMap=amapper ) #TODO(CJ): put into the rdkit interface
-
+    AlignMol( ligand, template, atomMap=amapper )
     interface.rdkit.update_ligand_positions(r_ligand, ligand)
 
 
-def ligand_mcs_score( l1, l2 ) -> float:
+def ligand_mcs_score( l1:Ligand, l2:Ligand ) -> float:
+    """Given two ligands, find the maximum common substructure (MCS) score. A score of 1 indicates 
+    a perfect match and 0 indicates no overlap.
+
+    Args:
+        l1: The first Ligand.
+        l2: The second Ligand.
+
+    Returns:
+        The score as a float ranging from 0 to 1.
+    """
     
     if l1 is None or l2 is None:
         return 0.0
@@ -115,6 +143,17 @@ def ligand_mcs_score( l1, l2 ) -> float:
 
 
 def mimic_torsions_mcs(t_ligand:Ligand, r_ligand:Ligand) -> None:
+    """Apply torsion angles from a template Ligand to a result Ligand. Torsion angles are mapped based on 
+    substructure similarity.
+
+    Args:
+        t_ligand: The template Ligand from which torsion angles are derived.
+        r_ligand: The result Ligand to which torsion angles are applied.
+
+    Returns:
+        Nothing.
+
+    """
     
     mcs = interface.rdkit.find_mcs( t_ligand, r_ligand )
 
@@ -147,7 +186,7 @@ def mimic_torsions_mcs(t_ligand:Ligand, r_ligand:Ligand) -> None:
         )
 
     amapper = list(zip(template_to_ligand.values(), template_to_ligand.keys()))
-    AlignMol( ligand, template, atomMap=amapper ) #TODO(CJ): put into the rdkit interface
+    AlignMol( ligand, template, atomMap=amapper ) 
     
 
     interface.rdkit.update_ligand_positions(r_ligand, ligand)

@@ -519,6 +519,7 @@ class RosettaScriptsProtocol:
 
         return fname
 
+#TODO(CJ): the documentation
 @dataclass
 class RosettaScriptsEgg(ModelingResultEgg):
     score_file:str
@@ -1521,19 +1522,19 @@ class RosettaInterface(BaseInterface):
         work_dir:str=None        
     ) -> List[float]:
         """Provides the total score in Rosetta Energy Units (REU) for a given structure. Uses default flags but can have behavior modified
-        via supplied extra_flags. Returns the total score in REU.
+        via supplied extra_flags. Returns total scores in REU.
 
         Arguments:
-            structure:
-            opts:
-            residue_selectors:
-            score_fxn:
-            work_dir:
+            structure: The Structure or StructureEnsemble to score.
+            opts: A RosettaOptions object that dictates the commandline options. Optional.
+            protocol: A RosettaScriptsProtocol that defines the protocol to use for scoring. Optional.
+            score_fxn: The specific scorefxn that should be applied. Optional, uses Ref2015 by default.
+            prefix: File prefix for the temporary files that are created. Optional.
+            work_dir: Where the input and output files will be saved.
 
         Returns:
-            Score of structure in file in REU.
-
-        """ #TODO(CJ): update this
+            A List[float] with scores for the Structure()'s in the supplied Structure/StructureEnsemble.
+        """
         if prefix is None:
             prefix = "rosetta_score"
 
