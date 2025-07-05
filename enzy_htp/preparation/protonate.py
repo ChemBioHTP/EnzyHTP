@@ -171,9 +171,25 @@ def pdb2pqr_protonate_pdb(pdb_path: str, pqr_path: str, ph: float = 7.0, ffout: 
     Runs PDB2PQR on a specified pdb file and saves it to the specified pqr path. This preparation step
     makes use of [PDB2PQR](https://www.poissonboltzmann.org/) via the pdb2pqr python [package](https://pdb2pqr.readthedocs.io/en/latest/).
     Adds in missing atoms and finds the protonation state of the pdb file.
+
+    Args:
+        pdb_path: File to the input, pre-protonation Structure.
+        pqr_path: File to the output, protonated Structure.
+        ph: The pH to perform the protonation at. Optional. Default is 7.0
+        ffout: The force field naming convention to use. Optional. Default is AMBER.
+
+    Returns:
+        Nothing.
+
+    Raises:
+        ValueError if the supplied ffout is not supported.
     """
-    # TODO(CJ): check if ffout is valid.
-    # TODO(CJ): maybe improve the documentation here?
+    ALLOWED_FF="AMBER,CHARMM,PARSE,TYL06,PEOEPB,SWANSON".split(',')
+    if ffout not in ALLOWED_FF:
+        err_str=f"The force field {ffout} is not supported"
+        _LOGGER.error(err_str)
+        raise TypeError(err_str)
+
     core.check_valid_ph(ph)
     pdb2pqr_parser = build_pdb2pqr_parser()
     args = pdb2pqr_parser.parse_args([

@@ -1,4 +1,6 @@
-"""
+"""Defines an RDKitInterface class that serves as an interface for utilizing the RDKit python library.
+This class facilitates operations such as molecule loading, saving, conformer generation, and molecular volume calculations.
+
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-10-09
 """
@@ -24,9 +26,17 @@ from enzy_htp.structure import (
     Ligand,
     Mol2Parser
 )
-#TODO(CJ): documentation
+
 class RDKitInterface(BaseInterface):
-    pass
+
+    """Class that provides an interface for RDKit operations. It manages the loading and saving
+    of molecular structures, generating conformers, checking RDKit installation, and performing various
+    molecular calculations.
+
+    Attributes:
+        config_: Configuration settings for RDKit.
+        chem_: The RDKit Chemistry module, loaded dynamically.
+    """
 
     def __init__(self, parent, config: RDKitConfig = None) -> None:
         """Simplicstic constructor that requires the parent interface as an argument and optionally takes an RDKitConfig instance.
@@ -38,8 +48,8 @@ class RDKitInterface(BaseInterface):
             self.chem_ = importlib.import_module('rdkit.Chem')
         except:
             pass
-
-        from rdkit import RDLogger #TODO(CJ): update this
+        
+        from rdkit import RDLogger
         RDLogger.DisableLog('rdApp.*')
 
     @property
@@ -62,7 +72,11 @@ class RDKitInterface(BaseInterface):
             exit(1)
 
     def check_rdkit_installed(self) -> None:
-        """ """
+        """Checks if RDKit is installed in the environment.
+
+        Raises:
+            SystemExit: Exits if RDKit is not installed.
+        """
         if "rdkit" in self.missing_py_modules():
             _LOGGER.error("rdkit is NOT installed. Use 'conda install -c conda-forge -y -q rdkit'")
             exit(1)
@@ -73,10 +87,21 @@ class RDKitInterface(BaseInterface):
                        removeHs: bool = False,
                        cleanupSubstructures: bool = False,
                        proximityBonding: bool = False,
-                       strictParsing: bool = False) :
-        """ """
-        #TODO(CJ): add in checks that the file exists
-        #TODO(CJ): get the list of molecules out if needed
+                       strictParsing: bool = False) -> "rdkit.Chem.Mol":
+        """Loads an RDKit.Molecule from a file, applying specified options. Checks if supplied file type is supported.
+        Will raise a TypeError if the supplied file is not supported. 
+
+        Args:
+            molfile: The path to the molecular file.
+            sanitize: Should the molecule be sanitized? Default is False.
+            removeHs: Should rdkit remove the molecules hydrogens? Default is False.
+            cleanupSubstructures: Should molecule substructures be cleaned?
+            proximityBonding: Should rdkit use proximity bonding? Default is False.
+            strictParsing: Should rdkit's strict parsing rules be applied? Default is False.
+
+        Returns:
+            The loaded molecule.
+        """
         fs.check_file_exists(molfile)
         self._supported_ftype(molfile)
 
@@ -96,8 +121,22 @@ class RDKitInterface(BaseInterface):
             for rr in reader:
                 return rr
 
+        err_str=f"The file extension {ext} is not supported!"
+        _LOGGER.error(err_str)
+        raise TypeError(err_str)
+
+
     def _save_molecule(self, mol, outfile: str, kekulize: bool = True) -> str:
-        """ """
+        """Saves a molecule to a specified file. Can optionally kekulize molecule.
+
+        Args:
+            mol: The molecule to save.
+            outfile: The path to save the molecule.
+            kekulize: Should delocalized bonds be kekulized? Default is True. 
+
+        Returns:
+            The path to the saved file.
+        """
         self._supported_ftype(outfile)
 
         ext: str = Path(outfile).suffix
@@ -125,6 +164,17 @@ class RDKitInterface(BaseInterface):
                 removeHs:bool=True,
                 cleanupSubstructures:bool=True,
                 work_dir:str=None ) -> "rdkit.Chem.Mol":
+        """Adapter function that translates a Ligand object to an RDKit molecule
+
+        Args:
+            ligand: The Ligand object to convert.
+            removeHs: Should rdkit remove the molecules hydrogens? Default is False.
+            cleanupSubstructures: Should molecule substructures be cleaned?
+            work_dir: The directory for temporary files.
+
+        Returns:
+            The corresponding RDKit molecule.
+        """
         if not work_dir:
             work_dir = self.parent.config()['system.SCRATCH_DIR']
    
@@ -143,7 +193,15 @@ class RDKitInterface(BaseInterface):
         return result
 
     def find_mcs(self, ligand1:Ligand, ligand2:Ligand):
+        """Finds the maximum common substructure between two ligands using rdkit's fdMCS module..
 
+        Args:
+            ligand1: The first Ligand object.
+            ligand2: The second Ligand object.
+
+        Returns:
+            The maximum common substructure result.
+        """
 
         mol1 = self.mol_from_ligand( ligand1 )
         mol2 = self.mol_from_ligand( ligand2 )
@@ -160,9 +218,16 @@ class RDKitInterface(BaseInterface):
 
 
     def kekulize(self, molfile: str, outfile: str) -> str:
-        """ """
+        """Kekulizes a molecule and saves it to a specified file.
+
+        Args:
+            molfile: The input molecular file.
+            outfile: The output file path.
+
+        Returns:
+            The path to the saved kekulized file.
+        """
         mol = self._load_molecule(molfile)
-        #TODO(CJ): need to add some stuff for phosphates/carboxylic acids
         self._save_molecule(mol, outfile)
         return outfile
 
@@ -173,22 +238,34 @@ class RDKitInterface(BaseInterface):
         return _rchem.rdMolDescriptors.CalcNumRotatableBonds(mol)
 
     def volume(self, molfile: str, gridSpacing: float = 0.2, boxMargin: float = 2.0) -> float:
-        """Calculates the volume of the molecule in the supplied file. All calculations done in Angstroms.
+        """Calculates the volume of the molecule in the supplied file.
 
         Args:
-            molfile:
-            gridSpacing:
-            boxMargin:
+            molfile: The path to the molecular file.
+            gridSpacing: Spacing between grid points in Angstroms. Optional. Default value is 0.2.
+            boxMargin: The margin around the box used in calculations. Optional. Default value is 2.0.
 
         Returns:
             The volume in Angstroms^3.
-            
         """
         self.check_rdkit_installed()
         mol: _rdkit.Chem = self._load_molecule(molfile)
         return _rchem_ac.ComputeMolVolume(mol, gridSpacing=gridSpacing, boxMargin=boxMargin)
 
-    def update_ligand_positions(self, ligand:Ligand, mol, cidx:int=-1) -> None:
+    def update_ligand_positions(self, ligand:Ligand, mol:"rdkit.Chem.Mol", cidx:int=-1) -> None:
+        """Update the atoms of a Ligand with the current values in an rdkit Mol().
+
+        Args:
+            ligand: The Ligand() object whose coordinates will be updated.
+            mol: The rdkit.Chem.Mol to get atomic positions from.
+            cidx: The conformer to use from the rdkit.Chem.Mol. Optional. Default is -1. 
+
+        Returns:
+            Nothing.
+
+        Raises:
+            AssertionError if the Ligand() and Mol() do not have the same number of atoms.
+        """
         
         assert len(ligand.atoms) == len(mol.GetAtoms())
        
@@ -203,6 +280,9 @@ class RDKitInterface(BaseInterface):
             rms_cutoff:float,
             attempts:int,
             rng:int=1996 ) -> List[Ligand]:
+        """
+        """
+
 
         module = None
         try:
