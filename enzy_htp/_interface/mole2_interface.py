@@ -58,7 +58,7 @@ class Mole2Cavity:
 
     
     def points(self) -> List[npt.NDArray]:
-        """TODO(CJ)"""
+        """Getter for the vertices describing the cavity."""
         return self.points_
 
     def volume(self) -> float:
@@ -88,8 +88,14 @@ class Mole2Cavity:
         return bool(result['SelectedPoints'][0])
 
     def contains_points(self, points: List[npt.NDArray]) -> bool:
-        """TODO(CJ): make this a dispatch and this will be the list version"""
+        """Are the supplied points inside of this cavity? True if at least one point is inside the cavity.
 
+        Args:
+            points: The List of points to check.
+
+        Returns:
+            Whether at least one point is inside the cavity.
+        """
         points = pv.PolyData(points)
         result = points.select_enclosed_points(
             self.mesh_,
@@ -254,7 +260,7 @@ class Mole2Interface(BaseInterface):
             probe: Probe radius to use in A. Defaults to Mole2Config.PROBE if not supplied.
             inner: Inner radius to use in A. Defaults to Mole2Config.INNER if not supplied.
             mesh_density: Mesh density to use in A. Defaults to Mole2Config.MESH_DENSITY if not supplied.
-            ignore_hetatm: TODO(CJ)
+            ignore_hetatm: Should Mole2 ignore HETATM lines? Defaults to Mole2Config.IGNORE_HETATM if not supplied.
             work_dir: Directory to do work in. Defaults to system.SCATCH_DIR if not supplied.
             use_mono: Does mono need to be used during run time? Defaults to true.
 
