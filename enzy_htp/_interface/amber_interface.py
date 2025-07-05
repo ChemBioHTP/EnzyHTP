@@ -955,7 +955,18 @@ class AmberMDStep(MolDynStep):
             # 1. stdout stderr
             # error types: Fall of bus, periodic box has changed too much, illegel mem
             if isinstance(stdstream_source, ClusterJob):
-                with open(stdstream_source.job_cluster_log) as f:
+                # more debug info
+                joblog = stdstream_source.job_cluster_log
+                if not joblog: # in case the job is merged
+                    merged_job = stdstream_source.mimo.get("merged_job", None)
+                    if merged_job:
+                        joblog = merged_job.job_cluster_log
+                        if not Path(joblog).exists():
+                            _LOGGER.error(f"Found merged job ({stdstream_source}) for md step ({self.name}), but no job_cluster_log found.)")
+                    else:
+                        _LOGGER.error(f"The job (never merged, {stdstream_source}) for md step ({self.name}) does not have job_cluster_log.)")
+
+                with open(joblog) as f:
                     stderr_stdout = f.read()
                     error_info_list.append(f"stdout/stderr(from job log):{os.linesep*2}{stderr_stdout}")
             elif isinstance(stdstream_source, CompletedProcess):
