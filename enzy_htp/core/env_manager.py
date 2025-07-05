@@ -166,8 +166,9 @@ class EnvironmentManager:
                 are some unrepeatable error thus allow taking next retry earlier.)
                 (Unit: s)
             quiet_fail:
-                #TODO(CJ)
-            log_level: the logging level that non-error/warning loggings in this function goes to.
+                Quiet failing mode allows system commands to have a non-zero return code without escalating the error.
+            log_level: 
+                the logging level that non-error/warning loggings in this function goes to.
 
         Returns:
             return the CompletedProcess object
