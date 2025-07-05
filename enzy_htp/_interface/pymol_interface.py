@@ -67,19 +67,20 @@ class PyMolInterface(BaseInterface):
         """Method that converts a supplied file to a different format. Requires a pymol2 session from PyMolInterface.new_session().
         Either a new filename or new file  extension an be supplied. If neither or both are supplied, then the function will exist. 
         Note that the function does not check for valid file types and will catch any errors that are thrown if an invalid file_1 or
-        output file combination is supplied. Returns the new outfile.
+        output file combination is supplied. Returns the new outfile or List of outfiles if multiple states are present and the split_states
+        option is set to True.
 
         Args:
             session : A pymol2.PyMOL() session to use
             file_1 : The name of the original file as a str().
             file_2 : The name of the output file as a str(). Optional.
             new_ext : The new extension to use. Optional.
+            split_states: Should individual states be split and written to separate files? Optional, default is False.
 
         Returns:
-            The name of the new file as a str().
+            The name of the new file as a str() or a List[str] if multiple states are present and split_states is True.
         """
         self.check_pymol2_installed()
-        #TODO(CJ): update split states. update return policy
 
         fs.check_file_exists(file_1)
 
@@ -140,7 +141,6 @@ class PyMolInterface(BaseInterface):
         Returns:
             Whether the file type is supported.
         """
-        #TODO(CJ): need to check which file formats are actually supported
         extension: str = Path(fname).suffix
         return extension in self.config().IO_EXTENSIONS
 
@@ -586,74 +586,6 @@ class PyMolInterface(BaseInterface):
                         f"chain {row2.chain} and resi {row2.resi} and resn {row2.resn}",
                     ))
         self.general_cmd(session, args)
-
-
-    def create_cluster(self, session, fname: str, sele_str: str, outfile: str = None, cap_strategy: str = 'H', work_dir: str = None) -> str:
-        """TODO(CJ)"""
-
-        if work_dir is None:
-            work_dir = eh_config['system.WORK_DIR']
-
-        fs.check_file_exists(fname)
-
-        if outfile is None:
-            temp_path = Path(fname)
-            outfile: str = f"{work_dir}/{temp_path.stem}_cluster{temp_path.suffix}"
-
-        #TODO(CJ): add file check for fname
-        obj_name: str = '__eh_cluster'
-        self.general_cmd(session, [('delete', 'all'), ('load', fname), ('select', sele_str), ('create', obj_name, sele_str),
-                                   ('delete', Path(fname).stem)])
-
-        self._remove_ligand_bonding(session)
-
-        df: pd.DataFrame = self.collect(session, 'memory', "chain resi resn name".split())
-
-        args = list()
-        for i, row in df.iterrows():
-            if row['name'] not in "N C".split():
-                continue
-
-            if not row.resn in chem.THREE_LETTER_AA_MAPPER:
-                continue
-
-            args.extend([('valence', 'guess', f"chain {row.chain} and resi {row.resi} and resn {row.resn} and name {row['name']}"),
-                         ('h_add', f"chain {row.chain} and resi {row.resi} and resn {row.resn} and name {row['name']}")])
-
-        args.append(("save", outfile, obj_name))
-
-        self.general_cmd(session, args)
-
-        if cap_strategy == 'H':
-            return outfile
-
-        if cap_strategy == 'CH3':
-
-            args = []
-            orig = set(zip(df.chain, df.resi, df.resn, df['name']))
-            updated: pd.DataFrame = self.collect(session, 'memory', "chain resi resn name".split())
-            new = set(zip(updated.chain, updated.resi, updated.resn, updated['name']))
-
-            for (cname, res_num, res_name, aname) in filter(lambda x: x not in orig, new):
-                if aname == 'H01':
-                    new_name = 'C21'
-                elif aname == 'H02':
-                    new_name = 'C22'
-                else:
-                    #TODO(CJ): better error message
-                    self.general_cmd(session, [('save', '_____mess_up.pdb')])
-                    assert False, (cname, res_num, res_name, aname)
-                args.extend([
-                    ('alter', f"chain {cname} and resi {res_num} and resn {res_name} and name {aname}", "elem='C'"),
-                    ('alter', f"chain {cname} and resi {res_num} and resn {res_name} and name {aname}", f"name='{new_name}'"),
-                ])
-
-            self.general_cmd(session, args)
-            args = [('valence', 'guess', 'name C21 or name C22'), ('h_add', 'name C21'), ('h_add', 'name C22'), ("save", outfile, obj_name)]
-            self.general_cmd(session, args)
-
-        return outfile
-
 
     def center_of_mass(self, session, sele:str='all', no_hydrogens:bool=True):
         """TODO(CJ)

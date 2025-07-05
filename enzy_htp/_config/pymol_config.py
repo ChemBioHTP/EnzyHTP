@@ -71,6 +71,8 @@ class PyMolConfig(BaseConfig):
 
     LIGAND_STEM: str = "https://files.rcsb.org/ligands/download/"
     """ """
+    #TODO(CJ): update all of this
+    IO_EXTENSIONS=".pdb .mol2 .cif".split()
 
     def display(self) -> None:
         """TODO"""
