@@ -2190,10 +2190,9 @@ class AmberInterface(BaseInterface):
         file_redirection_dict = {}
         group_info_list = []
 
-        # imin, ntx, irest, ntc, ntf
+        # imin, ntx, irest
         imin = int(md_config_dict["minimize"])
         ntx, irest = self.MD_RESTART_MAPPER[md_config_dict["restart"]]
-        ntc, ntf = self.MD_TIMESTEP_SHAKE_MAPPER[md_config_dict["timestep"]]
         # ifqnt
         ifqnt = int(md_config_dict["use_qmmm"])
 
@@ -2205,6 +2204,7 @@ class AmberInterface(BaseInterface):
         if imin == 0: # MD
             # nstlim
             timestep = md_config_dict["timestep"]
+            ntc, ntf = self.MD_TIMESTEP_SHAKE_MAPPER[md_config_dict["timestep"]]
             dt = timestep * 1000
             raw_nstlim = md_config_dict["length"] / timestep
             nstlim = mh.round_by(raw_nstlim, 0.5)
@@ -2280,6 +2280,9 @@ class AmberInterface(BaseInterface):
                 }
 
         else: # minimization
+            # SHAKE(ntc, ntf) NOTE using SHAKE significantly hinders minimization 
+            ntc = 1
+            ntf = 1
             # maxcyc, ncyc
             maxcyc = md_config_dict["length"]
             ncyc = max(mh.round_by(maxcyc * self.config()["HARDCODE_NCYC_RATIO"], 0.5), 1)
