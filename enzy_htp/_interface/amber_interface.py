@@ -998,11 +998,13 @@ class AmberMDStep(MolDynStep):
                                 "We sugggest to change the name and make them unique if you care about their result.")
             # try merge
             mergable = (
+                job.cluster,
                 job.mimo["env_settings"],
                 job.mimo["res_keywords"],
                 job.mimo["sub_dir"],                
             )
             exposed_mergable = (
+                merged_job.cluster,
                 merged_job.mimo["env_settings"],
                 merged_job.mimo["res_keywords"],
                 merged_job.mimo["sub_dir"],                
@@ -1015,6 +1017,7 @@ class AmberMDStep(MolDynStep):
                 md_names = merged_job.mimo["md_names"] + job.mimo["md_names"]
                 work_dir = merged_job.mimo["work_dir"]
                 merged_mdin = merged_job.mimo["temp_mdin"] + job.mimo["temp_mdin"]
+                merged_contain_jobs = merged_job.mimo.get("contain_jobs", list()) + [job]
                 sub_script_path = fs.get_valid_temp_name(f"{work_dir}/submit_{'_'.join(md_names)}.cmd")
                 # update merged job
                 merged_job = ClusterJob.config_job(
@@ -1033,11 +1036,20 @@ class AmberMDStep(MolDynStep):
                     "md_names" : md_names,
                     "work_dir" : work_dir,
                     "temp_mdin" : merged_mdin,
+                    "contain_jobs" : merged_contain_jobs, # temp k,v
                 }
                 result.append(merged_job) # add the job back
             else:
                 result.append(merged_job)
                 result.append(job) # add unmergable
+
+        # add the merged_job in the mimo or the original job. Because the ResultEgg can only find the original job.
+        for job in result:
+            contain_jobs = job.mimo.get("contain_jobs", None)
+            if contain_jobs:
+                for subjob in contain_jobs:
+                    subjob.mimo["merged_job"] = job
+                del job.mimo["contain_jobs"]
 
         return result
 
