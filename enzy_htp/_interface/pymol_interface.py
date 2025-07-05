@@ -588,11 +588,12 @@ class PyMolInterface(BaseInterface):
         self.general_cmd(session, args)
 
     def center_of_mass(self, session, sele:str='all', no_hydrogens:bool=True):
-        """TODO(CJ)
+        """Calculates the center of mass of a given selection in a given session.
+        
         Args:
-            session:
-            sele:
-            no_hydrogens:
+            session: A pymol2 Session to use.
+            sele: The selection over which the center of mass should be calculated.
+            no_hydrogens: Should hydrogens be skipped in the calculation? Optional, True by default.
 
         Returns:
             The specified center of mass.
@@ -632,62 +633,6 @@ class PyMolInterface(BaseInterface):
         if out_dir is not None:
             outfile = fs.safe_mv(outfile, f"{out_dir}/")
         return outfile
-
-    
-
-    def get_residue_list(self, session, stru, sele_str:str='all', work_dir:str=None) -> List[Tuple[str,int]]:
-        #TODO(CJ): add this documentation + type hinting
-        if work_dir is None:
-            work_dir = './'
-
-        temp_file:str = f"{work_dir}/__temp_pymol.pdb"
-
-        _parser = PDBParser()
-        _parser.save_structure(temp_file, stru)
-
-        df = self.collect(session, temp_file, "chain resi".split(), sele=sele_str)
-        
-        fs.safe_rm( temp_file )
-        result = list()
-        result_set = set()
-
-        for i, row in df.iterrows():
-            new = (row['chain'], int(row['resi']))
-            if new not in result_set:
-                result.append( new )
-                result_set.add( new )
-
-        return result 
-
-    
-    def get_atom_mask(self, session, stru:Structure, sele_str:str=None, work_dir:str=None) -> List[bool]:
-        #TODO(CJ): this stuff
-
-        
-        if work_dir is None:
-            work_dir = './'
-
-        temp_file:str = f"{work_dir}/__temp_pymol.pdb"
-        _parser = PDBParser()
-        _parser.save_structure(temp_file, stru)
-
-        session = self.new_session()
-
-        df:pd.DataFrame = self.collect(session, temp_file, "chain resi name".split(), sele=sele_str)
-        
-        fs.safe_rm( temp_file )
-
-        sele_set = set()
-
-        for i, row in df.iterrows():
-            sele_set.add(f"{row['chain']}.{row['resi']}.{row['name']}")
-
-        mask:List[bool] = list()
-
-        for atom in stru.atoms:
-            mask.append( atom.key in sele_set )            
-
-        return mask
 
     def get_sasa_relative(self, session, sele) -> Dict:
         """wrapper of pms.cmd.get_sasa_relative"""
