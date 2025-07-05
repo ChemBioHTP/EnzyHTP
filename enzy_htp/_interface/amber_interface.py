@@ -1009,13 +1009,11 @@ class AmberMDStep(MolDynStep):
                                 "We sugggest to change the name and make them unique if you care about their result.")
             # try merge
             mergable = (
-                job.cluster,
                 job.mimo["env_settings"],
                 job.mimo["res_keywords"],
                 job.mimo["sub_dir"],                
             )
             exposed_mergable = (
-                merged_job.cluster,
                 merged_job.mimo["env_settings"],
                 merged_job.mimo["res_keywords"],
                 merged_job.mimo["sub_dir"],                
