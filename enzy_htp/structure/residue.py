@@ -164,8 +164,8 @@ class Residue(DoubleLinkedNode):
             raise ResidueDontHaveAtom(self, name, f"residue {self} dont have {name}")
         return result[0]
 
-    def get(self, keyname) -> Atom:
-        #TODO(CJ): add error handling and documentation
+    def get(self, keyname:str) -> Union[Atom,None]:
+        """Given an atom name as a str, return the corresponding Atom. Returns None if no matching atom exists."""
         if self.has_atom_name( keyname ):
             return self.find_atom_name( keyname )
         return None

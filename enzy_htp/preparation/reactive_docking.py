@@ -211,7 +211,7 @@ def mm_minimization(structure:Structure,
         interface.rosetta.write_constraint_file( structure, constraints, work_dir=opts['out:path:all'])
     )
     
-    _LOGGER.info("Beginning Minimization step geometry sampling step...") #TODO(CJ):
+    _LOGGER.info("Beginning Minimization step geometry sampling step...") 
     interface.rosetta.run_rosetta_scripts(
         structure,
         protocol,
@@ -317,7 +317,7 @@ def dock_ligand(structure:Structure,
         'FastRelax', name="frelax", scorefxn="hard_rep", cst_file="%%cst_file%%", repeats="%%fr_repeats%%", children=[
             ('MoveMap', {'name':"full_enzyme", 'bb':"false", 'chi':"false", 'jump':"false", 'children':[
                 ('ResidueSelector', {'selector':'asite_protein', 'bb':'false', 'chi':'true', }),
-                ] + jumps + frozen_res_sels } #TODO(CJ): make bb flexibility an option
+                ] + jumps + frozen_res_sels } 
             )]
     ).add_simple_metric(
         'PerResidueClashMetric', name='clash', residue_selector='ligand', residue_selector2='asite'
@@ -342,8 +342,8 @@ def dock_ligand(structure:Structure,
             "ScoreFunction", name="qm_region", children=[
                 ('Reweight', {'scoretype':"orca_qm_energy", 'weight':"1.0" }),
                 ('Set', {'orca_path':config['rosetta.ORCA_DIR'] }),
-                ('Set', {'orca_processes':"1" }), #TODO(CJ): tunable
-                ('Set', {'orca_memory_megabytes':"3000" }), #TODO(CJ): tunable
+                ('Set', {'orca_processes':"1" }), 
+                ('Set', {'orca_memory_megabytes':"3000" }), 
                 ('Set', {'rosetta_orca_bridge_temp_directory':"xtb_temp" }),
                 ('Set', {'orca_electron_correlation_treatment':"XTB" }),
                 ('Set', {'orca_default_xtb_level': "XTB2"}),
@@ -382,7 +382,7 @@ def dock_ligand(structure:Structure,
 
     # this is where the local parallel thing goes
     if local_parallel:
-        pdb_files = local_parallel_rs( structure, protocol, opts, 'nstruct', local_processes, 'DOCK', './scratch' ) #TODO(CJ): parameterize
+        pdb_files = local_parallel_rs( structure, protocol, opts, 'nstruct', local_processes, 'DOCK', './scratch' ) 
     else:
         if chunk_size >= opts['nstruct']:
             pdb_files=list()
@@ -391,7 +391,7 @@ def dock_ligand(structure:Structure,
             ).iterrows():
                 pdb_files.append(f"./scratch/{row.description}.pdb")            
         else:
-            pdb_files = parallel_rs( structure, protocol, opts, job_config, 'nstruct', chunk_size, 'DOCK', './scratch' ) #TODO(CJ): parameterize
+            pdb_files = parallel_rs( structure, protocol, opts, job_config, 'nstruct', chunk_size, 'DOCK', './scratch' ) 
 
     assert pdb_files
 
@@ -409,7 +409,7 @@ def dock_ligand(structure:Structure,
         stru.data['rosetta_score'] = variables['rosetta_score']
         structures.append( stru )
     
-    clusters:List[StructureCluster] = cluster_structures( structures, 'polymer.protein', f"resn {ligand.name}", 1.0 ) #TODO(CJ): update params
+    clusters:List[StructureCluster] = cluster_structures( structures, 'polymer.protein', f"resn {ligand.name}", 1.0 ) 
     
     ref_stru = sorted(
         clusters,
@@ -442,6 +442,8 @@ def get_active_site_sele(structure: Structure,
                 sele_str:str,
                 fmt:str='pymol', 
                 ) -> str:
+    """
+    """
     #TODO(CJ): make this work with constraints
     _LOGGER.info("Analyzing enzyme active site...")
     session = interface.pymol.new_session()
