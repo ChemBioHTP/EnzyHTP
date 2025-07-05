@@ -5,6 +5,7 @@ Science API:
     + md_simulation()
     + equi_md_sampling()
     + deployable_equi_md_sampling()
+    + conformer_sampling()
 
 Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2023-7-30
@@ -596,7 +597,19 @@ def conformer_sampling(
     method:str='rdkit',
     rng:int=1996,
     ) -> LigandEnsemble:
-    #TODO(CJ): add documentation here
+    """Creates a LigandEnsemble for a given Ligand. Primiarily used for docking studies, namely RosettaLigand.
+
+    Args:
+        ligand: The Ligand object which will serve as the basis for the LigandEnsemble.
+        n_conformers: How many conformers should be made?
+        rms_cutoff: What should the RMS cutoff be for creating conformers? Optional, default is 0.1 A.
+        attempts: How many attempts should be allowed? Optional, default is 1000.
+        method: What engine should be used? Optional, default is rdkit.
+        rng: What random number generation seed should be used? Optional, default is 1996.
+
+    Returns:
+        The new LigandEnsemble object.
+    """
     le = LigandEnsemble( ligand )
     if method == 'rdkit':
         conformers:List[Ligand] = interface.rdkit.generate_conformers(
