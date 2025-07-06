@@ -5,12 +5,8 @@ Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-10-09
 """
 
-#TODO(CJ): maybe wrap this in a try,except loop
 import importlib
 from copy import deepcopy
-#import rdkit
-#from rdkit import Chem as _rchem
-#import rdkit.Chem.AllChem as _rchem_ac
 from typing import List
 from pathlib import Path
 
@@ -126,7 +122,7 @@ class RDKitInterface(BaseInterface):
         raise TypeError(err_str)
 
 
-    def _save_molecule(self, mol, outfile: str, kekulize: bool = True) -> str:
+    def _save_molecule(self, mol:"rdkit.Chem.Mol", outfile: str, kekulize: bool = True) -> str:
         """Saves a molecule to a specified file. Can optionally kekulize molecule.
 
         Args:
@@ -280,7 +276,18 @@ class RDKitInterface(BaseInterface):
             rms_cutoff:float,
             attempts:int,
             rng:int=1996 ) -> List[Ligand]:
-        """
+        """Creates a specified number of conformers for a given Ligand.
+        
+        Args:
+            ligand: The base Ligand to start with.
+            n_conformers: How many conformers should we create?
+            rms_cutoff: What should the RMS cutoff be? 
+            attempts: How many attempts should take place?
+            rng: The random number generator seed. Optional, 1996 by default.
+
+        Returns:
+            The conformer library as a List[Ligand].
+        
         """
 
 
@@ -312,6 +319,20 @@ class RDKitInterface(BaseInterface):
     def apply_coords(self,
                 template:Ligand,
                 ligand:Ligand) -> None:
+        """Apply the coordinates from a template Ligand to a target Ligand. Uses Atom naming to inform 
+        mapping. A minimization is applied to move the non-common Ligand regions. An error can be thrown 
+        if the SMILES string of the final Ligand is not the same as the start structure.
+
+        Args:
+            template: The template Ligand, serving as a coordinate donor.
+            ligand: The target Ligand, serving as a coordinate recipient.
+
+        Returns:
+            Nothing.
+        
+        Raises:
+            AssertionError if the final SMILES is not the same as the start.
+        """
         from rdkit.Chem import AllChem
         template_to_ligand = dict()
         atom_names = list()
@@ -343,7 +364,6 @@ class RDKitInterface(BaseInterface):
         ff.Minimize()
         from rdkit.Chem import rdMolTransforms as rdmt
 
-        #ff = AllChem.UFFGetMoleculeForceField(lmol)
         for idx in range(lmol.GetNumAtoms()):
             atom = lmol.GetAtomWithIdx(idx)
             if atom.GetAtomicNum() != 1:
@@ -365,4 +385,3 @@ class RDKitInterface(BaseInterface):
         self.update_ligand_positions(ligand, lmol)
         end_smiles=AllChem.MolToSmiles(lmol, canonical=True)
         assert orig_smiles == end_smiles, f"{orig_smiles}\n{end_smiles}"
-        #assert False
