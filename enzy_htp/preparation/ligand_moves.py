@@ -19,7 +19,7 @@ from enzy_htp import config, interface
 from enzy_htp.structure import Ligand
 
 
-def enumerate_torsions(mol:"rdkit.Chem.Mol") -> List[Tupe[int,int,int,int]]:
+def enumerate_torsions(mol:"rdkit.Chem.Mol") -> List[Tuple[int,int,int,int]]:
     """Given an rdkit Mol(), identifies all torsion angles, and returns corresponding indicies. Each item 
     in the resulting List are the 0-index indicies for each angle.
 

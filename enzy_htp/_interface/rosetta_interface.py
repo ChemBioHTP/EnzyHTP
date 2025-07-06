@@ -381,7 +381,7 @@ class RosettaScriptsProtocol:
 
         return self
 
-   def add_element(self, section: str, element: RosettaScriptsElement) -> None:
+    def add_element(self, section: str, element: RosettaScriptsElement) -> None:
         """Adds a RosettaScriptsElement to the specified section of the protocol.
 
         Args:
@@ -602,7 +602,7 @@ class RosettaScriptsProtocol:
         """
         return self.add_element("SCORINGGRIDS", scoring_grid)
 
-   def add_element(self, section: str, element: RosettaScriptsElement) -> None:
+    def add_element(self, section: str, element: RosettaScriptsElement) -> None:
         """Adds a RosettaScriptsElement to the specified section of the protocol.
 
         Args:
