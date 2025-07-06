@@ -437,7 +437,7 @@ class XTBInterface(BaseInterface):
             
                 args.extend(["--input", xtb_inp_file])
 
-            args.extend(["--opt", "normal"]) #TODO(CJ): make this parameter tunable
+            args.extend(["--opt", "normal"]) 
 
             result['expected_outfile'] = str( coord_path.parent / f"xtbopt{coord_path.suffix}" )
 

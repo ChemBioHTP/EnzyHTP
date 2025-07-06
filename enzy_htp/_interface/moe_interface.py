@@ -14,8 +14,6 @@ from enzy_htp.core import env_manager as em
 
 from enzy_htp._config.moe_config import MOEConfig, default_moe_config
 
-#TODO(CJ): need to add tests for this section
-
 from .base_interface import BaseInterface
 
 

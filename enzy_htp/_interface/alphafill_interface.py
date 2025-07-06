@@ -102,8 +102,7 @@ class AlphaFillInterface(BaseInterface):
         session = self.parent.pymol.new_session()
         self.parent.pymol.load_enzy_htp_stru(session,  stru)
         self.parent.pymol.general_cmd(session, [
-            ('save', structure_start, 'polymer.protein and (not resn SAH)'), #TODO(CJ): make this a config 
-            ('delete', 'all')
+            ('save', structure_start, 'polymer.protein'),             ('delete', 'all')
         ])
     
         lines:List[str]=fs.lines_from_file(structure_start)

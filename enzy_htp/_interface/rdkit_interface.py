@@ -348,9 +348,7 @@ class RDKitInterface(BaseInterface):
                     template_to_ligand[aidx] = lidx
                     break
             else:
-                #TODO(CJ): put an error code here
                 pass
-                #assert False, target_name
         
         lconf = lmol.GetConformer()
         tconf = tmol.GetConformer()
