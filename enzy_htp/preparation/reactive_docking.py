@@ -244,7 +244,25 @@ def dock_ligand(structure:Structure,
                     local_processes:int=10,
                     rosetta_freeze:str=None
                     ) -> None:
-    """TODO(CJ)"""
+    """Driver function for creating the constrained, docked poses as the first step of EnzyRCD. Resulting docked
+    structure is stored in place in the supplied structure.
+
+    Args:
+        structure: The Structure to perform docking on.
+        ligand: The Ligand that is being docked.
+        constraints: Constraints to be applied during the docking run.
+        opts: The RosettaOpt class driving behavior at command-line.
+        use_qm: Should RosettaQM be used during the docking?
+        qm_sele: The Rosetta-formatted sele describing the QM region.
+        job_config: Configuration to be used if Armer is in use. Optional.
+        chunk_size: The size of each individual docking run if parallelization is employed.
+        local_parallel: Should the local parallel method be used? False by default.
+        local_processes: How many processes should be utilized if local parallel is True? Default is 10.
+        rosetta_freeze: The structure reagion that should be frozen during docking and minimization.
+    
+    Returns:
+        Nothing.
+    """
 
     if chunk_size is None:
         chunk_size = 20
@@ -442,9 +460,17 @@ def get_active_site_sele(structure: Structure,
                 sele_str:str,
                 fmt:str='pymol', 
                 ) -> str:
+    """Apply a pymol-formatted selection to determine the active site or QM-region of the Structure.
+    Returns the selection as either a pymol or Rosetta-formatted str.
+    
+    Args:
+        structure: The Structure where the active site will be selected.
+        sele_str: The pymol-formatted selection as a str.
+        fmt: The format of the output. Optional, default is pymol.
+
+    Returns:
+        The formatted residue selection str.
     """
-    """
-    #TODO(CJ): make this work with constraints
     _LOGGER.info("Analyzing enzyme active site...")
     session = interface.pymol.new_session()
     interface.pymol.load_enzy_htp_stru(session, structure)

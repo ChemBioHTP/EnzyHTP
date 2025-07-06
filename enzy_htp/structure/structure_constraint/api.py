@@ -151,7 +151,7 @@ class StructureConstraint(ABC):
         )
    
     def update_target_to_current(self) -> None:
-        #TODO(CJ):
+        """Force the constraint to make the current value the new target."""
         self.target_value=self.current_geometry()
 
     @property
@@ -280,9 +280,6 @@ class StructureConstraint(ABC):
         """
         self.params_[key] = value 
     # endregion
-
-    #TODO(CJ): add function that checks if topology and constraints are compatible
-    #TODO(CJ): will need to make a version of this that actually works for the ResiduePairConstraint
     
     def is_constraining(self, residue: Residue) -> bool:
         """Is this StructureConstraint trying to enforce a constraint on the supplied Residue()?"""

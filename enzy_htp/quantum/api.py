@@ -244,26 +244,28 @@ def optimize(stru: Union[Structure, StructureEnsemble],
         work_dir: str="./QM_OPT",
         keep_in_file: bool=False,
         ) -> List[ElectronicStructure]:
-    """TODO(CJ)
-stru: Union[Structure, StructureEnsemble],
-        engine: str, # always acknowledge the engine
-        # single region case option
-        method: QMLevelOfTheory = None, # single region has to be QM
-        # multi region case option
-        regions: List[str]= None,
-        region_methods: List[LevelOfTheory]= None,
-        constraints:List[StructureConstraint] = None,
-        capping_method: str = "res_ter_cap",
-        embedding_method: str= "mechanical", # TODO probably not a good default choice
-        parallel_method: str="cluster_job",
-        nterm_cap:str=None,
-        cterm_cap:str=None,
-        cluster_job_config: Dict= None,
-        job_check_period: int= 210, # s
-        job_array_size: int= 20,
-        work_dir: str="./QM_OPT",
-        keep_in_file: bool=False,
-
+    """Perform a QM-based optimization on a Structure or StructureEnsemble. Optimization can be performed in many ways, with the QM package, level
+    of theory, region, and so on. Can be run with ARMer.
+        
+        stru: The Structure or StructureEnsemnle to optimize.
+        engine: Specific QM engine to use.
+        method: If a single region, the QM method to use.
+        regions: Different regions to apply different levels of theory to.
+        region_methods: If multiple regions are employed, respective differing levels of theory.
+        constraints: List[StructureContraint] to be applied during optimization.
+        capping_method: How should the boundary portions of regions be corvered?
+        embedding_method: What embedding method should be used? 
+        parallel_method: How the optimization(s) will be parallelized.
+        nterm_cap: The atom cap to be applied on the n-terminal side of boundary residues.
+        cterm_cap: The atom cap to be applied on the n-terminal side of boundary residues.
+        cluster_job_config: Configuration for ARMer jobs when that method is employed.
+        job_check_period: How often should ARMer check if jobs are done? Time in seconds.
+        job_array_size: Size of job arrays when ARMer is in use.
+        work_dir: Directory where the temporary files and calculation should be performed.
+        keep_in_file: Should the output be kept in file?
+    
+    Returns:
+        A List[ElectronicStructure] objects containing the results of the QM optimizations.
 
     """
     if isinstance(stru, Structure):
@@ -324,7 +326,6 @@ stru: Union[Structure, StructureEnsemble],
                                             work_dir=work_dir,
                                             keep_in_file=keep_in_file,
                                         )
-                                        #TODO(CJ): these keywords that are part of the ctor should be in the ABC __init__ class
 
     else:
         # multiscale
