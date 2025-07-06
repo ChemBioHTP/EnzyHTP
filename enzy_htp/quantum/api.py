@@ -244,7 +244,28 @@ def optimize(stru: Union[Structure, StructureEnsemble],
         work_dir: str="./QM_OPT",
         keep_in_file: bool=False,
         ) -> List[ElectronicStructure]:
-    """TODO(CJ): this documentation needs to be udpated"""
+    """TODO(CJ)
+stru: Union[Structure, StructureEnsemble],
+        engine: str, # always acknowledge the engine
+        # single region case option
+        method: QMLevelOfTheory = None, # single region has to be QM
+        # multi region case option
+        regions: List[str]= None,
+        region_methods: List[LevelOfTheory]= None,
+        constraints:List[StructureConstraint] = None,
+        capping_method: str = "res_ter_cap",
+        embedding_method: str= "mechanical", # TODO probably not a good default choice
+        parallel_method: str="cluster_job",
+        nterm_cap:str=None,
+        cterm_cap:str=None,
+        cluster_job_config: Dict= None,
+        job_check_period: int= 210, # s
+        job_array_size: int= 20,
+        work_dir: str="./QM_OPT",
+        keep_in_file: bool=False,
+
+
+    """
     if isinstance(stru, Structure):
         stru_esm = StructureEnsemble.from_single_stru(stru)
     elif isinstance(stru, StructureEnsemble):
