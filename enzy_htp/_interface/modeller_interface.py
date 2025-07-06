@@ -187,7 +187,10 @@ class ModellerInterface(BaseInterface):
         ]
 
         fs.write_lines(align_file, lines)
-        #TODO(CJ): probably need to check for loops that are too long
+        missing_ct=current_seq.count('-')
+        if missing_ct >= 12:
+            _LOGGER.warning(f"There are {missing_ct} missing residues to be modelled! Larger loops (12+) can cause problems. Review results carefully.")
+            
         Environ = self.modeller.Environ
         LoopModel = self.modeller_automodel.LoopModel
         refine = self.modeller_automodel.refine

@@ -381,98 +381,498 @@ class RosettaScriptsProtocol:
 
         return self
 
+   def add_element(self, section: str, element: RosettaScriptsElement) -> None:
+        """Adds a RosettaScriptsElement to the specified section of the protocol.
+
+        Args:
+            section (str): The section to which the RosettaScriptsElement should be added.
+            element (RosettaScriptsElement): The element to be added.
+
+        Raises:
+            TypeError: If the provided section name is not allowed, an error will be logged and an exception is raised.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol after the element has been added.
+        """
+        if section not in self.section_names:
+            err_str = f"The supplied section name '{section}' is not allowed. Supported section names are {', '.join(self.section_names)}"
+            _LOGGER.error(err_str)
+            raise TypeError(err_str)
+
+        self.sections[section].append(element)
+        return self
+
     @dispatch
     def add_scorefunction(self, scorefxn: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a scoring function element to the 'SCOREFXNS' section.
+
+        Args:
+            scorefxn (RosettaScriptsElement): The RosettaScriptsElement representing the scoring function.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added scoring function.
+        """
         return self.add_element("SCOREFXNS", scorefxn)
-    
+
     @dispatch
-    def add_scorefunction(self, sf_name:str, **kwargs) -> RosettaScriptsProtocol:
-        return self.add_element("SCOREFXNS", 
+    def add_scorefunction(self, sf_name: str, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a scoring function using a name and additional parameters.
+
+        Args:
+            sf_name (str): The name of the scoring function.
+            **kwargs: Additional parameters to configure the scoring function.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added scoring function.
+        """
+        return self.add_element("SCOREFXNS",
             RosettaScriptsElement(sf_name, **kwargs)
         )
 
     @dispatch
     def add_residue_selector(self, res_selector: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a residue selector element to the 'RESIDUE_SELECTORS' section.
+
+        Args:
+            res_selector (RosettaScriptsElement): The RosettaScriptsElement representing the residue selector.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added residue selector.
+        """
         return self.add_element("RESIDUE_SELECTORS", res_selector)
 
     @dispatch
-    def add_residue_selector(self, rs_type:str, **kwargs) -> RosettaScriptsProtocol:
+    def add_residue_selector(self, rs_type: str, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a residue selector using a type name and additional parameters.
+
+        Args:
+            rs_type (str): The type of residue selector.
+            **kwargs: Additional parameters to configure the residue selector.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added residue selector.
+        """
         return self.add_residue_selector(
             RosettaScriptsElement(rs_type, **kwargs)
         )
-    
+
     @dispatch
     def add_mover(self, mover: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a mover element to the 'MOVERS' section.
+
+        Args:
+            mover (RosettaScriptsElement): The RosettaScriptsElement representing the mover.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added mover.
+        """
         return self.add_element("MOVERS", mover)
 
     @dispatch
-    def add_mover(self, m_name:str, **kwargs) -> RosettaScriptsProtocol:
-        return self.add_element("MOVERS", 
+    def add_mover(self, m_name: str, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a mover using a name and additional parameters.
+
+        Args:
+            m_name (str): The name of the mover.
+            **kwargs: Additional parameters to configure the mover.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added mover.
+        """
+        return self.add_element("MOVERS",
             RosettaScriptsElement(m_name, **kwargs)
         )
 
     @dispatch
     def add_filter(self, r_filter: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a filter element to the 'FILTERS' section.
+
+        Args:
+            r_filter (RosettaScriptsElement): The RosettaScriptsElement representing the filter.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added filter.
+        """
         return self.add_element("FILTERS", r_filter)
 
     @dispatch
     def add_filter(self, rf_name: str, **kwargs) -> RosettaScriptsProtocol:
-        return self.add_element("FILTERS", 
-            RosettaScriptsElement( rf_name, **kwargs )
+        """Creates and adds a filter using a name and additional parameters.
+
+        Args:
+            rf_name (str): The name of the filter.
+            **kwargs: Additional parameters to configure the filter.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added filter.
+        """
+        return self.add_element("FILTERS",
+            RosettaScriptsElement(rf_name, **kwargs)
         )
-    
+
     @dispatch
     def add_simple_metric(self, simple_metric: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a simple metric element to the 'SIMPLE_METRICS' section.
+
+        Args:
+            simple_metric (RosettaScriptsElement): The RosettaScriptsElement representing the simple metric.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added simple metric.
+        """
         return self.add_element("SIMPLE_METRICS", simple_metric)
 
     @dispatch
-    def add_simple_metric(self, sm_name:str, **kwargs) -> RosettaScriptsProtocol:
-        return self.add_element("SIMPLE_METRICS", 
-            RosettaScriptsElement( sm_name,  **kwargs )
+    def add_simple_metric(self, sm_name: str, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a simple metric using a name and additional parameters.
+
+        Args:
+            sm_name (str): The name of the simple metric.
+            **kwargs: Additional parameters to configure the simple metric.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added simple metric.
+        """
+        return self.add_element("SIMPLE_METRICS",
+            RosettaScriptsElement(sm_name, **kwargs)
         )
 
     @dispatch
     def add_protocol(self, protocol: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a protocol element to the 'PROTOCOLS' section.
+
+        Args:
+            protocol (RosettaScriptsElement): The RosettaScriptsElement representing the protocol.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added protocol.
+        """
         return self.add_element("PROTOCOLS", protocol)
 
     @dispatch
     def add_protocol(self, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a protocol using default parameters.
+
+        Args:
+            **kwargs: Additional parameters to configure the protocol.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added protocol.
+        """
         return self.add_protocol(
             RosettaScriptsElement('Add', **kwargs)
         )
 
     @dispatch
     def add_constraint_generator(self, cst_gen: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a constraint generator element to the 'CONSTRAINT_GENERATORS' section.
+
+        Args:
+            cst_gen (RosettaScriptsElement): The RosettaScriptsElement representing the constraint generator.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added constraint generator.
+        """
         return self.add_element('CONSTRAINT_GENERATORS', cst_gen)
 
     @dispatch
-    def add_constraint_generator(self, cg_name:str, **kwargs) -> RosettaScriptsProtocol:
-        return self.add_element('CONSTRAINT_GENERATORS', 
+    def add_constraint_generator(self, cg_name: str, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a constraint generator using a name and additional parameters.
+
+        Args:
+            cg_name (str): The name of the constraint generator.
+            **kwargs: Additional parameters to configure the constraint generator.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added constraint generator.
+        """
+        return self.add_element('CONSTRAINT_GENERATORS',
             RosettaScriptsElement(cg_name, **kwargs)
         )
 
     @dispatch
     def add_scoring_grid(self, scoring_grid: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a scoring grid element to the 'SCORINGGRIDS' section.
 
+        Args:
+            scoring_grid (RosettaScriptsElement): The RosettaScriptsElement representing the scoring grid.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added scoring grid.
+        """
+        return self.add_element("SCORINGGRIDS", scoring_grid)
+
+   def add_element(self, section: str, element: RosettaScriptsElement) -> None:
+        """Adds a RosettaScriptsElement to the specified section of the protocol.
+
+        Args:
+            section (str): The section to which the RosettaScriptsElement should be added.
+            element (RosettaScriptsElement): The element to be added.
+
+        Raises:
+            TypeError: If the provided section name is not allowed, an error will be logged and an exception is raised.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol after the element has been added.
+        """
+        if section not in self.section_names:
+            err_str = f"The supplied section name '{section}' is not allowed. Supported section names are {', '.join(self.section_names)}"
+            _LOGGER.error(err_str)
+            raise TypeError(err_str)
+
+        self.sections[section].append(element)
+        return self
+
+    @dispatch
+    def add_scorefunction(self, scorefxn: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a scoring function element to the 'SCOREFXNS' section.
+
+        Args:
+            scorefxn (RosettaScriptsElement): The RosettaScriptsElement representing the scoring function.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added scoring function.
+        """
+        return self.add_element("SCOREFXNS", scorefxn)
+
+    @dispatch
+    def add_scorefunction(self, sf_name: str, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a scoring function using a name and additional parameters.
+
+        Args:
+            sf_name (str): The name of the scoring function.
+            **kwargs: Additional parameters to configure the scoring function.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added scoring function.
+        """
+        return self.add_element("SCOREFXNS",
+            RosettaScriptsElement(sf_name, **kwargs)
+        )
+
+    @dispatch
+    def add_residue_selector(self, res_selector: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a residue selector element to the 'RESIDUE_SELECTORS' section.
+
+        Args:
+            res_selector (RosettaScriptsElement): The RosettaScriptsElement representing the residue selector.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added residue selector.
+        """
+        return self.add_element("RESIDUE_SELECTORS", res_selector)
+
+    @dispatch
+    def add_residue_selector(self, rs_type: str, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a residue selector using a type name and additional parameters.
+
+        Args:
+            rs_type (str): The type of residue selector.
+            **kwargs: Additional parameters to configure the residue selector.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added residue selector.
+        """
+        return self.add_residue_selector(
+            RosettaScriptsElement(rs_type, **kwargs)
+        )
+
+    @dispatch
+    def add_mover(self, mover: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a mover element to the 'MOVERS' section.
+
+        Args:
+            mover (RosettaScriptsElement): The RosettaScriptsElement representing the mover.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added mover.
+        """
+        return self.add_element("MOVERS", mover)
+
+    @dispatch
+    def add_mover(self, m_name: str, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a mover using a name and additional parameters.
+
+        Args:
+            m_name (str): The name of the mover.
+            **kwargs: Additional parameters to configure the mover.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added mover.
+        """
+        return self.add_element("MOVERS",
+            RosettaScriptsElement(m_name, **kwargs)
+        )
+
+    @dispatch
+    def add_filter(self, r_filter: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a filter element to the 'FILTERS' section.
+
+        Args:
+            r_filter (RosettaScriptsElement): The RosettaScriptsElement representing the filter.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added filter.
+        """
+        return self.add_element("FILTERS", r_filter)
+
+    @dispatch
+    def add_filter(self, rf_name: str, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a filter using a name and additional parameters.
+
+        Args:
+            rf_name (str): The name of the filter.
+            **kwargs: Additional parameters to configure the filter.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added filter.
+        """
+        return self.add_element("FILTERS",
+            RosettaScriptsElement(rf_name, **kwargs)
+        )
+
+    @dispatch
+    def add_simple_metric(self, simple_metric: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a simple metric element to the 'SIMPLE_METRICS' section.
+
+        Args:
+            simple_metric (RosettaScriptsElement): The RosettaScriptsElement representing the simple metric.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added simple metric.
+        """
+        return self.add_element("SIMPLE_METRICS", simple_metric)
+
+    @dispatch
+    def add_simple_metric(self, sm_name: str, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a simple metric using a name and additional parameters.
+
+        Args:
+            sm_name (str): The name of the simple metric.
+            **kwargs: Additional parameters to configure the simple metric.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added simple metric.
+        """
+        return self.add_element("SIMPLE_METRICS",
+            RosettaScriptsElement(sm_name, **kwargs)
+        )
+
+    @dispatch
+    def add_protocol(self, protocol: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a protocol element to the 'PROTOCOLS' section.
+
+        Args:
+            protocol (RosettaScriptsElement): The RosettaScriptsElement representing the protocol.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added protocol.
+        """
+        return self.add_element("PROTOCOLS", protocol)
+
+    @dispatch
+    def add_protocol(self, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a protocol using default parameters.
+
+        Args:
+            **kwargs: Additional parameters to configure the protocol.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added protocol.
+        """
+        return self.add_protocol(
+            RosettaScriptsElement('Add', **kwargs)
+        )
+
+    @dispatch
+    def add_constraint_generator(self, cst_gen: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a constraint generator element to the 'CONSTRAINT_GENERATORS' section.
+
+        Args:
+            cst_gen (RosettaScriptsElement): The RosettaScriptsElement representing the constraint generator.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added constraint generator.
+        """
+        return self.add_element('CONSTRAINT_GENERATORS', cst_gen)
+
+    @dispatch
+    def add_constraint_generator(self, cg_name: str, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a constraint generator using a name and additional parameters.
+
+        Args:
+            cg_name (str): The name of the constraint generator.
+            **kwargs: Additional parameters to configure the constraint generator.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added constraint generator.
+        """
+        return self.add_element('CONSTRAINT_GENERATORS',
+            RosettaScriptsElement(cg_name, **kwargs)
+        )
+
+    @dispatch
+    def add_scoring_grid(self, scoring_grid: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a scoring grid element to the 'SCORINGGRIDS' section.
+
+        Args:
+            scoring_grid (RosettaScriptsElement): The RosettaScriptsElement representing the scoring grid.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added scoring grid.
+        """
         return self.add_element("SCORINGGRIDS", scoring_grid)
 
     @dispatch
-    def add_scoring_grid(self, **kwargs ) -> RosettaScriptsProtocol:
-        return self.add_element("SCORINGGRIDS", 
+    def add_scoring_grid(self, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a scoring grid element to the 'SCORINGGRIDS' section using specified parameters.
+
+        This method is designed to handle the creation of a scoring grid element with the provided keyword arguments,
+        which will be passed to the RosettaScriptsElement constructor. The name of the scoring grid is set as an
+        empty string by default.
+
+        Args:
+            **kwargs: Additional parameters to configure the scoring grid element.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added scoring grid element.
+        """
+        return self.add_element("SCORINGGRIDS",
             RosettaScriptsElement('', **kwargs)
         )
 
     @dispatch
     def add_task_operations(self, task_op: RosettaScriptsElement) -> RosettaScriptsProtocol:
+        """Adds a task operations element to the 'TASKOPERATIONS' section.
 
-        return self.add_element("TASKOPERATIONS", task_opt)
+        This method allows for the addition of a pre-existing RosettaScriptsElement representing task operations
+        directly to the TASKOPERATIONS section of the protocol.
+
+        Args:
+            task_op (RosettaScriptsElement): The RosettaScriptsElement representing the task operations to be added.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added task operations element.
+        """
+        return self.add_element("TASKOPERATIONS", task_op)
 
     @dispatch
-    def add_task_operations(self, to_name:str, **kwargs ) -> RosettaScriptsProtocol:
-        return self.add_element("TASKOPERATIONS", 
+    def add_task_operations(self, to_name: str, **kwargs) -> RosettaScriptsProtocol:
+        """Creates and adds a task operations element to the 'TASKOPERATIONS' section using the specified name and parameters.
+
+        This method allows for the creation of a new RosettaScriptsElement for task operations using a provided name
+        and additional keyword arguments for configuration.
+
+        Args:
+            to_name (str): The name of the task operation.
+            **kwargs: Additional parameters to configure the task operation element.
+
+        Returns:
+            RosettaScriptsProtocol: The current instance of the protocol with the added task operations element.
+        """
+        return self.add_element("TASKOPERATIONS",
             RosettaScriptsElement(to_name, **kwargs)
         )
-
 
     def to_file(self, fname:str) -> str:
         """Convert the current instance of the RosettaScriptsProtocol into an XML script that can be fed 
@@ -519,16 +919,47 @@ class RosettaScriptsProtocol:
 
         return fname
 
-#TODO(CJ): the documentation
 @dataclass
 class RosettaScriptsEgg(ModelingResultEgg):
-    score_file:str
-    pdb_files:List[str]
+    """A data class representing the results of a RosettaScripts job.
+
+    This class encapsulates essential output information for a RosettaScripts run, including the score file
+    and associated PDB files.
+
+    Attributes:
+        score_file (str): The path to the score file generated by the RosettaScripts job.
+        pdb_files (List[str]): A list of paths to PDB files produced as part of the modeling results.
+        parent_job (ClusterJob): The cluster job associated with the RosettaScripts execution.
+    """
+    score_file: str
+    pdb_files: List[str]
     parent_job: ClusterJob
 
-class RosettaScriptsEngine(ModelingEngine):
 
-    def __init__(self, interface, protocol: RosettaScriptsProtocol, opts:RosettaOptions, cluster_job_config:Dict, work_dir:str):
+class RosettaScriptsEngine(ModelingEngine):
+    """Engine class for executing RosettaScripts protocols.
+
+    This class is responsible for managing the preparation and execution of RosettaScripts workflow,
+    defining input setup, job submission, and result parsing.
+
+    Attributes:
+        _parent_interface: The interface through which the engine communicates with external components.
+        _work_dir (str): The directory where input/output files for the job are stored.
+        _protocol (RosettaScriptsProtocol): The protocol defining how RosettaScripts should be executed.
+        _opts (RosettaOptions): Options to configure the Rosetta job.
+        _cluster_job_config (Dict): Configuration parameters for cluster job submission.
+    """
+
+    def __init__(self, interface, protocol: RosettaScriptsProtocol, opts: RosettaOptions, cluster_job_config: Dict, work_dir: str):
+        """Initializes a RosettaScriptsEngine instance.
+
+        Args:
+            interface: The interface for communication with external modules.
+            protocol (RosettaScriptsProtocol): The protocol to be executed.
+            opts (RosettaOptions): Options specific to the Rosetta execution.
+            cluster_job_config (Dict): Configuration settings for the cluster job.
+            work_dir (str): Path to the working directory for storing job files.
+        """
         self._parent_interface = interface
         self._work_dir = work_dir
         self._protocol = protocol
@@ -537,130 +968,189 @@ class RosettaScriptsEngine(ModelingEngine):
 
     @property
     def parent_interface(self):
+        """Gets the parent interface for communication with external components.
+
+        Returns:
+            The parent interface.
+        """
         return self._parent_interface
 
     @property
     def work_dir(self) -> str:
+        """Gets the working directory for storing input/output files.
+
+        Returns:
+            str: Path to the working directory.
+        """
         return self._work_dir
 
     @property
     def protocol(self) -> RosettaScriptsProtocol:
+        """Gets the protocol associated with the engine.
+
+        Returns:
+            RosettaScriptsProtocol: The executing protocol.
+        """
         return self._protocol
 
     @property
     def opts(self) -> RosettaOptions:
+        """Gets the options for the Rosetta job execution.
+
+        Returns:
+            RosettaOptions: The options set for the job.
+        """
         return self._opts
 
     @property
     def cluster_job_config(self):
+        """Gets the configuration for cluster job submission.
+
+        Returns:
+            Dict: Configuration settings for cluster jobs.
+        """
         return self._cluster_job_config
 
     def engine(self) -> str:
+        """Identifies the engine being used.
+
+        Returns:
+            str: The name of the engine, which is 'rosetta' in this context.
+        """
         return "rosetta"
-        pass
 
     @property
     def name(self) -> str:
+        """Gets the name of the engine.
+
+        Returns:
+            str: The name of the engine, specifically 'rosetta_scripts'.
+        """
         return "rosetta_scripts"
 
     def make_input_files(self, stru: Structure):
+        """Prepares input files for the given structure.
+
+        Args:
+            stru (Structure): The structure for which input files need to be created.
+
+        Raises:
+            NotImplementedError: This method needs to be implemented in a subclass.
+        """
         pass
 
-    def make_job(self, stru:Structure) -> Tuple[ClusterJob, RosettaScriptsEgg]:
+    def make_job(self, stru: Structure) -> Tuple[ClusterJob, RosettaScriptsEgg]:
+        """Creates a job for the specified structure.
+
+        Args:
+            stru (Structure): The structure to be processed by the job.
+
+        Returns:
+            Tuple[ClusterJob, RosettaScriptsEgg]: A tuple containing the created cluster job and the result egg.
+
+        Raises:
+            TypeError: If the provided structure is not an instance of Structure.
+        """
         if not isinstance(stru, Structure):
             _LOGGER.error("only allow Structure as `stru`")
             raise TypeError
 
-        # 2. make .gjf file
+        # Create necessary working directory and handle file creation
         fs.safe_mkdir(self.work_dir)
-        #temp_gjf_file, gchk_path = self._make_gjf_file(stru)
         pdb_start = Path(f"{self.work_dir}/start.pdb")
         sp = PDBParser()
         sp.save_structure(str(pdb_start), stru)
+
         nstruct = 1
         if self.opts.has('nstruct'):
             nstruct = self.opts['nstruct']
 
-        prefix:str=""
+        prefix: str = ""
         if self.opts.has('out:prefix'):
             prefix = self.opts['out:prefix']
 
-        prot_file = self.protocol.to_file( f"{self.work_dir}/protocol.xml" )
+        # Serialize protocol to file
+        prot_file = self.protocol.to_file(f"{self.work_dir}/protocol.xml")
         self.opts['in:file:s'] = pdb_start.name
         self.opts['parser:protocol'] = str(Path(prot_file).absolute())
 
+        opt_file = self.opts.to_file(f"{self.work_dir}/rosetta_opts.txt")
+        logfile = str((Path(self.work_dir) / 'log.txt').absolute())
 
-        opt_file = self.opts.to_file( f"{self.work_dir}/rosetta_opts.txt" )
-        logfile = str( (Path(self.work_dir) / 'log.txt').absolute())
-
+        # Generate command string for job execution
         cmd_str = f"cd {Path(self.work_dir).absolute()} && {self.parent_interface.config_.ROSETTA_SCRIPTS} @{Path(opt_file).name} > {Path(logfile).name}"
 
-        # 4. assemble ClusterJob
+        # Assemble cluster job
         cluster = self.cluster_job_config["cluster"]
-        #print(cluster)
-        #exit( 0 )
         res_keywords = self.cluster_job_config["res_keywords"]
-        #env_settings = cluster.G16_ENV["CPU"]
+
+        # Environment settings for job execution
         env_settings = [
-            #'export ROSETTA3=/dors/meilerlab/apps/rosetta/rosetta-3.13/main/',
             'export ROSETTA3=/panfs/accrepfs.vampire/data/yang_lab/jurichc/main',
-            #'export LD_LIBRARY_PATH=$ROSETTA/source/build/external/release/linux//2.6/64/x86/gcc/5.2/default/:$LD_LIBRARY_PATH',
             'export LD_LIBRARY_PATH=/panfs/accrepfs.vampire/data/yang_lab/jurichc/main/source/cmake/build_release//:$LD_LIBRARY_PATH',
             'module load GCC/8',
             'module load OpenMPI/3.1.4',
             'export ORCA_HOME=$DATA/orca_6_0_0_shared_openmpi416/orca',
             'export LD_LIBRARY_PATH=$ORCA_HOME:$LD_LIBRARY_PATH',
-
         ]
+
         sub_script_path = fs.get_valid_temp_name(f"{self.work_dir}/submit_{self.name}.cmd")
         job = ClusterJob.config_job(
-            commands = cmd_str,
-            cluster = cluster,
-            env_settings = env_settings,
-            res_keywords = res_keywords,
-            sub_dir = "./", # because path are relative
-            sub_script_path = sub_script_path
+            commands=cmd_str,
+            cluster=cluster,
+            env_settings=env_settings,
+            res_keywords=res_keywords,
+            sub_dir="./",  # Relative path for subdirectory
+            sub_script_path=sub_script_path
         )
-        job.mimo = { # only used for translate clean up
-            #"temp_gin": [temp_gjf_file],
-        }
+        job.mimo = {}  # Placeholder for future use
 
-        # 5. make result egg
-        pdb_files = [f"{self.work_dir}/{prefix}start_{idx+1:04d}.pdb" for idx in range(nstruct)]
+        # Construct result egg containing score file and pdb files
+        pdb_files = [f"{self.work_dir}/{prefix}start_{idx + 1:04d}.pdb" for idx in range(nstruct)]
         result_egg = RosettaScriptsEgg(
             score_file=f"{self.work_dir}/{prefix}score.sc",
             pdb_files=pdb_files,
-            #gchk_path = gchk_path,
-            #stru=stru,
-            parent_job = job,
+            parent_job=job,
         )
 
         return (job, result_egg)
 
-    def run(self, stru:Structure) -> List[Structure]:
+    def run(self, stru: Structure) -> List[Structure]:
+        """Executes the RosettaScripts job for the provided structure.
 
+        Args:
+            stru (Structure): The structure to process.
+
+        Returns:
+            List[Structure]: A list of resulting structures obtained from the job execution.
+        """
         _parser = PDBParser()
-        score_file:str = self.parent_interface.run_rscripts(stru, self.protocol, self.opts, self.work_dir)
+        score_file: str = self.parent_interface.run_rscripts(stru, self.protocol, self.opts, self.work_dir)
 
         results = self.parent_interface.parse_score_file(score_file)
         structures = list()
 
         for i, row in results.iterrows():
             row_dict = row.to_dict()
-
             pdb_file = f"{self.work_dir}/{row_dict.pop('description')}.pdb"
             stru = _parser.get_structure(pdb_file)
 
             for rk, rv in row_dict.items():
                 stru.data[rk] = rv
 
-            structures.append( stru )
+            structures.append(stru)
 
         return structures
 
-
-
     def translate(self, egg: RosettaScriptsEgg):
+        """Translates the results stored in the RosettaScriptsEgg.
+
+        Args:
+            egg (RosettaScriptsEgg): The egg containing results to be translated.
+        
+        Raises:
+            NotImplementedError: This method needs to be implemented in a subclass.
+        """
         pass
 
 

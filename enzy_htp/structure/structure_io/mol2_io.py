@@ -121,7 +121,8 @@ class Mol2Parser(StructureParserInterface):
         for aidx,atom in enumerate(ligand.atoms):
             chrg = atom.charge
             if chrg is None:
-                chrg = 0.0 #TODO(CJ): put a warning here
+                _LOGGER.warning(f"Atom has no charge! Setting to 0.0")
+                chrg = 0.0 
             content.append(f"{aidx+1}\t{atom.name: >4}\t{atom.coord[0]:.3f}\t{atom.coord[1]:.3f}\t{atom.coord[2]:.3f}\t{atom._atom_type}\t{1}\t{ligand.name}{ligand.idx}\t{chrg:.3f}")
 
         content.append("@<TRIPOS>BOND")
