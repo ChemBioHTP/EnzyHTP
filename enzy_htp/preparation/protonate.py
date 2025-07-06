@@ -10,7 +10,6 @@ Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2022-04-05
 """
-# TODO(CJ): add more documentation
 from pathlib import Path
 from typing import Union, Tuple, Dict
 from biopandas.pdb import PandasPdb
