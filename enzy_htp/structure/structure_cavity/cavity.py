@@ -99,5 +99,21 @@ class Cavity():
         )
         return bool(result['SelectedPoints'][0])
     
+    def contains_array(self, points: List[npt.NDArray]) -> List[bool]:
+        """Check which pointss from an array of pointss are in a cavity(turn off surface checking).
+
+        Args:
+            points (List[npt.NDArray]): The points in question as a List[numpy array's] with each point having the format (x, y, z).
+
+        Returns:
+            A boolean array of whether or not each respective point is in the cavity.
+        """
+        points_poly = pv.PolyData(points)
+        result = points_poly.select_enclosed_points(
+            self.mesh,
+            check_surface=False
+        )
+        return result['SelectedPoints']
+    
     def __eq__(self, other: Cavity) -> bool:
         return self.stru == other.stru and set(self.__boundary_residues) == set(other.__boundary_residues) and set(self.__inner_residues) == set(other.__inner_residues)
