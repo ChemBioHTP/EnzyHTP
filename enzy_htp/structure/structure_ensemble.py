@@ -7,13 +7,16 @@ Author: Qianzhen (QZ) Shao <shaoqz@icloud.com>
 Date: 2023-10-28
 """
 from __future__ import annotations
+import os
 from typing import List, Generator, Callable, Tuple
 from copy import deepcopy
+import weakref
 
 from .structure import Structure
 from .structure_io import StructureParserInterface
 from . import structure_operation as stru_oper
 from enzy_htp.core.general import get_itself
+from enzy_htp.core.file_system import clean_temp_file_n_dir
 from enzy_htp.core.logger import _LOGGER
 
 # amber_interface = interface.amber

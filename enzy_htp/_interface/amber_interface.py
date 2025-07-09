@@ -1199,7 +1199,7 @@ class AmberInterface(BaseInterface):
             raise ValueError
 
     def convert_top_to_prmtop(self, fpath: str, out_path: str) -> None:
-        """convert the given topology file to the Amber .prmtop file in the out_path"""
+        """convert the given topology file to the Amber .prmtop file in the out_path""" #NOTE(qz) use mdtraj or pytraj to really do this.
         in_format = self.get_file_format(fpath)
 
         if in_format == "prmtop":
@@ -1210,7 +1210,7 @@ class AmberInterface(BaseInterface):
 
     def convert_stru_to_inpcrd(self, stru: Structure, out_path: str) -> None:
         """convert the given Structure() to the Amber .inpcrd file in the out_path
-        NOTE this could refactor to the inpcrd parser but MVP here."""
+        NOTE this could refactor to the inpcrd parser but MVP here.""" #NOTE(qz) use mdtraj or pytraj to really do this.
         # save a temp PDB
         fs.safe_mkdir(eh_config["system.SCRATCH_DIR"])
         temp_pdb_path = fs.get_valid_temp_name(f"{eh_config['system.SCRATCH_DIR']}/stru_to_inpcrd.pdb")
@@ -3405,7 +3405,8 @@ class AmberInterface(BaseInterface):
         return result
 
     def load_traj(self, prmtop_path: str, traj_path: str, ref_pdb: str = None) -> StructureEnsemble:
-        """load StructureEnsemble from Amber prmtop and nc/mdcrd files"""
+        """load StructureEnsemble from Amber prmtop and nc/mdcrd files
+        TODO(qz) make this a context manager so that the temp files are remove"""
         coord_parser_mapper = {
             ".nc" : AmberNCParser(prmtop_file=prmtop_path),
             ".mdcrd" : AmberMDCRDParser(prmtop_file=prmtop_path),
