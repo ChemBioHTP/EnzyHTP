@@ -29,3 +29,4 @@ from .rmsf import(
 from .covariance import coord_covariance
 from .binding import binding_energy
 from .spi import spi_metric
+from .clustering import rep_stru_clustering
