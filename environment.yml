@@ -3,17 +3,21 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - beautifulsoup4=4.12.2
-  - biopandas=0.4.1
-  - biopython=1.78
-  - colorlog=6.7.0
-  - openbabel=3.1.1
-  - pdb2pqr=3.6.1
+  - beautifulsoup4
+  - biopandas
+  - biopython
+  - colorlog
+  - openbabel
+  - pdb2pqr
   - plum-dispatch=2.2.2
-  - pymol-open-source=2.5.0
-  - pytest=7.4.0
-  - pyvista=0.42.3
-  - rdkit=2023.03.3
-  - requests=2.31.0
-  - scipy=1.11.4
-  - setuptools=68.2.2
+  - pymol-open-source=2.5.0=py39he03f1b4_6
+  - pyvista
+  - rdkit
+  - requests
+  - scipy
+  - setuptools
+  - goodvibes=3.2
+  - periodictable
+  - sympy
+  - editdistance
+  - scikit-learn
