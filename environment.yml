@@ -7,11 +7,11 @@ dependencies:
   - biopandas
   - biopython
   - colorlog
-  - openbabel
-  - pdb2pqr
+  - openbabel=3.1.1
+  - pdb2pqr=3.6.1
   - plum-dispatch=2.2.2
   - pymol-open-source=2.5.0=py39he03f1b4_6
-  - pyvista
+  - pyvista=0.42.3
   - rdkit
   - requests
   - scipy
