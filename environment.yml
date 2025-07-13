@@ -21,3 +21,4 @@ dependencies:
   - sympy
   - editdistance
   - scikit-learn
+  - pytest
