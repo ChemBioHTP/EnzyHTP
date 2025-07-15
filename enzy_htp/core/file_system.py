@@ -167,7 +167,7 @@ def write_data(outfile: str, tag: Any, data: Dict) -> str:
 
     return outfile
 
-def write_data_to_csv(output_directory: str, 
+def append_data_to_csv(output_directory: str, 
         csv_filename: str = "result.csv", 
         data: Dict[str, Any] = dict(), **kwargs):
     """Write a row of data to a CSV (.csv) file.
@@ -191,7 +191,7 @@ def write_data_to_csv(output_directory: str,
     else:
         data_df.to_csv(filepath, mode='a', header=False, index=False, encoding='utf-8')
 
-def write_data_to_excel(output_directory: str, 
+def append_data_to_excel(output_directory: str, 
         excel_filename: str = "result.xlsx", sheet_name: str = "Sheet1", 
         data: Dict[str, Any] = dict(), **kwargs):
     """Write a row of data to an excel (.xlsx) file.
