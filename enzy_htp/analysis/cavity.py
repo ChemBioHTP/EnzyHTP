@@ -26,38 +26,36 @@ CAVITY_IDENTIFICATION_METHODS: Dict[str, Callable[..., List[Cavity]]] = {
 }
 
 def identify_stru_cavities(stru: Structure,
-        non_active_residues: List[Residue] = list(), 
-        probe: float = None, 
-        inner: float = None, 
-        mesh_density: float = None,
-        ignore_hetatm: bool = None,
         work_dir: str = None,
-        use_mono: bool = True,
         engine: str = "mole2",
+        **kwargs
     ) -> List[Cavity]:
-    """Identifies cavities in a protein structure using the Mole2 software package. Client method that should be 
-    called by users. Results are represented via Cavity objects that support basic geometry operations.
+    """Identifies cavities in a Structure instance. 
+    Currently available engine:
+    * mole2;
 
     Args:
         stru (Structure): The structure instance to detect cavities from.
-        non_active_residues (List[Residue], optional): Residues that should be skipped.
-        probe (float, optional): Probe radius to use in A. Defaults to Mole2Config.PROBE if not supplied.
-        inner (float, optional): Inner radius to use in A. Defaults to Mole2Config.INNER if not supplied.
-        mesh_density (float, optional): Mesh density to use in A. Defaults to Mole2Config.MESH_DENSITY if not supplied.
-        ignore_hetatm (bool, optional): TODO(CJ)
         work_dir (str, optional): Directory to do work in. Defaults to system.SCATCH_DIR if not supplied.
-        use_mono (bool, optional): Indicate if mono need to be used during run time. Defaults to true.
         engine (str): The engine to use for cavity identification. Defaults to "mole2" (The only available one at present).
+        **kwargs: Engine-specific parameters in keyword arguments. 
 
     Returns:
-        A list of Cavity objects.
+        cavities (List[Cavity]): A list of Cavity objects.
+
+    Details:
+        * mole2 specific arguments:
+            - non_active_residues (List[Residue], optional): Residues that should be skipped.
+            - probe (float, optional): Probe radius to use in A. Defaults to Mole2Config.PROBE if not supplied.
+            - inner (float, optional): Inner radius to use in A. Defaults to Mole2Config.INNER if not supplied.
+            - mesh_density (float, optional): Mesh density to use in A. Defaults to Mole2Config.MESH_DENSITY if not supplied.
+            - ignore_hetatm (bool, optional): TODO (CJ)
+            - use_mono (bool, optional): Indicate if mono need to be used during run time. Defaults to true.
+
     """
     if work_dir is None:
         work_dir = eh_config['system.SCRATCH_DIR']
-    non_active_parts = [resi.key() for resi in non_active_residues]
 
-    cavities = CAVITY_IDENTIFICATION_METHODS[engine](stru=stru, non_active_parts=non_active_parts,
-        probe=probe, inner=inner, mesh_density=mesh_density, ignore_hetatm=ignore_hetatm,
-        work_dir=work_dir, use_mono=use_mono)
+    cavities = CAVITY_IDENTIFICATION_METHODS[engine](stru=stru, work_dir=work_dir, **kwargs)
     
     return cavities

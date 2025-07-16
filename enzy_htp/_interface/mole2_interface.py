@@ -211,7 +211,7 @@ class Mole2Interface(BaseInterface):
         )
 
     def identify_cavities(self, stru: Structure, 
-            non_active_parts: List[Tuple[str, int]] = None, 
+            non_active_residues: List[Residue] = list(), 
             probe: float = None, 
             inner: float = None, 
             mesh_density: float = None,
@@ -225,8 +225,7 @@ class Mole2Interface(BaseInterface):
 
         Args:
             stru (Structure): The structure instance to detect cavities from.
-            non_active_parts (List[Tuple[str, int]], optional): Residues that should be skipped. 
-                Should be in format List[Tuple] where Tuple has format (chain id, residue number).
+            non_active_residues (List[Residue], optional): Residues that should be skipped.
             probe (float, optional): Probe radius to use in A. Defaults to Mole2Config.PROBE if not supplied.
             inner (float, optional): Inner radius to use in A. Defaults to Mole2Config.INNER if not supplied.
             mesh_density (float, optional): Mesh density to use in A. Defaults to Mole2Config.MESH_DENSITY if not supplied.
@@ -251,6 +250,8 @@ class Mole2Interface(BaseInterface):
 
         if ignore_hetatm is None:
             ignore_hetatm = self.config_.IGNORE_HETATM
+
+        non_active_parts = [resi.key() for resi in non_active_residues]
 
         fs.safe_mkdir(work_dir)
         fs.safe_rmdir(f"{work_dir}/mesh/")
