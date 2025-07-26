@@ -1026,7 +1026,7 @@ class AmberMDStep(MolDynStep):
                 md_names = merged_job.mimo["md_names"] + job.mimo["md_names"]
                 work_dir = merged_job.mimo["work_dir"]
                 merged_mdin = merged_job.mimo["temp_mdin"] + job.mimo["temp_mdin"]
-                merged_contain_jobs = merged_job.mimo.get("contain_jobs", list()) + [job]
+                merged_contain_jobs = (merged_job.mimo.get("contain_jobs") or [merged_job]) + [job] # make sure the first job is there
                 sub_script_path = fs.get_valid_temp_name(f"{work_dir}/submit_{'_'.join(md_names)}.cmd")
                 # update merged job
                 merged_job = ClusterJob.config_job(
@@ -1052,7 +1052,7 @@ class AmberMDStep(MolDynStep):
                 result.append(merged_job)
                 result.append(job) # add unmergable
 
-        # add the merged_job in the mimo or the original job. Because the ResultEgg can only find the original job.
+        # add the merged_job in the mimo of the original job. Because the ResultEgg can only find the original job.
         for job in result:
             contain_jobs = job.mimo.get("contain_jobs", None)
             if contain_jobs:
