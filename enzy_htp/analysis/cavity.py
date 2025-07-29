@@ -38,7 +38,7 @@ def identify_stru_cavities(stru: Structure,
     Args:
         stru (Structure): The structure instance to detect cavities from.
         work_dir (str, optional): Directory to do work in. Defaults to system.SCATCH_DIR if not supplied.
-        engine (str): The engine to use for cavity identification. Defaults to "mole2" (The only available one at present).
+        engine (str, optional): The engine to use for cavity identification. Defaults to "mole2" (The only available one at present).
         **kwargs: Engine-specific parameters in keyword arguments. 
 
     Returns:
@@ -67,7 +67,8 @@ def _choose_cavity(cavity_list: List[Cavity],
         target_cavity: Cavity = None
     ) -> Tuple[Cavity, int]:
     """
-    Selects the most similar cavity to the focus cavity based on residue key overlap.
+    Selects the most similar cavity (to the focus cavity) from the `cavity_list` based on residue key overlap.
+    The cavity with most residue key overlap is selected.
     
     Args:
         cavity_list: List of Cavity objects to compare. All cavities should be in the same Structure instance.
@@ -81,7 +82,8 @@ def _choose_cavity(cavity_list: List[Cavity],
             * int: max_overlap value.
     """
     if sum(x is not None for x in (composing_residues, contain_ligand, target_cavity)) != 1:
-        raise ValueError("The `composing_residues`, `contain_ligand` and `target_cavity` are mutually exclusive to each other.")
+        _LOGGER.error("The `composing_residues`, `contain_ligand` and `target_cavity` are mutually exclusive to each other.")
+        raise ValueError()
     
     if (contain_ligand):
         stru = cavity_list[0].stru
@@ -111,8 +113,10 @@ def ensemble_cavity_volumes(
         contain_ligand: str = None, 
         target_cavity: Cavity = None, 
         frame_0_based: bool = True,
+        work_dir: str = None,
+        engine: str = "mole2",
         **kwargs) -> List[float]:
-    """Caculate cavity volumes from a StructureEnsemble instance.
+    """Caculate cavity volumes from a StructureEnsemble instance, which is done by each frame.
     The cavity should be selected by a list of Residue instances, a ligand string (PyMOL formatted), or a Cavity instance.
     
     Args:
@@ -121,27 +125,31 @@ def ensemble_cavity_volumes(
         contain_ligand (str, optional): The PyMOL-formatted pattern selecting the ligand in the cavity. Mutually exclusive with `target_cavity` or `composing_residues`.
         target_cavity (Cavity, optional): The target cavity to track throughout the ensemble (by most overlapped residues). Mutually exclusive with `composing_residues` or `contain_ligand`.
         frame_0_based (bool, optional): Indicate if the cavity selection input is formulated with the frame 0 structure to get target cavity.
+        work_dir (str, optional): Directory to do work in. Defaults to system.SCATCH_DIR if not supplied.
+        engine (str, optional): The engine to use for cavity identification.
 
     Returns:
-        volumes (List[float]): The list of cavity volume value from the ensemble.
+        volumes (List[float]): The list of cavity volume value of each frame from the ensemble.
     """
     if sum(x is not None for x in (composing_residues, contain_ligand, target_cavity)) != 1:
-        raise ValueError("The `composing_residues`, `contain_ligand` and `target_cavity` are mutually exclusive to each other.")
+        _LOGGER.error("The `composing_residues`, `contain_ligand` and `target_cavity` are mutually exclusive to each other.")
+        raise ValueError()
     esm_cavities: List[Cavity] = list()
     structure_0 = stru_esm.structure_0
 
     target_cavity_confirmed = None
     if frame_0_based:   # Confirm the target cavity if `frame_0_based=True`.
-        frame_0_cavities = identify_stru_cavities(stru=structure_0, **kwargs)
+        frame_0_cavities = identify_stru_cavities(stru=structure_0, work_dir=work_dir, engine=engine, **kwargs)
         target_cavity_confirmed, _ = _choose_cavity(cavity_list=frame_0_cavities, 
             composing_residues=composing_residues, contain_ligand=contain_ligand, target_cavity=target_cavity)
         if (target_cavity_confirmed is None):
-            raise ValueError("Unable to identify target cavity from frame 0 structure.")
+            _LOGGER.error("Unable to identify target cavity from frame 0 structure.")
+            raise ValueError()
     else:
         target_cavity_confirmed = target_cavity
     
     for stru_frame in stru_esm.structures(remove_solvent=True):     # Iterate over the ensemble.
-        frame_cavities = identify_stru_cavities(stru=stru_frame, **kwargs)
+        frame_cavities = identify_stru_cavities(stru=stru_frame, work_dir=work_dir, engine=engine, **kwargs)
         cavity, max_overlap = _choose_cavity(cavity_list=frame_cavities, 
             composing_residues=composing_residues, contain_ligand=contain_ligand, target_cavity=target_cavity_confirmed)
         esm_cavities.append(cavity)
