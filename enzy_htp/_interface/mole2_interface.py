@@ -73,7 +73,7 @@ class Mole2Interface(BaseInterface):
             ignore_hetam: TOOD(CJ)
 
         Returns:
-            A str() with the filename of the .xml containing the mole2 input.
+            input_filepath (str): The path to the .xml file containing the mole2 input.
         """
         content:List[str] = [
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?>", 
@@ -99,11 +99,11 @@ class Mole2Interface(BaseInterface):
             "</Tunnels>",
         ])
 
-        outfile: str = path.join(work_dir, "mole2_input.xml")
+        input_filepath: str = path.join(work_dir, "mole2_input.xml")
 
-        fs.write_lines(outfile, content)
+        fs.write_lines(input_filepath, content)
 
-        return outfile
+        return input_filepath
 
     def _read_cavity_from_xml(self, cavities_xml_filepath: str, cavity_id: int, cavity_type: Literal["Cavity", "Void"] = "Cavity") -> Tuple[float, list, list]:
         """Given a .xml file from a mole2 run, parses the cavity information and returns the boundary
@@ -259,16 +259,16 @@ class Mole2Interface(BaseInterface):
         pdb_filepath = fs.get_valid_temp_name(path.join(work_dir, "stru_cavity_temp.pdb"), ext_set=["pdb"])
         sp.save_structure(outfile=pdb_filepath, stru=stru)
 
-        input_xml_file: str = self._write_xml_input(pdb_filepath, work_dir, non_active_parts, probe, inner, mesh_density, ignore_hetatm)
+        input_xml_filepath: str = self._write_xml_input(pdb_filepath, work_dir, non_active_parts, probe, inner, mesh_density, ignore_hetatm)
 
         if use_mono:
-            self.env_manager_.run_command(self.config_.MONO, [self.config_.MOLE2, input_xml_file])
+            self.env_manager_.run_command(self.config_.MONO, [self.config_.MOLE2, input_xml_filepath])
         else:
-            self.env_manager_.run_command(self.config_.MOLE2, [input_xml_file])
+            self.env_manager_.run_command(self.config_.MOLE2, [input_xml_filepath])
         
-        cavity_mesh_files: List[str] = list(Path(f"{work_dir}/mesh/").glob("cavity_*.mesh"))
-        void_mesh_files: List[str] = list(Path(f"{work_dir}/mesh/").glob("void_*.mesh"))
-        cavities_xml_file = Path(work_dir).joinpath("xml", "cavities.xml")
+        cavity_mesh_files: List[str] = [str(filepath.resolve()) for filepath in Path(f"{work_dir}/mesh/").glob("cavity_*.mesh")]
+        void_mesh_files: List[str] = [str(filepath.resolve()) for filepath in Path(f"{work_dir}/mesh/").glob("void_*.mesh")]
+        cavities_xml_file = str(Path(work_dir).joinpath("xml", "cavities.xml"))
         _LOGGER.info(f"Found {len(cavity_mesh_files)} cavities and {len(void_mesh_files)} void cavities using probe radius of {probe:.3f} A and inner radius of {inner:.3f} A")
         
         result: List[Cavity] = list()
@@ -283,6 +283,6 @@ class Mole2Interface(BaseInterface):
                     cavity_id=(i+1), cavity_xml_filepath=cavities_xml_file, cavity_type="Void")
             )
 
-        fs.clean_temp_file_n_dir(work_dir)
+        fs.clean_temp_file_n_dir([cavity_mesh_files, void_mesh_files, cavities_xml_file, input_xml_filepath])
         
         return result
