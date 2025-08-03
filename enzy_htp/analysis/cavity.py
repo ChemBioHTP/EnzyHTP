@@ -145,6 +145,10 @@ def ensemble_cavity_volumes(
         if (target_cavity_confirmed is None):
             _LOGGER.error("Unable to identify target cavity from frame 0 structure.")
             raise ValueError()
+        else:
+            # If the target cavity is confirmed, we will track the target cavity instead of `composing_residues` or `contain_ligand`.
+            composing_residues = None
+            contain_ligand = None
     else:
         target_cavity_confirmed = target_cavity
     
