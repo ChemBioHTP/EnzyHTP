@@ -88,13 +88,21 @@ def _choose_cavity(cavity_list: List[Cavity],
     if (contain_ligand):
         stru = cavity_list[0].stru
         ligand_selection = select_stru(stru=stru, pattern=contain_ligand)
-        focus_point = np.array(ligand_selection.atoms[0].coord)
+        ligand_atom_points = [np.array(atom.coord) for atom in ligand_selection.atoms]
+        cavity_point_dict = dict()  # A dict recording how many atoms are contained by each cavity.
         for cavity in cavity_list:
-            if cavity.contains(focus_point):
-                return cavity, 1
-            else:
-                continue
-        return None, 0
+            contain_point_list = cavity.contains_array(ligand_atom_points)
+            contain_point_count = sum(1 for point in contain_point_list if point == True)   # Number of atoms in the cavity.
+            if (contain_point_count > 0):
+                cavity_point_dict[cavity] = contain_point_count
+            continue
+        if (len(cavity_point_dict.keys()) > 0):
+            # Return the cavity containing most atoms of the ligand.
+            selected_cavity = cavity_list[max(cavity_point_dict, key=cavity_point_dict.get)]
+            return selected_cavity, 1
+        else:
+            # If none of the cavities containing any atom of the ligand, return default value.
+            return None, 0
     else:
         focus_residue_keys = set()
         cavity_similarity = dict()
