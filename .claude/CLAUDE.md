@@ -10,10 +10,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `./dev-tools/conda-install` - Install enzy_htp and dependencies using conda
 
 ### Code Quality and Testing
-- `./dev-tools/lint` - Run yapf formatter on source code and tests (uses custom EnzyHTP settings) NOTE! only use this in new files.
+- `yapf --in-place <file_path>` - Run yapf formatter on a specific file. The custom EnzyHTP settings are automatically applied from `.style.yapf`. **IMPORTANT:** Only use this command for new files. For existing files, follow the established formatting conventions to avoid unnecessary changes.
 - `pytest` - Run unit tests (supports markers: `accre`, `long`, `clean`, `interface`, `temp`, `TODO`)
-- `pytest -m "not long"` - Run tests excluding time-consuming ones
-- `pytest -m accre` - Run tests that require ACCRE cluster environment
+- `pytest test/structure/test_structure.py` - Run unit test on a specific file. (the `test_structure.py` is used as example here)
+- `pytest test/structure/test_structure.py::test_deepcopy` - Run unit test on a specific test function. (the `test_structure.py::test_deepcopy` is used as example here)
+- IMPORTANT! You should avoid running pytest on the entire test folder because it will take a long time to run. You should instead more often run test on a specific test file or on a specific function.
+- To efficiently select and run specific tests, use pytest's `-k` option to match test names (e.g., `pytest -k "deepcopy"`), or `-m` to run tests with a specific marker (e.g., `pytest -m "interface"`).
 
 ### Test Markers
 - `accre`: Tests that only run on ACCRE cluster
