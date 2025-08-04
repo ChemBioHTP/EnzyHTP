@@ -2,28 +2,41 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Development Commands
-
-### Installation and Setup
+## Installation and Setup
 - Avoid installing the package yourself. If you found a problem involving environment or need to test install, ask for help from the user.
 - `./dev-tools/pip-install` - Install enzy_htp from source using pip (do not install dependencies)
 - `./dev-tools/conda-install` - Install enzy_htp and dependencies using conda
 
-### Code Quality and Testing
-- `yapf --in-place <file_path>` - Run yapf formatter on a specific file. The custom EnzyHTP settings are automatically applied from `.style.yapf`. **IMPORTANT:** Only use this command for new files. For existing files, follow the established formatting conventions to avoid unnecessary changes.
-- `pytest` - Run unit tests (supports markers: `accre`, `long`, `clean`, `interface`, `temp`, `TODO`)
-- `pytest test/structure/test_structure.py` - Run unit test on a specific file. (the `test_structure.py` is used as example here)
-- `pytest test/structure/test_structure.py::test_deepcopy` - Run unit test on a specific test function. (the `test_structure.py::test_deepcopy` is used as example here)
-- IMPORTANT! You should avoid running pytest on the entire test folder because it will take a long time to run. You should instead more often run test on a specific test file or on a specific function.
-- To efficiently select and run specific tests, use pytest's `-k` option to match test names (e.g., `pytest -k "deepcopy"`), or `-m` to run tests with a specific marker (e.g., `pytest -m "interface"`).
+## Testing
 
-### Test Markers
-- `accre`: Tests that only run on ACCRE cluster
-- `long`: Time-consuming tests (>10min) that need job submission
-- `interface`: Tests for main interfaces
-- `temp`: Temporary development tests
-- `TODO`: Known failing tests
-NOTE Not all eligible tests that fit a maker type are marked, but every marked test is eligible.
+The project uses `pytest` for testing.
+
+**IMPORTANT:** Avoid running `pytest` on the entire test suite, as it is very time-consuming. Instead, run specific tests or smaller groups of tests.
+
+### Running Tests
+
+The commands below are examples; you should replace file paths and test names with your actual targets.
+
+- **Run all tests in a file:**
+    `pytest test/structure/test_structure.py`
+- **Run a specific test function:**
+    `pytest test/structure/test_structure.py::test_deepcopy`
+- **Run tests by name pattern:**
+    `pytest -k "deepcopy"`
+- **Run tests by marker:**
+    `pytest -m "interface"`
+
+#### Test Markers
+
+The following markers are available to run specific subsets of tests:
+
+- `accre`: Tests that should only run on the ACCRE cluster.
+- `long`: Time-consuming tests (>10 minutes) that may need to be submitted as jobs.
+- `interface`: Tests for the main software interfaces.
+- `temp`: Temporary tests created during development.
+- `TODO`: Tests that are known to be failing.
+
+*Note: Not all eligible tests that fit a marker type are marked, but every marked test is eligible.*
 
 ## Architecture Overview
 
@@ -90,6 +103,11 @@ New science API modules may be added in the future following the same patterns. 
 - `enzy_htp/chemical/` - Knowledge base (chemistry, atoms, residues, physics constants)
 
 ## Code Conventions
+
+### Code Quality
+
+`yapf --in-place <file_path>`: Formats a Python file using the project's `yapf` style.
+- **IMPORTANT:** Only use this for new files. For existing files, follow the established formatting to avoid unnecessary changes.
 
 ### Import Organization
 Order imports by length within two sections:
