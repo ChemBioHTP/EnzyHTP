@@ -1,43 +1,27 @@
-# CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+# GEMINI.md
 
-## Development Commands
+This file provides guidance to gemini CLI when working with code in this repository.
 
-### Installation and Setup
-- Avoid installing the package yourself. If you found a problem involving environment or need to test install, ask for help from the user.
-- `./dev-tools/pip-install` - Install enzy_htp from source using pip (do not install dependencies)
-- `./dev-tools/conda-install` - Install enzy_htp and dependencies using conda
+# Project Overview
 
-### Code Quality and Testing
-- `yapf --in-place <file_path>` - Run yapf formatter on a specific file. The custom EnzyHTP settings are automatically applied from `.style.yapf`. **IMPORTANT:** Only use this command for new files. For existing files, follow the established formatting conventions to avoid unnecessary changes.
-- `pytest` - Run unit tests (supports markers: `accre`, `long`, `clean`, `interface`, `temp`, `TODO`)
-- `pytest test/structure/test_structure.py` - Run unit test on a specific file. (the `test_structure.py` is used as example here)
-- `pytest test/structure/test_structure.py::test_deepcopy` - Run unit test on a specific test function. (the `test_structure.py::test_deepcopy` is used as example here)
-- IMPORTANT! You should avoid running pytest on the entire test folder because it will take a long time to run. You should instead more often run test on a specific test file or on a specific function.
-- To efficiently select and run specific tests, use pytest's `-k` option to match test names (e.g., `pytest -k "deepcopy"`), or `-m` to run tests with a specific marker (e.g., `pytest -m "interface"`).
+This project, EnzyHTP, is a Python-based platform for high-throughput molecular simulation of enzymes. It automates the entire workflow of enzyme modeling, including model construction, mutation, sampling, qm, analysis, etc. 
 
-### Test Markers
-- `accre`: Tests that only run on ACCRE cluster
-- `long`: Time-consuming tests (>10min) that need job submission
-- `interface`: Tests for main interfaces
-- `temp`: Temporary development tests
-- `TODO`: Known failing tests
-NOTE Not all eligible tests that fit a maker type are marked, but every marked test is eligible.
+The project is structured as a Python package named `enzy_htp`. It interfaces with various external software packages for molecular modeling and simulation, such as Amber, Gaussian, Rosetta, and others. The configuration for these external tools is managed through a central `Config` object defined in `enzy_htp/_config/config.py`.
 
-## Architecture Overview
+# Architecture Overview
 
 EnzyHTP is a modular Python library for high-throughput enzyme modeling that automates molecular simulation workflows. The architecture follows a layered design with clear separation of concerns.
 
-### Core Architecture Principles
+## Core Architecture Principles
 - **Modular Design**: Each workflow component is encapsulated in its own module
 - **Interface Pattern**: Science APIs are decoupled from external tools via interface layer
 - **Structure-Centric**: Most operations work on `Structure` or `StructureEnsemble` objects
 - **Extensibility**: Easy to add new modules or replace existing implementations
 
-### Key Modules
+## Key Modules
 
-#### Core Data Structures
+### Core Data Structures
 The library is built around several key data types that represent different aspects of molecular systems:
 
 **Primary Structure Types (`enzy_htp/structure/`):**
@@ -61,7 +45,7 @@ The library is built around several key data types that represent different aspe
 
 Most functions in this library operate on these data types, particularly `Structure` objects.
 
-#### Science APIs (High-level Workflow Modules)
+### Science APIs (High-level Workflow Modules)
 These modules provide the main scientific functionality and are designed to be extensible:
 
 **Current Science API Modules:**
@@ -80,18 +64,77 @@ New science API modules may be added in the future following the same patterns. 
 - Submodules containing Science APIs (functions typically have "Science API" in their docstring)
 - Clear separation from interface implementations
 
-#### Interface Layer (`enzy_htp/_interface/`)
+### Interface Layer (`enzy_htp/_interface/`)
 - Interfaces to external tools: Amber, Gaussian, Rosetta, PyMOL, RDKit, etc.
 - Configurations stored in `enzy_htp/_config/`
 - Science APIs use these interfaces but are not tightly coupled to them
 
-#### Support Modules
+### Support Modules
 - `enzy_htp/core/` - General utilities, file system, job management, clusters
 - `enzy_htp/chemical/` - Knowledge base (chemistry, atoms, residues, physics constants)
 
-## Code Conventions
+# Building and Running
 
-### Import Organization
+## Dependencies & Installation
+
+- Avoid installing the package yourself. If you found a problem involving environment or need to test install, ask for help from the user.
+- `./dev-tools/pip-install` - Install enzy_htp from source using pip (do not install dependencies)
+- `./dev-tools/conda-install` - Install enzy_htp and dependencies using conda
+
+### Running Tests
+
+The project uses `pytest` for testing. Tests are located in the `test/` and `test_integration/` directories.
+
+**IMPORTANT:** Avoid running `pytest` on the entire test suite, as it can be time-consuming. Instead, run specific tests or groups of tests.
+
+**Basic Commands:**
+
+*   Run all tests in a specific file:
+    ```bash
+    pytest test/structure/test_structure.py
+    ```
+*   Run a specific test function within a file:
+    ```bash
+    pytest test/structure/test_structure.py::test_deepcopy
+    ```
+*   Run tests matching a specific name pattern:
+    ```bash
+    pytest -k "deepcopy"
+    ```
+
+**Using Markers:**
+
+The `pytest.ini` file defines custom markers to run specific subsets of tests.
+
+*   Run tests with a specific marker:
+    ```bash
+    pytest -m <marker_name>
+    ```
+    *Example:*
+    ```bash
+    pytest -m accre
+    ```
+
+**Available Markers:**
+
+*   `accre`: Tests that should only run on the ACCRE cluster.
+*   `long`: Time-consuming tests (>10 minutes) that may need to be submitted as jobs.
+*   `clean`: Tests that clean up generated files upon completion.
+*   `interface`: Tests for the main software interfaces.
+*   `temp`: Temporary tests created during development.
+*   `TODO`: Tests that are known to be failing.
+
+# Development Conventions
+
+## Coding Style
+
+The project uses `yapf` for code formatting. A `.style.yapf` file is present in the root directory, which defines the formatting rules. To format the code, run:
+
+`yapf --in-place <file_path>` - Run yapf formatter on a specific file. 
+
+**IMPORTANT:** Only use this command for new files. For existing files, follow the established formatting conventions to avoid unnecessary changes.
+
+## Import Organization
 Order imports by length within two sections:
 ```python
 import os
@@ -103,9 +146,13 @@ from .logger import _LOGGER
 from .exception import MissingEnvironmentElement
 ```
 
-### Key Patterns
+## Key Patterns
 - Functions primarily operate on `Structure` or `StructureEnsemble` objects
 - Use interface pattern to avoid tight coupling with external tools
 - Test-driven development with tests mirroring source code structure
 - Type hints for function parameters and return values
 - Google Python Style Guide compliance with custom pylint configuration
+
+## Contribution Guidelines
+
+The `CODEOWNERS` file indicates the owners of the codebase.
