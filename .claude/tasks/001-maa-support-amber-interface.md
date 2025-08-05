@@ -22,16 +22,32 @@ The agent should focus its work on `enzy_htp/_interface/amber_interface.py`.
 
 1.  **Review `_parameterize_ligand`:** Understand the existing half-done code for NCAA parameterization.
 2.  **Implement `run_prepgen` in `AmberInterface`:**
-    *   Create a new method `run_prepgen(self, ac_path: str, mc_path: str, prepin_path: str)`.
+    *   Create a new method `run_prepgen`.
     *   This method should execute the `prepgen` command with the appropriate input files.
+    *   This method should be flexible enough and not coupled with MAA parameterization.
 3.  **Implement `_parameterize_modified_res` in `AmberParameterizer`:**
-    *   Call `self.parent_interface.antechamber_ncaa_to_moldesc` to generate the `.ac` file.
-    *   **Implement logic to fix atom types in the `.ac` file.** This is a critical step.
-    *   Call `self.parent_interface.make_mc_file` to generate the `.mc` file.
-    *   Call the newly created `self.parent_interface.run_prepgen` to produce the `.prepin` file.
-    *   Call `self.parent_interface.run_antechamber` to convert the `.prepin` file to a `.mol2` file.
-    *   Call `self.parent_interface.run_parmchk2` twice to generate the `.frcmod` files.
-4.  **Finalize:** Remove the `raise Exception("TODO")` and ensure correct values are returned.
+    *   **Step 1: Generate `.ac` file with GAFF:** Call `self.parent_interface.antechamber_ncaa_to_moldesc`. It is essential that this step uses GAFF atom types. The agent should verify this in `self.parent_interface.antechamber_ncaa_to_moldesc`. The existing code use amber atom type which is deprocated.
+    *   **Step 2: Correct Atom Types in `.ac` file:** This is a critical step requiring a hybrid atom-typing approach.
+        *   Parse the generated `.ac` file.
+        *   Identify the core backbone atoms: the amide nitrogen and its attached hydrogen (`N`, `H`), and the carbonyl carbon and oxygen (`C`, `O`/`OXT`), and the alpha carbon (`CA`).
+        *   Replace the GAFF atom types for **only these specific atoms** with their corresponding standard Amber protein atom types (They may be different depending on user's choice of force field. You need to look into the lib files of Amber of the corresponding force field to make sure. Create maps when needed. Reference exisiting maps that serve similar purpose when you make these maps).
+        *   **Crucially, all other atoms** (including `CA`, `HA`, `CB`, and the entire sidechain) must **retain the GAFF atom types** assigned by `antechamber`.
+        *   **Note for the agent:** This hybrid assignment is experimental. It must be carefully tested to ensure the subsequent `parmchk2` and `tleap` steps can correctly build parameters from this mixed set of atom types.
+    *   **Step 3: Create `.mc` file:**
+        *   Call `self.parent_interface.make_mc_file` to generate the main chain definition file.
+        *   This file tells `prepgen` which atoms from the `.ac` file correspond to the N-terminus, C-terminus, and the main chain itself.
+    *   **Step 4: Run `prepgen`:**
+        *   Call the newly created `self.parent_interface.run_prepgen` with the corrected `.ac` file and the `.mc` file to produce a `.prepin` file.
+        *   It should work the same as this command: `prepgen -i {input file path.ac} -o {out file path.prepin} -m {mc file path.mc} -rn {residue name}`
+    *   **Step 5: Generate `.mol2` file:**
+        *   Call `self.parent_interface.run_antechamber` to convert the `.prepin` file into a `.mol2` file. This file contains the final atomic charges and residue topology.
+    *   **Step 6: Generate `.frcmod` files:** This step requires two calls to the `run_parmchk2` method. The agent should use the manual commands as a reference to ensure the arguments passed to the Python function are correct.
+        *   **First call:** Call `self.parent_interface.run_parmchk2`. This call should replicate the logic of the manual command: `parmchk2 -i xxx.prepin -f prepi -o xxx.frcmod -a Y -p $AMBERHOME/dat/leap/parm/parm10.dat`. The `-p` value should correspond to user's choice of the force field.            
+            * supports the equivalent of the `-a Y` is not there yet, make it. Make sure you use a reasonable name for it referencing the Amber document.
+        *   **remove all the ATTN lines in the generated frcmod file** this should works the same as to `grep -v "ATTN" xxx.frcmod > xxx.frcmod1` 
+        *   **Second call:** Call `self.parent_interface.run_parmchk2` again to generate parameters using the GAFF library, based on the manual command: `parmchk2 -i xxx.prepin -f prepi -o xxx.frcmod2`.
+
+4.  **Finalize:** Remove the `raise Exception("TODO")` and return the paths to the `.mol2` and the two `.frcmod` files.
 
 ## Testing Plan
 
