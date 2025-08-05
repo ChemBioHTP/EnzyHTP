@@ -47,7 +47,8 @@ The agent should focus its work on `enzy_htp/_interface/amber_interface.py`.
         *   **remove all the ATTN lines in the generated frcmod file** this should works the same as to `grep -v "ATTN" xxx.frcmod > xxx.frcmod1` 
         *   **Second call:** Call `self.parent_interface.run_parmchk2` again to generate parameters using the GAFF library, based on the manual command: `parmchk2 -i xxx.prepin -f prepi -o xxx.frcmod2`.
 
-4.  **Finalize:** Remove the `raise Exception("TODO")` and return the paths to the `.mol2` and the two `.frcmod` files.
+4.  **Test:** Run unit test according to the "Testing Plan" and make sure they pass. If not, fix the problem in the code.
+5.  **Finalize:** Remove the `raise Exception("TODO")` and return the paths to the `.mol2` and the two `.frcmod` files.
 
 ## Testing Plan
 
