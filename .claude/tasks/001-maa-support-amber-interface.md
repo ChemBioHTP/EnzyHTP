@@ -27,7 +27,7 @@ The agent should focus its work on `enzy_htp/_interface/amber_interface.py`.
     *   This method should be flexible enough and not coupled with MAA parameterization.
 3.  **Implement `_parameterize_modified_res` in `AmberParameterizer`:**
     *   **Step 1: Generate `.ac` file with GAFF:** Call `self.parent_interface.antechamber_ncaa_to_moldesc`. It is essential that this step uses GAFF atom types. The agent should verify this in `self.parent_interface.antechamber_ncaa_to_moldesc`. The existing code use amber atom type which is deprocated.
-    *   **Step 2: Correct Atom Types in `.ac` file:** This is a critical step requiring a hybrid atom-typing approach.
+    *   **Step 2: Correct Atom Types in `.ac` file:** This is a critical step requiring a hybrid atom-typing approach. This logic should be encapsulated in a new private method `_correct_atom_types_in_ac_file` to facilitate unit testing.
         *   Parse the generated `.ac` file.
         *   Identify the core backbone atoms: the amide nitrogen and its attached hydrogen (`N`, `H`), and the carbonyl carbon and oxygen (`C`, `O`/`OXT`), and the alpha carbon (`CA`).
         *   Replace the GAFF atom types for **only these specific atoms** with their corresponding standard Amber protein atom types (They may be different depending on user's choice of force field. You need to look into the lib files of Amber of the corresponding force field to make sure. Create maps when needed. Reference exisiting maps that serve similar purpose when you make these maps).
@@ -56,14 +56,24 @@ The current test suite in `test/_interface/test_amber_interface.py` already cont
 1.  **Existing Tests for MAA:**
     *   `test_ncaa_to_moldesc_modaa`: This test correctly uses `3FCR_protonated.pdb` (containing the modified residue LLP) to test the `antechamber_ncaa_to_moldesc` function. This is a good unit test for the first step of the parameterization process.
     *   `test_make_mc_file`: This test uses `3FCR_connect.pdb` (also with LLP) to test the creation of the `.mc` file, which is another crucial step.
-    *   `test_amber_parameterizer_run_lv_5` and `test_amber_parameterizer_run_lv_6` are marked as `TODO` and are intended as end-to-end tests for structures with modified residues.
+    *   `test_amber_parameterizer_run_lv_5` is marked as `TODO` and are intended as end-to-end tests for structures with modified residues.
 
-2.  **Proposed Test Implementation:**
+2.  **Unit Tests for New Helper Functions:**
+    *   **`test_run_prepgen`**:
+        *   This test will validate the new `run_prepgen` method in `AmberInterface`.
+        *   It will use a sample `.ac` file and `.mc` file as input.
+        *   It will assert that the `.prepin` file is created successfully and is not empty.
+    *   **`test_correct_atom_types_in_ac_file`**:
+        *   This will test the internal logic for correcting atom types in the `.ac` file, which should be refactored into a new private method `_correct_atom_types_in_ac_file` within `AmberParameterizer` to be testable.
+        *   The test will take a sample `.ac` file with GAFF atom types. Save it in data dir for future use.
+        *   It will assert that the backbone atom types (`N`, `H`, `C`, `O`, `CA`) are correctly replaced with standard Amber protein atom types, while other atoms retain their GAFF types.
+
+3.  **Proposed Test Implementation (Integration Test):**
 
     We should focus on completing `test_amber_parameterizer_run_lv_5` to serve as the main integration test for the entire MAA parameterization workflow.
 
     *   **Test Case:** Complete the implementation of `test_amber_parameterizer_run_lv_5`.
-    *   **PDB File to Re-use:** This test should use the `3FCR_protonated.pdb` file. This file is already used in `test_ncaa_to_moldesc_modaa`, contains the modified amino acid `LLP`, and is suitable for an end-to-end test. Using the same PDB file will ensure consistency across related tests.
+    *   **PDB File to Re-use:** This test should use the `3FCR_protonated.pdb` or `3cfr-slp-pea_ah.pdb` file. This file is already used in `test_ncaa_to_moldesc_modaa`, contains the modified amino acid `LLP`, and is suitable for an end-to-end test. Using the same PDB file will ensure consistency across related tests.
     *   **Test Logic:**
         1.  Load the `Structure` from `3FCR_protonated.pdb`.
         2.  Instantiate the `AmberParameterizer`.
@@ -80,7 +90,8 @@ By completing `test_amber_parameterizer_run_lv_5` with these detailed assertions
 
 ## Definition of Done
 
-- [ ] The `_parameterize_modified_res` method in `enzy_htp/_interface/amber_interface.py` is fully implemented.
-- [ ] The method no longer raises a `NotImplementedError` or `Exception`.
-- [ ] The method correctly generates `.mol2` and `.frcmod` files for a given MAA.
-- [ ] A new unit test that successfully parameterizes a structure with an MAA has been added and passes.
+- [ ] The `_parameterize_modified_res` method in `enzy_htp/_interface/amber_interface.py` is fully implemented, no longer raises an exception, and correctly generates the required `.mol2` and `.frcmod` files for a modified amino acid.
+- [ ] The new `run_prepgen` helper method is implemented in `AmberInterface`.
+- [ ] The atom type correction logic is implemented in a new private method within `AmberParameterizer`.
+- [ ] New unit tests for `run_prepgen` and the atom type correction method are added and pass.
+- [ ] The integration test `test_amber_parameterizer_run_lv_5` is completed and passes, successfully parameterizing a structure containing an MAA.
