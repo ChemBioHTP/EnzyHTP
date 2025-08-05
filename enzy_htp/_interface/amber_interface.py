@@ -341,28 +341,134 @@ class AmberParameterizer(MolDynParameterizer):
             self.parent_interface.antechamber_ncaa_to_moldesc(ncaa=maa_region,
                                                               out_path=mol_desc_path,
                                                               gaff_type=gaff_type)
-        # 2.1 fix the wrong atom type given by antechamber
+        # 2. Correct atom types in .ac file (hybrid approach)
+        self._correct_atom_types_in_ac_file(mol_desc_path)
 
-
-        # create mc file
+        # 3. Create mc file
         mc_path = f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.mc" # the search ensured no existing file named this
         self.parent_interface.make_mc_file(maa_region=maa_region, out_path=mc_path)
 
-        # 3. run prepgen on ac & mc get prepin
+        # 4. Run prepgen on ac & mc to get prepin
         prepin_path = fs.get_valid_temp_name(
             f"{self.ncaa_param_lib_path}/{maa.name}.prepin")
+        self.parent_interface.run_prepgen(in_file=mol_desc_path,
+                                          out_file=prepin_path,
+                                          mc_file=mc_path,
+                                          residue_name=maa.name)
 
-        # 4. run antechamber on prepin get mol2
+        # 5. Run antechamber on prepin to get mol2
         mol2_path = fs.get_valid_temp_name(
             f"{self.ncaa_param_lib_path}/{maa.name}.mol2")
+        self.parent_interface.run_antechamber(in_file=prepin_path,
+                                              out_file=mol2_path,
+                                              net_charge=maa.net_charge,
+                                              spin=maa.spin,
+                                              charge_method=self.charge_method,
+                                              res_name=maa.name)
 
-        # 5. run parmchk2 twice on prepin get frcmod & frcmod2
+        # 6. Run parmchk2 twice on prepin to get frcmod files
         frcmod_path = fs.get_valid_temp_name(
             f"{self.ncaa_param_lib_path}/{maa.name}.frcmod")
         frcmod2_path = fs.get_valid_temp_name(
             f"{self.ncaa_param_lib_path}/{maa.name}.frcmod2")
-        raise Exception("TODO")
+        
+        # First call: with annotation and custom force field path for ff14SB
+        amberhome = os.environ.get('AMBERHOME', '')
+        if amberhome:
+            parm_dat_path = f"{amberhome}/dat/leap/parm/parm10.dat"
+        else:
+            _LOGGER.warning("AMBERHOME not set, using default parameter file path")
+            parm_dat_path = None
+        
+        if parm_dat_path:
+            self.parent_interface.run_parmchk2(in_file=prepin_path,
+                                               out_file=frcmod_path,
+                                               gaff_type=gaff_type,
+                                               custom_force_field=parm_dat_path,
+                                               print_annotation=True)
+        else:
+            self.parent_interface.run_parmchk2(in_file=prepin_path,
+                                               out_file=frcmod_path,
+                                               gaff_type=gaff_type,
+                                               print_annotation=True)
+        
+        # Remove ATTN lines from the first frcmod file
+        frcmod_temp_path = f"{frcmod_path}.temp"
+        with open(frcmod_path, 'r') as infile, open(frcmod_temp_path, 'w') as outfile:
+            for line in infile:
+                if not line.strip().startswith('ATTN'):
+                    outfile.write(line)
+        
+        # Replace original with cleaned version
+        os.rename(frcmod_temp_path, frcmod_path)
+        
+        # Second call: generate parameters using GAFF library 
+        self.parent_interface.run_parmchk2(in_file=prepin_path,
+                                           out_file=frcmod2_path,
+                                           gaff_type=gaff_type)
         return mol2_path, [frcmod_path, frcmod2_path] # TODO make sure whether mol2 works or do we even need it?
+
+    def _correct_atom_types_in_ac_file(self, ac_file_path: str, force_field: str = "ff14SB") -> None:
+        """Correct GAFF atom types to standard Amber protein atom types for backbone atoms.
+        
+        Args:
+            ac_file_path: Path to the .ac file to modify
+            force_field: Force field to use for atom type mapping (default: ff14SB)
+        """
+        # Define backbone atom type mappings for different force fields
+        # Standard Amber protein backbone atom types for FF14SB
+        backbone_atom_type_map = {
+            "ff14SB": {
+                "N": "N",      # Amide nitrogen
+                "H": "H",      # Amide hydrogen  
+                "CA": "CX",    # Alpha carbon (FF14SB uses CX for CA)
+                "C": "C",      # Carbonyl carbon
+                "O": "O",      # Carbonyl oxygen
+                "OXT": "O2",   # Terminal carboxyl oxygen
+            }
+        }
+        
+        if force_field not in backbone_atom_type_map:
+            _LOGGER.warning(f"Force field {force_field} not supported for atom type correction. Using ff14SB.")
+            force_field = "ff14SB"
+        
+        atom_map = backbone_atom_type_map[force_field]
+        
+        # Read the .ac file
+        with open(ac_file_path, 'r') as f:
+            lines = f.readlines()
+        
+        # Process each line to correct backbone atom types
+        corrected_lines = []
+        for line in lines:
+            if line.startswith("ATOM"):
+                # Parse ATOM line format (typical .ac format)
+                # ATOM     1  N   LYS A   1      28.123  16.244  15.234 -0.415400 n4
+                parts = line.split()
+                if len(parts) >= 11:
+                    atom_name = parts[2]
+                    current_atom_type = parts[-1]  # Last field is usually the atom type
+                    
+                    # Check if this is a backbone atom that needs correction
+                    if atom_name in atom_map:
+                        # Replace GAFF atom type with standard Amber protein atom type
+                        parts[-1] = atom_map[atom_name]
+                        corrected_line = " ".join(parts) + "\n"
+                        _LOGGER.debug(f"Corrected atom type for {atom_name}: {current_atom_type} -> {atom_map[atom_name]}")
+                    else:
+                        corrected_line = line
+                else:
+                    corrected_line = line
+            else:
+                corrected_line = line
+            
+            corrected_lines.append(corrected_line)
+        
+        # Write the corrected .ac file
+        with open(ac_file_path, 'w') as f:
+            f.writelines(corrected_lines)
+        
+        _LOGGER.debug(f"Corrected backbone atom types in {ac_file_path}")
 
     def _parameterize_metalcenter(self, metal: MetalUnit,
                                   ligand_parms: Dict[str, Tuple[str, List[str]]],
@@ -1268,6 +1374,7 @@ class AmberInterface(BaseInterface):
     def run_parmchk2(self, in_file: str, out_file: str, gaff_type: str,
                      custom_force_field: str=None,
                      is_custom_ff_type_amber: bool=True,
+                     print_annotation: bool=False,
                      ) -> None:
         """the python wrapper of running parmchk2
         Args:
@@ -1277,7 +1384,8 @@ class AmberInterface(BaseInterface):
             custom_ff: the path of a customize ff file for search.
                        (e.g.: this allows you to use ff14SB for maa)
             is_custom_ff_type_amber: is the type of custom_ff amber
-            * TODO: support -c -a -w when needed"""
+            print_annotation: if True, add -a Y flag to print annotation information
+            * TODO: support -c -w when needed"""
         cmd_args = ["-i", in_file,
                     "-f", self.get_file_format(in_file),
                     "-o", out_file,
@@ -1286,8 +1394,25 @@ class AmberInterface(BaseInterface):
             cmd_args.extend(["-p", custom_force_field])
             if not is_custom_ff_type_amber:
                 cmd_args.extend(["-pf", "2"])
+        if print_annotation:
+            cmd_args.extend(["-a", "Y"])
 
         self.env_manager_.run_command("parmchk2", cmd_args)
+
+    def run_prepgen(self, in_file: str, out_file: str, mc_file: str, residue_name: str) -> None:
+        """the python wrapper of running prepgen
+        Args:
+            in_file: input .ac file path
+            out_file: the output .prepin file path
+            mc_file: the main chain definition file path (.mc)
+            residue_name: the name of the residue
+        """
+        cmd_args = ["-i", in_file,
+                    "-o", out_file,
+                    "-m", mc_file,
+                    "-rn", residue_name]
+        
+        self.env_manager_.run_command("prepgen", cmd_args)
 
     # -- add_pdb --
     def run_add_pdb(self, in_prmtop: str, out_path: str, ref_pdb: str, guess: bool = False):

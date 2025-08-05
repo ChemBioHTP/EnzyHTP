@@ -306,19 +306,84 @@ def test_amber_parameterizer_run_lv_4():
     fs.safe_rmdir(eh_config["system.SCRATCH_DIR"])
 
 
-def test_amber_parameterizer_run_lv_5(): #TODO
+def test_amber_parameterizer_run_lv_5():
     """level 5 test of the parameterizer.
     Test structure diversity:
     - 2 polypeptide chain
     - 1 substrate (CHONP)
-    - 1 modified amino acid (CHONP)"""
+    - 1 modified amino acid (CHONP)
+    
+    This is an integration test for the complete MAA parameterization workflow."""
     ai = interface.amber
+    
+    # Use the 3FCR_protonated.pdb file that contains the LLP modified amino acid
+    test_stru = struct.PDBParser().get_structure(f"{MM_DATA_DIR}/3FCR_protonated.pdb")
+    test_stru.assign_ncaa_chargespin({"LLP": (-2, 1)})
+    remove_solvent(test_stru)
+    connectivity.init_connectivity(test_stru)
+    
+    # Create parameterizer with empty library to force parameterization
     test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
-        ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib_empty"
+        ncaa_param_lib_path=f"{MM_WORK_DIR}/test_ncaa_lib_empty"
     )
-    test_stru = struct.PDBParser().get_structure(
-        f"{MM_DATA_DIR}/3cfr-slp-pea_ah.pdb")
-    test_param_worker.run(test_stru)
+    
+    # Ensure the directory exists and is empty
+    fs.safe_mkdir(f"{MM_WORK_DIR}/test_ncaa_lib_empty")
+    
+    # Run the parameterizer - this should trigger _parameterize_modified_res
+    params = test_param_worker.run(test_stru)
+    
+    # Primary assertion: verify the final parameters are valid
+    assert params.is_valid(), "Generated parameters should be valid"
+    
+    # Verify that .prmtop and .inpcrd files were created and are not empty
+    assert os.path.exists(params.prmtop_path)
+    assert os.path.exists(params.inpcrd_path)
+    assert os.path.getsize(params.prmtop_path) > 0
+    assert os.path.getsize(params.inpcrd_path) > 0
+    
+    # Detailed assertions: check intermediate files in the parameterizer's temp directory
+    temp_dir = test_param_worker.ncaa_param_lib_path
+    
+    # Check for corrected .ac file (should exist for LLP)
+    ac_files = glob.glob(f"{temp_dir}/LLP_*GAFF*.ac")
+    assert len(ac_files) > 0, "Should have generated .ac file for LLP"
+    
+    # Check for .mc file (main chain definition)
+    mc_files = glob.glob(f"{temp_dir}/LLP_*GAFF*.mc") 
+    assert len(mc_files) > 0, "Should have generated .mc file for LLP"
+    
+    # Check for .prepin file (from prepgen)
+    prepin_files = glob.glob(f"{temp_dir}/LLP*.prepin")
+    assert len(prepin_files) > 0, "Should have generated .prepin file for LLP"
+    
+    # Check for final .mol2 file
+    mol2_files = glob.glob(f"{temp_dir}/LLP*.mol2")
+    assert len(mol2_files) > 0, "Should have generated .mol2 file for LLP"
+    
+    # Check for both .frcmod files 
+    frcmod_files = glob.glob(f"{temp_dir}/LLP*.frcmod")
+    assert len(frcmod_files) >= 2, "Should have generated at least 2 .frcmod files for LLP"
+    
+    # Verify backbone atom type correction in .ac file
+    if ac_files:
+        with open(ac_files[0], 'r') as f:
+            ac_content = f.read()
+        
+        # Check for corrected backbone atom types (FF14SB types)
+        assert "       CX" in ac_content or "        N" in ac_content, "Should have corrected backbone atom types"
+        
+        # Should still have GAFF types for sidechain atoms
+        assert "       c3" in ac_content or "       c2" in ac_content, "Should retain GAFF types for sidechain"
+    
+    # Verify ATTN lines were removed from first frcmod file
+    if len(frcmod_files) >= 1:
+        with open(frcmod_files[0], 'r') as f:
+            frcmod_content = f.read()
+        assert "ATTN" not in frcmod_content, "ATTN lines should be removed from first frcmod file"
+    
+    # Clean up
+    # fs.clean_temp_file_n_dir([f"{MM_WORK_DIR}/test_ncaa_lib_empty"])
 
 
 def test_amber_parameterizer_run_lv_6(): #TODO
@@ -399,6 +464,104 @@ def test_run_parmchk2():
     assert os.path.exists(temp_frcmod_file)
     assert len(fs.lines_from_file(temp_frcmod_file)) == 23
     fs.safe_rm(temp_frcmod_file)
+
+
+def test_run_prepgen():
+    """test the run_prepgen function works well"""
+    ai = interface.amber
+    
+    # Use existing test .ac file
+    test_ac_file = f"{MM_NCAA_DIR}/LLP_AM1BCC-AMBER.ac"
+    assert os.path.exists(test_ac_file), f"Test .ac file not found: {test_ac_file}"
+    
+    # Generate a temporary .mc file using the make_mc_file function
+    file = f"{MM_DATA_DIR}/3FCR_connect.pdb"
+    stru = struct.PDBParser().get_structure(file)
+    stru.assign_ncaa_chargespin({"LLP": (-2, 1)})
+    remove_solvent(stru)
+    connectivity.init_connectivity(stru)
+    
+    maa = stru.modified_residue[0]
+    maa_region = create_region_from_residues(residues=[maa], nterm_cap="H", cterm_cap="OH")
+    
+    temp_mc_file = f"{MM_WORK_DIR}/test_LLP.mc"
+    ai.make_mc_file(maa_region, temp_mc_file)
+    
+    # Test output file
+    temp_prepin_file = f"{MM_WORK_DIR}/test_LLP.prepin"
+    
+    # Run prepgen
+    ai.run_prepgen(in_file=test_ac_file,
+                   out_file=temp_prepin_file,
+                   mc_file=temp_mc_file,
+                   residue_name="LLP")
+    
+    # Verify output file exists and is not empty
+    assert os.path.exists(temp_prepin_file)
+    assert os.path.getsize(temp_prepin_file) > 0
+    
+    # Clean up
+    fs.safe_rm(temp_mc_file)
+    fs.safe_rm(temp_prepin_file)
+
+
+def test_correct_atom_types_in_ac_file():
+    """test the _correct_atom_types_in_ac_file function works correctly"""
+    from enzy_htp._interface.amber_interface import AmberParameterizer
+    
+    # Create a test .ac file with GAFF atom types for backbone atoms
+    test_ac_content = """CHARGE     -2.00 ( -2 )
+Formula: H20 C14 N3 O7 P1 
+ATOM      1  N   LLP   289      -5.294  57.398  -9.041 -0.934800        n4
+ATOM      2  H   LLP   289      -4.547  56.832  -8.672  0.294400        hn
+ATOM      3  CA  LLP   289      -6.507  56.533  -9.201  0.170500        c3
+ATOM      4  C   LLP   289      -6.279  55.260 -10.075  0.636100         c
+ATOM      5  O   LLP   289      -5.895  54.198  -9.546 -0.619000         o
+ATOM      6  OXT LLP   289      -6.895  55.198  -11.146 -0.719000        o2
+ATOM      7  CB  LLP   289      -7.725  57.393  -9.645 -0.093400        c3
+ATOM      8  CG  LLP   289      -8.173  58.349  -8.514 -0.112400        c3
+"""
+    
+    test_ac_file = f"{MM_WORK_DIR}/test_correct_atom_types.ac"
+    with open(test_ac_file, 'w') as f:
+        f.write(test_ac_content)
+    
+    # Create a parameterizer instance to access the private method
+    ai = interface.amber
+    parameterizer = ai.build_md_parameterizer()
+    
+    # Call the correction method
+    parameterizer._correct_atom_types_in_ac_file(test_ac_file)
+    
+    # Read the corrected file and verify backbone atom types were changed
+    with open(test_ac_file, 'r') as f:
+        corrected_content = f.read()
+    
+    # Check that backbone atoms were corrected to FF14SB types
+    assert "        N" in corrected_content  # Amide nitrogen should remain N
+    assert "        H" in corrected_content  # Amide hydrogen should remain H  
+    assert "       CX" in corrected_content  # Alpha carbon should become CX
+    assert "        C" in corrected_content  # Carbonyl carbon should remain C
+    assert "        O" in corrected_content  # Carbonyl oxygen should remain O
+    assert "       O2" in corrected_content  # Terminal oxygen should remain O2
+    
+    # Check that sidechain atoms retained GAFF types (c3 for CB, CG)
+    assert "       c3" in corrected_content  # Sidechain carbons should keep c3
+    
+    # Verify specific corrections occurred
+    lines = corrected_content.split('\n')
+    n_line = [line for line in lines if "  N   LLP" in line][0]
+    ca_line = [line for line in lines if "  CA  LLP" in line][0]
+    c_line = [line for line in lines if "  C   LLP" in line][0]
+    cb_line = [line for line in lines if "  CB  LLP" in line][0]
+    
+    assert n_line.endswith("        N")   # N should be corrected to N
+    assert ca_line.endswith("       CX")  # CA should be corrected to CX
+    assert c_line.endswith("        C")   # C should be corrected to C
+    assert cb_line.endswith("       c3")  # CB should retain GAFF c3
+    
+    # Clean up
+    fs.safe_rm(test_ac_file)
 
 
 def test_run_antechamber():
