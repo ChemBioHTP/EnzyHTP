@@ -205,8 +205,8 @@ class Mole2Interface(BaseInterface):
             inner=inner,
             mesh_density=mesh_density,
             software_report_volume=mole2_volume,
-            boundary_residues=boundary_residues,
-            inner_residues=inner_residues,
+            boundary_residues=[x for x in boundary_residues if x is not None],
+            inner_residues=[x for x in inner_residues if x is not None],
             cavity_type=cavity_type
         )
 

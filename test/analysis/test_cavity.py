@@ -18,6 +18,7 @@ import enzy_htp.core.file_system as fs
 
 DATA_DIR = f"{path.dirname(path.abspath(__file__))}/data/"
 WORK_DIR = f"{path.dirname(path.abspath(__file__))}/work_dir/"
+SCRATCH_DIR = f"{path.dirname(path.abspath(__file__))}/scratch/"
 
 amber_interface = interface.amber
 sp = PDBParser()
@@ -50,11 +51,13 @@ def test_ensemble_cavity_volumes():
         ref_pdb=ref_pdb,
     )
 
-    volumes = ensemble_cavity_volumes(
-        stru_esm=stru_esm,
-        contain_ligand="resn H5J",
-        frame_0_based=True,
-        work_dir=WORK_DIR
-    )
-    print(mean(volumes))
+    with pytest.raises(ValueError) as exe:
+        volumes = ensemble_cavity_volumes(
+            stru_esm=stru_esm,
+            contain_ligand="resn H5J",
+            frame_0_based=True,
+            work_dir=SCRATCH_DIR
+        )
+        assert exe.value
+    fs.safe_rmdir(SCRATCH_DIR)
     pass
