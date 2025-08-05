@@ -442,18 +442,23 @@ class AmberParameterizer(MolDynParameterizer):
         corrected_lines = []
         for line in lines:
             if line.startswith("ATOM"):
-                # Parse ATOM line format (typical .ac format)
-                # ATOM     1  N   LYS A   1      28.123  16.244  15.234 -0.415400 n4
+                # Parse ATOM line format - .ac format has fixed-width fields
+                # ATOM      1  N   LLP   289      -5.294  57.398  -9.041 -0.934800        NT
+                # The atom type is at the end of the line after the charge
                 parts = line.split()
-                if len(parts) >= 11:
-                    atom_name = parts[2]
-                    current_atom_type = parts[-1]  # Last field is usually the atom type
+                if len(parts) >= 10:
+                    atom_name = parts[2]  # 3rd field is atom name
+                    current_atom_type = parts[-1]  # Last field is atom type
                     
                     # Check if this is a backbone atom that needs correction
                     if atom_name in atom_map:
-                        # Replace GAFF atom type with standard Amber protein atom type
-                        parts[-1] = atom_map[atom_name]
-                        corrected_line = " ".join(parts) + "\n"
+                        # Replace the atom type at the end of the line while preserving spacing
+                        # Find the position of the last field (atom type) and replace it
+                        last_space_pos = line.rfind(' ')
+                        if last_space_pos != -1:
+                            corrected_line = line[:last_space_pos+1] + atom_map[atom_name] + '\n'
+                        else:
+                            corrected_line = line  # Fallback if parsing fails
                         _LOGGER.debug(f"Corrected atom type for {atom_name}: {current_atom_type} -> {atom_map[atom_name]}")
                     else:
                         corrected_line = line
