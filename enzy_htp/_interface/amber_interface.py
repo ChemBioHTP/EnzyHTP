@@ -362,7 +362,7 @@ class AmberParameterizer(MolDynParameterizer):
         self.parent_interface.run_antechamber(in_file=prepin_path,
                                               out_file=mol2_path,
                                               net_charge=maa.net_charge,
-                                              spin=maa.spin,
+                                              spin=maa.multiplicity,
                                               charge_method=self.charge_method,
                                               res_name=maa.name)
 
@@ -412,60 +412,14 @@ class AmberParameterizer(MolDynParameterizer):
         """
         # Auto-detect force field from parameterizer settings if not provided
         if force_field is None:
-            # Extract protein force field from self.force_fields
-            protein_ff = None
-            for ff in self.force_fields:
-                if "protein.ff" in ff:
-                    if "ff14SB" in ff:
-                        protein_ff = "ff14SB"
-                        break
-                    elif "ff19SB" in ff:
-                        protein_ff = "ff19SB"
-                        break
-                    elif "ff99SB" in ff:
-                        protein_ff = "ff99SB"
-                        break
-            
-            if protein_ff is None:
-                _LOGGER.error("No supported protein force field found in force_fields. Cannot perform atom type correction.")
-                raise ValueError("Unsupported protein force field configuration")
-            
-            force_field = protein_ff
+            force_field = self.parent_interface.get_protein_force_field(self.force_fields)
         
-        # Define backbone atom type mappings for different force fields
-        # Based on Amber parameter library files under $AMBERHOME/dat/leap/lib/
-        backbone_atom_type_map = {
-            "ff14SB": {
-                "N": "N",      # Amide nitrogen
-                "H": "H",      # Amide hydrogen  
-                "CA": "CX",    # Alpha carbon (FF14SB uses CX for CA)
-                "C": "C",      # Carbonyl carbon
-                "O": "O",      # Carbonyl oxygen
-                "OXT": "O2",   # Terminal carboxyl oxygen
-            },
-            "ff19SB": {
-                "N": "N",      # Amide nitrogen
-                "H": "H",      # Amide hydrogen  
-                "CA": "XC",    # Alpha carbon (FF19SB also uses XC for CA)
-                "C": "C",      # Carbonyl carbon
-                "O": "O",      # Carbonyl oxygen
-                "OXT": "O2",   # Terminal carboxyl oxygen
-            },
-            "ff99SB": {
-                "N": "N",      # Amide nitrogen
-                "H": "H",      # Amide hydrogen  
-                "CA": "CT",    # Alpha carbon (FF99SB uses CT for CA)
-                "C": "C",      # Carbonyl carbon
-                "O": "O",      # Carbonyl oxygen
-                "OXT": "O2",   # Terminal carboxyl oxygen
-            }
-        }
-        
-        if force_field not in backbone_atom_type_map:
-            _LOGGER.error(f"Force field {force_field} not supported for atom type correction. Supported: {list(backbone_atom_type_map.keys())}")
+        # Use class variable for backbone atom type mappings
+        if force_field not in self.parent_interface.PROTEIN_FORCE_FIELD_BACKBONE_ATOM_TYPE_MAPPER:
+            _LOGGER.error(f"Force field {force_field} not supported for atom type correction. Supported: {self.parent_interface.SUPPORTED_PROTEIN_FORCE_FIELDS}. Feel free to submit an issue if you need it.")
             raise ValueError(f"Unsupported force field: {force_field}")
         
-        atom_map = backbone_atom_type_map[force_field]
+        atom_map = self.parent_interface.PROTEIN_FORCE_FIELD_BACKBONE_ATOM_TYPE_MAPPER[force_field]
         
         # Read the .ac file
         with open(ac_file_path, 'r') as f:
@@ -519,32 +473,15 @@ class AmberParameterizer(MolDynParameterizer):
             _LOGGER.warning("AMBERHOME not set, cannot determine parameter file path")
             return None
         
-        # Determine the protein force field being used
-        protein_ff = None
-        for ff in self.force_fields:
-            if "protein.ff" in ff:
-                if "ff14SB" in ff:
-                    protein_ff = "ff14SB"
-                    break
-                elif "ff19SB" in ff:
-                    protein_ff = "ff19SB"
-                    break
-                elif "ff99SB" in ff:
-                    protein_ff = "ff99SB"
-                    break
+        # Get the protein force field using the new method
+        protein_ff = self.parent_interface.get_protein_force_field(self.force_fields)
         
-        # Map force fields to their parameter files
-        force_field_parm_map = {
-            "ff14SB": "parm10.dat",
-            "ff19SB": "parm19.dat", 
-            "ff99SB": "parm99.dat"
-        }
-        
-        if protein_ff not in force_field_parm_map:
+        # Use class variable for parameter file mapping
+        if protein_ff not in self.parent_interface.PROTEIN_FORCE_FIELD_PARM_MAPPER:
             _LOGGER.error(f"Unsupported protein force field for parm dat mapping: {protein_ff}")
             raise ValueError(f"Cannot find parameter file for force field: {protein_ff}")
         
-        parm_dat_file = force_field_parm_map[protein_ff]
+        parm_dat_file = self.parent_interface.PROTEIN_FORCE_FIELD_PARM_MAPPER[protein_ff]
         parm_dat_path = f"{amberhome}/dat/leap/parm/{parm_dat_file}"
         
         # Verify the file exists
@@ -1218,6 +1155,44 @@ class AmberInterface(BaseInterface):
     MD_TIMESTEP_SHAKE_MAPPER = {0.000002: (2, 2), 0.000001: (1, 1)}
     """The mapper for mapping timestep - (ntc, ntf) value"""
 
+    SUPPORTED_PROTEIN_FORCE_FIELDS = ["ff14SB", "ff19SB", "ff99SB"]
+    """List of supported protein force fields for MAA parameterization"""
+    
+    PROTEIN_FORCE_FIELD_PARM_MAPPER = {
+        "ff14SB": "parm10.dat",
+        "ff19SB": "parm19.dat", 
+        "ff99SB": "parm99.dat"
+    }
+    """Mapper for protein force fields to their parameter dat files"""
+    
+    PROTEIN_FORCE_FIELD_BACKBONE_ATOM_TYPE_MAPPER = {
+        "ff14SB": {
+            "N": "N",      # Amide nitrogen
+            "H": "H",      # Amide hydrogen  
+            "CA": "CX",    # Alpha carbon (FF14SB uses CX for CA)
+            "C": "C",      # Carbonyl carbon
+            "O": "O",      # Carbonyl oxygen
+            "OXT": "O2",   # Terminal carboxyl oxygen
+        },
+        "ff19SB": {
+            "N": "N",      # Amide nitrogen
+            "H": "H",      # Amide hydrogen  
+            "CA": "XC",    # Alpha carbon (FF19SB uses XC for CA)
+            "C": "C",      # Carbonyl carbon
+            "O": "O",      # Carbonyl oxygen
+            "OXT": "O2",   # Terminal carboxyl oxygen
+        },
+        "ff99SB": {
+            "N": "N",      # Amide nitrogen
+            "H": "H",      # Amide hydrogen  
+            "CA": "CT",    # Alpha carbon (FF99SB uses CT for CA)
+            "C": "C",      # Carbonyl carbon
+            "O": "O",      # Carbonyl oxygen
+            "OXT": "O2",   # Terminal carboxyl oxygen
+        }
+    }
+    """Mapper for protein force fields to backbone atom types"""
+
     def __init__(self, parent, config: AmberConfig = None) -> None:
         """Simplistic constructor that optionally takes an AmberConfig object as its only argument.
         Calls parent class."""
@@ -1237,6 +1212,29 @@ class AmberInterface(BaseInterface):
         if "frcmod" in ext:
             return "frcmod"
         return self.AMBER_FILE_FORMAT_MAPPER.get(ext, ext[1:])
+
+    def get_protein_force_field(self, force_fields: List[str]) -> str:
+        """Extract the protein force field from the force fields list.
+        
+        Args:
+            force_fields: List of force fields to search.
+            
+        Returns:
+            The detected protein force field (e.g., "ff14SB", "ff19SB", "ff99SB")
+            
+        Raises:
+            ValueError: If no supported protein force field is found
+        """        
+        # Search for supported protein force fields in the list
+        for ff in force_fields:
+            if "protein.ff" in ff:
+                for supported_ff in self.SUPPORTED_PROTEIN_FORCE_FIELDS:
+                    if supported_ff in ff:
+                        return supported_ff
+        
+        # If no protein force field found, raise error
+        _LOGGER.error(f"No supported protein force field found in {force_fields}. Supported: {self.SUPPORTED_PROTEIN_FORCE_FIELDS}")
+        raise ValueError(f"Unsupported protein force field configuration: {force_fields}")
 
     def convert_traj_to_nc(self, traj_path: str, out_path: str, topology_path: str = str()) -> None:
         """Convert the given trajectory file to the Amber `.nc` format file in the out_path.
@@ -1491,12 +1489,27 @@ class AmberInterface(BaseInterface):
             mc_file: the main chain definition file path (.mc)
             residue_name: the name of the residue
         """
-        cmd_args = ["-i", in_file,
-                    "-o", out_file,
-                    "-m", mc_file,
-                    "-rn", residue_name]
+        import os
         
-        self.env_manager_.run_command("prepgen", cmd_args)
+        # prepgen seems to have issues with very long absolute paths
+        # Use relative paths by changing to the directory containing the files
+        base_dir = os.path.dirname(os.path.abspath(in_file))
+        in_basename = os.path.basename(in_file)
+        out_basename = os.path.basename(out_file)
+        mc_basename = os.path.basename(mc_file)
+        
+        # Change to the directory and use relative paths
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(base_dir)
+            cmd_args = ["-i", in_basename,
+                        "-o", out_basename,
+                        "-m", mc_basename,
+                        "-rn", residue_name]
+            
+            self.env_manager_.run_command("prepgen", cmd_args)
+        finally:
+            os.chdir(original_cwd)
 
     # -- add_pdb --
     def run_add_pdb(self, in_prmtop: str, out_path: str, ref_pdb: str, guess: bool = False):

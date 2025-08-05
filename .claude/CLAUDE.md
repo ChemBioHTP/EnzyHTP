@@ -26,6 +26,8 @@ The commands below are examples; you should replace file paths and test names wi
 - **Run tests by marker:**
     `pytest -m "interface"`
 
+IMPORTANT! Always run the unit test you wrote and make sure they passes so that the function is complete and working!
+
 #### Test Markers
 
 The following markers are available to run specific subsets of tests:
