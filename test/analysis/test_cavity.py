@@ -6,16 +6,20 @@ Created: 2025-06-02
 
 # Here put the import lib.
 from os import path
+from statistics import mean
 import glob
 import pytest
 import numpy as np
 
+from enzy_htp import interface
 from enzy_htp.structure import PDBParser
-from enzy_htp.analysis.cavity import identify_stru_cavities
+from enzy_htp.analysis.cavity import identify_stru_cavities, ensemble_cavity_volumes
 import enzy_htp.core.file_system as fs
 
 DATA_DIR = f"{path.dirname(path.abspath(__file__))}/data/"
 WORK_DIR = f"{path.dirname(path.abspath(__file__))}/work_dir/"
+
+amber_interface = interface.amber
 sp = PDBParser()
 
 def test_identify_stru_cavities():
@@ -33,3 +37,24 @@ def test_identify_stru_cavities():
     assert len(cavity.inner_residues) == 31
     assert abs(cavity.volume - 1147) < 1
     assert abs(cavity.software_report_volume - 947) < 1
+
+def test_ensemble_cavity_volumes():
+    """Test `ensemble_cavity_volumes` function."""
+    prmtop_path = path.join(DATA_DIR, "test_spi.prmtop")
+    traj_path = path.join(DATA_DIR, "test_spi.mdcrd")
+    ref_pdb = path.join(DATA_DIR, "test_spi_chainid.pdb")
+
+    stru_esm = amber_interface.load_traj(
+        prmtop_path=prmtop_path,
+        traj_path=traj_path,
+        ref_pdb=ref_pdb,
+    )
+
+    volumes = ensemble_cavity_volumes(
+        stru_esm=stru_esm,
+        contain_ligand="resn H5J",
+        frame_0_based=True,
+        work_dir=WORK_DIR
+    )
+    print(mean(volumes))
+    pass

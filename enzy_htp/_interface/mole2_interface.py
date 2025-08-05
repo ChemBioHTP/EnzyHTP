@@ -256,10 +256,10 @@ class Mole2Interface(BaseInterface):
         fs.safe_mkdir(work_dir)
         fs.safe_rmdir(f"{work_dir}/mesh/")
         
-        pdb_filepath = fs.get_valid_temp_name(path.join(work_dir, "stru_cavity_temp.pdb"), ext_set=["pdb"])
-        sp.save_structure(outfile=pdb_filepath, stru=stru)
+        temp_pdb_filepath = fs.get_valid_temp_name(path.join(work_dir, "stru_cavity_temp.pdb"), ext_set=["pdb"])
+        sp.save_structure(outfile=temp_pdb_filepath, stru=stru)
 
-        input_xml_filepath: str = self._write_xml_input(pdb_filepath, work_dir, non_active_parts, probe, inner, mesh_density, ignore_hetatm)
+        input_xml_filepath: str = self._write_xml_input(temp_pdb_filepath, work_dir, non_active_parts, probe, inner, mesh_density, ignore_hetatm)
 
         if use_mono:
             self.env_manager_.run_command(self.config_.MONO, [self.config_.MOLE2, input_xml_filepath])
@@ -283,6 +283,14 @@ class Mole2Interface(BaseInterface):
                     cavity_id=(i+1), cavity_xml_filepath=cavities_xml_file, cavity_type="Void")
             )
 
-        fs.clean_temp_file_n_dir([cavity_mesh_files, void_mesh_files, cavities_xml_file, input_xml_filepath])
+        fs.clean_temp_file_n_dir(
+            [
+                path.join(work_dir, "mesh"), 
+                path.join(work_dir, "xml"), 
+                cavities_xml_file, 
+                input_xml_filepath, 
+                temp_pdb_filepath
+            ]
+        )
         
         return result

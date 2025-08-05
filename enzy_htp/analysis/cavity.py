@@ -89,6 +89,8 @@ def _choose_cavity(cavity_list: List[Cavity],
         stru = cavity_list[0].stru
         ligand_selection = select_stru(stru=stru, pattern=contain_ligand)
         ligand_atom_points = [np.array(atom.coord) for atom in ligand_selection.atoms]
+        if (len(ligand_atom_points) == 0):  # If nothing selected.
+            return None, 0
         cavity_point_dict = dict()  # A dict recording how many atoms are contained by each cavity.
         for cavity in cavity_list:
             contain_point_list = cavity.contains_array(ligand_atom_points)
@@ -96,6 +98,7 @@ def _choose_cavity(cavity_list: List[Cavity],
             if (contain_point_count > 0):
                 cavity_point_dict[cavity] = contain_point_count
             continue
+        _LOGGER.info(cavity_point_dict)
         if (len(cavity_point_dict.keys()) > 0):
             # Return the cavity containing most atoms of the ligand.
             selected_cavity = cavity_list[max(cavity_point_dict, key=cavity_point_dict.get)]
@@ -145,12 +148,12 @@ def ensemble_cavity_volumes(
     esm_cavities: List[Cavity] = list()
     structure_0 = stru_esm.structure_0
 
-    target_cavity_confirmed = None
+    confirmed_target_cavity = None
     if frame_0_based:   # Confirm the target cavity if `frame_0_based=True`.
         frame_0_cavities = identify_stru_cavities(stru=structure_0, work_dir=work_dir, engine=engine, **kwargs)
-        target_cavity_confirmed, _ = _choose_cavity(cavity_list=frame_0_cavities, 
+        confirmed_target_cavity, _ = _choose_cavity(cavity_list=frame_0_cavities, 
             composing_residues=composing_residues, contain_ligand=contain_ligand, target_cavity=target_cavity)
-        if (target_cavity_confirmed is None):
+        if (confirmed_target_cavity is None):
             _LOGGER.error("Unable to identify target cavity from frame 0 structure.")
             raise ValueError()
         else:
@@ -158,12 +161,12 @@ def ensemble_cavity_volumes(
             composing_residues = None
             contain_ligand = None
     else:
-        target_cavity_confirmed = target_cavity
+        confirmed_target_cavity = target_cavity
     
-    for stru_frame in stru_esm.structures(remove_solvent=True):     # Iterate over the ensemble.
+    for stru_frame, _, _ in stru_esm.structures(remove_solvent=True):     # Iterate over the ensemble.
         frame_cavities = identify_stru_cavities(stru=stru_frame, work_dir=work_dir, engine=engine, **kwargs)
         cavity, max_overlap = _choose_cavity(cavity_list=frame_cavities, 
-            composing_residues=composing_residues, contain_ligand=contain_ligand, target_cavity=target_cavity_confirmed)
+            composing_residues=composing_residues, contain_ligand=contain_ligand, target_cavity=confirmed_target_cavity)
         esm_cavities.append(cavity)
         continue
 
