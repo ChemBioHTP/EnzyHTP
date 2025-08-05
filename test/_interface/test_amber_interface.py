@@ -326,7 +326,8 @@ def test_amber_parameterizer_run_lv_6(): #TODO
     Test structure diversity:
     - 2 polypeptide chain
     - 1 substrate (CHONP)
-    - 1 modified amino acid (CHONP)"""
+    - 1 modified amino acid (CHONP)
+    - 1 metal center"""
     ai = interface.amber
     test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
         ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib_empty"

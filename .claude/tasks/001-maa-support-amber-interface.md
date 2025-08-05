@@ -51,13 +51,32 @@ The agent should focus its work on `enzy_htp/_interface/amber_interface.py`.
 
 ## Testing Plan
 
-To verify the implementation, the agent should:
+The current test suite in `test/_interface/test_amber_interface.py` already contains stubs and tests for handling modified amino acids, which we can build upon.
 
-1.  **Create a new test case:** Add a new test function in `test/interface/test_amber_interface.py`.
-2.  **Use a real MAA:** The test should use a `Structure` object containing a known modified amino acid (e.g., phosphotyrosine).
-3.  **Run the parameterizer:** The test should instantiate `AmberParameterizer` and call the `run` method on the test structure.
-4.  **Assert file creation:** The test should assert that the final `.inpcrd` and `.prmtop` files are created and are not empty.
-5.  **(Optional) Inspect generated files:** For a more thorough test, the generated `.mol2` and `.frcmod` files for the MAA can be inspected to ensure they are chemically reasonable.
+1.  **Existing Tests for MAA:**
+    *   `test_ncaa_to_moldesc_modaa`: This test correctly uses `3FCR_protonated.pdb` (containing the modified residue LLP) to test the `antechamber_ncaa_to_moldesc` function. This is a good unit test for the first step of the parameterization process.
+    *   `test_make_mc_file`: This test uses `3FCR_connect.pdb` (also with LLP) to test the creation of the `.mc` file, which is another crucial step.
+    *   `test_amber_parameterizer_run_lv_5` and `test_amber_parameterizer_run_lv_6` are marked as `TODO` and are intended as end-to-end tests for structures with modified residues.
+
+2.  **Proposed Test Implementation:**
+
+    We should focus on completing `test_amber_parameterizer_run_lv_5` to serve as the main integration test for the entire MAA parameterization workflow.
+
+    *   **Test Case:** Complete the implementation of `test_amber_parameterizer_run_lv_5`.
+    *   **PDB File to Re-use:** This test should use the `3FCR_protonated.pdb` file. This file is already used in `test_ncaa_to_moldesc_modaa`, contains the modified amino acid `LLP`, and is suitable for an end-to-end test. Using the same PDB file will ensure consistency across related tests.
+    *   **Test Logic:**
+        1.  Load the `Structure` from `3FCR_protonated.pdb`.
+        2.  Instantiate the `AmberParameterizer`.
+        3.  Run the parameterizer on the structure: `params = parameterizer.run(structure)`.
+        4.  **Primary Assertion:** Assert that the final `.prmtop` and `.inpcrd` files are created and are not empty by calling `params.is_valid()`.
+        5.  **Detailed Assertions (recommended):** To ensure the implementation is correct, the test should also verify the intermediate steps within the `_parameterize_modified_res` method. This can be done by inspecting the files in the parameterizer's temporary directory.
+            *   Verify the creation of the corrected `.ac` file and check that the backbone atom types have been correctly replaced while sidechain atoms retain GAFF types.
+            *   Verify the creation of the `.mc` file.
+            *   Verify the creation of the `.prepin` file by `prepgen`.
+            *   Verify the creation of the final `.mol2` file for the MAA.
+            *   Verify that two `.frcmod` files are generated and that the first one has the `ATTN` lines removed.
+
+By completing `test_amber_parameterizer_run_lv_5` with these detailed assertions, we can be confident that the entire MAA parameterization workflow is functioning as expected. No new test files are needed; we can leverage the existing structure.
 
 ## Definition of Done
 
