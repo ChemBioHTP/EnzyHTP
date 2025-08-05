@@ -372,13 +372,8 @@ class AmberParameterizer(MolDynParameterizer):
         frcmod2_path = fs.get_valid_temp_name(
             f"{self.ncaa_param_lib_path}/{maa.name}.frcmod2")
         
-        # First call: with annotation and custom force field path for ff14SB
-        amberhome = os.environ.get('AMBERHOME', '')
-        if amberhome:
-            parm_dat_path = f"{amberhome}/dat/leap/parm/parm10.dat"
-        else:
-            _LOGGER.warning("AMBERHOME not set, using default parameter file path")
-            parm_dat_path = None
+        # First call: with annotation and custom force field path
+        parm_dat_path = self._get_force_field_parm_dat_path()
         
         if parm_dat_path:
             self.parent_interface.run_parmchk2(in_file=prepin_path,
@@ -408,15 +403,37 @@ class AmberParameterizer(MolDynParameterizer):
                                            gaff_type=gaff_type)
         return mol2_path, [frcmod_path, frcmod2_path] # TODO make sure whether mol2 works or do we even need it?
 
-    def _correct_atom_types_in_ac_file(self, ac_file_path: str, force_field: str = "ff14SB") -> None:
+    def _correct_atom_types_in_ac_file(self, ac_file_path: str, force_field: str = None) -> None:
         """Correct GAFF atom types to standard Amber protein atom types for backbone atoms.
         
         Args:
             ac_file_path: Path to the .ac file to modify
-            force_field: Force field to use for atom type mapping (default: ff14SB)
+            force_field: Force field to use for atom type mapping. If None, will be determined from self.force_fields
         """
+        # Auto-detect force field from parameterizer settings if not provided
+        if force_field is None:
+            # Extract protein force field from self.force_fields
+            protein_ff = None
+            for ff in self.force_fields:
+                if "protein.ff" in ff:
+                    if "ff14SB" in ff:
+                        protein_ff = "ff14SB"
+                        break
+                    elif "ff19SB" in ff:
+                        protein_ff = "ff19SB"
+                        break
+                    elif "ff99SB" in ff:
+                        protein_ff = "ff99SB"
+                        break
+            
+            if protein_ff is None:
+                _LOGGER.error("No supported protein force field found in force_fields. Cannot perform atom type correction.")
+                raise ValueError("Unsupported protein force field configuration")
+            
+            force_field = protein_ff
+        
         # Define backbone atom type mappings for different force fields
-        # Standard Amber protein backbone atom types for FF14SB
+        # Based on Amber parameter library files under $AMBERHOME/dat/leap/lib/
         backbone_atom_type_map = {
             "ff14SB": {
                 "N": "N",      # Amide nitrogen
@@ -425,12 +442,28 @@ class AmberParameterizer(MolDynParameterizer):
                 "C": "C",      # Carbonyl carbon
                 "O": "O",      # Carbonyl oxygen
                 "OXT": "O2",   # Terminal carboxyl oxygen
+            },
+            "ff19SB": {
+                "N": "N",      # Amide nitrogen
+                "H": "H",      # Amide hydrogen  
+                "CA": "XC",    # Alpha carbon (FF19SB also uses XC for CA)
+                "C": "C",      # Carbonyl carbon
+                "O": "O",      # Carbonyl oxygen
+                "OXT": "O2",   # Terminal carboxyl oxygen
+            },
+            "ff99SB": {
+                "N": "N",      # Amide nitrogen
+                "H": "H",      # Amide hydrogen  
+                "CA": "CT",    # Alpha carbon (FF99SB uses CT for CA)
+                "C": "C",      # Carbonyl carbon
+                "O": "O",      # Carbonyl oxygen
+                "OXT": "O2",   # Terminal carboxyl oxygen
             }
         }
         
         if force_field not in backbone_atom_type_map:
-            _LOGGER.warning(f"Force field {force_field} not supported for atom type correction. Using ff14SB.")
-            force_field = "ff14SB"
+            _LOGGER.error(f"Force field {force_field} not supported for atom type correction. Supported: {list(backbone_atom_type_map.keys())}")
+            raise ValueError(f"Unsupported force field: {force_field}")
         
         atom_map = backbone_atom_type_map[force_field]
         
@@ -474,6 +507,52 @@ class AmberParameterizer(MolDynParameterizer):
             f.writelines(corrected_lines)
         
         _LOGGER.debug(f"Corrected backbone atom types in {ac_file_path}")
+
+    def _get_force_field_parm_dat_path(self) -> str:
+        """Get the parameter dat file path for the current force field configuration.
+        
+        Returns:
+            Path to the appropriate parm dat file, or None if not found
+        """
+        amberhome = os.environ.get('AMBERHOME', '')
+        if not amberhome:
+            _LOGGER.warning("AMBERHOME not set, cannot determine parameter file path")
+            return None
+        
+        # Determine the protein force field being used
+        protein_ff = None
+        for ff in self.force_fields:
+            if "protein.ff" in ff:
+                if "ff14SB" in ff:
+                    protein_ff = "ff14SB"
+                    break
+                elif "ff19SB" in ff:
+                    protein_ff = "ff19SB"
+                    break
+                elif "ff99SB" in ff:
+                    protein_ff = "ff99SB"
+                    break
+        
+        # Map force fields to their parameter files
+        force_field_parm_map = {
+            "ff14SB": "parm10.dat",
+            "ff19SB": "parm19.dat", 
+            "ff99SB": "parm99.dat"
+        }
+        
+        if protein_ff not in force_field_parm_map:
+            _LOGGER.error(f"Unsupported protein force field for parm dat mapping: {protein_ff}")
+            raise ValueError(f"Cannot find parameter file for force field: {protein_ff}")
+        
+        parm_dat_file = force_field_parm_map[protein_ff]
+        parm_dat_path = f"{amberhome}/dat/leap/parm/{parm_dat_file}"
+        
+        # Verify the file exists
+        if not os.path.exists(parm_dat_path):
+            _LOGGER.warning(f"Parameter file not found: {parm_dat_path}")
+            return None
+        
+        return parm_dat_path
 
     def _parameterize_metalcenter(self, metal: MetalUnit,
                                   ligand_parms: Dict[str, Tuple[str, List[str]]],
@@ -2754,10 +2833,8 @@ class AmberInterface(BaseInterface):
                           " Structure.assign_ncaa_chargespin()")
             raise ValueError
 
-        if ncaa.is_modified():
-            atom_type = "AMBER"
-        else:
-            atom_type = gaff_type
+        # Use GAFF atom types for both modified amino acids and ligands
+        atom_type = gaff_type
 
         multiplicity = ncaa.multiplicity
         net_charge = ncaa.net_charge
