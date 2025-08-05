@@ -350,7 +350,7 @@ class AmberParameterizer(MolDynParameterizer):
 
         # 4. Run prepgen on ac & mc to get prepin
         prepin_path = fs.get_valid_temp_name(
-            f"{self.ncaa_param_lib_path}/{maa.name}.prepin")
+            f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.prepin")
         self.parent_interface.run_prepgen(in_file=mol_desc_path,
                                           out_file=prepin_path,
                                           mc_file=mc_path,
@@ -358,7 +358,7 @@ class AmberParameterizer(MolDynParameterizer):
 
         # 5. Run antechamber on prepin to get mol2
         mol2_path = fs.get_valid_temp_name(
-            f"{self.ncaa_param_lib_path}/{maa.name}.mol2")
+            f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.mol2")
         self.parent_interface.run_antechamber(in_file=prepin_path,
                                               out_file=mol2_path,
                                               net_charge=maa.net_charge,
@@ -368,9 +368,9 @@ class AmberParameterizer(MolDynParameterizer):
 
         # 6. Run parmchk2 twice on prepin to get frcmod files
         frcmod_path = fs.get_valid_temp_name(
-            f"{self.ncaa_param_lib_path}/{maa.name}.frcmod")
+            f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.frcmod")
         frcmod2_path = fs.get_valid_temp_name(
-            f"{self.ncaa_param_lib_path}/{maa.name}.frcmod2")
+            f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.frcmod2")
         
         # First call: with annotation and custom force field path
         parm_dat_path = self._get_force_field_parm_dat_path()
@@ -1227,10 +1227,20 @@ class AmberInterface(BaseInterface):
         """        
         # Search for supported protein force fields in the list
         for ff in force_fields:
-            if "protein.ff" in ff:
-                for supported_ff in self.SUPPORTED_PROTEIN_FORCE_FIELDS:
-                    if supported_ff in ff:
-                        return supported_ff
+            # Convert to uppercase for case-insensitive comparison
+            ff_upper = ff.upper()
+            
+            # Check both with and without protein.ff prefix for flexibility
+            for supported_ff in self.SUPPORTED_PROTEIN_FORCE_FIELDS:
+                supported_ff_upper = supported_ff.upper()
+                
+                # Match with protein.ff prefix (most common case)
+                if f"PROTEIN.{supported_ff_upper}" in ff_upper:
+                    return supported_ff
+                
+                # Match without prefix for flexibility (exact match only)
+                if ff_upper == supported_ff_upper:
+                    return supported_ff
         
         # If no protein force field found, raise error
         _LOGGER.error(f"No supported protein force field found in {force_fields}. Supported: {self.SUPPORTED_PROTEIN_FORCE_FIELDS}")
@@ -1489,8 +1499,6 @@ class AmberInterface(BaseInterface):
             mc_file: the main chain definition file path (.mc)
             residue_name: the name of the residue
         """
-        import os
-        
         # prepgen seems to have issues with very long absolute paths
         # Use relative paths by changing to the directory containing the files
         base_dir = os.path.dirname(os.path.abspath(in_file))
@@ -1500,15 +1508,18 @@ class AmberInterface(BaseInterface):
         
         # Change to the directory and use relative paths
         original_cwd = os.getcwd()
+        os.chdir(base_dir)
         try:
-            os.chdir(base_dir)
             cmd_args = ["-i", in_basename,
                         "-o", out_basename,
                         "-m", mc_basename,
                         "-rn", residue_name]
             
             self.env_manager_.run_command("prepgen", cmd_args)
+        except Exception as e:
+            raise e
         finally:
+            # Always restore original directory, but let exceptions propagate
             os.chdir(original_cwd)
 
     # -- add_pdb --
