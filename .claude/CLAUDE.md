@@ -108,8 +108,9 @@ New science API modules may be added in the future following the same patterns. 
 
 ### Code Quality
 
-`yapf --in-place <file_path>`: Formats a Python file using the project's `yapf` style.
-- **IMPORTANT:** Only use this for new files. For existing files, follow the established formatting to avoid unnecessary changes.
+- MAKE SURE you write state-of-the-art quality code. Make it modular, robust, extensible, and maintainable.
+- `yapf --in-place <file_path>`: Formats a Python file using the project's `yapf` style.
+- **IMPORTANT:** Only use yapf for new files. For existing files, follow the established formatting to avoid unnecessary changes.
 
 ### Import Organization
 Order imports by length within two sections:
