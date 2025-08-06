@@ -56,4 +56,41 @@ def test_connected_structure_deepcopy():
     # Test deepcopy AFTER connectivity initialization
     copied_stru_after = copy.deepcopy(test_stru)
 
-    # TODO also make sure the copied structure is connected and connectivity is correct. Same 5 atoms for test.
+    # Verify the copied structure maintains connectivity
+    # Test that the modified residue is still connected in the copied structure
+    assert len(copied_stru_after.modified_residue) > 0, "Copied structure should have modified residue"
+    assert copied_stru_after.modified_residue[0].is_connected(), "Copied structure's modified residue should be connected"
+    
+    # Verify connectivity integrity by checking a few atoms from the modified residue
+    # Get the first modified residue (LLP) and check connectivity of its atoms
+    original_maa = test_stru.modified_residue[0]
+    copied_maa = copied_stru_after.modified_residue[0]
+    
+    # Test connectivity for 5 key atoms: N, CA, C, CB, and one sidechain atom
+    test_atom_names = ['N', 'CA', 'C', 'CB', 'P1']  # P1 is specific to LLP residue
+    
+    for atom_name in test_atom_names:
+        original_atom = None
+        copied_atom = None
+        
+        # Find the atoms in both structures
+        for atom in original_maa.atoms:
+            if atom.name == atom_name:
+                original_atom = atom
+                break
+        for atom in copied_maa.atoms:
+            if atom.name == atom_name:
+                copied_atom = atom
+                break
+        
+        # If atom exists in original, it should exist in copy with same connectivity
+        if original_atom is not None:
+            assert copied_atom is not None, f"Atom {atom_name} should exist in copied structure"
+            assert original_atom.is_connected() == copied_atom.is_connected(), \
+                f"Atom {atom_name} connectivity should be preserved in copy"
+            
+            # Check that connected atoms count is the same
+            original_connections = len(original_atom.connect_nodes)
+            copied_connections = len(copied_atom.connect_nodes)
+            assert original_connections == copied_connections, \
+                f"Atom {atom_name} should have same number of connections ({original_connections}) in copy, got {copied_connections}"
