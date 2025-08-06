@@ -36,7 +36,7 @@ def test_connectivity_maa():
     assert test_stru.modified_residue[0].is_connected()
 
 
-def test_connected_structure_deepcopyn():
+def test_connected_structure_deepcopy():
     """Test to make sure deepcopy works on connected structures.
     NOTE: This test used to fail because the default deep copier walks the entire
     connectivity graph depth-first, so on large molecules it can exceed Python's

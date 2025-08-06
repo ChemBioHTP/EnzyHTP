@@ -384,7 +384,7 @@ def test_amber_parameterizer_run_lv_5():
         assert "ATTN" not in frcmod_content, "ATTN lines should be removed from first frcmod file"
     
     # Clean up
-    fs.clean_temp_file_n_dir([f"{MM_WORK_DIR}test_ncaa_lib_empty"])
+    # fs.clean_temp_file_n_dir([f"{MM_WORK_DIR}test_ncaa_lib_empty"])
 
 
 def test_amber_parameterizer_run_lv_6(): #TODO
