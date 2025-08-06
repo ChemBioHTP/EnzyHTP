@@ -1517,17 +1517,17 @@ class AmberInterface(BaseInterface):
         - If mc file path > 20 characters, copy it to work_dir with short name "temp.mc"
         - Clean up intermediate files before changing directory back
         """        
-        # Set up working directory
-        if work_dir is None:
-            work_dir = os.getcwd()
-        else:
-            fs.safe_mkdir(work_dir)
         temp_paths = [
             "ATOMTYPE.INF",
             "NEWPDB.PDB", 
             "PREP.INF",
-            work_dir,
         ]
+        # Set up working directory
+        if work_dir is None:
+            work_dir = os.getcwd()
+        elif not os.path.exists(work_dir):
+            fs.safe_mkdir(work_dir)
+            temp_paths.append(work_dir) # avoid deleting an existing empty directory that other processes may use
         
         # Get absolute paths
         abs_in_file = os.path.abspath(in_file)
