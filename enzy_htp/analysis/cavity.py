@@ -150,7 +150,13 @@ def ensemble_cavity_volumes(
 
     confirmed_target_cavity = None
     if frame_0_based:   # Confirm the target cavity if `frame_0_based=True`.
-        frame_0_cavities = identify_stru_cavities(stru=structure_0, work_dir=work_dir, engine=engine, **kwargs)
+        non_active_residues = []
+        if (kwargs.get(contain_ligand)):
+            ligand_selection = select_stru(stru=structure_0, pattern=kwargs.get(contain_ligand))
+            non_active_residues = ligand_selection.involved_residues
+        frame_0_cavities = identify_stru_cavities(stru=structure_0, 
+            work_dir=work_dir, engine=engine, 
+            non_active_residues=non_active_residues, **kwargs)
         confirmed_target_cavity, _ = _choose_cavity(cavity_list=frame_0_cavities, 
             composing_residues=composing_residues, contain_ligand=contain_ligand, target_cavity=target_cavity)
         if (confirmed_target_cavity is None):
@@ -164,7 +170,12 @@ def ensemble_cavity_volumes(
         confirmed_target_cavity = target_cavity
     
     for stru_frame, _, _ in stru_esm.structures(remove_solvent=True):     # Iterate over the ensemble.
-        frame_cavities = identify_stru_cavities(stru=stru_frame, work_dir=work_dir, engine=engine, **kwargs)
+        non_active_residues = []
+        if (kwargs.get(contain_ligand)):
+            ligand_selection = select_stru(stru=structure_0, pattern=kwargs.get(contain_ligand))
+            non_active_residues = ligand_selection.involved_residues
+        frame_cavities = identify_stru_cavities(stru=stru_frame, work_dir=work_dir, engine=engine, 
+            non_active_residues=non_active_residues, **kwargs)
         cavity, max_overlap = _choose_cavity(cavity_list=frame_cavities, 
             composing_residues=composing_residues, contain_ligand=contain_ligand, target_cavity=confirmed_target_cavity)
         esm_cavities.append(cavity)
