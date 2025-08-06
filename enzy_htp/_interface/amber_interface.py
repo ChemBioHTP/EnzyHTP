@@ -41,6 +41,7 @@ from enzy_htp.core.job_manager import ClusterJob, ClusterJobConfig
 from enzy_htp.core.exception import AddPDBError, tLEaPError, AmberMDError
 from enzy_htp.core.general import get_interval_str_from_list, load_obj, save_obj
 from enzy_htp.chemical import QMLevelOfTheory
+from enzy_htp.chemical.force_field import AMBER_PROTEIN_FF_BACKBONE_ATOM_TYPE_MAPPER
 from enzy_htp._config.amber_config import AmberConfig, default_amber_config
 from enzy_htp.structure.structure_io import pdb_io, prmtop_io
 from enzy_htp.structure.structure_constraint import (
@@ -425,11 +426,11 @@ class AmberParameterizer(MolDynParameterizer):
             force_field = self.parent_interface.get_protein_force_field(self.force_fields)
         
         # Use class variable for backbone atom type mappings
-        if force_field not in self.parent_interface.PROTEIN_FORCE_FIELD_BACKBONE_ATOM_TYPE_MAPPER:
-            _LOGGER.error(f"Force field {force_field} not supported for atom type correction. Supported: {self.parent_interface.SUPPORTED_PROTEIN_FORCE_FIELDS}. Feel free to submit an issue if you need it.")
+        if force_field not in AMBER_PROTEIN_FF_BACKBONE_ATOM_TYPE_MAPPER:
+            _LOGGER.error(f"Force field {force_field} not supported for atom type correction. Supported: {list(AMBER_PROTEIN_FF_BACKBONE_ATOM_TYPE_MAPPER.keys())}. Feel free to submit an issue if you need it.")
             raise ValueError(f"Unsupported force field: {force_field}")
         
-        atom_map = self.parent_interface.PROTEIN_FORCE_FIELD_BACKBONE_ATOM_TYPE_MAPPER[force_field]
+        atom_map = AMBER_PROTEIN_FF_BACKBONE_ATOM_TYPE_MAPPER[force_field]
         
         # Read the .ac file
         with open(ac_file_path, 'r') as f:
@@ -1287,7 +1288,7 @@ class AmberInterface(BaseInterface):
     }
     """map semi-emperical method name to sqm keyword. record all of them from Amber20."""
 
-    SUPPORTED_PROTEIN_FORCE_FIELDS = ["ff14SB", "ff19SB", "ff99SB"]
+    SUPPORTED_PROTEIN_FORCE_FIELDS = list(AMBER_PROTEIN_FF_BACKBONE_ATOM_TYPE_MAPPER.keys())
     """List of supported protein force fields for MAA parameterization"""
     
     PROTEIN_FORCE_FIELD_PARM_MAPPER = {
@@ -1296,34 +1297,6 @@ class AmberInterface(BaseInterface):
         "ff99SB": "parm99.dat"
     }
     """Mapper for protein force fields to their parameter dat files"""
-    
-    PROTEIN_FORCE_FIELD_BACKBONE_ATOM_TYPE_MAPPER = {
-        "ff14SB": {
-            "N": "N",      # Amide nitrogen
-            "H": "H",      # Amide hydrogen  
-            "CA": "CX",    # Alpha carbon (FF14SB uses CX for CA)
-            "C": "C",      # Carbonyl carbon
-            "O": "O",      # Carbonyl oxygen
-            "OXT": "O2",   # Terminal carboxyl oxygen
-        },
-        "ff19SB": {
-            "N": "N",      # Amide nitrogen
-            "H": "H",      # Amide hydrogen  
-            "CA": "XC",    # Alpha carbon (FF19SB uses XC for CA)
-            "C": "C",      # Carbonyl carbon
-            "O": "O",      # Carbonyl oxygen
-            "OXT": "O2",   # Terminal carboxyl oxygen
-        },
-        "ff99SB": {
-            "N": "N",      # Amide nitrogen
-            "H": "H",      # Amide hydrogen  
-            "CA": "CT",    # Alpha carbon (FF99SB uses CT for CA)
-            "C": "C",      # Carbonyl carbon
-            "O": "O",      # Carbonyl oxygen
-            "OXT": "O2",   # Terminal carboxyl oxygen
-        }
-    }
-    """Mapper for protein force fields to backbone atom types"""
 
     def __init__(self, parent, config: AmberConfig = None) -> None:
         """Simplistic constructor that optionally takes an AmberConfig object as its only argument.
