@@ -2018,7 +2018,7 @@ def test_get_protein_force_field():
     # Test normal cases with protein.ff prefix
     assert ai.get_protein_force_field(["protein.ff14SB"]) == "ff14SB"
     assert ai.get_protein_force_field(["protein.ff19SB"]) == "ff19SB"
-    assert ai.get_protein_force_field(["protein.ff99SB"]) == "ff99SB"
+    assert ai.get_protein_force_field(["protein.fb15"]) == "fb15"
     
     # Test with multiple force fields
     assert ai.get_protein_force_field(["water.tip3p", "protein.ff14SB", "gaff2"]) == "ff14SB"
@@ -2026,12 +2026,12 @@ def test_get_protein_force_field():
     # Test case insensitive matching - now should work
     assert ai.get_protein_force_field(["protein.ff14sb"]) == "ff14SB"
     assert ai.get_protein_force_field(["PROTEIN.FF19SB"]) == "ff19SB"
-    assert ai.get_protein_force_field(["protein.FF99sb"]) == "ff99SB"
+    assert ai.get_protein_force_field(["protein.FB15"]) == "fb15"
     
     # Test flexibility without protein.ff prefix - now should work  
     assert ai.get_protein_force_field(["ff14SB"]) == "ff14SB"
     assert ai.get_protein_force_field(["ff19sb"]) == "ff19SB"
-    assert ai.get_protein_force_field(["FF99SB"]) == "ff99SB"
+    assert ai.get_protein_force_field(["fb15"]) == "fb15"
     
     # Test mixed case with multiple entries
     assert ai.get_protein_force_field(["water.tip3p", "ff14sb", "gaff2"]) == "ff14SB"
@@ -2041,13 +2041,54 @@ def test_get_protein_force_field():
         ai.get_protein_force_field(["water.tip3p", "gaff2"])  # No protein force field
     
     with pytest.raises(ValueError):
-        ai.get_protein_force_field(["protein.ff20SB"])  # Unsupported force field
+        ai.get_protein_force_field(["protein.ff99SB"])  # Unsupported force field
     
     with pytest.raises(ValueError):
         ai.get_protein_force_field([])  # Empty list
     
     with pytest.raises(ValueError):
-        ai.get_protein_force_field(["ff20sb"])  # Unsupported force field without prefix
+        ai.get_protein_force_field(["ff99SB"])  # Unsupported force field without prefix
+
+
+def test_get_protein_force_field_modaa_combinations():
+    """Test get_protein_force_field with combinations like ff19SB + ff19SB_modAA"""
+    ai = interface.amber
+    
+    # Test ff19SB + ff19SB_modAA combination - should return ff19SB
+    assert ai.get_protein_force_field(["protein.ff19SB", "protein.ff19SB_modAA"]) == "ff19SB"
+    
+    # Test ff14SB + ff14SB_modAA combination - should return ff14SB  
+    assert ai.get_protein_force_field(["protein.ff14SB", "protein.ff14SB_modAA"]) == "ff14SB"
+    
+    # Test order doesn't matter
+    assert ai.get_protein_force_field(["protein.ff19SB_modAA", "protein.ff19SB"]) == "ff19SB"
+    
+    # Test with other force fields mixed in
+    assert ai.get_protein_force_field(["water.tip3p", "protein.ff19SB_modAA", "protein.ff19SB", "gaff2"]) == "ff19SB"
+
+
+def test_check_residue_name_ff_support():
+    """Test check_residue_name_ff_support function for detecting force field support"""
+    ai = interface.amber
+    temp_dir = Path(MM_WORK_DIR) / "test_residue_support"
+    temp_dir.mkdir(exist_ok=True)
+    
+    # Test supported standard amino acid
+    assert ai.check_residue_name_ff_support("ALA", ["protein.ff14SB"], temp_dir) == True
+    assert ai.check_residue_name_ff_support("TRP", ["protein.ff19SB"], temp_dir) == True
+    
+    # Test unsupported residue code
+    assert ai.check_residue_name_ff_support("XYZ", ["protein.ff14SB"], temp_dir) == False
+    assert ai.check_residue_name_ff_support("ABC", ["protein.ff19SB"], temp_dir) == False
+    
+    # Test with multiple force fields 
+    assert ai.check_residue_name_ff_support("ALA", ["protein.ff14SB", "protein.ff19SB"], temp_dir) == True
+    
+    # Test case sensitivity
+    assert ai.check_residue_name_ff_support("ala", ["protein.ff14SB"], temp_dir) == True  # Should still work
+    
+    # Clean up
+    shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 def test_ncaa_parm_lib_search():

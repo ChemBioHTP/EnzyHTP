@@ -25,6 +25,7 @@ import numpy as np
 import pandas as pd
 from sympy import sympify
 from collections.abc import Iterable
+import tempfile        
 
 from .base_interface import BaseInterface
 from .handle_types import (
@@ -333,6 +334,19 @@ class AmberParameterizer(MolDynParameterizer):
                           f" Check you force_fields. (current: {self.force_fields})")
             raise ValueError
     
+        # Check if this modified residue is already supported by the force field
+        is_ff_supported = self.parent_interface.check_residue_name_ff_support(
+            res_code=maa.name,
+            force_fields=self.force_fields, 
+            work_dir=Path(self.parameterizer_temp_dir)
+        )
+        
+        if is_ff_supported:
+            _LOGGER.info(f"Modified residue {maa.name} is already supported by force field {self.force_fields}. "
+                        "No additional parameterization needed.")
+            # Return empty paths to indicate force field already supports this residue
+            return "", []
+    
         # init
         fs.safe_mkdir(self.ncaa_param_lib_path)
         target_method = f"{self.charge_method}-{gaff_type}"
@@ -605,7 +619,11 @@ class AmberParameterizer(MolDynParameterizer):
         for frcmod in frcmod_path_list:
             result.append(f"loadAmberParams {frcmod}")
         # mol desc
-        if fs.get_file_ext(mol_desc_path) in [".prepin", ".prepi"]:
+        if not mol_desc_path:
+            _LOGGER.info(
+                f"Got empty mol_desc_path for {ncaa_name}. "
+                f"This could mean the {ncaa_name} is already supported by the force field.")
+        elif fs.get_file_ext(mol_desc_path) in [".prepin", ".prepi"]:
             result.append(f"loadAmberPrep {mol_desc_path}")
         elif fs.get_file_ext(mol_desc_path) in [".mol2"]:
             result.append(f"{ncaa_name} = loadmol2 {mol_desc_path}")
@@ -1338,9 +1356,14 @@ class AmberInterface(BaseInterface):
             ValueError: If no supported protein force field is found
         """        
         # Search for supported protein force fields in the list
+        # First pass: look for canonical protein force fields (non-modAA versions)
         for ff in force_fields:
             # Convert to uppercase for case-insensitive comparison
             ff_upper = ff.upper()
+            
+            # Skip modAA versions in first pass to prioritize canonical versions
+            if "_MODAA" in ff_upper:
+                continue
             
             # Check both with and without protein.ff prefix for flexibility
             for supported_ff in self.SUPPORTED_PROTEIN_FORCE_FIELDS:
@@ -1357,6 +1380,82 @@ class AmberInterface(BaseInterface):
         # If no protein force field found, raise error
         _LOGGER.error(f"No supported protein force field found in {force_fields}. Supported: {self.SUPPORTED_PROTEIN_FORCE_FIELDS}")
         raise ValueError(f"Unsupported protein force field configuration: {force_fields}")
+
+    def check_residue_name_ff_support(self, res_code: str, force_fields: List[str], work_dir: Path) -> bool:
+        """Check if a residue name is supported by the specified force fields.
+        
+        Uses tleap to verify if a residue code is recognized by loading the force fields
+        and attempting to create a sequence with that residue.
+        
+        Args:
+            res_code: 3-letter residue code to check (e.g., "ALA", "TRP", "XYZ")
+            force_fields: List of force field names to source in tleap
+            work_dir: Directory to use for temporary tleap files
+            
+        Returns:
+            True if residue is supported, False otherwise
+        """
+        # Ensure work directory exists
+        work_dir = Path(work_dir)
+        work_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Create tleap input to test residue support
+        tleap_input_lines = []
+        
+        # Source all force fields
+        for ff in force_fields:
+            # Handle both "leaprc.protein.ff14SB" and "ff14SB" formats
+            if ff.lower().startswith("leaprc.protein."):
+                # Force field already has full prefix, use as is
+                leaprc_name = ff
+            elif ff.lower().startswith("protein."):
+                # Already has protein prefix, use as is
+                leaprc_name = f"leaprc.{ff}"
+            else:
+                # Add protein prefix for bare force field names
+                leaprc_name = f"leaprc.protein.{ff}"
+            tleap_input_lines.append(f"source {leaprc_name}")
+        
+        # Test the residue by creating a sequence
+        tleap_input_lines.extend([
+            f"model = sequence {{ {res_code.upper()} }}",
+            "desc model",
+            "quit"
+        ])
+        
+        tleap_input_str = "\n".join(tleap_input_lines)
+        
+        try:
+            # Use the existing run_tleap method with temporary files
+            with tempfile.NamedTemporaryFile(
+                mode='w', suffix='.out', delete=False, dir=work_dir
+                ) as out_file:
+                out_path = out_file.name
+            
+            # Run tleap and capture any errors
+            self.run_tleap(
+                tleap_in_str=tleap_input_str,
+                if_ignore_start_up=True,
+                tleap_out_path=out_path
+            )
+            
+            # If we get here without exception, check output for success patterns
+            with open(out_path, 'r') as f:
+                output = f.read()
+            
+            # Check for success indicators
+            if "Contents:" in output and "Exiting LEaP: Errors = 0" in output:
+                return True
+            else:
+                return False
+                
+        except Exception as e:
+            # tleap failed or other error - residue not supported
+            _LOGGER.debug(f"tleap failed for residue {res_code}: {e}")
+            return False
+        finally:
+            # Clean up output file
+            fs.safe_rm(out_path)
 
     def convert_traj_to_nc(self, traj_path: str, out_path: str, topology_path: str = str()) -> None:
         """Convert the given trajectory file to the Amber `.nc` format file in the out_path.
@@ -1485,6 +1584,10 @@ class AmberInterface(BaseInterface):
                 for e_info in new_e.error_info_list:
                     _LOGGER.error(e_info)
                 raise new_e from e
+            else:
+                raise e
+        finally:
+            fs.clean_temp_file_n_dir(temp_path_list)
 
         # tleap can also sliently fail, so we need to check the output file
         tleap_error = self._find_tleap_error(tleap_out_path)
