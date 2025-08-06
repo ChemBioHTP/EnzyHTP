@@ -1351,7 +1351,7 @@ class AmberInterface(BaseInterface):
 
         # tleap can also sliently fail, so we need to check the output file
         tleap_error = self._find_tleap_error(tleap_out_path)
-        if tleap_error:
+        if tleap_error.error_info_list:
             raise tleap_error
 
         # clean up temp file if success
