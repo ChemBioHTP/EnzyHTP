@@ -1790,3 +1790,43 @@ NONBON
     fs.safe_rmdir(test_lib_dir)
 
 
+def test_clean_frcmod_file_removes_attn(tmp_path, monkeypatch):
+    """Test that _clean_frcmod_file removes lines starting with 'ATTN'."""
+    # Prepare sample frcmod file with lines to remove and keep
+    frcmod = tmp_path / "sample.frcmod"
+    sample_lines = [
+        "ATTN this line should be removed",
+        "PARAM a b c",
+        "  ATTN also remove",
+        "OTHER xyz"
+    ]
+    frcmod.write_text("\n".join(sample_lines))
+
+    # Monkeypatch fs.get_valid_temp_name to return temp path directly
+    monkeypatch.setattr(fs, "get_valid_temp_name", lambda x: str(x) + ".temp")
+
+    # Write a fake temp file name generator that matches expected behavior
+    # Create the temp file path (the original + .temp suffix)
+    temp_path = str(frcmod) + ".temp"
+
+    # Instantiate AmberParameterizer with dummy parameters
+    param = AmberParameterizer(
+        interface=None,
+        force_fields=[], charge_method="",
+        resp_engine="", resp_lvl_of_theory="",
+        ncaa_param_lib_path=str(tmp_path),
+        force_renew_ncaa_parameter=False,
+        ncaa_net_charge_engine="", ncaa_net_charge_ph=0.0,
+        solvate_box_type="", solvate_box_size=0.0,
+        gb_radii=0, parameterizer_temp_dir=str(tmp_path),
+        additional_tleap_lines=[], keep_tleap_in=False
+    )
+
+    # Run the cleanup method
+    param._clean_frcmod_file(str(frcmod))
+
+    # Read back content and verify ATTN lines are removed
+    remaining = frcmod.read_text().splitlines()
+    assert remaining == ["PARAM a b c", "OTHER xyz"]
+
+

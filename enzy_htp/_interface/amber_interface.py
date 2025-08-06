@@ -313,7 +313,11 @@ class AmberParameterizer(MolDynParameterizer):
 
     def _parameterize_modified_res(self, maa: ModifiedResidue, gaff_type: str) -> Tuple[str, List[str]]:
         """parameterize modified residues for AmberMD, use ncaa_param_lib_path for customized
-        parameters. Multiplicity and charge information can be set in ModifiedResidue objects."""
+        parameters. Multiplicity and charge information can be set in ModifiedResidue objects.
+        
+        Details:
+        We make the backbone atoms use Amber atom types and the protein FF to adapt the backbone rotation
+        correction. And use GAFF atom type for sidechain."""
 
         # san check
         if not gaff_type:
@@ -378,33 +382,30 @@ class AmberParameterizer(MolDynParameterizer):
         # First call: with annotation and custom force field path
         parm_dat_path = self._get_force_field_parm_dat_path()
         
-        if parm_dat_path:
-            self.parent_interface.run_parmchk2(in_file=prepin_path,
-                                               out_file=frcmod_path,
-                                               gaff_type=gaff_type,
-                                               custom_force_field=parm_dat_path,
-                                               print_annotation=True)
-        else:
-            self.parent_interface.run_parmchk2(in_file=prepin_path,
-                                               out_file=frcmod_path,
-                                               gaff_type=gaff_type,
-                                               print_annotation=True)
+        self.parent_interface.run_parmchk2(in_file=prepin_path,
+                                            out_file=frcmod_path,
+                                            gaff_type=gaff_type,
+                                            custom_force_field=parm_dat_path,
+                                            print_annotation=True)
         
-        # Remove ATTN lines from the first frcmod file
-        frcmod_temp_path = f"{frcmod_path}.temp"
-        with open(frcmod_path, 'r') as infile, open(frcmod_temp_path, 'w') as outfile:
-            for line in infile:
-                if not line.strip().startswith('ATTN'):
-                    outfile.write(line)
-        
-        # Replace original with cleaned version
-        os.rename(frcmod_temp_path, frcmod_path)
+        # Clean ATTN lines from the first frcmod file
+        self._clean_frcmod_file(frcmod_path)
         
         # Second call: generate parameters using GAFF library 
         self.parent_interface.run_parmchk2(in_file=prepin_path,
                                            out_file=frcmod2_path,
                                            gaff_type=gaff_type)
-        return mol2_path, [frcmod_path, frcmod2_path] # TODO make sure whether mol2 works or do we even need it?
+        return mol2_path, [frcmod_path, frcmod2_path]
+
+    def _clean_frcmod_file(self, frcmod_path: str) -> None:
+        """Remove 'ATTN' lines from a frcmod file in-place."""
+        temp_path = fs.get_valid_temp_name(f"{frcmod_path}.temp")
+        with open(frcmod_path, 'r') as infile, open(temp_path, 'w') as outfile:
+            for line in infile:
+                if not line.strip().startswith('ATTN'):
+                    outfile.write(line)
+        # Replace original with cleaned version
+        os.rename(temp_path, frcmod_path)
 
     def _correct_atom_types_in_ac_file(self, ac_file_path: str, force_field: str = None) -> None:
         """Correct GAFF atom types to standard Amber protein atom types for backbone atoms.
