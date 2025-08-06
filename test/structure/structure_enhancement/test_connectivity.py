@@ -36,49 +36,24 @@ def test_connectivity_maa():
     assert test_stru.modified_residue[0].is_connected()
 
 
-def test_structure_deepcopy_isolation():
-    """Test to isolate the deepcopy recursion error from integration tests
-    
-    This test demonstrates that the RecursionError in integration tests
-    is due to circular references in the structure's connectivity system 
-    that prevent deepcopy operations, not due to other code issues.
-    """
+def test_connected_structure_deepcopyn():
+    """Test to make sure deepcopy works on connected structures.
+    NOTE: This test used to fail because the default deep copier walks the entire
+    connectivity graph depth-first, so on large molecules it can exceed Python's
+    recursion limit and raise RecursionError (even though cycles are memoized).
+    This should be fixed now by the change in DoubleLinkedNode on 2025-08-05."""
     # Load the same structure that causes the error in integration tests
     test_stru = struct.PDBParser().get_structure(f"{DATA_DIR}/3FCR_modified.pdb")
     test_stru.assign_ncaa_chargespin({"LLP": (-2, 1), "RLP": (-2, 1)})
     remove_solvent(test_stru)
     
-    # Test deepcopy BEFORE connectivity initialization (should work)
-    try:
-        copied_stru_before = copy.deepcopy(test_stru)
-        _LOGGER.info("Structure deepcopy BEFORE connectivity init: SUCCESS")
-        deepcopy_before_connectivity = True
-    except RecursionError:
-        _LOGGER.warning("Structure deepcopy BEFORE connectivity init: FAILED")
-        deepcopy_before_connectivity = False
+    # Test deepcopy BEFORE connectivity initialization
+    copied_stru_before = copy.deepcopy(test_stru)
     
     # Now initialize connectivity (this creates the circular references)
     connectivity.init_connectivity(test_stru)
     
-    # Test deepcopy AFTER connectivity initialization (will fail)
-    try:
-        copied_stru_after = copy.deepcopy(test_stru)
-        _LOGGER.info("Structure deepcopy AFTER connectivity init: SUCCESS")
-        deepcopy_after_connectivity = True
-    except RecursionError:
-        _LOGGER.warning("Structure deepcopy AFTER connectivity init: FAILED with RecursionError")
-        deepcopy_after_connectivity = False
-    
-    # Document the findings
-    if deepcopy_before_connectivity and not deepcopy_after_connectivity:
-        _LOGGER.info("CONFIRMED: Connectivity initialization creates circular references")
-        _LOGGER.info("This explains why integration tests fail during PDB I/O deepcopy")
-        _LOGGER.info("The issue is in connectivity system, not in other code")
-        
-        # This is the expected behavior - connectivity creates circular refs
-        # The test passes to document this is a known connectivity issue
-        pass
-    else:
-        pytest.fail("Unexpected deepcopy behavior - connectivity issue not confirmed")
+    # Test deepcopy AFTER connectivity initialization
+    copied_stru_after = copy.deepcopy(test_stru)
 
-    
+    # TODO also make sure the copied structure is connected and connectivity is correct. Same 5 atoms for test.
