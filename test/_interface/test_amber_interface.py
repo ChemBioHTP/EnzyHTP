@@ -340,6 +340,9 @@ def test_amber_parameterizer_run_lv_5():
     
     # Clean up
     fs.safe_rmdir(test_ncaa_lib)
+    fs.clean_temp_file_n_dir(params.file_list + [
+        test_param_worker.parameterizer_temp_dir,
+    ])
 
 
 def test_amber_parameterizer_run_lv_6(): #TODO

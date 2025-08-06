@@ -375,7 +375,7 @@ class AmberParameterizer(MolDynParameterizer):
 
         # 6. Run parmchk2 twice on prepin to get frcmod files
         frcmod_path = fs.get_valid_temp_name(
-            f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.frcmod")
+            f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.frcmod1")
         frcmod2_path = fs.get_valid_temp_name(
             f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.frcmod2")
         
@@ -1500,6 +1500,10 @@ class AmberInterface(BaseInterface):
             cmd_args.extend(["-a", "Y"])
 
         self.env_manager_.run_command("parmchk2", cmd_args)
+
+        fs.clean_temp_file_n_dir([
+            "ANTECHAMBER.FRCMOD",
+        ])
 
     def run_prepgen(self, in_file: str, out_file: str, mc_file: str, residue_name: str, work_dir: str = None) -> None:
         """the python wrapper of running prepgen
