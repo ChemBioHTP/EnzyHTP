@@ -88,8 +88,14 @@ class ModifiedResidue(NonCanonicalBase):
 
     def find_mainchain(self) -> List[Atom]:
         """
-        Finds the shortest path from the N-terminal to the C-terminal using connectivity information
-        and breadth-first-search
+        Finds the shortest path from the N-terminal to the C-terminal using atom connectivity information.
+        
+        Algorithm:
+            Uses NetworkX's breadth-first search algorithm via `nx.shortest_path` to compute the shortest path
+            between the N-terminal and C-terminal atoms in the residue graph.
+        
+        Dependency:
+            Requires the NetworkX library (`import networkx as nx`).
         """
 
         graph = nx.Graph()
