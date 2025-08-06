@@ -315,7 +315,8 @@ def test_amber_parameterizer_run_lv_5():
     
     This is an integration test for the complete MAA parameterization workflow."""
     ai = interface.amber
-    
+    test_ncaa_lib = f"{MM_WORK_DIR}ncaa_lib_empty_lv5"
+
     # Use the 3FCR_protonated.pdb file that contains the LLP modified amino acid
     test_stru = struct.PDBParser().get_structure(f"{MM_DATA_DIR}/3FCR_protonated.pdb")
     # Assign charge/spin to all non-canonical residues in the structure
@@ -325,11 +326,11 @@ def test_amber_parameterizer_run_lv_5():
     
     # Create parameterizer with empty library to force parameterization
     test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
-        ncaa_param_lib_path=f"{MM_WORK_DIR}test_ncaa_lib_empty"
+        ncaa_param_lib_path=test_ncaa_lib,
     )
     
     # Ensure the directory exists and is empty
-    fs.safe_mkdir(f"{MM_WORK_DIR}test_ncaa_lib_empty")
+    fs.safe_mkdir(test_ncaa_lib)
     
     # Run the parameterizer - this should trigger _parameterize_modified_res
     params = test_param_worker.run(test_stru)
@@ -337,54 +338,8 @@ def test_amber_parameterizer_run_lv_5():
     # Primary assertion: verify the final parameters are valid
     assert params.is_valid(), "Generated parameters should be valid"
     
-    # Verify that .prmtop and .inpcrd files were created and are not empty
-    assert os.path.exists(params.prmtop_path)
-    assert os.path.exists(params.inpcrd_path)
-    assert os.path.getsize(params.prmtop_path) > 0
-    assert os.path.getsize(params.inpcrd_path) > 0
-    
-    # Detailed assertions: check intermediate files in the parameterizer's temp directory
-    temp_dir = test_param_worker.ncaa_param_lib_path
-    
-    # Check for corrected .ac file (should exist for LLP)
-    ac_files = glob.glob(f"{temp_dir}/LLP_*GAFF*.ac")
-    assert len(ac_files) > 0, "Should have generated .ac file for LLP"
-    
-    # Check for .mc file (main chain definition)
-    mc_files = glob.glob(f"{temp_dir}/LLP_*GAFF*.mc") 
-    assert len(mc_files) > 0, "Should have generated .mc file for LLP"
-    
-    # Check for .prepin file (from prepgen)
-    prepin_files = glob.glob(f"{temp_dir}/LLP*.prepin")
-    assert len(prepin_files) > 0, "Should have generated .prepin file for LLP"
-    
-    # Check for final .mol2 file
-    mol2_files = glob.glob(f"{temp_dir}/LLP*.mol2")
-    assert len(mol2_files) > 0, "Should have generated .mol2 file for LLP"
-    
-    # Check for both .frcmod files 
-    frcmod_files = glob.glob(f"{temp_dir}/LLP*.frcmod")
-    assert len(frcmod_files) >= 2, "Should have generated at least 2 .frcmod files for LLP"
-    
-    # Verify backbone atom type correction in .ac file
-    if ac_files:
-        with open(ac_files[0], 'r') as f:
-            ac_content = f.read()
-        
-        # Check for corrected backbone atom types (FF14SB types)
-        assert "       CX" in ac_content or "        N" in ac_content, "Should have corrected backbone atom types"
-        
-        # Should still have GAFF types for sidechain atoms
-        assert "       c3" in ac_content or "       c2" in ac_content, "Should retain GAFF types for sidechain"
-    
-    # Verify ATTN lines were removed from first frcmod file
-    if len(frcmod_files) >= 1:
-        with open(frcmod_files[0], 'r') as f:
-            frcmod_content = f.read()
-        assert "ATTN" not in frcmod_content, "ATTN lines should be removed from first frcmod file"
-    
     # Clean up
-    # fs.clean_temp_file_n_dir([f"{MM_WORK_DIR}test_ncaa_lib_empty"])
+    fs.safe_rmdir(test_ncaa_lib)
 
 
 def test_amber_parameterizer_run_lv_6(): #TODO

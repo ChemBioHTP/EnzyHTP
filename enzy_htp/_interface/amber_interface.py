@@ -341,37 +341,37 @@ class AmberParameterizer(MolDynParameterizer):
                 return mol_desc_path, frcmod_path_list
         else:
             # 1. generate ac if not found
-            mol_desc_path = f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.ac" # the search ensured no existing file named this
+            ac_path = f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.ac" # the search ensured no existing file named this
             self.parent_interface.antechamber_ncaa_to_moldesc(ncaa=maa_region,
-                                                              out_path=mol_desc_path,
+                                                              out_path=ac_path,
                                                               gaff_type=gaff_type)
-        # 2. Correct atom types in .ac file (hybrid approach)
-        self._correct_atom_types_in_ac_file(mol_desc_path)
+            # 2. Correct atom types in .ac file (hybrid approach)
+            self._correct_atom_types_in_ac_file(ac_path)
 
-        # 3. Create mc file
-        mc_path = fs.get_valid_temp_name(
-            f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.mc"
-        )
-        self.parent_interface.make_mc_file(maa_region=maa_region, out_path=mc_path)
+            # 3. Create mc file
+            mc_path = fs.get_valid_temp_name(
+                f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.mc"
+            )
+            self.parent_interface.make_mc_file(maa_region=maa_region, out_path=mc_path)
 
-        # 4. Run prepgen on ac & mc to get prepin
-        prepin_path = fs.get_valid_temp_name(
-            f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.prepin")
-        self.parent_interface.run_prepgen(in_file=mol_desc_path,
-                                          out_file=prepin_path,
-                                          mc_file=mc_path,
-                                          residue_name=maa.name,
-                                          work_dir=self.parameterizer_temp_dir)
+            # 4. Run prepgen on ac & mc to get prepin
+            prepin_path = fs.get_valid_temp_name(
+                f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.prepin")
+            self.parent_interface.run_prepgen(in_file=ac_path,
+                                            out_file=prepin_path,
+                                            mc_file=mc_path,
+                                            residue_name=maa.name,
+                                            work_dir=self.parameterizer_temp_dir)
 
-        # 5. Run antechamber on prepin to get mol2
-        mol2_path = fs.get_valid_temp_name(
-            f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.mol2")
-        self.parent_interface.run_antechamber(in_file=prepin_path,
-                                              out_file=mol2_path,
-                                              net_charge=maa.net_charge,
-                                              spin=maa.multiplicity,
-                                              charge_method=self.charge_method,
-                                              res_name=maa.name)
+            # 5. Run antechamber on prepin to get mol2
+            mol_desc_path = fs.get_valid_temp_name(
+                f"{self.ncaa_param_lib_path}/{maa.name}_{target_method}.mol2")
+            self.parent_interface.run_antechamber(in_file=prepin_path,
+                                                out_file=mol_desc_path,
+                                                net_charge=maa.net_charge,
+                                                spin=maa.multiplicity,
+                                                charge_method=self.charge_method,
+                                                res_name=maa.name)
 
         # 6. Run parmchk2 twice on prepin to get frcmod files
         frcmod_path = fs.get_valid_temp_name(
@@ -382,7 +382,7 @@ class AmberParameterizer(MolDynParameterizer):
         # First call: with annotation and custom force field path
         parm_dat_path = self._get_force_field_parm_dat_path()
         
-        self.parent_interface.run_parmchk2(in_file=prepin_path,
+        self.parent_interface.run_parmchk2(in_file=mol_desc_path,
                                             out_file=frcmod_path,
                                             gaff_type=gaff_type,
                                             custom_force_field=parm_dat_path,
@@ -392,17 +392,17 @@ class AmberParameterizer(MolDynParameterizer):
         self._clean_frcmod_file(frcmod_path)
         
         # Second call: generate parameters using GAFF library 
-        self.parent_interface.run_parmchk2(in_file=prepin_path,
+        self.parent_interface.run_parmchk2(in_file=mol_desc_path,
                                            out_file=frcmod2_path,
                                            gaff_type=gaff_type)
-        return mol2_path, [frcmod_path, frcmod2_path]
+        return mol_desc_path, [frcmod_path, frcmod2_path]
 
     def _clean_frcmod_file(self, frcmod_path: str) -> None:
         """Remove 'ATTN' lines from a frcmod file in-place."""
         temp_path = fs.get_valid_temp_name(f"{frcmod_path}.temp")
         with open(frcmod_path, 'r') as infile, open(temp_path, 'w') as outfile:
             for line in infile:
-                if not line.strip().startswith('ATTN'):
+                if not 'ATTN' in line:
                     outfile.write(line)
         # Replace original with cleaned version
         os.rename(temp_path, frcmod_path)
@@ -1331,12 +1331,13 @@ class AmberInterface(BaseInterface):
         with open(tleap_in_path, "w") as of:
             of.write(tleap_in_str)
         # run tleap command
-        cmd_args = f"-f {tleap_in_path} > {tleap_out_path}"
+        cmd_args = f"-f {tleap_in_path}"
         if if_ignore_start_up:
             cmd_args = f"-s {cmd_args}"
         if additional_search_path:
             for add_path in additional_search_path:
                 cmd_args = f"{cmd_args} -I {add_path}"
+        cmd_args = f"{cmd_args} > {tleap_out_path} 2>&1"
         try:
             self.env_manager_.run_command("tleap", cmd_args)
         except CalledProcessError as e:
@@ -1347,6 +1348,11 @@ class AmberInterface(BaseInterface):
                 for e_info in new_e.error_info_list:
                     _LOGGER.error(e_info)
                 raise new_e from e
+
+        # tleap can also sliently fail, so we need to check the output file
+        tleap_error = self._find_tleap_error(tleap_out_path)
+        if tleap_error:
+            raise tleap_error
 
         # clean up temp file if success
         fs.clean_temp_file_n_dir(temp_path_list)
