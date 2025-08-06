@@ -31,15 +31,18 @@ Date: 2022-10-21
 import copy
 from io import StringIO
 import os
+from pathlib import Path
 import re
 import sys
 import logging
+import tempfile
 import time
 import numpy as np
 from typing import Any, List, Iterable, Tuple, Dict, Callable
 import itertools
 import pickle
 import inspect
+from contextlib import contextmanager
 
 from .logger import _LOGGER
 from .file_system import write_lines
@@ -255,8 +258,6 @@ def get_str_for_print_class_var(cls) -> str:
     return result
 
 
-
-
 # == context manager ==
 class HiddenPrints:
     """block or redirect stdout/stderr prints to 'redirect'
@@ -336,6 +337,17 @@ class CaptureLogging:
         self.log_stream.seek(0)
 
 
+@contextmanager
+def trace_threads(tag: str = ""):
+    """trace the thread change before and after the block.
+    Need to install psutil for this"""
+    import psutil
+    proc = psutil.Process()
+    before = proc.num_threads()
+    yield
+    after = proc.num_threads()
+    _LOGGER.info(f"==> {tag} Threads: {before} → {after}")
+
 # == misc ===
 def timer(fn):
     """decodator for timing the run of the function {fn}"""
@@ -366,10 +378,33 @@ def get_itself(input_data: Any) -> Any:
 
 
 def save_obj(obj: Any, out_path: str):
-    """save {obj} to the {out_path} as a .pickle file"""
-    with open(out_path, "wb") as of:
-        pickle.dump(obj, of)
+    """save {obj} to the {out_path} as a .pickle file
+    
+    UPDATE(2025.7): use tempfile and os.replace after experienced
+    data lost upon OSError"""
+    out_path = Path(out_path).expanduser()
+    tmp_fd, tmp_name = tempfile.mkstemp(
+        dir=out_path.parent,
+        prefix=out_path.name + ".",
+        suffix=".tmp",
+    )
+    tmp_path = Path(tmp_name)
 
+    try:
+        with os.fdopen(tmp_fd, "wb") as tmp_file:
+            pickle.dump(obj, tmp_file)
+            tmp_file.flush()
+            os.fsync(tmp_file.fileno())
+
+        os.replace(tmp_path, out_path) # atomic replace
+    except (pickle.PicklingError, OSError, IOError) as e:
+        raise e
+    finally:
+        if tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
 
 def load_obj(in_path: str) -> Any:
     """load {obj} from the {in_path} as a .pickle file.

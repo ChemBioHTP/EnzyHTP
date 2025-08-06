@@ -83,8 +83,10 @@ Date: 2022-04-03
 """
 #TODO(CJ): add a method for changing/accessing a specific residue
 from __future__ import annotations
+import hashlib
 import itertools
 import os
+import numpy as np
 from plum import dispatch
 import string
 from copy import deepcopy
@@ -121,6 +123,7 @@ class Structure(DoubleLinkedNode):
 
     Attributes:
         children/chains: List[Chain]
+        pbc_box_shape: Tuple[float,float,float,float,float,float]
 
     Derived properties:
         residue_state : List[Tuple[str, str, int]]
@@ -138,12 +141,14 @@ class Structure(DoubleLinkedNode):
                              'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',
                              'U', 'V', 'W', 'X', 'Y', 'Z',] + [str(x) for x in range(50000)]
 
-    def __init__(self, chains: List[Chain]):
+    def __init__(self, chains: List[Chain], pbc_box_shape: Tuple[float] = None):
         """Constructor that takes just a list of Chain() objects as input."""
         self.set_children(chains)
         self.set_ghost_parent()
         if self.has_duplicate_chain_name():
             self.resolve_duplicated_chain_name()
+        # PBC
+        self._pbc_box_shape = pbc_box_shape
 
     #region === Getters-attr ===
     @property
@@ -180,6 +185,32 @@ class Structure(DoubleLinkedNode):
         """Gets a chain of the given name. Returns None if the Chain() is not present."""
         return self.chain_mapper.get(chain_name, None)
 
+    @property
+    def pbc_box_shape(self) -> Union[None, Tuple[float,float,float,float,float,float]]:
+        """a 6-D tuple for (edge_1, edge_2, edge_3, angle_1, angle_2, angle_3)
+        of the periodic boundary condition box.
+        Alternatively, None indicate the current Structure() does not have a PBC"""
+        return self._pbc_box_shape
+
+    @pbc_box_shape.setter
+    def pbc_box_shape(self, val: Union[None, Tuple[float,float,float,float,float,float]]):
+        """setter for pbc_box_shape"""
+        # san check
+        if val is not None:
+            if isinstance(val, tuple):
+                if len(val) == 6:
+                    for digit in val:
+                        if not isinstance(digit, float):
+                            _LOGGER.error(f"the pbc_box_shape expect float in a tuple, got: {val}")
+                            raise ValueError
+                else:
+                    _LOGGER.error(f"the pbc_box_shape expect 6 float in a tuple, got: {val}")
+                    raise ValueError
+            else:
+                _LOGGER.error(f"the pbc_box_shape expect a tuple or None, got: {val}")
+                raise TypeError
+
+        self._pbc_box_shape = val
     #endregion
 
     #region === Getter-Prop ===
@@ -608,6 +639,10 @@ class Structure(DoubleLinkedNode):
                 return False
         return True
 
+    def has_pbc_box(self) -> bool:
+        """check if there is a PBC box in the current Structure"""
+        return self.pbc_box_shape is not None
+
     def has_duplicate_chain_name(self) -> bool:
         """check if self._chain have duplicated chain name
         give warning if do."""
@@ -963,12 +998,21 @@ class Structure(DoubleLinkedNode):
             for atom, source_atom in zip(self.atoms, source.atoms):
                 atom.coord = source_atom.coord
 
+    def update_pbc_box_edges(self, pbc_box_edges: Tuple[float]):
+        """update the pbc box edges and keep the original angles. This is common in a
+        NPT simulation."""
+        if self.has_pbc_box():
+            self.pbc_box_shape = pbc_box_edges + self.pbc_box_shape[3:]
+        else:
+            _LOGGER.error("Structure does not have PBC. cant update. angles unknown")
+            raise ValueError
+
     def clone_residue_keys(self, other: Structure, amino_acid_only: bool =True):
         """clone residue keys from {other} to {self}.
         IMPORTANT: assume the chain order and sequence are the same between self and other"""
         # san check
         # - chain sequence consistency
-        if self.is_same_sequence(other, amino_acid_only=amino_acid_only):
+        if not self.is_same_sequence(other, amino_acid_only=amino_acid_only):
             _LOGGER.error(f"Inconsistent sequence betweem {self} and {other}. Clone rejected.")
             raise ValueError("inconsistent sequence")
         if amino_acid_only:
@@ -1025,13 +1069,46 @@ class Structure(DoubleLinkedNode):
 
     def __eq__(self, other: Structure) -> bool:
         """Structure comparsion is a multi-demension task. Vaguely asking for comparing just structures is not allowed."""
-        _LOGGER.error("Vaguely asking for comparing just structures is not allowed. Please use Structure().same_xxx. (xxx stands for a specific demension)")
-        raise NameError
+        if not isinstance(other, Structure):
+            return NotImplemented
+        _LOGGER.warning("User should never just vaguely asking for comparing just structures. Please use Structure().same_xxx. (xxx stands for a specific demension). Ignore this if you didn't explicitly use this.")
+        return (self._topology_signature() == other._topology_signature()
+                and 
+                self._geometry_digest() == other._geometry_digest())
 
     def __ne__(self, other: Structure) -> bool:
         """Structure comparsion is a multi-demension task. Vaguely asking for comparing just structures is not allowed."""
         _LOGGER.error("Vaguely asking for comparing just structures is not allowed. Please use Structure().same_xxx. (xxx stands for a specific demension)")
         raise NameError
+
+    def __hash__(self) -> int:
+        """make Structure hashable"""
+        return hash((self._topology_signature(), self._geometry_digest()))
+
+    def _topology_signature(self) -> tuple:
+        """
+        (chain name, residue idx, residue name, sorted atom name tuple) immutable sequence consisting of
+        are consistent as long as the topology is the same; independent of coordinates.
+        """
+        sig = []
+        for chain in sorted(self.chains, key=lambda c: c.name):
+            for res in sorted(chain.residues, key=lambda r: r.idx):
+                atom_names = tuple(sorted(a.name for a in res.atoms))
+                sig.append((chain.name, res.idx, res.name, atom_names))            
+        return tuple(sig)
+
+    def _geometry_digest(self, digits: int = 8) -> bytes:
+        """
+        Returns a coordinate-based SHA-1 summary (20 bytes).
+        digits controls how many decimal places the coordinates are preserved; the larger the stricter (default 1e-8).
+        """
+        # same order as topology_signature
+        coords = np.asarray([np.round(a.coord, digits)                         # -> (N,3) float32
+                             for chain in sorted(self.chains, key=lambda c: c.name)
+                             for res   in sorted(chain.residues, key=lambda r: r.idx)
+                             for a     in sorted(res.atoms, key=lambda x: x.name)],
+                            dtype=np.float32)
+        return hashlib.sha1(coords.tobytes()).digest()
     #endregion
 
     @dispatch

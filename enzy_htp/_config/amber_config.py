@@ -148,6 +148,33 @@ class AmberConfig(BaseConfig):
     DEFAULT_MD_WORK_DIR: str = "./MD"
     """The default value for the MD working dir that contains all the temp/result
     files. """
+
+    DEFAULT_MD_USE_QMMM: bool = False
+    """The default value for whether MD step is based on QM/MM (based on Amber20 Manual 10.1)"""
+    
+    DEFAULT_MD_QM_ENGINE: str = "sqm"
+    """The default value for the qm engine of the QM/MM MD"""
+
+    DEFAULT_MD_QM_ELE_CUTOFF: float = 12.0
+    """The default QM/MM electrostatic embedding cut-off distance"""
+
+    DEFAULT_MD_QM_EWALD: int = "amber_default"
+    """The default option that specifies how long range electrostatics
+    amber_default means dont write this option in .in file and use Amber default"""
+
+    DEFAULT_MD_QM_ADJUST_Q: int = "amber_default"
+    """The default for how charge is conserved during a QMMM calculation involving link atoms.
+    amber_default means dont write this option in .in file and use Amber default"""
+
+    DEFAULT_MD_QM_ADAPTIVE_SOLVENT_TYPE: str = None
+    """The default for adaptive QM/MM solvent treatmemt. None means turn it off"""
+
+    DEFAULT_MD_QM_NUM_ADAPTIVE_SOLVENT: int = 10
+    """The default number of adaptive solvents in the QM region"""
+
+    DEFAULT_MD_QM_NUM_TRANSITION_SOLVENT: int = 10
+    """The default number of transition solvent in the T region. 
+    NOTE 10 is probably not the best choice, user should evaluate carefully"""
     # endregion
 
     # region == Default values for StructureConstrain ==

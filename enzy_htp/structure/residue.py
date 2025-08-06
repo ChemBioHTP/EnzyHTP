@@ -206,7 +206,12 @@ class Residue(DoubleLinkedNode):
     def atom_idx_mapper(self) -> Dict[int, Atom]:
         """the mapper for idx -> atom"""
         return {atom.idx : atom for atom in self.atoms}
-    
+
+    @property
+    def atom_name_mapper(self) -> Dict[str, Atom]:
+        """the mapper for name -> atom"""
+        return {atom.name : atom for atom in self.atoms}
+
     @property
     def hydrogens(self) -> List[Atom]:
         """Return all the hydrogen atoms in the Residue/Ligand."""
@@ -364,6 +369,10 @@ class Residue(DoubleLinkedNode):
         """Does the residue contain hydrogen atoms?"""
         element_list = self.element_composition
         return ('H' in element_list)
+    
+    def is_same_residue(self, other: Residue) -> bool:
+        """determine if self and other is the same amino acid residue"""
+        return self.sequence_name == other.sequence_name
 
     #endregion
 
