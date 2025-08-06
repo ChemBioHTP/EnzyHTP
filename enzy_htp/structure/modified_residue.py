@@ -110,7 +110,7 @@ class ModifiedResidue(NonCanonicalBase):
                 graph.add_edge(aa, oa[0])
         try:
             path = nx.shortest_path(graph, start_atom, end_atom)
-        except nx.NodeNotFound:
+        except (nx.NodeNotFound, nx.NetworkXNoPath):
             raise AttributeError(f"Path from n-term to c-term does not exist for {self.name}")
         
         return path
