@@ -1,115 +1,134 @@
 # Analysis and Solution Plan for Structure Deepcopy Circular Reference Issue
 
-## Problem Analysis
+## CORRECTED Problem Analysis
 
 ### Root Cause
-The `test_structure_deepcopy_isolation` test fails because Python's default `deepcopy` cannot handle circular references in the Structure's connectivity system. The issue occurs when connectivity is initialized using `connectivity.init_connectivity()`.
+The issue is NOT that Structure lacks a custom deepcopy method. **Structure inherits from DoubleLinkedNode**, which DOES have a custom `__deepcopy__` method. The problem occurs because the DoubleLinkedNode's deepcopy method temporarily removes the custom deepcopy method and falls back to Python's default `copy.deepcopy`, which cannot handle circular references in the connectivity system.
 
 ### Technical Details
 
-1. **No Custom Deepcopy Implementation**: The `Structure` class does not implement a custom `__deepcopy__` method and relies on Python's default deepcopy behavior.
+1. **Existing Custom Deepcopy**: The `Structure` class inherits from `DoubleLinkedNode` which has a custom `__deepcopy__` method (`enzy_htp/core/doubly_linked_tree.py:119-158`).
 
-2. **Circular References in Connectivity**: The connectivity system creates bidirectional references between atoms:
-   - Each `Atom` has an attribute `_connect: List[Tuple[Atom, str]]`
-   - When atom A connects to atom B, both atoms store references to each other:
-     - `A._connect = [(B, bond_type), ...]`
-     - `B._connect = [(A, bond_type), ...]`
-
-3. **Where Circular References Are Created**: In `enzy_htp/structure/structure_enchantment/connectivity.py:190`:
+2. **DoubleLinkedNode Deepcopy Logic**:
    ```python
-   def _connect_caa_atom(atom: Atom) -> None:
-       # ... code to find connected atoms ...
-       connect.append((cnt_atom, None))  # Creates reference to other atoms
-       atom.connect = connect  # Stores list of (other_atom, bond_type) tuples
+   def __deepcopy__(self, memo: Union[Dict[int, Any], None] = None, _nil=[]):
+       # Handle parent-child relationships by setting parent to None in memo
+       # ... 
+       # CRITICAL ISSUE: Temporarily removes custom deepcopy method
+       self.__deepcopy__ = None
+       
+       # Falls back to Python's default deepcopy - CANNOT handle circular references
+       new_self = copy.deepcopy(self, memo)
+       
+       # Restore custom deepcopy method
+       delattr(self, "__deepcopy__")
+       delattr(new_self, "__deepcopy__")
    ```
 
-4. **Deepcopy Failure**: Python's default deepcopy traverses object graphs and fails with `RecursionError` when it encounters circular references without proper handling.
+3. **Circular References in Connectivity**: When `copy.deepcopy(self, memo)` is called on line 151 of DoubleLinkedNode, it uses Python's default deepcopy behavior which cannot handle the connectivity circular references:
+   - Each `Atom` has `_connect: List[Tuple[Atom, str]]` 
+   - When atom A connects to atom B: A._connect contains B, and B._connect contains A
+   - Default deepcopy fails with `RecursionError` on these circular references
+
+4. **Where Circular References Are Created**: In `enzy_htp/structure/structure_enchantment/connectivity.py:190`:
+   ```python
+   def _connect_caa_atom(atom: Atom) -> None:
+       # ... finds connected atoms ...
+       connect.append((cnt_atom, None))  # Creates reference to other atoms  
+       atom.connect = connect  # Stores bidirectional references causing circles
+   ```
 
 ## Confirmed Behavior
-- **Before connectivity initialization**: `copy.deepcopy(structure)` works fine
-- **After connectivity initialization**: `copy.deepcopy(structure)` fails with `RecursionError`
+- **Before connectivity initialization**: DoubleLinkedNode deepcopy works (no circular references)
+- **After connectivity initialization**: Default deepcopy fails on connectivity circular references
 
 ## Solution Plan
 
-### Option 1: Implement Custom `__deepcopy__` Method (Recommended)
+### Option 1: Fix DoubleLinkedNode Deepcopy Method (Recommended)
+
+**Location**: `enzy_htp/core/doubly_linked_tree.py`
+
+**Problem**: The DoubleLinkedNode deepcopy method removes the custom `__deepcopy__` and falls back to default deepcopy, which cannot handle connectivity.
+
+**Solution**: Modify the DoubleLinkedNode deepcopy to handle connectivity circular references:
+
+```python
+def __deepcopy__(self, memo: Union[Dict[int, Any], None] = None, _nil=[]):
+    if memo is None:
+        memo = {}
+    
+    # Handle parent relationships as before
+    if self.parent is not None:
+        parent_id = id(self.parent)
+        y = memo.get(parent_id, _nil)
+        if y is _nil:
+            memo[id(self.parent)] = None
+    
+    # Instead of removing __deepcopy__, use a connectivity-aware approach
+    new_self = self._deepcopy_with_connectivity_handling(memo)
+    return new_self
+
+def _deepcopy_with_connectivity_handling(self, memo):
+    # Custom deepcopy logic that handles connectivity circular references
+    # 1. Create new instance
+    # 2. Copy non-connectivity attributes
+    # 3. Handle connectivity separately to break circular references
+    # 4. Rebuild connectivity with copied atom references
+```
+
+### Option 2: Override Deepcopy in Structure Class
 
 **Location**: `enzy_htp/structure/structure.py`
 
-**Implementation Strategy**:
-1. Add `__deepcopy__(self, memo)` method to the `Structure` class
-2. Use `memo` dictionary to track already-copied objects and prevent infinite recursion
-3. Handle connectivity references specially:
-   - First pass: Copy all atoms without their `_connect` attributes
-   - Second pass: Rebuild connectivity using the copied atom references
+**Implementation**: Override the inherited deepcopy method in Structure to handle connectivity:
 
-**Code Structure**:
 ```python
 def __deepcopy__(self, memo):
-    import copy
-    
-    # Create new Structure instance
-    cls = self.__class__
-    new_structure = cls.__new__(cls)
-    memo[id(self)] = new_structure
-    
-    # Copy basic attributes (non-connectivity)
-    for attr, value in self.__dict__.items():
-        if attr.startswith('_connect'):
-            continue  # Skip connectivity for now
-        setattr(new_structure, attr, copy.deepcopy(value, memo))
-    
-    # Rebuild connectivity after all atoms are copied
-    self._rebuild_connectivity_in_copy(new_structure, memo)
-    
-    return new_structure
+    # Call parent deepcopy but with connectivity handling
+    # or implement Structure-specific deepcopy that handles atoms with connectivity
 ```
 
-### Option 2: Implement at Atom Level
-
-**Alternative**: Add `__deepcopy__` to the `Atom` class to handle its own connectivity references.
+### Option 3: Implement Connectivity-Aware Deepcopy at Atom Level  
 
 **Location**: `enzy_htp/structure/atom.py`
 
-### Option 3: Connectivity-Aware Copy Utility
-
-**Alternative**: Create a separate utility function `copy_structure_with_connectivity()` that handles the circular references.
+**Implementation**: Add custom `__deepcopy__` to Atom class to handle its `_connect` attribute properly.
 
 ## Recommended Implementation Plan
 
-### Phase 1: Structure-Level Implementation
-1. **Add `__deepcopy__` method to `Structure` class**
-2. **Implement connectivity rebuilding logic**
-3. **Update any other classes that might have circular references** (Chain, Residue, Atom)
+### Phase 1: DoubleLinkedNode Fix (Option 1)
+1. **Modify DoubleLinkedNode's `__deepcopy__` method** to detect and handle connectivity circular references
+2. **Add connectivity-aware deepcopy logic** that temporarily removes connectivity, copies the structure, then rebuilds connectivity
+3. **Ensure compatibility** with all DoubleLinkedNode subclasses (Structure, Chain, Residue, Atom)
 
-### Phase 2: Testing and Validation
+### Phase 2: Testing and Validation  
 1. **Update `test_structure_deepcopy_isolation`** to verify the fix works
-2. **Test with various structure types** (canonical residues, modified residues, ligands)
-3. **Ensure no performance regression** for deepcopy operations
+2. **Test deepcopy with connectivity** on various structure types
+3. **Verify no regression** in parent-child relationship handling
 
-### Phase 3: Documentation and Cleanup
-1. **Document the deepcopy behavior** in Structure class docstring
-2. **Add unit tests** for the custom deepcopy implementation
-3. **Consider whether other circular reference patterns exist** in the codebase
+### Phase 3: Documentation
+1. **Document the connectivity handling** in DoubleLinkedNode deepcopy
+2. **Add unit tests** for deepcopy with various connectivity scenarios
+3. **Document known limitations** if any
 
 ## Implementation Priority
 
-**High Priority**: Option 1 (Custom `__deepcopy__` in Structure class)
+**High Priority**: Option 1 (Fix DoubleLinkedNode deepcopy)
+- Fixes the root cause in the base class
+- Benefits all DoubleLinkedNode subclasses
+- Maintains the existing inheritance pattern
 - Most comprehensive solution
-- Handles all connectivity types
-- Maintains backward compatibility
-- Follows Python best practices for handling circular references
 
 ## Expected Outcome
 
 After implementation:
 - `copy.deepcopy(structure)` will work both before and after connectivity initialization
+- All DoubleLinkedNode subclasses will properly handle deepcopy with circular references
 - Integration tests that rely on structure copying will pass
-- No changes required to existing user code
-- Performance impact should be minimal for typical structure sizes
+- Existing parent-child relationship handling is preserved
 
 ## Files to Modify
 
-1. **Primary**: `enzy_htp/structure/structure.py` - Add `__deepcopy__` method
-2. **Secondary**: `enzy_htp/structure/atom.py` - Potentially add `__deepcopy__` method
-3. **Testing**: `test/structure/structure_enhancement/test_connectivity.py` - Update test expectations
-4. **Additional**: Any other classes with circular references (Chain, Residue, etc.)
+1. **Primary**: `enzy_htp/core/doubly_linked_tree.py` - Fix DoubleLinkedNode `__deepcopy__` method
+2. **Testing**: `test/structure/structure_enhancement/test_connectivity.py` - Update test expectations  
+3. **Additional**: Add unit tests for deepcopy with connectivity in various scenarios
