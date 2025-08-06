@@ -468,8 +468,28 @@ def test_run_parmchk2():
 
 
 def test_run_prepgen():
-    """test the run_prepgen function works well"""
-    pass
+    """test the run_prepgen function works well with existing files in data directory"""    
+    ai = interface.amber
+    
+    # Use existing test files in data directory
+    test_ac_file = f"{MM_DATA_DIR}/test_LLP_gaff.ac"
+    test_mc_file = f"{MM_DATA_DIR}/test_LLP.mc"
+    temp_prepin_file = f"{MM_WORK_DIR}/test_LLP.prepin"
+    
+    # Run prepgen with the existing ac and mc files
+    ai.run_prepgen(
+        in_file=test_ac_file,
+        out_file=temp_prepin_file,
+        mc_file=test_mc_file,
+        residue_name="LLP"
+    )
+   
+    # Verify files exist
+    assert os.path.exists(temp_prepin_file), "input .prepin file should exist"
+    assert os.path.getsize(temp_prepin_file) > 0, "input .prepin file should not be empty"
+    
+    # Clean up
+    fs.clean_temp_file_n_dir([temp_prepin_file])
 
 
 def test_run_prepgen_failure_cases():
