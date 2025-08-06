@@ -1292,9 +1292,15 @@ class AmberInterface(BaseInterface):
     """List of supported protein force fields for MAA parameterization"""
     
     PROTEIN_FORCE_FIELD_PARM_MAPPER = {
+        "fb15": "parm99.dat",
+        "ff03.r1": "parm99.dat",
+        "ff03ua": "parm99.dat",
         "ff14SB": "parm10.dat",
-        "ff19SB": "parm19.dat", 
-        "ff99SB": "parm99.dat"
+        "ff14SBonlysc": "parm10.dat",
+        "ff15ipq": "parm15ipq_10.3.dat",
+        "ff15ipq-vac": "parm15ipq_10.3.dat",
+        "ff19SB": "parm19.dat",
+        "ff19ipq": "parm19ipq.dat",
     }
     """Mapper for protein force fields to their parameter dat files"""
 
