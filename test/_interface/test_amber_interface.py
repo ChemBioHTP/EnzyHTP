@@ -472,7 +472,7 @@ def test_run_prepgen():
     ai = interface.amber
     
     # Use existing test files in data directory
-    test_ac_file = f"{MM_DATA_DIR}/test_LLP_gaff.ac"
+    test_ac_file = f"{MM_DATA_DIR}/test_LLP.ac"
     test_mc_file = f"{MM_DATA_DIR}/test_LLP.mc"
     temp_prepin_file = f"{MM_WORK_DIR}/test_LLP.prepin"
     
