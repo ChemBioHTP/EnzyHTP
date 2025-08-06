@@ -4,10 +4,14 @@ Date: 2025-02-13
 """
 
 import os
+import copy
+import pytest
+
 from enzy_htp.preparation.clean import remove_solvent
 import enzy_htp.structure as struct
 from enzy_htp.structure.structure_enchantment import connectivity
 from enzy_htp.core import file_system as fs
+from enzy_htp.core import _LOGGER
 import enzy_htp.structure.structure_region as stru_regi
 from enzy_htp.structure.structure_region import capping
 import enzy_htp.structure.structure_selection as stru_sele
@@ -39,10 +43,6 @@ def test_structure_deepcopy_isolation():
     is due to circular references in the structure's connectivity system 
     that prevent deepcopy operations, not due to other code issues.
     """
-    import copy
-    import pytest
-    from enzy_htp.core import _LOGGER
-    
     # Load the same structure that causes the error in integration tests
     test_stru = struct.PDBParser().get_structure(f"{DATA_DIR}/3FCR_modified.pdb")
     test_stru.assign_ncaa_chargespin({"LLP": (-2, 1), "RLP": (-2, 1)})
