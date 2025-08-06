@@ -513,6 +513,21 @@ def test_run_prepgen_failure_cases():
                        mc_file=f"{MM_WORK_DIR}/test_fail.mc",
                        residue_name="FAIL")
     
+    # Test with nonsense ac file - should fail with meaningful error
+    nonsense_ac_file = f"{MM_DATA_DIR}/nonsense_test.ac"
+    test_mc_file = f"{MM_DATA_DIR}/test_LLP.mc"
+    temp_prepin_file = f"{MM_WORK_DIR}/test_nonsense.prepin"
+    
+    with pytest.raises(RuntimeError) as exc_info:
+        ai.run_prepgen(in_file=nonsense_ac_file,
+                       out_file=temp_prepin_file,
+                       mc_file=test_mc_file,
+                       residue_name="TEST")
+    
+    # Verify that the error message contains useful information
+    error_message = str(exc_info.value)
+    assert "prepgen command failed" in error_message or "prepgen encountered an error" in error_message or "prepgen failed to create output file" in error_message
+    
     # Test that error handling preserves original working directory even on failure
     original_cwd = os.getcwd()
     

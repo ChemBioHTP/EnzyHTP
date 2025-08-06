@@ -90,7 +90,7 @@ def test_connected_structure_deepcopy():
                 f"Atom {atom_name} connectivity should be preserved in copy"
             
             # Check that connected atoms count is the same
-            original_connections = len(original_atom.connect_nodes)
-            copied_connections = len(copied_atom.connect_nodes)
+            original_connections = len(original_atom.connect_atoms)
+            copied_connections = len(copied_atom.connect_atoms)
             assert original_connections == copied_connections, \
                 f"Atom {atom_name} should have same number of connections ({original_connections}) in copy, got {copied_connections}"
