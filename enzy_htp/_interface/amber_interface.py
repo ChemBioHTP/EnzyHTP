@@ -1572,40 +1572,29 @@ class AmberInterface(BaseInterface):
             # Always restore directory
             os.chdir(original_cwd)
         
-        # Check for error patterns in stdout and stderr
-        # prepgen often doesn't exit with error code but prints errors
+        # Delegate output checking to private helper
+        self._check_prepgen_output(result, output_text, out_file)
+    
+    def _check_prepgen_output(self, result, output_text: str, out_file: str) -> None:
+        """Private helper to check prepgen stdout/stderr and output file creation."""
+        # decode stdout and stderr
         if hasattr(result, 'stdout') and result.stdout:
             output_text += result.stdout.decode() if isinstance(result.stdout, bytes) else str(result.stdout)
         if hasattr(result, 'stderr') and result.stderr:
             output_text += result.stderr.decode() if isinstance(result.stderr, bytes) else str(result.stderr)
-        
         # Common prepgen error patterns
         error_patterns = [
-            "Error",
-            "ERROR",  
-            "Fatal",
-            "FATAL",
-            "Cannot",
-            "cannot",
-            "Failed",
-            "failed",
-            "No such file",
-            "not found",
-            "Invalid",
-            "invalid",
-            "Abort",
-            "abort"
+            "Error", "ERROR", "Fatal", "FATAL",
+            "Cannot", "cannot", "Failed", "failed",
+            "No such file", "not found", "Invalid",
+            "invalid", "Abort", "abort"
         ]
-        
-        # Check for error patterns
         for pattern in error_patterns:
             if pattern in output_text:
                 raise RuntimeError(f"prepgen encountered an error: {pattern} found in output:\n{output_text}")
-        
-        # Verify output file was created and is not empty (use original path, not reduced)
+        # Verify output file exists and is non-empty
         if not os.path.exists(out_file):
             raise RuntimeError(f"prepgen failed to create output file {out_file}. Output: {output_text}")
-        
         if os.path.getsize(out_file) == 0:
             raise RuntimeError(f"prepgen created empty output file {out_file}. Output: {output_text}")
 
