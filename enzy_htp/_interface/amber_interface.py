@@ -19,11 +19,8 @@ from subprocess import CalledProcessError, CompletedProcess, SubprocessError
 from typing import Generator, List, Tuple, Union, Dict, Any
 from dataclasses import dataclass
 import pandas as pd
-from enzy_htp.structure.structure_region.structure_region import StructureRegion
 from sympy import sympify
 from collections import Iterable
-from enzy_htp.structure.chain import Chain
-from enzy_htp.structure.structure_region.api import create_region_from_residues, create_region_from_selection_pattern
 
 from .base_interface import BaseInterface
 from .handle_types import (
@@ -45,17 +42,21 @@ from enzy_htp.structure.structure_constraint import (
     StructureConstraint,
     CartesianFreeze,
     merge_cartesian_freeze)
+from enzy_htp.structure.structure_region import create_region_from_residues
 from enzy_htp.structure import StruSelection
 from enzy_htp.structure import (
     Structure,
     Atom,
     Residue,
     Ligand,
+    Chain,
     MetalUnit,
     ModifiedResidue,
     NonCanonicalBase,
     StructureEnsemble,
-    PDBParser)
+    PDBParser,
+    StructureRegion,
+)
 from enzy_htp import config as eh_config
 
 class AmberParameter(MolDynParameter):

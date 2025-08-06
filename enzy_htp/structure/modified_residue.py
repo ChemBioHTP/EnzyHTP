@@ -59,8 +59,6 @@ class ModifiedResidue(NonCanonicalBase):
         else:
             self._mainchain_atoms = self.find_mainchain()
             return self._mainchain_atoms
-            # raise AttributeError(f"Missing mainchain information for {self.name} at {self.key_str}! "
-            #                       "You can assign it using assign_mod_aa_mainchain()")
 
     # === Checker ===
     def is_modified_residue(self) -> bool:
