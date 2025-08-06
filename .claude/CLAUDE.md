@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Testing
 
-The project uses `pytest` for testing.
+The project uses `pytest` for testing. Use a default timeout wall of 10 min.
 
 **IMPORTANT:** Avoid running `pytest` on the entire test suite, as it is very time-consuming. Instead, run specific tests or smaller groups of tests.
 

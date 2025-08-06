@@ -1511,15 +1511,19 @@ class AmberInterface(BaseInterface):
           and when user use `-m` option, it will copy the path to this array and overflow the buffer.
         """        
         # deal with the .mc bug
+        abs_in_file = os.path.abspath(in_file)
+        abs_out_file = os.path.abspath(out_file)  
+        abs_mc_file = os.path.abspath(mc_file)
+
         # TODO
 
         result = None
 
         output_text = ""
         try:
-            cmd_args = ["-i", in_file,
-                        "-o", out_file,
-                        "-m", mc_file, 
+            cmd_args = ["-i", abs_in_file,
+                        "-o", abs_out_file,
+                        "-m", abs_mc_file,
                         "-rn", residue_name]
             
             result = self.env_manager_.run_command("prepgen", cmd_args)
