@@ -132,7 +132,7 @@ class PDBParser(StructureParserInterface):
                     stru: Structure,
                     if_renumber: bool = True,
                     if_fix_atomname: bool = True,
-                    same_chain_id_for_9999_solvent: bool = False,,
+                    same_chain_id_for_9999_solvent: bool = False,
                     omit_chain_id: bool = False ) -> str:
         """Inverse of PDBParser.get_structure(). Given a Structure(), save it to the given .pdb path.
 
