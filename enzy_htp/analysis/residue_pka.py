@@ -16,6 +16,37 @@ from enzy_htp import interface
 from enzy_htp.structure import Structure, StructureEnsemble, Residue
 from enzy_htp.core import _LOGGER
 
+
+def _filter_target_residues(all_pka: Dict[int, float], target_residues: Union[List[str], List[Residue], None]) -> Dict[int, float]:
+    """Helper function to filter pKa results for target residues."""
+    if target_residues is None:
+        return all_pka
+    
+    # Convert target_residues to residue numbers
+    target_res_nums = []
+    for res in target_residues:
+        if isinstance(res, str):
+            # Assume format like "A.100" or just "100" 
+            if "." in res:
+                parts = res.split(".")
+                try:
+                    target_res_nums.append(int(parts[-1]))
+                except ValueError:
+                    _LOGGER.warning(f"Could not parse residue number from '{res}'")
+            else:
+                try:
+                    target_res_nums.append(int(res))
+                except ValueError:
+                    _LOGGER.warning(f"Could not parse residue number from '{res}'")
+        elif isinstance(res, Residue):
+            target_res_nums.append(res.idx)
+        else:
+            _LOGGER.warning(f"Unsupported target_residues type: {type(res)}")
+    
+    # Filter results
+    return {res_num: pka for res_num, pka in all_pka.items() if res_num in target_res_nums}
+
+
 def residue_pka(
         stru: Union[Structure, StructureEnsemble],
         target_residues: Union[List[Residue], List[str], None] = None,
@@ -57,35 +88,6 @@ def residue_pka(
     if method not in PKA_METHODS:
         _LOGGER.error(f"Method '{method}' not supported. Supported methods: {list(PKA_METHODS.keys())}")
         raise ValueError
-
-    def _filter_target_residues(all_pka: Dict[int, float], target_residues: Union[List[str], List[Residue], None]):
-        """Helper function to filter pKa results for target residues."""
-        if target_residues is None:
-            return all_pka
-        
-        # Convert target_residues to residue numbers
-        target_res_nums = []
-        for res in target_residues:
-            if isinstance(res, str):
-                # Assume format like "A.100" or just "100" 
-                if "." in res:
-                    parts = res.split(".")
-                    try:
-                        target_res_nums.append(int(parts[-1]))
-                    except ValueError:
-                        _LOGGER.warning(f"Could not parse residue number from '{res}'")
-                else:
-                    try:
-                        target_res_nums.append(int(res))
-                    except ValueError:
-                        _LOGGER.warning(f"Could not parse residue number from '{res}'")
-            elif isinstance(res, Residue):
-                target_res_nums.append(res.idx)
-            else:
-                _LOGGER.warning(f"Unsupported target_residues type: {type(res)}")
-        
-        # Filter results
-        return {res_num: pka for res_num, pka in all_pka.items() if res_num in target_res_nums}
 
     if isinstance(stru, Structure):
         all_pka = PKA_METHODS[method](stru=stru, work_dir=work_dir, **kwargs)

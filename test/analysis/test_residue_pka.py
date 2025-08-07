@@ -7,10 +7,8 @@ import pytest
 import os
 import tempfile
 import shutil
-from typing import Dict, List
 
 from enzy_htp import interface
-from enzy_htp.structure import Structure, StructureEnsemble
 from enzy_htp.structure.structure_io.pdb_io import PDBParser
 from enzy_htp.analysis import residue_pka
 
@@ -142,19 +140,3 @@ def test_propka_methods_registry():
     
     assert "propka" in PKA_METHODS, "PROPKA method should be registered"
     assert callable(PKA_METHODS["propka"]), "PROPKA method should be callable"
-
-if __name__ == "__main__":
-    # Run basic test if called directly
-    print("Running basic pKa calculation test...")
-    
-    # Test with available structure
-    pdb_file = f"{DATA_DIR}/test_spi.pdb"
-    if os.path.exists(pdb_file):
-        stru = PDBParser().get_structure(pdb_file)
-        with tempfile.TemporaryDirectory() as temp_dir:
-            result = residue_pka(stru, method="propka", work_dir=temp_dir)
-            print(f"Found pKa values for {len(result)} residues:")
-            for res_num, pka_val in sorted(result.items()):
-                print(f"  Residue {res_num}: pKa = {pka_val:.2f}")
-    else:
-        print(f"Test PDB file not found: {pdb_file}")

@@ -19,6 +19,7 @@ from enzy_htp.core.file_system import safe_mkdir
 from enzy_htp._config.propka_config import PropkaConfig, default_propka_config
 from enzy_htp.structure import Structure
 from enzy_htp.structure.structure_io.pdb_io import PDBParser
+# remove_solvent imported dynamically to avoid circular import
 from enzy_htp import config as eh_config
 
 # Importing PROPKA components
@@ -52,21 +53,32 @@ class PropkaInterface(BaseInterface):
                 missing.append(module)
         return missing
 
-    def get_residue_pka_from_stru(self, stru: Structure, work_dir: str = "./propka") -> Dict[int, float]:
+    def get_residue_pka_from_stru(self, stru: Structure, work_dir: str = "./propka", remove_solvents: bool = True) -> Dict[int, float]:
         """Calculate pKa values for residues in a Structure object using PROPKA.
 
         Args:
             stru: The Structure object to analyze.
             work_dir: The working directory for the calculation.
+            remove_solvents: Whether to remove solvent molecules before calculation.
+                           Default True since PROPKA doesn't benefit from solvents.
 
         Returns:
             Dict[int, float]: A dictionary mapping residue numbers to their pKa values.
         """
         safe_mkdir(work_dir)
         
+        # Remove solvents by default as PROPKA doesn't benefit from them
+        if remove_solvents:
+            from enzy_htp.preparation.clean import remove_solvent
+            stru_clean = remove_solvent(stru, in_place=False)
+        else:
+            stru_clean = stru
+        
+        # Use omit_chain_id=True if we still have many residues after solvent removal
+        # to prevent chain ID overflow issues
         with tempfile.NamedTemporaryFile(mode='w', suffix='.pdb', delete=False, dir=work_dir) as tmp_file:
             temp_pdb_path = tmp_file.name
-            PDBParser.save_structure(temp_pdb_path, stru)
+            PDBParser.save_structure(temp_pdb_path, stru_clean, omit_chain_id=True)
         
         try:
             result = self.get_residue_pka_from_pdb(temp_pdb_path, work_dir)
