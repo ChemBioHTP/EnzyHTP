@@ -8,6 +8,7 @@ enzy_htp. Currently supports the ability to calculate:
     + residue pKa
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Author: QZ Shao <shaoqz@icloud.com>
 
 Date: 2022-11-06
 """

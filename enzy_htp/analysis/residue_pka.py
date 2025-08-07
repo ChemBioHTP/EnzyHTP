@@ -83,7 +83,7 @@ def residue_pka(
         method:
             The algorithm for the pKa calculation. (see Details)
         work_dir:
-            The working directory for the calculation. If None, uses the system SCRATCH directory.
+            The working directory for the calculation. If None, uses the enzyhtp system.SCRATCH directory.
         remove_solvents:
             Whether to remove solvent molecules before calculation. Default True 
             since PROPKA doesn't benefit from solvents and they can cause formatting issues.
