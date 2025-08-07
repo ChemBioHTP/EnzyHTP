@@ -168,6 +168,50 @@ def num_ele_2d(list_2d: List[list]) -> int:
 #     return [[x] + y if x != GHOST_LIST_ELEMENT else y for x in curr_list
 #             for y in next_list]
 
+# Sebastian - The breadth-first-search algorithm I made for finding the mainchain of a modified residue
+# graph: dict[Atom, List[Atom]] = {aa: [] for aa in self.atoms}
+# parent: dict[Atom, Atom] = {aa: None for aa in self.atoms}
+
+# start_atom: Atom = self.find_atom_name("N")
+# end_atom: Atom = self.find_atom_name("C")
+
+# # create "graph" of atoms
+# for aa in self.atoms:
+#     for oa in aa.connect:
+#         graph[aa].append(oa[0])
+
+# q: List[str] = [start_atom]
+
+# visited = [start_atom]
+
+# # breadth-first search
+# while q:
+#     curr_atom = q.pop(0)
+#     for aa in graph[curr_atom]:
+#         if aa not in visited:
+#             q.append(aa)
+#             visited.append(aa)
+#             parent[aa] = curr_atom
+
+#         if aa == end_atom:
+#             break
+
+# # hopefully, we have found the c-terminal. If not, throw an error
+# if parent[end_atom] is None:
+#     raise AttributeError(f"Path from n-term to c-term does not exist for {self.name}")
+
+# # find main chain atoms through searching parent
+# curr_atom = end_atom
+# main_chain = []
+# while parent[curr_atom] is not None:
+#     main_chain.append(curr_atom)
+#     curr_atom = parent[curr_atom]
+
+# main_chain.append(curr_atom)
+# main_chain.reverse()
+
+# return main_chain
+
 
 # == Dict related ==
 def get_copy_of_deleted_dict(orig_dict: Dict, del_key) -> Dict:

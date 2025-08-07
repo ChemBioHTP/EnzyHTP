@@ -145,6 +145,15 @@ class DoubleLinkedNode():
                 memo[id(self.parent)] = None
             # parent in memo -> this is part of the recursive copying initiated from the parent: default
 
+        # Stash original connectivity refs and place placeholders into memo
+        _conn_attrs = []
+        for _name in ("_connect",):
+            lst = getattr(self, _name, None)
+            if isinstance(lst, list):
+                _conn_attrs.append((_name, lst))
+                # Tell deepcopy to reuse this placeholder instead of recursing into neighbors
+                memo.setdefault(id(lst), [])  # minimal: empty list as placeholder
+
         # mask current method to use original deepcopy
         self.__deepcopy__ = None
 
@@ -155,6 +164,22 @@ class DoubleLinkedNode():
         delattr(self, "__deepcopy__")
         delattr(new_self, "__deepcopy__")
 
+        # deal with _connect
+        for _name, lst in _conn_attrs:
+            new_list = []
+            for entry in lst:
+                # expected shape: (neighbor_atom, tag) or just neighbor_atom
+                if isinstance(entry, tuple):
+                    neighbor = entry[0]
+                    tag = entry[1] if len(entry) > 1 else None
+                    # map original neighbor -> copied neighbor via memo
+                    copied_neighbor = memo.get(id(neighbor), neighbor)
+                    new_list.append((copied_neighbor, tag))
+                else:
+                    copied_neighbor = memo.get(id(entry), entry)
+                    new_list.append(copied_neighbor)
+            setattr(new_self, _name, new_list)
+    
         return new_self
 
     # def deepcopy_complete_tree(self, memo=None, _nil=[]):

@@ -38,9 +38,11 @@ def test_residue_cap_deepcopy():
     )
     ch3_copy = deepcopy(test_ch3)
 
-    assert ch3_copy.link_residue is not test_res
-    assert ch3_copy.link_residue.parent is None
-    assert ch3_copy.link_atom in ch3_copy.link_residue.atoms
+    assert ch3_copy.link_residue is None
+    assert ch3_copy.link_atom is None
+    assert ch3_copy.socket_atom is None
+    assert len(ch3_copy.atoms) == len(test_ch3.atoms)
+    assert id(ch3_copy) != id(test_ch3)
 
 def test_nhch3_cap(helpers):
     """tests NHCH3Cap to ensure region is capped properly"""
