@@ -25,3 +25,4 @@ from .rmsd import (
 )
 from .binding import binding_energy
 from .spi import spi_metric
+from .residue_pka import residue_pka
