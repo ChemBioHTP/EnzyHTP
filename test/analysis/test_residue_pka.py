@@ -11,6 +11,7 @@ import shutil
 from enzy_htp import interface
 from enzy_htp.structure.structure_io.pdb_io import PDBParser
 from enzy_htp.analysis import residue_pka
+from enzy_htp.core import file_system as fs
 
 DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/data/"
 INT_DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/../_interface/data/"
@@ -54,9 +55,13 @@ def test_residue_pka_structure(sample_structure, temp_work_dir):
     # Basic checks
     assert isinstance(result, dict), "Result should be a dictionary"
     assert len(result) > 0, "Result should contain pKa values"
-    
-    # Check that all values are numbers
-    for res_num, pka_val in result.items():
+
+    # Check that all keys are (chain_id, res_num) tuples and values are numbers
+    for key, pka_val in result.items():
+        assert isinstance(key, tuple), f"Key {key} should be a tuple"
+        assert len(key) == 2, f"Key {key} should be a 2-tuple"
+        chain_id, res_num = key
+        assert isinstance(chain_id, str), f"Chain ID {chain_id} should be a string"
         assert isinstance(res_num, int), f"Residue number {res_num} should be an integer"
         assert isinstance(pka_val, (int, float)), f"pKa value {pka_val} should be numeric"
         assert 0 < pka_val < 20, f"pKa value {pka_val} should be reasonable (0-20)"
@@ -73,18 +78,19 @@ def test_residue_pka_structure_with_target_residues(sample_structure, temp_work_
     if len(all_pka) == 0:
         pytest.skip("No ionizable residues found in test structure")
     
-    # Test with specific residue numbers
-    target_residues = list(all_pka.keys())[:2]  # Take first two residues
+    # Test with specific residues using chain.residue format
+    target_keys = list(all_pka.keys())[:2]  # Take first two residues
+    target_residues = [f"{chain_id}.{res_num}" for chain_id, res_num in target_keys]
     result = residue_pka(
         stru=sample_structure,
-        target_residues=[str(res) for res in target_residues],
+        target_residues=target_residues,
         method="propka",
         work_dir=temp_work_dir
     )
     
-    assert len(result) <= len(target_residues), "Result should not exceed requested residues"
-    for res_num in result.keys():
-        assert res_num in target_residues, f"Residue {res_num} not in target list"
+    assert len(result) <= len(target_keys), "Result should not exceed requested residues"
+    for key in result.keys():
+        assert key in target_keys, f"Residue {key} not in target list"
 
 def test_residue_pka_structure_ensemble(sample_structure_ensemble, temp_work_dir):
     """Test residue pKa calculation for a StructureEnsemble."""
@@ -101,9 +107,17 @@ def test_residue_pka_structure_ensemble(sample_structure_ensemble, temp_work_dir
     # Check each structure's results
     for i, struct_result in enumerate(result):
         assert isinstance(struct_result, dict), f"Structure {i} result should be a dictionary"
-        for res_num, pka_val in struct_result.items():
+        for key, pka_val in struct_result.items():
+            assert isinstance(key, tuple), f"Key {key} should be a tuple"
+            assert len(key) == 2, f"Key {key} should be a 2-tuple"
+            chain_id, res_num = key
+            assert isinstance(chain_id, str), f"Chain ID {chain_id} should be a string"
             assert isinstance(res_num, int), f"Residue number {res_num} should be an integer"
             assert isinstance(pka_val, (int, float)), f"pKa value {pka_val} should be numeric"
+    
+    fs.clean_temp_file_n_dir([
+        sample_structure_ensemble.topology_source_file,
+    ])
 
 def test_residue_pka_invalid_method(sample_structure, temp_work_dir):
     """Test that invalid methods raise appropriate errors."""
@@ -125,8 +139,12 @@ def test_residue_pka_invalid_structure_type(temp_work_dir):
 
 def test_propka_interface_directly(sample_structure, temp_work_dir):
     """Test the PROPKA interface directly to ensure it works."""
+    # Remove solvents first to avoid PDB formatting issues
+    from enzy_htp.preparation.clean import remove_solvent
+    clean_structure = remove_solvent(sample_structure, in_place=False)
+    
     result = interface.propka.get_residue_pka_from_stru(
-        stru=sample_structure,
+        stru=clean_structure,
         work_dir=temp_work_dir
     )
     

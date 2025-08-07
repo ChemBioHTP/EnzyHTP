@@ -8,53 +8,63 @@ Author: Robbie Ge
 
 Date: 2025-08-07
 """
-from typing import List, Dict, Union, Callable
-from functools import partial
-import os
+from typing import List, Dict, Union, Callable, Tuple
 
-from enzy_htp import interface
+from enzy_htp import interface, config as eh_config
 from enzy_htp.structure import Structure, StructureEnsemble, Residue
 from enzy_htp.core import _LOGGER
+from enzy_htp.preparation.clean import remove_solvent
 
 
-def _filter_target_residues(all_pka: Dict[int, float], target_residues: Union[List[str], List[Residue], None]) -> Dict[int, float]:
-    """Helper function to filter pKa results for target residues."""
+def _filter_target_residues(
+        all_pka: Dict[Tuple[str, int], float], 
+        target_residues: Union[List[str], List[Residue], None]
+    ) -> Dict[Tuple[str, int], float]:
+    """Helper function to filter pKa results for target residues using chain_id + res_num for robust alignment."""
     if target_residues is None:
         return all_pka
     
-    # Convert target_residues to residue numbers
-    target_res_nums = []
+    # Convert target_residues to (chain_id, res_num) tuples
+    target_keys = []
     for res in target_residues:
         if isinstance(res, str):
-            # Assume format like "A.100" or just "100" 
+            # Format: "A.100" (chain.residue_number)
             if "." in res:
                 parts = res.split(".")
-                try:
-                    target_res_nums.append(int(parts[-1]))
-                except ValueError:
-                    _LOGGER.warning(f"Could not parse residue number from '{res}'")
+                if len(parts) == 2:
+                    chain_id = parts[0]
+                    try:
+                        res_num = int(parts[1])
+                        target_keys.append((chain_id, res_num))
+                    except ValueError:
+                        _LOGGER.warning(f"Could not parse residue number from '{res}'")
+                else:
+                    _LOGGER.warning(f"Invalid format for residue string '{res}'. Expected 'chain.number'")
             else:
+                # Just a number, assume chain A 
                 try:
-                    target_res_nums.append(int(res))
+                    res_num = int(res)
+                    target_keys.append(("A", res_num))
+                    _LOGGER.warning(f"No chain specified for residue '{res}', assuming chain A")
                 except ValueError:
                     _LOGGER.warning(f"Could not parse residue number from '{res}'")
         elif isinstance(res, Residue):
-            target_res_nums.append(res.idx)
+            target_keys.append(res.key())
         else:
             _LOGGER.warning(f"Unsupported target_residues type: {type(res)}")
     
-    # Filter results
-    return {res_num: pka for res_num, pka in all_pka.items() if res_num in target_res_nums}
+    # Filter results using (chain_id, res_num) keys for robust alignment
+    return {key: pka for key, pka in all_pka.items() if key in target_keys}
 
 
 def residue_pka(
         stru: Union[Structure, StructureEnsemble],
         target_residues: Union[List[Residue], List[str], None] = None,
         method: str = "propka",
-        work_dir: str = "./pka",
-        keep_in_file: bool = False,
+        work_dir: str = None,
+        remove_solvents: bool = True,
         **kwargs,
-) -> Union[Dict[int, float], List[Dict[int, float]]]:
+) -> Union[Dict[Tuple[str, int], float], List[Dict[Tuple[str, int], float]]]:
     """Calculate the pKa of target residues in a protein structure.
     Science API function for calculating pKa values using structure-based methods.
     The methods in this function are structure-based, meaning that a pKa value
@@ -73,29 +83,40 @@ def residue_pka(
         method:
             The algorithm for the pKa calculation. (see Details)
         work_dir:
-            The working directory for the calculation.
-        keep_in_file:
-            Whether to keep the input files of the calculation.
+            The working directory for the calculation. If None, uses the system SCRATCH directory.
+        remove_solvents:
+            Whether to remove solvent molecules before calculation. Default True 
+            since PROPKA doesn't benefit from solvents and they can cause formatting issues.
 
     Returns:
-        A dictionary of residue numbers and their pKa values, or a list of
-        such dictionaries for a StructureEnsemble.
+        A dictionary mapping (chain_id, residue_number) tuples to their pKa values, 
+        or a list of such dictionaries for a StructureEnsemble.
 
     Details:
         Available implementations:
         - "propka": Uses PROPKA to calculate pKa values.
     """
+    # Set default work_dir to SCRATCH if not provided
+    if work_dir is None:
+        work_dir = eh_config.system.SCRATCH_DIR
+    
     if method not in PKA_METHODS:
         _LOGGER.error(f"Method '{method}' not supported. Supported methods: {list(PKA_METHODS.keys())}")
         raise ValueError
 
     if isinstance(stru, Structure):
-        all_pka = PKA_METHODS[method](stru=stru, work_dir=work_dir, **kwargs)
+        # Remove solvents if requested
+        if remove_solvents:
+            stru_clean = remove_solvent(stru, in_place=False)
+        else:
+            stru_clean = stru
+        
+        all_pka = PKA_METHODS[method](stru=stru_clean, work_dir=work_dir, **kwargs)
         return _filter_target_residues(all_pka, target_residues)
 
     elif isinstance(stru, StructureEnsemble):
         results = []
-        for s in stru.structures(remove_solvent=True):
+        for s in stru.structures(remove_solvent=remove_solvents):
             all_pka = PKA_METHODS[method](stru=s, work_dir=work_dir, **kwargs)
             results.append(_filter_target_residues(all_pka, target_residues))
         return results
