@@ -5,6 +5,7 @@ enzy_htp. Currently supports the ability to calculate:
     + dipole
     + stability
     + substrate positioning index (spi)
+    + residue pKa
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 
