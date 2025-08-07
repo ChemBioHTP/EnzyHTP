@@ -8,6 +8,7 @@ import enzy_htp
 from enzy_htp.core.general import EnablePropagate
 from enzy_htp import _LOGGER
 from enzy_htp.core import math_helper as mh
+from scipy.spatial.transform import Rotation as R
 
 
 def test_check_valid_ph_good_input(caplog):
@@ -185,3 +186,33 @@ def test_round_by():
     assert mh.round_by(-1.4, 0.5) == -1.0
     assert mh.round_by(-1.4, 0.3) == -2.0
     assert mh.round_by(1.4, 0.3) == 2.0
+
+
+def test_rot_vec_from_dihedral():
+    test_pt1 = np.array([1, 0, 0])
+    test_pt2 = np.array([5, 7, 3])
+    test_pt3 = np.array([1, 0, 5])
+    test_pt4 = np.array([4, -5, 7])
+
+    rv = mh.rot_vec_from_dihedral(test_pt1, test_pt2, test_pt3, test_pt4, 0)
+    rot = R.from_rotvec(rv, degrees=True)
+
+    dv = test_pt4 - test_pt3
+ 
+    test_pt4 = test_pt3 + rot.apply(dv)
+
+    assert abs(mh.get_dihedral(test_pt1, test_pt2, test_pt3, test_pt4)) <= 0.05
+
+    test_pt1_2 = np.array([1, 0, 0])
+    test_pt2_2 = np.array([5, 7, 3])
+    test_pt3_2 = np.array([1, 0, 5])
+    test_pt4_2 = np.array([4, -5, 7])
+
+    rv2 = mh.rot_vec_from_dihedral(test_pt1_2, test_pt2_2, test_pt3_2, test_pt4_2, 120)
+    rot2 = R.from_rotvec(rv2, degrees=True)
+
+    dv2 = test_pt4_2 - test_pt3_2
+ 
+    test_pt4_2 = test_pt3_2 + rot2.apply(dv2)
+
+    assert abs(abs(mh.get_dihedral(test_pt1_2, test_pt2_2, test_pt3_2, test_pt4_2)) - 120.0) <= 0.05

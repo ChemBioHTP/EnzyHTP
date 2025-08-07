@@ -11,7 +11,6 @@ there are configuration settings for the below packages by the given <Package>Co
     + AmberMD, AmberConfig
     + BCL, BCLConfig
     + Gaussian, GaussianConfig
-    + Modeller ModellerConfig
     + MOE, MOEConfig
     + Mole2, Mole2Config
     + Multiwfn, MultiwfnConfig

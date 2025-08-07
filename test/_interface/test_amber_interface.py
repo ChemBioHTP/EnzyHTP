@@ -5,27 +5,36 @@ Author: Zhong, Yinjie <yinjie.zhong@vanderbilt.edu>
 Date: 2022-06-03
 """
 import glob
+import io
 import os
 import re
 import shutil
 from subprocess import CompletedProcess
+from enzy_htp.preparation.clean import remove_solvent
+from enzy_htp.structure.structure_enchantment import connectivity
+from enzy_htp.structure.structure_region.api import create_region_from_residues
 import pytest
 import numpy as np
 from pathlib import Path
 from typing import Union
 
 from enzy_htp.core.clusters.accre import Accre
+from enzy_htp.core.clusters.accre_r9 import AccreR9
 from enzy_htp.core.exception import tLEaPError, AmberMDError
 from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.general import EnablePropagate
 from enzy_htp.core.job_manager import ClusterJob, ClusterJobConfig
 from enzy_htp.core import file_system as fs
+from enzy_htp.chemical.level_of_theory import QMLevelOfTheory
 from enzy_htp._interface.amber_interface import (
     AmberParameterizer,
     AmberParameter,
     AmberMDStep,
-    AmberMDResultEgg,)
+    AmberMDResultEgg,
+    AmberMDCRDParser,)
+from enzy_htp.preparation.clean import remove_solvent
 import enzy_htp.structure as struct
+from enzy_htp.structure.structure_io.prmtop_io import PrmtopParser
 from enzy_htp.structure.structure_constraint import (
     StructureConstraint,
     create_cartesian_freeze,
@@ -40,6 +49,7 @@ from enzy_htp.structure.structure_selection.general import select_stru
 
 MM_BASE_DIR = Path(__file__).absolute().parent
 MM_DATA_DIR = f"{MM_BASE_DIR}/data/"
+MM_NCAA_DIR = f"{MM_BASE_DIR}/../ncaa_lib/"
 STRU_DATA_DIR = f"{MM_BASE_DIR}/../structure/data/"
 MM_WORK_DIR = f"{MM_BASE_DIR}/work_dir/"
 MINIMIZE_INPUT_1 = f"{MM_DATA_DIR}/min_1.inp"
@@ -302,19 +312,43 @@ def test_amber_parameterizer_run_lv_4():
     fs.safe_rmdir(eh_config["system.SCRATCH_DIR"])
 
 
-def test_amber_parameterizer_run_lv_5(): #TODO
+def test_amber_parameterizer_run_lv_5():
     """level 5 test of the parameterizer.
     Test structure diversity:
     - 2 polypeptide chain
     - 1 substrate (CHONP)
-    - 1 modified amino acid (CHONP)"""
+    - 1 modified amino acid (CHONP)
+    
+    This is an integration test for the complete MAA parameterization workflow."""
     ai = interface.amber
+    test_ncaa_lib = f"{MM_WORK_DIR}ncaa_lib_empty_lv5"
+
+    # Use the 3FCR_protonated.pdb file that contains the LLP modified amino acid
+    test_stru = struct.PDBParser().get_structure(f"{MM_DATA_DIR}/3FCR_protonated.pdb")
+    # Assign charge/spin to all non-canonical residues in the structure
+    test_stru.assign_ncaa_chargespin({"LLP": (-2, 1), "RLP": (-2, 1)})  # RLP is another ligand in the structure
+    remove_solvent(test_stru)
+    connectivity.init_connectivity(test_stru)
+    
+    # Create parameterizer with empty library to force parameterization
     test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
-        ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib_empty"
+        ncaa_param_lib_path=test_ncaa_lib,
     )
-    test_stru = struct.PDBParser().get_structure(
-        f"{MM_DATA_DIR}/3cfr-slp-pea_ah.pdb")
-    test_param_worker.run(test_stru)
+    
+    # Ensure the directory exists and is empty
+    fs.safe_mkdir(test_ncaa_lib)
+    
+    # Run the parameterizer - this should trigger _parameterize_modified_res
+    params = test_param_worker.run(test_stru)
+    
+    # Primary assertion: verify the final parameters are valid
+    assert params.is_valid(), "Generated parameters should be valid"
+    
+    # Clean up
+    fs.safe_rmdir(test_ncaa_lib)
+    fs.clean_temp_file_n_dir(params.file_list + [
+        test_param_worker.parameterizer_temp_dir,
+    ])
 
 
 def test_amber_parameterizer_run_lv_6(): #TODO
@@ -322,7 +356,8 @@ def test_amber_parameterizer_run_lv_6(): #TODO
     Test structure diversity:
     - 2 polypeptide chain
     - 1 substrate (CHONP)
-    - 1 modified amino acid (CHONP)"""
+    - 1 modified amino acid (CHONP)
+    - 1 metal center"""
     ai = interface.amber
     test_param_worker: AmberParameterizer = ai.build_md_parameterizer(
         ncaa_param_lib_path=f"{MM_DATA_DIR}/ncaa_lib_empty"
@@ -394,6 +429,143 @@ def test_run_parmchk2():
     assert os.path.exists(temp_frcmod_file)
     assert len(fs.lines_from_file(temp_frcmod_file)) == 23
     fs.safe_rm(temp_frcmod_file)
+
+
+def test_run_prepgen():
+    """test the run_prepgen function works well with existing files in data directory"""    
+    ai = interface.amber
+    
+    # Use existing test files in data directory
+    test_ac_file = f"{MM_DATA_DIR}/test_LLP.ac"
+    test_mc_file = f"{MM_DATA_DIR}/test_LLP.mc"
+    temp_prepin_file = f"{MM_WORK_DIR}/test_LLP.prepin"
+    
+    # Run prepgen with the existing ac and mc files
+    ai.run_prepgen(
+        in_file=test_ac_file,
+        out_file=temp_prepin_file,
+        mc_file=test_mc_file,
+        residue_name="LLP"
+    )
+   
+    # Verify files exist
+    assert os.path.exists(temp_prepin_file), "input .prepin file should exist"
+    assert os.path.getsize(temp_prepin_file) > 0, "input .prepin file should not be empty"
+    
+    # Clean up
+    fs.clean_temp_file_n_dir([temp_prepin_file])
+
+
+def test_run_prepgen_failure_cases():
+    """Test that run_prepgen properly exposes errors and handles failure cases"""
+    ai = interface.amber
+    
+    # Test with non-existent input file - this should raise an OSError or similar
+    with pytest.raises(Exception):
+        ai.run_prepgen(in_file="/nonexistent/file.ac",
+                       out_file=f"{MM_WORK_DIR}/test_fail.prepin",
+                       mc_file=f"{MM_WORK_DIR}/test_fail.mc",
+                       residue_name="TEST")
+    
+    # Test directory change failure - use a non-existent directory
+    temp_invalid_ac = "/nonexistent_dir/invalid.ac"
+    
+    # This should fail during os.path.dirname() or os.chdir() operations
+    with pytest.raises(Exception):
+        ai.run_prepgen(in_file=temp_invalid_ac,
+                       out_file=f"{MM_WORK_DIR}/test_fail.prepin", 
+                       mc_file=f"{MM_WORK_DIR}/test_fail.mc",
+                       residue_name="FAIL")
+    
+    # Test with nonsense ac file - should fail with meaningful error
+    nonsense_ac_file = f"{MM_DATA_DIR}/nonsense_test.ac"
+    test_mc_file = f"{MM_DATA_DIR}/test_LLP.mc"
+    temp_prepin_file = f"{MM_WORK_DIR}/test_nonsense.prepin"
+    
+    with pytest.raises(RuntimeError) as exc_info:
+        ai.run_prepgen(in_file=nonsense_ac_file,
+                       out_file=temp_prepin_file,
+                       mc_file=test_mc_file,
+                       residue_name="TEST")
+    
+    # Verify that the error message contains useful information
+    error_message = str(exc_info.value)
+    assert "prepgen command failed" in error_message or "prepgen encountered an error" in error_message or "prepgen failed to create output file" in error_message
+    
+    # Test that error handling preserves original working directory even on failure
+    original_cwd = os.getcwd()
+    
+    try:
+        with pytest.raises(Exception):
+            # This should fail but should restore the working directory
+            ai.run_prepgen(in_file="/nonexistent/file.ac",
+                           out_file=f"{MM_WORK_DIR}/test_fail.prepin",
+                           mc_file=f"{MM_WORK_DIR}/test_fail.mc", 
+                           residue_name="TEST")
+    except:
+        pass
+    
+    # Verify working directory was restored even after exception
+    assert os.getcwd() == original_cwd, "Working directory should be restored after exception"
+
+
+def test_correct_atom_types_in_ac_file():
+    """test the _correct_atom_types_in_ac_file function works correctly"""
+    from enzy_htp._interface.amber_interface import AmberParameterizer
+    
+    # Create a test .ac file with GAFF atom types for backbone atoms
+    test_ac_content = """CHARGE     -2.00 ( -2 )
+Formula: H20 C14 N3 O7 P1 
+ATOM      1  N   LLP   289      -5.294  57.398  -9.041 -0.934800        n4
+ATOM      2  H   LLP   289      -4.547  56.832  -8.672  0.294400        hn
+ATOM      3  CA  LLP   289      -6.507  56.533  -9.201  0.170500        c3
+ATOM      4  C   LLP   289      -6.279  55.260 -10.075  0.636100         c
+ATOM      5  O   LLP   289      -5.895  54.198  -9.546 -0.619000         o
+ATOM      6  OXT LLP   289      -6.895  55.198  -11.146 -0.719000        o2
+ATOM      7  CB  LLP   289      -7.725  57.393  -9.645 -0.093400        c3
+ATOM      8  CG  LLP   289      -8.173  58.349  -8.514 -0.112400        c3
+"""
+    
+    test_ac_file = f"{MM_WORK_DIR}/test_correct_atom_types.ac"
+    with open(test_ac_file, 'w') as f:
+        f.write(test_ac_content)
+    
+    # Create a parameterizer instance to access the private method
+    ai = interface.amber
+    parameterizer = ai.build_md_parameterizer()
+    
+    # Call the correction method
+    parameterizer._correct_atom_types_in_ac_file(test_ac_file)
+    
+    # Read the corrected file and verify backbone atom types were changed
+    with open(test_ac_file, 'r') as f:
+        corrected_content = f.read()
+    
+    # Check that backbone atoms were corrected to FF14SB types
+    assert "        N" in corrected_content  # Amide nitrogen should remain N
+    assert "        H" in corrected_content  # Amide hydrogen should remain H  
+    assert "       CX" in corrected_content  # Alpha carbon should become CX
+    assert "        C" in corrected_content  # Carbonyl carbon should remain C
+    assert "        O" in corrected_content  # Carbonyl oxygen should remain O
+    assert "       O2" in corrected_content  # Terminal oxygen should remain O2
+    
+    # Check that sidechain atoms retained GAFF types (c3 for CB, CG)
+    assert "       c3" in corrected_content  # Sidechain carbons should keep c3
+    
+    # Verify specific corrections occurred
+    lines = corrected_content.split('\n')
+    n_line = [line for line in lines if "  N   LLP" in line][0]
+    ca_line = [line for line in lines if "  CA  LLP" in line][0]
+    c_line = [line for line in lines if "  C   LLP" in line][0]
+    cb_line = [line for line in lines if "  CB  LLP" in line][0]
+    
+    assert n_line.endswith("        N")   # N should be corrected to N
+    assert ca_line.endswith("       CX")  # CA should be corrected to CX
+    assert c_line.endswith("        C")   # C should be corrected to C
+    assert cb_line.endswith("       c3")  # CB should retain GAFF c3
+    
+    # Clean up
+    fs.safe_rm(test_ac_file)
 
 
 def test_run_antechamber():
@@ -504,7 +676,7 @@ def test_build_md_step_default():
     md_step: AmberMDStep = ai.build_md_step(length=0.1, core_type="cpu")
     assert md_step.temperature == 300.0
     assert md_step.core_type == "cpu"
-    assert md_step.cluster_job_config["res_keywords"]["core_type"] == "cpu"
+    assert md_step.cluster_job_config.res_keywords["core_type"] == "cpu"
     assert md_step.length == 0.1
     assert md_step.record_period == 0.0001
 
@@ -519,15 +691,15 @@ def test_build_md_step_res_keywords():
                                                 "res_keywords" : {"partition" : "production",
                                                                   "account" : "yang_lab",}
                                             })
-    assert md_step.cluster_job_config["cluster"] is None
-    assert md_step.cluster_job_config["res_keywords"]["core_type"] == "cpu"
-    assert md_step.cluster_job_config["res_keywords"]["partition"] == "production"
-    assert md_step.cluster_job_config["res_keywords"]["nodes"] == "1"
-    assert md_step.cluster_job_config["res_keywords"]["node_cores"] ==  "16"
-    assert md_step.cluster_job_config["res_keywords"]["job_name"] ==  "MD_EnzyHTP"
-    assert md_step.cluster_job_config["res_keywords"]["mem_per_core"] ==  "3G"
-    assert md_step.cluster_job_config["res_keywords"]["walltime"] ==  "1-00:00:00"
-    assert md_step.cluster_job_config["res_keywords"]["account"] ==  "yang_lab"
+    assert md_step.cluster_job_config.cluster is None
+    assert md_step.cluster_job_config.res_keywords["core_type"] == "cpu"
+    assert md_step.cluster_job_config.res_keywords["partition"] == "production"
+    assert md_step.cluster_job_config.res_keywords["nodes"] == "1"
+    assert md_step.cluster_job_config.res_keywords["node_cores"] ==  "16"
+    assert md_step.cluster_job_config.res_keywords["job_name"] ==  "MD_EnzyHTP"
+    assert md_step.cluster_job_config.res_keywords["mem_per_core"] ==  "3G"
+    assert md_step.cluster_job_config.res_keywords["walltime"] ==  "1-00:00:00"
+    assert md_step.cluster_job_config.res_keywords["account"] ==  "yang_lab"
 
 
 def test_write_to_mdin_from_raw_dict():
@@ -683,6 +855,7 @@ def test_parse_md_config_dict_to_raw_wo_cons():
                 'ntb': 1, 'ntp':0,
                 'iwrap': 1,
                 'ig': -1,
+                'ifqnt' : 0,
                 }
             },
            {'type': 'wt',
@@ -721,6 +894,129 @@ def test_parse_md_config_dict_to_raw_wo_cons():
             "if_report" : True,
             "record_period" : 0.0004, # ns
             "mdstep_dir" : "./MD",
+            "use_qmmm" : False,
+            "qm_region" : None,
+            "qm_region_charge_spin" : None,
+            "qm_level_of_theory" : None,
+            "qm_engine" : None,
+            "qm_region_pdb_path" : None,
+            "qm_ele_cutoff" : None,
+            "qm_ewald" : None,
+            "qm_adjust_q" : None,
+            "qm_adaptive_solvent_type" : None,
+            "qm_num_adaptive_solvent" : None,
+            "qm_num_transition_solvent" : None,
+            "available_cores" : 9,
+            "available_mem_per_core" : "2GB",
+    }
+
+    ai = interface.amber
+    test_raw_dict = ai._parse_md_config_dict_to_raw(test_md_config_dict)
+    assert test_raw_dict == answer_raw_dict
+
+
+def test_parse_md_config_dict_to_raw_qmmm():
+    """test to make sure _parse_md_config_dict_to_raw() works as expected.
+    using a dict from old EnzyHTP Class_Conf.Amber.conf_heat as an example"""
+    answer_raw_dict = {
+        'title': 'Heat',
+        'namelists': [
+           {'type': 'cntrl',
+            'config': {
+                'imin': 0, 'ntx': 1, 'irest': 0,
+                'ntc': 2, 'ntf': 2,
+                'cut': 10.0,
+                'nstlim': 20000, 'dt': 0.002,
+                'tempi': 0.0, 'temp0': 300.0,
+                'ntpr': 200, 'ntwx': 200,
+                'ntt': 3, 'gamma_ln': 5.0,
+                'ntb': 1, 'ntp':0,
+                'iwrap': 1,
+                'ig': -1,
+                'ifqnt' : 1,
+                }
+            },
+           {'type': 'qmmm',
+            'config': {
+                'adjust_q': 1,
+                'qm_ewald': 'amber_default',
+                'qm_theory': "'EXTERN'",
+                'qmcharge': -1,
+                'qmcut': 12.0,
+                'qmmask': "'@1567-1581,3963-3978'",
+                'spin': 1,
+                'vsolv': 1,
+                'writepdb': 0
+                }
+           },        
+           {'type': 'gau',
+            'config': {
+                    'basis': "'def2svp'",
+                    'mem': "'16GB'",
+                    'method': "'pbe1pbe'",
+                    'num_threads': 8
+                }
+            },
+           {'type': 'vsolv',
+            'config': {
+                'nearest_qm_solvent': 10,
+                }
+           },
+           {'type': 'wt',
+            'config': {
+                'type': "'TEMP0'",
+                'istep1': 0, 'istep2': 18000,
+                'value1': 0.0, 'value2': 300.0,
+                }
+            },
+           {'type': 'wt',
+            'config': {
+                'type': "'TEMP0'",
+                'istep1': 18001, 'istep2': 20000,
+                'value1': 300.0, 'value2': 300.0,
+                }
+            },
+           {'type': 'wt',
+            'config': {
+                'type': "'END'",
+                }
+            },
+        ],
+        'file_redirection': {},
+        'group_info': [],
+    }
+    test_pdb = f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb"
+    test_stru = struct.PDBParser().get_structure(test_pdb)
+    test_md_config_dict = {
+            "name" : "Heat",
+            "length" : 0.04, # ns
+            "timestep" : 0.000002, # ns
+            "minimize" : False,
+            "temperature" : [(0.0, 0.0), (0.036, 300.0), (0.04, 300.0)],
+            "thermostat" : "langevin",
+            "pressure_scaling" : "none",
+            "constrain" : None,
+            "restart" : False,
+            "if_report" : True,
+            "record_period" : 0.0004, # ns
+            "mdstep_dir" : "./MD",
+            "use_qmmm" : True,
+            "qm_region" : select_stru(test_stru, "resi 101+254"),
+            "qm_region_charge_spin" : (-1, 1),
+            "qm_level_of_theory" : QMLevelOfTheory(
+                                    basis_set="def2svp",
+                                    method="PBE0",
+                                   ),
+            "qm_engine" : "g16",
+            "qm_region_pdb_path" : None,
+            "qm_ele_cutoff" : 12.0,
+            "qm_ewald" : "amber_default",
+            "qm_adjust_q" : 1,
+            "qm_adaptive_solvent_type" : "single_point",
+            "qm_num_adaptive_solvent" : 10,
+            "qm_num_transition_solvent" : 0,
+            "available_cores" : 9,
+            "available_mem_per_core" : "2GB",
     }
 
     ai = interface.amber
@@ -741,6 +1037,7 @@ def test_parse_md_config_dict_to_raw_minimize():
                 'cut': 10.0,
                 'maxcyc': 20000, 'ncyc': 10000,
                 'ntpr': 200, 'ntwx': 0,
+                'ifqnt' : 0,
                 }
             },
         ],
@@ -760,6 +1057,20 @@ def test_parse_md_config_dict_to_raw_minimize():
             "if_report" : True,
             "record_period" : 0.0004, # ns
             "mdstep_dir" : "./MD",
+            "use_qmmm" : False,
+            "qm_region" : None,
+            "qm_region_charge_spin" : None,
+            "qm_level_of_theory" : None,
+            "qm_engine" : None,
+            "qm_region_pdb_path" : None,
+            "qm_ele_cutoff" : None,
+            "qm_ewald" : None,
+            "qm_adjust_q" : None,
+            "qm_adaptive_solvent_type" : None,
+            "qm_num_adaptive_solvent" : None,
+            "qm_num_transition_solvent" : None,
+            "available_cores" : 9,
+            "available_mem_per_core" : "2GB",
     }
 
     ai = interface.amber
@@ -789,6 +1100,7 @@ def test_parse_md_config_dict_to_raw_w_cons():
                 'nmropt': 1,
                 'ig': -1,
                 'ntr': 1, 'restraint_wt': 2.0, 'restraintmask': "'@C,CA,N'",
+                'ifqnt' : 0,
                 }
             },
            {'type': 'wt',
@@ -853,6 +1165,20 @@ def test_parse_md_config_dict_to_raw_w_cons():
         "if_report" : True,
         "record_period" : 0.0004,
         "mdstep_dir" : "./MD",
+        "use_qmmm" : False,
+        "qm_region" : None,
+        "qm_region_charge_spin" : None,
+        "qm_level_of_theory" : None,
+        "qm_engine" : None,
+        "qm_region_pdb_path" : None,
+        "qm_ele_cutoff" : None,
+        "qm_ewald" : None,
+        "qm_adjust_q" : None,
+        "qm_adaptive_solvent_type" : None,
+        "qm_num_adaptive_solvent" : None,
+        "qm_num_transition_solvent" : None,
+        "available_cores" : 9,
+        "available_mem_per_core" : "2GB",
     }
 
     ai = interface.amber
@@ -880,19 +1206,80 @@ def test_amber_md_step_make_job():
 #SBATCH --account=<fillthis>
 #SBATCH --export=NONE
 (?:#SBATCH --exclude=.+)?
-
 # Script generated by EnzyHTP [0-9]\.[0-9]\.[0-9] in [0-9]+-[0-9]+-[0-9]+ [0-9]+:[0-9]+:[0-9]+
 
-source /home/shaoq1/bin/amber_env/amber22\.sh
+source /sb/apps/amber22/amber\.sh
 
 pmemd\.cuda -O -i \./MD/amber_md_step_?[0-9]*\.in -o \./MD/amber_md_step\.out -p .*test/_interface/data//KE_07_R7_S\.prmtop -c .*test/_interface/data//KE_07_R7_S\.inpcrd -r \./MD/amber_md_step\.rst -ref .*test/_interface/data//KE_07_R7_S\.inpcrd -x \./MD/amber_md_step\.nc 
 """
+
     assert re.match(answer_pattern, test_job.sub_script_str)
     assert test_md_egg.traj_path == './MD/amber_md_step.nc'
     assert test_md_egg.traj_log_path == './MD/amber_md_step.out'
     assert test_md_egg.rst_path == './MD/amber_md_step.rst'
     assert Path(test_md_egg.prmtop_path) == Path('test/_interface/data//KE_07_R7_S.prmtop').absolute()
     fs.safe_rmdir(md_step.work_dir)
+
+
+def test_amber_md_step_make_job_qmmm():
+    """test to make sure AmberMDStep.make_job() works as expected.
+    w/o constraint.
+    w/ QMMM."""
+    ai = interface.amber
+    test_pdb = f"{MM_DATA_DIR}/KE_07_R7_2_S.pdb"
+    test_stru = struct.PDBParser().get_structure(test_pdb)
+    test_qm_lot = QMLevelOfTheory(
+        basis_set="def2svp",
+        method="PBE0",
+    )
+    md_step = ai.build_md_step(
+        minimize=True,
+        length=1, # i.e.: single point energy
+        core_type="cpu",
+        # qmmm settings
+        use_qmmm = True,
+        qm_region = select_stru(test_stru, "resi 101+254"),
+        qm_region_charge_spin = (-1, 1),
+        qm_level_of_theory  = test_qm_lot,
+        qm_engine = "g16",
+        qm_ele_cutoff = 12.0,
+        qm_adaptive_solvent_type = "single_point", # num_of_solvent, fixed_size
+        qm_num_adaptive_solvent = 10,
+    )
+    test_inpcrd = f"{MM_DATA_DIR}/KE_07_R7_S.inpcrd"
+    test_prmtop = f"{MM_DATA_DIR}/KE_07_R7_S.prmtop"
+    test_params = AmberParameter(test_inpcrd, test_prmtop)
+    test_job, test_md_egg = md_step.make_job(test_params)
+    
+    answer_pattern = r"""#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=16
+#SBATCH --job-name=MD_EnzyHTP
+#SBATCH --partition=<fillthis>
+#SBATCH --mem-per-cpu=3G
+#SBATCH --time=1-00:00:00
+#SBATCH --account=<fillthis>
+#SBATCH --export=NONE
+(?:#SBATCH --exclude=.+)?
+# Script generated by EnzyHTP [0-9]\.[0-9]\.[0-9] in [0-9]+-[0-9]+-[0-9]+ [0-9]+:[0-9]+:[0-9]+
+
+source /sb/apps/amber22/amber\.sh
+module load Gaussian/16\.B\.01
+mkdir \$TMPDIR/\$SLURM_JOB_ID
+export GAUSS_SCRDIR=\$TMPDIR/\$SLURM_JOB_ID
+
+mpirun -np 16 sander\.MPI -O -i \./MD/amber_md_step_?[0-9]*\.in -o \./MD/amber_md_step\.out -p .*test/_interface/data//KE_07_R7_S\.prmtop -c .*test/_interface/data//KE_07_R7_S\.inpcrd -r \./MD/amber_md_step\.rst -ref .*test/_interface/data//KE_07_R7_S\.inpcrd -x \./MD/amber_md_step\.nc 
+
+
+rm -rf \$TMPDIR/\$SLURM_JOB_ID"""
+    print(test_job.sub_script_str)
+    assert re.match(answer_pattern, test_job.sub_script_str)
+    assert test_md_egg.traj_path == './MD/amber_md_step.nc'
+    assert test_md_egg.traj_log_path == './MD/amber_md_step.out'
+    assert test_md_egg.rst_path == './MD/amber_md_step.rst'
+    assert Path(test_md_egg.prmtop_path) == Path('test/_interface/data//KE_07_R7_S.prmtop').absolute()
+    fs.safe_rmdir(md_step.work_dir)
+    assert False # TODO add more QMMM result assert 
 
 
 def test_amber_md_step_make_job_w_cons():
@@ -926,14 +1313,53 @@ def test_amber_md_step_make_job_w_cons():
 #SBATCH --account=<fillthis>
 #SBATCH --export=NONE
 (?:#SBATCH --exclude=.+)?
-
 # Script generated by EnzyHTP [0-9]\.[0-9]\.[0-9] in [0-9]+-[0-9]+-[0-9]+ [0-9]+:[0-9]+:[0-9]+
 
-source /home/shaoq1/bin/amber_env/amber22\.sh
+source /sb/apps/amber22/amber\.sh
 
 pmemd\.cuda -O -i \./MD/amber_md_step_?[0-9]*\.in -o \./MD/amber_md_step\.out -p .*test/_interface/data//KE_07_R7_S\.prmtop -c .*test/_interface/data//KE_07_R7_S\.inpcrd -r \./MD/amber_md_step\.rst -ref .*test/_interface/data//KE_07_R7_S\.inpcrd -x \./MD/amber_md_step\.nc 
 """
     assert re.match(answer_pattern, test_job.sub_script_str)
+    fs.safe_rmdir(md_step.work_dir)
+
+
+def test_amber_md_step_make_job_new_accre_node_cores():
+    """test to make sure AmberMDStep.make_job() works as expected.
+    w/o constraint and w/ custom node_core setting from new Accre."""
+    ai = interface.amber
+    cluster_job_config={
+        "cluster" : AccreR9(),
+        "res_keywords" : {"partition" : "batch_gpu",
+                          "account" : "yang_lab",
+                          "node_cores" : "nvidia_rtx_a6000:1"}
+    }    
+    md_step = ai.build_md_step(length=0.1, cluster_job_config=cluster_job_config) # 300K, NPT by default
+    test_inpcrd = f"{MM_DATA_DIR}/KE_07_R7_S.inpcrd"
+    test_prmtop = f"{MM_DATA_DIR}/KE_07_R7_S.prmtop"
+    test_params = AmberParameter(test_inpcrd, test_prmtop)
+    test_job, test_md_egg = md_step.make_job(test_params)
+    
+    answer_pattern = r"""#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:nvidia_rtx_a6000:1
+#SBATCH --job-name=MD_EnzyHTP
+#SBATCH --partition=batch_gpu
+#SBATCH --mem=8G
+#SBATCH --time=3-00:00:00
+#SBATCH --account=yang_lab
+#SBATCH --export=NONE
+(?:#SBATCH --exclude=.+)?
+# Script generated by EnzyHTP [0-9]\.[0-9]\.[0-9] in [0-9]+-[0-9]+-[0-9]+ [0-9]+:[0-9]+:[0-9]+
+
+source /sb/apps/amber22/amber\.sh
+
+pmemd\.cuda -O -i \./MD/amber_md_step_?[0-9]*\.in -o \./MD/amber_md_step\.out -p .*test/_interface/data//KE_07_R7_S\.prmtop -c .*test/_interface/data//KE_07_R7_S\.inpcrd -r \./MD/amber_md_step\.rst -ref .*test/_interface/data//KE_07_R7_S\.inpcrd -x \./MD/amber_md_step\.nc 
+"""
+    assert re.match(answer_pattern, test_job.sub_script_str)
+    assert test_md_egg.traj_path == './MD/amber_md_step.nc'
+    assert test_md_egg.traj_log_path == './MD/amber_md_step.out'
+    assert test_md_egg.rst_path == './MD/amber_md_step.rst'
+    assert Path(test_md_egg.prmtop_path) == Path('test/_interface/data//KE_07_R7_S.prmtop').absolute()
     fs.safe_rmdir(md_step.work_dir)
 
 
@@ -1070,9 +1496,9 @@ def test_get_amber_index_mapper():
     test_atom_1 = test_stru.get("D.371.N1A")
 
     index_mapper = ai.get_amber_index_mapper(test_stru)
-    assert index_mapper["residue"][test_res_1][1] == 3
-    assert index_mapper["residue"][test_res_2][1] == 143
-    assert index_mapper["atom"][test_atom_1] == 4434
+    assert index_mapper["residue"][test_res_1.key()][1] == 3
+    assert index_mapper["residue"][test_res_2.key()][1] == 143
+    assert index_mapper["atom"][(test_atom_1.key, test_atom_1.idx)] == 4434
 
 
 def test_parse_cons_to_raw_rs_dict():
@@ -1165,6 +1591,112 @@ def test_get_rmsd():
     fs.safe_rm(structure_ensemble.topology_source_file)
     for r, a in zip(result[:len(answer)], answer):
         assert np.isclose(r, a, atol=0.001)
+
+def test_get_rmsf():
+    """Test the function using RMSF value."""
+    prmtop_path = os.path.join(MM_DATA_DIR, "test_rmsd.prmtop")
+    traj_path = os.path.join(MM_DATA_DIR, "test_rmsd.mdcrd")
+    ref_pdb = os.path.join(MM_DATA_DIR, "test_rmsd_chainid.pdb")
+
+    structure_ensemble = interface.amber.load_traj(
+        prmtop_path=prmtop_path,
+        traj_path=traj_path,
+        ref_pdb=ref_pdb,
+    )
+    region_pattern = "resi 1-10 and (not elem H)"
+    stru_sele = select_stru(remove_solvent(structure_ensemble.structure_0), pattern=region_pattern)
+
+    answer = {'A.1': 3.7707, 'A.2': 2.0925, 'A.3': 1.1993, 'A.4': 1.2639, 'A.5': 1.0231, 'A.6': 0.717, 'A.7': 0.5976, 'A.8': 0.5906, 'A.9': 0.7608, 'A.10': 1.0404}
+    result = interface.amber.get_rmsf(
+        stru_esm=structure_ensemble,
+        stru_selection=stru_sele,
+        by_residue=True,
+    )
+    for (rk, rv), (ak, av) in zip(result.items(), answer.items()):
+        assert rk == ak
+        assert np.isclose(rv, av, atol=0.001)
+
+    answer = {
+        'A.1.N': 3.5966, 'A.1.CA': 2.8931, 'A.1.CB': 3.6548, 'A.1.CG': 3.9656, 'A.1.SD': 4.9683, 'A.1.CE': 5.9142, 'A.1.C': 1.7865, 'A.1.O': 2.0033, 
+        'A.2.N': 1.2328, 'A.2.CA': 1.2632, 'A.2.CB': 2.2251, 'A.2.CG': 2.8978, 'A.2.CD1': 3.8222, 'A.2.CD2': 3.6093, 'A.2.C': 1.0033, 'A.2.O': 1.1442, 
+        'A.3.N': 1.0691, 'A.3.CA': 1.0968, 'A.3.CB': 1.2919, 'A.3.C': 1.1669, 'A.3.O': 1.3451, 'A.4.N': 1.1199, 'A.4.CA': 1.1358, 'A.4.CB': 1.1587, 
+        'A.4.CG': 1.2595, 'A.4.CD': 1.3434, 'A.4.CE': 1.4846, 'A.4.NZ': 1.6629, 'A.4.C': 1.0697, 'A.4.O': 1.1399, 'A.5.N': 1.024, 'A.5.CA': 0.948, 
+        'A.5.CB': 1.0487, 'A.5.CG': 1.0787, 'A.5.CD': 1.1049, 'A.5.NE': 1.0158, 'A.5.CZ': 1.0912, 'A.5.NH1': 1.2637, 'A.5.NH2': 1.0379, 'A.5.C': 0.8178, 
+        'A.5.O': 0.842, 'A.6.N': 0.7398, 'A.6.CA': 0.6063, 'A.6.CB': 0.6539, 'A.6.CG2': 0.7202, 'A.6.CG1': 0.8109, 'A.6.CD1': 0.9799, 'A.6.C': 0.5498, 
+        'A.6.O': 0.6829, 'A.7.N': 0.4686, 'A.7.CA': 0.468, 'A.7.CB': 0.5531, 'A.7.CG': 0.6908, 'A.7.OD1': 0.8111, 'A.7.OD2': 0.8178, 'A.7.C': 0.4134, 
+        'A.7.O': 0.476, 'A.8.N': 0.4887, 'A.8.CA': 0.541, 'A.8.CB': 0.7263, 'A.8.C': 0.5447, 'A.8.O': 0.6495, 'A.9.N': 0.5552, 'A.9.CA': 0.6175, 
+        'A.9.CB': 0.6686, 'A.9.CG': 0.8125, 'A.9.CD': 0.8372, 'A.9.NE': 0.7787, 'A.9.CZ': 0.7582, 'A.9.NH1': 0.77, 'A.9.NH2': 0.9231, 'A.9.C': 0.7331, 
+        'A.9.O': 0.8784, 'A.10.N': 0.7813, 'A.10.CA': 0.8939, 'A.10.CB': 0.9704, 'A.10.CG': 1.0642, 'A.10.CD1': 1.3706, 'A.10.CD2': 1.3594, 'A.10.C': 0.942, 
+        'A.10.O': 0.9983
+    }
+    result = interface.amber.get_rmsf(
+        stru_esm=structure_ensemble,
+        stru_selection=stru_sele,
+        by_residue=False,
+    )
+    for (rk, rv), (ak, av) in zip(result.items(), answer.items()):
+        assert rk == ak
+        assert np.isclose(rv, av, atol=0.001)
+
+    fs.safe_rm(structure_ensemble.topology_source_file)
+
+def test_get_coord_covariance():
+    """Test the function using manually curated covariance value."""
+    prmtop_path = os.path.join(MM_DATA_DIR, "test_rmsd.prmtop")
+    traj_path = os.path.join(MM_DATA_DIR, "test_rmsd.mdcrd")
+    ref_pdb = os.path.join(MM_DATA_DIR, "test_rmsd_chainid.pdb")
+
+    structure_ensemble = interface.amber.load_traj(
+        prmtop_path=prmtop_path,
+        traj_path=traj_path,
+        ref_pdb=ref_pdb,
+    )
+    region_pattern = "resi 8-10 and (n. CA)"
+    stru_sele = select_stru(remove_solvent(structure_ensemble.structure_0), pattern=region_pattern)
+
+    answer = np.loadtxt(io.StringIO(
+        """
+        0.008  0.006  0.005 -0.011  0.003  0.001  0.003 -0.009 -0.006
+        0.006  0.005  0.004 -0.008  0.002  0.000  0.002 -0.007 -0.005
+        0.005  0.004  0.004 -0.007  0.002  0.000  0.002 -0.006 -0.004
+       -0.011 -0.008 -0.007  0.016 -0.004 -0.001 -0.004  0.012  0.008
+        0.003  0.002  0.002 -0.004  0.002  0.001  0.001 -0.004 -0.003
+        0.001  0.000  0.000 -0.001  0.001  0.000  0.000 -0.001 -0.001
+        0.003  0.002  0.002 -0.004  0.001  0.000  0.001 -0.003 -0.002
+       -0.009 -0.007 -0.006  0.012 -0.004 -0.001 -0.003  0.011  0.007
+       -0.006 -0.005 -0.004  0.008 -0.003 -0.001 -0.002  0.007  0.005
+        """
+    ))
+    result = interface.amber.get_coord_covariance(
+        stru_esm=structure_ensemble,
+        stru_selection=stru_sele,
+        reference_type="average", 
+        mass_weighted=False,
+    )
+    assert np.allclose(result, answer, atol=1e-8)
+
+    answer = np.loadtxt(io.StringIO(
+        """
+        12.203  3.979 -4.034  7.911  6.868 -0.535  9.176 12.091  1.348
+         3.979  2.139 -1.789  2.506  2.889 -0.233  2.834  4.665  0.629
+        -4.034 -1.789  4.170 -2.306 -3.540  2.656 -2.939 -6.418  3.655
+         7.911  2.506 -2.306  5.419  4.172  0.075  6.309  7.289  1.734
+         6.868  2.889 -3.540  4.172  4.795 -1.298  4.873  8.263 -0.841
+        -0.535 -0.233  2.656  0.075 -1.298  2.564 -0.177 -2.708  4.410
+         9.176  2.834 -2.939  6.309  4.873 -0.177  7.457  8.581  1.575
+        12.091  4.665 -6.418  7.289  8.263 -2.708  8.581 14.716 -2.396
+         1.348  0.629  3.655  1.734 -0.841  4.410  1.575 -2.396  8.312
+        """
+    ))
+    result = interface.amber.get_coord_covariance(
+        stru_esm=structure_ensemble,
+        stru_selection=stru_sele,
+        reference_type="first", 
+        mass_weighted=False,
+    )
+    assert np.allclose(result, answer, atol=1e-8)
+
+    fs.safe_rm(structure_ensemble.topology_source_file)
 
 def test_get_mmpbsa_energy():
     """test the function using old data generated by EnzyHTP 1.0"""
@@ -1369,3 +1901,352 @@ def test_parse_mmpbsa_result_by_frames():
 
     assert np.isclose(result["pbsa"]["DELTA TOTAL"].mean(), -1.3130, atol=0.01)
     assert np.isclose(result["gbsa"]["DELTA TOTAL"].mean(), -12.234, atol=0.01)
+
+def test_ncaa_to_moldesc_modaa():
+    file = f"{MM_DATA_DIR}/3FCR_protonated.pdb"
+    stru = struct.PDBParser().get_structure(file)
+    stru.assign_ncaa_chargespin({"LLP": (-2, 1)})
+    maa_region = create_region_from_residues([stru.modified_residue[0]], nterm_cap="H", cterm_cap="OH")
+
+    ai = interface.amber
+    out_path = ai.antechamber_ncaa_to_moldesc(ncaa=maa_region)
+
+    # assert amount of lines are equal and formula/charge is same
+    assert len(fs.lines_from_file(out_path)) == len(fs.lines_from_file(f"{MM_NCAA_DIR}/LLP_AM1BCC-AMBER_000001.ac"))
+    assert fs.lines_from_file(out_path)[0] == fs.lines_from_file(f"{MM_NCAA_DIR}/LLP_AM1BCC-AMBER_000001.ac")[0]
+    assert fs.lines_from_file(out_path)[1] == fs.lines_from_file(f"{MM_NCAA_DIR}/LLP_AM1BCC-AMBER_000001.ac")[1]
+
+    fs.safe_rm(out_path)
+
+def test_make_mc_file():
+    file = f"{MM_DATA_DIR}/3FCR_connect.pdb"
+    stru = struct.PDBParser().get_structure(file)
+    stru.assign_ncaa_chargespin({"LLP": (-2, 1)})
+    remove_solvent(stru)
+    connectivity.init_connectivity(stru)
+
+    ai = interface.amber
+
+    maa = stru.modified_residue[0]
+    maa_region = create_region_from_residues(residues=[maa], nterm_cap="H", cterm_cap="OH")
+
+    out_path = f"{MM_WORK_DIR}/LLP.mc"
+    
+    ai.make_mc_file(maa_region, out_path)
+
+    fs.safe_rm(f"{MM_NCAA_DIR}/LLP_any.prepin")
+
+
+def test_get_atom_number_consistency_cpptraj_log():
+    example_cpptraj_log = f"{MM_DATA_DIR}/cpptraj_inconsistent_atom_num.out"
+
+    ai = interface.amber
+
+    result = ai._check_atom_number_consistency_cpptraj_log(example_cpptraj_log)
+
+    assert result == False
+
+def test_check_prmtop_nc_consistency():
+    test_prmtop = f"{MM_DATA_DIR}/KE_07_R7_S.prmtop"
+    test_nc = f"{MM_DATA_DIR}/mmpbsa_test_sol_10f.nc"
+
+    ai = interface.amber
+    result = ai.check_prmtop_nc_consistency(test_prmtop, test_nc)
+
+    assert result == False
+
+def test_mdcrd_parser_get_coordinates():
+    test_prmtop = f"{STRU_DATA_DIR}/KE_07_R7_2_S_10f.prmtop"
+    test_mdcrd = f"{STRU_DATA_DIR}/KE_07_R7_2_S_10f.mdcrd"
+    answer = [
+        ([32.586, 55.789, 30.602], [39.661, 27.409, 36.51], (66.957, 66.957, 66.957)),
+        ([34.88, 53.201, 22.495], [36.392, 27.392, 38.547], (66.937, 66.937, 66.937)),
+        ([37.41, 54.562, 25.501], [35.305, 27.228, 38.266], (66.897, 66.897, 66.897)),
+        ([27.814, 51.521, 21.567], [37.699, 30.371, 39.822], (66.918, 66.918, 66.918)),
+        ([30.507, 43.798, 13.187], [35.46, 35.527, 40.971], (66.848, 66.848, 66.848)),
+        ([30.84, 19.298, 14.47], [35.6, 39.992, 38.233], (66.882, 66.882, 66.882)),
+        ([29.9, 19.785, 17.46], [36.833, 40.408, 37.839], (66.855, 66.855, 66.855)),
+        ([29.248, 19.402, 17.4], [38.487, 38.876, 37.831], (66.923, 66.923, 66.923)),
+        ([25.089, 14.023, 21.701], [36.193, 41.793, 35.419], (66.842, 66.842, 66.842)),
+        ([22.332, 17.39, 19.672], [38.004, 39.988, 36.79], (66.896, 66.896, 66.896)),
+        ([39.391, 19.22, 17.043], [37.366, 39.457, 37.706], (66.934, 66.934, 66.934)),
+    ]
+    tp = AmberMDCRDParser(test_prmtop)
+    result = tp.get_coordinates(test_mdcrd)
+    for (coords, pbc_box_edges), (answer_1, answer_m1, answer_pbc_edgs) in zip(result, answer):
+        assert coords[0] == answer_1
+        assert coords[-1] == answer_m1
+        assert pbc_box_edges == answer_pbc_edgs
+
+def test_convert_stru_to_inpcrd():
+    test_pdb = f"{STRU_DATA_DIR}/test_pdb_parser_solvated.pdb"
+    test_stru = struct.PDBParser().get_structure(test_pdb)
+    test_stru.pbc_box_shape = (66.957, 66.957, 66.957, 109.471219, 109.471219, 109.471219)
+    test_out_path = f"{MM_WORK_DIR}/test_convert_stru_to_inpcrd.inpcrd"
+    answer_inpcrd_file = f"{MM_DATA_DIR}/answer_convert_stru_to_inpcrd.inpcrd"
+    
+    ai = interface.amber
+    ai.convert_stru_to_inpcrd(test_stru, test_out_path)
+
+    assert files_equivalent(test_out_path, answer_inpcrd_file)
+
+    fs.clean_temp_file_n_dir([test_out_path])
+
+def test_convert_stru_to_inpcrd_too_many_solvent():
+    test_crd = f"{MM_DATA_DIR}/AMY_1f.mdcrd"
+    test_prmtop = f"{MM_DATA_DIR}/AMY.prmtop"
+    coord_0, pbc_box_edges = next(
+        AmberMDCRDParser(test_prmtop).get_coordinates(test_crd))
+    test_stru = PrmtopParser().get_structure(test_prmtop)
+    test_stru.apply_geom(coord_0)
+
+    test_out_path = f"{MM_WORK_DIR}/test_convert_stru_to_inpcrd.inpcrd"
+    answer_inpcrd_file = f"{MM_DATA_DIR}/answer_convert_stru_to_inpcrd_many_solvent.inpcrd"
+    
+    ai = interface.amber
+    ai.convert_stru_to_inpcrd(test_stru, test_out_path)
+
+    assert files_equivalent(test_out_path, answer_inpcrd_file)
+
+    fs.clean_temp_file_n_dir([test_out_path])
+
+
+def test_get_protein_force_field():
+    """Test the get_protein_force_field method with various inputs"""
+    ai = interface.amber
+    
+    # Test normal cases with protein.ff prefix
+    assert ai.get_protein_force_field(["protein.ff14SB"]) == "ff14SB"
+    assert ai.get_protein_force_field(["protein.ff19SB"]) == "ff19SB"
+    assert ai.get_protein_force_field(["protein.fb15"]) == "fb15"
+    
+    # Test with multiple force fields
+    assert ai.get_protein_force_field(["water.tip3p", "protein.ff14SB", "gaff2"]) == "ff14SB"
+    
+    # Test case insensitive matching - now should work
+    assert ai.get_protein_force_field(["protein.ff14sb"]) == "ff14SB"
+    assert ai.get_protein_force_field(["PROTEIN.FF19SB"]) == "ff19SB"
+    assert ai.get_protein_force_field(["protein.FB15"]) == "fb15"
+    
+    # Test flexibility without protein.ff prefix - now should work  
+    assert ai.get_protein_force_field(["ff14SB"]) == "ff14SB"
+    assert ai.get_protein_force_field(["ff19sb"]) == "ff19SB"
+    assert ai.get_protein_force_field(["fb15"]) == "fb15"
+    
+    # Test mixed case with multiple entries
+    assert ai.get_protein_force_field(["water.tip3p", "ff14sb", "gaff2"]) == "ff14SB"
+    
+    # Test error cases
+    with pytest.raises(ValueError):
+        ai.get_protein_force_field(["water.tip3p", "gaff2"])  # No protein force field
+    
+    with pytest.raises(ValueError):
+        ai.get_protein_force_field(["protein.ff99SB"])  # Unsupported force field
+    
+    with pytest.raises(ValueError):
+        ai.get_protein_force_field([])  # Empty list
+    
+    with pytest.raises(ValueError):
+        ai.get_protein_force_field(["ff99SB"])  # Unsupported force field without prefix
+
+
+def test_get_protein_force_field_modaa_combinations():
+    """Test get_protein_force_field with combinations like ff19SB + ff19SB_modAA"""
+    ai = interface.amber
+    
+    # Test ff19SB + ff19SB_modAA combination - should return ff19SB
+    assert ai.get_protein_force_field(["protein.ff19SB", "protein.ff19SB_modAA"]) == "ff19SB"
+    
+    # Test ff14SB + ff14SB_modAA combination - should return ff14SB  
+    assert ai.get_protein_force_field(["protein.ff14SB", "protein.ff14SB_modAA"]) == "ff14SB"
+    
+    # Test order doesn't matter
+    assert ai.get_protein_force_field(["protein.ff19SB_modAA", "protein.ff19SB"]) == "ff19SB"
+    
+    # Test with other force fields mixed in
+    assert ai.get_protein_force_field(["water.tip3p", "protein.ff19SB_modAA", "protein.ff19SB", "gaff2"]) == "ff19SB"
+
+
+def test_check_residue_name_ff_support():
+    """Test check_residue_name_ff_support function for detecting force field support"""
+    ai = interface.amber
+    temp_dir = Path(MM_WORK_DIR) / "test_residue_support"
+    temp_dir.mkdir(exist_ok=True)
+    
+    # Test supported standard amino acid
+    assert ai.check_residue_name_ff_support("ALA", ["protein.ff14SB"], temp_dir) == True
+    assert ai.check_residue_name_ff_support("TRP", ["protein.ff19SB"], temp_dir) == True
+    
+    # Test unsupported residue code
+    assert ai.check_residue_name_ff_support("XYZ", ["protein.ff14SB"], temp_dir) == False
+    assert ai.check_residue_name_ff_support("ABC", ["protein.ff19SB"], temp_dir) == False
+    
+    # Test with multiple force fields 
+    assert ai.check_residue_name_ff_support("ALA", ["protein.ff14SB", "protein.ff19SB"], temp_dir) == True
+    
+    # Test case sensitivity
+    assert ai.check_residue_name_ff_support("ala", ["protein.ff14SB"], temp_dir) == True  # Should still work
+    
+    # Clean up
+    shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_ncaa_parm_lib_search():
+    """Test the parm lib search functionality with correct file naming convention"""
+    from enzy_htp._interface.ncaa_library import search_ncaa_parm_file
+    import enzy_htp.structure as struct
+    from enzy_htp.preparation.clean import remove_solvent
+    from enzy_htp.structure.structure_enchantment import connectivity
+    
+    # Create a test library directory with properly named files
+    test_lib_dir = f"{MM_WORK_DIR}/test_parm_lib_search"
+    fs.safe_mkdir(test_lib_dir)
+    
+    # Create mock parameter files with correct naming convention
+    # LLP with AM1BCC-GAFF2 method
+    llp_mol2_content = """@<TRIPOS>MOLECULE
+LLP
+20 19 1 0 0
+SMALL
+bcc
+
+
+@<TRIPOS>ATOM
+      1 N           -5.2940    57.3980    -9.0410 N.am    1 LLP    -0.9348
+      2 H           -4.5470    56.8320    -8.6720 H       1 LLP     0.2944
+      3 CA          -6.5070    56.5330    -9.2010 C.3     1 LLP     0.1705
+"""
+    
+    llp_frcmod_content = """remark goes here
+MASS
+
+BOND
+
+ANGLE
+
+DIHE
+
+IMPROPER
+
+NONBON
+"""
+    
+    llp_frcmod2_content = """remark for second frcmod
+MASS
+
+BOND
+
+ANGLE
+
+DIHE
+
+IMPROPER
+
+NONBON
+"""
+    
+    # Write the files with correct naming convention  
+    llp_mol2_path = f"{test_lib_dir}/LLP_AM1BCC-GAFF2.mol2"
+    llp_frcmod_path = f"{test_lib_dir}/LLP_AM1BCC-GAFF2.frcmod"
+    llp_frcmod2_path = f"{test_lib_dir}/LLP_AM1BCC-GAFF2.frcmod2"
+    
+    with open(llp_mol2_path, 'w') as f:
+        f.write(llp_mol2_content)
+    with open(llp_frcmod_path, 'w') as f:
+        f.write(llp_frcmod_content)
+    with open(llp_frcmod2_path, 'w') as f:
+        f.write(llp_frcmod2_content)
+    
+    # Also create files for RLP (the other ligand in the test structure)
+    rlp_mol2_path = f"{test_lib_dir}/RLP_AM1BCC-GAFF2.mol2"
+    rlp_frcmod_path = f"{test_lib_dir}/RLP_AM1BCC-GAFF2.frcmod"
+    
+    with open(rlp_mol2_path, 'w') as f:
+        f.write(llp_mol2_content.replace("LLP", "RLP"))
+    with open(rlp_frcmod_path, 'w') as f:
+        f.write(llp_frcmod_content)
+    
+    # Load structure to get ModifiedResidue objects for testing
+    test_stru = struct.PDBParser().get_structure(f"{MM_DATA_DIR}/3FCR_protonated.pdb")
+    test_stru.assign_ncaa_chargespin({"LLP": (-2, 1), "RLP": (-2, 1)})
+    remove_solvent(test_stru)
+    connectivity.init_connectivity(test_stru)
+    
+    # Get the LLP modified residue
+    llp_maa = None
+    for maa in test_stru.modified_residue:
+        if maa.name == "LLP":
+            llp_maa = maa
+            break
+    
+    assert llp_maa is not None, "LLP modified residue not found in test structure"
+    
+    # Test the search function
+    target_method = "AM1BCC-GAFF2"
+    mol_desc_path, frcmod_path_list = search_ncaa_parm_file(
+        llp_maa, target_method, test_lib_dir
+    )
+    
+    # Verify the search results
+    assert mol_desc_path is not None, "Should find mol2 file for LLP"
+    assert mol_desc_path == llp_mol2_path, f"Expected {llp_mol2_path}, got {mol_desc_path}"
+    
+    assert len(frcmod_path_list) >= 1, "Should find at least one frcmod file"
+    assert llp_frcmod_path in frcmod_path_list, "Should find the frcmod file"
+    
+    # Test that files are properly named with target_method
+    assert "AM1BCC-GAFF2" in mol_desc_path
+    for frcmod_path in frcmod_path_list:
+        assert "AM1BCC-GAFF2" in frcmod_path
+    
+    # Test search for non-existent method
+    mol_desc_path_none, frcmod_path_list_none = search_ncaa_parm_file(
+        llp_maa, "RESP-GAFF", test_lib_dir
+    )
+    assert mol_desc_path_none is None, "Should not find files for non-existent method"
+    assert len(frcmod_path_list_none) == 0, "Should not find frcmod files for non-existent method"
+    
+    # Clean up
+    fs.safe_rmdir(test_lib_dir)
+
+
+def test_clean_frcmod_file_removes_attn(tmp_path, monkeypatch):
+    """Test that _clean_frcmod_file removes lines starting with 'ATTN'."""
+    # Prepare sample frcmod file with lines to remove and keep
+    frcmod = tmp_path / "sample.frcmod"
+    sample_lines = [
+        "ATTN this line should be removed",
+        "PARAM a b c",
+        "  ATTN also remove",
+        "OTHER xyz"
+    ]
+    frcmod.write_text("\n".join(sample_lines))
+
+    # Monkeypatch fs.get_valid_temp_name to return temp path directly
+    monkeypatch.setattr(fs, "get_valid_temp_name", lambda x: str(x) + ".temp")
+
+    # Write a fake temp file name generator that matches expected behavior
+    # Create the temp file path (the original + .temp suffix)
+    temp_path = str(frcmod) + ".temp"
+
+    # Instantiate AmberParameterizer with dummy parameters
+    param = AmberParameterizer(
+        interface=None,
+        force_fields=[], charge_method="",
+        resp_engine="", resp_lvl_of_theory="",
+        ncaa_param_lib_path=str(tmp_path),
+        force_renew_ncaa_parameter=False,
+        ncaa_net_charge_engine="", ncaa_net_charge_ph=0.0,
+        solvate_box_type="", solvate_box_size=0.0,
+        gb_radii=0, parameterizer_temp_dir=str(tmp_path),
+        additional_tleap_lines=[], keep_tleap_in=False
+    )
+
+    # Run the cleanup method
+    param._clean_frcmod_file(str(frcmod))
+
+    # Read back content and verify ATTN lines are removed
+    remaining = frcmod.read_text().splitlines()
+    assert remaining == ["PARAM a b c", "OTHER xyz"]
+
+

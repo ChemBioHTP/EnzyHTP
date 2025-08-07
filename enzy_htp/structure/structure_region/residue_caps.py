@@ -22,10 +22,11 @@ Date: 2024-01-31
 from __future__ import annotations
 from abc import abstractmethod, ABC
 from copy import deepcopy
+import copy
 import numpy as np
 import numpy.typing as npt
 from scipy.spatial.transform import Rotation as R
-from typing import List, Tuple, Dict
+from typing import Any, List, Tuple, Dict, Union
 
 from ..structure import Structure, Residue, Atom, Chain
 
@@ -33,7 +34,6 @@ from enzy_htp.core.logger import _LOGGER
 from enzy_htp.core.doubly_linked_tree import DoubleLinkedNode
 import enzy_htp.core.math_helper as mh
 from enzy_htp import chemical as chem
-
 
 class ResidueCap(Residue, ABC):
     """The residue cap that link to the corresponding
@@ -227,6 +227,69 @@ class ResidueCap(Residue, ABC):
         """str() rep of the ResidueCap() that shows its chemical type as well as what Atom()'s it is linked to."""
         return f"{self.cap_type}Cap(link_atom={self.link_atom.name},link_residue={self.link_residue.key_str})"
 
+    def __deepcopy__(self, memo: Union[Dict[int, Any], None] = None, _nil=[]):
+        """
+        Support deepcopy of ResidueCap that donot copy any parent, link_residue/atom, or socket_atom.
+
+        Returns:
+            a deepcopy of a Residue with parent = link_residue = link_atom = socket_atom = None.
+
+        NOTE: if there are not constructor in the class. All children with have no parent.
+        """
+        # in case this is the first copied item
+        if memo is None:
+            memo = {}
+        
+        # treat copying action on parent
+        if self.parent is not None:
+            # not the root.
+            parent_id = id(self.parent)
+            #print(f"parent_id: {parent_id}")
+            y = memo.get(parent_id, _nil)
+            if y is _nil:
+                # parent not in memo -> this is the first copied DoublyLinkNode: set parent to None in memo
+                memo[id(self.parent)] = None
+            # parent in memo -> this is part of the recursive copying initiated from the parent: default
+
+        # treat copying action on link_atom
+        if self.link_atom is not None:
+            # not the root.
+            link_atom_id = id(self.link_atom)
+            y = memo.get(link_atom_id, _nil)
+            if y is _nil:
+                memo[id(self.link_atom)] = None
+            # link_atom in memo -> this is part of the recursive copying initiated from the parent: default
+
+        # treat copying action on link_residue
+        if self.link_residue is not None:
+            # not the root.
+            link_residue_id = id(self.link_residue)
+            y = memo.get(link_residue_id, _nil)
+            if y is _nil:
+                memo[id(self.link_residue)] = None
+            # link_residue in memo -> this is part of the recursive copying initiated from the parent: default
+
+        # treat copying action on socket_atom
+        if self.socket_atom is not None:
+            # not the root.
+            socket_atom_id = id(self.socket_atom)
+            y = memo.get(socket_atom_id, _nil)
+            if y is _nil:
+                memo[id(self.socket_atom)] = None
+            # socket_atom in memo -> this is part of the recursive copying initiated from the parent: default
+
+        # mask current method to use original deepcopy
+        self.__deepcopy__ = None
+
+        new_self = copy.deepcopy(self, memo)
+
+        # recover current method for future use
+        # test shows this will rebind the method to correct instance when its called again
+        delattr(self, "__deepcopy__")
+        delattr(new_self, "__deepcopy__")
+
+        return new_self
+
 
 class HCap(ResidueCap):
     """A ResidueCap() which uses a -H (hydrogen) as a cap. Adds a total of 1 atom1, with the 
@@ -413,6 +476,7 @@ class NHCH3Cap(ResidueCap):
         user attempts to cap with NHCH3 on n-terminal side as this creates an unusual and unrealistic NH-NH bond."""
 
         if self.is_nterm_cap():
+            # just raise a TypeError or something here and report to logger. Contact devs if they need it
             _LOGGER.warning("WARNING: You are trying to add a methylamide cap on the n-terminal side of an amino acid!")
             self.atoms[0].coord = np.array(self.socket_atom.coord)
             self.atoms[1].coord = np.array(self.socket_atom.parent.find_atom_name('O').coord)
@@ -531,6 +595,114 @@ class COCH3Cap(ResidueCap):
             Atom(name='HP33', coord=[ 1.871 ,   0.890,  -0.514], element= 'H'),
         ]
 
+class OHCap(ResidueCap):
+    """A ResidueCap() which uses a -OH (hydroxyl) as a cap. Adds a total of 2 atoms, with the 
+    
+    n-terminal version having atom names:      
+    and c-terminal version having atom names: OXT, HXT
+
+    No support for n-terminal version (just duplicated from c-terminal)
+
+    """
+    FIXED_CHARGE_MAP:Dict[str,float] = {
+        # n-terminal
+        
+        # c-terminal
+        'OXT': 0.0,
+        'HXT': 0.0,
+    }
+    """Fixed charge for a OH attached to the N/C-ter of a Residue()."""
+
+    CAP_BOND_DISTANCE:Dict[str, float] = {
+        "N" : 1.342,
+        "C" : 1.342,
+    }
+    """Maps the name of the link_atom to appropriate bond distance."""
+
+    @property
+    def cap_type(self) -> str:
+        """This is the OH/hydroxyl ResidueCap."""
+        return "OH"
+
+    def align_rigid_atoms(self, atoms:List[Atom], d0 : npt.NDArray, p0 : npt.NDArray, bd:float=None) -> None:
+        """Method that aligns a rigid List[Atom] to the supplied distance (d0) and from the given point (p0). There are overall 
+        two steps, rotation, and translation. Both are specified by parameters above. Specialized case for OHCap only; adds 
+        dihedral rotation support.
+
+        Args:
+            atoms: The List[Atom] to rigidly rotate.
+            d0: The target direction.
+            p0: Starting point for translation in (x,y,z).
+            bd: How far should the List[Atom] be translated after rotating? Optional.
+
+        Returns:
+            Nothing.
+        """
+        rot_mat = mh.rotation_matrix_from_vectors(self.cap_direction(), d0)
+        if bd is None:
+            bd = self.CAP_BOND_DISTANCE[self.link_atom.name]
+        
+        oxygen = np.array(self.atoms[0].coord)
+        hydrogen = np.array(self.atoms[1].coord)
+        p2 = np.array(self.link_atom.parent.find_atom_name('O').coord)
+
+        # find and preemptively align the atoms that define the dihedral
+        prob_p1 = hydrogen
+        prob_p1 = np.transpose(np.matmul(rot_mat, np.transpose( prob_p1  )))
+        prob_p1 += (d0*bd) + p0
+
+        prob_p2 = oxygen
+        prob_p2 = np.transpose(np.matmul(rot_mat, np.transpose( prob_p2  )))
+        prob_p2 += (d0*bd) + p0
+        
+        # calculate rotation vector that sets the dihedral formed by the four points to 0
+        rv = mh.rot_vec_from_dihedral(prob_p1, prob_p2, p0, p2, 0)
+        rot = R.from_rotvec(rv, degrees=True)
+
+        for aa in atoms:
+            pt = np.array(aa.coord)
+
+            # rotate to align the angle
+            pt = np.transpose(np.matmul(rot_mat, np.transpose( pt  )))
+
+            # rotate to align the dihedral
+            pt = rot.apply(pt)
+
+            # translate
+            pt += (d0*bd) + p0
+            aa.coord = pt
+
+    def anchor(self) -> None:
+        """Specialized anchoring that is identical for both n-terminal and c-terminal capping. 
+        Raises warning if user attempts to use OH for n-ter"""
+
+        if self.is_nterm_cap():
+            # just raise a TypeError or something here and report to logger. Contact devs if they need it
+            _LOGGER.warning("WARNING: You are trying to add a hydroxyl cap on the n-terminal side of an amino acid!")
+        
+        link = np.array(self.link_atom.coord)
+        socket = np.array(self.socket_atom.coord)
+        
+        d0 = mh.direction_unit_vector(link, socket)
+
+        self.align_rigid_atoms(self.atoms, d0, link)
+
+    def net_charge(self) -> int:
+        return 0
+
+    def get_nterm_atoms(self) -> List[Atom]:
+        """Create the default n-terminal version of the OHCap with appropriate names."""
+        return [
+            Atom(name='OXT',  coord=[ 0.000 ,   0.000,  0.000], element= 'O'),
+            Atom(name='HXT',  coord=[ 0.439 ,   0.706,   -0.493], element= 'H'),
+        ]
+    
+    def get_cterm_atoms(self) -> List[Atom]:
+        """Create the default c-terminal version of the OHCap with appropriate names."""
+        return [
+            Atom(name='OXT',  coord=[ 0.000 ,   0.000,  0.000], element= 'O'),
+            Atom(name='HXT',  coord=[ 0.439 ,   0.706,   -0.493], element= 'H'),
+        ]
 
 def cap_residue_free_terminal(
         res: Residue, cap_name: str, terminal_type: str) -> List[Atom]:
@@ -570,10 +742,12 @@ SUPPORTED_CAPS: Dict[str, callable] = {
     "H" : HCap,
     "NHCH3": NHCH3Cap,
     "COCH3": COCH3Cap,
+    "OH": OHCap,
     # common names for redundancy
     "methyl": CH3Cap,
     "hydrogen": HCap,
     "methylamide": NHCH3Cap,
-    "acetate": COCH3Cap
+    "acetate": COCH3Cap,
+    "hydroxyl": OHCap,
 }
 """Mapper that converts a cap name into a constructor. Both the chemical formula and common names for each method are provided."""

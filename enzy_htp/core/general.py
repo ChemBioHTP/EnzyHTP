@@ -31,15 +31,18 @@ Date: 2022-10-21
 import copy
 from io import StringIO
 import os
+from pathlib import Path
 import re
 import sys
 import logging
+import tempfile
 import time
 import numpy as np
 from typing import Any, List, Iterable, Tuple, Dict, Callable
 import itertools
 import pickle
 import inspect
+from contextlib import contextmanager
 
 from .logger import _LOGGER
 from .file_system import write_lines
@@ -165,6 +168,50 @@ def num_ele_2d(list_2d: List[list]) -> int:
 #     return [[x] + y if x != GHOST_LIST_ELEMENT else y for x in curr_list
 #             for y in next_list]
 
+# Sebastian - The breadth-first-search algorithm I made for finding the mainchain of a modified residue
+# graph: dict[Atom, List[Atom]] = {aa: [] for aa in self.atoms}
+# parent: dict[Atom, Atom] = {aa: None for aa in self.atoms}
+
+# start_atom: Atom = self.find_atom_name("N")
+# end_atom: Atom = self.find_atom_name("C")
+
+# # create "graph" of atoms
+# for aa in self.atoms:
+#     for oa in aa.connect:
+#         graph[aa].append(oa[0])
+
+# q: List[str] = [start_atom]
+
+# visited = [start_atom]
+
+# # breadth-first search
+# while q:
+#     curr_atom = q.pop(0)
+#     for aa in graph[curr_atom]:
+#         if aa not in visited:
+#             q.append(aa)
+#             visited.append(aa)
+#             parent[aa] = curr_atom
+
+#         if aa == end_atom:
+#             break
+
+# # hopefully, we have found the c-terminal. If not, throw an error
+# if parent[end_atom] is None:
+#     raise AttributeError(f"Path from n-term to c-term does not exist for {self.name}")
+
+# # find main chain atoms through searching parent
+# curr_atom = end_atom
+# main_chain = []
+# while parent[curr_atom] is not None:
+#     main_chain.append(curr_atom)
+#     curr_atom = parent[curr_atom]
+
+# main_chain.append(curr_atom)
+# main_chain.reverse()
+
+# return main_chain
+
 
 # == Dict related ==
 def get_copy_of_deleted_dict(orig_dict: Dict, del_key) -> Dict:
@@ -209,8 +256,6 @@ def get_str_for_print_class_var(cls) -> str:
         var_value = getattr(cls, var_name)
         result += f"{os.linesep}{var_name}: {os.linesep}{var_value}{os.linesep}"
     return result
-
-
 
 
 # == context manager ==
@@ -292,6 +337,17 @@ class CaptureLogging:
         self.log_stream.seek(0)
 
 
+@contextmanager
+def trace_threads(tag: str = ""):
+    """trace the thread change before and after the block.
+    Need to install psutil for this"""
+    import psutil
+    proc = psutil.Process()
+    before = proc.num_threads()
+    yield
+    after = proc.num_threads()
+    _LOGGER.info(f"==> {tag} Threads: {before} → {after}")
+
 # == misc ===
 def timer(fn):
     """decodator for timing the run of the function {fn}"""
@@ -322,10 +378,33 @@ def get_itself(input_data: Any) -> Any:
 
 
 def save_obj(obj: Any, out_path: str):
-    """save {obj} to the {out_path} as a .pickle file"""
-    with open(out_path, "wb") as of:
-        pickle.dump(obj, of)
+    """save {obj} to the {out_path} as a .pickle file
+    
+    UPDATE(2025.7): use tempfile and os.replace after experienced
+    data lost upon OSError"""
+    out_path = Path(out_path).expanduser()
+    tmp_fd, tmp_name = tempfile.mkstemp(
+        dir=out_path.parent,
+        prefix=out_path.name + ".",
+        suffix=".tmp",
+    )
+    tmp_path = Path(tmp_name)
 
+    try:
+        with os.fdopen(tmp_fd, "wb") as tmp_file:
+            pickle.dump(obj, tmp_file)
+            tmp_file.flush()
+            os.fsync(tmp_file.fileno())
+
+        os.replace(tmp_path, out_path) # atomic replace
+    except (pickle.PicklingError, OSError, IOError) as e:
+        raise e
+    finally:
+        if tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
 
 def load_obj(in_path: str) -> Any:
     """load {obj} from the {in_path} as a .pickle file.

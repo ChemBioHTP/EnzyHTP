@@ -10,6 +10,7 @@ Date: 2022-02-15
 """
 from pathlib import Path
 from typing import List, Dict, Any, Union, Tuple
+from plum import dispatch
 
 import pymol2
 import numpy as np
@@ -250,6 +251,16 @@ class PyMolInterface(BaseInterface):
 
         pymol_session.cmd.get_wizard().apply()
 
+        # fix atom naming TODO extract into a function from here if more cases exists
+        if target == "GLY": # currently only mutations to GLY have the problem
+            chain = pos_key[0]
+            resi = pos_key[1]
+            if pymol_obj_name:
+                obj = f"{pymol_obj_name} & "
+            else:
+                obj = ""
+            pymol_session.cmd.alter(f"{obj}chain {chain} & resi {resi} & name 3HA", "name='HA3'")
+
     def export_pdb(self, pymol_session: pymol2.PyMOL, pymol_obj_name: str, if_retain_order: bool = True, tag: str = None) -> str:
         """
         Saves a PyMOL object to a PDB file.
@@ -476,7 +487,7 @@ class PyMolInterface(BaseInterface):
             except Exception as e:
                 _LOGGER.error(f"{e}")
                 _LOGGER.error(f"PyMOL function call '{cmd_str}' resulted in an error. Exiting...")
-                exit(1)
+                raise e
 
         return result
 
@@ -756,7 +767,34 @@ class PyMolInterface(BaseInterface):
         return result
 
     # == engines ==
-    def get_spi(self, stru: Structure, ligand:Ligand, pocket_sele:str) -> float:
+
+    @dispatch
+    def get_spi(self, stru: Structure, ligand_sele: str, pocket_sele: str) -> float:
+        """Calculates substrate positioning index (SPI) for a given Ligand selection pattern in a given Structure. SPI roughly corresponds to the
+        ratio of the ligand's solvent accessible surface area (SASA) dived by protein binding pocket SASA. The citation for 
+        this paper is here: DOI:https://doi.org/10.1021/acs.jpclett.3c02444.
+
+        Args:
+            stru (Structure): The Structure containing the Ligand and active site.
+            ligand_sele (str): A str describing the ligand we are calculating SPI for. 
+            pocket_sele (str): A str describing the active site of the protein in pymol format.
+        
+        Returns:
+            The calculated SPI as a float.
+        """
+        with OpenPyMolSession(self, thread_safe=False) as pms: #NOTE maybe should allow it to multi-thread?
+            self.load_enzy_htp_stru(pms, stru )
+            results:List[Any] = self.general_cmd(pms,[
+                ('set', 'dot_solvent', 1),
+                ('create', 'ligand', f'{ligand_sele} and not solvent'),
+                ('create', 'protein', f'not {ligand_sele} and not solvent'),
+                ('get_area', 'ligand'),
+                ('get_area', f'protein and ({pocket_sele})')
+            ])
+            return results[-2] / results[-1]
+
+    @dispatch
+    def get_spi(self, stru: Structure, ligand: Ligand, pocket_sele: str) -> float:
         """Calculates substrate positioning index (SPI) for a given Ligand in a given Structure. SPI roughly corresponds to the
         ratio of the ligand's solvent accessible surface area (SASA) dived by protein binding pocket SASA. The citation for 
         this paper is here: DOI:https://doi.org/10.1021/acs.jpclett.3c02444.
@@ -768,10 +806,9 @@ class PyMolInterface(BaseInterface):
         
         Returns:
             The calculated SPI as a float.
-
         """
         (lig_chain, lig_idx) = ligand.key()
-        with OpenPyMolSession(self) as pms:
+        with OpenPyMolSession(self, thread_safe=False) as pms:
             self.load_enzy_htp_stru(pms, stru )
             results:List[Any] = self.general_cmd(pms,[
                 ('set', 'dot_solvent', 1),
@@ -830,12 +867,15 @@ class PyMolInterface(BaseInterface):
 class OpenPyMolSession:
     """a context manager that open a pymol session once enter and close once exit"""
 
-    def __init__(self, pymol_interface: PyMolInterface) -> None:
+    def __init__(self, pymol_interface: PyMolInterface, thread_safe: bool=True) -> None:
         self.interface = pymol_interface
+        self.thread_safe = thread_safe
 
     def __enter__(self):
         """open a pymol session once enter"""
         self.session = self.interface.new_session()
+        if self.thread_safe:
+            self.session.cmd.set("max_threads", 1)
         return self.session
 
     def __exit__(self, exc_type, exc_val, exc_tb):

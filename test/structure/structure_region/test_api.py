@@ -27,3 +27,11 @@ def test_create_region_from_selection_pattern():
     )
     assert len(test_stru_region.atoms) == 335
 
+def test_create_region_from_residues():
+    """as name. TODO complete assert part"""
+    test_stru = sp.get_structure(f"{DATA_DIR}KE_07_R7_2_S.pdb")
+    test_stru_region = stru_regi.create_region_from_residues(
+        test_stru.residues[8:11], nterm_cap="CH3", cterm_cap="CH3"
+    )
+    assert len(test_stru_region.atoms) == 56
+

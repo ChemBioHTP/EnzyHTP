@@ -25,6 +25,11 @@ from .rmsd import (
     rmsd,
     rmsd_of_structure,
 )
+from .rmsf import(
+    rmsf
+)
+from .covariance import coord_covariance
 from .binding import binding_energy
 from .spi import spi_metric
+from .clustering import rep_stru_clustering
 from .residue_pka import residue_pka

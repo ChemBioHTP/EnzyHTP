@@ -16,4 +16,5 @@ from .api import (
     ResidueCap,
     create_region_from_selection_pattern,
     create_region_from_full_stru,
+    create_region_from_residues,
 )

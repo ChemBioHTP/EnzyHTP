@@ -7,7 +7,6 @@ class. Packages:
     + AlphaFill, AlphaFillInterface
     + BCL, BCLInterface
     + Gaussian, GaussianInterface
-    + Modeller, ModellerInterface
     + MOE, MOEInterface
     + Mole2, Mole2Interface
     + Multiwfn, MultiwfnInterface
