@@ -161,7 +161,9 @@ class PDBParser(StructureParserInterface):
             stru: Chain, 
             if_renumber: bool = True, 
             if_fix_atomname: bool = True, 
-            same_chain_id_for_9999_solvent: bool = False,) -> str:  # pylint: disable=function-redefined
+            same_chain_id_for_9999_solvent: bool = False,
+            omit_chain_id: bool = False,
+        ) -> str:  # pylint: disable=function-redefined
         """
         dispatch for supporting get pdb file str with Chain only
         """
@@ -178,7 +180,9 @@ class PDBParser(StructureParserInterface):
             stru: Residue,
             if_renumber: bool = True,
             if_fix_atomname: bool = True,
-            same_chain_id_for_9999_solvent: bool = False) -> str:  # pylint: disable=function-redefined
+            same_chain_id_for_9999_solvent: bool = False,
+            omit_chain_id: bool = False,
+            ) -> str:  # pylint: disable=function-redefined
         """
         dispatch for supporting get pdb file str with Residue only
         """
@@ -195,7 +199,9 @@ class PDBParser(StructureParserInterface):
             stru: Atom, 
             if_renumber: bool = True, 
             if_fix_atomname: bool = True, 
-            same_chain_id_for_9999_solvent: bool = False) -> str:  # pylint: disable=function-redefined
+            same_chain_id_for_9999_solvent: bool = False,
+            omit_chain_id: bool = False,
+        ) -> str:  # pylint: disable=function-redefined
         """
         dispatch for supporting get pdb file str with Atom only
         """
@@ -210,8 +216,9 @@ class PDBParser(StructureParserInterface):
             stru: Structure,  
             if_renumber: bool = True,
             if_fix_atomname: bool = True,
-            same_chain_id_for_9999_solvent: bool = False,,
-            omit_chain_id: bool = False) -> str:
+            same_chain_id_for_9999_solvent: bool = False,
+            omit_chain_id: bool = False,
+            ) -> str:
         """
         Convert Structure() into PDB file string. Only the simplest function is need for
         enzyme modeling.
