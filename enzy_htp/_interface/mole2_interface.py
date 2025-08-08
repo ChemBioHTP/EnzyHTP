@@ -115,6 +115,8 @@ class Mole2Interface(BaseInterface):
             
         Returns:
             A tuple containing (volume, boundary_residue_keys, inner_residue_keys).
+        
+        NOTE: if chain index overflows in the PDB file used for generating this xml, there will be residues with chain id like "i:1"
         """
         if (not cavities_xml_filepath or not cavity_id):
             return None, None, None

@@ -16,9 +16,10 @@ import numpy.typing as npt
 import pyvista as pv
 
 from enzy_htp import interface, _LOGGER, PDBParser
-from enzy_htp.structure import Structure, StructureEnsemble, Residue, Cavity
-from enzy_htp.structure.structure_selection import select_stru
 from enzy_htp import config as eh_config
+from enzy_htp.structure.structure_selection import select_stru
+import enzy_htp.structure.structure_operation as so
+from enzy_htp.structure import Structure, StructureEnsemble, Residue, Cavity
 from enzy_htp.core import file_system as fs
 
 sp = PDBParser()
@@ -174,7 +175,7 @@ def ensemble_cavity_volumes(
         _LOGGER.error(err_msg)
         raise ValueError(err_msg)
     esm_cavities: List[Cavity] = list()
-    structure_0 = stru_esm.structure_0
+    structure_0 = so.remove_solvent(stru_esm.structure_0) # dont need copy as this is lazy-generated property
 
     confirmed_target_cavity = None
     if frame_0_based:   # Confirm the target cavity if `frame_0_based=True`.

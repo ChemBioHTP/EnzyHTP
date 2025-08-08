@@ -41,6 +41,7 @@ def test_ensemble_cavity_volumes():
     prmtop_path = path.join(DATA_DIR, "test_spi.prmtop")
     traj_path = path.join(DATA_DIR, "test_spi.mdcrd")
     ref_pdb = path.join(DATA_DIR, "test_spi_chainid.pdb")
+    work_dir = f"{WORK_DIR}/cavity"
 
     stru_esm = amber_interface.load_traj(
         prmtop_path=prmtop_path,
@@ -53,8 +54,8 @@ def test_ensemble_cavity_volumes():
             stru_esm=stru_esm,
             contain_ligand="resn H5J",
             frame_0_based=True,
-            work_dir=SCRATCH_DIR
+            work_dir=work_dir
         )
         assert exe.value
-    fs.safe_rmdir(SCRATCH_DIR)
+
     pass
