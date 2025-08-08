@@ -1,4 +1,10 @@
-#!/usr/bin/env bash
+# this script needs to be sourced
+(return 0 2>/dev/null)
+if [ $? -ne 0 ]; then
+    echo "⚠️  Please run this script using: source ${BASH_SOURCE[0]}"
+    echo "Do NOT run it as ./${BASH_SOURCE[0]} or bash ${BASH_SOURCE[0]}"
+    exit 1
+fi
 
 # Store the initial working directory
 initial_dir=$(pwd)
@@ -11,7 +17,7 @@ target_env_name=$CONDA_DEFAULT_ENV
 
 # Function to display help message
 show_help() {
-    echo "Usage: ${0##*/} [-n|--name ENV_NAME]"
+    echo "Usage: source ${0##*/} [-n|--name ENV_NAME]"
     echo
     echo "Install EnzyHTP to your conda environment."
     echo
@@ -53,13 +59,8 @@ fi
 
 # Function to activate the conda environment
 activate_env() {
-    if type conda > /dev/null 2>&1; then
-        echo "Activating environment using conda"
-        conda activate "$target_env_name"
-    else
-        echo "Activating environment using source"
-        source activate "$target_env_name"
-    fi
+    echo "Activating environment..."
+    conda activate "$target_env_name"
 }
 
 # Function for yes/no prompt, called when the target environment is 'base'.
@@ -68,7 +69,7 @@ prompt_yes_no() {
         read -p "$1 (yes/no): " yn
         case $yn in
             [Yy]* ) break;;
-            [Nn]* ) return;;
+            [Nn]* ) echo "Aborting installation..."; return 1;;
             * ) echo "Please answer yes or no.";;
         esac
     done
@@ -76,7 +77,7 @@ prompt_yes_no() {
 
 # Function to check if the environment exists and create it if not
 check_and_create_env() {
-    if ! conda info --envs | grep "$target_env_name" > /dev/null; then
+    if ! conda env list | awk '{print $1}' | grep -Fx "$target_env_name" > /dev/null; then
         echo "Environment $target_env_name does not exist. Creating..."
         conda create -n "$target_env_name" python=3.9 --yes
     else
@@ -84,11 +85,32 @@ check_and_create_env() {
     fi
 }
 
+check_solver() {
+    local s
+    s=$(conda config --show solver 2>/dev/null | awk '/^solver:/ {print $2}') || s=""
+    if [[ "$s" != "libmamba" ]]; then
+        echo "⚠️  Current conda solver is '$s' (expected: libmamba)."
+        echo "⚠️  libmamba has been the default solver in conda since version 23.10 (2023/11)"
+        echo "⚠️  You see this message either mean you have a deprecated conda or changed the default solver before."
+        echo "    Please enable libmamba first:"
+        echo "    If you have an old conda, run:"
+        echo "        conda update -n base -c defaults conda"
+        echo "    If you changed the solver config, run:"
+        echo "        conda config --set solver libmamba"
+        return 1
+    fi
+}
+
 # Function to update the conda environment
 update_env() {
     echo "Updating conda environment: $target_env_name"
+    conda activate "$target_env_name"
+
+    check_solver || return 1
+
     conda env update -n "$target_env_name" --file environment.yml
-    activate_env
+
+    # Run post-install hook
     dev-tools/pip-install
 }
 
@@ -101,21 +123,19 @@ echo "Installing EnzyHTP to Conda environment: $target_env_name"
 
 # Check if the user is about to install in the base environment
 if [[ "$target_env_name" == "base" ]]; then
-    prompt_yes_no "You are about to install EnzyHTP in the base environment. Are you sure you want to continue?"
+    prompt_yes_no "We DO NOT recommend installing EnzyHTP in the base environment. Are you sure you want to continue?" || return 1
 fi
 
 # Compare current environment with env_name
 if [ "$current_env_name" = "$target_env_name" ]; then
-    echo "Deactivating current environment $current_env_name"
-    conda deactivate
-    update_env
+    update_env || return 1
 else
-    # Check and create environment if necessary.
+    # Check, create, and activate environment if necessary.
     check_and_create_env
 
     # After checking, perform update.
-    update_env
+    update_env || return 1
     conda deactivate
 fi
 
-cd $initial_dir
+cd "$initial_dir"

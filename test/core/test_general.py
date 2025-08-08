@@ -7,10 +7,12 @@ import os
 import numpy as np
 from enzy_htp.core import general as eg
 from enzy_htp.core import _LOGGER
+from enzy_htp.core import file_system as fs
 
 CURR_FILE = os.path.abspath(__file__)
 CURR_DIR = os.path.dirname(CURR_FILE)
 DATA_DIR = f"{CURR_DIR}/data"
+WORK_DIR = f"{CURR_DIR}/work_dir"
 
 def test_pop_random_list_elem():
     """test function works as expected"""
@@ -102,3 +104,19 @@ def test_load_obj():
     test_pickle_file = f"{DATA_DIR}/test_single.pickle"
     result = eg.load_obj(test_pickle_file)
     assert isinstance(result, int)
+
+def test_save_obj():
+    """test save_obj()"""
+    test_pickle_file = f"{WORK_DIR}/test_save.pickle"
+    test_obj = range(10)
+    eg.save_obj(test_obj, test_pickle_file)
+    answer_obj = eg.load_obj(test_pickle_file)
+    assert answer_obj == test_obj
+
+    # in case the file exists
+    test_obj_1 = range(20)
+    eg.save_obj(test_obj_1, test_pickle_file)
+    answer_obj = eg.load_obj(test_pickle_file)
+    assert answer_obj == test_obj_1
+
+    fs.clean_temp_file_n_dir([test_pickle_file])

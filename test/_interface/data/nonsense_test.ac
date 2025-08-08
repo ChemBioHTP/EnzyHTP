@@ -1,0 +1,7 @@
+CHARGE     -2.00 ( -2 )
+Formula: H1 C1 N1 O1  
+ATOM      1  X   LLP   289      -5.294  57.398  -9.041 -1.097600         X
+BOND    1    2
+BOND    2    3
+BOND    3    4
+BOND    4    5

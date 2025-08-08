@@ -15,12 +15,12 @@ versions=$(printf "%s\n21.3\n"  $PIP_VERSION )
 
 if [[ $versions == $(echo $versions | sort ) ]]; then
 
-    pip install . --use-feature=in-tree-build
+    PYTHONNOUSERSITE=1 pip install . --use-feature=in-tree-build
 
 
 else
 
-    pip install . 
+    PYTHONNOUSERSITE=1 pip install . 
 fi
 
 
