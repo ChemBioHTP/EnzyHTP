@@ -22,3 +22,5 @@ dependencies:
   - editdistance
   - scikit-learn
   - pytest
+  - mono
+  - networkx
