@@ -67,24 +67,49 @@ def _choose_cavity(cavity_list: List[Cavity],
         target_cavity: Cavity = None
     ) -> Tuple[Cavity, int]:
     """
-    Selects the most similar cavity (to the focus cavity) from the `cavity_list` based on residue key overlap.
-    The cavity with most residue key overlap is selected.
-    
+    Selects the most relevant Cavity from a list according to exactly one of three modes:
+        1. contain_ligand: find the cavity enclosing the most ligand atoms matching a PyMOL pattern;
+        2. composing_residues: find the cavity sharing the most residue keys with a given residue list;
+        3. target_cavity: find the cavity sharing the most residue keys with a reference cavity.
+
+    Exactly one of `composing_residues`, `contain_ligand`, or `target_cavity` must be provided;
+    otherwise a ValueError is raised.
     Args:
-        cavity_list: List of Cavity objects to compare. All cavities should be in the same Structure instance.
-        composing_residues (List[Residue], optional): A list of Residue instances composing the cavity. Mutually exclusive with `contain_ligand` or `target_cavity`.
-        contain_ligand (str, optional): The PyMOL-formatted pattern selecting the ligand in the cavity. Mutually exclusive with `target_cavity` or `composing_residues`.
-        target_cavity (Cavity, optional): The target cavity to track throughout the ensemble (by most overlapped residues). Mutually exclusive with `composing_residues` or `contain_ligand`.
-    
+        cavity_list (List[Cavity]):
+                List of candidate cavities (all must belong to the same Structure).
+        composing_residues (List[Residue], optional):
+                Residues defining the cavity of interest. Mutually exclusive with
+                `contain_ligand` and `target_cavity`.
+        contain_ligand (str, optional):
+                PyMOL selection pattern for ligand atoms. Mutually exclusive with
+                `composing_residues` and `target_cavity`.
+        target_cavity (Cavity, optional):
+                Reference cavity whose residues define the target site. Mutually exclusive with
+                `composing_residues` and `contain_ligand`.
     Returns:
-        result (Tuple[Cavity, int]): 
-            * Cavity: The Cavity object from cavity_list with highest residue key overlap with focus_cavity
-            * int: max_overlap value.
+        Tuple[Cavity, int]:
+            * The selected Cavity object from `cavity_list` with the highest residue-key overlap.
+            * The confidence score from 0 to 1. (
+                - for composing_residue: it is the ratio of shared residues to total residues in the cavity.
+                - for contain_ligand: it is the ratio of ligand atoms contained in the cavity to total ligand atoms.
+                - for target_cavity: it is a boolean indicating whether the cavity matches the target.
+            )
+    Raises:
+        ValueError:
+                If none or more than one of `composing_residues`, `contain_ligand`, or `target_cavity`
+                is specified.
+
+        Tuple[Cavity or None, int]:
+                - In ligand-containment mode: the cavity enclosing the most ligand atoms (or None if
+                    no atoms are found) and a flag 1 (if any cavity contains ligand) or 0.
+                - In residue-overlap modes: the cavity with the highest count of overlapping residue
+                    keys and the integer count of those shared residues.
     """
     if sum(x is not None for x in (composing_residues, contain_ligand, target_cavity)) != 1:
-        _LOGGER.error("The `composing_residues`, `contain_ligand` and `target_cavity` are mutually exclusive to each other.")
-        raise ValueError()
-    
+        err_msg = "The `composing_residues`, `contain_ligand` and `target_cavity` are mutually exclusive and at least one must be specified."
+        _LOGGER.error(err_msg)
+        raise ValueError(err_msg)
+
     if (contain_ligand):
         stru = cavity_list[0].stru
         ligand_selection = select_stru(stru=stru, pattern=contain_ligand)
@@ -98,25 +123,27 @@ def _choose_cavity(cavity_list: List[Cavity],
             if (contain_point_count > 0):
                 cavity_point_dict[cavity] = contain_point_count
             continue
-        _LOGGER.info(cavity_point_dict)
+        _LOGGER.info(f"ligand containing cavities (cavity:number of atoms contained):{cavity_point_dict}")
         if (len(cavity_point_dict.keys()) > 0):
             # Return the cavity containing most atoms of the ligand.
-            selected_cavity = cavity_list[max(cavity_point_dict, key=cavity_point_dict.get)]
-            return selected_cavity, 1
+            selected_cavity = max(cavity_point_dict, key=cavity_point_dict.get)
+            n_atoms_in_cavity = cavity_point_dict[selected_cavity]
+            ratio = n_atoms_in_cavity / len(ligand_atom_points)
+            return selected_cavity, ratio
         else:
             # If none of the cavities containing any atom of the ligand, return default value.
             return None, 0
     else:
         focus_residue_keys = set()
-        cavity_similarity = dict()
+        cavity_similarity = []
         if (target_cavity):
             focus_residue_keys = set(resi.key() for resi in (target_cavity.boundary_residues + target_cavity.inner_residues))
         if (composing_residues):
             focus_residue_keys = set(resi.key() for resi in composing_residues)
-        for i, cavity in enumerate(cavity_list):
+        for cavity in cavity_list:
             cavity_residue_keys = set(resi.key() for resi in (cavity.boundary_residues + cavity.inner_residues))
-            cavity_similarity[i] = len(cavity_residue_keys.intersection(focus_residue_keys))
-        return cavity_list[max(cavity_similarity, key=cavity_similarity.get)], max(cavity_similarity.values())
+            cavity_similarity.append(len(cavity_residue_keys.intersection(focus_residue_keys)))
+        return cavity_list[np.argmax(cavity_similarity)], max(cavity_similarity) / len(focus_residue_keys)
 
 def ensemble_cavity_volumes(
         stru_esm: StructureEnsemble, 
@@ -143,16 +170,17 @@ def ensemble_cavity_volumes(
         volumes (List[float]): The list of cavity volume value of each frame from the ensemble.
     """
     if sum(x is not None for x in (composing_residues, contain_ligand, target_cavity)) != 1:
-        _LOGGER.error("The `composing_residues`, `contain_ligand` and `target_cavity` are mutually exclusive to each other.")
-        raise ValueError()
+        err_msg = "The `composing_residues`, `contain_ligand` and `target_cavity` are mutually exclusive and at least one must be specified."
+        _LOGGER.error(err_msg)
+        raise ValueError(err_msg)
     esm_cavities: List[Cavity] = list()
     structure_0 = stru_esm.structure_0
 
     confirmed_target_cavity = None
     if frame_0_based:   # Confirm the target cavity if `frame_0_based=True`.
         non_active_residues = []
-        if (kwargs.get(contain_ligand)):
-            ligand_selection = select_stru(stru=structure_0, pattern=kwargs.get(contain_ligand))
+        if contain_ligand:
+            ligand_selection = select_stru(stru=structure_0, pattern=contain_ligand)
             non_active_residues = ligand_selection.involved_residues
         frame_0_cavities = identify_stru_cavities(stru=structure_0, 
             work_dir=work_dir, engine=engine, 
@@ -160,8 +188,9 @@ def ensemble_cavity_volumes(
         confirmed_target_cavity, _ = _choose_cavity(cavity_list=frame_0_cavities, 
             composing_residues=composing_residues, contain_ligand=contain_ligand, target_cavity=target_cavity)
         if (confirmed_target_cavity is None):
-            _LOGGER.error("Unable to identify target cavity from frame 0 structure.")
-            raise ValueError()
+            err_msg = "Unable to identify target cavity from frame 0 structure."
+            _LOGGER.error(err_msg)
+            raise ValueError(err_msg)
         else:
             # If the target cavity is confirmed, we will track the target cavity instead of `composing_residues` or `contain_ligand`.
             composing_residues = None
@@ -171,8 +200,8 @@ def ensemble_cavity_volumes(
     
     for stru_frame, _, _ in stru_esm.structures(remove_solvent=True):     # Iterate over the ensemble.
         non_active_residues = []
-        if (kwargs.get(contain_ligand)):
-            ligand_selection = select_stru(stru=structure_0, pattern=kwargs.get(contain_ligand))
+        if contain_ligand:
+            ligand_selection = select_stru(stru=structure_0, pattern=contain_ligand)
             non_active_residues = ligand_selection.involved_residues
         frame_cavities = identify_stru_cavities(stru=stru_frame, work_dir=work_dir, engine=engine, 
             non_active_residues=non_active_residues, **kwargs)
