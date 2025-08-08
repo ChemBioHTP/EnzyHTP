@@ -185,7 +185,7 @@ def ensemble_cavity_volumes(
         frame_0_cavities = identify_stru_cavities(stru=structure_0, 
             work_dir=work_dir, engine=engine, 
             non_active_residues=non_active_residues, **kwargs)
-        confirmed_target_cavity, _ = _choose_cavity(cavity_list=frame_0_cavities, 
+        confirmed_target_cavity, confidence = _choose_cavity(cavity_list=frame_0_cavities, 
             composing_residues=composing_residues, contain_ligand=contain_ligand, target_cavity=target_cavity)
         if (confirmed_target_cavity is None):
             err_msg = "Unable to identify target cavity from frame 0 structure."
@@ -205,7 +205,7 @@ def ensemble_cavity_volumes(
             non_active_residues = ligand_selection.involved_residues
         frame_cavities = identify_stru_cavities(stru=stru_frame, work_dir=work_dir, engine=engine, 
             non_active_residues=non_active_residues, **kwargs)
-        cavity, max_overlap = _choose_cavity(cavity_list=frame_cavities, 
+        cavity, confidence = _choose_cavity(cavity_list=frame_cavities, 
             composing_residues=composing_residues, contain_ligand=contain_ligand, target_cavity=confirmed_target_cavity)
         esm_cavities.append(cavity)
         continue
