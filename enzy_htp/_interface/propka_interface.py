@@ -71,7 +71,7 @@ class PropkaInterface(BaseInterface):
 
         with tempfile.NamedTemporaryFile(mode='w', suffix='.pdb', delete=False, dir=work_dir) as tmp_file:
             temp_pdb_path = tmp_file.name
-            PDBParser.save_structure(temp_pdb_path, stru)
+            PDBParser().save_structure(temp_pdb_path, stru)
         
         try:
             detailed_results = self.run_propka(temp_pdb_path, work_dir)

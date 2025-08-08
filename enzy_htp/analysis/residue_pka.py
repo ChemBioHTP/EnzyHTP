@@ -4,16 +4,59 @@
     of Structure()s
 
 Author: QZ Shao <shaoqz@icloud.com>
-Author: Robbie Ge
+Author: Robbie Ge <robbie.ge@vanderbilt.edu>
 
 Date: 2025-08-07
 """
-from typing import List, Dict, Union, Callable, Tuple
+from typing import List, Dict, Union, Callable, Tuple, Optional
 
 from enzy_htp import interface, config as eh_config
 from enzy_htp.structure import Structure, StructureEnsemble, Residue
 from enzy_htp.core import _LOGGER
 from enzy_htp.preparation.clean import remove_solvent
+
+
+def _parse_chain_res_code(res_str: str) -> Optional[Tuple[str, int]]:
+    """Parse a residue code in 'chain.number' format into (chain_id, residue_number)."""
+    parts = res_str.split('.')
+    if len(parts) != 2:
+        _LOGGER.warning(f"Invalid format for residue string '{res_str}'. Expected 'chain.number'")
+        return None
+    chain_id, num_str = parts
+    try:
+        return chain_id, int(num_str)
+    except ValueError:
+        _LOGGER.warning(f"Could not parse residue number from '{res_str}'")
+        return None
+
+
+def _parse_numeric_res_code(res_str: str) -> Optional[Tuple[str, int]]:
+    """Parse a numeric residue code, assuming chain 'A'."""
+    try:
+        num = int(res_str)
+        _LOGGER.warning(f"No chain specified for residue '{res_str}', assuming chain A")
+        return "A", num
+    except ValueError:
+        _LOGGER.warning(f"Could not parse residue number from '{res_str}'")
+        return None
+
+
+def _parse_residue_key(res: Union[str, Residue]) -> Optional[Tuple[str, int]]:
+    """Parse a residue identifier (str or Residue) into a (chain_id, residue_number) tuple."""
+    if isinstance(res, str):
+        # Try parsing 'chain.number' format
+        parsed = _parse_chain_res_code(res)
+        if parsed is not None:
+            return parsed
+        # Try numeric-only format
+        numeric = _parse_numeric_res_code(res)
+        if numeric is not None:
+            return numeric
+    elif isinstance(res, Residue):
+        return res.key()
+    else:
+        _LOGGER.warning(f"Unsupported target_residues type: {type(res)}")
+    return None
 
 
 def _filter_target_residues(
@@ -27,31 +70,9 @@ def _filter_target_residues(
     # Convert target_residues to (chain_id, res_num) tuples
     target_keys = []
     for res in target_residues:
-        if isinstance(res, str):
-            # Format: "A.100" (chain.residue_number)
-            if "." in res:
-                parts = res.split(".")
-                if len(parts) == 2:
-                    chain_id = parts[0]
-                    try:
-                        res_num = int(parts[1])
-                        target_keys.append((chain_id, res_num))
-                    except ValueError:
-                        _LOGGER.warning(f"Could not parse residue number from '{res}'")
-                else:
-                    _LOGGER.warning(f"Invalid format for residue string '{res}'. Expected 'chain.number'")
-            else:
-                # Just a number, assume chain A 
-                try:
-                    res_num = int(res)
-                    target_keys.append(("A", res_num))
-                    _LOGGER.warning(f"No chain specified for residue '{res}', assuming chain A")
-                except ValueError:
-                    _LOGGER.warning(f"Could not parse residue number from '{res}'")
-        elif isinstance(res, Residue):
-            target_keys.append(res.key())
-        else:
-            _LOGGER.warning(f"Unsupported target_residues type: {type(res)}")
+        key = _parse_residue_key(res)
+        if key is not None:
+            target_keys.append(key)
     
     # Filter results using (chain_id, res_num) keys for robust alignment
     return {key: pka for key, pka in all_pka.items() if key in target_keys}
@@ -101,8 +122,9 @@ def residue_pka(
         work_dir = eh_config.system.SCRATCH_DIR
     
     if method not in PKA_METHODS:
-        _LOGGER.error(f"Method '{method}' not supported. Supported methods: {list(PKA_METHODS.keys())}")
-        raise ValueError
+        err_msg = f"Method '{method}' not supported. Supported methods: {list(PKA_METHODS.keys())}"
+        _LOGGER.error(err_msg)
+        raise ValueError(err_msg)
 
     if isinstance(stru, Structure):
         # Remove solvents if requested
@@ -122,8 +144,9 @@ def residue_pka(
         return results
 
     else:
-        _LOGGER.error(f"stru can only be a Structure() or StructureEnsemble(). Found: {type(stru)}")
-        raise TypeError
+        err_msg = f"stru can only be a Structure() or StructureEnsemble(). Found: {type(stru)}"
+        _LOGGER.error(err_msg)
+        raise TypeError(err_msg)
 
 PKA_METHODS: Dict[str, Callable] = {
     "propka": interface.propka.get_residue_pka_from_stru,
