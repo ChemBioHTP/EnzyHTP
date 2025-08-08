@@ -254,7 +254,7 @@ class Mole2Interface(BaseInterface):
         non_active_parts = [resi.key() for resi in non_active_residues]
 
         fs.safe_mkdir(work_dir)
-        fs.safe_rmdir(f"{work_dir}/mesh/")
+        fs.safe_rmdir(f"{work_dir}/mesh/") # this may cause a problem when run in parallel and system.SCRATCH_DIR is used. Current fix is to specify work_dir when run in parallel.
         
         temp_pdb_filepath = fs.get_valid_temp_name(path.join(work_dir, "stru_cavity_temp.pdb"), ext_set=["pdb"])
         sp.save_structure(outfile=temp_pdb_filepath, stru=stru)
@@ -284,12 +284,13 @@ class Mole2Interface(BaseInterface):
             )
 
         fs.clean_temp_file_n_dir(
-            [
+            list(Path(f"{work_dir}/mesh").glob("*.mesh")) + list(Path(f"{work_dir}/xml").glob("*.xml")) +[
                 path.join(work_dir, "mesh"), 
                 path.join(work_dir, "xml"), 
                 cavities_xml_file, 
                 input_xml_filepath, 
-                temp_pdb_filepath
+                temp_pdb_filepath,
+                work_dir,
             ]
         )
         
