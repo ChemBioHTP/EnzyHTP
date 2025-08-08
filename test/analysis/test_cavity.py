@@ -24,13 +24,10 @@ amber_interface = interface.amber
 sp = PDBParser()
 
 def test_identify_stru_cavities():
-    """Test `identify_stru_cavities` function."""
-    fs.safe_mkdir(WORK_DIR)
-    
+    """Test `identify_stru_cavities` function."""    
     pdb_filepath = path.join(DATA_DIR, "cavity_calc", "aclHMT-ETI-SAH_no-ETI.pdb")
     stru = sp.get_structure(pdb_filepath)
     cavities = identify_stru_cavities(stru=stru, work_dir=WORK_DIR)
-    fs.safe_rmdir(WORK_DIR)
 
     assert len(cavities) == 10
     cavity = cavities[0]
