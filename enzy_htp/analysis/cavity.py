@@ -118,17 +118,18 @@ def _choose_cavity(cavity_list: List[Cavity],
         if (len(ligand_atom_points) == 0):  # If nothing selected.
             return None, 0
         cavity_point_dict = dict()  # A dict recording how many atoms are contained by each cavity.
-        for cavity in cavity_list:
+        for i, cavity in enumerate(cavity_list):
             contain_point_list = cavity.contains_array(ligand_atom_points)
             contain_point_count = sum(1 for point in contain_point_list if point == True)   # Number of atoms in the cavity.
             if (contain_point_count > 0):
-                cavity_point_dict[cavity] = contain_point_count
+                cavity_point_dict[i] = contain_point_count
             continue
-        _LOGGER.info(f"ligand containing cavities (cavity:number of atoms contained):{cavity_point_dict}")
+        _LOGGER.info(f"ligand containing cavities (cavity_idx:number of atoms contained):{cavity_point_dict}")
         if (len(cavity_point_dict.keys()) > 0):
             # Return the cavity containing most atoms of the ligand.
-            selected_cavity = max(cavity_point_dict, key=cavity_point_dict.get)
-            n_atoms_in_cavity = cavity_point_dict[selected_cavity]
+            selected_cavity_idx = max(cavity_point_dict, key=cavity_point_dict.get)
+            selected_cavity = cavity_list[selected_cavity_idx]
+            n_atoms_in_cavity = cavity_point_dict[selected_cavity_idx]
             ratio = n_atoms_in_cavity / len(ligand_atom_points)
             return selected_cavity, ratio
         else:
@@ -178,11 +179,11 @@ def ensemble_cavity_volumes(
     structure_0 = so.remove_solvent(stru_esm.structure_0) # dont need copy as this is lazy-generated property
 
     confirmed_target_cavity = None
+    non_active_residues = []
+    if contain_ligand:
+        ligand_selection = select_stru(stru=structure_0, pattern=contain_ligand)
+        non_active_residues = ligand_selection.involved_residues
     if frame_0_based:   # Confirm the target cavity if `frame_0_based=True`.
-        non_active_residues = []
-        if contain_ligand:
-            ligand_selection = select_stru(stru=structure_0, pattern=contain_ligand)
-            non_active_residues = ligand_selection.involved_residues
         frame_0_cavities = identify_stru_cavities(stru=structure_0, 
             work_dir=work_dir, engine=engine, 
             non_active_residues=non_active_residues, **kwargs)
@@ -194,22 +195,19 @@ def ensemble_cavity_volumes(
             raise ValueError(err_msg)
         else:
             # If the target cavity is confirmed, we will track the target cavity instead of `composing_residues` or `contain_ligand`.
+            # i.e. we use these to find the cavity in frame 0 and track the same cavity for the rest of the the frames
             composing_residues = None
             contain_ligand = None
     else:
         confirmed_target_cavity = target_cavity
     
-    for stru_frame, _, _ in stru_esm.structures(remove_solvent=True):     # Iterate over the ensemble.
-        non_active_residues = []
-        if contain_ligand:
-            ligand_selection = select_stru(stru=structure_0, pattern=contain_ligand)
-            non_active_residues = ligand_selection.involved_residues
+    for stru_frame in stru_esm.structures(remove_solvent=True):     # Iterate over the ensemble.
         frame_cavities = identify_stru_cavities(stru=stru_frame, work_dir=work_dir, engine=engine, 
             non_active_residues=non_active_residues, **kwargs)
+                
         cavity, confidence = _choose_cavity(cavity_list=frame_cavities, 
             composing_residues=composing_residues, contain_ligand=contain_ligand, target_cavity=confirmed_target_cavity)
         esm_cavities.append(cavity)
-        continue
 
     volumes = list()
     for cavity in esm_cavities:

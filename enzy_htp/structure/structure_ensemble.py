@@ -106,4 +106,6 @@ class StructureEnsemble:
     # region == special ==
     def __iter__(self):
         return self.structures()
+
+    # NOTE: if we need len. An idea is to find the bound class of coord_parser and using another classmethod. (e.g.: for amber ones, this way allow us to access to count_num_of_frames_traj) 
     # endregion
