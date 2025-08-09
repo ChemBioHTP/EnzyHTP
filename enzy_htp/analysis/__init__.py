@@ -5,8 +5,10 @@ enzy_htp. Currently supports the ability to calculate:
     + dipole
     + stability
     + substrate positioning index (spi)
+    + residue pKa
 
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
+Author: QZ Shao <shaoqz@icloud.com>
 
 Date: 2022-11-06
 """
@@ -30,3 +32,4 @@ from .covariance import coord_covariance
 from .binding import binding_energy
 from .spi import spi_metric
 from .clustering import rep_stru_clustering
+from .residue_pka import residue_pka

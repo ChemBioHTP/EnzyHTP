@@ -148,7 +148,7 @@ def write_lines(fname: str, lines: List[str]) -> None:
     """Writes lines to specified file, checking if file exists first and warning if it does. Assumes no newlines."""
     # TODO(CJ) check if binary file and dont return if so
     if os.path.exists(fname):
-        _LOGGER.warning(f"The file '{fname}' exists and will be overwritten")
+        _LOGGER.warning(f"The file '{fname}' exists (size: {os.path.getsize(fname)}) and will be overwritten")
     fh = open(fname, "w")
     fh.write("\n".join(lines))
     fh.close()
