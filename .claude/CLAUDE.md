@@ -4,8 +4,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Installation and Setup
 - Avoid installing the package yourself. If you found a problem involving environment or need to test install, ask for help from the user.
-- `./dev-tools/pip-install` - Install enzy_htp from source using pip (do not install dependencies)
-- `./dev-tools/conda-install` - Install enzy_htp and dependencies using conda
 
 ## Testing
 
@@ -23,22 +21,8 @@ The commands below are examples; you should replace file paths and test names wi
     `pytest test/structure/test_structure.py::test_deepcopy`
 - **Run tests by name pattern:**
     `pytest -k "deepcopy"`
-- **Run tests by marker:**
-    `pytest -m "interface"`
 
 IMPORTANT! Always run the unit test you wrote and make sure they passes so that the function is complete and working!
-
-#### Test Markers
-
-The following markers are available to run specific subsets of tests:
-
-- `accre`: Tests that should only run on the ACCRE cluster.
-- `long`: Time-consuming tests (>10 minutes) that may need to be submitted as jobs.
-- `interface`: Tests for the main software interfaces.
-- `temp`: Temporary tests created during development.
-- `TODO`: Tests that are known to be failing.
-
-*Note: Not all eligible tests that fit a marker type are marked, but every marked test is eligible.*
 
 ## Architecture Overview
 
@@ -56,7 +40,7 @@ EnzyHTP is a modular Python library for high-throughput enzyme modeling that aut
 The library is built around several key data types that represent different aspects of molecular systems:
 
 **Primary Structure Types (`enzy_htp/structure/`):**
-- `Structure` - Central data type representing complete enzyme structures
+- `Structure` - Central data type representing complete enzyme structures. Its data structure is described in `DoubleLinkedNode`.
 - `StructureEnsemble` - Collections of structures for ensemble-based operations
 - `StructureRegion` - Specific regions within structures for targeted operations
 
@@ -112,20 +96,7 @@ New science API modules may be added in the future following the same patterns. 
 - `yapf --in-place <file_path>`: Formats a Python file using the project's `yapf` style.
 - **IMPORTANT:** Only use yapf for new files. For existing files, follow the established formatting to avoid unnecessary changes.
 
-### Import Organization
-Order imports by length within two sections:
-```python
-import os
-import shutil
-from typing import List
-from subprocess import run
-
-from .logger import _LOGGER
-from .exception import MissingEnvironmentElement
-```
-
 ### Key Patterns
-- Functions primarily operate on `Structure` or `StructureEnsemble` objects
 - Use interface pattern to avoid tight coupling with external tools
 - Test-driven development with tests mirroring source code structure
 - Type hints for function parameters and return values
