@@ -4412,7 +4412,7 @@ class AmberRSTParser():
         prmtop_file
         parent_interface"""
     def __init__(self, prmtop_file: str, interface: BaseInterface = amber_interface):
-        self.prmtop_file = prmtop_file
+        self.prmtop_file = os.path.abspath(prmtop_file)
         self.parent_interface = interface
     
     def get_structure(self, rst_file: str) -> Structure:
@@ -4425,7 +4425,7 @@ class AmberMDCRDParser():
         prmtop_file
         parent_interface"""
     def __init__(self, prmtop_file: str, interface: AmberInterface = amber_interface):
-        self.prmtop_file = prmtop_file
+        self.prmtop_file = os.path.abspath(prmtop_file)
         self.parent_interface = interface
     
     def get_coordinates(self, mdcrd: str, remove_solvent: bool=False) -> Generator[Tuple[List[Tuple[float]],Tuple[float]], None, None]:
@@ -4531,7 +4531,7 @@ class AmberNCParser():
         prmtop_file
         parent_interface"""
     def __init__(self, prmtop_file: str, interface: BaseInterface = amber_interface):
-        self.prmtop_file = prmtop_file
+        self.prmtop_file = os.path.abspath(prmtop_file)
         self.parent_interface: AmberInterface = interface
 
         self.mdcrd: Dict = {}
