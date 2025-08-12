@@ -49,6 +49,16 @@ class StructureEnsemble:
         self.coordinate_list = coordinate_list
         self.coord_parser = coord_parser
 
+        # reinforce paths
+        self._reinforce_paths()
+
+    def _reinforce_paths(self) -> None:
+        """Reinforce the paths of the topology and coordinates."""
+        if isinstance(self._topology, str) and os.path.exists(self._topology):
+            self._topology = os.path.abspath(self._topology)
+        if isinstance(self.coordinate_list, str) and os.path.exists(self.coordinate_list):
+            self.coordinate_list = os.path.abspath(self.coordinate_list)
+
     def structures(self, remove_solvent: bool=False) -> Generator[Structure]:
         """get a Generator of all geometries in the ensemble
         as Structure()s"""
