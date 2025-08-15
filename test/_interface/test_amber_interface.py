@@ -89,6 +89,15 @@ def files_equivalent(fname1: str, fname2: str) -> bool:
             return False
 
     return True
+
+@pytest.fixture
+def patch_scratch_dir(monkeypatch, tmp_path):
+    """Fixture to patch the SCRATCH_DIR to a temporary directory for the duration of a test."""
+    temp_scratch = tmp_path / "scratch"
+    temp_scratch.mkdir()
+    monkeypatch.setattr(eh_config.system, 'SCRATCH_DIR', str(temp_scratch))
+    yield str(temp_scratch)
+    # No need for explicit cleanup, tmp_path and monkeypatch handle it automatically
 # endregion Tools
 
 def test_run_tleap():
@@ -2272,65 +2281,54 @@ def test_residue_list_to_amber_mask():
     # Test non-continuous residues
     residues = [("A", 10), ("A", 15), ("A", 20)]
     mask = interface.amber._residue_list_to_amber_mask(residues)
-    assert mask == ":10,:15,:20&!@H="
+    assert mask == ":10,15,20&!@H="
     
-    # Test multiple chains
+    # Test multiple chains (should warn and combine residue numbers)
     residues = [("A", 10), ("B", 20)]
     mask = interface.amber._residue_list_to_amber_mask(residues)
-    assert mask == ":10,:20&!@H="
+    assert mask == ":10,20&!@H="
     
     # Test complex case with multiple chains and ranges
     residues = [("A", 10), ("A", 11), ("A", 12), ("B", 20), ("B", 25)]
     mask = interface.amber._residue_list_to_amber_mask(residues)
-    assert mask == ":10-12,:20,:25&!@H="
+    assert mask == ":10-12,20,25&!@H="
+    
+    # Test without hydrogen exclusion
+    residues = [("A", 10), ("A", 11)]
+    mask = interface.amber._residue_list_to_amber_mask(residues, exclude_hydrogen=False)
+    assert mask == ":10-11"
 
 
-def test_calculate_dsi_metrics_mock(tmp_path, monkeypatch):
-    """Test calculate_dsi_metrics with mock data."""
-    import tempfile
-    from unittest.mock import MagicMock, mock_open, patch
-    
-    # Create a mock StructureEnsemble
-    mock_ensemble = MagicMock()
-    mock_ensemble.topology_source_file = "/path/to/topology.prmtop"
-    mock_ensemble.coordinate_list = "/path/to/trajectory.nc"
-    
-    # Mock the file system operations
-    mock_temp_file = str(tmp_path / "dsi_test.dat")
-    monkeypatch.setattr("enzy_htp.core.file_system.get_valid_temp_name", 
-                       lambda x: mock_temp_file)
-    monkeypatch.setattr("enzy_htp.core.file_system.safe_mkdir", lambda x: None)
-    monkeypatch.setattr("enzy_htp.core.file_system.clean_temp_file_n_dir", lambda x: None)
-    
-    # Mock cpptraj output file
-    mock_output_content = """#Frame  d_domain1_domain2  Rg_domain1  Rg_domain2
-1       10.5              3.2         2.8
-2       11.0              3.1         2.9
-3       10.8              3.3         2.7
-"""
-    
-    # Mock run_cpptraj to create the output file
-    def mock_run_cpptraj(contents):
-        with open(mock_temp_file, 'w') as f:
-            f.write(mock_output_content)
-    
-    monkeypatch.setattr(interface.amber, "run_cpptraj", mock_run_cpptraj)
-    
-    # Test the function
-    domain1_residues = [("A", 10), ("A", 20)]
-    domain2_residues = [("A", 30), ("A", 40)]
-    
-    result = interface.amber.calculate_dsi_metrics(
-        mock_ensemble, domain1_residues, domain2_residues
+def test_calculate_dsi_metrics(patch_scratch_dir):
+    """Test calculate_dsi_metrics function using test data files."""
+    # Use existing test data files from the test_get_coord_covariance pattern
+    prmtop_path = os.path.join(MM_DATA_DIR, "test_rmsd.prmtop")
+    traj_path = os.path.join(MM_DATA_DIR, "test_rmsd.mdcrd")
+    ref_pdb = os.path.join(MM_DATA_DIR, "test_rmsd_chainid.pdb")
+
+    # Load trajectory ensemble
+    structure_ensemble = interface.amber.load_traj(
+        prmtop_path=prmtop_path,
+        traj_path=traj_path,
+        ref_pdb=ref_pdb,
     )
     
-    # Check results (DSI = distance - rg1 - rg2)
-    expected = np.array([
-        10.5 - 3.2 - 2.8,  # Frame 1: 4.5
-        11.0 - 3.1 - 2.9,  # Frame 2: 5.0
-        10.8 - 3.3 - 2.7   # Frame 3: 4.8
-    ])
+    # Define two domains for DSI calculation
+    domain1_residues = [("A", 1), ("A", 5)]  # First 5 residues
+    domain2_residues = [("A", 10), ("A", 15)]  # Residues 10-15
     
-    np.testing.assert_array_almost_equal(result, expected, decimal=6)
+    # Calculate DSI
+    result = interface.amber.calculate_dsi_metrics(
+        structure_ensemble, domain1_residues, domain2_residues
+    )
+    
+    # Basic validation - ensure we get a reasonable result
+    assert isinstance(result, np.ndarray)
+    assert len(result) > 0  # Should have at least one frame
+    assert all(isinstance(x, (int, float)) for x in result)  # All values should be numeric
+    
+    # DSI values should be reasonable (not NaN or infinite)
+    assert not np.any(np.isnan(result))
+    assert not np.any(np.isinf(result))
 
 

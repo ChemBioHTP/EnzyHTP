@@ -1,15 +1,29 @@
 """Test module for enzy_htp.analysis.dsi
 
 Author: QZ Shao <shaoqz@icloud.com>
-Date: 2024-08-15
+Date: 2025-08-15
 """
+import os
 import pytest
 import numpy as np
 from unittest.mock import MagicMock, patch
 
 from enzy_htp.analysis.dsi import dsi, _expand_residue_ranges
 from enzy_htp.structure import StructureEnsemble
+from enzy_htp import interface
+from enzy_htp import config as eh_config
 
+# Test data directory
+DATA_DIR = f"{os.path.dirname(os.path.abspath(__file__))}/data/"
+
+@pytest.fixture
+def patch_scratch_dir(monkeypatch, tmp_path):
+    """Fixture to patch the SCRATCH_DIR to a temporary directory for the duration of a test."""
+    temp_scratch = tmp_path / "scratch"
+    temp_scratch.mkdir()
+    monkeypatch.setattr(eh_config.system, 'SCRATCH_DIR', str(temp_scratch))
+    yield str(temp_scratch)
+    # No need for explicit cleanup, tmp_path and monkeypatch handle it automatically
 
 def test_expand_residue_ranges():
     """Test expansion of residue ranges."""
@@ -20,19 +34,19 @@ def test_expand_residue_ranges():
     result = _expand_residue_ranges([("A", 10)])
     assert result == [("A", 10)]
     
-    # Test two residues - should expand to range
+    # Test two residues from same chain - should expand to range
     result = _expand_residue_ranges([("A", 10), ("A", 15)])
     expected = [("A", 10), ("A", 11), ("A", 12), ("A", 13), ("A", 14), ("A", 15)]
     assert result == expected
     
-    # Test multiple residues - should use individual residues
-    result = _expand_residue_ranges([("A", 10), ("A", 12), ("A", 15)])
-    expected = [("A", 10), ("A", 12), ("A", 15)]
+    # Test two residues from different chains - should remain as individual residues
+    result = _expand_residue_ranges([("A", 10), ("B", 15)])
+    expected = [("A", 10), ("B", 15)]
     assert result == expected
     
-    # Test multiple chains with ranges
-    result = _expand_residue_ranges([("A", 10), ("A", 12), ("B", 20), ("B", 22)])
-    expected = [("A", 10), ("A", 12), ("B", 20), ("B", 22)]
+    # Test multiple residues - should use individual residues (no expansion)
+    result = _expand_residue_ranges([("A", 10), ("A", 12), ("A", 15)])
+    expected = [("A", 10), ("A", 12), ("A", 15)]
     assert result == expected
 
 
@@ -150,3 +164,41 @@ def test_dsi_methods_dictionary():
     
     assert "cpptraj" in DSI_METHODS
     assert DSI_METHODS["cpptraj"] == interface.amber.calculate_dsi_metrics
+
+
+def test_dsi_real_data(patch_scratch_dir):
+    """Test DSI calculation with real trajectory data."""
+    # Use the same test data as other analysis tests
+    prmtop_path = os.path.join(DATA_DIR, "test_spi.prmtop")
+    traj_path = os.path.join(DATA_DIR, "test_spi.mdcrd")
+    ref_pdb = os.path.join(DATA_DIR, "test_spi_chainid.pdb")
+    
+    # Load trajectory ensemble
+    structure_ensemble = interface.amber.load_traj(
+        prmtop_path=prmtop_path,
+        traj_path=traj_path,
+        ref_pdb=ref_pdb,
+    )
+    
+    # Define two domains for DSI calculation
+    # Domain 1: residues 1-10 (N-terminal region)
+    # Domain 2: residues 100-110 (middle region)
+    domain1_residues = [("A", 1), ("A", 10)]
+    domain2_residues = [("A", 100), ("A", 110)]
+    
+    # Calculate DSI using the analysis API
+    result = dsi(structure_ensemble, domain1_residues, domain2_residues)
+
+    # Validate results
+    assert isinstance(result, np.ndarray)
+    assert len(result) > 0  # Should have at least one frame
+    assert all(isinstance(x, (int, float)) for x in result)  # All values should be numeric
+    
+    # DSI values should be reasonable (not NaN or infinite)
+    assert not np.any(np.isnan(result))
+    assert not np.any(np.isinf(result))
+    
+    # DSI values should generally be positive (distance minus radii of gyration)
+    # but can be negative if domains overlap significantly
+    assert all(x > -50 for x in result)  # Reasonable lower bound
+    assert all(x < 200 for x in result)   # Reasonable upper bound

@@ -4134,15 +4134,21 @@ class AmberInterface(BaseInterface):
         domain1_mask = self._residue_list_to_amber_mask(domain1_residues)
         domain2_mask = self._residue_list_to_amber_mask(domain2_residues)
         
-        # Create temporary output file
+        # Create temporary files for Amber format
         temp_dir = eh_config["system.SCRATCH_DIR"]
         fs.safe_mkdir(temp_dir)
+        tmp_nc_path = fs.get_valid_temp_name(os.path.join(temp_dir, "tmp_amber_traj.nc"))
+        tmp_prmtop_path = fs.get_valid_temp_name(os.path.join(temp_dir, "tmp_amber_topology.prmtop"))
         int_file = fs.get_valid_temp_name(f"{temp_dir}/dsi.dat")
+        
+        # Convert ensemble to Amber format (following get_coord_covariance pattern)
+        self.convert_top_to_prmtop(ensemble.topology_source_file, tmp_prmtop_path)
+        self.convert_traj_to_nc(ensemble.coordinate_list, tmp_nc_path, topology_path=tmp_prmtop_path)
         
         # Build cpptraj script
         contents: List[str] = [
-            f"parm {ensemble.topology_source_file}",
-            f"trajin {ensemble.coordinate_list}",
+            f"parm {tmp_prmtop_path}",
+            f"trajin {tmp_nc_path}",
             f"distance d_domain1_domain2 {domain1_mask} {domain2_mask} out {int_file} geom",
             f"radgyr Rg_domain1 {domain1_mask} out {int_file} nomax",
             f"radgyr Rg_domain2 {domain2_mask} out {int_file} nomax",
@@ -4166,61 +4172,47 @@ class AmberInterface(BaseInterface):
                     result.append(dsi_value)
         
         # Clean up temporary files
-        fs.clean_temp_file_n_dir(int_file)
+        fs.clean_temp_file_n_dir([
+            tmp_nc_path,
+            tmp_prmtop_path,
+            int_file,
+        ])
         
         return np.array(result)
     
-    def _residue_list_to_amber_mask(self, residue_list: List[Tuple[str, int]]) -> str:
+    def _residue_list_to_amber_mask(self, residue_list: List[Tuple[str, int]], exclude_hydrogen: bool = True) -> str:
         """Convert a list of residue keys to Amber mask format.
         
         Args:
             residue_list: List of (chain_id, residue_idx) tuples
+            exclude_hydrogen: Whether to exclude hydrogen atoms from the mask
             
         Returns:
-            str: Amber mask string for the residues, excluding hydrogen atoms
+            str: Amber mask string for the residues
         """
         if not residue_list:
             raise ValueError("Residue list cannot be empty")
         
-        # Group residues by chain
-        chain_ranges = {}
-        for chain_id, res_idx in residue_list:
-            if chain_id not in chain_ranges:
-                chain_ranges[chain_id] = []
-            chain_ranges[chain_id].append(res_idx)
+        # Check for multiple chain IDs and warn (Amber typically doesn't support different chain IDs)
+        chain_ids = set(chain_id for chain_id, _ in residue_list)
+        if len(chain_ids) > 1:
+            _LOGGER.warning(f"Multiple chain IDs found in residue list: {chain_ids}. "
+                          "Amber typically doesn't distinguish between chain IDs. "
+                          "Make sure residue numbering is globally unique.")
         
-        # Create mask parts for each chain
-        mask_parts = []
-        for chain_id, res_indices in chain_ranges.items():
-            res_indices.sort()
-            
-            # Convert to continuous ranges where possible
-            ranges = []
-            start = res_indices[0]
-            end = res_indices[0]
-            
-            for i in range(1, len(res_indices)):
-                if res_indices[i] == end + 1:
-                    end = res_indices[i]
-                else:
-                    if start == end:
-                        ranges.append(f":{start}")
-                    else:
-                        ranges.append(f":{start}-{end}")
-                    start = end = res_indices[i]
-            
-            # Add the last range
-            if start == end:
-                ranges.append(f":{start}")
-            else:
-                ranges.append(f":{start}-{end}")
-            
-            # Combine ranges for this chain
-            chain_mask = ",".join(ranges)
-            mask_parts.append(chain_mask)
+        # Extract just the residue indices (ignore chain IDs for Amber)
+        res_indices = [res_idx for _, res_idx in residue_list]
         
-        # Combine all chains and exclude hydrogen atoms
-        mask = ",".join(mask_parts) + "&!@H="
+        # Use the existing utility to create interval string
+        interval_str = get_interval_str_from_list(res_indices)
+        
+        # Format as Amber mask
+        mask = f":{interval_str}"
+        
+        # Add hydrogen exclusion if requested
+        if exclude_hydrogen:
+            mask += "&!@H="
+            
         return mask
 
     # -- MMPB/GBSA --
