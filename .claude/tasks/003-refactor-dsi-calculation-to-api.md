@@ -36,7 +36,7 @@ The user-facing API will reside in the `analysis` module and will be decoupled f
   import numpy as np
   from enzy_htp.structure import StructureEnsemble
 
-  def dsi(ensemble: StructureEnsemble, domain1_residues: List[Tuple[str, int]], domain2_residues: List[Tuple[str, int]]) -> np.ndarray:
+  def dsi(ensemble: StructureEnsemble, domain1_residues: List[Tuple[str, int]], domain2_residues: List[Tuple[str, int]], engine: str="cpptraj") -> np.ndarray:
       """
       Calculates the Domain-Domain Interaction Index (DSI) for a trajectory.
 
@@ -52,6 +52,7 @@ The user-facing API will reside in the `analysis` module and will be decoupled f
                             chain are provided, they are treated as the
                             start and end of a continuous residue range.
           domain2_residues: A list of residue keys for the second domain.
+          engine: the engine used for the dsi calculation.
       """
   ```
 - **Internal Logic:**
