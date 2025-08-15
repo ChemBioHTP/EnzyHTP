@@ -1,9 +1,10 @@
-"""Submodule contains code for calculating the Domain-Domain Interaction Index (DSI).
+"""Submodule contains code for calculating the Domain Separation Index (DSI).
 
-DSI is a measure of distance between two domains, defined as:
+DSI is a measure of separation between two domains, defined as:
 DSI = d(com1, com2) - (Rg1 + Rg2)
 where d(com1, com2) is the distance between the centers of mass of the
 two domains, and Rg1 and Rg2 are their respective radii of gyration.
+See https://onlinelibrary.wiley.com/doi/10.1002/anie.202505991 for full details.
 
 + dsi()
     Calculate the DSI for a trajectory from a StructureEnsemble
@@ -25,12 +26,13 @@ def dsi(
     domain2_residues: List[Tuple[str, int]], 
     engine: str = "cpptraj"
 ) -> np.ndarray:
-    """Calculate the Domain-Domain Interaction Index (DSI) for a trajectory.
+    """Calculate the Domain Separation Index (DSI) for a trajectory.
 
-    DSI is a measure of distance between two domains, defined as:
+    DSI is a measure of separation between two domains, defined as:
     DSI = d(com1, com2) - (Rg1 + Rg2)
     where d(com1, com2) is the distance between the centers of mass of the
     two domains, and Rg1 and Rg2 are their respective radii of gyration.
+    See https://onlinelibrary.wiley.com/doi/10.1002/anie.202505991 for full details.
 
     Args:
         ensemble: A StructureEnsemble object containing topology and trajectory.
