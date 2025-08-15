@@ -4109,6 +4109,120 @@ class AmberInterface(BaseInterface):
 
         return result
 
+    # -- DSI Calculation --
+    def calculate_dsi_metrics(
+        self,
+        ensemble: StructureEnsemble,
+        domain1_residues: List[Tuple[str, int]],
+        domain2_residues: List[Tuple[str, int]]
+    ) -> np.ndarray:
+        """Calculate Domain-Domain Interaction Index (DSI) metrics using cpptraj.
+        
+        This function encapsulates all cpptraj interactions required for DSI calculation.
+        It generates and executes a cpptraj script to compute the distance between 
+        the centers of mass and the radius of gyration for each of the two domain selections.
+        
+        Args:
+            ensemble: A StructureEnsemble object containing topology and trajectory
+            domain1_residues: List of residue keys (chain_id, residue_idx) for first domain
+            domain2_residues: List of residue keys (chain_id, residue_idx) for second domain
+            
+        Returns:
+            np.ndarray: DSI values for each frame, where DSI = d(com1, com2) - (Rg1 + Rg2)
+        """
+        # Convert residue selections to Amber mask format
+        domain1_mask = self._residue_list_to_amber_mask(domain1_residues)
+        domain2_mask = self._residue_list_to_amber_mask(domain2_residues)
+        
+        # Create temporary output file
+        temp_dir = eh_config["system.SCRATCH_DIR"]
+        fs.safe_mkdir(temp_dir)
+        int_file = fs.get_valid_temp_name(f"{temp_dir}/dsi.dat")
+        
+        # Build cpptraj script
+        contents: List[str] = [
+            f"parm {ensemble.topology_source_file}",
+            f"trajin {ensemble.coordinate_list}",
+            f"distance d_domain1_domain2 {domain1_mask} {domain2_mask} out {int_file} geom",
+            f"radgyr Rg_domain1 {domain1_mask} out {int_file} nomax",
+            f"radgyr Rg_domain2 {domain2_mask} out {int_file} nomax",
+            "run",
+            "quit",
+        ]
+        contents = "\n".join(contents)
+        
+        # Execute cpptraj
+        self.run_cpptraj(contents)
+        
+        # Parse results
+        result = []
+        with open(int_file) as f:
+            lines = f.readlines()[1:]  # Skip header
+            for line in lines:
+                parts = line.strip().split()
+                if len(parts) >= 4:
+                    index, distance, rg1, rg2 = parts[:4]
+                    dsi_value = float(distance) - float(rg1) - float(rg2)
+                    result.append(dsi_value)
+        
+        # Clean up temporary files
+        fs.clean_temp_file_n_dir(int_file)
+        
+        return np.array(result)
+    
+    def _residue_list_to_amber_mask(self, residue_list: List[Tuple[str, int]]) -> str:
+        """Convert a list of residue keys to Amber mask format.
+        
+        Args:
+            residue_list: List of (chain_id, residue_idx) tuples
+            
+        Returns:
+            str: Amber mask string for the residues, excluding hydrogen atoms
+        """
+        if not residue_list:
+            raise ValueError("Residue list cannot be empty")
+        
+        # Group residues by chain
+        chain_ranges = {}
+        for chain_id, res_idx in residue_list:
+            if chain_id not in chain_ranges:
+                chain_ranges[chain_id] = []
+            chain_ranges[chain_id].append(res_idx)
+        
+        # Create mask parts for each chain
+        mask_parts = []
+        for chain_id, res_indices in chain_ranges.items():
+            res_indices.sort()
+            
+            # Convert to continuous ranges where possible
+            ranges = []
+            start = res_indices[0]
+            end = res_indices[0]
+            
+            for i in range(1, len(res_indices)):
+                if res_indices[i] == end + 1:
+                    end = res_indices[i]
+                else:
+                    if start == end:
+                        ranges.append(f":{start}")
+                    else:
+                        ranges.append(f":{start}-{end}")
+                    start = end = res_indices[i]
+            
+            # Add the last range
+            if start == end:
+                ranges.append(f":{start}")
+            else:
+                ranges.append(f":{start}-{end}")
+            
+            # Combine ranges for this chain
+            chain_mask = ",".join(ranges)
+            mask_parts.append(chain_mask)
+        
+        # Combine all chains and exclude hydrogen atoms
+        mask = ",".join(mask_parts) + "&!@H="
+        return mask
+
     # -- MMPB/GBSA --
     def get_mmpbgbsa_energy(
         self,
