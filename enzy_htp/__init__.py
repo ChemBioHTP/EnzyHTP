@@ -70,3 +70,5 @@ from .analysis import (
     bond_dipole,
     spi_metric,
 )
+
+from .structure_prediction import predict_structure

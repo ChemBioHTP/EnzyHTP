@@ -31,6 +31,7 @@ Date: 2022-07-15
 """
 from typing import Any, Dict, List
 from .alphafill_config import AlphaFillConfig, default_alphafill_config
+from .alphafold_config import AlphafoldConfig, default_alphafold_config
 from .amber_config import AmberConfig, default_amber_config
 from .bcl_config import BCLConfig, default_bcl_config
 from .gaussian_config import GaussianConfig, default_gaussian_config
@@ -56,6 +57,7 @@ class Config:
 
     Attributes:
         _alphafill: Private instance of AlphaFillConfig() with default settings.
+        _alphafold: Private instance of AlphafoldConfig() with default settings.
         _amber: Private instance of AmberConfig() with default settings.
         _bcl: Private instance of BCLConfig() with default settings.
         _gaussian: Private instance of GaussianConfig() with default settings.
@@ -74,6 +76,7 @@ class Config:
     def __init__(self):
         """Constructor that creates a <Package>Config instance for each <package> using default_<package>_config."""
         self._alphafill = default_alphafill_config()
+        self._alphafold = default_alphafold_config()
         self._amber = default_amber_config()
         self._bcl = default_bcl_config()
         self._gaussian = default_gaussian_config()
@@ -89,6 +92,7 @@ class Config:
         self._propka = default_propka_config()
         self._mapper = {
             "alphafill": self._alphafill,
+            "alphafold": self._alphafold,
             "amber": self._amber,
             "bcl": self._bcl,
             "gaussian": self._gaussian,
@@ -109,6 +113,11 @@ class Config:
     def alphafill(self) -> AlphaFillConfig:
         """getter for _alphafill"""
         return self._alphafill
+
+    @property
+    def alphafold(self) -> AlphafoldConfig:
+        """getter for _alphafold"""
+        return self._alphafold
 
     @property
     def amber(self) -> AmberConfig:
@@ -274,4 +283,3 @@ class Config:
             counter += 1
 
         _LOGGER.info(f"Updated {counter} config settings!")
-
