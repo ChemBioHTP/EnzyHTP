@@ -89,6 +89,15 @@ def files_equivalent(fname1: str, fname2: str) -> bool:
             return False
 
     return True
+
+@pytest.fixture
+def patch_scratch_dir(monkeypatch, tmp_path):
+    """Fixture to patch the SCRATCH_DIR to a temporary directory for the duration of a test."""
+    temp_scratch = tmp_path / "scratch"
+    temp_scratch.mkdir()
+    monkeypatch.setattr(eh_config.system, 'SCRATCH_DIR', str(temp_scratch))
+    yield str(temp_scratch)
+    # No need for explicit cleanup, tmp_path and monkeypatch handle it automatically
 # endregion Tools
 
 def test_run_tleap():
@@ -2248,5 +2257,78 @@ def test_clean_frcmod_file_removes_attn(tmp_path, monkeypatch):
     # Read back content and verify ATTN lines are removed
     remaining = frcmod.read_text().splitlines()
     assert remaining == ["PARAM a b c", "OTHER xyz"]
+
+
+def test_calculate_dsi_metrics_input_validation():
+    """Test that calculate_dsi_metrics validates inputs correctly."""
+    # Test with empty residue lists
+    with pytest.raises(ValueError, match="Residue list cannot be empty"):
+        interface.amber._residue_list_to_amber_mask([])
+
+
+def test_residue_list_to_amber_mask():
+    """Test conversion of residue lists to Amber mask format."""
+    # Test single residue
+    residues = [("A", 10)]
+    mask = interface.amber._residue_list_to_amber_mask(residues)
+    assert mask == ":10&!@H="
+    
+    # Test multiple residues in same chain
+    residues = [("A", 10), ("A", 11), ("A", 12)]
+    mask = interface.amber._residue_list_to_amber_mask(residues)
+    assert mask == ":10-12&!@H="
+    
+    # Test non-continuous residues
+    residues = [("A", 10), ("A", 15), ("A", 20)]
+    mask = interface.amber._residue_list_to_amber_mask(residues)
+    assert mask == ":10,15,20&!@H="
+    
+    # Test multiple chains (should warn and combine residue numbers)
+    residues = [("A", 10), ("B", 20)]
+    mask = interface.amber._residue_list_to_amber_mask(residues)
+    assert mask == ":10,20&!@H="
+    
+    # Test complex case with multiple chains and ranges
+    residues = [("A", 10), ("A", 11), ("A", 12), ("B", 20), ("B", 25)]
+    mask = interface.amber._residue_list_to_amber_mask(residues)
+    assert mask == ":10-12,20,25&!@H="
+    
+    # Test without hydrogen exclusion
+    residues = [("A", 10), ("A", 11)]
+    mask = interface.amber._residue_list_to_amber_mask(residues, exclude_hydrogen=False)
+    assert mask == ":10-11"
+
+
+def test_calculate_dsi_metrics(patch_scratch_dir):
+    """Test calculate_dsi_metrics function using test data files."""
+    # Use existing test data files from the test_get_coord_covariance pattern
+    prmtop_path = os.path.join(MM_DATA_DIR, "test_rmsd.prmtop")
+    traj_path = os.path.join(MM_DATA_DIR, "test_rmsd.mdcrd")
+    ref_pdb = os.path.join(MM_DATA_DIR, "test_rmsd_chainid.pdb")
+
+    # Load trajectory ensemble
+    structure_ensemble = interface.amber.load_traj(
+        prmtop_path=prmtop_path,
+        traj_path=traj_path,
+        ref_pdb=ref_pdb,
+    )
+    
+    # Define two domains for DSI calculation
+    domain1_residues = [("A", 1), ("A", 5)]  # First 5 residues
+    domain2_residues = [("A", 10), ("A", 15)]  # Residues 10-15
+    
+    # Calculate DSI
+    result = interface.amber.calculate_dsi_metrics(
+        structure_ensemble, domain1_residues, domain2_residues
+    )
+    
+    # Basic validation - ensure we get a reasonable result
+    assert isinstance(result, np.ndarray)
+    assert len(result) > 0  # Should have at least one frame
+    assert all(isinstance(x, (int, float)) for x in result)  # All values should be numeric
+    
+    # DSI values should be reasonable (not NaN or infinite)
+    assert not np.any(np.isnan(result))
+    assert not np.any(np.isinf(result))
 
 

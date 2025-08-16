@@ -102,28 +102,6 @@ The project uses `pytest` for testing. Tests are located in the `test/` and `tes
     pytest -k "deepcopy"
     ```
 
-**Using Markers:**
-
-The `pytest.ini` file defines custom markers to run specific subsets of tests.
-
-*   Run tests with a specific marker:
-    ```bash
-    pytest -m <marker_name>
-    ```
-    *Example:*
-    ```bash
-    pytest -m accre
-    ```
-
-**Available Markers:**
-
-*   `accre`: Tests that should only run on the ACCRE cluster.
-*   `long`: Time-consuming tests (>10 minutes) that may need to be submitted as jobs.
-*   `clean`: Tests that clean up generated files upon completion.
-*   `interface`: Tests for the main software interfaces.
-*   `temp`: Temporary tests created during development.
-*   `TODO`: Tests that are known to be failing.
-
 # Development Conventions
 
 ## Coding Style
@@ -133,18 +111,6 @@ The project uses `yapf` for code formatting. A `.style.yapf` file is present in 
 `yapf --in-place <file_path>` - Run yapf formatter on a specific file. 
 
 **IMPORTANT:** Only use this command for new files. For existing files, follow the established formatting conventions to avoid unnecessary changes.
-
-## Import Organization
-Order imports by length within two sections:
-```python
-import os
-import shutil
-from typing import List
-from subprocess import run
-
-from .logger import _LOGGER
-from .exception import MissingEnvironmentElement
-```
 
 ## Key Patterns
 - Functions primarily operate on `Structure` or `StructureEnsemble` objects
