@@ -1,0 +1,56 @@
+/sb/apps/alphafold232/alphafold/run_alphafold.py:
+  --[no]benchmark: Run multiple JAX model evaluations to obtain a timing that excludes the compilation time, which should be more
+    indicative of the time required for inferencing many proteins.
+    (default: 'false')
+  --bfd_database_path: Path to the BFD database for use by HHblits.
+  --data_dir: Path to directory of supporting data.
+  --db_preset: <full_dbs|reduced_dbs>: Choose preset MSA database configuration - smaller genetic database config (reduced_dbs) or full
+    genetic database config  (full_dbs)
+    (default: 'full_dbs')
+  --fasta_paths: Paths to FASTA files, each containing a prediction target that will be folded one after another. If a FASTA file contains
+    multiple sequences, then it will be folded as a multimer. Paths should be separated by commas. All FASTA paths must have a unique
+    basename as the basename is used to name the output directories for each prediction.
+    (a comma separated list)
+  --hhblits_binary_path: Path to the HHblits executable.
+    (default: '/sb/apps/alphafold232/miniconda3/envs/af232/bin/hhblits')
+  --hhsearch_binary_path: Path to the HHsearch executable.
+    (default: '/sb/apps/alphafold232/miniconda3/envs/af232/bin/hhsearch')
+  --hmmbuild_binary_path: Path to the hmmbuild executable.
+    (default: '/sb/apps/alphafold232/miniconda3/envs/af232/bin/hmmbuild')
+  --hmmsearch_binary_path: Path to the hmmsearch executable.
+    (default: '/sb/apps/alphafold232/miniconda3/envs/af232/bin/hmmsearch')
+  --jackhmmer_binary_path: Path to the JackHMMER executable.
+    (default: '/sb/apps/alphafold232/miniconda3/envs/af232/bin/jackhmmer')
+  --kalign_binary_path: Path to the Kalign executable.
+    (default: '/sb/apps/alphafold232/miniconda3/envs/af232/bin/kalign')
+  --max_template_date: Maximum template release date to consider. Important if folding historical test sets.
+  --mgnify_database_path: Path to the MGnify database for use by JackHMMER.
+  --model_preset: <monomer|monomer_casp14|monomer_ptm|multimer>: Choose preset model configuration - the monomer model, the monomer model
+    with extra ensembling, monomer model with pTM head, or multimer model
+    (default: 'monomer')
+  --models_to_relax: <all|best|none>: The models to run the final relaxation step on. If `all`, all models are relaxed, which may be time
+    consuming. If `best`, only the most confident model is relaxed. If `none`, relaxation is not run. Turning off relaxation might result
+    in predictions with distracting stereochemical violations but might help in case you are having issues with the relaxation stage.
+    (default: 'best')
+  --num_multimer_predictions_per_model: How many predictions (each with a different random seed) will be generated per model. E.g. if this
+    is 2 and there are 5 models then there will be 10 predictions per input. Note: this FLAG only applies if model_preset=multimer
+    (default: '5')
+    (an integer)
+  --obsolete_pdbs_path: Path to file containing a mapping from obsolete PDB IDs to the PDB IDs of their replacements.
+  --output_dir: Path to a directory that will store the results.
+  --pdb70_database_path: Path to the PDB70 database for use by HHsearch.
+  --pdb_seqres_database_path: Path to the PDB seqres database for use by hmmsearch.
+  --random_seed: The random seed for the data pipeline. By default, this is randomly generated. Note that even if this is set, Alphafold
+    may still not be deterministic, because processes like GPU inference are nondeterministic.
+    (an integer)
+  --small_bfd_database_path: Path to the small version of BFD used with the "reduced_dbs" preset.
+  --template_mmcif_dir: Path to a directory with template mmCIF structures, each named <pdb_id>.cif
+  --uniprot_database_path: Path to the Uniprot database for use by JackHMMer.
+  --uniref30_database_path: Path to the UniRef30 database for use by HHblits.
+  --uniref90_database_path: Path to the Uniref90 database for use by JackHMMER.
+  --[no]use_gpu_relax: Whether to relax on GPU. Relax on GPU can be much faster than CPU, so it is recommended to enable if possible. GPUs
+    must be available if this setting is enabled.
+  --[no]use_precomputed_msas: Whether to read MSAs that have been written to disk instead of running the MSA tools. The MSA files are
+    looked up in the output directory, so it must stay the same between multiple runs that are to reuse the MSAs. WARNING: This will not
+    check if the sequence, database or configuration have changed.
+    (default: 'false')
