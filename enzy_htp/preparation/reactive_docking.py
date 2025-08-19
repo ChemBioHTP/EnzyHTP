@@ -345,10 +345,8 @@ def dock_ligand(structure:Structure,
     qm_resnums:str=get_active_site_sele(structure, qm_sele, fmt='rosetta')
     qm_protein_resnums:str=get_active_site_sele(structure, f"({qm_sele}) and polymer.protein", fmt='rosetta')
    
-    print(len(qm_protein_resnums))
     if rosetta_freeze:
         qm_protein_resnums=",".join(filter(lambda ll: ll not in rosetta_freeze.split(','), qm_protein_resnums.split(',')))
-    print(len(qm_protein_resnums))
 
 
     protocol = RosettaScriptsProtocol()
@@ -570,7 +568,7 @@ def qm_minimization(structure:Structure,
                 ) -> None:
 
     asite_sele=get_active_site_sele(structure, qm_sele)
-    print(asite_sele)
+
     session=interface.pymol.new_session()
     (sele, session)=interface.pymol.load_enzy_htp_stru(session, structure)
     df=interface.pymol.collect(
@@ -663,8 +661,6 @@ def local_parallel_rs(
             )
         except:
             pass
-
-    print(len(score_files))
     
     result=list()
     for sf,(_,_,opts) in zip(score_files,pool_args):
