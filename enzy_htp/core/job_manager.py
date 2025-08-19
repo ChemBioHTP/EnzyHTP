@@ -722,6 +722,7 @@ class ClusterJobConfig:
         'mem_per_core',
         'walltime',
         'account',
+        'qos',
     ]
 
     def __init__(self, cluster: ClusterInterface = None, res_keywords: dict = None):
