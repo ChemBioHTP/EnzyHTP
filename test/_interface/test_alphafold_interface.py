@@ -239,7 +239,6 @@ class TestAlphafoldClusterJobs:
                 fasta_path=create_fasta_from_sequences(sequences, ["test_seq"], output_path=Path(temp_dir) / "test.fasta"),
                 out_dir=Path(temp_dir) / "output",
                 cluster_job_config=cluster_job_config,
-                core_type="gpu",
                 seq_per_job=1
             )
             
@@ -282,7 +281,6 @@ class TestAlphafoldClusterJobs:
                 fasta_path=create_fasta_from_sequences(sequences, ["seq1"], output_path=Path(temp_dir) / "test.fasta"),
                 out_dir=Path(temp_dir) / "output", 
                 cluster_job_config=cluster_job_config,
-                core_type="gpu"
             )
             
             # Check that all default res_keywords were applied by examining the submission script
@@ -297,34 +295,6 @@ class TestAlphafoldClusterJobs:
             assert "#SBATCH --job-name=AF2_EnzyHTP" in script_content
             assert "#SBATCH --mem=24G" in script_content
             assert "#SBATCH --time=16:00:00" in script_content
-
-    def test_af2_predict_core_type_cpu(self):
-        """Test af2_predict with CPU core type."""
-        interface = AlphafoldInterface(None, AlphafoldConfig())
-        
-        cluster_job_config = {
-            "cluster": AccreR9(),
-            "res_keywords": {}
-        }
-        
-        sequences = ["MSTPSL"]
-        
-        with tempfile.TemporaryDirectory() as temp_dir:
-            result_eggs = interface.make_job(
-                fasta_path=create_fasta_from_sequences(sequences, ["seq1"], output_path=Path(temp_dir) / "test.fasta"),
-                out_dir=Path(temp_dir) / "output",
-                cluster_job_config=cluster_job_config,
-                core_type="cpu"
-            )
-            
-            # Check CPU-specific defaults were applied by examining the submission script
-            job = result_eggs[0].job
-            script_content = job.sub_script_str
-            
-            assert "#SBATCH --tasks-per-node=6" in script_content
-            assert "#SBATCH --partition=batch" in script_content
-            assert "#SBATCH --mem-per-cpu=4G" in script_content
-            assert "#SBATCH --time=24:00:00" in script_content
 
     def test_af2_predict_env_settings_reflection(self):
         """Test that environment settings properly reflect core_type for cluster jobs."""
@@ -344,7 +314,6 @@ class TestAlphafoldClusterJobs:
                 fasta_path=create_fasta_from_sequences(sequences, ["seq1"], output_path=Path(temp_dir) / "test.fasta"),
                 out_dir=Path(temp_dir) / "output",
                 cluster_job_config=cluster_job_config,
-                core_type="gpu"
             )
             
             # Verify that the environment settings are in the submission script
@@ -355,6 +324,7 @@ class TestAlphafoldClusterJobs:
             assert "source /sb/apps/alphafold232/miniconda3/bin/activate af232" in script_content
             assert "export LD_LIBRARY_PATH=/sb/apps/alphafold232/miniconda3/envs/af232/lib:$LD_LIBRARY_PATH" in script_content
 
+    # TODO make a real test by hand.
     @pytest.mark.slow
     def test_af2_predict_real_cluster_submission(self):
         """Test actual cluster job submission (non-mocked)."""
