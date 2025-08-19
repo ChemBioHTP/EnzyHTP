@@ -1,5 +1,9 @@
 """Driver for the reactive docking functionality available in enzy_htp. The only function that that should be 
 called is dock_reactants(). All others are implementation functions that SHOULD NOT be used. 
+
+Science API:
++ dock_reactants
+
 Author: Chris Jurich <chris.jurich@vanderbilt.edu>
 Date: 2023-07-28
 """
@@ -60,7 +64,67 @@ def dock_reactants(structure: Structure,
                    rosetta_freeze:str=None,
                    local_processes:int=None
                    ) -> None:
-    """
+    """Method to place Ligands into a protein active site while satisyfing a specified, reactive conformation. Consists of two main steps: i. docking and ii. QM/MM optimization. Note that
+	the supplied structure must have all ligands already present, and the final structure is created inplace. This method supports parallelization using either ARMer or local parallelization
+ 	using multiple processes. Note that for the QM compoenents to work, all non-amino acid entities must have valid charges and spins. 
+
+ 	Args:
+  		structure: Structure object on which to perform reactive docking.
+		ligands: List[Ligand] of ligands to be docked. Docked in list order.
+  		dock_csts: A List[StructureConstraint] to be enforced during docking. Optional. 
+		mm_csts: A List[StructureConstraint] to be enforced during MM component of QM/MM optimization. Optional.
+  		qm_csts: A List[StructureConstraint] to be enforced ruring QM component of QM/MM optimization. Optional. 
+		use_qm: Should QM be used during the reactive docking process? Default to True. 
+  		update_qm_csts: Should the constraints used during the QM/MM optimization be updated to values measured after the docking step? Defaults to False.
+		extra_qm_no_csts: Should we perform an extra QM optimization without constraints after the QM/MM optimization? Defaults to False.
+  		dock_opts: A Dict of docking options to be used during the docking step. Optional. 
+		qm_sele: A PyMOL-formatted sele for the QM region. Optional.
+  		qm_freeze_sele: A PyMOL-formatted sele specifying which atoms should be frozen during the QM/MM optimization. Optional. 
+		work_dir: Directory where all temp files should be stored. Optional.
+  		save_work_dir: Should temporary files be saved after the reactive docking run conclucdes? Defaults to True. 
+		save_snapshots: Should snapshots be saved after each major step of the protocol? Defaults to True. Files are saved in ./snapshots/ directory.
+  		cpu_config: ARMer formatted cpu config to parrallelize docking step. Optional. 
+		qm_config: ARMer formatted cpu config to perform QM optimization on the cluster. Optional. 
+  		local_parallel: Should the protocol be performed in a parallel fashion but using local (non-ARMer) resources? Defaults to False.
+		rosetta_freeze: Residues which should be frozen during Rosetta (docking+MM minimization) steps. Format is <resi><chain>.<resi><chain>.... format. Optional.
+  		local_proccesses: Number of local processses to account for if local_parallel is True. Optional.
+
+	Returns:
+ 		Nothing. The final docked structure is overwritten in place to the supplied structure. 
+
+	Example:
+ 			dock_opts={
+    			'n_struct':30,
+    			'clash_cutoff':40,
+    			'min_fr_repeats':3,
+    			'cst_energy':750.0,
+    			'move_distance':5.0,
+    			'transform_repeats':5,
+    			'transform_cycles':2000,
+    			'chunk_size':20
+			}
+
+            qm_sele="byres ((not elem H) within 7 of chain Z) or chain Y+Z"
+            qm_freeze_sele=f"(all beyond 7 of chain Z ) or (chain A and resi 101+99)"# or (chain Y and elem O)"
+            stru:Structure
+			constraints:List[StructureConstraint]
+            stru.assign_ncaa_chargespin({stru.get('Z.1').name:(0,1)})
+            
+			dock_reactants( stru,
+                            ligands=[stru.get('Z.1')], 
+                            rosetta_freeze="99A",
+                            dock_csts=constraints[0:4],
+                            mm_csts=constraints[0:4],
+                            qm_csts=[constraints[0]],
+                            use_qm=True,
+                            dock_opts=dock_opts,
+                            qm_sele=qm_sele,
+                            qm_freeze_sele=qm_freeze_sele,
+                            update_qm_csts=False,
+                            extra_qm_no_csts=False,
+                            local_parallel=True,
+                            local_processes=8
+							)
     """
     if work_dir is None:
         work_dir = config["system.SCRATCH_DIR"]
