@@ -318,7 +318,6 @@ class AlphafoldInterface(BaseInterface):
         out_dir.mkdir(exist_ok=True)
         
         # Parse FASTA to get sequences
-        from enzy_htp.chemical.sequence import parse_fasta_file
         fasta_sequences = parse_fasta_file(fasta_path)
         
         # Create individual jobs for array execution
@@ -362,15 +361,14 @@ class AlphafoldInterface(BaseInterface):
             if isinstance(cluster_job_config, dict):
                 job_config = ClusterJobConfig.from_dict(cluster_job_config)
             else:
-                job_config = cluster_job_config or ClusterJobConfig()
+                job_config = cluster_job_config
             
             # Use ClusterJob.config_job to create the job properly
             if not job_config.has_cluster():
-                # For testing/local execution, skip cluster creation
-                # In real usage, user should provide cluster in job_config
                 raise ValueError("cluster_job_config must specify a cluster for job execution")
             
             if not job_config.has_res_keywords():
+                _LOGGER.warning("No resource keywords specified in cluster job config, using empty dict")
                 job_config.res_keywords = {}
             
             job = ClusterJob.config_job(
