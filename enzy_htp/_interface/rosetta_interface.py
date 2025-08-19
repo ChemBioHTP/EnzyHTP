@@ -100,7 +100,7 @@ class RosettaOptions:
         """Updates the script variables, adding a new (key, value) pair."""
         self.script_vars_[key] = value 
 
-    def get_script_variable(self, key:stry) -> Any:
+    def get_script_variable(self, key:str) -> Any:
         """Returns whatever value is stored for a given script variable key."""
         return self.script_vars_[key]
 
