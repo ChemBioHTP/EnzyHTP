@@ -6,7 +6,8 @@ Date: 2025-08-16
 """
 from __future__ import annotations
 import os
-from typing import List
+from typing import List, Dict
+from copy import deepcopy
 from enzy_htp.core.general import get_str_for_print_class_var
 from enzy_htp.core.logger import _LOGGER
 
@@ -83,6 +84,35 @@ class AlphafoldConfig(BaseConfig):
     
     WORK_DIR: str = "./alphafold2_predictions"
     """Default working directory for predictions."""
+
+    # Default resource settings for cluster jobs
+    DEFAULT_AF2_CLUSTER_JOB_RES_KEYWORDS = {
+        "gpu": {
+            'core_type': 'gpu',
+            'nodes': '1',
+            'node_cores': 'nvidia_rtx_a4000:1',
+            'job_name': 'AF2_EnzyHTP',
+            'partition': '<fillthis>',
+            'account': '<fillthis>',
+            'mem_per_core': '24G',
+            'walltime': '24:00:00',
+        },
+        "cpu": {
+            'core_type': 'cpu',
+            'nodes': '1',
+            'node_cores': '24',
+            'job_name': 'AF2_EnzyHTP',
+            'partition': '<fillthis>',
+            'account': '<fillthis>',
+            'mem_per_core': '2G',
+            'walltime': '24:00:00',
+        }
+    }
+    """Default res_keywords for AlphaFold2 cluster jobs."""
+
+    def get_default_af2_cluster_job_res_keywords(self, key: str) -> Dict:
+        """Get default resource keywords for AF2 cluster jobs."""
+        return deepcopy(self.DEFAULT_AF2_CLUSTER_JOB_RES_KEYWORDS[key])
 
     def required_executables(self) -> List[str]:
         """A hardcoded list of required executables for Alphafold."""

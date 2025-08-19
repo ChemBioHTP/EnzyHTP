@@ -7,7 +7,8 @@ from __future__ import annotations
 import tempfile
 import os
 import re
-from typing import Union, List, Optional, Dict, Tuple
+import copy
+from typing import Union, List, Optional, Dict
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -71,6 +72,7 @@ class AlphafoldInterface(BaseInterface):
         out_dir: Union[str, Path, None] = None,
         # cluster job related
         cluster_job_config: Optional[Union[ClusterJobConfig, Dict]] = None,
+        core_type: str = "gpu",
         array_size: int = 0,
         job_check_period: int = 30,
         seq_per_job: int = 1,
@@ -92,6 +94,7 @@ class AlphafoldInterface(BaseInterface):
             sequences: List of amino acid sequences to predict
             out_dir: Output directory for results. If None, creates temporary directory.
             cluster_job_config: Configuration for cluster job submission
+            core_type: Type of computing core ('gpu' or 'cpu') for cluster jobs
             array_size: Number of jobs to run simultaneously (for cluster submission)
             job_check_period: Time cycle for job state checking (seconds)
             seq_per_job: Number of sequences per job (for array execution)
@@ -104,7 +107,6 @@ class AlphafoldInterface(BaseInterface):
             model_preset: Model preset configuration
             db_preset: Database preset
             additional_options: Additional command-line options
-            **kwargs: Additional arguments
             
         Returns:
             Dict mapping sequence identifiers to Structure objects
@@ -361,19 +363,20 @@ class AlphafoldInterface(BaseInterface):
             if isinstance(cluster_job_config, dict):
                 job_config = ClusterJobConfig.from_dict(cluster_job_config)
             else:
-                job_config = cluster_job_config
+                job_config = copy.deepcopy(cluster_job_config)
             
             # Use ClusterJob.config_job to create the job properly
             if not job_config.has_cluster():
                 raise ValueError("cluster_job_config must specify a cluster for job execution")
+            core_type = job_config.core_type if job_config.core_type else "gpu"
             
-            if not job_config.has_res_keywords():
-                _LOGGER.warning("No resource keywords specified in cluster job config, using empty dict")
-                job_config.res_keywords = {}
+            # Handle default res_keywords similar to amber_interface
+            res_keywords_update = job_config.res_keywords if job_config.has_res_keywords() else {}
+            default_res_keywords = self.config_.get_default_af2_cluster_job_res_keywords(core_type)
+            job_config.res_keywords = default_res_keywords | res_keywords_update
             
             # Set up environment settings based on cluster and core type
             cluster = job_config.cluster
-            core_type = job_config.core_type
             env_settings = cluster.AF2_ENV[core_type.upper()]
             
             # Create submission script path
@@ -527,6 +530,14 @@ class AlphafoldInterface(BaseInterface):
         cmd.extend(["--output_dir", str(out_dir)])
         cmd.extend(["--data_dir", config.DATA_DIR])
         cmd.extend(["--max_template_date", "9999-12-31"])
+        
+        # Add AlphaFold2-specific parameters (note: not all parameters from ColabFold are supported)
+        if model_preset:
+            cmd.extend(["--model_preset", model_preset])
+        
+        # Note: num_models, num_recycles, num_relax, relax_max_iteration, use_templates
+        # are not directly supported by native AlphaFold2 run_alphafold.py
+        # These are typically configured in the model preset or configuration files
         
         # Add all database paths required by AlphaFold
         if hasattr(config, 'UNIREF90_DATABASE_PATH') and config.UNIREF90_DATABASE_PATH:
