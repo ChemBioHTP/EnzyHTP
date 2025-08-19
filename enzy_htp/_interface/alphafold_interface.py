@@ -371,12 +371,22 @@ class AlphafoldInterface(BaseInterface):
                 _LOGGER.warning("No resource keywords specified in cluster job config, using empty dict")
                 job_config.res_keywords = {}
             
+            # Set up environment settings based on cluster and core type
+            cluster = job_config.cluster
+            core_type = job_config.core_type
+            env_settings = cluster.AF2_ENV[core_type.upper()]
+            
+            # Create submission script path
+            sub_script_path = out_dir / f"submit_alphafold_{i//seq_per_job}.cmd"
+            sub_script_path = fs.get_valid_temp_name(str(sub_script_path))
+            
             job = ClusterJob.config_job(
                 commands=' '.join(cmd),
-                cluster=job_config.cluster,
-                env_settings=[],
+                cluster=cluster,
+                env_settings=env_settings,
                 res_keywords=job_config.res_keywords,
-                sub_dir=str(out_dir)
+                sub_dir="./",  # Use current dir for submission since paths are absolute
+                sub_script_path=sub_script_path,
             )
             
             # Create result egg for this single job
@@ -509,32 +519,43 @@ class AlphafoldInterface(BaseInterface):
         model_preset: str,
         additional_options: Optional[List[str]]
     ) -> List[str]:
-        """Build command for AlphaFold2 Python execution."""
+        """Build command for AlphaFold2 native Python execution."""
         config = self.config_
         
-        cmd = [config.EXECUTABLE_PATH]
-        cmd.extend([fasta_path, str(out_dir)])
+        cmd = ["python", config.EXECUTABLE_PATH]
+        cmd.extend(["--fasta_paths", fasta_path])
+        cmd.extend(["--output_dir", str(out_dir)])
+        cmd.extend(["--data_dir", config.DATA_DIR])
+        cmd.extend(["--max_template_date", "9999-12-31"])
         
-        # Add options
-        cmd.extend(["--num-models", str(num_models)])
-        cmd.extend(["--num-recycle", str(num_recycles)])
+        # Add all database paths required by AlphaFold
+        if hasattr(config, 'UNIREF90_DATABASE_PATH') and config.UNIREF90_DATABASE_PATH:
+            cmd.extend(["--uniref90_database_path", config.UNIREF90_DATABASE_PATH])
         
-        if use_templates:
-            cmd.append("--templates")
+        if hasattr(config, 'MGNIFY_DATABASE_PATH') and config.MGNIFY_DATABASE_PATH:
+            cmd.extend(["--mgnify_database_path", config.MGNIFY_DATABASE_PATH])
+            
+        if hasattr(config, 'UNIREF30_DATABASE_PATH') and config.UNIREF30_DATABASE_PATH:
+            cmd.extend(["--uniref30_database_path", config.UNIREF30_DATABASE_PATH])
+            
+        if hasattr(config, 'BFD_DATABASE_PATH') and config.BFD_DATABASE_PATH:
+            cmd.extend(["--bfd_database_path", config.BFD_DATABASE_PATH])
+            
+        if hasattr(config, 'TEMPLATE_MMCIF_DIR') and config.TEMPLATE_MMCIF_DIR:
+            cmd.extend(["--template_mmcif_dir", config.TEMPLATE_MMCIF_DIR])
+            
+        if hasattr(config, 'PDB_SEQRES_DATABASE_PATH') and config.PDB_SEQRES_DATABASE_PATH:
+            cmd.extend(["--pdb_seqres_database_path", config.PDB_SEQRES_DATABASE_PATH])
+            
+        if hasattr(config, 'OBSOLETE_PDBS_PATH') and config.OBSOLETE_PDBS_PATH:
+            cmd.extend(["--obsolete_pdbs_path", config.OBSOLETE_PDBS_PATH])
+            
+        if hasattr(config, 'UNIPROT_DATABASE_PATH') and config.UNIPROT_DATABASE_PATH:
+            cmd.extend(["--uniprot_database_path", config.UNIPROT_DATABASE_PATH])
         
-        if model_preset:
-            # Map AlphaFold model names to ColabFold names
-            colabfold_model_map = {
-                "monomer": "alphafold2",
-                "monomer_ptm": "alphafold2_ptm",
-                "multimer": "alphafold2_multimer_v3"
-            }
-            mapped_preset = colabfold_model_map.get(model_preset, model_preset)
-            cmd.extend(["--model-type", mapped_preset])
-        
-        if num_relax > 0:
-            cmd.extend(["--amber", "--num-relax", str(num_relax)])
-            cmd.extend(["--relax-max-iterations", str(relax_max_iteration)])
+        # Add GPU relax option
+        if hasattr(config, 'USE_GPU_RELAX') and config.USE_GPU_RELAX:
+            cmd.append("--use_gpu_relax")
         
         if additional_options:
             cmd.extend(additional_options)
@@ -622,6 +643,14 @@ class AlphafoldInterface(BaseInterface):
         # Look for patterns like rank_001, rank_002, etc.
         return min(candidates, key=self._get_rank)
 
-    def _get_rank(self, filename):
+    def _get_rank(self, filename: str) -> int:
+        """Extract rank number from filename for sorting purposes.
+        
+        Args:
+            filename: Filename containing rank information (e.g., 'seq_0_rank_001_model_1.pdb')
+            
+        Returns:
+            Rank number if found, otherwise 999 (for consistent sorting behavior)
+        """
         match = re.search(r'rank_(\d+)', filename)
         return int(match.group(1)) if match else 999  # Lower rank number is better

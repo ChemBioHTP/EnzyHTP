@@ -36,7 +36,7 @@ def predict_structure(
     # Parse input sequences
     parsed_sequences = _parse_sequences_input(sequences)
     
-    return PREDICTION_ENGINES[engine](parsed_sequences, cluster_job_config, **kwargs)
+    return PREDICTION_ENGINES[engine](parsed_sequences, cluster_job_config=cluster_job_config, **kwargs)
 
 def _parse_sequences_input(sequences: Union[str, list[str], Path]) -> list[str]:
     """Parse sequence input from various formats.

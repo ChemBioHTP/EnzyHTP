@@ -70,6 +70,14 @@ export PATH=$PATH:$Multiwfnpath"""
         "parallel_CPU" : """module load gcc/11.3.0 openmpi/4.1.4
 export ROSETTA3=/data/yang_lab/shaoqz/software/Rosetta313/main/""",
     }
+
+    AF2_ENV = {
+        "GPU": """source /sb/apps/alphafold232/miniconda3/bin/activate af232
+export LD_LIBRARY_PATH=/sb/apps/alphafold232/miniconda3/envs/af232/lib:$LD_LIBRARY_PATH""",
+        "CPU": """source /sb/apps/alphafold232/miniconda3/bin/activate af232
+export LD_LIBRARY_PATH=/sb/apps/alphafold232/miniconda3/envs/af232/lib:$LD_LIBRARY_PATH""",
+    }
+
     ENZYHTP_MAIN_ENV = { # use the env from QZ
         "CPU": f"""source /home/shaoq1/bin/miniconda3/bin/activate new_EnzyHTP
 {G16_ENV['CPU']["head"]}

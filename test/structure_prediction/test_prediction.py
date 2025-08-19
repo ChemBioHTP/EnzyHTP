@@ -1,6 +1,6 @@
 """Test module for enzy_htp.structure_prediction.prediction
 
-Author: Gemini
+Author: QZ Shao <shaoqz@icloud.com>
 Date: 2025-08-16
 """
 import pytest
@@ -39,7 +39,7 @@ def test_predict_structure_single_sequence(mock_engines):
     assert isinstance(result, dict)
     assert sequence in result
     assert result[sequence] == mock_structure
-    mock_af2_predict.assert_called_once_with([sequence], None)
+    mock_af2_predict.assert_called_once_with([sequence], cluster_job_config=None)
 
 
 @patch('enzy_htp.structure_prediction.prediction.PREDICTION_ENGINES')
@@ -63,7 +63,7 @@ def test_predict_structure_multiple_sequences(mock_engines):
     assert len(result) == 2
     assert sequences[0] in result
     assert sequences[1] in result
-    mock_af2_predict.assert_called_once_with(sequences, None)
+    mock_af2_predict.assert_called_once_with(sequences, cluster_job_config=None)
 
 
 @patch('enzy_htp.structure_prediction.prediction.PREDICTION_ENGINES')
@@ -82,7 +82,7 @@ def test_predict_structure_with_cluster_job_config(mock_engines):
     
     # Assert
     assert isinstance(result, dict)
-    mock_af2_predict.assert_called_once_with([sequence], cluster_config)
+    mock_af2_predict.assert_called_once_with([sequence], cluster_job_config=cluster_config)
 
 
 @patch('enzy_htp.structure_prediction.prediction.PREDICTION_ENGINES')
@@ -106,7 +106,7 @@ def test_predict_structure_with_kwargs(mock_engines):
     # Assert
     assert isinstance(result, dict)
     mock_af2_predict.assert_called_once_with(
-        [sequence], None, num_models=3, num_recycles=5
+        [sequence], cluster_job_config=None, num_models=3, num_recycles=5
     )
 
 
@@ -135,7 +135,7 @@ def test_predict_structure_with_fasta_file(mock_parse_input, mock_engines):
     assert isinstance(result, dict)
     assert len(result) == 2
     mock_parse_input.assert_called_once_with(fasta_file)
-    mock_af2_predict.assert_called_once_with(sequences, None)
+    mock_af2_predict.assert_called_once_with(sequences, cluster_job_config=None)
 
 
 def test_prediction_engines_registry():

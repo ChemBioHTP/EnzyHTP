@@ -49,6 +49,34 @@ class AlphafoldConfig(BaseConfig):
     Required for native AlphaFold2 installations.
     """
     
+    # Database paths for native AlphaFold2 
+    UNIREF90_DATABASE_PATH: str = ""
+    """Path to UniRef90 database."""
+    
+    MGNIFY_DATABASE_PATH: str = ""
+    """Path to MGnify database."""
+    
+    UNIREF30_DATABASE_PATH: str = ""
+    """Path to UniRef30 database."""
+    
+    BFD_DATABASE_PATH: str = ""
+    """Path to BFD database."""
+    
+    TEMPLATE_MMCIF_DIR: str = ""
+    """Path to template mmCIF directory."""
+    
+    PDB_SEQRES_DATABASE_PATH: str = ""
+    """Path to PDB seqres database."""
+    
+    OBSOLETE_PDBS_PATH: str = ""
+    """Path to obsolete PDBs file."""
+    
+    UNIPROT_DATABASE_PATH: str = ""
+    """Path to UniProt database."""
+    
+    USE_GPU_RELAX: bool = True
+    """Whether to use GPU for relaxation."""
+    
     # Common configuration
     CACHE_DIR: str = "~/bin/colabfold/cache"
     """Path to cache directory for MSA and model downloads."""
